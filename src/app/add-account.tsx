@@ -16,8 +16,15 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Title } from '@/components/ui/typography';
+import { useCreateBankAccount, useCreateSalarySource } from '@/api/mutations';
 import { ACCOUNT_TYPES, type AccountType } from '@/data/accounts-mock';
-import { PAY_FREQUENCIES, formatFullDate, getNextPayday, type PayFrequency } from '@/lib/date';
+import {
+  PAY_FREQUENCIES,
+  formatFullDate,
+  getNextPayday,
+  toIsoDate,
+  type PayFrequency,
+} from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
 
@@ -48,7 +55,46 @@ export default function AddAccountScreen() {
   const nextPayday = lastPayday ? getNextPayday(lastPayday, payFrequency) : null;
 
   // Saving waits on the data layer; this only closes the screen.
-  const handleSave = () => router.back();
+  const [error, setError] = useState<string | null>(null);
+
+  const createAccount = useCreateBankAccount();
+  const createSalary = useCreateSalarySource();
+
+  const handleSave = async () => {
+    setError(null);
+    if (!bankName.trim()) {
+      setError('Enter the bank name.');
+      return;
+    }
+
+    try {
+      await createAccount.mutateAsync({
+        bank_name: bankName.trim(),
+        nickname: nickname.trim() || null,
+        // The picker shows "Checking"; the column is a lowercase enum.
+        account_type: accountType.toLowerCase() as 'checking' | 'savings',
+        last4: last4.length === 4 ? last4 : null,
+        color,
+        balance: Number(balance) || 0,
+      });
+
+      // Income entered here is a salary source in its own right, so it is
+      // saved as one rather than being dropped with the rest of the screen.
+      const pay = Number(income);
+      if (Number.isFinite(pay) && pay > 0) {
+        await createSalary.mutateAsync({
+          name: nickname.trim() || bankName.trim(),
+          amount: pay,
+          frequency: payFrequency,
+          last_payday: lastPayday ? toIsoDate(lastPayday) : null,
+        });
+      }
+
+      router.back();
+    } catch (thrown) {
+      setError((thrown as Error).message ?? 'Could not save that account.');
+    }
+  };
 
   return (
     <Screen showBack avoidKeyboard>
@@ -163,8 +209,17 @@ export default function AddAccountScreen() {
         </CollapsibleSection>
       </View>
 
+      {error ? (
+        <Text
+          className="mt-6 w-full text-center font-poppins text-[13px] text-red-600"
+          maxFontSizeMultiplier={1.4}
+        >
+          {error}
+        </Text>
+      ) : null}
+
       <View className="mt-auto w-full pt-10">
-        <Button label="Add account" onPress={handleSave} />
+        <Button label={createAccount.isPending ? 'Saving…' : 'Add account'} onPress={handleSave} />
       </View>
 
       {datePickerOpen ? (

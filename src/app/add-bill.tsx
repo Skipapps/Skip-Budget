@@ -3,6 +3,8 @@ import { Calculator, Calendar, ChevronLeft } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { useCreateBill } from '@/api/mutations';
+import { usePaymentSources } from '@/api/queries';
 import { CategoryPicker } from '@/components/bills/category-picker';
 import { IconPicker } from '@/components/bills/icon-picker';
 import { AmountPad } from '@/components/ui/amount-pad';
@@ -21,9 +23,8 @@ import {
   type BillCategory,
   type Recurrence,
 } from '@/data/bills-mock';
-import { formatFullDate } from '@/lib/date';
+import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { PAYMENT_SOURCES } from '@/lib/sources';
 import { colors } from '@/theme/colors';
 
 const CATEGORY_OPTIONS = BILL_CATEGORIES.map((category) => ({
@@ -79,7 +80,49 @@ export default function AddBillScreen() {
   };
 
   // Saving waits on the data layer; this only closes the screen.
-  const handleSave = () => router.back();
+  const [error, setError] = useState<string | null>(null);
+
+  const { sources } = usePaymentSources();
+  const createBill = useCreateBill();
+
+  const handleSave = async () => {
+    setError(null);
+    if (!name.trim()) {
+      setError('Give the bill a name.');
+      return;
+    }
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) {
+      setError('Enter how much it costs.');
+      return;
+    }
+
+    const chosen = sources.find((source) => source.id === sourceId);
+    // "Specific period" is a recurrence in the UI but a date range in the
+    // database, where the recurrence column carries 'period'.
+    const isPeriod = recurrence === PERIOD;
+
+    try {
+      await createBill.mutateAsync({
+        name: name.trim(),
+        amount: value,
+        category_id: categoryId,
+        icon_id: iconId || null,
+        recurrence: isPeriod
+          ? 'period'
+          : (recurrence as 'weekly' | 'monthly' | 'quarterly' | 'yearly'),
+        next_due_on: startDate ? toIsoDate(startDate) : null,
+        starts_on: startDate ? toIsoDate(startDate) : null,
+        ends_on: endDate ? toIsoDate(endDate) : null,
+        card_id: chosen?.kind === 'card' ? chosen.id : null,
+        bank_account_id: chosen?.kind === 'account' ? chosen.id : null,
+        note: note.trim() || null,
+      });
+      router.back();
+    } catch (thrown) {
+      setError((thrown as Error).message ?? 'Could not save that bill.');
+    }
+  };
 
   if (step === 'category') {
     return (
@@ -191,7 +234,7 @@ export default function AddBillScreen() {
 
         <View className="w-full">
           <FieldLabel className="mb-2">Paid with</FieldLabel>
-          <SourceTiles sources={PAYMENT_SOURCES} value={sourceId} onChange={setSourceId} />
+          <SourceTiles sources={sources} value={sourceId} onChange={setSourceId} />
         </View>
 
         <TextField
@@ -206,8 +249,17 @@ export default function AddBillScreen() {
         />
       </View>
 
+      {error ? (
+        <Text
+          className="mt-6 w-full text-center font-poppins text-[13px] text-red-600"
+          maxFontSizeMultiplier={1.4}
+        >
+          {error}
+        </Text>
+      ) : null}
+
       <View className="mt-auto w-full pt-10">
-        <Button label="Save bill" onPress={handleSave} />
+        <Button label={createBill.isPending ? 'Saving…' : 'Save bill'} onPress={handleSave} />
       </View>
 
       {datePicker ? (

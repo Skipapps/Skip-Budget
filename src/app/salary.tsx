@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Calculator, Plus, Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
@@ -12,16 +12,17 @@ import { Screen } from '@/components/ui/screen';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
-import { accounts } from '@/data/accounts-mock';
-import { salarySources, type SalarySource } from '@/data/salary-mock';
+import {
+  useCreateSalarySource,
+  useDeleteSalarySource,
+  useSetSalaryAccounts,
+  useUpdateSalarySource,
+} from '@/api/mutations';
+import { useBankAccounts, useSalarySources } from '@/api/queries';
+import { type SalarySource } from '@/data/salary-mock';
 import { PAY_FREQUENCIES, type PayFrequency } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { colors } from '@/theme/colors';
-
-const ACCOUNT_OPTIONS = accounts.map((account) => ({
-  value: account.id,
-  label: `${account.bankName} ••${account.last4}`,
-}));
 
 /** Normalised to monthly so sources on different cycles can be summed. */
 const PER_MONTH: Record<PayFrequency, number> = {
@@ -33,11 +34,60 @@ const PER_MONTH: Record<PayFrequency, number> = {
 
 type PadTarget = { sourceId: string; mode: 'pad' | 'calculator' } | null;
 
+/**
+ * Loads what exists, then hands it to the editor as initial state.
+ *
+ * Keyed on the row count so the editor remounts once the data lands — the same
+ * reason the receipt form does it: seeding state from a query inside an effect
+ * fights the user's own edits when a refetch arrives mid-typing.
+ */
 export default function SalaryScreen() {
-  const [sources, setSources] = useState<SalarySource[]>(salarySources);
+  const { data: saved = [], isLoading } = useSalarySources();
+
+  if (isLoading) {
+    return (
+      <Screen showBack>
+        <Title className="mt-2">Salary</Title>
+        <View className="mt-16 w-full items-center">
+          <ActivityIndicator size="small" color={colors.muted} />
+        </View>
+      </Screen>
+    );
+  }
+
+  const initial: SalarySource[] = saved.map((row) => ({
+    id: row.id,
+    name: row.name,
+    amount: row.amount,
+    frequency: row.frequency,
+    accountIds: [],
+  }));
+
+  return <SalaryEditor key={saved.map((row) => row.id).join('|') || 'empty'} initial={initial} />;
+}
+
+function SalaryEditor({ initial }: { initial: SalarySource[] }) {
+  const [sources, setSources] = useState<SalarySource[]>(initial);
   const [padTarget, setPadTarget] = useState<PadTarget>(null);
+  const [error, setError] = useState<string | null>(null);
   // Monotonic so ids stay unique even after sources are removed.
-  const nextId = useRef(salarySources.length + 1);
+  const nextId = useRef(initial.length + 1);
+  // Ids that exist in the database; anything else on screen is new, and
+  // anything here but no longer on screen has been removed.
+  const savedIds = useRef(new Set(initial.map((source) => source.id)));
+
+  const { data: accounts = [] } = useBankAccounts();
+  const accountOptions = accounts.map((account) => ({
+    value: account.id,
+    label: account.last4
+      ? `${account.nickname || account.bank_name} ••${account.last4}`
+      : account.nickname || account.bank_name,
+  }));
+
+  const createSource = useCreateSalarySource();
+  const updateSource = useUpdateSalarySource();
+  const deleteSource = useDeleteSalarySource();
+  const setAccounts = useSetSalaryAccounts();
 
   const monthlyTotal = sources.reduce(
     (sum, source) => sum + source.amount * PER_MONTH[source.frequency],
@@ -69,8 +119,41 @@ export default function SalaryScreen() {
 
   const activeSource = sources.find((source) => source.id === padTarget?.sourceId);
 
-  // Saving waits on the data layer; this only closes the screen.
-  const handleSave = () => router.back();
+  const handleSave = async () => {
+    setError(null);
+    const named = sources.filter((source) => source.name.trim() && source.amount > 0);
+    if (sources.length > 0 && named.length === 0) {
+      setError('Give each source a name and an amount.');
+      return;
+    }
+
+    try {
+      // Removed first, so a delete plus a re-add of the same name cannot
+      // collide on the way through.
+      const stillPresent = new Set(named.map((source) => source.id));
+      for (const id of savedIds.current) {
+        if (!stillPresent.has(id)) await deleteSource.mutateAsync(id);
+      }
+
+      for (const source of named) {
+        const values = {
+          name: source.name.trim(),
+          amount: source.amount,
+          frequency: source.frequency,
+          last_payday: null,
+        };
+        const id = savedIds.current.has(source.id)
+          ? (await updateSource.mutateAsync({ id: source.id, values }), source.id)
+          : (await createSource.mutateAsync(values)).id;
+
+        await setAccounts.mutateAsync({ salaryId: id, accountIds: source.accountIds });
+      }
+
+      router.back();
+    } catch (thrown) {
+      setError((thrown as Error).message ?? 'Could not save your income.');
+    }
+  };
 
   return (
     <Screen showBack avoidKeyboard>
@@ -146,7 +229,7 @@ export default function SalaryScreen() {
               <View className="w-full">
                 <FieldLabel className="mb-2">Paid into</FieldLabel>
                 <MultiChoiceChips
-                  options={ACCOUNT_OPTIONS}
+                  options={accountOptions}
                   values={source.accountIds}
                   onChange={(accountIds) => update(source.id, { accountIds })}
                   emptyHint="Link at least one account so Skip knows where this lands."
@@ -170,7 +253,15 @@ export default function SalaryScreen() {
       </Pressable>
 
       <View className="mt-auto w-full pt-10">
-        <Button label="Save" onPress={handleSave} />
+        {error ? (
+          <Text
+            className="mb-3 w-full text-center font-poppins text-[13px] text-red-600"
+            maxFontSizeMultiplier={1.4}
+          >
+            {error}
+          </Text>
+        ) : null}
+        <Button label={createSource.isPending ? 'Saving…' : 'Save'} onPress={handleSave} />
       </View>
 
       {padTarget && activeSource ? (

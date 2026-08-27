@@ -178,3 +178,35 @@ export type SubscriptionValues = {
 export const useCreateSubscription = () => useCreate<SubscriptionValues>('subscriptions');
 export const useUpdateSubscription = () => useUpdate<Partial<SubscriptionValues>>('subscriptions');
 export const useDeleteSubscription = () => useRemove('subscriptions');
+
+/**
+ * Replaces which accounts a salary source is paid into.
+ *
+ * The screen offers a multi-select, so this is a set operation rather than an
+ * insert: delete what is there, write what was chosen. Without it the account
+ * chips would look like they saved and quietly do nothing.
+ */
+export function useSetSalaryAccounts() {
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async ({ salaryId, accountIds }: { salaryId: string; accountIds: string[] }) => {
+      const { error: clearError } = await supabase
+        .from('salary_source_accounts')
+        .delete()
+        .eq('salary_source_id', salaryId);
+      if (clearError) throw clearError;
+
+      if (accountIds.length === 0) return { salaryId };
+
+      const rows = accountIds.map((bankAccountId) => ({
+        salary_source_id: salaryId,
+        bank_account_id: bankAccountId,
+      }));
+      const { error } = await supabase.from('salary_source_accounts').insert(rows as never);
+      if (error) throw error;
+      return { salaryId };
+    },
+    onSuccess: () => invalidate('salary_sources'),
+  });
+}

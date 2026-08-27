@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import { Calendar, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 
+import { useCreateCard } from '@/api/mutations';
 import { NetworkPicker } from '@/components/cards/network-picker';
 import { PaymentCard } from '@/components/cards/payment-card';
 import { Button } from '@/components/ui/button';
@@ -44,9 +45,33 @@ export default function AddCardScreen() {
 
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [amountPadOpen, setAmountPadOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Saving waits on the data layer; this only closes the screen.
-  const handleSave = () => router.back();
+  const createCard = useCreateCard();
+
+  const handleSave = async () => {
+    setError(null);
+    if (!name.trim()) {
+      setError('Give the card a name so you can tell it apart.');
+      return;
+    }
+
+    try {
+      await createCard.mutateAsync({
+        holder: name.trim(),
+        network,
+        last4: last4.length === 4 ? last4 : null,
+        color,
+        balance: Number(balance) || 0,
+        // The bill day is what recurs, not the specific date picked.
+        bill_due_day: dueDate ? dueDate.getDate() : null,
+        reminder_days: reminder === 'off' ? null : Number(reminder),
+      });
+      router.back();
+    } catch (thrown) {
+      setError((thrown as Error).message ?? 'Could not save that card.');
+    }
+  };
 
   return (
     <Screen showBack avoidKeyboard>
@@ -131,8 +156,17 @@ export default function AddCardScreen() {
         </CollapsibleSection>
       </View>
 
+      {error ? (
+        <Text
+          className="mt-6 w-full text-center font-poppins text-[13px] text-red-600"
+          maxFontSizeMultiplier={1.4}
+        >
+          {error}
+        </Text>
+      ) : null}
+
       <View className="mt-auto w-full pt-10">
-        <Button label="Add card" onPress={handleSave} />
+        <Button label={createCard.isPending ? 'Saving…' : 'Add card'} onPress={handleSave} />
       </View>
 
       {datePickerOpen ? (
