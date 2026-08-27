@@ -1,0 +1,180 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+import { supabase } from '@/lib/supabase';
+import { useUserId } from '@/providers/session-provider';
+
+/**
+ * Every write in the app.
+ *
+ * RLS scopes reads by auth.uid(), but inserts still send user_id explicitly:
+ * the with-check policy compares the incoming row to auth.uid(), and the
+ * column has no default, so a row without it is rejected rather than silently
+ * attributed to nobody.
+ *
+ * Updates and deletes filter on id alone — RLS refuses to touch a row owned by
+ * anyone else, so repeating the owner check here would be noise.
+ */
+
+/** Tables whose totals feed the dashboard, so a write there refreshes it too. */
+const AFFECTS_DASHBOARD = new Set(['bills', 'receipts', 'subscriptions', 'salary_sources']);
+
+function useInvalidate() {
+  const client = useQueryClient();
+  return (table: string) => {
+    client.invalidateQueries({ queryKey: [table] });
+    if (AFFECTS_DASHBOARD.has(table)) {
+      client.invalidateQueries({ queryKey: ['dashboard'] });
+    }
+  };
+}
+
+function useCreate<TInput extends Record<string, unknown>>(table: string) {
+  const userId = useUserId();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (values: TInput) => {
+      if (!userId) throw new Error('Sign in first.');
+      // The client has no generated Database types, so supabase-js cannot
+      // narrow a generic payload against a known row shape. The cast buys one
+      // shared helper instead of a near-identical hook per table; the per-table
+      // Values types above are what actually keep call sites honest.
+      const payload = { ...values, user_id: userId } as never;
+      const { data, error } = await supabase.from(table).insert(payload).select('id').single();
+      if (error) throw error;
+      return data as { id: string };
+    },
+    onSuccess: () => invalidate(table),
+  });
+}
+
+function useUpdate<TInput extends Record<string, unknown>>(table: string) {
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async ({ id, values }: { id: string; values: TInput }) => {
+      const { error } = await supabase
+        .from(table)
+        .update(values as never)
+        .eq('id', id);
+      if (error) throw error;
+      return { id };
+    },
+    onSuccess: () => invalidate(table),
+  });
+}
+
+function useRemove(table: string) {
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) throw error;
+      return { id };
+    },
+    onSuccess: () => invalidate(table),
+  });
+}
+
+// --- Cards -----------------------------------------------------------------
+
+export type CardValues = {
+  holder: string;
+  network: string;
+  last4: string | null;
+  color: string;
+  balance: number;
+  bill_due_day: number | null;
+  reminder_days: number | null;
+};
+
+export const useCreateCard = () => useCreate<CardValues>('cards');
+export const useUpdateCard = () => useUpdate<Partial<CardValues>>('cards');
+export const useDeleteCard = () => useRemove('cards');
+
+// --- Bank accounts ---------------------------------------------------------
+
+export type BankAccountValues = {
+  bank_name: string;
+  nickname: string | null;
+  account_type: 'checking' | 'savings';
+  last4: string | null;
+  color: string;
+  balance: number;
+};
+
+export const useCreateBankAccount = () => useCreate<BankAccountValues>('bank_accounts');
+export const useUpdateBankAccount = () => useUpdate<Partial<BankAccountValues>>('bank_accounts');
+export const useDeleteBankAccount = () => useRemove('bank_accounts');
+
+// --- Bills -----------------------------------------------------------------
+
+export type BillValues = {
+  name: string;
+  amount: number;
+  category_id: string;
+  icon_id: string | null;
+  recurrence: 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'period';
+  next_due_on: string | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  card_id: string | null;
+  bank_account_id: string | null;
+  note: string | null;
+};
+
+export const useCreateBill = () => useCreate<BillValues>('bills');
+export const useUpdateBill = () => useUpdate<Partial<BillValues>>('bills');
+export const useDeleteBill = () => useRemove('bills');
+
+// --- Salary ----------------------------------------------------------------
+
+export type SalaryValues = {
+  name: string;
+  amount: number;
+  frequency: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+  last_payday: string | null;
+};
+
+export const useCreateSalarySource = () => useCreate<SalaryValues>('salary_sources');
+export const useUpdateSalarySource = () => useUpdate<Partial<SalaryValues>>('salary_sources');
+export const useDeleteSalarySource = () => useRemove('salary_sources');
+
+// --- Receipts --------------------------------------------------------------
+
+export type ReceiptValues = {
+  brand_id: string | null;
+  merchant: string;
+  amount: number;
+  purchased_on: string;
+  category_id: string;
+  card_id: string | null;
+  bank_account_id: string | null;
+  note: string | null;
+  source: 'manual' | 'scan' | 'upload';
+  image_path: string | null;
+};
+
+export const useCreateReceipt = () => useCreate<ReceiptValues>('receipts');
+export const useUpdateReceipt = () => useUpdate<Partial<ReceiptValues>>('receipts');
+export const useDeleteReceipt = () => useRemove('receipts');
+
+// --- Subscriptions ---------------------------------------------------------
+
+export type SubscriptionValues = {
+  brand_id: string | null;
+  name: string;
+  amount: number;
+  cycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  next_renewal_on: string | null;
+  category_id: string;
+  card_id: string | null;
+  bank_account_id: string | null;
+  note: string | null;
+  active: boolean;
+};
+
+export const useCreateSubscription = () => useCreate<SubscriptionValues>('subscriptions');
+export const useUpdateSubscription = () => useUpdate<Partial<SubscriptionValues>>('subscriptions');
+export const useDeleteSubscription = () => useRemove('subscriptions');
