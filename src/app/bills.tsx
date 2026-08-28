@@ -1,252 +1,199 @@
 import { router } from 'expo-router';
-import { SlidersHorizontal } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { ChevronRight, Plus, ReceiptText } from 'lucide-react-native';
+import { Fragment, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import {
-  BillFilterSheet,
-  EMPTY_BILL_FILTERS,
-  countActiveBillFilters,
-  type BillFilters,
-} from '@/components/bills/bill-filter-sheet';
-import { BillRow } from '@/components/bills/bill-row';
-import { ActionPill } from '@/components/ui/action-pill';
-import { Screen } from '@/components/ui/screen';
-import { SearchField } from '@/components/ui/search-field';
+import { useBills, useLedger, usePaymentSources } from '@/api/queries';
+import { TransactionRow } from '@/components/dashboard/transaction-row';
+import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { PageState } from '@/components/ui/page-state';
+import { RangeDropdown } from '@/components/ui/range-dropdown';
+import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Title } from '@/components/ui/typography';
+import { toIsoDate } from '@/lib/date';
+import { formatCurrency } from '@/lib/format';
+import { groupByDate } from '@/lib/group';
+import { rangeFor, type RangeKey } from '@/lib/range';
+import { colors, moneyColor } from '@/theme/colors';
+import { shadows } from '@/theme/shadows';
 
 import EmptyArt from '@/assets/illustrations/state-empty-bills.svg';
 import ErrorArt from '@/assets/illustrations/state-error.svg';
-import NoResultsArt from '@/assets/illustrations/state-no-results.svg';
-import { usePaymentSources, useBills } from '@/api/queries';
-import { billWindow, occurrencesInRange } from '@/lib/card-ledger';
-import { rangeFor } from '@/lib/range';
-import { getBillCategory } from '@/data/bills-mock';
-import { DateGroupHeader } from '@/components/ui/date-group-header';
-import { toIsoDate } from '@/lib/date';
-import { groupByDate } from '@/lib/group';
-import { formatCurrency } from '@/lib/format';
-import { colors } from '@/theme/colors';
 
+/**
+ * What the bills have actually cost, over a window you choose.
+ *
+ * The schedule itself lives one tap away, on its own page. This one answers
+ * the question the app exists for — where the money went — so it lists the
+ * times a bill landed rather than the bills that produce them. A monthly bill
+ * is one line here per month it has run, not one line forever.
+ */
 export default function BillsScreen() {
-  const [queryText, setQuery] = useState('');
-  const [filters, setFilters] = useState<BillFilters>(EMPTY_BILL_FILTERS);
-  const [filterOpen, setFilterOpen] = useState(false);
-
-  const activeCount = countActiveBillFilters(filters);
+  const [rangeKey, setRangeKey] = useState<RangeKey>('month');
   const today = toIsoDate(new Date());
-  const query = useBills();
+  const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
+
+  const plans = useBills();
+  const { entries, isLoading, isError, refetch } = useLedger(range);
   const { sources } = usePaymentSources();
 
-  const sourceOptions = useMemo(
-    () => sources.map((source) => ({ value: source.id, label: source.label })),
-    [sources],
-  );
   const sourceLabels = useMemo(
     () => new Map(sources.map((source) => [source.id, source.label])),
     [sources],
   );
 
-  const monthRange = useMemo(() => rangeFor('month', new Date()), []);
+  const charges = useMemo(() => entries.filter((entry) => entry.kind === 'bill'), [entries]);
+  const total = charges.reduce((sum, entry) => sum + entry.amount, 0);
 
-  // The DB stores positive magnitudes; the UI shows outgoings as negative.
-  const bills = useMemo(
-    () =>
-      (query.data ?? []).map((row) => {
-        /**
-         * The day this bill lands on in the month being looked at.
-         *
-         * Not next_due_on, which is only ever the NEXT one: a bill due on the
-         * 14th reads as next month from the 15th onwards, so for most of any
-         * month the list would be dated a month ahead of the month you are in.
-         * The first occurrence inside this month is the honest answer, and it
-         * matches what the dashboard counts.
-         *
-         * A bill with nothing due this month — quarterly, or not started yet —
-         * keeps its next date, because that is genuinely when it next lands.
-         */
-        const window = billWindow(row, monthRange.from, monthRange.to);
-        const thisMonth =
-          row.next_due_on && (!window.from || window.from <= window.to)
-            ? occurrencesInRange(row.next_due_on, row.recurrence, window.from, window.to)
-            : [];
-
-        return {
-          id: row.id,
-          name: row.name,
-          amount: -row.amount,
-          // Newest first out of the walk, so the last entry is the month's first.
-          dueDate: thisMonth[thisMonth.length - 1] ?? row.next_due_on ?? '',
-          recurrence: row.recurrence,
-          categoryId: row.category_id,
-          iconId: row.icon_id ?? undefined,
-          sourceId: row.card_id ?? row.bank_account_id ?? '',
-        };
-      }),
-    [query.data, monthRange],
-  );
-
-  const visible = useMemo(() => {
-    const needle = queryText.trim().toLowerCase();
-
-    return bills.filter((bill) => {
-      if (needle) {
-        const category = getBillCategory(bill.categoryId)?.label ?? '';
-        const haystack = `${bill.name} ${category}`.toLowerCase();
-        if (!haystack.includes(needle)) return false;
-      }
-      if (filters.categoryIds.length > 0 && !filters.categoryIds.includes(bill.categoryId)) {
-        return false;
-      }
-      if (filters.sourceIds.length > 0 && !filters.sourceIds.includes(bill.sourceId)) return false;
-      if (filters.recurrences.length > 0 && !filters.recurrences.includes(bill.recurrence)) {
-        return false;
-      }
-      return true;
-    });
-  }, [bills, queryText, filters]);
-
-  // Reflects what is on screen, so it always agrees with the rows below it.
-  const total = visible.reduce((sum, bill) => sum + bill.amount, 0);
-
-  // Soonest first: a bill list is about what is coming, not what has gone.
   const groups = useMemo(
-    () =>
-      groupByDate(visible, (bill) => bill.dueDate, {
-        amountOf: (bill) => bill.amount,
-        direction: 'asc',
-      }),
-    [visible],
+    () => groupByDate(charges, (entry) => entry.date, { amountOf: (e) => e.amount }),
+    [charges],
   );
 
-  const narrowed = queryText.trim().length > 0 || activeCount > 0;
-  const showEmpty = !query.isPending && !query.isError && bills.length === 0;
-  const showNoMatches =
-    !query.isPending && !query.isError && bills.length > 0 && visible.length === 0;
+  const planCount = plans.data?.length ?? 0;
 
   return (
-    <Screen showBack avoidKeyboard>
-      <View className="mt-2 w-full flex-row items-center justify-between gap-3">
-        <Title align="left" className="flex-1">
-          Monthly bills
-        </Title>
+    <Screen showBack onRefresh={refetch}>
+      <Title align="left" className="mt-1 w-full">
+        Monthly bills
+      </Title>
 
-        <ActionPill label="Add bill" onPress={() => router.push('/add-bill')} />
+      <View className="mt-5 w-full flex-row gap-3">
+        <Tile
+          icon={ReceiptText}
+          title="Your bills"
+          caption={planCount === 1 ? '1 recurring' : `${planCount} recurring`}
+          onPress={() => router.push('/bill-plans')}
+          showChevron
+        />
+        <Tile
+          icon={Plus}
+          title="Add bill"
+          caption="Set up a new one"
+          onPress={() => router.push('/add-bill')}
+        />
       </View>
 
-      {showEmpty || query.isError ? null : (
-        <>
-          <View className="mt-5 w-full flex-row items-center gap-3">
-            <SearchField value={queryText} onChangeText={setQuery} placeholder="Search bills" />
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter bills'
-              }
-              onPress={() => setFilterOpen(true)}
-              className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-black/5"
-            >
-              <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />
-              {activeCount > 0 ? (
-                <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
-                  <Text
-                    allowFontScaling={false}
-                    className="font-poppins-medium text-[11px] text-ink"
-                  >
-                    {activeCount}
-                  </Text>
-                </View>
-              ) : null}
-            </Pressable>
-          </View>
-
-          <View className="mt-5 w-full flex-row items-center justify-between">
+      {/* One number, and the window it belongs to, side by side — the figure is
+          meaningless without knowing which stretch of time it covers. */}
+      <View className="mt-4 w-full rounded-[16px] bg-black/[0.035] px-4 py-4">
+        <View className="w-full flex-row items-start justify-between gap-3">
+          <View className="min-w-0 flex-1">
             <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-              {query.isPending
-                ? 'Loading'
-                : narrowed
-                  ? `${visible.length} of ${bills.length} bills`
-                  : `${bills.length} ${bills.length === 1 ? 'bill' : 'bills'}`}
+              Bills charged
             </Text>
             <Text
-              className="font-poppins-semibold text-[15px] text-ink"
-              maxFontSizeMultiplier={1.3}
+              className="mt-0.5 font-poppins-bold text-[26px]"
+              style={{ color: moneyColor(total) }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              maxFontSizeMultiplier={1.2}
             >
               {formatCurrency(total)}
             </Text>
           </View>
+          <RangeDropdown value={rangeKey} onChange={setRangeKey} />
+        </View>
 
-          <View className="mt-1 h-px w-full bg-line" />
-        </>
-      )}
+        <Text className="mt-2 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.2}>
+          {charges.length === 0
+            ? 'Nothing in this window'
+            : `${charges.length} ${charges.length === 1 ? 'charge' : 'charges'}`}
+        </Text>
+      </View>
 
-      {query.isPending ? <SkeletonList rows={6} /> : null}
+      {isLoading ? <SkeletonList rows={5} /> : null}
 
-      {query.isError ? (
+      {isError ? (
         <PageState
           art={ErrorArt}
           title="Could not load your bills"
           message="Check your connection and try again. Nothing has been lost."
           actionLabel="Try again"
-          onAction={() => query.refetch()}
+          onAction={refetch}
         />
       ) : null}
 
-      {showEmpty ? (
+      {!isLoading && !isError && charges.length === 0 ? (
         <PageState
           art={EmptyArt}
-          title="No bills yet"
-          message="Add the ones that repeat — rent, power, phone — and Skip will keep track of what is due."
-          actionLabel="Add a bill"
-          onAction={() => router.push('/add-bill')}
+          title={planCount === 0 ? 'No bills yet' : 'Nothing in this window'}
+          message={
+            planCount === 0
+              ? 'Add the ones that repeat — rent, power, phone — and each time one lands it shows up here.'
+              : 'Your bills have not landed in this stretch of time. Try a wider window.'
+          }
+          actionLabel={planCount === 0 ? 'Add a bill' : undefined}
+          onAction={planCount === 0 ? () => router.push('/add-bill') : undefined}
         />
       ) : null}
 
-      {showNoMatches ? (
-        <PageState
-          art={NoResultsArt}
-          title="Nothing matches"
-          message="No bill fits that search and those filters. Try a different name or clear what you have set."
-          actionLabel="Clear filters"
-          onAction={() => {
-            setQuery('');
-            setFilters(EMPTY_BILL_FILTERS);
-          }}
-        />
-      ) : null}
-
-      {!query.isPending && !query.isError && visible.length > 0 ? (
+      {!isLoading && !isError && charges.length > 0 ? (
         <View className="w-full pb-10">
           {groups.map((group) => (
             <View key={group.date || 'undated'} className="w-full">
               <DateGroupHeader date={group.date} today={today} total={group.total} />
-              {group.items.map((bill) => (
-                <BillRow
-                  key={bill.id}
-                  bill={bill}
-                  sourceLabel={sourceLabels.get(bill.sourceId) ?? ''}
-                  onPress={() => router.push(`/add-bill?id=${bill.id}`)}
-                />
+              {group.items.map((entry, index) => (
+                <Fragment key={entry.id}>
+                  {index > 0 ? <View className="ml-13 h-px bg-line/60" /> : null}
+                  <TransactionRow
+                    label={entry.label}
+                    amount={entry.amount}
+                    kindLabel={sourceLabels.get(entry.sourceId) ?? 'No payment method'}
+                    kind="bill"
+                    categoryId={entry.categoryId}
+                    iconId={entry.iconId}
+                  />
+                </Fragment>
               ))}
             </View>
           ))}
         </View>
       ) : null}
-
-      {filterOpen ? (
-        <BillFilterSheet
-          filters={filters}
-          sourceOptions={sourceOptions}
-          onCancel={() => setFilterOpen(false)}
-          onApply={(next) => {
-            setFilters(next);
-            setFilterOpen(false);
-          }}
-        />
-      ) : null}
     </Screen>
+  );
+}
+
+type TileProps = {
+  icon: typeof Plus;
+  title: string;
+  caption: string;
+  onPress: () => void;
+  showChevron?: boolean;
+};
+
+/** Compact pair at the top: the schedule behind this page, and a way to add. */
+function Tile({ icon: Icon, title, caption, onPress, showChevron }: TileProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${caption}.`}
+      onPress={onPress}
+      style={shadows.raised}
+      className="flex-1 rounded-[16px] bg-white p-4 active:opacity-70"
+    >
+      <View className="w-full flex-row items-center justify-between gap-2">
+        <View className="h-9 w-9 items-center justify-center rounded-full bg-black/5">
+          <Icon size={18} color={colors.ink} strokeWidth={2} />
+        </View>
+        {showChevron ? <ChevronRight size={18} color={colors.muted} strokeWidth={2} /> : null}
+      </View>
+
+      <Text
+        className="mt-3 font-poppins-medium text-[15px] text-ink"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.2}
+      >
+        {title}
+      </Text>
+      <Text
+        className="mt-0.5 font-poppins text-[12px] text-muted"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.2}
+      >
+        {caption}
+      </Text>
+    </Pressable>
   );
 }

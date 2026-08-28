@@ -15,7 +15,14 @@ export const RANGES = [
   { value: 'year', label: 'Year' },
 ] as const;
 
-export type RangeKey = (typeof RANGES)[number]['value'];
+/**
+ * The same windows plus everything, for the pages that list one kind of
+ * transaction. "All" is history: it ends today, because a charge that has not
+ * happened yet is not a transaction to look back at.
+ */
+export const LEDGER_RANGES = [...RANGES, { value: 'all', label: 'All' }] as const;
+
+export type RangeKey = 'today' | 'week' | 'month' | 'year' | 'all';
 
 export type DateRange = {
   /** yyyy-mm-dd, inclusive. */
@@ -59,6 +66,11 @@ export function rangeFor(key: RangeKey, anchor: Date): DateRange {
 
     case 'year':
       return { from: iso(new Date(year, 0, 1)), to: iso(new Date(year, 11, 31)) };
+
+    case 'all':
+      // Bills and subscriptions clamp to their own start date, so reaching
+      // back to the epoch cannot invent history from before they existed.
+      return { from: '1970-01-01', to: iso(anchor) };
   }
 }
 
@@ -71,7 +83,7 @@ export type Bucket = 'day' | 'week' | 'month';
  * is chosen so a chart lands between roughly 7 and 31 marks whatever the range.
  */
 export function bucketFor(key: RangeKey): Bucket {
-  if (key === 'year') return 'month';
+  if (key === 'all' || key === 'year') return 'month';
   if (key === 'month') return 'week';
   return 'day';
 }

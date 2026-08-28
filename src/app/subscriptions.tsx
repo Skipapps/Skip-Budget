@@ -1,179 +1,111 @@
 import { router } from 'expo-router';
-import { SlidersHorizontal } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { ChevronRight, Plus, Repeat } from 'lucide-react-native';
+import { Fragment, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { usePaymentSources, useSubscriptions } from '@/api/queries';
-import {
-  EMPTY_SUBSCRIPTION_FILTERS,
-  SubscriptionFilterSheet,
-  countActiveSubscriptionFilters,
-  type SubscriptionFilters,
-} from '@/components/subscriptions/subscription-filter-sheet';
-import { SubscriptionRow } from '@/components/subscriptions/subscription-row';
-import { ActionPill } from '@/components/ui/action-pill';
+import { useLedger, usePaymentSources, useSubscriptions } from '@/api/queries';
+import { TransactionRow } from '@/components/dashboard/transaction-row';
+import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { PageState } from '@/components/ui/page-state';
+import { RangeDropdown } from '@/components/ui/range-dropdown';
 import { Screen } from '@/components/ui/screen';
-import { SearchField } from '@/components/ui/search-field';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Title } from '@/components/ui/typography';
-import { DateGroupHeader } from '@/components/ui/date-group-header';
-import { occurrencesInRange } from '@/lib/card-ledger';
 import { toIsoDate } from '@/lib/date';
-import { rangeFor } from '@/lib/range';
-import { groupByDate } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
-import { colors } from '@/theme/colors';
+import { groupByDate } from '@/lib/group';
+import { rangeFor, type RangeKey } from '@/lib/range';
+import { colors, moneyColor } from '@/theme/colors';
+import { shadows } from '@/theme/shadows';
 
 import EmptyArt from '@/assets/illustrations/state-empty-subscriptions.svg';
 import ErrorArt from '@/assets/illustrations/state-error.svg';
-import NoResultsArt from '@/assets/illustrations/state-no-results.svg';
 
-/** Normalised to a month so a yearly plan does not look cheap beside a monthly one. */
-const PER_MONTH: Record<string, number> = {
-  weekly: 52 / 12,
-  monthly: 1,
-  quarterly: 1 / 3,
-  yearly: 1 / 12,
-};
-
+/**
+ * What the subscriptions have actually cost, over a window you choose.
+ *
+ * Same shape as the bills page, for the same reason: the plans live one tap
+ * away and this lists the times each one renewed. A plan cancelled in March
+ * still shows the months it ran, which is the whole point of looking back.
+ */
 export default function SubscriptionsScreen() {
-  const [query, setQuery] = useState('');
-  const [filters, setFilters] = useState<SubscriptionFilters>(EMPTY_SUBSCRIPTION_FILTERS);
-  const [filterOpen, setFilterOpen] = useState(false);
-
+  const [rangeKey, setRangeKey] = useState<RangeKey>('month');
   const today = toIsoDate(new Date());
-  const monthRange = useMemo(() => rangeFor('month', new Date()), []);
+  const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
 
-  /**
-   * The day a subscription renews in the month being looked at.
-   *
-   * Same reasoning as the bills list: next_renewal_on is only ever the NEXT
-   * one, so from the day after a renewal the list reads a month ahead of the
-   * month you are in. Anything not renewing this month keeps its next date,
-   * which is genuinely when it next lands.
-   */
-  const renewalIn = useCallback(
-    (renewsOn: string | null, cycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly') => {
-      if (!renewsOn) return '';
-      const inMonth = occurrencesInRange(renewsOn, cycle, monthRange.from, monthRange.to);
-      return inMonth[inMonth.length - 1] ?? renewsOn;
-    },
-    [monthRange],
-  );
-  const { data: subscriptions = [], isLoading, isError, refetch } = useSubscriptions();
+  const plans = useSubscriptions();
+  const { entries, isLoading, isError, refetch } = useLedger(range);
   const { sources } = usePaymentSources();
 
-  const activeCount = countActiveSubscriptionFilters(filters);
-  const sourceOptions = useMemo(
-    () => sources.map((source) => ({ value: source.id, label: source.label })),
-    [sources],
-  );
   const sourceLabels = useMemo(
     () => new Map(sources.map((source) => [source.id, source.label])),
     [sources],
   );
 
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-
-    return subscriptions.filter((subscription) => {
-      if (needle && !subscription.name.toLowerCase().includes(needle)) return false;
-      if (filters.cycles.length > 0 && !filters.cycles.includes(subscription.cycle)) return false;
-      if (filters.sourceIds.length > 0) {
-        const sourceId = subscription.card_id ?? subscription.bank_account_id;
-        if (!sourceId || !filters.sourceIds.includes(sourceId)) return false;
-      }
-      return true;
-    });
-  }, [subscriptions, query, filters]);
-
-  // Cancelled plans are shown but cost nothing, so they stay out of the total.
-  const monthlyTotal = visible.reduce(
-    (sum, subscription) =>
-      subscription.active ? sum + subscription.amount * (PER_MONTH[subscription.cycle] ?? 1) : sum,
-    0,
+  const charges = useMemo(
+    () => entries.filter((entry) => entry.kind === 'subscription'),
+    [entries],
   );
+  const total = charges.reduce((sum, entry) => sum + entry.amount, 0);
 
-  // By renewal date, soonest first — the next charge is the useful one.
-  // Cancelled plans still show, but contribute nothing to a group total.
   const groups = useMemo(
-    () =>
-      groupByDate(
-        visible,
-        (subscription) => renewalIn(subscription.next_renewal_on, subscription.cycle),
-        {
-          amountOf: (subscription) => (subscription.active ? -Math.abs(subscription.amount) : 0),
-          direction: 'asc',
-        },
-      ),
-    [visible, renewalIn],
+    () => groupByDate(charges, (entry) => entry.date, { amountOf: (e) => e.amount }),
+    [charges],
   );
 
-  const narrowed = query.trim().length > 0 || activeCount > 0;
-  const showEmpty = !isLoading && !isError && subscriptions.length === 0;
-  const showNoMatches = !isLoading && !isError && subscriptions.length > 0 && visible.length === 0;
+  const planCount = plans.data?.length ?? 0;
 
   return (
-    <Screen showBack avoidKeyboard>
-      <View className="mt-2 w-full flex-row items-center justify-between gap-3">
-        <Title align="left" className="flex-1">
-          Subscriptions
-        </Title>
-        <ActionPill label="Add" onPress={() => router.push('/add-subscription')} />
+    <Screen showBack onRefresh={refetch}>
+      <Title align="left" className="mt-1 w-full">
+        Subscriptions
+      </Title>
+
+      <View className="mt-5 w-full flex-row gap-3">
+        <Tile
+          icon={Repeat}
+          title="Your plans"
+          caption={planCount === 1 ? '1 subscription' : `${planCount} subscriptions`}
+          onPress={() => router.push('/subscription-plans')}
+          showChevron
+        />
+        <Tile
+          icon={Plus}
+          title="Add plan"
+          caption="Track a new one"
+          onPress={() => router.push('/add-subscription')}
+        />
       </View>
 
-      {showEmpty || isError ? null : (
-        <>
-          <View className="mt-5 w-full flex-row items-center gap-3">
-            <SearchField value={query} onChangeText={setQuery} placeholder="Search subscriptions" />
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter subscriptions'
-              }
-              onPress={() => setFilterOpen(true)}
-              className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-black/5"
-            >
-              <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />
-              {activeCount > 0 ? (
-                <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
-                  <Text
-                    allowFontScaling={false}
-                    className="font-poppins-medium text-[11px] text-ink"
-                  >
-                    {activeCount}
-                  </Text>
-                </View>
-              ) : null}
-            </Pressable>
-          </View>
-
-          <View className="mt-5 w-full flex-row items-center justify-between">
+      {/* One number, and the window it belongs to, side by side — the figure is
+          meaningless without knowing which stretch of time it covers. */}
+      <View className="mt-4 w-full rounded-[16px] bg-black/[0.035] px-4 py-4">
+        <View className="w-full flex-row items-start justify-between gap-3">
+          <View className="min-w-0 flex-1">
             <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-              {isLoading
-                ? 'Loading'
-                : narrowed
-                  ? `${visible.length} of ${subscriptions.length} subscriptions`
-                  : `${subscriptions.length} ${subscriptions.length === 1 ? 'subscription' : 'subscriptions'}`}
+              Renewals charged
             </Text>
-            {isLoading ? null : (
-              <Text
-                className="font-poppins-semibold text-[15px] text-ink"
-                maxFontSizeMultiplier={1.3}
-              >
-                {formatCurrency(monthlyTotal)}
-                <Text className="font-poppins text-[13px] text-muted"> / mo</Text>
-              </Text>
-            )}
+            <Text
+              className="mt-0.5 font-poppins-bold text-[26px]"
+              style={{ color: moneyColor(total) }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              maxFontSizeMultiplier={1.2}
+            >
+              {formatCurrency(total)}
+            </Text>
           </View>
+          <RangeDropdown value={rangeKey} onChange={setRangeKey} />
+        </View>
 
-          <View className="mt-1 h-px w-full bg-line" />
-        </>
-      )}
+        <Text className="mt-2 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.2}>
+          {charges.length === 0
+            ? 'Nothing in this window'
+            : `${charges.length} ${charges.length === 1 ? 'charge' : 'charges'}`}
+        </Text>
+      </View>
 
-      {isLoading ? <SkeletonList rows={6} /> : null}
+      {isLoading ? <SkeletonList rows={5} /> : null}
 
       {isError ? (
         <PageState
@@ -181,70 +113,88 @@ export default function SubscriptionsScreen() {
           title="Could not load your subscriptions"
           message="Check your connection and try again. Nothing has been lost."
           actionLabel="Try again"
-          onAction={() => refetch()}
+          onAction={refetch}
         />
       ) : null}
 
-      {showEmpty ? (
+      {!isLoading && !isError && charges.length === 0 ? (
         <PageState
           art={EmptyArt}
-          title="No subscriptions yet"
-          message="Add the ones you pay for and Skip will show what they cost you each month."
-          actionLabel="Add a subscription"
-          onAction={() => router.push('/add-subscription')}
+          title={planCount === 0 ? 'No subscriptions yet' : 'Nothing in this window'}
+          message={
+            planCount === 0
+              ? 'Add the ones you pay for and every renewal shows up here as it happens.'
+              : 'Nothing renewed in this stretch of time. Try a wider window.'
+          }
+          actionLabel={planCount === 0 ? 'Add a subscription' : undefined}
+          onAction={planCount === 0 ? () => router.push('/add-subscription') : undefined}
         />
       ) : null}
 
-      {showNoMatches ? (
-        <PageState
-          art={NoResultsArt}
-          title="Nothing matches"
-          message="No subscription fits that search and those filters. Try a different name or clear what you have set."
-          actionLabel="Clear filters"
-          onAction={() => {
-            setQuery('');
-            setFilters(EMPTY_SUBSCRIPTION_FILTERS);
-          }}
-        />
-      ) : null}
-
-      {!isLoading && !isError && visible.length > 0 ? (
+      {!isLoading && !isError && charges.length > 0 ? (
         <View className="w-full pb-10">
           {groups.map((group) => (
             <View key={group.date || 'undated'} className="w-full">
               <DateGroupHeader date={group.date} today={today} total={group.total} />
-              {group.items.map((subscription) => (
-                <SubscriptionRow
-                  key={subscription.id}
-                  name={subscription.name}
-                  amount={subscription.amount}
-                  cycle={subscription.cycle}
-                  renewsOn={renewalIn(subscription.next_renewal_on, subscription.cycle)}
-                  domain={subscription.brands?.domain}
-                  active={subscription.active}
-                  sourceLabel={
-                    sourceLabels.get(subscription.card_id ?? subscription.bank_account_id ?? '') ??
-                    ''
-                  }
-                  onPress={() => router.push(`/add-subscription?id=${subscription.id}`)}
-                />
+              {group.items.map((entry, index) => (
+                <Fragment key={entry.id}>
+                  {index > 0 ? <View className="ml-13 h-px bg-line/60" /> : null}
+                  <TransactionRow
+                    label={entry.label}
+                    amount={entry.amount}
+                    kindLabel={sourceLabels.get(entry.sourceId) ?? 'No payment method'}
+                    kind="subscription"
+                    domain={entry.domain}
+                  />
+                </Fragment>
               ))}
             </View>
           ))}
         </View>
       ) : null}
-
-      {filterOpen ? (
-        <SubscriptionFilterSheet
-          filters={filters}
-          sourceOptions={sourceOptions}
-          onCancel={() => setFilterOpen(false)}
-          onApply={(next) => {
-            setFilters(next);
-            setFilterOpen(false);
-          }}
-        />
-      ) : null}
     </Screen>
+  );
+}
+
+type TileProps = {
+  icon: typeof Plus;
+  title: string;
+  caption: string;
+  onPress: () => void;
+  showChevron?: boolean;
+};
+
+/** Compact pair at the top: the plans behind this page, and a way to add. */
+function Tile({ icon: Icon, title, caption, onPress, showChevron }: TileProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${caption}.`}
+      onPress={onPress}
+      style={shadows.raised}
+      className="flex-1 rounded-[16px] bg-white p-4 active:opacity-70"
+    >
+      <View className="w-full flex-row items-center justify-between gap-2">
+        <View className="h-9 w-9 items-center justify-center rounded-full bg-black/5">
+          <Icon size={18} color={colors.ink} strokeWidth={2} />
+        </View>
+        {showChevron ? <ChevronRight size={18} color={colors.muted} strokeWidth={2} /> : null}
+      </View>
+
+      <Text
+        className="mt-3 font-poppins-medium text-[15px] text-ink"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.2}
+      >
+        {title}
+      </Text>
+      <Text
+        className="mt-0.5 font-poppins text-[12px] text-muted"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.2}
+      >
+        {caption}
+      </Text>
+    </Pressable>
   );
 }
