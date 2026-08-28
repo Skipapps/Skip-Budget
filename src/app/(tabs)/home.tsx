@@ -12,20 +12,13 @@ import { DateSelector } from '@/components/dashboard/date-selector';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
-import {
-  useBills,
-  useDashboard,
-  useLedger,
-  useProfile,
-  useReceipts,
-  useSubscriptions,
-} from '@/api/queries';
+import { useLedger, useProfile } from '@/api/queries';
 import { useKeepSchedulesCurrent, useRefreshAll } from '@/api/refresh';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { LedgerSummary } from '@/components/transactions/ledger-summary';
 import { spendingCategories } from '@/data/dashboard-mock';
 import { RANGES, rangeFor, type RangeKey } from '@/lib/range';
-import { addDays, formatDayLabel, toIsoDate } from '@/lib/date';
+import { addDays, formatDayLabel } from '@/lib/date';
 
 // The gutter Screen applies. The category carousel cancels it so the cards
 // bleed to both edges and the last one peeks, signalling that the row scrolls.
@@ -43,54 +36,35 @@ export default function HomeScreen() {
   const { refresh, refreshing } = useRefreshAll();
 
   const profile = useProfile();
-  const dashboard = useDashboard();
-  const bills = useBills();
-  const receipts = useReceipts();
-  const subscriptions = useSubscriptions();
 
-  const monthlyBillsTotal = (bills.data ?? []).reduce((sum, bill) => {
-    const perMonth =
-      bill.recurrence === 'weekly'
-        ? bill.amount * (52 / 12)
-        : bill.recurrence === 'quarterly'
-          ? bill.amount / 3
-          : bill.recurrence === 'yearly'
-            ? bill.amount / 12
-            : bill.amount;
-    return sum + perMonth;
-  }, 0);
-
-  // This calendar month, so the tile agrees with "Left this month" above it.
-  const monthPrefix = toIsoDate(new Date()).slice(0, 7);
-  const receiptsTotal = (receipts.data ?? [])
-    .filter((row) => row.purchased_on.startsWith(monthPrefix))
-    .reduce((sum, row) => sum + Math.abs(row.amount), 0);
-
-  const subscriptionsTotal = (subscriptions.data ?? [])
-    .filter((row) => row.active)
-    .reduce((sum, row) => {
-      const perMonth =
-        row.cycle === 'weekly'
-          ? row.amount * (52 / 12)
-          : row.cycle === 'quarterly'
-            ? row.amount / 3
-            : row.cycle === 'yearly'
-              ? row.amount / 12
-              : row.amount;
-      return sum + perMonth;
-    }, 0);
+  // The calendar month we are actually in, which is what the card reports on.
+  // Deliberately not the date picker below it: moving the selector to browse
+  // another day changes the list, not the month you are living in.
+  const monthRange = useMemo(() => rangeFor('month', new Date()), []);
+  const month = useLedger(monthRange);
 
   /**
-   * Everything going out this month: the recurring commitments plus what has
-   * actually been spent.
+   * This month, as it actually falls.
    *
-   * Not v_dashboard.expenses, which counts bills alone — that figure came out
-   * identical to the Monthly Bills tile sitting right below it, so receipts
-   * and subscriptions were simply missing from the headline. Summing the same
-   * three numbers the tiles show means the card can never disagree with them.
+   * Every figure on the card comes from one window of real occurrences — a
+   * bill on its due date, a subscription on its renewal date, a receipt on the
+   * day it was bought, salary on its paydays. Nothing is averaged into a
+   * per-month rate, so a bill due in September belongs to September and this
+   * month starts again at zero on the first.
    */
-  const expensesThisMonth = monthlyBillsTotal + receiptsTotal + subscriptionsTotal;
-  const payday = dashboard.data?.payday ?? 0;
+  const spentOn = (kind: string) =>
+    month.entries
+      .filter((entry) => entry.kind === kind)
+      .reduce((sum, entry) => sum + Math.abs(entry.amount), 0);
+
+  const monthlyBillsTotal = spentOn('bill');
+  const receiptsTotal = spentOn('receipt');
+  const subscriptionsTotal = spentOn('subscription');
+
+  // Out and in for the same window. The three tiles below add up to expenses
+  // exactly, because they are the same entries grouped by kind.
+  const expensesThisMonth = month.totals.out;
+  const payday = month.totals.in;
 
   /** Calculators open a tool, so they carry no figure. */
   const tileAmounts: Record<string, number | undefined> = {
@@ -132,9 +106,7 @@ export default function HomeScreen() {
           leftThisMonth={payday - expensesThisMonth}
           payday={payday}
           expenses={expensesThisMonth}
-          loading={
-            dashboard.isPending || bills.isPending || receipts.isPending || subscriptions.isPending
-          }
+          loading={month.isLoading}
         />
       </View>
 
