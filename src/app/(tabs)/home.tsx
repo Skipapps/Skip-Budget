@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
-import { Fragment, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import {} from 'lucide-react-native';
+import { Fragment, useMemo, useState } from 'react';
+import { ScrollView, Text, View } from 'react-native';
 
 import { AddButton } from '@/components/dashboard/add-button';
 import { BalanceSummary } from '@/components/dashboard/balance-summary';
@@ -20,10 +20,11 @@ import {
   useReceipts,
   useSubscriptions,
 } from '@/api/queries';
+import { ChoiceChips } from '@/components/ui/choice-chips';
+import { LedgerSummary } from '@/components/transactions/ledger-summary';
 import { spendingCategories } from '@/data/dashboard-mock';
+import { RANGES, rangeFor, type RangeKey } from '@/lib/range';
 import { addDays, formatDayLabel, toIsoDate } from '@/lib/date';
-import { formatCurrency } from '@/lib/format';
-import { colors } from '@/theme/colors';
 
 // The gutter Screen applies. The category carousel cancels it so the cards
 // bleed to both edges and the last one peeks, signalling that the row scrolls.
@@ -39,8 +40,6 @@ export default function HomeScreen() {
   const profile = useProfile();
   const dashboard = useDashboard();
   const bills = useBills();
-  const { entries: ledger } = useLedger();
-
   const receipts = useReceipts();
   const subscriptions = useSubscriptions();
 
@@ -86,13 +85,17 @@ export default function HomeScreen() {
   // Today, not a hardcoded date: the dashboard opens on the day you are in.
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Today by default, so opening the app answers "what is happening now"
+  // rather than handing over a year of rows to scroll.
+  const [rangeKey, setRangeKey] = useState<RangeKey>('today');
+
+  const range = useMemo(() => rangeFor(rangeKey, selectedDate), [rangeKey, selectedDate]);
+  const { entries: ledger, totals } = useLedger(range);
 
   const { weekday, date } = formatDayLabel(selectedDate);
 
-  // The day's entries, from the same ledger the transactions tab reads.
-  const dayKey = toIsoDate(selectedDate);
-  const dayEntries = ledger.filter((entry) => entry.date === dayKey);
-  const dayTotal = dayEntries.reduce((sum, entry) => sum + entry.amount, 0);
+  // The window's entries, from the same ledger the transactions tab reads.
+  const dayEntries = ledger;
 
   const handleConfirmDate = (date: Date) => {
     setSelectedDate(date);
@@ -169,21 +172,14 @@ export default function HomeScreen() {
         />
       </View>
 
-      <View className="mt-5 w-full flex-row items-center justify-between">
-        <Text className="font-poppins text-[17px] text-body" maxFontSizeMultiplier={1.3}>
-          Total <Text className="font-poppins-semibold text-ink">{formatCurrency(dayTotal)}</Text>
-        </Text>
+      {/* The window sits directly under the date, because the date is what it
+          is measured from — a week means the week containing that day. */}
+      <View className="mt-4 w-full">
+        <ChoiceChips options={RANGES} value={rangeKey} onChange={setRangeKey} />
+      </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Filter transactions"
-          className="flex-row items-center gap-1 rounded-full border border-line py-1.5 pl-4 pr-2 active:bg-black/5"
-        >
-          <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
-            All
-          </Text>
-          <ChevronRight size={16} color={colors.muted} strokeWidth={2} />
-        </Pressable>
+      <View className="mt-4 w-full">
+        <LedgerSummary totals={totals} />
       </View>
 
       <View className="mt-1 w-full pb-24">
@@ -192,7 +188,7 @@ export default function HomeScreen() {
             className="w-full py-8 text-center font-poppins text-[14px] text-muted"
             maxFontSizeMultiplier={1.4}
           >
-            Nothing on this day.
+            {rangeKey === 'today' ? 'Nothing on this day.' : 'Nothing in this window.'}
           </Text>
         ) : (
           dayEntries.map((entry, index) => (

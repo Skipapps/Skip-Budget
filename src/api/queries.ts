@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { buildLedger, type SourceKind } from '@/lib/card-ledger';
+import { buildLedger, occurrencesInRange, type SourceKind } from '@/lib/card-ledger';
+import { paydaysInRange } from '@/lib/date';
+import type { DateRange } from '@/lib/range';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
@@ -368,80 +370,6 @@ export function useBankAccount(id: string | undefined) {
   });
 }
 
-/**
- * Everything that moved money, as one timeline.
- *
- * Receipts, subscriptions and bills live in separate tables because they are
- * different things with different fields — but a person thinks of them as one
- * history. This merges them client-side rather than in a view: all three sets
- * are already fetched for their own screens, so the rows are usually in cache
- * and the merge costs nothing.
- *
- * Bills and subscriptions contribute their NEXT date, not a payment history —
- * neither table records individual charges yet. That makes this a forward
- * ledger for those two and a real history for receipts.
- */
-export type LedgerEntry = {
-  id: string;
-  label: string;
-  /** Negative is money out; everything here is an outgoing. */
-  amount: number;
-  date: string;
-  kind: 'bill' | 'receipt' | 'subscription';
-  sourceId: string;
-  domain?: string | null;
-};
-
-export function useLedger() {
-  const receipts = useReceipts();
-  const subscriptions = useSubscriptions();
-  const bills = useBills();
-
-  const entries: LedgerEntry[] = [
-    ...(receipts.data ?? []).map((row) => ({
-      id: `receipt-${row.id}`,
-      label: row.merchant,
-      amount: -Math.abs(row.amount),
-      date: row.purchased_on,
-      kind: 'receipt' as const,
-      sourceId: row.card_id ?? row.bank_account_id ?? '',
-      domain: row.brands?.domain,
-    })),
-    ...(subscriptions.data ?? [])
-      .filter((row) => row.active && row.next_renewal_on)
-      .map((row) => ({
-        id: `subscription-${row.id}`,
-        label: row.name,
-        amount: -Math.abs(row.amount),
-        date: row.next_renewal_on!,
-        kind: 'subscription' as const,
-        sourceId: row.card_id ?? row.bank_account_id ?? '',
-        domain: row.brands?.domain,
-      })),
-    ...(bills.data ?? [])
-      .filter((row) => row.next_due_on)
-      .map((row) => ({
-        id: `bill-${row.id}`,
-        label: row.name,
-        amount: -Math.abs(row.amount),
-        date: row.next_due_on!,
-        kind: 'bill' as const,
-        sourceId: row.card_id ?? row.bank_account_id ?? '',
-      })),
-  ].sort((a, b) => b.date.localeCompare(a.date));
-
-  return {
-    entries,
-    isLoading: receipts.isLoading || subscriptions.isLoading || bills.isLoading,
-    isError: receipts.isError || subscriptions.isError || bills.isError,
-    refetch: () => {
-      receipts.refetch();
-      subscriptions.refetch();
-      bills.refetch();
-    },
-  };
-}
-
 export type PaymentRow = {
   id: string;
   card_id: string | null;
@@ -545,5 +473,138 @@ export function useSourceLedger(sourceId: string | undefined, today: string) {
       subscriptions.isLoading ||
       payments.isLoading,
     isError: cards.isError || accounts.isError || payments.isError,
+  };
+}
+
+/**
+ * Everything that moved money inside a window, as one timeline.
+ *
+ * Receipts are history — they happened on their date. Bills and subscriptions
+ * store only their NEXT date, so they are projected across the window in both
+ * directions; that is what makes "upcoming" possible without a job writing rows
+ * ahead of time. Salary is projected the same way and lands as money in.
+ *
+ * Card payments are deliberately absent. Paying a card moves money between two
+ * things you already own, so counting it here beside the charge it settles
+ * would double the same spending. It belongs on the card, and it is there.
+ */
+export type LedgerEntry = {
+  id: string;
+  label: string;
+  /** Negative is money out, positive is money in. */
+  amount: number;
+  date: string;
+  kind: 'bill' | 'receipt' | 'subscription' | 'income';
+  sourceId: string;
+  domain?: string | null;
+};
+
+export type LedgerTotals = {
+  /** Positive magnitude of everything going out. */
+  out: number;
+  /** Positive magnitude of everything coming in. */
+  in: number;
+  /** in - out. Negative means the window costs more than it brings. */
+  net: number;
+  count: number;
+};
+
+export function useLedger(range?: DateRange) {
+  const receipts = useReceipts();
+  const subscriptions = useSubscriptions();
+  const bills = useBills();
+  const salary = useSalarySources();
+
+  // No range means everything, which is what a card screen wants.
+  const from = range?.from ?? null;
+  const to = range?.to ?? '9999-12-31';
+  const inRange = (date: string) => date <= to && (!from || date >= from);
+
+  const entries: LedgerEntry[] = [];
+
+  for (const row of receipts.data ?? []) {
+    if (!inRange(row.purchased_on)) continue;
+    entries.push({
+      id: `receipt-${row.id}`,
+      label: row.merchant,
+      amount: -Math.abs(row.amount),
+      date: row.purchased_on,
+      kind: 'receipt',
+      sourceId: row.card_id ?? row.bank_account_id ?? '',
+      domain: row.brands?.domain,
+    });
+  }
+
+  for (const row of subscriptions.data ?? []) {
+    if (!row.active || !row.next_renewal_on) continue;
+    for (const date of occurrencesInRange(row.next_renewal_on, row.cycle, from, to)) {
+      entries.push({
+        id: `subscription-${row.id}@${date}`,
+        label: row.name,
+        amount: -Math.abs(row.amount),
+        date,
+        kind: 'subscription',
+        sourceId: row.card_id ?? row.bank_account_id ?? '',
+        domain: row.brands?.domain,
+      });
+    }
+  }
+
+  for (const row of bills.data ?? []) {
+    if (!row.next_due_on) continue;
+    for (const date of occurrencesInRange(row.next_due_on, row.recurrence, from, to)) {
+      entries.push({
+        id: `bill-${row.id}@${date}`,
+        label: row.name,
+        amount: -Math.abs(row.amount),
+        date,
+        kind: 'bill',
+        sourceId: row.card_id ?? row.bank_account_id ?? '',
+      });
+    }
+  }
+
+  for (const row of salary.data ?? []) {
+    if (!row.last_payday) continue;
+    const dates = paydaysInRange(
+      new Date(`${row.last_payday}T00:00:00`),
+      row.frequency,
+      from ?? row.last_payday,
+      to,
+    );
+    for (const date of dates) {
+      entries.push({
+        id: `income-${row.id}@${date}`,
+        label: row.name || 'Income',
+        amount: Math.abs(row.amount),
+        date,
+        kind: 'income',
+        sourceId: '',
+      });
+    }
+  }
+
+  entries.sort((a, b) =>
+    a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date),
+  );
+
+  const totals: LedgerTotals = {
+    out: entries.filter((e) => e.amount < 0).reduce((sum, e) => sum + Math.abs(e.amount), 0),
+    in: entries.filter((e) => e.amount > 0).reduce((sum, e) => sum + e.amount, 0),
+    net: entries.reduce((sum, e) => sum + e.amount, 0),
+    count: entries.length,
+  };
+
+  return {
+    entries,
+    totals,
+    isLoading: receipts.isLoading || subscriptions.isLoading || bills.isLoading || salary.isLoading,
+    isError: receipts.isError || subscriptions.isError || bills.isError,
+    refetch: () => {
+      receipts.refetch();
+      subscriptions.refetch();
+      bills.refetch();
+      salary.refetch();
+    },
   };
 }

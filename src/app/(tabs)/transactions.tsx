@@ -16,12 +16,16 @@ import { Title } from '@/components/ui/typography';
 import { usePaymentSources, useLedger, type LedgerEntry } from '@/api/queries';
 import { PageState } from '@/components/ui/page-state';
 import { SkeletonList } from '@/components/ui/skeleton';
+import { ChoiceChips } from '@/components/ui/choice-chips';
+import { FlowChart, type FlowBucket } from '@/components/transactions/flow-chart';
+import { LedgerSummary } from '@/components/transactions/ledger-summary';
 import { TRANSACTION_KINDS } from '@/data/transactions-mock';
+import { RANGES, bucketFor, bucketKey, bucketsIn, rangeFor, type RangeKey } from '@/lib/range';
 
 import EmptyArt from '@/assets/illustrations/state-empty-wallet.svg';
 import ErrorArt from '@/assets/illustrations/state-error.svg';
 import NoResultsArt from '@/assets/illustrations/state-no-results.svg';
-import { formatFullDate } from '@/lib/date';
+import { MONTHS_SHORT, formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { colors } from '@/theme/colors';
 
@@ -34,9 +38,14 @@ export default function TransactionsScreen() {
   const [filters, setFilters] = useState<LedgerFilters>(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  const activeCount = countActiveFilters(filters);
+  // Today by default: opening the app should answer "what is happening now",
+  // not hand over a year of rows to scroll.
+  const [rangeKey, setRangeKey] = useState<RangeKey>('today');
 
-  const { entries: ledger, isLoading, isError, refetch } = useLedger();
+  const activeCount = countActiveFilters(filters);
+  const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
+
+  const { entries: ledger, totals, isLoading, isError, refetch } = useLedger(range);
   const { sources } = usePaymentSources();
 
   const sourceOptions = useMemo(
@@ -47,6 +56,31 @@ export default function TransactionsScreen() {
     () => new Map(sources.map((source) => [source.id, source.label])),
     [sources],
   );
+
+  const buckets = useMemo<FlowBucket[]>(() => {
+    const size = bucketFor(rangeKey);
+    const keys = bucketsIn(range, size);
+    const empty = new Map(keys.map((key) => [key, { out: 0, in: 0 }]));
+
+    for (const entry of ledger) {
+      const slot = empty.get(bucketKey(entry.date, size));
+      if (!slot) continue;
+      if (entry.amount < 0) slot.out += Math.abs(entry.amount);
+      else slot.in += entry.amount;
+    }
+
+    return keys.map((key) => {
+      const [, month, day] = key.split('-');
+      return {
+        key,
+        // Months get their number, days get theirs — enough to orient without
+        // crowding a twelve-slot axis.
+        label: size === 'month' ? MONTHS_SHORT[Number(month) - 1] : String(Number(day)),
+        out: empty.get(key)!.out,
+        in: empty.get(key)!.in,
+      };
+    });
+  }, [ledger, range, rangeKey]);
 
   const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -79,6 +113,19 @@ export default function TransactionsScreen() {
   return (
     <Screen avoidKeyboard>
       <Title className="mt-2">Transactions</Title>
+
+      <View className="mt-5 w-full">
+        <ChoiceChips options={RANGES} value={rangeKey} onChange={setRangeKey} />
+      </View>
+
+      {!isLoading && !isError ? (
+        <View className="mt-4 w-full gap-4">
+          <LedgerSummary totals={totals} />
+          {/* The chart earns its space only once there is more than one slot to
+              compare; a single day is a number, not a shape. */}
+          {buckets.length > 1 ? <FlowChart buckets={buckets} /> : null}
+        </View>
+      ) : null}
 
       <View className="mt-5 w-full flex-row items-center gap-3">
         <SearchField value={query} onChangeText={setQuery} placeholder="Search transactions" />

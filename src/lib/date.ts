@@ -119,3 +119,52 @@ export function toIsoDate(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0');
   return `${date.getFullYear()}-${month}-${day}`;
 }
+
+/**
+ * Every payday inside a window.
+ *
+ * Pay cycles do not match bill recurrences — "every 2 weeks" and "twice a
+ * month" have no equivalent there — so income is projected with its own walker
+ * rather than bent into the bill shape. Reuses advanceOneCycle, which already
+ * knows that semimonthly means the 15th and the last day, and that monthly
+ * clamps rather than rolling past a short month.
+ */
+export function paydaysInRange(
+  lastPayday: Date,
+  frequency: PayFrequency,
+  from: string,
+  to: string,
+): string[] {
+  const found: string[] = [];
+  let cursor = new Date(lastPayday);
+
+  // Walk back to the window, then forward across it. Bounded so a stale date
+  // far in the past cannot spin.
+  for (let guard = 0; guard < 500 && toIsoDate(cursor) > from; guard += 1) {
+    const previous = new Date(cursor);
+    switch (frequency) {
+      case 'weekly':
+        previous.setDate(previous.getDate() - 7);
+        break;
+      case 'biweekly':
+        previous.setDate(previous.getDate() - 14);
+        break;
+      case 'semimonthly':
+        previous.setDate(previous.getDate() < 16 ? 0 : 15);
+        break;
+      case 'monthly':
+        previous.setMonth(previous.getMonth() - 1);
+        break;
+    }
+    cursor = previous;
+  }
+
+  for (let guard = 0; guard < 500; guard += 1) {
+    const key = toIsoDate(cursor);
+    if (key > to) break;
+    if (key >= from) found.push(key);
+    cursor = advanceOneCycle(cursor, frequency);
+  }
+
+  return found;
+}

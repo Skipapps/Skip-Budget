@@ -1,15 +1,16 @@
-import { FileText, Landmark, ReceiptText, Repeat, type LucideIcon } from 'lucide-react-native';
+import { ArrowDownLeft, FileText, ReceiptText, Repeat, type LucideIcon } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
-import type { LedgerEntry, TransactionKind } from '@/data/transactions-mock';
+import type { LedgerEntry } from '@/api/queries';
+import type { TransactionKind } from '@/data/transactions-mock';
 import { formatCurrency } from '@/lib/format';
 import { colors } from '@/theme/colors';
 
 const KIND_ICONS: Record<TransactionKind, LucideIcon> = {
+  income: ArrowDownLeft,
   bill: FileText,
   receipt: ReceiptText,
   subscription: Repeat,
-  loan: Landmark,
 };
 
 type LedgerRowProps = {

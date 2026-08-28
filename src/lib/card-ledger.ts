@@ -86,13 +86,13 @@ function daysInMonth(year: number, month: number): number {
 }
 
 /**
- * Steps a date backwards by whole cycles.
+ * Steps a date by whole cycles. Positive steps go back, negative go forward.
  *
  * Month arithmetic is done on the calendar rather than in milliseconds, and the
  * day is clamped to the month's length — a bill due on the 31st charges on the
  * 30th in a 30-day month rather than skidding into the next one.
  */
-function stepBack(date: string, recurrence: Recurrence, steps: number): string {
+function stepBy(date: string, recurrence: Recurrence, steps: number): string {
   const [year, month, day] = parts(date);
 
   if (recurrence === 'weekly') {
@@ -116,29 +116,49 @@ function stepBack(date: string, recurrence: Recurrence, steps: number): string {
  * schema stores. A "period" bill does not repeat, so it contributes at most its
  * one date.
  */
+export function occurrencesInRange(
+  anchor: string,
+  recurrence: Recurrence,
+  from: string | null,
+  to: string,
+): string[] {
+  if (!anchor) return [];
+
+  if (recurrence === 'period') {
+    return anchor <= to && (!from || anchor >= from) ? [anchor] : [];
+  }
+
+  const found: string[] = [];
+  // Hard stops, so a corrupt date or an unknown recurrence cannot spin here.
+  const GUARD = 600;
+
+  // Backwards from the anchor, including the anchor itself.
+  for (let step = 0; step < GUARD; step += 1) {
+    const date = stepBy(anchor, recurrence, step);
+    if (from && date < from) break;
+    if (date <= to) found.push(date);
+    // With no lower bound there is nothing to stop the walk but the guard.
+    if (!from && found.length > 240) break;
+  }
+
+  // Forwards from the anchor, for ranges that reach into the future.
+  for (let step = 1; step < GUARD; step += 1) {
+    const date = stepBy(anchor, recurrence, -step);
+    if (date > to) break;
+    if (!from || date >= from) found.push(date);
+  }
+
+  return found.sort((a, b) => b.localeCompare(a));
+}
+
+/** Backwards-only, which is what a card balance needs. */
 export function occurrencesBetween(
   nextDate: string,
   recurrence: Recurrence,
   from: string | null,
   to: string,
 ): string[] {
-  if (!nextDate) return [];
-
-  if (recurrence === 'period') {
-    return nextDate <= to && (!from || nextDate >= from) ? [nextDate] : [];
-  }
-
-  const found: string[] = [];
-  // A hard stop, so a corrupt date or an unknown recurrence cannot spin here.
-  for (let step = 0; step < 600; step += 1) {
-    const date = stepBack(nextDate, recurrence, step);
-    if (from && date < from) break;
-    if (date <= to) found.push(date);
-    // Nothing before the window and nothing after the anchor is possible once
-    // we have stepped past both ends.
-    if (!from && found.length > 240) break;
-  }
-  return found;
+  return occurrencesInRange(nextDate, recurrence, from, to);
 }
 
 /**
