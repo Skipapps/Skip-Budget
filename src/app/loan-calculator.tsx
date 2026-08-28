@@ -1,6 +1,7 @@
+import { router } from 'expo-router';
 import { Calendar } from 'lucide-react-native';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
 import { ProportionBar } from '@/components/calculators/proportion-bar';
 import { SliderRow } from '@/components/calculators/slider-row';
@@ -10,7 +11,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
 import { SelectField } from '@/components/ui/select-field';
 import { Title } from '@/components/ui/typography';
-import { formatFullDate } from '@/lib/date';
+import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { calculateLoan, formatTerm, payoffDate } from '@/lib/loan';
 
@@ -31,7 +32,34 @@ export default function LoanCalculatorScreen() {
   const lastPayment = payoffDate(startDate, months);
 
   // Saving waits on the data layer.
-  const handleSave = () => {};
+  /**
+   * Asks before it files anything. The calculator is a scratchpad — most
+   * people open it to try numbers, not to commit to a debt.
+   */
+  const handleSave = () => {
+    if (loan.monthlyPayment <= 0) return;
+
+    Alert.alert(
+      'Add this to monthly bills?',
+      `${formatCurrency(loan.monthlyPayment)} a month for ${formatTerm(months)}, filed under Loans.`,
+      [
+        { text: 'Not now', style: 'cancel' },
+        {
+          text: 'Continue',
+          onPress: () =>
+            router.push({
+              pathname: '/save-loan',
+              params: {
+                amount: String(amount),
+                rate: String(rate),
+                months: String(months),
+                start: toIsoDate(startDate),
+              },
+            }),
+        },
+      ],
+    );
+  };
 
   return (
     <Screen showBack>

@@ -232,3 +232,54 @@ export type PaymentValues = {
 
 export const useCreatePayment = () => useCreate<PaymentValues>('payments');
 export const useDeletePayment = () => useRemove('payments');
+
+// --- Loans ------------------------------------------------------------------
+
+export type SaveLoanValues = {
+  name: string;
+  iconId: string | null;
+  principal: number;
+  annualRate: number;
+  termMonths: number;
+  monthlyPayment: number;
+  totalInterest: number;
+  firstPaymentOn: string;
+  cardId: string | null;
+  bankAccountId: string | null;
+};
+
+/**
+ * Turns a calculated loan into a monthly bill.
+ *
+ * One RPC rather than two inserts: the bill and its loan detail are created in
+ * the same transaction, so there is no window where a bill exists with no loan
+ * attached to explain it. The function files it under the 'loans' category and
+ * sets the end date from the term.
+ */
+export function useSaveLoan() {
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (values: SaveLoanValues) => {
+      const { data, error } = await supabase.rpc('save_loan', {
+        p_name: values.name,
+        p_icon_id: values.iconId,
+        p_principal: values.principal,
+        p_annual_rate: values.annualRate,
+        p_term_months: values.termMonths,
+        p_monthly_payment: values.monthlyPayment,
+        p_total_interest: values.totalInterest,
+        p_first_payment_on: values.firstPaymentOn,
+        p_recurrence: 'monthly',
+        p_card_id: values.cardId,
+        p_bank_account_id: values.bankAccountId,
+      });
+      if (error) throw error;
+      return data as { id: string };
+    },
+    onSuccess: () => {
+      invalidate('bills');
+      invalidate('loans');
+    },
+  });
+}
