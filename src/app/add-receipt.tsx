@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Calendar, ImageUp, ScanLine, Trash2, Wallet } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { guessCategory, matchBrand, useBrandDirectory, useSpendCategories } from '@/api/brands';
 import { useCreateReceipt, useDeleteReceipt, useUpdateReceipt } from '@/api/mutations';
@@ -13,6 +13,7 @@ import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
+import { useDialog, useConfirm } from '@/providers/dialog-provider';
 import { SelectField } from '@/components/ui/select-field';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
@@ -109,6 +110,8 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
   const createReceipt = useCreateReceipt();
   const updateReceipt = useUpdateReceipt();
   const deleteReceipt = useDeleteReceipt();
+  const confirm = useConfirm();
+  const ask = useDialog();
 
   const categoryLabel = store
     ? (categories.find((category) => category.id === store.categoryId)?.label ?? 'Other')
@@ -209,13 +212,18 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
   };
 
   /** Photos and files are separate pickers on iOS, so ask which one. */
-  const handleUpload = () => {
+  const handleUpload = async () => {
     setError(null);
-    Alert.alert('Where is the receipt?', undefined, [
-      { text: 'Photo library', onPress: () => void pickPhoto() },
-      { text: 'Files', onPress: () => void pickFile() },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    const where = await ask({
+      title: 'Where is the receipt?',
+      actions: [
+        { id: 'photos', label: 'Photo library' },
+        { id: 'files', label: 'Files' },
+      ],
+    });
+
+    if (where === 'photos') await pickPhoto();
+    else if (where === 'files') await pickFile();
   };
 
   const handleSave = async () => {
@@ -257,23 +265,22 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!id) return;
-    Alert.alert('Delete this receipt?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteReceipt.mutateAsync(id);
-            router.back();
-          } catch (thrown) {
-            setError((thrown as Error).message ?? 'Could not delete that receipt.');
-          }
-        },
-      },
-    ]);
+    const ok = await confirm({
+      title: 'Delete this receipt?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    try {
+      await deleteReceipt.mutateAsync(id);
+      router.back();
+    } catch (thrown) {
+      setError((thrown as Error).message ?? 'Could not delete that receipt.');
+    }
   };
 
   const busy = createReceipt.isPending || updateReceipt.isPending;

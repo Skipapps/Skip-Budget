@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Calendar, Trash2, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { useSpendCategories } from '@/api/brands';
 import {
@@ -15,6 +15,7 @@ import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
+import { useConfirm } from '@/providers/dialog-provider';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SelectField } from '@/components/ui/select-field';
 import { SourceTiles } from '@/components/ui/source-tiles';
@@ -112,6 +113,7 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
   const createSubscription = useCreateSubscription();
   const updateSubscription = useUpdateSubscription();
   const deleteSubscription = useDeleteSubscription();
+  const confirm = useConfirm();
 
   const categoryLabel = service
     ? (categories.find((category) => category.id === service.categoryId)?.label ?? 'Other')
@@ -158,23 +160,22 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!id) return;
-    Alert.alert('Delete this subscription?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteSubscription.mutateAsync(id);
-            router.back();
-          } catch (thrown) {
-            setError((thrown as Error).message ?? 'Could not delete that subscription.');
-          }
-        },
-      },
-    ]);
+    const ok = await confirm({
+      title: 'Delete this subscription?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    try {
+      await deleteSubscription.mutateAsync(id);
+      router.back();
+    } catch (thrown) {
+      setError((thrown as Error).message ?? 'Could not delete that subscription.');
+    }
   };
 
   const busy = createSubscription.isPending || updateSubscription.isPending;

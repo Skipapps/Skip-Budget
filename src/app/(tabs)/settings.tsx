@@ -19,12 +19,13 @@ import {
   Vibrate,
 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { deleteAccount, signOut } from '@/api/auth';
 import { SettingsRow } from '@/components/settings/settings-row';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { Screen } from '@/components/ui/screen';
+import { useConfirm, useDialog } from '@/providers/dialog-provider';
 import { TextField } from '@/components/ui/text-field';
 import { Title } from '@/components/ui/typography';
 import { useBankAccounts, useCards, useSalarySources, useSubscriptions } from '@/api/queries';
@@ -34,6 +35,8 @@ import { useBankAccounts, useCards, useSalarySources, useSubscriptions } from '@
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 export default function SettingsScreen() {
+  const confirm = useConfirm();
+  const ask = useDialog();
   const cards = useCards();
   const accounts = useBankAccounts();
   const salary = useSalarySources();
@@ -50,39 +53,36 @@ export default function SettingsScreen() {
   const noop = () => {};
 
   /**
-   * Two taps, not one. The first spells out exactly what disappears; the
+   * Two dialogs, not one. The first spells out exactly what disappears; the
    * second is the point of no return. Account deletion is the only action in
    * the app that cannot be undone by any means, so it does not share the
    * single-confirm pattern used for deleting a receipt.
    */
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete your account?',
-      'Your cards, accounts, bills, subscriptions, receipts and scanned images are all deleted. This cannot be undone and there is no way to recover them.',
-      [
-        { text: 'Keep my account', style: 'cancel' },
-        {
-          text: 'Continue',
-          style: 'destructive',
-          onPress: () =>
-            Alert.alert('This is permanent', 'Delete everything and sign out?', [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete everything',
-                style: 'destructive',
-                onPress: async () => {
-                  const { error } = await deleteAccount();
-                  if (error) {
-                    Alert.alert('Could not delete your account', error);
-                    return;
-                  }
-                  router.replace('/welcome');
-                },
-              },
-            ]),
-        },
-      ],
-    );
+  const handleDeleteAccount = async () => {
+    const first = await confirm({
+      title: 'Delete your account?',
+      message:
+        'Your cards, accounts, bills, subscriptions, receipts and scanned images are all deleted. This cannot be undone and there is no way to recover them.',
+      confirmLabel: 'Continue',
+      destructive: true,
+      cancelLabel: 'Keep my account',
+    });
+    if (!first) return;
+
+    const second = await confirm({
+      title: 'This is permanent',
+      message: 'Delete everything and sign out?',
+      confirmLabel: 'Delete everything',
+      destructive: true,
+    });
+    if (!second) return;
+
+    const { error } = await deleteAccount();
+    if (error) {
+      await ask({ title: 'Could not delete your account', message: error, cancelLabel: null });
+      return;
+    }
+    router.replace('/welcome');
   };
 
   return (

@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Calculator, Calendar, Trash2, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { AccountCard } from '@/components/cards/account-card';
 import { AmountPad } from '@/components/ui/amount-pad';
@@ -12,6 +12,7 @@ import { ChoiceChips } from '@/components/ui/choice-chips';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
+import { useConfirm } from '@/providers/dialog-provider';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
@@ -97,28 +98,25 @@ function AccountForm({
   const createAccount = useCreateBankAccount();
   const updateAccount = useUpdateBankAccount();
   const deleteAccount = useDeleteBankAccount();
+  const confirm = useConfirm();
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!id) return;
-    Alert.alert(
-      'Delete this account?',
-      'Receipts, bills and subscriptions paid from it are kept, but stop showing this account.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteAccount.mutateAsync(id);
-              router.back();
-            } catch (thrown) {
-              setError((thrown as Error).message ?? 'Could not delete that account.');
-            }
-          },
-        },
-      ],
-    );
+    const ok = await confirm({
+      title: 'Delete this account?',
+      message:
+        'Receipts, bills and subscriptions paid from it are kept, but stop showing this account.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    try {
+      await deleteAccount.mutateAsync(id);
+      router.back();
+    } catch (thrown) {
+      setError((thrown as Error).message ?? 'Could not delete that account.');
+    }
   };
   const createSalary = useCreateSalarySource();
 

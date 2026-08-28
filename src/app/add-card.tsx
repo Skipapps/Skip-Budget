@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Calendar, Trash2, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { useCreateCard, useDeleteCard, useUpdateCard } from '@/api/mutations';
 import { useCard } from '@/api/queries';
@@ -14,6 +14,7 @@ import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { DatePicker } from '@/components/ui/date-picker';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { Screen } from '@/components/ui/screen';
+import { useConfirm } from '@/providers/dialog-provider';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
@@ -87,28 +88,25 @@ function CardForm({
   const createCard = useCreateCard();
   const updateCard = useUpdateCard();
   const deleteCard = useDeleteCard();
+  const confirm = useConfirm();
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!id) return;
-    Alert.alert(
-      'Delete this card?',
-      'Receipts, bills and subscriptions paid with it are kept, but stop showing this card.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteCard.mutateAsync(id);
-              router.back();
-            } catch (thrown) {
-              setError((thrown as Error).message ?? 'Could not delete that card.');
-            }
-          },
-        },
-      ],
-    );
+    const ok = await confirm({
+      title: 'Delete this card?',
+      message:
+        'Receipts, bills and subscriptions paid with it are kept, but stop showing this card.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    try {
+      await deleteCard.mutateAsync(id);
+      router.back();
+    } catch (thrown) {
+      setError((thrown as Error).message ?? 'Could not delete that card.');
+    }
   };
 
   const handleSave = async () => {

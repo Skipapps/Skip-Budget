@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Calculator, Calendar, ChevronLeft, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { useCreateBill, useDeleteBill, useUpdateBill, type BillValues } from '@/api/mutations';
 import { useBill, usePaymentSources } from '@/api/queries';
@@ -13,6 +13,7 @@ import { CalculatorPad } from '@/components/ui/calculator-pad';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
+import { useConfirm } from '@/providers/dialog-provider';
 import { SelectField } from '@/components/ui/select-field';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
@@ -120,24 +121,24 @@ function BillForm({
   const createBill = useCreateBill();
   const updateBill = useUpdateBill();
   const deleteBill = useDeleteBill();
+  const confirm = useConfirm();
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!id) return;
-    Alert.alert('Delete this bill?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteBill.mutateAsync(id);
-            router.back();
-          } catch (thrown) {
-            setError((thrown as Error).message ?? 'Could not delete that bill.');
-          }
-        },
-      },
-    ]);
+    const ok = await confirm({
+      title: 'Delete this bill?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    try {
+      await deleteBill.mutateAsync(id);
+      router.back();
+    } catch (thrown) {
+      setError((thrown as Error).message ?? 'Could not delete that bill.');
+    }
   };
 
   const handleSave = async () => {

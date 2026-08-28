@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { useCreatePayment, useDeletePayment } from '@/api/mutations';
 import { useSourceLedger } from '@/api/queries';
@@ -10,6 +10,7 @@ import { PaymentCard } from '@/components/cards/payment-card';
 import { AmountPad } from '@/components/ui/amount-pad';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
+import { useConfirm } from '@/providers/dialog-provider';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { Title } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
@@ -35,6 +36,7 @@ export default function SourceDetailScreen() {
   const { source, kind, card, account, ledger, isLoading, isError } = useSourceLedger(id, today);
   const createPayment = useCreatePayment();
   const deletePayment = useDeletePayment();
+  const confirm = useConfirm();
 
   const [padOpen, setPadOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,16 +88,14 @@ export default function SourceDetailScreen() {
   };
 
   /** Only payments can be removed here; a charge is edited where it lives. */
-  const handleRemovePayment = (entryId: string, label: string) => {
-    const paymentId = entryId.replace(/^payment-/, '');
-    Alert.alert(`Remove ${label.toLowerCase()}?`, 'The balance goes back up by that amount.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => deletePayment.mutate(paymentId),
-      },
-    ]);
+  const handleRemovePayment = async (entryId: string, label: string) => {
+    const ok = await confirm({
+      title: `Remove ${label.toLowerCase()}?`,
+      message: 'The balance goes back up by that amount.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    if (ok) deletePayment.mutate(entryId.replace(/^payment-/, ''));
   };
 
   return (

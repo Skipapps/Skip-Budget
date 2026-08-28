@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Calendar } from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { ProportionBar } from '@/components/calculators/proportion-bar';
 import { SliderRow } from '@/components/calculators/slider-row';
@@ -9,6 +9,7 @@ import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
+import { useConfirm } from '@/providers/dialog-provider';
 import { SelectField } from '@/components/ui/select-field';
 import { Title } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
@@ -19,6 +20,7 @@ const AMOUNT_MIN = 500;
 const AMOUNT_MAX = 1_000_000;
 
 export default function LoanCalculatorScreen() {
+  const confirm = useConfirm();
   const [amount, setAmount] = useState(25_000);
   const [rate, setRate] = useState(7.5);
   const [months, setMonths] = useState(60);
@@ -36,29 +38,26 @@ export default function LoanCalculatorScreen() {
    * Asks before it files anything. The calculator is a scratchpad — most
    * people open it to try numbers, not to commit to a debt.
    */
-  const handleSave = () => {
+  const handleSave = async () => {
     if (loan.monthlyPayment <= 0) return;
 
-    Alert.alert(
-      'Add this to monthly bills?',
-      `${formatCurrency(loan.monthlyPayment)} a month for ${formatTerm(months)}, filed under Loans.`,
-      [
-        { text: 'Not now', style: 'cancel' },
-        {
-          text: 'Continue',
-          onPress: () =>
-            router.push({
-              pathname: '/save-loan',
-              params: {
-                amount: String(amount),
-                rate: String(rate),
-                months: String(months),
-                start: toIsoDate(startDate),
-              },
-            }),
-        },
-      ],
-    );
+    const ok = await confirm({
+      title: 'Add this to monthly bills?',
+      message: `${formatCurrency(loan.monthlyPayment)} a month for ${formatTerm(months)}, filed under Loans.`,
+      confirmLabel: 'Continue',
+      cancelLabel: 'Not now',
+    });
+    if (!ok) return;
+
+    router.push({
+      pathname: '/save-loan',
+      params: {
+        amount: String(amount),
+        rate: String(rate),
+        months: String(months),
+        start: toIsoDate(startDate),
+      },
+    });
   };
 
   return (

@@ -15,6 +15,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { DialogProvider } from '@/providers/dialog-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { SessionProvider, useSession } from '@/providers/session-provider';
 import { colors } from '@/theme/colors';
@@ -48,8 +49,12 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <QueryProvider>
             <SessionProvider>
-              <RootNavigator />
-              <StatusBar style="dark" />
+              {/* Inside the session so a dialog can outlive a screen, outside
+                  the navigator so it draws above every route and modal. */}
+              <DialogProvider>
+                <RootNavigator />
+                <StatusBar style="dark" />
+              </DialogProvider>
             </SessionProvider>
           </QueryProvider>
         </SafeAreaProvider>
