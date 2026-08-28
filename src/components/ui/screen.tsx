@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ScrollView, View } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,6 +21,9 @@ type ScreenProps = {
   avoidKeyboard?: boolean;
   /** Overlay pinned bottom-right, above the scroll area (e.g. a FAB). */
   floating?: ReactNode;
+  /** Enables pull-to-refresh. Omit on screens with nothing to re-fetch. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
 };
 
 /**
@@ -35,6 +38,8 @@ export function Screen({
   showBack = false,
   avoidKeyboard = false,
   floating,
+  onRefresh,
+  refreshing = false,
 }: ScreenProps) {
   const column = (
     <View className={cn('w-full max-w-[520px] flex-1 px-6', className)}>{children}</View>
@@ -46,6 +51,11 @@ export function Screen({
     keyboardShouldPersistTaps: 'handled' as const,
     // Scrolling a page with the keyboard up should put it away.
     keyboardDismissMode: 'on-drag' as const,
+    // Only a screen that says how to refresh gets the gesture; the rest keep
+    // the plain bounce rather than a spinner that would resolve into nothing.
+    refreshControl: onRefresh ? (
+      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#9A9A9A" />
+    ) : undefined,
   };
 
   // KeyboardAwareScrollView scrolls the focused input clear of the keyboard,

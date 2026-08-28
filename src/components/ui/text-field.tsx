@@ -26,6 +26,7 @@ type TextFieldProps = {
   | 'textContentType'
   | 'returnKeyType'
   | 'onSubmitEditing'
+  | 'onBlur'
   | 'multiline'
   | 'maxLength'
 >;

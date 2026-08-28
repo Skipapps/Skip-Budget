@@ -23,8 +23,13 @@ const TAB_ICONS: Record<string, LucideIcon> = {
 };
 
 /**
- * Floating pill tab bar. The selected destination expands into an outlined
- * pill with its label; the rest stay as icons so the bar reads quietly.
+ * Floating pill tab bar.
+ *
+ * The selected destination expands into a filled charcoal pill carrying its
+ * label; the rest stay as plain icons so the bar reads quietly. Filled rather
+ * than outlined because an outline is the same weight as the bar's own edge —
+ * it says "here is a shape" where a solid says "you are here", and it is the
+ * same charcoal as the add button and the dashboard cards.
  */
 export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -33,7 +38,7 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
     <View className="bg-white px-4 pt-2" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
       <View
         style={shadows.floating}
-        className="flex-row items-center justify-around rounded-full border border-line bg-white px-2 py-2"
+        className="flex-row items-center justify-around rounded-full border border-line bg-white px-3 py-4"
       >
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
@@ -61,20 +66,20 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
               onPress={handlePress}
               className={cn(
                 'flex-row items-center justify-center rounded-full',
-                focused ? 'gap-2 border border-ink px-4 py-2.5' : 'h-11 w-11',
+                focused ? 'gap-2 bg-control px-5 py-3.5' : 'h-[52px] w-[52px] active:opacity-60',
               )}
             >
               {Icon ? (
                 <Icon
                   size={22}
-                  color={focused ? colors.ink : colors.muted}
+                  color={focused ? '#FFFFFF' : colors.muted}
                   strokeWidth={2}
                   absoluteStrokeWidth
                 />
               ) : null}
               {focused ? (
                 <Text
-                  className="font-poppins-medium text-[13px] text-ink"
+                  className="font-poppins-medium text-[13px] text-white"
                   maxFontSizeMultiplier={1.2}
                 >
                   {label}

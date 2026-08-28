@@ -221,6 +221,9 @@ export default function SourceDetailScreen() {
                 amount={entry.amount}
                 kindLabel={`${KIND_LABELS[entry.kind]} · ${formatFullDate(new Date(`${entry.date}T00:00:00`))}`}
                 domain={entry.domain}
+                kind={entry.kind}
+                categoryId={entry.categoryId}
+                iconId={entry.iconId}
                 onPress={
                   entry.kind === 'payment'
                     ? () => handleRemovePayment(entry.id, entry.label)

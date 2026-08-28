@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { buildLedger, occurrencesInRange, type SourceKind } from '@/lib/card-ledger';
+import { withTimeout } from '@/lib/deadline';
 import { paydaysInRange } from '@/lib/date';
 import type { DateRange } from '@/lib/range';
 import { supabase } from '@/lib/supabase';
@@ -68,13 +70,27 @@ export type DashboardRow = {
   left_this_month: number;
 };
 
+/**
+ * How long a read may take before it is treated as failed.
+ *
+ * A request that never answers is worse than one that fails: the query stays
+ * pending, the screen keeps its skeleton, and there is nothing to retry
+ * because nothing went wrong.
+ */
+const QUERY_TIMEOUT_MS = 12_000;
+
 function useOwnerQuery<T>(key: string, run: () => Promise<T>) {
   const userId = useUserId();
   return useQuery({
     // Keyed by user so switching accounts cannot serve the previous one's cache.
     queryKey: [key, userId],
     enabled: Boolean(userId),
-    queryFn: run,
+    queryFn: () =>
+      withTimeout(
+        run(),
+        QUERY_TIMEOUT_MS,
+        `Could not load ${key.replace(/_/g, ' ')}. Check your connection and try again.`,
+      ),
   });
 }
 
@@ -118,7 +134,7 @@ export function useBills() {
     const { data, error } = await supabase
       .from('bills')
       .select(
-        'id, name, amount, category_id, icon_id, recurrence, next_due_on, card_id, bank_account_id',
+        'id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id',
       )
       .order('next_due_on', { ascending: true, nullsFirst: false });
     if (error) throw error;
@@ -397,6 +413,80 @@ export function usePayments() {
  * already fetched for their own screens, so opening a card costs nothing new
  * and the numbers cannot disagree with the pages they came from.
  */
+/** Rows that can be charged to a source, as buildLedger wants them. */
+type LedgerSources = {
+  receipts: ReceiptRow[];
+  bills: BillRow[];
+  subscriptions: SubscriptionRow[];
+  payments: PaymentRow[];
+};
+
+/**
+ * One source's ledger, built from lists that were already fetched.
+ *
+ * Split out so the cards list and the card detail screen run the very same
+ * arithmetic. They used to disagree — the list rendered the stored figure and
+ * the detail screen rendered the derived one, so a receipt moved the balance on
+ * one screen and not the other.
+ */
+function ledgerForSource(
+  source: CardRow | BankAccountRow,
+  kind: SourceKind,
+  data: LedgerSources,
+  today: string,
+) {
+  const mine = <T extends { card_id: string | null; bank_account_id: string | null }>(rows: T[]) =>
+    rows.filter((row) => (row.card_id ?? row.bank_account_id) === source.id);
+
+  return buildLedger({
+    kind,
+    statedBalance: source.balance,
+    balanceAsOf: source.balance_as_of ?? null,
+    today,
+    charges: mine(data.receipts).map((row) => ({
+      id: `receipt-${row.id}`,
+      label: row.merchant,
+      amount: row.amount,
+      date: row.purchased_on,
+      kind: 'receipt' as const,
+      domain: row.brands?.domain,
+    })),
+    recurring: [
+      ...mine(data.bills)
+        .filter((row) => row.next_due_on)
+        .map((row) => ({
+          id: `bill-${row.id}`,
+          label: row.name,
+          amount: row.amount,
+          nextDate: row.next_due_on!,
+          recurrence: row.recurrence,
+          kind: 'bill' as const,
+          startsOn: row.starts_on,
+          endsOn: row.ends_on,
+          categoryId: row.category_id,
+          iconId: row.icon_id,
+        })),
+      ...mine(data.subscriptions)
+        .filter((row) => row.active && row.next_renewal_on)
+        .map((row) => ({
+          id: `subscription-${row.id}`,
+          label: row.name,
+          amount: row.amount,
+          nextDate: row.next_renewal_on!,
+          recurrence: row.cycle,
+          kind: 'subscription' as const,
+          domain: row.brands?.domain,
+        })),
+    ],
+    payments: mine(data.payments).map((row) => ({
+      id: `payment-${row.id}`,
+      amount: row.amount,
+      date: row.paid_on,
+      note: row.note,
+    })),
+  });
+}
+
 export function useSourceLedger(sourceId: string | undefined, today: string) {
   const cards = useCards();
   const accounts = useBankAccounts();
@@ -410,53 +500,18 @@ export function useSourceLedger(sourceId: string | undefined, today: string) {
   const source = card ?? account;
   const kind: SourceKind = card ? 'card' : 'account';
 
-  const mine = <T extends { card_id: string | null; bank_account_id: string | null }>(rows: T[]) =>
-    rows.filter((row) => (row.card_id ?? row.bank_account_id) === sourceId);
-
   const ledger = source
-    ? buildLedger({
+    ? ledgerForSource(
+        source,
         kind,
-        statedBalance: source.balance,
-        balanceAsOf: source.balance_as_of ?? null,
+        {
+          receipts: receipts.data ?? [],
+          bills: bills.data ?? [],
+          subscriptions: subscriptions.data ?? [],
+          payments: payments.data ?? [],
+        },
         today,
-        charges: mine(receipts.data ?? []).map((row) => ({
-          id: `receipt-${row.id}`,
-          label: row.merchant,
-          amount: row.amount,
-          date: row.purchased_on,
-          kind: 'receipt' as const,
-          domain: row.brands?.domain,
-        })),
-        recurring: [
-          ...mine(bills.data ?? [])
-            .filter((row) => row.next_due_on)
-            .map((row) => ({
-              id: `bill-${row.id}`,
-              label: row.name,
-              amount: row.amount,
-              nextDate: row.next_due_on!,
-              recurrence: row.recurrence,
-              kind: 'bill' as const,
-            })),
-          ...mine(subscriptions.data ?? [])
-            .filter((row) => row.active && row.next_renewal_on)
-            .map((row) => ({
-              id: `subscription-${row.id}`,
-              label: row.name,
-              amount: row.amount,
-              nextDate: row.next_renewal_on!,
-              recurrence: row.cycle,
-              kind: 'subscription' as const,
-              domain: row.brands?.domain,
-            })),
-        ],
-        payments: mine(payments.data ?? []).map((row) => ({
-          id: `payment-${row.id}`,
-          amount: row.amount,
-          date: row.paid_on,
-          note: row.note,
-        })),
-      })
+      )
     : null;
 
   return {
@@ -473,6 +528,66 @@ export function useSourceLedger(sourceId: string | undefined, today: string) {
       subscriptions.isLoading ||
       payments.isLoading,
     isError: cards.isError || accounts.isError || payments.isError,
+  };
+}
+
+/**
+ * Live balances for every card and account, keyed by id.
+ *
+ * The cards screen shows a wallet at a glance, so it needs what each source is
+ * at now — not the figure typed when it was added. Everything here is already
+ * in the cache for other screens, so this costs no extra round trip.
+ */
+export function useSourceBalances(today: string) {
+  const cards = useCards();
+  const accounts = useBankAccounts();
+  const receipts = useReceipts();
+  const bills = useBills();
+  const subscriptions = useSubscriptions();
+  const payments = usePayments();
+
+  // Every source's whole history is walked to work these out, so it is done
+  // once per change of the underlying lists rather than once per render — the
+  // cards screen re-renders on scroll, and this is not scroll-cheap work.
+  const balances = useMemo(() => {
+    const data: LedgerSources = {
+      receipts: receipts.data ?? [],
+      bills: bills.data ?? [],
+      subscriptions: subscriptions.data ?? [],
+      payments: payments.data ?? [],
+    };
+
+    const next = new Map<string, number>();
+    for (const card of cards.data ?? []) {
+      next.set(card.id, ledgerForSource(card, 'card', data, today).balance);
+    }
+    for (const account of accounts.data ?? []) {
+      next.set(account.id, ledgerForSource(account, 'account', data, today).balance);
+    }
+    return next;
+  }, [
+    cards.data,
+    accounts.data,
+    receipts.data,
+    bills.data,
+    subscriptions.data,
+    payments.data,
+    today,
+  ]);
+
+  return {
+    balances,
+    /** Charges land as their dates arrive, so a stale list shows stale money. */
+    isSettled:
+      !receipts.isLoading && !bills.isLoading && !subscriptions.isLoading && !payments.isLoading,
+    refetch: () => {
+      cards.refetch();
+      accounts.refetch();
+      receipts.refetch();
+      bills.refetch();
+      subscriptions.refetch();
+      payments.refetch();
+    },
   };
 }
 
@@ -497,6 +612,9 @@ export type LedgerEntry = {
   kind: 'bill' | 'receipt' | 'subscription' | 'income';
   sourceId: string;
   domain?: string | null;
+  /** Bills draw their category icon where a brand logo would go. */
+  categoryId?: string | null;
+  iconId?: string | null;
 };
 
 export type LedgerTotals = {
@@ -509,6 +627,27 @@ export type LedgerTotals = {
   count: number;
 };
 
+/**
+ * Narrows a window to the stretch a bill was actually running.
+ *
+ * Occurrences are derived by walking outwards from the stored next date, which
+ * on its own reaches back before the bill existed — add a monthly bill today
+ * and last spring fills with charges that were never paid. `starts_on` and
+ * `ends_on` are the bill's own bounds, so the walk is held inside them.
+ *
+ * Rows saved before those dates were captured have neither, and are left
+ * unbounded: guessing a start would erase real history.
+ */
+function billWindow(
+  bill: { starts_on?: string | null; ends_on?: string | null },
+  from: string | null,
+  to: string,
+): { from: string | null; to: string } {
+  const start = bill.starts_on && (!from || bill.starts_on > from) ? bill.starts_on : from;
+  const end = bill.ends_on && bill.ends_on < to ? bill.ends_on : to;
+  return { from: start, to: end };
+}
+
 export function useLedger(range?: DateRange) {
   const receipts = useReceipts();
   const subscriptions = useSubscriptions();
@@ -518,82 +657,102 @@ export function useLedger(range?: DateRange) {
   // No range means everything, which is what a card screen wants.
   const from = range?.from ?? null;
   const to = range?.to ?? '9999-12-31';
-  const inRange = (date: string) => date <= to && (!from || date >= from);
+  // Projecting every bill and payday across the window is real work — a year
+  // range walks each schedule dozens of times. Held to once per change of the
+  // data or the window, rather than repeating on every render of a screen that
+  // re-renders as it scrolls.
+  const entries = useMemo<LedgerEntry[]>(() => {
+    const inRange = (date: string) => date <= to && (!from || date >= from);
 
-  const entries: LedgerEntry[] = [];
+    const entries: LedgerEntry[] = [];
 
-  for (const row of receipts.data ?? []) {
-    if (!inRange(row.purchased_on)) continue;
-    entries.push({
-      id: `receipt-${row.id}`,
-      label: row.merchant,
-      amount: -Math.abs(row.amount),
-      date: row.purchased_on,
-      kind: 'receipt',
-      sourceId: row.card_id ?? row.bank_account_id ?? '',
-      domain: row.brands?.domain,
-    });
-  }
-
-  for (const row of subscriptions.data ?? []) {
-    if (!row.active || !row.next_renewal_on) continue;
-    for (const date of occurrencesInRange(row.next_renewal_on, row.cycle, from, to)) {
+    for (const row of receipts.data ?? []) {
+      if (!inRange(row.purchased_on)) continue;
       entries.push({
-        id: `subscription-${row.id}@${date}`,
-        label: row.name,
+        id: `receipt-${row.id}`,
+        label: row.merchant,
         amount: -Math.abs(row.amount),
-        date,
-        kind: 'subscription',
+        date: row.purchased_on,
+        kind: 'receipt',
         sourceId: row.card_id ?? row.bank_account_id ?? '',
         domain: row.brands?.domain,
       });
     }
-  }
 
-  for (const row of bills.data ?? []) {
-    if (!row.next_due_on) continue;
-    for (const date of occurrencesInRange(row.next_due_on, row.recurrence, from, to)) {
-      entries.push({
-        id: `bill-${row.id}@${date}`,
-        label: row.name,
-        amount: -Math.abs(row.amount),
-        date,
-        kind: 'bill',
-        sourceId: row.card_id ?? row.bank_account_id ?? '',
-      });
+    for (const row of subscriptions.data ?? []) {
+      if (!row.active || !row.next_renewal_on) continue;
+      for (const date of occurrencesInRange(row.next_renewal_on, row.cycle, from, to)) {
+        entries.push({
+          id: `subscription-${row.id}@${date}`,
+          label: row.name,
+          amount: -Math.abs(row.amount),
+          date,
+          kind: 'subscription',
+          sourceId: row.card_id ?? row.bank_account_id ?? '',
+          domain: row.brands?.domain,
+        });
+      }
     }
-  }
 
-  for (const row of salary.data ?? []) {
-    if (!row.last_payday) continue;
-    const dates = paydaysInRange(
-      new Date(`${row.last_payday}T00:00:00`),
-      row.frequency,
-      from ?? row.last_payday,
-      to,
+    for (const row of bills.data ?? []) {
+      if (!row.next_due_on) continue;
+      const window = billWindow(row, from, to);
+      if (window.from && window.from > window.to) continue;
+      for (const date of occurrencesInRange(
+        row.next_due_on,
+        row.recurrence,
+        window.from,
+        window.to,
+      )) {
+        entries.push({
+          id: `bill-${row.id}@${date}`,
+          label: row.name,
+          amount: -Math.abs(row.amount),
+          date,
+          kind: 'bill',
+          sourceId: row.card_id ?? row.bank_account_id ?? '',
+          categoryId: row.category_id,
+          iconId: row.icon_id,
+        });
+      }
+    }
+
+    for (const row of salary.data ?? []) {
+      if (!row.last_payday) continue;
+      const dates = paydaysInRange(
+        new Date(`${row.last_payday}T00:00:00`),
+        row.frequency,
+        from ?? row.last_payday,
+        to,
+      );
+      for (const date of dates) {
+        entries.push({
+          id: `income-${row.id}@${date}`,
+          label: row.name || 'Income',
+          amount: Math.abs(row.amount),
+          date,
+          kind: 'income',
+          sourceId: '',
+        });
+      }
+    }
+
+    entries.sort((a, b) =>
+      a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date),
     );
-    for (const date of dates) {
-      entries.push({
-        id: `income-${row.id}@${date}`,
-        label: row.name || 'Income',
-        amount: Math.abs(row.amount),
-        date,
-        kind: 'income',
-        sourceId: '',
-      });
-    }
-  }
 
-  entries.sort((a, b) =>
-    a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date),
+    return entries;
+  }, [receipts.data, subscriptions.data, bills.data, salary.data, from, to]);
+
+  const totals = useMemo<LedgerTotals>(
+    () => ({
+      out: entries.filter((e) => e.amount < 0).reduce((sum, e) => sum + Math.abs(e.amount), 0),
+      in: entries.filter((e) => e.amount > 0).reduce((sum, e) => sum + e.amount, 0),
+      net: entries.reduce((sum, e) => sum + e.amount, 0),
+      count: entries.length,
+    }),
+    [entries],
   );
-
-  const totals: LedgerTotals = {
-    out: entries.filter((e) => e.amount < 0).reduce((sum, e) => sum + Math.abs(e.amount), 0),
-    in: entries.filter((e) => e.amount > 0).reduce((sum, e) => sum + e.amount, 0),
-    net: entries.reduce((sum, e) => sum + e.amount, 0),
-    count: entries.length,
-  };
 
   return {
     entries,

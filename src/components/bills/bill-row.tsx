@@ -4,7 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { RECURRENCES, getBillIcon, type Bill } from '@/data/bills-mock';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { colors } from '@/theme/colors';
+import { colors, moneyColor } from '@/theme/colors';
 
 type BillRowProps = {
   bill: Bill;
@@ -47,12 +47,16 @@ export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
-          {recurrence} · {sourceLabel}
+          {sourceLabel ? `${recurrence} · ${sourceLabel}` : recurrence}
         </Text>
       </View>
 
       <View className="items-end">
-        <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.4}>
+        <Text
+          className="font-poppins-semibold text-[15px] text-ink"
+          style={{ color: moneyColor(bill.amount) }}
+          maxFontSizeMultiplier={1.4}
+        >
           {formatCurrency(bill.amount)}
         </Text>
         <Text className="mt-0.5 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>

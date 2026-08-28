@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Calculator, Plus, Trash2 } from 'lucide-react-native';
+import { Calculator, Calendar, Plus, Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
@@ -7,6 +7,7 @@ import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
 import { CalculatorPad } from '@/components/ui/calculator-pad';
 import { ChoiceChips } from '@/components/ui/choice-chips';
+import { DatePicker } from '@/components/ui/date-picker';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { Screen } from '@/components/ui/screen';
 import { SelectField } from '@/components/ui/select-field';
@@ -20,7 +21,13 @@ import {
 } from '@/api/mutations';
 import { useBankAccounts, useSalarySources } from '@/api/queries';
 import { type SalarySource } from '@/data/salary-mock';
-import { PAY_FREQUENCIES, type PayFrequency } from '@/lib/date';
+import {
+  PAY_FREQUENCIES,
+  formatFullDate,
+  getNextPayday,
+  toIsoDate,
+  type PayFrequency,
+} from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { colors } from '@/theme/colors';
 
@@ -33,6 +40,11 @@ const PER_MONTH: Record<PayFrequency, number> = {
 };
 
 type PadTarget = { sourceId: string; mode: 'pad' | 'calculator' } | null;
+
+/** Dates cross this screen as yyyy-mm-dd; the picker wants a Date. */
+function asDate(iso: string | null | undefined): Date | null {
+  return iso ? new Date(`${iso}T00:00:00`) : null;
+}
 
 /**
  * Loads what exists, then hands it to the editor as initial state.
@@ -60,6 +72,7 @@ export default function SalaryScreen() {
     name: row.name,
     amount: row.amount,
     frequency: row.frequency,
+    lastPayday: row.last_payday,
     accountIds: [],
   }));
 
@@ -69,6 +82,8 @@ export default function SalaryScreen() {
 function SalaryEditor({ initial }: { initial: SalarySource[] }) {
   const [sources, setSources] = useState<SalarySource[]>(initial);
   const [padTarget, setPadTarget] = useState<PadTarget>(null);
+  // Which source's payday is being picked, or null when the picker is closed.
+  const [dateTarget, setDateTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Monotonic so ids stay unique even after sources are removed.
   const nextId = useRef(initial.length + 1);
@@ -108,6 +123,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
         name: '',
         amount: 0,
         frequency: 'monthly',
+        lastPayday: null,
         accountIds: [],
       },
     ]);
@@ -126,6 +142,12 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
       setError('Give each source a name and an amount.');
       return;
     }
+    // Every payday is counted forward from the last one, so without that date
+    // the income is saved but never lands anywhere.
+    if (named.some((source) => !source.lastPayday)) {
+      setError('Pick the last payday for each source, so Skip can work out the next ones.');
+      return;
+    }
 
     try {
       // Removed first, so a delete plus a re-add of the same name cannot
@@ -140,7 +162,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
           name: source.name.trim(),
           amount: source.amount,
           frequency: source.frequency,
-          last_payday: null,
+          last_payday: source.lastPayday,
         };
         const id = savedIds.current.has(source.id)
           ? (await updateSource.mutateAsync({ id: source.id, values }), source.id)
@@ -226,6 +248,21 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
                 />
               </View>
 
+              <SelectField
+                label="Last payday"
+                value={source.lastPayday ? formatFullDate(asDate(source.lastPayday)!) : ''}
+                placeholder="Pick the most recent one"
+                icon={Calendar}
+                onPress={() => setDateTarget(source.id)}
+              />
+
+              {source.lastPayday ? (
+                <Text className="-mt-3 ml-4 font-poppins text-[13px] text-muted">
+                  Next payday{' '}
+                  {formatFullDate(getNextPayday(asDate(source.lastPayday)!, source.frequency))}
+                </Text>
+              ) : null}
+
               <View className="w-full">
                 <FieldLabel className="mb-2">Paid into</FieldLabel>
                 <MultiChoiceChips
@@ -263,6 +300,17 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
         ) : null}
         <Button label={createSource.isPending ? 'Saving…' : 'Save'} onPress={handleSave} />
       </View>
+
+      {dateTarget ? (
+        <DatePicker
+          value={asDate(sources.find((s) => s.id === dateTarget)?.lastPayday) ?? new Date()}
+          onCancel={() => setDateTarget(null)}
+          onConfirm={(date) => {
+            update(dateTarget, { lastPayday: toIsoDate(date) });
+            setDateTarget(null);
+          }}
+        />
+      ) : null}
 
       {padTarget && activeSource ? (
         padTarget.mode === 'calculator' ? (

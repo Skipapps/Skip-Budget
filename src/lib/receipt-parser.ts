@@ -183,3 +183,152 @@ export function parseReceipt(text: string): ParsedReceipt {
     last4: parseLast4(text),
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * Layout-aware parsing
+ *
+ * The functions above read a receipt as a list of strings, which is all the
+ * old scanner returned. That loses the two facts a receipt actually encodes in
+ * its layout: the shop's name is the biggest thing at the top, and a total is
+ * the money printed on the same ROW as the word "total" — not necessarily the
+ * next line, which is what reading order gives you on a two-column bill.
+ *
+ * Everything below works on positioned lines instead, and falls back to the
+ * flat-text versions whenever the layout is unavailable or unconvincing.
+ * ------------------------------------------------------------------ */
+
+export type ParsedLine = {
+  text: string;
+  candidates?: string[];
+  confidence?: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/** Boilerplate that outsizes the shop name on plenty of receipts. */
+const NOT_A_NAME =
+  /\b(welcome|thank\s*you|receipt|invoice|customer\s*copy|merchant\s*copy|order|survey|store\s*#?\d+|tel|phone|fax|www\.|http|gst|hst|qst|vat)\b/i;
+
+const ADDRESSY =
+  /\b(street|st\.?|road|rd\.?|ave\.?|avenue|suite|unit|blvd|hwy|highway|drive|dr\.?|floor)\b/i;
+
+const PHONE = /\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/;
+
+function looksLikeName(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length < 3 || trimmed.length > 40) return false;
+  // Needs letters, and must not be mostly digits — "12345678" is a store code.
+  if (!/[a-z]/i.test(trimmed)) return false;
+  if (trimmed.replace(/\D/g, '').length > trimmed.length / 2) return false;
+  if (PHONE.test(trimmed)) return false;
+  if (ADDRESSY.test(trimmed)) return false;
+  if (NOT_A_NAME.test(trimmed)) return false;
+  return true;
+}
+
+/**
+ * The shop, chosen by how it was printed rather than where it fell in the
+ * reading order.
+ *
+ * A receipt puts its name at the top and sets it larger than everything around
+ * it. Restricting the search to the top of the page and then taking the
+ * tallest surviving line gets the name even when a slogan or a store number is
+ * printed above it — the case that made the old first-match rule pick wrong.
+ */
+export function parseMerchantFromLines(lines: ParsedLine[]): string | undefined {
+  const top = lines.filter((line) => line.y <= 0.35 && looksLikeName(line.text));
+  if (!top.length) return undefined;
+
+  const tallest = top.reduce((best, line) => (line.height > best.height ? line : best));
+
+  // Only trust size when it is actually decisive. On a receipt printed at one
+  // size throughout, the topmost sensible line is the better answer.
+  const median = [...top].sort((a, b) => a.height - b.height)[Math.floor(top.length / 2)];
+  if (tallest.height < median.height * 1.15) {
+    const highest = top.reduce((best, line) => (line.y < best.y ? line : best));
+    return highest.text.trim().replace(/\s{2,}/g, ' ');
+  }
+
+  return tallest.text.trim().replace(/\s{2,}/g, ' ');
+}
+
+/** Two lines share a row when their vertical centres nearly coincide. */
+function sameRow(a: ParsedLine, b: ParsedLine): boolean {
+  const centreA = a.y + a.height / 2;
+  const centreB = b.y + b.height / 2;
+  return Math.abs(centreA - centreB) <= Math.max(a.height, b.height) * 0.6;
+}
+
+function moneyIn(text: string): number[] {
+  return (text.match(MONEY) ?? []).map(toAmount).filter((value) => value > 0);
+}
+
+/**
+ * The amount charged, matched to its label by row.
+ *
+ * Walks the lines that name a total, and for each one takes the money printed
+ * on the same row — preferring what sits to its right, which is where a
+ * receipt puts the figure. Only if the label's row carries no money at all
+ * does it look at the line below, the way the flat parser always had to.
+ *
+ * The last labelled total wins: card footers and reprints repeat it, and the
+ * final one is what was actually charged.
+ */
+export function parseTotalFromLines(lines: ParsedLine[]): number | undefined {
+  const labelled: { amount: number; y: number }[] = [];
+
+  for (const line of lines) {
+    if (!TOTAL_HINT.test(line.text) || NOT_TOTAL.test(line.text)) continue;
+
+    // The label's own line may already carry the figure.
+    const inline = moneyIn(line.text);
+    if (inline.length) {
+      labelled.push({ amount: inline[inline.length - 1], y: line.y });
+      continue;
+    }
+
+    const rowMates = lines
+      .filter((other) => other !== line && sameRow(other, line) && other.x >= line.x)
+      .sort((a, b) => a.x - b.x)
+      .flatMap((other) => moneyIn(other.text));
+
+    if (rowMates.length) {
+      labelled.push({ amount: rowMates[rowMates.length - 1], y: line.y });
+      continue;
+    }
+
+    // Nothing on the row: fall back to the nearest money below the label.
+    const below = lines
+      .filter((other) => other.y > line.y)
+      .sort((a, b) => a.y - b.y)
+      .flatMap((other) => moneyIn(other.text));
+    if (below.length) labelled.push({ amount: below[0], y: line.y });
+  }
+
+  if (labelled.length) {
+    return labelled.sort((a, b) => a.y - b.y)[labelled.length - 1].amount;
+  }
+
+  const all = lines.flatMap((line) => moneyIn(line.text));
+  return all.length ? Math.max(...all) : undefined;
+}
+
+/**
+ * A receipt read from its layout, with the flat parser behind it.
+ *
+ * Date and card digits do not depend on position — they are matched by shape
+ * anywhere on the page — so those still come from the joined text.
+ */
+export function parseReceiptFromLines(lines: ParsedLine[]): ParsedReceipt {
+  const text = lines.map((line) => line.text).join('\n');
+  if (!lines.length) return parseReceipt(text);
+
+  return {
+    merchant: parseMerchantFromLines(lines) ?? parseMerchant(text),
+    total: parseTotalFromLines(lines) ?? parseTotal(text),
+    date: parseDate(text),
+    last4: parseLast4(text),
+  };
+}

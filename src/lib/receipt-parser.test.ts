@@ -5,6 +5,12 @@ import {
   parseReceipt,
   parseTotal,
 } from '@/lib/receipt-parser';
+import {
+  parseMerchantFromLines,
+  parseReceiptFromLines,
+  parseTotalFromLines,
+  type ParsedLine,
+} from '@/lib/receipt-parser';
 
 /** Shaped the way Vision actually returns text: one line per recognised row. */
 const WALMART = `Walmart
@@ -166,5 +172,114 @@ describe('parseReceipt', () => {
       date: undefined,
       last4: undefined,
     });
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Layout-aware parsing
+ * ------------------------------------------------------------------ */
+
+/** Builds a positioned line; only the fields a test cares about are given. */
+function line(text: string, y: number, options: Partial<ParsedLine> = {}): ParsedLine {
+  return { text, x: 0.05, y, width: 0.4, height: 0.02, ...options };
+}
+
+describe('parseMerchantFromLines', () => {
+  it('takes the largest line at the top, not the first one', () => {
+    // A slogan is printed above the name on plenty of receipts.
+    const lines = [
+      line('Welcome to', 0.02),
+      line('LOBLAWS', 0.06, { height: 0.05 }),
+      line('1000 Yonge Street', 0.12),
+    ];
+    expect(parseMerchantFromLines(lines)).toBe('LOBLAWS');
+  });
+
+  it('falls back to the topmost line when nothing is set larger', () => {
+    const lines = [
+      line('Jean Coutu', 0.03),
+      line('Pharmacie', 0.07),
+      line('450 Rue Principale', 0.11),
+    ];
+    expect(parseMerchantFromLines(lines)).toBe('Jean Coutu');
+  });
+
+  it('skips store numbers, phone numbers and addresses', () => {
+    const lines = [
+      line('Store #1482', 0.02, { height: 0.05 }),
+      line('(573) 445-2828', 0.05, { height: 0.05 }),
+      line('COSTCO WHOLESALE', 0.09, { height: 0.04 }),
+    ];
+    expect(parseMerchantFromLines(lines)).toBe('COSTCO WHOLESALE');
+  });
+
+  it('ignores anything below the top of the page', () => {
+    expect(parseMerchantFromLines([line('TOTAL', 0.8, { height: 0.09 })])).toBeUndefined();
+  });
+});
+
+describe('parseTotalFromLines', () => {
+  it('pairs the label with the money on its own row', () => {
+    // The two-column case: reading order would hand back the subtotal.
+    const lines = [
+      line('SUBTOTAL', 0.6),
+      line('6.91', 0.6, { x: 0.7 }),
+      line('TAX', 0.64),
+      line('0.57', 0.64, { x: 0.7 }),
+      line('TOTAL', 0.68),
+      line('7.48', 0.68, { x: 0.7 }),
+    ];
+    expect(parseTotalFromLines(lines)).toBe(7.48);
+  });
+
+  it('never reads a subtotal or a tax line as the total', () => {
+    const lines = [
+      line('SUB-TOTAL', 0.6),
+      line('99.99', 0.6, { x: 0.7 }),
+      line('TOTAL DUE', 0.68),
+      line('12.00', 0.68, { x: 0.7 }),
+    ];
+    expect(parseTotalFromLines(lines)).toBe(12);
+  });
+
+  it('takes the last total when a card footer repeats it', () => {
+    const lines = [
+      line('TOTAL', 0.6),
+      line('42.00', 0.6, { x: 0.7 }),
+      line('VISA TOTAL', 0.9),
+      line('42.00', 0.9, { x: 0.7 }),
+    ];
+    expect(parseTotalFromLines(lines)).toBe(42);
+  });
+
+  it('falls back to the largest amount when nothing is labelled', () => {
+    const lines = [line('BREAD 1.28', 0.4), line('MILK 3.49', 0.45)];
+    expect(parseTotalFromLines(lines)).toBe(3.49);
+  });
+});
+
+describe('parseReceiptFromLines', () => {
+  it('reads store, total, date and card from a positioned receipt', () => {
+    const lines = [
+      line('WALMART', 0.04, { height: 0.05 }),
+      line('1701 W Broadway', 0.1),
+      line('SUBTOTAL', 0.6),
+      line('6.91', 0.6, { x: 0.7 }),
+      line('TOTAL', 0.66),
+      line('7.48', 0.66, { x: 0.7 }),
+      line('VISA ************1122', 0.8),
+      line('08/26/2026 14:22', 0.9),
+    ];
+
+    expect(parseReceiptFromLines(lines)).toEqual({
+      merchant: 'WALMART',
+      total: 7.48,
+      date: '2026-08-26',
+      last4: '1122',
+    });
+  });
+
+  it('falls back to flat parsing when there is no layout', () => {
+    expect(parseReceiptFromLines([])).toEqual(parseReceipt(''));
   });
 });

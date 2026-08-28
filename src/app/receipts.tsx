@@ -17,6 +17,9 @@ import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Title } from '@/components/ui/typography';
+import { DateGroupHeader } from '@/components/ui/date-group-header';
+import { toIsoDate } from '@/lib/date';
+import { groupByDate } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
 import { colors } from '@/theme/colors';
 
@@ -29,6 +32,7 @@ export default function ReceiptsScreen() {
   const [filters, setFilters] = useState<ReceiptFilters>(EMPTY_RECEIPT_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
 
+  const today = toIsoDate(new Date());
   const { data: receipts = [], isLoading, isError, refetch } = useReceipts();
   const { sources } = usePaymentSources();
 
@@ -58,6 +62,17 @@ export default function ReceiptsScreen() {
 
   // Reflects what is on screen, so it always agrees with the rows below it.
   const total = visible.reduce((sum, receipt) => sum - Math.abs(receipt.amount), 0);
+
+  // Newest day first: receipts are history, and the last shop is the one
+  // someone came here to check.
+  const groups = useMemo(
+    () =>
+      groupByDate(visible, (receipt) => receipt.purchased_on, {
+        amountOf: (receipt) => -Math.abs(receipt.amount),
+        direction: 'desc',
+      }),
+    [visible],
+  );
 
   const narrowed = query.trim().length > 0 || activeCount > 0;
   // A list that has never had anything needs a different answer from one that
@@ -160,16 +175,23 @@ export default function ReceiptsScreen() {
 
       {!isLoading && !isError && visible.length > 0 ? (
         <View className="w-full pb-10">
-          {visible.map((receipt) => (
-            <ReceiptRow
-              key={receipt.id}
-              merchant={receipt.merchant}
-              amount={receipt.amount}
-              date={receipt.purchased_on}
-              domain={receipt.brands?.domain}
-              sourceLabel={sourceLabels.get(receipt.card_id ?? receipt.bank_account_id ?? '') ?? ''}
-              onPress={() => router.push(`/add-receipt?id=${receipt.id}`)}
-            />
+          {groups.map((group) => (
+            <View key={group.date || 'undated'} className="w-full">
+              <DateGroupHeader date={group.date} today={today} total={group.total} />
+              {group.items.map((receipt) => (
+                <ReceiptRow
+                  key={receipt.id}
+                  merchant={receipt.merchant}
+                  amount={receipt.amount}
+                  date={receipt.purchased_on}
+                  domain={receipt.brands?.domain}
+                  sourceLabel={
+                    sourceLabels.get(receipt.card_id ?? receipt.bank_account_id ?? '') ?? ''
+                  }
+                  onPress={() => router.push(`/add-receipt?id=${receipt.id}`)}
+                />
+              ))}
+            </View>
           ))}
         </View>
       ) : null}

@@ -168,3 +168,34 @@ export function paydaysInRange(
 
   return found;
 }
+
+/**
+ * A day, named the way someone would say it out loud.
+ *
+ * Section headers are read at a glance, and "Today" lands faster than a date
+ * you have to compare against the one in your head. Anything further out keeps
+ * its full date, because "in 9 days" is not a thing anyone can plan around.
+ */
+export function formatRelativeDay(iso: string, today: string): string {
+  if (!iso) return 'No date yet';
+  if (iso === today) return 'Today';
+
+  const date = new Date(`${iso}T00:00:00`);
+  const reference = new Date(`${today}T00:00:00`);
+  const days = Math.round((date.getTime() - reference.getTime()) / 86_400_000);
+
+  if (days === -1) return 'Yesterday';
+  if (days === 1) return 'Tomorrow';
+  return formatFullDate(date);
+}
+
+/**
+ * Whole days left in the month after today.
+ *
+ * Note the month convention: getDaysInMonth is zero-based like Date itself, so
+ * this passes getMonth() straight through. Adding one to it reads naturally
+ * and measures the wrong month — the last day of the next one.
+ */
+export function daysLeftInMonth(today: Date): number {
+  return getDaysInMonth(today.getFullYear(), today.getMonth()) - today.getDate();
+}

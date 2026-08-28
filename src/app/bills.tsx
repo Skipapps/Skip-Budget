@@ -22,6 +22,9 @@ import ErrorArt from '@/assets/illustrations/state-error.svg';
 import NoResultsArt from '@/assets/illustrations/state-no-results.svg';
 import { usePaymentSources, useBills } from '@/api/queries';
 import { getBillCategory } from '@/data/bills-mock';
+import { DateGroupHeader } from '@/components/ui/date-group-header';
+import { toIsoDate } from '@/lib/date';
+import { groupByDate } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
 import { colors } from '@/theme/colors';
 
@@ -31,6 +34,7 @@ export default function BillsScreen() {
   const [filterOpen, setFilterOpen] = useState(false);
 
   const activeCount = countActiveBillFilters(filters);
+  const today = toIsoDate(new Date());
   const query = useBills();
   const { sources } = usePaymentSources();
 
@@ -81,6 +85,16 @@ export default function BillsScreen() {
 
   // Reflects what is on screen, so it always agrees with the rows below it.
   const total = visible.reduce((sum, bill) => sum + bill.amount, 0);
+
+  // Soonest first: a bill list is about what is coming, not what has gone.
+  const groups = useMemo(
+    () =>
+      groupByDate(visible, (bill) => bill.dueDate, {
+        amountOf: (bill) => bill.amount,
+        direction: 'asc',
+      }),
+    [visible],
+  );
 
   const narrowed = queryText.trim().length > 0 || activeCount > 0;
   const showEmpty = !query.isPending && !query.isError && bills.length === 0;
@@ -181,13 +195,18 @@ export default function BillsScreen() {
 
       {!query.isPending && !query.isError && visible.length > 0 ? (
         <View className="w-full pb-10">
-          {visible.map((bill) => (
-            <BillRow
-              key={bill.id}
-              bill={bill}
-              sourceLabel={sourceLabels.get(bill.sourceId) ?? ''}
-              onPress={() => router.push(`/add-bill?id=${bill.id}`)}
-            />
+          {groups.map((group) => (
+            <View key={group.date || 'undated'} className="w-full">
+              <DateGroupHeader date={group.date} today={today} total={group.total} />
+              {group.items.map((bill) => (
+                <BillRow
+                  key={bill.id}
+                  bill={bill}
+                  sourceLabel={sourceLabels.get(bill.sourceId) ?? ''}
+                  onPress={() => router.push(`/add-bill?id=${bill.id}`)}
+                />
+              ))}
+            </View>
           ))}
         </View>
       ) : null}

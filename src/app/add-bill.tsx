@@ -102,11 +102,9 @@ function BillForm({
 
   const handleRecurrenceChange = (next: RecurrenceChoice) => {
     setRecurrence(next);
-    // Leaving the period option would otherwise save dates the user cannot see.
-    if (next !== PERIOD) {
-      setStartDate(null);
-      setEndDate(null);
-    }
+    // The end date belongs to a period bill alone, so it goes when the period
+    // does. The first due date stays: every bill needs one, whatever its cycle.
+    if (next !== PERIOD) setEndDate(null);
   };
 
   const handleSelectCategory = (category: BillCategory) => {
@@ -163,6 +161,12 @@ function BillForm({
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
       setError('Enter how much it costs.');
+      return;
+    }
+    // A bill with no date cannot be scheduled, so it would save and then never
+    // appear anywhere. Better to ask for it than to lose it silently.
+    if (!startDate) {
+      setError(hasPeriod ? 'Pick the date it starts.' : 'Pick the first due date.');
       return;
     }
 
@@ -253,6 +257,17 @@ function BillForm({
           iconAccessibilityLabel="Open calculator"
         />
 
+        {/* Directly under the amount, and shown for every recurrence — this is
+            the date the schedule counts from, so a monthly bill is as dated as
+            a one-off. Without it nothing knows when the bill lands. */}
+        <SelectField
+          label={hasPeriod ? 'From' : 'First due date'}
+          value={startDate ? formatFullDate(startDate) : ''}
+          placeholder={hasPeriod ? 'Pick a start date' : 'Pick a date'}
+          icon={Calendar}
+          onPress={() => setDatePicker('start')}
+        />
+
         <View className="w-full">
           <FieldLabel className="mb-2">Recurring</FieldLabel>
           <ChoiceChips
@@ -266,14 +281,6 @@ function BillForm({
             full date on a narrow phone. */}
         {hasPeriod ? (
           <>
-            <SelectField
-              label="From"
-              value={startDate ? formatFullDate(startDate) : ''}
-              placeholder="First due date"
-              icon={Calendar}
-              onPress={() => setDatePicker('start')}
-            />
-
             <View className="w-full">
               <SelectField
                 label="To"

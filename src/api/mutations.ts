@@ -24,11 +24,28 @@ const AFFECTS_DASHBOARD = new Set([
   'payments',
 ]);
 
+/**
+ * Tables whose rows point at another table's rows.
+ *
+ * Deleting a card does not delete what was charged to it — the foreign keys
+ * are "on delete set null", so those rows survive with no source. The database
+ * has already changed them by the time the delete returns, so their caches are
+ * wrong until they are re-read. Without this a receipt keeps showing the card
+ * it was paid with until the app is restarted.
+ */
+const DEPENDENTS: Record<string, string[]> = {
+  cards: ['bills', 'receipts', 'subscriptions', 'payments'],
+  bank_accounts: ['bills', 'receipts', 'subscriptions', 'payments', 'salary_sources'],
+};
+
 function useInvalidate() {
   const client = useQueryClient();
   return (table: string) => {
     client.invalidateQueries({ queryKey: [table] });
-    if (AFFECTS_DASHBOARD.has(table)) {
+    for (const dependent of DEPENDENTS[table] ?? []) {
+      client.invalidateQueries({ queryKey: [dependent] });
+    }
+    if (AFFECTS_DASHBOARD.has(table) || DEPENDENTS[table]) {
       client.invalidateQueries({ queryKey: ['dashboard'] });
     }
   };
@@ -96,6 +113,32 @@ export type CardValues = {
   bill_due_day: number | null;
   reminder_days: number | null;
 };
+
+/** The only editable thing on a profile today; currency is fixed to USD. */
+export type ProfileValues = { display_name: string | null };
+
+/**
+ * Profiles are keyed by the signed-in user rather than by a row id, so this
+ * does not go through the shared update helper — and its query key is
+ * 'profile', singular, which no table name would ever match.
+ */
+export function useUpdateProfile() {
+  const userId = useUserId();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (values: ProfileValues) => {
+      if (!userId) throw new Error('Sign in first.');
+      const { error } = await supabase
+        .from('profiles')
+        .update(values as never)
+        .eq('id', userId);
+      if (error) throw error;
+      return values;
+    },
+    onSuccess: () => invalidate('profile'),
+  });
+}
 
 export const useCreateCard = () => useCreate<CardValues>('cards');
 export const useUpdateCard = () => useUpdate<Partial<CardValues>>('cards');

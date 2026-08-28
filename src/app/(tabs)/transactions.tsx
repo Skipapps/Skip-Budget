@@ -10,10 +10,12 @@ import {
   type LedgerFilters,
 } from '@/components/transactions/filter-sheet';
 import { LedgerRow } from '@/components/transactions/ledger-row';
+import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { Title } from '@/components/ui/typography';
 import { usePaymentSources, useLedger, type LedgerEntry } from '@/api/queries';
+import { useRefreshAll } from '@/api/refresh';
 import { PageState } from '@/components/ui/page-state';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ChoiceChips } from '@/components/ui/choice-chips';
@@ -25,8 +27,7 @@ import { RANGES, bucketFor, bucketKey, bucketsIn, rangeFor, type RangeKey } from
 import EmptyArt from '@/assets/illustrations/state-empty-wallet.svg';
 import ErrorArt from '@/assets/illustrations/state-error.svg';
 import NoResultsArt from '@/assets/illustrations/state-no-results.svg';
-import { MONTHS_SHORT, formatFullDate } from '@/lib/date';
-import { formatCurrency } from '@/lib/format';
+import { MONTHS_SHORT, toIsoDate } from '@/lib/date';
 import { colors } from '@/theme/colors';
 
 const KIND_LABELS = Object.fromEntries(
@@ -41,11 +42,13 @@ export default function TransactionsScreen() {
   // Today by default: opening the app should answer "what is happening now",
   // not hand over a year of rows to scroll.
   const [rangeKey, setRangeKey] = useState<RangeKey>('today');
+  const today = toIsoDate(new Date());
 
   const activeCount = countActiveFilters(filters);
   const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
 
   const { entries: ledger, totals, isLoading, isError, refetch } = useLedger(range);
+  const { refresh, refreshing } = useRefreshAll();
   const { sources } = usePaymentSources();
 
   const sourceOptions = useMemo(
@@ -111,7 +114,7 @@ export default function TransactionsScreen() {
   }, [ledger, query, filters]);
 
   return (
-    <Screen avoidKeyboard>
+    <Screen avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
       <Title className="mt-2">Transactions</Title>
 
       <View className="mt-5 w-full">
@@ -188,20 +191,9 @@ export default function TransactionsScreen() {
         <View className="mt-2 w-full pb-24">
           {groups.map((group) => (
             <View key={group.date} className="w-full">
-              <View className="mt-5 w-full flex-row items-center justify-between">
-                <Text
-                  className="font-poppins-medium text-[13px] text-muted"
-                  maxFontSizeMultiplier={1.3}
-                >
-                  {formatFullDate(new Date(`${group.date}T00:00:00`))}
-                </Text>
-                <Text
-                  className="font-poppins-medium text-[13px] text-muted"
-                  maxFontSizeMultiplier={1.3}
-                >
-                  {formatCurrency(group.total)}
-                </Text>
-              </View>
+              {/* The same heading the receipts, bills and subscriptions lists
+                  use, so a day reads identically wherever it appears. */}
+              <DateGroupHeader date={group.date} today={today} total={group.total} />
 
               <View className="mt-1 h-px w-full bg-line" />
 

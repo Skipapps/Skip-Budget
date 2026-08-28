@@ -1,17 +1,11 @@
-import { ArrowDownLeft, FileText, ReceiptText, Repeat, type LucideIcon } from 'lucide-react-native';
+import { ArrowDownLeft } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import type { LedgerEntry } from '@/api/queries';
-import type { TransactionKind } from '@/data/transactions-mock';
+import { BillMark } from '@/components/bills/bill-mark';
+import { BrandMark } from '@/components/brands/brand-mark';
 import { formatCurrency } from '@/lib/format';
-import { colors } from '@/theme/colors';
-
-const KIND_ICONS: Record<TransactionKind, LucideIcon> = {
-  income: ArrowDownLeft,
-  bill: FileText,
-  receipt: ReceiptText,
-  subscription: Repeat,
-};
+import { colors, moneyColor } from '@/theme/colors';
 
 type LedgerRowProps = {
   entry: LedgerEntry;
@@ -22,18 +16,31 @@ type LedgerRowProps = {
 };
 
 export function LedgerRow({ entry, sourceLabel, kindLabel, onPress }: LedgerRowProps) {
-  const Icon = KIND_ICONS[entry.kind];
+  // Income is the one kind with nothing to draw: a paycheque has no merchant,
+  // and a monogram of the employer's name reads as a mistake next to real
+  // logos. Everything that was actually bought somewhere gets its brand.
+  const isIncome = entry.kind === 'income';
+  // A bill is not a brand either — it carries the category icon instead.
+  const isBill = entry.kind === 'bill';
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${entry.label}, ${kindLabel}, ${sourceLabel}, ${formatCurrency(entry.amount)}`}
+      accessibilityLabel={[entry.label, kindLabel, sourceLabel, formatCurrency(entry.amount)]
+        .filter(Boolean)
+        .join(', ')}
       onPress={onPress}
       className="w-full flex-row items-center gap-3 py-3 active:opacity-60"
     >
-      <View className="h-10 w-10 items-center justify-center rounded-full bg-black/5">
-        <Icon size={18} color={colors.body} strokeWidth={1.8} />
-      </View>
+      {isIncome ? (
+        <View className="h-10 w-10 items-center justify-center rounded-full bg-black/5">
+          <ArrowDownLeft size={18} color={colors.body} strokeWidth={1.8} />
+        </View>
+      ) : isBill ? (
+        <BillMark categoryId={entry.categoryId} iconId={entry.iconId} size={40} />
+      ) : (
+        <BrandMark name={entry.label} domain={entry.domain} size={40} />
+      )}
 
       <View className="min-w-0 flex-1">
         <Text
@@ -48,11 +55,15 @@ export function LedgerRow({ entry, sourceLabel, kindLabel, onPress }: LedgerRowP
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
-          {kindLabel} · {sourceLabel}
+          {sourceLabel ? `${kindLabel} · ${sourceLabel}` : kindLabel}
         </Text>
       </View>
 
-      <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.4}>
+      <Text
+        className="font-poppins-semibold text-[15px] text-ink"
+        style={{ color: moneyColor(entry.amount) }}
+        maxFontSizeMultiplier={1.4}
+      >
         {formatCurrency(entry.amount)}
       </Text>
     </Pressable>

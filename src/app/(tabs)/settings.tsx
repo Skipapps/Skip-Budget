@@ -22,13 +22,20 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { deleteAccount, signOut } from '@/api/auth';
+import { useUpdateProfile } from '@/api/mutations';
 import { SettingsRow } from '@/components/settings/settings-row';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm, useDialog } from '@/providers/dialog-provider';
 import { TextField } from '@/components/ui/text-field';
 import { Title } from '@/components/ui/typography';
-import { useBankAccounts, useCards, useSalarySources, useSubscriptions } from '@/api/queries';
+import {
+  useBankAccounts,
+  useCards,
+  useProfile,
+  useSalarySources,
+  useSubscriptions,
+} from '@/api/queries';
 
 /** Straight from the subscriptions list, so the summary cannot drift. */
 
@@ -41,12 +48,26 @@ export default function SettingsScreen() {
   const accounts = useBankAccounts();
   const salary = useSalarySources();
   const subs = useSubscriptions();
+  const profile = useProfile();
+  const updateProfile = useUpdateProfile();
 
   const cardCount = cards.data?.length ?? 0;
   const accountCount = accounts.data?.length ?? 0;
   const salaryCount = salary.data?.length ?? 0;
   const trackedSubscriptions = subs.data?.length ?? 0;
-  const [displayName, setDisplayName] = useState('');
+  // Null until the field is touched, so the saved name shows through until
+  // someone edits it. Seeding state from the query in an effect instead would
+  // overwrite what they were typing the moment a refetch landed.
+  const [draftName, setDraftName] = useState<string | null>(null);
+  const savedName = profile.data?.display_name ?? '';
+  const displayName = draftName ?? savedName;
+
+  /** Saved when the field loses focus; there is no Save button on this screen. */
+  const commitName = () => {
+    const next = displayName.trim();
+    if (draftName === null || next === savedName) return;
+    updateProfile.mutate({ display_name: next || null });
+  };
   const [haptics, setHaptics] = useState(true);
   const [appLock, setAppLock] = useState(false);
 
@@ -94,7 +115,9 @@ export default function SettingsScreen() {
           <TextField
             label="Display name"
             value={displayName}
-            onChangeText={setDisplayName}
+            onChangeText={setDraftName}
+            onBlur={commitName}
+            onSubmitEditing={commitName}
             placeholder="Your name"
             autoCapitalize="words"
             returnKeyType="done"

@@ -5,6 +5,7 @@ import {
   type Payment,
   type RecurringCharge,
 } from '@/lib/card-ledger';
+import { nextOccurrenceFrom } from '@/lib/card-ledger';
 
 const receipt = (id: string, amount: number, date: string): Charge => ({
   id,
@@ -190,5 +191,89 @@ describe('buildLedger — bank account', () => {
       payments: [payment('d1', 50, '2026-08-21')],
     });
     expect(ledger.balance).toBe(850);
+  });
+});
+
+describe('nextOccurrenceFrom', () => {
+  it('leaves a date that has not passed alone', () => {
+    expect(nextOccurrenceFrom('2026-09-01', 'monthly', '2026-08-28')).toBe('2026-09-01');
+  });
+
+  it('advances a stale date to the next one still ahead', () => {
+    expect(nextOccurrenceFrom('2026-05-15', 'monthly', '2026-08-28')).toBe('2026-09-15');
+  });
+
+  it('keeps the chosen day of the month across a long gap', () => {
+    expect(nextOccurrenceFrom('2025-01-03', 'monthly', '2026-08-28')).toBe('2026-09-03');
+  });
+
+  it('clamps a 31st to the length of a short month', () => {
+    expect(nextOccurrenceFrom('2026-01-31', 'monthly', '2026-02-15')).toBe('2026-02-28');
+  });
+
+  it('walks weekly and yearly schedules too', () => {
+    expect(nextOccurrenceFrom('2026-08-03', 'weekly', '2026-08-28')).toBe('2026-08-31');
+    expect(nextOccurrenceFrom('2024-06-10', 'yearly', '2026-08-28')).toBe('2027-06-10');
+  });
+
+  it('never moves a one-off, which has no next', () => {
+    expect(nextOccurrenceFrom('2026-01-05', 'period', '2026-08-28')).toBe('2026-01-05');
+  });
+});
+
+describe('buildLedger — a recurring charge stays inside its own lifetime', () => {
+  const base = {
+    kind: 'card' as const,
+    statedBalance: 0,
+    balanceAsOf: null,
+    charges: [],
+    payments: [],
+    today: '2026-08-28',
+  };
+
+  const rent = {
+    id: 'bill-rent',
+    label: 'Rent',
+    amount: 100,
+    nextDate: '2026-09-01',
+    recurrence: 'monthly' as const,
+    kind: 'bill' as const,
+  };
+
+  it('back-dates a bill with no start, which is what old rows rely on', () => {
+    const ledger = buildLedger({ ...base, recurring: [rent] });
+    expect(ledger.entries.length).toBeGreaterThan(6);
+  });
+
+  it('never lands a charge before the bill started', () => {
+    const ledger = buildLedger({
+      ...base,
+      recurring: [{ ...rent, startsOn: '2026-07-01' }],
+    });
+
+    // July and August only — September is still ahead of today.
+    expect(ledger.entries.map((entry) => entry.date)).toEqual(['2026-08-01', '2026-07-01']);
+    expect(ledger.balance).toBe(200);
+  });
+
+  it('never lands a charge after the bill ended', () => {
+    const ledger = buildLedger({
+      ...base,
+      recurring: [{ ...rent, startsOn: '2026-05-01', endsOn: '2026-06-30' }],
+    });
+
+    expect(ledger.entries.map((entry) => entry.date)).toEqual(['2026-06-01', '2026-05-01']);
+    expect(ledger.balance).toBe(200);
+  });
+
+  it('drops a bill whose window closed before the balance was stated', () => {
+    const ledger = buildLedger({
+      ...base,
+      balanceAsOf: '2026-08-01',
+      recurring: [{ ...rent, startsOn: '2026-01-01', endsOn: '2026-03-01' }],
+    });
+
+    expect(ledger.entries).toEqual([]);
+    expect(ledger.balance).toBe(0);
   });
 });

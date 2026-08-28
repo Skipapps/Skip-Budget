@@ -20,6 +20,7 @@ import {
   useReceipts,
   useSubscriptions,
 } from '@/api/queries';
+import { useKeepSchedulesCurrent, useRefreshAll } from '@/api/refresh';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { LedgerSummary } from '@/components/transactions/ledger-summary';
 import { spendingCategories } from '@/data/dashboard-mock';
@@ -37,6 +38,10 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 export default function HomeScreen() {
+  // Opening the app is the moment to bring stale due dates up to date.
+  useKeepSchedulesCurrent();
+  const { refresh, refreshing } = useRefreshAll();
+
   const profile = useProfile();
   const dashboard = useDashboard();
   const bills = useBills();
@@ -103,7 +108,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <Screen floating={<AddButton />}>
+    <Screen floating={<AddButton />} onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-2 w-full">
         <DashboardHeader name={profile.data?.display_name ?? 'Welcome'} />
       </View>
@@ -117,22 +122,28 @@ export default function HomeScreen() {
         />
       </View>
 
-      <Text
-        className="mt-8 w-full font-poppins-medium text-[15px] text-body"
-        maxFontSizeMultiplier={1.3}
-      >
-        Spending category
-      </Text>
+      <View className="mt-8 w-full flex-row items-baseline justify-between gap-3">
+        <Text className="font-poppins-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
+          Where it goes
+        </Text>
+        <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.2}>
+          {spendingCategories.length} categories
+        </Text>
+      </View>
 
+      {/* Full-bleed, so a tile is cut by the screen edge rather than by a
+          margin. That cut is the affordance: tiles are sized so a third is
+          plainly half-visible, which is what says the row moves. */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
         style={{ marginHorizontal: -GUTTER }}
         contentContainerStyle={{ paddingHorizontal: GUTTER, gap: 12, paddingVertical: 12 }}
         className="w-full"
       >
         {spendingCategories.map((category) => (
-          <View key={category.id} className="w-[164px]">
+          <View key={category.id} className="w-[150px]">
             <AmountTile
               label={category.label}
               amount={tileAmounts[category.id]}
@@ -199,6 +210,9 @@ export default function HomeScreen() {
                 amount={entry.amount}
                 kindLabel={KIND_LABELS[entry.kind]}
                 domain={entry.domain}
+                kind={entry.kind}
+                categoryId={entry.categoryId}
+                iconId={entry.iconId}
               />
             </Fragment>
           ))

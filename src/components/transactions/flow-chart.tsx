@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import Svg, { Line, Path } from 'react-native-svg';
 
 import { formatCurrency } from '@/lib/format';
+import { money } from '@/theme/colors';
 
 /**
  * Money in and money out across a window.
@@ -18,8 +19,8 @@ import { formatCurrency } from '@/lib/format';
  */
 
 /** Validated against the palette checker: protan ΔE 11.7, normal ΔE 31.0. */
-const OUT = '#E4714E';
-const IN = '#0B6B3A';
+const OUT = money.out;
+const IN = money.in;
 const AXIS = '#DCDCDC';
 
 export type FlowBucket = {

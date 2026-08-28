@@ -3,6 +3,7 @@ import { Text, View, type ViewStyle } from 'react-native';
 import { cn } from '@/lib/cn';
 import { isLightColor } from '@/lib/color';
 import { formatCurrency } from '@/lib/format';
+import { moneyTone, type MoneyIntent } from '@/lib/tone';
 import { colors } from '@/theme/colors';
 import { shadows } from '@/theme/shadows';
 
@@ -15,7 +16,14 @@ type CardFaceProps = {
   meta: string;
   /** `mark` is the italic network wordmark; `label` is plain type. */
   metaStyle?: 'mark' | 'label';
+  /**
+   * Signed for display: negative is money owed, positive is money held. The
+   * caller decides which way round its own numbers run.
+   */
   amount: number;
+  /** Word above the figure — "Owed", "Available". Carries the meaning when
+   *  the card's colour leaves no room for a red or a green to read. */
+  caption?: string;
   last4: string;
   style?: ViewStyle;
 };
@@ -32,6 +40,7 @@ export function CardFace({
   meta,
   metaStyle = 'label',
   amount,
+  caption,
   last4,
   style,
 }: CardFaceProps) {
@@ -41,6 +50,14 @@ export function CardFace({
   const watermark = onLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)';
   // A white face would otherwise sit invisibly on a white screen.
   const needsOutline = color.toUpperCase() === '#FFFFFF';
+
+  // Nothing owed and nothing held is not good news or bad news, so it is not
+  // coloured. Rounded first: a balance of a few cents should not decide this.
+  const rounded = Math.round(amount);
+  const intent: MoneyIntent = rounded === 0 ? 'neutral' : rounded < 0 ? 'debt' : 'asset';
+  // Null means no tone on this card reads as its own colour; plain type then,
+  // with the caption and the minus sign still saying which way the money runs.
+  const amountColor = moneyTone(color, intent) ?? foreground;
 
   return (
     <View
@@ -84,9 +101,20 @@ export function CardFace({
           </Text>
         </View>
 
+        {caption ? (
+          <Text
+            style={{ color: mutedForeground }}
+            className="mt-2 font-poppins-medium text-[11px] uppercase tracking-wide"
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.2}
+          >
+            {caption}
+          </Text>
+        ) : null}
+
         <Text
-          style={{ color: foreground }}
-          className="mt-1.5 font-poppins-bold text-[26px]"
+          style={{ color: amountColor }}
+          className={cn('font-poppins-bold text-[26px]', caption ? 'mt-0.5' : 'mt-1.5')}
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}

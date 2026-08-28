@@ -10,6 +10,8 @@ type AccountCardProps = {
 };
 
 export function AccountCard({ account, placeholderName, style }: AccountCardProps) {
+  // An account already runs the right way round: the stored number is money
+  // held, so it needs no flipping the way a card's does.
   return (
     <CardFace
       color={account.color}
@@ -17,6 +19,7 @@ export function AccountCard({ account, placeholderName, style }: AccountCardProp
       titlePlaceholder={placeholderName}
       meta={account.accountType}
       amount={account.balance}
+      caption={Math.round(account.balance) < 0 ? 'Overdrawn' : 'Available'}
       last4={account.last4}
       style={style}
     />

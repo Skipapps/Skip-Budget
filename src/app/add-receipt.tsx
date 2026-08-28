@@ -20,11 +20,12 @@ import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Title } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { parseReceipt } from '@/lib/receipt-parser';
+import { parseReceipt, parseReceiptFromLines, type ParsedReceipt } from '@/lib/receipt-parser';
 import { colors } from '@/theme/colors';
 import {
   isRecognitionAvailable,
   isScanningAvailable,
+  recognizeReceipt,
   recognizeText,
   scanDocument,
 } from '../../modules/receipt-scanner';
@@ -148,8 +149,7 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
     : null;
 
   /** Turns recognised text into filled fields, leaving anything unsure alone. */
-  const applyScan = (text: string, from: 'scan' | 'upload') => {
-    const parsed = parseReceipt(text);
+  const applyScan = (parsed: ParsedReceipt, from: 'scan' | 'upload') => {
     const found: ScanField[] = [];
     let filled = 0;
 
@@ -239,7 +239,13 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
     try {
       setReading(true);
       const result = await scanDocument();
-      if (result) applyScan(result.text, 'scan');
+      // Prefer the positioned reading; a build without it still returns text.
+      if (result) {
+        applyScan(
+          result.lines?.length ? parseReceiptFromLines(result.lines) : parseReceipt(result.text),
+          'scan',
+        );
+      }
     } catch (thrown) {
       setError((thrown as Error).message ?? 'Could not open the scanner.');
     } finally {
@@ -250,7 +256,11 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
   const readFrom = async (uri: string) => {
     try {
       setReading(true);
-      applyScan(await recognizeText(uri), 'upload');
+      const lines = await recognizeReceipt(uri);
+      applyScan(
+        lines.length ? parseReceiptFromLines(lines) : parseReceipt(await recognizeText(uri)),
+        'upload',
+      );
     } catch (thrown) {
       setError((thrown as Error).message ?? 'Could not read that file.');
     } finally {

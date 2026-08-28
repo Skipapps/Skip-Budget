@@ -12,15 +12,28 @@ type InsightBannerProps = {
 /**
  * Full-width dashboard banner. Deliberately carries no figure — the spending
  * tiles above already report numbers, and this points at the story behind them.
+ *
+ * Only dresses itself as a link when it has somewhere to go. A chevron and a
+ * button role on a banner that does nothing is a promise the screen cannot
+ * keep: it reads as tappable, announces itself as tappable to a screen reader,
+ * and then swallows the tap. Without a destination it is simply a card.
  */
 export function InsightBanner({ onPress }: InsightBannerProps) {
+  const Container = onPress ? Pressable : View;
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Insights. See the story behind your spending."
-      onPress={onPress}
-      style={shadows.card}
-      className="w-full flex-row items-center gap-3 rounded-[10px] border border-line bg-white p-4 active:opacity-80"
+    <Container
+      {...(onPress
+        ? {
+            accessibilityRole: 'button' as const,
+            accessibilityLabel: 'Insights. See the story behind your spending.',
+            onPress,
+          }
+        : {})}
+      style={shadows.raised}
+      className={`w-full flex-row items-center gap-3 rounded-[16px] bg-white p-4 ${
+        onPress ? 'active:opacity-80' : ''
+      }`}
     >
       <View className="h-[76px] w-[76px] shrink-0">
         <InsightsArt width="100%" height="100%" />
@@ -43,7 +56,7 @@ export function InsightBanner({ onPress }: InsightBannerProps) {
         </Text>
       </View>
 
-      <ChevronRight size={20} color={colors.muted} strokeWidth={2} />
-    </Pressable>
+      {onPress ? <ChevronRight size={20} color={colors.muted} strokeWidth={2} /> : null}
+    </Container>
   );
 }

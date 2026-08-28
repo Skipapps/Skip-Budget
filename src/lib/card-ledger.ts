@@ -25,6 +25,12 @@ export type Charge = {
   domain?: string | null;
 };
 
+/** What a bill needs to draw its icon, since it has no brand to look up. */
+export type BillMarkFields = {
+  categoryId?: string | null;
+  iconId?: string | null;
+};
+
 /** Something that charges again and again, described by its NEXT date. */
 export type RecurringCharge = {
   id: string;
@@ -35,7 +41,11 @@ export type RecurringCharge = {
   recurrence: Recurrence;
   kind: 'bill' | 'subscription';
   domain?: string | null;
-};
+  /** yyyy-mm-dd the charge began, when known. Nothing lands before it. */
+  startsOn?: string | null;
+  /** yyyy-mm-dd it stopped, when known. Nothing lands after it. */
+  endsOn?: string | null;
+} & BillMarkFields;
 
 export type Payment = {
   id: string;
@@ -53,7 +63,7 @@ export type LedgerEntry = {
   amount: number;
   kind: 'receipt' | 'bill' | 'subscription' | 'payment';
   domain?: string | null;
-};
+} & BillMarkFields;
 
 export type Ledger = {
   /** Newest first. */
@@ -151,6 +161,29 @@ export function occurrencesInRange(
   return found.sort((a, b) => b.localeCompare(a));
 }
 
+/**
+ * The first occurrence on or after a given day.
+ *
+ * A stored "next due" goes stale the moment its date passes — the bill is
+ * still monthly, but the app would keep calling a date in the past the next
+ * one. Walking forward from the original anchor rather than from today keeps
+ * the day-of-month the user chose, so a rent bill set to the 1st stays on the
+ * 1st however long the app went unopened.
+ *
+ * History is unaffected: occurrences are derived by walking back from the
+ * anchor, so moving it forward cannot erase what already happened.
+ */
+export function nextOccurrenceFrom(anchor: string, recurrence: Recurrence, from: string): string {
+  // A one-off has no next: it happens on its date and never again.
+  if (!anchor || recurrence === 'period') return anchor;
+
+  let date = anchor;
+  for (let step = 1; date < from && step < 600; step += 1) {
+    date = stepBy(anchor, recurrence, -step);
+  }
+  return date;
+}
+
 /** Backwards-only, which is what a card balance needs. */
 export function occurrencesBetween(
   nextDate: string,
@@ -199,7 +232,14 @@ export function buildLedger(input: {
   }
 
   for (const item of recurring) {
-    for (const date of occurrencesBetween(item.nextDate, item.recurrence, balanceAsOf, today)) {
+    // The charge's own lifetime, narrowed by the window being asked about.
+    // Without this a bill added today would back-date itself onto the card.
+    const from =
+      item.startsOn && (!balanceAsOf || item.startsOn > balanceAsOf) ? item.startsOn : balanceAsOf;
+    const to = item.endsOn && item.endsOn < today ? item.endsOn : today;
+    if (from && from > to) continue;
+
+    for (const date of occurrencesBetween(item.nextDate, item.recurrence, from, to)) {
       entries.push({
         // Unique per occurrence, so React keys stay stable across renders.
         id: `${item.id}@${date}`,
@@ -208,6 +248,8 @@ export function buildLedger(input: {
         amount: -Math.abs(item.amount),
         kind: item.kind,
         domain: item.domain,
+        categoryId: item.categoryId,
+        iconId: item.iconId,
       });
     }
   }

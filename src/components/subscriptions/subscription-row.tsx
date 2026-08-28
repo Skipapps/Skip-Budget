@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
+import { moneyColor } from '@/theme/colors';
 
 export const CYCLE_LABELS: Record<string, string> = {
   weekly: 'Weekly',
@@ -66,7 +67,11 @@ export function SubscriptionRow({
       </View>
 
       <View className="items-end">
-        <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.4}>
+        <Text
+          className="font-poppins-semibold text-[15px] text-ink"
+          style={{ color: moneyColor(-Math.abs(amount)) }}
+          maxFontSizeMultiplier={1.4}
+        >
           {formatCurrency(amount)}
         </Text>
         <Text className="mt-0.5 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>

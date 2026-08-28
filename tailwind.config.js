@@ -24,6 +24,11 @@ module.exports = {
           DEFAULT: '#3D3D3D', // dark pill buttons
           pressed: '#2A2A2A',
         },
+        // Money in and money out. Kept in sync with `money` in theme/colors.ts.
+        money: {
+          in: '#0B6B3A',
+          out: '#C2472A',
+        },
       },
       // Phone-scale breakpoints. Tailwind's defaults start at 640px, which no
       // phone reaches, so every `sm:` rule would be dead code on a real device.

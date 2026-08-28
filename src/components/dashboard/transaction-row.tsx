@@ -1,7 +1,10 @@
+import { ArrowDownLeft } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
+import { BillMark } from '@/components/bills/bill-mark';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { formatCurrency } from '@/lib/format';
+import { colors, moneyColor } from '@/theme/colors';
 
 type TransactionRowProps = {
   label: string;
@@ -10,6 +13,10 @@ type TransactionRowProps = {
   /** What it came from, so the row says more than a name and a number. */
   kindLabel?: string;
   domain?: string | null;
+  /** Bills draw their category icon rather than a brand logo. */
+  kind?: 'receipt' | 'bill' | 'subscription' | 'payment' | 'income';
+  categoryId?: string | null;
+  iconId?: string | null;
   onPress?: () => void;
 };
 
@@ -20,7 +27,16 @@ type TransactionRowProps = {
  * a category glyph — the merchant's own logo is what people recognise, and it
  * keeps every list in the app reading the same way.
  */
-export function TransactionRow({ label, amount, kindLabel, domain, onPress }: TransactionRowProps) {
+export function TransactionRow({
+  label,
+  amount,
+  kindLabel,
+  domain,
+  kind,
+  categoryId,
+  iconId,
+  onPress,
+}: TransactionRowProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -28,7 +44,18 @@ export function TransactionRow({ label, amount, kindLabel, domain, onPress }: Tr
       onPress={onPress}
       className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
     >
-      <BrandMark name={label} domain={domain} size={40} />
+      {kind === 'bill' ? (
+        <BillMark categoryId={categoryId} iconId={iconId} size={40} />
+      ) : kind === 'payment' || kind === 'income' ? (
+        // Neither is a purchase from anyone, so neither has a logo. A monogram
+        // of the word "Payment" reads as a logo that failed to load; an arrow
+        // says what actually happened — money came in.
+        <View className="h-10 w-10 items-center justify-center rounded-full bg-black/5">
+          <ArrowDownLeft size={18} color={colors.body} strokeWidth={1.8} />
+        </View>
+      ) : (
+        <BrandMark name={label} domain={domain} size={40} />
+      )}
 
       <View className="min-w-0 flex-1">
         <Text
@@ -49,7 +76,11 @@ export function TransactionRow({ label, amount, kindLabel, domain, onPress }: Tr
         ) : null}
       </View>
 
-      <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.4}>
+      <Text
+        className="font-poppins-semibold text-[15px] text-ink"
+        style={{ color: moneyColor(amount) }}
+        maxFontSizeMultiplier={1.4}
+      >
         {formatCurrency(amount)}
       </Text>
     </Pressable>

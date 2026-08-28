@@ -50,6 +50,23 @@ public class ReceiptScannerModule: Module {
           promise.reject("ERR_UNREADABLE", "Could not open that file as an image or PDF.")
           return
         }
+        promise.resolve(Self.recognizeText(in: image))
+      }
+    }
+
+    /// The same recognition, with the layout kept.
+    ///
+    /// A receipt is a two-column document — labels on the left, money on the
+    /// right — and flattening it to lines of text throws away the one signal
+    /// that says which figure belongs to which label. Every line comes back
+    /// with where it sits on the page and how tall it was printed, so the
+    /// parser can find the name by its size and the total by its row.
+    AsyncFunction("recognizeReceipt") { (uri: String, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        guard let image = Self.loadImage(from: uri) else {
+          promise.reject("ERR_UNREADABLE", "Could not open that file as an image or PDF.")
+          return
+        }
         promise.resolve(Self.recognize(in: image))
       }
     }
@@ -87,29 +104,70 @@ public class ReceiptScannerModule: Module {
 
   // MARK: - Recognition
 
-  /// Lines come back in reading order, which is what the parser relies on to
-  /// tell a total from the line item that happens to share its amount.
-  fileprivate static func recognize(in image: UIImage) -> String {
-    guard let cgImage = image.cgImage else { return "" }
+  /// How many readings of each line to hand back.
+  ///
+  /// Vision ranks its guesses, and on thermal print the runner-up is often the
+  /// right one — an 8 read as a 3, an O read as a 0. The parser can test a
+  /// second candidate against the receipt's own arithmetic; it cannot invent
+  /// one that was never returned.
+  private static let candidateCount = 3
+
+  /// Every recognised line, with where it sits and how tall it was printed.
+  ///
+  /// Vision's bounding boxes are normalised with the origin at the bottom
+  /// left. They are flipped here so y grows downward, because every caller
+  /// reasons about a receipt from the top down.
+  fileprivate static func recognize(in image: UIImage) -> [[String: Any]] {
+    guard let cgImage = image.cgImage else { return [] }
 
     let request = VNRecognizeTextRequest()
     // Receipts are thermal-printed and often skewed; accurate beats fast when
     // the alternative is a wrong total.
     request.recognitionLevel = .accurate
-    request.usesLanguageCorrection = true
+
+    // Off, deliberately. Language correction is built for prose: it pulls
+    // unfamiliar tokens towards dictionary words, which is exactly wrong for a
+    // document made of shop names, product codes and prices. It is what turns
+    // the same storefront into a different name on two passes.
+    request.usesLanguageCorrection = false
+
     request.recognitionLanguages = ["en-US", "en-CA", "fr-CA"]
+    // Fine print — the tax line, the card footer — is small but load-bearing.
+    request.minimumTextHeight = 0.008
+
+    if #available(iOS 16.0, *) {
+      request.revision = VNRecognizeTextRequestRevision3
+    }
 
     let handler = VNImageRequestHandler(cgImage: cgImage, orientation: .up, options: [:])
     do {
       try handler.perform([request])
     } catch {
-      return ""
+      return []
     }
 
-    let observations = request.results ?? []
-    return
-      observations
-      .compactMap { $0.topCandidates(1).first?.string }
+    return (request.results ?? []).compactMap { observation in
+      let candidates = observation.topCandidates(candidateCount)
+      guard let best = candidates.first else { return nil }
+
+      let box = observation.boundingBox
+      return [
+        "text": best.string,
+        "candidates": candidates.map { $0.string },
+        "confidence": best.confidence,
+        "x": box.origin.x,
+        // Flipped: Vision measures up from the bottom, receipts read down.
+        "y": 1 - box.origin.y - box.size.height,
+        "width": box.size.width,
+        "height": box.size.height,
+      ]
+    }
+  }
+
+  /// The flat reading, for callers that only want the words.
+  fileprivate static func recognizeText(in image: UIImage) -> String {
+    recognize(in: image)
+      .compactMap { $0["text"] as? String }
       .joined(separator: "\n")
   }
 }
@@ -143,11 +201,14 @@ private class ScannerDelegate: NSObject, VNDocumentCameraViewControllerDelegate 
     // Multi-page scans are joined into one body of text: a receipt that spills
     // onto a second page is still one purchase.
     var pages: [String] = []
+    var lines: [[String: Any]] = []
     var savedPath: String?
 
     for index in 0..<scan.pageCount {
       let page = scan.imageOfPage(at: index)
-      pages.append(ReceiptScannerModule.recognize(in: page))
+      let recognised = ReceiptScannerModule.recognize(in: page)
+      lines.append(contentsOf: recognised)
+      pages.append(recognised.compactMap { $0["text"] as? String }.joined(separator: "\n"))
 
       if index == 0, let data = page.jpegData(compressionQuality: 0.8) {
         let url = FileManager.default.temporaryDirectory
@@ -161,6 +222,7 @@ private class ScannerDelegate: NSObject, VNDocumentCameraViewControllerDelegate 
     settle {
       promise.resolve([
         "text": pages.joined(separator: "\n"),
+        "lines": lines,
         "imageUri": savedPath as Any,
         "pageCount": scan.pageCount,
       ])

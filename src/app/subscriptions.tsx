@@ -17,6 +17,9 @@ import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Title } from '@/components/ui/typography';
+import { DateGroupHeader } from '@/components/ui/date-group-header';
+import { toIsoDate } from '@/lib/date';
+import { groupByDate } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
 import { colors } from '@/theme/colors';
 
@@ -37,6 +40,7 @@ export default function SubscriptionsScreen() {
   const [filters, setFilters] = useState<SubscriptionFilters>(EMPTY_SUBSCRIPTION_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
 
+  const today = toIsoDate(new Date());
   const { data: subscriptions = [], isLoading, isError, refetch } = useSubscriptions();
   const { sources } = usePaymentSources();
 
@@ -69,6 +73,17 @@ export default function SubscriptionsScreen() {
     (sum, subscription) =>
       subscription.active ? sum + subscription.amount * (PER_MONTH[subscription.cycle] ?? 1) : sum,
     0,
+  );
+
+  // By renewal date, soonest first — the next charge is the useful one.
+  // Cancelled plans still show, but contribute nothing to a group total.
+  const groups = useMemo(
+    () =>
+      groupByDate(visible, (subscription) => subscription.next_renewal_on, {
+        amountOf: (subscription) => (subscription.active ? -Math.abs(subscription.amount) : 0),
+        direction: 'asc',
+      }),
+    [visible],
   );
 
   const narrowed = query.trim().length > 0 || activeCount > 0;
@@ -171,20 +186,26 @@ export default function SubscriptionsScreen() {
 
       {!isLoading && !isError && visible.length > 0 ? (
         <View className="w-full pb-10">
-          {visible.map((subscription) => (
-            <SubscriptionRow
-              key={subscription.id}
-              name={subscription.name}
-              amount={subscription.amount}
-              cycle={subscription.cycle}
-              renewsOn={subscription.next_renewal_on}
-              domain={subscription.brands?.domain}
-              active={subscription.active}
-              sourceLabel={
-                sourceLabels.get(subscription.card_id ?? subscription.bank_account_id ?? '') ?? ''
-              }
-              onPress={() => router.push(`/add-subscription?id=${subscription.id}`)}
-            />
+          {groups.map((group) => (
+            <View key={group.date || 'undated'} className="w-full">
+              <DateGroupHeader date={group.date} today={today} total={group.total} />
+              {group.items.map((subscription) => (
+                <SubscriptionRow
+                  key={subscription.id}
+                  name={subscription.name}
+                  amount={subscription.amount}
+                  cycle={subscription.cycle}
+                  renewsOn={subscription.next_renewal_on}
+                  domain={subscription.brands?.domain}
+                  active={subscription.active}
+                  sourceLabel={
+                    sourceLabels.get(subscription.card_id ?? subscription.bank_account_id ?? '') ??
+                    ''
+                  }
+                  onPress={() => router.push(`/add-subscription?id=${subscription.id}`)}
+                />
+              ))}
+            </View>
           ))}
         </View>
       ) : null}

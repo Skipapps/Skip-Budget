@@ -7,7 +7,15 @@ import { PaymentCard } from '@/components/cards/payment-card';
 import { AmountTile } from '@/components/ui/amount-tile';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Screen } from '@/components/ui/screen';
-import { useBankAccounts, useCards, useSalarySources, useSavingsPots } from '@/api/queries';
+import {
+  useBankAccounts,
+  useCards,
+  useSalarySources,
+  useSavingsPots,
+  useSourceBalances,
+} from '@/api/queries';
+import { useRefreshAll } from '@/api/refresh';
+import { toIsoDate } from '@/lib/date';
 import { moneyBuckets } from '@/data/money-mock';
 import { colors } from '@/theme/colors';
 import { shadows } from '@/theme/shadows';
@@ -59,10 +67,16 @@ function EmptyNote({ text }: { text: string }) {
 }
 
 export default function CardsScreen() {
+  // Read once per render, so every face on the screen is worked out against
+  // the same day rather than drifting apart across a midnight boundary.
+  const today = toIsoDate(new Date());
+
   const cards = useCards();
   const accounts = useBankAccounts();
   const salary = useSalarySources();
   const savings = useSavingsPots();
+  const { balances } = useSourceBalances(today);
+  const { refresh, refreshing } = useRefreshAll();
 
   const monthlySalary = (salary.data ?? []).reduce(
     (sum, source) => sum + source.amount * PER_MONTH[source.frequency],
@@ -76,7 +90,7 @@ export default function CardsScreen() {
   };
 
   return (
-    <Screen>
+    <Screen onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-2 w-full">
         <SectionHeader
           title="Select Card"
@@ -101,7 +115,9 @@ export default function CardsScreen() {
               card={{
                 id: card.id,
                 holder: card.holder,
-                balance: card.balance,
+                // What the card is at now. The stored figure is only the
+                // starting point; receipts and bills have moved it since.
+                balance: balances.get(card.id) ?? card.balance,
                 last4: card.last4 ?? '',
                 network: card.network,
                 color: card.color,
@@ -138,7 +154,7 @@ export default function CardsScreen() {
                 bankName: account.bank_name,
                 nickname: account.nickname ?? '',
                 accountType: account.account_type === 'savings' ? 'Savings' : 'Checking',
-                balance: account.balance,
+                balance: balances.get(account.id) ?? account.balance,
                 last4: account.last4 ?? '',
                 color: account.color,
               }}
