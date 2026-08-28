@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -12,28 +13,17 @@ import { LedgerRow } from '@/components/transactions/ledger-row';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { Title } from '@/components/ui/typography';
-import { accounts } from '@/data/accounts-mock';
-import { cards } from '@/data/cards-mock';
-import { TRANSACTION_KINDS, ledger, type LedgerEntry } from '@/data/transactions-mock';
+import { usePaymentSources, useLedger, type LedgerEntry } from '@/api/queries';
+import { PageState } from '@/components/ui/page-state';
+import { SkeletonList } from '@/components/ui/skeleton';
+import { TRANSACTION_KINDS } from '@/data/transactions-mock';
+
+import EmptyArt from '@/assets/illustrations/state-empty-wallet.svg';
+import ErrorArt from '@/assets/illustrations/state-error.svg';
+import NoResultsArt from '@/assets/illustrations/state-no-results.svg';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { colors } from '@/theme/colors';
-
-/** One lookup for both payment sources, so a row can name where it came from. */
-const SOURCE_LABELS: Record<string, string> = {
-  ...Object.fromEntries(cards.map((card) => [card.id, `${card.network} ••${card.last4}`])),
-  ...Object.fromEntries(
-    accounts.map((account) => [account.id, `${account.bankName} ••${account.last4}`]),
-  ),
-};
-
-const SOURCE_OPTIONS = [
-  ...cards.map((card) => ({ value: card.id, label: `${card.network} ••${card.last4}` })),
-  ...accounts.map((account) => ({
-    value: account.id,
-    label: `${account.bankName} ••${account.last4}`,
-  })),
-];
 
 const KIND_LABELS = Object.fromEntries(
   TRANSACTION_KINDS.map((kind) => [kind.value, kind.label]),
@@ -45,6 +35,18 @@ export default function TransactionsScreen() {
   const [filterOpen, setFilterOpen] = useState(false);
 
   const activeCount = countActiveFilters(filters);
+
+  const { entries: ledger, isLoading, isError, refetch } = useLedger();
+  const { sources } = usePaymentSources();
+
+  const sourceOptions = useMemo(
+    () => sources.map((source) => ({ value: source.id, label: source.label })),
+    [sources],
+  );
+  const sourceLabels = useMemo(
+    () => new Map(sources.map((source) => [source.id, source.label])),
+    [sources],
+  );
 
   const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -72,7 +74,7 @@ export default function TransactionsScreen() {
         entries,
         total: entries.reduce((sum, entry) => sum + entry.amount, 0),
       }));
-  }, [query, filters]);
+  }, [ledger, query, filters]);
 
   return (
     <Screen avoidKeyboard>
@@ -100,13 +102,42 @@ export default function TransactionsScreen() {
         </Pressable>
       </View>
 
-      {groups.length === 0 ? (
-        <View className="mt-16 w-full items-center">
-          <Text className="font-poppins text-[15px] text-muted" maxFontSizeMultiplier={1.4}>
-            No transactions match.
-          </Text>
-        </View>
-      ) : (
+      {isLoading ? <SkeletonList rows={7} /> : null}
+
+      {isError ? (
+        <PageState
+          art={ErrorArt}
+          title="Could not load your transactions"
+          message="Check your connection and try again. Nothing has been lost."
+          actionLabel="Try again"
+          onAction={refetch}
+        />
+      ) : null}
+
+      {!isLoading && !isError && ledger.length === 0 ? (
+        <PageState
+          art={EmptyArt}
+          title="Nothing here yet"
+          message="Receipts, bills and subscriptions all show up here together once you add a few."
+          actionLabel="Add a receipt"
+          onAction={() => router.push('/add-receipt')}
+        />
+      ) : null}
+
+      {!isLoading && !isError && ledger.length > 0 && groups.length === 0 ? (
+        <PageState
+          art={NoResultsArt}
+          title="Nothing matches"
+          message="No transaction fits that search and those filters."
+          actionLabel="Clear filters"
+          onAction={() => {
+            setQuery('');
+            setFilters(EMPTY_FILTERS);
+          }}
+        />
+      ) : null}
+
+      {!isLoading && !isError && groups.length > 0 ? (
         <View className="mt-2 w-full pb-24">
           {groups.map((group) => (
             <View key={group.date} className="w-full">
@@ -131,19 +162,19 @@ export default function TransactionsScreen() {
                 <LedgerRow
                   key={entry.id}
                   entry={entry}
-                  sourceLabel={SOURCE_LABELS[entry.sourceId] ?? 'Unknown'}
+                  sourceLabel={sourceLabels.get(entry.sourceId) ?? ''}
                   kindLabel={KIND_LABELS[entry.kind] ?? entry.kind}
                 />
               ))}
             </View>
           ))}
         </View>
-      )}
+      ) : null}
 
       {filterOpen ? (
         <FilterSheet
           filters={filters}
-          sourceOptions={SOURCE_OPTIONS}
+          sourceOptions={sourceOptions}
           onCancel={() => setFilterOpen(false)}
           onApply={(next) => {
             setFilters(next);

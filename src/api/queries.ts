@@ -39,8 +39,11 @@ export type BillRow = {
   icon_id: string | null;
   recurrence: 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'period';
   next_due_on: string | null;
+  starts_on?: string | null;
+  ends_on?: string | null;
   card_id: string | null;
   bank_account_id: string | null;
+  note?: string | null;
 };
 
 export type SalarySourceRow = {
@@ -300,4 +303,135 @@ export function useSubscription(id: string | undefined) {
       return data as unknown as SubscriptionRow | null;
     },
   });
+}
+
+/** One bill, for the edit screen. */
+export function useBill(id: string | undefined) {
+  const userId = useUserId();
+  return useQuery({
+    queryKey: ['bill', id, userId],
+    enabled: Boolean(userId && id),
+    queryFn: async (): Promise<BillRow | null> => {
+      const { data, error } = await supabase
+        .from('bills')
+        .select(
+          'id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, note',
+        )
+        .eq('id', id!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as unknown as BillRow | null;
+    },
+  });
+}
+
+/** One card or bank account, for the edit screens. */
+export function useCard(id: string | undefined) {
+  const userId = useUserId();
+  return useQuery({
+    queryKey: ['card', id, userId],
+    enabled: Boolean(userId && id),
+    queryFn: async (): Promise<
+      (CardRow & { bill_due_day: number | null; reminder_days: number | null }) | null
+    > => {
+      const { data, error } = await supabase
+        .from('cards')
+        .select('id, holder, network, last4, color, balance, bill_due_day, reminder_days')
+        .eq('id', id!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as never;
+    },
+  });
+}
+
+export function useBankAccount(id: string | undefined) {
+  const userId = useUserId();
+  return useQuery({
+    queryKey: ['bank_account', id, userId],
+    enabled: Boolean(userId && id),
+    queryFn: async (): Promise<BankAccountRow | null> => {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('id, bank_name, nickname, account_type, last4, color, balance')
+        .eq('id', id!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as unknown as BankAccountRow | null;
+    },
+  });
+}
+
+/**
+ * Everything that moved money, as one timeline.
+ *
+ * Receipts, subscriptions and bills live in separate tables because they are
+ * different things with different fields — but a person thinks of them as one
+ * history. This merges them client-side rather than in a view: all three sets
+ * are already fetched for their own screens, so the rows are usually in cache
+ * and the merge costs nothing.
+ *
+ * Bills and subscriptions contribute their NEXT date, not a payment history —
+ * neither table records individual charges yet. That makes this a forward
+ * ledger for those two and a real history for receipts.
+ */
+export type LedgerEntry = {
+  id: string;
+  label: string;
+  /** Negative is money out; everything here is an outgoing. */
+  amount: number;
+  date: string;
+  kind: 'bill' | 'receipt' | 'subscription';
+  sourceId: string;
+  domain?: string | null;
+};
+
+export function useLedger() {
+  const receipts = useReceipts();
+  const subscriptions = useSubscriptions();
+  const bills = useBills();
+
+  const entries: LedgerEntry[] = [
+    ...(receipts.data ?? []).map((row) => ({
+      id: `receipt-${row.id}`,
+      label: row.merchant,
+      amount: -Math.abs(row.amount),
+      date: row.purchased_on,
+      kind: 'receipt' as const,
+      sourceId: row.card_id ?? row.bank_account_id ?? '',
+      domain: row.brands?.domain,
+    })),
+    ...(subscriptions.data ?? [])
+      .filter((row) => row.active && row.next_renewal_on)
+      .map((row) => ({
+        id: `subscription-${row.id}`,
+        label: row.name,
+        amount: -Math.abs(row.amount),
+        date: row.next_renewal_on!,
+        kind: 'subscription' as const,
+        sourceId: row.card_id ?? row.bank_account_id ?? '',
+        domain: row.brands?.domain,
+      })),
+    ...(bills.data ?? [])
+      .filter((row) => row.next_due_on)
+      .map((row) => ({
+        id: `bill-${row.id}`,
+        label: row.name,
+        amount: -Math.abs(row.amount),
+        date: row.next_due_on!,
+        kind: 'bill' as const,
+        sourceId: row.card_id ?? row.bank_account_id ?? '',
+      })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
+
+  return {
+    entries,
+    isLoading: receipts.isLoading || subscriptions.isLoading || bills.isLoading,
+    isError: receipts.isError || subscriptions.isError || bills.isError,
+    refetch: () => {
+      receipts.refetch();
+      subscriptions.refetch();
+      bills.refetch();
+    },
+  };
 }

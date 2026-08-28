@@ -1,10 +1,10 @@
-import { router } from 'expo-router';
-import { Calculator, Calendar, ChevronLeft } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Calculator, Calendar, ChevronLeft, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
-import { useCreateBill } from '@/api/mutations';
-import { usePaymentSources } from '@/api/queries';
+import { useCreateBill, useDeleteBill, useUpdateBill, type BillValues } from '@/api/mutations';
+import { useBill, usePaymentSources } from '@/api/queries';
 import { CategoryPicker } from '@/components/bills/category-picker';
 import { IconPicker } from '@/components/bills/icon-picker';
 import { AmountPad } from '@/components/ui/amount-pad';
@@ -40,18 +40,52 @@ type RecurrenceChoice = Recurrence | typeof PERIOD;
 
 type Step = 'category' | 'details';
 
-export default function AddBillScreen() {
-  const [step, setStep] = useState<Step>('category');
+const asDate = (value?: string | null) => (value ? new Date(`${value}T00:00:00`) : null);
 
-  const [categoryId, setCategoryId] = useState<string>('');
-  const [name, setName] = useState('');
-  const [iconId, setIconId] = useState('other');
-  const [amount, setAmount] = useState('');
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [recurrence, setRecurrence] = useState<RecurrenceChoice>('monthly');
-  const [sourceId, setSourceId] = useState('');
-  const [note, setNote] = useState('');
+/** Loads the bill being edited, then seeds the form by remount. */
+export default function AddBillScreen() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { data: existing, isLoading } = useBill(id);
+
+  if (id && isLoading && !existing) {
+    return (
+      <Screen showBack>
+        <Title className="mt-2">Edit bill</Title>
+        <View className="mt-16 w-full items-center">
+          <ActivityIndicator size="small" color={colors.muted} />
+        </View>
+      </Screen>
+    );
+  }
+
+  return <BillForm key={existing?.id ?? 'new'} id={id} existing={existing ?? null} />;
+}
+
+function BillForm({
+  id,
+  existing,
+}: {
+  id?: string;
+  existing: ReturnType<typeof useBill>['data'] | null;
+}) {
+  const editing = Boolean(id);
+  // Editing starts on the details step: the category is already chosen, and
+  // making someone re-pick it to fix an amount would be busywork.
+  const [step, setStep] = useState<Step>(editing ? 'details' : 'category');
+
+  const [categoryId, setCategoryId] = useState<string>(existing?.category_id ?? '');
+  const [name, setName] = useState(existing?.name ?? '');
+  const [iconId, setIconId] = useState(existing?.icon_id ?? 'other');
+  const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
+  const [startDate, setStartDate] = useState<Date | null>(
+    asDate(existing?.starts_on ?? existing?.next_due_on),
+  );
+  const [endDate, setEndDate] = useState<Date | null>(asDate(existing?.ends_on));
+  const [recurrence, setRecurrence] = useState<RecurrenceChoice>(
+    (existing?.recurrence as RecurrenceChoice) ?? 'monthly',
+  );
+  const [sourceId, setSourceId] = useState(existing?.card_id ?? existing?.bank_account_id ?? '');
+  const [note, setNote] = useState(existing?.note ?? '');
 
   // Which date the picker is editing, or null when it is closed.
   const [datePicker, setDatePicker] = useState<'start' | 'end' | null>(null);
@@ -84,6 +118,27 @@ export default function AddBillScreen() {
 
   const { sources } = usePaymentSources();
   const createBill = useCreateBill();
+  const updateBill = useUpdateBill();
+  const deleteBill = useDeleteBill();
+
+  const handleDelete = () => {
+    if (!id) return;
+    Alert.alert('Delete this bill?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteBill.mutateAsync(id);
+            router.back();
+          } catch (thrown) {
+            setError((thrown as Error).message ?? 'Could not delete that bill.');
+          }
+        },
+      },
+    ]);
+  };
 
   const handleSave = async () => {
     setError(null);
@@ -103,7 +158,7 @@ export default function AddBillScreen() {
     const isPeriod = recurrence === PERIOD;
 
     try {
-      await createBill.mutateAsync({
+      const values: BillValues = {
         name: name.trim(),
         amount: value,
         category_id: categoryId,
@@ -117,7 +172,13 @@ export default function AddBillScreen() {
         card_id: chosen?.kind === 'card' ? chosen.id : null,
         bank_account_id: chosen?.kind === 'account' ? chosen.id : null,
         note: note.trim() || null,
-      });
+      };
+
+      if (editing && id) {
+        await updateBill.mutateAsync({ id, values });
+      } else {
+        await createBill.mutateAsync(values);
+      }
       router.back();
     } catch (thrown) {
       setError((thrown as Error).message ?? 'Could not save that bill.');
@@ -258,8 +319,33 @@ export default function AddBillScreen() {
         </Text>
       ) : null}
 
-      <View className="mt-auto w-full pt-10">
-        <Button label={createBill.isPending ? 'Saving…' : 'Save bill'} onPress={handleSave} />
+      <View className="mt-auto w-full gap-3 pt-10">
+        <Button
+          label={
+            createBill.isPending || updateBill.isPending
+              ? 'Saving…'
+              : editing
+                ? 'Save changes'
+                : 'Save bill'
+          }
+          onPress={handleSave}
+        />
+        {editing ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Delete this bill"
+            onPress={handleDelete}
+            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-black/5"
+          >
+            <Trash2 size={17} color="#DC2626" strokeWidth={1.9} />
+            <Text
+              className="font-poppins-medium text-[15px] text-red-600"
+              maxFontSizeMultiplier={1.4}
+            >
+              {deleteBill.isPending ? 'Deleting…' : 'Delete bill'}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {datePicker ? (

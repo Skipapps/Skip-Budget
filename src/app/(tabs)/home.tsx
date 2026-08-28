@@ -12,9 +12,9 @@ import { DateSelector } from '@/components/dashboard/date-selector';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
-import { useBills, useDashboard, useProfile } from '@/api/queries';
-import { dayTotal, initialDate, spendingCategories, transactions } from '@/data/dashboard-mock';
-import { addDays, formatDayLabel } from '@/lib/date';
+import { useBills, useDashboard, useLedger, useProfile } from '@/api/queries';
+import { spendingCategories } from '@/data/dashboard-mock';
+import { addDays, formatDayLabel, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { colors } from '@/theme/colors';
 
@@ -22,10 +22,17 @@ import { colors } from '@/theme/colors';
 // bleed to both edges and the last one peeks, signalling that the row scrolls.
 const GUTTER = 24;
 
+const KIND_LABELS: Record<string, string> = {
+  receipt: 'Receipt',
+  bill: 'Bill',
+  subscription: 'Subscription',
+};
+
 export default function HomeScreen() {
   const profile = useProfile();
   const dashboard = useDashboard();
   const bills = useBills();
+  const { entries: ledger } = useLedger();
 
   // Only the Monthly Bills tile has a table behind it so far; receipts and
   // subscriptions keep their placeholder figures until those tables exist.
@@ -41,10 +48,16 @@ export default function HomeScreen() {
     return sum + perMonth;
   }, 0);
 
-  const [selectedDate, setSelectedDate] = useState(initialDate);
+  // Today, not a hardcoded date: the dashboard opens on the day you are in.
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const { weekday, date } = formatDayLabel(selectedDate);
+
+  // The day's entries, from the same ledger the transactions tab reads.
+  const dayKey = toIsoDate(selectedDate);
+  const dayEntries = ledger.filter((entry) => entry.date === dayKey);
+  const dayTotal = dayEntries.reduce((sum, entry) => sum + entry.amount, 0);
 
   const handleConfirmDate = (date: Date) => {
     setSelectedDate(date);
@@ -139,12 +152,26 @@ export default function HomeScreen() {
       </View>
 
       <View className="mt-1 w-full pb-24">
-        {transactions.map((transaction, index) => (
-          <Fragment key={transaction.id}>
-            {index > 0 ? <View className="ml-13 h-px bg-line/60" /> : null}
-            <TransactionRow transaction={transaction} />
-          </Fragment>
-        ))}
+        {dayEntries.length === 0 ? (
+          <Text
+            className="w-full py-8 text-center font-poppins text-[14px] text-muted"
+            maxFontSizeMultiplier={1.4}
+          >
+            Nothing on this day.
+          </Text>
+        ) : (
+          dayEntries.map((entry, index) => (
+            <Fragment key={entry.id}>
+              {index > 0 ? <View className="ml-13 h-px bg-line/60" /> : null}
+              <TransactionRow
+                label={entry.label}
+                amount={entry.amount}
+                kindLabel={KIND_LABELS[entry.kind]}
+                domain={entry.domain}
+              />
+            </Fragment>
+          ))
+        )}
       </View>
 
       {pickerOpen ? (

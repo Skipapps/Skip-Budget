@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { cn } from '@/lib/cn';
 import { isLightColor } from '@/lib/color';
-import type { PaymentSource } from '@/lib/sources';
+import type { PaymentSourceRow as PaymentSource } from '@/api/queries';
 import { colors } from '@/theme/colors';
 
 type SourceTilesProps = {

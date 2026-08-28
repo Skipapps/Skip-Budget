@@ -110,3 +110,26 @@ export async function signOut(): Promise<AuthResult> {
   const { error } = await supabase.auth.signOut();
   return { error: error ? readable(error.message) : null };
 }
+
+/**
+ * Deletes the signed-in user and everything belonging to them.
+ *
+ * The client cannot touch auth.users, so this calls a security-definer RPC
+ * that deletes exactly one row — whatever auth.uid() resolves to for this
+ * session. There is no id to pass and nothing to tamper with.
+ *
+ * Every table cascades from auth.users, so the data goes with the account.
+ * The local session is cleared afterwards regardless: the user it referred to
+ * no longer exists, and leaving a dead token in storage would leave the app
+ * in a state where every request 401s with no explanation.
+ */
+export async function deleteAccount(): Promise<AuthResult> {
+  const { error } = await supabase.rpc('delete_my_account');
+
+  if (error) {
+    return { error: readable(error.message) };
+  }
+
+  await supabase.auth.signOut();
+  return { error: null };
+}

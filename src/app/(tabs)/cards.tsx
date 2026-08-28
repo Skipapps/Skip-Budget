@@ -5,6 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 import { AccountCard } from '@/components/cards/account-card';
 import { PaymentCard } from '@/components/cards/payment-card';
 import { AmountTile } from '@/components/ui/amount-tile';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Screen } from '@/components/ui/screen';
 import { useBankAccounts, useCards, useSalarySources, useSavingsPots } from '@/api/queries';
 import { moneyBuckets } from '@/data/money-mock';
@@ -86,19 +87,32 @@ export default function CardsScreen() {
 
       <View className="mt-5 w-full gap-4">
         {(cards.data ?? []).map((card) => (
-          <PaymentCard
+          // Wrapped rather than given an onPress: PaymentCard stays purely
+          // presentational, and the same face is reused in the add-card preview
+          // where tapping it would mean nothing.
+          <Pressable
             key={card.id}
-            card={{
-              id: card.id,
-              holder: card.holder,
-              balance: card.balance,
-              last4: card.last4 ?? '',
-              network: card.network,
-              color: card.color,
-            }}
-          />
+            accessibilityRole="button"
+            accessibilityLabel={`Edit ${card.holder}`}
+            onPress={() => router.push(`/add-card?id=${card.id}`)}
+            className="active:opacity-80"
+          >
+            <PaymentCard
+              card={{
+                id: card.id,
+                holder: card.holder,
+                balance: card.balance,
+                last4: card.last4 ?? '',
+                network: card.network,
+                color: card.color,
+              }}
+            />
+          </Pressable>
         ))}
-        {cards.data?.length === 0 ? <EmptyNote text="No cards yet." /> : null}
+        {cards.isPending ? <Skeleton className="h-44 w-full rounded-[16px]" /> : null}
+        {!cards.isPending && cards.data?.length === 0 ? (
+          <EmptyNote text="No cards yet. Add one to track what you spend on it." />
+        ) : null}
       </View>
 
       <View className="mt-10 w-full">
@@ -111,20 +125,30 @@ export default function CardsScreen() {
 
       <View className="mt-5 w-full gap-4">
         {(accounts.data ?? []).map((account) => (
-          <AccountCard
+          <Pressable
             key={account.id}
-            account={{
-              id: account.id,
-              bankName: account.bank_name,
-              nickname: account.nickname ?? '',
-              accountType: account.account_type === 'savings' ? 'Savings' : 'Checking',
-              balance: account.balance,
-              last4: account.last4 ?? '',
-              color: account.color,
-            }}
-          />
+            accessibilityRole="button"
+            accessibilityLabel={`Edit ${account.nickname || account.bank_name}`}
+            onPress={() => router.push(`/add-account?id=${account.id}`)}
+            className="active:opacity-80"
+          >
+            <AccountCard
+              account={{
+                id: account.id,
+                bankName: account.bank_name,
+                nickname: account.nickname ?? '',
+                accountType: account.account_type === 'savings' ? 'Savings' : 'Checking',
+                balance: account.balance,
+                last4: account.last4 ?? '',
+                color: account.color,
+              }}
+            />
+          </Pressable>
         ))}
-        {accounts.data?.length === 0 ? <EmptyNote text="No bank accounts yet." /> : null}
+        {accounts.isPending ? <Skeleton className="h-36 w-full rounded-[16px]" /> : null}
+        {!accounts.isPending && accounts.data?.length === 0 ? (
+          <EmptyNote text="No bank accounts yet. Add one to see money coming in and out." />
+        ) : null}
       </View>
 
       <Text

@@ -1,9 +1,11 @@
-import { router } from 'expo-router';
-import { Calendar, Wallet } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Calendar, Trash2, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
-import { useCreateCard } from '@/api/mutations';
+import { useCreateCard, useDeleteCard, useUpdateCard } from '@/api/mutations';
+import { useCard } from '@/api/queries';
+import { colors } from '@/theme/colors';
 import { NetworkPicker } from '@/components/cards/network-picker';
 import { PaymentCard } from '@/components/cards/payment-card';
 import { Button } from '@/components/ui/button';
@@ -33,21 +35,81 @@ type Reminder = (typeof REMINDER_OPTIONS)[number]['value'];
 const MORE_SETUP_INFO =
   'Adding more details helps Skip calculate accurate balances and predict future transactions made with this card.';
 
+/** Loads the card being edited, then seeds the form by remount. */
 export default function AddCardScreen() {
-  const [network, setNetwork] = useState<string>(NETWORKS[0]);
-  const [name, setName] = useState('');
-  const [color, setColor] = useState<string>(DEFAULT_CARD_COLOR);
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { data: existing, isLoading } = useCard(id);
 
-  const [last4, setLast4] = useState('');
-  const [dueDate, setDueDate] = useState<Date | null>(null);
-  const [reminder, setReminder] = useState<Reminder>('3');
-  const [balance, setBalance] = useState('');
+  if (id && isLoading && !existing) {
+    return (
+      <Screen showBack>
+        <Title className="mt-2">Edit card</Title>
+        <View className="mt-16 w-full items-center">
+          <ActivityIndicator size="small" color={colors.muted} />
+        </View>
+      </Screen>
+    );
+  }
+
+  return <CardForm key={existing?.id ?? 'new'} id={id} existing={existing ?? null} />;
+}
+
+function CardForm({
+  id,
+  existing,
+}: {
+  id?: string;
+  existing: ReturnType<typeof useCard>['data'] | null;
+}) {
+  const editing = Boolean(id);
+
+  const [network, setNetwork] = useState<string>(existing?.network ?? NETWORKS[0]);
+  const [name, setName] = useState(existing?.holder ?? '');
+  const [color, setColor] = useState<string>(existing?.color ?? DEFAULT_CARD_COLOR);
+
+  const [last4, setLast4] = useState(existing?.last4 ?? '');
+  // Stored as a day of the month; the picker wants a Date, so it is placed in
+  // the current month purely to give the wheel something to open on.
+  const [dueDate, setDueDate] = useState<Date | null>(
+    existing?.bill_due_day
+      ? new Date(new Date().getFullYear(), new Date().getMonth(), existing.bill_due_day)
+      : null,
+  );
+  const [reminder, setReminder] = useState<Reminder>(
+    existing?.reminder_days == null ? 'off' : (String(existing.reminder_days) as Reminder),
+  );
+  const [balance, setBalance] = useState(existing ? String(existing.balance) : '');
 
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [amountPadOpen, setAmountPadOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const createCard = useCreateCard();
+  const updateCard = useUpdateCard();
+  const deleteCard = useDeleteCard();
+
+  const handleDelete = () => {
+    if (!id) return;
+    Alert.alert(
+      'Delete this card?',
+      'Receipts, bills and subscriptions paid with it are kept, but stop showing this card.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteCard.mutateAsync(id);
+              router.back();
+            } catch (thrown) {
+              setError((thrown as Error).message ?? 'Could not delete that card.');
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const handleSave = async () => {
     setError(null);
@@ -57,7 +119,7 @@ export default function AddCardScreen() {
     }
 
     try {
-      await createCard.mutateAsync({
+      const values = {
         holder: name.trim(),
         network,
         last4: last4.length === 4 ? last4 : null,
@@ -66,7 +128,13 @@ export default function AddCardScreen() {
         // The bill day is what recurs, not the specific date picked.
         bill_due_day: dueDate ? dueDate.getDate() : null,
         reminder_days: reminder === 'off' ? null : Number(reminder),
-      });
+      };
+
+      if (editing && id) {
+        await updateCard.mutateAsync({ id, values });
+      } else {
+        await createCard.mutateAsync(values);
+      }
       router.back();
     } catch (thrown) {
       setError((thrown as Error).message ?? 'Could not save that card.');
@@ -75,7 +143,7 @@ export default function AddCardScreen() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title className="mt-2">Adding New credit card</Title>
+      <Title className="mt-2">{editing ? 'Edit card' : 'Adding New credit card'}</Title>
 
       {/* Live preview — the colour picker is otherwise a blind choice. */}
       <View className="mt-6 w-full">
@@ -165,8 +233,33 @@ export default function AddCardScreen() {
         </Text>
       ) : null}
 
-      <View className="mt-auto w-full pt-10">
-        <Button label={createCard.isPending ? 'Saving…' : 'Add card'} onPress={handleSave} />
+      <View className="mt-auto w-full gap-3 pt-10">
+        <Button
+          label={
+            createCard.isPending || updateCard.isPending
+              ? 'Saving…'
+              : editing
+                ? 'Save changes'
+                : 'Add card'
+          }
+          onPress={handleSave}
+        />
+        {editing ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Delete this card"
+            onPress={handleDelete}
+            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-black/5"
+          >
+            <Trash2 size={17} color="#DC2626" strokeWidth={1.9} />
+            <Text
+              className="font-poppins-medium text-[15px] text-red-600"
+              maxFontSizeMultiplier={1.4}
+            >
+              {deleteCard.isPending ? 'Deleting…' : 'Delete card'}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {datePickerOpen ? (

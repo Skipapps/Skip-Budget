@@ -19,30 +19,71 @@ import {
   Vibrate,
 } from 'lucide-react-native';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 
-import { signOut } from '@/api/auth';
+import { deleteAccount, signOut } from '@/api/auth';
 import { SettingsRow } from '@/components/settings/settings-row';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { Title } from '@/components/ui/typography';
-import { accounts } from '@/data/accounts-mock';
-import { cards } from '@/data/cards-mock';
-import { salarySources } from '@/data/salary-mock';
-import { subscriptions } from '@/data/subscriptions-mock';
+import { useBankAccounts, useCards, useSalarySources, useSubscriptions } from '@/api/queries';
 
 /** Straight from the subscriptions list, so the summary cannot drift. */
-const trackedSubscriptions = subscriptions.length;
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 export default function SettingsScreen() {
+  const cards = useCards();
+  const accounts = useBankAccounts();
+  const salary = useSalarySources();
+  const subs = useSubscriptions();
+
+  const cardCount = cards.data?.length ?? 0;
+  const accountCount = accounts.data?.length ?? 0;
+  const salaryCount = salary.data?.length ?? 0;
+  const trackedSubscriptions = subs.data?.length ?? 0;
   const [displayName, setDisplayName] = useState('');
   const [haptics, setHaptics] = useState(true);
   const [appLock, setAppLock] = useState(false);
 
   const noop = () => {};
+
+  /**
+   * Two taps, not one. The first spells out exactly what disappears; the
+   * second is the point of no return. Account deletion is the only action in
+   * the app that cannot be undone by any means, so it does not share the
+   * single-confirm pattern used for deleting a receipt.
+   */
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete your account?',
+      'Your cards, accounts, bills, subscriptions, receipts and scanned images are all deleted. This cannot be undone and there is no way to recover them.',
+      [
+        { text: 'Keep my account', style: 'cancel' },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert('This is permanent', 'Delete everything and sign out?', [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete everything',
+                style: 'destructive',
+                onPress: async () => {
+                  const { error } = await deleteAccount();
+                  if (error) {
+                    Alert.alert('Could not delete your account', error);
+                    return;
+                  }
+                  router.replace('/welcome');
+                },
+              },
+            ]),
+        },
+      ],
+    );
+  };
 
   return (
     <Screen avoidKeyboard>
@@ -104,17 +145,13 @@ export default function SettingsScreen() {
         <SettingsRow
           icon={CreditCard}
           title="Cards and accounts"
-          subtitle={`${plural(cards.length, 'card')} · ${plural(accounts.length, 'bank account')}`}
+          subtitle={`${plural(cardCount, 'card')} · ${plural(accountCount, 'bank account')}`}
           onPress={() => router.push('/cards')}
         />
         <SettingsRow
           icon={CalendarDays}
           title="Payday"
-          subtitle={
-            salarySources.length > 0
-              ? plural(salarySources.length, 'salary source')
-              : 'Not set up yet'
-          }
+          subtitle={salaryCount > 0 ? plural(salaryCount, 'salary source') : 'Not set up yet'}
           onPress={() => router.push('/salary')}
           last
         />
@@ -172,7 +209,7 @@ export default function SettingsScreen() {
           title="Delete account"
           subtitle="Permanent, and it cannot be undone"
           destructive
-          onPress={noop}
+          onPress={handleDeleteAccount}
           last
         />
       </SettingsSection>

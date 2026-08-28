@@ -1,7 +1,7 @@
-import { router } from 'expo-router';
-import { Calculator, Calendar, Wallet } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Calculator, Calendar, Trash2, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { AccountCard } from '@/components/cards/account-card';
 import { AmountPad } from '@/components/ui/amount-pad';
@@ -16,7 +16,14 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Title } from '@/components/ui/typography';
-import { useCreateBankAccount, useCreateSalarySource } from '@/api/mutations';
+import {
+  useCreateBankAccount,
+  useCreateSalarySource,
+  useDeleteBankAccount,
+  useUpdateBankAccount,
+} from '@/api/mutations';
+import { useBankAccount } from '@/api/queries';
+import { colors } from '@/theme/colors';
 import { ACCOUNT_TYPES, type AccountType } from '@/data/accounts-mock';
 import {
   PAY_FREQUENCIES,
@@ -33,14 +40,44 @@ const TYPE_OPTIONS = ACCOUNT_TYPES.map((type) => ({ value: type, label: type }))
 const MORE_SETUP_INFO =
   'Adding more details helps Skip calculate accurate balances and predict future transactions made with this account.';
 
+/** Loads the account being edited, then seeds the form by remount. */
 export default function AddAccountScreen() {
-  const [bankName, setBankName] = useState('');
-  const [nickname, setNickname] = useState('');
-  const [accountType, setAccountType] = useState<AccountType>('Checking');
-  const [color, setColor] = useState<string>(DEFAULT_CARD_COLOR);
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { data: existing, isLoading } = useBankAccount(id);
 
-  const [last4, setLast4] = useState('');
-  const [balance, setBalance] = useState('');
+  if (id && isLoading && !existing) {
+    return (
+      <Screen showBack>
+        <Title className="mt-2">Edit account</Title>
+        <View className="mt-16 w-full items-center">
+          <ActivityIndicator size="small" color={colors.muted} />
+        </View>
+      </Screen>
+    );
+  }
+
+  return <AccountForm key={existing?.id ?? 'new'} id={id} existing={existing ?? null} />;
+}
+
+function AccountForm({
+  id,
+  existing,
+}: {
+  id?: string;
+  existing: ReturnType<typeof useBankAccount>['data'] | null;
+}) {
+  const editing = Boolean(id);
+  const [bankName, setBankName] = useState(existing?.bank_name ?? '');
+  const [nickname, setNickname] = useState(existing?.nickname ?? '');
+  const [accountType, setAccountType] = useState<AccountType>(
+    existing
+      ? ((existing.account_type === 'savings' ? 'Savings' : 'Checking') as AccountType)
+      : 'Checking',
+  );
+  const [color, setColor] = useState<string>(existing?.color ?? DEFAULT_CARD_COLOR);
+
+  const [last4, setLast4] = useState(existing?.last4 ?? '');
+  const [balance, setBalance] = useState(existing ? String(existing.balance) : '');
   const [income, setIncome] = useState('');
   const [payFrequency, setPayFrequency] = useState<PayFrequency>('monthly');
   const [lastPayday, setLastPayday] = useState<Date | null>(null);
@@ -58,6 +95,31 @@ export default function AddAccountScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const createAccount = useCreateBankAccount();
+  const updateAccount = useUpdateBankAccount();
+  const deleteAccount = useDeleteBankAccount();
+
+  const handleDelete = () => {
+    if (!id) return;
+    Alert.alert(
+      'Delete this account?',
+      'Receipts, bills and subscriptions paid from it are kept, but stop showing this account.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteAccount.mutateAsync(id);
+              router.back();
+            } catch (thrown) {
+              setError((thrown as Error).message ?? 'Could not delete that account.');
+            }
+          },
+        },
+      ],
+    );
+  };
   const createSalary = useCreateSalarySource();
 
   const handleSave = async () => {
@@ -68,7 +130,7 @@ export default function AddAccountScreen() {
     }
 
     try {
-      await createAccount.mutateAsync({
+      const values = {
         bank_name: bankName.trim(),
         nickname: nickname.trim() || null,
         // The picker shows "Checking"; the column is a lowercase enum.
@@ -76,12 +138,18 @@ export default function AddAccountScreen() {
         last4: last4.length === 4 ? last4 : null,
         color,
         balance: Number(balance) || 0,
-      });
+      };
+
+      if (editing && id) {
+        await updateAccount.mutateAsync({ id, values });
+      } else {
+        await createAccount.mutateAsync(values);
+      }
 
       // Income entered here is a salary source in its own right, so it is
       // saved as one rather than being dropped with the rest of the screen.
       const pay = Number(income);
-      if (Number.isFinite(pay) && pay > 0) {
+      if (!editing && Number.isFinite(pay) && pay > 0) {
         await createSalary.mutateAsync({
           name: nickname.trim() || bankName.trim(),
           amount: pay,
@@ -98,7 +166,7 @@ export default function AddAccountScreen() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title className="mt-2">Adding New bank account</Title>
+      <Title className="mt-2">{editing ? 'Edit account' : 'Adding New bank account'}</Title>
 
       <View className="mt-6 w-full">
         <AccountCard
@@ -218,8 +286,33 @@ export default function AddAccountScreen() {
         </Text>
       ) : null}
 
-      <View className="mt-auto w-full pt-10">
-        <Button label={createAccount.isPending ? 'Saving…' : 'Add account'} onPress={handleSave} />
+      <View className="mt-auto w-full gap-3 pt-10">
+        <Button
+          label={
+            createAccount.isPending || updateAccount.isPending
+              ? 'Saving…'
+              : editing
+                ? 'Save changes'
+                : 'Add account'
+          }
+          onPress={handleSave}
+        />
+        {editing ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Delete this account"
+            onPress={handleDelete}
+            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-black/5"
+          >
+            <Trash2 size={17} color="#DC2626" strokeWidth={1.9} />
+            <Text
+              className="font-poppins-medium text-[15px] text-red-600"
+              maxFontSizeMultiplier={1.4}
+            >
+              {deleteAccount.isPending ? 'Deleting…' : 'Delete account'}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {datePickerOpen ? (
