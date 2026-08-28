@@ -80,6 +80,18 @@ export default function HomeScreen() {
       return sum + perMonth;
     }, 0);
 
+  /**
+   * Everything going out this month: the recurring commitments plus what has
+   * actually been spent.
+   *
+   * Not v_dashboard.expenses, which counts bills alone — that figure came out
+   * identical to the Monthly Bills tile sitting right below it, so receipts
+   * and subscriptions were simply missing from the headline. Summing the same
+   * three numbers the tiles show means the card can never disagree with them.
+   */
+  const expensesThisMonth = monthlyBillsTotal + receiptsTotal + subscriptionsTotal;
+  const payday = dashboard.data?.payday ?? 0;
+
   /** Calculators open a tool, so they carry no figure. */
   const tileAmounts: Record<string, number | undefined> = {
     'monthly-bills': -monthlyBillsTotal,
@@ -115,10 +127,14 @@ export default function HomeScreen() {
 
       <View className="mt-6 w-full">
         <BalanceSummary
-          leftThisMonth={dashboard.data?.left_this_month ?? 0}
-          payday={dashboard.data?.payday ?? 0}
-          expenses={dashboard.data?.expenses ?? 0}
-          loading={dashboard.isPending}
+          // Derived from the same total, so income minus expenses is exactly
+          // what the card says is left rather than two views of the month.
+          leftThisMonth={payday - expensesThisMonth}
+          payday={payday}
+          expenses={expensesThisMonth}
+          loading={
+            dashboard.isPending || bills.isPending || receipts.isPending || subscriptions.isPending
+          }
         />
       </View>
 
