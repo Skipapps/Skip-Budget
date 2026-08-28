@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { SlidersHorizontal } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { usePaymentSources, useSubscriptions } from '@/api/queries';
@@ -18,7 +18,9 @@ import { SearchField } from '@/components/ui/search-field';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Title } from '@/components/ui/typography';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
+import { occurrencesInRange } from '@/lib/card-ledger';
 import { toIsoDate } from '@/lib/date';
+import { rangeFor } from '@/lib/range';
 import { groupByDate } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
 import { colors } from '@/theme/colors';
@@ -41,6 +43,24 @@ export default function SubscriptionsScreen() {
   const [filterOpen, setFilterOpen] = useState(false);
 
   const today = toIsoDate(new Date());
+  const monthRange = useMemo(() => rangeFor('month', new Date()), []);
+
+  /**
+   * The day a subscription renews in the month being looked at.
+   *
+   * Same reasoning as the bills list: next_renewal_on is only ever the NEXT
+   * one, so from the day after a renewal the list reads a month ahead of the
+   * month you are in. Anything not renewing this month keeps its next date,
+   * which is genuinely when it next lands.
+   */
+  const renewalIn = useCallback(
+    (renewsOn: string | null, cycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly') => {
+      if (!renewsOn) return '';
+      const inMonth = occurrencesInRange(renewsOn, cycle, monthRange.from, monthRange.to);
+      return inMonth[inMonth.length - 1] ?? renewsOn;
+    },
+    [monthRange],
+  );
   const { data: subscriptions = [], isLoading, isError, refetch } = useSubscriptions();
   const { sources } = usePaymentSources();
 
@@ -79,11 +99,15 @@ export default function SubscriptionsScreen() {
   // Cancelled plans still show, but contribute nothing to a group total.
   const groups = useMemo(
     () =>
-      groupByDate(visible, (subscription) => subscription.next_renewal_on, {
-        amountOf: (subscription) => (subscription.active ? -Math.abs(subscription.amount) : 0),
-        direction: 'asc',
-      }),
-    [visible],
+      groupByDate(
+        visible,
+        (subscription) => renewalIn(subscription.next_renewal_on, subscription.cycle),
+        {
+          amountOf: (subscription) => (subscription.active ? -Math.abs(subscription.amount) : 0),
+          direction: 'asc',
+        },
+      ),
+    [visible, renewalIn],
   );
 
   const narrowed = query.trim().length > 0 || activeCount > 0;
@@ -195,7 +219,7 @@ export default function SubscriptionsScreen() {
                   name={subscription.name}
                   amount={subscription.amount}
                   cycle={subscription.cycle}
-                  renewsOn={subscription.next_renewal_on}
+                  renewsOn={renewalIn(subscription.next_renewal_on, subscription.cycle)}
                   domain={subscription.brands?.domain}
                   active={subscription.active}
                   sourceLabel={

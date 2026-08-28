@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { buildLedger, occurrencesInRange, type SourceKind } from '@/lib/card-ledger';
+import { billWindow, buildLedger, occurrencesInRange, type SourceKind } from '@/lib/card-ledger';
 import { withTimeout } from '@/lib/deadline';
 import { paydaysInRange } from '@/lib/date';
 import type { DateRange } from '@/lib/range';
@@ -626,27 +626,6 @@ export type LedgerTotals = {
   net: number;
   count: number;
 };
-
-/**
- * Narrows a window to the stretch a bill was actually running.
- *
- * Occurrences are derived by walking outwards from the stored next date, which
- * on its own reaches back before the bill existed — add a monthly bill today
- * and last spring fills with charges that were never paid. `starts_on` and
- * `ends_on` are the bill's own bounds, so the walk is held inside them.
- *
- * Rows saved before those dates were captured have neither, and are left
- * unbounded: guessing a start would erase real history.
- */
-function billWindow(
-  bill: { starts_on?: string | null; ends_on?: string | null },
-  from: string | null,
-  to: string,
-): { from: string | null; to: string } {
-  const start = bill.starts_on && (!from || bill.starts_on > from) ? bill.starts_on : from;
-  const end = bill.ends_on && bill.ends_on < to ? bill.ends_on : to;
-  return { from: start, to: end };
-}
 
 export function useLedger(range?: DateRange) {
   const receipts = useReceipts();

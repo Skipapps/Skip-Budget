@@ -21,6 +21,8 @@ import EmptyArt from '@/assets/illustrations/state-empty-bills.svg';
 import ErrorArt from '@/assets/illustrations/state-error.svg';
 import NoResultsArt from '@/assets/illustrations/state-no-results.svg';
 import { usePaymentSources, useBills } from '@/api/queries';
+import { billWindow, occurrencesInRange } from '@/lib/card-ledger';
+import { rangeFor } from '@/lib/range';
 import { getBillCategory } from '@/data/bills-mock';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { toIsoDate } from '@/lib/date';
@@ -47,20 +49,43 @@ export default function BillsScreen() {
     [sources],
   );
 
+  const monthRange = useMemo(() => rangeFor('month', new Date()), []);
+
   // The DB stores positive magnitudes; the UI shows outgoings as negative.
   const bills = useMemo(
     () =>
-      (query.data ?? []).map((row) => ({
-        id: row.id,
-        name: row.name,
-        amount: -row.amount,
-        dueDate: row.next_due_on ?? '',
-        recurrence: row.recurrence,
-        categoryId: row.category_id,
-        iconId: row.icon_id ?? undefined,
-        sourceId: row.card_id ?? row.bank_account_id ?? '',
-      })),
-    [query.data],
+      (query.data ?? []).map((row) => {
+        /**
+         * The day this bill lands on in the month being looked at.
+         *
+         * Not next_due_on, which is only ever the NEXT one: a bill due on the
+         * 14th reads as next month from the 15th onwards, so for most of any
+         * month the list would be dated a month ahead of the month you are in.
+         * The first occurrence inside this month is the honest answer, and it
+         * matches what the dashboard counts.
+         *
+         * A bill with nothing due this month — quarterly, or not started yet —
+         * keeps its next date, because that is genuinely when it next lands.
+         */
+        const window = billWindow(row, monthRange.from, monthRange.to);
+        const thisMonth =
+          row.next_due_on && (!window.from || window.from <= window.to)
+            ? occurrencesInRange(row.next_due_on, row.recurrence, window.from, window.to)
+            : [];
+
+        return {
+          id: row.id,
+          name: row.name,
+          amount: -row.amount,
+          // Newest first out of the walk, so the last entry is the month's first.
+          dueDate: thisMonth[thisMonth.length - 1] ?? row.next_due_on ?? '',
+          recurrence: row.recurrence,
+          categoryId: row.category_id,
+          iconId: row.icon_id ?? undefined,
+          sourceId: row.card_id ?? row.bank_account_id ?? '',
+        };
+      }),
+    [query.data, monthRange],
   );
 
   const visible = useMemo(() => {
