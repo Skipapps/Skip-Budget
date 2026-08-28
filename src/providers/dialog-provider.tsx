@@ -1,4 +1,13 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { usePathname } from 'expo-router';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { ReactNode } from 'react';
 
 import { ConfirmDialog, type DialogRequest } from '@/components/ui/confirm-dialog';
@@ -39,6 +48,18 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     setRequest(null);
     settle?.(actionId);
   }, []);
+
+  // A dialog belongs to the screen that raised it. Navigating away — a deep
+  // link, a notification — would otherwise leave it floating over whatever
+  // came next, asking about a screen that is no longer there.
+  const pathname = usePathname();
+  const raisedOn = useRef(pathname);
+  useEffect(() => {
+    if (raisedOn.current !== pathname && resolver.current) {
+      resolve(null);
+    }
+    raisedOn.current = pathname;
+  }, [pathname, resolve]);
 
   const value = useMemo(() => ask, [ask]);
 
