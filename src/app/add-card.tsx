@@ -20,7 +20,7 @@ import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Title } from '@/components/ui/typography';
 import { NETWORKS } from '@/data/cards-mock';
 import { formatCurrency } from '@/lib/format';
-import { formatFullDate } from '@/lib/date';
+import { formatFullDate, toIsoDate } from '@/lib/date';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
 
 const REMINDER_OPTIONS = [
@@ -125,6 +125,9 @@ function CardForm({
         last4: last4.length === 4 ? last4 : null,
         color,
         balance: Number(balance) || 0,
+        // Stamped whenever a balance is stated, so charges before today are
+        // treated as already included rather than counted twice.
+        balance_as_of: balance ? toIsoDate(new Date()) : null,
         // The bill day is what recurs, not the specific date picked.
         bill_due_day: dueDate ? dueDate.getDate() : null,
         reminder_days: reminder === 'off' ? null : Number(reminder),

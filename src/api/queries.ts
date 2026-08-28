@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { buildLedger, type SourceKind } from '@/lib/card-ledger';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
@@ -19,6 +20,8 @@ export type CardRow = {
   last4: string | null;
   color: string;
   balance: number;
+  /** Date the stated balance was true; null means count every charge. */
+  balance_as_of?: string | null;
 };
 
 export type BankAccountRow = {
@@ -29,6 +32,7 @@ export type BankAccountRow = {
   last4: string | null;
   color: string;
   balance: number;
+  balance_as_of?: string | null;
 };
 
 export type BillRow = {
@@ -89,7 +93,7 @@ export function useCards() {
   return useOwnerQuery<CardRow[]>('cards', async () => {
     const { data, error } = await supabase
       .from('cards')
-      .select('id, holder, network, last4, color, balance')
+      .select('id, holder, network, last4, color, balance, balance_as_of')
       .order('created_at', { ascending: true });
     if (error) throw error;
     return data ?? [];
@@ -100,7 +104,7 @@ export function useBankAccounts() {
   return useOwnerQuery<BankAccountRow[]>('bank_accounts', async () => {
     const { data, error } = await supabase
       .from('bank_accounts')
-      .select('id, bank_name, nickname, account_type, last4, color, balance')
+      .select('id, bank_name, nickname, account_type, last4, color, balance, balance_as_of')
       .order('created_at', { ascending: true });
     if (error) throw error;
     return data ?? [];
@@ -336,7 +340,9 @@ export function useCard(id: string | undefined) {
     > => {
       const { data, error } = await supabase
         .from('cards')
-        .select('id, holder, network, last4, color, balance, bill_due_day, reminder_days')
+        .select(
+          'id, holder, network, last4, color, balance, balance_as_of, bill_due_day, reminder_days',
+        )
         .eq('id', id!)
         .maybeSingle();
       if (error) throw error;
@@ -353,7 +359,7 @@ export function useBankAccount(id: string | undefined) {
     queryFn: async (): Promise<BankAccountRow | null> => {
       const { data, error } = await supabase
         .from('bank_accounts')
-        .select('id, bank_name, nickname, account_type, last4, color, balance')
+        .select('id, bank_name, nickname, account_type, last4, color, balance, balance_as_of')
         .eq('id', id!)
         .maybeSingle();
       if (error) throw error;
@@ -433,5 +439,111 @@ export function useLedger() {
       subscriptions.refetch();
       bills.refetch();
     },
+  };
+}
+
+export type PaymentRow = {
+  id: string;
+  card_id: string | null;
+  bank_account_id: string | null;
+  amount: number;
+  paid_on: string;
+  note: string | null;
+};
+
+export function usePayments() {
+  return useOwnerQuery<PaymentRow[]>('payments', async () => {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('id, card_id, bank_account_id, amount, paid_on, note')
+      .order('paid_on', { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  });
+}
+
+/**
+ * Everything that has hit one card or account, plus what it is at now.
+ *
+ * Filtering happens here rather than in five scoped queries: the lists are
+ * already fetched for their own screens, so opening a card costs nothing new
+ * and the numbers cannot disagree with the pages they came from.
+ */
+export function useSourceLedger(sourceId: string | undefined, today: string) {
+  const cards = useCards();
+  const accounts = useBankAccounts();
+  const receipts = useReceipts();
+  const bills = useBills();
+  const subscriptions = useSubscriptions();
+  const payments = usePayments();
+
+  const card = (cards.data ?? []).find((row) => row.id === sourceId);
+  const account = (accounts.data ?? []).find((row) => row.id === sourceId);
+  const source = card ?? account;
+  const kind: SourceKind = card ? 'card' : 'account';
+
+  const mine = <T extends { card_id: string | null; bank_account_id: string | null }>(rows: T[]) =>
+    rows.filter((row) => (row.card_id ?? row.bank_account_id) === sourceId);
+
+  const ledger = source
+    ? buildLedger({
+        kind,
+        statedBalance: source.balance,
+        balanceAsOf: source.balance_as_of ?? null,
+        today,
+        charges: mine(receipts.data ?? []).map((row) => ({
+          id: `receipt-${row.id}`,
+          label: row.merchant,
+          amount: row.amount,
+          date: row.purchased_on,
+          kind: 'receipt' as const,
+          domain: row.brands?.domain,
+        })),
+        recurring: [
+          ...mine(bills.data ?? [])
+            .filter((row) => row.next_due_on)
+            .map((row) => ({
+              id: `bill-${row.id}`,
+              label: row.name,
+              amount: row.amount,
+              nextDate: row.next_due_on!,
+              recurrence: row.recurrence,
+              kind: 'bill' as const,
+            })),
+          ...mine(subscriptions.data ?? [])
+            .filter((row) => row.active && row.next_renewal_on)
+            .map((row) => ({
+              id: `subscription-${row.id}`,
+              label: row.name,
+              amount: row.amount,
+              nextDate: row.next_renewal_on!,
+              recurrence: row.cycle,
+              kind: 'subscription' as const,
+              domain: row.brands?.domain,
+            })),
+        ],
+        payments: mine(payments.data ?? []).map((row) => ({
+          id: `payment-${row.id}`,
+          amount: row.amount,
+          date: row.paid_on,
+          note: row.note,
+        })),
+      })
+    : null;
+
+  return {
+    source,
+    kind,
+    card,
+    account,
+    ledger,
+    isLoading:
+      cards.isLoading ||
+      accounts.isLoading ||
+      receipts.isLoading ||
+      bills.isLoading ||
+      subscriptions.isLoading ||
+      payments.isLoading,
+    isError: cards.isError || accounts.isError || payments.isError,
   };
 }

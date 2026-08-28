@@ -138,6 +138,7 @@ function AccountForm({
         last4: last4.length === 4 ? last4 : null,
         color,
         balance: Number(balance) || 0,
+        balance_as_of: balance ? toIsoDate(new Date()) : null,
       };
 
       if (editing && id) {

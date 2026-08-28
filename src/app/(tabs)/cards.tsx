@@ -93,8 +93,8 @@ export default function CardsScreen() {
           <Pressable
             key={card.id}
             accessibilityRole="button"
-            accessibilityLabel={`Edit ${card.holder}`}
-            onPress={() => router.push(`/add-card?id=${card.id}`)}
+            accessibilityLabel={`${card.holder}, view transactions`}
+            onPress={() => router.push(`/source/${card.id}`)}
             className="active:opacity-80"
           >
             <PaymentCard
@@ -128,8 +128,8 @@ export default function CardsScreen() {
           <Pressable
             key={account.id}
             accessibilityRole="button"
-            accessibilityLabel={`Edit ${account.nickname || account.bank_name}`}
-            onPress={() => router.push(`/add-account?id=${account.id}`)}
+            accessibilityLabel={`${account.nickname || account.bank_name}, view transactions`}
+            onPress={() => router.push(`/source/${account.id}`)}
             className="active:opacity-80"
           >
             <AccountCard

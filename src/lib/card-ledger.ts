@@ -1,0 +1,222 @@
+/**
+ * Works out what a card or bank account is actually at.
+ *
+ * A card is a running total, not a stored number. The user states a balance,
+ * and from that moment everything charged to the card pushes it up and every
+ * payment brings it down — the same arithmetic a real statement does, except
+ * nothing here is automated: every figure comes from a row the user entered.
+ *
+ * Pure on purpose. No dates read from the clock, no queries — everything is an
+ * argument, so the whole thing is testable and produces the same answer twice.
+ */
+
+export type SourceKind = 'card' | 'account';
+
+export type Recurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'period';
+
+/** A single dated charge against a source. Amount is a positive magnitude. */
+export type Charge = {
+  id: string;
+  label: string;
+  amount: number;
+  /** yyyy-mm-dd */
+  date: string;
+  kind: 'receipt' | 'bill' | 'subscription';
+  domain?: string | null;
+};
+
+/** Something that charges again and again, described by its NEXT date. */
+export type RecurringCharge = {
+  id: string;
+  label: string;
+  amount: number;
+  /** yyyy-mm-dd of the next time it lands. */
+  nextDate: string;
+  recurrence: Recurrence;
+  kind: 'bill' | 'subscription';
+  domain?: string | null;
+};
+
+export type Payment = {
+  id: string;
+  amount: number;
+  /** yyyy-mm-dd */
+  date: string;
+  note?: string | null;
+};
+
+export type LedgerEntry = {
+  id: string;
+  label: string;
+  date: string;
+  /** Signed for display: negative is money out of pocket. */
+  amount: number;
+  kind: 'receipt' | 'bill' | 'subscription' | 'payment';
+  domain?: string | null;
+};
+
+export type Ledger = {
+  /** Newest first. */
+  entries: LedgerEntry[];
+  /** Charges that landed inside the window, summed. */
+  charged: number;
+  /** Payments made inside the window, summed. */
+  paid: number;
+  /** What the source is at now. */
+  balance: number;
+};
+
+const STEP_MONTHS: Partial<Record<Recurrence, number>> = {
+  monthly: 1,
+  quarterly: 3,
+  yearly: 12,
+};
+
+function parts(iso: string): [number, number, number] {
+  const [year, month, day] = iso.split('-').map(Number);
+  return [year, month, day];
+}
+
+function iso(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/**
+ * Steps a date backwards by whole cycles.
+ *
+ * Month arithmetic is done on the calendar rather than in milliseconds, and the
+ * day is clamped to the month's length — a bill due on the 31st charges on the
+ * 30th in a 30-day month rather than skidding into the next one.
+ */
+function stepBack(date: string, recurrence: Recurrence, steps: number): string {
+  const [year, month, day] = parts(date);
+
+  if (recurrence === 'weekly') {
+    const shifted = new Date(Date.UTC(year, month - 1, day - 7 * steps));
+    return iso(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, shifted.getUTCDate());
+  }
+
+  const months = STEP_MONTHS[recurrence];
+  if (!months) return date;
+
+  const total = year * 12 + (month - 1) - months * steps;
+  const targetYear = Math.floor(total / 12);
+  const targetMonth = (total % 12) + 1;
+  return iso(targetYear, targetMonth, Math.min(day, daysInMonth(targetYear, targetMonth)));
+}
+
+/**
+ * Every time a recurring charge landed inside a window.
+ *
+ * Walks backwards from the next due date, because that is the only date the
+ * schema stores. A "period" bill does not repeat, so it contributes at most its
+ * one date.
+ */
+export function occurrencesBetween(
+  nextDate: string,
+  recurrence: Recurrence,
+  from: string | null,
+  to: string,
+): string[] {
+  if (!nextDate) return [];
+
+  if (recurrence === 'period') {
+    return nextDate <= to && (!from || nextDate >= from) ? [nextDate] : [];
+  }
+
+  const found: string[] = [];
+  // A hard stop, so a corrupt date or an unknown recurrence cannot spin here.
+  for (let step = 0; step < 600; step += 1) {
+    const date = stepBack(nextDate, recurrence, step);
+    if (from && date < from) break;
+    if (date <= to) found.push(date);
+    // Nothing before the window and nothing after the anchor is possible once
+    // we have stepped past both ends.
+    if (!from && found.length > 240) break;
+  }
+  return found;
+}
+
+/**
+ * Turns everything charged to one source into a ledger and a balance.
+ *
+ * `statedBalance` is what the user typed and `balanceAsOf` is when it was true.
+ * Charges before that date are assumed to be baked into the figure already, so
+ * counting them again would double them. When no balance was ever stated, every
+ * charge counts — a backdated receipt on a fresh card still has to appear.
+ */
+export function buildLedger(input: {
+  kind: SourceKind;
+  statedBalance: number;
+  /** yyyy-mm-dd, or null when no balance was ever stated. */
+  balanceAsOf: string | null;
+  charges: Charge[];
+  recurring: RecurringCharge[];
+  payments: Payment[];
+  /** yyyy-mm-dd. Nothing dated after it has happened yet. */
+  today: string;
+}): Ledger {
+  const { kind, statedBalance, balanceAsOf, charges, recurring, payments, today } = input;
+
+  const inWindow = (date: string) => date <= today && (!balanceAsOf || date >= balanceAsOf);
+
+  const entries: LedgerEntry[] = [];
+
+  for (const charge of charges) {
+    if (!inWindow(charge.date)) continue;
+    entries.push({
+      id: charge.id,
+      label: charge.label,
+      date: charge.date,
+      amount: -Math.abs(charge.amount),
+      kind: charge.kind,
+      domain: charge.domain,
+    });
+  }
+
+  for (const item of recurring) {
+    for (const date of occurrencesBetween(item.nextDate, item.recurrence, balanceAsOf, today)) {
+      entries.push({
+        // Unique per occurrence, so React keys stay stable across renders.
+        id: `${item.id}@${date}`,
+        label: item.label,
+        date,
+        amount: -Math.abs(item.amount),
+        kind: item.kind,
+        domain: item.domain,
+      });
+    }
+  }
+
+  for (const payment of payments) {
+    if (!inWindow(payment.date)) continue;
+    entries.push({
+      id: payment.id,
+      label: payment.note?.trim() || 'Payment',
+      date: payment.date,
+      amount: Math.abs(payment.amount),
+      kind: 'payment',
+    });
+  }
+
+  entries.sort((a, b) =>
+    a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date),
+  );
+
+  const charged = entries
+    .filter((entry) => entry.kind !== 'payment')
+    .reduce((sum, entry) => sum + Math.abs(entry.amount), 0);
+  const paid = entries
+    .filter((entry) => entry.kind === 'payment')
+    .reduce((sum, entry) => sum + entry.amount, 0);
+
+  // A card balance is debt, so spending raises it and paying lowers it. An
+  // account balance is money held, so the same two events do the opposite.
+  const balance = kind === 'card' ? statedBalance + charged - paid : statedBalance - charged + paid;
+
+  return { entries, charged, paid, balance };
+}

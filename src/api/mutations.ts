@@ -16,7 +16,13 @@ import { useUserId } from '@/providers/session-provider';
  */
 
 /** Tables whose totals feed the dashboard, so a write there refreshes it too. */
-const AFFECTS_DASHBOARD = new Set(['bills', 'receipts', 'subscriptions', 'salary_sources']);
+const AFFECTS_DASHBOARD = new Set([
+  'bills',
+  'receipts',
+  'subscriptions',
+  'salary_sources',
+  'payments',
+]);
 
 function useInvalidate() {
   const client = useQueryClient();
@@ -85,6 +91,8 @@ export type CardValues = {
   last4: string | null;
   color: string;
   balance: number;
+  /** When the stated balance was true; charges before it are already in it. */
+  balance_as_of: string | null;
   bill_due_day: number | null;
   reminder_days: number | null;
 };
@@ -102,6 +110,7 @@ export type BankAccountValues = {
   last4: string | null;
   color: string;
   balance: number;
+  balance_as_of: string | null;
 };
 
 export const useCreateBankAccount = () => useCreate<BankAccountValues>('bank_accounts');
@@ -210,3 +219,16 @@ export function useSetSalaryAccounts() {
     onSuccess: () => invalidate('salary_sources'),
   });
 }
+
+// --- Payments ---------------------------------------------------------------
+
+export type PaymentValues = {
+  card_id: string | null;
+  bank_account_id: string | null;
+  amount: number;
+  paid_on: string;
+  note: string | null;
+};
+
+export const useCreatePayment = () => useCreate<PaymentValues>('payments');
+export const useDeletePayment = () => useRemove('payments');
