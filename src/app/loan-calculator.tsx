@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { ProportionBar } from '@/components/calculators/proportion-bar';
+import { ScheduleCard } from '@/components/calculators/schedule-card';
 import { SliderRow } from '@/components/calculators/slider-row';
 import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ import { SelectField } from '@/components/ui/select-field';
 import { Title } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { calculateLoan, formatTerm, payoffDate } from '@/lib/loan';
+import { amortisationSchedule, calculateLoan, formatTerm, payoffDate } from '@/lib/loan';
 
 const AMOUNT_MIN = 500;
 const AMOUNT_MAX = 1_000_000;
@@ -31,6 +32,7 @@ export default function LoanCalculatorScreen() {
   const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const loan = calculateLoan(amount, rate, months);
+  const schedule = amortisationSchedule(amount, rate, months, startDate);
   const lastPayment = payoffDate(startDate, months);
 
   // Saving waits on the data layer.
@@ -146,6 +148,25 @@ export default function LoanCalculatorScreen() {
           <View className="h-px w-full bg-line" />
           <SummaryLine label="Total you repay" value={formatCurrency(loan.totalPaid)} strong />
         </View>
+      </View>
+
+      {/* Directly under the summary, because it is the same figures opened up
+          rather than a separate idea. */}
+      <View className="mt-3 w-full">
+        <ScheduleCard
+          rows={schedule}
+          onPress={() =>
+            router.push({
+              pathname: '/loan-schedule',
+              params: {
+                amount: String(amount),
+                rate: String(rate),
+                months: String(months),
+                start: toIsoDate(startDate),
+              },
+            })
+          }
+        />
       </View>
 
       <View className="mt-auto w-full pb-8 pt-8">

@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { useCreateBill, useDeleteBill, useUpdateBill, type BillValues } from '@/api/mutations';
-import { useBill, usePaymentSources } from '@/api/queries';
+import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
+import { ScheduleCard } from '@/components/calculators/schedule-card';
 import { CategoryPicker } from '@/components/bills/category-picker';
 import { IconPicker } from '@/components/bills/icon-picker';
 import { AmountPad } from '@/components/ui/amount-pad';
@@ -26,6 +27,7 @@ import {
 } from '@/data/bills-mock';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
+import { amortisationSchedule } from '@/lib/loan';
 import { colors } from '@/theme/colors';
 
 const CATEGORY_OPTIONS = BILL_CATEGORIES.map((category) => ({
@@ -118,6 +120,17 @@ function BillForm({
   const [error, setError] = useState<string | null>(null);
 
   const { sources } = usePaymentSources();
+  // Present only when this bill came from the loan calculator, which is what
+  // decides whether there is a schedule worth offering.
+  const { data: loan } = useLoanForBill(id);
+  const schedule = loan
+    ? amortisationSchedule(
+        loan.principal,
+        loan.annual_rate,
+        loan.term_months,
+        new Date(`${loan.first_payment_on ?? existing?.next_due_on}T00:00:00`),
+      )
+    : [];
   const createBill = useCreateBill();
   const updateBill = useUpdateBill();
   const deleteBill = useDeleteBill();
@@ -298,6 +311,24 @@ function BillForm({
           <FieldLabel className="mb-2">Paid with</FieldLabel>
           <SourceTiles sources={sources} value={sourceId} onChange={setSourceId} />
         </View>
+
+        {schedule.length > 0 && loan ? (
+          <ScheduleCard
+            rows={schedule}
+            onPress={() =>
+              router.push({
+                pathname: '/loan-schedule',
+                params: {
+                  amount: String(loan.principal),
+                  rate: String(loan.annual_rate),
+                  months: String(loan.term_months),
+                  start: loan.first_payment_on ?? '',
+                  name: name || 'Payment schedule',
+                },
+              })
+            }
+          />
+        ) : null}
 
         <TextField
           label="Note"

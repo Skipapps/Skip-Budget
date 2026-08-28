@@ -608,3 +608,40 @@ export function useLedger(range?: DateRange) {
     },
   };
 }
+
+export type LoanRow = {
+  id: string;
+  bill_id: string;
+  principal: number;
+  annual_rate: number;
+  term_months: number;
+  monthly_payment: number;
+  total_interest: number;
+  first_payment_on: string | null;
+};
+
+/**
+ * The loan behind a bill, when there is one.
+ *
+ * Most bills are not loans, so this returns null rather than erroring — the
+ * edit screen uses its presence to decide whether a payment schedule exists to
+ * show.
+ */
+export function useLoanForBill(billId: string | undefined) {
+  const userId = useUserId();
+  return useQuery({
+    queryKey: ['loan', billId, userId],
+    enabled: Boolean(userId && billId),
+    queryFn: async (): Promise<LoanRow | null> => {
+      const { data, error } = await supabase
+        .from('loans')
+        .select(
+          'id, bill_id, principal, annual_rate, term_months, monthly_payment, total_interest, first_payment_on',
+        )
+        .eq('bill_id', billId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as unknown as LoanRow | null;
+    },
+  });
+}
