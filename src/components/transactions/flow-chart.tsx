@@ -32,8 +32,15 @@ export type FlowBucket = {
   in: number;
 };
 
-const HEIGHT = 132;
+const HEIGHT = 128;
 const GAP = 2;
+/**
+ * Bars stop short of the edge. A mark that touches the frame reads as clipped —
+ * as though the real value is larger than the chart can show.
+ */
+const HEADROOM = 0.88;
+/** So a real but tiny amount is still a visible mark rather than nothing. */
+const MIN_MARK = 3;
 
 /**
  * A bar with its far end rounded and its baseline end square, so the mark is
@@ -61,8 +68,10 @@ export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
   const zeroY = Math.max(18, Math.min(HEIGHT - 18, HEIGHT * (inShare / (inShare + 1)) + 6));
 
   const scale = (value: number, up: boolean) => {
-    const room = up ? zeroY : HEIGHT - zeroY;
-    return up ? zeroY - (value / peak) * room : zeroY + (value / peak) * room;
+    if (value <= 0) return zeroY;
+    const room = (up ? zeroY : HEIGHT - zeroY) * HEADROOM;
+    const length = Math.max(MIN_MARK, (value / peak) * room);
+    return up ? zeroY - length : zeroY + length;
   };
 
   const shown = buckets.find((bucket) => bucket.key === active);
@@ -84,7 +93,11 @@ export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
           >
             {shown.label} · {formatCurrency(shown.in)} in · {formatCurrency(-shown.out)} out
           </Text>
-        ) : null}
+        ) : (
+          <Text className="font-poppins text-[11px] text-muted" maxFontSizeMultiplier={1.3}>
+            Tap a bar
+          </Text>
+        )}
       </View>
 
       <View className="w-full" onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
