@@ -29,6 +29,24 @@ import {
   scanDocument,
 } from '../../modules/receipt-scanner';
 
+type ScanField = 'store' | 'date' | 'amount' | 'card';
+
+type ScanResult = { read: ScanField[]; missed: ScanField[] };
+
+const FIELD_WORDS: Record<ScanField, string> = {
+  store: 'store',
+  date: 'date',
+  amount: 'amount',
+  card: 'card',
+};
+
+/** "store, date and amount" — an Oxford-free list, because it is read aloud. */
+function listWords(fields: ScanField[]): string {
+  const words = fields.map((field) => FIELD_WORDS[field]);
+  if (words.length <= 1) return words[0] ?? '';
+  return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
+}
+
 type Initial = {
   store: BrandSelection | null;
   date: Date;
@@ -102,6 +120,7 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
   const [amountPadOpen, setAmountPadOpen] = useState(false);
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
 
   const { sources } = usePaymentSources();
   const { data: categories = [] } = useSpendCategories();
@@ -113,6 +132,17 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
   const confirm = useConfirm();
   const ask = useDialog();
 
+  /**
+   * Any hand edit retires the scan report. Telling someone to check the amount
+   * after they have just corrected it is worse than saying nothing.
+   */
+  const edited =
+    <T,>(set: (value: T) => void) =>
+    (value: T) => {
+      setScanResult(null);
+      set(value);
+    };
+
   const categoryLabel = store
     ? (categories.find((category) => category.id === store.categoryId)?.label ?? 'Other')
     : null;
@@ -120,6 +150,7 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
   /** Turns recognised text into filled fields, leaving anything unsure alone. */
   const applyScan = (text: string, from: 'scan' | 'upload') => {
     const parsed = parseReceipt(text);
+    const found: ScanField[] = [];
     let filled = 0;
 
     if (parsed.merchant) {
@@ -139,14 +170,17 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
               categoryId: guessCategory(parsed.merchant),
             },
       );
+      found.push('store');
       filled += 1;
     }
     if (parsed.total !== undefined) {
       setAmount(String(parsed.total));
+      found.push('amount');
       filled += 1;
     }
     if (parsed.date) {
       setDate(new Date(`${parsed.date}T00:00:00`));
+      found.push('date');
       filled += 1;
     }
     if (parsed.last4) {
@@ -154,20 +188,54 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
       const matched = sources.find((source) => source.label.endsWith(digits));
       if (matched) {
         setSourceId(matched.id);
+        found.push('card');
         filled += 1;
       }
     }
 
     setCaptureSource(from);
-    setError(
+    setError(null);
+    // Naming what was and was not read is the difference between trusting the
+    // scan and re-checking every field by hand.
+    setScanResult(
       filled === 0
-        ? 'Could not read that one. Fill it in by hand and it will still be saved.'
-        : null,
+        ? { read: [], missed: ['store', 'date', 'amount'] }
+        : {
+            read: found,
+            missed: (['store', 'date', 'amount', 'card'] as const).filter(
+              (field) => !found.includes(field),
+            ),
+          },
     );
   };
 
   const handleScan = async () => {
     setError(null);
+    setScanResult(null);
+
+    // Scanning only exists on real hardware. Saying so beats a button that
+    // silently does nothing, and beats hiding it so the feature looks unbuilt.
+    if (!isScanningAvailable()) {
+      await ask({
+        title: 'Scanning needs a camera',
+        message:
+          'The Simulator has none, so scanning is unavailable here. Upload reads a photo or a PDF and works everywhere.',
+        cancelLabel: null,
+      });
+      return;
+    }
+
+    // A word before the camera opens. The scan is only as good as the shot,
+    // and the two things that ruin one are shadow and a cropped total.
+    const go = await confirm({
+      title: 'Scanning a receipt',
+      message:
+        'Lay it flat in good light and fit the whole receipt in frame — the total is usually at the bottom. Skip reads the store, date, total and card, and you can fix anything it gets wrong.',
+      confirmLabel: 'Open scanner',
+      cancelLabel: 'Not now',
+    });
+    if (!go) return;
+
     try {
       setReading(true);
       const result = await scanDocument();
@@ -293,21 +361,27 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
           burying it under the fields makes typing look like the only option.
           Hidden while editing — a saved receipt is corrected, not re-read. */}
       {!editing && isRecognitionAvailable() ? (
-        <View className="mt-6 w-full flex-row gap-3">
-          {isScanningAvailable() ? (
+        <View className="mt-6 w-full gap-2">
+          <View className="w-full flex-row gap-3">
             <CaptureButton
               icon={<ScanLine size={18} color={colors.ink} strokeWidth={1.9} />}
               label="Scan"
               onPress={handleScan}
               disabled={reading}
             />
-          ) : null}
-          <CaptureButton
-            icon={<ImageUp size={18} color={colors.ink} strokeWidth={1.9} />}
-            label="Upload"
-            onPress={handleUpload}
-            disabled={reading}
-          />
+            <CaptureButton
+              icon={<ImageUp size={18} color={colors.ink} strokeWidth={1.9} />}
+              label="Upload"
+              onPress={handleUpload}
+              disabled={reading}
+            />
+          </View>
+          <Text
+            className="w-full text-center font-poppins text-[12px] text-muted"
+            maxFontSizeMultiplier={1.3}
+          >
+            Point the camera at a paper receipt, or upload a photo or PDF
+          </Text>
         </View>
       ) : null}
 
@@ -321,7 +395,7 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
       ) : null}
 
       <View className="mt-8 w-full gap-6">
-        <BrandField label="Store" value={store} onChange={setStore} />
+        <BrandField label="Store" value={store} onChange={edited(setStore)} />
 
         <SelectField
           label="Date"
@@ -341,7 +415,7 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
         {sources.length > 0 ? (
           <View className="w-full">
             <FieldLabel className="mb-3">Paid with</FieldLabel>
-            <SourceTiles sources={sources} value={sourceId} onChange={setSourceId} />
+            <SourceTiles sources={sources} value={sourceId} onChange={edited(setSourceId)} />
           </View>
         ) : null}
 
@@ -355,6 +429,28 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
           maxLength={200}
           autoCapitalize="sentences"
         />
+
+        {scanResult ? (
+          <View className="w-full rounded-[10px] border border-line px-4 py-3">
+            {scanResult.read.length > 0 ? (
+              <Text className="font-poppins text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
+                Read the {listWords(scanResult.read)}.
+              </Text>
+            ) : (
+              <Text className="font-poppins text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
+                Could not read that one.
+              </Text>
+            )}
+            {scanResult.missed.length > 0 ? (
+              <Text
+                className="mt-1 font-poppins text-[13px] text-muted"
+                maxFontSizeMultiplier={1.4}
+              >
+                Check the {listWords(scanResult.missed)} below — it will save either way.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
         {categoryLabel ? (
           <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
@@ -397,7 +493,7 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
           value={date}
           onCancel={() => setDatePickerOpen(false)}
           onConfirm={(next) => {
-            setDate(next);
+            edited(setDate)(next);
             setDatePickerOpen(false);
           }}
         />
@@ -410,7 +506,7 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
           value={amount}
           onCancel={() => setAmountPadOpen(false)}
           onConfirm={(next) => {
-            setAmount(next);
+            edited(setAmount)(next);
             setAmountPadOpen(false);
           }}
         />
