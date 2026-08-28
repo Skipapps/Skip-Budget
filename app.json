@@ -27,7 +27,10 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.skipapps.skip.budget",
-      "permissions": ["POST_NOTIFICATIONS", "SCHEDULE_EXACT_ALARM"]
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM"
+      ]
     },
     "web": {
       "output": "static",
@@ -53,7 +56,13 @@
       "expo-secure-store",
       "expo-localization",
       "expo-sharing",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      [
+        "./plugins/with-signing.js",
+        {
+          "teamId": "2YDDY7H6XP"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
