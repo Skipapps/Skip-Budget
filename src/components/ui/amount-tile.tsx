@@ -8,7 +8,8 @@ import { shadows } from '@/theme/shadows';
 
 type AmountTileProps = {
   label: string;
-  amount: number;
+  /** Omitted for tiles that open a tool rather than report spending. */
+  amount?: number;
   artwork: FC<SvgProps>;
   onPress?: () => void;
   className?: string;
@@ -30,7 +31,7 @@ export function AmountTile({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${label}, ${formatCurrency(amount)}`}
+      accessibilityLabel={amount === undefined ? label : `${label}, ${formatCurrency(amount)}`}
       onPress={onPress}
       style={shadows.card}
       className={cn(
@@ -50,13 +51,18 @@ export function AmountTile({
         >
           {label}
         </Text>
+        {/* A calculator tile has no figure; the row keeps its height so the
+            tiles stay square and aligned beside the ones that do. */}
         <Text
-          className="mt-1 font-poppins-semibold text-[16px] text-ink"
+          className={cn(
+            'mt-1 font-poppins-semibold text-[16px]',
+            amount === undefined ? 'text-muted' : 'text-ink',
+          )}
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.3}
         >
-          {formatCurrency(amount)}
+          {amount === undefined ? 'Open' : formatCurrency(amount)}
         </Text>
       </View>
     </Pressable>

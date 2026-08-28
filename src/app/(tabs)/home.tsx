@@ -12,7 +12,14 @@ import { DateSelector } from '@/components/dashboard/date-selector';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
-import { useBills, useDashboard, useLedger, useProfile } from '@/api/queries';
+import {
+  useBills,
+  useDashboard,
+  useLedger,
+  useProfile,
+  useReceipts,
+  useSubscriptions,
+} from '@/api/queries';
 import { spendingCategories } from '@/data/dashboard-mock';
 import { addDays, formatDayLabel, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
@@ -34,8 +41,9 @@ export default function HomeScreen() {
   const bills = useBills();
   const { entries: ledger } = useLedger();
 
-  // Only the Monthly Bills tile has a table behind it so far; receipts and
-  // subscriptions keep their placeholder figures until those tables exist.
+  const receipts = useReceipts();
+  const subscriptions = useSubscriptions();
+
   const monthlyBillsTotal = (bills.data ?? []).reduce((sum, bill) => {
     const perMonth =
       bill.recurrence === 'weekly'
@@ -47,6 +55,33 @@ export default function HomeScreen() {
             : bill.amount;
     return sum + perMonth;
   }, 0);
+
+  // This calendar month, so the tile agrees with "Left this month" above it.
+  const monthPrefix = toIsoDate(new Date()).slice(0, 7);
+  const receiptsTotal = (receipts.data ?? [])
+    .filter((row) => row.purchased_on.startsWith(monthPrefix))
+    .reduce((sum, row) => sum + Math.abs(row.amount), 0);
+
+  const subscriptionsTotal = (subscriptions.data ?? [])
+    .filter((row) => row.active)
+    .reduce((sum, row) => {
+      const perMonth =
+        row.cycle === 'weekly'
+          ? row.amount * (52 / 12)
+          : row.cycle === 'quarterly'
+            ? row.amount / 3
+            : row.cycle === 'yearly'
+              ? row.amount / 12
+              : row.amount;
+      return sum + perMonth;
+    }, 0);
+
+  /** Calculators open a tool, so they carry no figure. */
+  const tileAmounts: Record<string, number | undefined> = {
+    'monthly-bills': -monthlyBillsTotal,
+    receipts: -receiptsTotal,
+    subscriptions: -subscriptionsTotal,
+  };
 
   // Today, not a hardcoded date: the dashboard opens on the day you are in.
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -97,7 +132,7 @@ export default function HomeScreen() {
           <View key={category.id} className="w-[164px]">
             <AmountTile
               label={category.label}
-              amount={category.id === 'monthly-bills' ? -monthlyBillsTotal : category.amount}
+              amount={tileAmounts[category.id]}
               artwork={category.artwork}
               onPress={
                 category.id === 'monthly-bills'

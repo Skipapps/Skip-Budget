@@ -17,7 +17,6 @@ import SubscriptionsArt from '@/assets/illustrations/tile-subscriptions.svg';
 export type SpendingCategory = {
   id: string;
   label: string;
-  amount: number;
   artwork: FC<SvgProps>;
 };
 
@@ -37,12 +36,19 @@ export const account = {
   expenses: -1865.75,
 };
 
+/**
+ * Tile definitions only — label and artwork.
+ *
+ * The figures used to live here and were invented. They are computed from the
+ * real tables now, and the two calculators carry no figure at all: they open a
+ * tool rather than report spending, so a number beside them meant nothing.
+ */
 export const spendingCategories: SpendingCategory[] = [
-  { id: 'monthly-bills', label: 'Monthly Bills', amount: -1240, artwork: MonthlyBillsArt },
-  { id: 'receipts', label: 'Receipts', amount: -385.5, artwork: ReceiptsArt },
-  { id: 'subscriptions', label: 'Subscriptions', amount: -96, artwork: SubscriptionsArt },
-  { id: 'loan-calculator', label: 'Loan calculator', amount: -720, artwork: LoanRepaymentArt },
-  { id: 'split-calculator', label: 'Split calculator', amount: -248, artwork: SplitCalculatorArt },
+  { id: 'monthly-bills', label: 'Monthly Bills', artwork: MonthlyBillsArt },
+  { id: 'receipts', label: 'Receipts', artwork: ReceiptsArt },
+  { id: 'subscriptions', label: 'Subscriptions', artwork: SubscriptionsArt },
+  { id: 'loan-calculator', label: 'Loan calculator', artwork: LoanRepaymentArt },
+  { id: 'split-calculator', label: 'Split calculator', artwork: SplitCalculatorArt },
 ];
 
 /** Day the dashboard opens on. */
