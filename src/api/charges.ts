@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { withTimeout } from '@/lib/deadline';
 import { unrecordedDates, type ChargeablePlan } from '@/lib/charges';
@@ -29,10 +29,17 @@ export type ChargeRow = {
   charged_on: string;
   card_id: string | null;
   bank_account_id: string | null;
+  /**
+   * When the notice about this was cleared. Hides it from the notifications
+   * list and nothing else — the charge still counts everywhere it did before.
+   */
+  notification_dismissed_at: string | null;
 };
 
+// One literal, not a concatenation: supabase-js parses this string at the type
+// level to work out the row shape, and it cannot follow a joined expression.
 const CHARGE_COLUMNS =
-  'id, bill_id, subscription_id, label, amount, charged_on, card_id, bank_account_id';
+  'id, bill_id, subscription_id, label, amount, charged_on, card_id, bank_account_id, notification_dismissed_at';
 
 export function useCharges() {
   const userId = useUserId();
@@ -171,4 +178,37 @@ export async function recordDueCharges(userId: string, today: string): Promise<n
     .upsert(rows as never, { ignoreDuplicates: true });
 
   return error ? 0 : rows.length;
+}
+
+/**
+ * How far back the notifications list reaches.
+ *
+ * A week, and the window is the whole expiry mechanism: a notice leaves on its
+ * own the day it turns eight days old, one day at a time, without a job to run
+ * or a row to delete. What ages out is the announcement — the charge behind it
+ * is kept for seven years like every other thing that happened.
+ */
+export const NOTICE_DAYS = 7;
+
+/**
+ * Clears notices, without touching the money they announced.
+ *
+ * Deliberately an update and never a delete. Removing the charge would take
+ * the spending out of the dashboard and the ledger to tidy a list, which is
+ * the one thing this screen must not be able to do.
+ */
+export function useDismissNotices() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (chargeIds: string[]) => {
+      if (chargeIds.length === 0) return;
+      const { error } = await supabase
+        .from('charges')
+        .update({ notification_dismissed_at: new Date().toISOString() } as never)
+        .in('id', chargeIds);
+      if (error) throw error;
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: ['charges'] }),
+  });
 }

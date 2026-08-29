@@ -118,6 +118,8 @@ export type ProfileValues = {
   display_name?: string | null;
   /** Which bundled avatar was chosen; null for none. See theme/avatars.ts. */
   avatar_id?: string | null;
+  /** Dashboard tile ids, first to last. */
+  tile_order?: string[] | null;
 };
 
 /**

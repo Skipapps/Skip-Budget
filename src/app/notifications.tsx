@@ -1,18 +1,21 @@
+import { Trash2, X } from 'lucide-react-native';
 import { Fragment, useMemo } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
-import { useCharges } from '@/api/charges';
+import { NOTICE_DAYS, useCharges, useDismissNotices } from '@/api/charges';
 import { usePaymentSources } from '@/api/queries';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Subtitle, Title } from '@/components/ui/typography';
-import { toIsoDate } from '@/lib/date';
+import { addDays, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { groupByDate } from '@/lib/group';
-import { useMoneyColor } from '@/providers/theme-provider';
+import { tap } from '@/lib/haptics';
+import { useConfirm } from '@/providers/dialog-provider';
+import { useColors, useMoneyColor } from '@/providers/theme-provider';
 
 /**
  * What the app has done on your behalf.
@@ -27,9 +30,12 @@ import { useMoneyColor } from '@/providers/theme-provider';
  */
 export default function NotificationsScreen() {
   const artwork = useArtwork();
+  const colors = useColors();
   const moneyColor = useMoneyColor();
   const today = toIsoDate(new Date());
   const charges = useCharges();
+  const dismiss = useDismissNotices();
+  const confirm = useConfirm();
   const { sources } = usePaymentSources();
 
   const sourceLabels = useMemo(
@@ -37,13 +43,43 @@ export default function NotificationsScreen() {
     [sources],
   );
 
+  /**
+   * A rolling week, still here, newest first.
+   *
+   * The window is the whole expiry mechanism: a notice drops off on its own
+   * the day it turns eight days old, one day at a time. Nothing is deleted to
+   * make that happen — the charge behind it is kept for seven years like
+   * everything else that went out.
+   */
+  const since = toIsoDate(addDays(new Date(), -(NOTICE_DAYS - 1)));
+
+  const visible = useMemo(
+    () =>
+      (charges.data ?? []).filter(
+        (charge) => charge.charged_on >= since && !charge.notification_dismissed_at,
+      ),
+    [charges.data, since],
+  );
+
   const groups = useMemo(
     () =>
-      groupByDate(charges.data ?? [], (charge) => charge.charged_on, {
+      groupByDate(visible, (charge) => charge.charged_on, {
         amountOf: (charge) => -Math.abs(charge.amount),
       }),
-    [charges.data],
+    [visible],
   );
+
+  const clearAll = async () => {
+    const ok = await confirm({
+      title: `Clear ${visible.length === 1 ? 'this notice' : `all ${visible.length} notices`}?`,
+      message:
+        'Only the notices go. Every charge stays on your bills, your cards and ' +
+        'in your transactions, and none of your totals change.',
+      confirmLabel: 'Clear',
+      cancelLabel: 'Keep them',
+    });
+    if (ok) dismiss.mutate(visible.map((charge) => charge.id));
+  };
 
   return (
     <Screen showBack onRefresh={() => charges.refetch()}>
@@ -51,8 +87,23 @@ export default function NotificationsScreen() {
         Notifications
       </Title>
       <Subtitle className="mt-2 w-full text-left">
-        Every bill and subscription the app has put through, newest first.
+        What the app has put through this past week. Older notices clear themselves; the charges
+        behind them are kept.
       </Subtitle>
+
+      {visible.length > 0 ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Clear all notices"
+          onPress={() => void clearAll()}
+          className="mt-4 flex-row items-center gap-1.5 self-start rounded-full border border-line px-3.5 py-2 active:bg-ink/5"
+        >
+          <Trash2 size={14} color={colors.muted} strokeWidth={2} />
+          <Text className="font-poppins-medium text-[13px] text-body" maxFontSizeMultiplier={1.2}>
+            Clear all
+          </Text>
+        </Pressable>
+      ) : null}
 
       {charges.isPending ? <SkeletonList rows={5} /> : null}
 
@@ -66,15 +117,15 @@ export default function NotificationsScreen() {
         />
       ) : null}
 
-      {!charges.isPending && !charges.isError && (charges.data ?? []).length === 0 ? (
+      {!charges.isPending && !charges.isError && visible.length === 0 ? (
         <PageState
           art={artwork.emptyWallet}
-          title="Nothing has gone out yet"
+          title="Nothing this week"
           message="When a bill falls due or a subscription renews, the app records it and tells you here."
         />
       ) : null}
 
-      {!charges.isPending && !charges.isError && (charges.data ?? []).length > 0 ? (
+      {!charges.isPending && !charges.isError && visible.length > 0 ? (
         <View className="mt-2 w-full pb-10">
           {groups.map((group) => (
             <View key={group.date} className="w-full">
@@ -109,6 +160,19 @@ export default function NotificationsScreen() {
                       >
                         {formatCurrency(-Math.abs(charge.amount))}
                       </Text>
+
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Clear the notice for ${charge.label}`}
+                        hitSlop={8}
+                        onPress={() => {
+                          tap();
+                          dismiss.mutate([charge.id]);
+                        }}
+                        className="h-8 w-8 items-center justify-center rounded-full active:bg-ink/5"
+                      >
+                        <X size={16} color={colors.muted} strokeWidth={2} />
+                      </Pressable>
                     </View>
                   </Fragment>
                 );

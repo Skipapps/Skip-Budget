@@ -17,6 +17,7 @@ import {
   ScanFace,
   ScrollText,
   Shield,
+  LayoutGrid,
   Trash2,
   UserRound,
   Vibrate,
@@ -256,6 +257,12 @@ export default function SettingsScreen() {
           title="Reminders"
           subtitle="Before a renewal, a bill or payday"
           onPress={() => router.push('/reminders')}
+        />
+        <SettingsRow
+          icon={LayoutGrid}
+          title="Dashboard tiles"
+          subtitle="The order of “Where it goes”"
+          onPress={() => router.push('/tiles')}
           last
         />
       </SettingsSection>

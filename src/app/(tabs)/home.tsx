@@ -17,6 +17,7 @@ import { Screen } from '@/components/ui/screen';
 import { useLedger, useProfile, type LedgerEntry } from '@/api/queries';
 import { useKeepSchedulesCurrent, useRefreshAll } from '@/api/refresh';
 import { spendingCategories } from '@/data/dashboard-mock';
+import { orderByIds } from '@/lib/order';
 import { groupByDate } from '@/lib/group';
 import { rangeFor } from '@/lib/range';
 import { addDays, formatDateRange, formatDayLabel, toIsoDate } from '@/lib/date';
@@ -42,6 +43,12 @@ export default function HomeScreen() {
   // Held for the life of the screen so every window below is measured from
   // one day. Reading the clock per call would let a midnight rollover put two
   // sections on different days.
+  // Whichever order they arranged them in, with anything unmentioned behind.
+  const tiles = useMemo(
+    () => orderByIds(spendingCategories, profile.data?.tile_order),
+    [profile.data?.tile_order],
+  );
+
   const todayDate = useMemo(() => new Date(), []);
   const today = toIsoDate(todayDate);
 
@@ -155,7 +162,7 @@ export default function HomeScreen() {
           Where it goes
         </Text>
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.2}>
-          {spendingCategories.length} categories
+          {tiles.length} categories
         </Text>
       </View>
 
@@ -170,7 +177,7 @@ export default function HomeScreen() {
         contentContainerStyle={{ paddingHorizontal: GUTTER, gap: 12, paddingVertical: 12 }}
         className="w-full"
       >
-        {spendingCategories.map((category) => (
+        {tiles.map((category) => (
           <View key={category.id} className="w-[150px]">
             <AmountTile
               label={category.label}
