@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { SlidersHorizontal } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -14,7 +14,7 @@ import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { Title } from '@/components/ui/typography';
-import { usePaymentSources, useLedger, type LedgerEntry } from '@/api/queries';
+import { usePaymentSources, useLedger } from '@/api/queries';
 import { useRefreshAll } from '@/api/refresh';
 import { PageState } from '@/components/ui/page-state';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -22,13 +22,23 @@ import { ChoiceChips } from '@/components/ui/choice-chips';
 import { FlowChart, type FlowBucket } from '@/components/transactions/flow-chart';
 import { LedgerSummary } from '@/components/transactions/ledger-summary';
 import { TRANSACTION_KINDS } from '@/data/transactions-mock';
-import { RANGES, bucketFor, bucketKey, bucketsIn, rangeFor, type RangeKey } from '@/lib/range';
+import {
+  PERIODS,
+  isEarliestPeriod,
+  isLatestPeriod,
+  periodBuckets,
+  periodLabel,
+  periodRange,
+  stepPeriod,
+  type PeriodKey,
+} from '@/lib/period';
 
 import EmptyArt from '@/assets/illustrations/state-empty-wallet.svg';
 import ErrorArt from '@/assets/illustrations/state-error.svg';
 import NoResultsArt from '@/assets/illustrations/state-no-results.svg';
-import { MONTHS_SHORT, toIsoDate } from '@/lib/date';
-import { colors } from '@/theme/colors';
+import { toIsoDate } from '@/lib/date';
+import { formatCurrency } from '@/lib/format';
+import { colors, moneyColor } from '@/theme/colors';
 
 const KIND_LABELS = Object.fromEntries(
   TRANSACTION_KINDS.map((kind) => [kind.value, kind.label]),
@@ -39,17 +49,36 @@ export default function TransactionsScreen() {
   const [filters, setFilters] = useState<LedgerFilters>(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  // Today by default: opening the app should answer "what is happening now",
-  // not hand over a year of rows to scroll.
-  const [rangeKey, setRangeKey] = useState<RangeKey>('today');
-  const today = toIsoDate(new Date());
+  // Weeks by default. Fixed edges, not a window measured from today: a ledger
+  // answers "what did that week cost", and two people comparing notes on the
+  // same week have to be looking at the same days.
+  const [periodKey, setPeriodKey] = useState<PeriodKey>('week');
+  const [anchor, setAnchor] = useState(() => new Date());
 
-  const activeCount = countActiveFilters(filters);
-  const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
+  const todayDate = useMemo(() => new Date(), []);
+  const today = toIsoDate(todayDate);
+
+  const atLatest = isLatestPeriod(periodKey, anchor, todayDate);
+  const atEarliest = isEarliestPeriod(periodKey, anchor, todayDate);
+
+  /**
+   * The period, cut off at today.
+   *
+   * This page is a record of what happened, so it never reaches past the
+   * present. Looking at this month in the middle of it shows the days that
+   * have been, not a projection of the ones still to come — those live on the
+   * dashboard under Coming up, where they are labelled as still to happen.
+   */
+  const range = useMemo(() => {
+    const period = periodRange(periodKey, anchor);
+    return { from: period.from, to: period.to > today ? today : period.to };
+  }, [periodKey, anchor, today]);
 
   const { entries: ledger, totals, isLoading, isError, refetch } = useLedger(range);
   const { refresh, refreshing } = useRefreshAll();
   const { sources } = usePaymentSources();
+
+  const activeCount = countActiveFilters(filters);
 
   const sourceOptions = useMemo(
     () => sources.map((source) => ({ value: source.id, label: source.label })),
@@ -60,65 +89,111 @@ export default function TransactionsScreen() {
     [sources],
   );
 
-  const buckets = useMemo<FlowBucket[]>(() => {
-    const size = bucketFor(rangeKey);
-    const keys = bucketsIn(range, size);
-    const empty = new Map(keys.map((key) => [key, { out: 0, in: 0 }]));
+  /**
+   * The period's divisions, used twice.
+   *
+   * The same buckets draw the chart and head the list, so a bar and the run of
+   * rows under it are guaranteed to be the same slice of time. Deriving them
+   * separately is how a chart and a list quietly stop agreeing.
+   */
+  const buckets = useMemo(() => periodBuckets(periodKey, anchor), [periodKey, anchor]);
 
-    for (const entry of ledger) {
-      const slot = empty.get(bucketKey(entry.date, size));
-      if (!slot) continue;
-      if (entry.amount < 0) slot.out += Math.abs(entry.amount);
-      else slot.in += entry.amount;
-    }
-
-    return keys.map((key) => {
-      const [, month, day] = key.split('-');
-      return {
-        key,
-        // Months get their number, days get theirs — enough to orient without
-        // crowding a twelve-slot axis.
-        label: size === 'month' ? MONTHS_SHORT[Number(month) - 1] : String(Number(day)),
-        out: empty.get(key)!.out,
-        in: empty.get(key)!.in,
-      };
-    });
-  }, [ledger, range, rangeKey]);
-
-  const groups = useMemo(() => {
+  const matching = useMemo(() => {
     const needle = query.trim().toLowerCase();
-
-    const matching = ledger.filter((entry) => {
+    return ledger.filter((entry) => {
       if (needle && !entry.label.toLowerCase().includes(needle)) return false;
       if (filters.date && entry.date !== filters.date) return false;
       if (filters.sourceIds.length > 0 && !filters.sourceIds.includes(entry.sourceId)) return false;
       if (filters.kinds.length > 0 && !filters.kinds.includes(entry.kind)) return false;
       return true;
     });
-
-    // Group by day, newest first, preserving that order in the output.
-    const byDate = new Map<string, LedgerEntry[]>();
-    for (const entry of matching) {
-      const bucket = byDate.get(entry.date);
-      if (bucket) bucket.push(entry);
-      else byDate.set(entry.date, [entry]);
-    }
-
-    return [...byDate.entries()]
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([date, entries]) => ({
-        date,
-        entries,
-        total: entries.reduce((sum, entry) => sum + entry.amount, 0),
-      }));
   }, [ledger, query, filters]);
+
+  const chartBuckets = useMemo<FlowBucket[]>(
+    () =>
+      buckets.map((bucket) => {
+        const inside = matching.filter(
+          (entry) => entry.date >= bucket.from && entry.date <= bucket.to,
+        );
+        return {
+          key: bucket.key,
+          label: bucket.label,
+          out: inside.filter((e) => e.amount < 0).reduce((sum, e) => sum + Math.abs(e.amount), 0),
+          in: inside.filter((e) => e.amount > 0).reduce((sum, e) => sum + e.amount, 0),
+        };
+      }),
+    [buckets, matching],
+  );
+
+  /** Newest first, and empty buckets dropped — a heading over nothing is noise. */
+  const groups = useMemo(
+    () =>
+      buckets
+        .map((bucket) => {
+          const entries = matching
+            .filter((entry) => entry.date >= bucket.from && entry.date <= bucket.to)
+            .sort((a, b) =>
+              a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date),
+            );
+          return {
+            ...bucket,
+            entries,
+            total: entries.reduce((sum, entry) => sum + entry.amount, 0),
+          };
+        })
+        .filter((bucket) => bucket.entries.length > 0)
+        .reverse(),
+    [buckets, matching],
+  );
 
   return (
     <Screen avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
       <Title className="mt-2">Transactions</Title>
 
       <View className="mt-5 w-full">
-        <ChoiceChips options={RANGES} value={rangeKey} onChange={setRangeKey} />
+        <ChoiceChips options={PERIODS} value={periodKey} onChange={setPeriodKey} />
+      </View>
+
+      {/* The window itself, and the way through it. Forward stops at the
+          period holding today; back stops where the kept history ends. */}
+      <View className="mt-4 w-full flex-row items-center justify-between rounded-[10px] border border-line px-1.5 py-2">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Earlier"
+          accessibilityState={{ disabled: atEarliest }}
+          disabled={atEarliest}
+          onPress={() => setAnchor((current) => stepPeriod(periodKey, current, -1))}
+          className={
+            atEarliest
+              ? 'h-10 w-10 items-center justify-center rounded-[8px] opacity-30'
+              : 'h-10 w-10 items-center justify-center rounded-[8px] active:bg-black/5'
+          }
+        >
+          <ChevronLeft size={20} color={colors.ink} strokeWidth={2} />
+        </Pressable>
+
+        <Text
+          className="flex-1 text-center font-poppins-semibold text-[15px] text-ink"
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.3}
+        >
+          {periodLabel(periodKey, anchor)}
+        </Text>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Later"
+          accessibilityState={{ disabled: atLatest }}
+          disabled={atLatest}
+          onPress={() => setAnchor((current) => stepPeriod(periodKey, current, 1))}
+          className={
+            atLatest
+              ? 'h-10 w-10 items-center justify-center rounded-[8px] opacity-30'
+              : 'h-10 w-10 items-center justify-center rounded-[8px] active:bg-black/5'
+          }
+        >
+          <ChevronRight size={20} color={colors.ink} strokeWidth={2} />
+        </Pressable>
       </View>
 
       {!isLoading && !isError ? (
@@ -126,7 +201,7 @@ export default function TransactionsScreen() {
           <LedgerSummary totals={totals} />
           {/* The chart earns its space only once there is more than one slot to
               compare; a single day is a number, not a shape. */}
-          {buckets.length > 1 ? <FlowChart buckets={buckets} /> : null}
+          {chartBuckets.length > 1 ? <FlowChart buckets={chartBuckets} /> : null}
         </View>
       ) : null}
 
@@ -190,10 +265,27 @@ export default function TransactionsScreen() {
       {!isLoading && !isError && groups.length > 0 ? (
         <View className="mt-2 w-full pb-24">
           {groups.map((group) => (
-            <View key={group.date} className="w-full">
-              {/* The same heading the receipts, bills and subscriptions lists
-                  use, so a day reads identically wherever it appears. */}
-              <DateGroupHeader date={group.date} today={today} total={group.total} />
+            <View key={group.key} className="w-full">
+              {group.from === group.to ? (
+                <DateGroupHeader date={group.from} today={today} total={group.total} />
+              ) : (
+                <View className="w-full flex-row items-center justify-between gap-3 bg-white pb-1.5 pt-4">
+                  <Text
+                    className="font-poppins-medium text-[13px] uppercase tracking-wide text-muted"
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={1.3}
+                  >
+                    {group.label}
+                  </Text>
+                  <Text
+                    className="font-poppins text-[13px]"
+                    style={{ color: moneyColor(group.total) }}
+                    maxFontSizeMultiplier={1.3}
+                  >
+                    {formatCurrency(group.total)}
+                  </Text>
+                </View>
+              )}
 
               <View className="mt-1 h-px w-full bg-line" />
 

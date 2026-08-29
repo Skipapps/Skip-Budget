@@ -20,7 +20,7 @@ export const MONTHS_SHORT = [
   'Dec',
 ] as const;
 
-const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+export const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 const pad = (value: number) => String(value).padStart(2, '0');
 

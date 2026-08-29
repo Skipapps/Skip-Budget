@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import Svg, { Line, Path } from 'react-native-svg';
 
 import { formatCurrency } from '@/lib/format';
-import { money } from '@/theme/colors';
+import { colors } from '@/theme/colors';
 
 /**
  * Money in and money out across a window.
@@ -18,9 +18,16 @@ import { money } from '@/theme/colors';
  * size, and money in and money out share a scale anyway.
  */
 
-/** Validated against the palette checker: protan ΔE 11.7, normal ΔE 31.0. */
-const OUT = money.out;
-const IN = money.in;
+/**
+ * One colour, both directions.
+ *
+ * The chart already said this was the plan: in and out are opposite directions
+ * of one measure, so the side of the axis a bar sits on carries the meaning and
+ * colour was only ever reinforcing it. Dropping to a single ink makes the shape
+ * do the work, keeps the page to one accent, and reads the same for anyone who
+ * cannot separate two hues.
+ */
+const BAR = colors.control;
 const AXIS = '#DCDCDC';
 
 export type FlowBucket = {
@@ -79,13 +86,16 @@ export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
 
   return (
     <View className="w-full">
-      {/* Legend is always present for two series; identity is never colour
-          alone, since direction says the same thing. */}
-      <View className="mb-2 w-full flex-row items-center justify-between">
-        <View className="flex-row items-center gap-3">
-          <Key color={IN} label="In" />
-          <Key color={OUT} label="Out" />
-        </View>
+      {/* Two swatches of the same ink would say nothing, so the legend names
+          the thing that actually separates them: which side of the line. */}
+      <View className="mb-2 w-full flex-row items-center justify-between gap-3">
+        <Text
+          className="font-poppins text-[11px] text-muted"
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.3}
+        >
+          In above · out below
+        </Text>
         {shown ? (
           <Text
             className="font-poppins text-[12px] text-body"
@@ -112,14 +122,14 @@ export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
                   {bucket.in > 0 ? (
                     <Path
                       d={barPath(x, barWidth, zeroY, scale(bucket.in, true))}
-                      fill={IN}
+                      fill={BAR}
                       opacity={active && active !== bucket.key ? 0.35 : 1}
                     />
                   ) : null}
                   {bucket.out > 0 ? (
                     <Path
                       d={barPath(x, barWidth, zeroY, scale(bucket.out, false))}
-                      fill={OUT}
+                      fill={BAR}
                       opacity={active && active !== bucket.key ? 0.35 : 1}
                     />
                   ) : null}
@@ -165,17 +175,6 @@ export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
           </View>
         ))}
       </View>
-    </View>
-  );
-}
-
-function Key({ color, label }: { color: string; label: string }) {
-  return (
-    <View className="flex-row items-center gap-1.5">
-      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
-      <Text className="font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-        {label}
-      </Text>
     </View>
   );
 }
