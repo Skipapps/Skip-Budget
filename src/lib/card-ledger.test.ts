@@ -277,3 +277,20 @@ describe('buildLedger — a recurring charge stays inside its own lifetime', () 
     expect(ledger.balance).toBe(0);
   });
 });
+
+import { planFloor } from '@/lib/card-ledger';
+
+describe('planFloor', () => {
+  it('prefers the start date the plan actually carries', () => {
+    expect(planFloor('2026-06-14', '2026-08-01T10:00:00Z')).toBe('2026-06-14');
+  });
+
+  it('falls back to the day the row was created', () => {
+    // A plan with no start date cannot have charged before the app knew of it.
+    expect(planFloor(null, '2026-08-01T10:00:00Z')).toBe('2026-08-01');
+  });
+
+  it('is null only when nothing at all is known', () => {
+    expect(planFloor(null, null)).toBeNull();
+  });
+});

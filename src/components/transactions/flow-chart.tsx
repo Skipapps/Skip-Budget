@@ -1,137 +1,108 @@
 import { Fragment, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import Svg, { Line, Path } from 'react-native-svg';
+import { Text, View } from 'react-native';
+import Svg, { Line, Path, Text as SvgText } from 'react-native-svg';
 
-import { formatCurrency } from '@/lib/format';
 import { colors } from '@/theme/colors';
 
 /**
- * Money in and money out across a window.
+ * What each slice of the period cost.
  *
- * Diverging bars, not a stacked or grouped pair: in and out are opposite
- * directions of one measure, so direction carries the meaning and colour only
- * reinforces it. That also means the chart still reads for anyone who cannot
- * separate the two hues — the bar above the line is income whatever colour it
- * appears to be.
+ * Spending only. Income is in the list below and in the totals above, but it
+ * is not a bar here: one measure per chart means every bar is comparable to
+ * every other at a glance, where mixing two directions asks the reader to
+ * work out which is which before they can read the shape at all.
  *
- * One axis. Two measures on two scales would be a lie about their relative
- * size, and money in and money out share a scale anyway.
+ * Every bar carries its own figure. A chart you have to tap to interrogate is
+ * a chart that has not answered the question yet.
  */
 
-/**
- * One colour, both directions.
- *
- * The chart already said this was the plan: in and out are opposite directions
- * of one measure, so the side of the axis a bar sits on carries the meaning and
- * colour was only ever reinforcing it. Dropping to a single ink makes the shape
- * do the work, keeps the page to one accent, and reads the same for anyone who
- * cannot separate two hues.
- */
 const BAR = colors.control;
 const AXIS = '#DCDCDC';
 
 export type FlowBucket = {
-  /** yyyy-mm-dd of the bucket start; used as the key. */
+  /** Identity for the slice; also its React key. */
   key: string;
+  /** Axis label. Short — a phone fits about six characters per bar. */
   label: string;
-  /** Positive magnitude. */
-  out: number;
-  /** Positive magnitude. */
-  in: number;
+  /** Positive magnitude of what went out. */
+  spent: number;
 };
 
-const HEIGHT = 128;
+const HEIGHT = 132;
+/** Room above the tallest bar for its figure to sit without clipping. */
+const LABEL_ROOM = 18;
 const GAP = 2;
-/**
- * Bars stop short of the edge. A mark that touches the frame reads as clipped —
- * as though the real value is larger than the chart can show.
- */
-const HEADROOM = 0.88;
 /** So a real but tiny amount is still a visible mark rather than nothing. */
 const MIN_MARK = 3;
 
 /**
- * A bar with its far end rounded and its baseline end square, so the mark is
- * visibly anchored to zero rather than floating.
+ * Money short enough to sit on a bar.
+ *
+ * Twelve months across a phone leaves under thirty points per bar, which is
+ * not enough for "$1,234.56" at any readable size. Thousands collapse and
+ * cents go: on a bar the figure is for comparing, and the exact number is a
+ * row away in the list underneath.
  */
-function barPath(x: number, width: number, zeroY: number, endY: number): string {
-  const radius = Math.min(4, width / 2, Math.abs(endY - zeroY));
-  const up = endY < zeroY;
-  const far = up ? endY + radius : endY - radius;
+function compact(value: number): string {
+  if (value >= 1000) {
+    const thousands = value / 1000;
+    return `$${thousands >= 10 ? Math.round(thousands) : thousands.toFixed(1)}k`;
+  }
+  return `$${Math.round(value)}`;
+}
 
-  return up
-    ? `M${x},${zeroY} L${x},${far} Q${x},${endY} ${x + radius},${endY} L${x + width - radius},${endY} Q${x + width},${endY} ${x + width},${far} L${x + width},${zeroY} Z`
-    : `M${x},${zeroY} L${x},${far} Q${x},${endY} ${x + radius},${endY} L${x + width - radius},${endY} Q${x + width},${endY} ${x + width},${far} L${x + width},${zeroY} Z`;
+/** A bar with its top corners rounded, anchored square to the baseline. */
+function barPath(x: number, width: number, baseY: number, topY: number): string {
+  const radius = Math.min(4, width / 2, baseY - topY);
+  return (
+    `M${x},${baseY} L${x},${topY + radius} Q${x},${topY} ${x + radius},${topY} ` +
+    `L${x + width - radius},${topY} Q${x + width},${topY} ${x + width},${topY + radius} ` +
+    `L${x + width},${baseY} Z`
+  );
 }
 
 export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
   const [width, setWidth] = useState(0);
-  const [active, setActive] = useState<string | null>(null);
 
-  const peak = Math.max(1, ...buckets.map((bucket) => Math.max(bucket.out, bucket.in)));
+  const peak = Math.max(1, ...buckets.map((bucket) => bucket.spent));
   const slotWidth = buckets.length > 0 ? width / buckets.length : 0;
   const barWidth = Math.max(3, slotWidth - GAP * 2);
-  // Zero sits proportionally, so a window with no income is not half empty.
-  const inShare = Math.max(...buckets.map((b) => b.in), 0) / peak;
-  const zeroY = Math.max(18, Math.min(HEIGHT - 18, HEIGHT * (inShare / (inShare + 1)) + 6));
+  const baseY = HEIGHT;
 
-  const scale = (value: number, up: boolean) => {
-    if (value <= 0) return zeroY;
-    const room = (up ? zeroY : HEIGHT - zeroY) * HEADROOM;
-    const length = Math.max(MIN_MARK, (value / peak) * room);
-    return up ? zeroY - length : zeroY + length;
+  const topOf = (value: number) => {
+    if (value <= 0) return baseY;
+    const room = HEIGHT - LABEL_ROOM;
+    return baseY - Math.max(MIN_MARK, (value / peak) * room);
   };
-
-  const shown = buckets.find((bucket) => bucket.key === active);
 
   return (
     <View className="w-full">
-      {/* Two swatches of the same ink would say nothing, so the legend names
-          the thing that actually separates them: which side of the line. */}
-      <View className="mb-2 w-full flex-row items-center justify-between gap-3">
-        <Text
-          className="font-poppins text-[11px] text-muted"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.3}
-        >
-          In above · out below
-        </Text>
-        {shown ? (
-          <Text
-            className="font-poppins text-[12px] text-body"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.3}
-          >
-            {shown.label} · {formatCurrency(shown.in)} in · {formatCurrency(-shown.out)} out
-          </Text>
-        ) : (
-          <Text className="font-poppins text-[11px] text-muted" maxFontSizeMultiplier={1.3}>
-            Tap a bar
-          </Text>
-        )}
-      </View>
-
       <View className="w-full" onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
         {width > 0 ? (
           <Svg width={width} height={HEIGHT}>
-            <Line x1={0} y1={zeroY} x2={width} y2={zeroY} stroke={AXIS} strokeWidth={1} />
+            <Line x1={0} y1={baseY} x2={width} y2={baseY} stroke={AXIS} strokeWidth={1} />
             {buckets.map((bucket, index) => {
               const x = index * slotWidth + GAP;
+              const topY = topOf(bucket.spent);
+
               return (
                 <Fragment key={bucket.key}>
-                  {bucket.in > 0 ? (
-                    <Path
-                      d={barPath(x, barWidth, zeroY, scale(bucket.in, true))}
-                      fill={BAR}
-                      opacity={active && active !== bucket.key ? 0.35 : 1}
-                    />
-                  ) : null}
-                  {bucket.out > 0 ? (
-                    <Path
-                      d={barPath(x, barWidth, zeroY, scale(bucket.out, false))}
-                      fill={BAR}
-                      opacity={active && active !== bucket.key ? 0.35 : 1}
-                    />
+                  {bucket.spent > 0 ? (
+                    <>
+                      <Path d={barPath(x, barWidth, baseY, topY)} fill={BAR} />
+                      {/* Nothing to say about a slice where nothing went out,
+                          so a zero bar carries no figure either. */}
+                      <SvgText
+                        x={x + barWidth / 2}
+                        y={topY - 6}
+                        fill={colors.body}
+                        fontSize={10}
+                        fontWeight="600"
+                        textAnchor="middle"
+                      >
+                        {compact(bucket.spent)}
+                      </SvgText>
+                    </>
                   ) : null}
                 </Fragment>
               );
@@ -140,32 +111,14 @@ export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
         ) : (
           <View style={{ height: HEIGHT }} />
         )}
-
-        {/* Touch targets sit over the marks and are a whole slot wide, because
-            a 3px bar is not something anyone can hit. */}
-        {width > 0 ? (
-          <View className="absolute inset-0 flex-row">
-            {buckets.map((bucket) => (
-              <Pressable
-                key={bucket.key}
-                accessibilityRole="button"
-                accessibilityLabel={`${bucket.label}, ${formatCurrency(bucket.in)} in, ${formatCurrency(-bucket.out)} out`}
-                onPress={() => setActive(active === bucket.key ? null : bucket.key)}
-                style={{ width: slotWidth, height: HEIGHT }}
-              />
-            ))}
-          </View>
-        ) : null}
       </View>
 
-      <View className="mt-1 w-full flex-row">
-        {buckets.map((bucket, index) => (
+      <View className="mt-1.5 w-full flex-row">
+        {buckets.map((bucket) => (
           <View key={bucket.key} style={{ width: slotWidth }} className="items-center">
-            {/* Every label on a 12-month axis collides; showing every other one
-                keeps the axis readable without dropping its ends. */}
-            {buckets.length <= 8 || index % 2 === 0 ? (
+            {slotWidth > 22 ? (
               <Text
-                className="font-poppins text-[10px] text-muted"
+                className="font-poppins text-[11px] text-muted"
                 numberOfLines={1}
                 allowFontScaling={false}
               >

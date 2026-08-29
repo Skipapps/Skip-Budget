@@ -109,19 +109,19 @@ export default function TransactionsScreen() {
     });
   }, [ledger, query, filters]);
 
+  // Spending only. Income still counts in the totals above and appears in the
+  // list below; it is left off the chart so every bar measures one thing.
   const chartBuckets = useMemo<FlowBucket[]>(
     () =>
-      buckets.map((bucket) => {
-        const inside = matching.filter(
-          (entry) => entry.date >= bucket.from && entry.date <= bucket.to,
-        );
-        return {
-          key: bucket.key,
-          label: bucket.label,
-          out: inside.filter((e) => e.amount < 0).reduce((sum, e) => sum + Math.abs(e.amount), 0),
-          in: inside.filter((e) => e.amount > 0).reduce((sum, e) => sum + e.amount, 0),
-        };
-      }),
+      buckets.map((bucket) => ({
+        key: bucket.key,
+        label: bucket.label,
+        spent: matching
+          .filter(
+            (entry) => entry.amount < 0 && entry.date >= bucket.from && entry.date <= bucket.to,
+          )
+          .reduce((sum, entry) => sum + Math.abs(entry.amount), 0),
+      })),
     [buckets, matching],
   );
 

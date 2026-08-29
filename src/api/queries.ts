@@ -41,6 +41,7 @@ export type BankAccountRow = {
 
 export type BillRow = {
   id: string;
+  created_at?: string | null;
   name: string;
   amount: number;
   category_id: string;
@@ -134,7 +135,7 @@ export function useBills() {
     const { data, error } = await supabase
       .from('bills')
       .select(
-        'id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id',
+        'id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at',
       )
       .order('next_due_on', { ascending: true, nullsFirst: false });
     if (error) throw error;
@@ -256,6 +257,8 @@ export function useReceipts() {
 
 export type SubscriptionRow = {
   id: string;
+  started_on?: string | null;
+  created_at?: string | null;
   brand_id: string | null;
   name: string;
   amount: number;
@@ -274,7 +277,7 @@ export function useSubscriptions() {
     const { data, error } = await supabase
       .from('subscriptions')
       .select(
-        'id, brand_id, name, amount, cycle, next_renewal_on, category_id, card_id, bank_account_id, note, active, brands(domain)',
+        'id, brand_id, name, amount, cycle, next_renewal_on, started_on, created_at, category_id, card_id, bank_account_id, note, active, brands(domain)',
       )
       // Renewals with no date sort last rather than jumping the queue.
       .order('next_renewal_on', { ascending: true, nullsFirst: false });
@@ -660,7 +663,20 @@ export function useLedger(range?: DateRange) {
 
     for (const row of subscriptions.data ?? []) {
       if (!row.active || !row.next_renewal_on) continue;
-      for (const date of occurrencesInRange(row.next_renewal_on, row.cycle, from, to)) {
+      // The same floor bills get. Without it a plan added today fills every
+      // month behind it with renewals nobody was charged for.
+      const window = billWindow(
+        { starts_on: row.started_on, created_at: row.created_at },
+        from,
+        to,
+      );
+      if (window.from && window.from > window.to) continue;
+      for (const date of occurrencesInRange(
+        row.next_renewal_on,
+        row.cycle,
+        window.from,
+        window.to,
+      )) {
         entries.push({
           id: `subscription-${row.id}@${date}`,
           label: row.name,

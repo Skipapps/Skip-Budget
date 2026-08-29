@@ -284,6 +284,23 @@ export function buildLedger(input: {
 }
 
 /**
+ * The earliest day a plan could honestly have charged.
+ *
+ * Occurrences are walked outwards from the stored next date, which on its own
+ * reaches back forever: a monthly bill added today fills every month before it
+ * with charges nobody made. `startsOn` is the real answer when it is known,
+ * and the day the row was created is the honest fallback — the app cannot have
+ * recorded anything before it was told about it.
+ */
+export function planFloor(
+  startsOn: string | null | undefined,
+  createdAt: string | null | undefined,
+): string | null {
+  if (startsOn) return startsOn;
+  return createdAt ? createdAt.slice(0, 10) : null;
+}
+
+/**
  * Narrows a window to the stretch a bill was actually running.
  *
  * Occurrences are derived by walking outwards from the stored next date, which
@@ -291,15 +308,21 @@ export function buildLedger(input: {
  * and last spring fills with charges that were never paid. `starts_on` and
  * `ends_on` are the bill's own bounds, so the walk is held inside them.
  *
- * Rows saved before those dates were captured have neither, and are left
- * unbounded: guessing a start would erase real history.
+ * A row saved before those dates were captured falls back to when it was
+ * created, which is the last honest bound available: the app cannot have
+ * charged anything before it was told the plan existed.
  */
 export function billWindow(
-  bill: { starts_on?: string | null; ends_on?: string | null },
+  bill: {
+    starts_on?: string | null;
+    ends_on?: string | null;
+    created_at?: string | null;
+  },
   from: string | null,
   to: string,
 ): { from: string | null; to: string } {
-  const start = bill.starts_on && (!from || bill.starts_on > from) ? bill.starts_on : from;
+  const floor = planFloor(bill.starts_on, bill.created_at);
+  const start = floor && (!from || floor > from) ? floor : from;
   const end = bill.ends_on && bill.ends_on < to ? bill.ends_on : to;
   return { from: start, to: end };
 }
