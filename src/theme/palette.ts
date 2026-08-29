@@ -20,32 +20,40 @@ export const MODES = [
   { id: 'system', label: 'System', caption: 'Follows your phone' },
 ] as const;
 
-/** The twelve. Values are what get stored, so they must not be reordered. */
+/**
+ * The twelve. Values are what get stored, so they must not be reordered.
+ *
+ * Soft rather than saturated, and that is the point rather than a preference:
+ * the accent is a full-width card carrying the largest figure on the screen,
+ * so it is read through rather than looked at. A pastel lets the number sit on
+ * it; a saturated hue makes the number fight the card it is printed on.
+ *
+ * Two are deliberately dark. Plum and slate exist so the set is not twelve
+ * variations of pale — and because they are what proves the foreground is
+ * measured rather than assumed: on those two the figures come out white.
+ */
 export const ACCENTS = [
-  { id: 'skip-green', label: 'Skip green', value: '#34C77B' },
-  { id: 'sunflower', label: 'Sunflower', value: '#F5DE3F' },
-  { id: 'coral', label: 'Coral', value: '#EF5F6B' },
-  { id: 'sky', label: 'Sky', value: '#4EB3F0' },
-  { id: 'tangerine', label: 'Tangerine', value: '#F58634' },
-  { id: 'lime', label: 'Lime', value: '#A8CC4A' },
-  { id: 'cocoa', label: 'Cocoa', value: '#B08155' },
-  { id: 'sand', label: 'Sand', value: '#BFB59A' },
-  { id: 'blush', label: 'Blush', value: '#F0D0DC' },
-  { id: 'meadow', label: 'Meadow', value: '#C4EBB4' },
-  { id: 'violet', label: 'Violet', value: '#8B7BF5' },
-  { id: 'teal', label: 'Teal', value: '#2DC9B5' },
+  { id: 'butter', label: 'Butter', value: '#F6E3A9' },
+  { id: 'honey', label: 'Honey', value: '#F2C86B' },
+  { id: 'apricot', label: 'Apricot', value: '#EFA168' },
+  { id: 'coral', label: 'Coral', value: '#E98B88' },
+  { id: 'blush', label: 'Blush', value: '#EBCBC6' },
+  { id: 'rose', label: 'Rose', value: '#C98BA4' },
+  { id: 'plum', label: 'Plum', value: '#6E3E5C' },
+  { id: 'lavender', label: 'Lavender', value: '#A79CC4' },
+  { id: 'powder', label: 'Powder', value: '#B3CBE4' },
+  { id: 'sage', label: 'Sage', value: '#AAC5A9' },
+  { id: 'taupe', label: 'Taupe', value: '#A5877F' },
+  { id: 'slate', label: 'Slate', value: '#4C4C4C' },
 ] as const;
 
 export type AccentId = (typeof ACCENTS)[number]['id'];
 
 /**
- * Tangerine on install.
- *
- * It is the closest of the twelve to the coral the illustrations are drawn in,
- * so a fresh install looks like one app rather than a green shell around orange
- * artwork. One line to change if the brand moves.
+ * Apricot on install: the warmest of the soft set, and the one that carries a
+ * large figure best. One line to change if the brand moves.
  */
-export const DEFAULT_ACCENT: AccentId = 'tangerine';
+export const DEFAULT_ACCENT: AccentId = 'apricot';
 export const DEFAULT_MODE: ModeKey = 'system';
 
 export function accentValue(id: AccentId): string {
@@ -78,7 +86,15 @@ export function mix(hex: string, towards: string, amount: number): string {
   return toHex(r1 + (r2 - r1) * amount, g1 + (g2 - g1) * amount, b1 + (b2 - b1) * amount);
 }
 
-/** The one of black or white that reads better on this colour. */
+/**
+ * The one of black or white that reads better on this colour.
+ *
+ * Measured, not guessed from a lightness threshold, and this is where the
+ * dashboard's headline figure gets its colour. Pick slate or plum and the
+ * number comes out white; pick butter and it comes out near-black. Nothing in
+ * the app decides that per colour, which is why adding a thirteenth accent
+ * needs no thought about what to print on it.
+ */
 export function onColor(hex: string): string {
   return contrast('#111111', hex) >= contrast('#FFFFFF', hex) ? '#111111' : '#FFFFFF';
 }
