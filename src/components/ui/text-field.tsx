@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { EyeIcon } from '@/components/icons/eye-icon';
@@ -16,6 +16,8 @@ type TextFieldProps = {
   className?: string;
   /** Optional-field hint, shown next to the label rather than in the input. */
   optional?: boolean;
+  /** Sits in the field's trailing corner — a tick, a unit, a small action. */
+  trailing?: ReactNode;
 } & Pick<
   TextInputProps,
   | 'autoCapitalize'
@@ -44,6 +46,7 @@ export function TextField({
   className,
   secureTextEntry,
   optional,
+  trailing,
   multiline,
   ...inputProps
 }: TextFieldProps) {
@@ -77,14 +80,22 @@ export function TextField({
           placeholder={placeholder}
           placeholderTextColor={colors.muted}
           onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           secureTextEntry={isPassword && !revealed}
           multiline={multiline}
           textAlignVertical={multiline ? 'top' : 'center'}
           className={cn('flex-1 py-4 font-poppins text-[16px] text-ink', multiline && 'min-h-20')}
           maxFontSizeMultiplier={1.5}
           {...inputProps}
+          // After the spread, and calling through: a caller passing onBlur
+          // would otherwise replace the one that clears the focus ring, and
+          // the field would sit looking focused for the rest of the session.
+          onBlur={(event) => {
+            setFocused(false);
+            inputProps.onBlur?.(event);
+          }}
         />
+
+        {trailing ? <View className="ml-2">{trailing}</View> : null}
 
         {isPassword ? (
           <Pressable

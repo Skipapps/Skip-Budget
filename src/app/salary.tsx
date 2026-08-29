@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Calculator, Calendar, Plus, Trash2 } from 'lucide-react-native';
+import { Calculator, Calendar, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
@@ -84,6 +84,9 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
   const [padTarget, setPadTarget] = useState<PadTarget>(null);
   // Which source's payday is being picked, or null when the picker is closed.
   const [dateTarget, setDateTarget] = useState<string | null>(null);
+  // Collapsed by id. Everything starts open — a source you just added is a
+  // source you are still filling in.
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   // Monotonic so ids stay unique even after sources are removed.
   const nextId = useRef(initial.length + 1);
@@ -207,72 +210,113 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
                 Source {index + 1}
               </Text>
 
-              {sources.length > 1 ? (
+              <View className="flex-row items-center gap-1">
+                {sources.length > 1 ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove source ${index + 1}`}
+                    hitSlop={8}
+                    onPress={() => removeSource(source.id)}
+                    className="h-9 w-9 items-center justify-center rounded-[8px] active:bg-black/5"
+                  >
+                    <Trash2 size={18} color={colors.muted} strokeWidth={1.8} />
+                  </Pressable>
+                ) : null}
+
+                {/* Several sources fill the screen fast, and most of the time
+                    you are editing one of them. Folding the rest away keeps
+                    the one you are working on in view. */}
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Remove source ${index + 1}`}
+                  accessibilityLabel={
+                    collapsed[source.id]
+                      ? `Expand source ${index + 1}`
+                      : `Collapse source ${index + 1}`
+                  }
+                  accessibilityState={{ expanded: !collapsed[source.id] }}
                   hitSlop={8}
-                  onPress={() => removeSource(source.id)}
+                  onPress={() =>
+                    setCollapsed((current) => ({
+                      ...current,
+                      [source.id]: !current[source.id],
+                    }))
+                  }
                   className="h-9 w-9 items-center justify-center rounded-[8px] active:bg-black/5"
                 >
-                  <Trash2 size={18} color={colors.muted} strokeWidth={1.8} />
+                  {collapsed[source.id] ? (
+                    <ChevronDown size={18} color={colors.ink} strokeWidth={2} />
+                  ) : (
+                    <ChevronUp size={18} color={colors.ink} strokeWidth={2} />
+                  )}
                 </Pressable>
-              ) : null}
-            </View>
-
-            <View className="w-full gap-5">
-              <TextField
-                label="Name"
-                value={source.name}
-                onChangeText={(text) => update(source.id, { name: text })}
-                autoCapitalize="words"
-                returnKeyType="done"
-              />
-
-              <SelectField
-                label="Amount"
-                value={source.amount ? formatCurrency(source.amount) : ''}
-                placeholder="Enter an amount"
-                icon={Calculator}
-                onPress={() => setPadTarget({ sourceId: source.id, mode: 'pad' })}
-                onIconPress={() => setPadTarget({ sourceId: source.id, mode: 'calculator' })}
-                iconAccessibilityLabel="Open calculator"
-              />
-
-              <View className="w-full">
-                <FieldLabel className="mb-2">How often</FieldLabel>
-                <ChoiceChips
-                  options={PAY_FREQUENCIES}
-                  value={source.frequency}
-                  onChange={(frequency) => update(source.id, { frequency })}
-                />
-              </View>
-
-              <SelectField
-                label="Last payday"
-                value={source.lastPayday ? formatFullDate(asDate(source.lastPayday)!) : ''}
-                placeholder="Pick the most recent one"
-                icon={Calendar}
-                onPress={() => setDateTarget(source.id)}
-              />
-
-              {source.lastPayday ? (
-                <Text className="-mt-3 ml-4 font-poppins text-[13px] text-muted">
-                  Next payday{' '}
-                  {formatFullDate(getNextPayday(asDate(source.lastPayday)!, source.frequency))}
-                </Text>
-              ) : null}
-
-              <View className="w-full">
-                <FieldLabel className="mb-2">Paid into</FieldLabel>
-                <MultiChoiceChips
-                  options={accountOptions}
-                  values={source.accountIds}
-                  onChange={(accountIds) => update(source.id, { accountIds })}
-                  emptyHint="Link at least one account so Skip knows where this lands."
-                />
               </View>
             </View>
+
+            {collapsed[source.id] ? (
+              // Folded: enough to tell one source from another without opening it.
+              <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+                {[
+                  source.name.trim() || 'Unnamed',
+                  source.amount ? formatCurrency(source.amount) : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+            ) : (
+              <View className="w-full gap-5">
+                <TextField
+                  label="Name"
+                  value={source.name}
+                  onChangeText={(text) => update(source.id, { name: text })}
+                  autoCapitalize="words"
+                  returnKeyType="done"
+                />
+
+                <SelectField
+                  label="Amount"
+                  value={source.amount ? formatCurrency(source.amount) : ''}
+                  placeholder="Enter an amount"
+                  icon={Calculator}
+                  onPress={() => setPadTarget({ sourceId: source.id, mode: 'pad' })}
+                  onIconPress={() => setPadTarget({ sourceId: source.id, mode: 'calculator' })}
+                  iconAccessibilityLabel="Open calculator"
+                />
+
+                <View className="w-full">
+                  <FieldLabel className="mb-2">How often</FieldLabel>
+                  <ChoiceChips
+                    options={PAY_FREQUENCIES}
+                    value={source.frequency}
+                    onChange={(frequency) => update(source.id, { frequency })}
+                  />
+                </View>
+
+                <SelectField
+                  label="Last payday"
+                  value={source.lastPayday ? formatFullDate(asDate(source.lastPayday)!) : ''}
+                  placeholder="Pick the most recent one"
+                  icon={Calendar}
+                  onPress={() => setDateTarget(source.id)}
+                />
+
+                {source.lastPayday ? (
+                  <Text className="-mt-3 ml-4 font-poppins text-[13px] text-muted">
+                    Next payday{' '}
+                    {formatFullDate(getNextPayday(asDate(source.lastPayday)!, source.frequency))}
+                  </Text>
+                ) : null}
+
+                <View className="w-full">
+                  <FieldLabel className="mb-2">Paid into</FieldLabel>
+                  <MultiChoiceChips
+                    options={accountOptions}
+                    values={source.accountIds}
+                    onChange={(accountIds) => update(source.id, { accountIds })}
+                    emptyHint="Link at least one account so Skip knows where this lands."
+                  />
+                </View>
+              </View>
+            )}
           </View>
         ))}
       </View>

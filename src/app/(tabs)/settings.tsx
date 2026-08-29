@@ -1,16 +1,18 @@
 import Constants from 'expo-constants';
+import { openBrowserAsync } from 'expo-web-browser';
 import { router } from 'expo-router';
 import {
   Bell,
   CalendarDays,
+  Check,
   Coffee,
   CreditCard,
-  DollarSign,
   FileText,
   Lightbulb,
   LogOut,
   Mail,
   Palette,
+  ReceiptText,
   Repeat,
   ScanFace,
   ScrollText,
@@ -19,7 +21,7 @@ import {
   Vibrate,
 } from 'lucide-react-native';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { deleteAccount, signOut } from '@/api/auth';
 import { useUpdateProfile } from '@/api/mutations';
@@ -29,10 +31,14 @@ import { Screen } from '@/components/ui/screen';
 import { useConfirm, useDialog } from '@/providers/dialog-provider';
 import { TextField } from '@/components/ui/text-field';
 import { Title } from '@/components/ui/typography';
+import { money } from '@/theme/colors';
+import { useCharges } from '@/api/charges';
 import {
   useBankAccounts,
+  useBills,
   useCards,
   useProfile,
+  useReceipts,
   useSalarySources,
   useSubscriptions,
 } from '@/api/queries';
@@ -51,6 +57,11 @@ export default function SettingsScreen() {
   const profile = useProfile();
   const updateProfile = useUpdateProfile();
 
+  const bills = useBills();
+  const receipts = useReceipts();
+  const charges = useCharges();
+
+  const billCount = bills.data?.length ?? 0;
   const cardCount = cards.data?.length ?? 0;
   const accountCount = accounts.data?.length ?? 0;
   const salaryCount = salary.data?.length ?? 0;
@@ -62,11 +73,17 @@ export default function SettingsScreen() {
   const savedName = profile.data?.display_name ?? '';
   const displayName = draftName ?? savedName;
 
-  /** Saved when the field loses focus; there is no Save button on this screen. */
+  /** Whether what is on screen differs from what is stored. */
+  const nameDirty = draftName !== null && draftName.trim() !== savedName;
+
   const commitName = () => {
-    const next = displayName.trim();
-    if (draftName === null || next === savedName) return;
-    updateProfile.mutate({ display_name: next || null });
+    if (!nameDirty) return;
+    updateProfile.mutate(
+      { display_name: displayName.trim() || null },
+      // Back to reading the saved value, so the tick means "this is what is
+      // stored" rather than "this is what you typed".
+      { onSuccess: () => setDraftName(null) },
+    );
   };
   const [haptics, setHaptics] = useState(true);
   const [appLock, setAppLock] = useState(false);
@@ -74,26 +91,43 @@ export default function SettingsScreen() {
   const noop = () => {};
 
   /**
-   * Two dialogs, not one. The first spells out exactly what disappears; the
-   * second is the point of no return. Account deletion is the only action in
-   * the app that cannot be undone by any means, so it does not share the
+   * Two dialogs, not one.
+   *
+   * The first counts what is about to go. "Everything" is easy to agree to;
+   * "3 cards, 57 transactions" is the same fact in a form somebody can weigh.
+   * The second is the point of no return. Account deletion is the only action
+   * in the app that cannot be undone by any means, so it does not share the
    * single-confirm pattern used for deleting a receipt.
    */
   const handleDeleteAccount = async () => {
+    const tally = [
+      [cardCount, 'card'],
+      [accountCount, 'bank account'],
+      [billCount, 'bill'],
+      [trackedSubscriptions, 'subscription'],
+      [receipts.data?.length ?? 0, 'receipt'],
+      [charges.data?.length ?? 0, 'recorded charge'],
+      [salaryCount, 'salary source'],
+    ] as const;
+
+    const held = tally.filter(([count]) => count > 0).map(([count, word]) => plural(count, word));
+
     const first = await confirm({
       title: 'Delete your account?',
-      message:
-        'Your cards, accounts, bills, subscriptions, receipts and scanned images are all deleted. This cannot be undone and there is no way to recover them.',
+      message: held.length
+        ? `This removes ${held.join(', ')} — everything Skip holds for you. It cannot be undone.`
+        : 'This removes your account and everything Skip holds for you. It cannot be undone.',
       confirmLabel: 'Continue',
-      destructive: true,
       cancelLabel: 'Keep my account',
+      destructive: true,
     });
     if (!first) return;
 
     const second = await confirm({
-      title: 'This is permanent',
-      message: 'Delete everything and sign out?',
+      title: 'Delete everything, for good?',
+      message: 'There is no way back from here, and no copy kept.',
       confirmLabel: 'Delete everything',
+      cancelLabel: 'Keep my account',
       destructive: true,
     });
     if (!second) return;
@@ -116,12 +150,35 @@ export default function SettingsScreen() {
             label="Display name"
             value={displayName}
             onChangeText={setDraftName}
-            onBlur={commitName}
             onSubmitEditing={commitName}
             placeholder="Your name"
             autoCapitalize="words"
             returnKeyType="done"
+            // A tick only once it is stored. Saving on blur alone left people
+            // with no way to tell whether their name had been kept.
+            trailing={
+              !nameDirty && savedName ? (
+                <Check size={20} color={money.in} strokeWidth={2.6} />
+              ) : null
+            }
           />
+
+          {nameDirty ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Save your display name"
+              onPress={commitName}
+              disabled={updateProfile.isPending}
+              className="mt-3 self-end rounded-full bg-control px-5 py-2.5 active:opacity-80"
+            >
+              <Text
+                className="font-poppins-medium text-[14px] text-white"
+                maxFontSizeMultiplier={1.2}
+              >
+                {updateProfile.isPending ? 'Saving…' : 'Save'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </SettingsSection>
 
@@ -155,14 +212,15 @@ export default function SettingsScreen() {
 
       <SettingsSection title="Your money">
         <SettingsRow
-          icon={DollarSign}
-          title="Currency"
-          subtitle="US dollar (USD) · More currencies coming"
+          icon={ReceiptText}
+          title="Bills"
+          subtitle={billCount > 0 ? plural(billCount, 'recurring bill') : 'None yet'}
+          onPress={() => router.push('/bills')}
         />
         <SettingsRow
           icon={Repeat}
           title="Subscriptions"
-          subtitle={`${trackedSubscriptions} tracked`}
+          subtitle={trackedSubscriptions > 0 ? plural(trackedSubscriptions, 'tracked') : 'None yet'}
           onPress={() => router.push('/subscriptions')}
         />
         <SettingsRow
@@ -211,9 +269,9 @@ export default function SettingsScreen() {
         />
         <SettingsRow
           icon={Coffee}
-          title="Buy me a coffee"
+          title="Buy a coffee for team"
           subtitle="Keep Skip brewing"
-          onPress={noop}
+          onPress={() => openBrowserAsync('https://buymeacoffee.com/Weknd_team')}
           last
         />
       </SettingsSection>
