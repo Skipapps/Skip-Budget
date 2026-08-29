@@ -54,6 +54,7 @@
       "expo-localization",
       "expo-sharing",
       "@sentry/react-native",
+      "expo-notifications",
       [
         "./plugins/with-signing.js",
         {
