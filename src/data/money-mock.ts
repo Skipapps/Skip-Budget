@@ -1,20 +1,17 @@
 /**
  * Placeholder money buckets shown on the cards screen. Sample data only.
  */
-import type { FC } from 'react';
-import type { SvgProps } from 'react-native-svg';
-
-import SalaryArt from '@/assets/illustrations/tile-salary.svg';
-import SavingsArt from '@/assets/illustrations/tile-savings.svg';
+import type { ArtworkName } from '@/theme/artwork';
 
 export type MoneyBucket = {
   id: string;
   label: string;
   amount: number;
-  artwork: FC<SvgProps>;
+  /** Looked up in the artwork registry, which knows the light and dark pair. */
+  artwork: ArtworkName;
 };
 
 export const moneyBuckets: MoneyBucket[] = [
-  { id: 'salary', label: 'Salary', amount: 5600, artwork: SalaryArt },
-  { id: 'savings', label: 'Savings', amount: 12850, artwork: SavingsArt },
+  { id: 'salary', label: 'Salary', amount: 5600, artwork: 'tileSalary' },
+  { id: 'savings', label: 'Savings', amount: 12850, artwork: 'tileSavings' },
 ];

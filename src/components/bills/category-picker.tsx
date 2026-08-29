@@ -2,7 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { BILL_CATEGORIES, type BillCategory } from '@/data/bills-mock';
 import { cn } from '@/lib/cn';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type CategoryPickerProps = {
   onSelect: (category: BillCategory) => void;
@@ -14,6 +14,7 @@ type CategoryPickerProps = {
  * room to read — a four-up grid would truncate "Memberships & Services".
  */
 export function CategoryPicker({ onSelect, selectedId }: CategoryPickerProps) {
+  const colors = useColors();
   return (
     <View className="w-full flex-row flex-wrap gap-3">
       {BILL_CATEGORIES.map((category) => {
@@ -30,13 +31,13 @@ export function CategoryPicker({ onSelect, selectedId }: CategoryPickerProps) {
             style={{ width: '47.5%' }}
             className={cn(
               'rounded-[10px] border p-3.5 active:opacity-80',
-              selected ? 'border-control bg-black/[0.03]' : 'border-line bg-white',
+              selected ? 'border-control bg-ink/[0.03]' : 'border-line bg-card',
             )}
           >
             <View
               className={cn(
                 'h-11 w-11 items-center justify-center rounded-[10px]',
-                selected ? 'bg-control' : 'bg-black/5',
+                selected ? 'bg-control' : 'bg-ink/5',
               )}
             >
               <Icon width={22} height={22} color={selected ? colors.surface : colors.body} />

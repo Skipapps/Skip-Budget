@@ -4,7 +4,7 @@ import { Pressable, Text, TextInput, View, type TextInputProps } from 'react-nat
 import { EyeIcon } from '@/components/icons/eye-icon';
 import { FieldLabel } from '@/components/ui/typography';
 import { cn } from '@/lib/cn';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type TextFieldProps = {
   label: string;
@@ -50,6 +50,7 @@ export function TextField({
   multiline,
   ...inputProps
 }: TextFieldProps) {
+  const colors = useColors();
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const isPassword = Boolean(secureTextEntry);

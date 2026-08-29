@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { useCreateCard, useDeleteCard, useUpdateCard } from '@/api/mutations';
 import { useCard } from '@/api/queries';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 import { NetworkPicker } from '@/components/cards/network-picker';
 import { PaymentCard } from '@/components/cards/payment-card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm } from '@/providers/dialog-provider';
-import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Title } from '@/components/ui/typography';
@@ -24,20 +23,12 @@ import { formatCurrency } from '@/lib/format';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
 
-const REMINDER_OPTIONS = [
-  { value: 'off', label: 'Off' },
-  { value: '1', label: '1 day' },
-  { value: '3', label: '3 days' },
-  { value: '7', label: '1 week' },
-] as const;
-
-type Reminder = (typeof REMINDER_OPTIONS)[number]['value'];
-
 const MORE_SETUP_INFO =
   'Adding more details helps Skip calculate accurate balances and predict future transactions made with this card.';
 
 /** Loads the card being edited, then seeds the form by remount. */
 export default function AddCardScreen() {
+  const colors = useColors();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { data: existing, isLoading } = useCard(id);
 
@@ -75,9 +66,6 @@ function CardForm({
     existing?.bill_due_day
       ? new Date(new Date().getFullYear(), new Date().getMonth(), existing.bill_due_day)
       : null,
-  );
-  const [reminder, setReminder] = useState<Reminder>(
-    existing?.reminder_days == null ? 'off' : (String(existing.reminder_days) as Reminder),
   );
   const [balance, setBalance] = useState(existing ? String(existing.balance) : '');
 
@@ -128,7 +116,6 @@ function CardForm({
         balance_as_of: balance ? toIsoDate(new Date()) : null,
         // The bill day is what recurs, not the specific date picked.
         bill_due_day: dueDate ? dueDate.getDate() : null,
-        reminder_days: reminder === 'off' ? null : Number(reminder),
       };
 
       if (editing && id) {
@@ -205,15 +192,6 @@ function CardForm({
               onPress={() => setDatePickerOpen(true)}
             />
 
-            <View className="w-full">
-              <FieldLabel className="mb-2">Reminder</FieldLabel>
-              <SegmentedControl
-                options={REMINDER_OPTIONS}
-                value={reminder}
-                onChange={setReminder}
-              />
-            </View>
-
             <SelectField
               label="Today's balance"
               value={balance ? formatCurrency(Number(balance)) : ''}
@@ -250,7 +228,7 @@ function CardForm({
             accessibilityRole="button"
             accessibilityLabel="Delete this card"
             onPress={handleDelete}
-            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-black/5"
+            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-ink/5"
           >
             <Trash2 size={17} color="#DC2626" strokeWidth={1.9} />
             <Text

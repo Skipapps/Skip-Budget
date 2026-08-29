@@ -9,6 +9,7 @@ import {
   countActiveBillFilters,
   type BillFilters,
 } from '@/components/bills/bill-filter-sheet';
+import { useArtwork } from '@/theme/artwork';
 import { BillRow } from '@/components/bills/bill-row';
 import { ActionPill } from '@/components/ui/action-pill';
 import { Screen } from '@/components/ui/screen';
@@ -17,18 +18,17 @@ import { PageState } from '@/components/ui/page-state';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Title } from '@/components/ui/typography';
 
-import EmptyArt from '@/assets/illustrations/state-empty-bills.svg';
-import ErrorArt from '@/assets/illustrations/state-error.svg';
-import NoResultsArt from '@/assets/illustrations/state-no-results.svg';
 import { usePaymentSources, useBills } from '@/api/queries';
 import { getBillCategory } from '@/data/bills-mock';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 export default function BillPlansScreen() {
+  const artwork = useArtwork();
+  const colors = useColors();
   const [queryText, setQuery] = useState('');
   const [filters, setFilters] = useState<BillFilters>(EMPTY_BILL_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -124,14 +124,14 @@ export default function BillPlansScreen() {
                 activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter bills'
               }
               onPress={() => setFilterOpen(true)}
-              className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-black/5"
+              className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-ink/5"
             >
               <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />
               {activeCount > 0 ? (
                 <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
                   <Text
                     allowFontScaling={false}
-                    className="font-poppins-medium text-[11px] text-ink"
+                    className="font-poppins-medium text-[11px] text-on-control"
                   >
                     {activeCount}
                   </Text>
@@ -164,7 +164,7 @@ export default function BillPlansScreen() {
 
       {query.isError ? (
         <PageState
-          art={ErrorArt}
+          art={artwork.error}
           title="Could not load your bills"
           message="Check your connection and try again. Nothing has been lost."
           actionLabel="Try again"
@@ -174,7 +174,7 @@ export default function BillPlansScreen() {
 
       {showEmpty ? (
         <PageState
-          art={EmptyArt}
+          art={artwork.emptyBills}
           title="No bills yet"
           message="Add the ones that repeat — rent, power, phone — and Skip will keep track of what is due."
           actionLabel="Add a bill"
@@ -184,7 +184,7 @@ export default function BillPlansScreen() {
 
       {showNoMatches ? (
         <PageState
-          art={NoResultsArt}
+          art={artwork.noResults}
           title="Nothing matches"
           message="No bill fits that search and those filters. Try a different name or clear what you have set."
           actionLabel="Clear filters"

@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { View } from 'react-native';
 
 import { getBillIcon } from '@/data/bills-mock';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type BillMarkProps = {
   categoryId?: string | null;
@@ -23,6 +23,7 @@ type BillMarkProps = {
  * next to each other and any difference reads as a mistake.
  */
 export function BillMark({ categoryId, iconId, size = 40 }: BillMarkProps) {
+  const colors = useColors();
   // createElement, not JSX: getBillIcon looks a component up rather than
   // defining one, and assigning it to a capitalised local trips the lint rule.
   const icon = createElement(
@@ -33,7 +34,7 @@ export function BillMark({ categoryId, iconId, size = 40 }: BillMarkProps) {
   return (
     <View
       style={{ width: size, height: size }}
-      className="items-center justify-center rounded-full border border-line bg-black/5"
+      className="items-center justify-center rounded-full border border-line bg-ink/5"
     >
       {icon}
     </View>

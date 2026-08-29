@@ -6,7 +6,7 @@ import { guessCategory, useBrandSearch, type BrandRow } from '@/api/brands';
 import { BrandLogo } from '@/components/brands/brand-logo';
 import { FieldLabel } from '@/components/ui/typography';
 import { cn } from '@/lib/cn';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 export type BrandSelection = {
   /** Null for a store the catalog does not know. */
@@ -54,6 +54,7 @@ export function BrandField({
   error,
   className,
 }: BrandFieldProps) {
+  const colors = useColors();
   const [query, setQuery] = useState('');
   const [focused, setFocused] = useState(false);
   const debounced = useDebounced(query);
@@ -99,7 +100,7 @@ export function BrandField({
             accessibilityLabel={`Change store, currently ${value.name}`}
             hitSlop={10}
             onPress={clear}
-            className="-mr-1 h-10 w-10 items-center justify-center rounded-[8px] active:bg-black/10"
+            className="-mr-1 h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/10"
           >
             <X size={18} color={colors.muted} strokeWidth={2} />
           </Pressable>
@@ -142,7 +143,7 @@ export function BrandField({
               accessibilityLabel={brand.name}
               onPress={() => choose(brand)}
               className={cn(
-                'min-h-14 flex-row items-center px-4 py-3 active:bg-black/5',
+                'min-h-14 flex-row items-center px-4 py-3 active:bg-ink/5',
                 index > 0 && 'border-t border-line',
               )}
             >
@@ -176,7 +177,7 @@ export function BrandField({
                 })
               }
               className={cn(
-                'min-h-14 flex-row items-center px-4 py-3 active:bg-black/5',
+                'min-h-14 flex-row items-center px-4 py-3 active:bg-ink/5',
                 results.length > 0 && 'border-t border-line',
               )}
             >

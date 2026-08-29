@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { LayoutAnimation, Platform, Pressable, Text, UIManager, View } from 'react-native';
 
 import { InfoDialog } from '@/components/ui/info-dialog';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -29,6 +29,7 @@ export function CollapsibleSection({
   infoTitle,
   infoMessage,
 }: CollapsibleSectionProps) {
+  const colors = useColors();
   const [open, setOpen] = useState(defaultOpen);
   const [infoOpen, setInfoOpen] = useState(false);
 

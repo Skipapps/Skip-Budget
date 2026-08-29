@@ -1,8 +1,9 @@
 import { Plus } from 'lucide-react-native';
 import { Pressable, Text } from 'react-native';
 
+import { withTap } from '@/lib/press';
 import { cn } from '@/lib/cn';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
 type ActionPillProps = {
@@ -13,14 +14,15 @@ type ActionPillProps = {
 
 /** The "+ New card" / "+ Add bill" header action, shared across list pages. */
 export function ActionPill({ label, onPress, className }: ActionPillProps) {
+  const colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      onPress={onPress}
+      onPress={withTap(onPress)}
       style={shadows.card}
       className={cn(
-        'flex-row items-center gap-1.5 rounded-full border border-line bg-white py-2.5 pl-3 pr-4 active:bg-black/5',
+        'flex-row items-center gap-1.5 rounded-full border border-line bg-card py-2.5 pl-3 pr-4 active:bg-ink/5',
         className,
       )}
     >

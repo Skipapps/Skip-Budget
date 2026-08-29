@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { withTimeout } from '@/lib/deadline';
-import { chargeKey, unrecordedDates } from '@/lib/charges';
+import { unrecordedDates, type ChargeablePlan } from '@/lib/charges';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
@@ -66,6 +66,15 @@ type NewCharge = {
   bank_account_id: string | null;
 };
 
+/** A plan of either kind, flattened to the fields recording actually needs. */
+type Plan = ChargeablePlan & {
+  label: string;
+  amount: number;
+  cardId: string | null;
+  accountId: string | null;
+  kind: 'bill' | 'subscription';
+};
+
 /**
  * Records every occurrence that has come due and is not written down yet.
  *
@@ -78,87 +87,76 @@ export async function recordDueCharges(userId: string, today: string): Promise<n
     supabase
       .from('bills')
       .select(
-        'id, name, amount, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id',
+        'id, name, amount, recurrence, next_due_on, starts_on, ends_on, created_at, card_id, bank_account_id',
       ),
     supabase
       .from('subscriptions')
-      .select('id, name, amount, cycle, next_renewal_on, card_id, bank_account_id')
+      .select(
+        'id, name, amount, cycle, next_renewal_on, started_on, created_at, card_id, bank_account_id',
+      )
       .eq('active', true),
     supabase.from('charges').select('bill_id, subscription_id, charged_on'),
   ]);
 
   if (bills.error || subscriptions.error || existing.error) return 0;
 
-  // One lookup for everything already written, so each plan is a set check
-  // rather than a round trip.
-  const recorded = new Set(
-    (existing.data ?? []).map((row) =>
-      chargeKey((row.bill_id ?? row.subscription_id) as string, row.charged_on as string),
-    ),
-  );
+  // Grouped once, so each plan is a set lookup rather than a scan of every
+  // charge the user has ever had. Seven years of a busy account is thousands
+  // of rows, and this runs on every launch.
+  const recorded = new Map<string, Set<string>>();
+  for (const row of existing.data ?? []) {
+    // Keyed by the raw column here, not by the ledger's name for the plan:
+    // this side is matching rows up with the table they came from.
+    const planId = (row.bill_id ?? row.subscription_id) as string;
+    const dates = recorded.get(planId) ?? new Set<string>();
+    dates.add(row.charged_on as string);
+    recorded.set(planId, dates);
+  }
+
+  const plans: Plan[] = [
+    ...(bills.data ?? []).map((row) => ({
+      id: row.id as string,
+      kind: 'bill' as const,
+      label: (row.name as string) || 'Bill',
+      amount: row.amount as number,
+      recurrence: row.recurrence as never,
+      nextDate: row.next_due_on as string | null,
+      startsOn: row.starts_on as string | null,
+      createdAt: row.created_at as string | null,
+      endsOn: row.ends_on as string | null,
+      cardId: (row.card_id as string | null) ?? null,
+      accountId: (row.bank_account_id as string | null) ?? null,
+    })),
+    ...(subscriptions.data ?? []).map((row) => ({
+      id: row.id as string,
+      kind: 'subscription' as const,
+      label: (row.name as string) || 'Subscription',
+      amount: row.amount as number,
+      recurrence: row.cycle as never,
+      nextDate: row.next_renewal_on as string | null,
+      startsOn: row.started_on as string | null,
+      createdAt: row.created_at as string | null,
+      // A subscription runs until it is switched off, and switching it off
+      // sets active = false rather than an end date. Nothing to bound it with.
+      endsOn: null,
+      cardId: (row.card_id as string | null) ?? null,
+      accountId: (row.bank_account_id as string | null) ?? null,
+    })),
+  ];
 
   const rows: NewCharge[] = [];
 
-  for (const bill of bills.data ?? []) {
-    const dates = unrecordedDates(
-      {
-        id: bill.id as string,
-        recurrence: bill.recurrence as never,
-        nextDate: bill.next_due_on as string | null,
-        startsOn: bill.starts_on as string | null,
-        endsOn: bill.ends_on as string | null,
-      },
-      today,
-      new Set(
-        [...recorded]
-          .filter((key) => key.startsWith(`${bill.id}@`))
-          .map((key) => key.split('@')[1]),
-      ),
-    );
-
-    for (const date of dates) {
+  for (const plan of plans) {
+    for (const date of unrecordedDates(plan, today, recorded.get(plan.id) ?? new Set())) {
       rows.push({
         user_id: userId,
-        bill_id: bill.id as string,
-        subscription_id: null,
-        label: (bill.name as string) || 'Bill',
-        amount: bill.amount as number,
+        bill_id: plan.kind === 'bill' ? plan.id : null,
+        subscription_id: plan.kind === 'subscription' ? plan.id : null,
+        label: plan.label,
+        amount: plan.amount,
         charged_on: date,
-        card_id: (bill.card_id as string | null) ?? null,
-        bank_account_id: (bill.bank_account_id as string | null) ?? null,
-      });
-    }
-  }
-
-  for (const plan of subscriptions.data ?? []) {
-    const dates = unrecordedDates(
-      {
-        id: plan.id as string,
-        recurrence: plan.cycle as never,
-        nextDate: plan.next_renewal_on as string | null,
-        // Subscriptions carry no start date, so they record from today on
-        // rather than inventing renewals nobody was charged for.
-        startsOn: null,
-        endsOn: null,
-      },
-      today,
-      new Set(
-        [...recorded]
-          .filter((key) => key.startsWith(`${plan.id}@`))
-          .map((key) => key.split('@')[1]),
-      ),
-    );
-
-    for (const date of dates) {
-      rows.push({
-        user_id: userId,
-        bill_id: null,
-        subscription_id: plan.id as string,
-        label: (plan.name as string) || 'Subscription',
-        amount: plan.amount as number,
-        charged_on: date,
-        card_id: (plan.card_id as string | null) ?? null,
-        bank_account_id: (plan.bank_account_id as string | null) ?? null,
+        card_id: plan.cardId,
+        bank_account_id: plan.accountId,
       });
     }
   }

@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { moneyColor } from '@/theme/colors';
+import { useMoneyColor } from '@/providers/theme-provider';
 
 export const CYCLE_LABELS: Record<string, string> = {
   weekly: 'Weekly',
@@ -35,6 +35,7 @@ export function SubscriptionRow({
   active = true,
   onPress,
 }: SubscriptionRowProps) {
+  const moneyColor = useMoneyColor();
   const cycleLabel = CYCLE_LABELS[cycle] ?? cycle;
 
   return (

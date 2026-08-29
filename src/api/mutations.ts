@@ -111,7 +111,6 @@ export type CardValues = {
   /** When the stated balance was true; charges before it are already in it. */
   balance_as_of: string | null;
   bill_due_day: number | null;
-  reminder_days: number | null;
 };
 
 /** The only editable thing on a profile today; currency is fixed to USD. */

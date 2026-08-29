@@ -12,22 +12,29 @@ module.exports = {
         'poppins-semibold': ['Poppins_600SemiBold'],
         'poppins-bold': ['Poppins_700Bold'],
       },
-      // Brand palette. Keep these in sync with src/theme/colors.ts, which is the
-      // same set of tokens for places that need a raw value (SVG fills, props).
+      // Every colour is a CSS variable so one provider can repaint the whole
+      // app at runtime — light or dark, and any of the twelve accents — without
+      // a single className changing. The values live in src/theme/palette.ts;
+      // src/global.css only seeds the first frame.
       colors: {
-        ink: '#111111', // headings
-        body: '#2F2F2F', // paragraph copy
-        muted: '#6F6F6F', // secondary / captions
-        accent: '#FA8F6F', // coral used throughout the illustrations
-        line: '#DCDCDC', // hairline borders (inputs, dividers)
+        ink: 'rgb(var(--color-ink) / <alpha-value>)', // headings
+        body: 'rgb(var(--color-body) / <alpha-value>)', // paragraph copy
+        muted: 'rgb(var(--color-muted) / <alpha-value>)', // secondary / captions
+        line: 'rgb(var(--color-line) / <alpha-value>)', // hairline borders
+        surface: 'rgb(var(--color-surface) / <alpha-value>)', // the page itself
+        card: 'rgb(var(--color-card) / <alpha-value>)', // anything raised off it
+        // The chosen colour. `accent` fills, `accent-ink` is the same colour
+        // pushed until it can be read as type on the page behind it.
+        accent: 'rgb(var(--color-accent) / <alpha-value>)',
+        'accent-ink': 'rgb(var(--color-accent-ink) / <alpha-value>)',
+        'on-control': 'rgb(var(--color-on-control) / <alpha-value>)',
         control: {
-          DEFAULT: '#3D3D3D', // dark pill buttons
-          pressed: '#2A2A2A',
+          DEFAULT: 'rgb(var(--color-control) / <alpha-value>)', // pill buttons
+          pressed: 'rgb(var(--color-control-pressed) / <alpha-value>)',
         },
-        // Money in and money out. Kept in sync with `money` in theme/colors.ts.
         money: {
-          in: '#0B6B3A',
-          out: '#C2472A',
+          in: 'rgb(var(--color-money-in) / <alpha-value>)',
+          out: 'rgb(var(--color-money-out) / <alpha-value>)',
         },
       },
       // Phone-scale breakpoints. Tailwind's defaults start at 640px, which no

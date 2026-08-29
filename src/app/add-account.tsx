@@ -24,7 +24,7 @@ import {
   useUpdateBankAccount,
 } from '@/api/mutations';
 import { useBankAccount } from '@/api/queries';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 import { ACCOUNT_TYPES, type AccountType } from '@/data/accounts-mock';
 import {
   PAY_FREQUENCIES,
@@ -43,6 +43,7 @@ const MORE_SETUP_INFO =
 
 /** Loads the account being edited, then seeds the form by remount. */
 export default function AddAccountScreen() {
+  const colors = useColors();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { data: existing, isLoading } = useBankAccount(id);
 
@@ -301,7 +302,7 @@ function AccountForm({
             accessibilityRole="button"
             accessibilityLabel="Delete this account"
             onPress={handleDelete}
-            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-black/5"
+            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-ink/5"
           >
             <Trash2 size={17} color="#DC2626" strokeWidth={1.9} />
             <Text

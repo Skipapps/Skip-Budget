@@ -3,6 +3,7 @@ import {} from 'lucide-react-native';
 import { Fragment, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
+import { useArtwork } from '@/theme/artwork';
 import { AddButton } from '@/components/dashboard/add-button';
 import { BalanceSummary } from '@/components/dashboard/balance-summary';
 import { AmountTile } from '@/components/ui/amount-tile';
@@ -31,17 +32,24 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 export default function HomeScreen() {
+  const artwork = useArtwork();
   // Opening the app is the moment to bring stale due dates up to date.
   useKeepSchedulesCurrent();
   const { refresh, refreshing } = useRefreshAll();
 
   const profile = useProfile();
 
+  // Held for the life of the screen so every window below is measured from
+  // one day. Reading the clock per call would let a midnight rollover put two
+  // sections on different days.
+  const todayDate = useMemo(() => new Date(), []);
+  const today = toIsoDate(todayDate);
+
   // The calendar month we are actually in, which is what the card reports on.
   // Deliberately not the date picker below it: moving the selector to browse
   // another day changes the list, not the month you are living in.
   const monthRange = useMemo(() => rangeFor('month', new Date()), []);
-  const month = useLedger(monthRange);
+  const month = useLedger(monthRange, today);
 
   /**
    * This month, as it actually falls.
@@ -77,8 +85,7 @@ export default function HomeScreen() {
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  const todayDate = useMemo(() => new Date(), []);
-  const atLatest = toIsoDate(selectedDate) >= toIsoDate(todayDate);
+  const atLatest = toIsoDate(selectedDate) >= today;
 
   /**
    * A week behind the chosen day, and the week in front of it.
@@ -93,6 +100,7 @@ export default function HomeScreen() {
       () => ({ from: toIsoDate(recentFrom), to: toIsoDate(selectedDate) }),
       [recentFrom, selectedDate],
     ),
+    today,
   );
   const upcoming = useLedger(
     useMemo(
@@ -102,6 +110,7 @@ export default function HomeScreen() {
       }),
       [selectedDate],
     ),
+    today,
   );
 
   const { weekday, date } = formatDayLabel(selectedDate);
@@ -164,7 +173,7 @@ export default function HomeScreen() {
             <AmountTile
               label={category.label}
               amount={tileAmounts[category.id]}
-              artwork={category.artwork}
+              artwork={artwork[category.artwork]}
               onPress={
                 category.id === 'monthly-bills'
                   ? () => router.push('/bills')
@@ -207,7 +216,7 @@ export default function HomeScreen() {
         entries={recent.entries}
         empty="Nothing in this week."
         loading={recent.isLoading}
-        today={toIsoDate(todayDate)}
+        today={today}
         direction="desc"
       />
 
@@ -218,7 +227,7 @@ export default function HomeScreen() {
           entries={upcoming.entries}
           empty="Nothing due in the week ahead."
           loading={upcoming.isLoading}
-          today={toIsoDate(todayDate)}
+          today={today}
           direction="asc"
         />
       </View>

@@ -3,6 +3,7 @@ import { SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { useArtwork } from '@/theme/artwork';
 import { usePaymentSources, useReceipts } from '@/api/queries';
 import {
   EMPTY_RECEIPT_FILTERS,
@@ -23,13 +24,11 @@ import { groupByDate } from '@/lib/group';
 import { RangeDropdown } from '@/components/ui/range-dropdown';
 import { rangeFor, type RangeKey } from '@/lib/range';
 import { formatCurrency } from '@/lib/format';
-import { colors } from '@/theme/colors';
-
-import EmptyArt from '@/assets/illustrations/state-empty-receipts.svg';
-import ErrorArt from '@/assets/illustrations/state-error.svg';
-import NoResultsArt from '@/assets/illustrations/state-no-results.svg';
+import { useColors } from '@/providers/theme-provider';
 
 export default function ReceiptsScreen() {
+  const artwork = useArtwork();
+  const colors = useColors();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<ReceiptFilters>(EMPTY_RECEIPT_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -110,14 +109,14 @@ export default function ReceiptsScreen() {
                 activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter receipts'
               }
               onPress={() => setFilterOpen(true)}
-              className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-black/5"
+              className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-ink/5"
             >
               <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />
               {activeCount > 0 ? (
                 <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
                   <Text
                     allowFontScaling={false}
-                    className="font-poppins-medium text-[11px] text-ink"
+                    className="font-poppins-medium text-[11px] text-on-control"
                   >
                     {activeCount}
                   </Text>
@@ -151,7 +150,7 @@ export default function ReceiptsScreen() {
 
       {isError ? (
         <PageState
-          art={ErrorArt}
+          art={artwork.error}
           title="Could not load your receipts"
           message="Check your connection and try again. Nothing has been lost."
           actionLabel="Try again"
@@ -161,7 +160,7 @@ export default function ReceiptsScreen() {
 
       {showEmpty ? (
         <PageState
-          art={EmptyArt}
+          art={artwork.emptyReceipts}
           title="No receipts yet"
           message="Add your first one by hand, or scan a paper receipt and let Skip read it for you."
           actionLabel="Add a receipt"
@@ -171,7 +170,7 @@ export default function ReceiptsScreen() {
 
       {showNoMatches ? (
         <PageState
-          art={NoResultsArt}
+          art={artwork.noResults}
           title="Nothing matches"
           message="No receipt fits that search and those filters. Try a different store or clear what you have set."
           actionLabel="Clear filters"

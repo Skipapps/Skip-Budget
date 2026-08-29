@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { FieldLabel } from '@/components/ui/typography';
 import { BILLING_CYCLES } from '@/data/subscriptions-mock';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 export type SubscriptionFilters = {
   cycles: string[];
@@ -39,13 +39,14 @@ export function SubscriptionFilterSheet({
   onCancel,
   onApply,
 }: SubscriptionFilterSheetProps) {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<SubscriptionFilters>(filters);
 
   return (
     <Modal visible animationType="slide" onRequestClose={onCancel}>
       <View
-        className="flex-1 bg-white"
+        className="flex-1 bg-card"
         style={{ paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 16) }}
       >
         <View className="flex-row items-center px-4 py-2">
@@ -54,7 +55,7 @@ export function SubscriptionFilterSheet({
             accessibilityLabel="Close filters"
             hitSlop={8}
             onPress={onCancel}
-            className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-black/5"
+            className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-ink/5"
           >
             <X size={22} color={colors.ink} strokeWidth={2} />
           </Pressable>
@@ -92,7 +93,7 @@ export function SubscriptionFilterSheet({
           <Pressable
             accessibilityRole="button"
             onPress={() => setDraft(EMPTY_SUBSCRIPTION_FILTERS)}
-            className="min-h-16 flex-1 items-center justify-center rounded-[10px] border border-control active:bg-black/5"
+            className="min-h-16 flex-1 items-center justify-center rounded-[10px] border border-control active:bg-ink/5"
           >
             <Text className="font-poppins-medium text-[17px] text-ink">Reset</Text>
           </Pressable>

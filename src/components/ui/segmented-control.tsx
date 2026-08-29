@@ -31,13 +31,13 @@ export function SegmentedControl<T extends string>({
             onPress={() => onChange(option.value)}
             className={cn(
               'flex-1 items-center justify-center rounded-[7px] py-2.5',
-              selected ? 'bg-control' : 'active:bg-black/5',
+              selected ? 'bg-control' : 'active:bg-ink/5',
             )}
           >
             <Text
               className={cn(
                 'text-[13px]',
-                selected ? 'font-poppins-medium text-white' : 'font-poppins text-body',
+                selected ? 'font-poppins-medium text-on-control' : 'font-poppins text-body',
               )}
               numberOfLines={1}
               maxFontSizeMultiplier={1.2}

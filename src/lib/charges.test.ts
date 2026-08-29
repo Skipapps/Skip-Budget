@@ -1,4 +1,4 @@
-import { chargeKey, unrecordedDates, type ChargeablePlan } from '@/lib/charges';
+import { unrecordedDates, type ChargeablePlan } from '@/lib/charges';
 
 const plan = (over: Partial<ChargeablePlan> = {}): ChargeablePlan => ({
   id: 'bill-1',
@@ -37,7 +37,18 @@ describe('unrecordedDates', () => {
     expect(dates).toEqual(['2026-08-14']);
   });
 
-  it('does not backfill a plan with no start date', () => {
+  it('falls back to when the row was made', () => {
+    // No start date, but the app cannot have missed anything before it was
+    // told the plan existed — and that is the floor the screens read with.
+    const dates = unrecordedDates(
+      plan({ startsOn: null, createdAt: '2026-07-02T09:15:00Z' }),
+      '2026-08-28',
+      none,
+    );
+    expect(dates).toEqual(['2026-07-14', '2026-08-14']);
+  });
+
+  it('does not backfill a plan with neither date', () => {
     // Nothing is known about whether it ran before, so it starts from today.
     expect(unrecordedDates(plan({ startsOn: null }), '2026-08-28', none)).toEqual([]);
   });
@@ -70,12 +81,5 @@ describe('unrecordedDates', () => {
 
   it('says nothing for a plan with no date at all', () => {
     expect(unrecordedDates(plan({ nextDate: null }), '2026-08-28', none)).toEqual([]);
-  });
-});
-
-describe('chargeKey', () => {
-  it('is unique per plan and day', () => {
-    expect(chargeKey('a', '2026-08-14')).not.toBe(chargeKey('b', '2026-08-14'));
-    expect(chargeKey('a', '2026-08-14')).not.toBe(chargeKey('a', '2026-09-14'));
   });
 });

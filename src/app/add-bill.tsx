@@ -28,7 +28,7 @@ import {
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { amortisationSchedule } from '@/lib/loan';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 const CATEGORY_OPTIONS = BILL_CATEGORIES.map((category) => ({
   value: category.id,
@@ -47,6 +47,7 @@ const asDate = (value?: string | null) => (value ? new Date(`${value}T00:00:00`)
 
 /** Loads the bill being edited, then seeds the form by remount. */
 export default function AddBillScreen() {
+  const colors = useColors();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { data: existing, isLoading } = useBill(id);
 
@@ -71,6 +72,7 @@ function BillForm({
   id?: string;
   existing: ReturnType<typeof useBill>['data'] | null;
 }) {
+  const colors = useColors();
   const editing = Boolean(id);
   // Editing starts on the details step: the category is already chosen, and
   // making someone re-pick it to fix an amount would be busywork.
@@ -224,7 +226,7 @@ function BillForm({
         accessibilityRole="button"
         accessibilityLabel="Back to categories"
         onPress={() => setStep('category')}
-        className="-ml-2 mt-1 h-11 w-11 items-center justify-center rounded-[10px] active:bg-black/5"
+        className="-ml-2 mt-1 h-11 w-11 items-center justify-center rounded-[10px] active:bg-ink/5"
       >
         <ChevronLeft size={26} color={colors.ink} strokeWidth={2} />
       </Pressable>
@@ -374,7 +376,7 @@ function BillForm({
             accessibilityRole="button"
             accessibilityLabel="Delete this bill"
             onPress={handleDelete}
-            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-black/5"
+            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-ink/5"
           >
             <Trash2 size={17} color="#DC2626" strokeWidth={1.9} />
             <Text

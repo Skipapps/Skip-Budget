@@ -9,7 +9,7 @@ import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { SelectField } from '@/components/ui/select-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { formatFullDate } from '@/lib/date';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 export type ReceiptFilters = {
   /** ISO yyyy-mm-dd, or null for any date. */
@@ -37,6 +37,7 @@ export function ReceiptFilterSheet({
   onCancel,
   onApply,
 }: ReceiptFilterSheetProps) {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<ReceiptFilters>(filters);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
@@ -44,7 +45,7 @@ export function ReceiptFilterSheet({
   return (
     <Modal visible animationType="slide" onRequestClose={onCancel}>
       <View
-        className="flex-1 bg-white"
+        className="flex-1 bg-card"
         style={{ paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 16) }}
       >
         <View className="flex-row items-center px-4 py-2">
@@ -53,7 +54,7 @@ export function ReceiptFilterSheet({
             accessibilityLabel="Close filters"
             hitSlop={8}
             onPress={onCancel}
-            className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-black/5"
+            className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-ink/5"
           >
             <X size={22} color={colors.ink} strokeWidth={2} />
           </Pressable>
@@ -100,7 +101,7 @@ export function ReceiptFilterSheet({
           <Pressable
             accessibilityRole="button"
             onPress={() => setDraft(EMPTY_RECEIPT_FILTERS)}
-            className="min-h-16 flex-1 items-center justify-center rounded-[10px] border border-control active:bg-black/5"
+            className="min-h-16 flex-1 items-center justify-center rounded-[10px] border border-control active:bg-ink/5"
           >
             <Text className="font-poppins-medium text-[17px] text-ink">Reset</Text>
           </Pressable>

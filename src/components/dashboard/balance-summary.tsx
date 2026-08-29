@@ -4,8 +4,7 @@ import { Text, View } from 'react-native';
 import { RollingNumber } from '@/components/ui/rolling-number';
 import { daysLeftInMonth } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { colors } from '@/theme/colors';
-import { moneyTone } from '@/lib/tone';
+import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
 type BalanceSummaryProps = {
@@ -39,6 +38,7 @@ export function BalanceSummary({
   expenses,
   loading = false,
 }: BalanceSummaryProps) {
+  const colors = useColors();
   const today = new Date();
   const daysLeft = daysLeftInMonth(today);
 
@@ -57,15 +57,15 @@ export function BalanceSummary({
       <View style={shadows.card} className="w-full overflow-hidden rounded-[20px] bg-control p-5">
         <View className="w-full flex-row items-start justify-between gap-3">
           <Text
-            className="font-poppins-medium text-[15px] text-white/70"
+            className="font-poppins-medium text-[15px] text-on-control/70"
             maxFontSizeMultiplier={1.3}
           >
             Left this month
           </Text>
 
-          <View className="rounded-full bg-white/15 px-3 py-1.5">
+          <View className="rounded-full bg-on-control/15 px-3 py-1.5">
             <Text
-              className="font-poppins-medium text-[12px] text-white"
+              className="font-poppins-medium text-[12px] text-on-control"
               allowFontScaling={false}
               numberOfLines={1}
             >
@@ -76,7 +76,7 @@ export function BalanceSummary({
 
         {loading ? (
           <Text
-            className="mt-3 font-poppins-bold text-[40px] text-white"
+            className="mt-3 font-poppins-bold text-[40px] text-on-control"
             maxFontSizeMultiplier={1.2}
           >
             —
@@ -87,24 +87,24 @@ export function BalanceSummary({
             value={leftThisMonth}
             lineHeight={Math.round(fontSize * 1.3)}
             fontSize={fontSize}
-            textClassName="font-poppins-bold text-white"
+            textClassName="font-poppins-bold text-on-control"
           />
         )}
 
         {spentShare === null ? null : (
           <View className="mt-5 w-full">
-            <View className="h-2 w-full overflow-hidden rounded-full bg-white/15">
+            <View className="h-2 w-full overflow-hidden rounded-full bg-on-control/15">
               {/* Flex rather than a percentage width: the track is already the
                   full width, so the fill can share it without measuring. */}
               <View className="h-full flex-row">
-                {/* Coral, so the brand still shows on a card that gave up its
-                    colour to let the figure carry the weight. */}
-                <View style={{ flex: spentShare }} className="h-full rounded-full bg-accent" />
+                {/* The card is already the chosen colour, so the fill has to be
+                    the one thing guaranteed to read on it: its own foreground. */}
+                <View style={{ flex: spentShare }} className="h-full rounded-full bg-on-control" />
                 <View style={{ flex: 1 - spentShare }} />
               </View>
             </View>
             <Text
-              className="mt-2 font-poppins text-[12px] text-white/70"
+              className="mt-2 font-poppins text-[12px] text-on-control/70"
               maxFontSizeMultiplier={1.3}
             >
               {Math.round(spentShare * 100)}% of this month&apos;s income is spoken for
@@ -113,15 +113,17 @@ export function BalanceSummary({
         )}
       </View>
 
+      {/* Deliberately not the accent. These two are the only figures on the
+          dashboard read as numbers rather than as a headline, and an accent
+          fill decides their colour for them: on a pale accent the only legible
+          money tones are the near-black end of the ramp, which is what made
+          them look heavy. On the plain card the soft pair carries them. */}
       <View className="mt-3 w-full flex-row gap-3">
-        {/* The green and red that work on white are both too dark to read on
-            charcoal, so the tone is picked against the surface it actually
-            sits on rather than hardcoded. */}
         <Stat
           label="Income"
           amount={payday}
           icon={ArrowDownLeft}
-          color={moneyTone(colors.control, 'asset') ?? '#FFFFFF'}
+          color={colors.moneyIn}
           loading={loading}
         />
         {/* Stored as a positive magnitude; shown as money going out. */}
@@ -129,7 +131,7 @@ export function BalanceSummary({
           label="Expenses"
           amount={-expenses}
           icon={ArrowUpRight}
-          color={moneyTone(colors.control, 'debt') ?? '#FFFFFF'}
+          color={colors.moneyOut}
           loading={loading}
         />
       </View>
@@ -146,19 +148,20 @@ type StatProps = {
 };
 
 /**
- * One figure on the same charcoal as the card above it.
+ * One figure, on the plain card rather than on the accent.
  *
- * All three surfaces match, so the eye reads them as one block and the only
- * colour on it is the money itself — which is the thing worth looking at.
+ * The headline above carries the colour. These two carry the arithmetic, and
+ * the only colour on them is the money itself — which is the thing worth
+ * looking at.
  */
 function Stat({ label, amount, icon: Icon, color, loading }: StatProps) {
   return (
-    <View className="flex-1 justify-between rounded-[16px] bg-control p-4">
+    <View className="flex-1 justify-between rounded-[16px] border border-line bg-card p-4">
       <View className="flex-row items-center gap-2.5">
-        <View className="h-8 w-8 items-center justify-center rounded-full bg-white/10">
+        <View className="h-8 w-8 items-center justify-center rounded-full bg-ink/5">
           <Icon size={16} color={color} strokeWidth={2.4} />
         </View>
-        <Text className="font-poppins-medium text-[13px] text-white/70" maxFontSizeMultiplier={1.2}>
+        <Text className="font-poppins-medium text-[13px] text-muted" maxFontSizeMultiplier={1.2}>
           {label}
         </Text>
       </View>

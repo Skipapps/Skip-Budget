@@ -34,14 +34,14 @@ export function NetworkPicker({ networks, value, onChange }: NetworkPickerProps)
             <View
               className={cn(
                 'h-16 w-16 items-center justify-center rounded-full border',
-                selected ? 'border-2 border-ink bg-ink' : 'border-line bg-white',
+                selected ? 'border-2 border-ink bg-ink' : 'border-line bg-card',
               )}
             >
               <Text
                 allowFontScaling={false}
                 className={cn(
                   'font-poppins-bold text-[13px] italic',
-                  selected ? 'text-white' : 'text-ink',
+                  selected ? 'text-on-control' : 'text-ink',
                 )}
               >
                 {MARKS[network] ?? network}

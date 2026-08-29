@@ -4,7 +4,7 @@ import { cn } from '@/lib/cn';
 import { isLightColor } from '@/lib/color';
 import { formatCurrency } from '@/lib/format';
 import { moneyTone, type MoneyIntent } from '@/lib/tone';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
 type CardFaceProps = {
@@ -44,6 +44,7 @@ export function CardFace({
   last4,
   style,
 }: CardFaceProps) {
+  const colors = useColors();
   const onLight = isLightColor(color);
   const foreground = onLight ? colors.ink : '#FFFFFF';
   const mutedForeground = onLight ? 'rgba(17,17,17,0.6)' : 'rgba(255,255,255,0.7)';

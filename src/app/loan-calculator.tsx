@@ -69,7 +69,7 @@ export default function LoanCalculatorScreen() {
       </Title>
 
       {/* The answer first — everything below it is how you change it. */}
-      <View className="mt-6 w-full items-center rounded-[10px] border border-line bg-white px-5 py-6">
+      <View className="mt-6 w-full items-center rounded-[10px] border border-line bg-card px-5 py-6">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           Monthly payment
         </Text>
@@ -139,7 +139,7 @@ export default function LoanCalculatorScreen() {
         />
       </View>
 
-      <View className="mt-7 w-full rounded-[10px] border border-line bg-white p-5">
+      <View className="mt-7 w-full rounded-[10px] border border-line bg-card p-5">
         <ProportionBar principal={amount} interest={loan.totalInterest} />
 
         <View className="mt-5 w-full gap-3">
@@ -243,7 +243,7 @@ function SummaryLine({
           strong
             ? 'font-poppins-bold text-[17px] text-ink'
             : accent
-              ? 'font-poppins-semibold text-[15px] text-accent'
+              ? 'font-poppins-semibold text-[15px] text-accent-ink'
               : 'font-poppins-semibold text-[15px] text-ink'
         }
         maxFontSizeMultiplier={1.3}

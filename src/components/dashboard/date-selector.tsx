@@ -1,7 +1,7 @@
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type DateSelectorProps = {
   weekday: string;
@@ -28,13 +28,14 @@ export function DateSelector({
   onPickDate,
   atLatest = false,
 }: DateSelectorProps) {
+  const colors = useColors();
   return (
     <View className="w-full flex-row items-center justify-between rounded-[10px] border border-line px-1.5 py-2">
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Previous day"
         onPress={onPrevious}
-        className="h-10 w-10 items-center justify-center rounded-[8px] active:bg-black/5"
+        className="h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/5"
       >
         <ChevronLeft size={20} color={colors.ink} strokeWidth={2} />
       </Pressable>
@@ -65,7 +66,7 @@ export function DateSelector({
         className={
           atLatest
             ? 'h-10 w-10 items-center justify-center rounded-[8px] opacity-30'
-            : 'h-10 w-10 items-center justify-center rounded-[8px] active:bg-black/5'
+            : 'h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/5'
         }
       >
         <ChevronRight size={20} color={colors.ink} strokeWidth={2} />

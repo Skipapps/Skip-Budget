@@ -15,5 +15,7 @@
     "expo-env.d.ts",
     "nativewind-env.d.ts",
     "types/**/*.d.ts"
-  ]
+  ],
+  "//": "Edge Functions are Deno, not React Native — different globals and jsr: specifiers this compiler cannot follow.",
+  "exclude": ["node_modules", "supabase/functions"]
 }

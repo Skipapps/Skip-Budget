@@ -3,6 +3,7 @@ import { SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { useArtwork } from '@/theme/artwork';
 import { usePaymentSources, useSubscriptions } from '@/api/queries';
 import {
   EMPTY_SUBSCRIPTION_FILTERS,
@@ -21,11 +22,7 @@ import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
-import { colors } from '@/theme/colors';
-
-import EmptyArt from '@/assets/illustrations/state-empty-subscriptions.svg';
-import ErrorArt from '@/assets/illustrations/state-error.svg';
-import NoResultsArt from '@/assets/illustrations/state-no-results.svg';
+import { useColors } from '@/providers/theme-provider';
 
 /** Normalised to a month so a yearly plan does not look cheap beside a monthly one. */
 const PER_MONTH: Record<string, number> = {
@@ -36,6 +33,8 @@ const PER_MONTH: Record<string, number> = {
 };
 
 export default function SubscriptionPlansScreen() {
+  const artwork = useArtwork();
+  const colors = useColors();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<SubscriptionFilters>(EMPTY_SUBSCRIPTION_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -111,14 +110,14 @@ export default function SubscriptionPlansScreen() {
                 activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter subscriptions'
               }
               onPress={() => setFilterOpen(true)}
-              className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-black/5"
+              className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-ink/5"
             >
               <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />
               {activeCount > 0 ? (
                 <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
                   <Text
                     allowFontScaling={false}
-                    className="font-poppins-medium text-[11px] text-ink"
+                    className="font-poppins-medium text-[11px] text-on-control"
                   >
                     {activeCount}
                   </Text>
@@ -154,7 +153,7 @@ export default function SubscriptionPlansScreen() {
 
       {isError ? (
         <PageState
-          art={ErrorArt}
+          art={artwork.error}
           title="Could not load your subscriptions"
           message="Check your connection and try again. Nothing has been lost."
           actionLabel="Try again"
@@ -164,7 +163,7 @@ export default function SubscriptionPlansScreen() {
 
       {showEmpty ? (
         <PageState
-          art={EmptyArt}
+          art={artwork.emptySubscriptions}
           title="No subscriptions yet"
           message="Add the ones you pay for and Skip will show what they cost you each month."
           actionLabel="Add a subscription"
@@ -174,7 +173,7 @@ export default function SubscriptionPlansScreen() {
 
       {showNoMatches ? (
         <PageState
-          art={NoResultsArt}
+          art={artwork.noResults}
           title="Nothing matches"
           message="No subscription fits that search and those filters. Try a different name or clear what you have set."
           actionLabel="Clear filters"

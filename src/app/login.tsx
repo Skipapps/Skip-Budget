@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { resendOtp, signInWithEmail } from '@/api/auth';
 import { Button } from '@/components/ui/button';
@@ -91,6 +91,34 @@ export default function LoginScreen() {
 
       <View className="mt-auto w-full pt-10">
         <Button label={busy ? 'Signing in…' : 'Log in'} onPress={handleLogin} />
+
+        {/* Under the button, not buried in Settings: this is the moment the
+            agreement is actually being made. */}
+        <View className="mt-5 w-full flex-row flex-wrap items-center justify-center">
+          <Text
+            className="font-poppins text-[12px] leading-[18px] text-muted"
+            maxFontSizeMultiplier={1.3}
+          >
+            By continuing you agree to our{' '}
+          </Text>
+          <TextLink
+            label="Terms of service"
+            variant="subtle"
+            onPress={() => router.push('/terms')}
+          />
+          <Text
+            className="font-poppins text-[12px] leading-[18px] text-muted"
+            maxFontSizeMultiplier={1.3}
+          >
+            {' '}
+            and{' '}
+          </Text>
+          <TextLink
+            label="Privacy policy"
+            variant="subtle"
+            onPress={() => router.push('/privacy')}
+          />
+        </View>
       </View>
     </Screen>
   );

@@ -4,8 +4,9 @@ import type { ComponentProps } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { withTap } from '@/lib/press';
 import { cn } from '@/lib/cn';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
 /**
@@ -32,13 +33,14 @@ const TAB_ICONS: Record<string, LucideIcon> = {
  * same charcoal as the add button and the dashboard cards.
  */
 export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
 
   return (
-    <View className="bg-white px-4 pt-2" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+    <View className="bg-surface px-4 pt-2" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
       <View
         style={shadows.floating}
-        className="flex-row items-center justify-around rounded-full border border-line bg-white px-3 py-4"
+        className="flex-row items-center justify-around rounded-full border border-line bg-card px-3 py-4"
       >
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
@@ -63,7 +65,7 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
               accessibilityRole="button"
               accessibilityState={{ selected: focused }}
               accessibilityLabel={label}
-              onPress={handlePress}
+              onPress={withTap(handlePress)}
               className={cn(
                 'flex-row items-center justify-center rounded-full',
                 focused ? 'gap-2 bg-control px-5 py-3.5' : 'h-[52px] w-[52px] active:opacity-60',
@@ -79,7 +81,7 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
               ) : null}
               {focused ? (
                 <Text
-                  className="font-poppins-medium text-[13px] text-white"
+                  className="font-poppins-medium text-[13px] text-on-control"
                   maxFontSizeMultiplier={1.2}
                 >
                   {label}

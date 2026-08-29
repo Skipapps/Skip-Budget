@@ -1,10 +1,10 @@
 import { ChevronRight } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
-import ScheduleArt from '@/assets/illustrations/loan-schedule.svg';
+import { useArtwork } from '@/theme/artwork';
 import { formatCurrency } from '@/lib/format';
 import type { AmortisationRow } from '@/lib/loan';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type ScheduleCardProps = {
   rows: AmortisationRow[];
@@ -19,6 +19,8 @@ type ScheduleCardProps = {
  * is interest, and seeing it once explains the whole schedule.
  */
 export function ScheduleCard({ rows, onPress }: ScheduleCardProps) {
+  const artwork = useArtwork();
+  const colors = useColors();
   const first = rows[0];
   if (!first) return null;
 
@@ -29,10 +31,10 @@ export function ScheduleCard({ rows, onPress }: ScheduleCardProps) {
       accessibilityRole="button"
       accessibilityLabel={`Where each payment goes. First payment: ${formatCurrency(first.interest)} interest, ${formatCurrency(first.principal)} off the balance. Opens the full schedule.`}
       onPress={onPress}
-      className="w-full flex-row items-center gap-3 rounded-[10px] border border-line px-4 py-4 active:bg-black/5"
+      className="w-full flex-row items-center gap-3 rounded-[10px] border border-line px-4 py-4 active:bg-ink/5"
     >
       <View className="h-[72px] w-[72px]">
-        <ScheduleArt width="100%" height="100%" />
+        <artwork.loanSchedule width="100%" height="100%" />
       </View>
 
       <View className="min-w-0 flex-1">
@@ -49,8 +51,8 @@ export function ScheduleCard({ rows, onPress }: ScheduleCardProps) {
 
         {/* The same two colours as the summary bar above it, so the split reads
             as the same idea seen closer up rather than a new one. */}
-        <View className="mt-2.5 h-2 w-full flex-row overflow-hidden rounded-full bg-black/5">
-          <View style={{ flex: Math.max(first.principal, 0) }} className="bg-control" />
+        <View className="mt-2.5 h-2 w-full flex-row overflow-hidden rounded-full bg-ink/5">
+          <View style={{ flex: Math.max(first.principal, 0) }} className="bg-body" />
           <View style={{ flex: Math.max(first.interest, 0) }} className="bg-accent" />
         </View>
       </View>

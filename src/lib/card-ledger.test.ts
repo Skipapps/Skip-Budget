@@ -1,11 +1,16 @@
 import {
   buildLedger,
-  occurrencesBetween,
+  chargePlanKey,
+  nextOccurrenceFrom,
+  occurrencesInRange,
+  planFloor,
+  planKey,
+  planOccurrences,
   type Charge,
   type Payment,
+  type RecordedCharge,
   type RecurringCharge,
 } from '@/lib/card-ledger';
-import { nextOccurrenceFrom, planFloor } from '@/lib/card-ledger';
 
 const receipt = (id: string, amount: number, date: string): Charge => ({
   id,
@@ -38,7 +43,7 @@ const base = {
 
 describe('occurrencesBetween', () => {
   it('walks a monthly charge back to the anchor', () => {
-    expect(occurrencesBetween('2026-09-05', 'monthly', '2026-06-01', '2026-08-27')).toEqual([
+    expect(occurrencesInRange('2026-09-05', 'monthly', '2026-06-01', '2026-08-27')).toEqual([
       '2026-08-05',
       '2026-07-05',
       '2026-06-05',
@@ -46,27 +51,27 @@ describe('occurrencesBetween', () => {
   });
 
   it('excludes the next date when it has not arrived', () => {
-    expect(occurrencesBetween('2026-09-05', 'monthly', '2026-08-01', '2026-08-27')).toEqual([
+    expect(occurrencesInRange('2026-09-05', 'monthly', '2026-08-01', '2026-08-27')).toEqual([
       '2026-08-05',
     ]);
   });
 
   it('includes the next date once it has arrived', () => {
-    expect(occurrencesBetween('2026-08-27', 'monthly', '2026-08-01', '2026-08-27')).toEqual([
+    expect(occurrencesInRange('2026-08-27', 'monthly', '2026-08-01', '2026-08-27')).toEqual([
       '2026-08-27',
     ]);
   });
 
   it('clamps the day to a shorter month', () => {
     // A bill due on the 31st cannot land on 31 September.
-    expect(occurrencesBetween('2026-10-31', 'monthly', '2026-08-01', '2026-10-30')).toEqual([
+    expect(occurrencesInRange('2026-10-31', 'monthly', '2026-08-01', '2026-10-30')).toEqual([
       '2026-09-30',
       '2026-08-31',
     ]);
   });
 
   it('steps weekly charges by seven days across a month boundary', () => {
-    expect(occurrencesBetween('2026-09-03', 'weekly', '2026-08-13', '2026-08-27')).toEqual([
+    expect(occurrencesInRange('2026-09-03', 'weekly', '2026-08-13', '2026-08-27')).toEqual([
       '2026-08-27',
       '2026-08-20',
       '2026-08-13',
@@ -74,17 +79,17 @@ describe('occurrencesBetween', () => {
   });
 
   it('steps yearly charges by whole years', () => {
-    expect(occurrencesBetween('2026-11-02', 'yearly', '2024-01-01', '2026-08-27')).toEqual([
+    expect(occurrencesInRange('2026-11-02', 'yearly', '2024-01-01', '2026-08-27')).toEqual([
       '2025-11-02',
       '2024-11-02',
     ]);
   });
 
   it('treats a period bill as a single dated charge', () => {
-    expect(occurrencesBetween('2026-08-10', 'period', '2026-08-01', '2026-08-27')).toEqual([
+    expect(occurrencesInRange('2026-08-10', 'period', '2026-08-01', '2026-08-27')).toEqual([
       '2026-08-10',
     ]);
-    expect(occurrencesBetween('2026-09-10', 'period', '2026-08-01', '2026-08-27')).toEqual([]);
+    expect(occurrencesInRange('2026-09-10', 'period', '2026-08-01', '2026-08-27')).toEqual([]);
   });
 });
 
@@ -290,5 +295,122 @@ describe('planFloor', () => {
 
   it('is null only when nothing at all is known', () => {
     expect(planFloor(null, null)).toBeNull();
+  });
+});
+
+describe('planOccurrences', () => {
+  const today = '2026-08-28';
+
+  const rent: RecurringCharge = {
+    id: 'bill-rent',
+    label: 'Rent',
+    amount: 900,
+    nextDate: '2026-09-01',
+    recurrence: 'monthly',
+    kind: 'bill',
+    startsOn: '2026-06-01',
+    cardId: 'card-now',
+  };
+
+  // What went out at the time: a tenner cheaper, off a card since replaced.
+  const charged = (date: string, over: Partial<RecordedCharge> = {}): RecordedCharge => ({
+    id: `charge-${date}`,
+    planId: 'bill-rent',
+    label: 'Rent',
+    amount: 850,
+    date,
+    cardId: 'card-then',
+    accountId: null,
+    ...over,
+  });
+
+  const summer = [charged('2026-06-01'), charged('2026-07-01'), charged('2026-08-01')];
+
+  const ask = (over: Partial<Parameters<typeof planOccurrences>[0]> = {}) =>
+    planOccurrences({
+      plan: rent,
+      charges: summer,
+      isRecorded: true,
+      from: null,
+      to: today,
+      today,
+      ...over,
+    });
+
+  it('reads the past off the record, not off the plan', () => {
+    // Rent went up to 900 this month. June, July and August still cost 850.
+    expect(ask().map((entry) => entry.amount)).toEqual([850, 850, 850]);
+  });
+
+  it('leaves a charge where it landed when the plan moves off that day', () => {
+    // The due date is now the 15th. Last June was still paid on the 1st.
+    const moved = ask({ plan: { ...rent, nextDate: '2026-09-15' } });
+    expect(moved.map((entry) => entry.date)).toEqual(['2026-06-01', '2026-07-01', '2026-08-01']);
+  });
+
+  it('keeps the source that actually paid, not the one it charges now', () => {
+    expect(ask().every((entry) => entry.cardId === 'card-then')).toBe(true);
+  });
+
+  it('still forecasts, whatever the past says', () => {
+    const ahead = ask({ to: '2026-11-30' });
+    const future = ahead.filter((entry) => !entry.recorded);
+
+    expect(future.map((entry) => entry.date)).toEqual(['2026-09-01', '2026-10-01', '2026-11-01']);
+    // A forecast is the plan's to make: today's amount, today's card.
+    expect(future.every((entry) => entry.amount === 900)).toBe(true);
+    expect(future.every((entry) => entry.cardId === 'card-now')).toBe(true);
+  });
+
+  it('projects the past for a plan nothing has been recorded for', () => {
+    // The recorder has not reached it — offline, or a first run. Falling back
+    // to the plan is what keeps the screen from going blank.
+    const fallback = ask({ charges: [], isRecorded: false });
+
+    expect(fallback.map((entry) => entry.date)).toEqual(['2026-06-01', '2026-07-01', '2026-08-01']);
+    expect(fallback.every((entry) => entry.recorded)).toBe(false);
+  });
+
+  it('does not fill a gap in a plan that is on the record', () => {
+    // July is missing because it was skipped, not because nobody looked.
+    // Putting it back from the plan is exactly the rewriting this replaces.
+    const gapped = ask({ charges: [charged('2026-06-01'), charged('2026-08-01')] });
+    expect(gapped.map((entry) => entry.date)).toEqual(['2026-06-01', '2026-08-01']);
+  });
+
+  it('counts a day once when the record and the plan both claim it', () => {
+    const skewed = ask({ charges: [charged('2026-09-01')], to: '2026-09-30' });
+    expect(skewed).toHaveLength(1);
+    expect(skewed[0].id).toBe('charge-2026-09-01');
+  });
+
+  it('drops what the window does not ask about', () => {
+    expect(ask({ from: '2026-07-01' }).map((entry) => entry.date)).toEqual([
+      '2026-07-01',
+      '2026-08-01',
+    ]);
+  });
+
+  it('shows a charge the plan has since been shortened past', () => {
+    // Ending a bill stops it charging. It does not unspend what it charged.
+    const ended = ask({ plan: { ...rent, endsOn: '2026-06-30' } });
+    expect(ended.map((entry) => entry.date)).toEqual(['2026-06-01', '2026-07-01', '2026-08-01']);
+  });
+});
+
+describe('planKey', () => {
+  it('holds bills and subscriptions apart', () => {
+    // Different tables, so the same id in each is two different plans.
+    expect(planKey('bill', 'abc')).not.toBe(planKey('subscription', 'abc'));
+  });
+
+  it('files a charge under the same name its plan has', () => {
+    // The wiring this protects fails silently when it breaks: a charge that
+    // does not match its plan just never gets found, and the screen projects
+    // instead — which looks exactly like everything working.
+    expect(chargePlanKey({ bill_id: 'abc', subscription_id: null })).toBe(planKey('bill', 'abc'));
+    expect(chargePlanKey({ bill_id: null, subscription_id: 'xyz' })).toBe(
+      planKey('subscription', 'xyz'),
+    );
   });
 });

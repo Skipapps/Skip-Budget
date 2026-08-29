@@ -9,6 +9,7 @@ import {
   countActiveFilters,
   type LedgerFilters,
 } from '@/components/transactions/filter-sheet';
+import { useArtwork } from '@/theme/artwork';
 import { LedgerRow } from '@/components/transactions/ledger-row';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { Screen } from '@/components/ui/screen';
@@ -33,18 +34,18 @@ import {
   type PeriodKey,
 } from '@/lib/period';
 
-import EmptyArt from '@/assets/illustrations/state-empty-wallet.svg';
-import ErrorArt from '@/assets/illustrations/state-error.svg';
-import NoResultsArt from '@/assets/illustrations/state-no-results.svg';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { colors, moneyColor } from '@/theme/colors';
+import { useColors, useMoneyColor } from '@/providers/theme-provider';
 
 const KIND_LABELS = Object.fromEntries(
   TRANSACTION_KINDS.map((kind) => [kind.value, kind.label]),
 ) as Record<string, string>;
 
 export default function TransactionsScreen() {
+  const artwork = useArtwork();
+  const colors = useColors();
+  const moneyColor = useMoneyColor();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<LedgerFilters>(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -74,7 +75,7 @@ export default function TransactionsScreen() {
     return { from: period.from, to: period.to > today ? today : period.to };
   }, [periodKey, anchor, today]);
 
-  const { entries: ledger, totals, isLoading, isError, refetch } = useLedger(range);
+  const { entries: ledger, totals, isLoading, isError, refetch } = useLedger(range, today);
   const { refresh, refreshing } = useRefreshAll();
   const { sources } = usePaymentSources();
 
@@ -151,7 +152,17 @@ export default function TransactionsScreen() {
       <Title className="mt-2">Transactions</Title>
 
       <View className="mt-5 w-full">
-        <ChoiceChips options={PERIODS} value={periodKey} onChange={setPeriodKey} />
+        <ChoiceChips
+          options={PERIODS}
+          value={periodKey}
+          onChange={(key) => {
+            setPeriodKey(key);
+            // Switching between the stepped periods keeps your place, which is
+            // the point of them. "All" is not stepped and always ends now, so
+            // arriving from a browse of 2023 has to come back to the present.
+            if (key === 'all') setAnchor(new Date());
+          }}
+        />
       </View>
 
       {/* The window itself, and the way through it. Forward stops at the
@@ -166,7 +177,7 @@ export default function TransactionsScreen() {
           className={
             atEarliest
               ? 'h-10 w-10 items-center justify-center rounded-[8px] opacity-30'
-              : 'h-10 w-10 items-center justify-center rounded-[8px] active:bg-black/5'
+              : 'h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/5'
           }
         >
           <ChevronLeft size={20} color={colors.ink} strokeWidth={2} />
@@ -189,7 +200,7 @@ export default function TransactionsScreen() {
           className={
             atLatest
               ? 'h-10 w-10 items-center justify-center rounded-[8px] opacity-30'
-              : 'h-10 w-10 items-center justify-center rounded-[8px] active:bg-black/5'
+              : 'h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/5'
           }
         >
           <ChevronRight size={20} color={colors.ink} strokeWidth={2} />
@@ -214,7 +225,7 @@ export default function TransactionsScreen() {
             activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter transactions'
           }
           onPress={() => setFilterOpen(true)}
-          className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-black/5"
+          className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-ink/5"
         >
           <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />
           {activeCount > 0 ? (
@@ -231,7 +242,7 @@ export default function TransactionsScreen() {
 
       {isError ? (
         <PageState
-          art={ErrorArt}
+          art={artwork.error}
           title="Could not load your transactions"
           message="Check your connection and try again. Nothing has been lost."
           actionLabel="Try again"
@@ -241,7 +252,7 @@ export default function TransactionsScreen() {
 
       {!isLoading && !isError && ledger.length === 0 ? (
         <PageState
-          art={EmptyArt}
+          art={artwork.emptyWallet}
           title="Nothing here yet"
           message="Receipts, bills and subscriptions all show up here together once you add a few."
           actionLabel="Add a receipt"
@@ -251,7 +262,7 @@ export default function TransactionsScreen() {
 
       {!isLoading && !isError && ledger.length > 0 && groups.length === 0 ? (
         <PageState
-          art={NoResultsArt}
+          art={artwork.noResults}
           title="Nothing matches"
           message="No transaction fits that search and those filters."
           actionLabel="Clear filters"
@@ -269,7 +280,7 @@ export default function TransactionsScreen() {
               {group.from === group.to ? (
                 <DateGroupHeader date={group.from} today={today} total={group.total} />
               ) : (
-                <View className="w-full flex-row items-center justify-between gap-3 bg-white pb-1.5 pt-4">
+                <View className="w-full flex-row items-center justify-between gap-3 bg-surface pb-1.5 pt-4">
                   <Text
                     className="font-poppins-medium text-[13px] uppercase tracking-wide text-muted"
                     numberOfLines={1}

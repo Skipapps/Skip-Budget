@@ -1,6 +1,7 @@
 import { Fragment, useMemo } from 'react';
 import { Text, View } from 'react-native';
 
+import { useArtwork } from '@/theme/artwork';
 import { useCharges } from '@/api/charges';
 import { usePaymentSources } from '@/api/queries';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
@@ -11,10 +12,7 @@ import { Subtitle, Title } from '@/components/ui/typography';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { groupByDate } from '@/lib/group';
-import { moneyColor } from '@/theme/colors';
-
-import EmptyArt from '@/assets/illustrations/state-empty-wallet.svg';
-import ErrorArt from '@/assets/illustrations/state-error.svg';
+import { useMoneyColor } from '@/providers/theme-provider';
 
 /**
  * What the app has done on your behalf.
@@ -28,6 +26,8 @@ import ErrorArt from '@/assets/illustrations/state-error.svg';
  * on the dashboard under Coming up, where there is room to act on them.
  */
 export default function NotificationsScreen() {
+  const artwork = useArtwork();
+  const moneyColor = useMoneyColor();
   const today = toIsoDate(new Date());
   const charges = useCharges();
   const { sources } = usePaymentSources();
@@ -58,7 +58,7 @@ export default function NotificationsScreen() {
 
       {charges.isError ? (
         <PageState
-          art={ErrorArt}
+          art={artwork.error}
           title="Could not load these"
           message="Check your connection and try again. Nothing has been lost."
           actionLabel="Try again"
@@ -68,7 +68,7 @@ export default function NotificationsScreen() {
 
       {!charges.isPending && !charges.isError && (charges.data ?? []).length === 0 ? (
         <PageState
-          art={EmptyArt}
+          art={artwork.emptyWallet}
           title="Nothing has gone out yet"
           message="When a bill falls due or a subscription renews, the app records it and tells you here."
         />

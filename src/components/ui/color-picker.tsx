@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { isLightColor } from '@/lib/color';
 import { CARD_COLORS } from '@/theme/card-colors';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type ColorPickerProps = {
   value: string;
@@ -12,6 +12,7 @@ type ColorPickerProps = {
 
 /** Swatch row for choosing a card face colour. */
 export function ColorPicker({ value, onChange }: ColorPickerProps) {
+  const colors = useColors();
   return (
     <View className="w-full flex-row flex-wrap gap-3">
       {CARD_COLORS.map((option) => {

@@ -1,8 +1,8 @@
 import { ChevronRight } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
-import InsightsArt from '@/assets/illustrations/insights.svg';
-import { colors } from '@/theme/colors';
+import { useArtwork } from '@/theme/artwork';
+import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
 type InsightBannerProps = {
@@ -19,6 +19,8 @@ type InsightBannerProps = {
  * and then swallows the tap. Without a destination it is simply a card.
  */
 export function InsightBanner({ onPress }: InsightBannerProps) {
+  const artwork = useArtwork();
+  const colors = useColors();
   const Container = onPress ? Pressable : View;
 
   return (
@@ -31,12 +33,12 @@ export function InsightBanner({ onPress }: InsightBannerProps) {
           }
         : {})}
       style={shadows.raised}
-      className={`w-full flex-row items-center gap-3 rounded-[16px] bg-white p-4 ${
+      className={`w-full flex-row items-center gap-3 rounded-[16px] bg-card p-4 ${
         onPress ? 'active:opacity-80' : ''
       }`}
     >
       <View className="h-[76px] w-[76px] shrink-0">
-        <InsightsArt width="100%" height="100%" />
+        <artwork.insights width="100%" height="100%" />
       </View>
 
       <View className="min-w-0 flex-1">

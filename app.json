@@ -27,7 +27,10 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.skipapps.skip.budget",
-      "permissions": ["POST_NOTIFICATIONS", "SCHEDULE_EXACT_ALARM"]
+      "permissions": [
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM"
+      ]
     },
     "web": {
       "output": "static",
@@ -48,6 +51,12 @@
         "@react-native-google-signin/google-signin",
         {
           "iosUrlScheme": "com.googleusercontent.apps.454715210371-8kpjr204d615ejo3fi58814e49o79voc"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Skip uses Face ID to unlock your budget when you open the app."
         }
       ],
       "expo-secure-store",

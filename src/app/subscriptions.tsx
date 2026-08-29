@@ -3,6 +3,7 @@ import { ChevronRight, Plus, Repeat } from 'lucide-react-native';
 import { Fragment, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { useArtwork } from '@/theme/artwork';
 import { useLedger, usePaymentSources, useSubscriptions } from '@/api/queries';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
@@ -15,11 +16,8 @@ import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { groupByDate } from '@/lib/group';
 import { rangeFor, type RangeKey } from '@/lib/range';
-import { colors, moneyColor } from '@/theme/colors';
+import { useColors, useMoneyColor } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
-
-import EmptyArt from '@/assets/illustrations/state-empty-subscriptions.svg';
-import ErrorArt from '@/assets/illustrations/state-error.svg';
 
 /**
  * What the subscriptions have actually cost, over a window you choose.
@@ -29,12 +27,14 @@ import ErrorArt from '@/assets/illustrations/state-error.svg';
  * still shows the months it ran, which is the whole point of looking back.
  */
 export default function SubscriptionsScreen() {
+  const artwork = useArtwork();
+  const moneyColor = useMoneyColor();
   const [rangeKey, setRangeKey] = useState<RangeKey>('month');
   const today = toIsoDate(new Date());
   const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
 
   const plans = useSubscriptions();
-  const { entries, isLoading, isError, refetch } = useLedger(range);
+  const { entries, isLoading, isError, refetch } = useLedger(range, today);
   const { sources } = usePaymentSources();
 
   const sourceLabels = useMemo(
@@ -79,7 +79,7 @@ export default function SubscriptionsScreen() {
 
       {/* One number, and the window it belongs to, side by side — the figure is
           meaningless without knowing which stretch of time it covers. */}
-      <View className="mt-4 w-full rounded-[16px] bg-black/[0.035] px-4 py-4">
+      <View className="mt-4 w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
         <View className="w-full flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1">
             <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
@@ -109,7 +109,7 @@ export default function SubscriptionsScreen() {
 
       {isError ? (
         <PageState
-          art={ErrorArt}
+          art={artwork.error}
           title="Could not load your subscriptions"
           message="Check your connection and try again. Nothing has been lost."
           actionLabel="Try again"
@@ -119,7 +119,7 @@ export default function SubscriptionsScreen() {
 
       {!isLoading && !isError && charges.length === 0 ? (
         <PageState
-          art={EmptyArt}
+          art={artwork.emptySubscriptions}
           title={planCount === 0 ? 'No subscriptions yet' : 'Nothing in this window'}
           message={
             planCount === 0
@@ -166,16 +166,17 @@ type TileProps = {
 
 /** Compact pair at the top: the plans behind this page, and a way to add. */
 function Tile({ icon: Icon, title, caption, onPress, showChevron }: TileProps) {
+  const colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${title}. ${caption}.`}
       onPress={onPress}
       style={shadows.raised}
-      className="flex-1 rounded-[16px] bg-white p-4 active:opacity-70"
+      className="flex-1 rounded-[16px] bg-card p-4 active:opacity-70"
     >
       <View className="w-full flex-row items-center justify-between gap-2">
-        <View className="h-9 w-9 items-center justify-center rounded-full bg-black/5">
+        <View className="h-9 w-9 items-center justify-center rounded-full bg-ink/5">
           <Icon size={18} color={colors.ink} strokeWidth={2} />
         </View>
         {showChevron ? <ChevronRight size={18} color={colors.muted} strokeWidth={2} /> : null}

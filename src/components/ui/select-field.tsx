@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { FieldLabel } from '@/components/ui/typography';
 import { cn } from '@/lib/cn';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type SelectFieldProps = {
   label: string;
@@ -32,6 +32,7 @@ export function SelectField({
   iconAccessibilityLabel,
   className,
 }: SelectFieldProps) {
+  const colors = useColors();
   return (
     <View className={cn('w-full', className)}>
       <FieldLabel className="mb-2">{label}</FieldLabel>
@@ -40,7 +41,7 @@ export function SelectField({
         accessibilityRole="button"
         accessibilityLabel={`${label}. ${value || placeholder || 'Not set'}`}
         onPress={onPress}
-        className="min-h-14 w-full flex-row items-center justify-between rounded-[10px] border border-line px-5 active:bg-black/5"
+        className="min-h-14 w-full flex-row items-center justify-between rounded-[10px] border border-line px-5 active:bg-ink/5"
       >
         <Text
           className={cn('flex-1 py-4 font-poppins text-[16px]', value ? 'text-ink' : 'text-muted')}
@@ -57,7 +58,7 @@ export function SelectField({
               accessibilityLabel={iconAccessibilityLabel ?? label}
               hitSlop={10}
               onPress={onIconPress}
-              className="-mr-1 h-10 w-10 items-center justify-center rounded-[8px] active:bg-black/10"
+              className="-mr-1 h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/10"
             >
               <Icon size={20} color={colors.ink} strokeWidth={1.8} />
             </Pressable>

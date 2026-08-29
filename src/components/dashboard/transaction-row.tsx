@@ -4,7 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { BillMark } from '@/components/bills/bill-mark';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { formatCurrency } from '@/lib/format';
-import { colors, moneyColor } from '@/theme/colors';
+import { useColors, useMoneyColor } from '@/providers/theme-provider';
 
 type TransactionRowProps = {
   label: string;
@@ -37,6 +37,8 @@ export function TransactionRow({
   iconId,
   onPress,
 }: TransactionRowProps) {
+  const colors = useColors();
+  const moneyColor = useMoneyColor();
   return (
     <Pressable
       accessibilityRole="button"
@@ -50,7 +52,7 @@ export function TransactionRow({
         // Neither is a purchase from anyone, so neither has a logo. A monogram
         // of the word "Payment" reads as a logo that failed to load; an arrow
         // says what actually happened — money came in.
-        <View className="h-10 w-10 items-center justify-center rounded-full bg-black/5">
+        <View className="h-10 w-10 items-center justify-center rounded-full bg-ink/5">
           <ArrowDownLeft size={18} color={colors.body} strokeWidth={1.8} />
         </View>
       ) : (

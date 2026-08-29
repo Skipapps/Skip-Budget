@@ -2,8 +2,10 @@ import { ChevronRight, type LucideIcon } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 
+import { toggle as toggleFeedback } from '@/lib/haptics';
+import { withTap } from '@/lib/press';
 import { cn } from '@/lib/cn';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type SettingsRowProps = {
   icon: LucideIcon;
@@ -38,6 +40,7 @@ export function SettingsRow({
   destructive = false,
   last = false,
 }: SettingsRowProps) {
+  const colors = useColors();
   const tint = destructive ? '#DC2626' : colors.body;
   const isInteractive = Boolean(onPress) && !toggle;
 
@@ -70,7 +73,12 @@ export function SettingsRow({
       {toggle ? (
         <Switch
           value={toggle.value}
-          onValueChange={toggle.onChange}
+          // A switch is a press too, and a firmer one: it changed something
+          // rather than opening something.
+          onValueChange={(next) => {
+            toggleFeedback();
+            toggle.onChange(next);
+          }}
           trackColor={{ false: colors.line, true: colors.control }}
           thumbColor="#FFFFFF"
           ios_backgroundColor={colors.line}
@@ -91,7 +99,7 @@ export function SettingsRow({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={subtitle ? `${title}. ${subtitle}` : title}
-          onPress={onPress}
+          onPress={withTap(onPress)}
           className="w-full active:opacity-60"
         >
           {body}

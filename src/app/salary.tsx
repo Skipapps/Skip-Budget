@@ -29,7 +29,7 @@ import {
   type PayFrequency,
 } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 /** Normalised to monthly so sources on different cycles can be summed. */
 const PER_MONTH: Record<PayFrequency, number> = {
@@ -54,6 +54,7 @@ function asDate(iso: string | null | undefined): Date | null {
  * fights the user's own edits when a refetch arrives mid-typing.
  */
 export default function SalaryScreen() {
+  const colors = useColors();
   const { data: saved = [], isLoading } = useSalarySources();
 
   if (isLoading) {
@@ -80,6 +81,7 @@ export default function SalaryScreen() {
 }
 
 function SalaryEditor({ initial }: { initial: SalarySource[] }) {
+  const colors = useColors();
   const [sources, setSources] = useState<SalarySource[]>(initial);
   const [padTarget, setPadTarget] = useState<PadTarget>(null);
   // Which source's payday is being picked, or null when the picker is closed.
@@ -217,7 +219,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
                     accessibilityLabel={`Remove source ${index + 1}`}
                     hitSlop={8}
                     onPress={() => removeSource(source.id)}
-                    className="h-9 w-9 items-center justify-center rounded-[8px] active:bg-black/5"
+                    className="h-9 w-9 items-center justify-center rounded-[8px] active:bg-ink/5"
                   >
                     <Trash2 size={18} color={colors.muted} strokeWidth={1.8} />
                   </Pressable>
@@ -241,7 +243,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
                       [source.id]: !current[source.id],
                     }))
                   }
-                  className="h-9 w-9 items-center justify-center rounded-[8px] active:bg-black/5"
+                  className="h-9 w-9 items-center justify-center rounded-[8px] active:bg-ink/5"
                 >
                   {collapsed[source.id] ? (
                     <ChevronDown size={18} color={colors.ink} strokeWidth={2} />
@@ -325,7 +327,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
         accessibilityRole="button"
         accessibilityLabel="Add salary source"
         onPress={addSource}
-        className="mt-4 w-full flex-row items-center justify-center gap-2 rounded-[10px] border border-dashed border-line py-4 active:bg-black/5"
+        className="mt-4 w-full flex-row items-center justify-center gap-2 rounded-[10px] border border-dashed border-line py-4 active:bg-ink/5"
       >
         <Plus size={18} color={colors.ink} strokeWidth={2.2} />
         <Text className="font-poppins-medium text-[15px] text-ink" maxFontSizeMultiplier={1.3}>

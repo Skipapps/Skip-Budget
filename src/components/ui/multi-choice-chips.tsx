@@ -40,14 +40,14 @@ export function MultiChoiceChips<T extends string>({
               onPress={() => toggle(option.value)}
               className={cn(
                 'flex-row items-center gap-1.5 rounded-full border px-4 py-2.5',
-                selected ? 'border-control bg-control' : 'border-line bg-white active:bg-black/5',
+                selected ? 'border-control bg-control' : 'border-line bg-card active:bg-ink/5',
               )}
             >
               {selected ? <Check size={14} color="#FFFFFF" strokeWidth={3} /> : null}
               <Text
                 className={cn(
                   'text-[13px]',
-                  selected ? 'font-poppins-medium text-white' : 'font-poppins text-body',
+                  selected ? 'font-poppins-medium text-on-control' : 'font-poppins text-body',
                 )}
                 maxFontSizeMultiplier={1.2}
               >

@@ -5,19 +5,14 @@
  * before the database exists. Replace wholesale once queries are wired up.
  */
 import { Coffee, Gem, ShoppingCart, type LucideIcon } from 'lucide-react-native';
-import type { FC } from 'react';
-import type { SvgProps } from 'react-native-svg';
 
-import LoanRepaymentArt from '@/assets/illustrations/tile-loan-repayment.svg';
-import SplitCalculatorArt from '@/assets/illustrations/tile-split-calculator.svg';
-import MonthlyBillsArt from '@/assets/illustrations/tile-monthly-bills.svg';
-import ReceiptsArt from '@/assets/illustrations/tile-receipts.svg';
-import SubscriptionsArt from '@/assets/illustrations/tile-subscriptions.svg';
+import type { ArtworkName } from '@/theme/artwork';
 
 export type SpendingCategory = {
   id: string;
   label: string;
-  artwork: FC<SvgProps>;
+  /** Looked up in the artwork registry, which knows the light and dark pair. */
+  artwork: ArtworkName;
 };
 
 export type Transaction = {
@@ -44,11 +39,11 @@ export const account = {
  * tool rather than report spending, so a number beside them meant nothing.
  */
 export const spendingCategories: SpendingCategory[] = [
-  { id: 'monthly-bills', label: 'Monthly Bills', artwork: MonthlyBillsArt },
-  { id: 'receipts', label: 'Receipts', artwork: ReceiptsArt },
-  { id: 'subscriptions', label: 'Subscriptions', artwork: SubscriptionsArt },
-  { id: 'loan-calculator', label: 'Loan calculator', artwork: LoanRepaymentArt },
-  { id: 'split-calculator', label: 'Split calculator', artwork: SplitCalculatorArt },
+  { id: 'monthly-bills', label: 'Monthly Bills', artwork: 'tileMonthlyBills' },
+  { id: 'receipts', label: 'Receipts', artwork: 'tileReceipts' },
+  { id: 'subscriptions', label: 'Subscriptions', artwork: 'tileSubscriptions' },
+  { id: 'loan-calculator', label: 'Loan calculator', artwork: 'tileLoanRepayment' },
+  { id: 'split-calculator', label: 'Split calculator', artwork: 'tileSplitCalculator' },
 ];
 
 /** Day the dashboard opens on. */

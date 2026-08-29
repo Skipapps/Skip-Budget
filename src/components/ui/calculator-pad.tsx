@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type CalculatorPadProps = {
   title?: string;
@@ -83,6 +83,7 @@ export function CalculatorPad({
   onCancel,
   onConfirm,
 }: CalculatorPadProps) {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
 
   const [current, setCurrent] = useState(value);
@@ -188,7 +189,7 @@ export function CalculatorPad({
   return (
     <Modal visible animationType="slide" onRequestClose={onCancel}>
       <View
-        className="flex-1 bg-white"
+        className="flex-1 bg-card"
         style={{ paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 16) }}
       >
         <View className="flex-row items-center px-4 py-2">
@@ -197,7 +198,7 @@ export function CalculatorPad({
             accessibilityLabel="Back"
             hitSlop={8}
             onPress={onCancel}
-            className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-black/5"
+            className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-ink/5"
           >
             <ChevronLeft size={24} color={colors.ink} strokeWidth={2} />
           </Pressable>
@@ -263,8 +264,8 @@ export function CalculatorPad({
                           : isActiveOperator
                             ? 'border-control bg-control active:opacity-90'
                             : isOperator || key.action === 'clear' || key.action === 'delete'
-                              ? 'border-line bg-black/[0.04] active:bg-black/10'
-                              : 'border-line bg-white active:bg-black/5',
+                              ? 'border-line bg-ink/[0.04] active:bg-ink/10'
+                              : 'border-line bg-card active:bg-ink/5',
                       )}
                     >
                       {key.action === 'delete' ? (
@@ -274,7 +275,7 @@ export function CalculatorPad({
                           allowFontScaling={false}
                           className={cn(
                             'font-poppins text-[24px]',
-                            isEquals || isActiveOperator ? 'text-white' : 'text-ink',
+                            isEquals || isActiveOperator ? 'text-on-control' : 'text-ink',
                           )}
                         >
                           {key.label}

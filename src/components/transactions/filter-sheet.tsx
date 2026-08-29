@@ -10,7 +10,7 @@ import { SelectField } from '@/components/ui/select-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { TRANSACTION_KINDS, type TransactionKind } from '@/data/transactions-mock';
 import { formatFullDate } from '@/lib/date';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 export type LedgerFilters = {
   /** ISO yyyy-mm-dd, or null for any date. */
@@ -40,6 +40,7 @@ const KIND_OPTIONS = TRANSACTION_KINDS.map((kind) => ({ value: kind.value, label
 
 /** Draft filters live here and only reach the list on Apply. */
 export function FilterSheet({ filters, sourceOptions, onCancel, onApply }: FilterSheetProps) {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<LedgerFilters>(filters);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
@@ -47,7 +48,7 @@ export function FilterSheet({ filters, sourceOptions, onCancel, onApply }: Filte
   return (
     <Modal visible animationType="slide" onRequestClose={onCancel}>
       <View
-        className="flex-1 bg-white"
+        className="flex-1 bg-card"
         style={{ paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 16) }}
       >
         <View className="flex-row items-center px-4 py-2">
@@ -56,7 +57,7 @@ export function FilterSheet({ filters, sourceOptions, onCancel, onApply }: Filte
             accessibilityLabel="Close filters"
             hitSlop={8}
             onPress={onCancel}
-            className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-black/5"
+            className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-ink/5"
           >
             <X size={22} color={colors.ink} strokeWidth={2} />
           </Pressable>
@@ -116,7 +117,7 @@ export function FilterSheet({ filters, sourceOptions, onCancel, onApply }: Filte
           <Pressable
             accessibilityRole="button"
             onPress={() => setDraft(EMPTY_FILTERS)}
-            className="min-h-16 flex-1 items-center justify-center rounded-[10px] border border-control active:bg-black/5"
+            className="min-h-16 flex-1 items-center justify-center rounded-[10px] border border-control active:bg-ink/5"
           >
             <Text className="font-poppins-medium text-[17px] text-ink">Reset</Text>
           </Pressable>

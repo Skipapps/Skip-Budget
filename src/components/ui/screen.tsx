@@ -71,7 +71,7 @@ export function Screen({
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top', 'bottom']}>
+    <SafeAreaView className="flex-1 bg-surface" edges={['top', 'bottom']}>
       {showBack ? (
         // Outside the scroll view so it stays put while content scrolls under it.
         <View className="w-full items-center">

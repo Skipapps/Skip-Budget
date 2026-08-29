@@ -1,4 +1,5 @@
 import {
+  PERIODS,
   isEarliestPeriod,
   isLatestPeriod,
   periodBuckets,
@@ -76,7 +77,8 @@ describe('periodBuckets', () => {
   });
 
   it('covers the whole period with no day left out or counted twice', () => {
-    for (const key of ['week', 'month', 'year'] as const) {
+    // Every period there is, so adding one cannot skip this check.
+    for (const key of PERIODS.map((period) => period.value)) {
       const buckets = periodBuckets(key, on(2026, 8, 28));
       const range = periodRange(key, on(2026, 8, 28));
       expect(buckets[0].from).toBe(range.from);
@@ -113,5 +115,39 @@ describe('periodLabel', () => {
 
   it('names both months when a week straddles them', () => {
     expect(periodLabel('week', on(2026, 9, 1))).toBe('30 Aug – 5 Sep');
+  });
+});
+
+describe('the All period', () => {
+  const today = on(2026, 8, 28);
+
+  it('reaches back exactly as far as the app keeps anything', () => {
+    const range = periodRange('all', today);
+    expect(range).toEqual({ from: '2020-01-01', to: '2026-12-31' });
+  });
+
+  it('reads as one bar a year', () => {
+    const buckets = periodBuckets('all', today);
+    expect(buckets.map((bucket) => bucket.label)).toEqual([
+      '2020',
+      '2021',
+      '2022',
+      '2023',
+      '2024',
+      '2025',
+      '2026',
+    ]);
+  });
+
+  it('names the span it covers', () => {
+    expect(periodLabel('all', today)).toBe('2020 – 2026');
+  });
+
+  it('does not step, and says so at both ends', () => {
+    // Both arrows read as disabled, rather than looking live and doing nothing.
+    expect(stepPeriod('all', today, -1)).toBe(today);
+    expect(stepPeriod('all', today, 1)).toBe(today);
+    expect(isEarliestPeriod('all', today, today)).toBe(true);
+    expect(isLatestPeriod('all', today, today)).toBe(true);
   });
 });

@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
-import LoginHero from '@/assets/illustrations/login-hero.svg';
+import { useArtwork } from '@/theme/artwork';
 import { signInWithApple, signInWithGoogle } from '@/api/oauth';
 import { AppleIcon } from '@/components/icons/apple-icon';
 import { GoogleIcon } from '@/components/icons/google-icon';
@@ -13,6 +13,7 @@ import { TextLink } from '@/components/ui/text-link';
 import { Subtitle, Title } from '@/components/ui/typography';
 
 export default function AuthScreen() {
+  const artwork = useArtwork();
   // Auth is wired up after the database work — these are intentionally inert for now.
   const [busy, setBusy] = useState<'google' | 'apple' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +43,7 @@ export default function AuthScreen() {
 
   return (
     <Screen showBack>
-      <Illustration source={LoginHero} widthRatio={0.78} maxWidth={290} className="pt-2" />
+      <Illustration source={artwork.loginHero} widthRatio={0.78} maxWidth={290} className="pt-2" />
 
       <Title className="mt-6">Set up your login</Title>
       <Subtitle className="mt-3">

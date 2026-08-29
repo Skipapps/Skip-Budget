@@ -2,7 +2,7 @@ import { Pressable, View } from 'react-native';
 
 import { BILL_ICON_CHOICES } from '@/data/bills-mock';
 import { cn } from '@/lib/cn';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type IconPickerProps = {
   value: string;
@@ -11,6 +11,7 @@ type IconPickerProps = {
 
 /** Icon choices for a bill someone names themselves. */
 export function IconPicker({ value, onChange }: IconPickerProps) {
+  const colors = useColors();
   return (
     <View className="w-full flex-row flex-wrap gap-3">
       {BILL_ICON_CHOICES.map((choice) => {
@@ -26,7 +27,7 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
             onPress={() => onChange(choice.id)}
             className={cn(
               'h-12 w-12 items-center justify-center rounded-[10px] border',
-              selected ? 'border-control bg-control' : 'border-line bg-white active:bg-black/5',
+              selected ? 'border-control bg-control' : 'border-line bg-card active:bg-ink/5',
             )}
           >
             <Icon width={22} height={22} color={selected ? colors.surface : colors.body} />

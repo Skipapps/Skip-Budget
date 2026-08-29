@@ -32,13 +32,13 @@ export function ChoiceChips<T extends string>({ options, value, onChange }: Choi
             onPress={() => onChange(option.value)}
             className={cn(
               'rounded-full border px-4 py-2.5',
-              selected ? 'border-control bg-control' : 'border-line bg-white active:bg-black/5',
+              selected ? 'border-control bg-control' : 'border-line bg-card active:bg-ink/5',
             )}
           >
             <Text
               className={cn(
                 'text-[13px]',
-                selected ? 'font-poppins-medium text-white' : 'font-poppins text-body',
+                selected ? 'font-poppins-medium text-on-control' : 'font-poppins text-body',
               )}
               maxFontSizeMultiplier={1.2}
             >

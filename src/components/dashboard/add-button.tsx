@@ -1,7 +1,8 @@
 import { Plus } from 'lucide-react-native';
 import { Pressable } from 'react-native';
 
-import { colors } from '@/theme/colors';
+import { withTap } from '@/lib/press';
+import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
 type AddButtonProps = {
@@ -10,11 +11,12 @@ type AddButtonProps = {
 
 /** Floating action button for logging a new transaction. */
 export function AddButton({ onPress }: AddButtonProps) {
+  const colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Add a transaction"
-      onPress={onPress}
+      onPress={withTap(onPress)}
       style={shadows.floating}
       className="h-16 w-16 items-center justify-center rounded-full bg-control active:opacity-90"
     >

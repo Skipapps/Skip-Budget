@@ -1,7 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { billWindow, buildLedger, occurrencesInRange, type SourceKind } from '@/lib/card-ledger';
+import { useCharges, type ChargeRow } from '@/api/charges';
+import {
+  buildLedger,
+  chargePlanKey,
+  planKey,
+  planOccurrences,
+  type PlanOccurrence,
+  type RecordedCharge,
+  type SourceKind,
+} from '@/lib/card-ledger';
 import { withTimeout } from '@/lib/deadline';
 import { paydaysInRange } from '@/lib/date';
 import type { DateRange } from '@/lib/range';
@@ -356,14 +365,10 @@ export function useCard(id: string | undefined) {
   return useQuery({
     queryKey: ['card', id, userId],
     enabled: Boolean(userId && id),
-    queryFn: async (): Promise<
-      (CardRow & { bill_due_day: number | null; reminder_days: number | null }) | null
-    > => {
+    queryFn: async (): Promise<(CardRow & { bill_due_day: number | null }) | null> => {
       const { data, error } = await supabase
         .from('cards')
-        .select(
-          'id, holder, network, last4, color, balance, balance_as_of, bill_due_day, reminder_days',
-        )
+        .select('id, holder, network, last4, color, balance, balance_as_of, bill_due_day')
         .eq('id', id!)
         .maybeSingle();
       if (error) throw error;
@@ -416,12 +421,37 @@ export function usePayments() {
  * already fetched for their own screens, so opening a card costs nothing new
  * and the numbers cannot disagree with the pages they came from.
  */
+/**
+ * Charges in the shape the ledger reads them, and which plans are on record.
+ *
+ * The set is built from every charge rather than from the ones being shown,
+ * because it answers a different question: not "what did this card pay" but
+ * "has this plan ever been written down". A bill moved from one card to
+ * another has no charges on the new card and a full history on the old one,
+ * and only the unfiltered set knows that its past is already accounted for.
+ */
+function readCharges(rows: ChargeRow[]): { rows: RecordedCharge[]; plans: Set<string> } {
+  return {
+    rows: rows.map((row) => ({
+      id: `charge-${row.id}`,
+      planId: chargePlanKey(row),
+      label: row.label,
+      amount: row.amount,
+      date: row.charged_on,
+      cardId: row.card_id,
+      accountId: row.bank_account_id,
+    })),
+    plans: new Set(rows.map(chargePlanKey)),
+  };
+}
+
 /** Rows that can be charged to a source, as buildLedger wants them. */
 type LedgerSources = {
   receipts: ReceiptRow[];
   bills: BillRow[];
   subscriptions: SubscriptionRow[];
   payments: PaymentRow[];
+  charges: ReturnType<typeof readCharges>;
 };
 
 /**
@@ -454,30 +484,41 @@ function ledgerForSource(
       kind: 'receipt' as const,
       domain: row.brands?.domain,
     })),
+    // Filtered on the charge's own source, not the plan's. A bill moved to a
+    // different card keeps last March on the card that actually paid it.
+    recorded: data.charges.rows.filter((row) => (row.cardId ?? row.accountId) === source.id),
+    recordedPlans: data.charges.plans,
     recurring: [
       ...mine(data.bills)
         .filter((row) => row.next_due_on)
         .map((row) => ({
-          id: `bill-${row.id}`,
+          id: planKey('bill', row.id),
           label: row.name,
           amount: row.amount,
           nextDate: row.next_due_on!,
           recurrence: row.recurrence,
           kind: 'bill' as const,
           startsOn: row.starts_on,
+          createdAt: row.created_at,
           endsOn: row.ends_on,
+          cardId: row.card_id,
+          accountId: row.bank_account_id,
           categoryId: row.category_id,
           iconId: row.icon_id,
         })),
       ...mine(data.subscriptions)
         .filter((row) => row.active && row.next_renewal_on)
         .map((row) => ({
-          id: `subscription-${row.id}`,
+          id: planKey('subscription', row.id),
           label: row.name,
           amount: row.amount,
           nextDate: row.next_renewal_on!,
           recurrence: row.cycle,
           kind: 'subscription' as const,
+          startsOn: row.started_on,
+          createdAt: row.created_at,
+          cardId: row.card_id,
+          accountId: row.bank_account_id,
           domain: row.brands?.domain,
         })),
     ],
@@ -497,25 +538,42 @@ export function useSourceLedger(sourceId: string | undefined, today: string) {
   const bills = useBills();
   const subscriptions = useSubscriptions();
   const payments = usePayments();
+  const charges = useCharges();
 
   const card = (cards.data ?? []).find((row) => row.id === sourceId);
   const account = (accounts.data ?? []).find((row) => row.id === sourceId);
   const source = card ?? account;
   const kind: SourceKind = card ? 'card' : 'account';
 
-  const ledger = source
-    ? ledgerForSource(
-        source,
-        kind,
-        {
-          receipts: receipts.data ?? [],
-          bills: bills.data ?? [],
-          subscriptions: subscriptions.data ?? [],
-          payments: payments.data ?? [],
-        },
-        today,
-      )
-    : null;
+  // Walking a source's whole history is not scroll-cheap work, and this screen
+  // re-renders as it scrolls. Held to once per change of the lists behind it.
+  const ledger = useMemo(
+    () =>
+      source
+        ? ledgerForSource(
+            source,
+            kind,
+            {
+              receipts: receipts.data ?? [],
+              bills: bills.data ?? [],
+              subscriptions: subscriptions.data ?? [],
+              payments: payments.data ?? [],
+              charges: readCharges(charges.data ?? []),
+            },
+            today,
+          )
+        : null,
+    [
+      source,
+      kind,
+      receipts.data,
+      bills.data,
+      subscriptions.data,
+      payments.data,
+      charges.data,
+      today,
+    ],
+  );
 
   return {
     source,
@@ -529,7 +587,8 @@ export function useSourceLedger(sourceId: string | undefined, today: string) {
       receipts.isLoading ||
       bills.isLoading ||
       subscriptions.isLoading ||
-      payments.isLoading,
+      payments.isLoading ||
+      charges.isLoading,
     isError: cards.isError || accounts.isError || payments.isError,
   };
 }
@@ -548,6 +607,7 @@ export function useSourceBalances(today: string) {
   const bills = useBills();
   const subscriptions = useSubscriptions();
   const payments = usePayments();
+  const charges = useCharges();
 
   // Every source's whole history is walked to work these out, so it is done
   // once per change of the underlying lists rather than once per render — the
@@ -558,6 +618,7 @@ export function useSourceBalances(today: string) {
       bills: bills.data ?? [],
       subscriptions: subscriptions.data ?? [],
       payments: payments.data ?? [],
+      charges: readCharges(charges.data ?? []),
     };
 
     const next = new Map<string, number>();
@@ -575,6 +636,7 @@ export function useSourceBalances(today: string) {
     bills.data,
     subscriptions.data,
     payments.data,
+    charges.data,
     today,
   ]);
 
@@ -582,7 +644,11 @@ export function useSourceBalances(today: string) {
     balances,
     /** Charges land as their dates arrive, so a stale list shows stale money. */
     isSettled:
-      !receipts.isLoading && !bills.isLoading && !subscriptions.isLoading && !payments.isLoading,
+      !receipts.isLoading &&
+      !bills.isLoading &&
+      !subscriptions.isLoading &&
+      !payments.isLoading &&
+      !charges.isLoading,
     refetch: () => {
       cards.refetch();
       accounts.refetch();
@@ -590,6 +656,7 @@ export function useSourceBalances(today: string) {
       bills.refetch();
       subscriptions.refetch();
       payments.refetch();
+      charges.refetch();
     },
   };
 }
@@ -630,11 +697,12 @@ export type LedgerTotals = {
   count: number;
 };
 
-export function useLedger(range?: DateRange) {
+export function useLedger(range: DateRange | undefined, today: string) {
   const receipts = useReceipts();
   const subscriptions = useSubscriptions();
   const bills = useBills();
   const salary = useSalarySources();
+  const charges = useCharges();
 
   // No range means everything, which is what a card screen wants.
   const from = range?.from ?? null;
@@ -645,6 +713,14 @@ export function useLedger(range?: DateRange) {
   // re-renders as it scrolls.
   const entries = useMemo<LedgerEntry[]>(() => {
     const inRange = (date: string) => date <= to && (!from || date >= from);
+
+    const recorded = readCharges(charges.data ?? []);
+    const byPlan = new Map<string, RecordedCharge[]>();
+    for (const charge of recorded.rows) {
+      const rows = byPlan.get(charge.planId);
+      if (rows) rows.push(charge);
+      else byPlan.set(charge.planId, [charge]);
+    }
 
     const entries: LedgerEntry[] = [];
 
@@ -661,63 +737,92 @@ export function useLedger(range?: DateRange) {
       });
     }
 
-    for (const row of subscriptions.data ?? []) {
-      if (!row.active || !row.next_renewal_on) continue;
-      // The same floor bills get. Without it a plan added today fills every
-      // month behind it with renewals nobody was charged for.
-      const window = billWindow(
-        { starts_on: row.started_on, created_at: row.created_at },
+    // Bills and subscriptions run through the same split: what already went
+    // out is read off the record, what has not happened yet is projected. The
+    // lifetime floor is applied in there, so a plan added today cannot fill
+    // the months behind it with charges nobody was billed for.
+    const expand = (
+      plan: Parameters<typeof planOccurrences>[0]['plan'],
+      draw: (occurrence: PlanOccurrence) => Omit<LedgerEntry, 'id' | 'date' | 'amount'>,
+    ) => {
+      for (const occurrence of planOccurrences({
+        plan,
+        charges: byPlan.get(plan.id) ?? [],
+        isRecorded: recorded.plans.has(plan.id),
         from,
         to,
-      );
-      if (window.from && window.from > window.to) continue;
-      for (const date of occurrencesInRange(
-        row.next_renewal_on,
-        row.cycle,
-        window.from,
-        window.to,
-      )) {
+        today,
+      })) {
         entries.push({
-          id: `subscription-${row.id}@${date}`,
-          label: row.name,
-          amount: -Math.abs(row.amount),
-          date,
-          kind: 'subscription',
-          sourceId: row.card_id ?? row.bank_account_id ?? '',
-          domain: row.brands?.domain,
+          ...draw(occurrence),
+          id: occurrence.id,
+          date: occurrence.date,
+          amount: -Math.abs(occurrence.amount),
         });
       }
+    };
+
+    for (const row of subscriptions.data ?? []) {
+      if (!row.active || !row.next_renewal_on) continue;
+      expand(
+        {
+          id: planKey('subscription', row.id),
+          label: row.name,
+          amount: row.amount,
+          nextDate: row.next_renewal_on,
+          recurrence: row.cycle,
+          kind: 'subscription',
+          startsOn: row.started_on,
+          createdAt: row.created_at,
+          cardId: row.card_id,
+          accountId: row.bank_account_id,
+        },
+        (occurrence) => ({
+          label: occurrence.label,
+          kind: 'subscription',
+          sourceId: occurrence.cardId ?? occurrence.accountId ?? '',
+          domain: row.brands?.domain,
+        }),
+      );
     }
 
     for (const row of bills.data ?? []) {
       if (!row.next_due_on) continue;
-      const window = billWindow(row, from, to);
-      if (window.from && window.from > window.to) continue;
-      for (const date of occurrencesInRange(
-        row.next_due_on,
-        row.recurrence,
-        window.from,
-        window.to,
-      )) {
-        entries.push({
-          id: `bill-${row.id}@${date}`,
+      expand(
+        {
+          id: planKey('bill', row.id),
           label: row.name,
-          amount: -Math.abs(row.amount),
-          date,
+          amount: row.amount,
+          nextDate: row.next_due_on,
+          recurrence: row.recurrence,
           kind: 'bill',
-          sourceId: row.card_id ?? row.bank_account_id ?? '',
+          startsOn: row.starts_on,
+          createdAt: row.created_at,
+          endsOn: row.ends_on,
+          cardId: row.card_id,
+          accountId: row.bank_account_id,
+        },
+        (occurrence) => ({
+          label: occurrence.label,
+          kind: 'bill',
+          sourceId: occurrence.cardId ?? occurrence.accountId ?? '',
           categoryId: row.category_id,
           iconId: row.icon_id,
-        });
-      }
+        }),
+      );
     }
 
     for (const row of salary.data ?? []) {
       if (!row.last_payday) continue;
+      // The floor bills get, in the only form income has. One payday is a
+      // thing the user told us happened; everything before it is the walker
+      // running backwards over years nobody was paid for as far as we know.
+      // Without this a seven-year window invents a career.
+      const floor = from && from > row.last_payday ? from : row.last_payday;
       const dates = paydaysInRange(
         new Date(`${row.last_payday}T00:00:00`),
         row.frequency,
-        from ?? row.last_payday,
+        floor,
         to,
       );
       for (const date of dates) {
@@ -737,7 +842,7 @@ export function useLedger(range?: DateRange) {
     );
 
     return entries;
-  }, [receipts.data, subscriptions.data, bills.data, salary.data, from, to]);
+  }, [receipts.data, subscriptions.data, bills.data, salary.data, charges.data, from, to, today]);
 
   const totals = useMemo<LedgerTotals>(
     () => ({
@@ -752,13 +857,19 @@ export function useLedger(range?: DateRange) {
   return {
     entries,
     totals,
-    isLoading: receipts.isLoading || subscriptions.isLoading || bills.isLoading || salary.isLoading,
+    isLoading:
+      receipts.isLoading ||
+      subscriptions.isLoading ||
+      bills.isLoading ||
+      salary.isLoading ||
+      charges.isLoading,
     isError: receipts.isError || subscriptions.isError || bills.isError,
     refetch: () => {
       receipts.refetch();
       subscriptions.refetch();
       bills.refetch();
       salary.refetch();
+      charges.refetch();
     },
   };
 }

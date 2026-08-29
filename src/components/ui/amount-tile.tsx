@@ -78,7 +78,7 @@ export function AmountTile({
       <Animated.View
         style={[shadows.raised, surface]}
         className={cn(
-          'aspect-square w-full justify-between rounded-[16px] bg-white p-3.5',
+          'aspect-square w-full justify-between rounded-[16px] bg-card p-3.5',
           // Someone who has asked for less motion still gets an answer to their
           // finger, just a static one.
           reduced && onPress ? 'active:opacity-70' : null,

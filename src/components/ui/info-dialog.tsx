@@ -20,7 +20,7 @@ export function InfoDialog({ title, message, onClose }: InfoDialogProps) {
         <Pressable
           onPress={() => {}}
           style={shadows.floating}
-          className="w-full max-w-[340px] overflow-hidden rounded-[10px] bg-white"
+          className="w-full max-w-[340px] overflow-hidden rounded-[10px] bg-card"
         >
           <View className="px-5 pb-4 pt-5">
             <Text
@@ -41,7 +41,7 @@ export function InfoDialog({ title, message, onClose }: InfoDialogProps) {
             <Pressable
               accessibilityRole="button"
               onPress={onClose}
-              className="rounded-[10px] px-5 py-3 active:bg-black/5"
+              className="rounded-[10px] px-5 py-3 active:bg-ink/5"
             >
               <Text className="font-poppins-semibold text-[15px] text-ink">Got it</Text>
             </Pressable>

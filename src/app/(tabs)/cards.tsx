@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
+import { useArtwork } from '@/theme/artwork';
 import { AccountCard } from '@/components/cards/account-card';
 import { PaymentCard } from '@/components/cards/payment-card';
 import { AmountTile } from '@/components/ui/amount-tile';
@@ -17,7 +18,7 @@ import {
 import { useRefreshAll } from '@/api/refresh';
 import { toIsoDate } from '@/lib/date';
 import { moneyBuckets } from '@/data/money-mock';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
 type SectionHeaderProps = {
@@ -27,6 +28,7 @@ type SectionHeaderProps = {
 };
 
 function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
+  const colors = useColors();
   return (
     <View className="w-full flex-row items-center justify-between gap-3">
       <Text
@@ -42,7 +44,7 @@ function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
         accessibilityLabel={actionLabel}
         onPress={onAction}
         style={shadows.card}
-        className="flex-row items-center gap-1.5 rounded-full border border-line bg-white py-2.5 pl-3 pr-4 active:bg-black/5"
+        className="flex-row items-center gap-1.5 rounded-full border border-line bg-card py-2.5 pl-3 pr-4 active:bg-ink/5"
       >
         <Plus size={18} color={colors.ink} strokeWidth={2.2} />
         <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
@@ -67,6 +69,7 @@ function EmptyNote({ text }: { text: string }) {
 }
 
 export default function CardsScreen() {
+  const artwork = useArtwork();
   // Read once per render, so every face on the screen is worked out against
   // the same day rather than drifting apart across a midnight boundary.
   const today = toIsoDate(new Date());
@@ -182,7 +185,7 @@ export default function CardsScreen() {
             <AmountTile
               label={bucket.label}
               amount={moneyAmounts[bucket.id] ?? 0}
-              artwork={bucket.artwork}
+              artwork={artwork[bucket.artwork]}
               onPress={bucket.id === 'salary' ? () => router.push('/salary') : undefined}
             />
           </View>

@@ -2,7 +2,7 @@ import { Search, X } from 'lucide-react-native';
 import { Pressable, TextInput, View } from 'react-native';
 
 import { cn } from '@/lib/cn';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type SearchFieldProps = {
   value: string;
@@ -12,6 +12,7 @@ type SearchFieldProps = {
 };
 
 export function SearchField({ value, onChangeText, placeholder, className }: SearchFieldProps) {
+  const colors = useColors();
   return (
     <View
       className={cn(
@@ -37,7 +38,7 @@ export function SearchField({ value, onChangeText, placeholder, className }: Sea
           accessibilityLabel="Clear search"
           hitSlop={8}
           onPress={() => onChangeText('')}
-          className="h-7 w-7 items-center justify-center rounded-full active:bg-black/5"
+          className="h-7 w-7 items-center justify-center rounded-full active:bg-ink/5"
         >
           <X size={16} color={colors.muted} strokeWidth={2.2} />
         </Pressable>

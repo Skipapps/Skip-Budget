@@ -1,7 +1,7 @@
 import { Bell, Camera } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type DashboardHeaderProps = {
   name: string;
@@ -15,6 +15,7 @@ export function DashboardHeader({
   onAvatarPress,
   onNotificationsPress,
 }: DashboardHeaderProps) {
+  const colors = useColors();
   return (
     <View className="w-full flex-row items-center justify-between">
       <View className="flex-1 flex-row items-center gap-3">
@@ -39,7 +40,7 @@ export function DashboardHeader({
         accessibilityRole="button"
         accessibilityLabel="Notifications"
         onPress={onNotificationsPress}
-        className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-black/5"
+        className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-ink/5"
       >
         <Bell size={22} color={colors.ink} strokeWidth={1.8} />
       </Pressable>

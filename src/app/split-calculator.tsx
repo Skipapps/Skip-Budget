@@ -10,7 +10,7 @@ import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Title } from '@/components/ui/typography';
 import { formatCurrency } from '@/lib/format';
 import { splitBill, type Participant } from '@/lib/split';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type PadTarget = { kind: 'total' } | { kind: 'paid'; id: string } | { kind: 'calculator' } | null;
 
@@ -20,6 +20,7 @@ const INITIAL: Participant[] = [
 ];
 
 export default function SplitCalculatorScreen() {
+  const colors = useColors();
   const [total, setTotal] = useState(0);
   const [people, setPeople] = useState<Participant[]>(INITIAL);
   const [padTarget, setPadTarget] = useState<PadTarget>(null);
@@ -61,7 +62,7 @@ export default function SplitCalculatorScreen() {
         Split calculator
       </Title>
 
-      <View className="mt-6 w-full items-center rounded-[10px] border border-line bg-white px-5 py-6">
+      <View className="mt-6 w-full items-center rounded-[10px] border border-line bg-card px-5 py-6">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           Each person owes
         </Text>
@@ -97,7 +98,7 @@ export default function SplitCalculatorScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Total bill, ${formatCurrency(total)}. Edit`}
             onPress={() => setPadTarget({ kind: 'total' })}
-            className="min-h-14 flex-1 justify-center rounded-[10px] border border-line px-5 active:bg-black/5"
+            className="min-h-14 flex-1 justify-center rounded-[10px] border border-line px-5 active:bg-ink/5"
           >
             <Text className="font-poppins text-[16px] text-ink" maxFontSizeMultiplier={1.4}>
               {formatCurrency(total)}
@@ -108,7 +109,7 @@ export default function SplitCalculatorScreen() {
             accessibilityRole="button"
             accessibilityLabel="Open calculator"
             onPress={() => setPadTarget({ kind: 'calculator' })}
-            className="min-h-14 w-14 items-center justify-center rounded-[10px] border border-line active:bg-black/5"
+            className="min-h-14 w-14 items-center justify-center rounded-[10px] border border-line active:bg-ink/5"
           >
             <Calculator size={20} color={colors.ink} strokeWidth={1.8} />
           </Pressable>
@@ -143,7 +144,7 @@ export default function SplitCalculatorScreen() {
                       accessibilityLabel={`Remove person ${index + 1}`}
                       hitSlop={8}
                       onPress={() => removePerson(person.id)}
-                      className="h-9 w-9 items-center justify-center rounded-[8px] active:bg-black/5"
+                      className="h-9 w-9 items-center justify-center rounded-[8px] active:bg-ink/5"
                     >
                       <Trash2 size={18} color={colors.muted} strokeWidth={1.8} />
                     </Pressable>
@@ -155,7 +156,7 @@ export default function SplitCalculatorScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={`Paid ${formatCurrency(person.paid)}. Edit`}
                     onPress={() => setPadTarget({ kind: 'paid', id: person.id })}
-                    className="min-h-11 flex-1 justify-center rounded-[8px] border border-line px-3 active:bg-black/5"
+                    className="min-h-11 flex-1 justify-center rounded-[8px] border border-line px-3 active:bg-ink/5"
                   >
                     <Text className="font-poppins text-[11px] text-muted">Paid</Text>
                     <Text className="font-poppins-semibold text-[15px] text-ink">
@@ -163,7 +164,7 @@ export default function SplitCalculatorScreen() {
                     </Text>
                   </Pressable>
 
-                  <View className="min-h-11 flex-1 justify-center rounded-[8px] bg-black/[0.03] px-3">
+                  <View className="min-h-11 flex-1 justify-center rounded-[8px] bg-ink/[0.03] px-3">
                     <Text className="font-poppins text-[11px] text-muted">
                       {balance >= 0 ? 'Gets back' : 'Owes'} · share {formatCurrency(personShare)}
                     </Text>
@@ -184,7 +185,7 @@ export default function SplitCalculatorScreen() {
           accessibilityRole="button"
           accessibilityLabel="Add person"
           onPress={addPerson}
-          className="mt-3 w-full flex-row items-center justify-center gap-2 rounded-[10px] border border-dashed border-line py-4 active:bg-black/5"
+          className="mt-3 w-full flex-row items-center justify-center gap-2 rounded-[10px] border border-dashed border-line py-4 active:bg-ink/5"
         >
           <Plus size={18} color={colors.ink} strokeWidth={2.2} />
           <Text className="font-poppins-medium text-[15px] text-ink" maxFontSizeMultiplier={1.3}>

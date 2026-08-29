@@ -111,8 +111,8 @@ function PaymentRow({ row }: { row: AmortisationRow }) {
 
       {/* Principal first, so the dark section growing left to right down the
           list is the loan being paid off. */}
-      <View className="mt-2 h-2 w-full flex-row overflow-hidden rounded-full bg-black/5">
-        <View style={{ flex: Math.max(row.principal, 0) }} className="bg-control" />
+      <View className="mt-2 h-2 w-full flex-row overflow-hidden rounded-full bg-ink/5">
+        <View style={{ flex: Math.max(row.principal, 0) }} className="bg-body" />
         <View style={{ flex: Math.max(row.interest, 0) }} className="bg-accent" />
       </View>
 

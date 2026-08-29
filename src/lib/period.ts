@@ -15,6 +15,7 @@ export const PERIODS = [
   { value: 'week', label: 'Week' },
   { value: 'month', label: 'Month' },
   { value: 'year', label: 'Year' },
+  { value: 'all', label: 'All' },
 ] as const;
 
 export type PeriodKey = (typeof PERIODS)[number]['value'];
@@ -54,7 +55,15 @@ export function periodRange(key: PeriodKey, anchor: Date): DateRange {
     };
   }
 
-  return { from: toIsoDate(new Date(year, 0, 1)), to: toIsoDate(new Date(year, 11, 31)) };
+  if (key === 'year') {
+    return { from: toIsoDate(new Date(year, 0, 1)), to: toIsoDate(new Date(year, 11, 31)) };
+  }
+
+  // Everything the app still holds, ending with the year the anchor is in.
+  return {
+    from: toIsoDate(new Date(year - (HISTORY_YEARS - 1), 0, 1)),
+    to: toIsoDate(new Date(year, 11, 31)),
+  };
 }
 
 /** Moves whole periods. Negative goes back. */
@@ -66,12 +75,15 @@ export function stepPeriod(key: PeriodKey, anchor: Date, delta: number): Date {
   if (key === 'week') return new Date(year, month, day + delta * 7);
   // Day 1 first: stepping from the 31st would otherwise skid past a short month.
   if (key === 'month') return new Date(year, month + delta, 1);
-  return new Date(year + delta, month, 1);
+  if (key === 'year') return new Date(year + delta, month, 1);
+  // "All" is already everything there is, so there is nowhere to step to.
+  return anchor;
 }
 
 /** What the period is called, once you are looking at it. */
 export function periodLabel(key: PeriodKey, anchor: Date): string {
   const range = periodRange(key, anchor);
+  if (key === 'all') return `${range.from.slice(0, 4)} – ${range.to.slice(0, 4)}`;
   if (key === 'year') return String(anchor.getFullYear());
   if (key === 'month') return `${MONTHS_SHORT[anchor.getMonth()]} ${anchor.getFullYear()}`;
 
@@ -132,24 +144,43 @@ export function periodBuckets(key: PeriodKey, anchor: Date): Bucket[] {
     return buckets;
   }
 
-  return Array.from({ length: 12 }, (_, month) => {
-    const from = toIsoDate(new Date(anchor.getFullYear(), month, 1));
+  if (key === 'year') {
+    return Array.from({ length: 12 }, (_, month) => {
+      const from = toIsoDate(new Date(anchor.getFullYear(), month, 1));
+      return {
+        key: from,
+        label: MONTHS_SHORT[month],
+        from,
+        to: toIsoDate(new Date(anchor.getFullYear(), month + 1, 0)),
+      };
+    });
+  }
+
+  // One bar a year. Seven of them is the whole history the app keeps, which is
+  // the only view here that answers "is this getting worse every year".
+  const lastYear = anchor.getFullYear();
+  return Array.from({ length: HISTORY_YEARS }, (_, index) => {
+    const year = lastYear - (HISTORY_YEARS - 1) + index;
     return {
-      key: from,
-      label: MONTHS_SHORT[month],
-      from,
-      to: toIsoDate(new Date(anchor.getFullYear(), month + 1, 0)),
+      key: String(year),
+      label: String(year),
+      from: toIsoDate(new Date(year, 0, 1)),
+      to: toIsoDate(new Date(year, 11, 31)),
     };
   });
 }
 
 /** Whether stepping forward would land past the period containing today. */
 export function isLatestPeriod(key: PeriodKey, anchor: Date, today: Date): boolean {
+  // "All" has nowhere to go in either direction, so both ends read as reached
+  // and the arrows come up disabled rather than looking live and doing nothing.
+  if (key === 'all') return true;
   return periodRange(key, anchor).to >= periodRange(key, today).to;
 }
 
 /** Whether stepping back would leave the years the app keeps. */
 export function isEarliestPeriod(key: PeriodKey, anchor: Date, today: Date): boolean {
+  if (key === 'all') return true;
   const floor = new Date(today.getFullYear() - HISTORY_YEARS, today.getMonth(), today.getDate());
   return periodRange(key, stepPeriod(key, anchor, -1)).to < toIsoDate(floor);
 }

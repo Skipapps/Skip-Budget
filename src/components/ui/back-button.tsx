@@ -2,7 +2,8 @@ import { router } from 'expo-router';
 import { Pressable } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { colors } from '@/theme/colors';
+import { withTap } from '@/lib/press';
+import { useColors } from '@/providers/theme-provider';
 
 type BackButtonProps = {
   /** Defaults to popping the navigation stack. */
@@ -11,13 +12,14 @@ type BackButtonProps = {
 
 /** Top-left chevron. Sized to a 44pt touch target per Apple's minimum. */
 export function BackButton({ onPress }: BackButtonProps) {
+  const colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Go back"
       hitSlop={8}
-      onPress={onPress ?? (() => router.back())}
-      className="-ml-2 h-11 w-11 items-center justify-center rounded-[10px] active:bg-black/5"
+      onPress={withTap(onPress ?? (() => router.back()))}
+      className="-ml-2 h-11 w-11 items-center justify-center rounded-[10px] active:bg-ink/5"
     >
       <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
         <Path

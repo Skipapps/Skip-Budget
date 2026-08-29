@@ -56,7 +56,7 @@ export function ConfirmDialog({
         <Pressable
           onPress={() => {}}
           style={shadows.floating}
-          className="w-full max-w-[340px] overflow-hidden rounded-[10px] bg-white"
+          className="w-full max-w-[340px] overflow-hidden rounded-[10px] bg-card"
         >
           <View className="px-5 pb-4 pt-5">
             <Text
@@ -122,7 +122,7 @@ function DialogButton({
       accessibilityLabel={label}
       onPress={onPress}
       className={cn(
-        'min-h-12 items-center justify-center rounded-[10px] px-5 active:bg-black/5',
+        'min-h-12 items-center justify-center rounded-[10px] px-5 active:bg-ink/5',
         fullWidth && 'w-full',
       )}
     >

@@ -4,7 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { cn } from '@/lib/cn';
 import { isLightColor } from '@/lib/color';
 import type { PaymentSourceRow as PaymentSource } from '@/api/queries';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type SourceTilesProps = {
   sources: readonly PaymentSource[];
@@ -19,6 +19,7 @@ type SourceTilesProps = {
  * without reading the digits.
  */
 export function SourceTiles({ sources, value, onChange }: SourceTilesProps) {
+  const colors = useColors();
   return (
     <View className="w-full flex-row flex-wrap gap-3">
       {sources.map((source) => {
@@ -34,9 +35,7 @@ export function SourceTiles({ sources, value, onChange }: SourceTilesProps) {
             style={{ width: '47.5%' }}
             className={cn(
               'flex-row items-center gap-2.5 rounded-[10px] border px-3 py-3',
-              selected
-                ? 'border-control bg-black/[0.03]'
-                : 'border-line bg-white active:bg-black/5',
+              selected ? 'border-control bg-ink/[0.03]' : 'border-line bg-card active:bg-ink/5',
             )}
           >
             <View

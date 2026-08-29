@@ -50,3 +50,8 @@ export function useSession() {
 export function useUserId() {
   return useSession().session?.user.id ?? null;
 }
+
+/** The address they signed in with. Shown, never asked for, never editable. */
+export function useUserEmail() {
+  return useSession().session?.user.email ?? null;
+}

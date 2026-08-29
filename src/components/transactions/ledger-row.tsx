@@ -5,7 +5,7 @@ import type { LedgerEntry } from '@/api/queries';
 import { BillMark } from '@/components/bills/bill-mark';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { formatCurrency } from '@/lib/format';
-import { colors, moneyColor } from '@/theme/colors';
+import { useColors, useMoneyColor } from '@/providers/theme-provider';
 
 type LedgerRowProps = {
   entry: LedgerEntry;
@@ -16,6 +16,8 @@ type LedgerRowProps = {
 };
 
 export function LedgerRow({ entry, sourceLabel, kindLabel, onPress }: LedgerRowProps) {
+  const colors = useColors();
+  const moneyColor = useMoneyColor();
   // Income is the one kind with nothing to draw: a paycheque has no merchant,
   // and a monogram of the employer's name reads as a mistake next to real
   // logos. Everything that was actually bought somewhere gets its brand.
@@ -33,7 +35,7 @@ export function LedgerRow({ entry, sourceLabel, kindLabel, onPress }: LedgerRowP
       className="w-full flex-row items-center gap-3 py-3 active:opacity-60"
     >
       {isIncome ? (
-        <View className="h-10 w-10 items-center justify-center rounded-full bg-black/5">
+        <View className="h-10 w-10 items-center justify-center rounded-full bg-ink/5">
           <ArrowDownLeft size={18} color={colors.body} strokeWidth={1.8} />
         </View>
       ) : isBill ? (

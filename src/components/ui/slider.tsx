@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { PanResponder, View, type LayoutChangeEvent } from 'react-native';
 
 import { cn } from '@/lib/cn';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 type SliderProps = {
   value: number;
@@ -40,6 +40,7 @@ export function Slider({
   scale = 'linear',
   className,
 }: SliderProps) {
+  const colors = useColors();
   const [width, setWidth] = useState(0);
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
@@ -92,7 +93,7 @@ export function Slider({
       // Tall hit area: a 6px track is far too thin to grab reliably.
       className={cn('h-11 w-full justify-center', className)}
     >
-      <View className="h-1.5 w-full rounded-full bg-black/10" />
+      <View className="h-1.5 w-full rounded-full bg-ink/10" />
 
       <View
         pointerEvents="none"
@@ -108,7 +109,7 @@ export function Slider({
           height: THUMB,
           borderColor: colors.control,
         }}
-        className="absolute rounded-full border-[3px] bg-white"
+        className="absolute rounded-full border-[3px] bg-card"
       />
     </View>
   );

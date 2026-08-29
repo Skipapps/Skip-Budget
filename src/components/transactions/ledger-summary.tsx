@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 
 import type { LedgerTotals } from '@/api/queries';
 import { formatCurrency } from '@/lib/format';
-import { money, moneyColor } from '@/theme/colors';
+import { useColors, useMoneyColor } from '@/providers/theme-provider';
 
 /**
  * What a window of time came to.
@@ -14,13 +14,15 @@ import { money, moneyColor } from '@/theme/colors';
  * it sit underneath as the working rather than the headline.
  */
 export function LedgerSummary({ totals }: { totals: LedgerTotals }) {
+  const colors = useColors();
+  const moneyColor = useMoneyColor();
   const short = totals.net < 0;
   const moved = totals.in + totals.out;
   // Both sides are magnitudes, so the split is simply their share of the pair.
   const inShare = moved > 0 ? totals.in / moved : 0;
 
   return (
-    <View className="w-full rounded-[16px] bg-black/[0.035] px-4 py-4">
+    <View className="w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
       <View className="w-full flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">
           <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
@@ -50,14 +52,14 @@ export function LedgerSummary({ totals }: { totals: LedgerTotals }) {
 
       {moved === 0 ? null : (
         <>
-          <View className="mt-4 h-2.5 w-full flex-row overflow-hidden rounded-full bg-black/5">
-            <View style={{ flex: inShare, backgroundColor: money.in }} />
-            <View style={{ flex: 1 - inShare, backgroundColor: money.out }} />
+          <View className="mt-4 h-2.5 w-full flex-row overflow-hidden rounded-full bg-ink/5">
+            <View style={{ flex: inShare, backgroundColor: colors.moneyIn }} />
+            <View style={{ flex: 1 - inShare, backgroundColor: colors.moneyOut }} />
           </View>
 
           <View className="mt-3 w-full flex-row items-center justify-between gap-3">
-            <Leg label="In" amount={totals.in} color={money.in} />
-            <Leg label="Out" amount={-totals.out} color={money.out} />
+            <Leg label="In" amount={totals.in} color={colors.moneyIn} />
+            <Leg label="Out" amount={-totals.out} color={colors.moneyOut} />
           </View>
         </>
       )}

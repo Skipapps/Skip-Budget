@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react';
 import { Text, View } from 'react-native';
 import Svg, { Line, Path, Text as SvgText } from 'react-native-svg';
 
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 
 /**
  * What each slice of the period cost.
@@ -15,9 +15,6 @@ import { colors } from '@/theme/colors';
  * Every bar carries its own figure. A chart you have to tap to interrogate is
  * a chart that has not answered the question yet.
  */
-
-const BAR = colors.control;
-const AXIS = '#DCDCDC';
 
 export type FlowBucket = {
   /** Identity for the slice; also its React key. */
@@ -62,6 +59,12 @@ function barPath(x: number, width: number, baseY: number, topY: number): string 
 }
 
 export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
+  const colors = useColors();
+  // The bars are the chosen colour — this is one of the charts the accent is
+  // for. The axis is the same hairline every other divider in the app uses.
+  const BAR = colors.control;
+  const AXIS = colors.line;
+
   const [width, setWidth] = useState(0);
 
   const peak = Math.max(1, ...buckets.map((bucket) => bucket.spent));

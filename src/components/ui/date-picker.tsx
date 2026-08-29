@@ -4,7 +4,7 @@ import { Modal, Pressable, Text, View } from 'react-native';
 
 import { cn } from '@/lib/cn';
 import { MONTHS_SHORT, WEEKDAY_INITIALS, getDaysInMonth, getFirstWeekday } from '@/lib/date';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
 type DatePickerProps = {
@@ -22,6 +22,7 @@ type DatePickerProps = {
  * genuinely discards.
  */
 export function DatePicker({ value, onCancel, onConfirm }: DatePickerProps) {
+  const colors = useColors();
   const [step, setStep] = useState<'month' | 'day'>('month');
   const [month, setMonth] = useState(value.getMonth());
   const [year, setYear] = useState(value.getFullYear());
@@ -47,16 +48,19 @@ export function DatePicker({ value, onCancel, onConfirm }: DatePickerProps) {
         <Pressable
           onPress={() => {}}
           style={shadows.floating}
-          className="w-full max-w-[340px] overflow-hidden rounded-[10px] bg-white"
+          className="w-full max-w-[340px] overflow-hidden rounded-[10px] bg-card"
         >
           <View className="bg-control px-5 py-4">
-            <Text className="font-poppins text-[13px] text-white/70" maxFontSizeMultiplier={1.2}>
+            <Text
+              className="font-poppins text-[13px] text-on-control/70"
+              maxFontSizeMultiplier={1.2}
+            >
               {safeDay} {MONTHS_SHORT[month]} {year}
             </Text>
 
             <View className="mt-1 flex-row items-center justify-between">
               <Text
-                className="font-poppins-bold text-[30px] text-white"
+                className="font-poppins-bold text-[30px] text-on-control"
                 maxFontSizeMultiplier={1.2}
               >
                 {year}
@@ -67,7 +71,7 @@ export function DatePicker({ value, onCancel, onConfirm }: DatePickerProps) {
                   accessibilityRole="button"
                   accessibilityLabel="Next year"
                   onPress={() => setYear((current) => current + 1)}
-                  className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-white/10"
+                  className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-on-control/10"
                 >
                   <ChevronUp size={22} color={colors.surface} strokeWidth={2} />
                 </Pressable>
@@ -75,7 +79,7 @@ export function DatePicker({ value, onCancel, onConfirm }: DatePickerProps) {
                   accessibilityRole="button"
                   accessibilityLabel="Previous year"
                   onPress={() => setYear((current) => current - 1)}
-                  className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-white/10"
+                  className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-on-control/10"
                 >
                   <ChevronDown size={22} color={colors.surface} strokeWidth={2} />
                 </Pressable>
@@ -96,13 +100,15 @@ export function DatePicker({ value, onCancel, onConfirm }: DatePickerProps) {
                       onPress={() => handleMonthPress(index)}
                       className={cn(
                         'h-14 w-14 items-center justify-center rounded-full',
-                        selected ? 'bg-control' : 'active:bg-black/5',
+                        selected ? 'bg-control' : 'active:bg-ink/5',
                       )}
                     >
                       <Text
                         className={cn(
                           'text-[15px]',
-                          selected ? 'font-poppins-semibold text-white' : 'font-poppins text-ink',
+                          selected
+                            ? 'font-poppins-semibold text-on-control'
+                            : 'font-poppins text-ink',
                         )}
                         maxFontSizeMultiplier={1.2}
                       >
@@ -119,7 +125,7 @@ export function DatePicker({ value, onCancel, onConfirm }: DatePickerProps) {
                 accessibilityRole="button"
                 accessibilityLabel="Back to months"
                 onPress={() => setStep('month')}
-                className="mb-2 flex-row items-center gap-1 self-start rounded-[8px] px-2 py-1.5 active:bg-black/5"
+                className="mb-2 flex-row items-center gap-1 self-start rounded-[8px] px-2 py-1.5 active:bg-ink/5"
               >
                 <ChevronLeft size={16} color={colors.muted} strokeWidth={2} />
                 <Text
@@ -158,14 +164,16 @@ export function DatePicker({ value, onCancel, onConfirm }: DatePickerProps) {
                         onPress={() => setDay(dayNumber)}
                         className={cn(
                           'h-10 w-10 items-center justify-center rounded-full',
-                          selected ? 'bg-control' : 'active:bg-black/5',
+                          selected ? 'bg-control' : 'active:bg-ink/5',
                         )}
                       >
                         <Text
                           allowFontScaling={false}
                           className={cn(
                             'text-[14px]',
-                            selected ? 'font-poppins-semibold text-white' : 'font-poppins text-ink',
+                            selected
+                              ? 'font-poppins-semibold text-on-control'
+                              : 'font-poppins text-ink',
                           )}
                         >
                           {dayNumber}
@@ -182,7 +190,7 @@ export function DatePicker({ value, onCancel, onConfirm }: DatePickerProps) {
             <Pressable
               accessibilityRole="button"
               onPress={onCancel}
-              className="rounded-[10px] px-5 py-3 active:bg-black/5"
+              className="rounded-[10px] px-5 py-3 active:bg-ink/5"
             >
               <Text className="font-poppins-medium text-[15px] text-muted">Cancel</Text>
             </Pressable>
@@ -193,7 +201,7 @@ export function DatePicker({ value, onCancel, onConfirm }: DatePickerProps) {
               onPress={() =>
                 step === 'month' ? setStep('day') : onConfirm(new Date(year, month, safeDay))
               }
-              className="rounded-[10px] px-5 py-3 active:bg-black/5"
+              className="rounded-[10px] px-5 py-3 active:bg-ink/5"
             >
               <Text className="font-poppins-semibold text-[15px] text-ink">
                 {step === 'month' ? 'Next' : 'OK'}

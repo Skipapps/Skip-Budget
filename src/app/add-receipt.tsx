@@ -21,7 +21,7 @@ import { FieldLabel, Title } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { parseReceipt, parseReceiptFromLines, type ParsedReceipt } from '@/lib/receipt-parser';
-import { colors } from '@/theme/colors';
+import { useColors } from '@/providers/theme-provider';
 import {
   isRecognitionAvailable,
   isScanningAvailable,
@@ -74,6 +74,7 @@ const BLANK: Initial = {
  * render and fights the user's own edits afterwards.
  */
 export default function AddReceiptScreen() {
+  const colors = useColors();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { data: existing, isLoading } = useReceipt(id);
 
@@ -108,6 +109,7 @@ export default function AddReceiptScreen() {
 }
 
 function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
+  const colors = useColors();
   const editing = Boolean(id);
 
   const [store, setStore] = useState<BrandSelection | null>(initial.store);
@@ -485,7 +487,7 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
             accessibilityRole="button"
             accessibilityLabel="Delete this receipt"
             onPress={handleDelete}
-            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-black/5"
+            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-ink/5"
           >
             <Trash2 size={17} color="#DC2626" strokeWidth={1.9} />
             <Text
@@ -543,7 +545,7 @@ function CaptureButton({
       accessibilityState={{ disabled }}
       onPress={onPress}
       disabled={disabled}
-      className="min-h-12 flex-1 flex-row items-center justify-center gap-2 rounded-[10px] border border-line active:bg-black/5"
+      className="min-h-12 flex-1 flex-row items-center justify-center gap-2 rounded-[10px] border border-line active:bg-ink/5"
       style={disabled ? { opacity: 0.5 } : undefined}
     >
       {icon}

@@ -43,8 +43,13 @@ export type RecurringCharge = {
   domain?: string | null;
   /** yyyy-mm-dd the charge began, when known. Nothing lands before it. */
   startsOn?: string | null;
+  /** When the row was made, as the floor of last resort. */
+  createdAt?: string | null;
   /** yyyy-mm-dd it stopped, when known. Nothing lands after it. */
   endsOn?: string | null;
+  /** Where it charges NOW. What it charged before is on the charge itself. */
+  cardId?: string | null;
+  accountId?: string | null;
 } & BillMarkFields;
 
 export type Payment = {
@@ -184,14 +189,141 @@ export function nextOccurrenceFrom(anchor: string, recurrence: Recurrence, from:
   return date;
 }
 
-/** Backwards-only, which is what a card balance needs. */
-export function occurrencesBetween(
-  nextDate: string,
-  recurrence: Recurrence,
-  from: string | null,
-  to: string,
-): string[] {
-  return occurrencesInRange(nextDate, recurrence, from, to);
+/**
+ * How the ledger names a plan.
+ *
+ * Bills and subscriptions are separate tables with their own ids, so the
+ * ledger holds them apart by kind. Charges have to be filed under the same
+ * name or a plan's history simply never matches it — and it would fail
+ * quietly, by projecting, which looks exactly like working.
+ */
+export function planKey(kind: 'bill' | 'subscription', id: string): string {
+  return `${kind}-${id}`;
+}
+
+/** The same name, worked out from a charge row. */
+export function chargePlanKey(row: {
+  bill_id: string | null;
+  subscription_id: string | null;
+}): string {
+  return row.bill_id
+    ? planKey('bill', row.bill_id)
+    : planKey('subscription', row.subscription_id as string);
+}
+
+/** The next calendar day. */
+function dayAfter(date: string): string {
+  const [year, month, day] = parts(date);
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  return iso(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate());
+}
+
+/** The later of two lower bounds, where null means "no bound at all". */
+function laterOf(bound: string | null, floor: string): string {
+  return bound && bound > floor ? bound : floor;
+}
+
+/** One occurrence as it was written down, narrowed to what a ledger draws. */
+export type RecordedCharge = {
+  id: string;
+  /** The bill or subscription it came from. */
+  planId: string;
+  label: string;
+  amount: number;
+  /** yyyy-mm-dd */
+  date: string;
+  /** Where it actually came out of, copied when it landed. */
+  cardId: string | null;
+  accountId: string | null;
+};
+
+/** One time a plan landed — read from the record where there is one. */
+export type PlanOccurrence = {
+  /** The charge's own id, or the plan and the date, so keys stay stable. */
+  id: string;
+  label: string;
+  amount: number;
+  date: string;
+  cardId: string | null;
+  accountId: string | null;
+  /** False when this has not happened yet and is only a forecast. */
+  recorded: boolean;
+};
+
+/**
+ * Every time a plan landed or is going to, inside a window.
+ *
+ * The past and the future are answered by different things, and that split is
+ * the whole point. What already went out is read from the charges written down
+ * at the time, carrying the label, amount and source they had then — so
+ * putting rent up next month leaves last month at the old figure, and moving a
+ * bill to a different card leaves March on the card that actually paid it.
+ * Only what has not happened yet is projected from the plan, because a
+ * forecast is the one thing the plan is still the authority on.
+ *
+ * `isRecorded` says whether this plan has ever been written down — anywhere,
+ * not just inside this window. When it has not, the projection carries the
+ * past as well, which is what keeps the screens working before the recorder
+ * has caught up, or when it cannot run at all. A plan on the record does not
+ * get that fallback: its history is exactly what was recorded, and filling
+ * gaps from the plan would put back the very rewriting this replaces.
+ */
+export function planOccurrences(input: {
+  plan: RecurringCharge;
+  /** This plan's charges. Already narrowed to the source being asked about. */
+  charges: readonly RecordedCharge[];
+  /** Whether the plan has any charge at all, in any scope. */
+  isRecorded: boolean;
+  from: string | null;
+  to: string;
+  /** yyyy-mm-dd. Nothing after it has happened. */
+  today: string;
+}): PlanOccurrence[] {
+  const { plan, charges, isRecorded, from, to, today } = input;
+
+  // Bounded by the window asked about and nothing else. A charge is not
+  // clipped to the plan's lifetime: it is on the record because it happened,
+  // and shortening a bill afterwards does not unspend the money.
+  const found: PlanOccurrence[] = charges
+    .filter((charge) => charge.date <= to && (!from || charge.date >= from))
+    .map((charge) => ({
+      id: charge.id,
+      label: charge.label,
+      amount: charge.amount,
+      date: charge.date,
+      cardId: charge.cardId,
+      accountId: charge.accountId,
+      recorded: true,
+    }));
+
+  const window = billWindow(
+    { starts_on: plan.startsOn, ends_on: plan.endsOn, created_at: plan.createdAt },
+    isRecorded ? laterOf(from, dayAfter(today)) : from,
+    to,
+  );
+
+  if (!window.from || window.from <= window.to) {
+    // Anything already on the record wins the day it falls on, so a clock
+    // skewed a day forward cannot have it counted twice.
+    const taken = new Set(found.map((occurrence) => occurrence.date));
+
+    for (const date of occurrencesInRange(plan.nextDate, plan.recurrence, window.from, window.to)) {
+      if (taken.has(date)) continue;
+      found.push({
+        id: `${plan.id}@${date}`,
+        label: plan.label,
+        amount: plan.amount,
+        date,
+        cardId: plan.cardId ?? null,
+        accountId: plan.accountId ?? null,
+        recorded: false,
+      });
+    }
+  }
+
+  return found.sort((a, b) =>
+    a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date),
+  );
 }
 
 /**
@@ -201,6 +333,10 @@ export function occurrencesBetween(
  * Charges before that date are assumed to be baked into the figure already, so
  * counting them again would double them. When no balance was ever stated, every
  * charge counts — a backdated receipt on a fresh card still has to appear.
+ *
+ * A card only ever shows what has already happened, so once its bills are on
+ * the record the balance is built entirely from `recorded` and the plans are
+ * left to describe the future nobody is asking about here.
  */
 export function buildLedger(input: {
   kind: SourceKind;
@@ -210,10 +346,16 @@ export function buildLedger(input: {
   charges: Charge[];
   recurring: RecurringCharge[];
   payments: Payment[];
+  /** Charges written down against THIS source, whichever plan they came from. */
+  recorded?: readonly RecordedCharge[];
+  /** Every plan with a charge anywhere. Absent means nothing is recorded yet. */
+  recordedPlans?: ReadonlySet<string>;
   /** yyyy-mm-dd. Nothing dated after it has happened yet. */
   today: string;
 }): Ledger {
   const { kind, statedBalance, balanceAsOf, charges, recurring, payments, today } = input;
+  const recorded = input.recorded ?? [];
+  const recordedPlans = input.recordedPlans ?? new Set<string>();
 
   const inWindow = (date: string) => date <= today && (!balanceAsOf || date >= balanceAsOf);
 
@@ -231,21 +373,30 @@ export function buildLedger(input: {
     });
   }
 
-  for (const item of recurring) {
-    // The charge's own lifetime, narrowed by the window being asked about.
-    // Without this a bill added today would back-date itself onto the card.
-    const from =
-      item.startsOn && (!balanceAsOf || item.startsOn > balanceAsOf) ? item.startsOn : balanceAsOf;
-    const to = item.endsOn && item.endsOn < today ? item.endsOn : today;
-    if (from && from > to) continue;
+  const byPlan = new Map<string, RecordedCharge[]>();
+  for (const charge of recorded) {
+    const rows = byPlan.get(charge.planId);
+    if (rows) rows.push(charge);
+    else byPlan.set(charge.planId, [charge]);
+  }
 
-    for (const date of occurrencesBetween(item.nextDate, item.recurrence, from, to)) {
+  for (const item of recurring) {
+    // Recorded where it is recorded, projected only where it is not. The
+    // lifetime bounds live in there too: without them a bill added today would
+    // back-date itself onto the card.
+    for (const occurrence of planOccurrences({
+      plan: item,
+      charges: byPlan.get(item.id) ?? [],
+      isRecorded: recordedPlans.has(item.id),
+      from: balanceAsOf,
+      to: today,
+      today,
+    })) {
       entries.push({
-        // Unique per occurrence, so React keys stay stable across renders.
-        id: `${item.id}@${date}`,
-        label: item.label,
-        date,
-        amount: -Math.abs(item.amount),
+        id: occurrence.id,
+        label: occurrence.label,
+        date: occurrence.date,
+        amount: -Math.abs(occurrence.amount),
         kind: item.kind,
         domain: item.domain,
         categoryId: item.categoryId,

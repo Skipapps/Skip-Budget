@@ -3,6 +3,7 @@ import { Pencil, Plus } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
+import { useArtwork } from '@/theme/artwork';
 import { useCreatePayment, useDeletePayment } from '@/api/mutations';
 import { useSourceLedger } from '@/api/queries';
 import { AccountCard } from '@/components/cards/account-card';
@@ -15,10 +16,7 @@ import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { Title } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { colors } from '@/theme/colors';
-
-import EmptyArt from '@/assets/illustrations/state-empty-wallet.svg';
-import ErrorArt from '@/assets/illustrations/state-error.svg';
+import { useColors } from '@/providers/theme-provider';
 
 const KIND_LABELS: Record<string, string> = {
   receipt: 'Receipt',
@@ -28,6 +26,8 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 export default function SourceDetailScreen() {
+  const artwork = useArtwork();
+  const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   // Read once per render rather than inside the hook, so the ledger stays a
   // pure function of its inputs and cannot shift mid-render.
@@ -55,7 +55,7 @@ export default function SourceDetailScreen() {
     return (
       <Screen showBack>
         <PageState
-          art={ErrorArt}
+          art={artwork.error}
           title="Could not open this one"
           message="It may have been deleted. Go back and pick another."
           actionLabel="Go back"
@@ -109,7 +109,10 @@ export default function SourceDetailScreen() {
           className="h-14 flex-row items-center gap-2 rounded-full bg-control px-5 active:opacity-80"
         >
           <Plus size={20} color="#FFFFFF" strokeWidth={2.2} />
-          <Text className="font-poppins-medium text-[15px] text-white" maxFontSizeMultiplier={1.3}>
+          <Text
+            className="font-poppins-medium text-[15px] text-on-control"
+            maxFontSizeMultiplier={1.3}
+          >
             {isCard ? 'Make a payment' : 'Add money'}
           </Text>
         </Pressable>
@@ -126,7 +129,7 @@ export default function SourceDetailScreen() {
           onPress={() =>
             router.push(isCard ? `/add-card?id=${source.id}` : `/add-account?id=${source.id}`)
           }
-          className="h-11 w-11 items-center justify-center rounded-full border border-line active:bg-black/5"
+          className="h-11 w-11 items-center justify-center rounded-full border border-line active:bg-ink/5"
         >
           <Pencil size={18} color={colors.ink} strokeWidth={1.9} />
         </Pressable>
@@ -203,7 +206,7 @@ export default function SourceDetailScreen() {
 
       {ledger.entries.length === 0 ? (
         <PageState
-          art={EmptyArt}
+          art={artwork.emptyWallet}
           title="Nothing on this one yet"
           message={
             isCard

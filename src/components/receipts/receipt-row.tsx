@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { moneyColor } from '@/theme/colors';
+import { useMoneyColor } from '@/providers/theme-provider';
 
 type ReceiptRowProps = {
   merchant: string;
@@ -25,6 +25,7 @@ export function ReceiptRow({
   domain,
   onPress,
 }: ReceiptRowProps) {
+  const moneyColor = useMoneyColor();
   const spent = -Math.abs(amount);
 
   return (

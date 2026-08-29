@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 
 import { formatRelativeDay } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { moneyColor } from '@/theme/colors';
+import { useMoneyColor } from '@/providers/theme-provider';
 
 type DateGroupHeaderProps = {
   /** yyyy-mm-dd, or '' for the undated group. */
@@ -20,8 +20,9 @@ type DateGroupHeaderProps = {
  * the right where the row amounts already are.
  */
 export function DateGroupHeader({ date, today, total }: DateGroupHeaderProps) {
+  const moneyColor = useMoneyColor();
   return (
-    <View className="w-full flex-row items-center justify-between gap-3 bg-white pb-1.5 pt-4">
+    <View className="w-full flex-row items-center justify-between gap-3 bg-surface pb-1.5 pt-4">
       <Text
         className="font-poppins-medium text-[13px] uppercase tracking-wide text-muted"
         numberOfLines={1}
