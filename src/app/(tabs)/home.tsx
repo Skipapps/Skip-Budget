@@ -194,7 +194,10 @@ export default function HomeScreen() {
 
       {/* Full width and outside the carousel — it is a destination, not a stat. */}
       <View className="mt-3 w-full">
-        <InsightBanner />
+        {/* Transactions is the story: the chart, the timeline and the
+            periods to read them over. The banner said so already and had
+            nowhere to send anyone. */}
+        <InsightBanner onPress={() => router.push('/transactions')} />
       </View>
 
       <View className="mt-5 h-px w-full bg-line" />

@@ -26,7 +26,12 @@ type AmountTileProps = {
 const PRESSED = 0.955;
 
 /**
- * Square tile: artwork, label, amount.
+ * Square tile: artwork, label, amount, stacked down the middle.
+ *
+ * Centred rather than pushed to the corners, because the artwork is the thing
+ * the eye lands on and a drawing pinned top-left with its caption bottom-left
+ * reads as two separate objects sharing a box. One column keeps them a single
+ * thing, and the tiles line up with each other across the row.
  *
  * Fills whatever width its parent gives it, so the same tile works in the
  * dashboard's fixed-width carousel and in a flexible two-up row.
@@ -78,7 +83,7 @@ export function AmountTile({
       <Animated.View
         style={[shadows.raised, surface]}
         className={cn(
-          'aspect-square w-full justify-between rounded-[16px] bg-card p-3.5',
+          'aspect-square w-full items-center justify-center rounded-[16px] bg-card p-3.5',
           // Someone who has asked for less motion still gets an answer to their
           // finger, just a static one.
           reduced && onPress ? 'active:opacity-70' : null,
@@ -89,9 +94,9 @@ export function AmountTile({
           <Artwork width="100%" height="100%" />
         </View>
 
-        <View>
+        <View className="mt-2.5 w-full items-center">
           <Text
-            className="font-poppins-medium text-[13px] leading-[18px] text-body"
+            className="text-center font-poppins-medium text-[13px] leading-[18px] text-body"
             numberOfLines={1}
             maxFontSizeMultiplier={1.3}
           >
@@ -101,7 +106,7 @@ export function AmountTile({
               tiles stay square and aligned beside the ones that do. */}
           <Text
             className={cn(
-              'mt-1 font-poppins-semibold text-[16px]',
+              'mt-1 text-center font-poppins-semibold text-[16px]',
               amount === undefined ? 'text-muted' : 'text-ink',
             )}
             numberOfLines={1}

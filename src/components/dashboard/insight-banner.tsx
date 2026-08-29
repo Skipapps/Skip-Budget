@@ -33,7 +33,7 @@ export function InsightBanner({ onPress }: InsightBannerProps) {
           }
         : {})}
       style={shadows.raised}
-      className={`w-full flex-row items-center gap-3 rounded-[16px] bg-card p-4 ${
+      className={`w-full flex-row items-center gap-3 overflow-hidden rounded-[16px] bg-card p-4 ${
         onPress ? 'active:opacity-80' : ''
       }`}
     >
@@ -58,7 +58,14 @@ export function InsightBanner({ onPress }: InsightBannerProps) {
         </Text>
       </View>
 
-      {onPress ? <ChevronRight size={20} color={colors.muted} strokeWidth={2} /> : null}
+      {/* Pinned to the corner rather than sat in the row: centred beside two
+          lines of text it reads as a third column, and the artwork already
+          gives this banner a left-to-right shape to follow. */}
+      {onPress ? (
+        <View className="absolute right-3 top-3">
+          <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
+        </View>
+      ) : null}
     </Container>
   );
 }
