@@ -5,7 +5,7 @@ import {
   type Payment,
   type RecurringCharge,
 } from '@/lib/card-ledger';
-import { nextOccurrenceFrom } from '@/lib/card-ledger';
+import { nextOccurrenceFrom, planFloor } from '@/lib/card-ledger';
 
 const receipt = (id: string, amount: number, date: string): Charge => ({
   id,
@@ -277,8 +277,6 @@ describe('buildLedger — a recurring charge stays inside its own lifetime', () 
     expect(ledger.balance).toBe(0);
   });
 });
-
-import { planFloor } from '@/lib/card-ledger';
 
 describe('planFloor', () => {
   it('prefers the start date the plan actually carries', () => {
