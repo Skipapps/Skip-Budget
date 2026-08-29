@@ -258,7 +258,12 @@ export function useSetSalaryAccounts() {
       if (error) throw error;
       return { salaryId };
     },
-    onSuccess: () => invalidate('salary_sources'),
+    onSuccess: () => {
+      invalidate('salary_sources');
+      // Which accounts pay lands in is read on its own, for the reminders that
+      // are about money arriving. Without this it stays stale until a restart.
+      invalidate('salary_source_accounts');
+    },
   });
 }
 

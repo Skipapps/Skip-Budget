@@ -14,16 +14,24 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm } from '@/providers/dialog-provider';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { ReminderField } from '@/components/ui/reminder-field';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Title } from '@/components/ui/typography';
 import {
   useCreateBankAccount,
   useCreateSalarySource,
+  useSetSalaryAccounts,
   useDeleteBankAccount,
   useUpdateBankAccount,
 } from '@/api/mutations';
-import { useBankAccount } from '@/api/queries';
+import {
+  choiceToLead,
+  useApplyReminder,
+  useReminderChoice,
+  type ReminderChoice,
+} from '@/api/reminders';
+import { useBankAccount, useSalaryAccountIds } from '@/api/queries';
 import { useColors } from '@/providers/theme-provider';
 import { ACCOUNT_TYPES, type AccountType } from '@/data/accounts-mock';
 import {
@@ -120,6 +128,18 @@ function AccountForm({
     }
   };
   const createSalary = useCreateSalarySource();
+  const setSalaryAccounts = useSetSalaryAccounts();
+
+  const savedReminder = useReminderChoice('account', id);
+  const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
+  const reminder = reminderDraft ?? savedReminder;
+  const applyReminder = useApplyReminder();
+
+  const { ids: salaryAccountIds } = useSalaryAccountIds();
+  // An account reminder is about pay arriving, so it means nothing until
+  // something is paid in. On a new account that is the income being entered
+  // right here; on an existing one it is whatever is already linked.
+  const payLandsHere = editing ? salaryAccountIds.has(id ?? '') : Number(income) > 0;
 
   const handleSave = async () => {
     setError(null);
@@ -140,23 +160,30 @@ function AccountForm({
         balance_as_of: balance ? toIsoDate(new Date()) : null,
       };
 
-      if (editing && id) {
-        await updateAccount.mutateAsync({ id, values });
-      } else {
-        await createAccount.mutateAsync(values);
-      }
+      const accountId =
+        editing && id
+          ? (await updateAccount.mutateAsync({ id, values }), id)
+          : (await createAccount.mutateAsync(values)).id;
 
       // Income entered here is a salary source in its own right, so it is
-      // saved as one rather than being dropped with the rest of the screen.
+      // saved as one rather than being dropped with the rest of the screen —
+      // and pointed at this account, which is the whole reason it was typed on
+      // this form. Without the link the money existed but landed nowhere.
       const pay = Number(income);
       if (!editing && Number.isFinite(pay) && pay > 0) {
-        await createSalary.mutateAsync({
+        const salary = await createSalary.mutateAsync({
           name: nickname.trim() || bankName.trim(),
           amount: pay,
           frequency: payFrequency,
           last_payday: lastPayday ? toIsoDate(lastPayday) : null,
         });
+        await setSalaryAccounts.mutateAsync({
+          salaryId: salary.id,
+          accountIds: [accountId],
+        });
       }
+
+      await applyReminder('account', accountId, payLandsHere ? choiceToLead(reminder) : null);
 
       router.back();
     } catch (thrown) {
@@ -273,6 +300,17 @@ function AccountForm({
                 </Text>
               ) : null}
             </View>
+
+            <ReminderField
+              kind="account"
+              value={reminder}
+              onChange={setReminderDraft}
+              unavailable={
+                payLandsHere
+                  ? null
+                  : 'Add the income paid into this account and Skip can tell you when it lands.'
+              }
+            />
           </View>
         </CollapsibleSection>
       </View>

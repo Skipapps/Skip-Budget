@@ -3,6 +3,12 @@ import { Calculator, Calendar, ChevronLeft, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
+import {
+  choiceToLead,
+  useApplyReminder,
+  useReminderChoice,
+  type ReminderChoice,
+} from '@/api/reminders';
 import { useCreateBill, useDeleteBill, useUpdateBill, type BillValues } from '@/api/mutations';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { ScheduleCard } from '@/components/calculators/schedule-card';
@@ -10,6 +16,7 @@ import { CategoryPicker } from '@/components/bills/category-picker';
 import { IconPicker } from '@/components/bills/icon-picker';
 import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
+import { ReminderField } from '@/components/ui/reminder-field';
 import { CalculatorPad } from '@/components/ui/calculator-pad';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -154,6 +161,13 @@ function BillForm({
     }
   };
 
+  // Held as a draft over whatever is stored, so a reminder that loads a moment
+  // after the form does not overwrite what is already being chosen.
+  const savedReminder = useReminderChoice('bill', id);
+  const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
+  const reminder = reminderDraft ?? savedReminder;
+  const applyReminder = useApplyReminder();
+
   const handleSave = async () => {
     setError(null);
     if (!name.trim()) {
@@ -194,11 +208,14 @@ function BillForm({
         note: note.trim() || null,
       };
 
-      if (editing && id) {
-        await updateBill.mutateAsync({ id, values });
-      } else {
-        await createBill.mutateAsync(values);
-      }
+      const billId =
+        editing && id
+          ? (await updateBill.mutateAsync({ id, values }), id)
+          : (await createBill.mutateAsync(values)).id;
+
+      // After the bill exists, because a reminder points at a row.
+      await applyReminder('bill', billId, choiceToLead(reminder));
+
       router.back();
     } catch (thrown) {
       setError((thrown as Error).message ?? 'Could not save that bill.');
@@ -338,6 +355,8 @@ function BillForm({
             }
           />
         ) : null}
+
+        <ReminderField kind="bill" value={reminder} onChange={setReminderDraft} />
 
         <TextField
           label="Note"

@@ -35,6 +35,8 @@ export type CardRow = {
   balance: number;
   /** Date the stated balance was true; null means count every charge. */
   balance_as_of?: string | null;
+  /** Day of the month the card's own bill falls due. What a reminder needs. */
+  bill_due_day?: number | null;
 };
 
 export type BankAccountRow = {
@@ -121,7 +123,7 @@ export function useCards() {
   return useOwnerQuery<CardRow[]>('cards', async () => {
     const { data, error } = await supabase
       .from('cards')
-      .select('id, holder, network, last4, color, balance, balance_as_of')
+      .select('id, holder, network, last4, color, balance, balance_as_of, bill_due_day')
       .order('created_at', { ascending: true });
     if (error) throw error;
     return data ?? [];
@@ -192,6 +194,28 @@ export function useDashboard() {
  * this is the live equivalent, so anything asking "which card?" reads the same
  * shape whether it renders samples or the real wallet.
  */
+/**
+ * Accounts that a salary source pays into.
+ *
+ * An account has no date of its own, so "remind me when pay lands" only means
+ * something for an account something is paid into. This is how the reminders
+ * page knows which ones can answer that.
+ */
+export function useSalaryAccountIds() {
+  const query = useOwnerQuery<{ bank_account_id: string }[]>('salary_source_accounts', async () => {
+    const { data, error } = await supabase.from('salary_source_accounts').select('bank_account_id');
+    if (error) throw error;
+    return (data ?? []) as { bank_account_id: string }[];
+  });
+
+  const ids = useMemo(
+    () => new Set((query.data ?? []).map((row) => row.bank_account_id)),
+    [query.data],
+  );
+
+  return { ids, isLoading: query.isLoading };
+}
+
 export type PaymentSourceRow = {
   id: string;
   label: string;

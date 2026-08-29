@@ -3,8 +3,14 @@ import { Calendar, Trash2, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
+import {
+  choiceToLead,
+  useApplyReminder,
+  useReminderChoice,
+  type ReminderChoice,
+} from '@/api/reminders';
 import { useCreateCard, useDeleteCard, useUpdateCard } from '@/api/mutations';
-import { useCard } from '@/api/queries';
+import { useCard, useSourceLedger } from '@/api/queries';
 import { useColors } from '@/providers/theme-provider';
 import { NetworkPicker } from '@/components/cards/network-picker';
 import { PaymentCard } from '@/components/cards/payment-card';
@@ -13,6 +19,7 @@ import { AmountPad } from '@/components/ui/amount-pad';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { DatePicker } from '@/components/ui/date-picker';
 import { ColorPicker } from '@/components/ui/color-picker';
+import { ReminderField } from '@/components/ui/reminder-field';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm } from '@/providers/dialog-provider';
 import { SelectField } from '@/components/ui/select-field';
@@ -69,6 +76,16 @@ function CardForm({
   );
   const [balance, setBalance] = useState(existing ? String(existing.balance) : '');
 
+  const today = toIsoDate(new Date());
+  // What the card is showing right now, so the warning below can say how much
+  // history a new balance would absorb rather than warning in the abstract.
+  const { ledger } = useSourceLedger(editing ? id : undefined, today);
+
+  const savedReminder = useReminderChoice('card', id);
+  const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
+  const reminder = reminderDraft ?? savedReminder;
+  const applyReminder = useApplyReminder();
+
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [amountPadOpen, setAmountPadOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +121,29 @@ function CardForm({
       return;
     }
 
+    // Stating a balance means "this is what the card is at, today", so
+    // everything charged before today is treated as already inside that
+    // figure. That is the right arithmetic and an unpleasant surprise: the
+    // transactions vanish off the card with no explanation. Say it first.
+    if (editing && existing && Number(balance) !== existing.balance) {
+      const absorbed = (ledger?.entries ?? []).filter((entry) => entry.date < today);
+
+      if (absorbed.length > 0) {
+        const ok = await confirm({
+          title: 'This balance becomes the starting point',
+          message:
+            `A new balance is taken as today's figure, so the ` +
+            `${absorbed.length === 1 ? 'transaction' : `${absorbed.length} transactions`} ` +
+            `already on this card ${absorbed.length === 1 ? 'is' : 'are'} counted as part of ` +
+            `it and will stop showing here. Nothing is deleted — they stay in your ` +
+            `transactions, and on the bills and receipts they came from.`,
+          confirmLabel: 'Update the balance',
+          cancelLabel: 'Leave it as it was',
+        });
+        if (!ok) return;
+      }
+    }
+
     try {
       const values = {
         holder: name.trim(),
@@ -118,11 +158,15 @@ function CardForm({
         bill_due_day: dueDate ? dueDate.getDate() : null,
       };
 
-      if (editing && id) {
-        await updateCard.mutateAsync({ id, values });
-      } else {
-        await createCard.mutateAsync(values);
-      }
+      const cardId =
+        editing && id
+          ? (await updateCard.mutateAsync({ id, values }), id)
+          : (await createCard.mutateAsync(values)).id;
+
+      // A card reminder counts back from its payment day, so it is only
+      // written when there is one to count from.
+      await applyReminder('card', cardId, dueDate ? choiceToLead(reminder) : null);
+
       router.back();
     } catch (thrown) {
       setError((thrown as Error).message ?? 'Could not save that card.');
@@ -190,6 +234,15 @@ function CardForm({
               placeholder="Choose a date"
               icon={Calendar}
               onPress={() => setDatePickerOpen(true)}
+            />
+
+            <ReminderField
+              kind="card"
+              value={reminder}
+              onChange={setReminderDraft}
+              unavailable={
+                dueDate ? null : 'Set a bill due date above and Skip can remind you before it.'
+              }
             />
 
             <SelectField

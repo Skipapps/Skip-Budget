@@ -29,6 +29,7 @@ import {
   type PayFrequency,
 } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
+import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
 
 /** Normalised to monthly so sources on different cycles can be summed. */
@@ -107,6 +108,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
   const createSource = useCreateSalarySource();
   const updateSource = useUpdateSalarySource();
   const deleteSource = useDeleteSalarySource();
+  const confirm = useConfirm();
   const setAccounts = useSetSalaryAccounts();
 
   const monthlyTotal = sources.reduce(
@@ -134,8 +136,29 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
     ]);
   };
 
-  const removeSource = (id: string) => {
-    setSources((current) => current.filter((source) => source.id !== id));
+  /**
+   * Removing a source takes its income out of every projection with it.
+   *
+   * That is a bigger change than the bin icon suggests — paydays are what the
+   * dashboard measures spending against — so it asks first. The row goes on
+   * Save with the rest of the screen, not on the tap.
+   */
+  const removeSource = async (id: string) => {
+    const source = sources.find((row) => row.id === id);
+    const name = source?.name.trim();
+
+    const ok = await confirm({
+      title: name ? `Remove ${name}?` : 'Remove this source?',
+      message:
+        'Its paydays stop being counted as money coming in, on the dashboard and ' +
+        'everywhere else. Nothing you have spent changes.',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Keep it',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    setSources((current) => current.filter((row) => row.id !== id));
   };
 
   const activeSource = sources.find((source) => source.id === padTarget?.sourceId);
@@ -213,17 +236,18 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
               </Text>
 
               <View className="flex-row items-center gap-1">
-                {sources.length > 1 ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove source ${index + 1}`}
-                    hitSlop={8}
-                    onPress={() => removeSource(source.id)}
-                    className="h-9 w-9 items-center justify-center rounded-[8px] active:bg-ink/5"
-                  >
-                    <Trash2 size={18} color={colors.muted} strokeWidth={1.8} />
-                  </Pressable>
-                ) : null}
+                {/* Offered on the only source too. Someone who added income by
+                    mistake, or who has stopped being paid from somewhere, had
+                    no way to take it back out. */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove source ${index + 1}`}
+                  hitSlop={8}
+                  onPress={() => void removeSource(source.id)}
+                  className="h-9 w-9 items-center justify-center rounded-[8px] active:bg-ink/5"
+                >
+                  <Trash2 size={18} color={colors.muted} strokeWidth={1.8} />
+                </Pressable>
 
                 {/* Several sources fill the screen fast, and most of the time
                     you are editing one of them. Folding the rest away keeps

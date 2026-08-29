@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
 import { withTimeout } from '@/lib/deadline';
 import { supabase } from '@/lib/supabase';
@@ -11,6 +12,18 @@ import { useUserId } from '@/providers/session-provider';
  * together and the scheduler can read them in one query. The row holds only the
  * decision — on or off, and how many days ahead — never a copy of the date,
  * which is read from the bill or the card when the push is actually sent.
+ *
+ * Four kinds, and each one is answered by a different date:
+ *
+ *   bill          its next due date
+ *   subscription  its next renewal
+ *   card          the card's own payment day (cards.bill_due_day)
+ *   account       the next payday landing in it
+ *
+ * The account one is the odd one out and worth stating plainly: it is about
+ * money arriving, not leaving. An account has no date of its own, so it
+ * borrows the payday of whatever salary source pays into it — and an account
+ * nothing is paid into has nothing to announce.
  */
 
 /** The four things that can carry a reminder. */
@@ -60,6 +73,42 @@ export const LEAD_OPTIONS = [
 ] as const;
 
 export const DEFAULT_LEAD_DAYS = 1;
+
+/**
+ * The same choices with an off switch folded in, for the creation forms.
+ *
+ * The page has room for a toggle and a row of leads because it is showing
+ * twenty of them at once. A form has one, and a single row of chips that
+ * includes "Off" is one decision instead of two.
+ */
+export const REMINDER_CHOICES = [
+  { value: 'off', label: 'Off' },
+  { value: '0', label: 'On the day' },
+  { value: '1', label: '1 day' },
+  { value: '3', label: '3 days' },
+  { value: '7', label: '1 week' },
+] as const;
+
+export type ReminderChoice = (typeof REMINDER_CHOICES)[number]['value'];
+
+/** Lead days as the forms hold them: null when off. */
+export function choiceToLead(choice: ReminderChoice): number | null {
+  return choice === 'off' ? null : Number(choice);
+}
+
+export function leadToChoice(lead: number | null | undefined): ReminderChoice {
+  if (lead === null || lead === undefined) return 'off';
+  const match = REMINDER_CHOICES.find((option) => option.value === String(lead));
+  return match ? match.value : '1';
+}
+
+/** What the reminder for each kind is actually counted from. */
+export const REMINDER_CAPTION: Record<ReminderKind, string> = {
+  bill: 'Before the bill is due',
+  subscription: 'Before it renews',
+  card: "Before this card's payment day",
+  account: 'When your pay lands here',
+};
 
 export function useReminders() {
   const userId = useUserId();
@@ -120,6 +169,49 @@ export function useSetReminder() {
     },
     onSuccess: () => client.invalidateQueries({ queryKey: ['reminders'] }),
   });
+}
+
+/**
+ * The choice already stored for one thing, for a form to open on.
+ *
+ * Returns 'off' for anything with no row, which is the same answer as "never
+ * asked" — the distinction matters to the table and not to the person looking
+ * at a form.
+ */
+export function useReminderChoice(
+  kind: ReminderKind,
+  targetId: string | undefined,
+): ReminderChoice {
+  const reminders = useReminders();
+
+  const row = (reminders.data ?? []).find(
+    (candidate) => targetId && reminderKey(candidate) === targetKey(kind, targetId),
+  );
+
+  return row?.enabled ? leadToChoice(row.lead_days) : 'off';
+}
+
+/**
+ * Sets or clears the reminder for one thing, in a single call.
+ *
+ * What the creation forms need: they hold one choice, and after the row is
+ * saved they say what it should be. Off deletes rather than storing a disabled
+ * row, because a form that was never touched should leave nothing behind.
+ */
+export function useApplyReminder() {
+  const setReminder = useSetReminder();
+  const removeReminder = useRemoveReminder();
+
+  return useCallback(
+    async (kind: ReminderKind, targetId: string, leadDays: number | null) => {
+      if (leadDays === null) {
+        await removeReminder.mutateAsync({ kind, targetId });
+        return;
+      }
+      await setReminder.mutateAsync({ kind, targetId, enabled: true, leadDays });
+    },
+    [setReminder, removeReminder],
+  );
 }
 
 /**

@@ -3,6 +3,12 @@ import { Calendar, Trash2, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
+import {
+  choiceToLead,
+  useApplyReminder,
+  useReminderChoice,
+  type ReminderChoice,
+} from '@/api/reminders';
 import { useSpendCategories } from '@/api/brands';
 import {
   useCreateSubscription,
@@ -17,6 +23,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm } from '@/providers/dialog-provider';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { ReminderField } from '@/components/ui/reminder-field';
 import { SelectField } from '@/components/ui/select-field';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
@@ -120,6 +127,11 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
     ? (categories.find((category) => category.id === service.categoryId)?.label ?? 'Other')
     : null;
 
+  const savedReminder = useReminderChoice('subscription', id);
+  const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
+  const reminder = reminderDraft ?? savedReminder;
+  const applyReminder = useApplyReminder();
+
   const handleSave = async () => {
     setError(null);
 
@@ -150,11 +162,13 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
     };
 
     try {
-      if (editing && id) {
-        await updateSubscription.mutateAsync({ id, values });
-      } else {
-        await createSubscription.mutateAsync(values);
-      }
+      const subscriptionId =
+        editing && id
+          ? (await updateSubscription.mutateAsync({ id, values }), id)
+          : (await createSubscription.mutateAsync(values)).id;
+
+      // After the row exists, because a reminder points at one.
+      await applyReminder('subscription', subscriptionId, choiceToLead(reminder));
       router.back();
     } catch (thrown) {
       setError((thrown as Error).message ?? 'Could not save that subscription.');
@@ -220,6 +234,8 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
             <SourceTiles sources={sources} value={sourceId} onChange={setSourceId} />
           </View>
         ) : null}
+
+        <ReminderField kind="subscription" value={reminder} onChange={setReminderDraft} />
 
         <TextField
           label="Note"

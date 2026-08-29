@@ -6,6 +6,7 @@ import { Pressable, Switch, Text, View } from 'react-native';
 import {
   DEFAULT_LEAD_DAYS,
   LEAD_OPTIONS,
+  REMINDER_CAPTION,
   reminderKey,
   targetKey,
   useReminders,
@@ -14,7 +15,13 @@ import {
   type ReminderKind,
 } from '@/api/reminders';
 import { useArtwork } from '@/theme/artwork';
-import { useBankAccounts, useBills, useCards, useSubscriptions } from '@/api/queries';
+import {
+  useBankAccounts,
+  useBills,
+  useCards,
+  useSalaryAccountIds,
+  useSubscriptions,
+} from '@/api/queries';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -43,6 +50,13 @@ type Item = {
   id: string;
   label: string;
   caption: string;
+  /**
+   * Why this one cannot be reminded about, if it cannot. A card with no
+   * payment day and an account nothing is paid into have no date to count
+   * back from, and a switch that saves a setting nothing can act on is a
+   * promise the app cannot keep.
+   */
+  blocked?: string;
 };
 
 type Group = {
@@ -60,6 +74,7 @@ export default function RemindersScreen() {
   const cards = useCards();
   const accounts = useBankAccounts();
   const reminders = useReminders();
+  const { ids: salaryAccountIds } = useSalaryAccountIds();
 
   const setReminder = useSetReminder();
   const removeReminder = useRemoveReminder();
@@ -116,6 +131,7 @@ export default function RemindersScreen() {
           id: row.id,
           label: row.holder || 'Card',
           caption: row.last4 ? `•••• ${row.last4}` : row.network,
+          blocked: row.bill_due_day ? undefined : 'Add a payment day to this card first',
         })),
       },
       {
@@ -126,13 +142,20 @@ export default function RemindersScreen() {
           id: row.id,
           label: row.nickname || row.bank_name || 'Account',
           caption: row.last4 ? `•••• ${row.last4}` : row.account_type,
+          blocked: salaryAccountIds.has(row.id) ? undefined : 'No pay lands here yet',
         })),
       },
     ],
-    [bills.data, subscriptions.data, cards.data, accounts.data],
+    [bills.data, subscriptions.data, cards.data, accounts.data, salaryAccountIds],
   );
 
   const total = groups.reduce((sum, group) => sum + group.items.length, 0);
+  // Counted over what can actually be switched on. A card with no payment day
+  // is not one of nine things you have declined to be told about.
+  const available = groups.reduce(
+    (sum, group) => sum + group.items.filter((item) => !item.blocked).length,
+    0,
+  );
   const on = (reminders.data ?? []).filter((row) => row.enabled).length;
 
   return (
@@ -143,7 +166,7 @@ export default function RemindersScreen() {
       <Subtitle className="mt-2 w-full text-left">
         {total === 0
           ? 'Once you add a bill, a subscription, a card or an account, it can remind you here.'
-          : `${on} of ${total} things will let you know before they land.`}
+          : `${on} of ${available} will let you know.`}
       </Subtitle>
 
       {loading ? <SkeletonList rows={6} /> : null}
@@ -170,6 +193,16 @@ export default function RemindersScreen() {
                   {group.title}
                 </Text>
               </View>
+
+              {/* What the reminder is counted from. Different for each kind,
+                  and the account one runs the other way — it is about money
+                  arriving rather than leaving. */}
+              <Text
+                className="mt-1 font-poppins text-[13px] text-muted"
+                maxFontSizeMultiplier={1.3}
+              >
+                {REMINDER_CAPTION[group.items[0].kind]}
+              </Text>
 
               <View className="mt-2 w-full">
                 {group.items.map((item) => {
@@ -200,27 +233,36 @@ export default function RemindersScreen() {
                           </Text>
                         </View>
 
-                        <Switch
-                          value={enabled}
-                          onValueChange={(next) => {
-                            toggleFeedback();
-                            setReminder.mutate({
-                              kind: item.kind,
-                              targetId: item.id,
-                              enabled: next,
-                              leadDays,
-                            });
-                          }}
-                          trackColor={{ false: colors.line, true: colors.control }}
-                          thumbColor="#FFFFFF"
-                          ios_backgroundColor={colors.line}
-                        />
+                        {item.blocked ? (
+                          <Text
+                            className="max-w-[45%] text-right font-poppins text-[12px] text-muted"
+                            maxFontSizeMultiplier={1.2}
+                          >
+                            {item.blocked}
+                          </Text>
+                        ) : (
+                          <Switch
+                            value={enabled}
+                            onValueChange={(next) => {
+                              toggleFeedback();
+                              setReminder.mutate({
+                                kind: item.kind,
+                                targetId: item.id,
+                                enabled: next,
+                                leadDays,
+                              });
+                            }}
+                            trackColor={{ false: colors.line, true: colors.control }}
+                            thumbColor="#FFFFFF"
+                            ios_backgroundColor={colors.line}
+                          />
+                        )}
                       </View>
 
                       {/* The lead time only exists once there is something to
                           lead. Showing it on an off reminder asks people to
                           set a detail of a thing that will not happen. */}
-                      {enabled ? (
+                      {enabled && !item.blocked ? (
                         <View className="mt-3 w-full flex-row flex-wrap items-center gap-2">
                           {LEAD_OPTIONS.map((option) => {
                             const selected = option.value === leadDays;
