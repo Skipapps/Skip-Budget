@@ -15,9 +15,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { useRegisterPush } from '@/api/push';
 import { AppLockGate } from '@/components/app-lock-gate';
 import { DialogProvider } from '@/providers/dialog-provider';
 import { QueryProvider } from '@/providers/query-provider';
+import { RealtimeProvider } from '@/providers/realtime-provider';
 import { PreferencesProvider } from '@/providers/preferences-provider';
 import { SessionProvider, useSession } from '@/providers/session-provider';
 import { ThemeProvider, useColors, useTheme } from '@/providers/theme-provider';
@@ -70,17 +72,21 @@ function AppShell({ fontsReady }: { fontsReady: boolean }) {
       <SafeAreaProvider>
         <QueryProvider>
           <SessionProvider>
-            {/* Inside the session so a dialog can outlive a screen, outside
-                the navigator so it draws above every route and modal. */}
-            <DialogProvider>
-              {/* Inside the session, so signing out cannot strand somebody
+            {/* Inside the session because it subscribes per user, and above
+                the navigator so one socket serves every screen. */}
+            <RealtimeProvider>
+              {/* Inside the session so a dialog can outlive a screen, outside
+                  the navigator so it draws above every route and modal. */}
+              <DialogProvider>
+                {/* Inside the session, so signing out cannot strand somebody
                   behind a lock, and above the navigator so no route renders
                   underneath it. */}
-              <AppLockGate>
-                <RootNavigator />
-              </AppLockGate>
-              <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-            </DialogProvider>
+                <AppLockGate>
+                  <RootNavigator />
+                </AppLockGate>
+                <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+              </DialogProvider>
+            </RealtimeProvider>
           </SessionProvider>
         </QueryProvider>
       </SafeAreaProvider>
@@ -91,6 +97,11 @@ function AppShell({ fontsReady }: { fontsReady: boolean }) {
 function RootNavigator() {
   const { ready } = useSession();
   const colors = useColors();
+
+  // Inside the session, because a token is stored against a user. Re-runs on
+  // every launch: iOS rotates tokens on restore and reinstall, and a stale one
+  // fails silently forever.
+  useRegisterPush();
 
   // Render nothing until the stored session has been read, or the first frame
   // would route a signed-in user through onboarding.
