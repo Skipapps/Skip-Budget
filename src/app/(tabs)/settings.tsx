@@ -18,6 +18,7 @@ import {
   ScrollText,
   Shield,
   Trash2,
+  UserRound,
   Vibrate,
 } from 'lucide-react-native';
 import { useState } from 'react';
@@ -26,12 +27,14 @@ import { Pressable, Text, View } from 'react-native';
 import { deleteAccount, signOut } from '@/api/auth';
 import { authenticate, lockCapability, unavailableMessage } from '@/lib/app-lock';
 import { useUpdateProfile } from '@/api/mutations';
+import { ProfileAvatar } from '@/components/ui/profile-avatar';
 import { SettingsRow } from '@/components/settings/settings-row';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm, useDialog } from '@/providers/dialog-provider';
 import { usePreferences } from '@/providers/preferences-provider';
 import { useTheme, useColors } from '@/providers/theme-provider';
+import { findAvatar } from '@/theme/avatars';
 import { ACCENTS, MODES } from '@/theme/palette';
 import { TextField } from '@/components/ui/text-field';
 import { Title } from '@/components/ui/typography';
@@ -176,7 +179,19 @@ export default function SettingsScreen() {
       <Title className="mt-2">Settings</Title>
 
       <SettingsSection title="Profile">
-        <View className="mt-1 w-full">
+        {/* Above the name, in the order the dashboard shows them. */}
+        <SettingsRow
+          icon={UserRound}
+          artwork={<ProfileAvatar avatarId={profile.data?.avatar_id} size={34} />}
+          title="Profile picture"
+          subtitle={
+            findAvatar(profile.data?.avatar_id)?.label ?? 'Pick one to show on your dashboard'
+          }
+          onPress={() => router.push('/avatar')}
+          last
+        />
+
+        <View className="mt-4 w-full">
           <TextField
             label="Display name"
             value={displayName}

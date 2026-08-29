@@ -109,13 +109,18 @@ function useOwnerQuery<T>(key: string, run: () => Promise<T>) {
   });
 }
 
-export type ProfileRow = { id: string; display_name: string | null; currency: string };
+export type ProfileRow = {
+  id: string;
+  display_name: string | null;
+  currency: string;
+  avatar_id: string | null;
+};
 
 export function useProfile() {
   return useOwnerQuery<ProfileRow | null>('profile', async () => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, display_name, currency')
+      .select('id, display_name, currency, avatar_id')
       .maybeSingle();
     if (error) throw error;
     return data;

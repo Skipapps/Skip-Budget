@@ -133,6 +133,8 @@ export default function HomeScreen() {
       <View className="mt-2 w-full">
         <DashboardHeader
           name={profile.data?.display_name ?? 'Welcome'}
+          avatarId={profile.data?.avatar_id}
+          onAvatarPress={() => router.push('/avatar')}
           onNotificationsPress={() => router.push('/notifications')}
         />
       </View>

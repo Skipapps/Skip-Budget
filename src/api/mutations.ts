@@ -114,7 +114,11 @@ export type CardValues = {
 };
 
 /** The only editable thing on a profile today; currency is fixed to USD. */
-export type ProfileValues = { display_name: string | null };
+export type ProfileValues = {
+  display_name?: string | null;
+  /** Which bundled avatar was chosen; null for none. See theme/avatars.ts. */
+  avatar_id?: string | null;
+};
 
 /**
  * Profiles are keyed by the signed-in user rather than by a row id, so this

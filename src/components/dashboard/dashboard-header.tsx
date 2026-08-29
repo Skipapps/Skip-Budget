@@ -1,10 +1,13 @@
-import { Bell, Camera } from 'lucide-react-native';
+import { Bell } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
+import { ProfileAvatar } from '@/components/ui/profile-avatar';
 import { useColors } from '@/providers/theme-provider';
 
 type DashboardHeaderProps = {
   name: string;
+  /** Which bundled avatar was chosen; null shows the empty slot. */
+  avatarId?: string | null;
   onAvatarPress?: () => void;
   onNotificationsPress?: () => void;
 };
@@ -12,6 +15,7 @@ type DashboardHeaderProps = {
 /** Avatar, account name, and the way through to what the app has been doing. */
 export function DashboardHeader({
   name,
+  avatarId,
   onAvatarPress,
   onNotificationsPress,
 }: DashboardHeaderProps) {
@@ -21,11 +25,11 @@ export function DashboardHeader({
       <View className="flex-1 flex-row items-center gap-3">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Change profile photo"
+          accessibilityLabel={avatarId ? 'Change your profile picture' : 'Add a profile picture'}
           onPress={onAvatarPress}
-          className="h-12 w-12 items-center justify-center rounded-full border border-line active:opacity-70"
+          className="rounded-full active:opacity-70"
         >
-          <Camera size={20} color={colors.muted} strokeWidth={1.8} />
+          <ProfileAvatar avatarId={avatarId} size={48} />
         </Pressable>
         <Text
           className="flex-1 font-poppins-semibold text-[20px] text-ink"
