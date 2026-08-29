@@ -24,6 +24,9 @@ const COLUMN: Record<ReminderKind, string> = {
   account: 'bank_account_id',
 };
 
+/** The constraint the upsert resolves against. Must list every target column. */
+const CONFLICT_TARGET = 'bill_id,subscription_id,card_id,bank_account_id';
+
 export type ReminderRow = {
   id: string;
   bill_id: string | null;
@@ -98,14 +101,20 @@ export function useSetReminder() {
     mutationFn: async ({ kind, targetId, enabled, leadDays }: SetReminderInput) => {
       if (!userId) throw new Error('Sign in first.');
 
+      // All four columns, three of them null, because the constraint spans all
+      // four — naming only the one that is set gives ON CONFLICT nothing it can
+      // infer, which is a planning error rather than a failed row.
       const { error } = await supabase.from('reminders').upsert(
         {
           user_id: userId,
-          [COLUMN[kind]]: targetId,
+          bill_id: kind === 'bill' ? targetId : null,
+          subscription_id: kind === 'subscription' ? targetId : null,
+          card_id: kind === 'card' ? targetId : null,
+          bank_account_id: kind === 'account' ? targetId : null,
           enabled,
           lead_days: leadDays,
         } as never,
-        { onConflict: COLUMN[kind] },
+        { onConflict: CONFLICT_TARGET },
       );
       if (error) throw error;
     },
