@@ -1,4 +1,4 @@
-import { Camera, Scan } from 'lucide-react-native';
+import { Bell, Camera } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { colors } from '@/theme/colors';
@@ -6,11 +6,15 @@ import { colors } from '@/theme/colors';
 type DashboardHeaderProps = {
   name: string;
   onAvatarPress?: () => void;
-  onScanPress?: () => void;
+  onNotificationsPress?: () => void;
 };
 
-/** Avatar, account name, and the scan shortcut. */
-export function DashboardHeader({ name, onAvatarPress, onScanPress }: DashboardHeaderProps) {
+/** Avatar, account name, and the way through to what the app has been doing. */
+export function DashboardHeader({
+  name,
+  onAvatarPress,
+  onNotificationsPress,
+}: DashboardHeaderProps) {
   return (
     <View className="w-full flex-row items-center justify-between">
       <View className="flex-1 flex-row items-center gap-3">
@@ -33,11 +37,11 @@ export function DashboardHeader({ name, onAvatarPress, onScanPress }: DashboardH
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Scan a receipt"
-        onPress={onScanPress}
+        accessibilityLabel="Notifications"
+        onPress={onNotificationsPress}
         className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-black/5"
       >
-        <Scan size={22} color={colors.ink} strokeWidth={1.8} />
+        <Bell size={22} color={colors.ink} strokeWidth={1.8} />
       </Pressable>
     </View>
   );

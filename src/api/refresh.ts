@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
+import { recordDueCharges } from '@/api/charges';
 import { nextOccurrenceFrom } from '@/lib/card-ledger';
 import { settleWithin } from '@/lib/deadline';
 import { toIsoDate } from '@/lib/date';
@@ -112,10 +113,23 @@ export async function rollSchedulesForward(today: string): Promise<number> {
  */
 const SPINNER_TIMEOUT_MS = 6_000;
 
-/** Advances stale dates, then re-reads only what could have moved. */
-async function sweep(client: ReturnType<typeof useQueryClient>): Promise<void> {
-  const moved = await rollSchedulesForward(toIsoDate(new Date()));
+/**
+ * Brings the books up to date, then re-reads whatever moved.
+ *
+ * Recording comes first and rolling second. Charges are worked out from the
+ * stored anchor, and rolling it forward is what marks an occurrence as dealt
+ * with — doing that before writing the charge would step over the very date
+ * being recorded.
+ */
+async function sweep(client: ReturnType<typeof useQueryClient>, userId: string): Promise<void> {
+  const today = toIsoDate(new Date());
+
+  const recorded = await recordDueCharges(userId, today);
+  if (recorded > 0) client.invalidateQueries({ queryKey: ['charges'] });
+
+  const moved = await rollSchedulesForward(today);
   if (moved === 0) return;
+
   client.invalidateQueries({ queryKey: ['bills'] });
   client.invalidateQueries({ queryKey: ['subscriptions'] });
   client.invalidateQueries({ queryKey: ['dashboard'] });
@@ -141,7 +155,7 @@ export function useRefreshAll() {
       // needs its own round trips, and making the pull wait on them is the
       // difference between a refresh that feels instant and one that does not.
       // It re-reads what it moved on its own.
-      void sweep(client);
+      void sweep(client, userId);
       await settleWithin(client.invalidateQueries(), SPINNER_TIMEOUT_MS);
     } finally {
       setRefreshing(false);
@@ -178,7 +192,7 @@ export function useKeepSchedulesCurrent() {
       const now = Date.now();
       if (now - lastSweep.current < SWEEP_INTERVAL_MS) return;
       lastSweep.current = now;
-      void sweep(client);
+      void sweep(client, userId);
     };
 
     maybeSweep();

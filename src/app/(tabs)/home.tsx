@@ -114,9 +114,18 @@ export default function HomeScreen() {
   };
 
   return (
-    <Screen floating={<AddButton />} onRefresh={refresh} refreshing={refreshing}>
+    <Screen
+      // The quickest thing anyone does in a budget app is note what they just
+      // bought, so the button that is always on screen goes straight there.
+      floating={<AddButton onPress={() => router.push('/add-receipt')} />}
+      onRefresh={refresh}
+      refreshing={refreshing}
+    >
       <View className="mt-2 w-full">
-        <DashboardHeader name={profile.data?.display_name ?? 'Welcome'} />
+        <DashboardHeader
+          name={profile.data?.display_name ?? 'Welcome'}
+          onNotificationsPress={() => router.push('/notifications')}
+        />
       </View>
 
       <View className="mt-6 w-full">
@@ -192,17 +201,9 @@ export default function HomeScreen() {
         />
       </View>
 
-      {/* The stretch the day above stands for, spelled out — otherwise a date
-          on its own gives no clue that a week hangs off it. */}
-      <Text
-        className="mt-2 w-full text-center font-poppins text-[13px] text-muted"
-        maxFontSizeMultiplier={1.3}
-      >
-        {formatDateRange(recentFrom, selectedDate)}
-      </Text>
-
       <Section
         title="Recent"
+        range={formatDateRange(recentFrom, selectedDate)}
         entries={recent.entries}
         empty="Nothing in this week."
         loading={recent.isLoading}
@@ -213,6 +214,7 @@ export default function HomeScreen() {
       <View className="w-full pb-24">
         <Section
           title="Coming up"
+          range={formatDateRange(addDays(selectedDate, 1), addDays(selectedDate, 7))}
           entries={upcoming.entries}
           empty="Nothing due in the week ahead."
           loading={upcoming.isLoading}
@@ -234,6 +236,8 @@ export default function HomeScreen() {
 
 type SectionProps = {
   title: string;
+  /** The week this heading covers, which moves with the chosen day. */
+  range: string;
   entries: LedgerEntry[];
   empty: string;
   loading: boolean;
@@ -249,7 +253,7 @@ type SectionProps = {
  * weeks, so they are the same component — anything that made one read
  * differently from the other would be an accident rather than a decision.
  */
-function Section({ title, entries, empty, loading, today, direction }: SectionProps) {
+function Section({ title, range, entries, empty, loading, today, direction }: SectionProps) {
   const groups = groupByDate(entries, (entry) => entry.date, {
     amountOf: (entry) => entry.amount,
     direction,
@@ -257,9 +261,20 @@ function Section({ title, entries, empty, loading, today, direction }: SectionPr
 
   return (
     <View className="mt-7 w-full">
-      <Text className="font-poppins-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
-        {title}
-      </Text>
+      {/* Each heading carries its own dates: two weeks are on screen at once,
+          and a single caption above them could only ever describe one. */}
+      <View className="w-full flex-row items-baseline justify-between gap-3">
+        <Text className="font-poppins-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
+          {title}
+        </Text>
+        <Text
+          className="font-poppins text-[13px] text-muted"
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.2}
+        >
+          {range}
+        </Text>
+      </View>
 
       {loading || entries.length === 0 ? (
         <Text
