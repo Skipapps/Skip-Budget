@@ -10,11 +10,13 @@ import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { InsightBanner } from '@/components/dashboard/insight-banner';
 import { DateSelector } from '@/components/dashboard/date-selector';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
+import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
 import { useLedger, useProfile, type LedgerEntry } from '@/api/queries';
 import { useKeepSchedulesCurrent, useRefreshAll } from '@/api/refresh';
 import { spendingCategories } from '@/data/dashboard-mock';
+import { groupByDate } from '@/lib/group';
 import { rangeFor } from '@/lib/range';
 import { addDays, formatDateRange, formatDayLabel, toIsoDate } from '@/lib/date';
 
@@ -204,6 +206,8 @@ export default function HomeScreen() {
         entries={recent.entries}
         empty="Nothing in this week."
         loading={recent.isLoading}
+        today={toIsoDate(todayDate)}
+        direction="desc"
       />
 
       <View className="w-full pb-24">
@@ -212,6 +216,8 @@ export default function HomeScreen() {
           entries={upcoming.entries}
           empty="Nothing due in the week ahead."
           loading={upcoming.isLoading}
+          today={toIsoDate(todayDate)}
+          direction="asc"
         />
       </View>
 
@@ -231,6 +237,9 @@ type SectionProps = {
   entries: LedgerEntry[];
   empty: string;
   loading: boolean;
+  today: string;
+  /** Recent counts back from the chosen day; Coming up counts forward. */
+  direction: 'asc' | 'desc';
 };
 
 /**
@@ -240,7 +249,12 @@ type SectionProps = {
  * weeks, so they are the same component — anything that made one read
  * differently from the other would be an accident rather than a decision.
  */
-function Section({ title, entries, empty, loading }: SectionProps) {
+function Section({ title, entries, empty, loading, today, direction }: SectionProps) {
+  const groups = groupByDate(entries, (entry) => entry.date, {
+    amountOf: (entry) => entry.amount,
+    direction,
+  });
+
   return (
     <View className="mt-7 w-full">
       <Text className="font-poppins-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
@@ -256,19 +270,24 @@ function Section({ title, entries, empty, loading }: SectionProps) {
         </Text>
       ) : (
         <View className="mt-1 w-full">
-          {entries.map((entry, index) => (
-            <Fragment key={entry.id}>
-              {index > 0 ? <View className="ml-13 h-px bg-line/60" /> : null}
-              <TransactionRow
-                label={entry.label}
-                amount={entry.amount}
-                kindLabel={KIND_LABELS[entry.kind]}
-                domain={entry.domain}
-                kind={entry.kind}
-                categoryId={entry.categoryId}
-                iconId={entry.iconId}
-              />
-            </Fragment>
+          {groups.map((group) => (
+            <View key={group.date || 'undated'} className="w-full">
+              <DateGroupHeader date={group.date} today={today} total={group.total} />
+              {group.items.map((entry, index) => (
+                <Fragment key={entry.id}>
+                  {index > 0 ? <View className="ml-13 h-px bg-line/60" /> : null}
+                  <TransactionRow
+                    label={entry.label}
+                    amount={entry.amount}
+                    kindLabel={KIND_LABELS[entry.kind]}
+                    domain={entry.domain}
+                    kind={entry.kind}
+                    categoryId={entry.categoryId}
+                    iconId={entry.iconId}
+                  />
+                </Fragment>
+              ))}
+            </View>
           ))}
         </View>
       )}
