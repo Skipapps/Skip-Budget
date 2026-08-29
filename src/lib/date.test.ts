@@ -1,4 +1,10 @@
-import { daysLeftInMonth, getDaysInMonth, getNextPayday, toIsoDate } from '@/lib/date';
+import {
+  daysLeftInMonth,
+  formatDateRange,
+  getDaysInMonth,
+  getNextPayday,
+  toIsoDate,
+} from '@/lib/date';
 
 /** Local-time construction, matching how the app builds dates from a picker. */
 const on = (year: number, month: number, day: number) => new Date(year, month - 1, day);
@@ -55,5 +61,23 @@ describe('getNextPayday', () => {
   it('always lands in the future, however stale the last one', () => {
     const next = getNextPayday(on(2020, 1, 15), 'monthly');
     expect(next.getTime()).toBeGreaterThan(Date.now());
+  });
+});
+
+describe('formatDateRange', () => {
+  it('names the month once when both ends share it', () => {
+    expect(formatDateRange(on(2026, 8, 22), on(2026, 8, 28))).toBe('22 – 28 Aug 2026');
+  });
+
+  it('names both months when the span crosses one', () => {
+    expect(formatDateRange(on(2026, 8, 29), on(2026, 9, 4))).toBe('29 Aug – 4 Sep 2026');
+  });
+
+  it('spells both ends out when the span crosses a year', () => {
+    expect(formatDateRange(on(2026, 12, 28), on(2027, 1, 3))).toBe('28 Dec 2026 – 3 Jan 2027');
+  });
+
+  it('handles a single day at both ends', () => {
+    expect(formatDateRange(on(2026, 8, 28), on(2026, 8, 28))).toBe('28 – 28 Aug 2026');
   });
 });

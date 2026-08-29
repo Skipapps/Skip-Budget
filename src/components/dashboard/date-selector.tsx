@@ -9,10 +9,25 @@ type DateSelectorProps = {
   onPrevious?: () => void;
   onNext?: () => void;
   onPickDate?: () => void;
+  /**
+   * Stops the stepper going past today.
+   *
+   * The dashboard looks back over a week that has happened, so there is no
+   * day after today to step onto — the week ahead is already on screen under
+   * its own heading.
+   */
+  atLatest?: boolean;
 };
 
 /** Day stepper for the transaction list below it. */
-export function DateSelector({ weekday, date, onPrevious, onNext, onPickDate }: DateSelectorProps) {
+export function DateSelector({
+  weekday,
+  date,
+  onPrevious,
+  onNext,
+  onPickDate,
+  atLatest = false,
+}: DateSelectorProps) {
   return (
     <View className="w-full flex-row items-center justify-between rounded-[10px] border border-line px-1.5 py-2">
       <Pressable
@@ -44,8 +59,14 @@ export function DateSelector({ weekday, date, onPrevious, onNext, onPickDate }: 
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Next day"
+        accessibilityState={{ disabled: atLatest }}
+        disabled={atLatest}
         onPress={onNext}
-        className="h-10 w-10 items-center justify-center rounded-[8px] active:bg-black/5"
+        className={
+          atLatest
+            ? 'h-10 w-10 items-center justify-center rounded-[8px] opacity-30'
+            : 'h-10 w-10 items-center justify-center rounded-[8px] active:bg-black/5'
+        }
       >
         <ChevronRight size={20} color={colors.ink} strokeWidth={2} />
       </Pressable>

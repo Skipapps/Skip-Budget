@@ -12,13 +12,11 @@ import { DateSelector } from '@/components/dashboard/date-selector';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
-import { useLedger, useProfile } from '@/api/queries';
+import { useLedger, useProfile, type LedgerEntry } from '@/api/queries';
 import { useKeepSchedulesCurrent, useRefreshAll } from '@/api/refresh';
-import { ChoiceChips } from '@/components/ui/choice-chips';
-import { LedgerSummary } from '@/components/transactions/ledger-summary';
 import { spendingCategories } from '@/data/dashboard-mock';
-import { RANGES, rangeFor, type RangeKey } from '@/lib/range';
-import { addDays, formatDayLabel } from '@/lib/date';
+import { rangeFor } from '@/lib/range';
+import { addDays, formatDateRange, formatDayLabel, toIsoDate } from '@/lib/date';
 
 // The gutter Screen applies. The category carousel cancels it so the cards
 // bleed to both edges and the last one peeks, signalling that the row scrolls.
@@ -76,20 +74,40 @@ export default function HomeScreen() {
   // Today, not a hardcoded date: the dashboard opens on the day you are in.
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [pickerOpen, setPickerOpen] = useState(false);
-  // Today by default, so opening the app answers "what is happening now"
-  // rather than handing over a year of rows to scroll.
-  const [rangeKey, setRangeKey] = useState<RangeKey>('today');
 
-  const range = useMemo(() => rangeFor(rangeKey, selectedDate), [rangeKey, selectedDate]);
-  const { entries: ledger, totals } = useLedger(range);
+  const todayDate = useMemo(() => new Date(), []);
+  const atLatest = toIsoDate(selectedDate) >= toIsoDate(todayDate);
+
+  /**
+   * A week behind the chosen day, and the week in front of it.
+   *
+   * Both are seven days measured from the same point, so stepping the date
+   * back a day slides both windows together — you are always looking at one
+   * week of what happened and the week that followed it.
+   */
+  const recentFrom = useMemo(() => addDays(selectedDate, -6), [selectedDate]);
+  const recent = useLedger(
+    useMemo(
+      () => ({ from: toIsoDate(recentFrom), to: toIsoDate(selectedDate) }),
+      [recentFrom, selectedDate],
+    ),
+  );
+  const upcoming = useLedger(
+    useMemo(
+      () => ({
+        from: toIsoDate(addDays(selectedDate, 1)),
+        to: toIsoDate(addDays(selectedDate, 7)),
+      }),
+      [selectedDate],
+    ),
+  );
 
   const { weekday, date } = formatDayLabel(selectedDate);
 
-  // The window's entries, from the same ledger the transactions tab reads.
-  const dayEntries = ledger;
-
   const handleConfirmDate = (date: Date) => {
-    setSelectedDate(date);
+    // Forward is not a direction here: the week ahead already has its own
+    // heading, so picking a future day would only duplicate it.
+    setSelectedDate(date > todayDate ? todayDate : date);
     setPickerOpen(false);
   };
 
@@ -168,29 +186,77 @@ export default function HomeScreen() {
           onPrevious={() => setSelectedDate((current) => addDays(current, -1))}
           onNext={() => setSelectedDate((current) => addDays(current, 1))}
           onPickDate={() => setPickerOpen(true)}
+          atLatest={atLatest}
         />
       </View>
 
-      {/* The window sits directly under the date, because the date is what it
-          is measured from — a week means the week containing that day. */}
-      <View className="mt-4 w-full">
-        <ChoiceChips options={RANGES} value={rangeKey} onChange={setRangeKey} />
+      {/* The stretch the day above stands for, spelled out — otherwise a date
+          on its own gives no clue that a week hangs off it. */}
+      <Text
+        className="mt-2 w-full text-center font-poppins text-[13px] text-muted"
+        maxFontSizeMultiplier={1.3}
+      >
+        {formatDateRange(recentFrom, selectedDate)}
+      </Text>
+
+      <Section
+        title="Recent"
+        entries={recent.entries}
+        empty="Nothing in this week."
+        loading={recent.isLoading}
+      />
+
+      <View className="w-full pb-24">
+        <Section
+          title="Coming up"
+          entries={upcoming.entries}
+          empty="Nothing due in the week ahead."
+          loading={upcoming.isLoading}
+        />
       </View>
 
-      <View className="mt-4 w-full">
-        <LedgerSummary totals={totals} />
-      </View>
+      {pickerOpen ? (
+        <DatePicker
+          value={selectedDate}
+          onCancel={() => setPickerOpen(false)}
+          onConfirm={handleConfirmDate}
+        />
+      ) : null}
+    </Screen>
+  );
+}
 
-      <View className="mt-1 w-full pb-24">
-        {dayEntries.length === 0 ? (
-          <Text
-            className="w-full py-8 text-center font-poppins text-[14px] text-muted"
-            maxFontSizeMultiplier={1.4}
-          >
-            {rangeKey === 'today' ? 'Nothing on this day.' : 'Nothing in this window.'}
-          </Text>
-        ) : (
-          dayEntries.map((entry, index) => (
+type SectionProps = {
+  title: string;
+  entries: LedgerEntry[];
+  empty: string;
+  loading: boolean;
+};
+
+/**
+ * One headed run of transactions.
+ *
+ * Recent and Coming up are the same list of the same rows over two different
+ * weeks, so they are the same component — anything that made one read
+ * differently from the other would be an accident rather than a decision.
+ */
+function Section({ title, entries, empty, loading }: SectionProps) {
+  return (
+    <View className="mt-7 w-full">
+      <Text className="font-poppins-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
+        {title}
+      </Text>
+
+      {loading || entries.length === 0 ? (
+        <Text
+          className="w-full py-6 text-center font-poppins text-[14px] text-muted"
+          maxFontSizeMultiplier={1.4}
+        >
+          {loading ? 'Loading' : empty}
+        </Text>
+      ) : (
+        <View className="mt-1 w-full">
+          {entries.map((entry, index) => (
             <Fragment key={entry.id}>
               {index > 0 ? <View className="ml-13 h-px bg-line/60" /> : null}
               <TransactionRow
@@ -203,17 +269,9 @@ export default function HomeScreen() {
                 iconId={entry.iconId}
               />
             </Fragment>
-          ))
-        )}
-      </View>
-
-      {pickerOpen ? (
-        <DatePicker
-          value={selectedDate}
-          onCancel={() => setPickerOpen(false)}
-          onConfirm={handleConfirmDate}
-        />
-      ) : null}
-    </Screen>
+          ))}
+        </View>
+      )}
+    </View>
   );
 }

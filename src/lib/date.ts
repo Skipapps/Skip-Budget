@@ -199,3 +199,27 @@ export function formatRelativeDay(iso: string, today: string): string {
 export function daysLeftInMonth(today: Date): number {
   return getDaysInMonth(today.getFullYear(), today.getMonth()) - today.getDate();
 }
+
+/**
+ * A span of days, said the way a person would.
+ *
+ * Collapses whatever the two ends share: inside one month only the day
+ * changes, inside one year only the month follows it. "22 – 28 Aug 2026"
+ * rather than "22 Aug 2026 – 28 Aug 2026", which is the same fact printed
+ * twice and reads as two dates rather than one stretch.
+ */
+export function formatDateRange(from: Date, to: Date): string {
+  const sameYear = from.getFullYear() === to.getFullYear();
+  const sameMonth = sameYear && from.getMonth() === to.getMonth();
+
+  if (sameMonth) {
+    return `${from.getDate()} – ${to.getDate()} ${MONTHS_SHORT[to.getMonth()]} ${to.getFullYear()}`;
+  }
+  if (sameYear) {
+    return (
+      `${from.getDate()} ${MONTHS_SHORT[from.getMonth()]} – ` +
+      `${to.getDate()} ${MONTHS_SHORT[to.getMonth()]} ${to.getFullYear()}`
+    );
+  }
+  return `${formatFullDate(from)} – ${formatFullDate(to)}`;
+}
