@@ -90,7 +90,11 @@ export function AmountTile({
           className,
         )}
       >
-        <View className="h-[84px] w-[84px]">
+        {/* Held back on purpose. The drawings are solid black on white and
+            solid white on near-black, which at full strength out-shouts the
+            figure underneath — and the figure is what the tile is for. Softened
+            they still say which tile this is at a glance without competing. */}
+        <View className="h-[84px] w-[84px] opacity-55">
           <Artwork width="100%" height="100%" />
         </View>
 

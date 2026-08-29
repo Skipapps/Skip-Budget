@@ -37,7 +37,9 @@ export function InsightBanner({ onPress }: InsightBannerProps) {
         onPress ? 'active:opacity-80' : ''
       }`}
     >
-      <View className="h-[76px] w-[76px] shrink-0">
+      {/* Same restraint as the tiles above it. Left at full strength this
+          would become the loudest thing on the dashboard by default. */}
+      <View className="h-[76px] w-[76px] shrink-0 opacity-55">
         <artwork.insights width="100%" height="100%" />
       </View>
 
