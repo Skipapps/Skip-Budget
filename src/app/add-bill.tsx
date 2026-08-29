@@ -12,6 +12,7 @@ import {
 import { useCreateBill, useDeleteBill, useUpdateBill, type BillValues } from '@/api/mutations';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { ScheduleCard } from '@/components/calculators/schedule-card';
+import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { CategoryPicker } from '@/components/bills/category-picker';
 import { IconPicker } from '@/components/bills/icon-picker';
 import { AmountPad } from '@/components/ui/amount-pad';
@@ -47,6 +48,25 @@ const PERIOD = 'period';
 const RECURRENCE_CHOICES = [...RECURRENCES, { value: PERIOD, label: 'Specific period' }] as const;
 
 type RecurrenceChoice = Recurrence | typeof PERIOD;
+
+/**
+ * What to search for, in the words of the category already chosen.
+ *
+ * A blank "search for a company" leaves people guessing whether their electric
+ * utility counts. Naming three real ones answers that before it is asked.
+ */
+const ISSUER_HINT: Record<string, string> = {
+  housing: 'Letting agent or management company',
+  energy: 'AEP, Duke Energy, National Grid',
+  water: 'Your water company',
+  internet: 'Xfinity, Spectrum, Verizon',
+  mobile: 'T-Mobile, AT&T, Verizon',
+  insurance: 'Geico, State Farm, Progressive',
+  loans: 'Chase, Discover, SoFi',
+  transport: 'Transit, tolls or parking',
+  family: 'Nursery, school or clinic',
+  other: 'Search for a company',
+};
 
 type Step = 'category' | 'details';
 
@@ -86,6 +106,20 @@ function BillForm({
   const [step, setStep] = useState<Step>(editing ? 'details' : 'category');
 
   const [categoryId, setCategoryId] = useState<string>(existing?.category_id ?? '');
+  // Who issues the bill. Optional, and stays that way: a large share of bills
+  // — rent, HOA fees, a loan from a relative — have no company behind them.
+  const [issuer, setIssuer] = useState<BrandSelection | null>(
+    existing?.brand_id
+      ? {
+          brandId: existing.brand_id,
+          name: existing.name,
+          domain: existing.brands?.domain ?? null,
+          // Bills carry their own category vocabulary, chosen a step earlier.
+          // The brand is never allowed to answer that question.
+          categoryId: existing.category_id,
+        }
+      : null,
+  );
   const [name, setName] = useState(existing?.name ?? '');
   const [iconId, setIconId] = useState(existing?.icon_id ?? 'other');
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
@@ -106,6 +140,26 @@ function BillForm({
 
   // Only a self-named bill needs its own icon; the rest inherit the category's.
   const isCustom = categoryId === 'other';
+
+  /**
+   * Picking a company names the bill, unless it has been given a real name.
+   *
+   * "Not named yet" is broader than "empty", because choosing a category
+   * already fills the field with its label — so a bill sitting on the default
+   * "Mobile Phone" has been named by the app, not by the person, and T-Mobile
+   * is the better answer. Anything they typed themselves is left alone, as is
+   * "Flat — electric".
+   */
+  const categoryLabel = BILL_CATEGORIES.find((option) => option.id === categoryId)?.label ?? '';
+
+  const handleIssuer = (next: BrandSelection | null) => {
+    setIssuer(next);
+    if (!next) return;
+
+    const current = name.trim();
+    const untouched = !current || current === categoryLabel || current === issuer?.name;
+    if (untouched) setName(next.name);
+  };
   // The date range is only meaningful for a bill that runs between two dates.
   const hasPeriod = recurrence === PERIOD;
 
@@ -197,6 +251,7 @@ function BillForm({
       const values: BillValues = {
         name: name.trim(),
         amount: value,
+        brand_id: issuer?.brandId ?? null,
         category_id: categoryId,
         icon_id: iconId || null,
         recurrence: isPeriod
@@ -253,6 +308,16 @@ function BillForm({
       <Title className="mt-1">Bill details</Title>
 
       <View className="mt-7 w-full gap-5">
+        {/* Above the name, because it is the question people can answer
+            first: the company is what they recognise, the name is what they
+            want to call it. */}
+        <BrandField
+          label="Company"
+          value={issuer}
+          onChange={handleIssuer}
+          placeholder={ISSUER_HINT[categoryId] ?? ISSUER_HINT.other}
+        />
+
         <TextField
           label="Name"
           value={name}
@@ -261,7 +326,9 @@ function BillForm({
           returnKeyType="done"
         />
 
-        {isCustom ? (
+        {/* The icon is only ever seen when there is no logo to show instead,
+            so offering it beside one is a control that changes nothing. */}
+        {isCustom && !issuer ? (
           <View className="w-full">
             <FieldLabel className="mb-2">Icon</FieldLabel>
             <IconPicker value={iconId} onChange={setIconId} />

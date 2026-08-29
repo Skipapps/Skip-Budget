@@ -57,6 +57,7 @@ export default function BillPlansScreen() {
         // Next due, not this month's date: this page is the schedule itself,
         // and what it has to answer is "when does this land again".
         dueDate: row.next_due_on ?? '',
+        domain: row.brands?.domain ?? null,
         recurrence: row.recurrence,
         categoryId: row.category_id,
         iconId: row.icon_id ?? undefined,

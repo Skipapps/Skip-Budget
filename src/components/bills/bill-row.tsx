@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { BrandLogo } from '@/components/brands/brand-logo';
 import { RECURRENCES, getBillIcon, type Bill } from '@/data/bills-mock';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
@@ -24,6 +25,7 @@ export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
   // defining one, but assigning it to a capitalised local trips the lint rule.
   const icon = createElement(getBillIcon(bill), { width: 22, height: 22, color: colors.body });
   const recurrence = RECURRENCE_LABELS[bill.recurrence] ?? bill.recurrence;
+  const domain = bill.domain;
 
   return (
     <Pressable
@@ -32,7 +34,15 @@ export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
       onPress={onPress}
       className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
     >
-      <View className="h-11 w-11 items-center justify-center rounded-[10px] bg-ink/5">{icon}</View>
+      {/* The issuer's logo when there is one — AEP and T-Mobile are what the
+          eye finds in this list — and the category icon when there is not. */}
+      {domain ? (
+        <BrandLogo name={bill.name} domain={domain} size={44} />
+      ) : (
+        <View className="h-11 w-11 items-center justify-center rounded-[10px] bg-ink/5">
+          {icon}
+        </View>
+      )}
 
       <View className="min-w-0 flex-1">
         <Text

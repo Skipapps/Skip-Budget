@@ -47,7 +47,7 @@ export function TransactionRow({
       className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
     >
       {kind === 'bill' ? (
-        <BillMark categoryId={categoryId} iconId={iconId} size={40} />
+        <BillMark categoryId={categoryId} iconId={iconId} domain={domain} name={label} size={40} />
       ) : kind === 'payment' || kind === 'income' ? (
         // Neither is a purchase from anyone, so neither has a logo. A monogram
         // of the word "Payment" reads as a logo that failed to load; an arrow

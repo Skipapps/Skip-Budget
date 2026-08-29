@@ -39,7 +39,13 @@ export function LedgerRow({ entry, sourceLabel, kindLabel, onPress }: LedgerRowP
           <ArrowDownLeft size={18} color={colors.body} strokeWidth={1.8} />
         </View>
       ) : isBill ? (
-        <BillMark categoryId={entry.categoryId} iconId={entry.iconId} size={40} />
+        <BillMark
+          categoryId={entry.categoryId}
+          iconId={entry.iconId}
+          domain={entry.domain}
+          name={entry.label}
+          size={40}
+        />
       ) : (
         <BrandMark name={entry.label} domain={entry.domain} size={40} />
       )}

@@ -162,6 +162,8 @@ export const useDeleteBankAccount = () => useRemove('bank_accounts');
 // --- Bills -----------------------------------------------------------------
 
 export type BillValues = {
+  /** Optional. Who issues the bill, for its logo. */
+  brand_id: string | null;
   name: string;
   amount: number;
   category_id: string;

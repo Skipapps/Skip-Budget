@@ -104,6 +104,8 @@ export type Bill = {
   categoryId: string;
   /** Overrides the category icon when someone picked their own. */
   iconId?: string;
+  /** The issuer's domain, when the bill has one. Its logo replaces the icon. */
+  domain?: string | null;
   /** Card or bank account it is paid from. */
   sourceId: string;
 };

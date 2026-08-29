@@ -2,11 +2,100 @@
 /**
  * Generates the brand seed migration.
  *
+ * Retailers, restaurants and subscriptions, plus the companies that bill you —
+ * utilities, telecoms, insurers and lenders. The second group is here for the
+ * same reason as the first: a logo is what someone recognises in a list, and
+ * "AEP" is as much a brand as "Netflix".
+ *
  * Columns: name | domain | category | country | rank | aliases(;-separated)
  * rank only breaks ties in search — daily-shop brands outrank niche ones so
  * "wal" surfaces Walmart before Walgreens.
  */
 const DATA = `
+# ---- Electricity and gas ----
+AEP|aep.com|utilities|us|85|american electric power;aep ohio;aep texas
+Duke Energy|duke-energy.com|utilities|us|85|duke
+Dominion Energy|dominionenergy.com|utilities|us|75|dominion
+Xcel Energy|xcelenergy.com|utilities|us|75|xcel
+Con Edison|coned.com|utilities|us|75|coned;consolidated edison
+PG&E|pge.com|utilities|us|80|pacific gas and electric;pacific gas
+National Grid|nationalgrid.com|utilities|us|70|
+FirstEnergy|firstenergycorp.com|utilities|us|65|first energy
+Entergy|entergy.com|utilities|us|65|
+DTE Energy|dteenergy.com|utilities|us|65|dte
+Ameren|ameren.com|utilities|us|60|
+Georgia Power|georgiapower.com|utilities|us|65|
+Florida Power & Light|fpl.com|utilities|us|70|fpl;florida power and light
+Southern California Edison|sce.com|utilities|us|70|sce;socal edison
+PSE&G|pseg.com|utilities|us|65|pseg;public service enterprise
+CenterPoint Energy|centerpointenergy.com|utilities|us|60|centerpoint
+Eversource|eversource.com|utilities|us|65|
+Consumers Energy|consumersenergy.com|utilities|us|60|
+Alliant Energy|alliantenergy.com|utilities|us|50|alliant
+APS|aps.com|utilities|us|55|arizona public service
+Salt River Project|srpnet.com|utilities|us|50|srp
+NV Energy|nvenergy.com|utilities|us|50|
+Puget Sound Energy|pse.com|utilities|us|50|puget sound
+ComEd|comed.com|utilities|us|65|commonwealth edison
+PECO|peco.com|utilities|us|55|
+BGE|bge.com|utilities|us|55|baltimore gas and electric
+Pepco|pepco.com|utilities|us|55|
+# ---- Water and waste ----
+American Water|amwater.com|utilities|us|55|
+Republic Services|republicservices.com|utilities|us|55|republic
+Waste Management|wm.com|utilities|us|60|wm
+# ---- Mobile ----
+T-Mobile|t-mobile.com|telecom|us|95|tmobile;t mobile
+Verizon|verizon.com|telecom|us|95|verizon wireless
+AT&T|att.com|telecom|us|95|at&t;atandt
+Mint Mobile|mintmobile.com|telecom|us|60|mint
+Cricket Wireless|cricketwireless.com|telecom|us|60|cricket
+Boost Mobile|boostmobile.com|telecom|us|55|boost
+Metro by T-Mobile|metrobyt-mobile.com|telecom|us|55|metro pcs;metropcs
+Google Fi|fi.google.com|telecom|us|50|
+Visible|visible.com|telecom|us|45|
+UScellular|uscellular.com|telecom|us|45|us cellular
+Straight Talk|straighttalk.com|telecom|us|45|
+# ---- Internet and TV ----
+Xfinity|xfinity.com|telecom|us|90|comcast
+Spectrum|spectrum.com|telecom|us|85|charter
+Cox|cox.com|telecom|us|70|cox communications
+Optimum|optimum.com|telecom|us|60|altice
+Frontier|frontier.com|telecom|us|60|frontier communications
+CenturyLink|centurylink.com|telecom|us|60|lumen
+Starlink|starlink.com|telecom|both|55|
+Google Fiber|fiber.google.com|telecom|us|45|
+Astound Broadband|astound.com|telecom|us|40|rcn;wave
+WOW!|wowway.com|telecom|us|40|wide open west
+Windstream|windstream.com|telecom|us|40|kinetic
+# ---- Insurance ----
+GEICO|geico.com|insurance|us|90|
+State Farm|statefarm.com|insurance|us|90|
+Progressive|progressive.com|insurance|us|85|
+Allstate|allstate.com|insurance|us|80|
+USAA|usaa.com|insurance|us|75|
+Liberty Mutual|libertymutual.com|insurance|us|70|
+Nationwide|nationwide.com|insurance|us|65|
+Farmers Insurance|farmers.com|insurance|us|65|farmers
+Travelers|travelers.com|insurance|us|60|
+American Family|amfam.com|insurance|us|55|amfam
+Lemonade|lemonade.com|insurance|us|45|
+Root|joinroot.com|insurance|us|40|root insurance
+# ---- Banking and loans ----
+Chase|chase.com|finance|us|90|jpmorgan chase
+Bank of America|bankofamerica.com|finance|us|90|bofa
+Wells Fargo|wellsfargo.com|finance|us|85|
+Capital One|capitalone.com|finance|us|85|
+Discover|discover.com|finance|us|80|
+American Express|americanexpress.com|finance|us|85|amex
+Citi|citi.com|finance|us|80|citibank
+Ally|ally.com|finance|us|60|ally bank
+SoFi|sofi.com|finance|us|60|
+Synchrony|synchrony.com|finance|us|55|synchrony bank
+Navient|navient.com|finance|us|55|
+Nelnet|nelnet.com|finance|us|55|
+MOHELA|mohela.com|finance|us|50|
+Aidvantage|aidvantage.com|finance|us|50|
 # ---- Video and television ----
 Netflix|netflix.com|entertainment|both|95|
 Disney+|disneyplus.com|entertainment|both|85|disney plus;disney
@@ -363,8 +452,9 @@ const values = rows
 
 const sql = `-- Brand catalog sync
 --
--- ${rows.length} US and Canadian retailers, restaurants and subscription
--- services. Generated, not hand-written — see scripts/gen-brands.mjs.
+-- ${rows.length} brands: US and Canadian retailers, restaurants and
+-- subscription services, plus the utilities, telecoms, insurers and lenders
+-- that send bills. Generated, not hand-written — see scripts/gen-brands.mjs.
 --
 -- One row per brand. Sub-brands that would share a parent's logo (Walmart+,
 -- Costco Pharmacy, Apple Music) are folded into the parent and survive as

@@ -53,6 +53,9 @@ export type BankAccountRow = {
 export type BillRow = {
   id: string;
   created_at?: string | null;
+  /** Optional. Who issues it — null for rent, HOA fees and the like. */
+  brand_id?: string | null;
+  brands?: { domain: string | null } | null;
   name: string;
   amount: number;
   category_id: string;
@@ -146,11 +149,12 @@ export function useBills() {
     const { data, error } = await supabase
       .from('bills')
       .select(
-        'id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at',
+        'id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at, brand_id, brands(domain)',
       )
       .order('next_due_on', { ascending: true, nullsFirst: false });
     if (error) throw error;
-    return data ?? [];
+    // PostgREST types an embedded relation as an array; it is one row here.
+    return (data ?? []) as unknown as BillRow[];
   });
 }
 
@@ -373,7 +377,7 @@ export function useBill(id: string | undefined) {
       const { data, error } = await supabase
         .from('bills')
         .select(
-          'id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, note',
+          'id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, note, brand_id, brands(domain)',
         )
         .eq('id', id!)
         .maybeSingle();
@@ -527,6 +531,7 @@ function ledgerForSource(
           endsOn: row.ends_on,
           cardId: row.card_id,
           accountId: row.bank_account_id,
+          domain: row.brands?.domain,
           categoryId: row.category_id,
           iconId: row.icon_id,
         })),
@@ -830,6 +835,8 @@ export function useLedger(range: DateRange | undefined, today: string) {
           label: occurrence.label,
           kind: 'bill',
           sourceId: occurrence.cardId ?? occurrence.accountId ?? '',
+          // A logo when the bill has an issuer, the category icon when not.
+          domain: row.brands?.domain,
           categoryId: row.category_id,
           iconId: row.icon_id,
         }),
