@@ -129,7 +129,9 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
 
   const savedReminder = useReminderChoice('subscription', id);
   const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
-  const reminder = reminderDraft ?? savedReminder;
+  const [timeDraft, setTimeDraft] = useState<string | null>(null);
+  const reminder = reminderDraft ?? savedReminder.choice;
+  const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
   const handleSave = async () => {
@@ -168,7 +170,7 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
           : (await createSubscription.mutateAsync(values)).id;
 
       // After the row exists, because a reminder points at one.
-      await applyReminder('subscription', subscriptionId, choiceToLead(reminder));
+      await applyReminder('subscription', subscriptionId, choiceToLead(reminder), remindAt);
       router.back();
     } catch (thrown) {
       setError((thrown as Error).message ?? 'Could not save that subscription.');
@@ -235,7 +237,13 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
           </View>
         ) : null}
 
-        <ReminderField kind="subscription" value={reminder} onChange={setReminderDraft} />
+        <ReminderField
+          kind="subscription"
+          value={reminder}
+          onChange={setReminderDraft}
+          time={remindAt}
+          onTimeChange={setTimeDraft}
+        />
 
         <TextField
           label="Note"

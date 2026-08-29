@@ -48,9 +48,12 @@ export type ReminderRow = {
   bank_account_id: string | null;
   enabled: boolean;
   lead_days: number;
+  /** Local time of day, "HH:MM:SS" as Postgres hands a `time` back. */
+  remind_at: string;
 };
 
-const COLUMNS = 'id, bill_id, subscription_id, card_id, bank_account_id, enabled, lead_days';
+const COLUMNS =
+  'id, bill_id, subscription_id, card_id, bank_account_id, enabled, lead_days, remind_at';
 
 /** The kind and target a row points at, as the page keys them. */
 export function reminderKey(row: ReminderRow): string {
@@ -73,6 +76,9 @@ export const LEAD_OPTIONS = [
 ] as const;
 
 export const DEFAULT_LEAD_DAYS = 1;
+
+/** Nine in the morning: early enough to act on, late enough not to wake anyone. */
+export const DEFAULT_REMIND_AT = '09:00';
 
 /**
  * The same choices with an off switch folded in, for the creation forms.
@@ -133,6 +139,8 @@ type SetReminderInput = {
   targetId: string;
   enabled: boolean;
   leadDays: number;
+  /** "HH:MM". Left off to keep whatever time is already stored. */
+  remindAt?: string;
 };
 
 /**
@@ -147,7 +155,7 @@ export function useSetReminder() {
   const client = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ kind, targetId, enabled, leadDays }: SetReminderInput) => {
+    mutationFn: async ({ kind, targetId, enabled, leadDays, remindAt }: SetReminderInput) => {
       if (!userId) throw new Error('Sign in first.');
 
       // All four columns, three of them null, because the constraint spans all
@@ -162,6 +170,7 @@ export function useSetReminder() {
           bank_account_id: kind === 'account' ? targetId : null,
           enabled,
           lead_days: leadDays,
+          remind_at: remindAt ?? DEFAULT_REMIND_AT,
         } as never,
         { onConflict: CONFLICT_TARGET },
       );
@@ -181,14 +190,18 @@ export function useSetReminder() {
 export function useReminderChoice(
   kind: ReminderKind,
   targetId: string | undefined,
-): ReminderChoice {
+): { choice: ReminderChoice; remindAt: string } {
   const reminders = useReminders();
 
   const row = (reminders.data ?? []).find(
     (candidate) => targetId && reminderKey(candidate) === targetKey(kind, targetId),
   );
 
-  return row?.enabled ? leadToChoice(row.lead_days) : 'off';
+  return {
+    choice: row?.enabled ? leadToChoice(row.lead_days) : 'off',
+    // Trimmed to HH:MM; the seconds Postgres adds are noise here.
+    remindAt: row?.remind_at?.slice(0, 5) ?? DEFAULT_REMIND_AT,
+  };
 }
 
 /**
@@ -203,12 +216,17 @@ export function useApplyReminder() {
   const removeReminder = useRemoveReminder();
 
   return useCallback(
-    async (kind: ReminderKind, targetId: string, leadDays: number | null) => {
+    async (
+      kind: ReminderKind,
+      targetId: string,
+      leadDays: number | null,
+      remindAt: string = DEFAULT_REMIND_AT,
+    ) => {
       if (leadDays === null) {
         await removeReminder.mutateAsync({ kind, targetId });
         return;
       }
-      await setReminder.mutateAsync({ kind, targetId, enabled: true, leadDays });
+      await setReminder.mutateAsync({ kind, targetId, enabled: true, leadDays, remindAt });
     },
     [setReminder, removeReminder],
   );

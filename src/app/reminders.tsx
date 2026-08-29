@@ -1,10 +1,19 @@
-import { Bell, CreditCard, Landmark, ReceiptText, Repeat, Trash2 } from 'lucide-react-native';
+import {
+  Bell,
+  Clock,
+  CreditCard,
+  Landmark,
+  ReceiptText,
+  Repeat,
+  Trash2,
+} from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 
 import {
   DEFAULT_LEAD_DAYS,
+  DEFAULT_REMIND_AT,
   LEAD_OPTIONS,
   REMINDER_CAPTION,
   reminderKey,
@@ -25,9 +34,10 @@ import {
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
+import { TimePicker } from '@/components/ui/time-picker';
 import { Subtitle, Title } from '@/components/ui/typography';
 import { cn } from '@/lib/cn';
-import { formatFullDate } from '@/lib/date';
+import { formatClock, formatFullDate, parseClock } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { tap, toggle as toggleFeedback } from '@/lib/haptics';
 import { useColors } from '@/providers/theme-provider';
@@ -75,6 +85,9 @@ export default function RemindersScreen() {
   const accounts = useBankAccounts();
   const reminders = useReminders();
   const { ids: salaryAccountIds } = useSalaryAccountIds();
+
+  // Which row's clock is open, by target key. One at a time.
+  const [timeFor, setTimeFor] = useState<string | null>(null);
 
   const setReminder = useSetReminder();
   const removeReminder = useRemoveReminder();
@@ -206,9 +219,12 @@ export default function RemindersScreen() {
 
               <View className="mt-2 w-full">
                 {group.items.map((item) => {
-                  const row = stored.get(targetKey(item.kind, item.id));
+                  const key = targetKey(item.kind, item.id);
+                  const row = stored.get(key);
                   const enabled = row?.enabled ?? false;
                   const leadDays = row?.lead_days ?? DEFAULT_LEAD_DAYS;
+                  const remindAt = row?.remind_at?.slice(0, 5) ?? DEFAULT_REMIND_AT;
+                  const clock = parseClock(remindAt);
 
                   return (
                     <View
@@ -279,6 +295,7 @@ export default function RemindersScreen() {
                                     targetId: item.id,
                                     enabled: true,
                                     leadDays: option.value,
+                                    remindAt,
                                   });
                                 }}
                                 className={cn(
@@ -303,6 +320,30 @@ export default function RemindersScreen() {
                             );
                           })}
 
+                          {/* What time of day it arrives. A reminder with no
+                              time lands whenever the job happens to run, which
+                              is how you get told about the rent at 3am. */}
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Sent at ${formatClock(
+                              clock.hour,
+                              clock.minute,
+                            )}. Change the time for ${item.label}.`}
+                            onPress={() => {
+                              tap();
+                              setTimeFor(key);
+                            }}
+                            className="flex-row items-center gap-1.5 rounded-full border border-line px-3 py-1.5 active:bg-ink/5"
+                          >
+                            <Clock size={13} color={colors.muted} strokeWidth={2} />
+                            <Text
+                              className="font-poppins text-[12px] text-body"
+                              maxFontSizeMultiplier={1.2}
+                            >
+                              {formatClock(clock.hour, clock.minute)}
+                            </Text>
+                          </Pressable>
+
                           <Pressable
                             accessibilityRole="button"
                             accessibilityLabel={`Remove the reminder for ${item.label}`}
@@ -315,6 +356,23 @@ export default function RemindersScreen() {
                             <Trash2 size={16} color={colors.muted} strokeWidth={2} />
                           </Pressable>
                         </View>
+                      ) : null}
+
+                      {timeFor === key ? (
+                        <TimePicker
+                          value={remindAt}
+                          onCancel={() => setTimeFor(null)}
+                          onConfirm={(next) => {
+                            setTimeFor(null);
+                            setReminder.mutate({
+                              kind: item.kind,
+                              targetId: item.id,
+                              enabled: true,
+                              leadDays,
+                              remindAt: next,
+                            });
+                          }}
+                        />
                       ) : null}
                     </View>
                   );

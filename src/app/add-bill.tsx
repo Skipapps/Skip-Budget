@@ -165,7 +165,9 @@ function BillForm({
   // after the form does not overwrite what is already being chosen.
   const savedReminder = useReminderChoice('bill', id);
   const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
-  const reminder = reminderDraft ?? savedReminder;
+  const [timeDraft, setTimeDraft] = useState<string | null>(null);
+  const reminder = reminderDraft ?? savedReminder.choice;
+  const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
   const handleSave = async () => {
@@ -214,7 +216,7 @@ function BillForm({
           : (await createBill.mutateAsync(values)).id;
 
       // After the bill exists, because a reminder points at a row.
-      await applyReminder('bill', billId, choiceToLead(reminder));
+      await applyReminder('bill', billId, choiceToLead(reminder), remindAt);
 
       router.back();
     } catch (thrown) {
@@ -356,7 +358,13 @@ function BillForm({
           />
         ) : null}
 
-        <ReminderField kind="bill" value={reminder} onChange={setReminderDraft} />
+        <ReminderField
+          kind="bill"
+          value={reminder}
+          onChange={setReminderDraft}
+          time={remindAt}
+          onTimeChange={setTimeDraft}
+        />
 
         <TextField
           label="Note"

@@ -132,7 +132,9 @@ function AccountForm({
 
   const savedReminder = useReminderChoice('account', id);
   const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
-  const reminder = reminderDraft ?? savedReminder;
+  const [timeDraft, setTimeDraft] = useState<string | null>(null);
+  const reminder = reminderDraft ?? savedReminder.choice;
+  const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
   const { ids: salaryAccountIds } = useSalaryAccountIds();
@@ -183,7 +185,12 @@ function AccountForm({
         });
       }
 
-      await applyReminder('account', accountId, payLandsHere ? choiceToLead(reminder) : null);
+      await applyReminder(
+        'account',
+        accountId,
+        payLandsHere ? choiceToLead(reminder) : null,
+        remindAt,
+      );
 
       router.back();
     } catch (thrown) {
@@ -305,6 +312,8 @@ function AccountForm({
               kind="account"
               value={reminder}
               onChange={setReminderDraft}
+              time={remindAt}
+              onTimeChange={setTimeDraft}
               unavailable={
                 payLandsHere
                   ? null

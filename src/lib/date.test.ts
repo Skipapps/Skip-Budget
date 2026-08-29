@@ -1,8 +1,11 @@
 import {
   daysLeftInMonth,
+  formatClock,
   formatDateRange,
   getDaysInMonth,
   getNextPayday,
+  parseClock,
+  toClockValue,
   toIsoDate,
 } from '@/lib/date';
 
@@ -79,5 +82,33 @@ describe('formatDateRange', () => {
 
   it('handles a single day at both ends', () => {
     expect(formatDateRange(on(2026, 8, 28), on(2026, 8, 28))).toBe('28 – 28 Aug 2026');
+  });
+});
+
+describe('clock times', () => {
+  it('reads what Postgres hands back', () => {
+    expect(parseClock('09:00:00')).toEqual({ hour: 9, minute: 0 });
+    expect(parseClock('21:30')).toEqual({ hour: 21, minute: 30 });
+  });
+
+  it('falls back to nine in the morning when there is nothing to read', () => {
+    expect(parseClock(null)).toEqual({ hour: 9, minute: 0 });
+    expect(parseClock('nonsense')).toEqual({ hour: 9, minute: 0 });
+  });
+
+  it('clamps a value outside the day', () => {
+    expect(parseClock('99:99')).toEqual({ hour: 23, minute: 59 });
+  });
+
+  it('writes back the shape the column wants', () => {
+    expect(toClockValue(9, 0)).toBe('09:00');
+    expect(toClockValue(21, 5)).toBe('21:05');
+  });
+
+  it('says midnight and midday as twelve, not zero', () => {
+    expect(formatClock(0, 0)).toBe('12:00 AM');
+    expect(formatClock(12, 0)).toBe('12:00 PM');
+    expect(formatClock(13, 30)).toBe('1:30 PM');
+    expect(formatClock(9, 5)).toBe('9:05 AM');
   });
 });

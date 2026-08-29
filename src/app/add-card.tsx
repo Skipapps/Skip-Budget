@@ -83,7 +83,9 @@ function CardForm({
 
   const savedReminder = useReminderChoice('card', id);
   const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
-  const reminder = reminderDraft ?? savedReminder;
+  const [timeDraft, setTimeDraft] = useState<string | null>(null);
+  const reminder = reminderDraft ?? savedReminder.choice;
+  const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
   const [datePickerOpen, setDatePickerOpen] = useState(false);
@@ -165,7 +167,7 @@ function CardForm({
 
       // A card reminder counts back from its payment day, so it is only
       // written when there is one to count from.
-      await applyReminder('card', cardId, dueDate ? choiceToLead(reminder) : null);
+      await applyReminder('card', cardId, dueDate ? choiceToLead(reminder) : null, remindAt);
 
       router.back();
     } catch (thrown) {
@@ -240,6 +242,8 @@ function CardForm({
               kind="card"
               value={reminder}
               onChange={setReminderDraft}
+              time={remindAt}
+              onTimeChange={setTimeDraft}
               unavailable={
                 dueDate ? null : 'Set a bill due date above and Skip can remind you before it.'
               }

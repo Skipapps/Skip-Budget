@@ -223,3 +223,35 @@ export function formatDateRange(from: Date, to: Date): string {
   }
   return `${formatFullDate(from)} – ${formatFullDate(to)}`;
 }
+
+/**
+ * Times of day, as the reminders table stores them.
+ *
+ * Postgres hands back a `time` as "09:00:00"; the app only ever cares about
+ * hours and minutes, and writes the same shape back. Kept as plain strings
+ * rather than Dates because a time of day is not a moment — attaching one to a
+ * date invites a timezone conversion that would move it.
+ */
+export function parseClock(value: string | null | undefined): { hour: number; minute: number } {
+  const [rawHour, rawMinute] = (value ?? '09:00').split(':');
+  const hour = Number(rawHour);
+  const minute = Number(rawMinute);
+
+  return {
+    hour: Number.isFinite(hour) ? Math.min(Math.max(hour, 0), 23) : 9,
+    minute: Number.isFinite(minute) ? Math.min(Math.max(minute, 0), 59) : 0,
+  };
+}
+
+/** "09:00" — what goes back into the column. */
+export function toClockValue(hour: number, minute: number): string {
+  return `${pad(hour)}:${pad(minute)}`;
+}
+
+/** "9:00 AM" — how a time is read out loud. */
+export function formatClock(hour: number, minute: number): string {
+  const period = hour < 12 ? 'AM' : 'PM';
+  // 0 and 12 both show as 12: midnight and midday.
+  const shown = hour % 12 === 0 ? 12 : hour % 12;
+  return `${shown}:${pad(minute)} ${period}`;
+}
