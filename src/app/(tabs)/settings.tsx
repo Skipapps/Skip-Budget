@@ -32,6 +32,8 @@ import { useConfirm, useDialog } from '@/providers/dialog-provider';
 import { TextField } from '@/components/ui/text-field';
 import { Title } from '@/components/ui/typography';
 import { money } from '@/theme/colors';
+
+import CoffeeMark from '@/assets/illustrations/buy-me-a-coffee.svg';
 import { useCharges } from '@/api/charges';
 import {
   useBankAccounts,
@@ -269,6 +271,9 @@ export default function SettingsScreen() {
         />
         <SettingsRow
           icon={Coffee}
+          // Their mark, in their colours. Tinting someone else's logo to match
+          // the row would be misrepresenting it.
+          artwork={<CoffeeMark width={22} height={22} />}
           title="Buy a coffee for team"
           subtitle="Keep Skip brewing"
           onPress={() => openBrowserAsync('https://buymeacoffee.com/Weknd_team')}

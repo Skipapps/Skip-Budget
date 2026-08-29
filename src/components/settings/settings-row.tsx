@@ -1,4 +1,5 @@
 import { ChevronRight, type LucideIcon } from 'lucide-react-native';
+import type { ReactNode } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 
 import { cn } from '@/lib/cn';
@@ -6,6 +7,13 @@ import { colors } from '@/theme/colors';
 
 type SettingsRowProps = {
   icon: LucideIcon;
+  /**
+   * Replaces the icon entirely, for a row that carries somebody else's mark.
+   *
+   * A brand logo is not a glyph: it has its own colours and cannot be tinted
+   * to match the row without misrepresenting it.
+   */
+  artwork?: ReactNode;
   title: string;
   subtitle?: string;
   /** Right-hand static value, e.g. a version number. */
@@ -21,6 +29,7 @@ type SettingsRowProps = {
 
 export function SettingsRow({
   icon: Icon,
+  artwork,
   title,
   subtitle,
   value,
@@ -34,7 +43,7 @@ export function SettingsRow({
 
   const body = (
     <View className="w-full flex-row items-center gap-3 py-3.5">
-      <Icon size={20} color={tint} strokeWidth={1.8} />
+      {artwork ?? <Icon size={20} color={tint} strokeWidth={1.8} />}
 
       <View className="min-w-0 flex-1">
         <Text
