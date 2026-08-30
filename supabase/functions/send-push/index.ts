@@ -243,8 +243,21 @@ Deno.serve(async (request) => {
     body: string;
   }[];
 
-  if (rows.length === 0 && charges.length === 0) {
-    return new Response(JSON.stringify({ recorded: 0, due: 0, sent: 0 }), {
+  // Shared-group notices: somebody added an expense, settled up, or asked to
+  // be your friend. Queued by triggers rather than pushed from them, so a slow
+  // Apple never sits inside the transaction that added the expense.
+  const { data: noticeRows, error: noticeError } = await supabase.rpc('split_notices_due');
+  if (noticeError) console.error('split_notices_due failed', noticeError.message);
+
+  const notices = (noticeRows ?? []) as {
+    notice_id: string;
+    user_id: string;
+    title: string;
+    body: string;
+  }[];
+
+  if (rows.length === 0 && charges.length === 0 && notices.length === 0) {
+    return new Response(JSON.stringify({ recorded: 0, due: 0, sent: 0, notices: 0 }), {
       headers: { 'Content-Type': 'application/json' },
     });
   }
@@ -296,10 +309,38 @@ Deno.serve(async (request) => {
     }
   }
 
+  // ---- Tell people what happened in their groups ------------------------
+  let shared = 0;
+  for (const notice of notices) {
+    let delivered = false;
+    for (const tokenRow of await tokensFor(supabase, notice.user_id)) {
+      if (await push(supabase, tokenRow, jwt, notice.title, notice.body)) delivered = true;
+    }
+
+    // Stamped whether or not Apple took it. Unlike a reminder, which is about
+    // something still ahead and worth retrying, this is about something that
+    // already happened — retrying it tomorrow would deliver stale news, and
+    // leaving it unstamped would retry it forever for an account with no
+    // device registered at all.
+    await supabase
+      .from('split_notices')
+      .update({ sent_at: new Date().toISOString() })
+      .eq('id', notice.notice_id);
+
+    if (delivered) shared += 1;
+  }
+
   // Reported separately so a quiet run can be told apart from a broken one:
   // recorded says what the server found, announced and sent say what Apple took.
   return new Response(
-    JSON.stringify({ recorded: charges.length, announced, due: rows.length, sent }),
+    JSON.stringify({
+      recorded: charges.length,
+      announced,
+      due: rows.length,
+      sent,
+      notices: notices.length,
+      shared,
+    }),
     { headers: { 'Content-Type': 'application/json' } },
   );
 });

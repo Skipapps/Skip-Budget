@@ -193,7 +193,7 @@ export default function HomeScreen() {
                       : category.id === 'loan-calculator'
                         ? () => router.push('/loan-calculator')
                         : category.id === 'split-calculator'
-                          ? () => router.push('/split-calculator')
+                          ? () => router.push('/splits')
                           : undefined
               }
             />

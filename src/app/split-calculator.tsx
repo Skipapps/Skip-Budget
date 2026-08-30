@@ -1,4 +1,5 @@
-import { ArrowRight, Calculator, Plus, Trash2 } from 'lucide-react-native';
+import { ArrowRight, Calculator, Plus, Trash2, Users } from 'lucide-react-native';
+import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -53,8 +54,24 @@ export default function SplitCalculatorScreen() {
     setPeople((current) => current.filter((person) => person.id !== id));
   };
 
-  // Saving waits on the data layer.
-  const handleSave = () => {};
+  /**
+   * The way out of a scratchpad.
+   *
+   * This screen is deliberately stateless — most split bills are one restaurant
+   * with people you will not split with again. But some turn out to be the
+   * start of a flat or a trip, and retyping everyone's name to find that out is
+   * the kind of small friction that stops people bothering.
+   *
+   * The names travel; the amounts do not. A group starts from what everyone
+   * actually spends together, not from the one bill that prompted it.
+   */
+  const handleSave = () => {
+    const carried = named
+      .map((person) => person.name)
+      .filter((name) => name && name !== 'You')
+      .join(',');
+    router.push(`/add-group?names=${encodeURIComponent(carried)}`);
+  };
 
   return (
     <Screen showBack avoidKeyboard>
@@ -255,7 +272,12 @@ export default function SplitCalculatorScreen() {
       </View>
 
       <View className="mt-auto w-full pb-8 pt-8">
-        <Button label="Save" onPress={handleSave} />
+        <Button
+          label="Make this a group"
+          variant="outline"
+          icon={<Users size={17} color={colors.ink} strokeWidth={1.9} />}
+          onPress={handleSave}
+        />
       </View>
 
       {padTarget?.kind === 'calculator' ? (
