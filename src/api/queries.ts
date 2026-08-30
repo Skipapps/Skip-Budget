@@ -921,6 +921,12 @@ export type LoanRow = {
   monthly_payment: number;
   total_interest: number;
   first_payment_on: string | null;
+  /** When interest started running — sets the length of the opening period. */
+  funded_on: string | null;
+  day_count_basis: 'actual/365' | 'actual/360' | '30/360';
+  /** A balance read off a statement, and the date it was true. */
+  statement_on: string | null;
+  statement_principal: number | null;
 };
 
 /**
@@ -939,7 +945,7 @@ export function useLoanForBill(billId: string | undefined) {
       const { data, error } = await supabase
         .from('loans')
         .select(
-          'id, bill_id, principal, annual_rate, term_months, monthly_payment, total_interest, first_payment_on',
+          'id, bill_id, principal, annual_rate, term_months, monthly_payment, total_interest, first_payment_on, funded_on, day_count_basis, statement_on, statement_principal',
         )
         .eq('bill_id', billId!)
         .maybeSingle();

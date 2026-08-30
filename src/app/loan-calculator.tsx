@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { Calendar } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { ProportionBar } from '@/components/calculators/proportion-bar';
@@ -15,7 +15,7 @@ import { SelectField } from '@/components/ui/select-field';
 import { Title } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { amortisationSchedule, calculateLoan, formatTerm, payoffDate } from '@/lib/loan';
+import { amortise, daysBetween, formatTerm, payoffDate } from '@/lib/loan';
 
 const AMOUNT_MIN = 500;
 const AMOUNT_MAX = 1_000_000;
@@ -26,14 +26,33 @@ export default function LoanCalculatorScreen() {
   const [rate, setRate] = useState(7.5);
   const [months, setMonths] = useState(60);
   const [startDate, setStartDate] = useState(new Date());
+  // Interest starts the day the money lands, which is rarely a month before the
+  // first payment. Defaulted, but editable, because on a real loan that gap is
+  // worth more than any other input on this screen.
+  const [fundedOn, setFundedOn] = useState(() => monthBefore(new Date()));
 
   const [padOpen, setPadOpen] = useState(false);
   const [ratePadOpen, setRatePadOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [fundedPickerOpen, setFundedPickerOpen] = useState(false);
 
-  const loan = calculateLoan(amount, rate, months);
-  const schedule = amortisationSchedule(amount, rate, months, startDate);
+  // Recomputed on every drag of a slider, so it is worth not redoing at 60fps.
+  const loan = useMemo(
+    () =>
+      amortise({
+        principal: amount,
+        annualRatePercent: rate,
+        months,
+        firstPaymentOn: startDate,
+        fundedOn,
+        basis: 'actual/365',
+      }),
+    [amount, rate, months, startDate, fundedOn],
+  );
+
+  const schedule = loan.rows;
   const lastPayment = payoffDate(startDate, months);
+  const openingDays = daysBetween(fundedOn, startDate);
 
   // Saving waits on the data layer.
   /**
@@ -41,11 +60,11 @@ export default function LoanCalculatorScreen() {
    * people open it to try numbers, not to commit to a debt.
    */
   const handleSave = async () => {
-    if (loan.monthlyPayment <= 0) return;
+    if (loan.payment <= 0) return;
 
     const ok = await confirm({
       title: 'Add this to monthly bills?',
-      message: `${formatCurrency(loan.monthlyPayment)} a month for ${formatTerm(months)}, filed under Loans.`,
+      message: `${formatCurrency(loan.payment)} a month for ${formatTerm(months)}, filed under Loans.`,
       confirmLabel: 'Continue',
       cancelLabel: 'Not now',
     });
@@ -58,6 +77,7 @@ export default function LoanCalculatorScreen() {
         rate: String(rate),
         months: String(months),
         start: toIsoDate(startDate),
+        funded: toIsoDate(fundedOn),
       },
     });
   };
@@ -79,7 +99,7 @@ export default function LoanCalculatorScreen() {
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}
         >
-          {formatCurrency(loan.monthlyPayment)}
+          {formatCurrency(loan.payment)}
         </Text>
         <Text
           className="mt-1 text-center font-poppins text-[13px] text-muted"
@@ -87,6 +107,19 @@ export default function LoanCalculatorScreen() {
         >
           {months} payments · last on {formatFullDate(lastPayment)}
         </Text>
+
+        {/* The opening period is the one input people never think about and the
+            one that moves the payment most, so it is called out rather than
+            buried in the schedule. */}
+        {openingDays > 0 && openingDays !== 30 && openingDays !== 31 ? (
+          <Text
+            className="mt-2 text-center font-poppins text-[12px] leading-[17px] text-muted"
+            maxFontSizeMultiplier={1.3}
+          >
+            First payment covers {openingDays} days, not a month —{' '}
+            {formatCurrency(schedule[0]?.interest ?? 0)} of it is interest.
+          </Text>
+        ) : null}
       </View>
 
       <View className="mt-7 w-full gap-6">
@@ -130,7 +163,13 @@ export default function LoanCalculatorScreen() {
         />
       </View>
 
-      <View className="mt-7 w-full">
+      <View className="mt-7 w-full gap-5">
+        <SelectField
+          label="Money received"
+          value={formatFullDate(fundedOn)}
+          icon={Calendar}
+          onPress={() => setFundedPickerOpen(true)}
+        />
         <SelectField
           label="First payment"
           value={formatFullDate(startDate)}
@@ -163,6 +202,7 @@ export default function LoanCalculatorScreen() {
                 rate: String(rate),
                 months: String(months),
                 start: toIsoDate(startDate),
+                funded: toIsoDate(fundedOn),
               },
             })
           }
@@ -209,12 +249,36 @@ export default function LoanCalculatorScreen() {
           onCancel={() => setDatePickerOpen(false)}
           onConfirm={(date) => {
             setStartDate(date);
+            // Money cannot land after the first payment is due. Nudging the
+            // funding date along beats rejecting the change with an error.
+            if (fundedOn >= date) setFundedOn(monthBefore(date));
             setDatePickerOpen(false);
+          }}
+        />
+      ) : null}
+
+      {fundedPickerOpen ? (
+        <DatePicker
+          value={fundedOn}
+          onCancel={() => setFundedPickerOpen(false)}
+          onConfirm={(date) => {
+            setFundedOn(date < startDate ? date : monthBefore(startDate));
+            setFundedPickerOpen(false);
           }}
         />
       ) : null}
     </Screen>
   );
+}
+
+/** One month back, holding the day of month through short months. */
+function monthBefore(date: Date): Date {
+  const earlier = new Date(date);
+  earlier.setDate(1);
+  earlier.setMonth(date.getMonth() - 1);
+  const lastOfMonth = new Date(earlier.getFullYear(), earlier.getMonth() + 1, 0).getDate();
+  earlier.setDate(Math.min(date.getDate(), lastOfMonth));
+  return earlier;
 }
 
 function SummaryLine({

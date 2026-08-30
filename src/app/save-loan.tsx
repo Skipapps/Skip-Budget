@@ -12,7 +12,7 @@ import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { calculateLoan, formatTerm } from '@/lib/loan';
+import { amortise, formatTerm } from '@/lib/loan';
 
 /**
  * Names a calculated loan and files it as a monthly bill.
@@ -28,14 +28,23 @@ export default function SaveLoanScreen() {
     rate?: string;
     months?: string;
     start?: string;
+    funded?: string;
   }>();
 
   const principal = Number(params.amount) || 0;
   const annualRate = Number(params.rate) || 0;
   const termMonths = Number(params.months) || 0;
   const firstPaymentOn = params.start ?? '';
+  const fundedOn = params.funded ?? '';
 
-  const loan = calculateLoan(principal, annualRate, termMonths);
+  const loan = amortise({
+    principal,
+    annualRatePercent: annualRate,
+    months: termMonths,
+    firstPaymentOn: firstPaymentOn ? new Date(`${firstPaymentOn}T00:00:00`) : new Date(),
+    fundedOn: fundedOn ? new Date(`${fundedOn}T00:00:00`) : undefined,
+    basis: 'actual/365',
+  });
 
   const [name, setName] = useState('');
   // 'other' is the neutral choice that actually exists in BILL_ICON_CHOICES;
@@ -69,9 +78,11 @@ export default function SaveLoanScreen() {
         principal,
         annualRate,
         termMonths,
-        monthlyPayment: loan.monthlyPayment,
+        monthlyPayment: loan.payment,
         totalInterest: loan.totalInterest,
         firstPaymentOn,
+        fundedOn: fundedOn || null,
+        dayCountBasis: 'actual/365',
         cardId: chosen?.kind === 'card' ? chosen.id : null,
         bankAccountId: chosen?.kind === 'account' ? chosen.id : null,
       });
@@ -92,7 +103,7 @@ export default function SaveLoanScreen() {
       {/* What is actually being saved, restated. The calculator's sliders are
           gone by now and the numbers should not have to be remembered. */}
       <View className="mt-7 w-full rounded-[10px] border border-line px-4 py-3">
-        <Row label="Monthly payment" value={formatCurrency(loan.monthlyPayment)} strong />
+        <Row label="Monthly payment" value={formatCurrency(loan.payment)} strong />
         <Row label="Borrowed" value={formatCurrency(principal)} />
         <Row label="Rate" value={`${annualRate}% APR`} />
         <Row label="Term" value={`${formatTerm(termMonths)} · ${termMonths} payments`} />

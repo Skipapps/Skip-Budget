@@ -35,7 +35,7 @@ import {
 } from '@/data/bills-mock';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { amortisationSchedule } from '@/lib/loan';
+import { amortise, termsFromStored } from '@/lib/loan';
 import { useColors } from '@/providers/theme-provider';
 
 const CATEGORY_OPTIONS = BILL_CATEGORIES.map((category) => ({
@@ -184,14 +184,8 @@ function BillForm({
   // Present only when this bill came from the loan calculator, which is what
   // decides whether there is a schedule worth offering.
   const { data: loan } = useLoanForBill(id);
-  const schedule = loan
-    ? amortisationSchedule(
-        loan.principal,
-        loan.annual_rate,
-        loan.term_months,
-        new Date(`${loan.first_payment_on ?? existing?.next_due_on}T00:00:00`),
-      )
-    : [];
+  const terms = loan ? termsFromStored(loan, existing?.next_due_on ?? undefined) : null;
+  const schedule = terms ? amortise(terms).rows : [];
   const createBill = useCreateBill();
   const updateBill = useUpdateBill();
   const deleteBill = useDeleteBill();
@@ -418,6 +412,7 @@ function BillForm({
                   rate: String(loan.annual_rate),
                   months: String(loan.term_months),
                   start: loan.first_payment_on ?? '',
+                  funded: loan.funded_on ?? '',
                   name: name || 'Payment schedule',
                 },
               })

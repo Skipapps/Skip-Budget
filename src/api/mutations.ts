@@ -299,6 +299,9 @@ export type SaveLoanValues = {
   monthlyPayment: number;
   totalInterest: number;
   firstPaymentOn: string;
+  /** When interest starts running. Null lets the server assume a month. */
+  fundedOn: string | null;
+  dayCountBasis: 'actual/365' | 'actual/360' | '30/360';
   cardId: string | null;
   bankAccountId: string | null;
 };
@@ -328,6 +331,8 @@ export function useSaveLoan() {
         p_recurrence: 'monthly',
         p_card_id: values.cardId,
         p_bank_account_id: values.bankAccountId,
+        p_funded_on: values.fundedOn,
+        p_day_count_basis: values.dayCountBasis,
       });
       if (error) throw error;
       return data as { id: string };
