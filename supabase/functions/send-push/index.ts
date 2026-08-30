@@ -1,7 +1,18 @@
 // Skip · send-push
 //
+// The scheduled tick. Every quarter of an hour it does three things in this
+// order, and the order is the important part:
+//
+//   1. records the charges that have come due
+//   2. rolls the schedules that have gone past
+//   3. sends what is owed — a notice for each new charge, and any reminder
+//      whose time has arrived
+//
+// Recording before rolling, because the stored anchor is what occurrences are
+// walked from and moving it first steps over the date being written.
+//
 // Posts to Apple directly rather than through a relay, using the key already
-// in this project's secrets. Called by pg_cron every quarter of an hour.
+// in this project's secrets.
 //
 // Two things about APNs are worth stating up front, because both fail quietly
 // rather than loudly:
@@ -154,6 +165,19 @@ async function push(
   return false;
 }
 
+type TokenRow = { id: string; token: string; environment: Environment };
+
+async function tokensFor(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<TokenRow[]> {
+  const { data } = await supabase
+    .from('device_tokens')
+    .select('id, token, environment')
+    .eq('user_id', userId);
+  return (data ?? []) as TokenRow[];
+}
+
 Deno.serve(async (request) => {
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -182,6 +206,29 @@ Deno.serve(async (request) => {
     });
   }
 
+  // ---- What actually went out -------------------------------------------
+  //
+  // Recorded here rather than on the phone, which is the whole reason a "this
+  // went out" notice is possible at all: until now nothing on the server knew
+  // a bill had fallen due until somebody opened the app.
+  //
+  // Only rows genuinely inserted come back — the unique indexes refuse a day
+  // the phone already wrote — so nothing is announced twice.
+  const { data: recorded, error: recordError } = await supabase.rpc('record_due_charges');
+  if (recordError) console.error('record_due_charges failed', recordError.message);
+
+  // Strictly after recording. The stored anchor is what occurrences are walked
+  // from, so moving it first would step over the very date just written.
+  const { error: rollError } = await supabase.rpc('roll_schedules_forward');
+  if (rollError) console.error('roll_schedules_forward failed', rollError.message);
+
+  const charges = (recorded ?? []) as {
+    user_id: string;
+    label: string;
+    amount: number;
+    charged_on: string;
+  }[];
+
   const { data: due, error } = await supabase.rpc('reminders_due');
   if (error) {
     console.error('reminders_due failed', error.message);
@@ -196,27 +243,45 @@ Deno.serve(async (request) => {
     body: string;
   }[];
 
-  if (rows.length === 0) {
-    return new Response(JSON.stringify({ due: 0, sent: 0 }), {
+  if (rows.length === 0 && charges.length === 0) {
+    return new Response(JSON.stringify({ recorded: 0, due: 0, sent: 0 }), {
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
   const jwt = await providerToken();
   let sent = 0;
+  let announced = 0;
 
+  // ---- Announce what went out -------------------------------------------
+  const byUser = new Map<string, typeof charges>();
+  for (const charge of charges) {
+    byUser.set(charge.user_id, [...(byUser.get(charge.user_id) ?? []), charge]);
+  }
+
+  for (const [chargeUser, theirs] of byUser) {
+    const tokens = await tokensFor(supabase, chargeUser);
+    if (tokens.length === 0) continue;
+
+    // One notice per charge reads better than a digest — until it doesn't.
+    // A first run that catches up on a backlog would otherwise arrive as a
+    // wall of notifications, so past a handful it becomes one line.
+    const total = theirs.reduce((sum, c) => sum + Math.abs(Number(c.amount)), 0);
+    const title = theirs.length > 3 ? 'Payments went out' : theirs[0].label;
+    const body =
+      theirs.length > 3
+        ? `${theirs.length} charges · $${total.toFixed(2)}`
+        : theirs.map((c) => `$${Math.abs(Number(c.amount)).toFixed(2)} went out`).join(' · ');
+
+    for (const tokenRow of tokens) {
+      if (await push(supabase, tokenRow, jwt, title, body)) announced += 1;
+    }
+  }
+
+  // ---- Remind about what is coming --------------------------------------
   for (const row of rows) {
-    const { data: tokens } = await supabase
-      .from('device_tokens')
-      .select('id, token, environment')
-      .eq('user_id', row.user_id);
-
     let delivered = false;
-    for (const tokenRow of (tokens ?? []) as {
-      id: string;
-      token: string;
-      environment: Environment;
-    }[]) {
+    for (const tokenRow of await tokensFor(supabase, row.user_id)) {
       if (await push(supabase, tokenRow, jwt, row.title, row.body)) delivered = true;
     }
 
@@ -231,7 +296,10 @@ Deno.serve(async (request) => {
     }
   }
 
-  return new Response(JSON.stringify({ due: rows.length, sent }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
+  // Reported separately so a quiet run can be told apart from a broken one:
+  // recorded says what the server found, announced and sent say what Apple took.
+  return new Response(
+    JSON.stringify({ recorded: charges.length, announced, due: rows.length, sent }),
+    { headers: { 'Content-Type': 'application/json' } },
+  );
 });
