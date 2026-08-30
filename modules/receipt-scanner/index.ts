@@ -31,7 +31,9 @@ export type ScanResult = {
 
 type ReceiptScannerModule = {
   isScanningAvailable: () => boolean;
+  isCaptureAvailable?: () => boolean;
   scanDocument: () => Promise<ScanResult | null>;
+  captureReceipt?: () => Promise<ScanResult | null>;
   recognizeText: (uri: string) => Promise<string>;
   recognizeReceipt?: (uri: string) => Promise<TextLine[]>;
 };
@@ -58,6 +60,33 @@ export function isRecognitionAvailable(): boolean {
 export async function scanDocument(): Promise<ScanResult | null> {
   if (!native) throw new Error('Scanning needs a newer build of the app.');
   return native.scanDocument();
+}
+
+/** False on the Simulator, on web, and on a build made before the one-shot camera. */
+export function isCaptureAvailable(): boolean {
+  try {
+    return native?.isCaptureAvailable?.() ?? false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * One shutter tap, then the reading — no review screen in between.
+ *
+ * `scanDocument` puts Apple's document scanner on screen, which is a multi-page
+ * session: it reviews each capture and needs a second confirm to finish. That
+ * is three taps to log something a person is holding in one hand at a till.
+ * This is the same recognition behind a plain camera.
+ *
+ * Falls back to the document scanner on a build that predates the native
+ * camera, so an older binary keeps working rather than losing the feature.
+ * Resolves null when the user backs out.
+ */
+export async function captureReceipt(): Promise<ScanResult | null> {
+  if (!native) throw new Error('Scanning needs a newer build of the app.');
+  if (!native.captureReceipt) return native.scanDocument();
+  return native.captureReceipt();
 }
 
 export async function recognizeText(uri: string): Promise<string> {

@@ -1,10 +1,12 @@
 import { router } from 'expo-router';
-import { SlidersHorizontal } from 'lucide-react-native';
+import { ScanLine, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
+import { useCreateReceipt } from '@/api/mutations';
 import { usePaymentSources, useReceipts } from '@/api/queries';
+import { draftToParams, useReceiptScan } from '@/api/scan';
 import {
   EMPTY_RECEIPT_FILTERS,
   ReceiptFilterSheet,
@@ -32,6 +34,7 @@ export default function ReceiptsScreen() {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<ReceiptFilters>(EMPTY_RECEIPT_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const today = toIsoDate(new Date());
   // A month by default: receipts are day-to-day spending, and the question
@@ -40,6 +43,48 @@ export default function ReceiptsScreen() {
   const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
   const { data: receipts = [], isLoading, isError, refetch } = useReceipts();
   const { sources } = usePaymentSources();
+
+  const { scan, scanning, available: canScan } = useReceiptScan();
+  const createReceipt = useCreateReceipt();
+
+  /**
+   * Camera, shutter, done.
+   *
+   * A scan that read both a store and a total is filed on the spot and the row
+   * appears at the top of this list — which is the confirmation, and a better
+   * one than a dialog, because it shows the figures that were actually saved
+   * and taps through to fix them. Anything less certain goes to the form with
+   * what was read already filled in, since a receipt with no total is not a
+   * receipt yet.
+   */
+  const handleScan = async () => {
+    setScanError(null);
+    try {
+      const draft = await scan();
+      if (!draft) return;
+
+      if (draft.complete && draft.store && draft.amount !== null) {
+        const chosen = sources.find((source) => source.id === draft.sourceId);
+        await createReceipt.mutateAsync({
+          brand_id: draft.store.brandId,
+          merchant: draft.store.name,
+          amount: draft.amount,
+          purchased_on: toIsoDate(draft.date),
+          category_id: draft.store.categoryId || 'other',
+          card_id: chosen?.kind === 'card' ? chosen.id : null,
+          bank_account_id: chosen?.kind === 'account' ? chosen.id : null,
+          note: null,
+          source: 'scan',
+          image_path: null,
+        });
+        return;
+      }
+
+      router.push({ pathname: '/add-receipt', params: draftToParams(draft) });
+    } catch (thrown) {
+      setScanError((thrown as Error).message ?? 'Could not read that receipt.');
+    }
+  };
 
   const activeCount = countActiveReceiptFilters(filters);
   const sourceOptions = useMemo(
@@ -93,8 +138,27 @@ export default function ReceiptsScreen() {
         <Title align="left" className="flex-1">
           Receipts
         </Title>
-        <ActionPill label="Add receipt" onPress={() => router.push('/add-receipt')} />
+        {/* Scanning leads: it is one tap to a filed receipt, and typing one out
+            by hand is the fallback rather than the other way round. */}
+        {canScan ? (
+          <ActionPill
+            icon={ScanLine}
+            label={scanning || createReceipt.isPending ? 'Reading…' : 'Scan'}
+            onPress={handleScan}
+            disabled={scanning || createReceipt.isPending}
+          />
+        ) : null}
+        <ActionPill label="Add" onPress={() => router.push('/add-receipt')} />
       </View>
+
+      {scanError ? (
+        <Text
+          className="mt-3 w-full font-poppins text-[13px] text-red-600"
+          maxFontSizeMultiplier={1.4}
+        >
+          {scanError}
+        </Text>
+      ) : null}
 
       {/* The search and filter controls are pointless before anything exists,
           and their presence makes an empty list look like a failed search. */}
@@ -162,9 +226,13 @@ export default function ReceiptsScreen() {
         <PageState
           art={artwork.emptyReceipts}
           title="No receipts yet"
-          message="Add your first one by hand, or scan a paper receipt and let Skip read it for you."
-          actionLabel="Add a receipt"
-          onAction={() => router.push('/add-receipt')}
+          message={
+            canScan
+              ? 'Point the camera at a paper receipt and Skip reads the store, date and total. Or add one by hand.'
+              : 'Add your first one by hand, or scan a paper receipt and let Skip read it for you.'
+          }
+          actionLabel={canScan ? 'Scan a receipt' : 'Add a receipt'}
+          onAction={canScan ? handleScan : () => router.push('/add-receipt')}
         />
       ) : null}
 

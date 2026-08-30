@@ -23,11 +23,12 @@ import { formatCurrency } from '@/lib/format';
 import { parseReceipt, parseReceiptFromLines, type ParsedReceipt } from '@/lib/receipt-parser';
 import { useColors } from '@/providers/theme-provider';
 import {
+  captureReceipt,
+  isCaptureAvailable,
   isRecognitionAvailable,
   isScanningAvailable,
   recognizeReceipt,
   recognizeText,
-  scanDocument,
 } from '../../modules/receipt-scanner';
 
 type ScanField = 'store' | 'date' | 'amount' | 'card';
@@ -66,6 +67,56 @@ const BLANK: Initial = {
   captureSource: 'manual',
 };
 
+const ALL_FIELDS = ['store', 'date', 'amount', 'card'] as const;
+
+type ScanParams = {
+  scannedStore?: string;
+  scannedBrandId?: string;
+  scannedDomain?: string;
+  scannedCategory?: string;
+  scannedAmount?: string;
+  scannedDate?: string;
+  scannedSource?: string;
+  scannedRead?: string;
+};
+
+/**
+ * A scan that could not be filed on its own, arriving as route params.
+ *
+ * The receipts page files anything with both a store and a total without ever
+ * opening this screen. What lands here is the remainder — a reading that is
+ * missing one of them — so the fields it did get are already in place and only
+ * the gap needs typing.
+ */
+function fromScanParams(params: ScanParams): { initial: Initial; result: ScanResult | null } {
+  const read = (params.scannedRead ?? '')
+    .split(',')
+    .filter((field): field is ScanField => (ALL_FIELDS as readonly string[]).includes(field));
+
+  if (read.length === 0 && !params.scannedStore && !params.scannedAmount) {
+    return { initial: BLANK, result: null };
+  }
+
+  return {
+    initial: {
+      store: params.scannedStore
+        ? {
+            brandId: params.scannedBrandId || null,
+            name: params.scannedStore,
+            domain: params.scannedDomain || null,
+            categoryId: params.scannedCategory || 'other',
+          }
+        : null,
+      date: params.scannedDate ? new Date(`${params.scannedDate}T00:00:00`) : new Date(),
+      amount: params.scannedAmount ?? '',
+      sourceId: params.scannedSource ?? '',
+      note: '',
+      captureSource: 'scan',
+    },
+    result: { read, missed: ALL_FIELDS.filter((field) => !read.includes(field)) },
+  };
+}
+
 /**
  * Loads the row being edited, then hands it to the form as initial state.
  *
@@ -75,7 +126,8 @@ const BLANK: Initial = {
  */
 export default function AddReceiptScreen() {
   const colors = useColors();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string } & ScanParams>();
+  const { id } = params;
   const { data: existing, isLoading } = useReceipt(id);
 
   if (id && isLoading && !existing) {
@@ -88,6 +140,8 @@ export default function AddReceiptScreen() {
       </Screen>
     );
   }
+
+  const scanned = fromScanParams(params);
 
   const initial: Initial = existing
     ? {
@@ -103,12 +157,27 @@ export default function AddReceiptScreen() {
         note: existing.note ?? '',
         captureSource: existing.source,
       }
-    : BLANK;
+    : scanned.initial;
 
-  return <ReceiptForm key={existing?.id ?? 'new'} id={id} initial={initial} />;
+  return (
+    <ReceiptForm
+      key={existing?.id ?? 'new'}
+      id={id}
+      initial={initial}
+      initialScan={existing ? null : scanned.result}
+    />
+  );
 }
 
-function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
+function ReceiptForm({
+  id,
+  initial,
+  initialScan,
+}: {
+  id?: string;
+  initial: Initial;
+  initialScan: ScanResult | null;
+}) {
   const colors = useColors();
   const editing = Boolean(id);
 
@@ -123,7 +192,7 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
   const [amountPadOpen, setAmountPadOpen] = useState(false);
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(initialScan);
 
   const { sources } = usePaymentSources();
   const { data: categories = [] } = useSpendCategories();
@@ -211,13 +280,22 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
     );
   };
 
+  /**
+   * Straight to the camera.
+   *
+   * There used to be a dialog here explaining how to hold a receipt. It was a
+   * tap in front of the one thing this button exists to do, and it appeared
+   * every single time — advice you have read once is noise the second time.
+   * The framing hint now lives under the viewfinder, where it is useful while
+   * the shot is being lined up rather than before the camera is even open.
+   */
   const handleScan = async () => {
     setError(null);
     setScanResult(null);
 
     // Scanning only exists on real hardware. Saying so beats a button that
     // silently does nothing, and beats hiding it so the feature looks unbuilt.
-    if (!isScanningAvailable()) {
+    if (!isCaptureAvailable() && !isScanningAvailable()) {
       await ask({
         title: 'Scanning needs a camera',
         message:
@@ -227,20 +305,9 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
       return;
     }
 
-    // A word before the camera opens. The scan is only as good as the shot,
-    // and the two things that ruin one are shadow and a cropped total.
-    const go = await confirm({
-      title: 'Scanning a receipt',
-      message:
-        'Lay it flat in good light and fit the whole receipt in frame — the total is usually at the bottom. Skip reads the store, date, total and card, and you can fix anything it gets wrong.',
-      confirmLabel: 'Open scanner',
-      cancelLabel: 'Not now',
-    });
-    if (!go) return;
-
     try {
       setReading(true);
-      const result = await scanDocument();
+      const result = await captureReceipt();
       // Prefer the positioned reading; a build without it still returns text.
       if (result) {
         applyScan(
@@ -249,7 +316,7 @@ function ReceiptForm({ id, initial }: { id?: string; initial: Initial }) {
         );
       }
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not open the scanner.');
+      setError((thrown as Error).message ?? 'Could not open the camera.');
     } finally {
       setReading(false);
     }
