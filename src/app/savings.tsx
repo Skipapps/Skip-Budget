@@ -1,4 +1,4 @@
-import { useMonthlySavings } from '@/api/queries';
+import { savedFor, useMonthlySavings, type MonthlySavingRow } from '@/api/queries';
 import { useRefreshAll } from '@/api/refresh';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
@@ -6,7 +6,11 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { Subtitle, Title } from '@/components/ui/typography';
 import { formatCurrency } from '@/lib/format';
 import { useArtwork } from '@/theme/artwork';
-import { Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { ChevronRight } from 'lucide-react-native';
+import { Pressable, Text, View } from 'react-native';
+
+import { useColors } from '@/providers/theme-provider';
 
 /** "August 2026" — the month is the identity of a row, so it is spelled out. */
 function monthName(month: string): string {
@@ -31,8 +35,11 @@ export default function SavingsScreen() {
   const { data: months = [], isLoading, isError, refetch } = useMonthlySavings();
   const { refresh, refreshing } = useRefreshAll();
 
-  const total = months.reduce((sum, month) => sum + Number(month.saved), 0);
-  const kept = months.filter((month) => Number(month.saved) > 0).length;
+  // The corrected figure where there is one, and nothing at all from a month
+  // left out — so the total is what the person says they kept, not what the
+  // app guessed.
+  const total = months.reduce((sum, month) => sum + savedFor(month), 0);
+  const kept = months.filter((month) => savedFor(month) > 0).length;
 
   return (
     <Screen showBack onRefresh={refresh} refreshing={refreshing}>
@@ -94,10 +101,8 @@ export default function SavingsScreen() {
             {months.map((month) => (
               <MonthRow
                 key={month.month}
-                month={month.month}
-                income={Number(month.income)}
-                spent={Number(month.spent)}
-                saved={Number(month.saved)}
+                row={month}
+                onPress={() => router.push(`/savings-month?month=${month.month}`)}
               />
             ))}
           </View>
@@ -110,61 +115,69 @@ export default function SavingsScreen() {
 /**
  * One month, and the arithmetic behind it.
  *
- * The sentence underneath is the point of the row. It is the difference
- * between a number somebody has to take on trust and one they can check.
+ * The sentence underneath is the point of the row — it is the difference
+ * between a number somebody has to take on trust and one they can check. When
+ * a month has been corrected it says so and gives the reason, because a figure
+ * that disagrees with the app's own maths needs to explain itself more, not
+ * less.
  */
-function MonthRow({
-  month,
-  income,
-  spent,
-  saved,
-}: {
-  month: string;
-  income: number;
-  spent: number;
-  saved: number;
-}) {
-  const over = saved < 0;
-  const name = monthName(month);
+function MonthRow({ row, onPress }: { row: MonthlySavingRow; onPress: () => void }) {
+  const colors = useColors();
+
+  const computed = Number(row.saved);
+  const corrected = row.adjusted_saved !== null;
+  const excluded = Boolean(row.excluded_at);
+  const shown = corrected ? Number(row.adjusted_saved) : computed;
+  const over = shown < 0;
+  const name = monthName(row.month);
+
+  const explain = excluded
+    ? 'Left out of your savings. Tap to count it again.'
+    : corrected
+      ? `You said this month left ${formatCurrency(shown)}${row.note ? ` — ${row.note}` : ''}. Skip worked out ${formatCurrency(computed)}.`
+      : over
+        ? `${formatCurrency(Number(row.spent))} went out against ${formatCurrency(Number(row.income))} coming in, so this month took from your savings rather than adding to them.`
+        : `${formatCurrency(Number(row.income))} came in and ${formatCurrency(Number(row.spent))} went out on bills, subscriptions and receipts — the rest stayed.`;
 
   return (
-    <View
-      className="w-full border-b border-line py-4"
-      accessible
-      accessibilityLabel={
-        over
-          ? `${name}. Overspent by ${formatCurrency(Math.abs(saved))}. ${formatCurrency(income)} came in, ${formatCurrency(spent)} went out.`
-          : `${name}. Saved ${formatCurrency(saved)}. ${formatCurrency(income)} came in, ${formatCurrency(spent)} went out.`
-      }
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${name}. ${excluded ? 'Left out of your savings.' : `${formatCurrency(shown)}.`} ${explain} Tap to correct.`}
+      onPress={onPress}
+      className="w-full flex-row items-center gap-3 border-b border-line py-4 active:bg-ink/5"
     >
-      <View className="w-full flex-row items-baseline justify-between gap-3">
+      <View className="min-w-0 flex-1">
+        <View className="w-full flex-row items-baseline justify-between gap-3">
+          <Text
+            className="min-w-0 flex-1 font-poppins-semibold text-[16px] text-ink"
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.3}
+          >
+            {name}
+          </Text>
+          <Text
+            className={
+              excluded
+                ? 'font-poppins text-[14px] text-muted line-through'
+                : over
+                  ? 'font-poppins-bold text-[17px] text-ink'
+                  : 'font-poppins-bold text-[17px] text-accent-ink'
+            }
+            maxFontSizeMultiplier={1.3}
+          >
+            {over ? `\u2212${formatCurrency(Math.abs(shown))}` : formatCurrency(shown)}
+          </Text>
+        </View>
+
         <Text
-          className="min-w-0 flex-1 font-poppins-semibold text-[16px] text-ink"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.3}
+          className="mt-1.5 font-poppins text-[12px] leading-[18px] text-muted"
+          maxFontSizeMultiplier={1.4}
         >
-          {name}
-        </Text>
-        <Text
-          className={
-            over
-              ? 'font-poppins-bold text-[17px] text-ink'
-              : 'font-poppins-bold text-[17px] text-accent-ink'
-          }
-          maxFontSizeMultiplier={1.3}
-        >
-          {over ? `−${formatCurrency(Math.abs(saved))}` : formatCurrency(saved)}
+          {explain}
         </Text>
       </View>
 
-      <Text
-        className="mt-1.5 font-poppins text-[12px] leading-[18px] text-muted"
-        maxFontSizeMultiplier={1.4}
-      >
-        {over
-          ? `${formatCurrency(spent)} went out against ${formatCurrency(income)} coming in, so this month took from your savings rather than adding to them.`
-          : `${formatCurrency(income)} came in and ${formatCurrency(spent)} went out on bills, subscriptions and receipts — the rest stayed.`}
-      </Text>
-    </View>
+      <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
+    </Pressable>
   );
 }

@@ -219,6 +219,44 @@ export const useCreateReceipt = () => useCreate<ReceiptValues>('receipts');
 export const useUpdateReceipt = () => useUpdate<Partial<ReceiptValues>>('receipts');
 export const useDeleteReceipt = () => useRemove('receipts');
 
+// --- Savings ---------------------------------------------------------------
+
+/**
+ * Correcting a month.
+ *
+ * A null amount clears the correction and puts the month back on what the app
+ * worked out — which is what somebody wants after adding the bill they had
+ * missed, rather than having to remember the original figure.
+ */
+export function useAdjustSavingsMonth() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (values: { month: string; amount: number | null; note: string | null }) => {
+      const { error } = await supabase.rpc('adjust_savings_month', {
+        p_month: values.month,
+        p_amount: values.amount,
+        p_note: values.note,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => invalidate('monthly-savings'),
+  });
+}
+
+export function useExcludeSavingsMonth() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (values: { month: string; excluded: boolean }) => {
+      const { error } = await supabase.rpc('exclude_savings_month', {
+        p_month: values.month,
+        p_excluded: values.excluded,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => invalidate('monthly-savings'),
+  });
+}
+
 // --- Subscriptions ---------------------------------------------------------
 
 export type SubscriptionValues = {

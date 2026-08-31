@@ -181,9 +181,21 @@ export type MonthlySavingRow = {
   month: string;
   income: number;
   spent: number;
-  /** Negative on a month that was overspent. Deliberately not floored. */
+  /** What the app worked out. Negative on a month that was overspent. */
   saved: number;
+  /** What the person says it really left. Null means use the computed figure. */
+  adjusted_saved: number | null;
+  /** Why it was corrected. */
+  note: string | null;
+  /** Set when the month is kept out of the total. */
+  excluded_at: string | null;
 };
+
+/** What a month contributes: the correction if there is one, else the maths. */
+export function savedFor(month: MonthlySavingRow): number {
+  if (month.excluded_at) return 0;
+  return Number(month.adjusted_saved ?? month.saved);
+}
 
 /**
  * What each finished month left behind.
@@ -205,7 +217,7 @@ export function useMonthlySavings() {
 
       const { data, error } = await supabase
         .from('monthly_savings')
-        .select('month, income, spent, saved')
+        .select('month, income, spent, saved, adjusted_saved, note, excluded_at')
         .order('month', { ascending: false });
       if (error) throw error;
       return (data ?? []) as MonthlySavingRow[];
