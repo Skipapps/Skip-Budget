@@ -8,6 +8,7 @@ import { AddButton } from '@/components/dashboard/add-button';
 import { BalanceSummary } from '@/components/dashboard/balance-summary';
 import { AmountTile } from '@/components/ui/amount-tile';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
+import { GettingStartedCard } from '@/components/dashboard/getting-started-card';
 import { InsightBanner } from '@/components/dashboard/insight-banner';
 import { DateSelector } from '@/components/dashboard/date-selector';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
@@ -156,6 +157,10 @@ export default function HomeScreen() {
           loading={month.isLoading}
         />
       </View>
+
+      {/* Renders nothing once its five steps are done or it was waved away —
+          margin included, so established accounts get no phantom gap. */}
+      <GettingStartedCard />
 
       <View className="mt-8 w-full flex-row items-baseline justify-between gap-3">
         <Text className="font-poppins-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>

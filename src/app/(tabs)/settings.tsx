@@ -21,6 +21,8 @@ import {
   Trash2,
   UserRound,
   Vibrate,
+  CircleHelp,
+  Compass,
 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -316,6 +318,18 @@ export default function SettingsScreen() {
       </SettingsSection>
 
       <SettingsSection title="Support and feedback">
+        <SettingsRow
+          icon={CircleHelp}
+          title="Common questions"
+          subtitle="Short answers, no waiting"
+          onPress={() => router.push('/faq')}
+        />
+        <SettingsRow
+          icon={Compass}
+          title="What Skip can do"
+          subtitle="The six things, each a tap away"
+          onPress={() => router.push('/tour')}
+        />
         <SettingsRow
           icon={Mail}
           title="Email support"

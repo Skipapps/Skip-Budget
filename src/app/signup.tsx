@@ -46,7 +46,7 @@ export default function SignUpScreen() {
     // With confirmation off Supabase signs the user straight in; with it on a
     // code is emailed. Handle both rather than assuming one is configured.
     if (signedIn) {
-      router.replace('/home');
+      router.replace('/hello');
       return;
     }
     router.push({ pathname: '/verify-otp', params: { email: email.trim(), purpose: 'signup' } });

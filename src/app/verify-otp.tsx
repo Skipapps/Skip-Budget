@@ -41,7 +41,7 @@ export default function VerifyOtpScreen() {
 
     // A verified signup is already signed in; recovery hands over a short-lived
     // session that only exists so the password can be changed.
-    router.replace(mode === 'signup' ? '/home' : '/reset-password');
+    router.replace(mode === 'signup' ? '/hello' : '/reset-password');
   };
 
   const handleResend = async () => {

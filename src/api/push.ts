@@ -31,17 +31,52 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/** Whether notifications are allowed right now, without asking. */
+export async function remindersAllowed(): Promise<boolean> {
+  if (!Device.isDevice || Platform.OS !== 'ios') return false;
+  const existing = await Notifications.getPermissionsAsync();
+  return (
+    existing.granted || existing.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
+  );
+}
+
+/**
+ * Ask for notifications, then register this device.
+ *
+ * The ask lives here, behind a tap that explains itself — the Getting Started
+ * step, or the reminders screen — and nowhere else. iOS grants one system
+ * prompt per install, and spending it at launch, before the app has shown any
+ * value, is how most refusals happen. Returns whether reminders can now send.
+ */
+export async function enableReminders(userId: string): Promise<boolean> {
+  if (!Device.isDevice || Platform.OS !== 'ios') return false;
+
+  const allowed = await remindersAllowed();
+  const decision = allowed
+    ? await Notifications.getPermissionsAsync()
+    : await Notifications.requestPermissionsAsync();
+  if (
+    !decision.granted &&
+    decision.ios?.status !== Notifications.IosAuthorizationStatus.PROVISIONAL
+  )
+    return false;
+
+  try {
+    await registerDevice(userId);
+  } catch {
+    // A token failure loses nothing that the next launch will not retry.
+  }
+  return true;
+}
+
 async function registerDevice(userId: string): Promise<void> {
   // A simulator has no push certificate and cannot be given a token; asking
   // throws rather than returning null.
   if (!Device.isDevice || Platform.OS !== 'ios') return;
 
-  const existing = await Notifications.getPermissionsAsync();
-  const granted =
-    existing.granted || existing.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
-
-  const decision = granted ? existing : await Notifications.requestPermissionsAsync();
-  if (!decision.granted) return;
+  // Register only what was already granted. The asking happens in
+  // enableReminders, at a moment somebody chose; launch is not that moment.
+  if (!(await remindersAllowed())) return;
 
   const token = await Notifications.getDevicePushTokenAsync();
   if (typeof token.data !== 'string' || !token.data) return;

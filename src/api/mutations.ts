@@ -120,6 +120,8 @@ export type ProfileValues = {
   avatar_id?: string | null;
   /** Dashboard tile ids, first to last. */
   tile_order?: string[] | null;
+  /** When the Getting Started card was waved away. */
+  getting_started_dismissed_at?: string | null;
 };
 
 /**

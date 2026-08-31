@@ -116,13 +116,14 @@ export type ProfileRow = {
   avatar_id: string | null;
   /** Dashboard tile ids, first to last. Null means the shipped order. */
   tile_order: string[] | null;
+  getting_started_dismissed_at: string | null;
 };
 
 export function useProfile() {
   return useOwnerQuery<ProfileRow | null>('profile', async () => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, display_name, currency, avatar_id, tile_order')
+      .select('id, display_name, currency, avatar_id, tile_order, getting_started_dismissed_at')
       .maybeSingle();
     if (error) throw error;
     return data;
