@@ -317,16 +317,10 @@ Deno.serve(async (request) => {
       if (await push(supabase, tokenRow, jwt, notice.title, notice.body)) delivered = true;
     }
 
-    // Stamped whether or not Apple took it. Unlike a reminder, which is about
-    // something still ahead and worth retrying, this is about something that
-    // already happened — retrying it tomorrow would deliver stale news, and
-    // leaving it unstamped would retry it forever for an account with no
-    // device registered at all.
-    await supabase
-      .from('split_notices')
-      .update({ sent_at: new Date().toISOString() })
-      .eq('id', notice.notice_id);
-
+    // No stamping here any more. split_notices_due claims its rows and marks
+    // them in the same statement, so two senders dispatched seconds apart can
+    // never both take the same notice — which they otherwise would, now that
+    // every write dispatches one rather than waiting for a single cron job.
     if (delivered) shared += 1;
   }
 

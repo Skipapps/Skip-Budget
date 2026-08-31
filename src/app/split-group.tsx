@@ -15,6 +15,7 @@ import {
 } from '@/api/splits';
 import { GroupIcon } from '@/components/splits/group-icon';
 import { Person } from '@/components/splits/person';
+import { useRefreshAll } from '@/api/refresh';
 import { Button } from '@/components/ui/button';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
@@ -45,6 +46,7 @@ export default function SplitGroupScreen() {
   const { data: balances = [] } = useGroupBalances(id);
   const { data: expenses = [] } = useGroupExpenses(id);
   const { data: settlements = [] } = useGroupSettlements(id);
+  const { refresh, refreshing } = useRefreshAll();
 
   const byId = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
 
@@ -95,7 +97,7 @@ export default function SplitGroupScreen() {
   }
 
   return (
-    <Screen showBack>
+    <Screen showBack onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-2 w-full flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1 flex-row items-center gap-3">
           <GroupIcon iconId={group.icon_id} size={24} color={colors.ink} />

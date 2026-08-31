@@ -6,6 +6,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useArtwork } from '@/theme/artwork';
 import { useCreateReceipt } from '@/api/mutations';
 import { usePaymentSources, useReceipts } from '@/api/queries';
+import { useRefreshAll } from '@/api/refresh';
 import { draftToParams, useReceiptScan } from '@/api/scan';
 import {
   EMPTY_RECEIPT_FILTERS,
@@ -46,6 +47,7 @@ export default function ReceiptsScreen() {
 
   const { scan, scanning, available: canScan } = useReceiptScan();
   const createReceipt = useCreateReceipt();
+  const { refresh, refreshing } = useRefreshAll();
 
   /**
    * Camera, shutter, done.
@@ -133,7 +135,7 @@ export default function ReceiptsScreen() {
   const showNoMatches = !isLoading && !isError && receipts.length > 0 && visible.length === 0;
 
   return (
-    <Screen showBack avoidKeyboard>
+    <Screen showBack avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-2 w-full flex-row items-center justify-between gap-3">
         <Title align="left" className="flex-1">
           Receipts

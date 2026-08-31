@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Calculator, ChevronRight, Users } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
+import { useRefreshAll } from '@/api/refresh';
 import { useFriendRequests, useFriends, useGroups, useMyBalances } from '@/api/splits';
 import { GroupIcon } from '@/components/splits/group-icon';
 import { ActionPill } from '@/components/ui/action-pill';
@@ -30,12 +31,13 @@ export default function SplitsScreen() {
   const { data: balances } = useMyBalances();
   const { data: friends = [] } = useFriends();
   const { data: requests } = useFriendRequests();
+  const { refresh, refreshing } = useRefreshAll();
 
   const waiting = requests?.incoming.length ?? 0;
   const live = groups.filter((group) => !group.archived_at);
 
   return (
-    <Screen showBack>
+    <Screen showBack onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-2 w-full flex-row items-center justify-between gap-3">
         <Title align="left" className="flex-1">
           Split manager

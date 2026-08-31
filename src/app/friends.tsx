@@ -13,6 +13,7 @@ import {
   type FriendRow,
 } from '@/api/splits';
 import { useProfile } from '@/api/queries';
+import { useRefreshAll } from '@/api/refresh';
 import { Person } from '@/components/splits/person';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
@@ -53,6 +54,7 @@ export default function FriendsScreen() {
   const addFriend = useAddFriendByCode();
   const respond = useRespondToFriendRequest();
   const removeFriend = useRemoveFriend();
+  const { refresh, refreshing } = useRefreshAll();
 
   const handleAdd = async () => {
     setError(null);
@@ -107,7 +109,7 @@ export default function FriendsScreen() {
   const outgoing = requests?.outgoing ?? [];
 
   return (
-    <Screen showBack avoidKeyboard>
+    <Screen showBack avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
       <Title className="mt-2">Friends</Title>
       <Subtitle className="mt-3">
         Share your code with someone and they can add you. Nobody can find you without it.
