@@ -206,7 +206,7 @@ export default function HomeScreen() {
         {/* Transactions is the story: the chart, the timeline and the
             periods to read them over. The banner said so already and had
             nowhere to send anyone. */}
-        <InsightBanner onPress={() => router.push('/transactions')} />
+        <InsightBanner onPress={() => router.push('/insights')} />
       </View>
 
       <View className="mt-5 h-px w-full bg-line" />
