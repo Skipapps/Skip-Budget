@@ -23,6 +23,7 @@ import {
   Vibrate,
   CircleHelp,
   Compass,
+  ListChecks,
 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -318,6 +319,17 @@ export default function SettingsScreen() {
       </SettingsSection>
 
       <SettingsSection title="Support and feedback">
+        <SettingsRow
+          icon={ListChecks}
+          title="Getting started"
+          subtitle="Put the setup steps back on Home"
+          onPress={() => {
+            // Clearing the dismissal is all it takes: the card derives its
+            // steps live, and it still leaves on its own once all five are done.
+            updateProfile.mutate({ getting_started_dismissed_at: null });
+            router.push('/home');
+          }}
+        />
         <SettingsRow
           icon={CircleHelp}
           title="Common questions"

@@ -26,6 +26,11 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
           'On purpose. Skip never asks for bank credentials, so there is no login to leak and no third party reading your transactions. You tell Skip what happened — by scanning a receipt, or typing a bill once — and everything it knows stays between you and your own account. Your bank never knows Skip exists.',
       },
       {
+        question: 'Can I get the Getting started card back?',
+        answer:
+          'Yes — Settings → Getting started puts it back on Home. It only stays while there is something left to do; once all five steps are done it leaves on its own. A step can tick itself: turning on notifications for Skip once counts for every account on this phone, because the permission belongs to the phone.',
+      },
+      {
         question: 'What should I set up first?',
         answer:
           'Your pay, under Cards → Salary. Left this month, savings and Insights all start from what comes in. The Getting Started card on Home walks you through the rest — a card, a bill, a scanned receipt, reminders.',
