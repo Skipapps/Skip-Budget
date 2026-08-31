@@ -60,11 +60,12 @@ export function InsightBanner({ onPress }: InsightBannerProps) {
         </Text>
       </View>
 
-      {/* Pinned to the corner rather than sat in the row: centred beside two
-          lines of text it reads as a third column, and the artwork already
-          gives this banner a left-to-right shape to follow. */}
+      {/* A row child rather than an absolute corner pin, so the row's own
+          items-center does the vertical centring — and the chevron keeps its
+          distance from the text instead of overlapping it when the label wraps
+          to a second line at large type sizes. */}
       {onPress ? (
-        <View className="absolute right-3 top-3">
+        <View className="shrink-0 pl-1">
           <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
         </View>
       ) : null}

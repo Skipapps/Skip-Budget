@@ -15,7 +15,8 @@ import {
 } from '@/api/queries';
 import { useRefreshAll } from '@/api/refresh';
 import { useMyBalances } from '@/api/splits';
-import { BrandLogo } from '@/components/brands/brand-logo';
+import { BillMark } from '@/components/bills/bill-mark';
+import { BrandMark } from '@/components/brands/brand-mark';
 import { FlowChart, type FlowBucket } from '@/components/transactions/flow-chart';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { Screen } from '@/components/ui/screen';
@@ -146,21 +147,40 @@ export default function InsightsScreen() {
   // --- Where you spend most -------------------------------------------------
 
   const merchants = useMemo(() => {
-    const byName = new Map<string, { amount: number; visits: number; domain?: string | null }>();
+    type Merchant = {
+      amount: number;
+      visits: number;
+      domain?: string | null;
+      kind: string;
+      categoryId?: string | null;
+      iconId?: string | null;
+    };
+
+    const byName = new Map<string, Merchant>();
     for (const entry of entries) {
       if (entry.amount >= 0) continue;
       const found = byName.get(entry.label);
       if (found) {
         found.amount += Math.abs(entry.amount);
         found.visits += 1;
+        // Any row that knows the brand settles it for the group. Keeping only
+        // the first row's domain loses the logo whenever the earliest entry
+        // happened to be the one typed by hand.
+        found.domain = found.domain ?? entry.domain;
+        found.categoryId = found.categoryId ?? entry.categoryId;
+        found.iconId = found.iconId ?? entry.iconId;
       } else {
         byName.set(entry.label, {
           amount: Math.abs(entry.amount),
           visits: 1,
           domain: entry.domain,
+          kind: entry.kind,
+          categoryId: entry.categoryId,
+          iconId: entry.iconId,
         });
       }
     }
+
     return [...byName.entries()]
       .map(([name, value]) => ({ name, ...value }))
       .sort((a, b) => b.amount - a.amount)
@@ -296,30 +316,40 @@ export default function InsightsScreen() {
           <Heading>Where it goes</Heading>
           <View className="w-full rounded-[14px] border border-line bg-card px-5 py-5">
             {categories.map((category, index) => (
-              <View key={category.id} className={index > 0 ? 'mt-4' : undefined}>
-                <View className="w-full flex-row items-baseline justify-between gap-3">
-                  <Text
-                    className="min-w-0 flex-1 font-poppins-medium text-[14px] text-ink"
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={1.3}
-                  >
-                    {category.label}
-                  </Text>
-                  <Text
-                    className="font-poppins-semibold text-[14px] text-ink"
-                    maxFontSizeMultiplier={1.3}
-                  >
-                    {formatCurrency(category.amount)}
-                  </Text>
-                </View>
-                {/* Bars are relative to the biggest, not to the total — the
+              <View
+                key={category.id}
+                className={
+                  index > 0 ? 'mt-4 flex-row items-center gap-3' : 'flex-row items-center gap-3'
+                }
+              >
+                {/* The same mark a bill row draws, so a category reads the
+                    same way here as it does everywhere else in the app. */}
+                <BillMark categoryId={category.id} size={34} />
+                <View className="min-w-0 flex-1">
+                  <View className="w-full flex-row items-baseline justify-between gap-3">
+                    <Text
+                      className="min-w-0 flex-1 font-poppins-medium text-[14px] text-ink"
+                      numberOfLines={1}
+                      maxFontSizeMultiplier={1.3}
+                    >
+                      {category.label}
+                    </Text>
+                    <Text
+                      className="font-poppins-semibold text-[14px] text-ink"
+                      maxFontSizeMultiplier={1.3}
+                    >
+                      {formatCurrency(category.amount)}
+                    </Text>
+                  </View>
+                  {/* Bars are relative to the biggest, not to the total — the
                     question is which category dominates, and against a total
                     every bar on a varied month looks equally short. */}
-                <View className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-ink/5">
-                  <View
-                    className="h-full rounded-full bg-accent"
-                    style={{ width: `${biggest > 0 ? (category.amount / biggest) * 100 : 0}%` }}
-                  />
+                  <View className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-ink/5">
+                    <View
+                      className="h-full rounded-full bg-accent"
+                      style={{ width: `${biggest > 0 ? (category.amount / biggest) * 100 : 0}%` }}
+                    />
+                  </View>
                 </View>
               </View>
             ))}
@@ -339,7 +369,21 @@ export default function InsightsScreen() {
                   index > 0 ? 'mt-4 flex-row items-center gap-3' : 'flex-row items-center gap-3'
                 }
               >
-                <BrandLogo name={merchant.name} domain={merchant.domain} size={40} />
+                {/* A bill is not a brand. AEP and T-Mobile have logos, but
+                    rent and HOA fees have a category and nothing else, and a
+                    monogram beside real logos reads as a failed load. BillMark
+                    picks whichever the row actually has. */}
+                {merchant.kind === 'bill' ? (
+                  <BillMark
+                    categoryId={merchant.categoryId}
+                    iconId={merchant.iconId}
+                    domain={merchant.domain}
+                    name={merchant.name}
+                    size={40}
+                  />
+                ) : (
+                  <BrandMark name={merchant.name} domain={merchant.domain} size={40} />
+                )}
                 <View className="min-w-0 flex-1">
                   <View className="w-full flex-row items-baseline justify-between gap-3">
                     <Text
