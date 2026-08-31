@@ -43,7 +43,7 @@ export const spendingCategories: SpendingCategory[] = [
   { id: 'receipts', label: 'Receipts', artwork: 'tileReceipts' },
   { id: 'subscriptions', label: 'Subscriptions', artwork: 'tileSubscriptions' },
   { id: 'loan-calculator', label: 'Loan calculator', artwork: 'tileLoanRepayment' },
-  { id: 'split-calculator', label: 'Splits', artwork: 'tileSplitCalculator' },
+  { id: 'split-calculator', label: 'Split manager', artwork: 'tileSplitCalculator' },
 ];
 
 /** Day the dashboard opens on. */

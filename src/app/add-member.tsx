@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAddGroupMember, useFriends, useGroup, useGroupMembers } from '@/api/splits';
+import { Person } from '@/components/splits/person';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
@@ -92,13 +93,7 @@ export default function AddMemberScreen() {
             disabled={addMember.isPending}
             className="w-full flex-row items-center justify-between gap-3 py-3.5 active:bg-ink/5"
           >
-            <Text
-              className="min-w-0 flex-1 font-poppins-medium text-[15px] text-ink"
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.3}
-            >
-              {friend.display_name || 'Someone on Skip'}
-            </Text>
+            <Person name={friend.display_name || 'Someone on Skip'} avatarId={friend.avatar_id} />
             <View className="h-9 w-9 items-center justify-center rounded-full border border-line">
               <Check size={16} color={colors.muted} strokeWidth={2.2} />
             </View>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
 
 import {
+  memberAvatar,
   memberName,
   useArchiveGroup,
   useGroup,
@@ -12,6 +13,7 @@ import {
   useRemoveGroupMember,
   useUpdateGroup,
 } from '@/api/splits';
+import { Person } from '@/components/splits/person';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
@@ -179,24 +181,15 @@ export default function GroupSettingsScreen() {
 
           return (
             <View key={member.id} className="w-full flex-row items-center gap-3 py-3.5">
-              <View className="min-w-0 flex-1">
-                <Text
-                  className="font-poppins-medium text-[15px] text-ink"
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={1.3}
-                >
-                  {label}
-                  {isMe ? ' (you)' : ''}
-                </Text>
-                <Text
-                  className="mt-0.5 font-poppins text-[12px] text-muted"
-                  maxFontSizeMultiplier={1.3}
-                >
-                  {square
+              <Person
+                name={`${label}${isMe ? ' (you)' : ''}`}
+                avatarId={memberAvatar(member)}
+                subtitle={
+                  square
                     ? 'settled up'
-                    : `${balance > 0 ? 'owed' : 'owes'} ${formatCurrency(Math.abs(balance))}`}
-                </Text>
-              </View>
+                    : `${balance > 0 ? 'owed' : 'owes'} ${formatCurrency(Math.abs(balance))}`
+                }
+              />
 
               {isOwner && !isMe ? (
                 <Pressable

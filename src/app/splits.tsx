@@ -36,7 +36,7 @@ export default function SplitsScreen() {
     <Screen showBack>
       <View className="mt-2 w-full flex-row items-center justify-between gap-3">
         <Title align="left" className="flex-1">
-          Splits
+          Split manager
         </Title>
         <ActionPill label="New group" onPress={() => router.push('/add-group')} />
       </View>

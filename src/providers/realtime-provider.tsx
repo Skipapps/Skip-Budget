@@ -152,5 +152,39 @@ function SharedRealtime() {
     };
   }, [client, userId, key]);
 
+  return <FriendRealtime />;
+}
+
+/**
+ * Friend requests, which belong to no group.
+ *
+ * A friendship exists before the two people share anything to scope it by, so
+ * these ride a topic per account instead. Both sides are told: the receiver so
+ * a request appears while they are looking at the screen, and the sender so an
+ * accept lands without them going back to check.
+ */
+function FriendRealtime() {
+  const client = useQueryClient();
+  const userId = useUserId();
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`user:${userId}`, { config: { private: true } })
+      .on('broadcast', { event: '*' }, () => {
+        client.invalidateQueries({ queryKey: ['friends'] });
+        client.invalidateQueries({ queryKey: ['friend-requests'] });
+        // A new friendship changes who can be added to a group.
+        client.invalidateQueries({ queryKey: ['group-members'] });
+      });
+
+    channel.subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [client, userId]);
+
   return null;
 }

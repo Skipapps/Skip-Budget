@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { Pressable, Share, Text, View } from 'react-native';
 
 import {
+  memberAvatar,
   memberName,
   useGroup,
   useGroupBalances,
@@ -12,6 +13,7 @@ import {
   useGroupSettlements,
   type GroupMemberRow,
 } from '@/api/splits';
+import { Person } from '@/components/splits/person';
 import { Button } from '@/components/ui/button';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
@@ -346,21 +348,11 @@ function MemberRow({
           : `${name}${isYou ? ', you' : ''}. ${balance > 0 ? 'Owed' : 'Owes'} ${formatCurrency(Math.abs(balance))}.`
       }
     >
-      <View className="min-w-0 flex-1">
-        <Text
-          className="font-poppins-medium text-[15px] text-ink"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.3}
-        >
-          {name}
-          {isYou ? ' (you)' : ''}
-        </Text>
-        {pending ? (
-          <Text className="mt-0.5 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-            Not on Skip yet
-          </Text>
-        ) : null}
-      </View>
+      <Person
+        name={`${name}${isYou ? ' (you)' : ''}`}
+        avatarId={memberAvatar(member)}
+        subtitle={pending ? 'Not on Skip yet' : null}
+      />
       <Text
         className={
           settled

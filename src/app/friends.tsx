@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { Check, Share2, UserMinus, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Share, Text, View } from 'react-native';
@@ -11,6 +12,8 @@ import {
   useRespondToFriendRequest,
   type FriendRow,
 } from '@/api/splits';
+import { useProfile } from '@/api/queries';
+import { Person } from '@/components/splits/person';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
@@ -36,6 +39,14 @@ export default function FriendsScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const { data: mine } = useMyInviteCode();
+  const { data: profile } = useProfile();
+
+  // What everyone else sees is your display name, and it starts empty. Worth
+  // saying here rather than on the settings screen, because this is where the
+  // consequence lands: a friend request from "Someone on Skip" is one nobody
+  // can place, and the person sending it has no way to know that is how they
+  // appear.
+  const unnamed = !(profile?.display_name ?? '').trim();
   const { data: friends = [], isLoading } = useFriends();
   const { data: requests } = useFriendRequests();
 
@@ -128,6 +139,26 @@ export default function FriendsScreen() {
         />
       </View>
 
+      {unnamed ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Set your name in settings, so friends can recognise you"
+          onPress={() => router.push('/(tabs)/settings')}
+          className="mt-4 w-full rounded-[10px] border border-line px-4 py-3.5 active:bg-ink/5"
+        >
+          <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.4}>
+            Add your name first
+          </Text>
+          <Text
+            className="mt-1 font-poppins text-[12px] leading-[17px] text-muted"
+            maxFontSizeMultiplier={1.4}
+          >
+            Without one you show up as “Someone on Skip”, and a request from that is hard to place.
+            Set it in Settings, along with a picture.
+          </Text>
+        </Pressable>
+      ) : null}
+
       <View className="mt-7 w-full">
         <TextField
           label="Add someone by code"
@@ -170,13 +201,10 @@ export default function FriendsScreen() {
           <View className="h-px w-full bg-line" />
           {incoming.map((request) => (
             <View key={request.id} className="w-full flex-row items-center gap-3 py-3.5">
-              <Text
-                className="min-w-0 flex-1 font-poppins-medium text-[15px] text-ink"
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.3}
-              >
-                {request.profile?.display_name || 'Someone on Skip'}
-              </Text>
+              <Person
+                name={request.profile?.display_name || 'Someone on Skip'}
+                avatarId={request.profile?.avatar_id}
+              />
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Decline ${request.profile?.display_name || 'this request'}`}
@@ -203,14 +231,13 @@ export default function FriendsScreen() {
           <FieldLabel className="mb-2">Asked, not answered</FieldLabel>
           <View className="h-px w-full bg-line" />
           {outgoing.map((request) => (
-            <Text
-              key={request.id}
-              className="w-full py-3.5 font-poppins text-[15px] text-muted"
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.3}
-            >
-              {request.profile?.display_name || 'Someone on Skip'}
-            </Text>
+            <View key={request.id} className="w-full flex-row items-center py-3.5">
+              <Person
+                name={request.profile?.display_name || 'Someone on Skip'}
+                avatarId={request.profile?.avatar_id}
+                subtitle="Waiting for them"
+              />
+            </View>
           ))}
         </View>
       ) : null}
@@ -239,13 +266,7 @@ export default function FriendsScreen() {
 
         {friends.map((friend) => (
           <View key={friend.id} className="w-full flex-row items-center gap-3 py-3.5">
-            <Text
-              className="min-w-0 flex-1 font-poppins-medium text-[15px] text-ink"
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.3}
-            >
-              {friend.display_name || 'Someone on Skip'}
-            </Text>
+            <Person name={friend.display_name || 'Someone on Skip'} avatarId={friend.avatar_id} />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Remove ${friend.display_name || 'this friend'}`}

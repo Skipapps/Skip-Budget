@@ -89,6 +89,11 @@ export function memberName(member: GroupMemberRow | undefined | null): string {
   return member.display_name || member.profile?.display_name || 'Someone';
 }
 
+/** A placeholder has no account and so no picture — the fallback face stands in. */
+export function memberAvatar(member: GroupMemberRow | undefined | null): string | null {
+  return member?.profile?.avatar_id ?? null;
+}
+
 // --- Me ---------------------------------------------------------------------
 
 /** Your own invite code, which is the whole of how somebody adds you. */
