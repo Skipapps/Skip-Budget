@@ -42,7 +42,8 @@ export type GroupRow = {
   simplify_debts: boolean;
   invite_code: string | null;
   archived_at: string | null;
-  created_by: string;
+  /** Null once whoever made it deleted their account. */
+  created_by: string | null;
 };
 
 export type GroupMemberRow = {
@@ -63,7 +64,8 @@ export type ExpenseRow = {
   category_id: string | null;
   spent_on: string;
   split_mode: 'equal' | 'exact';
-  created_by: string;
+  /** Null once whoever recorded it deleted their account. */
+  created_by: string | null;
   splits: { member_id: string; share: number }[];
 };
 

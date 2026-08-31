@@ -128,7 +128,7 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
       {
         question: 'How do I delete my account?',
         answer:
-          'Settings → Account → Delete account. Everything goes with it — there is no grace copy kept.',
+          'Settings → Account → Delete account. Everything that is yours goes with it immediately — there is no grace copy kept. The one exception is shared groups: bills you were part of stay in your groupmates’ ledgers under just your name, because their history belongs to them too.',
       },
     ],
   },
