@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { LogOut, UserMinus } from 'lucide-react-native';
+import { LogOut, Share2, UserMinus, UserPlus } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, Switch, Text, View } from 'react-native';
+import { Pressable, Share, Switch, Text, View } from 'react-native';
 
 import {
   memberAvatar,
@@ -14,7 +14,7 @@ import {
   useUpdateGroup,
 } from '@/api/splits';
 import { Person } from '@/components/splits/person';
-import { IconPicker } from '@/components/bills/icon-picker';
+import { GroupIconPicker } from '@/components/splits/group-icon-picker';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
@@ -48,6 +48,13 @@ export default function GroupSettingsScreen() {
   const updateGroup = useUpdateGroup();
   const archiveGroup = useArchiveGroup();
   const removeMember = useRemoveGroupMember();
+
+  const handleShare = async () => {
+    if (!group?.invite_code) return;
+    await Share.share({
+      message: `Join "${group.name}" on Skip with the code ${group.invite_code} — we can keep track of who paid for what.`,
+    });
+  };
 
   const me = members.find((member) => member.user_id === userId);
   const isOwner = me?.role === 'owner';
@@ -140,8 +147,8 @@ export default function GroupSettingsScreen() {
       {isOwner ? (
         <View className="mt-7 w-full">
           <FieldLabel className="mb-3">Icon</FieldLabel>
-          <IconPicker
-            value={group?.icon_id ?? 'other'}
+          <GroupIconPicker
+            value={group?.icon_id ?? 'housing'}
             onChange={(next) => (id ? updateGroup.mutate({ id, iconId: next }) : undefined)}
           />
         </View>
@@ -181,7 +188,20 @@ export default function GroupSettingsScreen() {
       ) : null}
 
       <View className="mt-9 w-full">
-        <FieldLabel className="mb-2">Members</FieldLabel>
+        <View className="w-full flex-row items-center justify-between gap-3">
+          <FieldLabel>Members</FieldLabel>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add someone to this group"
+            onPress={() => (id ? router.push(`/add-member?group=${id}`) : undefined)}
+            className="min-h-11 flex-row items-center gap-1.5 rounded-full px-2 active:bg-ink/5"
+          >
+            <UserPlus size={16} color={colors.ink} strokeWidth={1.9} />
+            <Text className="font-poppins-medium text-[13px] text-ink" maxFontSizeMultiplier={1.3}>
+              Add
+            </Text>
+          </Pressable>
+        </View>
         <View className="h-px w-full bg-line" />
 
         {members.map((member) => {
@@ -215,6 +235,25 @@ export default function GroupSettingsScreen() {
             </View>
           );
         })}
+
+        {/* Sharing the code is how somebody who is not yet a friend gets in, so
+            it belongs with the members rather than on the group's main screen —
+            which is about money, not administration. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Share the group code ${group?.invite_code ?? ''}`}
+          onPress={handleShare}
+          className="mt-3 min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] border border-line active:bg-ink/5"
+        >
+          <Share2 size={16} color={colors.ink} strokeWidth={1.9} />
+          <Text
+            className="font-poppins-medium text-[14px] text-ink"
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.3}
+          >
+            Share code {group?.invite_code}
+          </Text>
+        </Pressable>
       </View>
 
       {error ? (

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Calculator, ChevronRight, Users } from 'lucide-react-native';
+import { ChevronRight, Users } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { useRefreshAll } from '@/api/refresh';
@@ -45,27 +45,6 @@ export default function SplitsScreen() {
         <ActionPill label="New group" onPress={() => router.push('/add-group')} />
       </View>
 
-      {/* Two ways in, and the quick one first because it is the common one. */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Quick split. Work out a bill without saving anything."
-        onPress={() => router.push('/split-calculator')}
-        className="mt-6 w-full flex-row items-center gap-3 rounded-[10px] border border-line px-4 py-4 active:bg-ink/5"
-      >
-        <View className="h-11 w-11 items-center justify-center rounded-full bg-ink/5">
-          <Calculator size={20} color={colors.ink} strokeWidth={1.9} />
-        </View>
-        <View className="min-w-0 flex-1">
-          <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
-            Quick split
-          </Text>
-          <Text className="mt-0.5 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-            Work out one bill. Nothing is saved and nobody is told.
-          </Text>
-        </View>
-        <ChevronRight size={20} color={colors.muted} strokeWidth={2} />
-      </Pressable>
-
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
@@ -74,7 +53,7 @@ export default function SplitsScreen() {
             : `Friends. ${friends.length} on Skip.`
         }
         onPress={() => router.push('/friends')}
-        className="mt-3 w-full flex-row items-center gap-3 rounded-[10px] border border-line px-4 py-4 active:bg-ink/5"
+        className="mt-6 w-full flex-row items-center gap-3 rounded-[10px] border border-line px-4 py-4 active:bg-ink/5"
       >
         <View className="h-11 w-11 items-center justify-center rounded-full bg-ink/5">
           <Users size={20} color={colors.ink} strokeWidth={1.9} />
@@ -134,6 +113,7 @@ export default function SplitsScreen() {
             {live.map((group) => (
               <GroupCard
                 key={group.id}
+                id={group.id}
                 name={group.name}
                 iconId={group.icon_id}
                 balance={balances?.get(group.id) ?? 0}
@@ -160,11 +140,13 @@ export default function SplitsScreen() {
  * meaning of the number and is the easiest thing on the screen to miss.
  */
 function GroupCard({
+  id,
   name,
   iconId,
   balance,
   onPress,
 }: {
+  id: string;
   name: string;
   iconId: string | null;
   balance: number;
@@ -189,7 +171,7 @@ function GroupCard({
       className="w-full rounded-[14px] border border-line bg-card px-5 py-5 active:bg-ink/5"
     >
       <View className="w-full flex-row items-center gap-4">
-        <GroupIcon iconId={iconId} color={colors.ink} />
+        <GroupIcon iconId={iconId} groupId={id} />
 
         <View className="min-w-0 flex-1">
           <Text

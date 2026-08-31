@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Switch, Text, View } from 'react-native';
 
 import { useAddGroupMember, useCreateGroup } from '@/api/splits';
-import { IconPicker } from '@/components/bills/icon-picker';
+import { GroupIconPicker } from '@/components/splits/group-icon-picker';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
@@ -29,9 +29,9 @@ export default function AddGroupScreen() {
 
   const [name, setName] = useState('');
   const [simplify, setSimplify] = useState(true);
-  // 'other' is the neutral glyph that actually exists in the set; defaulting to
-  // a missing id would draw the picker with nothing selected.
-  const [iconId, setIconId] = useState('other');
+  // A house rather than the neutral glyph: most groups are a flat or a shared
+  // household, and a default that is usually right saves a tap.
+  const [iconId, setIconId] = useState('housing');
   const [error, setError] = useState<string | null>(null);
 
   const createGroup = useCreateGroup();
@@ -95,7 +95,7 @@ export default function AddGroupScreen() {
 
       <View className="mt-7 w-full">
         <FieldLabel className="mb-3">Icon</FieldLabel>
-        <IconPicker value={iconId} onChange={setIconId} />
+        <GroupIconPicker value={iconId} onChange={setIconId} />
       </View>
 
       <View className="mt-7 w-full flex-row items-center gap-4 rounded-[10px] border border-line px-4 py-4">

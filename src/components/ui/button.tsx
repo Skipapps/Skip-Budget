@@ -64,8 +64,14 @@ export function Button({
       )}
     >
       {icon ? <View className="mr-3 shrink-0">{icon}</View> : null}
+      {/* One line, always. Two of these sit side by side on a group screen,
+          and a label that wraps there makes the pair different heights on a
+          narrow phone. Shrinking the type is the better trade. */}
       <Text
         className={cn('shrink text-center font-poppins-medium text-[17px]', label[variant])}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
         maxFontSizeMultiplier={1.5}
       >
         {labelText}

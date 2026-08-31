@@ -4,78 +4,18 @@
  * All arithmetic runs in integer cents. Dividing dollars as floats and rounding
  * each share loses money: $500 across 6 people rounds to $83.33 each, which is
  * $499.98 — two cents unaccounted for. Cents plus an explicit remainder means
- * the shares always sum back to the exact total.
+ * the shares always sum back to the exact total, which the database insists on:
+ * an expense whose shares do not add up to its total is refused.
  */
 
-export type Participant = {
-  id: string;
-  name: string;
-  /** What this person actually put in. */
-  paid: number;
-};
-
-export type Balance = Participant & {
-  /** This person's exact share — may be a cent more than someone else's. */
-  share: number;
-  /** Positive: owed money. Negative: owes money. */
-  balance: number;
-};
+const toCents = (value: number) => Math.round(value * 100);
+const toDollars = (cents: number) => cents / 100;
 
 export type Settlement = {
   from: string;
   to: string;
   amount: number;
 };
-
-export type SplitResult = {
-  /** Equal when the total divides evenly; a cent apart when it does not. */
-  shareMin: number;
-  shareMax: number;
-  /** How many people carry the extra cent. */
-  roundedUpCount: number;
-  balances: Balance[];
-  settlements: Settlement[];
-  paidTotal: number;
-};
-
-const toCents = (value: number) => Math.round(value * 100);
-const toDollars = (cents: number) => cents / 100;
-
-export function splitBill(participants: Participant[], total: number): SplitResult {
-  const count = Math.max(participants.length, 1);
-  const totalCents = Math.max(0, toCents(total));
-
-  // Everyone pays the base; the leftover cents go one each to the first few, so
-  // nothing is lost and no one is ever more than a cent out.
-  const baseCents = Math.floor(totalCents / count);
-  const remainder = totalCents - baseCents * count;
-
-  const balances: Balance[] = participants.map((person, index) => {
-    const shareCents = baseCents + (index < remainder ? 1 : 0);
-    const paidCents = toCents(person.paid);
-    return {
-      ...person,
-      share: toDollars(shareCents),
-      balance: toDollars(paidCents - shareCents),
-    };
-  });
-
-  const settlements = simplifyDebts(
-    balances.map((person) => ({
-      id: person.name,
-      balance: toDollars(toCents(person.paid) - toCents(person.share)),
-    })),
-  );
-
-  return {
-    shareMin: toDollars(baseCents),
-    shareMax: toDollars(baseCents + (remainder > 0 ? 1 : 0)),
-    roundedUpCount: remainder,
-    balances,
-    settlements,
-    paidTotal: toDollars(participants.reduce((sum, person) => sum + toCents(person.paid), 0)),
-  };
-}
 
 // --- Working out who pays whom ------------------------------------------------
 
