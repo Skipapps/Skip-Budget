@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Check } from 'lucide-react-native';
+import { Check, Share2, UserPlus } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Share, Text, View } from 'react-native';
 
 import { useAddGroupMember, useFriends, useGroup, useGroupMembers } from '@/api/splits';
 import { Person } from '@/components/splits/person';
@@ -31,6 +31,22 @@ export default function AddMemberScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const addMember = useAddGroupMember();
+
+  /**
+   * The way in for somebody who is not a friend yet.
+   *
+   * The group's own code, not a personal one: it puts them straight into this
+   * group rather than making them befriend you first and be added second. It
+   * works whether or not they already have Skip — the link is the same either
+   * way, and somebody without the app is the commonest case for a group that
+   * is short of people.
+   */
+  const handleInvite = async () => {
+    if (!group?.invite_code) return;
+    await Share.share({
+      message: `Join "${group.name}" on Skip with the code ${group.invite_code} — we can keep track of who paid for what.`,
+    });
+  };
   const alreadyIn = new Set(members.map((member) => member.user_id).filter(Boolean));
   const available = friends.filter((friend) => !alreadyIn.has(friend.id));
 
@@ -67,7 +83,42 @@ export default function AddMemberScreen() {
         now and claim it later.
       </Subtitle>
 
+      {/* First, because it is the answer when the list below is empty — and
+          an empty list is exactly when somebody opens this page. */}
       <View className="mt-8 w-full">
+        <FieldLabel className="mb-3">Invite a friend</FieldLabel>
+        <Button
+          label="Share the group link"
+          icon={<Share2 size={17} color={colors.onControl} strokeWidth={1.9} />}
+          onPress={handleInvite}
+          disabled={!group?.invite_code}
+        />
+        <Text
+          className="mt-2.5 w-full font-poppins text-[12px] leading-[18px] text-muted"
+          maxFontSizeMultiplier={1.4}
+        >
+          Anyone with the code joins this group directly, whether or not they already have Skip.
+          {group?.invite_code ? ` Your code is ${group.invite_code}.` : ''}
+        </Text>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add a friend on Skip by their code"
+          onPress={() => router.push('/friends')}
+          className="mt-3 min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] border border-line active:bg-ink/5"
+        >
+          <UserPlus size={16} color={colors.ink} strokeWidth={1.9} />
+          <Text
+            className="font-poppins-medium text-[14px] text-ink"
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.4}
+          >
+            Add a friend by code
+          </Text>
+        </Pressable>
+      </View>
+
+      <View className="mt-9 w-full">
         <FieldLabel className="mb-2">
           {available.length > 0 ? 'Your friends' : 'No friends left to add'}
         </FieldLabel>
