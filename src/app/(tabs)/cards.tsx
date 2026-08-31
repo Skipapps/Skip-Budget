@@ -12,7 +12,7 @@ import {
   useBankAccounts,
   useCards,
   useSalarySources,
-  useSavingsPots,
+  useMonthlySavings,
   useSourceBalances,
 } from '@/api/queries';
 import { useRefreshAll } from '@/api/refresh';
@@ -77,7 +77,7 @@ export default function CardsScreen() {
   const cards = useCards();
   const accounts = useBankAccounts();
   const salary = useSalarySources();
-  const savings = useSavingsPots();
+  const savings = useMonthlySavings();
   const { balances } = useSourceBalances(today);
   const { refresh, refreshing } = useRefreshAll();
 
@@ -85,7 +85,9 @@ export default function CardsScreen() {
     (sum, source) => sum + source.amount * PER_MONTH[source.frequency],
     0,
   );
-  const savingsTotal = (savings.data ?? []).reduce((sum, pot) => sum + pot.amount, 0);
+  // What the finished months added up to. A month that was overspent takes
+  // from it, so this can fall as well as rise.
+  const savingsTotal = (savings.data ?? []).reduce((sum, month) => sum + Number(month.saved), 0);
 
   const moneyAmounts: Record<string, number> = {
     salary: monthlySalary,
@@ -186,7 +188,13 @@ export default function CardsScreen() {
               label={bucket.label}
               amount={moneyAmounts[bucket.id] ?? 0}
               artwork={artwork[bucket.artwork]}
-              onPress={bucket.id === 'salary' ? () => router.push('/salary') : undefined}
+              onPress={
+                bucket.id === 'salary'
+                  ? () => router.push('/salary')
+                  : bucket.id === 'savings'
+                    ? () => router.push('/savings')
+                    : undefined
+              }
             />
           </View>
         ))}

@@ -176,6 +176,43 @@ export function useSalarySources() {
   });
 }
 
+export type MonthlySavingRow = {
+  /** yyyy-mm-01 — the month is the identity of the row. */
+  month: string;
+  income: number;
+  spent: number;
+  /** Negative on a month that was overspent. Deliberately not floored. */
+  saved: number;
+};
+
+/**
+ * What each finished month left behind.
+ *
+ * Closes anything outstanding before reading, so a month that ended while the
+ * phone was shut shows up the moment somebody opens the page rather than
+ * whenever the monthly job next runs. The call is idempotent and cheap when
+ * there is nothing to close.
+ */
+export function useMonthlySavings() {
+  const userId = useUserId();
+  return useQuery({
+    queryKey: ['monthly-savings', userId],
+    enabled: Boolean(userId),
+    queryFn: async (): Promise<MonthlySavingRow[]> => {
+      // Failure here is not fatal: the rows already closed are still worth
+      // showing, and the job will catch up whatever this missed.
+      await supabase.rpc('close_my_savings');
+
+      const { data, error } = await supabase
+        .from('monthly_savings')
+        .select('month, income, spent, saved')
+        .order('month', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as MonthlySavingRow[];
+    },
+  });
+}
+
 export function useSavingsPots() {
   return useOwnerQuery<SavingsPotRow[]>('savings_pots', async () => {
     const { data, error } = await supabase
