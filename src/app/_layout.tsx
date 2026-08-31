@@ -19,6 +19,7 @@ import { useRegisterPush } from '@/api/push';
 import { AppLockGate } from '@/components/app-lock-gate';
 import { DialogProvider } from '@/providers/dialog-provider';
 import { QueryProvider } from '@/providers/query-provider';
+import { FriendRequestPopup } from '@/components/splits/friend-request-popup';
 import { RealtimeProvider } from '@/providers/realtime-provider';
 import { PreferencesProvider } from '@/providers/preferences-provider';
 import { SessionProvider, useSession } from '@/providers/session-provider';
@@ -83,6 +84,9 @@ function AppShell({ fontsReady }: { fontsReady: boolean }) {
                   underneath it. */}
                 <AppLockGate>
                   <RootNavigator />
+                  {/* Inside the lock so it never draws on a locked phone, and
+                      after the navigator so it sits above every route. */}
+                  <FriendRequestPopup />
                 </AppLockGate>
                 <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
               </DialogProvider>
