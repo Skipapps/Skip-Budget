@@ -377,12 +377,21 @@ private final class ReceiptCameraViewController: UIViewController {
 
   private let session = AVCaptureSession()
   private let photoOutput = AVCapturePhotoOutput()
+  // Live frames for finding the receipt while the shot is being lined up.
+  private let videoOutput = AVCaptureVideoDataOutput()
+  private let detectionQueue = DispatchQueue(label: "com.skipapps.receipt-detect")
   // startRunning blocks until the camera warms up, which is long enough to drop
   // frames off the main thread's animation.
   private let sessionQueue = DispatchQueue(label: "com.skipapps.receipt-camera")
 
   private var previewLayer: AVCaptureVideoPreviewLayer?
   private var device: AVCaptureDevice?
+
+  /// The found receipt, drawn over the preview the way the system scanner
+  /// draws its capture area — so "it sees it" is visible before the tap.
+  private let outlineLayer = CAShapeLayer()
+  private var detecting = false
+  private var missCount = 0
 
   private let shutter = UIButton(type: .custom)
   private let closeButton = UIButton(type: .system)
@@ -405,6 +414,7 @@ private final class ReceiptCameraViewController: UIViewController {
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
     previewLayer?.frame = view.bounds
+    outlineLayer.frame = view.bounds
   }
 
   /// Portrait only, matching the app — a receipt is read down the page anyway.
@@ -479,6 +489,7 @@ private final class ReceiptCameraViewController: UIViewController {
 
   /// Everything except the preview, dimmed while the shot is being read.
   private func setBusy(_ busy: Bool) {
+    if busy { outlineLayer.opacity = 0 }
     shutter.isEnabled = !busy
     shutter.alpha = busy ? 0.4 : 1
     torchButton.isEnabled = !busy
@@ -513,6 +524,17 @@ private final class ReceiptCameraViewController: UIViewController {
     view.layer.insertSublayer(layer, at: 0)
     previewLayer = layer
 
+    // Above the preview, below the controls. CAShapeLayer animates path and
+    // opacity changes on its own, which is what makes the outline glide with
+    // the receipt rather than snap between detections.
+    outlineLayer.strokeColor = UIColor.systemBlue.cgColor
+    outlineLayer.fillColor = UIColor.systemBlue.withAlphaComponent(0.14).cgColor
+    outlineLayer.lineWidth = 2
+    outlineLayer.lineJoin = .round
+    outlineLayer.opacity = 0
+    outlineLayer.frame = view.bounds
+    view.layer.insertSublayer(outlineLayer, above: layer)
+
     sessionQueue.async { [weak self] in
       guard let self else { return }
 
@@ -534,6 +556,16 @@ private final class ReceiptCameraViewController: UIViewController {
 
       self.session.addInput(input)
       self.session.addOutput(self.photoOutput)
+
+      // The same frames the preview shows, handed to Vision. Late frames are
+      // dropped rather than queued: an outline for where the receipt was a
+      // second ago is worse than none.
+      if self.session.canAddOutput(self.videoOutput) {
+        self.videoOutput.alwaysDiscardsLateVideoFrames = true
+        self.videoOutput.setSampleBufferDelegate(self, queue: self.detectionQueue)
+        self.session.addOutput(self.videoOutput)
+      }
+
       self.session.commitConfiguration()
       self.device = camera
 
@@ -652,5 +684,67 @@ extension ReceiptCameraViewController: AVCapturePhotoCaptureDelegate {
         ]))
       }
     }
+  }
+}
+
+extension ReceiptCameraViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
+  func captureOutput(
+    _ output: AVCaptureOutput,
+    didOutput sampleBuffer: CMSampleBuffer,
+    from connection: AVCaptureConnection
+  ) {
+    // One request in flight at a time is the throttle: rectangle detection is
+    // quicker than the frame rate, and skipped frames cost nothing.
+    guard !settled, !capturing, !detecting,
+          let buffer = CMSampleBufferGetImageBuffer(sampleBuffer)
+    else { return }
+    detecting = true
+
+    let request = VNDetectRectanglesRequest { [weak self] request, _ in
+      let found = (request.results as? [VNRectangleObservation])?.first
+      DispatchQueue.main.async {
+        self?.showOutline(for: found)
+        self?.detecting = false
+      }
+    }
+    // The same shape rules the post-shot flattening uses, so the outline
+    // promises exactly what the correction will deliver.
+    request.minimumAspectRatio = 0.15
+    request.maximumAspectRatio = 1.0
+    request.minimumSize = 0.2
+    request.minimumConfidence = 0.6
+    request.maximumObservations = 1
+    request.quadratureTolerance = 35
+
+    // Deliberately .up: the corners come back in the sensor's own landscape
+    // space, and layerPointConverted below does every rotation and crop the
+    // preview applies — doing any of it by hand here would double it.
+    let handler = VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up, options: [:])
+    try? handler.perform([request])
+  }
+
+  private func showOutline(for rect: VNRectangleObservation?) {
+    guard let previewLayer, let rect, !settled, !capturing else {
+      missCount += 1
+      // A few misses before letting go: detection flickers frame to frame,
+      // and an outline that blinks with it reads as a fault.
+      if missCount > 4 { outlineLayer.opacity = 0 }
+      return
+    }
+    missCount = 0
+
+    // Vision measures up from the bottom of the buffer; the capture-device
+    // space the preview converts from measures down from the top.
+    let corners = [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft].map {
+      previewLayer.layerPointConverted(fromCaptureDevicePoint: CGPoint(x: $0.x, y: 1 - $0.y))
+    }
+
+    let path = UIBezierPath()
+    path.move(to: corners[0])
+    for corner in corners.dropFirst() { path.addLine(to: corner) }
+    path.close()
+
+    outlineLayer.path = path.cgPath
+    outlineLayer.opacity = 1
   }
 }

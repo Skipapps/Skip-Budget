@@ -83,7 +83,7 @@ export function useGettingStarted() {
     {
       id: 'scan',
       title: 'Scan a receipt',
-      detail: 'Point the camera at one and Skip files it in a tap.',
+      detail: 'Point the camera at one — Skip reads it, you check it, done.',
       done: (receipts.data ?? []).some((row) => row.source === 'scan' || row.source === 'upload'),
       href: '/receipts',
     },

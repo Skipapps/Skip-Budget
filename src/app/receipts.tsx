@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
-import { useCreateReceipt } from '@/api/mutations';
 import { usePaymentSources, useReceipts } from '@/api/queries';
 import { useRefreshAll } from '@/api/refresh';
 import { draftToParams, useReceiptScan } from '@/api/scan';
@@ -46,42 +45,23 @@ export default function ReceiptsScreen() {
   const { sources } = usePaymentSources();
 
   const { scan, scanning, available: canScan } = useReceiptScan();
-  const createReceipt = useCreateReceipt();
   const { refresh, refreshing } = useRefreshAll();
 
   /**
-   * Camera, shutter, done.
+   * Camera, shutter, then the form — with everything readable already read.
    *
-   * A scan that read both a store and a total is filed on the spot and the row
-   * appears at the top of this list — which is the confirmation, and a better
-   * one than a dialog, because it shows the figures that were actually saved
-   * and taps through to fix them. Anything less certain goes to the form with
-   * what was read already filled in, since a receipt with no total is not a
-   * receipt yet.
+   * The scan used to file a confident read on the spot, and the row appearing
+   * was the confirmation. It saved a tap and cost the check: the one moment to
+   * pick which card paid and catch a misread total was skipped exactly when
+   * the scan was surest of itself. Now every scan lands on the form with the
+   * fields filled in, so saving is one look and one tap — and the look is the
+   * point.
    */
   const handleScan = async () => {
     setScanError(null);
     try {
       const draft = await scan();
       if (!draft) return;
-
-      if (draft.complete && draft.store && draft.amount !== null) {
-        const chosen = sources.find((source) => source.id === draft.sourceId);
-        await createReceipt.mutateAsync({
-          brand_id: draft.store.brandId,
-          merchant: draft.store.name,
-          amount: draft.amount,
-          purchased_on: toIsoDate(draft.date),
-          category_id: draft.store.categoryId || 'other',
-          card_id: chosen?.kind === 'card' ? chosen.id : null,
-          bank_account_id: chosen?.kind === 'account' ? chosen.id : null,
-          note: null,
-          source: 'scan',
-          image_path: null,
-        });
-        return;
-      }
-
       router.push({ pathname: '/add-receipt', params: draftToParams(draft) });
     } catch (thrown) {
       setScanError((thrown as Error).message ?? 'Could not read that receipt.');
@@ -145,9 +125,9 @@ export default function ReceiptsScreen() {
         {canScan ? (
           <ActionPill
             icon={ScanLine}
-            label={scanning || createReceipt.isPending ? 'Reading…' : 'Scan'}
+            label={scanning ? 'Reading…' : 'Scan'}
             onPress={handleScan}
-            disabled={scanning || createReceipt.isPending}
+            disabled={scanning}
           />
         ) : null}
         <ActionPill label="Add" onPress={() => router.push('/add-receipt')} />

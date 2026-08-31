@@ -34,7 +34,7 @@ const STOPS: Stop[] = [
     artwork: 'tileReceipts',
     title: 'Scan receipts in a tap',
     detail:
-      'Point the camera at a receipt and it is read on your phone and filed — store, date, total. The photo never leaves the device.',
+      'Point the camera at a receipt and it is read on your phone — store, date, total, ready to check and save. The photo never leaves the device.',
     href: '/receipts',
   },
   {
