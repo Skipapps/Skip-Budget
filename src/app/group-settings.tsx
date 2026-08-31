@@ -188,21 +188,19 @@ export default function GroupSettingsScreen() {
       ) : null}
 
       <View className="mt-9 w-full">
-        <View className="w-full flex-row items-center justify-between gap-3">
-          <FieldLabel>Members</FieldLabel>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Add someone to this group"
-            onPress={() => (id ? router.push(`/add-member?group=${id}`) : undefined)}
-            className="min-h-11 flex-row items-center gap-1.5 rounded-full px-2 active:bg-ink/5"
-          >
-            <UserPlus size={16} color={colors.ink} strokeWidth={1.9} />
-            <Text className="font-poppins-medium text-[13px] text-ink" maxFontSizeMultiplier={1.3}>
-              Add
-            </Text>
-          </Pressable>
-        </View>
-        <View className="h-px w-full bg-line" />
+        <FieldLabel className="mb-3">Members</FieldLabel>
+
+        {/* Above the list rather than tucked beside the heading. Adding people
+            is what somebody opens this section to do, and a small control in
+            the corner competes with the rows for the same glance. */}
+        <Button
+          label="Add someone"
+          variant="outline"
+          icon={<UserPlus size={17} color={colors.ink} strokeWidth={1.9} />}
+          onPress={() => (id ? router.push(`/add-member?group=${id}`) : undefined)}
+        />
+
+        <View className="mt-5 h-px w-full bg-line" />
 
         {members.map((member) => {
           const balance = balanceOf(member.id);
