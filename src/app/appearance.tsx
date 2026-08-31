@@ -6,6 +6,7 @@ import { Screen } from '@/components/ui/screen';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { Title } from '@/components/ui/typography';
 import { cn } from '@/lib/cn';
+import { useProGate } from '@/components/pro/pro-gate';
 import { useColors, useTheme } from '@/providers/theme-provider';
 import { ACCENTS, MODES, onColor, type AccentId, type ModeKey } from '@/theme/palette';
 
@@ -22,6 +23,15 @@ import { ACCENTS, MODES, onColor, type AccentId, type ModeKey } from '@/theme/pa
 const MODE_ICONS = { light: Sun, dark: Moon, system: Monitor } as const;
 
 export default function AppearanceScreen() {
+  // A wrapper, not an inline return: the screen below runs its own
+  // hooks, and an early return above them would change the hook count
+  // the moment the entitlement answer arrives — which React forbids.
+  const gate = useProGate('theming');
+  if (gate) return gate;
+  return <AppearanceScreenInner />;
+}
+
+function AppearanceScreenInner() {
   const colors = useColors();
   const { mode, accentId, setMode, setAccent } = useTheme();
 

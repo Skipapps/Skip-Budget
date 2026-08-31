@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Calculator, Calendar, Trash2, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
@@ -11,6 +11,8 @@ import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { DatePicker } from '@/components/ui/date-picker';
+import { usePro } from '@/api/pro';
+import { useBankAccounts, useBankAccount, useSalaryAccountIds } from '@/api/queries';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm } from '@/providers/dialog-provider';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -31,7 +33,6 @@ import {
   useReminderChoice,
   type ReminderChoice,
 } from '@/api/reminders';
-import { useBankAccount, useSalaryAccountIds } from '@/api/queries';
 import { useColors } from '@/providers/theme-provider';
 import { ACCOUNT_TYPES, type AccountType } from '@/data/accounts-mock';
 import {
@@ -51,6 +52,19 @@ const MORE_SETUP_INFO =
 
 /** Loads the account being edited, then seeds the form by remount. */
 export default function AddAccountScreen() {
+  // Deep-link guard: creating past the free allowance opens the case
+  // for Pro instead of a form the database would refuse. Editing is
+  // untouched. Wrapper-shaped so the hook count never changes.
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { pro, ready } = usePro();
+  const existing = useBankAccounts();
+  if (!id && ready && !pro && (existing.data?.length ?? 0) >= 1) {
+    return <Redirect href={{ pathname: '/pro-feature', params: { id: 'unlimited' } }} />;
+  }
+  return <AddAccountScreenInner />;
+}
+
+function AddAccountScreenInner() {
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { data: existing, isLoading } = useBankAccount(id);

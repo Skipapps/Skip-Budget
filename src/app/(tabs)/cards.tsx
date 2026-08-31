@@ -15,6 +15,7 @@ import {
   useMonthlySavings,
   useSourceBalances,
 } from '@/api/queries';
+import { usePro } from '@/api/pro';
 import { useRefreshAll } from '@/api/refresh';
 import { toIsoDate } from '@/lib/date';
 import { moneyBuckets } from '@/data/money-mock';
@@ -80,6 +81,7 @@ export default function CardsScreen() {
   const savings = useMonthlySavings();
   const { balances } = useSourceBalances(today);
   const { refresh, refreshing } = useRefreshAll();
+  const { pro } = usePro();
 
   const monthlySalary = (salary.data ?? []).reduce(
     (sum, source) => sum + source.amount * PER_MONTH[source.frequency],
@@ -100,21 +102,39 @@ export default function CardsScreen() {
         <SectionHeader
           title="Select Card"
           actionLabel="New card"
-          onAction={() => router.push('/add-card')}
+          onAction={() =>
+            // The second of anything is where Pro begins. The database refuses
+            // it too; this door just explains itself first.
+            !pro && (cards.data?.length ?? 0) >= 1
+              ? router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } })
+              : router.push('/add-card')
+          }
         />
       </View>
 
       <View className="mt-5 w-full gap-4">
-        {(cards.data ?? []).map((card) => (
+        {(cards.data ?? []).map((card, index) => (
           // Wrapped rather than given an onPress: PaymentCard stays purely
           // presentational, and the same face is reused in the add-card preview
           // where tapping it would mean nothing.
           <Pressable
             key={card.id}
             accessibilityRole="button"
-            accessibilityLabel={`${card.holder}, view transactions`}
-            onPress={() => router.push(`/source/${card.id}`)}
+            accessibilityLabel={
+              !pro && index > 0
+                ? `${card.holder}, locked on the free plan. Opens Skip Pro.`
+                : `${card.holder}, view transactions`
+            }
+            onPress={() =>
+              // Locked, not lost: extras beyond the free allowance survive a
+              // downgrade untouched and open the way back in. The oldest one
+              // stays fully usable.
+              !pro && index > 0
+                ? router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } })
+                : router.push(`/source/${card.id}`)
+            }
             className="active:opacity-80"
+            style={!pro && index > 0 ? { opacity: 0.45 } : undefined}
           >
             <PaymentCard
               card={{
@@ -140,18 +160,31 @@ export default function CardsScreen() {
         <SectionHeader
           title="Bank accounts"
           actionLabel="Add account"
-          onAction={() => router.push('/add-account')}
+          onAction={() =>
+            !pro && (accounts.data?.length ?? 0) >= 1
+              ? router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } })
+              : router.push('/add-account')
+          }
         />
       </View>
 
       <View className="mt-5 w-full gap-4">
-        {(accounts.data ?? []).map((account) => (
+        {(accounts.data ?? []).map((account, index) => (
           <Pressable
             key={account.id}
             accessibilityRole="button"
-            accessibilityLabel={`${account.nickname || account.bank_name}, view transactions`}
-            onPress={() => router.push(`/source/${account.id}`)}
+            accessibilityLabel={
+              !pro && index > 0
+                ? `${account.nickname || account.bank_name}, locked on the free plan. Opens Skip Pro.`
+                : `${account.nickname || account.bank_name}, view transactions`
+            }
+            onPress={() =>
+              !pro && index > 0
+                ? router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } })
+                : router.push(`/source/${account.id}`)
+            }
             className="active:opacity-80"
+            style={!pro && index > 0 ? { opacity: 0.45 } : undefined}
           >
             <AccountCard
               account={{

@@ -6,6 +6,7 @@ import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { guessCategory, matchBrand, useBrandDirectory, useSpendCategories } from '@/api/brands';
+import { usePro } from '@/api/pro';
 import { useCreateReceipt, useDeleteReceipt, useUpdateReceipt } from '@/api/mutations';
 import { usePaymentSources, useReceipt } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
@@ -203,6 +204,7 @@ function ReceiptForm({
   const deleteReceipt = useDeleteReceipt();
   const confirm = useConfirm();
   const ask = useDialog();
+  const { pro } = usePro();
 
   /**
    * Any hand edit retires the scan report. Telling someone to check the amount
@@ -293,6 +295,11 @@ function ReceiptForm({
     setError(null);
     setScanResult(null);
 
+    if (!pro) {
+      router.push({ pathname: '/pro-feature', params: { id: 'scan' } });
+      return;
+    }
+
     // Scanning only exists on real hardware. Saying so beats a button that
     // silently does nothing, and beats hiding it so the feature looks unbuilt.
     if (!isCaptureAvailable() && !isScanningAvailable()) {
@@ -361,6 +368,10 @@ function ReceiptForm({
   /** Photos and files are separate pickers on iOS, so ask which one. */
   const handleUpload = async () => {
     setError(null);
+    if (!pro) {
+      router.push({ pathname: '/pro-feature', params: { id: 'scan' } });
+      return;
+    }
     const where = await ask({
       title: 'Where is the receipt?',
       actions: [

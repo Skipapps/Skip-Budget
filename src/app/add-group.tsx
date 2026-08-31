@@ -5,6 +5,7 @@ import { Switch, Text, View } from 'react-native';
 import { useAddGroupMember, useCreateGroup } from '@/api/splits';
 import { GroupIconPicker } from '@/components/splits/group-icon-picker';
 import { Button } from '@/components/ui/button';
+import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
@@ -17,6 +18,15 @@ import { useColors } from '@/providers/theme-provider';
  * worth hiding — so it is explained rather than labelled.
  */
 export default function AddGroupScreen() {
+  // A wrapper, not an inline return: the screen below runs its own
+  // hooks, and an early return above them would change the hook count
+  // the moment the entitlement answer arrives — which React forbids.
+  const gate = useProGate('splits');
+  if (gate) return gate;
+  return <AddGroupScreenInner />;
+}
+
+function AddGroupScreenInner() {
   const colors = useColors();
   const { names } = useLocalSearchParams<{ names?: string }>();
 

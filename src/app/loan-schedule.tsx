@@ -3,6 +3,7 @@ import { Fragment } from 'react';
 import { Text, View } from 'react-native';
 
 import { ProportionBar } from '@/components/calculators/proportion-bar';
+import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { Subtitle, Title } from '@/components/ui/typography';
 import { formatFullDate } from '@/lib/date';
@@ -21,6 +22,15 @@ import { amortise, formatTerm, scheduleByYear, type ScheduleRow } from '@/lib/lo
  * actually want when they ask what a loan cost them last year.
  */
 export default function LoanScheduleScreen() {
+  // A wrapper, not an inline return: the screen below runs its own
+  // hooks, and an early return above them would change the hook count
+  // the moment the entitlement answer arrives — which React forbids.
+  const gate = useProGate('loans');
+  if (gate) return gate;
+  return <LoanScheduleScreenInner />;
+}
+
+function LoanScheduleScreenInner() {
   const params = useLocalSearchParams<{
     amount?: string;
     rate?: string;

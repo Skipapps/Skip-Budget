@@ -15,6 +15,7 @@ import { withTimeout } from '@/lib/deadline';
 import { paydaysInRange } from '@/lib/date';
 import type { DateRange } from '@/lib/range';
 import { supabase } from '@/lib/supabase';
+import { usePro } from '@/api/pro';
 import { useUserId } from '@/providers/session-provider';
 
 /**
@@ -290,9 +291,17 @@ export type PaymentSourceRow = {
 export function usePaymentSources() {
   const cards = useCards();
   const accounts = useBankAccounts();
+  const { pro } = usePro();
+
+  // Locked sources take no new spending: beyond the free allowance, only the
+  // oldest card and account appear in "Paid with" pickers. Their history keeps
+  // counting everywhere — this filters where money can go next, never where it
+  // already went. Queries order oldest-first, so slice(0,1) is the allowance.
+  const usableCards = pro ? (cards.data ?? []) : (cards.data ?? []).slice(0, 1);
+  const usableAccounts = pro ? (accounts.data ?? []) : (accounts.data ?? []).slice(0, 1);
 
   const sources: PaymentSourceRow[] = [
-    ...(cards.data ?? []).map((card) => ({
+    ...usableCards.map((card) => ({
       id: card.id,
       // Digits are optional on a card, so the network alone has to still read
       // as a label rather than leaving a dangling "••".
@@ -300,7 +309,7 @@ export function usePaymentSources() {
       color: card.color,
       kind: 'card' as const,
     })),
-    ...(accounts.data ?? []).map((account) => ({
+    ...usableAccounts.map((account) => ({
       id: account.id,
       label: account.last4
         ? `${account.nickname || account.bank_name} ••${account.last4}`

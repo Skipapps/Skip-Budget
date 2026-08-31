@@ -130,6 +130,26 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
     ],
   },
   {
+    title: 'Skip Pro and billing',
+    entries: [
+      {
+        question: 'What does Pro include?',
+        answer:
+          'Unlimited cards, accounts and incomes, unlimited receipt scanning, the loan calculator, the split manager, Insights, colour theming, early access to new features and first-in-line support. $1.99 a month or $19.99 a year, billed by Apple.',
+      },
+      {
+        question: 'What happens to my things if I cancel?',
+        answer:
+          'Nothing is deleted — ever. Extra cards and accounts stay, locked, with the oldest of each still fully usable, and every figure they contributed keeps counting. Come back to Pro and it is all exactly where you left it.',
+      },
+      {
+        question: 'How do I cancel?',
+        answer:
+          'In your Apple subscriptions — Settings → your name → Subscriptions on the iPhone, or from the Skip Pro page in the app. Skip never bills you itself, so cancelling is entirely between you and Apple.',
+      },
+    ],
+  },
+  {
     title: 'Privacy and your data',
     entries: [
       {

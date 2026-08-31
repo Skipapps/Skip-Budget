@@ -19,6 +19,7 @@ import { BillMark } from '@/components/bills/bill-mark';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { FlowChart, type FlowBucket } from '@/components/transactions/flow-chart';
 import { ChoiceChips } from '@/components/ui/choice-chips';
+import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Title } from '@/components/ui/typography';
@@ -49,6 +50,14 @@ const PER_MONTH: Record<string, number> = {
  * having none.
  */
 export default function InsightsScreen() {
+  // Wrapper, not inline: an early return above the screen's own hooks
+  // would change the hook count when the entitlement answer lands.
+  const gate = useProGate('insights');
+  if (gate) return gate;
+  return <InsightsScreenInner />;
+}
+
+function InsightsScreenInner() {
   const colors = useColors();
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>('month');

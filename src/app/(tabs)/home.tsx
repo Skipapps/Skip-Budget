@@ -8,6 +8,7 @@ import { AddButton } from '@/components/dashboard/add-button';
 import { BalanceSummary } from '@/components/dashboard/balance-summary';
 import { AmountTile } from '@/components/ui/amount-tile';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
+import { usePro } from '@/api/pro';
 import { GettingStartedCard } from '@/components/dashboard/getting-started-card';
 import { InsightBanner } from '@/components/dashboard/insight-banner';
 import { DateSelector } from '@/components/dashboard/date-selector';
@@ -35,6 +36,7 @@ const KIND_LABELS: Record<string, string> = {
 
 export default function HomeScreen() {
   const artwork = useArtwork();
+  const { pro } = usePro();
   // Opening the app is the moment to bring stale due dates up to date.
   useKeepSchedulesCurrent();
   const { refresh, refreshing } = useRefreshAll();
@@ -184,6 +186,22 @@ export default function HomeScreen() {
       >
         {tiles.map((category) => (
           <View key={category.id} className="w-[150px]">
+            {/* Locked features keep their tile — a hidden feature sells
+                nothing; a visible locked one is an advert that renders
+                itself. The gate on the screen does the actual refusing. */}
+            {!pro && (category.id === 'loan-calculator' || category.id === 'split-calculator') ? (
+              <View
+                pointerEvents="none"
+                className="absolute right-2 top-2 z-10 rounded-full bg-accent px-2 py-0.5"
+              >
+                <Text
+                  allowFontScaling={false}
+                  className="font-poppins-bold text-[9px] text-on-control"
+                >
+                  PRO
+                </Text>
+              </View>
+            ) : null}
             <AmountTile
               label={category.label}
               amount={tileAmounts[category.id]}

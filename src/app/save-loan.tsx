@@ -6,6 +6,7 @@ import { useSaveLoan } from '@/api/mutations';
 import { usePaymentSources } from '@/api/queries';
 import { IconPicker } from '@/components/bills/icon-picker';
 import { Button } from '@/components/ui/button';
+import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
@@ -23,6 +24,15 @@ import { amortise, formatTerm } from '@/lib/loan';
  * principal, rate and term.
  */
 export default function SaveLoanScreen() {
+  // A wrapper, not an inline return: the screen below runs its own
+  // hooks, and an early return above them would change the hook count
+  // the moment the entitlement answer arrives — which React forbids.
+  const gate = useProGate('loans');
+  if (gate) return gate;
+  return <SaveLoanScreenInner />;
+}
+
+function SaveLoanScreenInner() {
   const params = useLocalSearchParams<{
     amount?: string;
     rate?: string;

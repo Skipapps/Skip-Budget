@@ -9,6 +9,7 @@ import { CalculatorPad } from '@/components/ui/calculator-pad';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { DatePicker } from '@/components/ui/date-picker';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
+import { usePro } from '@/api/pro';
 import { Screen } from '@/components/ui/screen';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
@@ -122,7 +123,15 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
     );
   };
 
+  const { pro } = usePro();
+
   const addSource = () => {
+    // One income is the free allowance; the second opens the case for Pro.
+    // The database refuses it too — this just makes the door say why.
+    if (!pro && sources.length >= 1) {
+      router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } });
+      return;
+    }
     setSources((current) => [
       ...current,
       {

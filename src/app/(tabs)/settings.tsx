@@ -24,11 +24,13 @@ import {
   CircleHelp,
   Compass,
   ListChecks,
+  Crown,
 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { deleteAccount, signOut } from '@/api/auth';
+import { usePro } from '@/api/pro';
 import { authenticate, lockCapability, unavailableMessage } from '@/lib/app-lock';
 import { useUpdateProfile } from '@/api/mutations';
 import { ProfileAvatar } from '@/components/ui/profile-avatar';
@@ -68,6 +70,7 @@ export default function SettingsScreen() {
   const salary = useSalarySources();
   const subs = useSubscriptions();
   const profile = useProfile();
+  const { pro } = usePro();
   const updateProfile = useUpdateProfile();
   const { mode, accentId } = useTheme();
   const { haptics, setHaptics, appLock, setAppLock } = usePreferences();
@@ -181,6 +184,20 @@ export default function SettingsScreen() {
   return (
     <Screen avoidKeyboard>
       <Title className="mt-2">Settings</Title>
+
+      <SettingsSection title="Skip Pro">
+        <SettingsRow
+          icon={Crown}
+          title={pro ? 'Skip Pro — active' : 'Skip Pro'}
+          subtitle={
+            pro
+              ? 'Everything unlocked · manage in the App Store'
+              : 'Unlimited everything, $1.99/mo or $19.99/yr'
+          }
+          onPress={() => router.push('/pro')}
+          last
+        />
+      </SettingsSection>
 
       <SettingsSection title="Profile">
         {/* Above the name, in the order the dashboard shows them. */}

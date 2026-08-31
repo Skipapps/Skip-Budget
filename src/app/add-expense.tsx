@@ -15,6 +15,7 @@ import {
 import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
+import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SelectField } from '@/components/ui/select-field';
@@ -39,6 +40,15 @@ type Mode = 'equal' | 'exact';
  * fact after a failed save is a telling-off.
  */
 export default function AddExpenseScreen() {
+  // A wrapper, not an inline return: the screen below runs its own
+  // hooks, and an early return above them would change the hook count
+  // the moment the entitlement answer arrives — which React forbids.
+  const gate = useProGate('splits');
+  if (gate) return gate;
+  return <AddExpenseScreenInner />;
+}
+
+function AddExpenseScreenInner() {
   const colors = useColors();
   const confirm = useConfirm();
   const userId = useUserId();

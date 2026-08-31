@@ -19,6 +19,7 @@ import { useRegisterPush } from '@/api/push';
 import { AppLockGate } from '@/components/app-lock-gate';
 import { DialogProvider } from '@/providers/dialog-provider';
 import { QueryProvider } from '@/providers/query-provider';
+import { useConfigurePurchases } from '@/api/pro';
 import { FriendRequestPopup } from '@/components/splits/friend-request-popup';
 import { RealtimeProvider } from '@/providers/realtime-provider';
 import { PreferencesProvider } from '@/providers/preferences-provider';
@@ -87,6 +88,7 @@ function AppShell({ fontsReady }: { fontsReady: boolean }) {
                   {/* Inside the lock so it never draws on a locked phone, and
                       after the navigator so it sits above every route. */}
                   <FriendRequestPopup />
+                  <PurchasesBridge />
                 </AppLockGate>
                 <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
               </DialogProvider>
@@ -119,4 +121,11 @@ function RootNavigator() {
       }}
     />
   );
+}
+
+/** Signs RevenueCat in as the Supabase user. Renders nothing; must live
+ * inside the session provider, which is why it is a component and not a call. */
+function PurchasesBridge() {
+  useConfigurePurchases();
+  return null;
 }

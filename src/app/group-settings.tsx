@@ -16,6 +16,7 @@ import {
 import { Person } from '@/components/splits/person';
 import { GroupIconPicker } from '@/components/splits/group-icon-picker';
 import { Button } from '@/components/ui/button';
+import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Title } from '@/components/ui/typography';
@@ -33,6 +34,15 @@ import { useColors } from '@/providers/theme-provider';
  * database; this screen only has to show what comes back.
  */
 export default function GroupSettingsScreen() {
+  // A wrapper, not an inline return: the screen below runs its own
+  // hooks, and an early return above them would change the hook count
+  // the moment the entitlement answer arrives — which React forbids.
+  const gate = useProGate('splits');
+  if (gate) return gate;
+  return <GroupSettingsScreenInner />;
+}
+
+function GroupSettingsScreenInner() {
   const colors = useColors();
   const confirm = useConfirm();
   const userId = useUserId();

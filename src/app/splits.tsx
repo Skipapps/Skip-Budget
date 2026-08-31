@@ -7,6 +7,7 @@ import { useFriendRequests, useFriends, useGroups, useMyBalances } from '@/api/s
 import { GroupIcon } from '@/components/splits/group-icon';
 import { ActionPill } from '@/components/ui/action-pill';
 import { PageState } from '@/components/ui/page-state';
+import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Title } from '@/components/ui/typography';
@@ -24,6 +25,15 @@ import { useArtwork } from '@/theme/artwork';
  * commonest case. Groups are for the flat, the trip, the ongoing thing.
  */
 export default function SplitsScreen() {
+  // A wrapper, not an inline return: the screen below runs its own
+  // hooks, and an early return above them would change the hook count
+  // the moment the entitlement answer arrives — which React forbids.
+  const gate = useProGate('splits');
+  if (gate) return gate;
+  return <SplitsScreenInner />;
+}
+
+function SplitsScreenInner() {
   const colors = useColors();
   const artwork = useArtwork();
 

@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 
 import { useUpdateProfile } from '@/api/mutations';
+import { usePro } from '@/api/pro';
 import { enableReminders } from '@/api/push';
 import {
   useBankAccounts,
@@ -43,6 +44,7 @@ export function useGettingStarted() {
   const bills = useBills();
   const receipts = useReceipts();
   const updateProfile = useUpdateProfile();
+  const { pro } = usePro();
 
   // An account fact, not a device one. The phone's permission is shared by
   // every account on it, and a step that read it arrived pre-ticked for every
@@ -80,13 +82,25 @@ export function useGettingStarted() {
       done: (bills.data?.length ?? 0) > 0,
       href: '/add-bill',
     },
-    {
-      id: 'scan',
-      title: 'Scan a receipt',
-      detail: 'Point the camera at one — Skip reads it, you check it, done.',
-      done: (receipts.data ?? []).some((row) => row.source === 'scan' || row.source === 'upload'),
-      href: '/receipts',
-    },
+    // Scanning is Pro; the checklist has to be finishable on free, so the
+    // free step is the manual one and either kind of receipt completes it.
+    pro
+      ? {
+          id: 'scan' as const,
+          title: 'Scan a receipt',
+          detail: 'Point the camera at one — Skip reads it, you check it, done.',
+          done: (receipts.data ?? []).some(
+            (row) => row.source === 'scan' || row.source === 'upload',
+          ),
+          href: '/receipts',
+        }
+      : {
+          id: 'scan' as const,
+          title: 'Add your first receipt',
+          detail: 'What you spend day to day, next to your bills.',
+          done: (receipts.data ?? []).length > 0,
+          href: '/add-receipt',
+        },
     {
       id: 'reminders',
       title: 'Turn on reminders',

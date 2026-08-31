@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Calendar, Trash2, Wallet } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
@@ -10,7 +10,7 @@ import {
   type ReminderChoice,
 } from '@/api/reminders';
 import { useCreateCard, useDeleteCard, useUpdateCard } from '@/api/mutations';
-import { useCard, useSourceLedger } from '@/api/queries';
+import { useCard, useSourceLedger, useCards } from '@/api/queries';
 import { useColors } from '@/providers/theme-provider';
 import { NetworkPicker } from '@/components/cards/network-picker';
 import { PaymentCard } from '@/components/cards/payment-card';
@@ -20,6 +20,7 @@ import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { DatePicker } from '@/components/ui/date-picker';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { ReminderField } from '@/components/ui/reminder-field';
+import { usePro } from '@/api/pro';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm } from '@/providers/dialog-provider';
 import { SelectField } from '@/components/ui/select-field';
@@ -35,6 +36,19 @@ const MORE_SETUP_INFO =
 
 /** Loads the card being edited, then seeds the form by remount. */
 export default function AddCardScreen() {
+  // Deep-link guard: creating past the free allowance opens the case
+  // for Pro instead of a form the database would refuse. Editing is
+  // untouched. Wrapper-shaped so the hook count never changes.
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { pro, ready } = usePro();
+  const existing = useCards();
+  if (!id && ready && !pro && (existing.data?.length ?? 0) >= 1) {
+    return <Redirect href={{ pathname: '/pro-feature', params: { id: 'unlimited' } }} />;
+  }
+  return <AddCardScreenInner />;
+}
+
+function AddCardScreenInner() {
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { data: existing, isLoading } = useCard(id);

@@ -17,6 +17,7 @@ import { useRefreshAll } from '@/api/refresh';
 import { Button } from '@/components/ui/button';
 import { PageState } from '@/components/ui/page-state';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
+import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
@@ -36,6 +37,15 @@ import { useArtwork } from '@/theme/artwork';
  * the problem, and only the payment list tells you what to do about it.
  */
 export default function SplitGroupScreen() {
+  // A wrapper, not an inline return: the screen below runs its own
+  // hooks, and an early return above them would change the hook count
+  // the moment the entitlement answer arrives — which React forbids.
+  const gate = useProGate('splits');
+  if (gate) return gate;
+  return <SplitGroupScreenInner />;
+}
+
+function SplitGroupScreenInner() {
   const colors = useColors();
   const artwork = useArtwork();
   const userId = useUserId();

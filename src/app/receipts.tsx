@@ -5,6 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
 import { usePaymentSources, useReceipts } from '@/api/queries';
+import { usePro } from '@/api/pro';
 import { useRefreshAll } from '@/api/refresh';
 import { draftToParams, useReceiptScan } from '@/api/scan';
 import {
@@ -45,6 +46,7 @@ export default function ReceiptsScreen() {
   const { sources } = usePaymentSources();
 
   const { scan, scanning, available: canScan } = useReceiptScan();
+  const { pro } = usePro();
   const { refresh, refreshing } = useRefreshAll();
 
   /**
@@ -59,6 +61,11 @@ export default function ReceiptsScreen() {
    */
   const handleScan = async () => {
     setScanError(null);
+    // The camera is the paid feature; typing a receipt stays free forever.
+    if (!pro) {
+      router.push({ pathname: '/pro-feature', params: { id: 'scan' } });
+      return;
+    }
     try {
       const draft = await scan();
       if (!draft) return;
