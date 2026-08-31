@@ -13,6 +13,7 @@ import {
   useGroupSettlements,
   type GroupMemberRow,
 } from '@/api/splits';
+import { GroupIcon } from '@/components/splits/group-icon';
 import { Person } from '@/components/splits/person';
 import { Button } from '@/components/ui/button';
 import { PageState } from '@/components/ui/page-state';
@@ -96,11 +97,14 @@ export default function SplitGroupScreen() {
   return (
     <Screen showBack>
       <View className="mt-2 w-full flex-row items-start justify-between gap-3">
-        <View className="min-w-0 flex-1">
-          <Title align="left">{group.name}</Title>
-          <Subtitle className="mt-2">
-            {members.length} {members.length === 1 ? 'person' : 'people'}
-          </Subtitle>
+        <View className="min-w-0 flex-1 flex-row items-center gap-3">
+          <GroupIcon iconId={group.icon_id} size={24} color={colors.ink} />
+          <View className="min-w-0 flex-1">
+            <Title align="left">{group.name}</Title>
+            <Subtitle className="mt-1">
+              {members.length} {members.length === 1 ? 'person' : 'people'}
+            </Subtitle>
+          </View>
         </View>
         <Pressable
           accessibilityRole="button"

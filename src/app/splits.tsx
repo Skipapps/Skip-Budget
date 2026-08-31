@@ -3,12 +3,14 @@ import { Calculator, ChevronRight, Users } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { useFriendRequests, useFriends, useGroups, useMyBalances } from '@/api/splits';
+import { GroupIcon } from '@/components/splits/group-icon';
 import { ActionPill } from '@/components/ui/action-pill';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Title } from '@/components/ui/typography';
 import { formatCurrency } from '@/lib/format';
+import { shadows } from '@/theme/shadows';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 
@@ -126,16 +128,17 @@ export default function SplitsScreen() {
           <Text className="font-poppins-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
             Groups
           </Text>
-          <View className="mt-1 h-px w-full bg-line" />
-
-          {live.map((group) => (
-            <GroupRow
-              key={group.id}
-              name={group.name}
-              balance={balances?.get(group.id) ?? 0}
-              onPress={() => router.push(`/split-group?id=${group.id}`)}
-            />
-          ))}
+          <View className="mt-4 w-full gap-3">
+            {live.map((group) => (
+              <GroupCard
+                key={group.id}
+                name={group.name}
+                iconId={group.icon_id}
+                balance={balances?.get(group.id) ?? 0}
+                onPress={() => router.push(`/split-group?id=${group.id}`)}
+              />
+            ))}
+          </View>
         </View>
       ) : null}
     </Screen>
@@ -143,22 +146,31 @@ export default function SplitsScreen() {
 }
 
 /**
- * One group, and where you stand in it.
+ * One group, as a card.
  *
- * The figure is the point of the row, so it says which way it goes in words
- * rather than relying on a sign a glance can miss. Being square gets its own
- * wording — "$0.00" reads like a group nobody has used.
+ * A row in a list makes every group look like every other group, and the whole
+ * point of opening this screen is to find one. So the name is set large and
+ * heavy enough to be the thing the eye lands on, the icon gives it a shape to
+ * be recognised by, and the figure sits underneath where it reads as a fact
+ * about that group rather than a column to be scanned.
+ *
+ * Which way the money goes is said in words. A minus sign carries the entire
+ * meaning of the number and is the easiest thing on the screen to miss.
  */
-function GroupRow({
+function GroupCard({
   name,
+  iconId,
   balance,
   onPress,
 }: {
   name: string;
+  iconId: string | null;
   balance: number;
   onPress: () => void;
 }) {
   const colors = useColors();
+  // Half a cent, so a balance that is zero only through rounding still reads
+  // as settled rather than as a very small debt.
   const settled = Math.abs(balance) < 0.005;
   const owed = balance > 0;
 
@@ -171,34 +183,41 @@ function GroupRow({
           : `${name}. You ${owed ? 'are owed' : 'owe'} ${formatCurrency(Math.abs(balance))}.`
       }
       onPress={onPress}
-      className="w-full flex-row items-center gap-3 py-4 active:bg-ink/5"
+      style={shadows.card}
+      className="w-full rounded-[14px] border border-line bg-card px-5 py-5 active:bg-ink/5"
     >
-      <View className="min-w-0 flex-1">
-        <Text
-          className="font-poppins-medium text-[15px] text-ink"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.3}
-        >
-          {name}
-        </Text>
-        <Text className="mt-0.5 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-          {settled ? 'All settled up' : owed ? 'you are owed' : 'you owe'}
-        </Text>
-      </View>
+      <View className="w-full flex-row items-center gap-4">
+        <GroupIcon iconId={iconId} color={colors.ink} />
 
-      {settled ? null : (
-        <Text
-          className={
-            owed
-              ? 'font-poppins-semibold text-[15px] text-accent-ink'
-              : 'font-poppins-semibold text-[15px] text-ink'
-          }
-          maxFontSizeMultiplier={1.3}
-        >
-          {formatCurrency(Math.abs(balance))}
-        </Text>
-      )}
-      <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
+        <View className="min-w-0 flex-1">
+          <Text
+            className="font-poppins-bold text-[21px] leading-[27px] text-ink"
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.2}
+          >
+            {name}
+          </Text>
+          <Text className="mt-1 font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+            {settled ? 'All settled up' : owed ? 'you are owed' : 'you owe'}
+          </Text>
+        </View>
+
+        {settled ? (
+          <ChevronRight size={20} color={colors.muted} strokeWidth={2} />
+        ) : (
+          <Text
+            className={
+              owed
+                ? 'font-poppins-bold text-[22px] text-accent-ink'
+                : 'font-poppins-bold text-[22px] text-ink'
+            }
+            numberOfLines={1}
+            maxFontSizeMultiplier={1.2}
+          >
+            {formatCurrency(Math.abs(balance))}
+          </Text>
+        )}
+      </View>
     </Pressable>
   );
 }

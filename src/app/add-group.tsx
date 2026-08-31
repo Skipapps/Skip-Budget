@@ -3,10 +3,11 @@ import { useState } from 'react';
 import { Switch, Text, View } from 'react-native';
 
 import { useAddGroupMember, useCreateGroup } from '@/api/splits';
+import { IconPicker } from '@/components/bills/icon-picker';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
 import { useColors } from '@/providers/theme-provider';
 
 /**
@@ -28,6 +29,9 @@ export default function AddGroupScreen() {
 
   const [name, setName] = useState('');
   const [simplify, setSimplify] = useState(true);
+  // 'other' is the neutral glyph that actually exists in the set; defaulting to
+  // a missing id would draw the picker with nothing selected.
+  const [iconId, setIconId] = useState('other');
   const [error, setError] = useState<string | null>(null);
 
   const createGroup = useCreateGroup();
@@ -41,7 +45,11 @@ export default function AddGroupScreen() {
     }
 
     try {
-      const group = await createGroup.mutateAsync({ name: name.trim(), simplifyDebts: simplify });
+      const group = await createGroup.mutateAsync({
+        name: name.trim(),
+        simplifyDebts: simplify,
+        iconId,
+      });
 
       // Added as placeholders — they are names off a calculator, not accounts.
       // Each can be claimed later by whoever it belongs to.
@@ -83,6 +91,11 @@ export default function AddGroupScreen() {
           maxLength={60}
           autoCapitalize="sentences"
         />
+      </View>
+
+      <View className="mt-7 w-full">
+        <FieldLabel className="mb-3">Icon</FieldLabel>
+        <IconPicker value={iconId} onChange={setIconId} />
       </View>
 
       <View className="mt-7 w-full flex-row items-center gap-4 rounded-[10px] border border-line px-4 py-4">

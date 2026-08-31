@@ -14,6 +14,7 @@ import {
   useUpdateGroup,
 } from '@/api/splits';
 import { Person } from '@/components/splits/person';
+import { IconPicker } from '@/components/bills/icon-picker';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
@@ -135,6 +136,16 @@ export default function GroupSettingsScreen() {
           autoCapitalize="sentences"
         />
       </View>
+
+      {isOwner ? (
+        <View className="mt-7 w-full">
+          <FieldLabel className="mb-3">Icon</FieldLabel>
+          <IconPicker
+            value={group?.icon_id ?? 'other'}
+            onChange={(next) => (id ? updateGroup.mutate({ id, iconId: next }) : undefined)}
+          />
+        </View>
+      ) : null}
 
       <View className="mt-7 w-full flex-row items-center gap-4 rounded-[10px] border border-line px-4 py-4">
         <View className="min-w-0 flex-1">

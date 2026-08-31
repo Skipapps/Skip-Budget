@@ -37,6 +37,7 @@ export type FriendRequestRow = {
 export type GroupRow = {
   id: string;
   name: string;
+  icon_id: string | null;
   currency: string;
   simplify_debts: boolean;
   invite_code: string | null;
@@ -192,7 +193,7 @@ export function useGroups() {
     queryFn: async (): Promise<GroupRow[]> => {
       const { data, error } = await supabase
         .from('groups')
-        .select('id, name, currency, simplify_debts, invite_code, archived_at, created_by')
+        .select('id, name, icon_id, currency, simplify_debts, invite_code, archived_at, created_by')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return (data ?? []) as GroupRow[];
@@ -208,7 +209,7 @@ export function useGroup(groupId: string | undefined) {
     queryFn: async (): Promise<GroupRow | null> => {
       const { data, error } = await supabase
         .from('groups')
-        .select('id, name, currency, simplify_debts, invite_code, archived_at, created_by')
+        .select('id, name, icon_id, currency, simplify_debts, invite_code, archived_at, created_by')
         .eq('id', groupId!)
         .maybeSingle();
       if (error) throw error;
@@ -400,11 +401,17 @@ export function useRemoveFriend() {
 export function useCreateGroup() {
   const invalidate = useSplitInvalidate();
   return useMutation({
-    mutationFn: (values: { name: string; currency?: string; simplifyDebts?: boolean }) =>
+    mutationFn: (values: {
+      name: string;
+      currency?: string;
+      simplifyDebts?: boolean;
+      iconId?: string | null;
+    }) =>
       callRpc<GroupRow>('create_group', {
         p_name: values.name,
         p_currency: values.currency ?? 'USD',
         p_simplify_debts: values.simplifyDebts ?? true,
+        p_icon_id: values.iconId ?? null,
       }),
     onSuccess: () => invalidate(['groups']),
   });
@@ -452,10 +459,16 @@ export function useRemoveGroupMember() {
 export function useUpdateGroup() {
   const invalidate = useSplitInvalidate();
   return useMutation({
-    mutationFn: async (values: { id: string; name?: string; simplifyDebts?: boolean }) => {
+    mutationFn: async (values: {
+      id: string;
+      name?: string;
+      simplifyDebts?: boolean;
+      iconId?: string | null;
+    }) => {
       const patch: Record<string, unknown> = {};
       if (values.name !== undefined) patch.name = values.name;
       if (values.simplifyDebts !== undefined) patch.simplify_debts = values.simplifyDebts;
+      if (values.iconId !== undefined) patch.icon_id = values.iconId;
 
       const { error } = await supabase.from('groups').update(patch).eq('id', values.id);
       if (error) throw new Error(error.message);
