@@ -28,7 +28,7 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
       {
         question: 'Can I get the Getting started card back?',
         answer:
-          'Yes — Settings → Getting started puts it back on Home. It only stays while there is something left to do; once all five steps are done it leaves on its own. A step can tick itself: turning on notifications for Skip once counts for every account on this phone, because the permission belongs to the phone.',
+          'Yes — Settings → Getting started puts it back on Home. It only stays while there is something left to do; once all five steps are done it leaves on its own.',
       },
       {
         question: 'What should I set up first?',

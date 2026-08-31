@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AppState } from 'react-native';
+import { useCallback } from 'react';
 
 import { useUpdateProfile } from '@/api/mutations';
-import { enableReminders, remindersAllowed } from '@/api/push';
+import { enableReminders } from '@/api/push';
 import {
   useBankAccounts,
   useBills,
@@ -45,30 +44,19 @@ export function useGettingStarted() {
   const receipts = useReceipts();
   const updateProfile = useUpdateProfile();
 
-  // Read from the phone, not the server: permission is a device fact. Asked
-  // again on foreground, so granting it in Settings ticks the step on return.
-  const [notified, setNotified] = useState(false);
-  useEffect(() => {
-    let live = true;
-    const check = () => {
-      void remindersAllowed().then((allowed) => {
-        if (live) setNotified(allowed);
-      });
-    };
-    check();
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') check();
-    });
-    return () => {
-      live = false;
-      sub.remove();
-    };
-  }, []);
+  // An account fact, not a device one. The phone's permission is shared by
+  // every account on it, and a step that read it arrived pre-ticked for every
+  // fresh sign-in on a used phone — claiming credit for a choice nobody made.
+  const notified = Boolean(profile.data?.reminders_enabled_at);
 
   const askForReminders = useCallback(async () => {
     if (!userId) return;
-    setNotified(await enableReminders(userId));
-  }, [userId]);
+    if (await enableReminders(userId)) {
+      // enableReminders wrote the column; this refreshes the cache so the
+      // tick appears now rather than on the next profile read.
+      updateProfile.mutate({ reminders_enabled_at: new Date().toISOString() });
+    }
+  }, [userId, updateProfile]);
 
   const steps: SetupStep[] = [
     {

@@ -122,6 +122,8 @@ export type ProfileValues = {
   tile_order?: string[] | null;
   /** When the Getting Started card was waved away. */
   getting_started_dismissed_at?: string | null;
+  /** When this account chose to be reminded. */
+  reminders_enabled_at?: string | null;
 };
 
 /**

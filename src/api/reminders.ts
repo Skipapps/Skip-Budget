@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { withTimeout } from '@/lib/deadline';
+import { enableReminders } from '@/api/push';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
@@ -150,12 +151,22 @@ type SetReminderInput = {
  * target is what makes "one reminder per thing" true — two quick taps on the
  * same switch resolve to one row instead of racing each other into two.
  */
+/**
+ * Saving a reminder is the loudest possible yes to being reminded, so it also
+ * enables reminders for the account — permission, token and the profile flag —
+ * for somebody who never met the Getting Started step. Failures are ignored:
+ * the reminder row is worth keeping even when the phone refuses to be pushed.
+ */
 export function useSetReminder() {
   const userId = useUserId();
   const client = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ kind, targetId, enabled, leadDays, remindAt }: SetReminderInput) => {
+      if (enabled) {
+        const { data: auth } = await supabase.auth.getUser();
+        if (auth.user) void enableReminders(auth.user.id);
+      }
       if (!userId) throw new Error('Sign in first.');
 
       // All four columns, three of them null, because the constraint spans all

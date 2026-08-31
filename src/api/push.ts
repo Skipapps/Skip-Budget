@@ -63,8 +63,14 @@ export async function enableReminders(userId: string): Promise<boolean> {
 
   try {
     await registerDevice(userId);
+    await storeTimezone(userId);
+    // The account's yes, written down — launch reads this from now on.
+    await supabase
+      .from('profiles')
+      .update({ reminders_enabled_at: new Date().toISOString() } as never)
+      .eq('id', userId);
   } catch {
-    // A token failure loses nothing that the next launch will not retry.
+    // A token failure loses nothing that the next attempt will not retry.
   }
   return true;
 }
@@ -120,6 +126,16 @@ export function useRegisterPush(): void {
 
     (async () => {
       try {
+        // Only for an account that chose reminders. The phone's permission is
+        // shared by every account on it, so registering on permission alone
+        // silently opted every fresh sign-in into another account's choice.
+        const { data } = await supabase
+          .from('profiles')
+          .select('reminders_enabled_at')
+          .eq('id', userId)
+          .maybeSingle();
+        if (cancelled || !data?.reminders_enabled_at) return;
+
         await registerDevice(userId);
         if (!cancelled) await storeTimezone(userId);
       } catch {
