@@ -130,6 +130,19 @@ export async function deleteAccount(): Promise<AuthResult> {
     return { error: readable(error.message) };
   }
 
+  // Trust, then verify. "No error" once meant "deleted" here, and a server
+  // fault proved able to say nothing while deleting nothing — so the app
+  // announced success over an account that was still alive. The token in hand
+  // stays technically valid after a real deletion, but the auth server checks
+  // the row itself: a deleted account cannot answer getUser.
+  const { data } = await supabase.auth.getUser();
+  if (data.user) {
+    return {
+      error:
+        'Your account is still there — the deletion did not go through. Try again, and message us if it happens twice.',
+    };
+  }
+
   await supabase.auth.signOut();
   return { error: null };
 }
