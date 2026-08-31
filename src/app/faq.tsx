@@ -1,10 +1,17 @@
 import { router } from 'expo-router';
-import { Text, View } from 'react-native';
+import { ChevronDown } from 'lucide-react-native';
+import { useState } from 'react';
+import { LayoutAnimation, Platform, Pressable, Text, UIManager, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
-import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { Screen } from '@/components/ui/screen';
 import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
+import { useColors } from '@/providers/theme-provider';
+import { shadows } from '@/theme/shadows';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type Entry = { question: string; answer: string };
 
@@ -153,16 +160,9 @@ export default function FaqScreen() {
       {GROUPS.map((group) => (
         <View key={group.title} className="mt-8 w-full">
           <FieldLabel className="mb-3">{group.title}</FieldLabel>
-          <View className="w-full gap-2.5">
+          <View className="w-full gap-3">
             {group.entries.map((entry) => (
-              <CollapsibleSection key={entry.question} title={entry.question}>
-                <Text
-                  className="font-poppins text-[14px] leading-[21px] text-body"
-                  maxFontSizeMultiplier={1.5}
-                >
-                  {entry.answer}
-                </Text>
-              </CollapsibleSection>
+              <QuestionCard key={entry.question} question={entry.question} answer={entry.answer} />
             ))}
           </View>
         </View>
@@ -176,5 +176,58 @@ export default function FaqScreen() {
         />
       </View>
     </Screen>
+  );
+}
+
+/**
+ * One question, dressed as a card.
+ *
+ * The same surface as a group or a tour stop — rounded, bordered, gently
+ * lifted — so the FAQ reads as a stack of things to pick up rather than a
+ * legal document. The whole card is the button: a tap target the size of the
+ * question, not a chevron the size of a fingertip.
+ */
+function QuestionCard({ question, answer }: Entry) {
+  const colors = useColors();
+  const [open, setOpen] = useState(false);
+
+  const toggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpen((current) => !current);
+  };
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      accessibilityLabel={question}
+      accessibilityHint={open ? 'Collapses the answer' : 'Shows the answer'}
+      onPress={toggle}
+      style={shadows.card}
+      className="w-full rounded-[14px] border border-line bg-card px-5 py-4 active:bg-ink/5"
+    >
+      <View className="w-full flex-row items-center gap-3">
+        <Text
+          className="min-w-0 flex-1 font-poppins-semibold text-[15px] leading-[21px] text-ink"
+          maxFontSizeMultiplier={1.4}
+        >
+          {question}
+        </Text>
+        {/* Rotation instead of an icon swap: the same chevron turning is the
+            card visibly opening, not one symbol replaced by another. */}
+        <View style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
+          <ChevronDown size={18} color={colors.muted} strokeWidth={2} />
+        </View>
+      </View>
+
+      {open ? (
+        <Text
+          className="mt-3 font-poppins text-[14px] leading-[21px] text-body"
+          maxFontSizeMultiplier={1.5}
+        >
+          {answer}
+        </Text>
+      ) : null}
+    </Pressable>
   );
 }
