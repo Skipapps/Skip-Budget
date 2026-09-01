@@ -2,7 +2,7 @@ import * as Device from 'expo-device';
 import * as Localization from 'expo-localization';
 import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
@@ -119,6 +119,18 @@ async function storeTimezone(userId: string): Promise<void> {
  */
 export function useRegisterPush(): void {
   const userId = useUserId();
+
+  // The icon badge means "something waiting inside" — so being inside clears
+  // it. Without this, the badge every push sets outlives the notification it
+  // announced and sits on the icon pointing at nothing.
+  useEffect(() => {
+    const clear = () => void Notifications.setBadgeCountAsync(0).catch(() => {});
+    clear();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') clear();
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
