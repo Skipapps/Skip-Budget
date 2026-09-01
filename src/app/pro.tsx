@@ -185,6 +185,19 @@ export default function ProScreen() {
         </Text>
       ) : null}
 
+      {/* When the store gives nothing, say why — a mute disabled button turns
+          every cause into the same mystery. */}
+      {!canBuy && prices.isFetched ? (
+        <Text
+          className="mt-4 w-full text-center font-poppins text-[12px] leading-[17px] text-muted"
+          maxFontSizeMultiplier={1.4}
+        >
+          {prices.error
+            ? `The store said: ${(prices.error as Error).message}`
+            : 'The App Store returned no plans for this app yet. Freshly readied products can take a few hours to reach the sandbox — check again shortly.'}
+        </Text>
+      ) : null}
+
       <View className="mb-6 mt-6 w-full gap-2">
         <Button
           label={
@@ -194,10 +207,12 @@ export default function ProScreen() {
                 ? trial
                   ? `Start ${trial}`
                   : 'Continue'
-                : 'Purchases open soon'
+                : prices.isFetching
+                  ? 'Checking the store…'
+                  : 'Check again'
           }
-          onPress={handleContinue}
-          disabled={busy || !canBuy}
+          onPress={canBuy ? handleContinue : () => void prices.refetch()}
+          disabled={busy || prices.isFetching}
         />
         <View className="w-full flex-row items-center justify-center gap-4 pt-1">
           <FooterLink label="Restore purchases" onPress={handleRestore} />
