@@ -167,6 +167,8 @@ export type ProPrices = {
   yearly: PurchasesPackage | null;
   /** "7 days free" when Apple has an intro offer configured; null otherwise. */
   trialText: string | null;
+  /** Why the store came back the way it did — shown while debugging billing. */
+  debug: string;
 };
 
 /** The live prices, straight from the store — never hardcoded when buyable. */
@@ -184,13 +186,30 @@ export function useProPrices() {
       const monthly = current?.monthly ?? null;
       const yearly = current?.annual ?? null;
 
+      // When the offering comes back without packages, ask StoreKit for the two
+      // products by id directly. Two products here but no packages means a
+      // RevenueCat offering-linkage problem; zero products means Apple's
+      // sandbox is serving nothing to this device — different fixes entirely.
+      let debug = `offerings=${Object.keys(offerings.all).length} current=${current ? 'yes' : 'none'} pkgs=${current?.availablePackages.length ?? 0}`;
+      if (!monthly && !yearly) {
+        try {
+          const products = await Purchases.getProducts([
+            'skip_budget_pro_monthly',
+            'skip_budget_pro_yearly',
+          ]);
+          debug += ` direct=${products.length}`;
+        } catch (thrown) {
+          debug += ` fetchErr=${(thrown as Error).message}`;
+        }
+      }
+
       const intro = yearly?.product.introPrice ?? monthly?.product.introPrice;
       const trialText =
         intro && intro.price === 0
           ? `${intro.periodNumberOfUnits} ${intro.periodUnit.toLowerCase()}${intro.periodNumberOfUnits === 1 ? '' : 's'} free`
           : null;
 
-      return { monthly, yearly, trialText };
+      return { monthly, yearly, trialText, debug };
     },
   });
 }

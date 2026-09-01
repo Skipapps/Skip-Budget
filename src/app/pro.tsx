@@ -195,6 +195,7 @@ export default function ProScreen() {
           {prices.error
             ? `The store said: ${(prices.error as Error).message}`
             : 'The App Store returned no plans for this app yet. Freshly readied products can take a few hours to reach the sandbox — check again shortly.'}
+          {prices.data?.debug ? `\n\n[${prices.data.debug}]` : ''}
         </Text>
       ) : null}
 
