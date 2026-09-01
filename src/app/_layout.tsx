@@ -84,11 +84,13 @@ function AppShell({ fontsReady }: { fontsReady: boolean }) {
                   behind a lock, and above the navigator so no route renders
                   underneath it. */}
                 <AppLockGate>
+                  {/* Before the navigator: its configure kick starts ahead of
+                      any screen effect that talks to the SDK. */}
+                  <PurchasesBridge />
                   <RootNavigator />
                   {/* Inside the lock so it never draws on a locked phone, and
                       after the navigator so it sits above every route. */}
                   <FriendRequestPopup />
-                  <PurchasesBridge />
                 </AppLockGate>
                 <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
               </DialogProvider>

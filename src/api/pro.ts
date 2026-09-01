@@ -28,6 +28,48 @@ import { useUserId } from '@/providers/session-provider';
 const RC_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '';
 
 let configuredFor: string | null = null;
+let configuring: Promise<boolean> | null = null;
+
+/**
+ * Configure exactly once, and make every SDK caller wait for it.
+ *
+ * The first version configured in a fire-and-forget effect and swallowed any
+ * failure — so one early throw (setLogLevel before configure, as it turned
+ * out) silently left the SDK unconfigured forever, and every later call died
+ * with "no singleton instance" while the app showed no reason why. Now there
+ * is one gate: nobody talks to the SDK until this resolves true, a failure is
+ * retried on the next call instead of remembered forever, and setLogLevel
+ * runs after configure, where it cannot abort it.
+ */
+function ensureConfigured(userId: string): Promise<boolean> {
+  if (!RC_KEY) return Promise.resolve(false);
+  if (configuredFor === userId) return Promise.resolve(true);
+
+  if (!configuring) {
+    configuring = (async () => {
+      try {
+        if (configuredFor === null) {
+          Purchases.configure({ apiKey: RC_KEY, appUserID: userId });
+          try {
+            Purchases.setLogLevel(LOG_LEVEL.WARN);
+          } catch {
+            // Log verbosity is not worth failing configuration over.
+          }
+        } else {
+          await Purchases.logIn(userId);
+        }
+        configuredFor = userId;
+        return true;
+      } catch (thrown) {
+        console.warn('Purchases configure failed', (thrown as Error).message);
+        return false;
+      } finally {
+        configuring = null;
+      }
+    })();
+  }
+  return configuring;
+}
 
 /** True on real hardware with a key present — the only case purchases work. */
 export function purchasesAvailable(): boolean {
@@ -38,9 +80,7 @@ function proFrom(info: CustomerInfo | null): boolean {
   // Either identifier counts. The dashboard was set up as skip_budget_pro
   // while the plan said pro; accepting both means a rename there can never
   // silently lock out paying customers.
-  return Boolean(
-    info?.entitlements.active['pro'] || info?.entitlements.active['skip_budget_pro'],
-  );
+  return Boolean(info?.entitlements.active['pro'] || info?.entitlements.active['skip_budget_pro']);
 }
 
 /**
@@ -54,22 +94,7 @@ export function useConfigurePurchases(): void {
   const userId = useUserId();
 
   useEffect(() => {
-    if (!RC_KEY || !userId || configuredFor === userId) return;
-
-    (async () => {
-      try {
-        if (configuredFor === null) {
-          Purchases.setLogLevel(LOG_LEVEL.WARN);
-          Purchases.configure({ apiKey: RC_KEY, appUserID: userId });
-        } else {
-          await Purchases.logIn(userId);
-        }
-        configuredFor = userId;
-      } catch {
-        // Purchases failing to start must never take the app with it; the
-        // server row still answers usePro.
-      }
-    })();
+    if (userId) void ensureConfigured(userId);
   }, [userId]);
 }
 
@@ -96,6 +121,7 @@ export function usePro() {
   useEffect(() => {
     if (!RC_KEY || !userId) return;
     let live = true;
+    let listening = false;
 
     const listener = (info: CustomerInfo) => {
       if (!live) return;
@@ -105,14 +131,23 @@ export function usePro() {
       client.invalidateQueries({ queryKey: ['entitlement'] });
     };
 
-    Purchases.addCustomerInfoUpdateListener(listener);
-    Purchases.getCustomerInfo()
-      .then((info) => live && setSdkPro(proFrom(info)))
-      .catch(() => {});
+    // Everything waits behind the configure gate — touching the SDK before it
+    // is what produced "no singleton instance" on every screen.
+    void (async () => {
+      if (!(await ensureConfigured(userId)) || !live) return;
+      Purchases.addCustomerInfoUpdateListener(listener);
+      listening = true;
+      try {
+        const info = await Purchases.getCustomerInfo();
+        if (live) setSdkPro(proFrom(info));
+      } catch {
+        // The server row still answers.
+      }
+    })();
 
     return () => {
       live = false;
-      Purchases.removeCustomerInfoUpdateListener(listener);
+      if (listening) Purchases.removeCustomerInfoUpdateListener(listener);
     };
   }, [userId, client]);
 
@@ -136,10 +171,14 @@ export type ProPrices = {
 
 /** The live prices, straight from the store — never hardcoded when buyable. */
 export function useProPrices() {
+  const userId = useUserId();
   return useQuery({
-    queryKey: ['pro-prices'],
-    enabled: purchasesAvailable(),
+    queryKey: ['pro-prices', userId],
+    enabled: purchasesAvailable() && Boolean(userId),
     queryFn: async (): Promise<ProPrices> => {
+      if (!(await ensureConfigured(userId!))) {
+        throw new Error('Purchases are not ready yet.');
+      }
       const offerings = await Purchases.getOfferings();
       const current = offerings.current;
       const monthly = current?.monthly ?? null;
@@ -158,10 +197,14 @@ export function useProPrices() {
 
 export function usePurchasePro() {
   const client = useQueryClient();
+  const userId = useUserId();
 
   const purchase = useCallback(
     async (pack: PurchasesPackage): Promise<'done' | 'cancelled'> => {
       try {
+        if (!userId || !(await ensureConfigured(userId))) {
+          throw new Error('Purchases are not ready yet — try again in a moment.');
+        }
         await Purchases.purchasePackage(pack);
         client.invalidateQueries({ queryKey: ['entitlement'] });
         return 'done';
@@ -170,14 +213,17 @@ export function usePurchasePro() {
         throw thrown;
       }
     },
-    [client],
+    [client, userId],
   );
 
   const restore = useCallback(async (): Promise<boolean> => {
+    if (!userId || !(await ensureConfigured(userId))) {
+      throw new Error('Purchases are not ready yet — try again in a moment.');
+    }
     const info = await Purchases.restorePurchases();
     client.invalidateQueries({ queryKey: ['entitlement'] });
     return proFrom(info);
-  }, [client]);
+  }, [client, userId]);
 
   return { purchase, restore };
 }
