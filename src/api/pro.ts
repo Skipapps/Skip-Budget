@@ -35,7 +35,12 @@ export function purchasesAvailable(): boolean {
 }
 
 function proFrom(info: CustomerInfo | null): boolean {
-  return Boolean(info?.entitlements.active['pro']);
+  // Either identifier counts. The dashboard was set up as skip_budget_pro
+  // while the plan said pro; accepting both means a rename there can never
+  // silently lock out paying customers.
+  return Boolean(
+    info?.entitlements.active['pro'] || info?.entitlements.active['skip_budget_pro'],
+  );
 }
 
 /**
