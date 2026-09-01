@@ -29,6 +29,8 @@ const RC_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '';
 
 let configuredFor: string | null = null;
 let configuring: Promise<boolean> | null = null;
+/** The real reason configure last failed — surfaced, never guessed at. */
+let lastConfigureError: string | null = null;
 
 /**
  * Configure exactly once, and make every SDK caller wait for it.
@@ -47,25 +49,32 @@ function ensureConfigured(userId: string): Promise<boolean> {
 
   if (!configuring) {
     configuring = (async () => {
-      try {
-        if (configuredFor === null) {
-          Purchases.configure({ apiKey: RC_KEY, appUserID: userId });
-          try {
-            Purchases.setLogLevel(LOG_LEVEL.WARN);
-          } catch {
-            // Log verbosity is not worth failing configuration over.
+      // Two attempts with a beat between them: the first native call of a
+      // launch can race bridge start-up, and one retry separates a transient
+      // stumble from a real fault worth reporting.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          if (configuredFor === null) {
+            Purchases.configure({ apiKey: RC_KEY, appUserID: userId });
+            try {
+              Purchases.setLogLevel(LOG_LEVEL.WARN);
+            } catch {
+              // Log verbosity is not worth failing configuration over.
+            }
+          } else {
+            await Purchases.logIn(userId);
           }
-        } else {
-          await Purchases.logIn(userId);
+          configuredFor = userId;
+          lastConfigureError = null;
+          configuring = null;
+          return true;
+        } catch (thrown) {
+          lastConfigureError = (thrown as Error).message || String(thrown);
+          await new Promise((resolve) => setTimeout(resolve, 400));
         }
-        configuredFor = userId;
-        return true;
-      } catch (thrown) {
-        console.warn('Purchases configure failed', (thrown as Error).message);
-        return false;
-      } finally {
-        configuring = null;
       }
+      configuring = null;
+      return false;
     })();
   }
   return configuring;
@@ -179,7 +188,11 @@ export function useProPrices() {
     enabled: purchasesAvailable() && Boolean(userId),
     queryFn: async (): Promise<ProPrices> => {
       if (!(await ensureConfigured(userId!))) {
-        throw new Error('Purchases are not ready yet.');
+        throw new Error(
+          lastConfigureError
+            ? `could not start — ${lastConfigureError}`
+            : 'could not start, with no reason given.',
+        );
       }
       const offerings = await Purchases.getOfferings();
       const current = offerings.current;
@@ -222,7 +235,9 @@ export function usePurchasePro() {
     async (pack: PurchasesPackage): Promise<'done' | 'cancelled'> => {
       try {
         if (!userId || !(await ensureConfigured(userId))) {
-          throw new Error('Purchases are not ready yet — try again in a moment.');
+          throw new Error(
+            lastConfigureError ?? 'Purchases are not ready yet — try again in a moment.',
+          );
         }
         await Purchases.purchasePackage(pack);
         client.invalidateQueries({ queryKey: ['entitlement'] });
@@ -237,7 +252,7 @@ export function usePurchasePro() {
 
   const restore = useCallback(async (): Promise<boolean> => {
     if (!userId || !(await ensureConfigured(userId))) {
-      throw new Error('Purchases are not ready yet — try again in a moment.');
+      throw new Error(lastConfigureError ?? 'Purchases are not ready yet — try again in a moment.');
     }
     const info = await Purchases.restorePurchases();
     client.invalidateQueries({ queryKey: ['entitlement'] });
