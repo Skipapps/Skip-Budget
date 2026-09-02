@@ -34,7 +34,7 @@ import {
   type PeriodKey,
 } from '@/lib/period';
 
-import { toIsoDate } from '@/lib/date';
+import { useToday } from '@/lib/use-today';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
 
@@ -56,8 +56,9 @@ export default function TransactionsScreen() {
   const [periodKey, setPeriodKey] = useState<PeriodKey>('week');
   const [anchor, setAnchor] = useState(() => new Date());
 
-  const todayDate = useMemo(() => new Date(), []);
-  const today = toIsoDate(todayDate);
+  // The day as state: it turns at midnight and on resume instead of freezing
+  // at whatever day this tab first mounted on.
+  const { today, todayDate } = useToday();
 
   const atLatest = isLatestPeriod(periodKey, anchor, todayDate);
   const atEarliest = isEarliestPeriod(periodKey, anchor, todayDate);

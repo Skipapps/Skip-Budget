@@ -17,7 +17,7 @@ import {
 } from '@/api/queries';
 import { usePro } from '@/api/pro';
 import { useRefreshAll } from '@/api/refresh';
-import { toIsoDate } from '@/lib/date';
+import { useToday } from '@/lib/use-today';
 import { moneyBuckets } from '@/data/money-mock';
 import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
@@ -73,7 +73,9 @@ export default function CardsScreen() {
   const artwork = useArtwork();
   // Read once per render, so every face on the screen is worked out against
   // the same day rather than drifting apart across a midnight boundary.
-  const today = toIsoDate(new Date());
+  // As state, not a render-time read: a backgrounded tab does not re-render,
+  // so a plain new Date() here stays on yesterday after an overnight resume.
+  const { today } = useToday();
 
   const cards = useCards();
   const accounts = useBankAccounts();

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import {} from 'lucide-react-native';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
@@ -23,6 +23,7 @@ import { orderByIds } from '@/lib/order';
 import { groupByDate } from '@/lib/group';
 import { rangeFor } from '@/lib/range';
 import { addDays, formatDateRange, formatDayLabel, toIsoDate } from '@/lib/date';
+import { useToday } from '@/lib/use-today';
 
 // The gutter Screen applies. The category carousel cancels it so the cards
 // bleed to both edges and the last one peeks, signalling that the row scrolls.
@@ -43,22 +44,20 @@ export default function HomeScreen() {
 
   const profile = useProfile();
 
-  // Held for the life of the screen so every window below is measured from
-  // one day. Reading the clock per call would let a midnight rollover put two
-  // sections on different days.
   // Whichever order they arranged them in, with anything unmentioned behind.
   const tiles = useMemo(
     () => orderByIds(spendingCategories, profile.data?.tile_order),
     [profile.data?.tile_order],
   );
 
-  const todayDate = useMemo(() => new Date(), []);
-  const today = toIsoDate(todayDate);
+  // One consistent day for every window below — and it turns at midnight and
+  // on resume, so the dashboard never wakes up showing yesterday.
+  const { today, todayDate } = useToday();
 
   // The calendar month we are actually in, which is what the card reports on.
   // Deliberately not the date picker below it: moving the selector to browse
   // another day changes the list, not the month you are living in.
-  const monthRange = useMemo(() => rangeFor('month', new Date()), []);
+  const monthRange = useMemo(() => rangeFor('month', todayDate), [todayDate]);
   const month = useLedger(monthRange, today);
 
   /**
@@ -94,6 +93,17 @@ export default function HomeScreen() {
   // Today, not a hardcoded date: the dashboard opens on the day you are in.
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // When the day turns while the dashboard is alive, follow it — but only if
+  // the selector was sitting on the old today. A deliberately browsed day is
+  // a choice, and midnight is no reason to overrule it.
+  const prevToday = useRef(today);
+  useEffect(() => {
+    if (prevToday.current !== today) {
+      setSelectedDate((held) => (toIsoDate(held) === prevToday.current ? todayDate : held));
+      prevToday.current = today;
+    }
+  }, [today, todayDate]);
 
   const atLatest = toIsoDate(selectedDate) >= today;
 
