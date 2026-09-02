@@ -138,6 +138,14 @@ export function useRegisterPush(): void {
 
     (async () => {
       try {
+        // Every account gets its clock stored, reminders or not: the server
+        // computes each user's own "today" — bill and subscription charge
+        // dates, reminder times — from profiles.timezone, and someone who
+        // never enables reminders must not be billed on UTC's calendar. Runs
+        // each launch, so travel updates it too.
+        await storeTimezone(userId);
+        if (cancelled) return;
+
         // Only for an account that chose reminders. The phone's permission is
         // shared by every account on it, so registering on permission alone
         // silently opted every fresh sign-in into another account's choice.
@@ -149,7 +157,6 @@ export function useRegisterPush(): void {
         if (cancelled || !data?.reminders_enabled_at) return;
 
         await registerDevice(userId);
-        if (!cancelled) await storeTimezone(userId);
       } catch {
         // Nothing the person holding the phone can act on.
       }
