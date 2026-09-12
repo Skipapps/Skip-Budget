@@ -1,3 +1,4 @@
+import { forgetDevice } from '@/api/push';
 import { supabase } from '@/lib/supabase';
 
 export type AuthResult = { error: string | null };
@@ -106,9 +107,41 @@ export async function sendPasswordReset(email: string): Promise<AuthResult> {
   return { error: error ? readable(error.message) : null };
 }
 
+/**
+ * Signing out, and telling the server to stop pushing to this phone.
+ *
+ * The delete has to happen first and it has to happen here. `device_tokens`
+ * is protected by `auth.uid() = user_id`, so once the session is gone the row
+ * is unreachable from the client forever — and until something deletes it the
+ * scheduler keeps sending this account's reminders to a phone nobody is
+ * signed in on. Only this device's row goes; the account's other devices are
+ * none of this sign-out's business.
+ *
+ * Failure to tidy up is never failure to sign out. The token read can throw
+ * (a simulator), the network can be down, and none of that is a reason to
+ * leave somebody signed in to an account they asked to leave. It is logged
+ * and the sign-out continues; the row is then self-healing but slowly — the
+ * sender only drops it once APNs answers Unregistered.
+ */
 export async function signOut(): Promise<AuthResult> {
+  await forgetThisDevice();
+
   const { error } = await supabase.auth.signOut();
   return { error: error ? readable(error.message) : null };
+}
+
+/** Best-effort removal of this device's push row, while a session still exists. */
+async function forgetThisDevice(): Promise<void> {
+  try {
+    // getSession reads the stored session rather than asking the auth server,
+    // so a phone that is offline can still identify whose row to delete.
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user?.id;
+    if (!userId) return;
+    await forgetDevice(userId);
+  } catch (error) {
+    console.warn('Could not unregister this device for push notifications', error);
+  }
 }
 
 /**
@@ -118,7 +151,13 @@ export async function signOut(): Promise<AuthResult> {
  * that deletes exactly one row — whatever auth.uid() resolves to for this
  * session. There is no id to pass and nothing to tamper with.
  *
- * Every table cascades from auth.users, so the data goes with the account.
+ * Every table cascades from auth.users, so the data goes with the account —
+ * including this phone's row in device_tokens
+ * (`20260829100009_push_devices.sql`: `user_id ... references auth.users (id)
+ * on delete cascade`). That is why there is no client-side delete on this
+ * path the way there is in signOut: the row is gone before the app could ask
+ * for it, and a delete afterwards would match nothing.
+ *
  * The local session is cleared afterwards regardless: the user it referred to
  * no longer exists, and leaving a dead token in storage would leave the app
  * in a state where every request 401s with no explanation.

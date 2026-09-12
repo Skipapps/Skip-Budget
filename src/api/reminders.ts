@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
+import { NOTHING_SAVED } from '@/api/mutations';
 import { withTimeout } from '@/lib/deadline';
 import { enableReminders } from '@/api/push';
 import { supabase } from '@/lib/supabase';
@@ -259,5 +260,147 @@ export function useRemoveReminder() {
       if (error) throw error;
     },
     onSuccess: () => client.invalidateQueries({ queryKey: ['reminders'] }),
+  });
+}
+
+/**
+ * The daily receipts reminder.
+ *
+ * The odd one out, and deliberately not a `reminders` row: that table's
+ * constraint is `num_nonnulls(bill_id, subscription_id, card_id,
+ * bank_account_id) = 1`, and the upsert above resolves against all four
+ * columns. This reminder points at nothing — it is about the habit, not about
+ * a thing — and there is exactly one per account, so it lives as three columns
+ * on `profiles` (20260912100001_receipt_reminder.sql).
+ *
+ * Kept out of `useProfile` on purpose. That query backs the dashboard header
+ * and the tile order; invalidating it every time somebody drags the clock is a
+ * dashboard re-render for no reason.
+ */
+
+/** Eight in the evening: the day's shopping is done and the receipts are still in a pocket. */
+export const DEFAULT_RECEIPT_REMIND_AT = '20:00';
+
+/** The two columns a screen reads; the sender owns the third. */
+type ReceiptReminderRow = {
+  receipt_reminder_enabled: boolean | null;
+  /** Local time of day, "HH:MM:SS". */
+  receipt_reminder_at: string | null;
+};
+
+export type ReceiptReminder = {
+  enabled: boolean;
+  /** "HH:MM", local wall clock. */
+  remindAt: string;
+};
+
+/**
+ * The stored setting, in the shape a screen wants.
+ *
+ * Separated from the hook so the defaulting is testable without a query: the
+ * columns are `not null` with a stored default of 20:00, but a client that
+ * reads a profile written before the migration, or no profile row at all, must
+ * still show the Founder's default rather than an empty pill or midnight.
+ */
+export function receiptReminderFrom(row: ReceiptReminderRow | null | undefined): ReceiptReminder {
+  const at =
+    typeof row?.receipt_reminder_at === 'string' ? row.receipt_reminder_at.slice(0, 5) : '';
+  return {
+    enabled: row?.receipt_reminder_enabled === true,
+    // Trimmed to HH:MM; the seconds Postgres adds are noise here.
+    remindAt: /^\d{2}:\d{2}$/.test(at) ? at : DEFAULT_RECEIPT_REMIND_AT,
+  };
+}
+
+/**
+ * Whether the daily receipts reminder is on, and when it lands.
+ *
+ * Returns the setting flattened, with loading and error alongside it, so a
+ * screen can render the row before the read lands and still say when it
+ * failed. `enabled` is false and `remindAt` is the default until proven
+ * otherwise — the safe way round for something that sends a notification.
+ */
+export function useReceiptReminder() {
+  const userId = useUserId();
+
+  const query = useQuery({
+    // Keyed by user so switching accounts cannot serve the previous one's setting.
+    queryKey: ['receipt-reminder', userId],
+    enabled: Boolean(userId),
+    queryFn: () =>
+      withTimeout(
+        (async () => {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('receipt_reminder_enabled, receipt_reminder_at')
+            .maybeSingle();
+          if (error) throw error;
+          return (data ?? null) as ReceiptReminderRow | null;
+        })(),
+        12_000,
+        'Could not load your receipts reminder. Check your connection and try again.',
+      ),
+  });
+
+  const setting = receiptReminderFrom(query.data);
+
+  return {
+    enabled: setting.enabled,
+    remindAt: setting.remindAt,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
+  };
+}
+
+type SetReceiptReminderInput = {
+  enabled: boolean;
+  /** "HH:MM". Left off to keep whatever time is already stored. */
+  remindAt?: string;
+};
+
+/**
+ * Turns the daily receipts reminder on or off, or moves it.
+ *
+ * Switching it on is the loudest possible yes to being reminded, so it enables
+ * reminders for the account first — permission, token and the profile flag —
+ * exactly as saving any other reminder does. Failure there is ignored on
+ * purpose: the setting is worth keeping even when the phone refuses to be
+ * pushed, and the next launch retries the registration.
+ *
+ * The time is only written when one is given, so toggling the switch cannot
+ * quietly reset a time the user chose.
+ */
+export function useSetReceiptReminder() {
+  const userId = useUserId();
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ enabled, remindAt }: SetReceiptReminderInput) => {
+      if (enabled) {
+        const { data: auth } = await supabase.auth.getUser();
+        if (auth.user) void enableReminders(auth.user.id);
+      }
+      if (!userId) throw new Error('Sign in first.');
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          receipt_reminder_enabled: enabled,
+          ...(remindAt ? { receipt_reminder_at: remindAt } : {}),
+        } as never)
+        // RLS already scopes this to the caller; naming the row as well means a
+        // mistake here cannot become an update across the table.
+        .eq('id', userId)
+        // An update that matches no row is a 204 with no error, so without
+        // this a missing profile would let the switch report success and
+        // change nothing — and the next launch would read it back off.
+        .select('id');
+      if (error) throw error;
+      // A setting, not a list row — NOTHING_SAVED rather than NOTHING_UPDATED.
+      if (!data || data.length === 0) throw new Error(NOTHING_SAVED);
+    },
+    // Its own key: the profile query behind the dashboard is left alone.
+    onSuccess: () => client.invalidateQueries({ queryKey: ['receipt-reminder'] }),
   });
 }

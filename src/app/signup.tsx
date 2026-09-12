@@ -54,7 +54,7 @@ export default function SignUpScreen() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title className="mt-4">Create your account</Title>
+      <Title>Create your account</Title>
       <Subtitle className="mt-3">Use your email and a password you will remember.</Subtitle>
 
       <View className="mt-8 w-full gap-5">

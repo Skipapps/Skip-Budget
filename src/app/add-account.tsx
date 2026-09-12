@@ -1,25 +1,26 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { Calculator, Calendar, Trash2, Wallet } from 'lucide-react-native';
+import { Calculator, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { AccountCard } from '@/components/cards/account-card';
 import { AmountPad } from '@/components/ui/amount-pad';
-import { Button } from '@/components/ui/button';
+import { AmountStep } from '@/components/flow/amount-step';
+import { InlineCalendar } from '@/components/flow/inline-calendar';
+import { StepFlow } from '@/components/flow/step-flow';
 import { CalculatorPad } from '@/components/ui/calculator-pad';
-import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { ColorPicker } from '@/components/ui/color-picker';
-import { DatePicker } from '@/components/ui/date-picker';
+import { PageState } from '@/components/ui/page-state';
+import { Screen } from '@/components/ui/screen';
+import { Skeleton } from '@/components/ui/skeleton';
 import { usePro } from '@/api/pro';
 import { useBankAccounts, useBankAccount, useSalaryAccountIds } from '@/api/queries';
-import { Screen } from '@/components/ui/screen';
 import { useConfirm } from '@/providers/dialog-provider';
-import { SegmentedControl } from '@/components/ui/segmented-control';
 import { ReminderField } from '@/components/ui/reminder-field';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
-import { FieldLabel, Title } from '@/components/ui/typography';
+import { FieldLabel } from '@/components/ui/typography';
 import {
   useCreateBankAccount,
   useCreateSalarySource,
@@ -34,6 +35,7 @@ import {
   type ReminderChoice,
 } from '@/api/reminders';
 import { useColors } from '@/providers/theme-provider';
+import { useArtwork } from '@/theme/artwork';
 import { ACCOUNT_TYPES, type AccountType } from '@/data/accounts-mock';
 import {
   PAY_FREQUENCIES,
@@ -43,12 +45,10 @@ import {
   type PayFrequency,
 } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
+import { success, warn } from '@/lib/haptics';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
 
 const TYPE_OPTIONS = ACCOUNT_TYPES.map((type) => ({ value: type, label: type }));
-
-const MORE_SETUP_INFO =
-  'Adding more details helps Skip calculate accurate balances and predict future transactions made with this account.';
 
 /** Loads the account being edited, then seeds the form by remount. */
 export default function AddAccountScreen() {
@@ -64,23 +64,72 @@ export default function AddAccountScreen() {
   return <AddAccountScreenInner />;
 }
 
+/**
+ * An edit only ever runs on a record it actually has.
+ *
+ * `id` is what makes Save an update, so a form mounted while the read failed
+ * would put a blank bank name and a $0 balance over a real account. Loading,
+ * could not be read and no longer there are three separate answers; none of
+ * them is a blank form, and a failed read never turns into a new account.
+ */
 function AddAccountScreenInner() {
-  const colors = useColors();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { data: existing, isLoading } = useBankAccount(id);
+  const artwork = useArtwork();
+  const account = useBankAccount(id);
+  const existing = account.data ?? null;
 
-  if (id && isLoading && !existing) {
+  if (id && !existing) {
+    if (account.isError) {
+      return (
+        <Screen showBack>
+          <PageState
+            art={artwork.error}
+            title="Could not open this account"
+            message="Check your connection and try again. Your balance has not been touched."
+            actionLabel="Try again"
+            onAction={() => {
+              void account.refetch();
+            }}
+            secondaryLabel="Go back"
+            onSecondary={() => router.back()}
+          />
+        </Screen>
+      );
+    }
+
+    if (!account.isFetched) {
+      return (
+        <StepFlow
+          title="Edit account"
+          steps={3}
+          current={1}
+          onBack={() => router.back()}
+          primaryLabel="Continue"
+          primaryDisabled
+          onPrimary={() => {}}
+        >
+          <View className="w-full gap-6">
+            <Skeleton className="h-[180px] w-full rounded-[16px]" />
+            <Skeleton className="h-14 w-full rounded-[12px]" />
+          </View>
+        </StepFlow>
+      );
+    }
+
     return (
       <Screen showBack>
-        <Title className="mt-2">Edit account</Title>
-        <View className="mt-16 w-full items-center">
-          <ActivityIndicator size="small" color={colors.muted} />
-        </View>
+        <PageState
+          art={artwork.error}
+          title="That account is not here"
+          message="It may have been removed. Nothing has been changed."
+          actionLabel="Go back"
+          onAction={() => router.back()}
+        />
       </Screen>
     );
   }
 
-  return <AccountForm key={existing?.id ?? 'new'} id={id} existing={existing ?? null} />;
+  return <AccountForm key={existing?.id ?? 'new'} id={id} existing={existing} />;
 }
 
 function AccountForm({
@@ -90,6 +139,7 @@ function AccountForm({
   id?: string;
   existing: ReturnType<typeof useBankAccount>['data'] | null;
 }) {
+  const colors = useColors();
   const editing = Boolean(id);
   const [bankName, setBankName] = useState(existing?.bank_name ?? '');
   const [nickname, setNickname] = useState(existing?.nickname ?? '');
@@ -106,17 +156,16 @@ function AccountForm({
   const [payFrequency, setPayFrequency] = useState<PayFrequency>('monthly');
   const [lastPayday, setLastPayday] = useState<Date | null>(null);
 
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [balancePadOpen, setBalancePadOpen] = useState(false);
+  // Editing opens on the details, not the keypad.
+  const [step, setStep] = useState(editing ? 1 : 0);
   const [incomePadOpen, setIncomePadOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
 
-  const frequencyMeta = PAY_FREQUENCIES.find((option) => option.value === payFrequency);
   // Only meaningful once a last pay day is known.
   const nextPayday = lastPayday ? getNextPayday(lastPayday, payFrequency) : null;
 
   // Saving waits on the data layer; this only closes the screen.
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; step: number } | null>(null);
 
   const createAccount = useCreateBankAccount();
   const updateAccount = useUpdateBankAccount();
@@ -138,7 +187,7 @@ function AccountForm({
       await deleteAccount.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not delete that account.');
+      setError({ message: (thrown as Error).message ?? 'Could not delete that account.', step });
     }
   };
   const createSalary = useCreateSalarySource();
@@ -151,16 +200,31 @@ function AccountForm({
   const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
-  const { ids: salaryAccountIds } = useSalaryAccountIds();
+  const salaryAccounts = useSalaryAccountIds();
   // An account reminder is about pay arriving, so it means nothing until
   // something is paid in. On a new account that is the income being entered
   // right here; on an existing one it is whatever is already linked.
-  const payLandsHere = editing ? salaryAccountIds.has(id ?? '') : Number(income) > 0;
+  const payLandsHere = editing ? salaryAccounts.ids.has(id ?? '') : Number(income) > 0;
+  // Only while editing: a new account's answer comes from the figure typed on
+  // the step before, which no read can fail. An empty set from a read that has
+  // not landed — or has failed — is indistinguishable from "nothing is paid in
+  // here", and the reminder would simply vanish with an explanation that is
+  // not true.
+  const payLookupPending = Boolean(editing) && salaryAccounts.isLoading;
+  const payLookupFailed = Boolean(editing) && salaryAccounts.isError;
+  const payLookupUnknown = payLookupPending || payLookupFailed;
+
+  /** A check for a field on an earlier step sends you back to that step. */
+  const fail = (message: string, atStep: number) => {
+    warn();
+    setError({ message, step: atStep });
+    setStep(atStep);
+  };
 
   const handleSave = async () => {
     setError(null);
     if (!bankName.trim()) {
-      setError('Enter the bank name.');
+      fail('Enter the bank name.', 1);
       return;
     }
 
@@ -199,205 +263,200 @@ function AccountForm({
         });
       }
 
-      await applyReminder(
-        'account',
-        accountId,
-        payLandsHere ? choiceToLead(reminder) : null,
-        remindAt,
-      );
+      // Untouched while the link is unknown. `payLandsHere` is false for an
+      // empty set, and `applyReminder(…, null)` deletes the row — so saving
+      // during a read that failed or has not landed would quietly remove a
+      // payday reminder set weeks ago, on a step that was not even offering
+      // the controls.
+      if (!payLookupUnknown) {
+        await applyReminder(
+          'account',
+          accountId,
+          payLandsHere ? choiceToLead(reminder) : null,
+          remindAt,
+        );
+      }
 
+      success();
       router.back();
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not save that account.');
+      warn();
+      setError({ message: (thrown as Error).message ?? 'Could not save that account.', step: 2 });
     }
   };
 
+  const busy = createAccount.isPending || updateAccount.isPending;
+
+  // A balance of zero is a real answer for an account, so step 1 never blocks
+  // on the figure — only on the one field the mutation itself insists on.
+  const stepValid = step === 1 ? Boolean(bankName.trim()) : !busy;
+
+  const question =
+    step === 0
+      ? 'What is in the account today?'
+      : step === 2
+        ? 'When was the last pay day?'
+        : undefined;
+  const primaryLabel =
+    step < 2 ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save account';
+  const stepError = error && error.step === step ? error.message : null;
+
   return (
-    <Screen showBack avoidKeyboard>
-      <Title className="mt-2">{editing ? 'Edit account' : 'Adding New bank account'}</Title>
-
-      <View className="mt-6 w-full">
-        <AccountCard
-          account={{
-            id: 'preview',
-            bankName,
-            nickname,
-            accountType,
-            balance: Number(balance) || 0,
-            last4,
-            color,
-          }}
-          placeholderName="Bank name"
-        />
-      </View>
-
-      <View className="mt-8 w-full">
-        <TextField
-          label="Bank name"
-          value={bankName}
-          onChangeText={setBankName}
-          autoCapitalize="words"
-          returnKeyType="next"
-        />
-      </View>
-
-      <View className="mt-6 w-full">
-        <FieldLabel className="mb-2">Account type</FieldLabel>
-        <SegmentedControl options={TYPE_OPTIONS} value={accountType} onChange={setAccountType} />
-      </View>
-
-      <View className="mt-6 w-full">
-        <TextField
-          label="Name of the account"
-          value={nickname}
-          onChangeText={setNickname}
-          autoCapitalize="words"
-          returnKeyType="done"
-        />
-      </View>
-
-      <View className="mt-6 w-full">
-        <FieldLabel className="mb-3">Card colour</FieldLabel>
-        <ColorPicker value={color} onChange={setColor} />
-      </View>
-
-      <View className="mt-8 w-full border-t border-line pt-4">
-        <CollapsibleSection
-          title="More setup"
-          badgeLabel="Recommended"
-          infoTitle="Why add these?"
-          infoMessage={MORE_SETUP_INFO}
-        >
-          <View className="w-full gap-5">
-            <TextField
-              label="Last 4 digits"
-              value={last4}
-              onChangeText={(text) => setLast4(text.replace(/\D/g, '').slice(0, 4))}
-              keyboardType="number-pad"
-              returnKeyType="done"
-            />
-
-            <SelectField
-              label="Today's balance"
-              value={balance ? formatCurrency(Number(balance)) : ''}
-              placeholder="Enter an amount"
-              icon={Wallet}
-              onPress={() => setBalancePadOpen(true)}
-            />
-
-            <SelectField
-              label="Expected income"
-              value={income ? formatCurrency(Number(income)) : ''}
-              placeholder="Enter an amount"
-              icon={Calculator}
-              onPress={() => setIncomePadOpen(true)}
-              onIconPress={() => setCalculatorOpen(true)}
-              iconAccessibilityLabel="Open calculator"
-            />
-
-            <View className="w-full">
-              <FieldLabel className="mb-2">How often are you paid?</FieldLabel>
-              <ChoiceChips
-                options={PAY_FREQUENCIES}
-                value={payFrequency}
-                onChange={setPayFrequency}
-              />
-            </View>
-
-            <View className="w-full">
-              <SelectField
-                label="Last pay day"
-                value={lastPayday ? formatFullDate(lastPayday) : ''}
-                placeholder="Choose a date"
-                icon={Calendar}
-                onPress={() => setDatePickerOpen(true)}
-              />
-              {nextPayday ? (
-                <Text
-                  className="ml-5 mt-1.5 font-poppins text-[13px] text-muted"
-                  maxFontSizeMultiplier={1.4}
-                >
-                  Next payday: {formatFullDate(nextPayday)}
-                </Text>
-              ) : null}
-            </View>
-
-            <ReminderField
-              kind="account"
-              value={reminder}
-              onChange={setReminderDraft}
-              time={remindAt}
-              onTimeChange={setTimeDraft}
-              unavailable={
-                payLandsHere
-                  ? null
-                  : 'Add the income paid into this account and Skip can tell you when it lands.'
-              }
-            />
-          </View>
-        </CollapsibleSection>
-      </View>
-
-      {error ? (
-        <Text
-          className="mt-6 w-full text-center font-poppins text-[13px] text-red-600"
-          maxFontSizeMultiplier={1.4}
-        >
-          {error}
-        </Text>
-      ) : null}
-
-      <View className="mt-auto w-full gap-3 pt-10">
-        <Button
-          label={
-            createAccount.isPending || updateAccount.isPending
-              ? 'Saving…'
-              : editing
-                ? 'Save changes'
-                : 'Add account'
-          }
-          onPress={handleSave}
-        />
-        {editing ? (
+    <StepFlow
+      title={editing ? 'Edit account' : 'Add an account'}
+      steps={3}
+      current={step}
+      onBack={() => {
+        setError(null);
+        if (step === 0) router.back();
+        else setStep((current) => current - 1);
+      }}
+      question={question}
+      primaryLabel={primaryLabel}
+      primaryDisabled={!stepValid}
+      onPrimary={() => {
+        if (step < 2) {
+          setError(null);
+          setStep((current) => current + 1);
+          return;
+        }
+        void handleSave();
+      }}
+      error={step === 1 ? null : stepError}
+      avoidKeyboard={step === 1}
+      footerSlot={
+        editing ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Delete this account"
             onPress={handleDelete}
-            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-ink/5"
+            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
-            <Trash2 size={17} color="#DC2626" strokeWidth={1.9} />
+            <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
             <Text
-              className="font-poppins-medium text-[15px] text-red-600"
+              className="font-poppins-medium text-[15px] text-danger"
               maxFontSizeMultiplier={1.4}
             >
               {deleteAccount.isPending ? 'Deleting…' : 'Delete account'}
             </Text>
           </Pressable>
-        ) : null}
-      </View>
+        ) : null
+      }
+    >
+      {step === 0 ? <AmountStep value={balance} onChange={setBalance} /> : null}
 
-      {datePickerOpen ? (
-        <DatePicker
-          value={lastPayday ?? new Date()}
-          onCancel={() => setDatePickerOpen(false)}
-          onConfirm={(date) => {
-            setLastPayday(date);
-            setDatePickerOpen(false);
-          }}
-        />
+      {step === 1 ? (
+        <View className="w-full gap-6">
+          <AccountCard
+            account={{
+              id: 'preview',
+              bankName,
+              nickname,
+              accountType,
+              balance: Number(balance) || 0,
+              last4,
+              color,
+            }}
+            placeholderName="Bank name"
+          />
+
+          <TextField
+            label="Bank name"
+            value={bankName}
+            onChangeText={setBankName}
+            autoCapitalize="words"
+            returnKeyType="next"
+          />
+
+          <View className="w-full">
+            <FieldLabel className="mb-2">Account type</FieldLabel>
+            <ChoiceChips options={TYPE_OPTIONS} value={accountType} onChange={setAccountType} />
+          </View>
+
+          <TextField
+            label="Name of the account"
+            value={nickname}
+            onChangeText={setNickname}
+            autoCapitalize="words"
+            returnKeyType="done"
+          />
+
+          <View className="w-full">
+            <FieldLabel className="mb-3">Card colour</FieldLabel>
+            <ColorPicker value={color} onChange={setColor} />
+          </View>
+
+          <TextField
+            label="Last 4 digits"
+            value={last4}
+            onChangeText={(text) => setLast4(text.replace(/\D/g, '').slice(0, 4))}
+            keyboardType="number-pad"
+            returnKeyType="done"
+          />
+
+          <SelectField
+            label="Expected income"
+            variant="pill"
+            value={income ? formatCurrency(Number(income)) : ''}
+            placeholder="Enter an amount"
+            icon={Calculator}
+            onPress={() => setIncomePadOpen(true)}
+            onIconPress={() => setCalculatorOpen(true)}
+            iconAccessibilityLabel="Open calculator"
+          />
+
+          {stepError ? (
+            <Text
+              className="w-full font-poppins text-[13px] text-danger"
+              maxFontSizeMultiplier={1.4}
+            >
+              {stepError}
+            </Text>
+          ) : null}
+        </View>
       ) : null}
 
-      {balancePadOpen ? (
-        <AmountPad
-          title="Balance today"
-          caption="Account balance"
-          value={balance}
-          onCancel={() => setBalancePadOpen(false)}
-          onConfirm={(next) => {
-            setBalance(next);
-            setBalancePadOpen(false);
-          }}
-        />
+      {step === 2 ? (
+        <View className="w-full gap-6">
+          <View className="w-full">
+            <InlineCalendar value={lastPayday} onChange={setLastPayday} />
+            {nextPayday ? (
+              <Text
+                className="mt-2 w-full text-center font-poppins text-[13px] text-muted"
+                maxFontSizeMultiplier={1.4}
+              >
+                Next payday: {formatFullDate(nextPayday)}
+              </Text>
+            ) : null}
+          </View>
+
+          <View className="w-full">
+            <FieldLabel className="mb-2">How often are you paid?</FieldLabel>
+            <ChoiceChips
+              options={PAY_FREQUENCIES}
+              value={payFrequency}
+              onChange={setPayFrequency}
+            />
+          </View>
+
+          <ReminderField
+            kind="account"
+            value={reminder}
+            onChange={setReminderDraft}
+            time={remindAt}
+            onTimeChange={setTimeDraft}
+            unavailable={
+              payLookupPending
+                ? 'Checking what is paid into this account…'
+                : payLookupFailed
+                  ? 'Skip could not check what is paid into this account, so it cannot set this up yet.'
+                  : payLandsHere
+                    ? null
+                    : 'Add the income paid into this account and Skip can tell you when it lands.'
+            }
+            onRetry={payLookupFailed ? () => void salaryAccounts.refetch() : undefined}
+          />
+        </View>
       ) : null}
 
       {calculatorOpen ? (
@@ -415,7 +474,9 @@ function AccountForm({
       {incomePadOpen ? (
         <AmountPad
           title="Expected income"
-          caption={frequencyMeta?.caption ?? 'Each pay period'}
+          // The pay frequency is asked for on the step after this one, so
+          // naming a cycle here would state a choice nobody has made yet.
+          caption="Each pay period"
           value={income}
           onCancel={() => setIncomePadOpen(false)}
           onConfirm={(next) => {
@@ -424,6 +485,6 @@ function AccountForm({
           }}
         />
       ) : null}
-    </Screen>
+    </StepFlow>
   );
 }

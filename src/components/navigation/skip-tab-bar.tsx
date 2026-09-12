@@ -74,7 +74,10 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
               {Icon ? (
                 <Icon
                   size={22}
-                  color={focused ? '#FFFFFF' : colors.muted}
+                  // The pill's own foreground, the same as the label beside
+                  // it. Hardcoded white sat at 2.11:1 on a pale accent, next
+                  // to a near-black label inside the same pill.
+                  color={focused ? colors.onControl : colors.muted}
                   strokeWidth={2}
                   absoluteStrokeWidth
                 />

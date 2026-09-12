@@ -68,11 +68,11 @@ export function TextField({
 
       <View
         className={cn(
-          'w-full rounded-[10px] border px-5',
+          'w-full rounded-[12px] border px-5',
           // A multiline box grows downward, so the input must sit at the top
           // rather than be vertically centred like a single-line field.
           multiline ? 'min-h-24 py-1' : 'min-h-14 flex-row items-center',
-          error ? 'border-red-500' : focused ? 'border-control' : 'border-line',
+          error ? 'border-danger' : focused ? 'border-control' : 'border-line',
         )}
       >
         <TextInput
@@ -113,7 +113,7 @@ export function TextField({
 
       {error ? (
         <Text
-          className="ml-5 mt-1.5 font-poppins text-[13px] text-red-600"
+          className="ml-5 mt-1.5 font-poppins text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {error}

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { NOTHING_UPDATED } from '@/api/mutations';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
@@ -457,7 +458,16 @@ export function useRemoveGroupMember() {
   });
 }
 
-/** Rename, or change how it settles. Owner-only, enforced by the group policy. */
+/**
+ * Rename, or change how it settles. Owner-only, enforced by the group policy.
+ *
+ * The `select('id')` is the same guard every other edit in the app has, and it
+ * matters more here than on a row this account owns outright: the group policy
+ * shows a member the row and lets only the owner write it, so a member's
+ * rename is a filter that matches nothing, which PostgREST answers with 204
+ * and no error. Without the select, Group settings popped with a success
+ * haptic having written nothing at all.
+ */
 export function useUpdateGroup() {
   const invalidate = useSplitInvalidate();
   return useMutation({
@@ -472,8 +482,13 @@ export function useUpdateGroup() {
       if (values.simplifyDebts !== undefined) patch.simplify_debts = values.simplifyDebts;
       if (values.iconId !== undefined) patch.icon_id = values.iconId;
 
-      const { error } = await supabase.from('groups').update(patch).eq('id', values.id);
+      const { data, error } = await supabase
+        .from('groups')
+        .update(patch)
+        .eq('id', values.id)
+        .select('id');
       if (error) throw new Error(error.message);
+      if (!data || data.length === 0) throw new Error(NOTHING_UPDATED);
     },
     onSuccess: () => invalidate(['groups', 'group']),
   });
@@ -490,11 +505,15 @@ export function useArchiveGroup() {
   const invalidate = useSplitInvalidate();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('groups')
         .update({ archived_at: new Date().toISOString() })
-        .eq('id', id);
+        .eq('id', id)
+        // As in useUpdateGroup: archiving is owner-only, and an update that
+        // matched no row has to be an error rather than a quiet success.
+        .select('id');
       if (error) throw new Error(error.message);
+      if (!data || data.length === 0) throw new Error(NOTHING_UPDATED);
     },
     onSuccess: () => invalidate(['groups', 'group']),
   });

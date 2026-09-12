@@ -73,9 +73,7 @@ export default function TourScreen() {
 
   return (
     <Screen showBack>
-      <Title align="left" className="mt-2">
-        What Skip can do
-      </Title>
+      <Title align="left">What Skip can do</Title>
       <Subtitle className="mt-3 w-full text-left">
         Six things, each a tap away. No setup order to follow — start wherever your money bothers
         you most.
@@ -90,7 +88,7 @@ export default function TourScreen() {
               accessibilityRole="button"
               accessibilityLabel={`${stop.title}. ${stop.detail}`}
               onPress={() => router.push(stop.href as never)}
-              className="w-full flex-row items-center gap-4 rounded-[14px] border border-line bg-card p-4 active:bg-ink/5"
+              className="w-full flex-row items-center gap-4 rounded-[16px] border border-line bg-card p-4 active:bg-ink/5"
             >
               <View className="h-[64px] w-[64px] shrink-0 opacity-70">
                 <Art width="100%" height="100%" />

@@ -20,7 +20,10 @@ export function AddButton({ onPress }: AddButtonProps) {
       style={shadows.floating}
       className="h-16 w-16 items-center justify-center rounded-full bg-control active:opacity-90"
     >
-      <Plus size={28} color={colors.surface} strokeWidth={2.5} />
+      {/* The control's own foreground, not the page's. On eleven of the
+          twelve accents `surface` is the wrong end of the ramp in at least one
+          mode, which left a white plus on a butter disc. */}
+      <Plus size={28} color={colors.onControl} strokeWidth={2} />
     </Pressable>
   );
 }

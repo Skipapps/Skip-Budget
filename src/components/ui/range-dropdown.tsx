@@ -31,12 +31,14 @@ export function RangeDropdown({ value, onChange }: RangeDropdownProps) {
         accessibilityRole="button"
         accessibilityLabel={`Showing ${current.label}. Change the window.`}
         onPress={() => setOpen(true)}
-        className="flex-row items-center gap-1.5 rounded-full border border-line bg-card py-2 pl-3.5 pr-3 active:bg-ink/5"
+        // The pill is 40pt tall by design; the touch target is the 44pt floor.
+        hitSlop={{ top: 4, bottom: 4 }}
+        className="min-h-10 flex-row items-center gap-1.5 rounded-full bg-ink/5 pl-4 pr-3 active:bg-ink/10"
       >
         <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
           {current.label}
         </Text>
-        <ChevronDown size={16} color={colors.muted} strokeWidth={2.2} />
+        <ChevronDown size={16} color={colors.muted} strokeWidth={2} />
       </Pressable>
 
       {open ? (
@@ -50,7 +52,7 @@ export function RangeDropdown({ value, onChange }: RangeDropdownProps) {
             <Pressable
               onPress={() => {}}
               style={shadows.floating}
-              className="w-full max-w-[300px] overflow-hidden rounded-[14px] bg-card py-1.5"
+              className="w-full max-w-[300px] overflow-hidden rounded-[16px] bg-card py-1.5"
             >
               {LEDGER_RANGES.map((range) => {
                 const selected = range.value === value;

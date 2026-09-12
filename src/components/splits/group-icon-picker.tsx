@@ -28,7 +28,7 @@ export function GroupIconPicker({ value, onChange }: GroupIconPickerProps) {
         const glyph = createElement(choice.icon, {
           width: 21,
           height: 21,
-          color: selected ? colors.surface : colors.body,
+          color: selected ? colors.onControl : colors.body,
         });
 
         return (

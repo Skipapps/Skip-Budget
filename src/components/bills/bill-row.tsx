@@ -23,7 +23,7 @@ export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
   const moneyColor = useMoneyColor();
   // createElement, not JSX: getBillIcon looks a component up rather than
   // defining one, but assigning it to a capitalised local trips the lint rule.
-  const icon = createElement(getBillIcon(bill), { width: 22, height: 22, color: colors.body });
+  const icon = createElement(getBillIcon(bill), { width: 20, height: 20, color: colors.body });
   const recurrence = RECURRENCE_LABELS[bill.recurrence] ?? bill.recurrence;
   const domain = bill.domain;
 
@@ -37,9 +37,9 @@ export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
       {/* The issuer's logo when there is one — AEP and T-Mobile are what the
           eye finds in this list — and the category icon when there is not. */}
       {domain ? (
-        <BrandLogo name={bill.name} domain={domain} size={44} />
+        <BrandLogo name={bill.name} domain={domain} size={40} />
       ) : (
-        <View className="h-11 w-11 items-center justify-center rounded-[10px] bg-ink/5">
+        <View className="h-10 w-10 items-center justify-center rounded-[12px] bg-ink/5">
           {icon}
         </View>
       )}

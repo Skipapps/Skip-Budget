@@ -8,7 +8,7 @@ import { Body, Quote, Strong, Title } from '@/components/ui/typography';
 export default function MessageScreen() {
   return (
     <Screen showBack>
-      <Title className="mt-6">Why Skip is different</Title>
+      <Title>Why Skip is different</Title>
 
       <View className="mt-8 w-full gap-4">
         <Body>

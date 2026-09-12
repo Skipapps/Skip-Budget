@@ -57,7 +57,7 @@ export function Button({
       disabled={disabled}
       onPress={withTap(onPress)}
       className={cn(
-        'min-h-16 w-full flex-row items-center justify-center rounded-[10px] px-5 py-4',
+        'min-h-16 w-full flex-row items-center justify-center rounded-full px-5 py-4',
         container[variant],
         disabled && 'opacity-50',
         className,

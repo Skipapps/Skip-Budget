@@ -127,15 +127,25 @@ export default function TransactionsScreen() {
     [buckets, matching],
   );
 
-  /** Newest first, and empty buckets dropped — a heading over nothing is noise. */
+  /**
+   * Oldest first, and empty buckets dropped — a heading over nothing is noise.
+   *
+   * Both the rows inside a bucket and the buckets themselves run forwards, so
+   * the page reads top to bottom as time passed and today is the last thing on
+   * it. `periodBuckets` already hands them over oldest-first, so the order is
+   * taken as given rather than reversed — the `.reverse()` that used to sit
+   * here existed only to undo that.
+   */
   const groups = useMemo(
     () =>
       buckets
         .map((bucket) => {
           const entries = matching
             .filter((entry) => entry.date >= bucket.from && entry.date <= bucket.to)
+            // Same-day rows keep the id tiebreak they have always had; only the
+            // day comparison flipped.
             .sort((a, b) =>
-              a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date),
+              a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date),
             );
           return {
             ...bucket,
@@ -143,14 +153,13 @@ export default function TransactionsScreen() {
             total: entries.reduce((sum, entry) => sum + entry.amount, 0),
           };
         })
-        .filter((bucket) => bucket.entries.length > 0)
-        .reverse(),
+        .filter((bucket) => bucket.entries.length > 0),
     [buckets, matching],
   );
 
   return (
     <Screen avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
-      <Title className="mt-2">Transactions</Title>
+      <Title>Transactions</Title>
 
       <View className="mt-5 w-full">
         <ChoiceChips
@@ -168,17 +177,18 @@ export default function TransactionsScreen() {
 
       {/* The window itself, and the way through it. Forward stops at the
           period holding today; back stops where the kept history ends. */}
-      <View className="mt-4 w-full flex-row items-center justify-between rounded-[10px] border border-line px-1.5 py-2">
+      <View className="mt-4 w-full flex-row items-center justify-between rounded-full bg-ink/5 px-1.5 py-2">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Earlier"
           accessibilityState={{ disabled: atEarliest }}
           disabled={atEarliest}
           onPress={() => setAnchor((current) => stepPeriod(periodKey, current, -1))}
+          hitSlop={8}
           className={
             atEarliest
-              ? 'h-10 w-10 items-center justify-center rounded-[8px] opacity-30'
-              : 'h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/5'
+              ? 'h-10 w-10 items-center justify-center rounded-full opacity-30'
+              : 'h-10 w-10 items-center justify-center rounded-full active:bg-ink/5'
           }
         >
           <ChevronLeft size={20} color={colors.ink} strokeWidth={2} />
@@ -198,10 +208,11 @@ export default function TransactionsScreen() {
           accessibilityState={{ disabled: atLatest }}
           disabled={atLatest}
           onPress={() => setAnchor((current) => stepPeriod(periodKey, current, 1))}
+          hitSlop={8}
           className={
             atLatest
-              ? 'h-10 w-10 items-center justify-center rounded-[8px] opacity-30'
-              : 'h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/5'
+              ? 'h-10 w-10 items-center justify-center rounded-full opacity-30'
+              : 'h-10 w-10 items-center justify-center rounded-full active:bg-ink/5'
           }
         >
           <ChevronRight size={20} color={colors.ink} strokeWidth={2} />
@@ -226,12 +237,15 @@ export default function TransactionsScreen() {
             activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter transactions'
           }
           onPress={() => setFilterOpen(true)}
-          className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-ink/5"
+          className="h-11 w-11 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
         >
-          <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />
+          <SlidersHorizontal size={20} color={colors.ink} strokeWidth={1.8} />
           {activeCount > 0 ? (
             <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
-              <Text allowFontScaling={false} className="font-poppins-medium text-[11px] text-ink">
+              <Text
+                allowFontScaling={false}
+                className="font-poppins-medium text-[11px] text-on-control"
+              >
                 {activeCount}
               </Text>
             </View>

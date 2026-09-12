@@ -1,7 +1,7 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { Calendar, Trash2, Wallet } from 'lucide-react-native';
+import { Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import {
   choiceToLead,
@@ -14,25 +14,23 @@ import { useCard, useSourceLedger, useCards } from '@/api/queries';
 import { useColors } from '@/providers/theme-provider';
 import { NetworkPicker } from '@/components/cards/network-picker';
 import { PaymentCard } from '@/components/cards/payment-card';
-import { Button } from '@/components/ui/button';
-import { AmountPad } from '@/components/ui/amount-pad';
-import { CollapsibleSection } from '@/components/ui/collapsible-section';
-import { DatePicker } from '@/components/ui/date-picker';
+import { AmountStep } from '@/components/flow/amount-step';
+import { InlineCalendar } from '@/components/flow/inline-calendar';
+import { StepFlow } from '@/components/flow/step-flow';
 import { ColorPicker } from '@/components/ui/color-picker';
-import { ReminderField } from '@/components/ui/reminder-field';
-import { usePro } from '@/api/pro';
+import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
+import { ReminderField } from '@/components/ui/reminder-field';
+import { Skeleton } from '@/components/ui/skeleton';
+import { usePro } from '@/api/pro';
 import { useConfirm } from '@/providers/dialog-provider';
-import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
-import { FieldLabel, Title } from '@/components/ui/typography';
+import { FieldLabel } from '@/components/ui/typography';
 import { NETWORKS } from '@/data/cards-mock';
-import { formatCurrency } from '@/lib/format';
-import { formatFullDate, toIsoDate } from '@/lib/date';
+import { success, warn } from '@/lib/haptics';
+import { toIsoDate } from '@/lib/date';
+import { useArtwork } from '@/theme/artwork';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
-
-const MORE_SETUP_INFO =
-  'Adding more details helps Skip calculate accurate balances and predict future transactions made with this card.';
 
 /** Loads the card being edited, then seeds the form by remount. */
 export default function AddCardScreen() {
@@ -48,23 +46,73 @@ export default function AddCardScreen() {
   return <AddCardScreenInner />;
 }
 
+/**
+ * An edit only ever runs on a record it actually has.
+ *
+ * This one has teeth beyond the blanked fields. `id` makes Save an update, and
+ * a form with no record has no due day either — so Save would also call
+ * `applyReminder('card', id, null, …)`, which deletes the reminder on a card
+ * whose only crime was being read on a bad connection. Loading, could not be
+ * read and no longer there each get said, and none of them is a blank form.
+ */
 function AddCardScreenInner() {
-  const colors = useColors();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { data: existing, isLoading } = useCard(id);
+  const artwork = useArtwork();
+  const card = useCard(id);
+  const existing = card.data ?? null;
 
-  if (id && isLoading && !existing) {
+  if (id && !existing) {
+    if (card.isError) {
+      return (
+        <Screen showBack>
+          <PageState
+            art={artwork.error}
+            title="Could not open this card"
+            message="Check your connection and try again. Your card and its reminder are unchanged."
+            actionLabel="Try again"
+            onAction={() => {
+              void card.refetch();
+            }}
+            secondaryLabel="Go back"
+            onSecondary={() => router.back()}
+          />
+        </Screen>
+      );
+    }
+
+    if (!card.isFetched) {
+      return (
+        <StepFlow
+          title="Edit card"
+          steps={3}
+          current={1}
+          onBack={() => router.back()}
+          primaryLabel="Continue"
+          primaryDisabled
+          onPrimary={() => {}}
+        >
+          <View className="w-full gap-6">
+            <Skeleton className="h-[180px] w-full rounded-[16px]" />
+            <Skeleton className="h-14 w-full rounded-[12px]" />
+          </View>
+        </StepFlow>
+      );
+    }
+
     return (
       <Screen showBack>
-        <Title className="mt-2">Edit card</Title>
-        <View className="mt-16 w-full items-center">
-          <ActivityIndicator size="small" color={colors.muted} />
-        </View>
+        <PageState
+          art={artwork.error}
+          title="That card is not here"
+          message="It may have been removed. Nothing has been changed."
+          actionLabel="Go back"
+          onAction={() => router.back()}
+        />
       </Screen>
     );
   }
 
-  return <CardForm key={existing?.id ?? 'new'} id={id} existing={existing ?? null} />;
+  return <CardForm key={existing?.id ?? 'new'} id={id} existing={existing} />;
 }
 
 function CardForm({
@@ -74,6 +122,7 @@ function CardForm({
   id?: string;
   existing: ReturnType<typeof useCard>['data'] | null;
 }) {
+  const colors = useColors();
   const editing = Boolean(id);
 
   const [network, setNetwork] = useState<string>(existing?.network ?? NETWORKS[0]);
@@ -102,9 +151,9 @@ function CardForm({
   const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [amountPadOpen, setAmountPadOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Editing opens on the details, not the keypad.
+  const [step, setStep] = useState(editing ? 1 : 0);
+  const [error, setError] = useState<{ message: string; step: number } | null>(null);
 
   const createCard = useCreateCard();
   const updateCard = useUpdateCard();
@@ -126,14 +175,21 @@ function CardForm({
       await deleteCard.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not delete that card.');
+      setError({ message: (thrown as Error).message ?? 'Could not delete that card.', step });
     }
+  };
+
+  /** A check for a field on an earlier step sends you back to that step. */
+  const fail = (message: string, atStep: number) => {
+    warn();
+    setError({ message, step: atStep });
+    setStep(atStep);
   };
 
   const handleSave = async () => {
     setError(null);
     if (!name.trim()) {
-      setError('Give the card a name so you can tell it apart.');
+      fail('Give the card a name so you can tell it apart.', 1);
       return;
     }
 
@@ -183,158 +239,139 @@ function CardForm({
       // written when there is one to count from.
       await applyReminder('card', cardId, dueDate ? choiceToLead(reminder) : null, remindAt);
 
+      success();
       router.back();
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not save that card.');
+      warn();
+      setError({ message: (thrown as Error).message ?? 'Could not save that card.', step: 2 });
     }
   };
 
+  const busy = createCard.isPending || updateCard.isPending;
+
+  // A card's balance is allowed to be zero — that is a real answer, and it is
+  // what a new card is at — so step 1 never blocks on it.
+  const stepValid = step === 1 ? Boolean(name.trim()) : !busy;
+
+  const question =
+    step === 0 ? 'What is on the card today?' : step === 2 ? 'When is the bill due?' : undefined;
+  const primaryLabel =
+    step < 2 ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save card';
+  const stepError = error && error.step === step ? error.message : null;
+
   return (
-    <Screen showBack avoidKeyboard>
-      <Title className="mt-2">{editing ? 'Edit card' : 'Adding New credit card'}</Title>
-
-      {/* Live preview — the colour picker is otherwise a blind choice. */}
-      <View className="mt-6 w-full">
-        <PaymentCard
-          card={{
-            id: 'preview',
-            holder: name,
-            balance: Number(balance) || 0,
-            last4,
-            network,
-            color,
-          }}
-          placeholderHolder="Name of the card"
-        />
-      </View>
-
-      <View className="mt-8 w-full">
-        <FieldLabel className="mb-3">Select Network provider</FieldLabel>
-        <NetworkPicker networks={NETWORKS} value={network} onChange={setNetwork} />
-      </View>
-
-      <View className="mt-8 w-full">
-        <TextField
-          label="Name of the card"
-          value={name}
-          onChangeText={setName}
-          autoCapitalize="words"
-          returnKeyType="done"
-        />
-      </View>
-
-      <View className="mt-6 w-full">
-        <FieldLabel className="mb-3">Card colour</FieldLabel>
-        <ColorPicker value={color} onChange={setColor} />
-      </View>
-
-      <View className="mt-8 w-full border-t border-line pt-4">
-        <CollapsibleSection
-          title="More setup"
-          badgeLabel="Recommended"
-          infoTitle="Why add these?"
-          infoMessage={MORE_SETUP_INFO}
-        >
-          <View className="w-full gap-5">
-            <TextField
-              label="Last 4 digits"
-              value={last4}
-              onChangeText={(text) => setLast4(text.replace(/\D/g, '').slice(0, 4))}
-              keyboardType="number-pad"
-              returnKeyType="next"
-            />
-
-            <SelectField
-              label="Bill due date"
-              value={dueDate ? formatFullDate(dueDate) : ''}
-              placeholder="Choose a date"
-              icon={Calendar}
-              onPress={() => setDatePickerOpen(true)}
-            />
-
-            <ReminderField
-              kind="card"
-              value={reminder}
-              onChange={setReminderDraft}
-              time={remindAt}
-              onTimeChange={setTimeDraft}
-              unavailable={
-                dueDate ? null : 'Set a bill due date above and Skip can remind you before it.'
-              }
-            />
-
-            <SelectField
-              label="Today's balance"
-              value={balance ? formatCurrency(Number(balance)) : ''}
-              placeholder="Enter an amount"
-              icon={Wallet}
-              onPress={() => setAmountPadOpen(true)}
-            />
-          </View>
-        </CollapsibleSection>
-      </View>
-
-      {error ? (
-        <Text
-          className="mt-6 w-full text-center font-poppins text-[13px] text-red-600"
-          maxFontSizeMultiplier={1.4}
-        >
-          {error}
-        </Text>
-      ) : null}
-
-      <View className="mt-auto w-full gap-3 pt-10">
-        <Button
-          label={
-            createCard.isPending || updateCard.isPending
-              ? 'Saving…'
-              : editing
-                ? 'Save changes'
-                : 'Add card'
-          }
-          onPress={handleSave}
-        />
-        {editing ? (
+    <StepFlow
+      title={editing ? 'Edit card' : 'Add a card'}
+      steps={3}
+      current={step}
+      onBack={() => {
+        setError(null);
+        if (step === 0) router.back();
+        else setStep((current) => current - 1);
+      }}
+      question={question}
+      primaryLabel={primaryLabel}
+      primaryDisabled={!stepValid}
+      onPrimary={() => {
+        if (step < 2) {
+          setError(null);
+          setStep((current) => current + 1);
+          return;
+        }
+        void handleSave();
+      }}
+      error={step === 1 ? null : stepError}
+      avoidKeyboard={step === 1}
+      footerSlot={
+        editing ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Delete this card"
             onPress={handleDelete}
-            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-ink/5"
+            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
-            <Trash2 size={17} color="#DC2626" strokeWidth={1.9} />
+            <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
             <Text
-              className="font-poppins-medium text-[15px] text-red-600"
+              className="font-poppins-medium text-[15px] text-danger"
               maxFontSizeMultiplier={1.4}
             >
               {deleteCard.isPending ? 'Deleting…' : 'Delete card'}
             </Text>
           </Pressable>
-        ) : null}
-      </View>
+        ) : null
+      }
+    >
+      {step === 0 ? <AmountStep value={balance} onChange={setBalance} /> : null}
 
-      {datePickerOpen ? (
-        <DatePicker
-          value={dueDate ?? new Date()}
-          onCancel={() => setDatePickerOpen(false)}
-          onConfirm={(date) => {
-            setDueDate(date);
-            setDatePickerOpen(false);
-          }}
-        />
+      {step === 1 ? (
+        <View className="w-full gap-6">
+          {/* Live preview — the colour picker is otherwise a blind choice, and
+              it now carries the balance typed a step ago. */}
+          <PaymentCard
+            card={{
+              id: 'preview',
+              holder: name,
+              balance: Number(balance) || 0,
+              last4,
+              network,
+              color,
+            }}
+            placeholderHolder="Name of the card"
+          />
+
+          <View className="w-full">
+            <FieldLabel className="mb-3">Select Network provider</FieldLabel>
+            <NetworkPicker networks={NETWORKS} value={network} onChange={setNetwork} />
+          </View>
+
+          <TextField
+            label="Name of the card"
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="words"
+            returnKeyType="done"
+          />
+
+          <View className="w-full">
+            <FieldLabel className="mb-3">Card colour</FieldLabel>
+            <ColorPicker value={color} onChange={setColor} />
+          </View>
+
+          <TextField
+            label="Last 4 digits"
+            value={last4}
+            onChangeText={(text) => setLast4(text.replace(/\D/g, '').slice(0, 4))}
+            keyboardType="number-pad"
+            returnKeyType="done"
+          />
+
+          {stepError ? (
+            <Text
+              className="w-full font-poppins text-[13px] text-danger"
+              maxFontSizeMultiplier={1.4}
+            >
+              {stepError}
+            </Text>
+          ) : null}
+        </View>
       ) : null}
 
-      {amountPadOpen ? (
-        <AmountPad
-          title="Balance today"
-          caption="Card balance"
-          value={balance}
-          onCancel={() => setAmountPadOpen(false)}
-          onConfirm={(next) => {
-            setBalance(next);
-            setAmountPadOpen(false);
-          }}
-        />
+      {step === 2 ? (
+        <View className="w-full gap-6">
+          <InlineCalendar value={dueDate} onChange={setDueDate} />
+
+          <ReminderField
+            kind="card"
+            value={reminder}
+            onChange={setReminderDraft}
+            time={remindAt}
+            onTimeChange={setTimeDraft}
+            unavailable={
+              dueDate ? null : 'Set a bill due date above and Skip can remind you before it.'
+            }
+          />
+        </View>
       ) : null}
-    </Screen>
+    </StepFlow>
   );
 }

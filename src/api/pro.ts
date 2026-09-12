@@ -6,6 +6,7 @@ import Purchases, {
   type PurchasesPackage,
 } from 'react-native-purchases';
 
+import { useProBypass } from '@/lib/pro-bypass';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
@@ -111,6 +112,11 @@ export function usePro() {
   const userId = useUserId();
   const client = useQueryClient();
   const [sdkPro, setSdkPro] = useState<boolean | null>(null);
+  // Development-only, and only when somebody opted in on purpose. It changes
+  // the answer below and nothing else: the SDK listener, the server query,
+  // offerings, purchase and restore all still run exactly as they do for a
+  // paying account. See src/lib/pro-bypass.ts for the two locks.
+  const bypass = useProBypass();
 
   // The server's copy — also the only copy when no key is configured.
   const server = useQuery({
@@ -163,11 +169,13 @@ export function usePro() {
   return {
     // Either source saying yes is yes: the SDK knows a purchase before the
     // webhook lands, and the row knows a restore made on another device.
-    pro: sdkPro === true || server.data === true,
+    pro: bypass || sdkPro === true || server.data === true,
     // Ready means "safe to show a gate": the server has answered, or the SDK
     // has. Until then screens render nothing rather than flashing a paywall
-    // at somebody who paid.
-    ready: server.isFetched || sdkPro !== null,
+    // at somebody who paid. The bypass is ready by definition — it has no
+    // request to wait on, and a tester with no signed-in account would
+    // otherwise sit on a blank gate forever.
+    ready: bypass || server.isFetched || sdkPro !== null,
   };
 }
 

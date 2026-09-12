@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/ui/back-button';
 import { cn } from '@/lib/cn';
+import { useColors } from '@/providers/theme-provider';
 
 type ScreenProps = {
   children: ReactNode;
@@ -24,6 +25,16 @@ type ScreenProps = {
   /** Enables pull-to-refresh. Omit on screens with nothing to re-fetch. */
   onRefresh?: () => void;
   refreshing?: boolean;
+  /**
+   * Opens the page at the bottom instead of the top, once.
+   *
+   * Dated lists run oldest-first, so the newest rows — the ones somebody came
+   * to see — sit below the fold. Pass `true` only when the real content is on
+   * screen (not while a skeleton is up), and the page jumps to the end on the
+   * first layout that follows. It happens at most once per mount, so filtering,
+   * refreshing or loading more never yanks the page out from under a thumb.
+   */
+  startAtEnd?: boolean;
 };
 
 /**
@@ -40,10 +51,17 @@ export function Screen({
   floating,
   onRefresh,
   refreshing = false,
+  startAtEnd = false,
 }: ScreenProps) {
+  const colors = useColors();
   const column = (
     <View className={cn('w-full max-w-[520px] flex-1 px-6', className)}>{children}</View>
   );
+
+  // Held as a callback ref because the two scroll views have different ref
+  // types; both expose the ScrollView methods, and only one is ever mounted.
+  const scroller = useRef<ScrollView | null>(null);
+  const jumped = useRef(false);
 
   const scrollProps = {
     contentContainerStyle: { flexGrow: 1, alignItems: 'center' as const, paddingBottom: 16 },
@@ -54,18 +72,46 @@ export function Screen({
     // Only a screen that says how to refresh gets the gesture; the rest keep
     // the plain bounce rather than a spinner that would resolve into nothing.
     refreshControl: onRefresh ? (
-      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#9A9A9A" />
+      // Muted from the live theme, not a fixed grey: the hardcoded one
+      // disappeared into the dark surface it was spinning on.
+      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.muted} />
     ) : undefined,
+    // Fires after the content has been measured, which is the only moment the
+    // end is a real offset. Unanimated: a page that scrolls itself on open
+    // looks like a gesture nobody made.
+    onContentSizeChange: (_width: number, height: number) => {
+      if (!startAtEnd || jumped.current || height <= 0) return;
+      // `KeyboardAwareScrollView` hands back a stand-in with only its own
+      // method until the inner ScrollView has mounted, so the jump is spent
+      // only once there is something that can actually perform it.
+      const node = scroller.current;
+      if (typeof node?.scrollToEnd !== 'function') return;
+      jumped.current = true;
+      node.scrollToEnd({ animated: false });
+    },
   };
 
   // KeyboardAwareScrollView scrolls the focused input clear of the keyboard,
   // which plain padding-based avoidance cannot do for fields low on the page.
   const body = avoidKeyboard ? (
-    <KeyboardAwareScrollView {...scrollProps} bottomOffset={72}>
+    <KeyboardAwareScrollView
+      {...scrollProps}
+      bottomOffset={72}
+      ref={(node) => {
+        scroller.current = node;
+      }}
+    >
       {column}
     </KeyboardAwareScrollView>
   ) : scrollable ? (
-    <ScrollView {...scrollProps}>{column}</ScrollView>
+    <ScrollView
+      {...scrollProps}
+      ref={(node) => {
+        scroller.current = node;
+      }}
+    >
+      {column}
+    </ScrollView>
   ) : (
     <View className="flex-1 items-center">{column}</View>
   );

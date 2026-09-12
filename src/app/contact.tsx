@@ -81,7 +81,7 @@ export default function ContactScreen() {
           </View>
 
           <View className="items-center gap-2">
-            <Title>Sent</Title>
+            <Title flush>Sent</Title>
             <Subtitle className="text-center">
               Thanks — we read every one. If it needs an answer it will come to {email}.
             </Subtitle>
@@ -95,7 +95,7 @@ export default function ContactScreen() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title align="left" className="mt-1 w-full">
+      <Title align="left" className="w-full">
         {copy.title}
       </Title>
       <Subtitle className="mt-2 w-full text-left">{copy.subtitle}</Subtitle>

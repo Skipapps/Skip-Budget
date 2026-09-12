@@ -30,12 +30,13 @@ export function DateSelector({
 }: DateSelectorProps) {
   const colors = useColors();
   return (
-    <View className="w-full flex-row items-center justify-between rounded-[10px] border border-line px-1.5 py-2">
+    <View className="w-full flex-row items-center justify-between rounded-[12px] border border-line px-1.5 py-2">
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Previous day"
         onPress={onPrevious}
-        className="h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/5"
+        hitSlop={8}
+        className="h-10 w-10 items-center justify-center rounded-full active:bg-ink/5"
       >
         <ChevronLeft size={20} color={colors.ink} strokeWidth={2} />
       </Pressable>
@@ -63,10 +64,11 @@ export function DateSelector({
         accessibilityState={{ disabled: atLatest }}
         disabled={atLatest}
         onPress={onNext}
+        hitSlop={8}
         className={
           atLatest
-            ? 'h-10 w-10 items-center justify-center rounded-[8px] opacity-30'
-            : 'h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/5'
+            ? 'h-10 w-10 items-center justify-center rounded-full opacity-30'
+            : 'h-10 w-10 items-center justify-center rounded-full active:bg-ink/5'
         }
       >
         <ChevronRight size={20} color={colors.ink} strokeWidth={2} />

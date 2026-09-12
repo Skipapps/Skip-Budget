@@ -9,6 +9,7 @@ import {
   type ReminderKind,
 } from '@/api/reminders';
 import { ChoiceChips } from '@/components/ui/choice-chips';
+import { TextLink } from '@/components/ui/text-link';
 import { TimePicker } from '@/components/ui/time-picker';
 import { FieldLabel } from '@/components/ui/typography';
 import { formatClock, parseClock } from '@/lib/date';
@@ -27,6 +28,12 @@ type ReminderFieldProps = {
    * worse than an explanation.
    */
   unavailable?: string | null;
+  /**
+   * Offered under `unavailable` when the reason is a read that failed rather
+   * than a fact about the thing. "Add the income paid into this account" is
+   * something to go and do; "we could not check" is something to try again.
+   */
+  onRetry?: () => void;
 };
 
 /**
@@ -46,6 +53,7 @@ export function ReminderField({
   time,
   onTimeChange,
   unavailable,
+  onRetry,
 }: ReminderFieldProps) {
   const colors = useColors();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -58,6 +66,15 @@ export function ReminderField({
         {unavailable ?? REMINDER_CAPTION[kind]}
       </Text>
 
+      {unavailable && onRetry ? (
+        <TextLink
+          label="Try again"
+          variant="subtle"
+          onPress={onRetry}
+          className="mb-1 self-start"
+        />
+      ) : null}
+
       {unavailable ? null : (
         <>
           <ChoiceChips options={REMINDER_CHOICES} value={value} onChange={onChange} />
@@ -67,11 +84,13 @@ export function ReminderField({
               accessibilityRole="button"
               accessibilityLabel={`Sent at ${formatClock(clock.hour, clock.minute)}. Change the time.`}
               onPress={() => setPickerOpen(true)}
-              className="mt-3 flex-row items-center gap-2 self-start rounded-full border border-line bg-card px-3.5 py-2 active:bg-ink/5"
+              // The pill is 40pt tall by design; the target is the 44pt floor.
+              hitSlop={{ top: 4, bottom: 4 }}
+              className="mt-3 min-h-10 flex-row items-center gap-2 self-start rounded-full bg-ink/5 px-4 active:bg-ink/10"
             >
-              <Clock size={15} color={colors.muted} strokeWidth={2} />
+              <Clock size={18} color={colors.body} strokeWidth={1.8} />
               <Text
-                className="font-poppins-medium text-[13px] text-body"
+                className="font-poppins-medium text-[14px] text-ink"
                 maxFontSizeMultiplier={1.2}
               >
                 at {formatClock(clock.hour, clock.minute)}

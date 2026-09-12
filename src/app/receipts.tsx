@@ -105,13 +105,13 @@ export default function ReceiptsScreen() {
   // Reflects what is on screen, so it always agrees with the rows below it.
   const total = visible.reduce((sum, receipt) => sum - Math.abs(receipt.amount), 0);
 
-  // Newest day first: receipts are history, and the last shop is the one
-  // someone came here to check.
+  // Oldest day first, today last. The last shop is still the one somebody came
+  // here to check, so it is now at the bottom and the page opens there.
   const groups = useMemo(
     () =>
       groupByDate(visible, (receipt) => receipt.purchased_on, {
         amountOf: (receipt) => -Math.abs(receipt.amount),
-        direction: 'desc',
+        direction: 'asc',
       }),
     [visible],
   );
@@ -122,9 +122,16 @@ export default function ReceiptsScreen() {
   const showNoMatches = !isLoading && !isError && receipts.length > 0 && visible.length === 0;
 
   return (
-    <Screen showBack avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
+    <Screen
+      showBack
+      avoidKeyboard
+      onRefresh={refresh}
+      refreshing={refreshing}
+      // Oldest day first, so the last shop is at the bottom — open there.
+      startAtEnd={!isLoading && !isError && visible.length > 0}
+    >
       <View className="mt-2 w-full flex-row items-center justify-between gap-3">
-        <Title align="left" className="flex-1">
+        <Title flush align="left" className="flex-1">
           Receipts
         </Title>
         {/* Scanning leads: it is one tap to a filed receipt, and typing one out
@@ -142,7 +149,7 @@ export default function ReceiptsScreen() {
 
       {scanError ? (
         <Text
-          className="mt-3 w-full font-poppins text-[13px] text-red-600"
+          className="mt-3 w-full font-poppins text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {scanError}
@@ -162,9 +169,9 @@ export default function ReceiptsScreen() {
                 activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter receipts'
               }
               onPress={() => setFilterOpen(true)}
-              className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-ink/5"
+              className="h-11 w-11 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
             >
-              <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />
+              <SlidersHorizontal size={20} color={colors.ink} strokeWidth={1.8} />
               {activeCount > 0 ? (
                 <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
                   <Text
@@ -194,8 +201,6 @@ export default function ReceiptsScreen() {
               {isLoading ? '' : formatCurrency(total)}
             </Text>
           </View>
-
-          <View className="mt-1 h-px w-full bg-line" />
         </>
       )}
 

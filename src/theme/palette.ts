@@ -156,6 +156,11 @@ const RAMPS = {
     // off-white, and these sit just above it rather than well under it.
     moneyIn: '#2F7A55',
     moneyOut: '#B85040',
+    // Destructive, one step hotter and deeper than an outflow figure. Delete
+    // and Remove have to read as stronger than "money left", and they are
+    // rarely more than a 15px label, so this clears 5.5:1 on both surfaces
+    // rather than sitting on the 4.5 line the way the old #DC2626 did.
+    danger: '#B0453A',
   },
   dark: {
     surface: '#1B181F',
@@ -168,6 +173,10 @@ const RAMPS = {
     // the background, where the light pair would be an unreadable smudge.
     moneyIn: '#7FD6A0',
     moneyOut: '#ED7A7A',
+    // #DC2626 scored 3.05:1 on this card — the one real contrast failure in
+    // the app. The same rose as moneyOut, lifted a step: 6.09 on the card,
+    // 7.26 on the page.
+    danger: '#F08A86',
   },
 } as const;
 
@@ -191,6 +200,8 @@ export type Tokens = {
   accentInk: string;
   moneyIn: string;
   moneyOut: string;
+  /** Destructive type and glyphs — Delete, Remove, Sign out. Never a fill. */
+  danger: string;
 };
 
 /** Resolves one mode and one accent into every colour the app draws with. */
@@ -208,6 +219,7 @@ export function buildTokens(scheme: Scheme, accent: string): Tokens {
     accentInk: readable(accent, ramp.surface),
     moneyIn: ramp.moneyIn,
     moneyOut: ramp.moneyOut,
+    danger: ramp.danger,
   };
 }
 

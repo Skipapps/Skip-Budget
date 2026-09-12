@@ -55,7 +55,7 @@ export function SubscriptionFilterSheet({
             accessibilityLabel="Close filters"
             hitSlop={8}
             onPress={onCancel}
-            className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-ink/5"
+            className="h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
           >
             <X size={22} color={colors.ink} strokeWidth={2} />
           </Pressable>
@@ -93,7 +93,7 @@ export function SubscriptionFilterSheet({
           <Pressable
             accessibilityRole="button"
             onPress={() => setDraft(EMPTY_SUBSCRIPTION_FILTERS)}
-            className="min-h-16 flex-1 items-center justify-center rounded-[10px] border border-control active:bg-ink/5"
+            className="min-h-16 flex-1 items-center justify-center rounded-full border border-control active:bg-ink/5"
           >
             <Text className="font-poppins-medium text-[17px] text-ink">Reset</Text>
           </Pressable>

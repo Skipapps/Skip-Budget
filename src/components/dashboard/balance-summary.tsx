@@ -1,11 +1,12 @@
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 
 import { RollingNumber } from '@/components/ui/rolling-number';
+import { Skeleton } from '@/components/ui/skeleton';
 import { daysLeftInMonth } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { useColors } from '@/providers/theme-provider';
-import { shadows } from '@/theme/shadows';
 
 type BalanceSummaryProps = {
   /** Payday minus expenses. Cash flow, not an account balance. */
@@ -13,34 +14,40 @@ type BalanceSummaryProps = {
   payday: number;
   expenses: number;
   loading?: boolean;
+  /** The month could not be fetched. Nothing derived from it may be shown. */
+  error?: boolean;
 };
 
 /**
- * The dashboard's headline: what is left, and where it went.
+ * The dashboard's headline: what is left, and the two figures it came from.
  *
- * Built as a card rather than bare type on the page, so the first thing on the
- * dashboard belongs to the same family as the cards in the wallet. It carries
- * no watermark, though the card faces do: they are mostly empty and can afford
- * one, while this holds the number the whole screen is about.
+ * One card rather than a card and a pair beneath it. The three numbers are a
+ * single sentence — income, less expenses, leaves this — and splitting them
+ * across two surfaces asked the reader to join them back up. Income and
+ * expenses sit inside the bottom edge of the same card at a quieter size, so
+ * the hierarchy says which one the screen is about.
  *
  * Charcoal, the same surface the buttons and the add control use. A dark card
- * under white type puts the figure further from its background than any tint
- * could, and it leaves colour to mean one thing on this screen — the coral in
- * the bar, and the green and red below.
+ * under its own foreground puts the figure further from its background than
+ * any tint could, and it leaves colour to mean one thing on this screen.
  *
- * The two figures underneath sit on their own tinted surfaces, which is what
- * lets money in and money out be told apart at arm's length without reading
- * either number.
+ * The two supporting figures are drawn in the card's foreground rather than in
+ * the money pair: green and red are tuned to be read on the page, not on the
+ * control surface, and on a pale accent the only legible member of that pair
+ * is the near-black end of the ramp. Their labels and the minus sign carry the
+ * direction instead, which is what they were doing anyway.
  */
 export function BalanceSummary({
   leftThisMonth,
   payday,
   expenses,
   loading = false,
+  error = false,
 }: BalanceSummaryProps) {
   const colors = useColors();
   const today = new Date();
   const daysLeft = daysLeftInMonth(today);
+  const daysLabel = daysLeft === 0 ? 'Last day' : `${daysLeft} days left`;
 
   // Wheels cannot shrink to fit, so the size is chosen from the length of the
   // figure instead. Someone with a seven-figure balance gets smaller type
@@ -50,14 +57,21 @@ export function BalanceSummary({
 
   // What share of this month's income is already committed. Only meaningful
   // once income is known, so the bar simply does not appear until it is.
-  const spentShare = payday > 0 ? Math.min(Math.max(expenses / payday, 0), 1) : null;
+  const spentShare = error || payday <= 0 ? null : Math.min(Math.max(expenses / payday, 0), 1);
 
   return (
-    <View className="w-full">
-      <View style={shadows.card} className="w-full overflow-hidden rounded-[20px] bg-control p-5">
+    <View className="w-full overflow-hidden rounded-[24px] bg-control p-5">
+      <View
+        accessible
+        accessibilityLabel={
+          error
+            ? `Left this month, unavailable, ${daysLabel}`
+            : `Left this month, ${formatCurrency(leftThisMonth)}, ${daysLabel}`
+        }
+      >
         <View className="w-full flex-row items-start justify-between gap-3">
           <Text
-            className="font-poppins-medium text-[15px] text-on-control/70"
+            className="font-poppins-medium text-[15px] text-on-control/85"
             maxFontSizeMultiplier={1.3}
           >
             Left this month
@@ -69,18 +83,28 @@ export function BalanceSummary({
               allowFontScaling={false}
               numberOfLines={1}
             >
-              {daysLeft === 0 ? 'Last day' : `${daysLeft} days left`}
+              {daysLabel}
             </Text>
           </View>
         </View>
 
-        {loading ? (
+        {/* A figure that failed to load is never guessed at: the card shows
+            that it has nothing rather than a total built from half a month. */}
+        {error ? (
           <Text
             className="mt-3 font-poppins-bold text-[40px] text-on-control"
             maxFontSizeMultiplier={1.2}
           >
             —
           </Text>
+        ) : loading ? (
+          // The label and the pill stay put, so nothing jumps when it lands.
+          <View className="mt-3 h-[52px] w-2/3 opacity-20">
+            <Skeleton
+              className="h-full w-full rounded-[12px]"
+              style={{ backgroundColor: colors.onControl }}
+            />
+          </View>
         ) : (
           <RollingNumber
             className="mt-3 justify-start"
@@ -90,49 +114,54 @@ export function BalanceSummary({
             textClassName="font-poppins-bold text-on-control"
           />
         )}
-
-        {spentShare === null ? null : (
-          <View className="mt-5 w-full">
-            <View className="h-2 w-full overflow-hidden rounded-full bg-on-control/15">
-              {/* Flex rather than a percentage width: the track is already the
-                  full width, so the fill can share it without measuring. */}
-              <View className="h-full flex-row">
-                {/* The card is already the chosen colour, so the fill has to be
-                    the one thing guaranteed to read on it: its own foreground. */}
-                <View style={{ flex: spentShare }} className="h-full rounded-full bg-on-control" />
-                <View style={{ flex: 1 - spentShare }} />
-              </View>
-            </View>
-            <Text
-              className="mt-2 font-poppins text-[12px] text-on-control/70"
-              maxFontSizeMultiplier={1.3}
-            >
-              {Math.round(spentShare * 100)}% of this month&apos;s income is spoken for
-            </Text>
-          </View>
-        )}
       </View>
 
-      {/* Deliberately not the accent. These two are the only figures on the
-          dashboard read as numbers rather than as a headline, and an accent
-          fill decides their colour for them: on a pale accent the only legible
-          money tones are the near-black end of the ramp, which is what made
-          them look heavy. On the plain card the soft pair carries them. */}
-      <View className="mt-3 w-full flex-row gap-3">
-        <Stat
-          label="Income"
-          amount={payday}
-          icon={ArrowDownLeft}
-          color={colors.moneyIn}
-          loading={loading}
-        />
+      {error ? (
+        <Text
+          className="mt-4 font-poppins text-[12px] leading-[17px] text-on-control/85"
+          maxFontSizeMultiplier={1.3}
+        >
+          We could not load this month. Pull down to try again.
+        </Text>
+      ) : spentShare === null ? null : (
+        <View
+          className="mt-5 w-full"
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel={`${Math.round(spentShare * 100)}% of this month's income is spoken for`}
+          accessibilityValue={{ min: 0, max: 100, now: Math.round(spentShare * 100) }}
+        >
+          <View className="h-2 w-full overflow-hidden rounded-full bg-on-control/15">
+            {/* Flex rather than a percentage width: the track is already the
+                full width, so the fill can share it without measuring. */}
+            <View className="h-full flex-row">
+              {/* The card is already the chosen colour, so the fill has to be
+                  the one thing guaranteed to read on it: its own foreground. */}
+              <View style={{ flex: spentShare }} className="h-full rounded-full bg-on-control" />
+              <View style={{ flex: 1 - spentShare }} />
+            </View>
+          </View>
+          <Text
+            className="mt-2 font-poppins text-[12px] text-on-control/85"
+            maxFontSizeMultiplier={1.3}
+          >
+            {Math.round(spentShare * 100)}% of this month&apos;s income is spoken for
+          </Text>
+        </View>
+      )}
+
+      {/* Inside the card's bottom edge, under a hairline of its own
+          foreground — the two figures the headline is made of, not two
+          separate statistics that happen to be nearby. */}
+      <View className="mt-5 w-full flex-row gap-4 border-t border-on-control/20 pt-4">
+        <Stat label="Income" amount={payday} icon={ArrowDownLeft} loading={loading} error={error} />
         {/* Stored as a positive magnitude; shown as money going out. */}
         <Stat
           label="Expenses"
           amount={-expenses}
           icon={ArrowUpRight}
-          color={colors.moneyOut}
           loading={loading}
+          error={error}
         />
       </View>
     </View>
@@ -142,39 +171,55 @@ export function BalanceSummary({
 type StatProps = {
   label: string;
   amount: number;
-  icon: typeof ArrowDownLeft;
-  color: string;
+  icon: LucideIcon;
   loading: boolean;
+  error: boolean;
 };
 
-/**
- * One figure, on the plain card rather than on the accent.
- *
- * The headline above carries the colour. These two carry the arithmetic, and
- * the only colour on them is the money itself — which is the thing worth
- * looking at.
- */
-function Stat({ label, amount, icon: Icon, color, loading }: StatProps) {
+/** One supporting figure inside the hero's bottom edge. */
+function Stat({ label, amount, icon: Icon, loading, error }: StatProps) {
+  const colors = useColors();
+
   return (
-    <View className="flex-1 justify-between rounded-[16px] border border-line bg-card p-4">
-      <View className="flex-row items-center gap-2.5">
-        <View className="h-8 w-8 items-center justify-center rounded-full bg-ink/5">
-          <Icon size={16} color={color} strokeWidth={2.4} />
+    <View
+      className="min-w-0 flex-1"
+      accessible
+      accessibilityLabel={
+        error || loading
+          ? `${label}, ${error ? 'unavailable' : 'loading'}`
+          : `${label}, ${formatCurrency(amount)}`
+      }
+    >
+      <View className="flex-row items-center gap-1.5">
+        <View className="opacity-70">
+          <Icon size={14} color={colors.onControl} strokeWidth={1.8} />
         </View>
-        <Text className="font-poppins-medium text-[13px] text-muted" maxFontSizeMultiplier={1.2}>
+        <Text
+          className="shrink font-poppins-medium text-[12px] text-on-control/85"
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.2}
+        >
           {label}
         </Text>
       </View>
 
-      <Text
-        className="mt-4 font-poppins-semibold text-[18px]"
-        style={{ color }}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        maxFontSizeMultiplier={1.2}
-      >
-        {loading ? '—' : formatCurrency(amount)}
-      </Text>
+      {loading && !error ? (
+        <View className="mt-1.5 h-5 w-24 opacity-20">
+          <Skeleton
+            className="h-full w-full rounded-[6px]"
+            style={{ backgroundColor: colors.onControl }}
+          />
+        </View>
+      ) : (
+        <Text
+          className="mt-1 font-poppins-semibold text-[20px] text-on-control"
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={1.2}
+        >
+          {error ? '—' : formatCurrency(amount)}
+        </Text>
+      )}
     </View>
   );
 }

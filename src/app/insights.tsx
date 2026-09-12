@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
+import { ArrowRight, ChevronRight } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -18,16 +18,20 @@ import { useMyBalances } from '@/api/splits';
 import { BillMark } from '@/components/bills/bill-mark';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { FlowChart, type FlowBucket } from '@/components/transactions/flow-chart';
+import { ActionPill } from '@/components/ui/action-pill';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { useProGate } from '@/components/pro/pro-gate';
+import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { Title } from '@/components/ui/typography';
+import { SectionHeading, Title } from '@/components/ui/typography';
 import { BILL_CATEGORIES } from '@/data/bills-mock';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
+import { sortByDateAscending } from '@/lib/group';
 import { PERIODS, periodBuckets, periodRange, type PeriodKey } from '@/lib/period';
 import { useColors } from '@/providers/theme-provider';
+import { useArtwork } from '@/theme/artwork';
 
 const PER_MONTH: Record<string, number> = {
   weekly: 52 / 12,
@@ -59,6 +63,7 @@ export default function InsightsScreen() {
 
 function InsightsScreenInner() {
   const colors = useColors();
+  const artwork = useArtwork();
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>('month');
   const anchor = useMemo(() => new Date(), []);
@@ -72,16 +77,55 @@ function InsightsScreenInner() {
     return { from: period.from, to: period.to > today ? today : period.to };
   }, [periodKey, anchor, today]);
 
-  const { entries, totals, isLoading } = useLedger(range, today);
+  const ledger = useLedger(range, today);
+  const { entries, totals, isLoading } = ledger;
   const { refresh, refreshing } = useRefreshAll();
 
   const cards = useCards();
   const salary = useSalarySources();
   const savings = useMonthlySavings();
   const subscriptions = useSubscriptions();
-  const { data: groupBalances } = useMyBalances();
-  const { data: spendCategories = [] } = useSpendCategories();
-  const { balances } = useSourceBalances(today);
+  const groups = useMyBalances();
+  const categoriesQuery = useSpendCategories();
+  const groupBalances = groups.data;
+  // Held stable so the label map below is not rebuilt on every render.
+  const spendCategories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data]);
+  const { balances, isError: balancesError, refetch: refetchBalances } = useSourceBalances(today);
+
+  /**
+   * Any one of these failing makes every total below it a lie.
+   *
+   * The figures on this page are differences — saved less owed, in less out —
+   * so a query that comes back empty because it failed does not show a gap, it
+   * shows a smaller number that looks exactly like good news. Net worth with a
+   * failed cards fetch is the user's whole card debt added to what they have.
+   * So nothing here renders a figure until every source it subtracts from has
+   * actually answered.
+   */
+  const isError =
+    ledger.isError ||
+    cards.isError ||
+    salary.isError ||
+    savings.isError ||
+    subscriptions.isError ||
+    groups.isError ||
+    categoriesQuery.isError ||
+    // The eighth. Card balances are walked from seven lists of their own, and
+    // without this flag a failed walk falls back to the figure typed when the
+    // card was added — so "saved, less what you owe" could be wrong by a whole
+    // card's debt with nothing on screen to say so.
+    balancesError;
+
+  const retry = () => {
+    ledger.refetch();
+    cards.refetch();
+    salary.refetch();
+    savings.refetch();
+    subscriptions.refetch();
+    groups.refetch();
+    categoriesQuery.refetch();
+    refetchBalances();
+  };
 
   // --- Where you stand ------------------------------------------------------
 
@@ -203,17 +247,47 @@ function InsightsScreenInner() {
     .filter((subscription) => subscription.active)
     .reduce((sum, subscription) => sum + subscription.amount, 0);
 
-  const recentMonths = (savings.data ?? []).slice(0, 3);
+  /**
+   * The three months that finished most recently, oldest of the three first.
+   *
+   * Picked by date, never by position. This used to be `slice(0, 3)`, which
+   * meant "the three most recent" only while the query happened to return them
+   * newest-first — flip that order anywhere upstream and this card silently
+   * showed the three *oldest* months with no error and no clue. Sorting here
+   * makes the card immune to whatever order the list arrives in.
+   */
+  const recentMonths = useMemo(
+    () =>
+      sortByDateAscending(
+        savings.data ?? [],
+        (month) => month.month,
+        (month) => month.month,
+      ).slice(-3),
+    [savings.data],
+  );
+
+  if (isError) {
+    return (
+      <Screen showBack onRefresh={refresh} refreshing={refreshing}>
+        <Title align="left">Insights</Title>
+        <PageState
+          art={artwork.error}
+          title="We could not load your insights"
+          message="Something went wrong fetching your figures. Nothing is lost — check your connection and try again."
+          actionLabel="Try again"
+          onAction={retry}
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen showBack onRefresh={refresh} refreshing={refreshing}>
-      <Title align="left" className="mt-2">
-        Insights
-      </Title>
+      <Title align="left">Insights</Title>
 
       {/* ---- Where you stand ------------------------------------------- */}
       <Heading>Where you stand</Heading>
-      <View className="w-full rounded-[14px] border border-line bg-card px-5 py-5">
+      <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           Saved, less what you owe
         </Text>
@@ -242,7 +316,7 @@ function InsightsScreenInner() {
       {/* ---- What comes in --------------------------------------------- */}
       <Heading>What comes in</Heading>
       {monthlyIncome > 0 ? (
-        <View className="w-full rounded-[14px] border border-line bg-card px-5 py-5">
+        <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
           <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
             Every month
           </Text>
@@ -280,7 +354,7 @@ function InsightsScreenInner() {
         <SkeletonList rows={3} />
       ) : (
         <>
-          <View className="mt-4 w-full rounded-[14px] border border-line bg-card px-5 py-5">
+          <View className="mt-4 w-full rounded-[16px] border border-line bg-card px-5 py-5">
             <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
               {periodKey === 'all' ? 'All time' : `This ${periodKey}`}
             </Text>
@@ -297,7 +371,7 @@ function InsightsScreenInner() {
             </View>
           </View>
 
-          <View className="mt-3 w-full rounded-[14px] border border-line bg-card px-5 py-4">
+          <View className="mt-3 w-full rounded-[16px] border border-line bg-card px-5 py-4">
             <StandRow label="Shop receipts" value={-(byKind.get('receipt') ?? 0)} plain />
             <View className="h-2" />
             <StandRow label="Bills" value={-(byKind.get('bill') ?? 0)} plain />
@@ -323,7 +397,7 @@ function InsightsScreenInner() {
       {categories.length > 0 ? (
         <>
           <Heading>Where it goes</Heading>
-          <View className="w-full rounded-[14px] border border-line bg-card px-5 py-5">
+          <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
             {categories.map((category, index) => (
               <View
                 key={category.id}
@@ -370,7 +444,7 @@ function InsightsScreenInner() {
       {merchants.length > 0 ? (
         <>
           <Heading>Where you spend most</Heading>
-          <View className="w-full rounded-[14px] border border-line bg-card px-5 py-5">
+          <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
             {merchants.map((merchant, index) => (
               <View
                 key={merchant.name}
@@ -446,7 +520,7 @@ function InsightsScreenInner() {
       {/* ---- What you keep --------------------------------------------- */}
       <Heading>What you keep</Heading>
       {recentMonths.length > 0 ? (
-        <View className="w-full rounded-[14px] border border-line bg-card px-5 py-4">
+        <View className="w-full rounded-[16px] border border-line bg-card px-5 py-4">
           {recentMonths.map((month, index) => (
             <View key={month.month} className={index > 0 ? 'mt-3' : undefined}>
               <StandRow
@@ -485,7 +559,7 @@ function InsightsScreenInner() {
       {(cards.data ?? []).length > 0 ? (
         <>
           <Heading>What you owe</Heading>
-          <View className="w-full rounded-[14px] border border-line bg-card px-5 py-4">
+          <View className="w-full rounded-[16px] border border-line bg-card px-5 py-4">
             {(cards.data ?? []).map((card, index) => (
               <View key={card.id} className={index > 0 ? 'mt-3' : undefined}>
                 <StandRow
@@ -517,15 +591,9 @@ function InsightsScreenInner() {
   );
 }
 
+/** The app's section heading, at this screen's rhythm. */
 function Heading({ children }: { children: string }) {
-  return (
-    <Text
-      className="mb-4 mt-9 w-full font-poppins-semibold text-[19px] text-ink"
-      maxFontSizeMultiplier={1.3}
-    >
-      {children}
-    </Text>
-  );
+  return <SectionHeading className="mb-3 mt-8">{children}</SectionHeading>;
 }
 
 /** A label and a signed figure. Money out is tinted, money in is not shouted about. */
@@ -582,7 +650,7 @@ function Row({
       accessibilityRole="button"
       accessibilityLabel={`${label}${value ? `, ${value}` : ''}${hint ? `, ${hint}` : ''}`}
       onPress={onPress}
-      className="w-full flex-row items-center gap-3 rounded-[14px] border border-line bg-card px-5 py-4 active:bg-ink/5"
+      className="w-full flex-row items-center gap-3 rounded-[16px] border border-line bg-card px-5 py-4 active:bg-ink/5"
     >
       <View className="min-w-0 flex-1">
         <Text
@@ -620,7 +688,7 @@ function Prompt({
   onPress: () => void;
 }) {
   return (
-    <View className="w-full rounded-[14px] border border-line bg-card px-5 py-5">
+    <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
       <Text
         className="font-poppins-semibold text-[15px] leading-6 text-ink"
         maxFontSizeMultiplier={1.3}
@@ -633,22 +701,14 @@ function Prompt({
       >
         {message}
       </Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={actionLabel}
+      {/* Inline action, so it is a pill sized to its label rather than a
+          full-width bar competing with the screen's own buttons. */}
+      <ActionPill
+        className="mt-4 self-start"
+        icon={ArrowRight}
+        label={actionLabel}
         onPress={onPress}
-        className="mt-4 min-h-12 w-full items-center justify-center rounded-[10px] border border-line active:bg-ink/5"
-      >
-        <Text
-          className="font-poppins-medium text-[15px] text-ink"
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.85}
-          maxFontSizeMultiplier={1.4}
-        >
-          {actionLabel}
-        </Text>
-      </Pressable>
+      />
     </View>
   );
 }

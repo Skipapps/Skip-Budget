@@ -61,10 +61,12 @@ export default function NotificationsScreen() {
     [charges.data, since],
   );
 
+  // Oldest day first, today last, like every other dated list in the app.
   const groups = useMemo(
     () =>
       groupByDate(visible, (charge) => charge.charged_on, {
         amountOf: (charge) => -Math.abs(charge.amount),
+        direction: 'asc',
       }),
     [visible],
   );
@@ -83,7 +85,7 @@ export default function NotificationsScreen() {
 
   return (
     <Screen showBack onRefresh={() => charges.refetch()}>
-      <Title align="left" className="mt-1 w-full">
+      <Title align="left" className="w-full">
         Notifications
       </Title>
       <Subtitle className="mt-2 w-full text-left">
@@ -96,10 +98,11 @@ export default function NotificationsScreen() {
           accessibilityRole="button"
           accessibilityLabel="Clear all notices"
           onPress={() => void clearAll()}
-          className="mt-4 flex-row items-center gap-1.5 self-start rounded-full border border-line px-3.5 py-2 active:bg-ink/5"
+          hitSlop={{ top: 4, bottom: 4 }}
+          className="mt-4 min-h-10 flex-row items-center gap-1.5 self-start rounded-full bg-ink/5 px-4 active:bg-ink/10"
         >
-          <Trash2 size={14} color={colors.muted} strokeWidth={2} />
-          <Text className="font-poppins-medium text-[13px] text-body" maxFontSizeMultiplier={1.2}>
+          <Trash2 size={18} color={colors.ink} strokeWidth={1.8} />
+          <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
             Clear all
           </Text>
         </Pressable>
@@ -171,7 +174,7 @@ export default function NotificationsScreen() {
                         }}
                         className="h-8 w-8 items-center justify-center rounded-full active:bg-ink/5"
                       >
-                        <X size={16} color={colors.muted} strokeWidth={2} />
+                        <X size={16} color={colors.muted} strokeWidth={1.8} />
                       </Pressable>
                     </View>
                   </Fragment>

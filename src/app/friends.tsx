@@ -120,14 +120,14 @@ function FriendsScreenInner() {
 
   return (
     <Screen showBack avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
-      <Title className="mt-2">Friends</Title>
+      <Title>Friends</Title>
       <Subtitle className="mt-3">
         Share your code with someone and they can add you. Nobody can find you without it.
       </Subtitle>
 
       {/* The code is the product here, so it is set like one: large, spaced, and
           unambiguous to read aloud down a phone. */}
-      <View className="mt-7 w-full items-center rounded-[10px] border border-line bg-card px-5 py-6">
+      <View className="mt-7 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           Your code
         </Text>
@@ -156,7 +156,7 @@ function FriendsScreenInner() {
           accessibilityRole="button"
           accessibilityLabel="Set your name in settings, so friends can recognise you"
           onPress={() => router.push('/(tabs)/settings')}
-          className="mt-4 w-full rounded-[10px] border border-line px-4 py-3.5 active:bg-ink/5"
+          className="mt-4 w-full rounded-[16px] border border-line px-4 py-3.5 active:bg-ink/5"
         >
           <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.4}>
             Add your name first
@@ -200,7 +200,7 @@ function FriendsScreenInner() {
 
       {error ? (
         <Text
-          className="mt-4 w-full font-poppins text-[13px] text-red-600"
+          className="mt-4 w-full font-poppins text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {error}
@@ -221,7 +221,7 @@ function FriendsScreenInner() {
                 accessibilityRole="button"
                 accessibilityLabel={`Decline ${request.profile?.display_name || 'this request'}`}
                 onPress={() => respond.mutate({ id: request.id, accept: false })}
-                className="h-11 w-11 items-center justify-center rounded-full border border-line active:bg-ink/5"
+                className="h-11 w-11 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
               >
                 <X size={18} color={colors.muted} strokeWidth={2.2} />
               </Pressable>

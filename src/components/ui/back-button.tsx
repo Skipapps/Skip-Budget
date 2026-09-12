@@ -19,7 +19,7 @@ export function BackButton({ onPress }: BackButtonProps) {
       accessibilityLabel="Go back"
       hitSlop={8}
       onPress={withTap(onPress ?? (() => router.back()))}
-      className="-ml-2 h-11 w-11 items-center justify-center rounded-[10px] active:bg-ink/5"
+      className="-ml-2 h-11 w-11 items-center justify-center rounded-[12px] active:bg-ink/5"
     >
       <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
         <Path

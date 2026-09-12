@@ -36,7 +36,7 @@ export function ReceiptRow({
       onPress={onPress}
       className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
     >
-      <BrandMark name={merchant} domain={domain} size={44} />
+      <BrandMark name={merchant} domain={domain} size={40} />
 
       <View className="min-w-0 flex-1">
         <Text

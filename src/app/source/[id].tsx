@@ -13,8 +13,9 @@ import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm } from '@/providers/dialog-provider';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
-import { Title } from '@/components/ui/typography';
+import { SectionHeading, Title } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
+import { sortByDateAscending } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
 import { useColors } from '@/providers/theme-provider';
 
@@ -68,6 +69,20 @@ export default function SourceDetailScreen() {
   const isCard = kind === 'card';
   const name = isCard ? card!.holder : account!.nickname || account!.bank_name;
 
+  /**
+   * The ledger's rows, oldest day first.
+   *
+   * `ledgerForSource` sorts newest-first because the balance arithmetic sits
+   * next to that sort and is not a display concern; the order a person reads
+   * is decided here instead. Nothing above this line moves, so `charged`,
+   * `paid` and `balance` are the same figures either way.
+   */
+  const entries = sortByDateAscending(
+    ledger.entries,
+    (entry) => entry.date,
+    (entry) => entry.id,
+  );
+
   const handlePay = async (amount: string) => {
     const value = Number(amount);
     setPadOpen(false);
@@ -101,6 +116,10 @@ export default function SourceDetailScreen() {
   return (
     <Screen
       showBack
+      // The ledger runs oldest-first, so the newest movement on this card is at
+      // the bottom. Past the loading and error guards already, so the rows are
+      // on screen by the time this is true.
+      startAtEnd={entries.length > 0}
       floating={
         <Pressable
           accessibilityRole="button"
@@ -108,7 +127,7 @@ export default function SourceDetailScreen() {
           onPress={() => setPadOpen(true)}
           className="h-14 flex-row items-center gap-2 rounded-full bg-control px-5 active:opacity-80"
         >
-          <Plus size={20} color="#FFFFFF" strokeWidth={2.2} />
+          <Plus size={20} color={colors.onControl} strokeWidth={2} />
           <Text
             className="font-poppins-medium text-[15px] text-on-control"
             maxFontSizeMultiplier={1.3}
@@ -119,7 +138,7 @@ export default function SourceDetailScreen() {
       }
     >
       <View className="mt-2 w-full flex-row items-center justify-between gap-3">
-        <Title align="left" className="flex-1">
+        <Title flush align="left" className="flex-1">
           {name}
         </Title>
         <Pressable
@@ -129,9 +148,9 @@ export default function SourceDetailScreen() {
           onPress={() =>
             router.push(isCard ? `/add-card?id=${source.id}` : `/add-account?id=${source.id}`)
           }
-          className="h-11 w-11 items-center justify-center rounded-full border border-line active:bg-ink/5"
+          className="h-11 w-11 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
         >
-          <Pencil size={18} color={colors.ink} strokeWidth={1.9} />
+          <Pencil size={18} color={colors.ink} strokeWidth={1.8} />
         </Pressable>
       </View>
 
@@ -166,7 +185,7 @@ export default function SourceDetailScreen() {
 
       {/* The arithmetic, spelled out. A balance that moved without explanation
           is the fastest way to lose someone's trust in a money app. */}
-      <View className="mt-6 w-full rounded-[10px] border border-line px-4 py-3">
+      <View className="mt-6 w-full rounded-[16px] border border-line px-4 py-3">
         <SummaryLine
           label={
             source.balance_as_of
@@ -190,21 +209,18 @@ export default function SourceDetailScreen() {
 
       {error ? (
         <Text
-          className="mt-4 w-full text-center font-poppins text-[13px] text-red-600"
+          className="mt-4 w-full text-center font-poppins text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {error}
         </Text>
       ) : null}
 
-      <Text
-        className="mt-8 w-full font-poppins-semibold text-[17px] text-ink"
-        maxFontSizeMultiplier={1.3}
-      >
-        Transactions
-      </Text>
+      <View className="mt-8 w-full">
+        <SectionHeading>Transactions</SectionHeading>
+      </View>
 
-      {ledger.entries.length === 0 ? (
+      {entries.length === 0 ? (
         <PageState
           art={artwork.emptyWallet}
           title="Nothing on this one yet"
@@ -216,9 +232,9 @@ export default function SourceDetailScreen() {
         />
       ) : (
         <View className="mt-1 w-full pb-28">
-          {ledger.entries.map((entry, index) => (
+          {entries.map((entry, index) => (
             <Fragment key={entry.id}>
-              {index > 0 ? <View className="ml-13 h-px bg-line/60" /> : null}
+              {index > 0 ? <View className="ml-[52px] h-px bg-line/60" /> : null}
               <TransactionRow
                 label={entry.label}
                 amount={entry.amount}

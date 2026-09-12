@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Calendar, Trash2, Wallet } from 'lucide-react-native';
+import { Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import {
   choiceToLead,
@@ -17,20 +17,22 @@ import {
 } from '@/api/mutations';
 import { usePaymentSources, useSubscription } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
-import { AmountPad } from '@/components/ui/amount-pad';
-import { Button } from '@/components/ui/button';
-import { DatePicker } from '@/components/ui/date-picker';
+import { AmountStep } from '@/components/flow/amount-step';
+import { InlineCalendar } from '@/components/flow/inline-calendar';
+import { StepFlow } from '@/components/flow/step-flow';
+import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useConfirm } from '@/providers/dialog-provider';
-import { SegmentedControl } from '@/components/ui/segmented-control';
+import { ChoiceChips } from '@/components/ui/choice-chips';
 import { ReminderField } from '@/components/ui/reminder-field';
-import { SelectField } from '@/components/ui/select-field';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
-import { FieldLabel, Title } from '@/components/ui/typography';
-import { formatFullDate, toIsoDate } from '@/lib/date';
-import { formatCurrency } from '@/lib/format';
+import { FieldLabel } from '@/components/ui/typography';
+import { toIsoDate } from '@/lib/date';
+import { success, warn } from '@/lib/haptics';
 import { useColors } from '@/providers/theme-provider';
+import { useArtwork } from '@/theme/artwork';
 
 const CYCLES = [
   { value: 'weekly', label: 'Weekly' },
@@ -61,19 +63,68 @@ const BLANK: Initial = {
   active: true,
 };
 
-/** Loads the row, then seeds the form by remount — see add-receipt for why. */
+/**
+ * Loads the row, then seeds the form by remount — see add-receipt for why.
+ *
+ * An edit that has not got its record never opens as a blank form: `id` is what
+ * turns Save into an update, so the empty fields would go straight over a real
+ * subscription. Loading, failed and gone each get their own answer, and a
+ * failed read is never allowed to become a new subscription instead.
+ */
 export default function AddSubscriptionScreen() {
-  const colors = useColors();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { data: existing, isLoading } = useSubscription(id);
+  const artwork = useArtwork();
+  const subscription = useSubscription(id);
+  const existing = subscription.data ?? null;
 
-  if (id && isLoading && !existing) {
+  if (id && !existing) {
+    if (subscription.isError) {
+      return (
+        <Screen showBack>
+          <PageState
+            art={artwork.error}
+            title="Could not open this subscription"
+            message="Check your connection and try again. Nothing about it has changed."
+            actionLabel="Try again"
+            onAction={() => {
+              void subscription.refetch();
+            }}
+            secondaryLabel="Go back"
+            onSecondary={() => router.back()}
+          />
+        </Screen>
+      );
+    }
+
+    if (!subscription.isFetched) {
+      return (
+        <StepFlow
+          title="Edit subscription"
+          steps={3}
+          current={1}
+          onBack={() => router.back()}
+          primaryLabel="Continue"
+          primaryDisabled
+          onPrimary={() => {}}
+        >
+          <View className="w-full gap-6">
+            <Skeleton className="h-14 w-full rounded-[12px]" />
+            <Skeleton className="h-10 w-2/3 rounded-full" />
+            <Skeleton className="h-24 w-full rounded-[12px]" />
+          </View>
+        </StepFlow>
+      );
+    }
+
     return (
       <Screen showBack>
-        <Title className="mt-2">Edit subscription</Title>
-        <View className="mt-16 w-full items-center">
-          <ActivityIndicator size="small" color={colors.muted} />
-        </View>
+        <PageState
+          art={artwork.error}
+          title="That subscription is not here"
+          message="It may have been deleted. Nothing has been changed."
+          actionLabel="Go back"
+          onAction={() => router.back()}
+        />
       </Screen>
     );
   }
@@ -101,6 +152,7 @@ export default function AddSubscriptionScreen() {
 }
 
 function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
+  const colors = useColors();
   const editing = Boolean(id);
 
   const [service, setService] = useState<BrandSelection | null>(initial.service);
@@ -111,9 +163,9 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
   const [note, setNote] = useState(initial.note);
   const [active, setActive] = useState(initial.active);
 
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [amountPadOpen, setAmountPadOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Editing opens on the details, not the keypad.
+  const [step, setStep] = useState(editing ? 1 : 0);
+  const [error, setError] = useState<{ message: string; step: number } | null>(null);
 
   const { sources } = usePaymentSources();
   const { data: categories = [] } = useSpendCategories();
@@ -134,16 +186,23 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
   const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
+  /** A check for a field on an earlier step sends you back to that step. */
+  const fail = (message: string, atStep: number) => {
+    warn();
+    setError({ message, step: atStep });
+    setStep(atStep);
+  };
+
   const handleSave = async () => {
     setError(null);
 
     if (!service) {
-      setError('Pick a service first.');
+      fail('Pick a service first.', 1);
       return;
     }
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
-      setError('Enter what it costs.');
+      fail('Enter what it costs.', 0);
       return;
     }
 
@@ -171,9 +230,14 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
 
       // After the row exists, because a reminder points at one.
       await applyReminder('subscription', subscriptionId, choiceToLead(reminder), remindAt);
+      success();
       router.back();
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not save that subscription.');
+      warn();
+      setError({
+        message: (thrown as Error).message ?? 'Could not save that subscription.',
+        step: 2,
+      });
     }
   };
 
@@ -191,146 +255,149 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
       await deleteSubscription.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not delete that subscription.');
+      setError({
+        message: (thrown as Error).message ?? 'Could not delete that subscription.',
+        step,
+      });
     }
   };
 
   const busy = createSubscription.isPending || updateSubscription.isPending;
 
+  const value = Number(amount);
+  const amountReady = Number.isFinite(value) && value > 0;
+  const stepValid = step === 0 ? amountReady : step === 1 ? Boolean(service) : !busy;
+
+  const question =
+    step === 0 ? 'How much does it cost?' : step === 2 ? 'When does it renew?' : undefined;
+  const primaryLabel =
+    step < 2 ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save subscription';
+  const stepError = error && error.step === step ? error.message : null;
+
   return (
-    <Screen showBack avoidKeyboard>
-      <Title className="mt-2">{editing ? 'Edit subscription' : 'Add subscription'}</Title>
-
-      <View className="mt-8 w-full gap-6">
-        <BrandField
-          label="Service"
-          value={service}
-          onChange={setService}
-          placeholder="Search for a service"
-        />
-
-        <SelectField
-          label="Amount"
-          value={amount ? formatCurrency(Number(amount)) : ''}
-          placeholder="Enter an amount"
-          icon={Wallet}
-          onPress={() => setAmountPadOpen(true)}
-        />
-
-        <View className="w-full">
-          <FieldLabel className="mb-2">Billing cycle</FieldLabel>
-          <SegmentedControl options={CYCLES} value={cycle} onChange={setCycle} />
-        </View>
-
-        <SelectField
-          label="Next renewal"
-          value={renewsOn ? formatFullDate(renewsOn) : ''}
-          placeholder="Choose a date"
-          icon={Calendar}
-          onPress={() => setDatePickerOpen(true)}
-        />
-
-        {sources.length > 0 ? (
-          <View className="w-full">
-            <FieldLabel className="mb-3">Charged to</FieldLabel>
-            <SourceTiles sources={sources} value={sourceId} onChange={setSourceId} />
-          </View>
-        ) : null}
-
-        <ReminderField
-          kind="subscription"
-          value={reminder}
-          onChange={setReminderDraft}
-          time={remindAt}
-          onTimeChange={setTimeDraft}
-        />
-
-        <TextField
-          label="Note"
-          optional
-          value={note}
-          onChangeText={setNote}
-          placeholder="Which plan, for example"
-          multiline
-          maxLength={200}
-          autoCapitalize="sentences"
-        />
-
-        {/* Cancelling keeps the history. Only offered on something that
-            already exists — nobody adds a subscription as cancelled. */}
-        {editing ? (
-          <View className="w-full">
-            <FieldLabel className="mb-2">Status</FieldLabel>
-            <SegmentedControl
-              options={[
-                { value: 'active', label: 'Active' },
-                { value: 'cancelled', label: 'Cancelled' },
-              ]}
-              value={active ? 'active' : 'cancelled'}
-              onChange={(next) => setActive(next === 'active')}
-            />
-          </View>
-        ) : null}
-
-        {categoryLabel ? (
-          <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-            Filed under {categoryLabel}
-          </Text>
-        ) : null}
-
-        {error ? (
-          <Text className="font-poppins text-[13px] text-red-600" maxFontSizeMultiplier={1.4}>
-            {error}
-          </Text>
-        ) : null}
-      </View>
-
-      <View className="mt-auto w-full gap-3 pt-10">
-        <Button
-          label={busy ? 'Saving…' : editing ? 'Save changes' : 'Save subscription'}
-          onPress={handleSave}
-        />
-        {editing ? (
+    <StepFlow
+      title={editing ? 'Edit subscription' : 'Add a subscription'}
+      steps={3}
+      current={step}
+      onBack={() => {
+        setError(null);
+        if (step === 0) router.back();
+        else setStep((current) => current - 1);
+      }}
+      question={question}
+      primaryLabel={primaryLabel}
+      primaryDisabled={!stepValid}
+      onPrimary={() => {
+        if (step < 2) {
+          setError(null);
+          setStep((current) => current + 1);
+          return;
+        }
+        void handleSave();
+      }}
+      error={step === 1 ? null : stepError}
+      avoidKeyboard={step === 1}
+      footerSlot={
+        editing ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Delete this subscription"
             onPress={handleDelete}
-            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-ink/5"
+            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
-            <Trash2 size={17} color="#DC2626" strokeWidth={1.9} />
+            <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
             <Text
-              className="font-poppins-medium text-[15px] text-red-600"
+              className="font-poppins-medium text-[15px] text-danger"
               maxFontSizeMultiplier={1.4}
             >
               {deleteSubscription.isPending ? 'Deleting…' : 'Delete subscription'}
             </Text>
           </Pressable>
-        ) : null}
-      </View>
+        ) : null
+      }
+    >
+      {step === 0 ? <AmountStep value={amount} onChange={setAmount} /> : null}
 
-      {datePickerOpen ? (
-        <DatePicker
-          value={renewsOn ?? new Date()}
-          onCancel={() => setDatePickerOpen(false)}
-          onConfirm={(next) => {
-            setRenewsOn(next);
-            setDatePickerOpen(false);
-          }}
-        />
+      {step === 1 ? (
+        <View className="w-full gap-6">
+          <BrandField
+            label="Service"
+            value={service}
+            onChange={setService}
+            placeholder="Search for a service"
+          />
+
+          {sources.length > 0 ? (
+            <View className="w-full">
+              <FieldLabel className="mb-3">Charged to</FieldLabel>
+              <SourceTiles sources={sources} value={sourceId} onChange={setSourceId} />
+            </View>
+          ) : null}
+
+          <TextField
+            label="Note"
+            optional
+            value={note}
+            onChangeText={setNote}
+            placeholder="Which plan, for example"
+            multiline
+            maxLength={200}
+            autoCapitalize="sentences"
+          />
+
+          {/* Cancelling keeps the history. Only offered on something that
+              already exists — nobody adds a subscription as cancelled. */}
+          {editing ? (
+            <View className="w-full">
+              <FieldLabel className="mb-2">Status</FieldLabel>
+              <ChoiceChips
+                options={[
+                  { value: 'active', label: 'Active' },
+                  { value: 'cancelled', label: 'Cancelled' },
+                ]}
+                value={active ? 'active' : 'cancelled'}
+                onChange={(next) => setActive(next === 'active')}
+              />
+            </View>
+          ) : null}
+
+          {categoryLabel ? (
+            <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+              Filed under {categoryLabel}
+            </Text>
+          ) : null}
+
+          {stepError ? (
+            <Text
+              className="w-full font-poppins text-[13px] text-danger"
+              maxFontSizeMultiplier={1.4}
+            >
+              {stepError}
+            </Text>
+          ) : null}
+        </View>
       ) : null}
 
-      {amountPadOpen ? (
-        <AmountPad
-          title="Amount"
-          caption={service ? service.name : 'Subscription cost'}
-          value={amount}
-          onCancel={() => setAmountPadOpen(false)}
-          onConfirm={(next) => {
-            setAmount(next);
-            setAmountPadOpen(false);
-          }}
-        />
+      {step === 2 ? (
+        <View className="w-full gap-6">
+          {/* Optional: plenty of people know the cost but not the renewal date,
+              so nothing here is pre-selected and nothing insists. */}
+          <InlineCalendar value={renewsOn} onChange={setRenewsOn} />
+
+          <View className="w-full">
+            <FieldLabel className="mb-2">Billing cycle</FieldLabel>
+            <ChoiceChips options={CYCLES} value={cycle} onChange={setCycle} />
+          </View>
+
+          <ReminderField
+            kind="subscription"
+            value={reminder}
+            onChange={setReminderDraft}
+            time={remindAt}
+            onTimeChange={setTimeDraft}
+          />
+        </View>
       ) : null}
-    </Screen>
+    </StepFlow>
   );
 }

@@ -107,7 +107,7 @@ export default function BillPlansScreen() {
   return (
     <Screen showBack avoidKeyboard>
       <View className="mt-2 w-full flex-row items-center justify-between gap-3">
-        <Title align="left" className="flex-1">
+        <Title flush align="left" className="flex-1">
           Your bills
         </Title>
 
@@ -125,9 +125,9 @@ export default function BillPlansScreen() {
                 activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter bills'
               }
               onPress={() => setFilterOpen(true)}
-              className="min-h-12 w-12 items-center justify-center rounded-[10px] border border-line active:bg-ink/5"
+              className="h-11 w-11 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
             >
-              <SlidersHorizontal size={20} color={colors.ink} strokeWidth={2} />
+              <SlidersHorizontal size={20} color={colors.ink} strokeWidth={1.8} />
               {activeCount > 0 ? (
                 <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
                   <Text

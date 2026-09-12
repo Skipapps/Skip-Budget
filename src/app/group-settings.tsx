@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { LogOut, Share2, UserMinus, UserPlus } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, Share, Switch, Text, View } from 'react-native';
+import { Pressable, Share, Text, View } from 'react-native';
 
 import {
   memberAvatar,
@@ -15,15 +15,20 @@ import {
 } from '@/api/splits';
 import { Person } from '@/components/splits/person';
 import { GroupIconPicker } from '@/components/splits/group-icon-picker';
+import { ActionPill } from '@/components/ui/action-pill';
 import { Button } from '@/components/ui/button';
 import { useProGate } from '@/components/pro/pro-gate';
+import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
+import { Skeleton } from '@/components/ui/skeleton';
+import { SwitchControl } from '@/components/ui/switch-control';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Title } from '@/components/ui/typography';
 import { formatCurrency } from '@/lib/format';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useUserId } from '@/providers/session-provider';
 import { useColors } from '@/providers/theme-provider';
+import { useArtwork } from '@/theme/artwork';
 
 /**
  * The parts of a group that are not money.
@@ -42,17 +47,106 @@ export default function GroupSettingsScreen() {
   return <GroupSettingsScreenInner />;
 }
 
+type GroupRecord = NonNullable<ReturnType<typeof useGroup>['data']>;
+type MemberRecord = NonNullable<ReturnType<typeof useGroupMembers>['data']>[number];
+type BalanceRecord = NonNullable<ReturnType<typeof useGroupBalances>['data']>[number];
+
+/**
+ * Waits for the group before the form exists, then seeds it by remount.
+ *
+ * The name field is a `useState` initial value, and an initial value is read
+ * once. On a cold cache — opened from a notification, or after a cold start —
+ * the row lands after the first render, so without the key the field opens
+ * empty and stays empty. Nothing bad is saved (`handleRename` refuses a blank,
+ * and refuses a name that matches the one on record), but an empty box under
+ * the label "Name" reads as a group that has lost its name.
+ */
 function GroupSettingsScreenInner() {
+  const artwork = useArtwork();
+  const { id } = useLocalSearchParams<{ id?: string }>();
+
+  const group = useGroup(id);
+  const members = useGroupMembers(id);
+  const balances = useGroupBalances(id);
+
+  if (group.isLoading || members.isLoading || balances.isLoading) {
+    return (
+      <Screen showBack>
+        <Title>Group settings</Title>
+        <View className="mt-8 w-full gap-6" accessibilityLabel="Loading">
+          <Skeleton className="h-14 w-full rounded-[12px]" />
+          <Skeleton className="h-20 w-full rounded-[16px]" />
+          <Skeleton className="h-12 w-full rounded-full" />
+        </View>
+      </Screen>
+    );
+  }
+
+  // A failed read is not a group without members: without this, the page draws
+  // itself as if nobody were in it and every balance were zero, and offers to
+  // rename and close it on that basis.
+  if (group.isError || members.isError || balances.isError) {
+    return (
+      <Screen showBack>
+        <PageState
+          art={artwork.error}
+          title="Could not open these settings"
+          message="Check your connection and try again. Nothing about the group has changed."
+          actionLabel="Try again"
+          onAction={() => {
+            void group.refetch();
+            void members.refetch();
+            void balances.refetch();
+          }}
+          secondaryLabel="Back to splits"
+          onSecondary={() => router.replace('/splits')}
+        />
+      </Screen>
+    );
+  }
+
+  // The read landed and there is no row: a different thing entirely, and the
+  // only one of the three that is worth offering a way out of rather than a
+  // way back in.
+  if (!group.data) {
+    return (
+      <Screen showBack>
+        <PageState
+          art={artwork.error}
+          title="That group is not here"
+          message="It may have been closed, or you may no longer be a member."
+          actionLabel="Back to splits"
+          onAction={() => router.replace('/splits')}
+        />
+      </Screen>
+    );
+  }
+
+  return (
+    <GroupSettingsForm
+      key={group.data.id}
+      group={group.data}
+      members={members.data ?? []}
+      balances={balances.data ?? []}
+    />
+  );
+}
+
+function GroupSettingsForm({
+  group,
+  members,
+  balances,
+}: {
+  group: GroupRecord;
+  members: MemberRecord[];
+  balances: BalanceRecord[];
+}) {
   const colors = useColors();
   const confirm = useConfirm();
   const userId = useUserId();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const id = group.id;
 
-  const { data: group } = useGroup(id);
-  const { data: members = [] } = useGroupMembers(id);
-  const { data: balances = [] } = useGroupBalances(id);
-
-  const [name, setName] = useState(group?.name ?? '');
+  const [name, setName] = useState(group.name ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const updateGroup = useUpdateGroup();
@@ -60,7 +154,7 @@ function GroupSettingsScreenInner() {
   const removeMember = useRemoveGroupMember();
 
   const handleShare = async () => {
-    if (!group?.invite_code) return;
+    if (!group.invite_code) return;
     await Share.share({
       message: `Join "${group.name}" on Skip with the code ${group.invite_code} — we can keep track of who paid for what.`,
     });
@@ -73,7 +167,7 @@ function GroupSettingsScreenInner() {
     Number(balances.find((row) => row.member_id === memberId)?.balance ?? 0);
 
   const handleRename = async () => {
-    if (!id || !name.trim() || name.trim() === group?.name) return;
+    if (!name.trim() || name.trim() === group.name) return;
     setError(null);
     try {
       await updateGroup.mutateAsync({ id, name: name.trim() });
@@ -103,7 +197,7 @@ function GroupSettingsScreenInner() {
     if (!me) return;
     setError(null);
     const ok = await confirm({
-      title: `Leave ${group?.name ?? 'this group'}?`,
+      title: `Leave ${group.name}?`,
       message: 'You will stop seeing it. What you already paid stays in everyone else’s history.',
       confirmLabel: 'Leave',
       destructive: true,
@@ -119,10 +213,9 @@ function GroupSettingsScreenInner() {
   };
 
   const handleArchive = async () => {
-    if (!id) return;
     setError(null);
     const ok = await confirm({
-      title: `Close ${group?.name ?? 'this group'}?`,
+      title: `Close ${group.name}?`,
       message:
         'It comes off everyone’s list. Nothing is deleted — the expenses stay exactly as they are.',
       confirmLabel: 'Close group',
@@ -140,7 +233,7 @@ function GroupSettingsScreenInner() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title className="mt-2">Group settings</Title>
+      <Title>Group settings</Title>
 
       <View className="mt-8 w-full">
         <TextField
@@ -148,7 +241,7 @@ function GroupSettingsScreenInner() {
           value={name}
           onChangeText={setName}
           onBlur={handleRename}
-          placeholder={group?.name ?? 'Group name'}
+          placeholder={group.name}
           maxLength={60}
           autoCapitalize="sentences"
         />
@@ -158,13 +251,13 @@ function GroupSettingsScreenInner() {
         <View className="mt-7 w-full">
           <FieldLabel className="mb-3">Icon</FieldLabel>
           <GroupIconPicker
-            value={group?.icon_id ?? 'housing'}
-            onChange={(next) => (id ? updateGroup.mutate({ id, iconId: next }) : undefined)}
+            value={group.icon_id ?? 'housing'}
+            onChange={(next) => updateGroup.mutate({ id, iconId: next })}
           />
         </View>
       ) : null}
 
-      <View className="mt-7 w-full flex-row items-center gap-4 rounded-[10px] border border-line px-4 py-4">
+      <View className="mt-7 w-full flex-row items-center gap-4 rounded-[16px] border border-line px-4 py-4">
         <View className="min-w-0 flex-1">
           <Text className="font-poppins-medium text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
             Simplify who pays whom
@@ -176,15 +269,11 @@ function GroupSettingsScreenInner() {
             Fewer payments, but it can pair you with somebody you never ate with.
           </Text>
         </View>
-        <Switch
-          value={group?.simplify_debts ?? true}
-          onValueChange={(next) =>
-            id ? updateGroup.mutate({ id, simplifyDebts: next }) : undefined
-          }
+        <SwitchControl
+          value={group.simplify_debts ?? true}
+          onValueChange={(next) => updateGroup.mutate({ id, simplifyDebts: next })}
           disabled={!isOwner}
-          trackColor={{ false: colors.line, true: colors.control }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor={colors.line}
+          accessibilityLabel="Simplify who pays whom"
         />
       </View>
 
@@ -207,7 +296,7 @@ function GroupSettingsScreenInner() {
           label="Add someone"
           variant="outline"
           icon={<UserPlus size={17} color={colors.ink} strokeWidth={1.9} />}
-          onPress={() => (id ? router.push(`/add-member?group=${id}`) : undefined)}
+          onPress={() => router.push(`/add-member?group=${id}`)}
         />
 
         <View className="mt-5 h-px w-full bg-line" />
@@ -247,26 +336,18 @@ function GroupSettingsScreenInner() {
         {/* Sharing the code is how somebody who is not yet a friend gets in, so
             it belongs with the members rather than on the group's main screen —
             which is about money, not administration. */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Share the group code ${group?.invite_code ?? ''}`}
-          onPress={handleShare}
-          className="mt-3 min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] border border-line active:bg-ink/5"
-        >
-          <Share2 size={16} color={colors.ink} strokeWidth={1.9} />
-          <Text
-            className="font-poppins-medium text-[14px] text-ink"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.3}
-          >
-            Share code {group?.invite_code}
-          </Text>
-        </Pressable>
+        <View className="mt-3 w-full flex-row">
+          <ActionPill
+            icon={Share2}
+            label={`Share code ${group.invite_code ?? ''}`}
+            onPress={handleShare}
+          />
+        </View>
       </View>
 
       {error ? (
         <Text
-          className="mt-5 w-full font-poppins text-[13px] text-red-600"
+          className="mt-5 w-full font-poppins text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {error}
@@ -274,17 +355,12 @@ function GroupSettingsScreenInner() {
       ) : null}
 
       <View className="mb-10 mt-auto w-full gap-3 pt-10">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Leave this group"
+        <Button
+          label="Leave group"
+          variant="outline"
+          icon={<LogOut size={17} color={colors.ink} strokeWidth={1.9} />}
           onPress={handleLeave}
-          className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] border border-line active:bg-ink/5"
-        >
-          <LogOut size={17} color={colors.ink} strokeWidth={1.9} />
-          <Text className="font-poppins-medium text-[15px] text-ink" maxFontSizeMultiplier={1.4}>
-            Leave group
-          </Text>
-        </Pressable>
+        />
 
         {isOwner ? (
           <Button label="Close this group" variant="outline" onPress={handleArchive} />

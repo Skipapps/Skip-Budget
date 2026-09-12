@@ -30,7 +30,7 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
               selected ? 'border-control bg-control' : 'border-line bg-card active:bg-ink/5',
             )}
           >
-            <Icon width={22} height={22} color={selected ? colors.surface : colors.body} />
+            <Icon width={22} height={22} color={selected ? colors.onControl : colors.body} />
           </Pressable>
         );
       })}

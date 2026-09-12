@@ -31,7 +31,7 @@ export function ScheduleCard({ rows, onPress }: ScheduleCardProps) {
       accessibilityRole="button"
       accessibilityLabel={`Where each payment goes. First payment: ${formatCurrency(first.interest)} interest, ${formatCurrency(first.principal)} off the balance. Opens the full schedule.`}
       onPress={onPress}
-      className="w-full flex-row items-center gap-3 rounded-[10px] border border-line px-4 py-4 active:bg-ink/5"
+      className="w-full flex-row items-center gap-3 rounded-[16px] border border-line px-4 py-4 active:bg-ink/5"
     >
       <View className="h-[72px] w-[72px]">
         <artwork.loanSchedule width="100%" height="100%" />

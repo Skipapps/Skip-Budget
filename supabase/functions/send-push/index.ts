@@ -5,8 +5,9 @@
 //
 //   1. records the charges that have come due
 //   2. rolls the schedules that have gone past
-//   3. sends what is owed — a notice for each new charge, and any reminder
-//      whose time has arrived
+//   3. sends what is owed — a notice for each new charge, any reminder whose
+//      time has arrived, the waiting shared-group notices, and the daily
+//      receipts nudge for anybody whose chosen hour has come round
 //
 // Recording before rolling, because the stored anchor is what occurrences are
 // walked from and moving it first steps over the date being written.
@@ -35,6 +36,10 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const BUNDLE_ID = 'com.skipapps.skip.budget';
+
+// Where a tapped receipts reminder lands. The phone treats this as a name to
+// look up in its own allow-list, not as a URL to open — see src/api/push.ts.
+const RECEIPT_TAP = { route: '/add-receipt' } as const;
 
 const HOSTS = {
   development: 'https://api.sandbox.push.apple.com',
@@ -96,12 +101,28 @@ async function providerToken(): Promise<string> {
 
 type SendResult = { ok: boolean; reason?: string; environment?: Environment };
 
+/**
+ * What the phone should do when the notification is tapped.
+ *
+ * Sent as a top-level `body` object beside `aps`, which reads like a mistake
+ * and is not: expo-notifications takes a *remote* notification's `content.data`
+ * from `userInfo["body"]` and from nowhere else. Any other custom key is
+ * carried by APNs and then dropped on the floor by the client. Verified in the
+ * installed module's own source, expo-notifications@57.0.13,
+ * ios/ExpoNotifications/Notifications/NotificationRecords.swift:328-334.
+ *
+ * Undefined for every existing notification, which keeps their payloads
+ * byte-for-byte what they were.
+ */
+type TapPayload = { route: string };
+
 async function pushOnce(
   token: string,
   environment: Environment,
   jwt: string,
   title: string,
   body: string,
+  data?: TapPayload,
 ): Promise<SendResult> {
   const response = await fetch(`${HOSTS[environment]}/3/device/${token}`, {
     method: 'POST',
@@ -115,6 +136,7 @@ async function pushOnce(
     },
     body: JSON.stringify({
       aps: { alert: { title, body }, sound: 'default', badge: 1 },
+      ...(data ? { body: data } : {}),
     }),
   });
 
@@ -137,8 +159,9 @@ async function push(
   jwt: string,
   title: string,
   body: string,
+  data?: TapPayload,
 ): Promise<boolean> {
-  const first = await pushOnce(tokenRow.token, tokenRow.environment, jwt, title, body);
+  const first = await pushOnce(tokenRow.token, tokenRow.environment, jwt, title, body, data);
   if (first.ok) return true;
 
   // A token minted for one Apple environment is meaningless to the other, and
@@ -147,7 +170,7 @@ async function push(
   if (first.reason === 'BadDeviceToken') {
     const other: Environment =
       tokenRow.environment === 'development' ? 'production' : 'development';
-    const retry = await pushOnce(tokenRow.token, other, jwt, title, body);
+    const retry = await pushOnce(tokenRow.token, other, jwt, title, body, data);
 
     if (retry.ok) {
       await supabase.from('device_tokens').update({ environment: other }).eq('id', tokenRow.id);
@@ -256,10 +279,32 @@ Deno.serve(async (request) => {
     body: string;
   }[];
 
-  if (rows.length === 0 && charges.length === 0 && notices.length === 0) {
-    return new Response(JSON.stringify({ recorded: 0, due: 0, sent: 0, notices: 0 }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+  // The daily receipts nudge. Same shape as a reminder, but it points at a
+  // habit rather than at a row, so it is decided per account rather than per
+  // reminder — which is why it needs its own RPC and its own stamp.
+  //
+  // Logged and skipped rather than fatal, unlike reminders_due above. This
+  // block can reach a database where the migration defining
+  // receipt_reminders_due() has not been applied yet, and a missing function
+  // must not take the bill reminders down with it: Postgres answers 42883 and
+  // supabase-js surfaces it as an ordinary error here, so the run continues
+  // with nothing due. That is also what happens if the function is revoked or
+  // renamed — a quiet zero, never a dropped charge notice.
+  const { data: receiptRows, error: receiptError } = await supabase.rpc('receipt_reminders_due');
+  if (receiptError) console.error('receipt_reminders_due failed', receiptError.message);
+
+  const receipts = (receiptRows ?? []) as {
+    user_id: string;
+    local_date: string;
+    title: string;
+    body: string;
+  }[];
+
+  if (rows.length === 0 && charges.length === 0 && notices.length === 0 && receipts.length === 0) {
+    return new Response(
+      JSON.stringify({ recorded: 0, due: 0, sent: 0, notices: 0, receipts: 0, receiptsSent: 0 }),
+      { headers: { 'Content-Type': 'application/json' } },
+    );
   }
 
   const jwt = await providerToken();
@@ -324,8 +369,33 @@ Deno.serve(async (request) => {
     if (delivered) shared += 1;
   }
 
+  // ---- Ask about today's receipts ---------------------------------------
+  let receiptsSent = 0;
+  for (const row of receipts) {
+    let delivered = false;
+    for (const tokenRow of await tokensFor(supabase, row.user_id)) {
+      if (await push(supabase, tokenRow, jwt, row.title, row.body, RECEIPT_TAP)) delivered = true;
+    }
+
+    // Same rule as a reminder: stamped only on a delivery, so a day nobody
+    // could be pushed stays due and the next quarter hour tries again. The
+    // date written is the account's own local date, as the RPC computed it —
+    // not this server's, which is UTC and would mark tomorrow done for
+    // anybody east of it.
+    if (delivered) {
+      await supabase
+        .from('profiles')
+        .update({ receipt_reminder_last_sent_on: row.local_date })
+        .eq('id', row.user_id);
+      receiptsSent += 1;
+    }
+  }
+
   // Reported separately so a quiet run can be told apart from a broken one:
   // recorded says what the server found, announced and sent say what Apple took.
+  // receipts/receiptsSent are their own pair for the same reason — folded into
+  // due/sent, a receipts reminder that never reaches Apple would be hidden by a
+  // bill reminder that did.
   return new Response(
     JSON.stringify({
       recorded: charges.length,
@@ -334,6 +404,8 @@ Deno.serve(async (request) => {
       sent,
       notices: notices.length,
       shared,
+      receipts: receipts.length,
+      receiptsSent,
     }),
     { headers: { 'Content-Type': 'application/json' } },
   );

@@ -54,7 +54,7 @@ export function ReceiptFilterSheet({
             accessibilityLabel="Close filters"
             hitSlop={8}
             onPress={onCancel}
-            className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-ink/5"
+            className="h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
           >
             <X size={22} color={colors.ink} strokeWidth={2} />
           </Pressable>
@@ -79,9 +79,11 @@ export function ReceiptFilterSheet({
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setDraft((current) => ({ ...current, date: null }))}
-                className="mt-2 self-start rounded-[8px] px-1 py-1 active:opacity-60"
+                className="mt-2 self-start rounded-full px-1 py-1 active:opacity-60"
               >
-                <Text className="font-poppins text-[13px] text-muted">Clear date</Text>
+                <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+                  Clear date
+                </Text>
               </Pressable>
             ) : null}
           </View>
@@ -101,9 +103,11 @@ export function ReceiptFilterSheet({
           <Pressable
             accessibilityRole="button"
             onPress={() => setDraft(EMPTY_RECEIPT_FILTERS)}
-            className="min-h-16 flex-1 items-center justify-center rounded-[10px] border border-control active:bg-ink/5"
+            className="min-h-16 flex-1 items-center justify-center rounded-full border border-control active:bg-ink/5"
           >
-            <Text className="font-poppins-medium text-[17px] text-ink">Reset</Text>
+            <Text className="font-poppins-medium text-[17px] text-ink" maxFontSizeMultiplier={1.4}>
+              Reset
+            </Text>
           </Pressable>
           <View className="flex-[2]">
             <Button label="Apply" onPress={() => onApply(draft)} />

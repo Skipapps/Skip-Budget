@@ -8,6 +8,7 @@ import {
   Coffee,
   CreditCard,
   FileText,
+  FlaskConical,
   Lightbulb,
   LogOut,
   Mail,
@@ -32,6 +33,7 @@ import { Pressable, Text, View } from 'react-native';
 import { deleteAccount, signOut } from '@/api/auth';
 import { usePro } from '@/api/pro';
 import { authenticate, lockCapability, unavailableMessage } from '@/lib/app-lock';
+import { setProBypass, useProBypass } from '@/lib/pro-bypass';
 import { useUpdateProfile } from '@/api/mutations';
 import { ProfileAvatar } from '@/components/ui/profile-avatar';
 import { SettingsRow } from '@/components/settings/settings-row';
@@ -71,6 +73,7 @@ export default function SettingsScreen() {
   const subs = useSubscriptions();
   const profile = useProfile();
   const { pro } = usePro();
+  const proBypass = useProBypass();
   const updateProfile = useUpdateProfile();
   const { mode, accentId } = useTheme();
   const { haptics, setHaptics, appLock, setAppLock } = usePreferences();
@@ -183,7 +186,7 @@ export default function SettingsScreen() {
 
   return (
     <Screen avoidKeyboard>
-      <Title className="mt-2">Settings</Title>
+      <Title>Settings</Title>
 
       <SettingsSection title="Skip Pro">
         <SettingsRow
@@ -198,6 +201,25 @@ export default function SettingsScreen() {
           last
         />
       </SettingsSection>
+
+      {/* Development builds only. `__DEV__` is false in every Release bundle,
+          so this section does not exist in anything a customer can install —
+          and the switch behind it is inert there too. */}
+      {__DEV__ ? (
+        <SettingsSection title="Developer">
+          <SettingsRow
+            icon={FlaskConical}
+            title="Fake Pro"
+            subtitle={
+              proBypass
+                ? 'On — Pro screens unlocked, nothing purchased'
+                : 'Unlock Pro screens for testing, without buying'
+            }
+            toggle={{ value: proBypass, onChange: setProBypass }}
+            last
+          />
+        </SettingsSection>
+      ) : null}
 
       <SettingsSection title="Profile">
         {/* Above the name, in the order the dashboard shows them. */}
@@ -236,7 +258,8 @@ export default function SettingsScreen() {
               accessibilityLabel="Save your display name"
               onPress={commitName}
               disabled={updateProfile.isPending}
-              className="mt-3 self-end rounded-full bg-control px-5 py-2.5 active:opacity-80"
+              hitSlop={{ top: 4, bottom: 4 }}
+              className="mt-3 min-h-10 items-center justify-center self-end rounded-full bg-control px-4 active:bg-control-pressed"
             >
               <Text
                 className="font-poppins-medium text-[14px] text-on-control"
@@ -249,7 +272,7 @@ export default function SettingsScreen() {
         </View>
       </SettingsSection>
 
-      <SettingsSection title="Preference">
+      <SettingsSection title="Preferences">
         <SettingsRow
           icon={Palette}
           title="Appearance"
@@ -280,7 +303,7 @@ export default function SettingsScreen() {
         />
         <SettingsRow
           icon={LayoutGrid}
-          title="Dashboard tiles"
+          title="Dashboard order"
           subtitle="The order of “Where it goes”"
           onPress={() => router.push('/tiles')}
           last

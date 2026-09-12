@@ -1,21 +1,23 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Switch, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useAddGroupMember, useCreateGroup } from '@/api/splits';
 import { GroupIconPicker } from '@/components/splits/group-icon-picker';
-import { Button } from '@/components/ui/button';
+import { StepFlow } from '@/components/flow/step-flow';
 import { useProGate } from '@/components/pro/pro-gate';
-import { Screen } from '@/components/ui/screen';
+import { SwitchControl } from '@/components/ui/switch-control';
 import { TextField } from '@/components/ui/text-field';
-import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
-import { useColors } from '@/providers/theme-provider';
+import { FieldLabel } from '@/components/ui/typography';
+import { success, warn } from '@/lib/haptics';
 
 /**
  * Naming a group and choosing how it settles.
  *
- * Two fields, and the second one is a genuine choice rather than a default
- * worth hiding — so it is explained rather than labelled.
+ * Two steps rather than three: a group has no amount and no date, so there is
+ * no keypad step to open on. Settling is a genuine choice rather than a
+ * default worth hiding, which is why it gets a step of its own to be explained
+ * on instead of a switch buried under the name.
  */
 export default function AddGroupScreen() {
   // A wrapper, not an inline return: the screen below runs its own
@@ -27,7 +29,6 @@ export default function AddGroupScreen() {
 }
 
 function AddGroupScreenInner() {
-  const colors = useColors();
   const { names } = useLocalSearchParams<{ names?: string }>();
 
   // Carried over from the quick calculator, so a one-off split that turned out
@@ -42,7 +43,8 @@ function AddGroupScreenInner() {
   // A house rather than the neutral glyph: most groups are a flat or a shared
   // household, and a default that is usually right saves a tap.
   const [iconId, setIconId] = useState('housing');
-  const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState(0);
+  const [error, setError] = useState<{ message: string; step: number } | null>(null);
 
   const createGroup = useCreateGroup();
   const addMember = useAddGroupMember();
@@ -50,7 +52,10 @@ function AddGroupScreenInner() {
   const handleCreate = async () => {
     setError(null);
     if (!name.trim()) {
-      setError('Give the group a name so you can tell it from the others.');
+      // The name lives on the first step, so that is where the message goes.
+      warn();
+      setError({ message: 'Give the group a name so you can tell it from the others.', step: 0 });
+      setStep(0);
       return;
     }
 
@@ -68,84 +73,109 @@ function AddGroupScreenInner() {
       }
       // Replace, so backing out of the new group lands on the list rather than
       // on the form that just created it.
+      success();
       router.replace(`/split-group?id=${group.id}`);
     } catch (thrown) {
-      setError((thrown as Error).message);
+      warn();
+      setError({ message: (thrown as Error).message, step: 1 });
     }
   };
 
+  const stepError = error && error.step === step ? error.message : null;
+
   return (
-    <Screen showBack avoidKeyboard>
-      <Title className="mt-2">New group</Title>
-      <Subtitle className="mt-3">
-        For the flat, the trip, the thing that keeps going. Everyone in it sees the same running
-        total.
-      </Subtitle>
+    <StepFlow
+      title="New group"
+      steps={2}
+      current={step}
+      onBack={() => {
+        setError(null);
+        if (step === 0) router.back();
+        else setStep(0);
+      }}
+      question={step === 0 ? 'What is the group called?' : 'How should the group settle up?'}
+      primaryLabel={step === 0 ? 'Continue' : createGroup.isPending ? 'Creating…' : 'Create group'}
+      primaryDisabled={step === 0 ? !name.trim() : createGroup.isPending}
+      onPrimary={() => {
+        if (step === 0) {
+          setError(null);
+          setStep(1);
+          return;
+        }
+        void handleCreate();
+      }}
+      error={step === 1 ? stepError : null}
+      avoidKeyboard={step === 0}
+    >
+      {step === 0 ? (
+        <View className="w-full gap-7">
+          {carried.length > 0 ? (
+            <Text
+              className="w-full font-poppins text-[13px] leading-[19px] text-muted"
+              maxFontSizeMultiplier={1.4}
+            >
+              {carried.join(', ')} will be added as names. They can claim their own once they are on
+              Skip.
+            </Text>
+          ) : null}
 
-      {carried.length > 0 ? (
-        <Text
-          className="mt-4 w-full font-poppins text-[13px] leading-[19px] text-muted"
-          maxFontSizeMultiplier={1.4}
-        >
-          {carried.join(', ')} will be added as names. They can claim their own once they are on
-          Skip.
-        </Text>
-      ) : null}
+          <TextField
+            label="Group name"
+            value={name}
+            onChangeText={setName}
+            placeholder="Barcelona, or Flat 3"
+            maxLength={60}
+            autoCapitalize="sentences"
+          />
 
-      <View className="mt-8 w-full">
-        <TextField
-          label="Group name"
-          value={name}
-          onChangeText={setName}
-          placeholder="Barcelona, or Flat 3"
-          maxLength={60}
-          autoCapitalize="sentences"
-        />
-      </View>
+          <View className="w-full">
+            <FieldLabel className="mb-3">Icon</FieldLabel>
+            <GroupIconPicker value={iconId} onChange={setIconId} />
+          </View>
 
-      <View className="mt-7 w-full">
-        <FieldLabel className="mb-3">Icon</FieldLabel>
-        <GroupIconPicker value={iconId} onChange={setIconId} />
-      </View>
+          {stepError ? (
+            <Text
+              className="w-full font-poppins text-[13px] text-danger"
+              maxFontSizeMultiplier={1.4}
+            >
+              {stepError}
+            </Text>
+          ) : null}
+        </View>
+      ) : (
+        <View className="w-full">
+          <View className="w-full flex-row items-center gap-4 rounded-[16px] bg-ink/5 px-4 py-4">
+            <View className="min-w-0 flex-1">
+              <Text
+                className="font-poppins-medium text-[15px] text-ink"
+                maxFontSizeMultiplier={1.3}
+              >
+                Simplify who pays whom
+              </Text>
+              <Text
+                className="mt-1 font-poppins text-[12px] leading-[17px] text-muted"
+                maxFontSizeMultiplier={1.3}
+              >
+                Collapses chains, so three payments become one. It can ask you to pay somebody you
+                never ate with — which is the trade.
+              </Text>
+            </View>
+            <SwitchControl
+              value={simplify}
+              onValueChange={setSimplify}
+              accessibilityLabel="Simplify who pays whom"
+            />
+          </View>
 
-      <View className="mt-7 w-full flex-row items-center gap-4 rounded-[10px] border border-line px-4 py-4">
-        <View className="min-w-0 flex-1">
-          <Text className="font-poppins-medium text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
-            Simplify who pays whom
-          </Text>
           <Text
-            className="mt-1 font-poppins text-[12px] leading-[17px] text-muted"
-            maxFontSizeMultiplier={1.3}
+            className="mt-5 w-full font-poppins text-[13px] leading-[19px] text-muted"
+            maxFontSizeMultiplier={1.4}
           >
-            Collapses chains, so three payments become one. It can ask you to pay somebody you never
-            ate with — which is the trade.
+            For the flat, the trip, the thing that keeps going. Everyone in it sees the same running
+            total.
           </Text>
         </View>
-        <Switch
-          value={simplify}
-          onValueChange={setSimplify}
-          trackColor={{ false: colors.line, true: colors.control }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor={colors.line}
-        />
-      </View>
-
-      {error ? (
-        <Text
-          className="mt-5 w-full font-poppins text-[13px] text-red-600"
-          maxFontSizeMultiplier={1.4}
-        >
-          {error}
-        </Text>
-      ) : null}
-
-      <View className="mt-auto w-full pb-8 pt-10">
-        <Button
-          label={createGroup.isPending ? 'Creating…' : 'Create group'}
-          onPress={handleCreate}
-          disabled={createGroup.isPending}
-        />
-      </View>
-    </Screen>
+      )}
+    </StepFlow>
   );
 }

@@ -13,7 +13,12 @@ import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { amortise, formatTerm } from '@/lib/loan';
+import { amortise, formatTerm, type AccrualBasis } from '@/lib/loan';
+
+/** Only the app's own conventions get through a hand-edited link. */
+const BASES: readonly AccrualBasis[] = ['actual/365', 'actual/360', '30/360', 'monthly'];
+const parseBasis = (value: string | undefined): AccrualBasis =>
+  BASES.find((basis) => basis === value) ?? 'actual/365';
 
 /**
  * Names a calculated loan and files it as a monthly bill.
@@ -39,6 +44,7 @@ function SaveLoanScreenInner() {
     months?: string;
     start?: string;
     funded?: string;
+    basis?: string;
   }>();
 
   const principal = Number(params.amount) || 0;
@@ -46,14 +52,20 @@ function SaveLoanScreenInner() {
   const termMonths = Number(params.months) || 0;
   const firstPaymentOn = params.start ?? '';
   const fundedOn = params.funded ?? '';
+  const basis = parseBasis(params.basis);
 
+  const firstPaymentDate = firstPaymentOn ? new Date(`${firstPaymentOn}T00:00:00`) : new Date();
+  const fundedDate = fundedOn ? new Date(`${fundedOn}T00:00:00`) : undefined;
+
+  // Overpayments are deliberately not carried here: the bill is the contract
+  // payment, which is the figure the lender will actually take.
   const loan = amortise({
     principal,
     annualRatePercent: annualRate,
     months: termMonths,
-    firstPaymentOn: firstPaymentOn ? new Date(`${firstPaymentOn}T00:00:00`) : new Date(),
-    fundedOn: fundedOn ? new Date(`${fundedOn}T00:00:00`) : undefined,
-    basis: 'actual/365',
+    firstPaymentOn: firstPaymentDate,
+    fundedOn: fundedDate,
+    basis,
   });
 
   const [name, setName] = useState('');
@@ -78,7 +90,6 @@ function SaveLoanScreenInner() {
       setError('That loan does not have a payment to save.');
       return;
     }
-
     const chosen = sources.find((source) => source.id === sourceId);
 
     try {
@@ -92,7 +103,11 @@ function SaveLoanScreenInner() {
         totalInterest: loan.totalInterest,
         firstPaymentOn,
         fundedOn: fundedOn || null,
-        dayCountBasis: 'actual/365',
+        // The convention exactly as it was priced above, monthly rests
+        // included — the column holds all four, so nothing is mapped into a
+        // neighbouring basis and no figure moves between this screen and the
+        // schedule the loan is later shown on.
+        dayCountBasis: basis,
         cardId: chosen?.kind === 'card' ? chosen.id : null,
         bankAccountId: chosen?.kind === 'account' ? chosen.id : null,
       });
@@ -105,17 +120,17 @@ function SaveLoanScreenInner() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title className="mt-2">Add to monthly bills</Title>
+      <Title>Add to monthly bills</Title>
       <Subtitle className="mt-3">
         This becomes a monthly bill under Loans, so it counts against what you have left.
       </Subtitle>
 
       {/* What is actually being saved, restated. The calculator's sliders are
           gone by now and the numbers should not have to be remembered. */}
-      <View className="mt-7 w-full rounded-[10px] border border-line px-4 py-3">
+      <View className="mt-6 w-full rounded-[16px] border border-line bg-card px-4 py-3">
         <Row label="Monthly payment" value={formatCurrency(loan.payment)} strong />
         <Row label="Borrowed" value={formatCurrency(principal)} />
-        <Row label="Rate" value={`${annualRate}% APR`} />
+        <Row label="Rate" value={`${annualRate}% a year`} />
         <Row label="Term" value={`${formatTerm(termMonths)} · ${termMonths} payments`} />
         <Row
           label="First payment"
@@ -147,7 +162,7 @@ function SaveLoanScreenInner() {
         ) : null}
 
         {error ? (
-          <Text className="font-poppins text-[13px] text-red-600" maxFontSizeMultiplier={1.4}>
+          <Text className="font-poppins text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
             {error}
           </Text>
         ) : null}
@@ -169,7 +184,7 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
       <Text
         className={
           strong
-            ? 'font-poppins-semibold text-[16px] text-ink'
+            ? 'font-poppins-semibold text-[15px] text-ink'
             : 'font-poppins text-[14px] text-body'
         }
         maxFontSizeMultiplier={1.3}

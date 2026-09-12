@@ -44,7 +44,7 @@ export function DashboardHeader({
         accessibilityRole="button"
         accessibilityLabel="Notifications"
         onPress={onNotificationsPress}
-        className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-ink/5"
+        className="h-11 w-11 items-center justify-center rounded-[12px] active:bg-ink/5"
       >
         <Bell size={22} color={colors.ink} strokeWidth={1.8} />
       </Pressable>

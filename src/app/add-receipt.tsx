@@ -1,8 +1,8 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Calendar, ImageUp, ScanLine, Trash2, Wallet } from 'lucide-react-native';
-import { useState, type ReactNode } from 'react';
+import { ImageUp, ScanLine, Trash2 } from 'lucide-react-native';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { guessCategory, matchBrand, useBrandDirectory, useSpendCategories } from '@/api/brands';
@@ -10,19 +10,22 @@ import { usePro } from '@/api/pro';
 import { useCreateReceipt, useDeleteReceipt, useUpdateReceipt } from '@/api/mutations';
 import { usePaymentSources, useReceipt } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
-import { AmountPad } from '@/components/ui/amount-pad';
-import { Button } from '@/components/ui/button';
-import { DatePicker } from '@/components/ui/date-picker';
+import { AmountStep } from '@/components/flow/amount-step';
+import { InlineCalendar } from '@/components/flow/inline-calendar';
+import { StepFlow } from '@/components/flow/step-flow';
+import { ActionPill } from '@/components/ui/action-pill';
+import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useDialog, useConfirm } from '@/providers/dialog-provider';
-import { SelectField } from '@/components/ui/select-field';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
-import { FieldLabel, Title } from '@/components/ui/typography';
-import { formatFullDate, toIsoDate } from '@/lib/date';
-import { formatCurrency } from '@/lib/format';
+import { FieldLabel } from '@/components/ui/typography';
+import { toIsoDate } from '@/lib/date';
+import { success, warn } from '@/lib/haptics';
 import { parseReceipt, parseReceiptFromLines, type ParsedReceipt } from '@/lib/receipt-parser';
 import { useColors } from '@/providers/theme-provider';
+import { useArtwork } from '@/theme/artwork';
 import {
   captureReceipt,
   isCaptureAvailable,
@@ -126,18 +129,69 @@ function fromScanParams(params: ScanParams): { initial: Initial; result: ScanRes
  * render and fights the user's own edits afterwards.
  */
 export default function AddReceiptScreen() {
-  const colors = useColors();
   const params = useLocalSearchParams<{ id?: string } & ScanParams>();
   const { id } = params;
-  const { data: existing, isLoading } = useReceipt(id);
+  const artwork = useArtwork();
+  const receipt = useReceipt(id);
+  const existing = receipt.data ?? null;
 
-  if (id && isLoading && !existing) {
+  if (id && !existing) {
+    // A read that failed is not a receipt that is gone, and it is certainly
+    // not a new one: silently dropping the id would file a second copy of a
+    // receipt that already exists. So the screen says so and offers the retry.
+    if (receipt.isError) {
+      return (
+        <Screen showBack>
+          <PageState
+            art={artwork.error}
+            title="Could not open this receipt"
+            message="Check your connection and try again. Nothing about it has changed."
+            actionLabel="Try again"
+            onAction={() => {
+              void receipt.refetch();
+            }}
+            secondaryLabel="Go back"
+            onSecondary={() => router.back()}
+          />
+        </Screen>
+      );
+    }
+
+    // The shell with the fields greyed out, never a $0 figure: a placeholder
+    // amount on a receipt that is still loading is a wrong number on screen.
+    if (!receipt.isFetched) {
+      return (
+        <StepFlow
+          title="Edit receipt"
+          steps={3}
+          current={1}
+          onBack={() => router.back()}
+          primaryLabel="Continue"
+          primaryDisabled
+          onPrimary={() => {}}
+        >
+          <View className="w-full gap-6">
+            <Skeleton className="h-14 w-full rounded-[12px]" />
+            <Skeleton className="h-10 w-2/3 rounded-full" />
+            <Skeleton className="h-24 w-full rounded-[12px]" />
+          </View>
+        </StepFlow>
+      );
+    }
+
+    // The lookup ran and came back empty — deleted from another screen, or a
+    // stale link. An update filtered on an id that matches nothing reports
+    // success and writes nothing, so an edit would animate, return to the list
+    // and lose everything typed.
     return (
       <Screen showBack>
-        <Title className="mt-2">Edit receipt</Title>
-        <View className="mt-16 w-full items-center">
-          <ActivityIndicator size="small" color={colors.muted} />
-        </View>
+        <PageState
+          art={artwork.error}
+          title="That receipt is not here"
+          message="It may have been deleted. Nothing has been changed."
+          actionLabel="Go back"
+          onAction={() => router.back()}
+        />
       </Screen>
     );
   }
@@ -189,10 +243,10 @@ function ReceiptForm({
   const [note, setNote] = useState(initial.note);
   const [captureSource, setCaptureSource] = useState(initial.captureSource);
 
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [amountPadOpen, setAmountPadOpen] = useState(false);
+  // Editing opens on the details: a saved receipt is corrected, not re-typed.
+  const [step, setStep] = useState(editing ? 1 : 0);
   const [reading, setReading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; step: number } | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(initialScan);
 
   const { sources } = usePaymentSources();
@@ -323,7 +377,7 @@ function ReceiptForm({
         );
       }
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not open the camera.');
+      setError({ message: (thrown as Error).message ?? 'Could not open the camera.', step: 0 });
     } finally {
       setReading(false);
     }
@@ -338,7 +392,7 @@ function ReceiptForm({
         'upload',
       );
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not read that file.');
+      setError({ message: (thrown as Error).message ?? 'Could not read that file.', step: 0 });
     } finally {
       setReading(false);
     }
@@ -347,7 +401,10 @@ function ReceiptForm({
   const pickPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setError('Allow photo access in Settings to read a receipt from your library.');
+      setError({
+        message: 'Allow photo access in Settings to read a receipt from your library.',
+        step: 0,
+      });
       return;
     }
     const picked = await ImagePicker.launchImageLibraryAsync({
@@ -384,16 +441,23 @@ function ReceiptForm({
     else if (where === 'files') await pickFile();
   };
 
+  /** A check for a field on an earlier step sends you back to that step. */
+  const fail = (message: string, atStep: number) => {
+    warn();
+    setError({ message, step: atStep });
+    setStep(atStep);
+  };
+
   const handleSave = async () => {
     setError(null);
 
     if (!store) {
-      setError('Pick a store first.');
+      fail('Pick a store first.', 1);
       return;
     }
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) {
-      setError('Enter how much you spent.');
+      fail('Enter how much you spent.', 0);
       return;
     }
 
@@ -417,9 +481,11 @@ function ReceiptForm({
       } else {
         await createReceipt.mutateAsync(values);
       }
+      success();
       router.back();
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not save that receipt.');
+      warn();
+      setError({ message: (thrown as Error).message ?? 'Could not save that receipt.', step: 2 });
     }
   };
 
@@ -437,199 +503,169 @@ function ReceiptForm({
       await deleteReceipt.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not delete that receipt.');
+      setError({ message: (thrown as Error).message ?? 'Could not delete that receipt.', step });
     }
   };
 
   const busy = createReceipt.isPending || updateReceipt.isPending;
 
+  const total = Number(amount);
+  const amountReady = Number.isFinite(total) && total > 0;
+  const stepValid = step === 0 ? amountReady : step === 1 ? Boolean(store) : !busy;
+
+  const question = step === 0 ? 'How much did you spend?' : step === 2 ? 'When was it?' : undefined;
+  const primaryLabel =
+    step < 2 ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save receipt';
+  const stepError = error && error.step === step ? error.message : null;
+
   return (
-    <Screen showBack avoidKeyboard>
-      <Title className="mt-2">{editing ? 'Edit receipt' : 'Add receipt'}</Title>
+    <StepFlow
+      title={editing ? 'Edit receipt' : 'Add a receipt'}
+      steps={3}
+      current={step}
+      onBack={() => {
+        setError(null);
+        if (step === 0) router.back();
+        else setStep((current) => current - 1);
+      }}
+      question={question}
+      // Capture sits above the question, not below the fields: reading a paper
+      // receipt fills the amount, the store and the date at once, so it belongs
+      // before the first of them is asked for.
+      headerSlot={
+        step === 0 ? (
+          <View className="w-full gap-2">
+            {!editing && isRecognitionAvailable() ? (
+              <>
+                <View className="w-full flex-row justify-center gap-3">
+                  <ActionPill
+                    icon={ScanLine}
+                    label="Scan"
+                    onPress={handleScan}
+                    disabled={reading}
+                  />
+                  <ActionPill
+                    icon={ImageUp}
+                    label="Upload"
+                    onPress={handleUpload}
+                    disabled={reading}
+                  />
+                </View>
+                <Text
+                  className="w-full text-center font-poppins text-[12px] text-muted"
+                  maxFontSizeMultiplier={1.3}
+                >
+                  Point the camera at a paper receipt, or upload a photo or PDF
+                </Text>
+              </>
+            ) : null}
 
-      {/* Capture comes first: reading a paper receipt is the fast path, and
-          burying it under the fields makes typing look like the only option.
-          Hidden while editing — a saved receipt is corrected, not re-read. */}
-      {!editing && isRecognitionAvailable() ? (
-        <View className="mt-6 w-full gap-2">
-          <View className="w-full flex-row gap-3">
-            <CaptureButton
-              icon={<ScanLine size={18} color={colors.ink} strokeWidth={1.9} />}
-              label="Scan"
-              onPress={handleScan}
-              disabled={reading}
-            />
-            <CaptureButton
-              icon={<ImageUp size={18} color={colors.ink} strokeWidth={1.9} />}
-              label="Upload"
-              onPress={handleUpload}
-              disabled={reading}
-            />
-          </View>
-          <Text
-            className="w-full text-center font-poppins text-[12px] text-muted"
-            maxFontSizeMultiplier={1.3}
-          >
-            Point the camera at a paper receipt, or upload a photo or PDF
-          </Text>
-        </View>
-      ) : null}
+            {reading ? (
+              <View className="mt-2 w-full flex-row items-center justify-center gap-2">
+                <ActivityIndicator size="small" color={colors.muted} />
+                <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+                  Reading the receipt…
+                </Text>
+              </View>
+            ) : null}
 
-      {reading ? (
-        <View className="mt-4 w-full flex-row items-center justify-center gap-2">
-          <ActivityIndicator size="small" color={colors.muted} />
-          <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-            Reading the receipt…
-          </Text>
-        </View>
-      ) : null}
-
-      <View className="mt-8 w-full gap-6">
-        <BrandField label="Store" value={store} onChange={edited(setStore)} />
-
-        <SelectField
-          label="Date"
-          value={formatFullDate(date)}
-          icon={Calendar}
-          onPress={() => setDatePickerOpen(true)}
-        />
-
-        <SelectField
-          label="Amount"
-          value={amount ? formatCurrency(Number(amount)) : ''}
-          placeholder="Enter an amount"
-          icon={Wallet}
-          onPress={() => setAmountPadOpen(true)}
-        />
-
-        {sources.length > 0 ? (
-          <View className="w-full">
-            <FieldLabel className="mb-3">Paid with</FieldLabel>
-            <SourceTiles sources={sources} value={sourceId} onChange={edited(setSourceId)} />
-          </View>
-        ) : null}
-
-        <TextField
-          label="Note"
-          optional
-          value={note}
-          onChangeText={setNote}
-          placeholder="Anything worth remembering"
-          multiline
-          maxLength={200}
-          autoCapitalize="sentences"
-        />
-
-        {scanResult ? (
-          <View className="w-full rounded-[10px] border border-line px-4 py-3">
-            {scanResult.read.length > 0 ? (
-              <Text className="font-poppins text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
-                Read the {listWords(scanResult.read)}.
-              </Text>
-            ) : (
-              <Text className="font-poppins text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
-                Could not read that one.
-              </Text>
-            )}
-            {scanResult.missed.length > 0 ? (
-              <Text
-                className="mt-1 font-poppins text-[13px] text-muted"
-                maxFontSizeMultiplier={1.4}
-              >
-                Check the {listWords(scanResult.missed)} below — it will save either way.
-              </Text>
+            {scanResult ? (
+              <View className="mt-2 w-full rounded-[16px] bg-ink/5 px-4 py-3">
+                {scanResult.read.length > 0 ? (
+                  <Text className="font-poppins text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
+                    Read the {listWords(scanResult.read)}.
+                  </Text>
+                ) : (
+                  <Text className="font-poppins text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
+                    Could not read that one.
+                  </Text>
+                )}
+                {scanResult.missed.length > 0 ? (
+                  <Text
+                    className="mt-1 font-poppins text-[13px] text-muted"
+                    maxFontSizeMultiplier={1.4}
+                  >
+                    Check the {listWords(scanResult.missed)} below — it will save either way.
+                  </Text>
+                ) : null}
+              </View>
             ) : null}
           </View>
-        ) : null}
-
-        {categoryLabel ? (
-          <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-            Filed under {categoryLabel}
-          </Text>
-        ) : null}
-
-        {error ? (
-          <Text className="font-poppins text-[13px] text-red-600" maxFontSizeMultiplier={1.4}>
-            {error}
-          </Text>
-        ) : null}
-      </View>
-
-      <View className="mt-auto w-full gap-3 pt-10">
-        <Button
-          label={busy ? 'Saving…' : editing ? 'Save changes' : 'Save receipt'}
-          onPress={handleSave}
-        />
-        {editing ? (
+        ) : null
+      }
+      primaryLabel={primaryLabel}
+      primaryDisabled={!stepValid}
+      onPrimary={() => {
+        if (step < 2) {
+          setError(null);
+          setStep((current) => current + 1);
+          return;
+        }
+        void handleSave();
+      }}
+      error={step === 1 ? null : stepError}
+      avoidKeyboard={step === 1}
+      footerSlot={
+        editing ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Delete this receipt"
             onPress={handleDelete}
-            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] active:bg-ink/5"
+            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
-            <Trash2 size={17} color="#DC2626" strokeWidth={1.9} />
+            <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
             <Text
-              className="font-poppins-medium text-[15px] text-red-600"
+              className="font-poppins-medium text-[15px] text-danger"
               maxFontSizeMultiplier={1.4}
             >
               {deleteReceipt.isPending ? 'Deleting…' : 'Delete receipt'}
             </Text>
           </Pressable>
-        ) : null}
-      </View>
-
-      {datePickerOpen ? (
-        <DatePicker
-          value={date}
-          onCancel={() => setDatePickerOpen(false)}
-          onConfirm={(next) => {
-            edited(setDate)(next);
-            setDatePickerOpen(false);
-          }}
-        />
-      ) : null}
-
-      {amountPadOpen ? (
-        <AmountPad
-          title="Amount"
-          caption={store ? store.name : 'Receipt total'}
-          value={amount}
-          onCancel={() => setAmountPadOpen(false)}
-          onConfirm={(next) => {
-            edited(setAmount)(next);
-            setAmountPadOpen(false);
-          }}
-        />
-      ) : null}
-    </Screen>
-  );
-}
-
-function CaptureButton({
-  icon,
-  label,
-  onPress,
-  disabled,
-}: {
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      onPress={onPress}
-      disabled={disabled}
-      className="min-h-12 flex-1 flex-row items-center justify-center gap-2 rounded-[10px] border border-line active:bg-ink/5"
-      style={disabled ? { opacity: 0.5 } : undefined}
+        ) : null
+      }
     >
-      {icon}
-      <Text className="font-poppins-medium text-[15px] text-ink" maxFontSizeMultiplier={1.4}>
-        {label}
-      </Text>
-    </Pressable>
+      {step === 0 ? <AmountStep value={amount} onChange={edited(setAmount)} /> : null}
+
+      {step === 1 ? (
+        <View className="w-full gap-6">
+          <BrandField label="Store" value={store} onChange={edited(setStore)} />
+
+          {sources.length > 0 ? (
+            <View className="w-full">
+              <FieldLabel className="mb-3">Paid with</FieldLabel>
+              <SourceTiles sources={sources} value={sourceId} onChange={edited(setSourceId)} />
+            </View>
+          ) : null}
+
+          <TextField
+            label="Note"
+            optional
+            value={note}
+            onChangeText={setNote}
+            placeholder="Anything worth remembering"
+            multiline
+            maxLength={200}
+            autoCapitalize="sentences"
+          />
+
+          {categoryLabel ? (
+            <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+              Filed under {categoryLabel}
+            </Text>
+          ) : null}
+
+          {stepError ? (
+            <Text
+              className="w-full font-poppins text-[13px] text-danger"
+              maxFontSizeMultiplier={1.4}
+            >
+              {stepError}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {step === 2 ? <InlineCalendar value={date} onChange={edited(setDate)} /> : null}
+    </StepFlow>
   );
 }

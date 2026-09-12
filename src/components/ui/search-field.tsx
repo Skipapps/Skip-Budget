@@ -16,7 +16,7 @@ export function SearchField({ value, onChangeText, placeholder, className }: Sea
   return (
     <View
       className={cn(
-        'min-h-12 flex-1 flex-row items-center gap-2 rounded-[10px] border border-line px-3',
+        'min-h-12 flex-1 flex-row items-center gap-2 rounded-[12px] border border-line px-3',
         className,
       )}
     >

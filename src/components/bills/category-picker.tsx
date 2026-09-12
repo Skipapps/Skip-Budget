@@ -40,7 +40,7 @@ export function CategoryPicker({ onSelect, selectedId }: CategoryPickerProps) {
                 selected ? 'bg-control' : 'bg-ink/5',
               )}
             >
-              <Icon width={22} height={22} color={selected ? colors.surface : colors.body} />
+              <Icon width={22} height={22} color={selected ? colors.onControl : colors.body} />
             </View>
 
             <Text

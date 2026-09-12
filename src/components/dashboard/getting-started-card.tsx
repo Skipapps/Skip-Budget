@@ -2,9 +2,9 @@ import { router } from 'expo-router';
 import { Check, ChevronRight, X } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
+import { SectionHeading } from '@/components/ui/typography';
 import { useGettingStarted } from '@/api/onboarding';
 import { useColors } from '@/providers/theme-provider';
-import { shadows } from '@/theme/shadows';
 
 /**
  * Five steps between an empty app and a useful one.
@@ -23,15 +23,10 @@ export function GettingStartedCard() {
   const next = steps.find((step) => !step.done);
 
   return (
-    <View
-      style={shadows.card}
-      className="mt-6 w-full rounded-[14px] border border-line bg-card p-5"
-    >
+    <View className="mt-6 w-full rounded-[16px] border border-line bg-card p-5">
       <View className="w-full flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">
-          <Text className="font-poppins-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
-            Getting started
-          </Text>
+          <SectionHeading>Getting started</SectionHeading>
           <Text className="mt-0.5 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
             {doneCount} of {steps.length} done
           </Text>
@@ -78,10 +73,10 @@ export function GettingStartedCard() {
                 className={
                   step.done
                     ? 'h-6 w-6 items-center justify-center rounded-full bg-accent'
-                    : 'border-line-strong h-6 w-6 items-center justify-center rounded-full border'
+                    : 'h-6 w-6 items-center justify-center rounded-full border border-line'
                 }
               >
-                {step.done ? <Check size={14} color={colors.onControl} strokeWidth={3} /> : null}
+                {step.done ? <Check size={14} color={colors.onControl} strokeWidth={1.8} /> : null}
               </View>
 
               <View className="min-w-0 flex-1">

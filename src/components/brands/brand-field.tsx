@@ -116,7 +116,7 @@ export function BrandField({
       <View
         className={cn(
           'min-h-14 w-full flex-row items-center rounded-[10px] border px-5',
-          error ? 'border-red-500' : focused ? 'border-control' : 'border-line',
+          error ? 'border-danger' : focused ? 'border-control' : 'border-line',
         )}
       >
         <TextInput
@@ -198,7 +198,7 @@ export function BrandField({
 
       {error ? (
         <Text
-          className="ml-5 mt-1.5 font-poppins text-[13px] text-red-600"
+          className="ml-5 mt-1.5 font-poppins text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {error}

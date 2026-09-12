@@ -169,9 +169,7 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
 export default function FaqScreen() {
   return (
     <Screen showBack>
-      <Title align="left" className="mt-2">
-        Common questions
-      </Title>
+      <Title align="left">Common questions</Title>
       <Subtitle className="mt-3 w-full text-left">
         Short answers to the things people ask. If yours is not here, message us — a person reads
         every one.

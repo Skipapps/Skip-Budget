@@ -44,7 +44,7 @@ function AppearanceScreenInner() {
 
   return (
     <Screen showBack>
-      <Title align="left" className="mt-1 w-full">
+      <Title align="left" className="w-full">
         Appearance
       </Title>
 
@@ -61,7 +61,7 @@ function AppearanceScreenInner() {
               accessibilityLabel={`${option.label}. ${option.caption}`}
               onPress={() => setMode(option.id as ModeKey)}
               className={cn(
-                'mb-2.5 w-full flex-row items-center gap-3.5 rounded-[16px] border px-4 py-3.5',
+                'mb-3 w-full flex-row items-center gap-3 rounded-[16px] border px-4 py-3.5',
                 selected ? 'border-accent bg-accent/10' : 'border-line bg-card active:bg-ink/5',
               )}
             >
@@ -141,7 +141,8 @@ function AppearanceScreenInner() {
               setAccent(chosen);
               setDraft(null);
             }}
-            className="mt-1 self-end rounded-full bg-control px-6 py-3 active:bg-control-pressed"
+            hitSlop={{ top: 4, bottom: 4 }}
+            className="mt-1 min-h-10 items-center justify-center self-end rounded-full bg-control px-4 active:bg-control-pressed"
           >
             <Text
               className="font-poppins-medium text-[14px] text-on-control"

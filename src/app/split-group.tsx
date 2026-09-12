@@ -103,7 +103,8 @@ function SplitGroupScreenInner() {
       // Only expenses count towards a day's total. A settlement is money
       // moving between two people who are both already in the group.
       amountOf: (entry) => (entry.kind === 'expense' ? -Math.abs(entry.expense.amount) : 0),
-      direction: 'desc',
+      // Oldest day first, today last — the house rule for every dated list.
+      direction: 'asc',
     });
   }, [expenses, settlements]);
 
@@ -112,7 +113,7 @@ function SplitGroupScreenInner() {
   if (isLoading) {
     return (
       <Screen showBack>
-        <Title className="mt-2">Group</Title>
+        <Title>Group</Title>
         <SkeletonList rows={5} />
       </Screen>
     );
@@ -138,7 +139,9 @@ function SplitGroupScreenInner() {
         <View className="min-w-0 flex-1 flex-row items-center gap-3">
           <GroupIcon iconId={group.icon_id} groupId={group.id} size={22} />
           <View className="min-w-0 flex-1">
-            <Title align="left">{group.name}</Title>
+            <Title flush align="left">
+              {group.name}
+            </Title>
             <Subtitle className="mt-1">
               {members.length} {members.length === 1 ? 'person' : 'people'}
             </Subtitle>
@@ -155,7 +158,7 @@ function SplitGroupScreenInner() {
       </View>
 
       {/* Where you stand, said in words rather than left to a minus sign. */}
-      <View className="mt-6 w-full items-center rounded-[10px] border border-line bg-card px-5 py-6">
+      <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           {settled ? 'Nothing outstanding' : myBalance > 0 ? 'You are owed' : 'You owe'}
         </Text>

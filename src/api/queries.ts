@@ -13,6 +13,7 @@ import {
 } from '@/lib/card-ledger';
 import { withTimeout } from '@/lib/deadline';
 import { paydaysInRange } from '@/lib/date';
+import type { AccrualBasis } from '@/lib/loan';
 import type { DateRange } from '@/lib/range';
 import { supabase } from '@/lib/supabase';
 import { usePro } from '@/api/pro';
@@ -94,6 +95,25 @@ export type DashboardRow = {
  * because nothing went wrong.
  */
 const QUERY_TIMEOUT_MS = 12_000;
+
+/**
+ * Whether any read behind a derived figure failed.
+ *
+ * The hooks below combine several queries into one number — a balance, a
+ * running total, a month's spending — and every one of them needs the same
+ * answer: if any input is missing, the figure is not the truth and the screen
+ * must say so rather than show it.
+ *
+ * One helper instead of a hand-written boolean chain per hook, because the
+ * chains are exactly where the omissions hid. `useLedger` listed three of its
+ * five queries, so a failed *charges* read fell back to a bill's **projected**
+ * amount in place of the one actually taken, with no error anywhere — a
+ * statement figure quietly replaced by a plan figure. Adding a query to one of
+ * these hooks now means adding it to one list, not remembering four.
+ */
+function anyError(queries: readonly { isError: boolean }[]): boolean {
+  return queries.some((query) => query.isError);
+}
 
 function useOwnerQuery<T>(key: string, run: () => Promise<T>) {
   const userId = useUserId();
@@ -278,7 +298,17 @@ export function useSalaryAccountIds() {
     [query.data],
   );
 
-  return { ids, isLoading: query.isLoading };
+  // `isError` is additive on purpose: every caller today destructures `ids`
+  // (and one of them `isLoading`), and those keep their meaning. Without the
+  // flag a failed read is indistinguishable from "no salary lands here", so
+  // the payday reminder simply disappears from the screen instead of the
+  // screen saying it could not be loaded.
+  return {
+    ids,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
+  };
 }
 
 export type PaymentSourceRow = {
@@ -687,7 +717,22 @@ export function useSourceLedger(sourceId: string | undefined, today: string) {
       subscriptions.isLoading ||
       payments.isLoading ||
       charges.isLoading,
-    isError: cards.isError || accounts.isError || payments.isError,
+    // Every list the ledger is built from, not just the three that name the
+    // source: a failed receipts, bills, subscriptions or charges read leaves
+    // rows out of a running balance that still renders as if it were complete.
+    isError: anyError([cards, accounts, receipts, bills, subscriptions, payments, charges]),
+    // The screen has an error state and had no way to leave it. Each query
+    // keeps its own retry, so this is the whole set rather than the one that
+    // happened to fail.
+    refetch: () => {
+      cards.refetch();
+      accounts.refetch();
+      receipts.refetch();
+      bills.refetch();
+      subscriptions.refetch();
+      payments.refetch();
+      charges.refetch();
+    },
   };
 }
 
@@ -740,13 +785,21 @@ export function useSourceBalances(today: string) {
 
   return {
     balances,
-    /** Charges land as their dates arrive, so a stale list shows stale money. */
-    isSettled:
-      !receipts.isLoading &&
-      !bills.isLoading &&
-      !subscriptions.isLoading &&
-      !payments.isLoading &&
-      !charges.isLoading,
+    // `isSettled` used to be here, computed from five loading flags and read
+    // by nothing in the tree since the day it was written. Deleted rather than
+    // wired: whether a card should show a stale balance with a warning or a
+    // page-level error is a design call, and a flag sitting unread looks
+    // load-bearing to the next person to open this file. Consumers that want
+    // loading already have it from useCards/useBankAccounts directly.
+    /**
+     * A balance is only as good as the lists it was walked from.
+     *
+     * Consumers read `balances.get(id) ?? card.balance`, so without this a
+     * failed read presents the figure typed when the card was added as the
+     * live balance — the one number on that screen a person would check
+     * against their bank.
+     */
+    isError: anyError([cards, accounts, receipts, bills, subscriptions, payments, charges]),
     refetch: () => {
       cards.refetch();
       accounts.refetch();
@@ -963,7 +1016,11 @@ export function useLedger(range: DateRange | undefined, today: string) {
       bills.isLoading ||
       salary.isLoading ||
       charges.isLoading,
-    isError: receipts.isError || subscriptions.isError || bills.isError,
+    // Salary and charges included, which they were not: income missing makes
+    // a net figure wrong, and a failed charges read substitutes the projected
+    // plan amount for the recorded one — a bill charged $61.40 showing its
+    // scheduled $59.99 with nothing to say the figure is a guess.
+    isError: anyError([receipts, subscriptions, bills, salary, charges]),
     refetch: () => {
       receipts.refetch();
       subscriptions.refetch();
@@ -985,7 +1042,13 @@ export type LoanRow = {
   first_payment_on: string | null;
   /** When interest started running — sets the length of the opening period. */
   funded_on: string | null;
-  day_count_basis: 'actual/365' | 'actual/360' | '30/360';
+  /**
+   * The convention the lender charges under, including 'monthly' rests — see
+   * `AccrualBasis` in `lib/loan.ts`. Widened by
+   * `20260912100002_monthly_rests.sql`; rows written before it can only hold
+   * the three day counts.
+   */
+  day_count_basis: AccrualBasis;
   /** A balance read off a statement, and the date it was true. */
   statement_on: string | null;
   statement_principal: number | null;

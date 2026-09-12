@@ -15,6 +15,12 @@ type SelectFieldProps = {
   /** When set, the icon becomes its own control instead of part of the row. */
   onIconPress?: () => void;
   iconAccessibilityLabel?: string;
+  /**
+   * `field` is the bordered box that matches a TextField. `pill` is the tonal
+   * round-ended one used inside the stepped add flows — correct there because
+   * a select always opens something, which is exactly what a pill promises.
+   */
+  variant?: 'field' | 'pill';
   className?: string;
 };
 
@@ -30,9 +36,12 @@ export function SelectField({
   icon: Icon,
   onIconPress,
   iconAccessibilityLabel,
+  variant = 'field',
   className,
 }: SelectFieldProps) {
   const colors = useColors();
+  const pill = variant === 'pill';
+
   return (
     <View className={cn('w-full', className)}>
       <FieldLabel className="mb-2">{label}</FieldLabel>
@@ -41,7 +50,12 @@ export function SelectField({
         accessibilityRole="button"
         accessibilityLabel={`${label}. ${value || placeholder || 'Not set'}`}
         onPress={onPress}
-        className="min-h-14 w-full flex-row items-center justify-between rounded-[10px] border border-line px-5 active:bg-ink/5"
+        className={cn(
+          'min-h-14 w-full flex-row items-center justify-between px-5',
+          pill
+            ? 'rounded-full bg-ink/5 active:bg-ink/10'
+            : 'rounded-[12px] border border-line active:bg-ink/5',
+        )}
       >
         <Text
           className={cn('flex-1 py-4 font-poppins text-[16px]', value ? 'text-ink' : 'text-muted')}
@@ -58,7 +72,10 @@ export function SelectField({
               accessibilityLabel={iconAccessibilityLabel ?? label}
               hitSlop={10}
               onPress={onIconPress}
-              className="-mr-1 h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/10"
+              className={cn(
+                '-mr-1 h-10 w-10 items-center justify-center active:bg-ink/10',
+                pill ? 'rounded-full' : 'rounded-[12px]',
+              )}
             >
               <Icon size={20} color={colors.ink} strokeWidth={1.8} />
             </Pressable>

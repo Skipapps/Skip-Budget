@@ -1,17 +1,15 @@
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronRight, TrendingUp } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
-import { useArtwork } from '@/theme/artwork';
 import { useColors } from '@/providers/theme-provider';
-import { shadows } from '@/theme/shadows';
 
 type InsightBannerProps = {
   onPress?: () => void;
 };
 
 /**
- * Full-width dashboard banner. Deliberately carries no figure — the spending
- * tiles above already report numbers, and this points at the story behind them.
+ * Full-width dashboard row. Deliberately carries no figure — the list above
+ * already reports numbers, and this points at the story behind them.
  *
  * Only dresses itself as a link when it has somewhere to go. A chevron and a
  * button role on a banner that does nothing is a promise the screen cannot
@@ -19,7 +17,6 @@ type InsightBannerProps = {
  * and then swallows the tap. Without a destination it is simply a card.
  */
 export function InsightBanner({ onPress }: InsightBannerProps) {
-  const artwork = useArtwork();
   const colors = useColors();
   const Container = onPress ? Pressable : View;
 
@@ -32,27 +29,28 @@ export function InsightBanner({ onPress }: InsightBannerProps) {
             onPress,
           }
         : {})}
-      style={shadows.raised}
-      className={`w-full flex-row items-center gap-3 overflow-hidden rounded-[16px] bg-card p-4 ${
-        onPress ? 'active:opacity-80' : ''
+      className={`w-full flex-row items-center gap-3 overflow-hidden rounded-[16px] border border-line bg-card px-4 py-3.5 ${
+        onPress ? 'active:opacity-60' : ''
       }`}
     >
-      {/* Same restraint as the tiles above it. Left at full strength this
-          would become the loudest thing on the dashboard by default. */}
-      <View className="h-[76px] w-[76px] shrink-0 opacity-55">
-        <artwork.insights width="100%" height="100%" />
+      {/* A 76pt drawing at 55% opacity was the biggest thing on the dashboard
+          and said nothing the two lines beside it did not. The glyph is the
+          same size as every other leading mark on the screen, so this reads as
+          a row in the same list rather than an advert wedged between two. */}
+      <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-ink/5">
+        <TrendingUp size={20} color={colors.body} strokeWidth={1.8} />
       </View>
 
       <View className="min-w-0 flex-1">
         <Text
-          className="font-poppins-semibold text-[17px] text-ink"
+          className="font-poppins-medium text-[15px] text-ink"
           numberOfLines={1}
-          maxFontSizeMultiplier={1.3}
+          maxFontSizeMultiplier={1.4}
         >
           Insights
         </Text>
         <Text
-          className="mt-1 font-poppins text-[13px] leading-[18px] text-muted"
+          className="mt-0.5 font-poppins text-[12px] leading-[17px] text-muted"
           numberOfLines={2}
           maxFontSizeMultiplier={1.3}
         >

@@ -7,13 +7,16 @@ import { useAdjustSavingsMonth, useExcludeSavingsMonth } from '@/api/mutations';
 import { useMonthlySavings } from '@/api/queries';
 import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
+import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SelectField } from '@/components/ui/select-field';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TextField } from '@/components/ui/text-field';
 import { Subtitle, Title } from '@/components/ui/typography';
 import { formatCurrency } from '@/lib/format';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
+import { useArtwork } from '@/theme/artwork';
 
 function monthName(month: string): string {
   return new Date(`${month}T00:00:00`).toLocaleDateString(undefined, {
@@ -34,34 +37,82 @@ function monthName(month: string): string {
  * being replaced by it. Somebody coming back in six months needs to see both
  * to know why the two differ.
  */
+type SavingsMonthRow = NonNullable<ReturnType<typeof useMonthlySavings>['data']>[number];
+
+/**
+ * Waits for the month before the form exists, then seeds it by remount.
+ *
+ * The correction and the note are `useState` initial values, and an initial
+ * value is read once. Reached on a cold cache — a deep link, or a cold start
+ * onto this route — the row lands a moment after the first render, so without
+ * the key a month that already carries a correction opens with an empty
+ * amount, and saving it would write that emptiness back over the figure.
+ *
+ * The three answers are kept apart for the same reason: "that month is not on
+ * your savings" is a fact about the account, and answering a still-running or
+ * failed read with it tells somebody their record is gone when it is not.
+ */
 export default function SavingsMonthScreen() {
-  const colors = useColors();
-  const confirm = useConfirm();
+  const artwork = useArtwork();
   const { month } = useLocalSearchParams<{ month?: string }>();
 
-  const { data: months = [] } = useMonthlySavings();
-  const row = months.find((entry) => entry.month === month);
+  const months = useMonthlySavings();
+  const row = (months.data ?? []).find((entry) => entry.month === month);
+
+  if (months.isLoading) {
+    return (
+      <Screen showBack>
+        <View className="mt-2 w-full gap-4" accessibilityLabel="Loading">
+          <Skeleton className="h-8 w-2/3 rounded-[12px]" />
+          <Skeleton className="h-5 w-full" />
+          <Skeleton className="mt-2 h-28 w-full rounded-[16px]" />
+          <Skeleton className="h-14 w-full rounded-[12px]" />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (months.isError) {
+    return (
+      <Screen showBack>
+        <PageState
+          art={artwork.error}
+          title="Could not load that month"
+          message="Check your connection and try again. Nothing has been lost — the figure and any note you saved are still there."
+          actionLabel="Try again"
+          onAction={() => void months.refetch()}
+        />
+      </Screen>
+    );
+  }
+
+  if (!row || !month) {
+    return (
+      <Screen showBack>
+        <Title>Month</Title>
+        <Subtitle className="mt-3">That month is not on your savings.</Subtitle>
+      </Screen>
+    );
+  }
+
+  return <SavingsMonthForm key={row.month} month={month} row={row} />;
+}
+
+function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow }) {
+  const colors = useColors();
+  const confirm = useConfirm();
 
   const [amount, setAmount] = useState(
-    row?.adjusted_saved !== null && row?.adjusted_saved !== undefined
+    row.adjusted_saved !== null && row.adjusted_saved !== undefined
       ? String(row.adjusted_saved)
       : '',
   );
-  const [note, setNote] = useState(row?.note ?? '');
+  const [note, setNote] = useState(row.note ?? '');
   const [padOpen, setPadOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const adjust = useAdjustSavingsMonth();
   const exclude = useExcludeSavingsMonth();
-
-  if (!row || !month) {
-    return (
-      <Screen showBack>
-        <Title className="mt-2">Month</Title>
-        <Subtitle className="mt-3">That month is not on your savings.</Subtitle>
-      </Screen>
-    );
-  }
 
   const computed = Number(row.saved);
   const excluded = Boolean(row.excluded_at);
@@ -117,9 +168,7 @@ export default function SavingsMonthScreen() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title align="left" className="mt-2">
-        {monthName(month)}
-      </Title>
+      <Title align="left">{monthName(month)}</Title>
       <Subtitle className="mt-3">
         Skip only knows what it was told. If something was paid in cash or never scanned, put the
         real figure here.
@@ -127,7 +176,7 @@ export default function SavingsMonthScreen() {
 
       {/* What the app worked out, kept visible. A correction that replaced this
           would leave nothing to explain the difference later. */}
-      <View className="mt-7 w-full rounded-[10px] border border-line bg-card px-5 py-4">
+      <View className="mt-6 w-full rounded-[16px] border border-line bg-card px-5 py-4">
         <Text className="font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
           What Skip worked out
         </Text>
@@ -146,7 +195,7 @@ export default function SavingsMonthScreen() {
         </Text>
       </View>
 
-      <View className="mt-7 w-full gap-6">
+      <View className="mt-6 w-full gap-6">
         <SelectField
           label="What it really left"
           value={amount.trim() === '' ? '' : formatCurrency(Number(amount))}
@@ -168,7 +217,7 @@ export default function SavingsMonthScreen() {
 
       {error ? (
         <Text
-          className="mt-5 w-full font-poppins text-[13px] text-red-600"
+          className="mt-5 w-full font-poppins text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {error}
@@ -187,9 +236,9 @@ export default function SavingsMonthScreen() {
             accessibilityRole="button"
             accessibilityLabel="Put this month back on Skip’s own figure"
             onPress={handleReset}
-            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] border border-line active:bg-ink/5"
+            className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full bg-ink/5 active:bg-ink/10"
           >
-            <RotateCcw size={16} color={colors.ink} strokeWidth={1.9} />
+            <RotateCcw size={18} color={colors.ink} strokeWidth={1.8} />
             <Text
               className="font-poppins-medium text-[14px] text-ink"
               numberOfLines={1}
@@ -206,13 +255,13 @@ export default function SavingsMonthScreen() {
             excluded ? 'Count this month again' : 'Leave this month out of your savings'
           }
           onPress={handleExclude}
-          className="min-h-12 w-full items-center justify-center rounded-[10px] active:bg-ink/5"
+          className="min-h-12 w-full items-center justify-center rounded-full active:bg-ink/5"
         >
           <Text
             className={
               excluded
                 ? 'font-poppins-medium text-[14px] text-ink'
-                : 'font-poppins-medium text-[14px] text-red-600'
+                : 'font-poppins-medium text-[14px] text-danger'
             }
             numberOfLines={1}
             maxFontSizeMultiplier={1.4}

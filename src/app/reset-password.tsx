@@ -42,7 +42,7 @@ export default function ResetPasswordScreen() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title className="mt-4">Set a new password</Title>
+      <Title>Set a new password</Title>
       <Subtitle className="mt-3">Choose a password you have not used before.</Subtitle>
 
       <View className="mt-8 w-full gap-5">

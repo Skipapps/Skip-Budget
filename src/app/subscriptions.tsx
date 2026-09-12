@@ -17,7 +17,6 @@ import { formatCurrency } from '@/lib/format';
 import { groupByDate } from '@/lib/group';
 import { rangeFor, type RangeKey } from '@/lib/range';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
-import { shadows } from '@/theme/shadows';
 
 /**
  * What the subscriptions have actually cost, over a window you choose.
@@ -48,16 +47,27 @@ export default function SubscriptionsScreen() {
   );
   const total = charges.reduce((sum, entry) => sum + entry.amount, 0);
 
+  // Oldest day first, today last — stated rather than inherited, so a reader
+  // does not have to know what `groupByDate` defaults to.
   const groups = useMemo(
-    () => groupByDate(charges, (entry) => entry.date, { amountOf: (e) => e.amount }),
+    () =>
+      groupByDate(charges, (entry) => entry.date, {
+        amountOf: (e) => e.amount,
+        direction: 'asc',
+      }),
     [charges],
   );
 
   const planCount = plans.data?.length ?? 0;
 
   return (
-    <Screen showBack onRefresh={refetch}>
-      <Title align="left" className="mt-1 w-full">
+    <Screen
+      showBack
+      onRefresh={refetch}
+      // Oldest charge first, so the most recent is at the bottom — open there.
+      startAtEnd={!isLoading && !isError && charges.length > 0}
+    >
+      <Title align="left" className="w-full">
         Subscriptions
       </Title>
 
@@ -138,7 +148,7 @@ export default function SubscriptionsScreen() {
               <DateGroupHeader date={group.date} today={today} total={group.total} />
               {group.items.map((entry, index) => (
                 <Fragment key={entry.id}>
-                  {index > 0 ? <View className="ml-13 h-px bg-line/60" /> : null}
+                  {index > 0 ? <View className="ml-[52px] h-px bg-line/60" /> : null}
                   <TransactionRow
                     label={entry.label}
                     amount={entry.amount}
@@ -172,12 +182,11 @@ function Tile({ icon: Icon, title, caption, onPress, showChevron }: TileProps) {
       accessibilityRole="button"
       accessibilityLabel={`${title}. ${caption}.`}
       onPress={onPress}
-      style={shadows.raised}
-      className="flex-1 rounded-[16px] bg-card p-4 active:opacity-70"
+      className="flex-1 rounded-[16px] border border-line bg-card p-4 active:opacity-70"
     >
       <View className="w-full flex-row items-center justify-between gap-2">
         <View className="h-9 w-9 items-center justify-center rounded-full bg-ink/5">
-          <Icon size={18} color={colors.ink} strokeWidth={2} />
+          <Icon size={18} color={colors.ink} strokeWidth={1.8} />
         </View>
         {showChevron ? <ChevronRight size={18} color={colors.muted} strokeWidth={2} /> : null}
       </View>

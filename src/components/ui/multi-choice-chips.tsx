@@ -1,7 +1,9 @@
 import { Check } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
+import { selection } from '@/lib/haptics';
 import { cn } from '@/lib/cn';
+import { useColors } from '@/providers/theme-provider';
 
 type ChoiceOption<T extends string> = {
   value: T;
@@ -23,7 +25,9 @@ export function MultiChoiceChips<T extends string>({
   onChange,
   emptyHint,
 }: MultiChoiceChipsProps<T>) {
+  const colors = useColors();
   const toggle = (value: T) => {
+    selection();
     onChange(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
   };
 
@@ -35,18 +39,21 @@ export function MultiChoiceChips<T extends string>({
           return (
             <Pressable
               key={option.value}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
+              accessibilityRole="checkbox"
+              accessibilityLabel={option.label}
+              accessibilityState={{ checked: selected, selected }}
+              hitSlop={{ top: 4, bottom: 4 }}
               onPress={() => toggle(option.value)}
               className={cn(
-                'flex-row items-center gap-1.5 rounded-full border px-4 py-2.5',
-                selected ? 'border-control bg-control' : 'border-line bg-card active:bg-ink/5',
+                'min-h-10 flex-row items-center gap-1.5 rounded-full px-4',
+                selected ? 'bg-control' : 'bg-ink/5 active:bg-ink/10',
               )}
             >
-              {selected ? <Check size={14} color="#FFFFFF" strokeWidth={3} /> : null}
+              {/* The chip's own foreground, matching the label next to it. */}
+              {selected ? <Check size={16} color={colors.onControl} strokeWidth={1.8} /> : null}
               <Text
                 className={cn(
-                  'text-[13px]',
+                  'text-[14px]',
                   selected ? 'font-poppins-medium text-on-control' : 'font-poppins text-body',
                 )}
                 maxFontSizeMultiplier={1.2}

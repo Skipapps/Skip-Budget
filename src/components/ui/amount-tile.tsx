@@ -11,7 +11,6 @@ import type { SvgProps } from 'react-native-svg';
 
 import { cn } from '@/lib/cn';
 import { formatCurrency } from '@/lib/format';
-import { shadows } from '@/theme/shadows';
 
 type AmountTileProps = {
   label: string;
@@ -81,9 +80,9 @@ export function AmountTile({
       className="w-full"
     >
       <Animated.View
-        style={[shadows.raised, surface]}
+        style={surface}
         className={cn(
-          'aspect-square w-full items-center justify-center rounded-[16px] bg-card p-3.5',
+          'aspect-square w-full items-center justify-center rounded-[16px] border border-line bg-card p-3.5',
           // Someone who has asked for less motion still gets an answer to their
           // finger, just a static one.
           reduced && onPress ? 'active:opacity-70' : null,

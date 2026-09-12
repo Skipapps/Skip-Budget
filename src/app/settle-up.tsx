@@ -14,8 +14,10 @@ import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useProGate } from '@/components/pro/pro-gate';
+import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SelectField } from '@/components/ui/select-field';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TextField } from '@/components/ui/text-field';
 import { Subtitle, Title } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
@@ -23,6 +25,7 @@ import { formatCurrency } from '@/lib/format';
 import { simplifyDebts } from '@/lib/split';
 import { useUserId } from '@/providers/session-provider';
 import { useColors } from '@/providers/theme-provider';
+import { useArtwork } from '@/theme/artwork';
 
 /**
  * Writing down that a debt was paid.
@@ -41,14 +44,85 @@ export default function SettleUpScreen() {
   return <SettleUpScreenInner />;
 }
 
+type MemberRecord = NonNullable<ReturnType<typeof useGroupMembers>['data']>[number];
+type BalanceRecord = NonNullable<ReturnType<typeof useGroupBalances>['data']>[number];
+
+/**
+ * Waits for the group before the form exists, then seeds it by remount.
+ *
+ * Who paid, who was paid and how much are all `useState` initial values taken
+ * from the suggestion, and an initial value is read once. On a cold cache the
+ * balances land after the first render, so without the key this screen opens
+ * blank — losing the suggested payment, which is the only reason it exists,
+ * and leaving somebody to pick two names and retype a figure the app already
+ * knew. The key is the group rather than the suggestion: a later refetch must
+ * not remount the form and wipe what has been typed over it.
+ */
 function SettleUpScreenInner() {
-  const colors = useColors();
-  const userId = useUserId();
+  const artwork = useArtwork();
   const { group: groupId } = useLocalSearchParams<{ group?: string }>();
 
-  const { data: group } = useGroup(groupId);
-  const { data: members = [] } = useGroupMembers(groupId);
-  const { data: balances = [] } = useGroupBalances(groupId);
+  const group = useGroup(groupId);
+  const members = useGroupMembers(groupId);
+  const balances = useGroupBalances(groupId);
+
+  if (group.isLoading || members.isLoading || balances.isLoading) {
+    return (
+      <Screen showBack>
+        <Title>Settle up</Title>
+        <View className="mt-7 w-full gap-6" accessibilityLabel="Loading">
+          <Skeleton className="h-12 w-full rounded-full" />
+          <Skeleton className="h-14 w-full rounded-[12px]" />
+          <Skeleton className="h-14 w-full rounded-[12px]" />
+        </View>
+      </Screen>
+    );
+  }
+
+  // A failed read is not an empty group. Guessing past it would offer a
+  // payment between two people it could not name, for an amount nobody owes.
+  if (group.isError || members.isError || balances.isError) {
+    return (
+      <Screen showBack>
+        <PageState
+          art={artwork.error}
+          title="Could not open this group"
+          message="Check your connection and try again. Nothing has been recorded."
+          actionLabel="Try again"
+          onAction={() => {
+            void group.refetch();
+            void members.refetch();
+            void balances.refetch();
+          }}
+        />
+      </Screen>
+    );
+  }
+
+  return (
+    <SettleUpForm
+      key={groupId ?? 'none'}
+      groupId={groupId}
+      groupName={group.data?.name ?? null}
+      members={members.data ?? []}
+      balances={balances.data ?? []}
+    />
+  );
+}
+
+function SettleUpForm({
+  groupId,
+  groupName,
+  members,
+  balances,
+}: {
+  groupId?: string;
+  groupName: string | null;
+  members: MemberRecord[];
+  balances: BalanceRecord[];
+}) {
+  const colors = useColors();
+  const userId = useUserId();
 
   const me = members.find((member) => member.id && member.user_id === userId);
 
@@ -108,7 +182,7 @@ function SettleUpScreenInner() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title className="mt-2">Settle up</Title>
+      <Title>Settle up</Title>
       <Subtitle className="mt-3">
         Records a payment that happened somewhere else — cash, a bank transfer, a round of drinks.
         Skip does not move any money.
@@ -119,7 +193,7 @@ function SettleUpScreenInner() {
           accessibilityRole="button"
           accessibilityLabel={`Who paid: ${memberName(members.find((m) => m.id === fromMember))}`}
           onPress={() => setPicking(picking === 'from' ? null : 'from')}
-          className="min-h-12 min-w-0 flex-1 items-center justify-center rounded-[10px] border border-line px-3 active:bg-ink/5"
+          className="min-h-12 min-w-0 flex-1 items-center justify-center rounded-full bg-ink/5 px-3 active:bg-ink/10"
         >
           <Text
             className="font-poppins-medium text-[14px] text-ink"
@@ -136,7 +210,7 @@ function SettleUpScreenInner() {
           accessibilityRole="button"
           accessibilityLabel={`Who was paid: ${memberName(members.find((m) => m.id === toMember))}`}
           onPress={() => setPicking(picking === 'to' ? null : 'to')}
-          className="min-h-12 min-w-0 flex-1 items-center justify-center rounded-[10px] border border-line px-3 active:bg-ink/5"
+          className="min-h-12 min-w-0 flex-1 items-center justify-center rounded-full bg-ink/5 px-3 active:bg-ink/10"
         >
           <Text
             className="font-poppins-medium text-[14px] text-ink"
@@ -149,7 +223,7 @@ function SettleUpScreenInner() {
       </View>
 
       {picking ? (
-        <View className="mt-3 w-full rounded-[10px] border border-line">
+        <View className="mt-3 w-full overflow-hidden rounded-[16px] bg-ink/5">
           {members.map((member) => {
             const chosen = picking === 'from' ? fromMember : toMember;
             return (
@@ -206,7 +280,7 @@ function SettleUpScreenInner() {
 
       {error ? (
         <Text
-          className="mt-5 w-full font-poppins text-[13px] text-red-600"
+          className="mt-5 w-full font-poppins text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {error}
@@ -223,7 +297,7 @@ function SettleUpScreenInner() {
           className="mt-4 w-full text-center font-poppins text-[12px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
-          Everyone in {group?.name ?? 'the group'} will see this.
+          Everyone in {groupName ?? 'the group'} will see this.
         </Text>
       </View>
 

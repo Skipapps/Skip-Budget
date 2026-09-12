@@ -52,7 +52,7 @@ export default function LoginScreen() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title className="mt-4">Log in</Title>
+      <Title>Log in</Title>
       <Subtitle className="mt-3">Welcome back. Pick up where you left off.</Subtitle>
 
       <View className="mt-8 w-full gap-5">

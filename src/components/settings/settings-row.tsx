@@ -1,8 +1,8 @@
 import { ChevronRight, type LucideIcon } from 'lucide-react-native';
 import type { ReactNode } from 'react';
-import { Pressable, Switch, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { toggle as toggleFeedback } from '@/lib/haptics';
+import { SwitchControl } from '@/components/ui/switch-control';
 import { withTap } from '@/lib/press';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
@@ -41,18 +41,27 @@ export function SettingsRow({
   last = false,
 }: SettingsRowProps) {
   const colors = useColors();
-  const tint = destructive ? '#DC2626' : colors.body;
+  const tint = destructive ? colors.danger : colors.body;
   const isInteractive = Boolean(onPress) && !toggle;
 
   const body = (
     <View className="w-full flex-row items-center gap-3 py-3.5">
-      {artwork ?? <Icon size={20} color={tint} strokeWidth={1.8} />}
+      {/* A 40pt leading slot either way, so every row's text starts on the
+          same column and the divider below can be inset to meet it. Glyphs get
+          the tonal well; someone else's mark brings its own shape. */}
+      {artwork ? (
+        <View className="h-10 w-10 items-center justify-center">{artwork}</View>
+      ) : (
+        <View className="h-10 w-10 items-center justify-center rounded-[12px] bg-ink/5">
+          <Icon size={20} color={tint} strokeWidth={1.8} />
+        </View>
+      )}
 
       <View className="min-w-0 flex-1">
         <Text
           className={cn(
             'font-poppins-medium text-[15px]',
-            destructive ? 'text-[#DC2626]' : 'text-ink',
+            destructive ? 'text-danger' : 'text-ink',
           )}
           numberOfLines={1}
           maxFontSizeMultiplier={1.4}
@@ -71,17 +80,10 @@ export function SettingsRow({
       </View>
 
       {toggle ? (
-        <Switch
+        <SwitchControl
           value={toggle.value}
-          // A switch is a press too, and a firmer one: it changed something
-          // rather than opening something.
-          onValueChange={(next) => {
-            toggleFeedback();
-            toggle.onChange(next);
-          }}
-          trackColor={{ false: colors.line, true: colors.control }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor={colors.line}
+          onValueChange={toggle.onChange}
+          accessibilityLabel={subtitle ? `${title}. ${subtitle}` : title}
         />
       ) : value ? (
         <Text className="font-poppins text-[14px] text-muted" maxFontSizeMultiplier={1.3}>
@@ -108,8 +110,9 @@ export function SettingsRow({
         body
       )}
 
-      {/* Inset to line up under the text, not the icon. */}
-      {last ? null : <View className="ml-8 h-px bg-line/70" />}
+      {/* Inset to line up under the text, not the icon — the same 52pt every
+          other list in the app insets to. */}
+      {last ? null : <View className="ml-[52px] h-px bg-line/60" />}
     </View>
   );
 }

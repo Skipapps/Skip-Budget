@@ -13,15 +13,18 @@ import { cn } from '@/lib/cn';
 import { tap, warn } from '@/lib/haptics';
 import { moveBy, orderByIds } from '@/lib/order';
 import { useColors } from '@/providers/theme-provider';
-import { useArtwork } from '@/theme/artwork';
+import {
+  DESTINATION_FALLBACK_ICON,
+  DESTINATION_ICONS,
+} from '@/components/dashboard/destination-list';
 
 /**
  * Arranging the five tiles under "Where it goes".
  *
  * Which one you want first is personal — somebody carrying one large loan and
  * no subscriptions wants the opposite arrangement to somebody living off
- * streaming services — and the dashboard shows them in a row you scroll, so
- * the order decides what is visible without scrolling at all.
+ * streaming services — and the first row is what the eye lands on when the
+ * dashboard opens.
  *
  * Moved a step at a time rather than dragged. Five rows is short enough that
  * two taps beats a long press and a hold, it works for anyone who cannot hold
@@ -30,7 +33,6 @@ import { useArtwork } from '@/theme/artwork';
  */
 export default function TilesScreen() {
   const colors = useColors();
-  const artwork = useArtwork();
   const profile = useProfile();
   const updateProfile = useUpdateProfile();
 
@@ -68,26 +70,30 @@ export default function TilesScreen() {
 
   return (
     <Screen showBack>
-      <Title align="left" className="mt-1 w-full">
-        Dashboard tiles
+      <Title align="left" className="w-full">
+        Dashboard order
       </Title>
       <Subtitle className="mt-2 w-full text-left">
-        The order they appear in under “Where it goes”. The first two are the ones you see without
-        scrolling.
+        The order they appear in under “Where it goes” on your dashboard.
       </Subtitle>
 
       <View className="mt-6 w-full">
         {tiles.map((tile, index) => (
           <View
             key={tile.id}
-            className="mb-2.5 w-full flex-row items-center gap-3 rounded-[16px] border border-line bg-card px-3.5 py-3"
+            className="mb-3 w-full flex-row items-center gap-3 rounded-[16px] border border-line bg-card px-4 py-3.5"
           >
-            <View className="h-11 w-11 opacity-55">
-              {(() => {
-                const Art = artwork[tile.artwork];
-                return <Art width="100%" height="100%" />;
-              })()}
-            </View>
+            {/* The same glyph the dashboard row carries. A shortcut that
+                changes its picture depending on which screen you arrange it
+                from is a different shortcut as far as the eye is concerned. */}
+            {(() => {
+              const Icon = DESTINATION_ICONS[tile.id] ?? DESTINATION_FALLBACK_ICON;
+              return (
+                <View className="h-10 w-10 items-center justify-center rounded-[12px] bg-ink/5">
+                  <Icon size={20} color={colors.body} strokeWidth={1.8} />
+                </View>
+              );
+            })()}
 
             <Text
               className="flex-1 font-poppins-medium text-[15px] text-ink"
@@ -126,10 +132,10 @@ export default function TilesScreen() {
             tap();
             setDraft([...spendingCategories]);
           }}
-          className="mt-1 flex-row items-center gap-2 self-start rounded-full border border-line px-3.5 py-2 active:bg-ink/5"
+          className="mt-1 min-h-10 flex-row items-center gap-2 self-start rounded-full bg-ink/5 px-4 active:bg-ink/10"
         >
-          <RotateCcw size={14} color={colors.muted} strokeWidth={2} />
-          <Text className="font-poppins-medium text-[13px] text-body" maxFontSizeMultiplier={1.2}>
+          <RotateCcw size={18} color={colors.ink} strokeWidth={1.8} />
+          <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
             Original order
           </Text>
         </Pressable>
@@ -166,7 +172,7 @@ function Step({ direction, disabled, label, onPress }: StepProps) {
       onPress={onPress}
       hitSlop={4}
       className={cn(
-        'h-9 w-9 items-center justify-center rounded-[10px] border border-line',
+        'h-9 w-9 items-center justify-center rounded-[12px] border border-line',
         disabled ? 'opacity-30' : 'active:bg-ink/5',
       )}
     >

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+
+import { SectionHeading } from '@/components/ui/typography';
 
 type SettingsSectionProps = {
   title: string;
@@ -9,9 +11,7 @@ type SettingsSectionProps = {
 export function SettingsSection({ title, children }: SettingsSectionProps) {
   return (
     <View className="mt-8 w-full">
-      <Text className="font-poppins-bold text-[20px] text-ink" maxFontSizeMultiplier={1.3}>
-        {title}
-      </Text>
+      <SectionHeading>{title}</SectionHeading>
       <View className="mt-2 w-full">{children}</View>
     </View>
   );

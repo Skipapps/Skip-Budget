@@ -1,39 +1,50 @@
-import { Crown } from 'lucide-react-native';
+import {
+  Camera,
+  Calculator,
+  ChartColumn,
+  Check,
+  CreditCard,
+  Crown,
+  Palette,
+  Users,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 
 import { usePro, useProPrices, usePurchasePro, purchasesAvailable } from '@/api/pro';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
+import { TextLink } from '@/components/ui/text-link';
 import { Title } from '@/components/ui/typography';
 import { PRO_MONTHLY_LABEL, PRO_YEARLY_LABEL } from '@/lib/wall';
 import { router } from 'expo-router';
 import { useColors } from '@/providers/theme-provider';
 
-const FEATURES: { emoji: string; title: string; hint: string }[] = [
+const FEATURES: { icon: LucideIcon; title: string; hint: string }[] = [
   {
-    emoji: '💳',
+    icon: CreditCard,
     title: 'Unlimited cards, accounts & incomes',
     hint: 'Track every card and account you actually have',
   },
   {
-    emoji: '📷',
+    icon: Camera,
     title: 'Unlimited receipt scanning',
     hint: 'Point, tap, filed — read on your phone, never uploaded',
   },
   {
-    emoji: '🧮',
+    icon: Calculator,
     title: 'Loan calculator, to the cent',
     hint: 'Daily interest, the way your bank actually charges',
   },
   {
-    emoji: '👥',
+    icon: Users,
     title: 'Split manager',
     hint: 'Groups, friends, who-owes-who — settled without an app in the middle',
   },
-  { emoji: '📊', title: 'Insights', hint: 'Your whole money picture on one page' },
+  { icon: ChartColumn, title: 'Insights', hint: 'Your whole money picture on one page' },
   {
-    emoji: '🎨',
+    icon: Palette,
     title: 'Themes, early features, first-in-line support',
     hint: 'Make Skip yours, and get the new things first',
   },
@@ -59,6 +70,24 @@ export default function ProScreen() {
   const [message, setMessage] = useState<string | null>(null);
 
   const canBuy = purchasesAvailable() && Boolean(prices.data?.yearly || prices.data?.monthly);
+
+  /**
+   * What to say when there is nothing to buy, in the user's terms.
+   *
+   * Three different causes — no billing in this build, a store we could not
+   * reach, a store with no products yet — and each one has a different thing
+   * for the reader to do about it. The store's own error text is none of
+   * those, so it does not appear here.
+   */
+  const storeNote = !purchasesAvailable()
+    ? 'Purchases are not open in this version yet. Everything on this page is coming shortly.'
+    : !canBuy && prices.isFetched
+      ? prices.error
+        ? 'We could not reach the App Store. Check your connection and tap Check again.'
+        : 'The App Store returned no plans for this app yet. Freshly readied products can take a few hours to reach the sandbox — check again shortly.'
+      : null;
+
+  const devNote = prices.error ? (prices.error as Error).message : (prices.data?.debug ?? null);
   const yearlyPrice = prices.data?.yearly?.product.priceString ?? PRO_YEARLY_LABEL;
   const monthlyPrice = prices.data?.monthly?.product.priceString ?? PRO_MONTHLY_LABEL;
   const trial = prices.data?.trialText ?? null;
@@ -99,7 +128,9 @@ export default function ProScreen() {
           <View className="h-16 w-16 items-center justify-center rounded-full bg-accent">
             <Crown size={28} color={colors.onControl} strokeWidth={2} />
           </View>
-          <Title className="mt-5">You have Skip Pro</Title>
+          <Title flush className="mt-5">
+            You have Skip Pro
+          </Title>
           <Text
             className="mt-3 max-w-[300px] text-center font-poppins text-[14px] leading-[21px] text-muted"
             maxFontSizeMultiplier={1.4}
@@ -121,9 +152,7 @@ export default function ProScreen() {
 
   return (
     <Screen showBack>
-      <Title align="left" className="mt-2">
-        Skip Pro
-      </Title>
+      <Title align="left">Skip Pro</Title>
       <Text className="mt-2 w-full font-poppins text-[14px] text-muted" maxFontSizeMultiplier={1.4}>
         Everything Skip can do, for less than a coffee a month.
       </Text>
@@ -132,11 +161,14 @@ export default function ProScreen() {
         {FEATURES.map((feature) => (
           <View
             key={feature.title}
-            className="w-full flex-row items-center gap-3 rounded-[14px] border border-line bg-card px-4 py-3"
+            className="w-full flex-row items-center gap-3 rounded-[16px] border border-line bg-card px-4 py-3"
           >
-            <Text allowFontScaling={false} style={{ fontSize: 20 }}>
-              {feature.emoji}
-            </Text>
+            {/* A tonal well rather than an emoji: six different emoji fonts in
+                a column read as six different weights, and none of them take
+                the theme. */}
+            <View className="h-10 w-10 items-center justify-center rounded-[12px] bg-ink/5">
+              <feature.icon size={20} color={colors.body} strokeWidth={1.8} />
+            </View>
             <View className="min-w-0 flex-1">
               <Text
                 className="font-poppins-semibold text-[13.5px] text-ink"
@@ -151,7 +183,7 @@ export default function ProScreen() {
                 {feature.hint}
               </Text>
             </View>
-            <Text className="font-poppins-bold text-[15px] text-accent-ink">✓</Text>
+            <Check size={18} color={colors.accentInk} strokeWidth={2} />
           </View>
         ))}
       </View>
@@ -186,16 +218,26 @@ export default function ProScreen() {
       ) : null}
 
       {/* When the store gives nothing, say why — a mute disabled button turns
-          every cause into the same mystery. */}
-      {!canBuy && prices.isFetched ? (
+          every cause into the same mystery. What it never says is what the
+          store literally said: a RevenueCat exception is not a sentence anyone
+          can act on, and it is not what a paying customer should be reading. */}
+      {storeNote ? (
         <Text
           className="mt-4 w-full text-center font-poppins text-[12px] leading-[17px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
-          {prices.error
-            ? `The store said: ${(prices.error as Error).message}`
-            : 'The App Store returned no plans for this app yet. Freshly readied products can take a few hours to reach the sandbox — check again shortly.'}
-          {prices.data?.debug ? `\n\n[${prices.data.debug}]` : ''}
+          {storeNote}
+        </Text>
+      ) : null}
+
+      {/* The raw store reason, kept for whoever is wiring billing, and only
+          ever on a development build. */}
+      {__DEV__ && devNote ? (
+        <Text
+          className="mt-2 w-full text-center font-poppins text-[10px] leading-[14px] text-muted"
+          maxFontSizeMultiplier={1.2}
+        >
+          {devNote}
         </Text>
       ) : null}
 
@@ -215,10 +257,23 @@ export default function ProScreen() {
           onPress={canBuy ? handleContinue : () => void prices.refetch()}
           disabled={busy || prices.isFetching}
         />
-        <View className="w-full flex-row items-center justify-center gap-4 pt-1">
-          <FooterLink label="Restore purchases" onPress={handleRestore} />
-          <FooterLink label="Terms" onPress={() => router.push('/terms')} />
-          <FooterLink label="Privacy" onPress={() => router.push('/privacy')} />
+        {/* Text links, never pills: a pill next to the purchase button reads
+            as a second thing to buy. Restore keeps its own tap target — the
+            App Store expects it to be findable without hunting. */}
+        <View className="w-full flex-row flex-wrap items-center justify-center gap-5">
+          <TextLink label="Restore purchases" variant="subtle" onPress={handleRestore} />
+          <TextLink
+            label="Terms"
+            variant="subtle"
+            underline
+            onPress={() => router.push('/terms')}
+          />
+          <TextLink
+            label="Privacy"
+            variant="subtle"
+            underline
+            onPress={() => router.push('/privacy')}
+          />
         </View>
         <Text
           className="mt-1 w-full text-center font-poppins text-[10.5px] leading-[15px] text-muted"
@@ -255,8 +310,8 @@ function PriceCard({
       onPress={onPress}
       className={
         selected
-          ? 'w-full rounded-[14px] border-2 border-control bg-card px-4 py-3.5'
-          : 'w-full rounded-[14px] border border-line bg-card px-4 py-3.5 active:bg-ink/5'
+          ? 'w-full rounded-[16px] border-2 border-control bg-card px-4 py-3.5'
+          : 'w-full rounded-[16px] border border-line bg-card px-4 py-3.5 active:bg-ink/5'
       }
     >
       {badge ? (
@@ -279,16 +334,6 @@ function PriceCard({
       </View>
       <Text className="mt-0.5 font-poppins text-[11.5px] text-muted" maxFontSizeMultiplier={1.3}>
         {hint}
-      </Text>
-    </Pressable>
-  );
-}
-
-function FooterLink({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={8}>
-      <Text className="font-poppins text-[12px] text-muted underline" maxFontSizeMultiplier={1.4}>
-        {label}
       </Text>
     </Pressable>
   );

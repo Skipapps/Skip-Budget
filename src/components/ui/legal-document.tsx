@@ -34,7 +34,7 @@ type LegalDocumentProps = {
 export function LegalDocument({ title, updated, summary, sections }: LegalDocumentProps) {
   return (
     <Screen showBack>
-      <Title align="left" className="mt-1 w-full">
+      <Title align="left" className="w-full">
         {title}
       </Title>
 

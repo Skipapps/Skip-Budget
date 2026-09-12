@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import type { AccrualBasis } from '@/lib/loan';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
@@ -14,6 +15,29 @@ import { useUserId } from '@/providers/session-provider';
  * Updates and deletes filter on id alone — RLS refuses to touch a row owned by
  * anyone else, so repeating the owner check here would be noise.
  */
+
+/**
+ * What an edit to a *record* says when its filter matched no row.
+ *
+ * A bill, a receipt, a subscription, a group: things that live in a list and
+ * that another device can delete while this edit is open. That is nearly
+ * always the cause, so the message names it and points at the one action that
+ * helps — re-opening the list, which re-reads it.
+ */
+export const NOTHING_UPDATED =
+  'That is no longer there — it may have been deleted on another device. Open the list again.';
+
+/**
+ * What a *setting* says when its filter matched no row.
+ *
+ * Profiles and the receipts reminder are not list rows: there is exactly one
+ * per account and nobody deleted it on another device, so NOTHING_UPDATED's
+ * explanation would be a guess and its advice would point at a list that does
+ * not exist. If that update touched nothing, something is wrong that the
+ * person at the screen cannot diagnose, so the message says only what is true
+ * and what to try.
+ */
+export const NOTHING_SAVED = 'Skip could not save that. Close this and open it again.';
 
 /** Tables whose totals feed the dashboard, so a write there refreshes it too. */
 const AFFECTS_DASHBOARD = new Set([
@@ -71,22 +95,55 @@ function useCreate<TInput extends Record<string, unknown>>(table: string) {
   });
 }
 
+/**
+ * An update that cannot succeed quietly.
+ *
+ * PostgREST answers an update whose filter matches nothing with 204 and no
+ * error, so without the `select` below a save against a row that has been
+ * deleted — or that RLS will not show this account — resolves happily: the
+ * screen buzzes, the flow pops, and nothing was written. Every edit screen in
+ * the app goes through this helper, so that hole was every edit screen's.
+ *
+ * `select('id')` makes the response carry the rows it touched, and an empty
+ * array is then an error the user can act on rather than a silent no-op. Only
+ * the id is asked for: the caller already has the values it sent, and reading
+ * anything wider would be a second round trip's worth of columns for nothing.
+ */
 function useUpdate<TInput extends Record<string, unknown>>(table: string) {
   const invalidate = useInvalidate();
 
   return useMutation({
     mutationFn: async ({ id, values }: { id: string; values: TInput }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from(table)
         .update(values as never)
-        .eq('id', id);
+        .eq('id', id)
+        .select('id');
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error(NOTHING_UPDATED);
       return { id };
     },
     onSuccess: () => invalidate(table),
   });
 }
 
+/**
+ * A delete that is deliberately allowed to match nothing.
+ *
+ * `useUpdate` asks for the touched rows back because an update that wrote
+ * nothing has left the user's intent unfulfilled. A delete has not: the row
+ * the person asked to be rid of is not there, which is exactly the state they
+ * were after. Raising NOTHING_UPDATED here would put an error in front of
+ * somebody whose only mistake was deleting the same thing twice — most often
+ * a double tap, or a row already removed on another device — and the list
+ * re-read that follows would show the same absence either way.
+ *
+ * The case this gives up is a delete RLS refuses, which also answers 204 with
+ * no error. No screen can reach one: every delete in the app is dispatched
+ * from a row the same account just read, and the one owner-only table,
+ * `groups`, is archived through `useArchiveGroup` rather than deleted. If a
+ * shared table ever becomes directly deletable, this is the helper to revisit.
+ */
 function useRemove(table: string) {
   const invalidate = useInvalidate();
 
@@ -138,11 +195,16 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: async (values: ProfileValues) => {
       if (!userId) throw new Error('Sign in first.');
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .update(values as never)
-        .eq('id', userId);
+        .eq('id', userId)
+        .select('id');
       if (error) throw error;
+      // Same trap as useUpdate: a profile row that is missing takes this
+      // update with a 204 and no error, and the setting appears to save. The
+      // wording differs because the cause does — see NOTHING_SAVED.
+      if (!data || data.length === 0) throw new Error(NOTHING_SAVED);
       return values;
     },
     onSuccess: () => invalidate('profile'),
@@ -343,7 +405,13 @@ export type SaveLoanValues = {
   firstPaymentOn: string;
   /** When interest starts running. Null lets the server assume a month. */
   fundedOn: string | null;
-  dayCountBasis: 'actual/365' | 'actual/360' | '30/360';
+  /**
+   * The convention the lender charges under, 'monthly' rests included. The
+   * column accepts it from `20260912100002_monthly_rests.sql` onwards; against
+   * an older database the check constraint rejects it, which is the loud
+   * failure we want rather than a loan filed under the wrong convention.
+   */
+  dayCountBasis: AccrualBasis;
   cardId: string | null;
   bankAccountId: string | null;
 };

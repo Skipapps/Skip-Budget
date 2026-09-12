@@ -1,20 +1,34 @@
 /**
  * Amortisation maths for fixed-rate, fixed-term loans.
  *
- * Two things separate this from the textbook formula, and both are why a real
- * lender's statement disagrees with a naive calculator:
+ * The aim is a schedule that matches the lender's own statement to the cent,
+ * not one that matches a textbook. Four things separate the two:
  *
- * 1. Interest accrues DAILY on the outstanding principal, not in twelfths of a
- *    year. A 31-day period costs more than a 28-day one — on a $30k balance at
- *    8.14% that is a $23 swing between February and March, every year.
- * 2. The gap between the money landing and the first payment is rarely one
- *    month. Fund on 30 Nov and pay first on 14 Jan and the opening period is 45
- *    days, so payment one carries half again the interest of payment two.
+ * 1. **The convention is a choice, not a constant.** A US auto or personal
+ *    lender accrues DAILY, so a 31-day period costs more than a 28-day one —
+ *    on a $30k balance at 8.14% that is a $23 swing between February and March,
+ *    every year. A mortgage servicer or a UK personal lender charges MONTHLY
+ *    RESTS, one twelfth of the rate, and February costs the same as March. Both
+ *    are mainstream and neither is a rounding of the other, so both are here
+ *    (`AccrualBasis`), along with 30/360 and actual/360.
+ * 2. **The gap between the money landing and the first payment is rarely one
+ *    month.** Fund on 30 Nov and pay first on 14 Jan and the opening period is
+ *    45 days, so payment one carries half again the interest of payment two.
+ * 3. **Cents are posted, not carried.** Balances are integer cents and interest
+ *    is rounded to the cent the moment it posts — once per period, however many
+ *    pieces the period was accrued in — which is what a servicer does, so
+ *    nothing drifts over 360 payments. Half goes up; see `@/lib/money`.
+ * 4. **The last payment is not the same as the others.** Three hundred and
+ *    sixty roundings have to land somewhere, and a lender puts them on the
+ *    final payment so the balance closes at exactly zero.
  *
- * Balances are carried as integer cents. Interest is the only place a division
- * happens, and it is rounded to the cent the moment it posts — which is what a
- * servicer does — so nothing drifts over 72 payments.
+ * Overpayments (`Prepayment`) ride on top of all of that, and `comparePrepayment`
+ * is what turns them into the two figures a borrower actually wants: the
+ * interest avoided and the months removed from the end. The Reg Z APR lives
+ * next door in `@/lib/apr`, because it is a disclosure rather than a schedule.
  */
+
+import { fromCents, roundMoney, toCents } from '@/lib/money';
 
 // --- Day counts -------------------------------------------------------------
 
@@ -28,11 +42,35 @@
  */
 export type DayCountBasis = 'actual/365' | 'actual/360' | '30/360';
 
+/**
+ * Everything the engine can price, including the one convention that is not a
+ * day count at all.
+ *
+ * 'monthly' is monthly rests: the period rate is the nominal annual rate over
+ * twelve, applied whole, exactly as the textbook annuity formula assumes and
+ * exactly how a US mortgage servicer and a UK personal lender post interest.
+ * February costs the same as March. It is the mainstream convention — it is
+ * what every rate table, every comparison site and most statements use — so it
+ * is offered alongside the daily ones rather than hidden behind them.
+ *
+ * The only place it can disagree with '30/360' is an odd first period: 'monthly'
+ * charges the leftover days as simple daily interest on actual/365 (the "per
+ * diem" or "odd days interest" a lender collects at closing), while '30/360'
+ * counts them as thirtieths of a month. Over whole months the two are
+ * arithmetically identical — 30 days ÷ 360 is one twelfth — which is why a
+ * whole-month 'monthly' loan can be stored as '30/360' without moving a cent.
+ */
+export type AccrualBasis = DayCountBasis | 'monthly';
+
 const DAYS_IN_YEAR: Record<DayCountBasis, number> = {
   'actual/365': 365,
   'actual/360': 360,
   '30/360': 360,
 };
+
+/** How to count days under a convention that is not itself a day count. */
+const dayCountOf = (basis: AccrualBasis): DayCountBasis =>
+  basis === 'monthly' ? 'actual/365' : basis;
 
 const MS_PER_DAY = 86_400_000;
 
@@ -54,11 +92,97 @@ export function daysBetween(from: Date, to: Date, basis: DayCountBasis = 'actual
   );
 }
 
-// --- Money ------------------------------------------------------------------
+/**
+ * The same day of the month, some months away, without drifting.
+ *
+ * The day is set last and clamped to the length of the target month, so 31 Jan
+ * plus one month is 28 Feb and not 3 March — and because the clamp is applied
+ * to the ORIGINAL day each time rather than to the running one, 31 Jan plus two
+ * months is 31 March again. Walking a date forward a month at a time is the bug
+ * this exists to avoid: one February drags every later payment to the 28th and
+ * never lets go.
+ */
+export function addMonths(date: Date, months: number): Date {
+  const moved = new Date(date);
+  moved.setDate(1);
+  moved.setMonth(date.getMonth() + months);
+  const lastOfMonth = new Date(moved.getFullYear(), moved.getMonth() + 1, 0).getDate();
+  moved.setDate(Math.min(date.getDate(), lastOfMonth));
+  return moved;
+}
 
-const round2 = (value: number) => Math.round(value * 100) / 100;
-const toCents = (value: number) => Math.round(value * 100);
-const fromCents = (cents: number) => cents / 100;
+/**
+ * A span as whole months plus leftover days — the shape a monthly-rest lender
+ * bills in, and the shape Reg Z's Appendix J discounts in.
+ *
+ * The months are counted first and the days are what is left over, so funding
+ * on 30 Nov with a first payment on 14 Jan is one month and fifteen days, not
+ * forty-five days of nothing in particular.
+ */
+export function monthsAndDaysBetween(from: Date, to: Date): { months: number; days: number } {
+  if (utcDay(to) <= utcDay(from)) return { months: 0, days: 0 };
+
+  let months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+  if (months < 0) months = 0;
+  // The month arithmetic above can overshoot by one whenever the day of month
+  // of `to` is earlier than the day of month of `from`.
+  while (months > 0 && utcDay(addMonths(from, months)) > utcDay(to)) months -= 1;
+
+  return { months, days: daysBetween(addMonths(from, months), to) };
+}
+
+/**
+ * The fraction for one SCHEDULED period of a loan.
+ *
+ * Identical to `interestFraction` everywhere except monthly rests, where a
+ * scheduled period is one rest by definition — whatever the calendar did to the
+ * due dates. It has to be: a 30th-of-the-month loan runs 28 Feb → 30 Mar, which
+ * is a month and two days by any honest count, and billing those two days would
+ * charge thirteen rests a year on a twelve-rest loan. The odd days of the
+ * OPENING period are real and are still charged, because that gap is a genuine
+ * stub the borrower holds the money through.
+ */
+function scheduledFraction(
+  from: Date,
+  to: Date,
+  annualRatePercent: number,
+  basis: AccrualBasis,
+  opening: boolean,
+): number {
+  if (basis === 'monthly' && !opening) {
+    return annualRatePercent > 0 ? annualRatePercent / 100 / 12 : 0;
+  }
+  return interestFraction(from, to, annualRatePercent, basis);
+}
+
+/**
+ * The share of a year's interest a balance earns between two dates.
+ *
+ * One function for all four conventions, because it is the only place they
+ * actually differ — everything downstream is the same arithmetic. Returned
+ * unrounded: this is a rate, not a posting, and the rounding belongs at the
+ * moment the interest hits the account.
+ */
+export function interestFraction(
+  from: Date,
+  to: Date,
+  annualRatePercent: number,
+  basis: AccrualBasis = 'actual/365',
+): number {
+  if (annualRatePercent <= 0) return 0;
+  const rate = annualRatePercent / 100;
+
+  if (basis === 'monthly') {
+    const { months, days } = monthsAndDaysBetween(from, to);
+    // Whole months at the monthly rest, the stub at the per diem rate.
+    return (months * rate) / 12 + (days * rate) / DAYS_IN_YEAR['actual/365'];
+  }
+
+  const days = daysBetween(from, to, basis);
+  return days <= 0 ? 0 : (days * rate) / DAYS_IN_YEAR[basis];
+}
+
+// --- Money ------------------------------------------------------------------
 
 /**
  * Interest earned on a balance over a span of days.
@@ -74,7 +198,7 @@ export function accruedInterest(
   basis: DayCountBasis = 'actual/365',
 ): number {
   if (balance <= 0 || days <= 0 || annualRatePercent <= 0) return 0;
-  return round2((balance * (annualRatePercent / 100) * days) / DAYS_IN_YEAR[basis]);
+  return roundMoney((balance * (annualRatePercent / 100) * days) / DAYS_IN_YEAR[basis]);
 }
 
 // --- Terms ------------------------------------------------------------------
@@ -91,7 +215,7 @@ export type LoanTerms = {
    * hypothetical loan rather than tracking a real one.
    */
   fundedOn?: Date;
-  basis?: DayCountBasis;
+  basis?: AccrualBasis;
   /**
    * The lender's actual payment, when you know it from a statement.
    *
@@ -112,6 +236,29 @@ export type LoanTerms = {
    * only the reconstructed past as an estimate.
    */
   statement?: { on: Date; principal: number };
+  /** Anything paid above the contract payment. */
+  extra?: Prepayment;
+};
+
+/** A one-off overpayment: an amount, and the day it lands. */
+export type LumpSum = {
+  on: Date;
+  amount: number;
+};
+
+/**
+ * Money paid on top of the contract payment, all of it against principal.
+ *
+ * Two shapes cover almost every real case: rounding the payment up every month,
+ * and throwing a bonus or a tax refund at the balance once. Both shorten the
+ * term rather than the payment — which is what a lender does unless the
+ * borrower asks for a formal re-amortisation.
+ */
+export type Prepayment = {
+  /** Added to every scheduled payment. */
+  monthly?: number;
+  /** One-off amounts on given dates. */
+  lumpSums?: readonly LumpSum[];
 };
 
 /** The month before the first payment, used when no funding date is known. */
@@ -148,9 +295,13 @@ export type ScheduleRow = {
   date: string;
   /** Days this payment covers — the reason its interest differs from the last. */
   days: number;
+  /** Everything paid on this date: the contract payment plus any overpayment. */
   payment: number;
   interest: number;
+  /** Everything that came off the balance, overpayments included. */
   principal: number;
+  /** The part of `principal` that was paid above the contract payment. */
+  extra: number;
   /** What is still owed after this payment. */
   balance: number;
   /** True for rows reconstructed from origination, before any statement anchor. */
@@ -167,16 +318,49 @@ export type Amortisation = {
   totalInterest: number;
   /** Interest as a share of everything paid, 0–1. */
   interestShare: number;
-  basis: DayCountBasis;
+  basis: AccrualBasis;
   fundedOn: Date;
+  /** yyyy-mm-dd of the last payment, which overpayments can bring forward. */
+  payoffOn: string | null;
 };
 
-/** Walks the schedule at a fixed payment. The engine everything else sits on. */
+/**
+ * Walks the schedule at a fixed payment. The engine everything else sits on.
+ *
+ * The order inside a period is the order a servicer posts in, and it is not
+ * arbitrary:
+ *
+ * 1. A lump sum credits on the day it arrives (daily-accrual conventions only —
+ *    see below), so the rest of the period accrues on the smaller balance.
+ * 2. Interest for the period posts, rounded to the cent once. One posting, one
+ *    rounding: splitting a period at a lump sum does not mean rounding twice,
+ *    because the statement still shows a single interest line.
+ * 3. The contract payment covers that interest first; what is left reduces
+ *    principal. This is why a payment that is smaller than the interest never
+ *    touches the balance.
+ * 4. Any recurring overpayment comes off the principal after that.
+ *
+ * Under 'monthly' rests a mid-period credit does not accrue differently,
+ * because the convention has no notion of a day — the rest is the rest. So for
+ * that basis a lump sum applies at the due date of the period it falls in,
+ * which is what a lender billing on monthly rests actually does.
+ *
+ * Every figure is carried as integer cents, and the balance is never allowed
+ * below zero: a payment that would overshoot is trimmed to what is owed.
+ */
 function runSchedule(terms: LoanTerms, payment: number) {
   const basis = terms.basis ?? 'actual/365';
   const funded = terms.fundedOn ?? impliedFunding(terms.firstPaymentOn);
   const dates = paymentDates(terms.firstPaymentOn, terms.months);
   const paymentCents = toCents(payment);
+  const monthlyExtraCents = Math.max(0, toCents(terms.extra?.monthly ?? 0));
+
+  // Daily conventions credit on the day; periodic rests credit at the rest.
+  const creditsOnTheDay = basis !== 'monthly';
+  const lumpSums = (terms.extra?.lumpSums ?? [])
+    .map((lump) => ({ on: lump.on, cents: Math.max(0, toCents(lump.amount)) }))
+    .filter((lump) => lump.cents > 0)
+    .sort((a, b) => utcDay(a.on) - utcDay(b.on));
 
   // The last payment on or before the stated date is where the real balance
   // takes over from the reconstructed one.
@@ -191,19 +375,63 @@ function runSchedule(terms: LoanTerms, payment: number) {
 
   for (let index = 0; index < dates.length; index += 1) {
     const due = dates[index];
-    const days = daysBetween(previous, due, basis);
-    const interestCents = toCents(
-      accruedInterest(fromCents(balanceCents), terms.annualRatePercent, days, basis),
+    const days = daysBetween(previous, due, dayCountOf(basis));
+
+    // A lump sum dated before the money even landed is honoured at funding
+    // rather than dropped, so a mistyped date cannot silently cost nothing.
+    const inPeriod = lumpSums.filter((lump) =>
+      index === 0
+        ? utcDay(lump.on) <= utcDay(due)
+        : utcDay(lump.on) > utcDay(previous) && utcDay(lump.on) <= utcDay(due),
     );
+
+    let creditedCents = 0;
+    let interest = 0;
+    let cursor = previous;
+    let split = false;
+
+    if (creditsOnTheDay) {
+      for (const lump of inPeriod) {
+        const at = utcDay(lump.on) < utcDay(previous) ? previous : lump.on;
+        interest +=
+          fromCents(balanceCents) * interestFraction(cursor, at, terms.annualRatePercent, basis);
+        const applied = Math.min(lump.cents, balanceCents);
+        balanceCents -= applied;
+        creditedCents += applied;
+        cursor = at;
+        split = true;
+      }
+    }
+
+    // An unsplit period is one scheduled period and is charged as one; the tail
+    // of a split period is a span of days like any other.
+    interest +=
+      fromCents(balanceCents) *
+      (split
+        ? interestFraction(cursor, due, terms.annualRatePercent, basis)
+        : scheduledFraction(previous, due, terms.annualRatePercent, basis, index === 0));
+    const interestCents = toCents(interest);
+
+    if (!creditsOnTheDay) {
+      for (const lump of inPeriod) {
+        const applied = Math.min(lump.cents, balanceCents);
+        balanceCents -= applied;
+        creditedCents += applied;
+      }
+    }
 
     // The last payment settles whatever is actually left, and any payment that
     // would overshoot is trimmed — a loan cannot end owing less than nothing.
     const last = index === dates.length - 1;
     let principalCents = paymentCents - interestCents;
     if (last || principalCents > balanceCents) principalCents = balanceCents;
-
-    const paidCents = principalCents + interestCents;
     balanceCents -= principalCents;
+
+    const extraCents = Math.min(monthlyExtraCents, balanceCents);
+    balanceCents -= extraCents;
+
+    const offBalanceCents = principalCents + extraCents + creditedCents;
+    const paidCents = offBalanceCents + interestCents;
 
     // Snap to what the lender actually says is owed, then carry on from there.
     if (anchor && index === anchorIndex) balanceCents = toCents(anchor.principal);
@@ -214,12 +442,17 @@ function runSchedule(terms: LoanTerms, payment: number) {
       days,
       payment: fromCents(paidCents),
       interest: fromCents(interestCents),
-      principal: fromCents(principalCents),
+      principal: fromCents(offBalanceCents),
+      extra: fromCents(extraCents + creditedCents),
       balance: fromCents(Math.max(0, balanceCents)),
       estimated: index <= anchorIndex,
     });
 
     previous = due;
+
+    // Overpayments end the loan early. Emitting the remaining rows as zeroes
+    // would be a schedule of payments nobody makes.
+    if (balanceCents <= 0) break;
   }
 
   return { rows, basis, fundedOn: funded, shortfallCents: balanceCents };
@@ -252,11 +485,10 @@ export function solvePayment(terms: Omit<LoanTerms, 'payment'>): number {
   const basis = terms.basis ?? 'actual/365';
   const funded = terms.fundedOn ?? impliedFunding(terms.firstPaymentOn);
   const dates = paymentDates(terms.firstPaymentOn, terms.months);
-  const dailyRate = terms.annualRatePercent / 100 / DAYS_IN_YEAR[basis];
 
   const growth = dates.map((due, index) => {
     const from = index === 0 ? funded : dates[index - 1];
-    return 1 + dailyRate * daysBetween(from, due, basis);
+    return 1 + scheduledFraction(from, due, terms.annualRatePercent, basis, index === 0);
   });
 
   // Walk backwards: `carried` is the growth from period k to the end, which is
@@ -268,7 +500,7 @@ export function solvePayment(terms: Omit<LoanTerms, 'payment'>): number {
     carried *= growth[index];
   }
 
-  return sum > 0 ? round2((terms.principal * carried) / sum) : 0;
+  return sum > 0 ? roundMoney((terms.principal * carried) / sum) : 0;
 }
 
 /** The full picture: every payment, where it goes, and what it costs. */
@@ -283,6 +515,7 @@ export function amortise(terms: LoanTerms): Amortisation {
       interestShare: 0,
       basis: terms.basis ?? 'actual/365',
       fundedOn: terms.fundedOn ?? impliedFunding(terms.firstPaymentOn),
+      payoffOn: null,
     };
   }
 
@@ -301,6 +534,46 @@ export function amortise(terms: LoanTerms): Amortisation {
     interestShare: totalPaidCents > 0 ? totalInterestCents / totalPaidCents : 0,
     basis,
     fundedOn,
+    payoffOn: rows[rows.length - 1].date,
+  };
+}
+
+// --- Overpayments -----------------------------------------------------------
+
+export type PrepaymentComparison = {
+  /** The loan as contracted, with nothing extra paid. */
+  base: Amortisation;
+  /** The same loan with the overpayments applied. */
+  accelerated: Amortisation;
+  /** Interest the overpayments avoid, in money. */
+  interestSaved: number;
+  /** Payments the overpayments remove from the end of the term. */
+  monthsSaved: number;
+};
+
+/**
+ * What paying extra is worth.
+ *
+ * Both schedules are run at the SAME contract payment — the one solved from
+ * the original terms — because that is the comparison a borrower is actually
+ * making: not "a bigger loan versus a smaller one" but "this loan, with and
+ * without the extra". Solving the payment again against the shortened term
+ * would quietly answer a different question and always report a smaller saving.
+ *
+ * The saving is interest avoided, not money made: paying $100 a month extra
+ * costs $100 a month. It is reported next to the months removed from the end so
+ * the two are read together.
+ */
+export function comparePrepayment(terms: LoanTerms): PrepaymentComparison {
+  const base = amortise({ ...terms, extra: undefined });
+  const hasExtra = (terms.extra?.monthly ?? 0) > 0 || (terms.extra?.lumpSums?.length ?? 0) > 0;
+  const accelerated = hasExtra ? amortise({ ...terms, payment: base.payment }) : base;
+
+  return {
+    base,
+    accelerated,
+    interestSaved: roundMoney(base.totalInterest - accelerated.totalInterest),
+    monthsSaved: base.rows.length - accelerated.rows.length,
   };
 }
 
@@ -335,7 +608,10 @@ export type PayoffQuote = {
  */
 export function payoffQuote(terms: LoanTerms, asOf: Date): PayoffQuote {
   const schedule = amortise(terms);
-  const basis = schedule.basis;
+  // A payoff quote is a figure for one particular day, so even a monthly-rest
+  // loan is quoted with per diem interest from the last posting — which is what
+  // a servicer's own payoff letter does.
+  const basis = dayCountOf(schedule.basis);
   const asOfDay = utcDay(asOf);
 
   const paid = schedule.rows.filter((row) => utcDay(new Date(`${row.date}T00:00:00`)) <= asOfDay);
@@ -362,7 +638,7 @@ export function payoffQuote(terms: LoanTerms, asOf: Date): PayoffQuote {
   return {
     principal,
     accruedInterest: accrued,
-    payoff: round2(principal + accrued),
+    payoff: roundMoney(principal + accrued),
     daysAccrued,
     lastPaymentOn: last ? new Date(`${last.date}T00:00:00`) : null,
     nextPaymentOn: next ? new Date(`${next.date}T00:00:00`) : null,
@@ -415,9 +691,9 @@ export function calculateLoan(
   const totalInterest = totalPaid - principal;
 
   return {
-    monthlyPayment: round2(monthlyPayment),
-    totalPaid: round2(totalPaid),
-    totalInterest: round2(totalInterest),
+    monthlyPayment: roundMoney(monthlyPayment),
+    totalPaid: roundMoney(totalPaid),
+    totalInterest: roundMoney(totalInterest),
     interestShare: totalPaid > 0 ? totalInterest / totalPaid : 0,
   };
 }
@@ -495,7 +771,12 @@ export type StoredLoan = {
   monthly_payment: number;
   first_payment_on: string | null;
   funded_on: string | null;
-  day_count_basis: DayCountBasis;
+  /**
+   * Including 'monthly' rests: the column can hold it from
+   * `20260912100002_monthly_rests.sql` onwards, and the engine has always
+   * priced it.
+   */
+  day_count_basis: AccrualBasis;
   statement_on: string | null;
   statement_principal: number | null;
 };

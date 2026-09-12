@@ -198,7 +198,7 @@ export function CalculatorPad({
             accessibilityLabel="Back"
             hitSlop={8}
             onPress={onCancel}
-            className="h-11 w-11 items-center justify-center rounded-[10px] active:bg-ink/5"
+            className="h-11 w-11 items-center justify-center rounded-[12px] active:bg-ink/5"
           >
             <ChevronLeft size={24} color={colors.ink} strokeWidth={2} />
           </Pressable>
@@ -258,7 +258,7 @@ export function CalculatorPad({
                       accessibilityLabel={key.action === 'delete' ? 'Delete' : key.label}
                       onPress={() => press(key)}
                       className={cn(
-                        'h-[64px] items-center justify-center rounded-[10px] border',
+                        'h-[64px] items-center justify-center rounded-[12px] border',
                         isEquals
                           ? 'border-control bg-control active:opacity-90'
                           : isActiveOperator

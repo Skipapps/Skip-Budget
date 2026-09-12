@@ -29,9 +29,17 @@ const supported = Platform.OS === 'ios';
 
 function fire(run: () => Promise<void>) {
   if (!enabled || !supported) return;
-  // A device with no haptic engine rejects rather than throwing synchronously,
-  // and a missed tap is not worth an unhandled rejection.
-  run().catch(() => {});
+  try {
+    // A device with no haptic engine rejects rather than throwing synchronously,
+    // and a missed tap is not worth an unhandled rejection.
+    run().catch(() => {});
+  } catch {
+    // The synchronous case, which the `.catch` above cannot reach: a native
+    // module that is missing from the build throws on the call itself. These
+    // run *before* the thing they accompany — `withTap` buzzes and then
+    // navigates — so letting one escape would turn a missing haptic engine
+    // into a row that does nothing when pressed.
+  }
 }
 
 /** A control was pressed. The default for buttons, rows, chips and keys. */
@@ -52,4 +60,9 @@ export function success() {
 /** Something was refused or could not be done. */
 export function warn() {
   fire(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning));
+}
+
+/** A value inside a control changed — a keypad digit, a chip, a day cell. */
+export function selection() {
+  fire(() => Haptics.selectionAsync());
 }

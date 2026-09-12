@@ -5,9 +5,12 @@ import { Pressable, Text, View } from 'react-native';
 import { useArtwork } from '@/theme/artwork';
 import { AccountCard } from '@/components/cards/account-card';
 import { PaymentCard } from '@/components/cards/payment-card';
+import { ActionPill } from '@/components/ui/action-pill';
 import { AmountTile } from '@/components/ui/amount-tile';
+import { PageState } from '@/components/ui/page-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Screen } from '@/components/ui/screen';
+import { SectionHeading } from '@/components/ui/typography';
 import {
   useBankAccounts,
   useCards,
@@ -19,8 +22,6 @@ import { usePro } from '@/api/pro';
 import { useRefreshAll } from '@/api/refresh';
 import { useToday } from '@/lib/use-today';
 import { moneyBuckets } from '@/data/money-mock';
-import { useColors } from '@/providers/theme-provider';
-import { shadows } from '@/theme/shadows';
 
 type SectionHeaderProps = {
   title: string;
@@ -29,29 +30,13 @@ type SectionHeaderProps = {
 };
 
 function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
-  const colors = useColors();
   return (
     <View className="w-full flex-row items-center justify-between gap-3">
-      <Text
-        className="flex-1 font-poppins-semibold text-[20px] text-ink"
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.3}
-      >
-        {title}
-      </Text>
+      <View className="min-w-0 flex-1">
+        <SectionHeading>{title}</SectionHeading>
+      </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={actionLabel}
-        onPress={onAction}
-        style={shadows.card}
-        className="flex-row items-center gap-1.5 rounded-full border border-line bg-card py-2.5 pl-3 pr-4 active:bg-ink/5"
-      >
-        <Plus size={18} color={colors.ink} strokeWidth={2.2} />
-        <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
-          {actionLabel}
-        </Text>
-      </Pressable>
+      <ActionPill icon={Plus} label={actionLabel} onPress={onAction} className="shrink-0" />
     </View>
   );
 }
@@ -59,9 +44,16 @@ function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
 /** Salary sources arrive on different cycles; normalise before summing. */
 const PER_MONTH = { weekly: 52 / 12, biweekly: 26 / 12, semimonthly: 2, monthly: 1 } as const;
 
-function EmptyNote({ text }: { text: string }) {
+/**
+ * The note that stands in for an empty list.
+ *
+ * Empty only. A failed read is answered by the page, not by a region: the
+ * balances on this screen are walked from seven lists, so when one of them
+ * does not land there is no honest figure to draw beside a warning.
+ */
+function ListNote({ text }: { text: string }) {
   return (
-    <View className="w-full rounded-[10px] border border-dashed border-line p-5">
+    <View className="w-full items-center rounded-[16px] border border-line bg-card p-5">
       <Text className="text-center font-poppins text-[14px] text-muted" maxFontSizeMultiplier={1.4}>
         {text}
       </Text>
@@ -81,7 +73,7 @@ export default function CardsScreen() {
   const accounts = useBankAccounts();
   const salary = useSalarySources();
   const savings = useMonthlySavings();
-  const { balances } = useSourceBalances(today);
+  const { balances, isError: balancesError, refetch: refetchBalances } = useSourceBalances(today);
   const { refresh, refreshing } = useRefreshAll();
   const { pro } = usePro();
 
@@ -98,11 +90,32 @@ export default function CardsScreen() {
     savings: savingsTotal,
   };
 
+  // A wallet is the one screen where a stale figure is worse than no figure:
+  // what is shown here is what somebody checks against their bank. The balances
+  // are walked from seven reads, and when any of them fails the faces would
+  // fall back to `card.balance` — the number typed the day the card was added.
+  // So the page says so and offers the retry, exactly as every other list does,
+  // rather than drawing a wrong balance under a warning. Every hook above runs
+  // first, so the early return never changes the hook order.
+  if (balancesError) {
+    return (
+      <Screen onRefresh={refresh} refreshing={refreshing}>
+        <PageState
+          art={artwork.error}
+          title="Could not load your wallet"
+          message="Skip could not work out what is on your cards and accounts right now. Check your connection and try again."
+          actionLabel="Try again"
+          onAction={() => refetchBalances()}
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-2 w-full">
         <SectionHeader
-          title="Select Card"
+          title="Cards"
           actionLabel="New card"
           onAction={() =>
             // The second of anything is where Pro begins. The database refuses
@@ -153,8 +166,11 @@ export default function CardsScreen() {
           </Pressable>
         ))}
         {cards.isPending ? <Skeleton className="h-44 w-full rounded-[16px]" /> : null}
-        {!cards.isPending && cards.data?.length === 0 ? (
-          <EmptyNote text="No cards yet. Add one to track what you spend on it." />
+        {/* `data?.length === 0` is false when data is undefined, so a failed
+            fetch would leave this region blank — but a failed read never gets
+            this far now: it is answered by the page above. */}
+        {!cards.isPending && (cards.data?.length ?? 0) === 0 ? (
+          <ListNote text="No cards yet. Add one to track what you spend on it." />
         ) : null}
       </View>
 
@@ -202,17 +218,14 @@ export default function CardsScreen() {
           </Pressable>
         ))}
         {accounts.isPending ? <Skeleton className="h-36 w-full rounded-[16px]" /> : null}
-        {!accounts.isPending && accounts.data?.length === 0 ? (
-          <EmptyNote text="No bank accounts yet. Add one to see money coming in and out." />
+        {!accounts.isPending && (accounts.data?.length ?? 0) === 0 ? (
+          <ListNote text="No bank accounts yet. Add one to see money coming in and out." />
         ) : null}
       </View>
 
-      <Text
-        className="mt-10 w-full font-poppins-semibold text-[20px] text-ink"
-        maxFontSizeMultiplier={1.3}
-      >
-        Money
-      </Text>
+      <View className="mt-10 w-full">
+        <SectionHeading>Money</SectionHeading>
+      </View>
 
       {/* Two-up: tiles flex rather than sit at a fixed width, so they stay
           side by side on a narrow phone instead of overflowing. */}

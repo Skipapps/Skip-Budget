@@ -47,7 +47,7 @@ export function SubscriptionRow({
       className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
       style={active ? undefined : { opacity: 0.5 }}
     >
-      <BrandMark name={name} domain={domain} size={44} />
+      <BrandMark name={name} domain={domain} size={40} />
 
       <View className="min-w-0 flex-1">
         <Text

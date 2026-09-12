@@ -45,3 +45,8 @@ example
 # local env
 .env.local
 .env*.local
+
+# Team artefacts that must not be committed (real balances in screenshots; third-party prototype)
+.claude/team/testing/screenshots/
+.claude/team/design/reference/chatgpt-prototype/
+coverage/

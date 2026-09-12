@@ -27,10 +27,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.skipapps.skip.budget",
-      "permissions": [
-        "POST_NOTIFICATIONS",
-        "SCHEDULE_EXACT_ALARM"
-      ]
+      "permissions": ["POST_NOTIFICATIONS", "SCHEDULE_EXACT_ALARM"]
     },
     "web": {
       "output": "static",

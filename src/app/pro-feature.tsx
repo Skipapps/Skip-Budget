@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Lock } from 'lucide-react-native';
+import { Check, Lock } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { PRO_FEATURES } from '@/data/pro-features';
@@ -27,27 +27,20 @@ export default function ProFeatureScreen() {
 
   return (
     <Screen showBack>
-      <View className="mt-4 w-full items-center rounded-[14px] bg-ink/5 py-6">
+      <View className="mt-4 w-full items-center rounded-[16px] bg-ink/5 py-6">
         <View className="h-[110px] w-[110px]">
           <Art width="100%" height="100%" />
         </View>
       </View>
 
-      <Title align="left" className="mt-6">
-        {feature.title}
-      </Title>
+      <Title align="left">{feature.title}</Title>
       <Subtitle className="mt-2 w-full text-left">{feature.tagline}</Subtitle>
 
       <View className="mt-6 w-full gap-4">
         {feature.benefits.map((benefit) => (
           <View key={benefit.title} className="w-full flex-row gap-3">
             <View className="mt-0.5 h-6 w-6 items-center justify-center rounded-full bg-accent">
-              <Text
-                allowFontScaling={false}
-                className="font-poppins-bold text-[12px] text-on-control"
-              >
-                ✓
-              </Text>
+              <Check size={14} color={colors.onControl} strokeWidth={2} />
             </View>
             <View className="min-w-0 flex-1">
               <Text
@@ -67,8 +60,8 @@ export default function ProFeatureScreen() {
         ))}
       </View>
 
-      <View className="mt-7 w-full flex-row items-center gap-3 rounded-[14px] border border-line bg-card px-4 py-3.5">
-        <Lock size={17} color={colors.muted} strokeWidth={1.9} />
+      <View className="mt-6 w-full flex-row items-center gap-3 rounded-[16px] border border-line bg-card px-4 py-3.5">
+        <Lock size={18} color={colors.muted} strokeWidth={1.8} />
         <View className="min-w-0 flex-1">
           <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.3}>
             Part of Skip Pro
@@ -85,7 +78,7 @@ export default function ProFeatureScreen() {
           accessibilityRole="button"
           accessibilityLabel="Not now"
           onPress={() => router.back()}
-          className="min-h-11 w-full items-center justify-center rounded-[10px] active:bg-ink/5"
+          className="min-h-11 w-full items-center justify-center rounded-full active:bg-ink/5"
         >
           <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
             or {PRO_YEARLY_LABEL} · Not now

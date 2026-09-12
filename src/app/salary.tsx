@@ -62,7 +62,7 @@ export default function SalaryScreen() {
   if (isLoading) {
     return (
       <Screen showBack>
-        <Title className="mt-2">Salary</Title>
+        <Title>Salary</Title>
         <View className="mt-16 w-full items-center">
           <ActivityIndicator size="small" color={colors.muted} />
         </View>
@@ -216,15 +216,15 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title className="mt-2">Salary</Title>
+      <Title>Salary</Title>
       <Subtitle className="mt-3">Track every source of income and where each one is paid.</Subtitle>
 
-      <View className="mt-6 w-full rounded-[10px] border border-line px-4 py-3">
+      <View className="mt-6 w-full rounded-[16px] border border-line bg-card px-4 py-3">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           Total per month
         </Text>
         <Text
-          className="mt-0.5 font-poppins-bold text-[24px] text-ink"
+          className="mt-0.5 font-poppins-semibold text-[20px] text-ink"
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}
@@ -235,7 +235,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
 
       <View className="mt-6 w-full gap-4">
         {sources.map((source, index) => (
-          <View key={source.id} className="w-full rounded-[10px] border border-line p-4">
+          <View key={source.id} className="w-full rounded-[16px] border border-line bg-card p-4">
             <View className="mb-3 w-full flex-row items-center justify-between">
               <Text
                 className="font-poppins-medium text-[15px] text-ink"
@@ -253,7 +253,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
                   accessibilityLabel={`Remove source ${index + 1}`}
                   hitSlop={8}
                   onPress={() => void removeSource(source.id)}
-                  className="h-9 w-9 items-center justify-center rounded-[8px] active:bg-ink/5"
+                  className="h-9 w-9 items-center justify-center rounded-full active:bg-ink/5"
                 >
                   <Trash2 size={18} color={colors.muted} strokeWidth={1.8} />
                 </Pressable>
@@ -276,7 +276,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
                       [source.id]: !current[source.id],
                     }))
                   }
-                  className="h-9 w-9 items-center justify-center rounded-[8px] active:bg-ink/5"
+                  className="h-9 w-9 items-center justify-center rounded-full active:bg-ink/5"
                 >
                   {collapsed[source.id] ? (
                     <ChevronDown size={18} color={colors.ink} strokeWidth={2} />
@@ -312,6 +312,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
                   value={source.amount ? formatCurrency(source.amount) : ''}
                   placeholder="Enter an amount"
                   icon={Calculator}
+                  variant="pill"
                   onPress={() => setPadTarget({ sourceId: source.id, mode: 'pad' })}
                   onIconPress={() => setPadTarget({ sourceId: source.id, mode: 'calculator' })}
                   iconAccessibilityLabel="Open calculator"
@@ -331,6 +332,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
                   value={source.lastPayday ? formatFullDate(asDate(source.lastPayday)!) : ''}
                   placeholder="Pick the most recent one"
                   icon={Calendar}
+                  variant="pill"
                   onPress={() => setDateTarget(source.id)}
                 />
 
@@ -360,10 +362,10 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
         accessibilityRole="button"
         accessibilityLabel="Add salary source"
         onPress={addSource}
-        className="mt-4 w-full flex-row items-center justify-center gap-2 rounded-[10px] border border-dashed border-line py-4 active:bg-ink/5"
+        className="mt-4 min-h-14 w-full flex-row items-center justify-center gap-2 rounded-full bg-ink/5 active:bg-ink/10"
       >
-        <Plus size={18} color={colors.ink} strokeWidth={2.2} />
-        <Text className="font-poppins-medium text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+        <Plus size={18} color={colors.ink} strokeWidth={1.8} />
+        <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
           Add salary source
         </Text>
       </Pressable>
@@ -371,7 +373,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
       <View className="mt-auto w-full pt-10">
         {error ? (
           <Text
-            className="mb-3 w-full text-center font-poppins text-[13px] text-red-600"
+            className="mb-3 w-full text-center font-poppins text-[13px] text-danger"
             maxFontSizeMultiplier={1.4}
           >
             {error}

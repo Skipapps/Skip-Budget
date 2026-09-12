@@ -1,21 +1,22 @@
-import { router } from 'expo-router';
-import {} from 'lucide-react-native';
+import { router, type Href } from 'expo-router';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { useArtwork } from '@/theme/artwork';
-import { AddButton } from '@/components/dashboard/add-button';
 import { BalanceSummary } from '@/components/dashboard/balance-summary';
-import { AmountTile } from '@/components/ui/amount-tile';
+import { DestinationList } from '@/components/dashboard/destination-list';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { usePro } from '@/api/pro';
 import { GettingStartedCard } from '@/components/dashboard/getting-started-card';
 import { InsightBanner } from '@/components/dashboard/insight-banner';
+import { QuickActions } from '@/components/dashboard/quick-actions';
 import { DateSelector } from '@/components/dashboard/date-selector';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Screen } from '@/components/ui/screen';
+import { SkeletonList } from '@/components/ui/skeleton';
+import { TextLink } from '@/components/ui/text-link';
+import { SectionHeading } from '@/components/ui/typography';
 import { useLedger, useProfile, type LedgerEntry } from '@/api/queries';
 import { useKeepSchedulesCurrent, useRefreshAll } from '@/api/refresh';
 import { spendingCategories } from '@/data/dashboard-mock';
@@ -25,18 +26,22 @@ import { rangeFor } from '@/lib/range';
 import { addDays, formatDateRange, formatDayLabel, toIsoDate } from '@/lib/date';
 import { useToday } from '@/lib/use-today';
 
-// The gutter Screen applies. The category carousel cancels it so the cards
-// bleed to both edges and the last one peeks, signalling that the row scrolls.
-const GUTTER = 24;
-
 const KIND_LABELS: Record<string, string> = {
   receipt: 'Receipt',
   bill: 'Bill',
   subscription: 'Subscription',
 };
 
+/** Where each destination goes. The screen keeps owning its own routing. */
+const DESTINATION_ROUTES: Record<string, Href> = {
+  'monthly-bills': '/bills',
+  receipts: '/receipts',
+  subscriptions: '/subscriptions',
+  'loan-calculator': '/loan-calculator',
+  'split-calculator': '/splits',
+};
+
 export default function HomeScreen() {
-  const artwork = useArtwork();
   const { pro } = usePro();
   // Opening the app is the moment to bring stale due dates up to date.
   useKeepSchedulesCurrent();
@@ -143,13 +148,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <Screen
-      // The quickest thing anyone does in a budget app is note what they just
-      // bought, so the button that is always on screen goes straight there.
-      floating={<AddButton onPress={() => router.push('/add-receipt')} />}
-      onRefresh={refresh}
-      refreshing={refreshing}
-    >
+    <Screen onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-2 w-full">
         <DashboardHeader
           name={profile.data?.display_name ?? 'Welcome'}
@@ -167,74 +166,43 @@ export default function HomeScreen() {
           payday={payday}
           expenses={expensesThisMonth}
           loading={month.isLoading}
+          error={month.isError}
         />
+      </View>
+
+      {/* Recording something is the one thing on this screen that is not
+          reading: four of them, one tap each, right under the figure they
+          change. */}
+      <View className="mt-5 w-full">
+        <QuickActions onPress={(href) => router.push(href)} />
       </View>
 
       {/* Renders nothing once its five steps are done or it was waved away —
           margin included, so established accounts get no phantom gap. */}
       <GettingStartedCard />
 
-      <View className="mt-8 w-full flex-row items-baseline justify-between gap-3">
-        <Text className="font-poppins-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
-          Where it goes
-        </Text>
-        <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.2}>
-          {tiles.length} categories
-        </Text>
+      <View className="mt-8 w-full">
+        <SectionHeading caption="This month">Where it goes</SectionHeading>
       </View>
 
-      {/* Full-bleed, so a tile is cut by the screen edge rather than by a
-          margin. That cut is the affordance: tiles are sized so a third is
-          plainly half-visible, which is what says the row moves. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        style={{ marginHorizontal: -GUTTER }}
-        contentContainerStyle={{ paddingHorizontal: GUTTER, gap: 12, paddingVertical: 12 }}
-        className="w-full"
-      >
-        {tiles.map((category) => (
-          <View key={category.id} className="w-[150px]">
-            {/* Locked features keep their tile — a hidden feature sells
-                nothing; a visible locked one is an advert that renders
-                itself. The gate on the screen does the actual refusing. */}
-            {!pro && (category.id === 'loan-calculator' || category.id === 'split-calculator') ? (
-              <View
-                pointerEvents="none"
-                className="absolute right-2 top-2 z-10 rounded-full bg-accent px-2 py-0.5"
-              >
-                <Text
-                  allowFontScaling={false}
-                  className="font-poppins-bold text-[9px] text-on-control"
-                >
-                  PRO
-                </Text>
-              </View>
-            ) : null}
-            <AmountTile
-              label={category.label}
-              amount={tileAmounts[category.id]}
-              artwork={artwork[category.artwork]}
-              onPress={
-                category.id === 'monthly-bills'
-                  ? () => router.push('/bills')
-                  : category.id === 'receipts'
-                    ? () => router.push('/receipts')
-                    : category.id === 'subscriptions'
-                      ? () => router.push('/subscriptions')
-                      : category.id === 'loan-calculator'
-                        ? () => router.push('/loan-calculator')
-                        : category.id === 'split-calculator'
-                          ? () => router.push('/splits')
-                          : undefined
-              }
-            />
-          </View>
-        ))}
-      </ScrollView>
+      {/* One column of five, rather than a carousel that hid three of them
+          behind a gesture. The order is whatever they arranged. */}
+      <View className="mt-3 w-full">
+        <DestinationList
+          items={tiles}
+          amounts={tileAmounts}
+          pro={pro}
+          loading={month.isLoading}
+          error={month.isError}
+          onRetry={refresh}
+          onPress={(id) => {
+            const href = DESTINATION_ROUTES[id];
+            if (href) router.push(href);
+          }}
+        />
+      </View>
 
-      {/* Full width and outside the carousel — it is a destination, not a stat. */}
+      {/* Full width and outside the list — it is a story, not a figure. */}
       <View className="mt-3 w-full">
         {/* Transactions is the story: the chart, the timeline and the
             periods to read them over. The banner said so already and had
@@ -242,9 +210,9 @@ export default function HomeScreen() {
         <InsightBanner onPress={() => router.push('/insights')} />
       </View>
 
-      <View className="mt-5 h-px w-full bg-line" />
-
-      <View className="mt-5 w-full">
+      {/* Whitespace separates this from the blocks above it. The rule that
+          used to sit here was drawing a line the gap already drew. */}
+      <View className="mt-8 w-full">
         <DateSelector
           weekday={weekday}
           date={date}
@@ -261,8 +229,13 @@ export default function HomeScreen() {
         entries={recent.entries}
         empty="Nothing in this week."
         loading={recent.isLoading}
+        error={recent.isError}
+        onRetry={refresh}
         today={today}
-        direction="desc"
+        // Oldest day first, the chosen day last — the house rule for every
+        // dated list. Recent covers one week, so the newest day is at most six
+        // headings below the first rather than off the end of the page.
+        direction="asc"
       />
 
       <View className="w-full pb-24">
@@ -272,6 +245,8 @@ export default function HomeScreen() {
           entries={upcoming.entries}
           empty="Nothing due in the week ahead."
           loading={upcoming.isLoading}
+          error={upcoming.isError}
+          onRetry={refresh}
           today={today}
           direction="asc"
         />
@@ -295,8 +270,17 @@ type SectionProps = {
   entries: LedgerEntry[];
   empty: string;
   loading: boolean;
+  /** The week could not be fetched. An empty list would be a lie. */
+  error: boolean;
+  onRetry: () => void;
   today: string;
-  /** Recent counts back from the chosen day; Coming up counts forward. */
+  /**
+   * Day order. Both weeks run `'asc'` today — oldest heading first — so Recent
+   * ends on the chosen day and Coming up starts the morning after it, and the
+   * two halves of the screen read in one direction. Kept as a prop rather than
+   * hardcoded because the section is shared and the two weeks are not the same
+   * question.
+   */
   direction: 'asc' | 'desc';
 };
 
@@ -307,35 +291,51 @@ type SectionProps = {
  * weeks, so they are the same component — anything that made one read
  * differently from the other would be an accident rather than a decision.
  */
-function Section({ title, range, entries, empty, loading, today, direction }: SectionProps) {
+function Section({
+  title,
+  range,
+  entries,
+  empty,
+  loading,
+  error,
+  onRetry,
+  today,
+  direction,
+}: SectionProps) {
   const groups = groupByDate(entries, (entry) => entry.date, {
     amountOf: (entry) => entry.amount,
     direction,
   });
 
   return (
-    <View className="mt-7 w-full">
+    <View className="mt-8 w-full">
       {/* Each heading carries its own dates: two weeks are on screen at once,
           and a single caption above them could only ever describe one. */}
-      <View className="w-full flex-row items-baseline justify-between gap-3">
-        <Text className="font-poppins-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
-          {title}
-        </Text>
-        <Text
-          className="font-poppins text-[13px] text-muted"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.2}
-        >
-          {range}
-        </Text>
-      </View>
+      <SectionHeading caption={range}>{title}</SectionHeading>
 
-      {loading || entries.length === 0 ? (
+      {error ? (
+        // An empty week and a week that failed to arrive look identical, so
+        // the failure has to say so itself.
+        <View className="mt-2 w-full items-center">
+          <Text
+            className="w-full text-center font-poppins text-[14px] text-muted"
+            maxFontSizeMultiplier={1.4}
+          >
+            We could not load this week.
+          </Text>
+          <TextLink label="Try again" variant="subtle" onPress={onRetry} />
+        </View>
+      ) : loading ? (
+        // The shape of what is coming, like every other list in the app.
+        <View className="mt-1 w-full">
+          <SkeletonList rows={3} />
+        </View>
+      ) : entries.length === 0 ? (
         <Text
           className="w-full py-6 text-center font-poppins text-[14px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
-          {loading ? 'Loading' : empty}
+          {empty}
         </Text>
       ) : (
         <View className="mt-1 w-full">
@@ -344,7 +344,7 @@ function Section({ title, range, entries, empty, loading, today, direction }: Se
               <DateGroupHeader date={group.date} today={today} total={group.total} />
               {group.items.map((entry, index) => (
                 <Fragment key={entry.id}>
-                  {index > 0 ? <View className="ml-13 h-px bg-line/60" /> : null}
+                  {index > 0 ? <View className="ml-[52px] h-px bg-line/60" /> : null}
                   <TransactionRow
                     label={entry.label}
                     amount={entry.amount}

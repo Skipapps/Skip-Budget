@@ -45,7 +45,7 @@ export default function AvatarScreen() {
 
   return (
     <Screen showBack>
-      <Title align="left" className="mt-1 w-full">
+      <Title align="left" className="w-full">
         Profile picture
       </Title>
       <Subtitle className="mt-2 w-full text-left">

@@ -5,3 +5,10 @@ ios
 android
 package-lock.json
 supabase/.temp/
+
+# Team documents, not shipped code. Dmitri's 2026-09-12 gate, finding 3: these
+# 35 files are the whole reason `npm run check` has been red, and a gate nobody
+# can get green is a gate nobody reads — which is how two leftover scratch files
+# reached review on this branch.
+.claude/
+TEAM.md

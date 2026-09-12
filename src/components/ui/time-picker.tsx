@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, PanResponder, Pressable, Text, View } from 'react-native';
 import Svg, { Circle, Line } from 'react-native-svg';
 
+import { TogglePill } from '@/components/ui/toggle-pill';
 import { cn } from '@/lib/cn';
 import { parseClock, toClockValue } from '@/lib/date';
 import { tap } from '@/lib/haptics';
@@ -58,8 +59,9 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
   const isPm = hour >= 12;
   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
 
+  // No tap() here: the toggle fires its own selection tick, and two haptics on
+  // one press reads as a stutter rather than a confirmation.
   const setPeriod = (next: 'AM' | 'PM') => {
-    tap();
     setHour((current) => {
       const base = current % 12;
       return next === 'PM' ? base + 12 : base;
@@ -173,32 +175,19 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
               onPress={() => setMode('minute')}
               accessibilityLabel={`Minute, ${minute}`}
             />
+          </View>
 
-            <View className="ml-1 overflow-hidden rounded-[10px] border border-line">
-              {(['AM', 'PM'] as const).map((period) => {
-                const selected = period === (isPm ? 'PM' : 'AM');
-                return (
-                  <Pressable
-                    key={period}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={period}
-                    onPress={() => setPeriod(period)}
-                    className={cn('px-3 py-2.5', selected ? 'bg-control' : 'active:bg-ink/5')}
-                  >
-                    <Text
-                      className={cn(
-                        'font-poppins-medium text-[14px]',
-                        selected ? 'text-on-control' : 'text-body',
-                      )}
-                      maxFontSizeMultiplier={1.2}
-                    >
-                      {period}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+          {/* One track, two halves: AM and PM are one decision, and two
+              separate chips make them look like two. */}
+          <View className="mt-3 w-[184px] self-center">
+            <TogglePill
+              options={[
+                { value: 'AM', label: 'AM' },
+                { value: 'PM', label: 'PM' },
+              ]}
+              value={isPm ? 'PM' : 'AM'}
+              onChange={(next) => setPeriod(next as 'AM' | 'PM')}
+            />
           </View>
 
           <View className="mt-6 w-full items-center">
@@ -257,7 +246,7 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
               accessibilityRole="button"
               accessibilityLabel="Cancel"
               onPress={onCancel}
-              className="rounded-[10px] px-5 py-3 active:bg-ink/5"
+              className="min-h-11 justify-center rounded-full px-5 active:bg-ink/5"
             >
               <Text
                 className="font-poppins-medium text-[15px] text-body"
@@ -274,10 +263,10 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
                 tap();
                 onConfirm(toClockValue(hour, minute));
               }}
-              className="rounded-[10px] px-5 py-3 active:bg-ink/5"
+              className="min-h-11 justify-center rounded-full bg-control px-5 active:bg-control-pressed"
             >
               <Text
-                className="font-poppins-semibold text-[15px] text-accent-ink"
+                className="font-poppins-semibold text-[15px] text-on-control"
                 maxFontSizeMultiplier={1.2}
               >
                 OK
@@ -305,7 +294,7 @@ function Field({ label, active, onPress, accessibilityLabel }: FieldProps) {
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
       className={cn(
-        'min-w-[84px] items-center rounded-[10px] px-3 py-2',
+        'min-w-[84px] items-center rounded-[16px] px-3 py-2',
         active ? 'bg-control' : 'bg-ink/5 active:bg-ink/10',
       )}
     >

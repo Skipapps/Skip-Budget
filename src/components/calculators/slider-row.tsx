@@ -55,7 +55,8 @@ export function SliderRow({
             accessibilityRole="button"
             accessibilityLabel={`${label}, ${display}. Edit`}
             onPress={onValuePress}
-            className="rounded-[8px] border border-line px-3 py-1.5 active:bg-ink/5"
+            hitSlop={8}
+            className="min-h-10 justify-center rounded-full bg-ink/5 px-4 active:bg-ink/10"
           >
             {readout}
           </Pressable>

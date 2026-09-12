@@ -10,9 +10,8 @@ import { PageState } from '@/components/ui/page-state';
 import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { Title } from '@/components/ui/typography';
+import { SectionHeading, Title } from '@/components/ui/typography';
 import { formatCurrency } from '@/lib/format';
-import { shadows } from '@/theme/shadows';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 
@@ -49,7 +48,7 @@ function SplitsScreenInner() {
   return (
     <Screen showBack onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-2 w-full flex-row items-center justify-between gap-3">
-        <Title align="left" className="flex-1">
+        <Title flush align="left" className="flex-1">
           Split manager
         </Title>
         <ActionPill label="New group" onPress={() => router.push('/add-group')} />
@@ -63,13 +62,13 @@ function SplitsScreenInner() {
             : `Friends. ${friends.length} on Skip.`
         }
         onPress={() => router.push('/friends')}
-        className="mt-6 w-full flex-row items-center gap-3 rounded-[10px] border border-line px-4 py-4 active:bg-ink/5"
+        className="mt-6 w-full flex-row items-center gap-3 rounded-[16px] border border-line px-4 py-3.5 active:bg-ink/5"
       >
-        <View className="h-11 w-11 items-center justify-center rounded-full bg-ink/5">
-          <Users size={20} color={colors.ink} strokeWidth={1.9} />
+        <View className="h-10 w-10 items-center justify-center rounded-full bg-ink/5">
+          <Users size={20} color={colors.body} strokeWidth={1.8} />
         </View>
         <View className="min-w-0 flex-1">
-          <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+          <Text className="font-poppins-medium text-[15px] text-ink" maxFontSizeMultiplier={1.4}>
             Friends
           </Text>
           <Text className="mt-0.5 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
@@ -116,9 +115,7 @@ function SplitsScreenInner() {
 
       {live.length > 0 ? (
         <View className="mt-9 w-full">
-          <Text className="font-poppins-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
-            Groups
-          </Text>
+          <SectionHeading>Groups</SectionHeading>
           <View className="mt-4 w-full gap-3">
             {live.map((group) => (
               <GroupCard
@@ -177,15 +174,14 @@ function GroupCard({
           : `${name}. You ${owed ? 'are owed' : 'owe'} ${formatCurrency(Math.abs(balance))}.`
       }
       onPress={onPress}
-      style={shadows.card}
-      className="w-full rounded-[14px] border border-line bg-card px-5 py-5 active:bg-ink/5"
+      className="w-full rounded-[16px] border border-line bg-card p-4 active:bg-ink/5"
     >
       <View className="w-full flex-row items-center gap-4">
         <GroupIcon iconId={iconId} groupId={id} />
 
         <View className="min-w-0 flex-1">
           <Text
-            className="font-poppins-bold text-[21px] leading-[27px] text-ink"
+            className="font-poppins-semibold text-[17px] leading-6 text-ink"
             numberOfLines={1}
             maxFontSizeMultiplier={1.2}
           >
@@ -202,8 +198,8 @@ function GroupCard({
           <Text
             className={
               owed
-                ? 'font-poppins-bold text-[22px] text-accent-ink'
-                : 'font-poppins-bold text-[22px] text-ink'
+                ? 'font-poppins-semibold text-[20px] text-accent-ink'
+                : 'font-poppins-semibold text-[20px] text-ink'
             }
             numberOfLines={1}
             maxFontSizeMultiplier={1.2}

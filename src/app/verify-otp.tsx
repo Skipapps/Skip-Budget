@@ -56,7 +56,7 @@ export default function VerifyOtpScreen() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title className="mt-4">Enter the code</Title>
+      <Title>Enter the code</Title>
       <Subtitle className="mt-3">
         {email ? (
           <>
@@ -80,7 +80,7 @@ export default function VerifyOtpScreen() {
 
       {error ? (
         <Text
-          className="mt-4 w-full text-center font-poppins text-[13px] text-red-600"
+          className="mt-4 w-full text-center font-poppins text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {error}

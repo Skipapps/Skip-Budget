@@ -52,7 +52,7 @@ export function OtpInput({
             <View
               key={index}
               className={cn(
-                'h-14 flex-1 items-center justify-center rounded-[10px] border',
+                'h-14 flex-1 items-center justify-center rounded-[12px] border',
                 isCursor ? 'border-control' : digit ? 'border-control' : 'border-line',
               )}
             >

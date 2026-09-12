@@ -5,6 +5,7 @@ import { Pressable, Share, Text, View } from 'react-native';
 
 import { useAddGroupMember, useFriends, useGroup, useGroupMembers } from '@/api/splits';
 import { Person } from '@/components/splits/person';
+import { ActionPill } from '@/components/ui/action-pill';
 import { Button } from '@/components/ui/button';
 import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
@@ -87,7 +88,7 @@ function AddMemberScreenInner() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title className="mt-2">Add to {group?.name ?? 'group'}</Title>
+      <Title>Add to {group?.name ?? 'group'}</Title>
       <Subtitle className="mt-3">
         Friends join properly and see the group on their own phone. Anyone else can be a name for
         now and claim it later.
@@ -111,21 +112,13 @@ function AddMemberScreenInner() {
           {group?.invite_code ? ` Your code is ${group.invite_code}.` : ''}
         </Text>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Add a friend on Skip by their code"
-          onPress={() => router.push('/friends')}
-          className="mt-3 min-h-12 w-full flex-row items-center justify-center gap-2 rounded-[10px] border border-line active:bg-ink/5"
-        >
-          <UserPlus size={16} color={colors.ink} strokeWidth={1.9} />
-          <Text
-            className="font-poppins-medium text-[14px] text-ink"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.4}
-          >
-            Add a friend by code
-          </Text>
-        </Pressable>
+        <View className="mt-3 w-full flex-row">
+          <ActionPill
+            icon={UserPlus}
+            label="Add a friend by code"
+            onPress={() => router.push('/friends')}
+          />
+        </View>
       </View>
 
       <View className="mt-9 w-full">
@@ -155,7 +148,7 @@ function AddMemberScreenInner() {
             className="w-full flex-row items-center justify-between gap-3 py-3.5 active:bg-ink/5"
           >
             <Person name={friend.display_name || 'Someone on Skip'} avatarId={friend.avatar_id} />
-            <View className="h-9 w-9 items-center justify-center rounded-full border border-line">
+            <View className="h-9 w-9 items-center justify-center rounded-full bg-ink/5">
               <Check size={16} color={colors.muted} strokeWidth={2.2} />
             </View>
           </Pressable>
@@ -183,7 +176,7 @@ function AddMemberScreenInner() {
 
       {error ? (
         <Text
-          className="mt-5 w-full font-poppins text-[13px] text-red-600"
+          className="mt-5 w-full font-poppins text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {error}

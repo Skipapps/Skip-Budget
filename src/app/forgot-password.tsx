@@ -39,7 +39,7 @@ export default function ForgotPasswordScreen() {
 
   return (
     <Screen showBack avoidKeyboard>
-      <Title className="mt-4">Forgot password?</Title>
+      <Title>Forgot password?</Title>
       <Subtitle className="mt-3">
         Enter your email and we will send you a 6-digit verification code.
       </Subtitle>
