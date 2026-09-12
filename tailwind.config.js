@@ -36,6 +36,9 @@ module.exports = {
           in: 'rgb(var(--color-money-in) / <alpha-value>)',
           out: 'rgb(var(--color-money-out) / <alpha-value>)',
         },
+        // Destructive actions only. Follows the mode like everything else,
+        // which the hardcoded red it replaced did not.
+        danger: 'rgb(var(--color-danger) / <alpha-value>)',
       },
       // Phone-scale breakpoints. Tailwind's defaults start at 640px, which no
       // phone reaches, so every `sm:` rule would be dead code on a real device.
