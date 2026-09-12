@@ -11,6 +11,7 @@ import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
+import { saveErrorMessage } from '@/lib/save-error';
 import { useColors } from '@/providers/theme-provider';
 
 /**
@@ -67,7 +68,7 @@ function AddMemberScreenInner() {
     try {
       await addMember.mutateAsync({ groupId, userId });
     } catch (thrown) {
-      setError((thrown as Error).message);
+      setError(saveErrorMessage(thrown, 'Could not add them to the group.'));
     }
   };
 
@@ -82,7 +83,7 @@ function AddMemberScreenInner() {
       await addMember.mutateAsync({ groupId, displayName: name.trim() });
       setName('');
     } catch (thrown) {
-      setError((thrown as Error).message);
+      setError(saveErrorMessage(thrown, 'Could not add them to the group.'));
     }
   };
 

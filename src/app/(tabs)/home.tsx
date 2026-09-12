@@ -18,8 +18,10 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { TextLink } from '@/components/ui/text-link';
 import { SectionHeading } from '@/components/ui/typography';
 import { useLedger, useProfile, type LedgerEntry } from '@/api/queries';
+import { useCharges } from '@/api/charges';
 import { useKeepSchedulesCurrent, useRefreshAll } from '@/api/refresh';
 import { spendingCategories } from '@/data/dashboard-mock';
+import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
 import { orderByIds } from '@/lib/order';
 import { groupByDate } from '@/lib/group';
 import { rangeFor } from '@/lib/range';
@@ -138,6 +140,23 @@ export default function HomeScreen() {
     today,
   );
 
+  /**
+   * Which plan each recorded charge came from.
+   *
+   * A row in either week opens the record behind it, and an occurrence that
+   * was written down at the time is named after the charge rather than the
+   * bill or subscription that made it. The ledger reads the same query, so
+   * this costs no extra fetch.
+   */
+  const charges = useCharges();
+  const owners = useMemo(() => chargeOwners(charges.data ?? []), [charges.data]);
+
+  /** The row's handler, or undefined when there is nothing to open. */
+  const openEntry = (entry: LedgerEntry) => {
+    const href = ledgerHref(entry, owners);
+    return href ? () => router.push(href) : undefined;
+  };
+
   const { weekday, date } = formatDayLabel(selectedDate);
 
   const handleConfirmDate = (date: Date) => {
@@ -232,6 +251,7 @@ export default function HomeScreen() {
         error={recent.isError}
         onRetry={refresh}
         today={today}
+        onEntryPress={openEntry}
         // Oldest day first, the chosen day last — the house rule for every
         // dated list. Recent covers one week, so the newest day is at most six
         // headings below the first rather than off the end of the page.
@@ -248,6 +268,7 @@ export default function HomeScreen() {
           error={upcoming.isError}
           onRetry={refresh}
           today={today}
+          onEntryPress={openEntry}
           direction="asc"
         />
       </View>
@@ -275,6 +296,11 @@ type SectionProps = {
   onRetry: () => void;
   today: string;
   /**
+   * What a row opens, worked out per entry by the screen — undefined for an
+   * entry with no edit screen, which leaves that row inert.
+   */
+  onEntryPress: (entry: LedgerEntry) => (() => void) | undefined;
+  /**
    * Day order. Both weeks run `'asc'` today — oldest heading first — so Recent
    * ends on the chosen day and Coming up starts the morning after it, and the
    * two halves of the screen read in one direction. Kept as a prop rather than
@@ -300,6 +326,7 @@ function Section({
   error,
   onRetry,
   today,
+  onEntryPress,
   direction,
 }: SectionProps) {
   const groups = groupByDate(entries, (entry) => entry.date, {
@@ -353,6 +380,7 @@ function Section({
                     kind={entry.kind}
                     categoryId={entry.categoryId}
                     iconId={entry.iconId}
+                    onPress={onEntryPress(entry)}
                   />
                 </Fragment>
               ))}

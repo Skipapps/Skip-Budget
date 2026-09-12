@@ -828,3 +828,313 @@ gitignore it before any merge commit. Cosmetic, but it does not belong in the br
    adjudication covered the load error, not the dead row. It is one tap and it closes Tia's blocker 4
    completely.
 3. `supabase/.temp/cli-latest` — revert or gitignore before the merge commit.
+
+## 2026-09-12 — Tia (Tester) — rough test sweep (post-migration), `almost-done-all-pages`
+
+**Outcome.** Partial. Confirmed the three fixes the brief called out are real (Reminders end-to-end,
+monthly-rest loan save, Settings switches toggle off by tap), found one solid code-verified BLOCKER
+(transaction rows have no tap handler at all in two of the app's list views), and one reproducible
+but not-fully-root-caused navigation glitch (taps near the tab bar sometimes activate the tab bar
+instead of the content row above it). A large share of this session's time went into re-deriving the
+screenshot-to-device-point scale factor after my own early taps used unconverted pixel coordinates —
+several things I nearly filed as bugs (the step-flow/tab-bar "hit-box offset", dead Settings rows)
+turned out to be my own coordinate error once I recalibrated properly (native screenshots are
+1206×2622px, exactly 3× the 402×874pt device space; the tool's rendered preview is ~920px wide, so
+preview-pixel/2.286 ≈ device point). Recording that scale factor here since it cost real time. Did not
+sign out, edit app code, or enter real credentials/payment.
+
+**Bugs, ranked**
+
+1. **Major (confirmed in source, not a tap-coordinate issue) — receipts, bills, subscriptions and
+   income entries cannot be opened, edited, or deleted from either place a user naturally sees them.**
+   `src/app/(tabs)/transactions.tsx:319` renders `<LedgerRow key={entry.id} entry={entry}
+   sourceLabel={...} kindLabel={...} />` — no `onPress`. `src/components/transactions/ledger-row.tsx`
+   explicitly accepts and wires an `onPress?: () => void` prop (`:15`, `:34`), so the row is a
+   `Pressable` with nothing to call. Same pattern at `src/app/(tabs)/home.tsx:348` — `<TransactionRow
+   label=... amount=... />` with no `onPress`, even though
+   `src/components/dashboard/transaction-row.tsx:20` defines the prop identically. I tapped, long-
+   pressed (1.2s) and swiped a real "Tia QA Store" receipt row on both the Transactions tab and Home's
+   "Recent" list, at pixel-measured coordinates confirmed correct by cropping the native screenshot
+   (device (200, 660) on Transactions, (200, 434) and (100, 434) on Home) — no response, no swipe
+   action, nothing, which matches the missing prop exactly. **The dedicated `receipts.tsx` and
+   `bill-plans.tsx` screens do wire `onPress` correctly** (`receipts.tsx:261` →
+   `router.push('/add-receipt?id=...')`, `bill-plans.tsx:209` → `router.push('/add-bill?id=...')`), and
+   are reachable from Home's "Where it goes" list (see bug 2) or `skipbudget://receipts` — so the fix
+   is either wiring `onPress` on the two combined-ledger views, or accepting that the combined views
+   are read-only and documenting it. As shipped, a user who taps a transaction from the two most
+   prominent lists in the app (Home and the Transactions tab) gets no feedback at all.
+
+2. **Major, reproducible, not fully root-caused — taps aimed at the last row of a scrollable list
+   sometimes land on the floating tab bar instead.** On Home's "Where it goes" card, tapping the
+   "Insights" row (its own full-width bordered card, not part of the "Where it goes" list) at
+   pixel-measured device coordinates (250, 808) and (250, 827) — both comfortably on the visible
+   "Insights" label — instead activated the **Home** tab and then the **Transactions** tab
+   respectively (confirmed via the resulting screenshots, including one that showed my stale "Tia"
+   search text on the Transactions screen). The floating tab bar's own hit area sits at device
+   y≈782–827 (measured by cropping the native 1206×2622 screenshot and dividing by 3). When a content
+   row's true tap target falls inside or very close to that band, the tab bar wins. I could not isolate
+   the exact mechanism (z-order vs. hitSlop vs. absolute positioning) in the time available, and I
+   want to flag that my own coordinate mistakes account for a lot of apparent unresponsiveness this
+   session (see Outcome) — but this specific case was measured carefully, twice, with two different
+   observable wrong destinations, so I'm reporting it as real. Likely candidates: `skip-tab-bar.tsx`'s
+   `paddingBottom`/hitSlop, or the `DestinationList`/`Insights` card's own bottom margin interacting
+   with the floating bar's absolute position.
+
+3. **Major, transient — raw exception text surfaced to the user on an Add Receipt save.** First Save
+   attempt on step 3 of Add Receipt (amount $12.34, store "Tia QA Store", today) returned:
+   `Error: fetch failed: UnexpectedException: The network connection was lost. (at
+   ExpoModulesCore/Promise.swift:56)` in place of the normal success flow. A second, identical tap on
+   Save one screenshot later succeeded normally (receipt saved, list total updated to the cent). Could
+   not force a second repro; flagging as a real, witnessed failure mode rather than a confirmed
+   deterministic bug — the underlying transient network hiccup is plausible on a simulator, but the raw
+   Swift/Promise text reaching the screen is not acceptable user-facing copy regardless of cause.
+   Screenshot: `.claude/team/testing/screenshots/add-receipt-raw-network-error.png`.
+
+**What passed (all previously-reported blockers from earlier 09-12 sessions, re-verified)**
+- **Reminders screen (item 3): fully fixed.** Reached via Settings row and via
+  `skipbudget://reminders` — loads instantly, no error, no dead row. The bills reminder card and lead-
+  time chips render correctly. Daily receipts reminder switch toggled ON by a single tap, defaulted to
+  8:00 PM without needing the time picker, left the screen (edge-swipe back) and returned — still ON
+  at 8:00 PM, confirming persistence — then toggled back OFF by a single tap. This closes the earlier
+  "Reminders row does not navigate + screen errors" blocker completely.
+- **Loan calculator, Monthly rests + odd first period (item 5): fixed.** Set convention to "Monthly
+  rests", money received 12 Aug 2026, first payment moved to 25 Sep 2026 (a 44-day first period, well
+  off the 30/31-day norm) — "44% of your first payment is interest" banner rendered, Save opened the
+  payment schedule with no error and no raw Postgres text. Confirmed via the Bills list afterward that
+  saving the loan did **not** create a stray bill (still exactly "1 recurring bill" / Housing /
+  −$1,030.00), so no extra cleanup was needed for this test.
+- **Settings switches toggle off by tap (item 4): fixed.** Fake Pro and Haptics both went ON and then
+  OFF with a single plain tap each, no swipe workaround needed (this was a filed blocker in an earlier
+  09-12 session).
+- **Add Bill, Specific period end-date validation (item 2): fixed.** Start date 12 Sep 2026, switched
+  to "Specific period", opened the "To" date picker — days 1–11 render visibly greyed and are
+  unresponsive to tap (tried day 5 explicitly; header stayed on "12 Sep 2026", no selection changed).
+  This closes a Major bug carried over from two earlier 09-12 sessions.
+- **Add Receipt / Add Bill stepped flows:** keypad entry, Continue, back-chevron across steps
+  preserving typed values (amount, store, category) all worked correctly on both flows. Add Bill's
+  category pre-step correctly pre-filled the Name field and Category chip (picked "Internet").
+  Cancelling an in-progress Add Bill (back to step 0, then exit) left no stray data — Bills list
+  unchanged before and after.
+- **Receipts screen** (`skipbudget://receipts`, also reachable from Home's "Where it goes" list away
+  from the tab-bar interference zone in bug 2): search, Add, filter icon, edit (tap a row → prefilled
+  Edit receipt with Store chip and Delete link), delete confirmation dialog ("Delete this receipt? /
+  This cannot be undone."), and list totals all correct to the cent.
+- **Dashboard order** (Settings → Dashboard order): opens correctly, shows all 5 destinations
+  (Monthly Bills, Receipts, Subscriptions, Loan calculator, Split manager) numbered 1–5 with working
+  up/down arrows, first/last correctly disabled at the ends.
+- **Appearance:** Dark mode + Coral and Dark + Plum both rendered with correct contrast; reset to
+  Light + Plum at the end confirmed correctly (screenshot not needed, visually unambiguous).
+- **Settings row navigation**, once tapped at pixel-verified coordinates: Bills, Terms of service,
+  Appearance, Dashboard order, Reminders all navigated correctly on the first properly-aimed tap —
+  several earlier apparent failures this session were my own coordinate math, not the app (see
+  Outcome).
+- **Money to the cent:** Tia QA Store $12.34 receipt pushed Receipts from −$17.00/1 to −$29.34/2,
+  then deleting it returned the list to exactly **−$17.00 / 1 receipt (Desi Bits)** — the pre-existing
+  baseline, confirmed unchanged throughout.
+
+**Could not test this session (time)**
+- add-subscription, add-card, add-account, add-group, add-member full save/delete flows.
+- Edit-persistence proper (reopen a saved record, change a field, save, reopen, confirm the change
+  stuck) — I only verified open → view → delete on the receipt, not open → edit-a-field → save →
+  reopen.
+- Splits, Settle up, Group settings, Friends, Savings, Savings month, Salary, Tour.
+- iPhone SE / small screen, Dynamic Type, pre-auth Welcome copy.
+- Pull-to-refresh on Home; Transactions ascending-order re-check (confirmed in an earlier 09-12
+  session, not re-verified this time).
+- Home quick actions (Receipt/Bill/Subscription/Salary icons) and "Add a card or account" checklist
+  row — reached the stepped flows via a different path (Home destination tiles) after an unrelated
+  detour; did not specifically re-confirm the four quick-action icons route correctly this session.
+
+**Test data created and deleted**
+- Created and deleted one test receipt: **Tia QA Store, $12.34, today (12 Sep 2026)**. Confirmed
+  Receipts list returned to exactly **−$17.00 / 1 receipt (Desi Bits)** — the real, pre-existing entry
+  — after deletion.
+- Started but **cancelled without saving** one test bill (category Internet, $60.00, Specific period)
+  used only to verify the date-picker fix; Bills list unchanged (−$1,030.00 / 1 bill / Housing)
+  throughout and after.
+- Ran one Loan calculator scenario (Monthly rests, $25,000, 25 Sep 2026 first payment) through to the
+  schedule screen; confirmed no bill was created as a side effect.
+- **Reset before finishing:** Fake Pro switched back OFF (Settings → Developer); Appearance reset to
+  Light · Plum. Both confirmed via screenshot.
+
+**Open questions**
+1. Bug 1 (missing `onPress` on `LedgerRow`/`TransactionRow`) is a one-line-per-callsite fix and the
+   highest-value item on this list — it currently makes the two most-used transaction lists in the
+   app inert to touch.
+2. Bug 2 (tab-bar vs. last-row hit-testing) needs an engineer with access to the layout tree; I could
+   only confirm it happens, not why. Worth checking `skip-tab-bar.tsx` and whether the floating bar's
+   touchable area is z-ordered above sibling scroll content near the bottom of the screen.
+3. I would not re-litigate the earlier "hit-box offset" and "dead Settings row" bugs from prior 09-12
+   sessions without a fresh, pixel-measured repro — several of my own early taps this session looked
+   identical to those reports and turned out to be my coordinate math, not the app.
+
+
+## 2026-09-12 — Tia (Tester) — round 2, coverage sweep (amount figure, 5 add-flows, bill date validation, Fake-Pro screens), `almost-done-all-pages`
+
+**Outcome.** Partial pass. Covered every item in the brief. The amount-figure fix, all five add-flow
+lifecycles (subscription/card/account fully to persistence; group/member blocked), the bill
+date-order validation, and the Fake-Pro screen sweep are all done. One environment-level finding
+blocked the Splits half of item 4: the account's real Supabase `entitlements` row has no Pro grant,
+and `Fake Pro` is a client-only display toggle (`src/api/pro.ts:172`, `bypass || sdkPro === true ||
+server.data === true`) that does not touch that row — so every server-enforced free-tier wall
+(`supabase/migrations/20260831100007_pro_wall.sql`, `20260831100008_splits_are_pro.sql`) still fires
+exactly as it would for a real free user. Did not sign out, edit app code, or enter real
+credentials/payment. Coordinates below are device points (0–402 × 0–874) unless marked "pixel"
+(919-wide preview, ÷2.286) or "native" (1206-wide, ÷3).
+
+**Bugs, ranked**
+
+1. **Major, environment/UX — Fake Pro does not unlock server-enforced Pro walls, and the resulting
+   database exception text is confusing next to Settings' own claim.** With Fake Pro ON and Settings
+   reading "Skip Pro — active", tapping **Create group** in Add Group (name "Tia QA Group", airplane
+   icon, step 2 defaults) at device (201, 769) returned inline red text **"The split manager is part
+   of Skip Pro."** — the literal string raised by `supabase/migrations/20260831100008_splits_are_pro.sql:19`.
+   Reproduced twice, deterministically. The same pattern hit **Salary** independently: adding a second
+   income source ("Tia QA Salary", $2,000/mo, last payday 5 Sep 2026) and tapping Save returned **"Free
+   keeps one — Skip Pro removes the limit."** from `enforce_free_allowance` in the same migration file.
+   Both are legitimate, readable database messages (not raw stack traces like the prior session's
+   network error), and `saveErrorMessage` (`src/lib/save-error.ts`) is working as designed by passing
+   them through untouched — but a screen that says "Skip Pro — active" one tap away from a screen that
+   says "is part of Skip Pro" is a contradiction a real user could hit too, any time the client's SDK
+   cache briefly disagrees with the server (lapsed subscription, webhook lag). This also meant **Splits,
+   Settle up, Group settings, and a real Add Member save could not be exercised this round** — group
+   creation is the entry point for all of them. Screenshot:
+   `.claude/team/testing/screenshots/add-group-fake-pro-blocked-raw-sql-error.png`.
+
+2. **Minor, transient, twice-reproduced — reopening Edit immediately after a successful Save can show
+   one stale pre-edit render.** After editing the test Account's colour (orange → blue) and Save,
+   the Cards list correctly showed "Savings" + blue immediately. Tapping Edit again the very next time
+   showed **Checking + orange** — the pre-edit values — for that one open; back out and Edit again showed
+   the correct Savings + blue. Reproduced identically on the test Card (network Visa → Mastercard):
+   the immediate next Edit open showed Visa again, next one after that showed Mastercard correctly. Not
+   reproduced on Subscription (status change reflected immediately and consistently on every reopen). The
+   underlying data was never wrong — only the Edit form's very first read right after its own successful
+   write flashed the old value once. Likely a query-cache race between the mutation's optimistic update
+   and the refetch that backs the Edit screen's initial state.
+
+3. **Minor, cosmetic, single observation — Subscriptions list icon-matching can assign an unrelated
+   real-brand logo to a custom service name.** The test subscription, typed as "Tia QA Streaming" via
+   the "Add '...'" custom-service option, showed a purple **EA-style angle logo** on the Subscriptions
+   list, while the Edit screen for the same record correctly showed a generic "TQ" monogram avatar. Low
+   confidence / not re-verified a second time — flagging for someone with source access to `brand-field.tsx`
+   or the brand-matching lookup to confirm whether a fuzzy match against real brands is firing on
+   custom-typed names.
+
+**Passed**
+
+- **Amount figure fix (item 1, Pia's fix) — confirmed fixed, all three bands.** Add Account: typed
+  3000 → "$3,000" rendered at hero size (64px band) correctly cap-aligned beside "$"; Continue to step 2
+  showed the same figure; **back chevron to step 1 preserved the correct hero rendering** — this was
+  the Founder's exact reported bug (small number dropping below the "$") and it did not reproduce.
+  Cleared and typed 12345678 (8 glyphs) → correctly dropped to the second band (48px), still aligned.
+  Screenshot: `add-account-8glyphs-12345678.png`. Cleared and typed 123456789.99 (14 glyphs) → correctly
+  in the third band (36px), still aligned. Screenshot: `add-account-14glyphs-123456789-99.png`.
+- **Add Subscription — full lifecycle.** $45 (typed via keypad — see note below on my own coordinate
+  slip that produced $45 instead of an intended $15, harmless for this test), custom service "Tia QA
+  Streaming" via the "Add '...'" option, Monthly billing, saved → appeared correctly in
+  Subscriptions ($45.00/mo, 1 plan). Reopened, changed Status from Active to Cancelled (a later-step
+  field) — Monthly-total banner updated live to $0.00 with no extra navigation needed, confirming the
+  edit persisted without even needing to leave the screen. Deleted via the row → confirmation dialog →
+  list returned to "No subscriptions yet" / 0 subscriptions.
+- **Add Card — full lifecycle.** $100, "Tia QA Card" + auto-suffixed digits from a tool text-entry
+  quirk (see note), •••• 2468, Visa default, saved → appeared on Cards ($100 owed). Reopened, changed
+  Network from Visa to Mastercard (a later-step field), Save → detail immediately read "Mastercard".
+  Left and returned via deep link → still Mastercard (edit persistence confirmed past the transient
+  blip in bug 2). Deleted → confirmation dialog → "No cards yet."
+- **Add Account — full lifecycle.** $500 Checking, bank/account-name fields, •••• 4321, saved →
+  appeared on Cards ($500). Reopened, changed Card colour (orange → blue, correctly requiring the
+  colour-picker's actual device coordinates rather than my first, wrong guess — see note) and Account
+  type (Checking → Savings), Save → detail read "Savings" + blue. Left and returned → still Savings +
+  blue (past the bug-2 blip). Deleted → confirmation dialog → "No bank accounts yet."
+- **Add Bill, Specific period "To before From" (item 3) — confirmed impossible, still fixed.** From
+  date defaulted to today (12 Sep 2026). Opened the "To" date picker (a month/day two-step native-style
+  dialog, distinct from the grid picker in the last session's note) and tried day 5 (before From) —
+  no selection, header stayed "12 Sep 2026". Tried day 20 (after From) — selected immediately, header
+  updated to "20 Sep 2026", OK committed it, and the form showed "To: 20 Sep 2026" with a "Clear — make
+  it ongoing" link. Exited the flow without saving (test only, no bill created).
+- **Fake-Pro screen sweep (item 4), everything reachable without a group.** **Friends**: code, Share my
+  code, Add a friend by code, empty state all correct. **Savings**: correct "Nothing yet" empty state
+  with an honest explanation (first month not finished). **Savings month** (no id): "That month is not
+  on your savings" — handled gracefully rather than erroring. **Salary**: added a second source via
+  "+ Add salary source", used the dedicated **AmountPad** screen (typed $2,000 cleanly on the second
+  attempt once I found its keypad sits ~33pt lower than the flow's own keypad — see note), set Last
+  payday via the calendar (5 Sep 2026 → correctly computed "Next payday 5 Oct 2026"), then removed the
+  unsaved source via the trash icon → "Remove Tia QA Salary?" confirmation → "Remove", leaving the
+  pre-existing "Komal Pay" $1,880/twice-a-month source completely untouched throughout. Hit the same
+  Pro-wall pattern as bug 1 when attempting to Save with two sources present (expected, not a new bug).
+  **Tour** ("What Skip can do"): six cards render fully, nothing clipped. **Contact**: pre-fills real
+  name "Sam" and email from the signed-in account; did not tap Send (no real support ticket created).
+  **FAQ**: accordion expand/collapse works correctly (verified on "Why doesn't Skip connect to my
+  bank?"). **Privacy** and **Terms**: both render fully with no clipping, dated 28 August 2026.
+  **Split manager list, Group settings (no id)**: both handle the no-group state gracefully — the list
+  shows "No groups yet" / "Create a group", and a bad group-settings deep link shows a clear "That
+  group is not here" empty state with a "Back to splits" button, rather than erroring.
+- **Reset (item 5) — confirmed.** Fake Pro toggled OFF; Settings' Skip Pro row reverted from
+  "active" to the real "$1.99/mo or $19.99/yr" pricing, confirming the account is genuinely free-tier
+  and the toggle's OFF state is honoured. Tapping Appearance afterward correctly redirected to the
+  Pro-feature paywall explainer (client-side gate working as intended once Fake Pro is off) rather than
+  opening the picker — did not purchase. Appearance was **already** Light · Plum both before and after
+  this session; no change was needed and none was made.
+
+**Test data created and deleted**
+
+- Add Account: "Tia QA BankEverydayEveryday" (see note), $500, Checking → edited to Savings + blue,
+  •••• 4321 — created, edited, reopened to confirm, **deleted**; Cards screen confirmed "No bank
+  accounts yet." afterward.
+- Add Card: "Tia QA Card" + auto-suffixed digits, $100, Visa → edited to Mastercard, •••• 2468 —
+  created, edited, reopened to confirm, **deleted**; Cards screen confirmed "No cards yet." afterward.
+- Add Subscription: "Tia QA Streaming", $45.00/mo, Other category → edited to Cancelled — created,
+  edited, **deleted**; Subscriptions confirmed "No subscriptions yet" / $0.00 afterward.
+- Add Group: "Tia QA Group" — form-only, never persisted (blocked by bug 1); nothing to delete.
+- Add Member: "Tia QA Friend" typed into a groupless Add Member screen — form-only, never persisted;
+  nothing to delete.
+- Add Bill: Internet / $60 / Specific period 12–20 Sep 2026 — used only for date-picker validation,
+  exited without saving; Bills confirmed unchanged at 1 recurring bill / Housing / −$1,030.00 throughout
+  and after.
+- Salary: "Tia QA Salary", $2,000/mo, last payday 5 Sep 2026 — added, then removed via the trash-icon
+  confirmation before ever saving; "Komal Pay" ($1,880, twice a month) confirmed untouched, total
+  confirmed unchanged at $3,760.00/month before, during, and after.
+- **Could not create, so nothing to delete:** a real Splits group, a real group member, a saved
+  Specific-period bill.
+- **Reset confirmed:** Fake Pro OFF (Settings shows real pricing, not "active"); Appearance Light ·
+  Plum (unchanged throughout — never needed a reset).
+
+**Notes on my own coordinate/tooling mistakes this session (recorded so the next session doesn't
+re-litigate them as app bugs)**
+
+1. The screenshot preview the control tool shows is **919px wide**, i.e. pixel/2.286 = device point —
+   confirmed again this session, but I repeatedly slipped and used a screenshot's raw pixel value
+   directly as a device-point coordinate (no division), which produced several early "unresponsive
+   button" moments (Cards tab, Skip Pro row, the Bill date-picker "Next"/"OK" buttons, the Salary
+   amount-pad) that were entirely my own math, not the app. Native `simctl` screenshots are 1206px
+   wide, i.e. pixel/3 = device point — most reliable when precision actually mattered (colour swatches,
+   Save-button rows), and worth reaching for immediately rather than eyeballing a preview.
+2. **The floating tab bar did not respond to taps this session either** (Cards/Home icons, both at
+   correctly-converted coordinates) right after an Add Account save landed on Settings unexpectedly —
+   this matches the tab-bar issue Dana is already fixing per the brief, so I did not investigate further
+   and used `skipbudget://` deep links to navigate instead for the rest of the session.
+3. The dedicated **Salary AmountPad** screen (`src/components/ui/amount-pad.tsx`, used from
+   `salary.tsx`) has its keypad centred about 33pt lower (device y-centres 510/585/660/734) than the
+   stepped-flow's own keypad (`amount-keypad.tsx`, y-centres 477/552/626/701) — same three x-columns
+   (77/201/324) in both. Cost real time before I measured it directly; worth remembering as a genuine
+   layout difference between the two components, not a bug.
+4. Typed multi-word text (`"Tia QA Bank"`, `"Everyday"`) into TextFields intermittently arrived missing
+   its last word, or landed in the wrong (previously-focused, off-screen-scrolled) field after a
+   keyboard-driven auto-scroll — worked around with Select-All-and-retype rather than filing as an app
+   bug, since it was inconsistent, and Card and Account editing/name fields function correctly by
+   direct inspection (`text-field.tsx` has no length or word-count logic that would explain a dropped
+   word). The one deliberate $45-instead-of-$15 amount in the Subscription test was my own row
+   miscount, not a repeat of this issue.
+
+**Open questions**
+
+1. Bug 1 needs a Founder/CEO-level decision, not a code fix: either grant the Sam test account a real
+   `entitlements` row (`pro = true`) so Fake Pro's client-side promise matches the server for testing
+   Splits, or accept that Splits/Settle up/Group settings/Add Member's real save path cannot be verified
+   under this test setup and needs its own Pro-provisioned account.
+2. Bug 2 (stale Edit-reopen render) is real but light — worth a quick look at whether the Edit screens'
+   initial state comes from a query that hasn't invalidated by the time the very next navigation reads
+   it, right after that same screen's own successful mutation.
+3. Bug 3 (EA-style logo on a custom subscription name) is a single observation, not re-verified twice —
+   flagging rather than asserting; someone with time to check the brand-matching source should confirm
+   before treating it as confirmed.

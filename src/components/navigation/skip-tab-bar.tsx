@@ -31,13 +31,24 @@ const TAB_ICONS: Record<string, LucideIcon> = {
  * than outlined because an outline is the same weight as the bar's own edge —
  * it says "here is a shape" where a solid says "you are here", and it is the
  * same charcoal as the add button and the dashboard cards.
+ *
+ * The outer view is bigger than the pill it draws: 8pt above it, the home
+ * indicator's inset below it and the gutter either side, all painted in the
+ * page's own colour. That band is not part of the control, so it does not take
+ * touches — `box-none` lets anything aimed at it through to whatever is behind,
+ * and only the pill and the four buttons inside it respond. Padding, and so
+ * everything on screen, is unchanged.
  */
 export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
   return (
-    <View className="bg-surface px-4 pt-2" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+    <View
+      className="bg-surface px-4 pt-2"
+      style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+      pointerEvents="box-none"
+    >
       <View
         style={shadows.floating}
         className="flex-row items-center justify-around rounded-full border border-line bg-card px-3 py-4"

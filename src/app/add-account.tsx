@@ -46,6 +46,7 @@ import {
 } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { success, warn } from '@/lib/haptics';
+import { saveErrorMessage } from '@/lib/save-error';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
 
 const TYPE_OPTIONS = ACCOUNT_TYPES.map((type) => ({ value: type, label: type }));
@@ -187,7 +188,7 @@ function AccountForm({
       await deleteAccount.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError({ message: (thrown as Error).message ?? 'Could not delete that account.', step });
+      setError({ message: saveErrorMessage(thrown, 'Could not delete that account.'), step });
     }
   };
   const createSalary = useCreateSalarySource();
@@ -281,7 +282,7 @@ function AccountForm({
       router.back();
     } catch (thrown) {
       warn();
-      setError({ message: (thrown as Error).message ?? 'Could not save that account.', step: 2 });
+      setError({ message: saveErrorMessage(thrown, 'Could not save that account.'), step: 2 });
     }
   };
 

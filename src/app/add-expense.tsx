@@ -25,6 +25,7 @@ import { FieldLabel } from '@/components/ui/typography';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { success, warn } from '@/lib/haptics';
+import { saveErrorMessage } from '@/lib/save-error';
 import { equalShares, exactRemainder } from '@/lib/split';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useUserId } from '@/providers/session-provider';
@@ -230,7 +231,7 @@ function ExpenseForm({
       router.back();
     } catch (thrown) {
       warn();
-      setError({ message: (thrown as Error).message, step: 2 });
+      setError({ message: saveErrorMessage(thrown, 'Could not save that expense.'), step: 2 });
     }
   };
 
@@ -248,7 +249,7 @@ function ExpenseForm({
       await deleteExpense.mutateAsync(editing.id);
       router.back();
     } catch (thrown) {
-      setError({ message: (thrown as Error).message, step });
+      setError({ message: saveErrorMessage(thrown, 'Could not delete that expense.'), step });
     }
   };
 

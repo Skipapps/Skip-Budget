@@ -71,6 +71,39 @@ function group(raw: string): string {
 }
 
 /**
+ * How big the running figure is, decided from the string alone.
+ *
+ * The same rule, and the same reason, as `amountFigureBand` in
+ * `components/flow/amount-figure`: this used to be `adjustsFontSizeToFit`, and
+ * on iOS that measures against the first layout pass. The pad opens as a modal
+ * over a field that already has a value, so the text exists before the row has
+ * settled — exactly the case where the number shrinks to the floor while the
+ * "$" beside it stays at full size and never recovers.
+ *
+ * Sizes are set against measured Poppins Bold advances (widest digit "4" at
+ * 0.677em, comma 0.287em, point 0.282em, "$" 0.658em) so the widest string a
+ * band can hold still fits the narrowest screen, an iPhone SE at 375pt less
+ * the pad's px-6, or 327pt. `affixTop` puts the cap of the "$" level with the
+ * cap of the digits: 0.345 x (size - affixSize), which at 48/24 is the 8pt the
+ * pad has today.
+ *
+ * Unlike the keypad, this pad has no digit cap — a result can be arbitrarily
+ * long — so the last band is a floor rather than a fit: past about 18 digits
+ * the figure ellipsises, and no sum of real money gets there.
+ */
+const FIGURE_BANDS = [
+  { maxGlyphs: 7, size: 48, affixSize: 24, affixTop: 8 },
+  { maxGlyphs: 10, size: 40, affixSize: 20, affixTop: 7 },
+  { maxGlyphs: 14, size: 32, affixSize: 16, affixTop: 5.5 },
+  { maxGlyphs: 18, size: 26, affixSize: 13, affixTop: 4.5 },
+  { maxGlyphs: Infinity, size: 20, affixSize: 12, affixTop: 3 },
+];
+
+export function calculatorFigureBand(display: string) {
+  return FIGURE_BANDS.find((band) => display.length <= band.maxGlyphs) ?? FIGURE_BANDS[0];
+}
+
+/**
  * Four-function calculator for amount fields.
  *
  * Deliberately a running accumulator rather than an expression parser: it
@@ -178,6 +211,8 @@ export function CalculatorPad({
 
   const shown = current === '' ? (accumulator !== null ? String(accumulator) : '') : current;
   const isEmpty = shown === '' || Number(shown) === 0;
+  const shownFigure = group(shown);
+  const figure = calculatorFigureBand(shownFigure);
 
   const handleDone = () => {
     // Settle any half-finished operation so Done never discards a pending sum.
@@ -225,20 +260,18 @@ export function CalculatorPad({
           <View className="mt-1 flex-row items-start">
             <Text
               allowFontScaling={false}
-              className={cn(
-                'mt-2 font-poppins-bold text-[24px]',
-                isEmpty ? 'text-muted' : 'text-body',
-              )}
+              style={{ fontSize: figure.affixSize, marginTop: figure.affixTop }}
+              className={cn('font-poppins-bold', isEmpty ? 'text-muted' : 'text-body')}
             >
               $
             </Text>
             <Text
               allowFontScaling={false}
-              className={cn('font-poppins-bold text-[48px]', isEmpty ? 'text-muted' : 'text-ink')}
+              style={{ fontSize: figure.size }}
+              className={cn('font-poppins-bold', isEmpty ? 'text-muted' : 'text-ink')}
               numberOfLines={1}
-              adjustsFontSizeToFit
             >
-              {group(shown)}
+              {shownFigure}
             </Text>
           </View>
         </View>

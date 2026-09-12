@@ -2203,3 +2203,110 @@ has not been read by Priya's team.
    receipt", "That … is not here") — mine, written to match `group-settings.tsx`, not Priya's.
 3. The hidden "Today" pill is a judgement call one line past Dmitri's brief. If it should stay
    visible and simply be disabled instead, say so and it is a two-line change.
+
+## 2026-09-12 — Dana (Developer, UI and navigation) — Tia's three majors: dead rows, the tab bar's touch band, raw network errors
+
+**Outcome — done.** Every row in the Transactions tab and in Home's Recent and Coming up now opens
+the record behind it; the tab bar only takes touches on the pill it paints; a save that fails because
+the connection dropped says so in English. `npm run check` exits 0 (51 suites, 551 tests) after
+`rm -rf .expo/cache/eslint`. Nothing committed.
+
+### 1. The two combined ledgers now navigate
+
+The hard part was not the handler, it was working out *which record* a row belongs to. Rows in these
+lists are `useLedger` entries, which are **occurrences**, not records, and their ids come in four
+shapes: `receipt-<id>`, `bill-<id>@<date>` / `subscription-<id>@<date>` (projected from a plan),
+`charge-<id>` (an occurrence that was written down at the time) and `income-<id>@<date>`. Only the
+first three carry a record id, and the `charge-` one carries none at all — a charge row names its
+plan through `bill_id`/`subscription_id`, which is on the row and nowhere in the ledger entry.
+
+So the mapping lives in one pure file, `src/lib/ledger-link.ts`:
+
+- `ledgerHref(entry, owners)` → typed `Href` or **null**. Receipt → `/add-receipt?id=`, bill →
+  `/add-bill?id=`, subscription → `/add-subscription?id=` (the object form, the same routes
+  `receipts.tsx:261`, `bill-plans.tsx:209` and `subscription-plans.tsx:205` already push), income →
+  `/salary`, which edits every source at once and takes no id.
+- `chargeOwners(rows)` keys charge rows as `charge-<id>` → the plan's record id, which is what makes
+  a *recorded* bill or subscription row openable. Both screens read `useCharges()` — the very query
+  `useLedger` already reads, so it costs no fetch and no `src/api` file was touched.
+- Null means "nothing to open". `LedgerRow` and `TransactionRow` now render inert in that case:
+  `accessibilityRole` is `text` rather than `button`, `disabled`, and no `active:opacity-60`. A row
+  that dims under a thumb and then does nothing is the bug being fixed, not the fix.
+
+**Kinds with no edit screen:** none, in practice. `useLedger` produces exactly four kinds and all
+four now route. Card *payments* are deliberately not in this ledger at all (`queries.ts:823` — a
+payment moves money between two things you already own, so counting it beside the charge it settles
+would double the spending), so the `source/[id]` case in the brief does not arise on these two
+screens; that screen already handles its own payment rows. The only inert case left is an id of a
+shape nothing produces today, which is asserted rather than assumed.
+
+**Not wired, deliberately:** `bills.tsx`, `subscriptions.tsx` (the per-window charge lists) and the
+non-payment rows on `source/[id].tsx` still render `TransactionRow` with no handler. They were
+already inert; they are now *honestly* inert. Say the word and they take three lines each.
+
+### 2. The tab bar's touch band — root cause
+
+`SkipTabBar` renders **in the layout flow**, not absolutely: `BottomTabView` puts the screens
+container (`flex: 1`) above it and the bar after it, so page content is never underneath the bar.
+What *is* true is that the bar's touchable box is bigger than the control it draws. On a 402×874
+device with a 34pt home-indicator inset the outer view is `8 (pt-2) + 86 (pill) + 34 (paddingBottom)`
+= 128pt tall and owns y≈746–874, while the pill it paints spans y≈754–840. The 8pt above it, the
+34pt below it and the 16pt gutter either side are painted `bg-surface` — *the page's own colour* —
+so that band is indistinguishable from empty page and, until now, counted as a touch on the bar.
+
+Fix: `pointerEvents="box-none"` on that outer view (`skip-tab-bar.tsx:41`). It still paints exactly
+as before — padding, insets and colours are untouched, and a test asserts `paddingBottom` is still
+`Math.max(insets.bottom, 12)` — but only the pill and its four buttons receive touches now; anything
+aimed at the band goes through to whatever is behind it. `src/components/navigation/skip-tab-bar.test.tsx`
+covers the band, the pill, and that pressing a button still navigates (and that the open tab does not).
+
+**What I could not make the geometry agree with.** Tia's repro taps at device (250, 808) and
+(250, 827) are *inside* the drawn pill (754–840), not above it, and on a bar that is in flow no
+content can be drawn there. Either the page had scrolled between the screenshot she measured and
+the tap that followed, or the tap coordinates and the screenshot are not in the same space — the
+same class of error she flagged herself elsewhere in that session. Worth one fresh repro with the
+screenshot taken immediately before the tap; if content really is visible at y≈808 on a tab screen,
+the cause is something other than this component and I want to see that frame.
+
+### 3. Network failures no longer show their guts
+
+`src/lib/save-error.ts`, pure and tested (18 cases):
+
+- `saveErrorMessage(thrown, fallback)` → the network sentence when the failure is the connection,
+  the thrown message when there is one, the screen's own fallback when there is not (which the old
+  `(thrown as Error).message ?? '…'` never actually reached: an `Error` with no message has `''`,
+  not `undefined`).
+- Network-shaped means the message contains `network`, `fetch failed`, `failed to fetch`,
+  `connection`, `timed out` or `offline`, **or** it is a `TypeError` that mentions fetching — which
+  is what `fetch` itself throws, and on some platforms it says only "Load failed". Tia's exact
+  string, `Error: fetch failed: UnexpectedException: The network connection was lost`, is a test case.
+- `NOTHING_UPDATED`, `NOTHING_SAVED` and every validation line pass through whole; both are asserted.
+
+Used at every save and delete error line in the eight `src/app/add-*.tsx` screens. `src/api` is
+untouched, so the real error text still reaches logs and anything that needs to tell two failures
+apart. The two device errors in `add-receipt` (camera, file read) are left as they were.
+
+### Tests added
+
+`src/lib/save-error.test.ts` (18), `src/lib/ledger-link.test.ts` (9),
+`src/components/navigation/skip-tab-bar.test.tsx` (4), `src/__tests__/app/home.test.tsx` (1, new
+file), and a routing case added to `src/__tests__/app/transactions.test.tsx` whose ledger fixtures
+now carry realistic ids. The two screen routing tests press every kind inside **one** mount on
+purpose: a test per row made both files order-dependent — six mounts of a screen that size under
+fake timers left the last one with nothing queryable.
+
+### Could not verify
+
+Nothing on a device. Metro is live for Tia and I stayed out of the simulator beyond one passive
+screenshot. Item 2 in particular is proved structurally, not by a thumb on glass.
+
+### Open questions
+
+1. Item 2 needs Tia's re-test with a fresh, immediately-before-the-tap screenshot (see above). If it
+   still reproduces, the next suspect is outside this component.
+2. On a tab screen the bottom inset is counted twice — `Screen` (`screen.tsx:120`) asks for the
+   `bottom` edge and the bar adds `Math.max(insets.bottom, 12)` again — so ~34pt of dead page sits
+   between the last row and the pill. Harmless to touch handling, but it is the gap that makes the
+   bar look like it is floating over nothing. Priya's call, not mine.
+3. Should `bills.tsx`, `subscriptions.tsx` and `source/[id]`'s non-payment rows open their records
+   too? Same helper, three lines each, but it was outside the brief.

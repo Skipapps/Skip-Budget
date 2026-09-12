@@ -4,6 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import type { LedgerEntry } from '@/api/queries';
 import { BillMark } from '@/components/bills/bill-mark';
 import { BrandMark } from '@/components/brands/brand-mark';
+import { cn } from '@/lib/cn';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
 
@@ -12,6 +13,11 @@ type LedgerRowProps = {
   /** Human label for the card or account it came from. */
   sourceLabel: string;
   kindLabel: string;
+  /**
+   * Opens the record behind the row. Left undefined for an entry with nothing
+   * to open, and then the row is not a button at all — it neither dims under a
+   * thumb nor announces itself to VoiceOver as something that can be pressed.
+   */
   onPress?: () => void;
 };
 
@@ -25,14 +31,20 @@ export function LedgerRow({ entry, sourceLabel, kindLabel, onPress }: LedgerRowP
   // A bill is not a brand either — it carries the category icon instead.
   const isBill = entry.kind === 'bill';
 
+  const label = [entry.label, kindLabel, sourceLabel, formatCurrency(entry.amount)]
+    .filter(Boolean)
+    .join(', ');
+
   return (
     <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={[entry.label, kindLabel, sourceLabel, formatCurrency(entry.amount)]
-        .filter(Boolean)
-        .join(', ')}
+      accessibilityRole={onPress ? 'button' : 'text'}
+      accessibilityLabel={label}
       onPress={onPress}
-      className="w-full flex-row items-center gap-3 py-3 active:opacity-60"
+      disabled={!onPress}
+      className={cn(
+        'w-full flex-row items-center gap-3 py-3',
+        onPress ? 'active:opacity-60' : undefined,
+      )}
     >
       {isIncome ? (
         <View className="h-10 w-10 items-center justify-center rounded-full bg-ink/5">

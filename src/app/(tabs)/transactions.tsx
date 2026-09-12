@@ -15,7 +15,8 @@ import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { Title } from '@/components/ui/typography';
-import { usePaymentSources, useLedger } from '@/api/queries';
+import { usePaymentSources, useLedger, type LedgerEntry } from '@/api/queries';
+import { useCharges } from '@/api/charges';
 import { useRefreshAll } from '@/api/refresh';
 import { PageState } from '@/components/ui/page-state';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -35,6 +36,7 @@ import {
 } from '@/lib/period';
 
 import { useToday } from '@/lib/use-today';
+import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
 
@@ -79,6 +81,23 @@ export default function TransactionsScreen() {
   const { entries: ledger, totals, isLoading, isError, refetch } = useLedger(range, today);
   const { refresh, refreshing } = useRefreshAll();
   const { sources } = usePaymentSources();
+
+  /**
+   * Which plan each recorded charge came from, so a row that already happened
+   * opens the bill or subscription behind it.
+   *
+   * The same query the ledger itself reads, so this costs no fetch: an
+   * occurrence that was written down carries the charge's id and nothing that
+   * names its plan, and this is the only thing that can answer it.
+   */
+  const charges = useCharges();
+  const owners = useMemo(() => chargeOwners(charges.data ?? []), [charges.data]);
+
+  /** The row's handler, or undefined when the row opens nothing. */
+  const openEntry = (entry: LedgerEntry) => {
+    const href = ledgerHref(entry, owners);
+    return href ? () => router.push(href) : undefined;
+  };
 
   const activeCount = countActiveFilters(filters);
 
@@ -321,6 +340,11 @@ export default function TransactionsScreen() {
                   entry={entry}
                   sourceLabel={sourceLabels.get(entry.sourceId) ?? ''}
                   kindLabel={KIND_LABELS[entry.kind] ?? entry.kind}
+                  // Every row opens the record behind it — a receipt, the bill
+                  // or subscription that charged, the salary screen for a
+                  // payday. `ledgerHref` returns null when there is nothing to
+                  // open, and the row stays inert rather than guessing.
+                  onPress={openEntry(entry)}
                 />
               ))}
             </View>

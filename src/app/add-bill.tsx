@@ -39,6 +39,7 @@ import {
 } from '@/data/bills-mock';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { success, warn } from '@/lib/haptics';
+import { saveErrorMessage } from '@/lib/save-error';
 import { amortise, termsFromStored } from '@/lib/loan';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
@@ -276,7 +277,7 @@ function BillForm({
       await deleteBill.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError({ message: (thrown as Error).message ?? 'Could not delete that bill.', step });
+      setError({ message: saveErrorMessage(thrown, 'Could not delete that bill.'), step });
     }
   };
 
@@ -356,7 +357,7 @@ function BillForm({
       router.back();
     } catch (thrown) {
       warn();
-      setError({ message: (thrown as Error).message ?? 'Could not save that bill.', step: 'when' });
+      setError({ message: saveErrorMessage(thrown, 'Could not save that bill.'), step: 'when' });
     }
   };
 

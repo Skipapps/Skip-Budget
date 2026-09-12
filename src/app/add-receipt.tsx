@@ -23,6 +23,7 @@ import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { toIsoDate } from '@/lib/date';
 import { success, warn } from '@/lib/haptics';
+import { saveErrorMessage } from '@/lib/save-error';
 import { parseReceipt, parseReceiptFromLines, type ParsedReceipt } from '@/lib/receipt-parser';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
@@ -485,7 +486,7 @@ function ReceiptForm({
       router.back();
     } catch (thrown) {
       warn();
-      setError({ message: (thrown as Error).message ?? 'Could not save that receipt.', step: 2 });
+      setError({ message: saveErrorMessage(thrown, 'Could not save that receipt.'), step: 2 });
     }
   };
 
@@ -503,7 +504,7 @@ function ReceiptForm({
       await deleteReceipt.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError({ message: (thrown as Error).message ?? 'Could not delete that receipt.', step });
+      setError({ message: saveErrorMessage(thrown, 'Could not delete that receipt.'), step });
     }
   };
 

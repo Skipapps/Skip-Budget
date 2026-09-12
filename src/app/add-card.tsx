@@ -28,6 +28,7 @@ import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { NETWORKS } from '@/data/cards-mock';
 import { success, warn } from '@/lib/haptics';
+import { saveErrorMessage } from '@/lib/save-error';
 import { toIsoDate } from '@/lib/date';
 import { useArtwork } from '@/theme/artwork';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
@@ -175,7 +176,7 @@ function CardForm({
       await deleteCard.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError({ message: (thrown as Error).message ?? 'Could not delete that card.', step });
+      setError({ message: saveErrorMessage(thrown, 'Could not delete that card.'), step });
     }
   };
 
@@ -243,7 +244,7 @@ function CardForm({
       router.back();
     } catch (thrown) {
       warn();
-      setError({ message: (thrown as Error).message ?? 'Could not save that card.', step: 2 });
+      setError({ message: saveErrorMessage(thrown, 'Could not save that card.'), step: 2 });
     }
   };
 

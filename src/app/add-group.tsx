@@ -10,6 +10,7 @@ import { SwitchControl } from '@/components/ui/switch-control';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { success, warn } from '@/lib/haptics';
+import { saveErrorMessage } from '@/lib/save-error';
 
 /**
  * Naming a group and choosing how it settles.
@@ -77,7 +78,7 @@ function AddGroupScreenInner() {
       router.replace(`/split-group?id=${group.id}`);
     } catch (thrown) {
       warn();
-      setError({ message: (thrown as Error).message, step: 1 });
+      setError({ message: saveErrorMessage(thrown, 'Could not create that group.'), step: 1 });
     }
   };
 

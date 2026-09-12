@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { BillMark } from '@/components/bills/bill-mark';
 import { BrandMark } from '@/components/brands/brand-mark';
+import { cn } from '@/lib/cn';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
 
@@ -17,6 +18,10 @@ type TransactionRowProps = {
   kind?: 'receipt' | 'bill' | 'subscription' | 'payment' | 'income';
   categoryId?: string | null;
   iconId?: string | null;
+  /**
+   * Opens whatever is behind the row. Undefined leaves it inert — not dimming
+   * under a thumb, and not announced as a button by VoiceOver.
+   */
   onPress?: () => void;
 };
 
@@ -41,10 +46,14 @@ export function TransactionRow({
   const moneyColor = useMoneyColor();
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={onPress ? 'button' : 'text'}
       accessibilityLabel={`${label}, ${formatCurrency(amount)}${kindLabel ? `, ${kindLabel}` : ''}`}
       onPress={onPress}
-      className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
+      disabled={!onPress}
+      className={cn(
+        'w-full flex-row items-center gap-3 py-3.5',
+        onPress ? 'active:opacity-60' : undefined,
+      )}
     >
       {kind === 'bill' ? (
         <BillMark categoryId={categoryId} iconId={iconId} domain={domain} name={label} size={40} />

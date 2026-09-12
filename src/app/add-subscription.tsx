@@ -31,6 +31,7 @@ import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { toIsoDate } from '@/lib/date';
 import { success, warn } from '@/lib/haptics';
+import { saveErrorMessage } from '@/lib/save-error';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 
@@ -235,7 +236,7 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
     } catch (thrown) {
       warn();
       setError({
-        message: (thrown as Error).message ?? 'Could not save that subscription.',
+        message: saveErrorMessage(thrown, 'Could not save that subscription.'),
         step: 2,
       });
     }
@@ -256,7 +257,7 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
       router.back();
     } catch (thrown) {
       setError({
-        message: (thrown as Error).message ?? 'Could not delete that subscription.',
+        message: saveErrorMessage(thrown, 'Could not delete that subscription.'),
         step,
       });
     }

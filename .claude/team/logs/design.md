@@ -879,3 +879,70 @@ and no file owned by Paulo, Diego or Dana was edited by hand. Nothing committed.
    `SegmentedControl`. Three orphans is a tidy-up worth one commit. (Dmitri, CEO)
 3. `reminders.tsx:246`'s `mt-1` is the last un-swept title offset. Whoever next owns that file
    should delete the class. (Paulo/Dana)
+
+---
+
+## 2026-09-12 — Pia (Product Designer)
+
+**Outcome**
+Fixed: the hero amount figure no longer asks iOS to size itself. `AmountFigure` and the calculator
+pad's figure now pick a font size from the display string, so a step remounted with a value renders
+exactly as a fresh one does. `npm run check` exits 0 (518 tests, no lint warnings). Not seen on a
+device — the CEO verifies on the Simulator.
+
+**What changed**
+- `src/components/flow/amount-figure.tsx` — `adjustsFontSizeToFit` and `minimumFontScale` gone,
+  `shrink` gone from the number, size chosen by `amountFigureBand(display)` (exported for tests).
+  Bands, by glyph count of the grouped string: **≤7 → 64px/76**, **8–10 → 48/58**, **11–14 → 36/44**,
+  **15+ → 28/34**. The $ and % scale with the number (28/21/16/12) and their `marginTop` is
+  `0.345 × (size − affixSize)` — Poppins' ascender 1.05em less its cap 0.705em — which reproduces
+  today's `mt-3` at 64/28 to within half a point and holds the caps level at every other size.
+- `src/components/ui/calculator-pad.tsx` — same bug, same shape ($ at a fixed size beside a
+  shrink-to-fit number), and it opens as a modal over a field that already holds a value, which is
+  the mount-with-text case. Bands `≤7 → 48px`, `≤10 → 40`, `≤14 → 32`, `≤18 → 26`, `19+ → 20`,
+  affix at half and `affixTop` by the same rule (48/24 → 8pt, the `mt-2` it has today). Exported
+  `calculatorFigureBand`.
+- `src/components/flow/amount-figure.test.tsx` — seven new rendered cases: each band edge, the
+  over-cap figure, the $ and % proportions, and the Founder's case both ways (render `''` then
+  rerender `'3000'`, and back), asserting `fontSize` off the rendered style.
+- `src/components/ui/calculator-pad.test.tsx` (new) — band edges plus a render of the pad opened
+  with `value="3000"` asserting 48px and no `adjustsFontSizeToFit`.
+
+**How the bands were chosen (not by eye)**
+Parsed `hmtx` out of `Poppins_700Bold.ttf` in `node_modules`: unitsPerEm 1000, digits are *not*
+tabular — widest is "4" at 0.677em, narrowest "1" at 0.376 — comma 0.287, point 0.282, $ 0.658,
+cap height 0.705, ascender 1.05. Each band's worst-case string (all 4s) was checked against the
+narrowest screen the app supports: iOS deployment target is 16.4, so the smallest is a 375pt SE,
+less `Screen`'s `px-6` = 327pt. Widest case in any band is 14 glyphs at 36px = 309pt. Nothing
+shrinks, so nothing needs to.
+
+`affixTop` is arithmetic, not taste: RN only applies its centring baseline offset when the line
+height asked for is *taller* than the font's own (`RCTAttributedTextUtils.mm` returns early
+otherwise), and every band here is shorter, so cap-top offset is `0.345 × fontSize`. Both existing
+figures — `mt-3` at 64/28 and `mt-2` at 48/24 — land on cap-level alignment under that rule, which
+is presumably how they were tuned by eye.
+
+**Checked and deliberately left alone**
+The other 16 `adjustsFontSizeToFit` uses. The Founder's symptom needs a fixed-size affix as a
+sibling of a shrink-to-fit number; the rest (`bills`, `subscriptions`, `savings`, `salary`,
+`loan-calculator`, `split-group`, `friends`, `insights` ×3, `amount-tile`, `ledger-summary`,
+`card-face`, `balance-summary`:217, `button`, `friend-request-popup`) are single Texts filling
+their own block at 20–40px, where the worst case is a figure a little smaller than it needs to be,
+never a broken one. Taking shrink-to-fit off those without a band table would risk ellipsising real
+money in a 26px slot, which is worse than the thing being fixed. `balance-summary`'s 40px hero
+already does exactly this — `digits > 12 ? 28 : digits > 10 ? 34 : 40` — and needs nothing.
+
+**Could not verify**
+Nothing seen rendered. The Metro dev bundle lazy-loads routes, so a 200 from `entry.bundle` does
+not prove these two modules transformed; Fast Refresh will carry them to the Simulator. The glyph
+widths are measured, but the fit was computed rather than photographed.
+
+**Open questions**
+1. At the 36px band the "$" is 16px. That is the right proportion, but a nine-figure amount is the
+   one case where the currency mark could read as an afterthought. Worth a look on device. (Tia)
+2. The calculator pad has no digit cap, so past ~18 digits its figure ellipsises rather than
+   shrinking further. Real money never gets there and `Number` goes exponential before it does, but
+   if that bothers anyone the answer is a cap on the pad, not another band. (Priya)
+3. `AmountFigure` and the calculator pad now hold two band tables tuned to two different hero
+   sizes. They are each documented against the other; if a third figure ever needs this, it should
+   become one helper that takes a base size. (Dmitri)
