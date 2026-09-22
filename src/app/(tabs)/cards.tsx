@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Screen } from '@/components/ui/screen';
 import { SectionHeading } from '@/components/ui/typography';
 import {
+  savedFor,
   useBankAccounts,
   useCards,
   useSalarySources,
@@ -83,7 +84,10 @@ export default function CardsScreen() {
   );
   // What the finished months added up to. A month that was overspent takes
   // from it, so this can fall as well as rise.
-  const savingsTotal = (savings.data ?? []).reduce((sum, month) => sum + Number(month.saved), 0);
+  // The same figure the Savings screen shows: a corrected month counts its
+  // correction and a month left out counts nothing. Summing the raw `saved`
+  // here put a number on this tile that the page behind it then disowned.
+  const savingsTotal = (savings.data ?? []).reduce((sum, month) => sum + savedFor(month), 0);
 
   const moneyAmounts: Record<string, number> = {
     salary: monthlySalary,

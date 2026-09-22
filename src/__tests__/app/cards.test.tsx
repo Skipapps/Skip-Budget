@@ -21,8 +21,16 @@ jest.mock('react-native-keyboard-controller', () =>
 
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 // Reanimated 4 pulls react-native-worklets, which wants a native module. The
-// money tiles are the only thing on this page that animates.
-jest.mock('@/components/ui/amount-tile', () => ({ AmountTile: () => null }));
+// money tiles are the only thing on this page that animates, so the stand-in
+// just prints what the page handed it.
+jest.mock('@/components/ui/amount-tile', () => {
+  const { Text } = jest.requireActual('react-native');
+  return {
+    AmountTile: ({ label, amount }: { label: string; amount?: number }) => (
+      <Text>{`${label}: ${amount}`}</Text>
+    ),
+  };
+});
 jest.mock('@/components/cards/payment-card', () => ({ PaymentCard: () => null }));
 jest.mock('@/components/cards/account-card', () => ({ AccountCard: () => null }));
 
@@ -35,7 +43,12 @@ jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
 
-jest.mock('@/data/money-mock', () => ({ moneyBuckets: [] }));
+jest.mock('@/data/money-mock', () => ({
+  moneyBuckets: [
+    { id: 'salary', label: 'Salary', artwork: 'tileSalary' },
+    { id: 'savings', label: 'Savings', artwork: 'tileSavings' },
+  ],
+}));
 
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true }) }));
 
@@ -69,12 +82,20 @@ const mockAccounts = [
 
 let mockBalancesFailed = false;
 const mockRefetchBalances = jest.fn();
+let mockSavings: object[] = [];
 
 jest.mock('@/api/queries', () => ({
+  // The same rule the Savings page applies (the real module cannot load under
+  // Jest: it pulls in the Supabase client and its native storage).
+  savedFor: (month: {
+    excluded_at: string | null;
+    adjusted_saved: number | null;
+    saved: number;
+  }) => (month.excluded_at ? 0 : Number(month.adjusted_saved ?? month.saved)),
   useCards: () => ({ data: mockCards, isPending: false, isError: false }),
   useBankAccounts: () => ({ data: mockAccounts, isPending: false, isError: false }),
   useSalarySources: () => ({ data: [], isPending: false, isError: false }),
-  useMonthlySavings: () => ({ data: [], isPending: false, isError: false }),
+  useMonthlySavings: () => ({ data: mockSavings, isPending: false, isError: false }),
   useSourceBalances: () => ({
     // A walk that failed hands back no balances at all, which is exactly how
     // the screen used to end up drawing `card.balance` as if it were live.
@@ -88,8 +109,50 @@ jest.mock('@/lib/use-today', () => ({ useToday: () => ({ today: '2026-09-12' }) 
 
 beforeEach(() => {
   mockBalancesFailed = false;
+  mockSavings = [];
   mockRefetchBalances.mockClear();
   mockRefresh.mockClear();
+});
+
+/**
+ * The Savings tile is the Savings page's total, seen from one screen back.
+ *
+ * It used to sum the raw `saved` column, so a month corrected to $500 or left
+ * out altogether still counted at what the app had worked out — the tile said
+ * $1,783.46 above a page that said $0.00.
+ */
+describe('Cards — the Savings tile', () => {
+  const august = { month: '2026-08-01', income: 3760, spent: 1976.54, saved: 1783.46 };
+
+  it('counts a corrected month at its correction', async () => {
+    mockSavings = [
+      { ...august, adjusted_saved: 500, note: 'Paid the plumber in cash', excluded_at: null },
+    ];
+    const { getByText, queryByText } = await render(<CardsScreen />);
+
+    expect(getByText('Savings: 500')).toBeTruthy();
+    expect(queryByText('Savings: 1783.46')).toBeNull();
+  });
+
+  it('counts a month that was left out as nothing', async () => {
+    mockSavings = [
+      { ...august, adjusted_saved: 500, note: null, excluded_at: '2026-09-21T15:37:00Z' },
+      {
+        month: '2026-07-01',
+        income: 3760,
+        spent: 3500,
+        saved: 260,
+        adjusted_saved: null,
+        note: null,
+        excluded_at: null,
+      },
+    ];
+    const { getByText, queryByText } = await render(<CardsScreen />);
+
+    expect(getByText('Savings: 260')).toBeTruthy();
+    expect(queryByText('Savings: 1783.46')).toBeNull();
+    expect(queryByText('Savings: 500')).toBeNull();
+  });
 });
 
 describe('Cards — balances that could not be worked out', () => {
