@@ -61,12 +61,7 @@ export default function SubscriptionsScreen() {
   const planCount = plans.data?.length ?? 0;
 
   return (
-    <Screen
-      showBack
-      onRefresh={refetch}
-      // Oldest charge first, so the most recent is at the bottom — open there.
-      startAtEnd={!isLoading && !isError && charges.length > 0}
-    >
+    <Screen showBack onRefresh={refetch}>
       <Title align="left" className="w-full">
         Subscriptions
       </Title>
@@ -96,7 +91,7 @@ export default function SubscriptionsScreen() {
               Renewals charged
             </Text>
             <Text
-              className="mt-0.5 font-poppins-bold text-[26px]"
+              className="mt-0.5 font-poppins-bold text-[26px] text-ink"
               style={{ color: moneyColor(total) }}
               numberOfLines={1}
               adjustsFontSizeToFit

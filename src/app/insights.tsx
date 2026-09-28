@@ -303,7 +303,7 @@ function InsightsScreenInner() {
 
         <View className="mt-4 w-full gap-2.5">
           <StandRow label="Put aside" value={savedTotal} />
-          <StandRow label="Owed on cards" value={-owedOnCards} />
+          <StandRow label="Owed on credit cards" value={-owedOnCards} />
           {splitPosition !== 0 ? (
             <StandRow
               label={splitPosition > 0 ? 'Owed to you by friends' : 'You owe friends'}

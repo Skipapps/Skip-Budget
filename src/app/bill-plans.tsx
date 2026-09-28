@@ -24,6 +24,7 @@ import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
+import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
 
 export default function BillPlansScreen() {
@@ -67,14 +68,9 @@ export default function BillPlansScreen() {
   );
 
   const visible = useMemo(() => {
-    const needle = queryText.trim().toLowerCase();
-
     return bills.filter((bill) => {
-      if (needle) {
-        const category = getBillCategory(bill.categoryId)?.label ?? '';
-        const haystack = `${bill.name} ${category}`.toLowerCase();
-        if (!haystack.includes(needle)) return false;
-      }
+      const category = getBillCategory(bill.categoryId)?.label ?? '';
+      if (!matchesSearch(`${bill.name} ${category}`, queryText)) return false;
       if (filters.categoryIds.length > 0 && !filters.categoryIds.includes(bill.categoryId)) {
         return false;
       }

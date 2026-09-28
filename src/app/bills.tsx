@@ -59,12 +59,7 @@ export default function BillsScreen() {
   const planCount = plans.data?.length ?? 0;
 
   return (
-    <Screen
-      showBack
-      onRefresh={refetch}
-      // Oldest charge first, so the most recent is at the bottom — open there.
-      startAtEnd={!isLoading && !isError && charges.length > 0}
-    >
+    <Screen showBack onRefresh={refetch}>
       <Title align="left" className="w-full">
         Monthly bills
       </Title>
@@ -94,7 +89,9 @@ export default function BillsScreen() {
               Bills charged
             </Text>
             <Text
-              className="mt-0.5 font-poppins-bold text-[26px]"
+              // text-ink underneath: a zero total gets no money colour, and an
+              // unstyled figure is black — invisible in dark mode.
+              className="mt-0.5 font-poppins-bold text-[26px] text-ink"
               style={{ color: moneyColor(total) }}
               numberOfLines={1}
               adjustsFontSizeToFit

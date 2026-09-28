@@ -84,7 +84,7 @@ export function SubscriptionFilterSheet({
               options={sourceOptions}
               values={draft.sourceIds}
               onChange={(sourceIds) => setDraft((current) => ({ ...current, sourceIds }))}
-              emptyHint="Showing every card and account."
+              emptyHint="Showing every credit card and account."
             />
           </View>
         </ScrollView>

@@ -7,10 +7,12 @@ import {
   Poppins_700Bold,
   useFonts,
 } from '@expo-google-fonts/poppins';
+import * as Sentry from '@sentry/react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -30,7 +32,16 @@ import { ThemeProvider, useColors, useTheme } from '@/providers/theme-provider';
 // system font and then reflows once the real face loads.
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+// As early as the module loads, so a crash during startup is still caught.
+// Off in development on purpose: red boxes are already louder than Sentry,
+// and dev-session noise would bury the reports that matter.
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  enabled: !__DEV__,
+  sendDefaultPii: false,
+});
+
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -105,6 +116,12 @@ function AppShell({ fontsReady }: { fontsReady: boolean }) {
 function RootNavigator() {
   const { ready } = useSession();
   const colors = useColors();
+  // Remount the navigator when the phone's text size changes while the app
+  // is alive. React Native re-measures glyphs but keeps stale text-container
+  // layouts, so every heading came back as "Ca…" until a full relaunch. A
+  // font-size change is rare and deliberate, so restarting navigation on the
+  // home screen is a fair trade for a page that is actually readable.
+  const { fontScale } = useWindowDimensions();
 
   // Inside the session, because a token is stored against a user. Re-runs on
   // every launch: iOS rotates tokens on restore and reinstall, and a stale one
@@ -117,8 +134,12 @@ function RootNavigator() {
 
   return (
     <Stack
+      key={`fontscale-${fontScale}`}
       screenOptions={{
         headerShown: false,
+        // Every page is a push: forward slides in from the right, back slides
+        // out to the right. iOS resolves this to its native push transition.
+        animation: 'slide_from_right',
         contentStyle: { backgroundColor: colors.surface },
       }}
     />
@@ -131,3 +152,7 @@ function PurchasesBridge() {
   useConfigurePurchases();
   return null;
 }
+
+// The wrap is what ties uncaught render errors to the report — without it
+// Sentry only hears about errors thrown outside React.
+export default Sentry.wrap(RootLayout);

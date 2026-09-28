@@ -9,6 +9,7 @@ import { usePro } from '@/api/pro';
 import { GettingStartedCard } from '@/components/dashboard/getting-started-card';
 import { InsightBanner } from '@/components/dashboard/insight-banner';
 import { QuickActions } from '@/components/dashboard/quick-actions';
+import { ToolCards } from '@/components/dashboard/tool-cards';
 import { DateSelector } from '@/components/dashboard/date-selector';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
@@ -39,9 +40,10 @@ const DESTINATION_ROUTES: Record<string, Href> = {
   'monthly-bills': '/bills',
   receipts: '/receipts',
   subscriptions: '/subscriptions',
-  'loan-calculator': '/loan-calculator',
-  'split-calculator': '/splits',
 };
+
+/** The calculators live in their own card row now, not the spending list. */
+const TOOL_IDS = new Set(['loan-calculator', 'split-calculator']);
 
 export default function HomeScreen() {
   const { pro } = usePro();
@@ -52,8 +54,12 @@ export default function HomeScreen() {
   const profile = useProfile();
 
   // Whichever order they arranged them in, with anything unmentioned behind.
+  // The two calculators are drawn as cards of their own below the list.
   const tiles = useMemo(
-    () => orderByIds(spendingCategories, profile.data?.tile_order),
+    () =>
+      orderByIds(spendingCategories, profile.data?.tile_order).filter(
+        (tile) => !TOOL_IDS.has(tile.id),
+      ),
     [profile.data?.tile_order],
   );
 
@@ -192,7 +198,10 @@ export default function HomeScreen() {
       {/* Recording something is the one thing on this screen that is not
           reading: four of them, one tap each, right under the figure they
           change. */}
-      <View className="mt-5 w-full">
+      <View className="mt-6 w-full">
+        <SectionHeading>Quick add</SectionHeading>
+      </View>
+      <View className="mt-3 w-full">
         <QuickActions onPress={(href) => router.push(href)} />
       </View>
 
@@ -221,12 +230,17 @@ export default function HomeScreen() {
         />
       </View>
 
-      {/* Full width and outside the list — it is a story, not a figure. */}
+      {/* The three Pro destinations, raised off the page as cards: the two
+          calculators shoulder to shoulder, the insights story full width
+          beneath them. They open tools, not figures, so they left the list. */}
+      <View className="mt-8 w-full">
+        <SectionHeading caption="Included with Pro">Go further</SectionHeading>
+      </View>
       <View className="mt-3 w-full">
-        {/* Transactions is the story: the chart, the timeline and the
-            periods to read them over. The banner said so already and had
-            nowhere to send anyone. */}
-        <InsightBanner onPress={() => router.push('/insights')} />
+        <ToolCards pro={pro} onPress={(href) => router.push(href)} />
+      </View>
+      <View className="mt-4 w-full">
+        <InsightBanner pro={pro} onPress={() => router.push('/insights')} />
       </View>
 
       {/* Whitespace separates this from the blocks above it. The rule that

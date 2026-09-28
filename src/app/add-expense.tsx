@@ -17,7 +17,6 @@ import { AmountStep } from '@/components/flow/amount-step';
 import { InlineCalendar } from '@/components/flow/inline-calendar';
 import { StepFlow } from '@/components/flow/step-flow';
 import { ChoiceChips } from '@/components/ui/choice-chips';
-import { useProGate } from '@/components/pro/pro-gate';
 import { SelectField } from '@/components/ui/select-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TextField } from '@/components/ui/text-field';
@@ -45,15 +44,6 @@ type Mode = 'equal' | 'exact';
  * error on submit: "$4.20 left to assign" while you work is help, and the same
  * fact after a failed save is a telling-off.
  */
-export default function AddExpenseScreen() {
-  // A wrapper, not an inline return: the screen below runs its own
-  // hooks, and an early return above them would change the hook count
-  // the moment the entitlement answer arrives — which React forbids.
-  const gate = useProGate('splits');
-  if (gate) return gate;
-  return <AddExpenseScreenInner />;
-}
-
 /**
  * Waits for the group before the form exists, then seeds it by remount.
  *
@@ -64,7 +54,7 @@ export default function AddExpenseScreen() {
  * how state gets seeded from data without an effect writing state during
  * render and fighting the first thing you type.
  */
-function AddExpenseScreenInner() {
+export default function AddExpenseScreen() {
   const { group: groupId, id } = useLocalSearchParams<{ group?: string; id?: string }>();
 
   const { data: group } = useGroup(groupId);

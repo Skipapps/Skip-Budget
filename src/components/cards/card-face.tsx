@@ -3,7 +3,6 @@ import { Text, View, type ViewStyle } from 'react-native';
 import { cn } from '@/lib/cn';
 import { isLightColor } from '@/lib/color';
 import { formatCurrency } from '@/lib/format';
-import { moneyTone, type MoneyIntent } from '@/lib/tone';
 import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
@@ -21,8 +20,9 @@ type CardFaceProps = {
    * caller decides which way round its own numbers run.
    */
   amount: number;
-  /** Word above the figure — "Owed", "Available". Carries the meaning when
-   *  the card's colour leaves no room for a red or a green to read. */
+  /** Word above the figure — "Owed", "Available". The caption and the minus
+   *  sign carry the meaning; the figure itself stays in the face's own
+   *  foreground rather than a red or a green. */
   caption?: string;
   last4: string;
   style?: ViewStyle;
@@ -52,14 +52,6 @@ export function CardFace({
   // A white face would otherwise sit invisibly on a white screen.
   const needsOutline = color.toUpperCase() === '#FFFFFF';
 
-  // Nothing owed and nothing held is not good news or bad news, so it is not
-  // coloured. Rounded first: a balance of a few cents should not decide this.
-  const rounded = Math.round(amount);
-  const intent: MoneyIntent = rounded === 0 ? 'neutral' : rounded < 0 ? 'debt' : 'asset';
-  // Null means no tone on this card reads as its own colour; plain type then,
-  // with the caption and the minus sign still saying which way the money runs.
-  const amountColor = moneyTone(color, intent) ?? foreground;
-
   return (
     <View
       style={[
@@ -68,13 +60,13 @@ export function CardFace({
         needsOutline && { borderWidth: 1, borderColor: colors.line },
         style,
       ]}
-      className="aspect-[1.62] w-full justify-between overflow-hidden rounded-[10px] p-5"
+      className="aspect-[1.78] w-[94%] justify-between self-center overflow-hidden rounded-[14px] p-4"
     >
       <Text
         pointerEvents="none"
         allowFontScaling={false}
         style={{ color: watermark }}
-        className="absolute -bottom-4 left-3 font-poppins-bold text-[104px] leading-[120px]"
+        className="absolute -bottom-3 left-3 font-poppins-bold text-[80px] leading-[92px]"
       >
         Skip
       </Text>
@@ -83,7 +75,7 @@ export function CardFace({
         <View className="flex-row items-start justify-between gap-3">
           <Text
             style={{ color: title ? foreground : mutedForeground }}
-            className="flex-1 font-poppins-medium text-[15px]"
+            className="flex-1 font-poppins-medium text-[14px]"
             numberOfLines={1}
             maxFontSizeMultiplier={1.2}
           >
@@ -94,8 +86,8 @@ export function CardFace({
             style={{ color: metaStyle === 'mark' ? foreground : mutedForeground }}
             className={cn(
               metaStyle === 'mark'
-                ? 'font-poppins-bold text-[18px] italic'
-                : 'font-poppins-medium text-[13px]',
+                ? 'font-poppins-bold text-[16px] italic'
+                : 'font-poppins-medium text-[12px]',
             )}
           >
             {meta}
@@ -105,7 +97,7 @@ export function CardFace({
         {caption ? (
           <Text
             style={{ color: mutedForeground }}
-            className="mt-2 font-poppins-medium text-[11px] uppercase tracking-wide"
+            className="mt-1.5 font-poppins-medium text-[10px] uppercase tracking-wide"
             numberOfLines={1}
             maxFontSizeMultiplier={1.2}
           >
@@ -113,9 +105,12 @@ export function CardFace({
           </Text>
         ) : null}
 
+        {/* The face's own foreground, never a red or a green: "Owed" and the
+            minus sign already say which way the money runs, and a tone picked
+            against eight background colours read as mud on half of them. */}
         <Text
-          style={{ color: amountColor }}
-          className={cn('font-poppins-bold text-[26px]', caption ? 'mt-0.5' : 'mt-1.5')}
+          style={{ color: foreground }}
+          className={cn('font-poppins-bold text-[22px]', caption ? 'mt-0.5' : 'mt-1')}
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}
@@ -126,7 +121,7 @@ export function CardFace({
 
       <Text
         style={{ color: mutedForeground }}
-        className="font-poppins-medium text-[15px]"
+        className="font-poppins-medium text-[13px]"
         maxFontSizeMultiplier={1.2}
       >
         ••••{'  '}

@@ -1,8 +1,6 @@
 import { useCallback } from 'react';
 
 import { useUpdateProfile } from '@/api/mutations';
-import { usePro } from '@/api/pro';
-import { enableReminders } from '@/api/push';
 import {
   useBankAccounts,
   useBills,
@@ -10,55 +8,46 @@ import {
   useProfile,
   useReceipts,
   useSalarySources,
+  useSubscriptions,
 } from '@/api/queries';
-import { useUserId } from '@/providers/session-provider';
 
 export type SetupStep = {
-  id: 'salary' | 'source' | 'bill' | 'scan' | 'reminders';
+  id: 'salary' | 'wallet' | 'bill' | 'subscription' | 'receipt';
   title: string;
   detail: string;
   done: boolean;
-  /** Where tapping the step goes. Null when the step acts in place. */
-  href: string | null;
+  /** Where tapping the step goes. */
+  href: string;
+  /** Never blocks finishing setup; said out loud on both surfaces. */
+  optional?: boolean;
 };
 
 /**
- * The Getting Started checklist, derived rather than stored.
+ * The five setup steps, derived rather than stored — the one definition the
+ * walk-in flow (/setup) and Home's Getting Started card both read, so the
+ * two can never disagree about what is done.
  *
- * Every tick is read from the data the step creates — a salary row means pay
- * is set, a receipt scanned means the scanner was tried — the same rule the
- * balances follow, so the card can never disagree with reality. The only
- * stored fact is the dismissal, because "stop showing me this" is a choice
- * about the card and leaves no other trace.
+ * Every tick is read from the data the step creates: a salary row means pay
+ * is set, the same rule the balances follow. The only stored fact is the
+ * dismissal, because "stop showing me this" leaves no other trace.
  *
  * The order is the argument: pay first, because every good number in the app
- * is downstream of income; the scanner in the first five, because it is the
- * moment most likely to make somebody stay.
+ * is downstream of income; then somewhere for spending to live, then the
+ * bills that drain it. The receipt is optional — the habit matters, but a
+ * checklist that cannot be finished without inventing a purchase is a lie.
  */
 export function useGettingStarted() {
-  const userId = useUserId();
   const profile = useProfile();
   const salary = useSalarySources();
   const cards = useCards();
   const accounts = useBankAccounts();
   const bills = useBills();
+  const subscriptions = useSubscriptions();
   const receipts = useReceipts();
   const updateProfile = useUpdateProfile();
-  const { pro } = usePro();
 
-  // An account fact, not a device one. The phone's permission is shared by
-  // every account on it, and a step that read it arrived pre-ticked for every
-  // fresh sign-in on a used phone — claiming credit for a choice nobody made.
-  const notified = Boolean(profile.data?.reminders_enabled_at);
-
-  const askForReminders = useCallback(async () => {
-    if (!userId) return;
-    if (await enableReminders(userId)) {
-      // enableReminders wrote the column; this refreshes the cache so the
-      // tick appears now rather than on the next profile read.
-      updateProfile.mutate({ reminders_enabled_at: new Date().toISOString() });
-    }
-  }, [userId, updateProfile]);
+  const hasCard = (cards.data?.length ?? 0) > 0;
+  const hasAccount = (accounts.data?.length ?? 0) > 0;
 
   const steps: SetupStep[] = [
     {
@@ -69,53 +58,54 @@ export function useGettingStarted() {
       href: '/salary',
     },
     {
-      id: 'source',
-      title: 'Add a card or account',
-      detail: 'Gives your spending somewhere to come from.',
-      done: (cards.data?.length ?? 0) > 0 || (accounts.data?.length ?? 0) > 0,
+      // The card is the step; the account is offered right after it saves
+      // (the Cards tab asks), and skipping the offer still ticks the step —
+      // an unticked row after adding a card read as "it did not save".
+      id: 'wallet',
+      title: 'Add your credit card and bank account',
+      detail:
+        'Card first; the bank account is offered right after, and skipping it still completes the step.',
+      done: hasCard || hasAccount,
       href: '/add-card',
     },
     {
       id: 'bill',
-      title: 'Add your first bill',
+      title: 'Add your bills',
       detail: 'Rent or the phone bill — one is enough to light up Coming up.',
       done: (bills.data?.length ?? 0) > 0,
       href: '/add-bill',
     },
-    // Scanning is Pro; the checklist has to be finishable on free, so the
-    // free step is the manual one and either kind of receipt completes it.
-    pro
-      ? {
-          id: 'scan' as const,
-          title: 'Scan a receipt',
-          detail: 'Point the camera at one — Skip reads it, you check it, done.',
-          done: (receipts.data ?? []).some(
-            (row) => row.source === 'scan' || row.source === 'upload',
-          ),
-          href: '/receipts',
-        }
-      : {
-          id: 'scan' as const,
-          title: 'Add your first receipt',
-          detail: 'What you spend day to day, next to your bills.',
-          done: (receipts.data ?? []).length > 0,
-          href: '/add-receipt',
-        },
     {
-      id: 'reminders',
-      title: 'Turn on reminders',
-      detail: 'So a bill never lands unannounced.',
-      done: notified,
-      // Acts in place: the tap IS the system permission ask.
-      href: null,
+      id: 'subscription',
+      title: 'Add your subscriptions',
+      detail: 'Netflix, the gym — the charges that come back on their own land in Coming up.',
+      done: (subscriptions.data?.length ?? 0) > 0,
+      href: '/add-subscription',
+    },
+    {
+      id: 'receipt',
+      title: 'Add a receipt',
+      detail:
+        'What you spend day to day, next to your bills. Skippable — the app works without it.',
+      done: (receipts.data ?? []).length > 0,
+      href: '/add-receipt',
+      optional: true,
     },
   ];
 
   const doneCount = steps.filter((step) => step.done).length;
+  // What the walk-in flow gates on: the receipt never holds anybody hostage.
+  const requiredDone = steps.every((step) => step.optional || step.done);
 
-  // Still loading reads as dismissed, so the card cannot flash at people who
-  // finished setup months ago while their rows are on the way in.
-  const settled = Boolean(profile.data) && !salary.isPending && !bills.isPending;
+  // Still loading reads as dismissed, so neither surface can flash at people
+  // who finished setup months ago while their rows are on the way in.
+  const settled =
+    Boolean(profile.data) &&
+    !salary.isPending &&
+    !cards.isPending &&
+    !accounts.isPending &&
+    !bills.isPending &&
+    !subscriptions.isPending;
   const dismissed = Boolean(profile.data?.getting_started_dismissed_at);
   const visible = settled && !dismissed && doneCount < steps.length;
 
@@ -123,5 +113,5 @@ export function useGettingStarted() {
     updateProfile.mutate({ getting_started_dismissed_at: new Date().toISOString() });
   }, [updateProfile]);
 
-  return { steps, doneCount, visible, dismiss, askForReminders };
+  return { steps, doneCount, requiredDone, settled, dismissed, visible, dismiss };
 }

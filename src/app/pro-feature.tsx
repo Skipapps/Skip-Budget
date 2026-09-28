@@ -27,8 +27,10 @@ export default function ProFeatureScreen() {
 
   return (
     <Screen showBack>
-      <View className="mt-4 w-full items-center rounded-[16px] bg-ink/5 py-6">
-        <View className="h-[110px] w-[110px]">
+      {/* The drawing stands on the page itself — the set is drawn on
+          transparency, and a grey plate behind it read as a placeholder. */}
+      <View className="mt-4 w-full items-center py-4">
+        <View className="h-[130px] w-[130px]">
           <Art width="100%" height="100%" />
         </View>
       </View>

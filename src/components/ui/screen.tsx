@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,19 +22,16 @@ type ScreenProps = {
   avoidKeyboard?: boolean;
   /** Overlay pinned bottom-right, above the scroll area (e.g. a FAB). */
   floating?: ReactNode;
+  /**
+   * Pinned below the scroll area, always on screen. For the one action a page
+   * exists to offer: content that overflows — long copy, large Dynamic Type —
+   * scrolls above it instead of hiding it below the fold, where nothing says
+   * "scroll down for the button".
+   */
+  footer?: ReactNode;
   /** Enables pull-to-refresh. Omit on screens with nothing to re-fetch. */
   onRefresh?: () => void;
   refreshing?: boolean;
-  /**
-   * Opens the page at the bottom instead of the top, once.
-   *
-   * Dated lists run oldest-first, so the newest rows — the ones somebody came
-   * to see — sit below the fold. Pass `true` only when the real content is on
-   * screen (not while a skeleton is up), and the page jumps to the end on the
-   * first layout that follows. It happens at most once per mount, so filtering,
-   * refreshing or loading more never yanks the page out from under a thumb.
-   */
-  startAtEnd?: boolean;
 };
 
 /**
@@ -49,19 +46,14 @@ export function Screen({
   showBack = false,
   avoidKeyboard = false,
   floating,
+  footer,
   onRefresh,
   refreshing = false,
-  startAtEnd = false,
 }: ScreenProps) {
   const colors = useColors();
   const column = (
     <View className={cn('w-full max-w-[520px] flex-1 px-6', className)}>{children}</View>
   );
-
-  // Held as a callback ref because the two scroll views have different ref
-  // types; both expose the ScrollView methods, and only one is ever mounted.
-  const scroller = useRef<ScrollView | null>(null);
-  const jumped = useRef(false);
 
   const scrollProps = {
     contentContainerStyle: { flexGrow: 1, alignItems: 'center' as const, paddingBottom: 16 },
@@ -76,42 +68,16 @@ export function Screen({
       // disappeared into the dark surface it was spinning on.
       <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.muted} />
     ) : undefined,
-    // Fires after the content has been measured, which is the only moment the
-    // end is a real offset. Unanimated: a page that scrolls itself on open
-    // looks like a gesture nobody made.
-    onContentSizeChange: (_width: number, height: number) => {
-      if (!startAtEnd || jumped.current || height <= 0) return;
-      // `KeyboardAwareScrollView` hands back a stand-in with only its own
-      // method until the inner ScrollView has mounted, so the jump is spent
-      // only once there is something that can actually perform it.
-      const node = scroller.current;
-      if (typeof node?.scrollToEnd !== 'function') return;
-      jumped.current = true;
-      node.scrollToEnd({ animated: false });
-    },
   };
 
   // KeyboardAwareScrollView scrolls the focused input clear of the keyboard,
   // which plain padding-based avoidance cannot do for fields low on the page.
   const body = avoidKeyboard ? (
-    <KeyboardAwareScrollView
-      {...scrollProps}
-      bottomOffset={72}
-      ref={(node) => {
-        scroller.current = node;
-      }}
-    >
+    <KeyboardAwareScrollView {...scrollProps} bottomOffset={72}>
       {column}
     </KeyboardAwareScrollView>
   ) : scrollable ? (
-    <ScrollView
-      {...scrollProps}
-      ref={(node) => {
-        scroller.current = node;
-      }}
-    >
-      {column}
-    </ScrollView>
+    <ScrollView {...scrollProps}>{column}</ScrollView>
   ) : (
     <View className="flex-1 items-center">{column}</View>
   );
@@ -129,8 +95,19 @@ export function Screen({
 
       {body}
 
+      {footer ? (
+        // Below the scroll view rather than over it, so nothing ever renders
+        // underneath the action; the same column as the content keeps it lined
+        // up with what it concludes.
+        <View className="w-full items-center">
+          <View className="w-full max-w-[520px] px-6 pb-2 pt-3">{footer}</View>
+        </View>
+      ) : null}
+
       {floating ? (
-        <View className="absolute bottom-5 right-5" pointerEvents="box-none">
+        // Clear of the home indicator: flush against the safe-area edge the
+        // control read as glued to the screen's bottom lip.
+        <View className="absolute bottom-10 right-5" pointerEvents="box-none">
           {floating}
         </View>
       ) : null}

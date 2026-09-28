@@ -40,7 +40,7 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
       {
         question: 'What should I set up first?',
         answer:
-          'Your pay, under Cards → Salary. Left this month, savings and Insights all start from what comes in. The Getting Started card on Home walks you through the rest — a card, a bill, a scanned receipt, reminders.',
+          'Your pay, under Cards → Salary. Left this month, savings and Insights all start from what comes in. The Getting Started card on Home walks you through the rest — a credit card, a bank account, your bills and subscriptions.',
       },
     ],
   },
@@ -63,7 +63,7 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
           'Skip only knows what it was told. If you paid a plumber in cash or never scanned a receipt, the month looks better than it was — so you can put in the real figure, with a note, and Skip keeps both numbers so you can always see why they differ.',
       },
       {
-        question: 'Why don’t my card balances update by themselves?',
+        question: 'Why don’t my credit card balances update by themselves?',
         answer:
           'Because Skip is not connected to your bank. A card’s balance starts from the figure you gave it and moves with what you record — bills, subscriptions and receipts paid with that card.',
       },
@@ -135,12 +135,12 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
       {
         question: 'What does Pro include?',
         answer:
-          'Unlimited cards, accounts and incomes, unlimited receipt scanning, the loan calculator, the split manager, Insights, colour theming, early access to new features and first-in-line support. $1.99 a month or $19.99 a year, billed by Apple.',
+          'Unlimited credit cards, accounts and incomes, unlimited receipt scanning, the loan calculator, the split manager, Insights, colour theming, early access to new features and first-in-line support. $1.99 a month or $19.99 a year, billed by Apple.',
       },
       {
         question: 'What happens to my things if I cancel?',
         answer:
-          'Nothing is deleted — ever. Extra cards and accounts stay, locked, with the oldest of each still fully usable, and every figure they contributed keeps counting. Come back to Pro and it is all exactly where you left it.',
+          'Nothing is locked or deleted — ever. Every credit card, account and figure keeps working exactly as it was; you just cannot add past the free allowance until Pro returns.',
       },
       {
         question: 'How do I cancel?',

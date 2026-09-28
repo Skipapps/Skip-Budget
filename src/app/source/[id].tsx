@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pencil, Plus } from 'lucide-react-native';
+import { Pencil, Plus, SlidersHorizontal } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
@@ -8,15 +8,23 @@ import { useCreatePayment, useDeletePayment } from '@/api/mutations';
 import { useSourceLedger } from '@/api/queries';
 import { AccountCard } from '@/components/cards/account-card';
 import { PaymentCard } from '@/components/cards/payment-card';
+import {
+  EMPTY_FILTERS,
+  FilterSheet,
+  countActiveFilters,
+  type LedgerFilters,
+} from '@/components/transactions/filter-sheet';
 import { AmountPad } from '@/components/ui/amount-pad';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
+import { SearchField } from '@/components/ui/search-field';
 import { useConfirm } from '@/providers/dialog-provider';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { SectionHeading, Title } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { sortByDateAscending } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
+import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
 
 const KIND_LABELS: Record<string, string> = {
@@ -41,6 +49,12 @@ export default function SourceDetailScreen() {
 
   const [padOpen, setPadOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Search and filters for the transactions below. Held above the loading
+  // guards like every other hook, so the hook order never changes.
+  const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState<LedgerFilters>(EMPTY_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   if (isLoading && !source) {
     return (
@@ -83,6 +97,30 @@ export default function SourceDetailScreen() {
     (entry) => entry.id,
   );
 
+  /**
+   * The rows that answer the search and the filters, in the same order.
+   *
+   * The search forgives typos (`matchesSearch`); the filters are the shared
+   * ledger ones minus the source — this page already is one.
+   */
+  const visible = entries.filter(
+    (entry) =>
+      matchesSearch(entry.label, query) &&
+      (!filters.date || entry.date === filters.date) &&
+      (filters.kinds.length === 0 || filters.kinds.includes(entry.kind)),
+  );
+  const activeCount = countActiveFilters(filters);
+  const narrowed = query.trim().length > 0 || activeCount > 0;
+
+  /** What a row on this page can be — payments included, named for the side
+   *  of the money they sit on. */
+  const kindOptions = [
+    { value: 'receipt', label: 'Receipts' },
+    { value: 'bill', label: 'Monthly Bills' },
+    { value: 'subscription', label: 'Subscriptions' },
+    { value: 'payment', label: isCard ? 'Payments' : 'Money in' },
+  ];
+
   const handlePay = async (amount: string) => {
     const value = Number(amount);
     setPadOpen(false);
@@ -116,10 +154,7 @@ export default function SourceDetailScreen() {
   return (
     <Screen
       showBack
-      // The ledger runs oldest-first, so the newest movement on this card is at
-      // the bottom. Past the loading and error guards already, so the rows are
-      // on screen by the time this is true.
-      startAtEnd={entries.length > 0}
+      avoidKeyboard
       floating={
         <Pressable
           accessibilityRole="button"
@@ -220,6 +255,35 @@ export default function SourceDetailScreen() {
         <SectionHeading>Transactions</SectionHeading>
       </View>
 
+      {/* Only once there is something to search: a search field over an empty
+          ledger is a promise with nothing behind it. */}
+      {entries.length > 0 ? (
+        <View className="mt-3 w-full flex-row items-center gap-3">
+          <SearchField value={query} onChangeText={setQuery} placeholder="Search transactions" />
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter transactions'
+            }
+            onPress={() => setFilterOpen(true)}
+            className="h-11 w-11 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
+          >
+            <SlidersHorizontal size={20} color={colors.ink} strokeWidth={1.8} />
+            {activeCount > 0 ? (
+              <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
+                <Text
+                  allowFontScaling={false}
+                  className="font-poppins-medium text-[11px] text-on-control"
+                >
+                  {activeCount}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
+      ) : null}
+
       {entries.length === 0 ? (
         <PageState
           art={artwork.emptyWallet}
@@ -230,9 +294,20 @@ export default function SourceDetailScreen() {
               : 'Anything paid from this account lands here as its date arrives.'
           }
         />
+      ) : visible.length === 0 && narrowed ? (
+        <PageState
+          art={artwork.noResults}
+          title="Nothing matches"
+          message="No transaction on this one fits that search and those filters."
+          actionLabel="Clear search"
+          onAction={() => {
+            setQuery('');
+            setFilters(EMPTY_FILTERS);
+          }}
+        />
       ) : (
         <View className="mt-1 w-full pb-28">
-          {entries.map((entry, index) => (
+          {visible.map((entry, index) => (
             <Fragment key={entry.id}>
               {index > 0 ? <View className="ml-[52px] h-px bg-line/60" /> : null}
               <TransactionRow
@@ -261,6 +336,21 @@ export default function SourceDetailScreen() {
           value=""
           onCancel={() => setPadOpen(false)}
           onConfirm={handlePay}
+        />
+      ) : null}
+
+      {filterOpen ? (
+        <FilterSheet
+          filters={filters}
+          // This page is one source already, so the sheet offers no source
+          // section — date and type are the questions left.
+          sourceOptions={[]}
+          kindOptions={kindOptions}
+          onCancel={() => setFilterOpen(false)}
+          onApply={(next) => {
+            setFilters(next);
+            setFilterOpen(false);
+          }}
         />
       ) : null}
     </Screen>

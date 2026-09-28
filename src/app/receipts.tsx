@@ -27,6 +27,7 @@ import { groupByDate } from '@/lib/group';
 import { RangeDropdown } from '@/components/ui/range-dropdown';
 import { rangeFor, type RangeKey } from '@/lib/range';
 import { formatCurrency } from '@/lib/format';
+import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
 
 export default function ReceiptsScreen() {
@@ -86,13 +87,11 @@ export default function ReceiptsScreen() {
   );
 
   const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-
     return receipts.filter((receipt) => {
       // Receipts happened on a day rather than repeating, so the window is a
       // plain comparison — nothing to project.
       if (receipt.purchased_on < range.from || receipt.purchased_on > range.to) return false;
-      if (needle && !receipt.merchant.toLowerCase().includes(needle)) return false;
+      if (!matchesSearch(receipt.merchant, query)) return false;
       if (filters.date && receipt.purchased_on !== filters.date) return false;
       if (filters.sourceIds.length > 0) {
         const sourceId = receipt.card_id ?? receipt.bank_account_id;
@@ -122,14 +121,7 @@ export default function ReceiptsScreen() {
   const showNoMatches = !isLoading && !isError && receipts.length > 0 && visible.length === 0;
 
   return (
-    <Screen
-      showBack
-      avoidKeyboard
-      onRefresh={refresh}
-      refreshing={refreshing}
-      // Oldest day first, so the last shop is at the bottom — open there.
-      startAtEnd={!isLoading && !isError && visible.length > 0}
-    >
+    <Screen showBack avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-2 w-full flex-row items-center justify-between gap-3">
         <Title flush align="left" className="flex-1">
           Receipts

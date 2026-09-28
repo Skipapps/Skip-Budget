@@ -27,7 +27,7 @@ type QuickAction = {
 const ACTIONS: QuickAction[] = [
   {
     id: 'receipt',
-    label: 'Receipt',
+    label: 'Receipts',
     hint: 'Add a receipt',
     icon: ReceiptText,
     href: '/add-receipt',
@@ -72,9 +72,15 @@ export function QuickActions({ onPress }: QuickActionsProps) {
           <View className="h-12 w-12 items-center justify-center rounded-full bg-accent/10">
             <action.icon size={20} color={colors.accentInk} strokeWidth={1.8} />
           </View>
+          {/* One line, shrunk to fit when Dynamic Type outgrows the cell:
+              "Subscription" is a single word, so the two-line version could
+              only break it mid-word — "Subscripti / on" at the larger
+              sizes, which reads like a typo. */}
           <Text
             className="text-center font-poppins-medium text-[12px] text-body"
-            numberOfLines={2}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
             maxFontSizeMultiplier={1.3}
           >
             {action.label}

@@ -1,16 +1,18 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
-import { useAddGroupMember, useCreateGroup } from '@/api/splits';
+import { usePro } from '@/api/pro';
+import { useAddGroupMember, useCreateGroup, useGroups } from '@/api/splits';
 import { GroupIconPicker } from '@/components/splits/group-icon-picker';
 import { StepFlow } from '@/components/flow/step-flow';
-import { useProGate } from '@/components/pro/pro-gate';
 import { SwitchControl } from '@/components/ui/switch-control';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { success, warn } from '@/lib/haptics';
 import { saveErrorMessage } from '@/lib/save-error';
+import { FREE_LIMITS } from '@/lib/wall';
+import { useUserId } from '@/providers/session-provider';
 
 /**
  * Naming a group and choosing how it settles.
@@ -21,11 +23,20 @@ import { saveErrorMessage } from '@/lib/save-error';
  * on instead of a switch buried under the name.
  */
 export default function AddGroupScreen() {
-  // A wrapper, not an inline return: the screen below runs its own
-  // hooks, and an early return above them would change the hook count
-  // the moment the entitlement answer arrives — which React forbids.
-  const gate = useProGate('splits');
-  if (gate) return gate;
+  // Deep-link guard: opening a second group past the free allowance opens
+  // the case for Pro instead of a form the database would refuse. Groups you
+  // merely joined are not counted, and a closed group frees the slot —
+  // joining, spending and settling are never gated. Wrapper-shaped so the
+  // hook count never changes.
+  const { pro, ready } = usePro();
+  const userId = useUserId();
+  const groups = useGroups();
+  const openMine = (groups.data ?? []).filter(
+    (group) => group.created_by === userId && !group.archived_at,
+  ).length;
+  if (ready && !pro && openMine >= FREE_LIMITS.openGroups) {
+    return <Redirect href={{ pathname: '/pro-feature', params: { id: 'splits' } }} />;
+  }
   return <AddGroupScreenInner />;
 }
 

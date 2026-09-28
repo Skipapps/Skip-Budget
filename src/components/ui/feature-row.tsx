@@ -19,7 +19,7 @@ type FeatureRowProps = {
 export function FeatureRow({ illustration, children, className }: FeatureRowProps) {
   return (
     <View className={cn('w-full flex-row items-center gap-3 phone:gap-4', className)}>
-      <View className="h-16 w-16 shrink-0 items-center justify-center phone:h-20 phone:w-20">
+      <View className="h-20 w-20 shrink-0 items-center justify-center phone:h-24 phone:w-24">
         {illustration}
       </View>
       <View className="min-w-0 flex-1">{children}</View>

@@ -5,7 +5,6 @@ import type { SvgProps } from 'react-native-svg';
 import { useTheme } from '@/providers/theme-provider';
 
 import DarkInsights from '@/assets/illustrations/dark/insights.svg';
-import DarkLoginHero from '@/assets/illustrations/dark/login-hero.svg';
 import DarkStateEmptyBills from '@/assets/illustrations/dark/state-empty-bills.svg';
 import DarkStateEmptyCards from '@/assets/illustrations/dark/state-empty-cards.svg';
 import DarkStateEmptyReceipts from '@/assets/illustrations/dark/state-empty-receipts.svg';
@@ -13,15 +12,8 @@ import DarkStateEmptySubscriptions from '@/assets/illustrations/dark/state-empty
 import DarkStateEmptyWallet from '@/assets/illustrations/dark/state-empty-wallet.svg';
 import DarkStateError from '@/assets/illustrations/dark/state-error.svg';
 import DarkStateNoResults from '@/assets/illustrations/dark/state-no-results.svg';
-import DarkTileLoanRepayment from '@/assets/illustrations/dark/tile-loan-repayment.svg';
-import DarkTileMonthlyBills from '@/assets/illustrations/dark/tile-monthly-bills.svg';
-import DarkTileReceipts from '@/assets/illustrations/dark/tile-receipts.svg';
-import DarkTileSalary from '@/assets/illustrations/dark/tile-salary.svg';
-import DarkTileSavings from '@/assets/illustrations/dark/tile-savings.svg';
-import DarkTileSplitCalculator from '@/assets/illustrations/dark/tile-split-calculator.svg';
 import DarkTileSubscriptions from '@/assets/illustrations/dark/tile-subscriptions.svg';
-import DarkWelcomePrivacy from '@/assets/illustrations/dark/welcome-privacy.svg';
-import DarkWelcomeTrack from '@/assets/illustrations/dark/welcome-track.svg';
+import DarkWelcomeHero from '@/assets/illustrations/dark/welcome-hero.svg';
 
 import Insights from '@/assets/illustrations/insights.svg';
 import LoanSchedule from '@/assets/illustrations/loan-schedule.svg';
@@ -61,16 +53,20 @@ type Pair = { light: FC<SvgProps>; dark: FC<SvgProps> };
 
 const ARTWORK = {
   insights: { light: Insights, dark: DarkInsights },
-  loginHero: { light: LoginHero, dark: DarkLoginHero },
-  welcomePrivacy: { light: WelcomePrivacy, dark: DarkWelcomePrivacy },
-  welcomeTrack: { light: WelcomeTrack, dark: DarkWelcomeTrack },
+  // Drawn once for both modes: the artwork sits on transparency and its
+  // palette was chosen to read on light and near-black pages alike.
+  loginHero: { light: LoginHero, dark: LoginHero },
+  welcomeHero: { light: WelcomeHero, dark: DarkWelcomeHero },
+  welcomePrivacy: { light: WelcomePrivacy, dark: WelcomePrivacy },
+  welcomeTrack: { light: WelcomeTrack, dark: WelcomeTrack },
 
-  tileLoanRepayment: { light: TileLoanRepayment, dark: DarkTileLoanRepayment },
-  tileMonthlyBills: { light: TileMonthlyBills, dark: DarkTileMonthlyBills },
-  tileReceipts: { light: TileReceipts, dark: DarkTileReceipts },
-  tileSalary: { light: TileSalary, dark: DarkTileSalary },
-  tileSavings: { light: TileSavings, dark: DarkTileSavings },
-  tileSplitCalculator: { light: TileSplitCalculator, dark: DarkTileSplitCalculator },
+  // Single-mode drawings, like loginHero.
+  tileLoanRepayment: { light: TileLoanRepayment, dark: TileLoanRepayment },
+  tileMonthlyBills: { light: TileMonthlyBills, dark: TileMonthlyBills },
+  tileReceipts: { light: TileReceipts, dark: TileReceipts },
+  tileSalary: { light: TileSalary, dark: TileSalary },
+  tileSavings: { light: TileSavings, dark: TileSavings },
+  tileSplitCalculator: { light: TileSplitCalculator, dark: TileSplitCalculator },
   tileSubscriptions: { light: TileSubscriptions, dark: DarkTileSubscriptions },
 
   emptyBills: { light: StateEmptyBills, dark: DarkStateEmptyBills },
@@ -83,7 +79,6 @@ const ARTWORK = {
 
   // Still owed a dark version. The light drawing shows through until there is
   // one, which is worse than a redraw and better than a hole in the screen.
-  welcomeHero: { light: WelcomeHero, dark: WelcomeHero },
   loanSchedule: { light: LoanSchedule, dark: LoanSchedule },
 } satisfies Record<string, Pair>;
 

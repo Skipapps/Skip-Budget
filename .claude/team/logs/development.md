@@ -2310,3 +2310,320 @@ screenshot. Item 2 in particular is proved structurally, not by a thumb on glass
    bar look like it is floating over nothing. Priya's call, not mine.
 3. Should `bills.tsx`, `subscriptions.tsx` and `source/[id]`'s non-payment rows open their records
    too? Same helper, three lines each, but it was outside the brief.
+
+---
+
+## 2026-09-16 — Diego (Developer, data and backend) — demo data seeded into the live project
+
+**Outcome:** Done. `supabase/seed/demo-sam.sql` is written and applied three times to the linked
+project (ref `jwnsdszstqlpkzwehtmq`) for the Founder's account only; counts are identical after every
+apply, so it is genuinely idempotent. `supabase/seed/demo-sam-cleanup.sql` is written and **not** run.
+Home now reads income **$3,760.00**, expenses **$2,616.33**, **left this month $1,143.67**. Gates:
+`npm run typecheck` exit 0, `npm test` 51 suites / 551 tests pass. Nothing committed.
+
+**What was inserted** (user `bdb18bea-…c2020`, all ids derived from `md5('skip-demo-2026-09:' || key)`)
+cards 1 (Chase Sapphire · VISA · 4821 · sky, stated $412.30 as of 01 Sep → shows **$635.55**);
+bank_accounts 1 (Chase Checking · 7730, stated $7,900.00 as of 01 Sep → shows **$7,193.90**);
+bills 5 (Electricity/Con Edison $118.42 varying, Internet/Verizon $79.99, Phone/T-Mobile $65.00,
+Car insurance/GEICO $142.00, Car loan $493.85); loans 1; subscriptions 5 (Netflix 15.49, Spotify
+10.99, iCloud+ 2.99, Equinox 185.00, Amazon Prime 139.00 yearly, renews 2026-11-07); receipts 36 over
+eight weeks (2 today, 2 yesterday, $5.95–$174.28); charges 23 (Jul–Sep); payments 1; reminders 5;
+savings_pots 1; groups 1 + 3 members (two of them placeholders with no account) + 3 expenses + 9
+splits + 1 settlement; monthly_savings 1 (Aug 2026, computed by `close_savings_for`, not typed).
+
+**Decisions worth knowing**
+- **The car loan is the app's own arithmetic, not a plausible number.** $25,000 at 6.9% over 60
+  months, first payment 2026-03-15, funded 2026-02-15, `day_count_basis 'monthly'` → payment
+  **$493.85**, final $493.95, total interest **$4,631.10**, payoff 2031-02-15, and the 2026-09-15 row
+  is 131.50 interest / 362.35 principal / 22,506.63 outstanding. Taken from `amortise()` in
+  `src/lib/loan.ts` by executing it, so the schedule screen and the bill beside it agree to the cent.
+- **`starts_on` / `started_on` are set to each plan's first recorded charge.** The catch-up recorder
+  (`src/lib/charges.ts`) walks from that floor, so a looser value would have the app write months of
+  charges nobody entered the first time it is opened. Checked plan by plan: opening the app writes
+  **no** new charge and rolls **no** due date.
+- **The loan bill's `starts_on` (2026-07-15) deliberately differs from the loan's first payment
+  (2026-03-15).** The loan is real from March; Skip has only known about it since July, and the
+  ledger must not claim to have recorded what it never saw.
+- **Cards are capped at one.** `enforce_free_allowance` (0007 pro wall) is BEFORE INSERT, so it fires
+  ahead of `on conflict` — which is also why the card and account inserts are guarded with
+  `where not exists` instead. The account holds no entitlement row, and there was **no Amex on it**
+  (the brief assumed one); receipts are therefore split between the Visa and the checking account.
+- **`enforce_scan_is_pro`** means every receipt is `source = 'manual'`.
+- **One stray push suppressed.** `notify_added_to_group` queues a notice for any member who is not
+  the actor, and a seed has no actor, so Sam was told he had been added to his own group. The seed
+  deletes that unsent notice.
+
+**Could not verify:** nothing on a device or Simulator — no eyes on Home, Insights, Cards or Splits
+with this data in them. The figures above are computed from the database with the same arithmetic the
+hooks use, not read off a screen. Splits is Pro-gated in the app and this account is not Pro, so the
+group needs Dilip's dev bypass to be seen at all.
+
+**Open questions**
+1. Sam is not Pro, so Splits, Appearance and scanning are walled in the demo. Do we add an
+   `entitlements` row for the demo account (a product decision, so not mine to take), or is the dev
+   bypass enough for a stakeholder walk-through?
+2. Only **August 2026** appears on Savings. `close_savings_for` will not close a month before the
+   account existed (0006 savings-start-at-birth) and the profile was created 2026-08-31, so July's
+   eight weeks of receipts are counted nowhere. Correct by the rule, surprising in a demo.
+3. Cleanup has not been run, so it is verified by matching its predicates as counts (36 receipts,
+   23 charges, 5 bills, 5 subs, 5 reminders, 3 expenses, 9 splits, 3 members, 1 of each singleton —
+   and the four pre-existing rows matched by none of them), not by executing it.
+
+## 2026-09-17 — Dana (Developer, UI and navigation) — design kit: Cards tab, the money screens, Transactions
+
+**Outcome:** done. 56 frames across 8 new specs in `design/`, drawn from the routes' own source and
+the kit's components. `node design/build.mjs` renders 247 screens with no `✗`.
+
+**What changed** (new files, nothing else touched; nothing under `design/kit/` edited):
+- `design/screens/20-cards.mjs` — `cards`, `cards-empty`, `cards-free-plan`, `cards-error`.
+- `design/screens/21-add-card.mjs` — `add-card-amount`, `-details`, `-due`, `-due-no-date`, `-edit`,
+  `-save-error`, `-delete-confirm`, `-balance-confirm`, `-loading`, `-error`, `-missing`.
+- `design/screens/22-add-account.mjs` — `add-account-amount`, `-details`, `-payday`,
+  `-payday-no-income`, `-payday-unknown`, `-edit`, `-delete-confirm`, `-loading`, `-error`, `-missing`.
+- `design/screens/23-source.mjs` — `source-card`, `source-account`, `source-empty`, `source-loading`,
+  `source-error`, `source-pay-pad`.
+- `design/screens/24-salary.mjs` — `salary`, `salary-two-sources`, `salary-empty`, `salary-error`,
+  `salary-loading`, `salary-amount-pad`.
+- `design/screens/25-savings.mjs` — `savings`, `savings-excluded`, `savings-empty`,
+  `savings-loading`, `savings-error`.
+- `design/screens/26-savings-month.mjs` — `savings-month`, `-plain`, `-excluded`, `-exclude-confirm`,
+  `-loading`, `-error`, `-missing`.
+- `design/screens/27-transactions.mjs` — `transactions`, `transactions-month`, `transactions-filter`,
+  `transactions-no-results`, `transactions-empty`, `transactions-loading`, `transactions-error`.
+
+**Composed locally** (the kit has no component for them; measurements copied from the source):
+NetworkPicker, ReminderField, the delete/reset/exclude footer rows, salary's source card and
+"Add salary source" pill, savings' MonthRow and "Saved so far" card, savings-month's "What Skip
+worked out" card, source's SummaryLine block, header row and floating pill, the transactions period
+stepper, the filter button's count badge, the AmountPad modal, and a ring standing in for
+`ActivityIndicator`.
+
+**Sample figures, all reconciled to the cent:** card ledger $178.00 on 1 Sep + $384.30 charged −
+$150.00 paid = $412.30 owed; account $234.27 + $4,200.00 in − $1,594.15 out = $2,840.12; savings
+months 687.14 / −261.30 / 881.28 / 960.88 (corrected to 840.00) → Savings tile $2,268.00 (raw, as
+`cards.tsx` sums it) and "Saved so far" $2,147.12 (corrected, as `savings.tsx` sums it).
+
+**Two deviations from the brief, both to stay faithful to the source:**
+1. The Transactions tab has **no range dropdown** — it uses `ChoiceChips(PERIODS)` plus a stepper
+   pill (`periodLabel`). `RangeDropdown` lives on bills/subscriptions/receipts. So instead of a
+   `RangeMenu` overlay there is a second frame, `transactions-month`, showing the Month period.
+2. `FilterSheet` is a **full-screen `Modal`**, not a bottom sheet, so `transactions-filter` is a
+   full frame (X, centred "Filter", Reset/Apply footer) rather than `C.Sheet`.
+
+**Two real defects the faithful drawing exposed** (app bugs, not kit artefacts):
+- `src/components/cards/network-picker.tsx`: the selected circle is `bg-ink` with `text-on-control`.
+  With the apricot accent `onControl` is `#111111`, so in light mode the mark is black on black —
+  invisible. Visible in dark mode only. See `design/out/hifi/add-card-details.svg`.
+- The "This balance becomes the starting point" dialog puts "Leave it as it was" and "Update the
+  balance" side by side in a 326pt card at `numberOfLines={1}`; the primary label clips to
+  "Update the…". Three or more actions stack, two do not.
+
+**Could not verify:** nothing on a device — the frames are estimated Poppins metrics, so the two
+clipped strings above (and "Monthly Bills · Chase Checking ••1180" in `transactions-month`) are
+marginal and want checking on hardware.
+
+---
+
+## 2026-09-17 — Dilip (Developer, native and platform) — design kit: support, legal, reminders, notifications, tiles
+
+**Outcome:** Done. Seven specs, 24 frames, under `design/screens/60..66`. `node design/build.mjs`
+renders every screen in the kit (263 at the time of my last run) with **no `✗` lines**, and I
+sanity-checked eight of my hi-fi SVGs as rasterised images (headless Chrome, light and dark) rather
+than trusting the exit code.
+
+**What changed** (new files only; nothing under `design/kit/` or anyone else's screens touched)
+- `design/screens/60-faq.mjs` — `faq`, `faq-expanded`. All eight groups and eighteen questions from
+  `GROUPS` in `src/app/faq.tsx`, verbatim; the open card carries the first answer in full.
+- `design/screens/61-contact.mjs` — `contact`, `contact-idea`, `contact-filled`, `contact-error`,
+  `contact-sending`, `contact-sent`. Both `COPY` topics, the read-only email block, the 160pt message
+  box with its `n / 4000` counter, the disabled "Sending…" pill and the sent confirmation.
+- `design/screens/62-privacy.mjs` — `privacy`. All nine sections, every paragraph, bullet and note.
+- `design/screens/63-terms.mjs` — `terms`. All twelve sections, same.
+- `design/screens/64-reminders.mjs` — `reminders`, `reminders-empty`, `reminders-loading`,
+  `reminders-error`, `reminders-receipts-error`, `reminders-time-picker` (the `TimePicker` Modal as an
+  `overlay`). Captions from `REMINDER_CAPTION`, chips from `LEAD_OPTIONS`, the counts computed the way
+  the screen computes them.
+- `design/screens/65-notifications.mjs` — `notifications`, `notifications-empty`,
+  `notifications-loading`, `notifications-error`, `notifications-clear-all` (the confirm dialog).
+- `design/screens/66-tiles.mjs` — `tiles`, `tiles-moved`, `tiles-saving`.
+
+**Composed locally, because the kit has no component for them** (README rule 3)
+- `LegalDocument` (numbered heading, paragraph, bullet list, tinted note) — duplicated in 62 and 63.
+- The `TimePicker` dialog, including the 240pt clock face as a `raw` node with its own SVG and HTML
+  bodies (hand, centre dot, 22pt marker, twelve numbers). Colours resolve through the kit's `color()`,
+  so dark mode is correct — verified on screen.
+- The reminder card, group header, lead-chip row, "Clear all" and "Original order" pills, the tile
+  step buttons, and a left-aligned `Subtitle` (the kit's helper hardcodes centre).
+
+**Found while drawing — for whoever owns these files**
+1. `src/app/reminders.tsx` has **no "permission not granted" state**. `enableReminders()` asks iOS at
+   the moment a switch goes on and the page never reflects a refusal; the only in-app acknowledgement
+   is the standing Bell note. Nothing to draw, so I drew nothing.
+2. `reminders.tsx:187` `<Title align="left" className="mt-1 …">` — the `mt-1` is dead for the same
+   reason the `Title` doc comment gives for `text-left`: NativeWind resolves by CSS order, and the
+   component's own `mt-2` is generated after `mt-1`. Every other page's title is `mt-2`; I drew 8pt.
+3. The same mechanism means `Subtitle className="text-left"` (faq, contact, reminders, notifications,
+   tiles) may be rendering **centred** on device. I drew it left, which is plainly the intent, and
+   flagged it — one of the two (the class or the component) is wrong and it is a one-line fix either
+   way: give `Subtitle` an `align` prop like `Title` has.
+4. `notifications.tsx:150` — "Deducted from Chase Checking ••1180" clips at `numberOfLines={1}` on a
+   row whose amount is five digits ($120.00). Reproduced in the frame. Real, not a kit artefact.
+5. `tiles.tsx` has no drag handles — it is two chevron steppers per row, deliberately (see the file's
+   own comment). The brief called them drag handles; the frames show what the code does.
+
+**Could not verify:** nothing on a device or Simulator; the frames use the kit's estimated Poppins
+metrics, so finding 4 and the wrapped question cards are close calls that want hardware. I did not run
+the app, and nothing outside `design/screens/` was modified.
+
+---
+
+## 2026-09-17 — Diego (Developer, data and backend) — design kit: bills, subscriptions and receipts screens
+
+**Outcome:** Done. Eight new spec files under `design/screens/` (orders 30–37), 66 frames, every state each
+route actually has. `node design/build.mjs` prints no `✗`; all 66 render in all five variants
+(wireframes / hifi / hifi-dark / html / html-dark). Nothing under `design/kit/` was touched and no other
+designer's screen file was opened. Nothing committed.
+
+**What changed** (all new files)
+- `design/screens/30-bills.mjs` — `bills`, `bills-range`, `bills-loading`, `bills-empty`,
+  `bills-window-empty`, `bills-error`.
+- `design/screens/31-add-bill.mjs` — `add-bill-category`, `add-bill-amount`, `add-bill-amount-empty`,
+  `add-bill-details`, `add-bill-details-icon`, `add-bill-when`, `add-bill-when-period`, `add-bill-edit`,
+  `add-bill-edit-delete`, `add-bill-edit-loading`, `add-bill-missing`, `add-bill-read-error`.
+- `design/screens/32-bill-plans.mjs` — `bill-plans`, `-loading`, `-empty`, `-no-results`, `-error`, `-filter`.
+- `design/screens/33-subscriptions.mjs` — `subscriptions`, `-range`, `-loading`, `-empty`,
+  `-window-empty`, `-error`.
+- `design/screens/34-add-subscription.mjs` — `-amount`, `-amount-empty`, `-details`, `-search`, `-when`,
+  `-edit`, `-edit-delete`, `-edit-loading`, `-missing`, `-read-error`.
+- `design/screens/35-subscription-plans.mjs` — `subscription-plans`, `-loading`, `-empty`, `-no-results`,
+  `-error`, `-filter`.
+- `design/screens/36-receipts.mjs` — `receipts`, `-loading`, `-empty`, `-no-results`, `-error`,
+  `-scan-error`, `-filter`.
+- `design/screens/37-add-receipt.mjs` — `-amount`, `-reading`, `-scanned`, `-scan-failed`,
+  `-upload-where`, `-no-camera`, `-details`, `-when`, `-edit`, `-edit-delete`, `-edit-loading`,
+  `-missing`, `-read-error`.
+
+**Two corrections to the brief, made against the source**
+1. `bills.tsx` and `subscriptions.tsx` have **no filter sheet** — they carry a `RangeDropdown`, whose open
+   state is a centred `RangeMenu` over a scrim. Drawn as `bills-range` / `subscriptions-range`. The three
+   filter sheets belong to `bill-plans.tsx`, `subscription-plans.tsx` and `receipts.tsx`.
+2. Those three filter sheets are **full-screen `Modal`s over `bg-card`**, not bottom sheets. Drawn as their
+   own frames (full-bleed panel, `w: 390` with `ml: -24`) rather than `screen({ sheet })`, so the pinned
+   Reset/Apply row and the scrolling body land where they really are.
+   Cancelled subscription rows at 0.5 opacity live on `subscription-plans`, not `subscriptions`.
+
+**Composed locally (the kit has no equivalent)**
+`bills`/`subscriptions` `Tile`, the "Bills charged"/"Renewals charged" figure block, the filter button with
+its count badge, `CategoryPicker`, `IconPicker`, `BrandField` (empty, chosen, and mid-search),
+`ReminderField`, the Delete row, the scan report card, the filter modal shell, and a ring standing in for
+`ActivityIndicator`.
+
+**Could not represent**
+- The ten bill-category glyphs are custom SVGs in `assets/bill-icons/`; the kit draws lucide only, so the
+  nearest lucide name stands in for each (`00-home.mjs` already does this for the Rent row).
+- `BrandLogo`/`BrandMark` fall back to the monogram in the kit, so Electricity reads "EL" and T-Mobile "T-".
+- `C.SubscriptionRow` prints `-$15.49`; `subscription-row.tsx` prints `$15.49` coloured money-out. Kit
+  deviation, not mine to fix — `design/kit/` is off limits.
+- Payment-source labels are `network ••last4` (`queries.ts:338`), so `Chase ••4421` is shorthand: the real
+  label would be the *network*, e.g. `VISA ••4421`.
+
+**Two real-app observations for Priya/Dana, found while copying the source**
+1. `bills.tsx`, `subscriptions.tsx` and `bill-plans.tsx` show a **real-looking `$0.00`** beside the
+   skeletons while loading — the figure block and the count row are not gated on the query.
+   `subscription-plans.tsx` and `receipts.tsx` withhold the figure while loading, so the four pages
+   disagree with each other. See `bills-loading` / `bill-plans-loading` vs `receipts-loading`.
+2. `subscription-plans.tsx`'s title wraps to two lines: `Title flush align="left" className="flex-1"` has
+   no `numberOfLines`, and "Your subscriptions" at 28px does not fit beside the Add pill. Visible in
+   `subscription-plans`. "Your bills" and "Receipts" fit.
+
+**Checks I ran myself:** `node design/build.mjs` — 0 `✗`, 270 screens. Verified all 66 of my ids are unique
+across the whole `screens/` directory and that each produced all five outputs. Read the SVGs as text: the
+only `…` anywhere in my frames is the literal one in "Reading the receipt…", and no rect or text lands
+outside the 390pt frame. Checked the dark variant of the full-bleed filter panel keeps `card` over
+`surface`, and that the HTML variant reproduces the same full-bleed geometry.
+
+**Could not verify:** nothing rendered visually — I read the SVG/HTML as text, I did not look at a picture.
+Colour, weight and optical spacing still need Priya/Pia's eyes on `design/out/index.html`.
+
+**Open questions**
+1. Observation 1 above: should the loading state of these five list pages be made consistent — and in which
+   direction, blank or `$0.00`?
+2. Is the two-line title on `subscription-plans` intended, or should the Title get `numberOfLines={1}`?
+3. `design/build.mjs` no longer wipes `design/out/` (the `rmSync` was removed while I was working). That is
+   good for parallel work but means deleted screens leave stale files behind — worth one clean rebuild
+   before the kit is handed over.
+
+---
+
+## 2026-09-17 — Drew (Developer, money maths) — design kit: the seven Splits screens
+
+**Outcome:** Done. Seven new spec files under `design/screens/` (orders 50–56, section `Splits`)
+covering `splits`, `split-group`, `add-group`, `add-member`, `group-settings`, `settle-up` and
+`friends` — **43 frames**, every state each source renders. `node design/build.mjs` prints no `✗`
+(281 screens on the last run, the other 238 being other people's). No file under `design/kit/` and no
+other designer's screen file was touched, and nothing under `src/` or `supabase/` changed.
+
+**What changed** (all new, all untracked with the rest of `design/`)
+- `design/screens/50-splits.mjs` — `splits`, `splits-empty`, `splits-loading`, `splits-error`,
+  `splits-friend-request` (the popup drawn as a modal overlay over the loaded list).
+- `design/screens/51-split-group.mjs` — `split-group`, `split-group-empty`, `split-group-loading`,
+  `split-group-error`.
+- `design/screens/52-add-group.mjs` — `add-group-name`, `-name-empty`, `-name-carried`,
+  `add-group-settle`, `-settle-off`, `add-group-saving`, `add-group-error`.
+- `design/screens/53-add-member.mjs` — `add-member`, `-no-friends`, `-all-in`, `-error`.
+- `design/screens/54-group-settings.mjs` — `group-settings`, `-member` (not the owner), `-leave`,
+  `-close`, `-remove` (three ConfirmDialog overlays), `-loading`, `-error`, `-missing`.
+- `design/screens/55-settle-up.mjs` — `settle-up`, `-picking`, `-amount` (the full-screen AmountPad,
+  a frame of its own because it is a Modal), `-date` (DatePicker on its month step), `-note`,
+  `-invalid`, `-saving`, `-loading`, `-error`.
+- `design/screens/56-friends.mjs` — `friends`, `-empty`, `-requests`, `-added`, `-error`, `-loading`.
+
+**The figures are the real arithmetic, not decoration.** Lake house has two members (Sam, Priya) and
+`src/lib/split.ts` splits in integer cents: Fuel $52.00 paid by Priya → 2600/2600 (you $26.00);
+Groceries $86.20 paid by Sam → 4310/4310 (you $43.10); Priya then settles $5.00. Sam
+86.20 − 69.10 − 5.00 = **+12.10**; Priya 57.00 − 69.10 = **−12.10**; the pair sums to zero, so the hero
+reads "You are owed $12.10", `simplifyDebts()` has exactly one payment to suggest (Priya → Sam
+$12.10), the group-settings members read "owed $12.10" / "owes $12.10", and the Splits card reads
+"you are owed $12.10" — the same cent everywhere. The brief's "Priya owes Sam $12.10" only closes
+with two members, which is why Lake house is "2 people" rather than three.
+
+**Composed locally (the kit has no version)** — friend-request popup, GroupIconPicker (20 tiles),
+the AmountPad screen, the DatePicker month step, the two half-width group buttons, the unlabelled
+name field on `add-member`, the zero-total day heading, the friends ActivityIndicator.
+
+**One kit bug found, worked around rather than fixed** (I may not edit `design/kit/`):
+`render.mjs` gives an `icon()` node the full width of the box it sits in, so `align: 'center'` cannot
+move it and every glyph hugs the left edge of its well — a 26pt glyph lands 11pt off-centre in a 48pt
+`GroupIcon`, and the same goes for `IconWell`, `BillMark` and the kit's tab bar. Verified in the SVG:
+`<rect x="40" width="48">` with the glyph at `translate(40 …)`. My frames pass `hug: true` on every
+boxed icon, which is documented and gives the right position. One-line kit fix: centre an icon on
+`x + (w - size)/2` in `toSvg`/`toHtml`, or pass `hug: true` inside `IconWell`/`GroupIcon`/`BillMark`.
+Until then every other designer's wells are off-centre in the handoff.
+
+**Checks I ran myself:** `node design/build.mjs` clean, all 43 ids present in `wireframes/`, `hifi/`,
+`hifi-dark/` and `html/`; ids confirmed unique across all 281 screens (the apparent `splits`/`insights`
+collisions with `45-pro-feature.mjs` are entries in its FEATURES data, not screen ids). Read the SVGs
+as text and rasterised eight of them through `qlmanage` to look at them: geometry, centring and
+stacking check out and nothing overlaps (keypad ends 710, Done 730–794 in an 844 frame). The only `…`
+in my frames are the literal "Creating…"/"Saving…" labels plus the Note placeholder, which the kit's
+TextField truncates — the app's TextInput clips the same string, so it is honest either way.
+`npm test` — **51 suites / 551 tests pass** (I changed nothing under `src/`; run as the standing gate).
+
+**Could not verify / deviations**
+- The app's group glyphs are its own drawings under `@/assets/bill-icons`, which the kit cannot load;
+  each of the 20 is paired with the nearest lucide glyph, so count, order and geometry are right but
+  four or five drawings differ in detail.
+- `split-group`'s "2 people" line is centred, not left-aligned. That is what the app does —
+  `Subtitle` carries `text-center` in `typography.tsx` and the screen only passes `mt-1`. Drawn
+  faithfully; worth Priya's eye on whether the app should pass an alignment there.
+- `group-icons.ts` tints are `rgba()` literals, so they render identically in both modes, exactly as
+  the app intends. Not checked against the real dark surface by eye.
+
+**Open questions**
+1. `design/screens/48-add-expense.mjs` declares `section = 'Settings'`. `src/app/add-expense.tsx` is a
+   Splits screen and its 11 frames land in the wrong gallery group. Not my file — whoever owns it.
+2. `design/build.mjs` no longer wipes `design/out/`, so a renamed or deleted frame leaves a stale file
+   in the gallery. One clean rebuild before the handoff.
+3. `design/**` is not prettier-clean — `kit/components.mjs` and every screen file fail
+   `npx prettier --check`, mine included, because the kit's house style is one long line per
+   component. If `npm run check` is ever meant to be green, `design/` wants a `.prettierignore` line.

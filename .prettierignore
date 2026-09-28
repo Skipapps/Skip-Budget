@@ -12,3 +12,6 @@ supabase/.temp/
 # reached review on this branch.
 .claude/
 TEAM.md
+
+# Design kit: generated SVG/HTML and one-line-per-component specs, not shipped code.
+design/

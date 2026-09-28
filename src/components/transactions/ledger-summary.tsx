@@ -1,17 +1,19 @@
+import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 
 import type { LedgerTotals } from '@/api/queries';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
+import { shadows } from '@/theme/shadows';
 
 /**
  * What a window of time came to.
  *
- * Three figures in a bordered row read like a statement — a thing issued to
- * you, to be checked. The point of choosing a week or a month is softer than
- * that: it is "did this stretch pay for itself". So the answer leads at full
- * size, the bar shows the shape of it at a glance, and the two figures behind
- * it sit underneath as the working rather than the headline.
+ * A raised white card, like the dashboard hero in miniature: the verdict
+ * leads at full size with the count sitting quietly in a chip beside it, the
+ * bar shows the shape of the money at a glance, and income and expenses sit
+ * underneath as two tiles — the working, not the headline.
  */
 export function LedgerSummary({ totals }: { totals: LedgerTotals }) {
   const colors = useColors();
@@ -22,61 +24,86 @@ export function LedgerSummary({ totals }: { totals: LedgerTotals }) {
   const inShare = moved > 0 ? totals.in / moved : 0;
 
   return (
-    <View className="w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
-      <View className="w-full flex-row items-start justify-between gap-3">
-        <View className="min-w-0 flex-1">
-          <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-            {short ? 'Short by' : 'Left over'}
-          </Text>
+    <View style={shadows.card} className="w-full rounded-[20px] bg-card p-5">
+      <View className="w-full flex-row items-center justify-between gap-3">
+        <Text
+          className="min-w-0 flex-1 font-poppins text-[13px] text-muted"
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.3}
+        >
+          {short ? 'Short by' : 'Left over'}
+        </Text>
+
+        <View className="shrink-0 rounded-full bg-ink/5 px-3 py-1.5">
           <Text
-            className="mt-0.5 font-poppins-bold text-[26px]"
-            style={{ color: moneyColor(totals.net) }}
+            className="font-poppins-medium text-[12px] text-body"
             numberOfLines={1}
-            adjustsFontSizeToFit
-            maxFontSizeMultiplier={1.2}
+            allowFontScaling={false}
           >
-            {formatCurrency(Math.abs(totals.net))}
+            {totals.count === 0
+              ? 'Nothing yet'
+              : `${totals.count} ${totals.count === 1 ? 'transaction' : 'transactions'}`}
           </Text>
         </View>
-
-        <Text
-          className="mt-1 font-poppins text-[12px] text-muted"
-          maxFontSizeMultiplier={1.2}
-          numberOfLines={1}
-        >
-          {totals.count === 0
-            ? 'Nothing yet'
-            : `${totals.count} ${totals.count === 1 ? 'transaction' : 'transactions'}`}
-        </Text>
       </View>
 
-      {moved === 0 ? null : (
-        <>
-          <View className="mt-4 h-2.5 w-full flex-row overflow-hidden rounded-full bg-ink/5">
-            <View style={{ flex: inShare, backgroundColor: colors.moneyIn }} />
-            <View style={{ flex: 1 - inShare, backgroundColor: colors.moneyOut }} />
-          </View>
+      <Text
+        className="mt-1 font-poppins-bold text-[26px] text-ink"
+        style={{ color: moneyColor(totals.net) }}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        maxFontSizeMultiplier={1.2}
+      >
+        {formatCurrency(Math.abs(totals.net))}
+      </Text>
 
-          <View className="mt-3 w-full flex-row items-center justify-between gap-3">
-            <Leg label="In" amount={totals.in} color={colors.moneyIn} />
-            <Leg label="Out" amount={-totals.out} color={colors.moneyOut} />
-          </View>
-        </>
+      {moved === 0 ? null : (
+        <View className="mt-4 h-1.5 w-full flex-row overflow-hidden rounded-full bg-ink/5">
+          <View style={{ flex: inShare, backgroundColor: colors.moneyIn }} />
+          <View style={{ flex: 1 - inShare, backgroundColor: colors.moneyOut }} />
+        </View>
       )}
+
+      <View className="mt-4 w-full flex-row gap-3">
+        <Stat label="Income" icon={ArrowDownLeft} amount={totals.in} />
+        {/* Stored as a magnitude; shown as money going out. */}
+        <Stat label="Expenses" icon={ArrowUpRight} amount={-totals.out} />
+      </View>
     </View>
   );
 }
 
-function Leg({ label, amount, color }: { label: string; amount: number; color: string }) {
+/** One of the two figures the verdict is made of, on its own quiet tile. */
+function Stat({ label, icon: Icon, amount }: { label: string; icon: LucideIcon; amount: number }) {
+  const colors = useColors();
+  const moneyColor = useMoneyColor();
+
   return (
-    <View className="min-w-0 flex-1 flex-row items-center gap-2">
-      <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-      <Text className="font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.2}>
-        {label}
-      </Text>
+    <View
+      className="min-w-0 flex-1 items-center rounded-[12px] bg-ink/5 px-3 py-3"
+      accessible
+      accessibilityLabel={`${label}, ${formatCurrency(amount)}`}
+    >
+      <View className="flex-row items-center gap-1.5">
+        <View className="opacity-70">
+          <Icon size={13} color={colors.body} strokeWidth={1.8} />
+        </View>
+        <Text
+          className="shrink font-poppins-medium text-[12px] text-body"
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.2}
+        >
+          {label}
+        </Text>
+      </View>
+
+      {/* No adjustsFontSizeToFit here: on iOS it rebuilt the attributed
+          string and dropped the colour, which painted this figure black on
+          the dark theme however white the style said it was. The amounts on
+          these tiles are short enough that shrinking never fires anyway. */}
       <Text
-        className="min-w-0 flex-1 font-poppins-medium text-[13px]"
-        style={{ color }}
+        className="mt-1 text-center font-poppins-semibold text-[16px]"
+        style={{ color: moneyColor(amount) }}
         numberOfLines={1}
         maxFontSizeMultiplier={1.2}
       >

@@ -7,16 +7,16 @@ import { useGettingStarted } from '@/api/onboarding';
 import { useColors } from '@/providers/theme-provider';
 
 /**
- * Five steps between an empty app and a useful one.
+ * Five steps between an empty app and a useful one — the same five the
+ * walk-in flow (/setup) runs, read from the same definition.
  *
- * A card, not a wizard: Skip works from the first second — you can scan a
- * receipt before setting anything up — and a forced setup flow would stand in
- * front of exactly that moment. This sits on Home, ticks itself as the data
+ * A card, not a wizard: Skip works from the first second, and this sits on
+ * Home for whoever set up later or partway. It ticks itself as the data
  * appears, and leaves for good once everything is done or somebody says so.
  */
 export function GettingStartedCard() {
   const colors = useColors();
-  const { steps, doneCount, visible, dismiss, askForReminders } = useGettingStarted();
+  const { steps, doneCount, visible, dismiss } = useGettingStarted();
 
   if (!visible) return null;
 
@@ -63,10 +63,7 @@ export function GettingStartedCard() {
                 step.done ? `${step.title}. Done.` : `${step.title}. ${step.detail}`
               }
               disabled={step.done}
-              onPress={() => {
-                if (step.href) router.push(step.href as never);
-                else void askForReminders();
-              }}
+              onPress={() => router.push(step.href as never)}
               className="w-full flex-row items-center gap-3 py-2.5 active:opacity-70"
             >
               <View
@@ -80,17 +77,27 @@ export function GettingStartedCard() {
               </View>
 
               <View className="min-w-0 flex-1">
-                <Text
-                  className={
-                    step.done
-                      ? 'font-poppins text-[14px] text-muted line-through'
-                      : 'font-poppins-medium text-[14px] text-ink'
-                  }
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={1.3}
-                >
-                  {step.title}
-                </Text>
+                <View className="flex-row items-center gap-2">
+                  <Text
+                    className={
+                      step.done
+                        ? 'shrink font-poppins text-[14px] text-muted line-through'
+                        : 'shrink font-poppins-medium text-[14px] text-ink'
+                    }
+                    numberOfLines={2}
+                    maxFontSizeMultiplier={1.3}
+                  >
+                    {step.title}
+                  </Text>
+                  {step.optional && !step.done ? (
+                    <Text
+                      className="font-poppins text-[11px] text-muted"
+                      maxFontSizeMultiplier={1.2}
+                    >
+                      Optional
+                    </Text>
+                  ) : null}
+                </View>
                 {/* Only the next step explains itself. Five explanations at
                     once is a wall; one is an invitation. */}
                 {isNext ? (

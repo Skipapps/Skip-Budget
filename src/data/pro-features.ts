@@ -40,13 +40,13 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
   splits: {
     id: 'splits',
     artwork: 'tileSplitCalculator',
-    title: 'Split bills without the spreadsheet',
-    tagline: 'The flat, the trip, the dinner — everyone sees the same running total.',
+    title: 'Run every group at once',
+    tagline: 'The flat, the trip, the dinner — all open at the same time.',
     benefits: [
       {
-        title: 'Groups that keep score',
+        title: 'As many open groups as life has',
         detail:
-          'Add expenses as they happen and Skip works out who owes whom — down to who pays whom to settle in the fewest payments.',
+          'Your first group is on the house, and joining other people’s groups is always free. Pro opens as many of your own as you like — the flat does not close because a holiday started.',
       },
       {
         title: 'Friends without phone numbers',
@@ -69,7 +69,7 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
       {
         title: 'Where you stand, honestly',
         detail:
-          'Savings, less what you owe on cards, plus what friends owe you — one figure that means something.',
+          'Savings, less what you owe on credit cards, plus what friends owe you — one figure that means something.',
       },
       {
         title: 'Where it actually goes',
@@ -99,8 +99,9 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
           'Skip straightens the page before reading it, which is the difference between a 3 and an 8.',
       },
       {
-        title: 'The card comes pre-picked',
-        detail: 'When the last four digits match a card you track, it is already selected to save.',
+        title: 'The credit card comes pre-picked',
+        detail:
+          'When the last four digits match a credit card you track, it is already selected to save.',
       },
     ],
   },
@@ -127,11 +128,11 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
   unlimited: {
     id: 'unlimited',
     artwork: 'emptyWallet',
-    title: 'All your cards. All your accounts.',
+    title: 'All your credit cards. All your accounts.',
     tagline: 'Free keeps one of each. Real wallets are bigger than that.',
     benefits: [
       {
-        title: 'Every card and account you actually have',
+        title: 'Every credit card and account you actually have',
         detail: 'Track them all, with live balances and their own ledgers.',
       },
       {
@@ -139,9 +140,9 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
         detail: 'Salary, side work, the second job — Left this month gets the whole truth.',
       },
       {
-        title: 'Nothing ever deleted',
+        title: 'Nothing ever locked or deleted',
         detail:
-          'If Pro lapses, extras lock rather than vanish — everything is exactly where you left it when you return.',
+          'If Pro lapses, everything you made keeps working exactly as it is — you just cannot add past the free allowance until you are back.',
       },
     ],
   },

@@ -1,22 +1,29 @@
 import { ChevronRight, TrendingUp } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
+import { shadows } from '@/theme/shadows';
 import { useColors } from '@/providers/theme-provider';
 
 type InsightBannerProps = {
+  /** Hides the PRO badge once they have it — the card itself stays. */
+  pro?: boolean;
   onPress?: () => void;
 };
 
 /**
- * Full-width dashboard row. Deliberately carries no figure — the list above
+ * Full-width dashboard card. Deliberately carries no figure — the list above
  * already reports numbers, and this points at the story behind them.
+ *
+ * Raised on a shadow with no border, like the tool cards beside it: it is
+ * meant to be pressed, and an outline and a shadow together flatten each
+ * other out.
  *
  * Only dresses itself as a link when it has somewhere to go. A chevron and a
  * button role on a banner that does nothing is a promise the screen cannot
  * keep: it reads as tappable, announces itself as tappable to a screen reader,
  * and then swallows the tap. Without a destination it is simply a card.
  */
-export function InsightBanner({ onPress }: InsightBannerProps) {
+export function InsightBanner({ pro = true, onPress }: InsightBannerProps) {
   const colors = useColors();
   const Container = onPress ? Pressable : View;
 
@@ -25,19 +32,20 @@ export function InsightBanner({ onPress }: InsightBannerProps) {
       {...(onPress
         ? {
             accessibilityRole: 'button' as const,
-            accessibilityLabel: 'Insights. See the story behind your spending.',
+            accessibilityLabel: `Insights.${pro ? '' : ' Pro feature.'} See the story behind your spending.`,
             onPress,
           }
         : {})}
-      className={`w-full flex-row items-center gap-3 overflow-hidden rounded-[16px] border border-line bg-card px-4 py-3.5 ${
+      style={shadows.raised}
+      className={`w-full flex-row items-center gap-3 rounded-[16px] bg-card px-4 py-3.5 ${
         onPress ? 'active:opacity-60' : ''
       }`}
     >
       {/* A 76pt drawing at 55% opacity was the biggest thing on the dashboard
           and said nothing the two lines beside it did not. The glyph is the
           same size as every other leading mark on the screen, so this reads as
-          a row in the same list rather than an advert wedged between two. */}
-      <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-ink/5">
+          a peer of the tool cards rather than an advert wedged between two. */}
+      <View className="h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink/5">
         <TrendingUp size={20} color={colors.body} strokeWidth={1.8} />
       </View>
 
@@ -57,6 +65,18 @@ export function InsightBanner({ onPress }: InsightBannerProps) {
           See the story behind your spending
         </Text>
       </View>
+
+      {pro ? null : (
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          className="shrink-0 rounded-full bg-accent px-2 py-0.5"
+        >
+          <Text allowFontScaling={false} className="font-poppins-bold text-[9px] text-on-control">
+            PRO
+          </Text>
+        </View>
+      )}
 
       {/* A row child rather than an absolute corner pin, so the row's own
           items-center does the vertical centring — and the chevron keeps its

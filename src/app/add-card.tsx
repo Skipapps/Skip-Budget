@@ -1,6 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import {
@@ -38,10 +38,20 @@ export default function AddCardScreen() {
   // Deep-link guard: creating past the free allowance opens the case
   // for Pro instead of a form the database would refuse. Editing is
   // untouched. Wrapper-shaped so the hook count never changes.
+  //
+  // Decided once, on arrival: the count this reads changes the moment the
+  // form saves, and a live check then shoved the person who just added
+  // their first card onto the Pro page instead of back where they came
+  // from — reading as "your card was not added" when it very much was.
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { pro, ready } = usePro();
   const existing = useCards();
-  if (!id && ready && !pro && (existing.data?.length ?? 0) >= 1) {
+
+  const walled = useRef<boolean | null>(null);
+  if (walled.current === null && (id || (ready && !existing.isPending))) {
+    walled.current = !id && !pro && (existing.data?.length ?? 0) >= 1;
+  }
+  if (walled.current) {
     return <Redirect href={{ pathname: '/pro-feature', params: { id: 'unlimited' } }} />;
   }
   return <AddCardScreenInner />;
@@ -57,7 +67,7 @@ export default function AddCardScreen() {
  * read and no longer there each get said, and none of them is a blank form.
  */
 function AddCardScreenInner() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, from: origin } = useLocalSearchParams<{ id?: string; from?: string }>();
   const artwork = useArtwork();
   const card = useCard(id);
   const existing = card.data ?? null;
@@ -68,8 +78,8 @@ function AddCardScreenInner() {
         <Screen showBack>
           <PageState
             art={artwork.error}
-            title="Could not open this card"
-            message="Check your connection and try again. Your card and its reminder are unchanged."
+            title="Could not open this credit card"
+            message="Check your connection and try again. Your credit card and its reminder are unchanged."
             actionLabel="Try again"
             onAction={() => {
               void card.refetch();
@@ -84,7 +94,7 @@ function AddCardScreenInner() {
     if (!card.isFetched) {
       return (
         <StepFlow
-          title="Edit card"
+          title="Edit credit card"
           steps={3}
           current={1}
           onBack={() => router.back()}
@@ -104,7 +114,7 @@ function AddCardScreenInner() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title="That card is not here"
+          title="That credit card is not here"
           message="It may have been removed. Nothing has been changed."
           actionLabel="Go back"
           onAction={() => router.back()}
@@ -113,15 +123,18 @@ function AddCardScreenInner() {
     );
   }
 
-  return <CardForm key={existing?.id ?? 'new'} id={id} existing={existing} />;
+  return <CardForm key={existing?.id ?? 'new'} id={id} existing={existing} origin={origin} />;
 }
 
 function CardForm({
   id,
   existing,
+  origin,
 }: {
   id?: string;
   existing: ReturnType<typeof useCard>['data'] | null;
+  /** 'setup' when the walk-in flow sent us; changes only where Save lands. */
+  origin?: string;
 }) {
   const colors = useColors();
   const editing = Boolean(id);
@@ -164,9 +177,9 @@ function CardForm({
   const handleDelete = async () => {
     if (!id) return;
     const ok = await confirm({
-      title: 'Delete this card?',
+      title: 'Delete this credit card?',
       message:
-        'Receipts, bills and subscriptions paid with it are kept, but stop showing this card.',
+        'Receipts, bills and subscriptions paid with it are kept, but stop showing this credit card.',
       confirmLabel: 'Delete',
       destructive: true,
     });
@@ -176,7 +189,7 @@ function CardForm({
       await deleteCard.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError({ message: saveErrorMessage(thrown, 'Could not delete that card.'), step });
+      setError({ message: saveErrorMessage(thrown, 'Could not delete that credit card.'), step });
     }
   };
 
@@ -190,7 +203,7 @@ function CardForm({
   const handleSave = async () => {
     setError(null);
     if (!name.trim()) {
-      fail('Give the card a name so you can tell it apart.', 1);
+      fail('Give the credit card a name so you can tell it apart.', 1);
       return;
     }
 
@@ -207,7 +220,7 @@ function CardForm({
           message:
             `A new balance is taken as today's figure, so the ` +
             `${absorbed.length === 1 ? 'transaction' : `${absorbed.length} transactions`} ` +
-            `already on this card ${absorbed.length === 1 ? 'is' : 'are'} counted as part of ` +
+            `already on this credit card ${absorbed.length === 1 ? 'is' : 'are'} counted as part of ` +
             `it and will stop showing here. Nothing is deleted — they stay in your ` +
             `transactions, and on the bills and receipts they came from.`,
           confirmLabel: 'Update the balance',
@@ -241,10 +254,18 @@ function CardForm({
       await applyReminder('card', cardId, dueDate ? choiceToLead(reminder) : null, remindAt);
 
       success();
-      router.back();
+      // From the setup walk-in, the story continues on its own page: the
+      // bank-account offer, with Skip returning to the checklist. A page
+      // rather than a dialog — the dialog read as an interruption, and one
+      // raised mid-navigation never showed at all.
+      if (!editing && origin === 'setup') {
+        router.replace('/account-offer');
+      } else {
+        router.back();
+      }
     } catch (thrown) {
       warn();
-      setError({ message: saveErrorMessage(thrown, 'Could not save that card.'), step: 2 });
+      setError({ message: saveErrorMessage(thrown, 'Could not save that credit card.'), step: 2 });
     }
   };
 
@@ -254,15 +275,21 @@ function CardForm({
   // what a new card is at — so step 1 never blocks on it.
   const stepValid = step === 1 ? Boolean(name.trim()) : !busy;
 
+  // "Balance", not "what is on it": the figure can be owed or available, and
+  // balance is the one word people already use for both.
   const question =
-    step === 0 ? 'What is on the card today?' : step === 2 ? 'When is the bill due?' : undefined;
+    step === 0
+      ? 'What is the credit card balance right now?'
+      : step === 2
+        ? 'When is the bill due?'
+        : undefined;
   const primaryLabel =
-    step < 2 ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save card';
+    step < 2 ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save credit card';
   const stepError = error && error.step === step ? error.message : null;
 
   return (
     <StepFlow
-      title={editing ? 'Edit card' : 'Add a card'}
+      title={editing ? 'Edit credit card' : 'Add a credit card'}
       steps={3}
       current={step}
       onBack={() => {
@@ -287,7 +314,7 @@ function CardForm({
         editing ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Delete this card"
+            accessibilityLabel="Delete this credit card"
             onPress={handleDelete}
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
@@ -317,7 +344,7 @@ function CardForm({
               network,
               color,
             }}
-            placeholderHolder="Name of the card"
+            placeholderHolder="Name of the credit card"
           />
 
           <View className="w-full">
@@ -326,7 +353,7 @@ function CardForm({
           </View>
 
           <TextField
-            label="Name of the card"
+            label="Name of the credit card"
             value={name}
             onChangeText={setName}
             autoCapitalize="words"

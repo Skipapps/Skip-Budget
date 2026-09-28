@@ -55,6 +55,7 @@ jest.mock('@/api/mutations', () => ({
   useDeleteBankAccount: () => mockUseDelete(),
   useCreateSalarySource: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useSetSalaryAccounts: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useLinkAccountToSalaries: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
 
 jest.mock('@/api/reminders', () => ({
@@ -70,6 +71,7 @@ jest.mock('@/api/queries', () => ({
   useBankAccount: () => ({ ...mockAccount, refetch: mockRefetch }),
   useBankAccounts: () => ({ data: [] }),
   useSalaryAccountIds: () => ({ ids: new Set<string>(), isLoading: false, isError: false }),
+  useSalarySources: () => ({ data: [] }),
 }));
 
 beforeEach(() => {

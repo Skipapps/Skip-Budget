@@ -41,7 +41,11 @@ export function NetworkPicker({ networks, value, onChange }: NetworkPickerProps)
                 allowFontScaling={false}
                 className={cn(
                   'font-poppins-bold text-[13px] italic',
-                  selected ? 'text-on-control' : 'text-ink',
+                  // The chip is filled with ink, so the mark is drawn in the
+                  // surface — ink's own inverse in either mode. `on-control`
+                  // here was the accent's pairing, which is white on a navy
+                  // theme: invisible on this chip in dark mode.
+                  selected ? 'text-surface' : 'text-ink',
                 )}
               >
                 {MARKS[network] ?? network}

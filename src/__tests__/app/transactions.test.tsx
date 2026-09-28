@@ -6,11 +6,11 @@ import TransactionsScreen from '@/app/(tabs)/transactions';
 /**
  * Which day the Transactions list opens with, and what order its rows run in.
  *
- * This screen is the one the Founder's "today at the bottom" rule was written
- * about. Its day headings come from `periodBuckets`, which the screen used to
- * `.reverse()`; the rows inside each heading come from a sort in the screen
- * itself. Both changed, so both are asserted here — and the same-day case is
- * the one that must *not* have moved.
+ * The Founder's rule for this screen (2026-09-25): today at the top, time
+ * running backwards below it — the newest movement is what the tab is opened
+ * for. Day headings come from `periodBuckets` reversed; the rows inside each
+ * heading come from a sort in the screen itself. Both are asserted here — and
+ * the same-day id tiebreak is the one thing that must *not* have moved.
  *
  * The second half is where a row goes when it is pressed. Every row used to go
  * nowhere: the list rendered `LedgerRow` with no handler at all, so the whole
@@ -121,7 +121,7 @@ beforeEach(() => {
 });
 
 describe('Transactions — day order', () => {
-  it('runs the day headings forwards, ending on today', async () => {
+  it('runs the day headings backwards, starting on today', async () => {
     const { getAllByText } = await render(<TransactionsScreen />);
 
     // Day buckets on the "week" period: one heading per day that has rows.
@@ -129,7 +129,7 @@ describe('Transactions — day order', () => {
       (node) => node.props.children,
     );
 
-    expect(headings).toEqual(['7 Sep 2026', '8 Sep 2026', 'Today']);
+    expect(headings).toEqual(['Today', '8 Sep 2026', '7 Sep 2026']);
   });
 
   it('leaves the order inside a single day exactly as it was', async () => {
@@ -142,11 +142,11 @@ describe('Transactions — day order', () => {
     // Three rows share 8 September and keep their id tiebreak — e1, e2, e3 —
     // which is the order they had when the days ran the other way.
     expect(rows).toEqual([
-      expect.stringContaining('Greengrocer'),
+      expect.stringContaining('Bakery'),
       expect.stringContaining('Chemist'),
       expect.stringContaining('Hardware'),
       expect.stringContaining('Bookshop'),
-      expect.stringContaining('Bakery'),
+      expect.stringContaining('Greengrocer'),
     ]);
   });
 });

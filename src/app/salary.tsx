@@ -219,12 +219,15 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
       <Title>Salary</Title>
       <Subtitle className="mt-3">Track every source of income and where each one is paid.</Subtitle>
 
-      <View className="mt-6 w-full rounded-[16px] border border-line bg-card px-4 py-3">
+      {/* Deliberately not a card. Boxed like the sources below, this read as
+          one more editable field and people tapped it — it is a readout, and
+          plain centred text is what says so. */}
+      <View className="mt-6 w-full items-center">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           Total per month
         </Text>
         <Text
-          className="mt-0.5 font-poppins-semibold text-[20px] text-ink"
+          className="mt-0.5 font-poppins-semibold text-[24px] text-ink"
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}

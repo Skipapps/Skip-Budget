@@ -92,14 +92,14 @@ export function BalanceSummary({
             that it has nothing rather than a total built from half a month. */}
         {error ? (
           <Text
-            className="mt-3 font-poppins-bold text-[40px] text-on-control"
+            className="mt-3 text-center font-poppins-bold text-[40px] text-on-control"
             maxFontSizeMultiplier={1.2}
           >
             —
           </Text>
         ) : loading ? (
           // The label and the pill stay put, so nothing jumps when it lands.
-          <View className="mt-3 h-[52px] w-2/3 opacity-20">
+          <View className="mt-3 h-[52px] w-2/3 self-center opacity-20">
             <Skeleton
               className="h-full w-full rounded-[12px]"
               style={{ backgroundColor: colors.onControl }}
@@ -107,7 +107,7 @@ export function BalanceSummary({
           </View>
         ) : (
           <RollingNumber
-            className="mt-3 justify-start"
+            className="mt-3 justify-center"
             value={leftThisMonth}
             lineHeight={Math.round(fontSize * 1.3)}
             fontSize={fontSize}
@@ -128,7 +128,7 @@ export function BalanceSummary({
           className="mt-5 w-full"
           accessible
           accessibilityRole="progressbar"
-          accessibilityLabel={`${Math.round(spentShare * 100)}% of this month's income is spoken for`}
+          accessibilityLabel={`${Math.round(spentShare * 100)}% of the income is spent`}
           accessibilityValue={{ min: 0, max: 100, now: Math.round(spentShare * 100) }}
         >
           <View className="h-2 w-full overflow-hidden rounded-full bg-on-control/15">
@@ -145,15 +145,15 @@ export function BalanceSummary({
             className="mt-2 font-poppins text-[12px] text-on-control/85"
             maxFontSizeMultiplier={1.3}
           >
-            {Math.round(spentShare * 100)}% of this month&apos;s income is spoken for
+            {Math.round(spentShare * 100)}% of the income is spent
           </Text>
         </View>
       )}
 
-      {/* Inside the card's bottom edge, under a hairline of its own
-          foreground — the two figures the headline is made of, not two
-          separate statistics that happen to be nearby. */}
-      <View className="mt-5 w-full flex-row gap-4 border-t border-on-control/20 pt-4">
+      {/* Inside the card's bottom edge, each on its own quiet tile — the two
+          figures the headline is made of, not two separate statistics that
+          happen to be nearby. */}
+      <View className="mt-5 w-full flex-row gap-3">
         <Stat label="Income" amount={payday} icon={ArrowDownLeft} loading={loading} error={error} />
         {/* Stored as a positive magnitude; shown as money going out. */}
         <Stat
@@ -182,7 +182,7 @@ function Stat({ label, amount, icon: Icon, loading, error }: StatProps) {
 
   return (
     <View
-      className="min-w-0 flex-1"
+      className="min-w-0 flex-1 items-center rounded-[16px] bg-on-control/10 px-3 py-3"
       accessible
       accessibilityLabel={
         error || loading
@@ -212,7 +212,7 @@ function Stat({ label, amount, icon: Icon, loading, error }: StatProps) {
         </View>
       ) : (
         <Text
-          className="mt-1 font-poppins-semibold text-[20px] text-on-control"
+          className="mt-1 text-center font-poppins-semibold text-[17px] text-on-control"
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}

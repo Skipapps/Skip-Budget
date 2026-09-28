@@ -17,7 +17,6 @@ import { Person } from '@/components/splits/person';
 import { GroupIconPicker } from '@/components/splits/group-icon-picker';
 import { ActionPill } from '@/components/ui/action-pill';
 import { Button } from '@/components/ui/button';
-import { useProGate } from '@/components/pro/pro-gate';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -38,15 +37,6 @@ import { useArtwork } from '@/theme/artwork';
  * can act on, where "cannot leave group" is a wall. That check lives in the
  * database; this screen only has to show what comes back.
  */
-export default function GroupSettingsScreen() {
-  // A wrapper, not an inline return: the screen below runs its own
-  // hooks, and an early return above them would change the hook count
-  // the moment the entitlement answer arrives — which React forbids.
-  const gate = useProGate('splits');
-  if (gate) return gate;
-  return <GroupSettingsScreenInner />;
-}
-
 type GroupRecord = NonNullable<ReturnType<typeof useGroup>['data']>;
 type MemberRecord = NonNullable<ReturnType<typeof useGroupMembers>['data']>[number];
 type BalanceRecord = NonNullable<ReturnType<typeof useGroupBalances>['data']>[number];
@@ -61,7 +51,7 @@ type BalanceRecord = NonNullable<ReturnType<typeof useGroupBalances>['data']>[nu
  * and refuses a name that matches the one on record), but an empty box under
  * the label "Name" reads as a group that has lost its name.
  */
-function GroupSettingsScreenInner() {
+export default function GroupSettingsScreen() {
   const artwork = useArtwork();
   const { id } = useLocalSearchParams<{ id?: string }>();
 

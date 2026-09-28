@@ -95,10 +95,10 @@ describe('Add card — an edit whose card could not be read', () => {
     mockCard = { data: null, isError: true, isFetched: true };
     const { getByText, queryByText } = await render(<AddCardScreen />);
 
-    expect(getByText('Could not open this card')).toBeTruthy();
+    expect(getByText('Could not open this credit card')).toBeTruthy();
     expect(getByText('Try again')).toBeTruthy();
 
-    expect(queryByText('Edit card')).toBeNull();
+    expect(queryByText('Edit credit card')).toBeNull();
     expect(queryByText('Continue')).toBeNull();
     expect(queryByText('Save changes')).toBeNull();
 
@@ -114,8 +114,8 @@ describe('Add card — an edit whose card could not be read', () => {
   it('holds the skeleton while the read is still running', async () => {
     const { getByText, queryByText } = await render(<AddCardScreen />);
 
-    expect(getByText('Edit card')).toBeTruthy();
-    expect(queryByText('Could not open this card')).toBeNull();
+    expect(getByText('Edit credit card')).toBeTruthy();
+    expect(queryByText('Could not open this credit card')).toBeNull();
     expect(mockUseUpdate).not.toHaveBeenCalled();
   });
 
@@ -136,8 +136,8 @@ describe('Add card — an edit whose card could not be read', () => {
     };
     const { getByText, queryByText } = await render(<AddCardScreen />);
 
-    expect(getByText('Edit card')).toBeTruthy();
-    expect(queryByText('Could not open this card')).toBeNull();
+    expect(getByText('Edit credit card')).toBeTruthy();
+    expect(queryByText('Could not open this credit card')).toBeNull();
     expect(mockUseUpdate).toHaveBeenCalled();
   });
 
@@ -145,8 +145,8 @@ describe('Add card — an edit whose card could not be read', () => {
     mockCard = { data: null, isError: false, isFetched: true };
     const { getByText, queryByText } = await render(<AddCardScreen />);
 
-    expect(getByText('That card is not here')).toBeTruthy();
-    expect(queryByText('Edit card')).toBeNull();
+    expect(getByText('That credit card is not here')).toBeTruthy();
+    expect(queryByText('Edit credit card')).toBeNull();
     expect(mockUseUpdate).not.toHaveBeenCalled();
     expect(mockUseCreate).not.toHaveBeenCalled();
   });

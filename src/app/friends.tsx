@@ -16,7 +16,6 @@ import { useProfile } from '@/api/queries';
 import { useRefreshAll } from '@/api/refresh';
 import { Person } from '@/components/splits/person';
 import { Button } from '@/components/ui/button';
-import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
@@ -33,15 +32,6 @@ import { useColors } from '@/providers/theme-provider';
  * there is no lookup to abuse.
  */
 export default function FriendsScreen() {
-  // A wrapper, not an inline return: the screen below runs its own
-  // hooks, and an early return above them would change the hook count
-  // the moment the entitlement answer arrives — which React forbids.
-  const gate = useProGate('splits');
-  if (gate) return gate;
-  return <FriendsScreenInner />;
-}
-
-function FriendsScreenInner() {
   const colors = useColors();
   const confirm = useConfirm();
 

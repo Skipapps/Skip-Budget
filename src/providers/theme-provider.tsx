@@ -16,7 +16,8 @@ import {
   ACCENTS,
   DEFAULT_ACCENT,
   DEFAULT_MODE,
-  accentValue,
+  LEGACY_ACCENTS,
+  accentById,
   buildTokens,
   tokenVars,
   type AccentId,
@@ -80,7 +81,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         const [storedMode, storedAccent] = await AsyncStorage.multiGet([MODE_KEY, ACCENT_KEY]);
         if (cancelled) return;
         if (isMode(storedMode[1])) setModeState(storedMode[1]);
-        if (isAccent(storedAccent[1])) setAccentState(storedAccent[1]);
+        if (isAccent(storedAccent[1])) {
+          setAccentState(storedAccent[1]);
+        } else if (storedAccent[1] && storedAccent[1] in LEGACY_ACCENTS) {
+          // A colour from the retired set: land on its nearest survivor and
+          // remember that, so the mapping happens once rather than every launch.
+          const mapped = LEGACY_ACCENTS[storedAccent[1]];
+          setAccentState(mapped);
+          AsyncStorage.setItem(ACCENT_KEY, mapped).catch(() => {});
+        }
       } catch {
         // A device that cannot read its own storage still gets an app, in the
         // colours it shipped with.
@@ -94,7 +103,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const scheme: Scheme = mode === 'system' ? (phone === 'dark' ? 'dark' : 'light') : mode;
-  const colors = useMemo(() => buildTokens(scheme, accentValue(accentId)), [scheme, accentId]);
+  const colors = useMemo(() => buildTokens(scheme, accentById(accentId)), [scheme, accentId]);
 
   // Behind the app itself: what shows through during a navigation transition
   // and under the keyboard. Left as it was, that stays white in dark mode.
@@ -148,14 +157,17 @@ export function useColors(): Tokens {
  * green that reads on off-white disappears on near-black, so dark mode carries
  * its own. Call sites are unchanged — they still ask for a colour by amount.
  */
-export function useMoneyColor(): (amount: number) => string | undefined {
+export function useMoneyColor(): (amount: number) => string {
   const colors = useColors();
   return useCallback(
     (amount: number) => {
       if (amount > 0) return colors.moneyIn;
       if (amount < 0) return colors.moneyOut;
-      // Zero is neither good news nor bad, and reads better as plain type.
-      return undefined;
+      // Zero is neither good news nor bad: plain ink. Returned explicitly
+      // rather than as undefined, because `{ color: undefined }` in a style
+      // prop still overrides the className colour when React Native flattens
+      // styles — which is how "$0.00" came out black on the dark theme.
+      return colors.ink;
     },
     [colors],
   );

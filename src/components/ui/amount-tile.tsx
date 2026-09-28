@@ -89,11 +89,10 @@ export function AmountTile({
           className,
         )}
       >
-        {/* Held back on purpose. The drawings are solid black on white and
-            solid white on near-black, which at full strength out-shouts the
-            figure underneath — and the figure is what the tile is for. Softened
-            they still say which tile this is at a glance without competing. */}
-        <View className="h-[84px] w-[84px] opacity-55">
+        {/* Full strength: the current illustrations are drawn in their own
+            muted palette, so they no longer need the opacity that kept the old
+            solid-black drawings from out-shouting the figure. */}
+        <View className="h-[84px] w-[84px]">
           <Artwork width="100%" height="100%" />
         </View>
 

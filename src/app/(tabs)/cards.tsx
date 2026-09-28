@@ -107,7 +107,7 @@ export default function CardsScreen() {
         <PageState
           art={artwork.error}
           title="Could not load your wallet"
-          message="Skip could not work out what is on your cards and accounts right now. Check your connection and try again."
+          message="Skip could not work out what is on your credit cards and accounts right now. Check your connection and try again."
           actionLabel="Try again"
           onAction={() => refetchBalances()}
         />
@@ -119,8 +119,8 @@ export default function CardsScreen() {
     <Screen onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-2 w-full">
         <SectionHeader
-          title="Cards"
-          actionLabel="New card"
+          title="Credit cards"
+          actionLabel="New credit card"
           onAction={() =>
             // The second of anything is where Pro begins. The database refuses
             // it too; this door just explains itself first.
@@ -174,7 +174,7 @@ export default function CardsScreen() {
             fetch would leave this region blank — but a failed read never gets
             this far now: it is answered by the page above. */}
         {!cards.isPending && (cards.data?.length ?? 0) === 0 ? (
-          <ListNote text="No cards yet. Add one to track what you spend on it." />
+          <ListNote text="No credit cards yet. Add one to track what you spend on it." />
         ) : null}
       </View>
 

@@ -37,7 +37,7 @@ const SECTIONS: Section[] = [
           'Your account: the email address you signed up with, or the identifier Apple or Google gives us when you sign in with them.',
           'Your profile: the display name you choose, and nothing else.',
           'Your money: the bills, subscriptions, receipts, loans, salary sources, savings and card payments you enter, and the record of what your bills and subscriptions have charged.',
-          'Your cards and accounts: the name you give them, the network or bank, a colour, a balance you type, a due day, and at most the last four digits.',
+          'Your credit cards and accounts: the name you give them, the network or bank, a colour, a balance you type, a due day, and at most the last four digits.',
         ],
       },
       {
@@ -88,7 +88,7 @@ const SECTIONS: Section[] = [
         kind: 'bullets',
         items: [
           'Things that happened — recorded charges, receipts and card payments — are kept for seven years and then deleted automatically, a day at a time as each one passes the boundary.',
-          'Things that are still running — bills, subscriptions, cards, accounts and salary sources — are kept until you delete them, because a standing order set up years ago is still a standing order.',
+          'Things that are still running — bills, subscriptions, credit cards, accounts and salary sources — are kept until you delete them, because a standing order set up years ago is still a standing order.',
         ],
       },
     ],

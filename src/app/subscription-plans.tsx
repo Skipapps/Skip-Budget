@@ -22,6 +22,7 @@ import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
+import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
 
 /** Normalised to a month so a yearly plan does not look cheap beside a monthly one. */
@@ -55,10 +56,8 @@ export default function SubscriptionPlansScreen() {
   );
 
   const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-
     return subscriptions.filter((subscription) => {
-      if (needle && !subscription.name.toLowerCase().includes(needle)) return false;
+      if (!matchesSearch(subscription.name, query)) return false;
       if (filters.cycles.length > 0 && !filters.cycles.includes(subscription.cycle)) return false;
       if (filters.sourceIds.length > 0) {
         const sourceId = subscription.card_id ?? subscription.bank_account_id;

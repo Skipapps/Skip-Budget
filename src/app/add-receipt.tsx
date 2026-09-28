@@ -1,7 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ImageUp, ScanLine, Trash2 } from 'lucide-react-native';
+import { ImageUp, ScanLine, Trash2, type LucideIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
@@ -13,7 +13,6 @@ import { BrandField, type BrandSelection } from '@/components/brands/brand-field
 import { AmountStep } from '@/components/flow/amount-step';
 import { InlineCalendar } from '@/components/flow/inline-calendar';
 import { StepFlow } from '@/components/flow/step-flow';
-import { ActionPill } from '@/components/ui/action-pill';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +22,7 @@ import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { toIsoDate } from '@/lib/date';
 import { success, warn } from '@/lib/haptics';
+import { withTap } from '@/lib/press';
 import { saveErrorMessage } from '@/lib/save-error';
 import { parseReceipt, parseReceiptFromLines, type ParsedReceipt } from '@/lib/receipt-parser';
 import { useColors } from '@/providers/theme-provider';
@@ -537,28 +537,26 @@ function ReceiptForm({
         step === 0 ? (
           <View className="w-full gap-2">
             {!editing && isRecognitionAvailable() ? (
-              <>
-                <View className="w-full flex-row justify-center gap-3">
-                  <ActionPill
-                    icon={ScanLine}
-                    label="Scan"
-                    onPress={handleScan}
-                    disabled={reading}
-                  />
-                  <ActionPill
-                    icon={ImageUp}
-                    label="Upload"
-                    onPress={handleUpload}
-                    disabled={reading}
-                  />
-                </View>
-                <Text
-                  className="w-full text-center font-poppins text-[12px] text-muted"
-                  maxFontSizeMultiplier={1.3}
-                >
-                  Point the camera at a paper receipt, or upload a photo or PDF
-                </Text>
-              </>
+              // Two full-width capture doors, side by side. The helper line
+              // they used to carry lives on as their accessibility labels.
+              <View className="w-full flex-row gap-3">
+                <CaptureButton
+                  icon={ScanLine}
+                  label="Scan"
+                  hint="Point the camera at a paper receipt"
+                  onPress={handleScan}
+                  disabled={reading}
+                  proBadge={!pro}
+                />
+                <CaptureButton
+                  icon={ImageUp}
+                  label="Upload"
+                  hint="Upload a photo or PDF of a receipt"
+                  onPress={handleUpload}
+                  disabled={reading}
+                  proBadge={!pro}
+                />
+              </View>
             ) : null}
 
             {reading ? (
@@ -668,5 +666,66 @@ function ReceiptForm({
 
       {step === 2 ? <InlineCalendar value={date} onChange={edited(setDate)} /> : null}
     </StepFlow>
+  );
+}
+
+type CaptureButtonProps = {
+  icon: LucideIcon;
+  label: string;
+  /** The words the removed helper line used to say, read out per button. */
+  hint: string;
+  onPress: () => void;
+  disabled?: boolean;
+  /**
+   * Shows the small PRO pill. Passed as `!pro`, so a paying account never
+   * sees a sticker on a door it owns — the pill is the price tag, not the
+   * lock; the tap itself still decides where it leads.
+   */
+  proBadge?: boolean;
+};
+
+/**
+ * One of the two capture doors above the amount step.
+ *
+ * Half the row each rather than a pill in the middle: reading a paper receipt
+ * is the fastest way through this whole flow, so the two ways in are sized
+ * like the main event and not like a header accessory.
+ */
+function CaptureButton({
+  icon: Icon,
+  label,
+  hint,
+  onPress,
+  disabled,
+  proBadge,
+}: CaptureButtonProps) {
+  const colors = useColors();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={proBadge ? `${hint}. Part of Skip Pro.` : hint}
+      accessibilityState={{ disabled }}
+      onPress={withTap(onPress)}
+      disabled={disabled}
+      style={disabled ? { opacity: 0.5 } : undefined}
+      className="min-h-14 flex-1 flex-row items-center justify-center gap-2 rounded-[10px] bg-ink/5 active:bg-ink/10"
+    >
+      <Icon size={20} color={colors.ink} strokeWidth={1.8} />
+      <Text className="font-poppins-medium text-[15px] text-ink" maxFontSizeMultiplier={1.2}>
+        {label}
+      </Text>
+      {proBadge ? (
+        <View className="rounded-full bg-accent/15 px-2 py-0.5">
+          <Text
+            className="font-poppins-semibold text-[10px] tracking-widest"
+            style={{ color: colors.accentInk }}
+            maxFontSizeMultiplier={1.2}
+          >
+            PRO
+          </Text>
+        </View>
+      ) : null}
+    </Pressable>
   );
 }

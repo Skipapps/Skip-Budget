@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "start",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--dev-client", "--port", "8083"],
+      "port": 8083
+    },
+    {
+      "name": "attach-8081",
+      "url": "http://localhost:8081"
+    }
+  ]
+}

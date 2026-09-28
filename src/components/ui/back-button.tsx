@@ -10,6 +10,17 @@ type BackButtonProps = {
   onPress?: () => void;
 };
 
+/**
+ * Pops the stack — unless there is no stack. A screen opened cold from a
+ * deep link is the first and only entry, and back() from there is a dead
+ * button (and a red box in development). Home is where every such link's
+ * screen hangs off, so that is where its chevron leads.
+ */
+function goBack(): void {
+  if (router.canGoBack()) router.back();
+  else router.replace('/home');
+}
+
 /** Top-left chevron. Sized to a 44pt touch target per Apple's minimum. */
 export function BackButton({ onPress }: BackButtonProps) {
   const colors = useColors();
@@ -18,7 +29,7 @@ export function BackButton({ onPress }: BackButtonProps) {
       accessibilityRole="button"
       accessibilityLabel="Go back"
       hitSlop={8}
-      onPress={withTap(onPress ?? (() => router.back()))}
+      onPress={withTap(onPress ?? goBack)}
       className="-ml-2 h-11 w-11 items-center justify-center rounded-[12px] active:bg-ink/5"
     >
       <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">

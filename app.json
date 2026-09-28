@@ -59,7 +59,14 @@
       "expo-secure-store",
       "expo-localization",
       "expo-sharing",
-      "@sentry/react-native",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "organization": "skip-budget",
+          "project": "react-native"
+        }
+      ],
       "expo-notifications",
       [
         "./plugins/with-signing.js",

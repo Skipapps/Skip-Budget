@@ -21,43 +21,56 @@ export const MODES = [
 ] as const;
 
 /**
- * The twelve. Values are what get stored, so they must not be reordered.
+ * The eight, curated down from twelve (2026-09-25).
  *
- * Soft rather than saturated, and that is the point rather than a preference:
- * the accent is a full-width card carrying the largest figure on the screen,
- * so it is read through rather than looked at. A pastel lets the number sit on
- * it; a saturated hue makes the number fight the card it is printed on.
- *
- * Two are deliberately dark. Plum and slate exist so the set is not twelve
- * variations of pale — and because they are what proves the foreground is
- * measured rather than assumed: on those two the figures come out white.
+ * Two families of four rather than twelve variations of pale. The warm pastel
+ * row carries near-black ink; the deep dusty row carries white. `on` is
+ * declared per accent instead of computed, because the computation and the
+ * design disagree on the mid tones: black technically scores higher on
+ * periwinkle and rose, but white at 3.5:1 is what the large bold figures those
+ * surfaces carry actually want — measured against WCAG's large-text bar, not
+ * guessed. Every other pairing clears 4.5:1 outright.
  */
 export const ACCENTS = [
-  { id: 'butter', label: 'Butter', value: '#F6E3A9' },
-  { id: 'honey', label: 'Honey', value: '#F2C86B' },
-  { id: 'apricot', label: 'Apricot', value: '#EFA168' },
-  { id: 'coral', label: 'Coral', value: '#E98B88' },
-  { id: 'blush', label: 'Blush', value: '#EBCBC6' },
-  { id: 'rose', label: 'Rose', value: '#C98BA4' },
-  { id: 'plum', label: 'Plum', value: '#6E3E5C' },
-  { id: 'lavender', label: 'Lavender', value: '#A79CC4' },
-  { id: 'powder', label: 'Powder', value: '#B3CBE4' },
-  { id: 'sage', label: 'Sage', value: '#AAC5A9' },
-  { id: 'taupe', label: 'Taupe', value: '#A5877F' },
-  { id: 'slate', label: 'Slate', value: '#4C4C4C' },
+  { id: 'apricot', label: 'Apricot', value: '#EFA168', on: '#111111' },
+  { id: 'coral', label: 'Coral', value: '#FFA896', on: '#111111' },
+  { id: 'pistachio', label: 'Pistachio', value: '#D4DE95', on: '#111111' },
+  { id: 'lavender', label: 'Lavender', value: '#A79CC4', on: '#111111' },
+  { id: 'periwinkle', label: 'Periwinkle', value: '#8686AC', on: '#FFFFFF' },
+  { id: 'rose', label: 'Rose', value: '#B9718F', on: '#FFFFFF' },
+  { id: 'plum', label: 'Plum', value: '#6E3E5C', on: '#FFFFFF' },
+  { id: 'navy', label: 'Navy', value: '#272757', on: '#FFFFFF' },
 ] as const;
 
 export type AccentId = (typeof ACCENTS)[number]['id'];
+export type AccentDef = (typeof ACCENTS)[number];
 
 /**
- * Apricot on install: the warmest of the soft set, and the one that carries a
- * large figure best. One line to change if the brand moves.
+ * Where the retired four-and-three land. A device that stored butter wakes up
+ * on the nearest survivor rather than snapping to the default — the choice
+ * they made is honoured in spirit when it cannot be honoured exactly.
  */
-export const DEFAULT_ACCENT: AccentId = 'apricot';
+export const LEGACY_ACCENTS: Record<string, AccentId> = {
+  butter: 'apricot',
+  honey: 'apricot',
+  blush: 'coral',
+  powder: 'periwinkle',
+  sage: 'pistachio',
+  taupe: 'rose',
+  slate: 'navy',
+};
+
+/**
+ * Plum on install (Founder's call, 2026-09-27, superseding navy): deep and
+ * dusty with white type in both modes, and the colour every non-Pro user
+ * lives with — theming is a Pro feature, so this is effectively the brand.
+ * Mode follows the phone until they say otherwise.
+ */
+export const DEFAULT_ACCENT: AccentId = 'plum';
 export const DEFAULT_MODE: ModeKey = 'system';
 
-export function accentValue(id: AccentId): string {
-  return (ACCENTS.find((accent) => accent.id === id) ?? ACCENTS[0]).value;
+export function accentById(id: AccentId): AccentDef {
+  return ACCENTS.find((accent) => accent.id === id) ?? ACCENTS[0];
 }
 
 // ---------------------------------------------------------------------------
@@ -84,19 +97,6 @@ export function mix(hex: string, towards: string, amount: number): string {
   const [r1, g1, b1] = toRgb(hex);
   const [r2, g2, b2] = toRgb(towards);
   return toHex(r1 + (r2 - r1) * amount, g1 + (g2 - g1) * amount, b1 + (b2 - b1) * amount);
-}
-
-/**
- * The one of black or white that reads better on this colour.
- *
- * Measured, not guessed from a lightness threshold, and this is where the
- * dashboard's headline figure gets its colour. Pick slate or plum and the
- * number comes out white; pick butter and it comes out near-black. Nothing in
- * the app decides that per colour, which is why adding a thirteenth accent
- * needs no thought about what to print on it.
- */
-export function onColor(hex: string): string {
-  return contrast('#111111', hex) >= contrast('#FFFFFF', hex) ? '#111111' : '#FFFFFF';
 }
 
 /**
@@ -205,18 +205,20 @@ export type Tokens = {
 };
 
 /** Resolves one mode and one accent into every colour the app draws with. */
-export function buildTokens(scheme: Scheme, accent: string): Tokens {
+export function buildTokens(scheme: Scheme, accent: AccentDef): Tokens {
   const ramp = RAMPS[scheme];
 
   return {
     ...ramp,
-    control: accent,
+    control: accent.value,
     // Pressed reads as "further in", which is darker on light chrome and
     // lighter on dark. Following the scheme keeps the feedback visible either way.
-    controlPressed: mix(accent, scheme === 'dark' ? '#FFFFFF' : '#000000', 0.18),
-    onControl: onColor(accent),
-    accent,
-    accentInk: readable(accent, ramp.surface),
+    controlPressed: mix(accent.value, scheme === 'dark' ? '#FFFFFF' : '#000000', 0.18),
+    // Declared with the accent, not computed: the curated pairings are the
+    // palette, and the maths alone would put black on periwinkle and rose.
+    onControl: accent.on,
+    accent: accent.value,
+    accentInk: readable(accent.value, ramp.surface),
     moneyIn: ramp.moneyIn,
     moneyOut: ramp.moneyOut,
     danger: ramp.danger,

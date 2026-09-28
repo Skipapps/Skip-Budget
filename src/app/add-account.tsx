@@ -1,6 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Calculator, Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { AccountCard } from '@/components/cards/account-card';
@@ -15,15 +15,22 @@ import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePro } from '@/api/pro';
-import { useBankAccounts, useBankAccount, useSalaryAccountIds } from '@/api/queries';
+import {
+  useBankAccounts,
+  useBankAccount,
+  useSalaryAccountIds,
+  useSalarySources,
+} from '@/api/queries';
 import { useConfirm } from '@/providers/dialog-provider';
 import { ReminderField } from '@/components/ui/reminder-field';
 import { SelectField } from '@/components/ui/select-field';
+import { SwitchControl } from '@/components/ui/switch-control';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import {
   useCreateBankAccount,
   useCreateSalarySource,
+  useLinkAccountToSalaries,
   useSetSalaryAccounts,
   useDeleteBankAccount,
   useUpdateBankAccount,
@@ -56,10 +63,18 @@ export default function AddAccountScreen() {
   // Deep-link guard: creating past the free allowance opens the case
   // for Pro instead of a form the database would refuse. Editing is
   // untouched. Wrapper-shaped so the hook count never changes.
+  // Decided once, on arrival: the count changes the moment the form saves,
+  // and a live check then shoved the person who just added their first
+  // account onto the Pro page instead of back where they came from.
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { pro, ready } = usePro();
   const existing = useBankAccounts();
-  if (!id && ready && !pro && (existing.data?.length ?? 0) >= 1) {
+
+  const walled = useRef<boolean | null>(null);
+  if (walled.current === null && (id || (ready && !existing.isPending))) {
+    walled.current = !id && !pro && (existing.data?.length ?? 0) >= 1;
+  }
+  if (walled.current) {
     return <Redirect href={{ pathname: '/pro-feature', params: { id: 'unlimited' } }} />;
   }
   return <AddAccountScreenInner />;
@@ -74,7 +89,7 @@ export default function AddAccountScreen() {
  * them is a blank form, and a failed read never turns into a new account.
  */
 function AddAccountScreenInner() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, from: origin } = useLocalSearchParams<{ id?: string; from?: string }>();
   const artwork = useArtwork();
   const account = useBankAccount(id);
   const existing = account.data ?? null;
@@ -130,15 +145,18 @@ function AddAccountScreenInner() {
     );
   }
 
-  return <AccountForm key={existing?.id ?? 'new'} id={id} existing={existing} />;
+  return <AccountForm key={existing?.id ?? 'new'} id={id} existing={existing} origin={origin} />;
 }
 
 function AccountForm({
   id,
   existing,
+  origin,
 }: {
   id?: string;
   existing: ReturnType<typeof useBankAccount>['data'] | null;
+  /** 'setup' when the walk-in flow sent us; changes only where Save lands. */
+  origin?: string;
 }) {
   const colors = useColors();
   const editing = Boolean(id);
@@ -193,6 +211,14 @@ function AccountForm({
   };
   const createSalary = useCreateSalarySource();
   const setSalaryAccounts = useSetSalaryAccounts();
+  const linkSalaries = useLinkAccountToSalaries();
+  const salarySources = useSalarySources();
+  // Pay already set up (the walk-in's first step) means the question here is
+  // not "how much" but "does it land in this account" — a switch, defaulted
+  // on when setup sent us, instead of an income field that would mint a
+  // duplicate salary source.
+  const hasSalary = (salarySources.data?.length ?? 0) > 0;
+  const [linkPay, setLinkPay] = useState(origin === 'setup');
 
   const savedReminder = useReminderChoice('account', id);
   const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
@@ -205,7 +231,9 @@ function AccountForm({
   // An account reminder is about pay arriving, so it means nothing until
   // something is paid in. On a new account that is the income being entered
   // right here; on an existing one it is whatever is already linked.
-  const payLandsHere = editing ? salaryAccounts.ids.has(id ?? '') : Number(income) > 0;
+  const payLandsHere = editing
+    ? salaryAccounts.ids.has(id ?? '')
+    : Number(income) > 0 || (hasSalary && linkPay);
   // Only while editing: a new account's answer comes from the figure typed on
   // the step before, which no read can fail. An empty set from a read that has
   // not landed — or has failed — is indistinguishable from "nothing is paid in
@@ -264,6 +292,13 @@ function AccountForm({
         });
       }
 
+      // Pay that already exists as its own source is pointed at this account
+      // rather than typed in again — additive, so links made on the salary
+      // screen survive.
+      if (!editing && hasSalary && linkPay) {
+        await linkSalaries.mutateAsync(accountId);
+      }
+
       // Untouched while the link is unknown. `payLandsHere` is false for an
       // empty set, and `applyReminder(…, null)` deletes the row — so saving
       // during a read that failed or has not landed would quietly remove a
@@ -279,7 +314,10 @@ function AccountForm({
       }
 
       success();
-      router.back();
+      // The walk-in flow gets its checklist back; everyone else goes where
+      // they came from.
+      if (!editing && origin === 'setup') router.replace('/setup');
+      else router.back();
     } catch (thrown) {
       warn();
       setError({ message: saveErrorMessage(thrown, 'Could not save that account.'), step: 2 });
@@ -395,16 +433,40 @@ function AccountForm({
             returnKeyType="done"
           />
 
-          <SelectField
-            label="Expected income"
-            variant="pill"
-            value={income ? formatCurrency(Number(income)) : ''}
-            placeholder="Enter an amount"
-            icon={Calculator}
-            onPress={() => setIncomePadOpen(true)}
-            onIconPress={() => setCalculatorOpen(true)}
-            iconAccessibilityLabel="Open calculator"
-          />
+          {!editing && hasSalary ? (
+            <View className="w-full flex-row items-center gap-4 rounded-[16px] bg-ink/5 px-4 py-4">
+              <View className="min-w-0 flex-1">
+                <Text
+                  className="font-poppins-medium text-[15px] text-ink"
+                  maxFontSizeMultiplier={1.3}
+                >
+                  My pay lands here
+                </Text>
+                <Text
+                  className="mt-1 font-poppins text-[12px] leading-[17px] text-muted"
+                  maxFontSizeMultiplier={1.3}
+                >
+                  Links your salary to this account, so payday knows where the money arrives.
+                </Text>
+              </View>
+              <SwitchControl
+                value={linkPay}
+                onValueChange={setLinkPay}
+                accessibilityLabel="My pay lands here"
+              />
+            </View>
+          ) : (
+            <SelectField
+              label="Expected income"
+              variant="pill"
+              value={income ? formatCurrency(Number(income)) : ''}
+              placeholder="Enter an amount"
+              icon={Calculator}
+              onPress={() => setIncomePadOpen(true)}
+              onIconPress={() => setCalculatorOpen(true)}
+              iconAccessibilityLabel="Open calculator"
+            />
+          )}
 
           {stepError ? (
             <Text

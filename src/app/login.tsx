@@ -46,7 +46,7 @@ export default function LoginScreen() {
       setError(authError);
       return;
     }
-    router.replace('/home');
+    router.replace('/setup');
   };
   const handleForgotPassword = () => router.push('/forgot-password');
 

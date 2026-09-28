@@ -24,8 +24,8 @@ import { useColors } from '@/providers/theme-provider';
 const FEATURES: { icon: LucideIcon; title: string; hint: string }[] = [
   {
     icon: CreditCard,
-    title: 'Unlimited cards, accounts & incomes',
-    hint: 'Track every card and account you actually have',
+    title: 'Unlimited credit cards, accounts & incomes',
+    hint: 'Track every credit card and account you actually have',
   },
   {
     icon: Camera,

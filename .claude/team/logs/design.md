@@ -946,3 +946,149 @@ widths are measured, but the fit was computed rather than photographed.
 3. `AmountFigure` and the calculator pad now hold two band tables tuned to two different hero
    sizes. They are each documented against the other; if a third figure ever needs this, it should
    become one helper that takes a base size. (Dmitri)
+
+---
+
+## 2026-09-17 — Pia (Product Designer) — onboarding & auth screens for the design kit
+
+**Outcome:** Done. Eleven spec files under `design/screens/` covering the eleven onboarding and auth
+routes, 34 frames in all, rendering clean in all four outputs (`wireframes`, `hifi`, `hifi-dark`,
+`html`). `node design/build.mjs` prints no `✗`. Every heading, placeholder, button label, error and
+microcopy is verbatim from `src/app/*`; every margin is the source's own `mt-*`/`gap-*`/`pt-*`.
+
+**What changed** (new files only; nothing under `design/kit/`, `src/`, `supabase/` or `ios/` touched)
+- `design/screens/10-welcome.mjs` — `welcome`.
+- `design/screens/11-hello.mjs` — `hello`, `hello-filled`, `hello-loading`, `hello-error`.
+- `design/screens/12-tour.mjs` — `tour`.
+- `design/screens/13-auth.mjs` — `auth`, `auth-busy-google`, `auth-busy-apple`, `auth-error`.
+- `design/screens/14-login.mjs` — `login`, `login-filled`, `login-error`, `login-busy`.
+- `design/screens/15-signup.mjs` — `signup`, `signup-filled`, `signup-error`, `signup-busy`.
+- `design/screens/16-forgot-password.mjs` — 4 frames.
+- `design/screens/17-reset-password.mjs` — 4 frames.
+- `design/screens/18-verify-otp.mjs` — `verify-otp`, `-typing`, `-error`, `-notice`, `-busy`.
+- `design/screens/19-avatar.mjs` — `avatar`, `avatar-chosen` (all 34 faces plus "No picture").
+- `design/screens/19b-message.mjs` — `message`.
+
+**Composed locally, because the kit has no equivalent**
+1. Apple and Google marks (`13-auth.mjs`) — raw SVG using the exact paths from
+   `src/components/icons/*-icon.tsx`, with a greybox fallback in wireframe mode.
+2. Tour stop card, avatar grid cell, hello's three skeletons, login's two-line agreement row,
+   left-aligned Subtitle — all from primitives, measurements copied from source.
+
+**Two things found while drawing**
+- `auth.tsx:75` draws `<AppleIcon size={22} />` with no `color`, so the mark is the component's
+  hardcoded `#FFFFFF` on the apricot `bg-control` pill — the same class as audit finding 1
+  (`onControl` exists for this). Drawn as the app draws it; the hi-fi frame shows the contrast.
+- Kit bug (not fixed, not mine): an icon inside a fixed-size well is drawn flush left, not centred —
+  `out/hifi/home.svg` has `<rect x="40" width="40">` followed by `translate(40 992)`. It is in
+  `place()`'s `cw` rule for a non-hugging child of a col stack, so every `IconWell`, `BillMark` and
+  `AddButton` in the kit is affected. Worked around in my files with `hug: true` on the icon.
+
+**Could not verify / deviations**
+- `tour.tsx` is one scrolling list of six stops, not a paged tour, so it is one tall frame (1277pt)
+  rather than one frame per page, per "follow the REAL app".
+- Avatar faces are bundled PNGs; each is the kit's image placeholder with the avatar's initials.
+  Real faces could be inlined as base64 if the Founder wants photographic sheets (~1MB per frame).
+- Inline emphasis (welcome's two feature rows, message's closing line, verify-otp's address) uses
+  the kit's new `rich` / `C.RichBody` / `C.RichSubtitle`, added mid-task by the coordinator; my
+  word-level `wrap` workaround is gone. Each paragraph is now one text layer with mixed runs.
+- `verify-otp`'s no-email fallback ("We sent a 6-digit code to your email.") has no frame; it is a
+  defensive branch that the two screens pushing to the route never trigger.
+- Running `node design/build.mjs` while another agent ran it wiped `out/` mid-render twice and
+  printed spurious `✗` lines; the kit no longer wipes `out/`, so parallel builds are safe. Final
+  run clean, 281 screens.
+
+**Open questions**
+Answered by the coordinator during the task: the Apple mark stays as the app draws it (the contrast
+bug goes to the Founder separately), the focus ring on the "filled" frames is right, and
+`sam@skipbudget.app` is the sample identity. Nothing open from my side except the kit's icon-well
+centring bug above, which is the kit owner's to fix.
+
+---
+
+## 2026-09-17 — Paulo (Product Designer) — design kit: loans, insights, Pro, settings
+
+**Outcome:** Done. Nine spec files, 45 frames, in `design/screens/40..48`. `node design/build.mjs`
+prints no `✗` for any of them and renders all three SVG variants plus both HTML variants. Every loan
+figure on screen was produced by the app's own engine, not typed by hand.
+
+**What changed** (all new files, nothing else touched)
+- `design/screens/40-loan-calculator.mjs` — 6 frames: default, overpaying, monthly rests with an odd
+  first period, the "Add this to monthly bills?" confirm, and the two `AmountPad` modals (amount and
+  the percent-variant rate).
+- `design/screens/41-loan-schedule.mjs` — 3 frames: all 60 rows, the 41-row overpaid schedule, and a
+  saved loan opened from Bills (its own name in the title).
+- `design/screens/42-save-loan.mjs` — 5: fresh, named, the name-required error, saving, and the
+  no-sources case where "Paid from" is absent rather than empty.
+- `design/screens/43-insights.mjs` — 7: all four period states (week/month/year/all), loading, a
+  new account where both Prompts show and four sections drop out, and the `PageState` error.
+- `design/screens/44-pro.mjs` — 6: yearly, monthly, "No past purchase to restore.", the two
+  store-note causes, and the already-subscribed state.
+- `design/screens/45-pro-feature.mjs` — 6, one per id in `src/data/pro-features.ts`.
+- `design/screens/46-appearance.mjs` — 3, including the drafted-accent state with the Save pill.
+- `design/screens/47-settings.mjs` — 7: shipping, with Pro, a development build (Developer section),
+  name-not-saved, both delete-account confirms, plus a proposed sign-out confirm clearly labelled as
+  not being in the source.
+- `design/screens/48-add-expense.mjs` — 11: all three steps, payer list open, exact amounts with the
+  live remainder, a check that sends you back, the save error, the skeleton shell, editing with
+  Delete, the delete confirm, and one person's share pad.
+
+**Every loan figure is the engine's.** I ran `comparePrepayment`, `amortise`, `scheduleByYear` and
+`truthInLending` through `sucrase-node` on copies of `src/lib/{loan,money,apr,format,date}.ts` with
+the `@/lib` alias rewritten, and copied the output. $25,000 at 6.50% over 60 months, funded
+17 Aug 2026, first payment 17 Sep 2026, actual/365: payment **$489.22**, final **$489.42**, interest
+**$4,353.40**, repaid **$29,353.40**, APR **6.5059%**, first payment 28% interest, last 17 Aug 2031.
+With $150 a month, a $2,000 one-off on 17 Sep 2027 and $450 of fees: 41 payments, last 17 Jan 2030,
+interest $2,825.52, saved $1,527.88 / 1 yr 7 mo, APR 7.2674%. Monthly rests funded 28 Aug with a
+1 Oct first payment: $489.41, a one-month-plus-3-days opening at $148.77 interest, and — correctly —
+**no APR line**, because 6.4963% against 6.50% is under the screen's own half-basis-point rule.
+All 60 and all 41 schedule rows are the engine's, cent for cent.
+
+**Composed locally because the kit has no component for them** (all measured off the source):
+calculator `SummaryLine` and the monthly-payment hero; `PaymentRow` and the year heading;
+save-loan's `Row` and `IconPicker`; insights' `StandRow`, `Row`, `Prompt` and the category/merchant
+bar rows; pro's feature row and `PriceCard`; pro-feature's benefit row and lock card; appearance's
+mode row and the 4-up swatch grid; settings' Save pill; add-expense's member row, checkbox and payer
+list; and the `AmountPad` modal shell, which is a full-screen `Modal` and so a frame, not an overlay.
+
+**Findings worth someone's attention**
+1. **`pro.tsx` prints a doubled price suffix when the store has no products.** `PRO_YEARLY_LABEL`
+   is `'$19.99/yr'` and the card renders `` `${yearlyPrice}/yr` ``, so the fallback reads
+   **"$19.99/yr/yr"** and the monthly **"$1.99/mo/mo"**. Drawn as the code renders it in
+   `pro-store-closed` / `pro-offline` rather than quietly corrected. One-line fix: drop `/yr` and
+   `/mo` from the two labels in `src/lib/wall.ts`, or from the two template strings in `pro.tsx`.
+2. **Two settings subtitles ellipsise at 390pt.** `SettingsRow` sets `numberOfLines={1}`, and
+   "Everything unlocked · manage in the App Store" (Pro active) and "On — Pro screens unlocked,
+   nothing purchased" (Fake Pro) both run past the text column. Visible in `settings-pro` and
+   `settings-dev`.
+3. **The second delete-account dialog does not fit side by side.** "Delete everything" beside
+   "Keep my account" needs about 347pt of a 326pt dialog. The app will shrink or wrap them; the kit
+   ellipsises. Either shorten one label or let that dialog stack.
+4. **There is no sign-out confirmation in the source.** `(tabs)/settings.tsx` calls `signOut()` and
+   replaces to `/welcome` on the first tap. I drew one as `settings-sign-out-proposed`, named so
+   nobody files it as existing behaviour.
+5. `loan-schedule`'s per-row split line has no `numberOfLines`, so with an overpayment named in it
+   ("$501.21 off · $138.01 interest · $150.00 extra") it wraps to two lines and every row grows by
+   17pt. Correct, but it is why the overpaid schedule is taller per row than the plain one.
+
+**Could not represent**
+- The app's own bill-icon SVGs (`src/assets/bill-icons/*`). `save-loan`'s `IconPicker` and insights'
+  `BillMark` use lucide stand-ins at the real tile size, radius and gap.
+- `CircleHelp` ("Common questions"). The kit's icon sheet has no glyph for it — lucide 1.x renamed
+  the file to `circle-question-mark`, so `build-icons.mjs` lists it as missing — and I did not
+  regenerate a file under `design/kit/`. `Info` stands in.
+- `pro.tsx`'s `__DEV__` debug line. Deliberately left out: it does not exist in a Release build.
+- There is no saved-loans list on `loan-calculator.tsx` to draw; saved loans live in Bills.
+
+**Could not verify:** nothing rendered on a device or in Figma by me. The frames were checked as
+text — positions, wrap points and every `…` in all 45 — not by eye, and not imported into Figma or
+through html.to.design. Sam's non-loan sample figures (savings, card balances, category and merchant
+splits) are invented, but each set adds up to its own totals, and the month's bills/receipts/
+subscriptions match Home's destination amounts exactly.
+
+**Open questions**
+1. Finding 1 is on the paywall and visible to App Store review. Fix in `wall.ts` or in `pro.tsx`?
+2. `insights`' four period frames are the same page with a different chart; the gallery now carries
+   four tall near-duplicates. Keep all four, or ship month plus one contrast (year)?
+3. `loan-schedule` is drawn at full length — 5,890pt for 60 rows. Fine as an SVG; confirm that is
+   wanted in Figma rather than a truncated "first year plus last year" frame.

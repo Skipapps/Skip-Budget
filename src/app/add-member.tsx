@@ -7,7 +7,6 @@ import { useAddGroupMember, useFriends, useGroup, useGroupMembers } from '@/api/
 import { Person } from '@/components/splits/person';
 import { ActionPill } from '@/components/ui/action-pill';
 import { Button } from '@/components/ui/button';
-import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
@@ -23,15 +22,6 @@ import { useColors } from '@/providers/theme-provider';
  * claim the name and every share already attached to it comes with them.
  */
 export default function AddMemberScreen() {
-  // A wrapper, not an inline return: the screen below runs its own
-  // hooks, and an early return above them would change the hook count
-  // the moment the entitlement answer arrives — which React forbids.
-  const gate = useProGate('splits');
-  if (gate) return gate;
-  return <AddMemberScreenInner />;
-}
-
-function AddMemberScreenInner() {
   const colors = useColors();
   const { group: groupId } = useLocalSearchParams<{ group?: string }>();
 

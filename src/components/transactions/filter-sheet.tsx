@@ -8,7 +8,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { SelectField } from '@/components/ui/select-field';
 import { FieldLabel } from '@/components/ui/typography';
-import { TRANSACTION_KINDS, type TransactionKind } from '@/data/transactions-mock';
+import { TRANSACTION_KINDS } from '@/data/transactions-mock';
 import { formatFullDate } from '@/lib/date';
 import { useColors } from '@/providers/theme-provider';
 
@@ -16,7 +16,9 @@ export type LedgerFilters = {
   /** ISO yyyy-mm-dd, or null for any date. */
   date: string | null;
   sourceIds: string[];
-  kinds: TransactionKind[];
+  /** Kind values as the hosting screen names them — a card's page filters
+   *  payments too, which the shared kind list does not know about. */
+  kinds: string[];
 };
 
 export const EMPTY_FILTERS: LedgerFilters = { date: null, sourceIds: [], kinds: [] };
@@ -32,6 +34,8 @@ export function countActiveFilters(filters: LedgerFilters): number {
 type FilterSheetProps = {
   filters: LedgerFilters;
   sourceOptions: readonly { value: string; label: string }[];
+  /** The kinds this screen's rows can be. Defaults to the shared ledger set. */
+  kindOptions?: readonly { value: string; label: string }[];
   onCancel: () => void;
   onApply: (filters: LedgerFilters) => void;
 };
@@ -39,7 +43,13 @@ type FilterSheetProps = {
 const KIND_OPTIONS = TRANSACTION_KINDS.map((kind) => ({ value: kind.value, label: kind.label }));
 
 /** Draft filters live here and only reach the list on Apply. */
-export function FilterSheet({ filters, sourceOptions, onCancel, onApply }: FilterSheetProps) {
+export function FilterSheet({
+  filters,
+  sourceOptions,
+  kindOptions = KIND_OPTIONS,
+  onCancel,
+  onApply,
+}: FilterSheetProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<LedgerFilters>(filters);
@@ -94,20 +104,25 @@ export function FilterSheet({ filters, sourceOptions, onCancel, onApply }: Filte
             ) : null}
           </View>
 
-          <View className="mt-6 w-full">
-            <FieldLabel className="mb-2">Card or bank account</FieldLabel>
-            <MultiChoiceChips
-              options={sourceOptions}
-              values={draft.sourceIds}
-              onChange={(sourceIds) => setDraft((current) => ({ ...current, sourceIds }))}
-              emptyHint="Showing every card and account."
-            />
-          </View>
+          {/* Absent, not empty, on a screen that is already one source: the
+              card's own page passes no options, and a section offering a
+              choice of one thing would only restate the title above it. */}
+          {sourceOptions.length > 0 ? (
+            <View className="mt-6 w-full">
+              <FieldLabel className="mb-2">Card or bank account</FieldLabel>
+              <MultiChoiceChips
+                options={sourceOptions}
+                values={draft.sourceIds}
+                onChange={(sourceIds) => setDraft((current) => ({ ...current, sourceIds }))}
+                emptyHint="Showing every credit card and account."
+              />
+            </View>
+          ) : null}
 
           <View className="mt-6 w-full">
             <FieldLabel className="mb-2">Type of transaction</FieldLabel>
             <MultiChoiceChips
-              options={KIND_OPTIONS}
+              options={kindOptions}
               values={draft.kinds}
               onChange={(kinds) => setDraft((current) => ({ ...current, kinds }))}
               emptyHint="Showing every type."

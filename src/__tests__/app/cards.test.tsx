@@ -52,6 +52,17 @@ jest.mock('@/data/money-mock', () => ({
 
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true }) }));
 
+// The tab reads its params and can raise the account-offer dialog; neither
+// is what these tests are about.
+jest.mock('expo-router', () => ({
+  router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), setParams: jest.fn() },
+  useLocalSearchParams: () => ({}),
+}));
+jest.mock('@/providers/dialog-provider', () => ({
+  useConfirm: () => async () => true,
+  useDialog: () => async () => undefined,
+}));
+
 const mockRefresh = jest.fn();
 jest.mock('@/api/refresh', () => ({
   useRefreshAll: () => ({ refresh: () => mockRefresh(), refreshing: false }),
@@ -159,7 +170,7 @@ describe('Cards — balances that could not be worked out', () => {
   it('lists the wallet when every read lands', async () => {
     const { getByText, queryByText } = await render(<CardsScreen />);
 
-    expect(getByText('Cards')).toBeTruthy();
+    expect(getByText('Credit cards')).toBeTruthy();
     expect(getByText('Bank accounts')).toBeTruthy();
     expect(queryByText('Could not load your wallet')).toBeNull();
   });

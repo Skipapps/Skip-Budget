@@ -8,7 +8,7 @@ import { Title } from '@/components/ui/typography';
 import { cn } from '@/lib/cn';
 import { useProGate } from '@/components/pro/pro-gate';
 import { useColors, useTheme } from '@/providers/theme-provider';
-import { ACCENTS, MODES, onColor, type AccentId, type ModeKey } from '@/theme/palette';
+import { ACCENTS, MODES, type AccentId, type ModeKey } from '@/theme/palette';
 
 /**
  * Choosing what the app looks like.
@@ -116,9 +116,7 @@ function AppearanceScreenInner() {
                   }}
                   className="h-[58px] w-[58px] items-center justify-center rounded-full active:opacity-80"
                 >
-                  {selected ? (
-                    <Check size={24} color={onColor(accent.value)} strokeWidth={3} />
-                  ) : null}
+                  {selected ? <Check size={24} color={accent.on} strokeWidth={3} /> : null}
                 </Pressable>
 
                 <Text

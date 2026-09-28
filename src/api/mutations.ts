@@ -379,6 +379,41 @@ export function useSetSalaryAccounts() {
   });
 }
 
+/**
+ * Points every existing salary source at one more account — the "my pay
+ * lands here" switch on a new account. Additive on purpose, unlike
+ * useSetSalaryAccounts: the account form knows nothing about the links each
+ * source already carries and must not clobber them, so this only ever adds
+ * rows, and the composite key makes re-adding a link a no-op.
+ */
+export function useLinkAccountToSalaries() {
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (bankAccountId: string) => {
+      const { data: sources, error } = await supabase.from('salary_sources').select('id');
+      if (error) throw error;
+
+      const rows = (sources ?? []).map((source: { id: string }) => ({
+        salary_source_id: source.id,
+        bank_account_id: bankAccountId,
+      }));
+      if (rows.length === 0) return;
+
+      const { error: linkError } = await supabase
+        .from('salary_source_accounts')
+        .upsert(rows as never, {
+          onConflict: 'salary_source_id,bank_account_id',
+          ignoreDuplicates: true,
+        });
+      if (linkError) throw linkError;
+    },
+    onSuccess: () => {
+      invalidate('salary_source_accounts');
+    },
+  });
+}
+
 // --- Payments ---------------------------------------------------------------
 
 export type PaymentValues = {

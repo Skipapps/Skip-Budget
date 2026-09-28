@@ -21,7 +21,6 @@ import { useRefreshAll } from '@/api/refresh';
 import { PageState } from '@/components/ui/page-state';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ChoiceChips } from '@/components/ui/choice-chips';
-import { FlowChart, type FlowBucket } from '@/components/transactions/flow-chart';
 import { LedgerSummary } from '@/components/transactions/ledger-summary';
 import { TRANSACTION_KINDS } from '@/data/transactions-mock';
 import {
@@ -35,6 +34,7 @@ import {
   type PeriodKey,
 } from '@/lib/period';
 
+import { matchesSearch } from '@/lib/search';
 import { useToday } from '@/lib/use-today';
 import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
 import { formatCurrency } from '@/lib/format';
@@ -120,9 +120,8 @@ export default function TransactionsScreen() {
   const buckets = useMemo(() => periodBuckets(periodKey, anchor), [periodKey, anchor]);
 
   const matching = useMemo(() => {
-    const needle = query.trim().toLowerCase();
     return ledger.filter((entry) => {
-      if (needle && !entry.label.toLowerCase().includes(needle)) return false;
+      if (!matchesSearch(entry.label, query)) return false;
       if (filters.date && entry.date !== filters.date) return false;
       if (filters.sourceIds.length > 0 && !filters.sourceIds.includes(entry.sourceId)) return false;
       if (filters.kinds.length > 0 && !filters.kinds.includes(entry.kind)) return false;
@@ -130,30 +129,14 @@ export default function TransactionsScreen() {
     });
   }, [ledger, query, filters]);
 
-  // Spending only. Income still counts in the totals above and appears in the
-  // list below; it is left off the chart so every bar measures one thing.
-  const chartBuckets = useMemo<FlowBucket[]>(
-    () =>
-      buckets.map((bucket) => ({
-        key: bucket.key,
-        label: bucket.label,
-        spent: matching
-          .filter(
-            (entry) => entry.amount < 0 && entry.date >= bucket.from && entry.date <= bucket.to,
-          )
-          .reduce((sum, entry) => sum + Math.abs(entry.amount), 0),
-      })),
-    [buckets, matching],
-  );
-
   /**
-   * Oldest first, and empty buckets dropped — a heading over nothing is noise.
+   * Newest first, and empty buckets dropped — a heading over nothing is noise.
    *
-   * Both the rows inside a bucket and the buckets themselves run forwards, so
-   * the page reads top to bottom as time passed and today is the last thing on
-   * it. `periodBuckets` already hands them over oldest-first, so the order is
-   * taken as given rather than reversed — the `.reverse()` that used to sit
-   * here existed only to undo that.
+   * Today is the first thing on the page and time runs backwards from it: the
+   * newest movement is what somebody opening this tab came to check, and it
+   * should not sit below a scroll. `periodBuckets` hands buckets over
+   * oldest-first, so they are reversed here, and the rows inside a bucket run
+   * the same way. Same-day rows keep the id tiebreak they have always had.
    */
   const groups = useMemo(
     () =>
@@ -161,10 +144,8 @@ export default function TransactionsScreen() {
         .map((bucket) => {
           const entries = matching
             .filter((entry) => entry.date >= bucket.from && entry.date <= bucket.to)
-            // Same-day rows keep the id tiebreak they have always had; only the
-            // day comparison flipped.
             .sort((a, b) =>
-              a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date),
+              a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date),
             );
           return {
             ...bucket,
@@ -172,7 +153,8 @@ export default function TransactionsScreen() {
             total: entries.reduce((sum, entry) => sum + entry.amount, 0),
           };
         })
-        .filter((bucket) => bucket.entries.length > 0),
+        .filter((bucket) => bucket.entries.length > 0)
+        .reverse(),
     [buckets, matching],
   );
 
@@ -196,7 +178,7 @@ export default function TransactionsScreen() {
 
       {/* The window itself, and the way through it. Forward stops at the
           period holding today; back stops where the kept history ends. */}
-      <View className="mt-4 w-full flex-row items-center justify-between rounded-full bg-ink/5 px-1.5 py-2">
+      <View className="mt-4 w-full flex-row items-center justify-between rounded-[16px] border border-line bg-card px-2 py-2">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Earlier"
@@ -238,12 +220,11 @@ export default function TransactionsScreen() {
         </Pressable>
       </View>
 
+      {/* The verdict card and nothing else: the bar chart moved to Insights,
+          where the story behind the numbers lives. */}
       {!isLoading && !isError ? (
-        <View className="mt-4 w-full gap-4">
+        <View className="mt-4 w-full">
           <LedgerSummary totals={totals} />
-          {/* The chart earns its space only once there is more than one slot to
-              compare; a single day is a number, not a shape. */}
-          {chartBuckets.length > 1 ? <FlowChart buckets={chartBuckets} /> : null}
         </View>
       ) : null}
 
@@ -323,7 +304,7 @@ export default function TransactionsScreen() {
                     {group.label}
                   </Text>
                   <Text
-                    className="font-poppins text-[13px]"
+                    className="font-poppins text-[13px] text-muted"
                     style={{ color: moneyColor(group.total) }}
                     maxFontSizeMultiplier={1.3}
                   >
@@ -331,8 +312,6 @@ export default function TransactionsScreen() {
                   </Text>
                 </View>
               )}
-
-              <View className="mt-1 h-px w-full bg-line" />
 
               {group.entries.map((entry) => (
                 <LedgerRow

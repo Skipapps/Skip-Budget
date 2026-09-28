@@ -75,7 +75,7 @@ export default function NotificationsScreen() {
     const ok = await confirm({
       title: `Clear ${visible.length === 1 ? 'this notice' : `all ${visible.length} notices`}?`,
       message:
-        'Only the notices go. Every charge stays on your bills, your cards and ' +
+        'Only the notices go. Every charge stays on your bills, your credit cards and ' +
         'in your transactions, and none of your totals change.',
       confirmLabel: 'Clear',
       cancelLabel: 'Keep them',
@@ -157,7 +157,7 @@ export default function NotificationsScreen() {
                       </View>
 
                       <Text
-                        className="font-poppins-semibold text-[15px]"
+                        className="font-poppins-semibold text-[15px] text-ink"
                         style={{ color: moneyColor(-Math.abs(charge.amount)) }}
                         maxFontSizeMultiplier={1.4}
                       >

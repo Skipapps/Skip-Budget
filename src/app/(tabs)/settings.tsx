@@ -33,7 +33,7 @@ import { Pressable, Text, View } from 'react-native';
 import { deleteAccount, signOut } from '@/api/auth';
 import { usePro } from '@/api/pro';
 import { authenticate, lockCapability, unavailableMessage } from '@/lib/app-lock';
-import { setProBypass, useProBypass } from '@/lib/pro-bypass';
+import { setProOverride, useProOverride } from '@/lib/pro-bypass';
 import { useUpdateProfile } from '@/api/mutations';
 import { ProfileAvatar } from '@/components/ui/profile-avatar';
 import { SettingsRow } from '@/components/settings/settings-row';
@@ -73,7 +73,7 @@ export default function SettingsScreen() {
   const subs = useSubscriptions();
   const profile = useProfile();
   const { pro } = usePro();
-  const proBypass = useProBypass();
+  const proOverride = useProOverride();
   const updateProfile = useUpdateProfile();
   const { mode, accentId } = useTheme();
   const { haptics, setHaptics, appLock, setAppLock } = usePreferences();
@@ -211,11 +211,30 @@ export default function SettingsScreen() {
             icon={FlaskConical}
             title="Fake Pro"
             subtitle={
-              proBypass
+              proOverride === 'pro'
                 ? 'On — Pro screens unlocked, nothing purchased'
                 : 'Unlock Pro screens for testing, without buying'
             }
-            toggle={{ value: proBypass, onChange: setProBypass }}
+            toggle={{
+              value: proOverride === 'pro',
+              onChange: (on) => setProOverride(on ? 'pro' : 'off'),
+            }}
+          />
+          {/* The other lie, for the device a sandbox purchase has made Pro:
+              RevenueCat cannot be switched off from inside the app, and the
+              free and lapsed experiences still have to be testable on it. */}
+          <SettingsRow
+            icon={FlaskConical}
+            title="Fake Free"
+            subtitle={
+              proOverride === 'free'
+                ? 'On — drawing this account as free, whatever the store says'
+                : 'See the free experience, even with an entitlement active'
+            }
+            toggle={{
+              value: proOverride === 'free',
+              onChange: (on) => setProOverride(on ? 'free' : 'off'),
+            }}
             last
           />
         </SettingsSection>

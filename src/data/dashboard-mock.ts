@@ -28,6 +28,6 @@ export const spendingCategories: SpendingCategory[] = [
   { id: 'monthly-bills', label: 'Monthly Bills' },
   { id: 'receipts', label: 'Receipts' },
   { id: 'subscriptions', label: 'Subscriptions' },
-  { id: 'loan-calculator', label: 'Loan calculator' },
-  { id: 'split-calculator', label: 'Split manager' },
+  { id: 'loan-calculator', label: 'Loan Calculator' },
+  { id: 'split-calculator', label: 'Split Manager' },
 ];

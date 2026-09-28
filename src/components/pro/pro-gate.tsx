@@ -6,7 +6,7 @@ import { usePro } from '@/api/pro';
 /**
  * The one-line gate a Pro screen opens with.
  *
- *   const gate = useProGate('splits');
+ *   const gate = useProGate('insights');
  *   if (gate) return gate;
  *
  * Free lands on the feature's explainer; unknown-yet renders nothing rather

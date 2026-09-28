@@ -13,7 +13,6 @@ import {
 import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
-import { useProGate } from '@/components/pro/pro-gate';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SelectField } from '@/components/ui/select-field';
@@ -35,15 +34,6 @@ import { useArtwork } from '@/theme/artwork';
  * in a budgeting app reads like a transfer, and somebody will otherwise sit
  * waiting for one.
  */
-export default function SettleUpScreen() {
-  // A wrapper, not an inline return: the screen below runs its own
-  // hooks, and an early return above them would change the hook count
-  // the moment the entitlement answer arrives — which React forbids.
-  const gate = useProGate('splits');
-  if (gate) return gate;
-  return <SettleUpScreenInner />;
-}
-
 type MemberRecord = NonNullable<ReturnType<typeof useGroupMembers>['data']>[number];
 type BalanceRecord = NonNullable<ReturnType<typeof useGroupBalances>['data']>[number];
 
@@ -58,7 +48,7 @@ type BalanceRecord = NonNullable<ReturnType<typeof useGroupBalances>['data']>[nu
  * knew. The key is the group rather than the suggestion: a later refetch must
  * not remount the form and wipe what has been typed over it.
  */
-function SettleUpScreenInner() {
+export default function SettleUpScreen() {
   const artwork = useArtwork();
   const { group: groupId } = useLocalSearchParams<{ group?: string }>();
 
