@@ -25,7 +25,13 @@ jest.mock('react-native-keyboard-controller', () =>
 jest.mock('expo-router', () => {
   const { Text } = require('react-native');
   return {
-    router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
+    router: {
+      push: jest.fn(),
+      replace: jest.fn(),
+      back: jest.fn(),
+      canGoBack: jest.fn(() => false),
+      dismissAll: jest.fn(),
+    },
     Redirect: ({ href }: { href: string }) => <Text>{`redirect:${href}`}</Text>,
   };
 });
@@ -126,6 +132,22 @@ it('shows the five steps to a fresh account, with Continue aimed at the first', 
 
   await fireEvent.press(screen.getByText('Set up later'));
   expect(router.replace).toHaveBeenCalledWith('/home');
+});
+
+it('opens the bills step on its own page, not straight on the form', async () => {
+  mockGettingStarted.steps = makeSteps({ salary: true, wallet: true });
+  const screen = await render(<SetupScreen />);
+
+  await fireEvent.press(screen.getByText('Continue'));
+  expect(router.push).toHaveBeenCalledWith('/setup-bills');
+});
+
+it('opens the subscriptions step on its own page too', async () => {
+  mockGettingStarted.steps = makeSteps({ salary: true, wallet: true, bill: true });
+  const screen = await render(<SetupScreen />);
+
+  await fireEvent.press(screen.getByText('Continue'));
+  expect(router.push).toHaveBeenCalledWith('/setup-subscriptions');
 });
 
 it('passes a finished account straight to Home without rendering the flow', async () => {

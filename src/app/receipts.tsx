@@ -29,6 +29,7 @@ import { rangeFor, type RangeKey } from '@/lib/range';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 
 export default function ReceiptsScreen() {
   const artwork = useArtwork();
@@ -72,7 +73,7 @@ export default function ReceiptsScreen() {
       if (!draft) return;
       router.push({ pathname: '/add-receipt', params: draftToParams(draft) });
     } catch (thrown) {
-      setScanError((thrown as Error).message ?? 'Could not read that receipt.');
+      setScanError(failureMessage(thrown));
     }
   };
 
@@ -201,24 +202,21 @@ export default function ReceiptsScreen() {
       {isError ? (
         <PageState
           art={artwork.error}
-          title="Could not load your receipts"
-          message="Check your connection and try again. Nothing has been lost."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={() => refetch()}
         />
       ) : null}
 
       {showEmpty ? (
+        // Adding, not scanning: scanning is Pro, and the first receipt should
+        // never begin with a paywall. Scan stays one tap away in the header.
         <PageState
           art={artwork.emptyReceipts}
           title="No receipts yet"
-          message={
-            canScan
-              ? 'Point the camera at a paper receipt and Skip reads the store, date and total. Or add one by hand.'
-              : 'Add your first one by hand, or scan a paper receipt and let Skip read it for you.'
-          }
-          actionLabel={canScan ? 'Scan a receipt' : 'Add a receipt'}
-          onAction={canScan ? handleScan : () => router.push('/add-receipt')}
+          message="Add what you spend day to day and it shows up here."
+          actionLabel="Add a receipt"
+          onAction={() => router.push('/add-receipt')}
         />
       ) : null}
 

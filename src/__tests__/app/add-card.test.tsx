@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react-native';
 
 import AddCardScreen from '@/app/add-card';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * What the card editor does when it cannot read the card.
@@ -95,7 +96,7 @@ describe('Add card — an edit whose card could not be read', () => {
     mockCard = { data: null, isError: true, isFetched: true };
     const { getByText, queryByText } = await render(<AddCardScreen />);
 
-    expect(getByText('Could not open this credit card')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(getByText('Try again')).toBeTruthy();
 
     expect(queryByText('Edit credit card')).toBeNull();
@@ -115,7 +116,7 @@ describe('Add card — an edit whose card could not be read', () => {
     const { getByText, queryByText } = await render(<AddCardScreen />);
 
     expect(getByText('Edit credit card')).toBeTruthy();
-    expect(queryByText('Could not open this credit card')).toBeNull();
+    expect(queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(mockUseUpdate).not.toHaveBeenCalled();
   });
 
@@ -137,7 +138,9 @@ describe('Add card — an edit whose card could not be read', () => {
     const { getByText, queryByText } = await render(<AddCardScreen />);
 
     expect(getByText('Edit credit card')).toBeTruthy();
-    expect(queryByText('Could not open this credit card')).toBeNull();
+    // An edit walks the flow from the amount, exactly as adding does.
+    expect(getByText('What is the credit card balance right now?')).toBeTruthy();
+    expect(queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(mockUseUpdate).toHaveBeenCalled();
   });
 
@@ -145,7 +148,7 @@ describe('Add card — an edit whose card could not be read', () => {
     mockCard = { data: null, isError: false, isFetched: true };
     const { getByText, queryByText } = await render(<AddCardScreen />);
 
-    expect(getByText('That credit card is not here')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(queryByText('Edit credit card')).toBeNull();
     expect(mockUseUpdate).not.toHaveBeenCalled();
     expect(mockUseCreate).not.toHaveBeenCalled();

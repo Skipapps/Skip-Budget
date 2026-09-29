@@ -1,189 +1,126 @@
-import { Trash2, X } from 'lucide-react-native';
-import { Fragment, useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Download, Megaphone, Sparkles, type LucideIcon } from 'lucide-react-native';
+import { useEffect } from 'react';
+import { Text, View } from 'react-native';
 
-import { useArtwork } from '@/theme/artwork';
-import { NOTICE_DAYS, useCharges, useDismissNotices } from '@/api/charges';
-import { usePaymentSources } from '@/api/queries';
-import { DateGroupHeader } from '@/components/ui/date-group-header';
+import { useMarkNewsSeen } from '@/api/news';
+import { useAnnouncements, type AnnouncementRow } from '@/api/queries';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Subtitle, Title } from '@/components/ui/typography';
-import { addDays, toIsoDate } from '@/lib/date';
-import { formatCurrency } from '@/lib/format';
-import { groupByDate } from '@/lib/group';
-import { tap } from '@/lib/haptics';
-import { useConfirm } from '@/providers/dialog-provider';
-import { useColors, useMoneyColor } from '@/providers/theme-provider';
+import { formatFullDate } from '@/lib/date';
+import { FAILURE_MESSAGE } from '@/lib/failure';
+import { useColors } from '@/providers/theme-provider';
+import { useArtwork } from '@/theme/artwork';
+
+const KINDS: Record<AnnouncementRow['kind'], { label: string; icon: LucideIcon }> = {
+  update: { label: 'Update', icon: Download },
+  feature: { label: 'New feature', icon: Sparkles },
+  news: { label: 'News', icon: Megaphone },
+};
 
 /**
- * What the app has done on your behalf.
+ * News from Skip: an update to install, a feature that has just shipped.
  *
- * Every row here is a charge it recorded without being asked — a bill coming
- * due, a subscription renewing. That is exactly what the pushes will announce,
- * so this is the same list read after the fact rather than a second idea of it:
- * miss the notification and nothing is lost, it is still here.
- *
- * It only shows what has already happened. Reminders about what is coming are
- * on the dashboard under Coming up, where there is room to act on them.
+ * Only that. Reminders about bills and renewals are pushes and are not kept
+ * here — this screen once listed every charge the app recorded, which put a
+ * second, older copy of the lock screen inside the app. The charges themselves
+ * are where they always were: on the bills, the cards and the transactions.
  */
 export default function NotificationsScreen() {
   const artwork = useArtwork();
-  const colors = useColors();
-  const moneyColor = useMoneyColor();
-  const today = toIsoDate(new Date());
-  const charges = useCharges();
-  const dismiss = useDismissNotices();
-  const confirm = useConfirm();
-  const { sources } = usePaymentSources();
+  const news = useAnnouncements();
+  const markSeen = useMarkNewsSeen();
 
-  const sourceLabels = useMemo(
-    () => new Map(sources.map((source) => [source.id, source.label])),
-    [sources],
-  );
+  // Opening the screen is reading it: the newest item on it clears the dot.
+  const newest = news.data?.[0]?.published_at;
+  useEffect(() => {
+    if (newest) void markSeen(newest);
+  }, [newest, markSeen]);
 
-  /**
-   * A rolling week, still here, newest first.
-   *
-   * The window is the whole expiry mechanism: a notice drops off on its own
-   * the day it turns eight days old, one day at a time. Nothing is deleted to
-   * make that happen — the charge behind it is kept for seven years like
-   * everything else that went out.
-   */
-  const since = toIsoDate(addDays(new Date(), -(NOTICE_DAYS - 1)));
-
-  const visible = useMemo(
-    () =>
-      (charges.data ?? []).filter(
-        (charge) => charge.charged_on >= since && !charge.notification_dismissed_at,
-      ),
-    [charges.data, since],
-  );
-
-  // Oldest day first, today last, like every other dated list in the app.
-  const groups = useMemo(
-    () =>
-      groupByDate(visible, (charge) => charge.charged_on, {
-        amountOf: (charge) => -Math.abs(charge.amount),
-        direction: 'asc',
-      }),
-    [visible],
-  );
-
-  const clearAll = async () => {
-    const ok = await confirm({
-      title: `Clear ${visible.length === 1 ? 'this notice' : `all ${visible.length} notices`}?`,
-      message:
-        'Only the notices go. Every charge stays on your bills, your credit cards and ' +
-        'in your transactions, and none of your totals change.',
-      confirmLabel: 'Clear',
-      cancelLabel: 'Keep them',
-    });
-    if (ok) dismiss.mutate(visible.map((charge) => charge.id));
-  };
+  const items = news.data ?? [];
 
   return (
-    <Screen showBack onRefresh={() => charges.refetch()}>
+    <Screen showBack onRefresh={() => void news.refetch()} refreshing={news.isRefetching}>
       <Title align="left" className="w-full">
         Notifications
       </Title>
-      <Subtitle className="mt-2 w-full text-left">
-        What the app has put through this past week. Older notices clear themselves; the charges
-        behind them are kept.
+      <Subtitle align="left" className="mt-2 w-full">
+        News from Skip — updates to install and features that have just arrived.
       </Subtitle>
 
-      {visible.length > 0 ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Clear all notices"
-          onPress={() => void clearAll()}
-          hitSlop={{ top: 4, bottom: 4 }}
-          className="mt-4 min-h-10 flex-row items-center gap-1.5 self-start rounded-full bg-ink/5 px-4 active:bg-ink/10"
-        >
-          <Trash2 size={18} color={colors.ink} strokeWidth={1.8} />
-          <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
-            Clear all
-          </Text>
-        </Pressable>
-      ) : null}
-
-      {charges.isPending ? <SkeletonList rows={5} /> : null}
-
-      {charges.isError ? (
+      {news.isPending ? (
+        <View className="mt-6 w-full">
+          <SkeletonList rows={3} />
+        </View>
+      ) : news.isError ? (
         <PageState
           art={artwork.error}
-          title="Could not load these"
-          message="Check your connection and try again. Nothing has been lost."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
-          onAction={() => charges.refetch()}
+          onAction={() => void news.refetch()}
         />
-      ) : null}
-
-      {!charges.isPending && !charges.isError && visible.length === 0 ? (
-        <PageState
-          art={artwork.emptyWallet}
-          title="Nothing this week"
-          message="When a bill falls due or a subscription renews, the app records it and tells you here."
-        />
-      ) : null}
-
-      {!charges.isPending && !charges.isError && visible.length > 0 ? (
-        <View className="mt-2 w-full pb-10">
-          {groups.map((group) => (
-            <View key={group.date} className="w-full">
-              <DateGroupHeader date={group.date} today={today} total={group.total} />
-              {group.items.map((charge, index) => {
-                const source = sourceLabels.get(charge.card_id ?? charge.bank_account_id ?? '');
-                return (
-                  <Fragment key={charge.id}>
-                    {index > 0 ? <View className="h-px bg-line/60" /> : null}
-                    <View className="w-full flex-row items-center gap-3 py-3.5">
-                      <View className="min-w-0 flex-1">
-                        <Text
-                          className="font-poppins-medium text-[15px] text-ink"
-                          numberOfLines={1}
-                          maxFontSizeMultiplier={1.4}
-                        >
-                          {charge.label}
-                        </Text>
-                        <Text
-                          className="mt-0.5 font-poppins text-[12px] text-muted"
-                          numberOfLines={1}
-                          maxFontSizeMultiplier={1.3}
-                        >
-                          {source ? `Deducted from ${source}` : 'No payment method set'}
-                        </Text>
-                      </View>
-
-                      <Text
-                        className="font-poppins-semibold text-[15px] text-ink"
-                        style={{ color: moneyColor(-Math.abs(charge.amount)) }}
-                        maxFontSizeMultiplier={1.4}
-                      >
-                        {formatCurrency(-Math.abs(charge.amount))}
-                      </Text>
-
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Clear the notice for ${charge.label}`}
-                        hitSlop={8}
-                        onPress={() => {
-                          tap();
-                          dismiss.mutate([charge.id]);
-                        }}
-                        className="h-8 w-8 items-center justify-center rounded-full active:bg-ink/5"
-                      >
-                        <X size={16} color={colors.muted} strokeWidth={1.8} />
-                      </Pressable>
-                    </View>
-                  </Fragment>
-                );
-              })}
-            </View>
+      ) : items.length === 0 ? (
+        <View className="mt-16 w-full items-center px-4">
+          <Text
+            className="text-center font-poppins-semibold text-[17px] text-ink"
+            maxFontSizeMultiplier={1.4}
+          >
+            No news yet
+          </Text>
+          <Text
+            className="mt-2 text-center font-poppins text-[14px] leading-5 text-muted"
+            maxFontSizeMultiplier={1.4}
+          >
+            Updates and new features from Skip will show up here.
+          </Text>
+        </View>
+      ) : (
+        <View className="mt-6 w-full gap-3 pb-10">
+          {items.map((item) => (
+            <NewsCard key={item.id} item={item} />
           ))}
         </View>
-      ) : null}
+      )}
     </Screen>
+  );
+}
+
+function NewsCard({ item }: { item: AnnouncementRow }) {
+  const colors = useColors();
+  const kind = KINDS[item.kind] ?? KINDS.news;
+  const Icon = kind.icon;
+  const date = formatFullDate(new Date(item.published_at));
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${kind.label}, ${date}. ${item.title}. ${item.body}`}
+      className="w-full flex-row gap-3.5 rounded-[16px] border border-line bg-card p-4"
+    >
+      <View className="h-10 w-10 items-center justify-center rounded-full bg-ink/5">
+        <Icon size={20} color={colors.body} strokeWidth={1.8} />
+      </View>
+
+      <View className="min-w-0 flex-1">
+        <Text className="font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+          {kind.label} · {date}
+        </Text>
+        <Text
+          className="mt-1 font-poppins-semibold text-[15px] leading-5 text-ink"
+          maxFontSizeMultiplier={1.4}
+        >
+          {item.title}
+        </Text>
+        {item.body ? (
+          <Text
+            className="mt-1 font-poppins text-[14px] leading-5 text-body"
+            maxFontSizeMultiplier={1.4}
+          >
+            {item.body}
+          </Text>
+        ) : null}
+      </View>
+    </View>
   );
 }

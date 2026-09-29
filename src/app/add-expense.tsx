@@ -24,7 +24,7 @@ import { FieldLabel } from '@/components/ui/typography';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { success, warn } from '@/lib/haptics';
-import { saveErrorMessage } from '@/lib/save-error';
+import { failureMessage } from '@/lib/failure';
 import { equalShares, exactRemainder } from '@/lib/split';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useUserId } from '@/providers/session-provider';
@@ -69,8 +69,9 @@ export default function AddExpenseScreen() {
     return (
       <StepFlow
         title={id ? 'Edit expense' : 'Add an expense'}
+        closePrompt={id ? 'Cancel editing this expense?' : 'Cancel adding this expense?'}
         steps={3}
-        current={id ? 1 : 0}
+        current={0}
         onBack={() => router.back()}
         primaryLabel="Continue"
         primaryDisabled
@@ -135,9 +136,10 @@ function ExpenseForm({
       : {},
   );
 
-  // Editing opens on the details, not the keypad: somebody who came to change
-  // a name should not have to re-type an amount that was already right.
-  const [step, setStep] = useState(editing ? 1 : 0);
+  // Editing walks the flow from the start, amount first, exactly as adding
+  // does — every figure is in front of the person before Save, not just the
+  // ones on the page an edit happened to open on.
+  const [step, setStep] = useState(0);
   const [padTarget, setPadTarget] = useState<string | null>(null);
   const [payerOpen, setPayerOpen] = useState(false);
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
@@ -221,7 +223,7 @@ function ExpenseForm({
       router.back();
     } catch (thrown) {
       warn();
-      setError({ message: saveErrorMessage(thrown, 'Could not save that expense.'), step: 2 });
+      setError({ message: failureMessage(thrown), step: 2 });
     }
   };
 
@@ -239,7 +241,7 @@ function ExpenseForm({
       await deleteExpense.mutateAsync(editing.id);
       router.back();
     } catch (thrown) {
-      setError({ message: saveErrorMessage(thrown, 'Could not delete that expense.'), step });
+      setError({ message: failureMessage(thrown), step });
     }
   };
 
@@ -258,6 +260,7 @@ function ExpenseForm({
   return (
     <StepFlow
       title={editing ? 'Edit expense' : 'Add an expense'}
+      closePrompt={editing ? 'Cancel editing this expense?' : 'Cancel adding this expense?'}
       steps={3}
       current={step}
       onBack={() => {

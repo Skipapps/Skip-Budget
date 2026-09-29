@@ -23,6 +23,7 @@ import { usePro } from '@/api/pro';
 import { useRefreshAll } from '@/api/refresh';
 import { useToday } from '@/lib/use-today';
 import { moneyBuckets } from '@/data/money-mock';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 type SectionHeaderProps = {
   title: string;
@@ -106,8 +107,7 @@ export default function CardsScreen() {
       <Screen onRefresh={refresh} refreshing={refreshing}>
         <PageState
           art={artwork.error}
-          title="Could not load your wallet"
-          message="Skip could not work out what is on your credit cards and accounts right now. Check your connection and try again."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={() => refetchBalances()}
         />

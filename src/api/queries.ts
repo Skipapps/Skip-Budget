@@ -154,6 +154,32 @@ export function useProfile() {
   });
 }
 
+export type AnnouncementRow = {
+  id: string;
+  kind: 'update' | 'feature' | 'news';
+  title: string;
+  body: string;
+  published_at: string;
+};
+
+/**
+ * News from Skip — updates and new features — newest first.
+ *
+ * Only what is published: the table's policy hides rows dated in the future,
+ * so staged news needs no filter here.
+ */
+export function useAnnouncements() {
+  return useOwnerQuery<AnnouncementRow[]>('announcements', async () => {
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('id, kind, title, body, published_at')
+      .order('published_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return (data ?? []) as AnnouncementRow[];
+  });
+}
+
 export function useCards() {
   return useOwnerQuery<CardRow[]>('cards', async () => {
     const { data, error } = await supabase
@@ -456,7 +482,7 @@ export function useSubscription(id: string | undefined) {
       const { data, error } = await supabase
         .from('subscriptions')
         .select(
-          'id, brand_id, name, amount, cycle, next_renewal_on, category_id, card_id, bank_account_id, note, active, brands(domain)',
+          'id, brand_id, name, amount, cycle, next_renewal_on, started_on, created_at, category_id, card_id, bank_account_id, note, active, brands(domain)',
         )
         .eq('id', id!)
         .maybeSingle();

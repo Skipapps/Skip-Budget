@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 import { supabase } from '@/lib/supabase';
 
 export type OAuthResult = { error: string | null; cancelled?: boolean };
@@ -19,13 +20,13 @@ const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
  */
 export async function signInWithApple(): Promise<OAuthResult> {
   if (Platform.OS !== 'ios') {
-    return { error: 'Sign in with Apple is only available on iOS.' };
+    return { error: FAILURE_MESSAGE };
   }
 
   try {
     const available = await AppleAuthentication.isAvailableAsync();
     if (!available) {
-      return { error: 'Sign in with Apple is not available on this device.' };
+      return { error: FAILURE_MESSAGE };
     }
 
     const credential = await AppleAuthentication.signInAsync({
@@ -36,7 +37,7 @@ export async function signInWithApple(): Promise<OAuthResult> {
     });
 
     if (!credential.identityToken) {
-      return { error: 'Apple did not return an identity token.' };
+      return { error: FAILURE_MESSAGE };
     }
 
     const { error } = await supabase.auth.signInWithIdToken({
@@ -44,7 +45,7 @@ export async function signInWithApple(): Promise<OAuthResult> {
       token: credential.identityToken,
     });
 
-    return { error: error?.message ?? null };
+    return { error: error ? failureMessage(error) : null };
   } catch (thrown) {
     // Dismissing the sheet is a choice, not a failure — say nothing.
     const code = (thrown as { code?: string }).code;
@@ -52,15 +53,7 @@ export async function signInWithApple(): Promise<OAuthResult> {
       return { error: null, cancelled: true };
     }
 
-    // Apple reports "unknown" when the device has no Apple ID signed in —
-    // by far the most common cause, and the raw message explains none of it.
-    if (code === 'ERR_REQUEST_UNKNOWN') {
-      return {
-        error: 'Sign in to an Apple ID on this device first, then try again.',
-      };
-    }
-
-    return { error: (thrown as Error).message ?? 'Could not sign in with Apple.' };
+    return { error: failureMessage(thrown) };
   }
 }
 
@@ -105,7 +98,7 @@ async function signInWithGoogleNatively(iosClientId: string): Promise<OAuthResul
 
     const { idToken } = response.data;
     if (!idToken) {
-      return { error: 'Google did not return an identity token.' };
+      return { error: FAILURE_MESSAGE };
     }
 
     const { error } = await supabase.auth.signInWithIdToken({
@@ -113,13 +106,13 @@ async function signInWithGoogleNatively(iosClientId: string): Promise<OAuthResul
       token: idToken,
     });
 
-    return { error: error?.message ?? null };
+    return { error: error ? failureMessage(error) : null };
   } catch (thrown) {
     // Older SDK versions throw on cancel instead of returning it.
     if (isErrorWithCode(thrown) && thrown.code === statusCodes.SIGN_IN_CANCELLED) {
       return { error: null, cancelled: true };
     }
-    return { error: (thrown as Error).message ?? 'Could not sign in with Google.' };
+    return { error: failureMessage(thrown) };
   }
 }
 
@@ -139,8 +132,8 @@ async function signInWithGoogleInBrowser(): Promise<OAuthResult> {
     },
   });
 
-  if (error) return { error: error.message };
-  if (!data?.url) return { error: 'Could not start Google sign-in.' };
+  if (error) return { error: failureMessage(error) };
+  if (!data?.url) return { error: FAILURE_MESSAGE };
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
@@ -148,14 +141,14 @@ async function signInWithGoogleInBrowser(): Promise<OAuthResult> {
     return { error: null, cancelled: true };
   }
   if (result.type !== 'success') {
-    return { error: 'Google sign-in did not complete.' };
+    return { error: FAILURE_MESSAGE };
   }
 
   const code = new URL(result.url).searchParams.get('code');
   if (!code) {
-    return { error: 'Google sign-in returned no code.' };
+    return { error: FAILURE_MESSAGE };
   }
 
   const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-  return { error: exchangeError?.message ?? null };
+  return { error: exchangeError ? failureMessage(exchangeError) : null };
 }

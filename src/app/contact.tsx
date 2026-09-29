@@ -12,6 +12,7 @@ import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
 import { success, warn } from '@/lib/haptics';
 import { useUserEmail } from '@/providers/session-provider';
 import { useColors } from '@/providers/theme-provider';
+import { failureMessage } from '@/lib/failure';
 
 /**
  * One form for both ways of writing in.
@@ -68,7 +69,7 @@ export default function ContactScreen() {
       setSent(true);
     } catch (thrown) {
       warn();
-      setError((thrown as Error).message);
+      setError(failureMessage(thrown));
     }
   };
 

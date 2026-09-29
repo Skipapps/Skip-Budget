@@ -10,7 +10,7 @@ import { SwitchControl } from '@/components/ui/switch-control';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { success, warn } from '@/lib/haptics';
-import { saveErrorMessage } from '@/lib/save-error';
+import { failureMessage } from '@/lib/failure';
 import { FREE_LIMITS } from '@/lib/wall';
 import { useUserId } from '@/providers/session-provider';
 
@@ -89,7 +89,7 @@ function AddGroupScreenInner() {
       router.replace(`/split-group?id=${group.id}`);
     } catch (thrown) {
       warn();
-      setError({ message: saveErrorMessage(thrown, 'Could not create that group.'), step: 1 });
+      setError({ message: failureMessage(thrown), step: 1 });
     }
   };
 
@@ -98,6 +98,7 @@ function AddGroupScreenInner() {
   return (
     <StepFlow
       title="New group"
+      closePrompt="Cancel adding this group?"
       steps={2}
       current={step}
       onBack={() => {

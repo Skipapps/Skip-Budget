@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { BrandLogo } from '@/components/brands/brand-logo';
 import { getBillIcon } from '@/data/bills-mock';
+import { GLYPH_STROKE } from '@/data/glyphs';
 import { useColors } from '@/providers/theme-provider';
 
 type BillMarkProps = {
@@ -26,8 +27,8 @@ type BillMarkProps = {
  * like a logo that failed to load rather than a bill that never had one.
  *
  * So the logo is shown when there is a brand and the category icon when there
- * is not, and a bill that has never been given one looks exactly as it always
- * did.
+ * is not — or when the brand's logo will not load — and a bill that has never
+ * been given one looks exactly as it always did.
  *
  * Sized and shaped to match BrandMark either way, because in a mixed list the
  * two sit next to each other and any difference reads as a mistake.
@@ -35,23 +36,27 @@ type BillMarkProps = {
 export function BillMark({ categoryId, iconId, domain, name, size = 40 }: BillMarkProps) {
   const colors = useColors();
 
-  if (domain) {
-    return <BrandLogo name={name ?? ''} domain={domain} size={size} />;
-  }
-
   // createElement, not JSX: getBillIcon looks a component up rather than
   // defining one, and assigning it to a capitalised local trips the lint rule.
   const icon = createElement(
     getBillIcon({ categoryId: categoryId ?? 'other', iconId: iconId ?? undefined }),
-    { width: Math.round(size * 0.5), height: Math.round(size * 0.5), color: colors.body },
+    { size: Math.round(size * 0.5), strokeWidth: GLYPH_STROKE, color: colors.body },
   );
 
-  return (
+  const glyph = (
     <View
       style={{ width: size, height: size }}
       className="items-center justify-center rounded-full border border-line bg-ink/5"
     >
       {icon}
     </View>
+  );
+
+  // A logo that will not load falls back to the glyph too, not to a monogram:
+  // "no logo" should look the same however it came about.
+  return domain ? (
+    <BrandLogo name={name ?? ''} domain={domain} size={size} fallback={glyph} />
+  ) : (
+    glyph
   );
 }

@@ -1,6 +1,7 @@
 import { fireEvent, render } from '@testing-library/react-native';
 
 import SavingsMonthScreen from '@/app/savings-month';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * Correcting a month that arrives a moment after the screen does.
@@ -92,7 +93,7 @@ describe('A month on the savings list', () => {
     mockState = { data: [], isLoading: false, isError: true };
     const { getByText, queryByText } = await render(<SavingsMonthScreen />);
 
-    expect(getByText('Could not load that month')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(queryByText('That month is not on your savings.')).toBeNull();
 
     await fireEvent.press(getByText('Try again'));

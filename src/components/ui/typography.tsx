@@ -84,12 +84,23 @@ export function SectionHeading({ children, caption, className }: TextProps & { c
   );
 }
 
-/** Supporting line directly under a Title. */
-export function Subtitle({ children, className }: TextProps) {
+/**
+ * Supporting line directly under a Title.
+ *
+ * Alignment is a prop, as on Title, because `cn` joins classes rather than
+ * merging them: a `text-left` passed in sits beside the built-in `text-center`,
+ * and the centre wins.
+ */
+export function Subtitle({
+  children,
+  className,
+  align = 'center',
+}: TextProps & { align?: 'center' | 'left' }) {
   return (
     <Text
       className={cn(
-        'text-center font-poppins text-[15px] leading-6 text-body phone:text-base',
+        'font-poppins text-[15px] leading-6 text-body phone:text-base',
+        align === 'left' ? 'text-left' : 'text-center',
         className,
       )}
       maxFontSizeMultiplier={1.6}

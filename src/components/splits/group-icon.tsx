@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { View } from 'react-native';
 
 import { groupIconFor, groupTint } from '@/data/group-icons';
+import { GLYPH_STROKE } from '@/data/glyphs';
 import { cn } from '@/lib/cn';
 
 type GroupIconProps = {
@@ -28,8 +29,8 @@ export function GroupIcon({ iconId, groupId, size = 26, className }: GroupIconPr
   // than defining one, but assigning it to a capitalised local trips the lint
   // rule against creating components during render.
   const icon = createElement(groupIconFor(iconId), {
-    width: size,
-    height: size,
+    size,
+    strokeWidth: GLYPH_STROKE,
     color: tint.fg,
   });
 

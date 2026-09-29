@@ -53,10 +53,22 @@ import {
 } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { success, warn } from '@/lib/haptics';
-import { saveErrorMessage } from '@/lib/save-error';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
 
 const TYPE_OPTIONS = ACCOUNT_TYPES.map((type) => ({ value: type, label: type }));
+
+/** "Acme", "Acme and Side gig", "Acme, Side gig and Rent". */
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** "monthly", "every 2 weeks" — reads on after an amount. */
+function frequencyLabel(frequency: PayFrequency): string {
+  const match = PAY_FREQUENCIES.find((option) => option.value === frequency);
+  return (match?.label ?? frequency).toLowerCase();
+}
 
 /** Loads the account being edited, then seeds the form by remount. */
 export default function AddAccountScreen() {
@@ -100,8 +112,7 @@ function AddAccountScreenInner() {
         <Screen showBack>
           <PageState
             art={artwork.error}
-            title="Could not open this account"
-            message="Check your connection and try again. Your balance has not been touched."
+            title={FAILURE_MESSAGE}
             actionLabel="Try again"
             onAction={() => {
               void account.refetch();
@@ -117,8 +128,9 @@ function AddAccountScreenInner() {
       return (
         <StepFlow
           title="Edit account"
+          closePrompt="Cancel editing this account?"
           steps={3}
-          current={1}
+          current={0}
           onBack={() => router.back()}
           primaryLabel="Continue"
           primaryDisabled
@@ -136,8 +148,7 @@ function AddAccountScreenInner() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title="That account is not here"
-          message="It may have been removed. Nothing has been changed."
+          title={FAILURE_MESSAGE}
           actionLabel="Go back"
           onAction={() => router.back()}
         />
@@ -175,8 +186,10 @@ function AccountForm({
   const [payFrequency, setPayFrequency] = useState<PayFrequency>('monthly');
   const [lastPayday, setLastPayday] = useState<Date | null>(null);
 
-  // Editing opens on the details, not the keypad.
-  const [step, setStep] = useState(editing ? 1 : 0);
+  // Editing walks the flow from the start, amount first, exactly as adding
+  // does — every figure is in front of the person before Save, not just the
+  // ones on the page an edit happened to open on.
+  const [step, setStep] = useState(0);
   const [incomePadOpen, setIncomePadOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
 
@@ -206,7 +219,7 @@ function AccountForm({
       await deleteAccount.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError({ message: saveErrorMessage(thrown, 'Could not delete that account.'), step });
+      setError({ message: failureMessage(thrown), step });
     }
   };
   const createSalary = useCreateSalarySource();
@@ -214,11 +227,27 @@ function AccountForm({
   const linkSalaries = useLinkAccountToSalaries();
   const salarySources = useSalarySources();
   // Pay already set up (the walk-in's first step) means the question here is
-  // not "how much" but "does it land in this account" — a switch, defaulted
-  // on when setup sent us, instead of an income field that would mint a
-  // duplicate salary source.
-  const hasSalary = (salarySources.data?.length ?? 0) > 0;
+  // not "how much" but "does it land in this account" — a switch naming that
+  // pay, defaulted on when setup sent us. Linked, it brings its own payday and
+  // cycle, so the questions that would ask for them again stand down; switched
+  // off, the income, payday and cycle come back for pay of this account's own.
+  const salaries = salarySources.data ?? [];
+  const hasSalary = salaries.length > 0;
   const [linkPay, setLinkPay] = useState(origin === 'setup');
+  const payLinked = !editing && hasSalary && linkPay;
+  const salaryNames = joinNames(salaries.map((source) => source.name.trim()).filter(Boolean));
+  const linkTitle = salaryNames
+    ? `${salaryNames} ${salaries.length === 1 ? 'lands' : 'land'} here`
+    : 'My pay lands here';
+  const onlySalary = salaries.length === 1 ? salaries[0] : null;
+  const linkCaption = onlySalary
+    ? `${formatCurrency(Number(onlySalary.amount))} ${frequencyLabel(onlySalary.frequency)}` +
+      (onlySalary.last_payday ? ' · payday already set' : '')
+    : 'Their paydays are already set';
+  // Income and payday belong to pay, not to the account: they are only asked
+  // for while adding one, where they make a salary source. An edit never saved
+  // them, so it does not ask — the reminder is all that step has for an edit.
+  const askPay = !editing && !payLinked;
 
   const savedReminder = useReminderChoice('account', id);
   const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
@@ -231,9 +260,7 @@ function AccountForm({
   // An account reminder is about pay arriving, so it means nothing until
   // something is paid in. On a new account that is the income being entered
   // right here; on an existing one it is whatever is already linked.
-  const payLandsHere = editing
-    ? salaryAccounts.ids.has(id ?? '')
-    : Number(income) > 0 || (hasSalary && linkPay);
+  const payLandsHere = editing ? salaryAccounts.ids.has(id ?? '') : payLinked || Number(income) > 0;
   // Only while editing: a new account's answer comes from the figure typed on
   // the step before, which no read can fail. An empty set from a read that has
   // not landed — or has failed — is indistinguishable from "nothing is paid in
@@ -278,8 +305,10 @@ function AccountForm({
       // saved as one rather than being dropped with the rest of the screen —
       // and pointed at this account, which is the whole reason it was typed on
       // this form. Without the link the money existed but landed nowhere.
+      // Not while the existing pay is linked: a figure typed before the switch
+      // went back on would otherwise mint a second salary beside it.
       const pay = Number(income);
-      if (!editing && Number.isFinite(pay) && pay > 0) {
+      if (!editing && !payLinked && Number.isFinite(pay) && pay > 0) {
         const salary = await createSalary.mutateAsync({
           name: nickname.trim() || bankName.trim(),
           amount: pay,
@@ -295,7 +324,7 @@ function AccountForm({
       // Pay that already exists as its own source is pointed at this account
       // rather than typed in again — additive, so links made on the salary
       // screen survive.
-      if (!editing && hasSalary && linkPay) {
+      if (payLinked) {
         await linkSalaries.mutateAsync(accountId);
       }
 
@@ -316,11 +345,13 @@ function AccountForm({
       success();
       // The walk-in flow gets its checklist back; everyone else goes where
       // they came from.
-      if (!editing && origin === 'setup') router.replace('/setup');
-      else router.back();
+      if (!editing && origin === 'setup') {
+        if (router.canGoBack()) router.back();
+        else router.replace('/setup');
+      } else router.back();
     } catch (thrown) {
       warn();
-      setError({ message: saveErrorMessage(thrown, 'Could not save that account.'), step: 2 });
+      setError({ message: failureMessage(thrown), step: 2 });
     }
   };
 
@@ -334,7 +365,9 @@ function AccountForm({
     step === 0
       ? 'What is in the account today?'
       : step === 2
-        ? 'When was the last pay day?'
+        ? askPay
+          ? 'When was the last pay day?'
+          : 'Want a nudge when pay lands?'
         : undefined;
   const primaryLabel =
     step < 2 ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save account';
@@ -343,6 +376,7 @@ function AccountForm({
   return (
     <StepFlow
       title={editing ? 'Edit account' : 'Add an account'}
+      closePrompt={editing ? 'Cancel editing this account?' : 'Cancel adding this account?'}
       steps={3}
       current={step}
       onBack={() => {
@@ -440,22 +474,24 @@ function AccountForm({
                   className="font-poppins-medium text-[15px] text-ink"
                   maxFontSizeMultiplier={1.3}
                 >
-                  My pay lands here
+                  {linkTitle}
                 </Text>
                 <Text
                   className="mt-1 font-poppins text-[12px] leading-[17px] text-muted"
                   maxFontSizeMultiplier={1.3}
                 >
-                  Links your salary to this account, so payday knows where the money arrives.
+                  {linkCaption}
                 </Text>
               </View>
               <SwitchControl
                 value={linkPay}
                 onValueChange={setLinkPay}
-                accessibilityLabel="My pay lands here"
+                accessibilityLabel={linkTitle}
               />
             </View>
-          ) : (
+          ) : null}
+
+          {askPay ? (
             <SelectField
               label="Expected income"
               variant="pill"
@@ -466,7 +502,7 @@ function AccountForm({
               onIconPress={() => setCalculatorOpen(true)}
               iconAccessibilityLabel="Open calculator"
             />
-          )}
+          ) : null}
 
           {stepError ? (
             <Text
@@ -481,26 +517,30 @@ function AccountForm({
 
       {step === 2 ? (
         <View className="w-full gap-6">
-          <View className="w-full">
-            <InlineCalendar value={lastPayday} onChange={setLastPayday} />
-            {nextPayday ? (
-              <Text
-                className="mt-2 w-full text-center font-poppins text-[13px] text-muted"
-                maxFontSizeMultiplier={1.4}
-              >
-                Next payday: {formatFullDate(nextPayday)}
-              </Text>
-            ) : null}
-          </View>
+          {askPay ? (
+            <>
+              <View className="w-full">
+                <InlineCalendar value={lastPayday} onChange={setLastPayday} />
+                {nextPayday ? (
+                  <Text
+                    className="mt-2 w-full text-center font-poppins text-[13px] text-muted"
+                    maxFontSizeMultiplier={1.4}
+                  >
+                    Next payday: {formatFullDate(nextPayday)}
+                  </Text>
+                ) : null}
+              </View>
 
-          <View className="w-full">
-            <FieldLabel className="mb-2">How often are you paid?</FieldLabel>
-            <ChoiceChips
-              options={PAY_FREQUENCIES}
-              value={payFrequency}
-              onChange={setPayFrequency}
-            />
-          </View>
+              <View className="w-full">
+                <FieldLabel className="mb-2">How often are you paid?</FieldLabel>
+                <ChoiceChips
+                  options={PAY_FREQUENCIES}
+                  value={payFrequency}
+                  onChange={setPayFrequency}
+                />
+              </View>
+            </>
+          ) : null}
 
           <ReminderField
             kind="account"
@@ -512,7 +552,7 @@ function AccountForm({
               payLookupPending
                 ? 'Checking what is paid into this account…'
                 : payLookupFailed
-                  ? 'Skip could not check what is paid into this account, so it cannot set this up yet.'
+                  ? FAILURE_MESSAGE
                   : payLandsHere
                     ? null
                     : 'Add the income paid into this account and Skip can tell you when it lands.'

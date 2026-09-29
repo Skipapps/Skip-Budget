@@ -20,6 +20,7 @@ import { TextLink } from '@/components/ui/text-link';
 import { SectionHeading } from '@/components/ui/typography';
 import { useLedger, useProfile, type LedgerEntry } from '@/api/queries';
 import { useCharges } from '@/api/charges';
+import { useHasUnreadNews } from '@/api/news';
 import { useKeepSchedulesCurrent, useRefreshAll } from '@/api/refresh';
 import { spendingCategories } from '@/data/dashboard-mock';
 import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
@@ -28,6 +29,7 @@ import { groupByDate } from '@/lib/group';
 import { rangeFor } from '@/lib/range';
 import { addDays, formatDateRange, formatDayLabel, toIsoDate } from '@/lib/date';
 import { useToday } from '@/lib/use-today';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 const KIND_LABELS: Record<string, string> = {
   receipt: 'Receipt',
@@ -155,6 +157,7 @@ export default function HomeScreen() {
    * this costs no extra fetch.
    */
   const charges = useCharges();
+  const unreadNews = useHasUnreadNews();
   const owners = useMemo(() => chargeOwners(charges.data ?? []), [charges.data]);
 
   /** The row's handler, or undefined when there is nothing to open. */
@@ -180,6 +183,7 @@ export default function HomeScreen() {
           avatarId={profile.data?.avatar_id}
           onAvatarPress={() => router.push('/avatar')}
           onNotificationsPress={() => router.push('/notifications')}
+          unread={unreadNews}
         />
       </View>
 
@@ -362,7 +366,7 @@ function Section({
             className="w-full text-center font-poppins text-[14px] text-muted"
             maxFontSizeMultiplier={1.4}
           >
-            We could not load this week.
+            {FAILURE_MESSAGE}
           </Text>
           <TextLink label="Try again" variant="subtle" onPress={onRetry} />
         </View>

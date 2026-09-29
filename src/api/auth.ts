@@ -1,4 +1,5 @@
 import { forgetDevice } from '@/api/push';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 import { supabase } from '@/lib/supabase';
 
 export type AuthResult = { error: string | null };
@@ -7,23 +8,6 @@ export type SignUpResult = AuthResult & {
   /** False when the project requires email confirmation before signing in. */
   signedIn: boolean;
 };
-
-/** Supabase messages are terse; these read like something a person wrote. */
-function readable(message: string): string {
-  const lower = message.toLowerCase();
-  if (lower.includes('invalid login credentials')) return 'That email and password do not match.';
-  if (lower.includes('already registered')) return 'That email already has an account.';
-  if (lower.includes('password should be')) return 'Password must be at least 6 characters.';
-  if (lower.includes('unable to validate email')) return 'That email address does not look right.';
-  if (lower.includes('network')) return 'Could not reach the server. Check your connection.';
-  if (lower.includes('token has expired') || lower.includes('expired'))
-    return 'That code has expired. Send a new one.';
-  if (lower.includes('invalid token') || lower.includes('otp'))
-    return 'That code is not right. Check it and try again.';
-  if (lower.includes('rate limit') || lower.includes('too many'))
-    return 'Too many attempts. Wait a minute and try again.';
-  return message;
-}
 
 /**
  * Six-digit codes, not confirmation links.
@@ -45,7 +29,7 @@ export async function verifyOtp(
     token: token.trim(),
     type: purpose === 'signup' ? 'signup' : 'recovery',
   });
-  return { error: error ? readable(error.message) : null };
+  return { error: error ? failureMessage(error) : null };
 }
 
 export async function resendOtp(email: string, purpose: OtpPurpose): Promise<AuthResult> {
@@ -54,13 +38,13 @@ export async function resendOtp(email: string, purpose: OtpPurpose): Promise<Aut
     return sendPasswordReset(email);
   }
   const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
-  return { error: error ? readable(error.message) : null };
+  return { error: error ? failureMessage(error) : null };
 }
 
 export async function updatePassword(password: string): Promise<AuthResult> {
   // Only works while the recovery session from verifyOtp is active.
   const { error } = await supabase.auth.updateUser({ password });
-  return { error: error ? readable(error.message) : null };
+  return { error: error ? failureMessage(error) : null };
 }
 
 export async function signUpWithEmail(
@@ -78,7 +62,7 @@ export async function signUpWithEmail(
   // session. Reporting that is the difference between "check your inbox" and a
   // screen that silently does nothing.
   return {
-    error: error ? readable(error.message) : null,
+    error: error ? failureMessage(error) : null,
     signedIn: Boolean(data.session),
   };
 }
@@ -97,14 +81,14 @@ export async function signInWithEmail(email: string, password: string): Promise<
   const unconfirmed = Boolean(error && /not confirmed|email.*confirm/i.test(error.message));
 
   return {
-    error: error && !unconfirmed ? readable(error.message) : null,
+    error: error && !unconfirmed ? failureMessage(error) : null,
     needsConfirmation: unconfirmed,
   };
 }
 
 export async function sendPasswordReset(email: string): Promise<AuthResult> {
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
-  return { error: error ? readable(error.message) : null };
+  return { error: error ? failureMessage(error) : null };
 }
 
 /**
@@ -127,7 +111,7 @@ export async function signOut(): Promise<AuthResult> {
   await forgetThisDevice();
 
   const { error } = await supabase.auth.signOut();
-  return { error: error ? readable(error.message) : null };
+  return { error: error ? failureMessage(error) : null };
 }
 
 /** Best-effort removal of this device's push row, while a session still exists. */
@@ -166,7 +150,7 @@ export async function deleteAccount(): Promise<AuthResult> {
   const { error } = await supabase.rpc('delete_my_account');
 
   if (error) {
-    return { error: readable(error.message) };
+    return { error: failureMessage(error) };
   }
 
   // Trust, then verify. "No error" once meant "deleted" here, and a server
@@ -176,10 +160,7 @@ export async function deleteAccount(): Promise<AuthResult> {
   // the row itself: a deleted account cannot answer getUser.
   const { data } = await supabase.auth.getUser();
   if (data.user) {
-    return {
-      error:
-        'Your account is still there — the deletion did not go through. Try again, and message us if it happens twice.',
-    };
+    return { error: FAILURE_MESSAGE };
   }
 
   await supabase.auth.signOut();

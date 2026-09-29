@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { resendOtp, signInWithEmail } from '@/api/auth';
+import { resetTo } from '@/lib/nav';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
@@ -46,7 +47,7 @@ export default function LoginScreen() {
       setError(authError);
       return;
     }
-    router.replace('/setup');
+    resetTo('/setup');
   };
   const handleForgotPassword = () => router.push('/forgot-password');
 

@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react-native';
 
 import AddBillScreen from '@/app/add-bill';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * What the bill editor does when it cannot read the bill.
@@ -40,6 +41,17 @@ jest.mock('@/theme/artwork', () => ({
 }));
 
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => async () => true }));
+// The past-charges question has its own tests; these are about the edit gate.
+jest.mock('@/api/past-charges', () => ({
+  usePastCharges: () => ({
+    choose: async () => 'upcoming',
+    apply: jest.fn(),
+    lastChargedOn: null,
+    ready: true,
+    retry: jest.fn(),
+    saving: false,
+  }),
+}));
 
 jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
@@ -97,7 +109,7 @@ describe('Add bill — an edit whose bill could not be read', () => {
     mockBill = { data: null, isError: true, isFetched: true };
     const { getByText, queryByText } = await render(<AddBillScreen />);
 
-    expect(getByText('Could not open this bill')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(getByText('Try again')).toBeTruthy();
 
     // Not the flow at all: no shell, no fields, nothing to press Save on.
@@ -117,7 +129,7 @@ describe('Add bill — an edit whose bill could not be read', () => {
     const { getByText, queryByText } = await render(<AddBillScreen />);
 
     expect(getByText('Edit bill')).toBeTruthy();
-    expect(queryByText('Could not open this bill')).toBeNull();
+    expect(queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(mockUseUpdateBill).not.toHaveBeenCalled();
   });
 
@@ -145,8 +157,9 @@ describe('Add bill — an edit whose bill could not be read', () => {
     const { getByText, queryByText } = await render(<AddBillScreen />);
 
     expect(getByText('Edit bill')).toBeTruthy();
-    expect(queryByText('Could not open this bill')).toBeNull();
-    expect(queryByText('That bill is not here')).toBeNull();
+    // An edit walks the flow from the amount, exactly as adding does.
+    expect(getByText('How much is the bill?')).toBeTruthy();
+    expect(queryByText(FAILURE_MESSAGE)).toBeNull();
     // The gate is about a missing record, not about editing: the real path
     // still wires the update up.
     expect(mockUseUpdateBill).toHaveBeenCalled();
@@ -156,7 +169,7 @@ describe('Add bill — an edit whose bill could not be read', () => {
     mockBill = { data: null, isError: false, isFetched: true };
     const { getByText, queryByText } = await render(<AddBillScreen />);
 
-    expect(getByText('That bill is not here')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     // An update filtered on a missing id writes nothing and reports success,
     // and a create here would file a second bill. Neither is offered.
     expect(queryByText('Edit bill')).toBeNull();

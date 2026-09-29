@@ -212,7 +212,7 @@ export function chargePlanKey(row: {
 }
 
 /** The next calendar day. */
-function dayAfter(date: string): string {
+export function dayAfter(date: string): string {
   const [year, month, day] = parts(date);
   const next = new Date(Date.UTC(year, month - 1, day + 1));
   return iso(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate());

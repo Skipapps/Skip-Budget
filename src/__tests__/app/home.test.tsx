@@ -50,6 +50,7 @@ jest.mock('@/providers/theme-provider', () => ({
 }));
 
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: false }) }));
+jest.mock('@/api/news', () => ({ useHasUnreadNews: () => false }));
 jest.mock('@/api/refresh', () => ({
   useRefreshAll: () => ({ refresh: () => {}, refreshing: false }),
   useKeepSchedulesCurrent: () => {},

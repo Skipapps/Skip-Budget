@@ -1,6 +1,7 @@
 import { fireEvent, render } from '@testing-library/react-native';
 
 import RemindersScreen from '@/app/reminders';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * The daily receipts reminder, rendered — and what the page does when a read
@@ -198,7 +199,7 @@ describe('Reminders — a read that did not land', () => {
     mockFailed = failed;
     const { getByText, queryByRole, queryByText } = await render(<RemindersScreen />);
 
-    expect(getByText('Could not load your reminders')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(getByText('Try again')).toBeTruthy();
 
     // The two lies this replaces: a switch sitting off, and a count of the
@@ -238,16 +239,17 @@ describe('Reminders — the receipts read alone', () => {
   });
 
   it('keeps the page, and puts the failure in its own section', async () => {
-    const { getByText, queryByText, queryByRole } = await render(<RemindersScreen />);
+    const { getAllByText, getByText, queryByRole } = await render(<RemindersScreen />);
 
     // The section is still there, and says what it could not do.
     expect(getByText('Daily receipts reminder')).toBeTruthy();
-    expect(getByText('Skip could not check whether this one is on.')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(getByText('Try again')).toBeTruthy();
 
-    // But not the page-level error, and not a switch drawn off over a read
+    // But not the page-level error — which would say the same line, once,
+    // with nothing else on the page — and not a switch drawn off over a read
     // that never landed.
-    expect(queryByText('Could not load your reminders')).toBeNull();
+    expect(getAllByText(FAILURE_MESSAGE)).toHaveLength(1);
     expect(queryByRole('switch')).toBeNull();
   });
 

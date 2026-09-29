@@ -45,6 +45,7 @@ import { formatCurrency } from '@/lib/format';
 import { tap } from '@/lib/haptics';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * Every reminder in the app, in one place.
@@ -266,8 +267,7 @@ export default function RemindersScreen() {
       {failed ? (
         <PageState
           art={artwork.error}
-          title="Could not load your reminders"
-          message="Nothing has changed. Check your connection and try again — until this loads, Skip cannot tell you what it is set to send."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={retry}
         />
@@ -305,9 +305,7 @@ export default function RemindersScreen() {
                     numberOfLines={2}
                     maxFontSizeMultiplier={1.3}
                   >
-                    {receiptsFailed
-                      ? 'Skip could not check whether this one is on.'
-                      : 'A nudge to log what you bought today.'}
+                    {receiptsFailed ? FAILURE_MESSAGE : 'A nudge to log what you bought today.'}
                   </Text>
                 </View>
 

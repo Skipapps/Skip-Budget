@@ -1,16 +1,23 @@
 import { Stack, useFocusEffect } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
-import type { ComponentRef, ReactNode } from 'react';
+import { ChevronLeft, X } from 'lucide-react-native';
+import type { ComponentRef, ReactNode, RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AccessibilityInfo, BackHandler, Pressable, Text, View } from 'react-native';
 
+import { goBack } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { cn } from '@/lib/cn';
+import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
 
 type StepFlowProps = {
   title: string;
+  /**
+   * What the close button asks before it throws the flow away — "Cancel
+   * adding this bill?", "Cancel editing this receipt?".
+   */
+  closePrompt: string;
   /** How many dots. One per step. */
   steps: number;
   /** Zero-based. */
@@ -51,6 +58,7 @@ type StepFlowProps = {
  */
 export function StepFlow({
   title,
+  closePrompt,
   steps,
   current,
   onBack,
@@ -65,7 +73,6 @@ export function StepFlow({
   avoidKeyboard = false,
   children,
 }: StepFlowProps) {
-  const colors = useColors();
   const questionRef = useRef<ComponentRef<typeof Text>>(null);
   const titleRef = useRef<ComponentRef<typeof Text>>(null);
 
@@ -108,46 +115,30 @@ export function StepFlow({
   );
 
   return (
-    <Screen scrollable={scrollable} avoidKeyboard={avoidKeyboard}>
+    <Screen
+      scrollable={scrollable}
+      avoidKeyboard={avoidKeyboard}
+      // Pinned: back, close and where you are stay put while a long step
+      // scrolls under them, instead of leaving with the first swipe.
+      header={
+        <View className="w-full pb-2">
+          <FlowHeader title={title} onBack={onBack} closePrompt={closePrompt} titleRef={titleRef} />
+          <StepIndicator steps={steps} current={current} />
+        </View>
+      }
+    >
       <Stack.Screen options={screenOptions} />
 
-      <View className="w-full pt-1">
-        <View className="h-11 w-full justify-center">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            onPress={onBack}
-            hitSlop={8}
-            className="absolute left-0 z-10 h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
-          >
-            <ChevronLeft size={24} color={colors.ink} strokeWidth={2} />
-          </Pressable>
-
-          {/* The title is laid out over the whole header row, so without this
-              it sits on top of the back button and swallows every tap on it:
-              a plain Text is still a hit target, and the chevron is its
-              sibling rather than its parent, so the tap reaches nothing. */}
-          <Text
-            ref={titleRef}
-            pointerEvents="none"
-            className="px-12 text-center font-poppins-semibold text-[17px] text-ink"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.3}
-          >
-            {title}
-          </Text>
-        </View>
-
-        <StepIndicator steps={steps} current={current} />
-      </View>
-
-      {headerSlot ? <View className="mt-6 w-full">{headerSlot}</View> : null}
+      {headerSlot ? <View className="mt-4 w-full">{headerSlot}</View> : null}
 
       {question ? (
         <Text
           ref={questionRef}
           accessibilityRole="header"
-          className="mt-8 w-full text-center font-poppins text-[20px] text-muted"
+          className={cn(
+            'w-full text-center font-poppins text-[20px] text-muted',
+            headerSlot ? 'mt-8' : 'mt-6',
+          )}
           numberOfLines={2}
           maxFontSizeMultiplier={1.3}
         >
@@ -155,7 +146,7 @@ export function StepFlow({
         </Text>
       ) : null}
 
-      <View className={cn('w-full flex-1', question ? 'mt-6' : 'mt-8')}>{children}</View>
+      <View className={cn('w-full flex-1', question ? 'mt-6' : 'mt-4')}>{children}</View>
 
       <View className="mt-8 w-full gap-3 pb-2">
         {error ? (
@@ -171,6 +162,79 @@ export function StepFlow({
         {footerSlot}
       </View>
     </Screen>
+  );
+}
+
+/**
+ * Back on the left, close on the right, the flow's name between them.
+ *
+ * Back steps back; close leaves the whole flow, from any step, after asking —
+ * everything typed so far is thrown away, and a stray tap in the corner should
+ * not be able to do that. Exported for the screens that open a flow before
+ * its steps begin, like the bill category chooser.
+ */
+export function FlowHeader({
+  title,
+  onBack,
+  closePrompt,
+  titleRef,
+}: {
+  title: string;
+  onBack: () => void;
+  closePrompt: string;
+  titleRef?: RefObject<ComponentRef<typeof Text> | null>;
+}) {
+  const colors = useColors();
+  const confirm = useConfirm();
+
+  const close = async () => {
+    const ok = await confirm({
+      title: closePrompt,
+      message: 'Nothing you have entered here will be saved.',
+      confirmLabel: 'Yes',
+      cancelLabel: 'Go back',
+      destructive: true,
+    });
+    if (ok) goBack();
+  };
+
+  return (
+    <View className="h-11 w-full justify-center">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Back"
+        onPress={onBack}
+        hitSlop={8}
+        className="absolute left-0 z-10 h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
+      >
+        <ChevronLeft size={24} color={colors.ink} strokeWidth={2} />
+      </Pressable>
+
+      {/* The title is laid out over the whole header row, so without this
+          it sits on top of the buttons and swallows every tap on them: a
+          plain Text is still a hit target, and the buttons are its siblings
+          rather than its children, so the tap reaches nothing. */}
+      <Text
+        ref={titleRef}
+        pointerEvents="none"
+        className="px-12 text-center font-poppins-semibold text-[17px] text-ink"
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.3}
+      >
+        {title}
+      </Text>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Close"
+        accessibilityHint={closePrompt}
+        onPress={() => void close()}
+        hitSlop={8}
+        className="absolute right-0 z-10 h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
+      >
+        <X size={22} color={colors.ink} strokeWidth={2} />
+      </Pressable>
+    </View>
   );
 }
 

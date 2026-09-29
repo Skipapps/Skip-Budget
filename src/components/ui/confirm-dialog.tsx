@@ -33,6 +33,12 @@ type ConfirmDialogProps = DialogRequest & {
  *
  * Two choices sit side by side because that is one glance. Three or more stack,
  * because three side by side truncates the moment a label is longer than a word.
+ *
+ * The buttons are the app's buttons: the first choice is the filled pill, any
+ * other is the outlined one, and a destructive choice is filled red. Plain
+ * words floating in the card read as a caption, not as something to press.
+ * Cancel sits beside a single choice as an equal outlined pill, and under a
+ * stack as a quiet link — the way out, never competing with the choice.
  */
 export function ConfirmDialog({
   title,
@@ -43,7 +49,12 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const choices = actions.length > 0 ? actions : [{ id: 'ok', label: 'OK' }];
   const showCancel = cancelLabel !== null && actions.length > 0;
-  const sideBySide = showCancel && choices.length === 1;
+  // Side by side only while both labels fit half the card: "Delete" and
+  // "Cancel" do, "Delete everything" and "Keep my account" end in "…" on a
+  // small phone, so those stack like any other longer set of choices.
+  const labels = [...choices.map((choice) => choice.label), cancelLabel ?? ''];
+  const sideBySide =
+    showCancel && choices.length === 1 && labels.every((label) => label.length <= 12);
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => onResolve(null)}>
@@ -75,26 +86,31 @@ export function ConfirmDialog({
             ) : null}
           </View>
 
-          <View className={cn('gap-2 px-3 pb-3', sideBySide ? 'flex-row justify-end' : 'w-full')}>
+          <View className={cn('gap-2.5 px-5 pb-5 pt-1', sideBySide ? 'flex-row' : 'w-full')}>
             {/* Stacked layouts put the way out last, where a thumb rests and
                 where it cannot be hit while reaching for the real choice. */}
             {sideBySide && showCancel ? (
-              <DialogButton label={cancelLabel} onPress={() => onResolve(null)} />
+              <DialogButton
+                label={cancelLabel}
+                variant="outline"
+                sideBySide
+                onPress={() => onResolve(null)}
+              />
             ) : null}
 
-            {choices.map((action) => (
+            {choices.map((action, index) => (
               <DialogButton
                 key={action.id}
                 label={action.label}
                 destructive={action.destructive}
-                emphasis
-                fullWidth={!sideBySide}
+                variant={index === 0 ? 'filled' : 'outline'}
+                sideBySide={sideBySide}
                 onPress={() => onResolve(action.id)}
               />
             ))}
 
             {!sideBySide && showCancel ? (
-              <DialogButton label={cancelLabel} fullWidth onPress={() => onResolve(null)} />
+              <DialogButton label={cancelLabel} variant="link" onPress={() => onResolve(null)} />
             ) : null}
           </View>
         </Pressable>
@@ -107,14 +123,16 @@ function DialogButton({
   label,
   onPress,
   destructive,
-  emphasis,
-  fullWidth,
+  variant,
+  sideBySide,
 }: {
   label: string;
   onPress: () => void;
   destructive?: boolean;
-  emphasis?: boolean;
-  fullWidth?: boolean;
+  /** `filled` is the choice, `outline` another choice, `link` the way out. */
+  variant: 'filled' | 'outline' | 'link';
+  /** Two across share the row equally; stacked ones take the full width. */
+  sideBySide?: boolean;
 }) {
   return (
     <Pressable
@@ -122,18 +140,35 @@ function DialogButton({
       accessibilityLabel={label}
       onPress={onPress}
       className={cn(
-        'min-h-12 items-center justify-center rounded-[12px] px-5 active:bg-ink/5',
-        fullWidth && 'w-full',
+        'items-center justify-center rounded-full px-5',
+        sideBySide ? 'min-w-0 flex-1' : 'w-full',
+        variant === 'link' ? 'min-h-11 active:bg-ink/5' : 'min-h-12',
+        variant === 'filled' &&
+          (destructive ? 'bg-danger active:opacity-80' : 'bg-control active:bg-control-pressed'),
+        variant === 'outline' &&
+          (destructive
+            ? 'border border-danger active:bg-danger/10'
+            : 'border border-control active:bg-ink/5'),
       )}
     >
       <Text
         className={cn(
-          'text-[15px]',
-          emphasis ? 'font-poppins-semibold' : 'font-poppins-medium',
-          destructive ? 'text-danger' : emphasis ? 'text-ink' : 'text-muted',
+          'text-center text-[15px]',
+          variant === 'link' ? 'font-poppins-medium' : 'font-poppins-semibold',
+          variant === 'filled'
+            ? destructive
+              ? // The page colour, not white: the dark theme's red is light,
+                // and white on it fails contrast where the page colour clears 7:1.
+                'text-surface'
+              : 'text-on-control'
+            : destructive
+              ? 'text-danger'
+              : variant === 'outline'
+                ? 'text-ink'
+                : 'text-muted',
         )}
         maxFontSizeMultiplier={1.4}
-        numberOfLines={1}
+        numberOfLines={2}
       >
         {label}
       </Text>

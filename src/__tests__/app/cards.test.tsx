@@ -1,6 +1,7 @@
 import { fireEvent, render } from '@testing-library/react-native';
 
 import CardsScreen from '@/app/(tabs)/cards';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * What the wallet does when the balances could not be worked out.
@@ -172,14 +173,14 @@ describe('Cards — balances that could not be worked out', () => {
 
     expect(getByText('Credit cards')).toBeTruthy();
     expect(getByText('Bank accounts')).toBeTruthy();
-    expect(queryByText('Could not load your wallet')).toBeNull();
+    expect(queryByText(FAILURE_MESSAGE)).toBeNull();
   });
 
   it('replaces the wallet with an error rather than showing the figure typed at setup', async () => {
     mockBalancesFailed = true;
     const { getByText, queryByText } = await render(<CardsScreen />);
 
-    expect(getByText('Could not load your wallet')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     // Not a stale list under a warning: the rows and their actions are gone.
     expect(queryByText('Cards')).toBeNull();
     expect(queryByText('Bank accounts')).toBeNull();

@@ -27,6 +27,7 @@ import { simplifyDebts } from '@/lib/split';
 import { useUserId } from '@/providers/session-provider';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * One group: where everyone stands, and everything that put them there.
@@ -114,8 +115,7 @@ export default function SplitGroupScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title="Could not open that group"
-          message="It may have been archived, or you may no longer be a member."
+          title={FAILURE_MESSAGE}
           actionLabel="Back to splits"
           onAction={() => router.replace('/splits')}
         />

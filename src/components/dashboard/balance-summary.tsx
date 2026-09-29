@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { daysLeftInMonth } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { useColors } from '@/providers/theme-provider';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 type BalanceSummaryProps = {
   /** Payday minus expenses. Cash flow, not an account balance. */
@@ -121,7 +122,7 @@ export function BalanceSummary({
           className="mt-4 font-poppins text-[12px] leading-[17px] text-on-control/85"
           maxFontSizeMultiplier={1.3}
         >
-          We could not load this month. Pull down to try again.
+          {FAILURE_MESSAGE}
         </Text>
       ) : spentShare === null ? null : (
         <View

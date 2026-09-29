@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { BILL_CATEGORIES, type BillCategory } from '@/data/bills-mock';
+import { GLYPH_STROKE } from '@/data/glyphs';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
 
@@ -40,7 +41,11 @@ export function CategoryPicker({ onSelect, selectedId }: CategoryPickerProps) {
                 selected ? 'bg-control' : 'bg-ink/5',
               )}
             >
-              <Icon width={22} height={22} color={selected ? colors.onControl : colors.body} />
+              <Icon
+                size={22}
+                strokeWidth={GLYPH_STROKE}
+                color={selected ? colors.onControl : colors.body}
+              />
             </View>
 
             <Text

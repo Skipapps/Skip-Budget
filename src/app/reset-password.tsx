@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { resetTo } from '@/lib/nav';
 import { useState } from 'react';
 import { View } from 'react-native';
 
@@ -37,7 +37,7 @@ export default function ResetPasswordScreen() {
       setError(updateError);
       return;
     }
-    router.replace('/home');
+    resetTo('/home');
   };
 
   return (

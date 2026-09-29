@@ -1,6 +1,7 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { View } from 'react-native';
 
+import { useSession } from '@/providers/session-provider';
 import { useArtwork } from '@/theme/artwork';
 import { Button } from '@/components/ui/button';
 import { FeatureRow } from '@/components/ui/feature-row';
@@ -11,6 +12,13 @@ import { Body, Strong, Title } from '@/components/ui/typography';
 
 export default function WelcomeScreen() {
   const artwork = useArtwork();
+  const { session, ready } = useSession();
+
+  // The front door of the signed-out world. Anybody signed in who lands
+  // here — a stale deep link, a back gesture that slipped through — belongs
+  // in the app, not in the pitch.
+  if (ready && session) return <Redirect href="/home" />;
+
   return (
     <Screen
       footer={

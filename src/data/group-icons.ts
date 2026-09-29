@@ -1,24 +1,4 @@
-import CoffeeIcon from '@/assets/bill-icons/coffee.svg';
-import EducationIcon from '@/assets/bill-icons/education.svg';
-import EnergyIcon from '@/assets/bill-icons/energy.svg';
-import FamilyIcon from '@/assets/bill-icons/family.svg';
-import HealthIcon from '@/assets/bill-icons/health.svg';
-import HousingIcon from '@/assets/bill-icons/housing.svg';
-import InsuranceIcon from '@/assets/bill-icons/insurance.svg';
-import InternetIcon from '@/assets/bill-icons/internet.svg';
-import LoansIcon from '@/assets/bill-icons/loans.svg';
-import MobileIcon from '@/assets/bill-icons/mobile.svg';
-import MusicIcon from '@/assets/bill-icons/music.svg';
-import OtherIcon from '@/assets/bill-icons/other.svg';
-import PetsIcon from '@/assets/bill-icons/pets.svg';
-import ShoppingIcon from '@/assets/bill-icons/shopping.svg';
-import SoftwareIcon from '@/assets/bill-icons/software.svg';
-import TransportIcon from '@/assets/bill-icons/transport.svg';
-import TravelIcon from '@/assets/bill-icons/travel.svg';
-import TvIcon from '@/assets/bill-icons/tv.svg';
-import WasteIcon from '@/assets/bill-icons/waste.svg';
-import WaterIcon from '@/assets/bill-icons/water.svg';
-import type { BillIcon } from '@/data/bills-mock';
+import { FALLBACK_GLYPH, GLYPHS, type Glyph } from '@/data/glyphs';
 
 /**
  * Every glyph the app ships, offered for a group.
@@ -28,35 +8,35 @@ import type { BillIcon } from '@/data/bills-mock';
  * flat, a holiday, a car — so it gets the whole set, ordered roughly by how
  * likely a group is to be about that thing.
  */
-export const GROUP_ICON_CHOICES: { id: string; icon: BillIcon }[] = [
-  { id: 'housing', icon: HousingIcon },
-  { id: 'travel', icon: TravelIcon },
-  { id: 'coffee', icon: CoffeeIcon },
-  { id: 'shopping', icon: ShoppingIcon },
-  { id: 'transport', icon: TransportIcon },
-  { id: 'family', icon: FamilyIcon },
-  { id: 'pets', icon: PetsIcon },
-  { id: 'energy', icon: EnergyIcon },
-  { id: 'water', icon: WaterIcon },
-  { id: 'internet', icon: InternetIcon },
-  { id: 'mobile', icon: MobileIcon },
-  { id: 'tv', icon: TvIcon },
-  { id: 'music', icon: MusicIcon },
-  { id: 'software', icon: SoftwareIcon },
-  { id: 'health', icon: HealthIcon },
-  { id: 'education', icon: EducationIcon },
-  { id: 'insurance', icon: InsuranceIcon },
-  { id: 'loans', icon: LoansIcon },
-  { id: 'waste', icon: WasteIcon },
-  { id: 'other', icon: OtherIcon },
-];
+export const GROUP_ICON_CHOICES: { id: string; icon: Glyph }[] = [
+  'housing',
+  'travel',
+  'coffee',
+  'shopping',
+  'transport',
+  'family',
+  'pets',
+  'energy',
+  'water',
+  'internet',
+  'mobile',
+  'tv',
+  'music',
+  'software',
+  'health',
+  'education',
+  'insurance',
+  'loans',
+  'waste',
+  'other',
+].map((id) => ({ id, icon: GLYPHS[id] }));
 
 const BY_ID = new Map(GROUP_ICON_CHOICES.map((choice) => [choice.id, choice.icon]));
 
 /** The neutral glyph, and what a retired id falls back to. */
-export const FALLBACK_GROUP_ICON = OtherIcon;
+export const FALLBACK_GROUP_ICON = FALLBACK_GLYPH;
 
-export function groupIconFor(iconId: string | null | undefined): BillIcon {
+export function groupIconFor(iconId: string | null | undefined): Glyph {
   return (iconId ? BY_ID.get(iconId) : undefined) ?? FALLBACK_GROUP_ICON;
 }
 

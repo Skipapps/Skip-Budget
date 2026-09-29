@@ -28,7 +28,7 @@ import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { NETWORKS } from '@/data/cards-mock';
 import { success, warn } from '@/lib/haptics';
-import { saveErrorMessage } from '@/lib/save-error';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 import { toIsoDate } from '@/lib/date';
 import { useArtwork } from '@/theme/artwork';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
@@ -78,8 +78,7 @@ function AddCardScreenInner() {
         <Screen showBack>
           <PageState
             art={artwork.error}
-            title="Could not open this credit card"
-            message="Check your connection and try again. Your credit card and its reminder are unchanged."
+            title={FAILURE_MESSAGE}
             actionLabel="Try again"
             onAction={() => {
               void card.refetch();
@@ -95,8 +94,9 @@ function AddCardScreenInner() {
       return (
         <StepFlow
           title="Edit credit card"
+          closePrompt="Cancel editing this credit card?"
           steps={3}
-          current={1}
+          current={0}
           onBack={() => router.back()}
           primaryLabel="Continue"
           primaryDisabled
@@ -114,8 +114,7 @@ function AddCardScreenInner() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title="That credit card is not here"
-          message="It may have been removed. Nothing has been changed."
+          title={FAILURE_MESSAGE}
           actionLabel="Go back"
           onAction={() => router.back()}
         />
@@ -165,8 +164,10 @@ function CardForm({
   const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
-  // Editing opens on the details, not the keypad.
-  const [step, setStep] = useState(editing ? 1 : 0);
+  // Editing walks the flow from the start, amount first, exactly as adding
+  // does — every figure is in front of the person before Save, not just the
+  // ones on the page an edit happened to open on.
+  const [step, setStep] = useState(0);
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
 
   const createCard = useCreateCard();
@@ -189,7 +190,7 @@ function CardForm({
       await deleteCard.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError({ message: saveErrorMessage(thrown, 'Could not delete that credit card.'), step });
+      setError({ message: failureMessage(thrown), step });
     }
   };
 
@@ -265,7 +266,7 @@ function CardForm({
       }
     } catch (thrown) {
       warn();
-      setError({ message: saveErrorMessage(thrown, 'Could not save that credit card.'), step: 2 });
+      setError({ message: failureMessage(thrown), step: 2 });
     }
   };
 
@@ -290,6 +291,7 @@ function CardForm({
   return (
     <StepFlow
       title={editing ? 'Edit credit card' : 'Add a credit card'}
+      closePrompt={editing ? 'Cancel editing this credit card?' : 'Cancel adding this credit card?'}
       steps={3}
       current={step}
       onBack={() => {

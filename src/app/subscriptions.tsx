@@ -17,6 +17,7 @@ import { formatCurrency } from '@/lib/format';
 import { groupByDate } from '@/lib/group';
 import { rangeFor, type RangeKey } from '@/lib/range';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * What the subscriptions have actually cost, over a window you choose.
@@ -115,8 +116,7 @@ export default function SubscriptionsScreen() {
       {isError ? (
         <PageState
           art={artwork.error}
-          title="Could not load your subscriptions"
-          message="Check your connection and try again. Nothing has been lost."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={refetch}
         />

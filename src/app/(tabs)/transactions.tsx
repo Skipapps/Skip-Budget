@@ -39,6 +39,7 @@ import { useToday } from '@/lib/use-today';
 import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 const KIND_LABELS = Object.fromEntries(
   TRANSACTION_KINDS.map((kind) => [kind.value, kind.label]),
@@ -258,8 +259,7 @@ export default function TransactionsScreen() {
       {isError ? (
         <PageState
           art={artwork.error}
-          title="Could not load your transactions"
-          message="Check your connection and try again. Nothing has been lost."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={refetch}
         />

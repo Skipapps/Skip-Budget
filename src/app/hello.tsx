@@ -1,8 +1,9 @@
-import { Redirect, router } from 'expo-router';
+import { router } from 'expo-router';
 import { Pencil } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { resetTo } from '@/lib/nav';
 import { useUpdateProfile } from '@/api/mutations';
 import { useProfile } from '@/api/queries';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import { TextLink } from '@/components/ui/text-link';
 import { Title } from '@/components/ui/typography';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * One question, right after signup: what should we call you?
@@ -43,6 +45,15 @@ export default function HelloScreen() {
 
   const [name, setName] = useState('');
 
+  // A returning account has answered already. A reset rather than a
+  // redirect: a Redirect swaps only this screen and leaves onboarding
+  // stacked beneath the app, and the back swipe then walked out of Home
+  // into the pitch. An effect, because navigation cannot run mid-render.
+  const named = Boolean(profile.data && (profile.data.display_name ?? '').trim());
+  useEffect(() => {
+    if (named) resetTo('/setup');
+  }, [named]);
+
   // Nothing is asked until the profile is in. Rendering the form first and
   // navigating away a frame later showed returning accounts a question they
   // had already answered.
@@ -66,8 +77,7 @@ export default function HelloScreen() {
       <Screen>
         <PageState
           art={artwork.error}
-          title="Could not load your profile"
-          message="Check your connection and try again. Your account is safe."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={() => void profile.refetch()}
         />
@@ -75,18 +85,14 @@ export default function HelloScreen() {
     );
   }
 
-  // A returning account has answered already. Declared as a redirect rather
-  // than navigating during render, which React does not allow.
-  if (profile.data && (profile.data.display_name ?? '').trim()) {
-    return <Redirect href="/setup" />;
-  }
+  if (named) return null;
 
   const handleContinue = () => {
     const trimmed = name.trim();
     // The picture is already saved — the picker writes it on tap — so the
     // only thing Continue has left to carry is the name.
     if (trimmed) updateProfile.mutate({ display_name: trimmed });
-    router.replace('/setup');
+    resetTo('/setup');
   };
 
   return (
@@ -97,11 +103,7 @@ export default function HelloScreen() {
           <Button label="Continue" onPress={handleContinue} />
           {/* A link, not a pill: "Skip for now" sits under the primary action
               and a second pill there would read as a second thing to do. */}
-          <TextLink
-            label="Skip for now"
-            variant="subtle"
-            onPress={() => router.replace('/setup')}
-          />
+          <TextLink label="Skip for now" variant="subtle" onPress={() => resetTo('/setup')} />
         </View>
       }
     >

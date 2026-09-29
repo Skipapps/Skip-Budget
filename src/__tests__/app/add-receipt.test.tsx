@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react-native';
 
 import AddReceiptScreen from '@/app/add-receipt';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * What the receipt editor does when it cannot read the receipt.
@@ -95,7 +96,7 @@ describe('Add receipt — an edit whose receipt could not be read', () => {
     mockReceipt = { data: null, isError: true, isFetched: true };
     const { getByText, queryByText } = await render(<AddReceiptScreen />);
 
-    expect(getByText('Could not open this receipt')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(getByText('Try again')).toBeTruthy();
 
     expect(queryByText('Edit receipt')).toBeNull();
@@ -112,7 +113,7 @@ describe('Add receipt — an edit whose receipt could not be read', () => {
     const { getByText, queryByText } = await render(<AddReceiptScreen />);
 
     expect(getByText('Edit receipt')).toBeTruthy();
-    expect(queryByText('Could not open this receipt')).toBeNull();
+    expect(queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(mockUseUpdate).not.toHaveBeenCalled();
   });
 
@@ -137,7 +138,9 @@ describe('Add receipt — an edit whose receipt could not be read', () => {
     const { getByText, queryByText } = await render(<AddReceiptScreen />);
 
     expect(getByText('Edit receipt')).toBeTruthy();
-    expect(queryByText('Could not open this receipt')).toBeNull();
+    // An edit walks the flow from the amount, exactly as adding does.
+    expect(getByText('How much did you spend?')).toBeTruthy();
+    expect(queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(mockUseUpdate).toHaveBeenCalled();
   });
 
@@ -145,7 +148,7 @@ describe('Add receipt — an edit whose receipt could not be read', () => {
     mockReceipt = { data: null, isError: false, isFetched: true };
     const { getByText, queryByText } = await render(<AddReceiptScreen />);
 
-    expect(getByText('That receipt is not here')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(queryByText('Edit receipt')).toBeNull();
     expect(queryByText('Add a receipt')).toBeNull();
     expect(mockUseUpdate).not.toHaveBeenCalled();

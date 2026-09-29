@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react-native';
 
 import AddSubscriptionScreen from '@/app/add-subscription';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * What the subscription editor does when it cannot read the subscription.
@@ -30,6 +31,17 @@ jest.mock('@/theme/artwork', () => ({
 }));
 
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => async () => true }));
+// The past-charges question has its own tests; these are about the edit gate.
+jest.mock('@/api/past-charges', () => ({
+  usePastCharges: () => ({
+    choose: async () => 'upcoming',
+    apply: jest.fn(),
+    lastChargedOn: null,
+    ready: true,
+    retry: jest.fn(),
+    saving: false,
+  }),
+}));
 
 jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
@@ -84,7 +96,7 @@ describe('Add subscription — an edit whose row could not be read', () => {
     mockSubscription = { data: null, isError: true, isFetched: true };
     const { getByText, queryByText } = await render(<AddSubscriptionScreen />);
 
-    expect(getByText('Could not open this subscription')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(getByText('Try again')).toBeTruthy();
 
     expect(queryByText('Edit subscription')).toBeNull();
@@ -101,7 +113,7 @@ describe('Add subscription — an edit whose row could not be read', () => {
     const { getByText, queryByText } = await render(<AddSubscriptionScreen />);
 
     expect(getByText('Edit subscription')).toBeTruthy();
-    expect(queryByText('Could not open this subscription')).toBeNull();
+    expect(queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(mockUseUpdate).not.toHaveBeenCalled();
   });
 
@@ -127,7 +139,9 @@ describe('Add subscription — an edit whose row could not be read', () => {
     const { getByText, queryByText } = await render(<AddSubscriptionScreen />);
 
     expect(getByText('Edit subscription')).toBeTruthy();
-    expect(queryByText('Could not open this subscription')).toBeNull();
+    // An edit walks the flow from the amount, exactly as adding does.
+    expect(getByText('How much does it cost?')).toBeTruthy();
+    expect(queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(mockUseUpdate).toHaveBeenCalled();
   });
 
@@ -135,7 +149,7 @@ describe('Add subscription — an edit whose row could not be read', () => {
     mockSubscription = { data: null, isError: false, isFetched: true };
     const { getByText, queryByText } = await render(<AddSubscriptionScreen />);
 
-    expect(getByText('That subscription is not here')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(queryByText('Edit subscription')).toBeNull();
     expect(mockUseUpdate).not.toHaveBeenCalled();
     expect(mockUseCreate).not.toHaveBeenCalled();

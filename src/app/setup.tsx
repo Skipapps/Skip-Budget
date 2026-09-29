@@ -4,11 +4,19 @@ import { Pressable, Text, View } from 'react-native';
 import { Check, ChevronRight } from 'lucide-react-native';
 
 import { useGettingStarted, type SetupStep } from '@/api/onboarding';
+import { resetTo } from '@/lib/nav';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
 import { Title } from '@/components/ui/typography';
 import { useColors } from '@/providers/theme-provider';
+
+/** Where a step opens from the walk-in, when that is not its everyday screen. */
+const SETUP_ROUTES: Partial<Record<SetupStep['id'], string>> = {
+  wallet: '/add-card?from=setup',
+  bill: '/setup-bills',
+  subscription: '/setup-subscriptions',
+};
 
 /**
  * The walk-in: five steps between signing in and a working app.
@@ -39,10 +47,11 @@ export default function SetupScreen() {
   if (decided.current === null) return <></>;
   if (decided.current === 'home') return <Redirect href="/home" />;
 
-  // The wallet step carries its origin: arriving from here, the card form
-  // hands over to the Cards tab to offer the account, then returns.
-  const openStep = (step: SetupStep) =>
-    router.push((step.id === 'wallet' ? `${step.href}?from=setup` : step.href) as never);
+  // Three steps go somewhere of their own from here. The wallet carries its
+  // origin, so the card form hands over to the account offer, then returns;
+  // bills and subscriptions open a page that takes as many as somebody has,
+  // rather than the form, which would drop them back here after the first.
+  const openStep = (step: SetupStep) => router.push((SETUP_ROUTES[step.id] ?? step.href) as never);
 
   const next = steps.find((step) => !step.done);
   const receipt = steps[steps.length - 1];
@@ -51,7 +60,7 @@ export default function SetupScreen() {
   // Required steps first, then the receipt gets one clear moment: add it or
   // walk in. Never a dead end, never a forced purchase.
   const primary = allDone
-    ? { label: 'All set — open Skip', act: () => router.replace('/home') }
+    ? { label: 'All set — open Skip', act: () => resetTo('/home') }
     : requiredDone
       ? { label: 'Add a receipt', act: () => openStep(receipt) }
       : { label: 'Continue', act: () => openStep(next!) };
@@ -65,7 +74,7 @@ export default function SetupScreen() {
             <TextLink
               label={requiredDone ? 'Skip the receipt — open Skip' : 'Set up later'}
               variant="subtle"
-              onPress={() => router.replace('/home')}
+              onPress={() => resetTo('/home')}
             />
           ) : null}
         </View>

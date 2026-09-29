@@ -11,12 +11,13 @@ import { PageState } from '@/components/ui/page-state';
 import { RangeDropdown } from '@/components/ui/range-dropdown';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { Title } from '@/components/ui/typography';
+import { SectionHeading, Title } from '@/components/ui/typography';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { groupByDate } from '@/lib/group';
 import { rangeFor, type RangeKey } from '@/lib/range';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * What the bills have actually cost, over a window you choose.
@@ -80,9 +81,14 @@ export default function BillsScreen() {
         />
       </View>
 
+      {/* Named, because the tiles above are the plans and everything from here
+          down is what those plans actually took — two different things that
+          otherwise run together on one page. */}
+      <SectionHeading className="mt-7">Charges</SectionHeading>
+
       {/* One number, and the window it belongs to, side by side — the figure is
           meaningless without knowing which stretch of time it covers. */}
-      <View className="mt-4 w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
+      <View className="mt-3 w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
         <View className="w-full flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1">
             <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
@@ -115,8 +121,7 @@ export default function BillsScreen() {
       {isError ? (
         <PageState
           art={artwork.error}
-          title="Could not load your bills"
-          message="Check your connection and try again. Nothing has been lost."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={refetch}
         />

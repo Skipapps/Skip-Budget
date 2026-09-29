@@ -25,6 +25,7 @@ import { simplifyDebts } from '@/lib/split';
 import { useUserId } from '@/providers/session-provider';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 
 /**
  * Writing down that a debt was paid.
@@ -76,8 +77,7 @@ export default function SettleUpScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title="Could not open this group"
-          message="Check your connection and try again. Nothing has been recorded."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={() => {
             void group.refetch();
@@ -166,7 +166,7 @@ function SettleUpForm({
       });
       router.back();
     } catch (thrown) {
-      setError((thrown as Error).message);
+      setError(failureMessage(thrown));
     }
   };
 

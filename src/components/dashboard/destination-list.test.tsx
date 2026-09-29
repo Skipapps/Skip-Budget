@@ -2,6 +2,7 @@ import { fireEvent, render } from '@testing-library/react-native';
 
 import { DestinationList } from '@/components/dashboard/destination-list';
 import type { SpendingCategory } from '@/data/dashboard-mock';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 // jest.mock calls are hoisted above these imports by babel-plugin-jest-hoist,
 // so the ordering here is for readability, not execution. Each factory below
@@ -112,7 +113,7 @@ describe('DestinationList', () => {
 
     // One "—" per money row (three of the five categories carry a figure).
     expect(getAllByText('—')).toHaveLength(3);
-    expect(getByText('Amounts are unavailable right now.')).toBeTruthy();
+    expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
 
     const retry = getByText('Try again');
     await fireEvent.press(retry);

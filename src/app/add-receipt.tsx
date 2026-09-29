@@ -23,7 +23,7 @@ import { FieldLabel } from '@/components/ui/typography';
 import { toIsoDate } from '@/lib/date';
 import { success, warn } from '@/lib/haptics';
 import { withTap } from '@/lib/press';
-import { saveErrorMessage } from '@/lib/save-error';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 import { parseReceipt, parseReceiptFromLines, type ParsedReceipt } from '@/lib/receipt-parser';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
@@ -145,8 +145,7 @@ export default function AddReceiptScreen() {
         <Screen showBack>
           <PageState
             art={artwork.error}
-            title="Could not open this receipt"
-            message="Check your connection and try again. Nothing about it has changed."
+            title={FAILURE_MESSAGE}
             actionLabel="Try again"
             onAction={() => {
               void receipt.refetch();
@@ -164,8 +163,9 @@ export default function AddReceiptScreen() {
       return (
         <StepFlow
           title="Edit receipt"
+          closePrompt="Cancel editing this receipt?"
           steps={3}
-          current={1}
+          current={0}
           onBack={() => router.back()}
           primaryLabel="Continue"
           primaryDisabled
@@ -188,8 +188,7 @@ export default function AddReceiptScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title="That receipt is not here"
-          message="It may have been deleted. Nothing has been changed."
+          title={FAILURE_MESSAGE}
           actionLabel="Go back"
           onAction={() => router.back()}
         />
@@ -244,8 +243,10 @@ function ReceiptForm({
   const [note, setNote] = useState(initial.note);
   const [captureSource, setCaptureSource] = useState(initial.captureSource);
 
-  // Editing opens on the details: a saved receipt is corrected, not re-typed.
-  const [step, setStep] = useState(editing ? 1 : 0);
+  // Editing walks the flow from the start, amount first, exactly as adding
+  // does — every figure is in front of the person before Save, not just the
+  // ones on the page an edit happened to open on.
+  const [step, setStep] = useState(0);
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(initialScan);
@@ -378,7 +379,7 @@ function ReceiptForm({
         );
       }
     } catch (thrown) {
-      setError({ message: (thrown as Error).message ?? 'Could not open the camera.', step: 0 });
+      setError({ message: failureMessage(thrown), step: 0 });
     } finally {
       setReading(false);
     }
@@ -393,7 +394,7 @@ function ReceiptForm({
         'upload',
       );
     } catch (thrown) {
-      setError({ message: (thrown as Error).message ?? 'Could not read that file.', step: 0 });
+      setError({ message: failureMessage(thrown), step: 0 });
     } finally {
       setReading(false);
     }
@@ -486,7 +487,7 @@ function ReceiptForm({
       router.back();
     } catch (thrown) {
       warn();
-      setError({ message: saveErrorMessage(thrown, 'Could not save that receipt.'), step: 2 });
+      setError({ message: failureMessage(thrown), step: 2 });
     }
   };
 
@@ -504,7 +505,7 @@ function ReceiptForm({
       await deleteReceipt.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError({ message: saveErrorMessage(thrown, 'Could not delete that receipt.'), step });
+      setError({ message: failureMessage(thrown), step });
     }
   };
 
@@ -522,6 +523,7 @@ function ReceiptForm({
   return (
     <StepFlow
       title={editing ? 'Edit receipt' : 'Add a receipt'}
+      closePrompt={editing ? 'Cancel editing this receipt?' : 'Cancel adding this receipt?'}
       steps={3}
       current={step}
       onBack={() => {
@@ -576,7 +578,7 @@ function ReceiptForm({
                   </Text>
                 ) : (
                   <Text className="font-poppins text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
-                    Could not read that one.
+                    {FAILURE_MESSAGE}
                   </Text>
                 )}
                 {scanResult.missed.length > 0 ? (

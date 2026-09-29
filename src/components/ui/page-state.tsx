@@ -10,8 +10,11 @@ import { cn } from '@/lib/cn';
 type PageStateProps = {
   art: FC<SvgProps>;
   title: string;
-  /** One or two sentences. Says what to do next, not what went wrong twice. */
-  message: string;
+  /**
+   * One or two sentences. Says what to do next, not what went wrong twice.
+   * Left off on failure screens, whose title is the whole message.
+   */
+  message?: string;
   actionLabel?: string;
   onAction?: () => void;
   /** Quieter second option — "Try again" under a primary action. */
@@ -53,12 +56,14 @@ export function PageState({
         {title}
       </Text>
 
-      <Text
-        className="mt-2.5 max-w-[320px] text-center font-poppins text-[14px] leading-5 text-muted"
-        maxFontSizeMultiplier={1.4}
-      >
-        {message}
-      </Text>
+      {message ? (
+        <Text
+          className="mt-2.5 max-w-[320px] text-center font-poppins text-[14px] leading-5 text-muted"
+          maxFontSizeMultiplier={1.4}
+        >
+          {message}
+        </Text>
+      ) : null}
 
       {actionLabel && onAction ? (
         <View className="mt-7 w-full max-w-[280px]">

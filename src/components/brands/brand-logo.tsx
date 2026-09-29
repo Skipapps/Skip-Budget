@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { cn } from '@/lib/cn';
@@ -17,6 +17,12 @@ type BrandLogoProps = {
   logoPath?: string | null;
   size?: number;
   className?: string;
+  /**
+   * Drawn instead of the monogram when there is no logo to show. A bill passes
+   * its own glyph: a Housing bill whose logo will not load is still a house,
+   * not a pair of letters.
+   */
+  fallback?: ReactNode;
 };
 
 /**
@@ -60,7 +66,14 @@ function logoUrl(domain?: string | null, logoPath?: string | null): string | nul
  * The fallback is not an error state — custom stores people type themselves
  * will never have a logo, and they should look deliberate rather than broken.
  */
-export function BrandLogo({ name, domain, logoPath, size = 40, className }: BrandLogoProps) {
+export function BrandLogo({
+  name,
+  domain,
+  logoPath,
+  size = 40,
+  className,
+  fallback,
+}: BrandLogoProps) {
   const url = logoUrl(domain, logoPath);
   // Remembering which URL failed rather than a bare boolean means a recycled
   // row showing a different brand recovers on its own — no effect, no reset.
@@ -68,6 +81,8 @@ export function BrandLogo({ name, domain, logoPath, size = 40, className }: Bran
 
   const showFallback = !url || failedUrl === url;
   const background = monogramColor(name || '?');
+
+  if (showFallback && fallback) return fallback;
 
   return (
     <View

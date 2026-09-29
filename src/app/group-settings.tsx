@@ -28,6 +28,7 @@ import { useConfirm } from '@/providers/dialog-provider';
 import { useUserId } from '@/providers/session-provider';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 
 /**
  * The parts of a group that are not money.
@@ -80,8 +81,7 @@ export default function GroupSettingsScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title="Could not open these settings"
-          message="Check your connection and try again. Nothing about the group has changed."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={() => {
             void group.refetch();
@@ -103,8 +103,7 @@ export default function GroupSettingsScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title="That group is not here"
-          message="It may have been closed, or you may no longer be a member."
+          title={FAILURE_MESSAGE}
           actionLabel="Back to splits"
           onAction={() => router.replace('/splits')}
         />
@@ -162,7 +161,7 @@ function GroupSettingsForm({
     try {
       await updateGroup.mutateAsync({ id, name: name.trim() });
     } catch (thrown) {
-      setError((thrown as Error).message);
+      setError(failureMessage(thrown));
     }
   };
 
@@ -179,7 +178,7 @@ function GroupSettingsForm({
     try {
       await removeMember.mutateAsync(memberId);
     } catch (thrown) {
-      setError((thrown as Error).message);
+      setError(failureMessage(thrown));
     }
   };
 
@@ -198,7 +197,7 @@ function GroupSettingsForm({
       await removeMember.mutateAsync(me.id);
       router.replace('/splits');
     } catch (thrown) {
-      setError((thrown as Error).message);
+      setError(failureMessage(thrown));
     }
   };
 
@@ -217,7 +216,7 @@ function GroupSettingsForm({
       await archiveGroup.mutateAsync(id);
       router.replace('/splits');
     } catch (thrown) {
-      setError((thrown as Error).message);
+      setError(failureMessage(thrown));
     }
   };
 

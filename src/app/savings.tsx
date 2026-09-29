@@ -12,6 +12,7 @@ import { ChevronRight } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { useColors } from '@/providers/theme-provider';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /** "August 2026" — the month is the identity of a row, so it is spelled out. */
 function monthName(month: string): string {
@@ -65,8 +66,7 @@ export default function SavingsScreen() {
       {isError ? (
         <PageState
           art={artwork.error}
-          title="Could not load your savings"
-          message="Check your connection and try again. Nothing has been lost."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={() => refetch()}
         />

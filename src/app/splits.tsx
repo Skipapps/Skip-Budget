@@ -13,6 +13,7 @@ import { SectionHeading, Title } from '@/components/ui/typography';
 import { formatCurrency } from '@/lib/format';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * Everything shared, in one place.
@@ -86,8 +87,7 @@ export default function SplitsScreen() {
       {isError ? (
         <PageState
           art={artwork.error}
-          title="Could not load your groups"
-          message="Check your connection and try again. Nothing has been lost."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={() => refetch()}
         />

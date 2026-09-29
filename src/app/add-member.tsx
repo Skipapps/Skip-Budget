@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
-import { saveErrorMessage } from '@/lib/save-error';
+import { failureMessage } from '@/lib/failure';
 import { useColors } from '@/providers/theme-provider';
 
 /**
@@ -58,7 +58,7 @@ export default function AddMemberScreen() {
     try {
       await addMember.mutateAsync({ groupId, userId });
     } catch (thrown) {
-      setError(saveErrorMessage(thrown, 'Could not add them to the group.'));
+      setError(failureMessage(thrown));
     }
   };
 
@@ -73,7 +73,7 @@ export default function AddMemberScreen() {
       await addMember.mutateAsync({ groupId, displayName: name.trim() });
       setName('');
     } catch (thrown) {
-      setError(saveErrorMessage(thrown, 'Could not add them to the group.'));
+      setError(failureMessage(thrown));
     }
   };
 

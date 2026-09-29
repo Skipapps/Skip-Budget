@@ -24,6 +24,7 @@ import { groupByDate } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /** Normalised to a month so a yearly plan does not look cheap beside a monthly one. */
 const PER_MONTH: Record<string, number> = {
@@ -153,8 +154,7 @@ export default function SubscriptionPlansScreen() {
       {isError ? (
         <PageState
           art={artwork.error}
-          title="Could not load your subscriptions"
-          message="Check your connection and try again. Nothing has been lost."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={() => refetch()}
         />

@@ -10,6 +10,7 @@ import {
   type ReminderChoice,
 } from '@/api/reminders';
 import { useCreateBill, useDeleteBill, useUpdateBill, type BillValues } from '@/api/mutations';
+import { usePastCharges } from '@/api/past-charges';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { ScheduleCard } from '@/components/calculators/schedule-card';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
@@ -17,7 +18,7 @@ import { CategoryPicker } from '@/components/bills/category-picker';
 import { IconPicker } from '@/components/bills/icon-picker';
 import { AmountStep } from '@/components/flow/amount-step';
 import { InlineCalendar } from '@/components/flow/inline-calendar';
-import { StepFlow } from '@/components/flow/step-flow';
+import { FlowHeader, StepFlow } from '@/components/flow/step-flow';
 import { ActionPill } from '@/components/ui/action-pill';
 import { ReminderField } from '@/components/ui/reminder-field';
 import { CalculatorPad } from '@/components/ui/calculator-pad';
@@ -37,9 +38,10 @@ import {
   type BillCategory,
   type Recurrence,
 } from '@/data/bills-mock';
+import { floorAfterCharges } from '@/lib/charges';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { success, warn } from '@/lib/haptics';
-import { saveErrorMessage } from '@/lib/save-error';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 import { amortise, termsFromStored } from '@/lib/loan';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
@@ -110,8 +112,7 @@ export default function AddBillScreen() {
         <Screen showBack>
           <PageState
             art={artwork.error}
-            title="Could not open this bill"
-            message="Check your connection and try again. Nothing about the bill has changed."
+            title={FAILURE_MESSAGE}
             actionLabel="Try again"
             onAction={() => {
               void bill.refetch();
@@ -129,8 +130,9 @@ export default function AddBillScreen() {
       return (
         <StepFlow
           title="Edit bill"
+          closePrompt="Cancel editing this bill?"
           steps={3}
-          current={1}
+          current={0}
           onBack={() => router.back()}
           primaryLabel="Continue"
           primaryDisabled
@@ -152,8 +154,7 @@ export default function AddBillScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title="That bill is not here"
-          message="It may have been deleted. Nothing has been changed."
+          title={FAILURE_MESSAGE}
           actionLabel="Go back"
           onAction={() => router.back()}
         />
@@ -173,9 +174,9 @@ function BillForm({
 }) {
   const colors = useColors();
   const editing = Boolean(id);
-  // Editing starts on the details step: the category is already chosen, and
-  // making someone re-pick it to fix an amount would be busywork.
-  const [step, setStep] = useState<Step>(editing ? 'details' : 'category');
+  // Editing walks the whole flow from the amount, like adding does; only the
+  // category chooser is skipped, because the bill already has one.
+  const [step, setStep] = useState<Step>(editing ? 'amount' : 'category');
   const dot = Math.max(DOTS.indexOf(step), 0);
 
   const [categoryId, setCategoryId] = useState<string>(existing?.category_id ?? '');
@@ -197,7 +198,14 @@ function BillForm({
   const [iconId, setIconId] = useState(existing?.icon_id ?? 'other');
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
   const [startDate, setStartDate] = useState<Date | null>(
-    asDate(existing?.starts_on ?? existing?.next_due_on),
+    // A repeating bill shows when it is next due; its start is bookkeeping (see
+    // floorAfterCharges) and can sit after the last charge. A bill that runs
+    // for a set period shows the period's first day.
+    asDate(
+      existing?.recurrence === 'period'
+        ? (existing.starts_on ?? existing.next_due_on)
+        : (existing?.next_due_on ?? existing?.starts_on),
+    ),
   );
   const [endDate, setEndDate] = useState<Date | null>(asDate(existing?.ends_on));
   const [recurrence, setRecurrence] = useState<RecurrenceChoice>(
@@ -260,6 +268,7 @@ function BillForm({
   const schedule = terms ? amortise(terms).rows : [];
   const createBill = useCreateBill();
   const updateBill = useUpdateBill();
+  const pastCharges = usePastCharges('bill', id);
   const deleteBill = useDeleteBill();
   const confirm = useConfirm();
 
@@ -277,7 +286,7 @@ function BillForm({
       await deleteBill.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError({ message: saveErrorMessage(thrown, 'Could not delete that bill.'), step });
+      setError({ message: failureMessage(thrown), step });
     }
   };
 
@@ -333,22 +342,61 @@ function BillForm({
         amount: value,
         brand_id: issuer?.brandId ?? null,
         category_id: categoryId,
-        icon_id: iconId || null,
+        // Only a self-named bill has an icon of its own; the rest wear their
+        // category's. Saving the picker's untouched 'other' onto a Housing
+        // bill is what put the Other glyph on every bill without a logo.
+        icon_id: isCustom ? iconId || null : null,
         recurrence: isPeriod
           ? 'period'
           : (recurrence as 'weekly' | 'monthly' | 'quarterly' | 'yearly'),
         next_due_on: startDate ? toIsoDate(startDate) : null,
-        starts_on: startDate ? toIsoDate(startDate) : null,
+        // Never on or before a charge already recorded, or the edit records
+        // that cycle a second time. A set period keeps its own first day.
+        starts_on: isPeriod
+          ? toIsoDate(startDate)
+          : floorAfterCharges(
+              toIsoDate(startDate),
+              pastCharges.lastChargedOn,
+              recurrence as Recurrence,
+            ),
         ends_on: endDate ? toIsoDate(endDate) : null,
         card_id: chosen?.kind === 'card' ? chosen.id : null,
         bank_account_id: chosen?.kind === 'account' ? chosen.id : null,
         note: note.trim() || null,
       };
 
+      // What a recorded charge copies from the bill, before and after.
+      const carried = {
+        label: values.name || 'Bill',
+        amount: value,
+        card_id: values.card_id,
+        bank_account_id: values.bank_account_id,
+      };
+      const changed =
+        editing &&
+        Boolean(existing) &&
+        (carried.label !== (existing?.name || 'Bill') ||
+          carried.amount !== Number(existing?.amount) ||
+          carried.card_id !== (existing?.card_id ?? null) ||
+          carried.bank_account_id !== (existing?.bank_account_id ?? null));
+
+      // Asked before anything is written, so backing out leaves the bill as it was.
+      if (!pastCharges.ready) {
+        pastCharges.retry();
+        warn();
+        setError({ message: FAILURE_MESSAGE, step: 'when' });
+        return;
+      }
+
+      const scope = await pastCharges.choose(carried.label, changed);
+      if (scope === null) return;
+
       const billId =
         editing && id
           ? (await updateBill.mutateAsync({ id, values }), id)
           : (await createBill.mutateAsync(values)).id;
+
+      if (scope === 'all') await pastCharges.apply(carried);
 
       // After the bill exists, because a reminder points at a row.
       await applyReminder('bill', billId, choiceToLead(reminder), remindAt);
@@ -357,13 +405,21 @@ function BillForm({
       router.back();
     } catch (thrown) {
       warn();
-      setError({ message: saveErrorMessage(thrown, 'Could not save that bill.'), step: 'when' });
+      setError({ message: failureMessage(thrown), step: 'when' });
     }
   };
 
   if (step === 'category') {
     return (
-      <Screen showBack>
+      <Screen
+        header={
+          <FlowHeader
+            title="Add a bill"
+            onBack={() => router.back()}
+            closePrompt="Cancel adding this bill?"
+          />
+        }
+      >
         <Title className="mt-2">What is this bill for?</Title>
         <Subtitle className="mt-3">
           Pick what this bill is for. You can rename it on the next step.
@@ -376,7 +432,7 @@ function BillForm({
     );
   }
 
-  const busy = createBill.isPending || updateBill.isPending;
+  const busy = createBill.isPending || updateBill.isPending || pastCharges.saving;
   const value = Number(amount);
   const amountReady = Number.isFinite(value) && value > 0;
   const stepValid =
@@ -399,6 +455,7 @@ function BillForm({
   return (
     <StepFlow
       title={editing ? 'Edit bill' : 'Add a bill'}
+      closePrompt={editing ? 'Cancel editing this bill?' : 'Cancel adding this bill?'}
       steps={3}
       current={dot}
       onBack={() => {

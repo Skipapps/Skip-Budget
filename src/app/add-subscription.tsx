@@ -15,6 +15,7 @@ import {
   useDeleteSubscription,
   useUpdateSubscription,
 } from '@/api/mutations';
+import { usePastCharges } from '@/api/past-charges';
 import { usePaymentSources, useSubscription } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { AmountStep } from '@/components/flow/amount-step';
@@ -29,9 +30,11 @@ import { ReminderField } from '@/components/ui/reminder-field';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
+import { planFloor } from '@/lib/card-ledger';
+import { countFromAfterPick, floorAfterCharges } from '@/lib/charges';
 import { toIsoDate } from '@/lib/date';
 import { success, warn } from '@/lib/haptics';
-import { saveErrorMessage } from '@/lib/save-error';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 
@@ -52,6 +55,8 @@ type Initial = {
   sourceId: string;
   note: string;
   active: boolean;
+  /** yyyy-mm-dd the app counts renewals from today; null for a new one. */
+  countsFrom: string | null;
 };
 
 const BLANK: Initial = {
@@ -62,6 +67,7 @@ const BLANK: Initial = {
   sourceId: '',
   note: '',
   active: true,
+  countsFrom: null,
 };
 
 /**
@@ -84,8 +90,7 @@ export default function AddSubscriptionScreen() {
         <Screen showBack>
           <PageState
             art={artwork.error}
-            title="Could not open this subscription"
-            message="Check your connection and try again. Nothing about it has changed."
+            title={FAILURE_MESSAGE}
             actionLabel="Try again"
             onAction={() => {
               void subscription.refetch();
@@ -101,8 +106,9 @@ export default function AddSubscriptionScreen() {
       return (
         <StepFlow
           title="Edit subscription"
+          closePrompt="Cancel editing this subscription?"
           steps={3}
-          current={1}
+          current={0}
           onBack={() => router.back()}
           primaryLabel="Continue"
           primaryDisabled
@@ -121,8 +127,7 @@ export default function AddSubscriptionScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title="That subscription is not here"
-          message="It may have been deleted. Nothing has been changed."
+          title={FAILURE_MESSAGE}
           actionLabel="Go back"
           onAction={() => router.back()}
         />
@@ -146,6 +151,8 @@ export default function AddSubscriptionScreen() {
         sourceId: existing.card_id ?? existing.bank_account_id ?? '',
         note: existing.note ?? '',
         active: existing.active,
+        // The floor the ledger and the recorder already use for this row.
+        countsFrom: planFloor(existing.started_on, existing.created_at),
       }
     : BLANK;
 
@@ -164,8 +171,10 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
   const [note, setNote] = useState(initial.note);
   const [active, setActive] = useState(initial.active);
 
-  // Editing opens on the details, not the keypad.
-  const [step, setStep] = useState(editing ? 1 : 0);
+  // Editing walks the flow from the start, amount first, exactly as adding
+  // does — every figure is in front of the person before Save, not just the
+  // ones on the page an edit happened to open on.
+  const [step, setStep] = useState(0);
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
 
   const { sources } = usePaymentSources();
@@ -173,6 +182,7 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
 
   const createSubscription = useCreateSubscription();
   const updateSubscription = useUpdateSubscription();
+  const pastCharges = usePastCharges('subscription', id);
   const deleteSubscription = useDeleteSubscription();
   const confirm = useConfirm();
 
@@ -208,6 +218,7 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
     }
 
     const chosen = sources.find((source) => source.id === sourceId);
+    const renewal = renewsOn ? toIsoDate(renewsOn) : null;
     const values = {
       brand_id: service.brandId,
       name: service.name,
@@ -215,7 +226,18 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
       cycle,
       // Optional: plenty of people know the cost but not the renewal date,
       // and refusing to save over that would be the wrong trade.
-      next_renewal_on: renewsOn ? toIsoDate(renewsOn) : null,
+      next_renewal_on: renewal,
+      // Counted from the renewal picked: a subscription added on the 28th that
+      // renewed on the 10th went out this month, and nothing was counting it —
+      // the start fell back to the day the row was made. An edit only ever
+      // moves the start earlier; moving it later would hide renewals that are
+      // already on the books.
+      // Never on or before a renewal already recorded — see floorAfterCharges.
+      started_on: floorAfterCharges(
+        countFromAfterPick(renewal, initial.countsFrom),
+        pastCharges.lastChargedOn,
+        cycle,
+      ),
       category_id: service.categoryId || 'other',
       card_id: chosen?.kind === 'card' ? chosen.id : null,
       bank_account_id: chosen?.kind === 'account' ? chosen.id : null,
@@ -224,10 +246,36 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
     };
 
     try {
+      // What a recorded renewal copies from the subscription, before and after.
+      const carried = {
+        label: values.name || 'Subscription',
+        amount: value,
+        card_id: values.card_id,
+        bank_account_id: values.bank_account_id,
+      };
+      const changed =
+        editing &&
+        (carried.label !== (initial.service?.name || 'Subscription') ||
+          carried.amount !== Number(initial.amount) ||
+          (carried.card_id ?? carried.bank_account_id ?? '') !== initial.sourceId);
+
+      // Asked before anything is written, so backing out leaves it as it was.
+      if (!pastCharges.ready) {
+        pastCharges.retry();
+        warn();
+        setError({ message: FAILURE_MESSAGE, step: 2 });
+        return;
+      }
+
+      const scope = await pastCharges.choose(carried.label, changed);
+      if (scope === null) return;
+
       const subscriptionId =
         editing && id
           ? (await updateSubscription.mutateAsync({ id, values }), id)
           : (await createSubscription.mutateAsync(values)).id;
+
+      if (scope === 'all') await pastCharges.apply(carried);
 
       // After the row exists, because a reminder points at one.
       await applyReminder('subscription', subscriptionId, choiceToLead(reminder), remindAt);
@@ -236,7 +284,7 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
     } catch (thrown) {
       warn();
       setError({
-        message: saveErrorMessage(thrown, 'Could not save that subscription.'),
+        message: failureMessage(thrown),
         step: 2,
       });
     }
@@ -257,13 +305,13 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
       router.back();
     } catch (thrown) {
       setError({
-        message: saveErrorMessage(thrown, 'Could not delete that subscription.'),
+        message: failureMessage(thrown),
         step,
       });
     }
   };
 
-  const busy = createSubscription.isPending || updateSubscription.isPending;
+  const busy = createSubscription.isPending || updateSubscription.isPending || pastCharges.saving;
 
   const value = Number(amount);
   const amountReady = Number.isFinite(value) && value > 0;
@@ -278,6 +326,9 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
   return (
     <StepFlow
       title={editing ? 'Edit subscription' : 'Add a subscription'}
+      closePrompt={
+        editing ? 'Cancel editing this subscription?' : 'Cancel adding this subscription?'
+      }
       steps={3}
       current={step}
       onBack={() => {

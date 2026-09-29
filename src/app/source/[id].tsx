@@ -26,6 +26,7 @@ import { sortByDateAscending } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 
 const KIND_LABELS: Record<string, string> = {
   receipt: 'Receipt',
@@ -71,8 +72,7 @@ export default function SourceDetailScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title="Could not open this one"
-          message="It may have been deleted. Go back and pick another."
+          title={FAILURE_MESSAGE}
           actionLabel="Go back"
           onAction={() => router.back()}
         />
@@ -136,7 +136,7 @@ export default function SourceDetailScreen() {
         note: null,
       });
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not record that payment.');
+      setError(failureMessage(thrown));
     }
   };
 

@@ -16,6 +16,7 @@ import { TextLink } from '@/components/ui/text-link';
 import type { SpendingCategory } from '@/data/dashboard-mock';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * The glyph for each dashboard destination.
@@ -131,26 +132,38 @@ export function DestinationList({
                 ) : null}
 
                 {isMoneyRow ? (
-                  loading ? (
-                    <Skeleton className="h-3.5 w-20" />
-                  ) : error ? (
-                    <Text
-                      className="shrink-0 font-poppins-semibold text-[15px] text-muted"
-                      numberOfLines={1}
-                      maxFontSizeMultiplier={1.4}
-                    >
-                      —
-                    </Text>
-                  ) : (
-                    <Text
-                      className="shrink-0 font-poppins-semibold text-[15px] text-ink"
-                      style={{ color: moneyColor(amount) }}
-                      numberOfLines={1}
-                      maxFontSizeMultiplier={1.4}
-                    >
-                      {formatCurrency(amount)}
-                    </Text>
-                  )
+                  // A rule before the figure and a chevron after it: the rule
+                  // sets the amounts apart as a column — a shared minimum width
+                  // keeps the rules in line down the card — and the chevron
+                  // says the row opens, as "Open" does on the tool rows.
+                  <View className="shrink-0 flex-row items-center">
+                    <View className="mr-3 h-6 w-px bg-line" />
+                    <View className="min-w-[96px] items-end">
+                      {loading ? (
+                        <Skeleton className="h-3.5 w-20" />
+                      ) : error ? (
+                        <Text
+                          className="font-poppins-semibold text-[15px] text-muted"
+                          numberOfLines={1}
+                          maxFontSizeMultiplier={1.4}
+                        >
+                          —
+                        </Text>
+                      ) : (
+                        <Text
+                          className="font-poppins-semibold text-[15px] text-ink"
+                          style={{ color: moneyColor(amount) }}
+                          numberOfLines={1}
+                          maxFontSizeMultiplier={1.4}
+                        >
+                          {formatCurrency(amount)}
+                        </Text>
+                      )}
+                    </View>
+                    <View className="ml-1.5">
+                      <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
+                    </View>
+                  </View>
                 ) : (
                   <View className="shrink-0 flex-row items-center gap-1">
                     <Text
@@ -174,7 +187,7 @@ export function DestinationList({
       {error ? (
         <View className="mt-3 w-full flex-row items-center justify-between gap-3">
           <Text className="shrink font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-            Amounts are unavailable right now.
+            {FAILURE_MESSAGE}
           </Text>
           {onRetry ? (
             <TextLink label="Try again" variant="subtle" onPress={onRetry} className="py-0" />

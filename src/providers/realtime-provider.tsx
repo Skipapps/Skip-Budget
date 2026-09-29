@@ -23,10 +23,9 @@ import { useUserId } from '@/providers/session-provider';
 /**
  * Which tables feed which caches.
  *
- * A charge changes the dashboard, the ledger and the notifications list, and
- * they are all read through the 'charges' key — but bills and subscriptions
- * feed the projected side of the same screens, so they invalidate the
- * dashboard too.
+ * A charge changes the dashboard and the ledger, and both are read through
+ * the 'charges' key — but bills and subscriptions feed the projected side of
+ * the same screens, so they invalidate the dashboard too.
  */
 const AFFECTS: Record<string, string[]> = {
   charges: ['charges', 'dashboard'],

@@ -16,7 +16,7 @@ type BackButtonProps = {
  * button (and a red box in development). Home is where every such link's
  * screen hangs off, so that is where its chevron leads.
  */
-function goBack(): void {
+export function goBack(): void {
   if (router.canGoBack()) router.back();
   else router.replace('/home');
 }

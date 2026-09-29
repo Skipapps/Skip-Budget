@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { BrandLogo } from '@/components/brands/brand-logo';
 import { RECURRENCES, getBillIcon, type Bill } from '@/data/bills-mock';
+import { GLYPH_STROKE } from '@/data/glyphs';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
@@ -23,7 +24,11 @@ export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
   const moneyColor = useMoneyColor();
   // createElement, not JSX: getBillIcon looks a component up rather than
   // defining one, but assigning it to a capitalised local trips the lint rule.
-  const icon = createElement(getBillIcon(bill), { width: 20, height: 20, color: colors.body });
+  const icon = createElement(getBillIcon(bill), {
+    size: 20,
+    strokeWidth: GLYPH_STROKE,
+    color: colors.body,
+  });
   const recurrence = RECURRENCE_LABELS[bill.recurrence] ?? bill.recurrence;
   const domain = bill.domain;
 

@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { GROUP_ICON_CHOICES } from '@/data/group-icons';
+import { GLYPH_STROKE } from '@/data/glyphs';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
 
@@ -26,8 +27,8 @@ export function GroupIconPicker({ value, onChange }: GroupIconPickerProps) {
         const selected = choice.id === value;
         // createElement rather than JSX, for the same reason as GroupIcon.
         const glyph = createElement(choice.icon, {
-          width: 21,
-          height: 21,
+          size: 21,
+          strokeWidth: GLYPH_STROKE,
           color: selected ? colors.onControl : colors.body,
         });
 

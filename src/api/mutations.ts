@@ -331,6 +331,12 @@ export type SubscriptionValues = {
   amount: number;
   cycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
   next_renewal_on: string | null;
+  /**
+   * The first renewal the app counts. Everything is walked back from
+   * `next_renewal_on` no further than this — without it the floor is the day
+   * the row was made, and a renewal earlier that month is never counted.
+   */
+  started_on: string | null;
   category_id: string;
   card_id: string | null;
   bank_account_id: string | null;

@@ -4,31 +4,9 @@
  * The ten categories cover the recurring bills most households have; anything
  * unusual goes under "Other", where people name it themselves and pick an icon.
  */
-import type { FC } from 'react';
-import type { SvgProps } from 'react-native-svg';
+import { FALLBACK_GLYPH, GLYPHS, glyphFor, type Glyph } from '@/data/glyphs';
 
-import CoffeeIcon from '@/assets/bill-icons/coffee.svg';
-import EducationIcon from '@/assets/bill-icons/education.svg';
-import EnergyIcon from '@/assets/bill-icons/energy.svg';
-import FamilyIcon from '@/assets/bill-icons/family.svg';
-import HealthIcon from '@/assets/bill-icons/health.svg';
-import HousingIcon from '@/assets/bill-icons/housing.svg';
-import InsuranceIcon from '@/assets/bill-icons/insurance.svg';
-import InternetIcon from '@/assets/bill-icons/internet.svg';
-import LoansIcon from '@/assets/bill-icons/loans.svg';
-import MobileIcon from '@/assets/bill-icons/mobile.svg';
-import MusicIcon from '@/assets/bill-icons/music.svg';
-import OtherIcon from '@/assets/bill-icons/other.svg';
-import PetsIcon from '@/assets/bill-icons/pets.svg';
-import ShoppingIcon from '@/assets/bill-icons/shopping.svg';
-import SoftwareIcon from '@/assets/bill-icons/software.svg';
-import TransportIcon from '@/assets/bill-icons/transport.svg';
-import TravelIcon from '@/assets/bill-icons/travel.svg';
-import TvIcon from '@/assets/bill-icons/tv.svg';
-import WasteIcon from '@/assets/bill-icons/waste.svg';
-import WaterIcon from '@/assets/bill-icons/water.svg';
-
-export type BillIcon = FC<SvgProps>;
+export type BillIcon = Glyph;
 
 export type BillCategory = {
   id: string;
@@ -39,47 +17,57 @@ export type BillCategory = {
 };
 
 export const BILL_CATEGORIES: BillCategory[] = [
-  { id: 'housing', label: 'Housing', hint: 'Rent, mortgage, HOA fees', icon: HousingIcon },
+  { id: 'housing', label: 'Housing', hint: 'Rent, mortgage, HOA fees', icon: GLYPHS.housing },
   {
     id: 'energy',
     label: 'Electricity & Gas',
     hint: 'Power, heating, cooking gas',
-    icon: EnergyIcon,
+    icon: GLYPHS.energy,
   },
-  { id: 'water', label: 'Water & Waste', hint: 'Water, sewer, garbage', icon: WaterIcon },
-  { id: 'internet', label: 'Internet', hint: 'Home broadband and Wi-Fi', icon: InternetIcon },
-  { id: 'mobile', label: 'Mobile Phone', hint: 'Phone plans, device payments', icon: MobileIcon },
-  { id: 'insurance', label: 'Insurance', hint: 'Car, health, home, life', icon: InsuranceIcon },
-  { id: 'loans', label: 'Loans & Credit', hint: 'Cards, student, auto, personal', icon: LoansIcon },
+  { id: 'water', label: 'Water & Waste', hint: 'Water, sewer, garbage', icon: GLYPHS.water },
+  { id: 'internet', label: 'Internet', hint: 'Home broadband and Wi-Fi', icon: GLYPHS.internet },
+  {
+    id: 'mobile',
+    label: 'Mobile Phone',
+    hint: 'Phone plans, device payments',
+    icon: GLYPHS.mobile,
+  },
+  { id: 'insurance', label: 'Insurance', hint: 'Car, health, home, life', icon: GLYPHS.insurance },
+  {
+    id: 'loans',
+    label: 'Loans & Credit',
+    hint: 'Cards, student, auto, personal',
+    icon: GLYPHS.loans,
+  },
   {
     id: 'transport',
     label: 'Transportation',
     hint: 'Car, transit, parking, tolls',
-    icon: TransportIcon,
+    icon: GLYPHS.transport,
   },
   {
     id: 'family',
     label: 'Family & Healthcare',
     hint: 'Childcare, tuition, medical',
-    icon: FamilyIcon,
+    icon: GLYPHS.family,
   },
-  { id: 'other', label: 'Other bill', hint: 'Name it and pick an icon', icon: OtherIcon },
+  { id: 'other', label: 'Other bill', hint: 'Name it and pick an icon', icon: GLYPHS.other },
 ];
 
 /** Extra icons offered when someone builds their own bill. */
 export const BILL_ICON_CHOICES: { id: string; icon: BillIcon }[] = [
-  { id: 'other', icon: OtherIcon },
-  { id: 'education', icon: EducationIcon },
-  { id: 'pets', icon: PetsIcon },
-  { id: 'tv', icon: TvIcon },
-  { id: 'shopping', icon: ShoppingIcon },
-  { id: 'travel', icon: TravelIcon },
-  { id: 'coffee', icon: CoffeeIcon },
-  { id: 'music', icon: MusicIcon },
-  { id: 'waste', icon: WasteIcon },
-  { id: 'software', icon: SoftwareIcon },
-  { id: 'health', icon: HealthIcon },
-];
+  'other',
+  'education',
+  'pets',
+  'tv',
+  'shopping',
+  'travel',
+  'coffee',
+  'music',
+  'waste',
+  'software',
+  'health',
+].map((id) => ({ id, icon: GLYPHS[id] }));
 
 export const RECURRENCES = [
   { value: 'weekly', label: 'Weekly' },
@@ -111,17 +99,25 @@ export type Bill = {
 };
 
 const CATEGORY_BY_ID = new Map(BILL_CATEGORIES.map((category) => [category.id, category]));
-const ICON_BY_ID = new Map(BILL_ICON_CHOICES.map((choice) => [choice.id, choice.icon]));
 
 export function getBillCategory(id: string): BillCategory | undefined {
   return CATEGORY_BY_ID.get(id);
 }
 
-/** A custom icon wins over the category's default. */
+/**
+ * The glyph for a bill with no logo: the one somebody picked, else its
+ * category's, else the neutral bill.
+ *
+ * 'other' is never a pick. It is where the icon picker starts, and add-bill
+ * used to save it onto every bill whatever its category — so a rent payment
+ * filed under Housing carried 'other' and drew the Other glyph instead of a
+ * house. Reading it as "nothing picked" puts the house back on every bill
+ * saved that way, without touching the rows.
+ *
+ * The category may be a spending one too (groceries, dining): receipts and
+ * subscriptions without a logo share this mark in the ledger.
+ */
 export function getBillIcon(bill: Pick<Bill, 'categoryId' | 'iconId'>): BillIcon {
-  if (bill.iconId) {
-    const custom = ICON_BY_ID.get(bill.iconId);
-    if (custom) return custom;
-  }
-  return CATEGORY_BY_ID.get(bill.categoryId)?.icon ?? OtherIcon;
+  const picked = bill.iconId === 'other' ? undefined : glyphFor(bill.iconId);
+  return picked ?? glyphFor(bill.categoryId) ?? FALLBACK_GLYPH;
 }

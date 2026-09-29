@@ -18,6 +18,12 @@ type ScreenProps = {
   scrollable?: boolean;
   /** Shows a back chevron pinned above the content. Off on entry screens. */
   showBack?: boolean;
+  /**
+   * A header of the screen's own, pinned above the content in the same place
+   * as the back chevron — the add flows' back, title, close and step dots.
+   * Takes the chevron's place when both are given.
+   */
+  header?: ReactNode;
   /** Scrolls the focused input clear of the keyboard. Turn on for screens with inputs. */
   avoidKeyboard?: boolean;
   /** Overlay pinned bottom-right, above the scroll area (e.g. a FAB). */
@@ -44,6 +50,7 @@ export function Screen({
   className,
   scrollable = true,
   showBack = false,
+  header,
   avoidKeyboard = false,
   floating,
   footer,
@@ -84,12 +91,10 @@ export function Screen({
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top', 'bottom']}>
-      {showBack ? (
+      {header || showBack ? (
         // Outside the scroll view so it stays put while content scrolls under it.
         <View className="w-full items-center">
-          <View className="w-full max-w-[520px] px-6 pt-1">
-            <BackButton />
-          </View>
+          <View className="w-full max-w-[520px] px-6 pt-1">{header ?? <BackButton />}</View>
         </View>
       ) : null}
 

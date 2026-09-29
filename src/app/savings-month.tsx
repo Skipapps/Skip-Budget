@@ -17,6 +17,7 @@ import { formatCurrency } from '@/lib/format';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 
 function monthName(month: string): string {
   return new Date(`${month}T00:00:00`).toLocaleDateString(undefined, {
@@ -77,8 +78,7 @@ export default function SavingsMonthScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title="Could not load that month"
-          message="Check your connection and try again. Nothing has been lost — the figure and any note you saved are still there."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={() => void months.refetch()}
         />
@@ -130,7 +130,7 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
       });
       router.back();
     } catch (thrown) {
-      setError((thrown as Error).message);
+      setError(failureMessage(thrown));
     }
   };
 
@@ -141,7 +141,7 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
       setAmount('');
       setNote('');
     } catch (thrown) {
-      setError((thrown as Error).message);
+      setError(failureMessage(thrown));
     }
   };
 
@@ -162,7 +162,7 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
       await exclude.mutateAsync({ month, excluded: !excluded });
       if (!excluded) router.back();
     } catch (thrown) {
-      setError((thrown as Error).message);
+      setError(failureMessage(thrown));
     }
   };
 

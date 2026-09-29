@@ -1,4 +1,10 @@
-import { billWindow, occurrencesInRange, planFloor, type Recurrence } from '@/lib/card-ledger';
+import {
+  billWindow,
+  dayAfter,
+  occurrencesInRange,
+  planFloor,
+  type Recurrence,
+} from '@/lib/card-ledger';
 
 /**
  * Deciding which occurrences still need writing down.
@@ -52,4 +58,59 @@ export function unrecordedDates(
   return occurrencesInRange(plan.nextDate, plan.recurrence, window.from, window.to)
     .filter((date) => !recorded.has(date))
     .sort();
+}
+
+/**
+ * Where a plan counts from once somebody has picked a date for it.
+ *
+ * The date picked, unless the plan already counts from earlier: moving the
+ * start later would drop occurrences that are already on the books, and
+ * nothing a person does in an edit form should quietly unspend money.
+ */
+export function countFromAfterPick(picked: string | null, current: string | null): string | null {
+  return picked && (!current || picked < current) ? picked : current;
+}
+
+/**
+ * The first day of the cycle after the one `date` falls in: next Monday, the
+ * 1st of next month, the next calendar quarter or the next New Year's Day.
+ */
+function nextCycleStart(date: string, recurrence: Recurrence): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const at = (next: Date) => next.toISOString().slice(0, 10);
+  switch (recurrence) {
+    case 'weekly': {
+      const monday = (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7;
+      return at(new Date(Date.UTC(year, month - 1, day + 7 - monday)));
+    }
+    case 'monthly':
+      return at(new Date(Date.UTC(year, month, 1)));
+    case 'quarterly':
+      return at(new Date(Date.UTC(year, (Math.floor((month - 1) / 3) + 1) * 3, 1)));
+    case 'yearly':
+      return at(new Date(Date.UTC(year + 1, 0, 1)));
+    default:
+      return dayAfter(date);
+  }
+}
+
+/**
+ * Keeps an edited plan from recording a cycle it has already been charged for.
+ *
+ * Both recorders — this app's and the server's — write every due date from
+ * the plan's start up to today that is not on the record yet, matched by exact
+ * date. So moving a charged rent from the 28th to the 1st made 1 Sep look like
+ * a September nobody had recorded, and September was charged twice; moving it
+ * the other way did the same with the 28th. Starting the plan at the next
+ * cycle after its newest charge leaves what is recorded as it is, and the next
+ * due date on or after that is the first one written.
+ */
+export function floorAfterCharges(
+  start: string | null,
+  lastCharged: string | null,
+  recurrence: Recurrence,
+): string | null {
+  if (!lastCharged) return start;
+  const floor = nextCycleStart(lastCharged, recurrence);
+  return start && start > floor ? start : floor;
 }

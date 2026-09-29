@@ -32,6 +32,7 @@ import { sortByDateAscending } from '@/lib/group';
 import { PERIODS, periodBuckets, periodRange, type PeriodKey } from '@/lib/period';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 const PER_MONTH: Record<string, number> = {
   weekly: 52 / 12,
@@ -272,8 +273,7 @@ function InsightsScreenInner() {
         <Title align="left">Insights</Title>
         <PageState
           art={artwork.error}
-          title="We could not load your insights"
-          message="Something went wrong fetching your figures. Nothing is lost — check your connection and try again."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={retry}
         />

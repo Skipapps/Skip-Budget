@@ -14,6 +14,7 @@ import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { amortise, formatTerm, type AccrualBasis } from '@/lib/loan';
+import { failureMessage } from '@/lib/failure';
 
 /** Only the app's own conventions get through a hand-edited link. */
 const BASES: readonly AccrualBasis[] = ['actual/365', 'actual/360', '30/360', 'monthly'];
@@ -114,7 +115,7 @@ function SaveLoanScreenInner() {
       // Back past the calculator to the bills list, where it now lives.
       router.dismissTo('/bills');
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not save that loan.');
+      setError(failureMessage(thrown));
     }
   };
 

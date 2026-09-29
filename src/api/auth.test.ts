@@ -13,6 +13,7 @@
 // babel-plugin-jest-hoist lifts the jest.mock() calls below above this import,
 // so auth.ts loads against them.
 import { signOut } from './auth';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 const order: string[] = [];
 
@@ -106,12 +107,12 @@ describe('signOut', () => {
     expect(result.error).toBeNull();
   });
 
-  it('still reports a failed sign-out in words', async () => {
+  it('still reports a failed sign-out', async () => {
     mockSignOutError = { message: 'network error' };
 
     const result = await signOut();
 
     expect(order).toEqual(['forget', 'signOut']);
-    expect(result.error).toBe('Could not reach the server. Check your connection.');
+    expect(result.error).toBe(FAILURE_MESSAGE);
   });
 });

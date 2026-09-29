@@ -20,7 +20,11 @@ const mockBack = jest.fn();
 const mockScreenOptions = jest.fn();
 
 jest.mock('expo-router', () => ({
-  router: { back: (...args: unknown[]) => mockBack(...args) },
+  router: {
+    back: (...args: unknown[]) => mockBack(...args),
+    canGoBack: () => true,
+    replace: jest.fn(),
+  },
   Stack: {
     Screen: ({ options }: { options: unknown }) => {
       mockScreenOptions(options);
@@ -39,6 +43,9 @@ jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
 );
 
+const mockConfirm = jest.fn();
+jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => mockConfirm }));
+
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', line: '#DDDDDD', surface: '#FFFFFF' }),
   useMoneyColor: () => () => '#000000',
@@ -52,6 +59,7 @@ function Flow({ from }: { from: number }) {
   return (
     <StepFlow
       title="Add a receipt"
+      closePrompt="Cancel adding this receipt?"
       steps={3}
       current={step}
       onBack={() => {
@@ -179,5 +187,55 @@ describe('the gesture and the hardware key', () => {
 
     expect(claimed).toBe(false);
     expect(mockBack).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Close leaves the whole flow from any step — after asking, because it throws
+ * away everything typed so far.
+ */
+describe('the close control', () => {
+  it('asks before leaving, in the words the screen gave it', async () => {
+    mockConfirm.mockResolvedValue(true);
+    const { getByLabelText } = await render(<Flow from={2} />);
+
+    await fireEvent.press(getByLabelText('Close'));
+
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Cancel adding this receipt?',
+        confirmLabel: 'Yes',
+        cancelLabel: 'Go back',
+      }),
+    );
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays on the step it was on when told to go back', async () => {
+    mockConfirm.mockResolvedValue(false);
+    const { getByLabelText, getByText } = await render(<Flow from={2} />);
+
+    await fireEvent.press(getByLabelText('Close'));
+
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(getByText('On step 2')).toBeTruthy();
+  });
+});
+
+/** Back, close and the dots stay on screen while a long step scrolls. */
+describe('the header', () => {
+  const insideScroll = (node: { type?: unknown; parent?: unknown } | null): boolean => {
+    for (let at = node; at; at = at.parent as typeof node) {
+      if (at.type === 'RCTScrollView') return true;
+    }
+    return false;
+  };
+
+  it('sits outside the scrolling content, while the step itself scrolls', async () => {
+    const { getByLabelText, getByText } = await render(<Flow from={1} />);
+
+    expect(insideScroll(getByLabelText('Back'))).toBe(false);
+    expect(insideScroll(getByLabelText('Close'))).toBe(false);
+    expect(insideScroll(getByText('On step 1'))).toBe(true);
   });
 });

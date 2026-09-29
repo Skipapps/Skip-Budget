@@ -2,11 +2,9 @@ import { router } from 'expo-router';
 import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
-import { Illustration } from '@/components/ui/illustration';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
 import { Title } from '@/components/ui/typography';
-import { useArtwork } from '@/theme/artwork';
 
 /**
  * The beat after the first credit card saves on the setup walk-in: one page,
@@ -18,8 +16,6 @@ import { useArtwork } from '@/theme/artwork';
  * reassurance copy about that — the checklist itself is the reassurance.
  */
 export default function AccountOfferScreen() {
-  const artwork = useArtwork();
-
   return (
     <Screen
       footer={
@@ -28,14 +24,20 @@ export default function AccountOfferScreen() {
             label="Add bank account"
             onPress={() => router.replace('/add-account?from=setup')}
           />
-          <TextLink label="Skip" variant="subtle" onPress={() => router.replace('/setup')} />
+          {/* Back, not another replace: the checklist is right beneath this
+              screen, and replacing stacked a second copy of it. */}
+          <TextLink
+            label="Skip"
+            variant="subtle"
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/setup'))}
+          />
         </View>
       }
     >
-      <Title>Add your bank account</Title>
-
-      <View className="flex-1 items-center justify-center">
-        <Illustration source={artwork.emptyWallet} widthRatio={0.6} maxWidth={240} />
+      {/* No artwork: the question alone, centred in the space above the
+          buttons. */}
+      <View className="flex-1 justify-center">
+        <Title flush>Add your bank account</Title>
       </View>
     </Screen>
   );

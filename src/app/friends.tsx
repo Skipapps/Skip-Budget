@@ -21,6 +21,7 @@ import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
+import { failureMessage } from '@/lib/failure';
 
 /**
  * Making friends inside Skip, without publishing who has an account.
@@ -77,7 +78,7 @@ export default function FriendsScreen() {
             : `Asked ${name}. They will see it next time they open Skip.`,
       );
     } catch (thrown) {
-      setError((thrown as Error).message);
+      setError(failureMessage(thrown));
     }
   };
 
@@ -101,7 +102,7 @@ export default function FriendsScreen() {
     try {
       await removeFriend.mutateAsync(friend.id);
     } catch (thrown) {
-      setError((thrown as Error).message);
+      setError(failureMessage(thrown));
     }
   };
 

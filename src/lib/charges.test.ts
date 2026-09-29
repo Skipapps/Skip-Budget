@@ -1,4 +1,10 @@
-import { unrecordedDates, type ChargeablePlan } from '@/lib/charges';
+import { planOccurrences } from '@/lib/card-ledger';
+import {
+  countFromAfterPick,
+  floorAfterCharges,
+  unrecordedDates,
+  type ChargeablePlan,
+} from '@/lib/charges';
 
 const plan = (over: Partial<ChargeablePlan> = {}): ChargeablePlan => ({
   id: 'bill-1',
@@ -81,5 +87,144 @@ describe('unrecordedDates', () => {
 
   it('says nothing for a plan with no date at all', () => {
     expect(unrecordedDates(plan({ nextDate: null }), '2026-08-28', none)).toEqual([]);
+  });
+});
+
+/**
+ * A subscription added on the 28th that renewed on the 10th went out this
+ * month. It used to vanish: nothing wrote a start date for subscriptions, so
+ * the floor fell back to the day the row was made and the 10th sat before it —
+ * not recorded, not projected, not on the Subscriptions page, not in Home's
+ * expenses. By the time anyone looked, the stored date had rolled on to the
+ * 10th of next month.
+ */
+describe('a subscription whose renewal was earlier this month', () => {
+  const TODAY = '2026-09-28';
+  const netflix = {
+    id: 'subscription:netflix',
+    label: 'Netflix',
+    amount: 15.49,
+    // Already rolled forward past the renewal that was picked.
+    nextDate: '2026-10-10',
+    recurrence: 'monthly' as const,
+    kind: 'subscription' as const,
+    createdAt: '2026-09-28T19:00:00+00:00',
+    cardId: 'card-1',
+    accountId: null,
+  };
+  const september = (startsOn: string | null) =>
+    planOccurrences({
+      plan: { ...netflix, startsOn },
+      charges: [],
+      isRecorded: false,
+      from: '2026-09-01',
+      to: '2026-09-30',
+      today: TODAY,
+    }).map((occurrence) => occurrence.date);
+
+  it('counts the renewal once the start is the date picked', () => {
+    expect(september('2026-09-10')).toEqual(['2026-09-10']);
+  });
+
+  it('is what went missing without a start date', () => {
+    expect(september(null)).toEqual([]);
+  });
+
+  it('is written down by the recorder too', () => {
+    const plan: ChargeablePlan = {
+      id: netflix.id,
+      recurrence: 'monthly',
+      nextDate: netflix.nextDate,
+      startsOn: '2026-09-10',
+      createdAt: netflix.createdAt,
+    };
+    expect(unrecordedDates(plan, TODAY, new Set())).toEqual(['2026-09-10']);
+  });
+});
+
+describe('countFromAfterPick', () => {
+  it('starts a new plan at the date picked', () => {
+    expect(countFromAfterPick('2026-09-10', null)).toBe('2026-09-10');
+  });
+
+  it('moves the start earlier when an earlier date is picked', () => {
+    expect(countFromAfterPick('2026-09-10', '2026-09-28')).toBe('2026-09-10');
+  });
+
+  it('never moves it later, which would drop what is already counted', () => {
+    expect(countFromAfterPick('2026-10-10', '2026-06-10')).toBe('2026-06-10');
+  });
+
+  it('leaves it alone when no date is picked', () => {
+    expect(countFromAfterPick(null, '2026-06-10')).toBe('2026-06-10');
+    expect(countFromAfterPick(null, null)).toBeNull();
+  });
+});
+
+/**
+ * Moving a charged bill's due date must not charge the same month twice.
+ *
+ * The Founder's rent was charged on 28 Sep, then its date was moved to the
+ * 1st: both recorders saw 1 Sep as a date nobody had recorded and wrote it,
+ * so September had two rents. The start now sits at the next cycle after the
+ * newest charge.
+ */
+describe('a charged bill whose due date is moved', () => {
+  const TODAY = '2026-09-28';
+
+  it('recorded September twice when the start followed the date picked', () => {
+    const plan: ChargeablePlan = {
+      id: 'bill:rent',
+      recurrence: 'monthly',
+      nextDate: '2026-09-01',
+      startsOn: '2026-09-01',
+    };
+    expect(unrecordedDates(plan, TODAY, new Set(['2026-09-28']))).toEqual(['2026-09-01']);
+  });
+
+  it('moved earlier in the month: nothing more in September, October on the new day', () => {
+    const plan: ChargeablePlan = {
+      id: 'bill:rent',
+      recurrence: 'monthly',
+      nextDate: '2026-09-01',
+      startsOn: floorAfterCharges('2026-09-01', '2026-09-28', 'monthly'),
+    };
+    const charged = new Set(['2026-09-28']);
+    expect(plan.startsOn).toBe('2026-10-01');
+    expect(unrecordedDates(plan, TODAY, charged)).toEqual([]);
+    expect(unrecordedDates(plan, '2026-10-01', charged)).toEqual(['2026-10-01']);
+  });
+
+  it('moved later in the month: nothing more in September, October on the new day', () => {
+    const plan: ChargeablePlan = {
+      id: 'bill:rent',
+      recurrence: 'monthly',
+      nextDate: '2026-09-28',
+      startsOn: floorAfterCharges('2026-09-28', '2026-09-01', 'monthly'),
+    };
+    const charged = new Set(['2026-09-01']);
+    expect(unrecordedDates(plan, TODAY, charged)).toEqual([]);
+    expect(unrecordedDates(plan, '2026-10-28', charged)).toEqual(['2026-10-28']);
+  });
+});
+
+describe('floorAfterCharges', () => {
+  it('leaves a plan with no charges where it was put', () => {
+    expect(floorAfterCharges('2026-09-01', null, 'monthly')).toBe('2026-09-01');
+    expect(floorAfterCharges(null, null, 'monthly')).toBeNull();
+  });
+
+  it('keeps a start already past the charged cycle', () => {
+    expect(floorAfterCharges('2026-10-15', '2026-09-28', 'monthly')).toBe('2026-10-15');
+  });
+
+  it('moves to the start of the next cycle for each recurrence', () => {
+    // 2026-09-23 is a Wednesday.
+    expect(floorAfterCharges(null, '2026-09-23', 'weekly')).toBe('2026-09-28');
+    expect(floorAfterCharges(null, '2026-09-28', 'weekly')).toBe('2026-10-05');
+    expect(floorAfterCharges(null, '2026-12-15', 'monthly')).toBe('2027-01-01');
+    expect(floorAfterCharges(null, '2026-02-10', 'quarterly')).toBe('2026-04-01');
+    expect(floorAfterCharges(null, '2026-11-30', 'quarterly')).toBe('2027-01-01');
+    expect(floorAfterCharges(null, '2026-06-01', 'yearly')).toBe('2027-01-01');
   });
 });

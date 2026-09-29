@@ -20,6 +20,7 @@ import { Title } from '@/components/ui/typography';
 import { PRO_MONTHLY_LABEL, PRO_YEARLY_LABEL } from '@/lib/wall';
 import { router } from 'expo-router';
 import { useColors } from '@/providers/theme-provider';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 
 const FEATURES: { icon: LucideIcon; title: string; hint: string }[] = [
   {
@@ -74,17 +75,14 @@ export default function ProScreen() {
   /**
    * What to say when there is nothing to buy, in the user's terms.
    *
-   * Three different causes — no billing in this build, a store we could not
-   * reach, a store with no products yet — and each one has a different thing
-   * for the reader to do about it. The store's own error text is none of
-   * those, so it does not appear here.
+   * No billing in this build is a fact about the version, so it says so. A
+   * store that could not be reached, or that sent back no plans, is a failure
+   * and says the one line every failure says.
    */
   const storeNote = !purchasesAvailable()
     ? 'Purchases are not open in this version yet. Everything on this page is coming shortly.'
     : !canBuy && prices.isFetched
-      ? prices.error
-        ? 'We could not reach the App Store. Check your connection and tap Check again.'
-        : 'The App Store returned no plans for this app yet. Freshly readied products can take a few hours to reach the sandbox — check again shortly.'
+      ? FAILURE_MESSAGE
       : null;
 
   const devNote = prices.error ? (prices.error as Error).message : (prices.data?.debug ?? null);
@@ -101,7 +99,7 @@ export default function ProScreen() {
       const result = await purchase(pack);
       if (result === 'done') router.back();
     } catch (thrown) {
-      setMessage((thrown as Error).message ?? 'The purchase did not go through.');
+      setMessage(failureMessage(thrown));
     } finally {
       setBusy(false);
     }
@@ -114,7 +112,7 @@ export default function ProScreen() {
       const restored = await restore();
       setMessage(restored ? 'Welcome back — Pro is active.' : 'No past purchase to restore.');
     } catch (thrown) {
-      setMessage((thrown as Error).message ?? 'Could not check past purchases.');
+      setMessage(failureMessage(thrown));
     } finally {
       setBusy(false);
     }

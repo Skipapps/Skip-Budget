@@ -31,6 +31,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { deleteAccount, signOut } from '@/api/auth';
+import { resetTo } from '@/lib/nav';
 import { usePro } from '@/api/pro';
 import { authenticate, lockCapability, unavailableMessage } from '@/lib/app-lock';
 import { setProOverride, useProOverride } from '@/lib/pro-bypass';
@@ -178,10 +179,10 @@ export default function SettingsScreen() {
 
     const { error } = await deleteAccount();
     if (error) {
-      await ask({ title: 'Could not delete your account', message: error, cancelLabel: null });
+      await ask({ title: error, cancelLabel: null });
       return;
     }
-    router.replace('/welcome');
+    resetTo('/welcome');
   };
 
   return (
@@ -431,7 +432,7 @@ export default function SettingsScreen() {
           title="Sign out"
           onPress={async () => {
             await signOut();
-            router.replace('/welcome');
+            resetTo('/welcome');
           }}
         />
         <SettingsRow

@@ -26,6 +26,7 @@ import { groupByDate } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 export default function BillPlansScreen() {
   const artwork = useArtwork();
@@ -162,8 +163,7 @@ export default function BillPlansScreen() {
       {query.isError ? (
         <PageState
           art={artwork.error}
-          title="Could not load your bills"
-          message="Check your connection and try again. Nothing has been lost."
+          title={FAILURE_MESSAGE}
           actionLabel="Try again"
           onAction={() => query.refetch()}
         />

@@ -32,6 +32,7 @@ import {
 import { formatCurrency } from '@/lib/format';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
+import { failureMessage } from '@/lib/failure';
 
 /** Normalised to monthly so sources on different cycles can be summed. */
 const PER_MONTH: Record<PayFrequency, number> = {
@@ -210,7 +211,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
 
       router.back();
     } catch (thrown) {
-      setError((thrown as Error).message ?? 'Could not save your income.');
+      setError(failureMessage(thrown));
     }
   };
 
