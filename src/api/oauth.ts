@@ -20,13 +20,13 @@ const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
  */
 export async function signInWithApple(): Promise<OAuthResult> {
   if (Platform.OS !== 'ios') {
-    return { error: FAILURE_MESSAGE };
+    return { error: 'Sign in with Apple is only available on iOS.' };
   }
 
   try {
     const available = await AppleAuthentication.isAvailableAsync();
     if (!available) {
-      return { error: FAILURE_MESSAGE };
+      return { error: 'Sign in with Apple is not available on this device.' };
     }
 
     const credential = await AppleAuthentication.signInAsync({
@@ -51,6 +51,12 @@ export async function signInWithApple(): Promise<OAuthResult> {
     const code = (thrown as { code?: string }).code;
     if (code === 'ERR_REQUEST_CANCELED' || code === 'ERR_CANCELED') {
       return { error: null, cancelled: true };
+    }
+
+    // Apple reports "unknown" when the device has no Apple ID signed in —
+    // by far the most common cause, and one the person can fix.
+    if (code === 'ERR_REQUEST_UNKNOWN') {
+      return { error: 'Sign in to an Apple ID on this device first, then try again.' };
     }
 
     return { error: failureMessage(thrown) };

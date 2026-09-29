@@ -55,8 +55,13 @@ export function unrecordedDates(
   const window = billWindow({ starts_on: floor, ends_on: plan.endsOn ?? null }, floor, today);
   if (window.from && window.from > window.to) return [];
 
+  // One charge per cycle, not just per date: a moved due date would otherwise
+  // look like a month nobody had recorded. The database holds the same rule
+  // (charges_one_per_cycle) for every writer; this keeps the app from asking.
+  const charged = new Set([...recorded].map((date) => cycleStart(date, plan.recurrence)));
+
   return occurrencesInRange(plan.nextDate, plan.recurrence, window.from, window.to)
-    .filter((date) => !recorded.has(date))
+    .filter((date) => !recorded.has(date) && !charged.has(cycleStart(date, plan.recurrence)))
     .sort();
 }
 
@@ -69,6 +74,31 @@ export function unrecordedDates(
  */
 export function countFromAfterPick(picked: string | null, current: string | null): string | null {
   return picked && (!current || picked < current) ? picked : current;
+}
+
+/**
+ * The first day of the cycle `date` falls in: its week's Monday, the 1st of
+ * its month, its calendar quarter or its year. A set period has no cycle, so
+ * each date is its own. Matches Postgres's date_trunc, which the database's
+ * copy of the rule uses.
+ */
+export function cycleStart(date: string, recurrence: Recurrence): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const at = (start: Date) => start.toISOString().slice(0, 10);
+  switch (recurrence) {
+    case 'weekly': {
+      const monday = (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7;
+      return at(new Date(Date.UTC(year, month - 1, day - monday)));
+    }
+    case 'monthly':
+      return at(new Date(Date.UTC(year, month - 1, 1)));
+    case 'quarterly':
+      return at(new Date(Date.UTC(year, Math.floor((month - 1) / 3) * 3, 1)));
+    case 'yearly':
+      return at(new Date(Date.UTC(year, 0, 1)));
+    default:
+      return date;
+  }
 }
 
 /**

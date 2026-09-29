@@ -1,4 +1,8 @@
+import * as Sentry from '@sentry/react-native';
+
 import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+
+jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
 
 /**
  * However a request fails, the screen says the same line. A dropped
@@ -32,5 +36,43 @@ describe('failureMessage', () => {
 
   it('is the constant the error screens use', () => {
     expect(failureMessage()).toBe(FAILURE_MESSAGE);
+  });
+});
+
+/**
+ * The screen says one line, so the real cause has to go somewhere a person
+ * can read it: Sentry, in a release build. Caught errors never reach the crash
+ * handler on their own.
+ */
+describe('in a release build', () => {
+  const dev = (global as { __DEV__?: boolean }).__DEV__;
+
+  beforeEach(() => {
+    (global as { __DEV__?: boolean }).__DEV__ = false;
+    jest.mocked(Sentry.captureException).mockClear();
+  });
+
+  afterEach(() => {
+    (global as { __DEV__?: boolean }).__DEV__ = dev;
+  });
+
+  it('reports the real error to Sentry', () => {
+    const thrown = new Error('duplicate key value violates unique constraint');
+    expect(failureMessage(thrown)).toBe(FAILURE_MESSAGE);
+    expect(Sentry.captureException).toHaveBeenCalledWith(thrown, {
+      tags: { handled: 'failure-message' },
+    });
+  });
+
+  it('turns a Supabase error object into an Error Sentry can group', () => {
+    failureMessage({ message: 'permission denied for table bills', code: '42501' });
+    const [sent] = jest.mocked(Sentry.captureException).mock.calls[0];
+    expect(sent).toBeInstanceOf(Error);
+    expect((sent as Error).message).toBe('permission denied for table bills');
+  });
+
+  it('reports nothing when nothing was thrown', () => {
+    failureMessage();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 });

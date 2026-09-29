@@ -12,7 +12,7 @@
 
 // babel-plugin-jest-hoist lifts the jest.mock() calls below above this import,
 // so auth.ts loads against them.
-import { signOut } from './auth';
+import { signInWithEmail, signOut, verifyOtp } from './auth';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 const order: string[] = [];
@@ -20,6 +20,7 @@ const order: string[] = [];
 let mockSession: { user: { id: string } } | null = { user: { id: 'user-A' } };
 let mockSessionError: Error | null = null;
 let mockSignOutError: { message: string } | null = null;
+let mockAuthError: { message: string } | null = null;
 
 const mockForgetDevice = jest.fn(async (_userId: string) => {
   order.push('forget');
@@ -44,6 +45,8 @@ jest.mock('@/lib/supabase', () => ({
     auth: {
       getSession: () => mockGetSession(),
       signOut: () => mockAuthSignOut(),
+      signInWithPassword: async () => ({ error: mockAuthError }),
+      verifyOtp: async () => ({ error: mockAuthError }),
     },
   },
 }));
@@ -113,6 +116,45 @@ describe('signOut', () => {
     const result = await signOut();
 
     expect(order).toEqual(['forget', 'signOut']);
+    expect(result.error).toBe(FAILURE_MESSAGE);
+  });
+});
+
+/**
+ * A refused sign-in says what to do about it; only what nobody can act on
+ * falls back to the one failure line (the Founder's call, 2026-09-28).
+ */
+describe('sign-in wording', () => {
+  beforeEach(() => {
+    mockAuthError = null;
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('names a wrong password', async () => {
+    mockAuthError = { message: 'Invalid login credentials' };
+    const result = await signInWithEmail('sam@example.com', 'nope');
+    expect(result.error).toBe('That email and password do not match.');
+  });
+
+  it('names an expired code', async () => {
+    mockAuthError = { message: 'Token has expired or is invalid' };
+    const result = await verifyOtp('sam@example.com', '123456', 'signup');
+    expect(result.error).toBe('That code has expired. Send a new one.');
+  });
+
+  it('names too many attempts', async () => {
+    mockAuthError = { message: 'Email rate limit exceeded' };
+    const result = await signInWithEmail('sam@example.com', 'nope');
+    expect(result.error).toBe('Too many attempts. Wait a minute and try again.');
+  });
+
+  it('says the one failure line for anything it does not recognise', async () => {
+    mockAuthError = { message: 'Network request failed' };
+    const result = await signInWithEmail('sam@example.com', 'nope');
     expect(result.error).toBe(FAILURE_MESSAGE);
   });
 });

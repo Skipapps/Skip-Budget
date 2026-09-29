@@ -1,6 +1,7 @@
 import { planOccurrences } from '@/lib/card-ledger';
 import {
   countFromAfterPick,
+  cycleStart,
   floorAfterCharges,
   unrecordedDates,
   type ChargeablePlan,
@@ -172,14 +173,17 @@ describe('countFromAfterPick', () => {
 describe('a charged bill whose due date is moved', () => {
   const TODAY = '2026-09-28';
 
-  it('recorded September twice when the start followed the date picked', () => {
+  it('will not record a second September even when the start was left on the 1st', () => {
+    // What an older build saved — and what the Founder's live bill still
+    // holds. The recorder itself now refuses the second charge in the month.
     const plan: ChargeablePlan = {
       id: 'bill:rent',
       recurrence: 'monthly',
-      nextDate: '2026-09-01',
+      nextDate: '2026-10-01',
       startsOn: '2026-09-01',
     };
-    expect(unrecordedDates(plan, TODAY, new Set(['2026-09-28']))).toEqual(['2026-09-01']);
+    expect(unrecordedDates(plan, TODAY, new Set(['2026-09-28']))).toEqual([]);
+    expect(unrecordedDates(plan, '2026-10-01', new Set(['2026-09-28']))).toEqual(['2026-10-01']);
   });
 
   it('moved earlier in the month: nothing more in September, October on the new day', () => {
@@ -226,5 +230,31 @@ describe('floorAfterCharges', () => {
     expect(floorAfterCharges(null, '2026-02-10', 'quarterly')).toBe('2026-04-01');
     expect(floorAfterCharges(null, '2026-11-30', 'quarterly')).toBe('2027-01-01');
     expect(floorAfterCharges(null, '2026-06-01', 'yearly')).toBe('2027-01-01');
+  });
+});
+
+describe('cycleStart', () => {
+  it('matches Postgres date_trunc for each recurrence', () => {
+    // 2026-09-23 is a Wednesday; date_trunc('week') is Monday the 21st.
+    expect(cycleStart('2026-09-23', 'weekly')).toBe('2026-09-21');
+    expect(cycleStart('2026-09-21', 'weekly')).toBe('2026-09-21');
+    expect(cycleStart('2026-09-27', 'weekly')).toBe('2026-09-21');
+    expect(cycleStart('2026-09-28', 'monthly')).toBe('2026-09-01');
+    expect(cycleStart('2026-11-30', 'quarterly')).toBe('2026-10-01');
+    expect(cycleStart('2026-06-01', 'yearly')).toBe('2026-01-01');
+  });
+});
+
+describe('a weekly plan', () => {
+  it('records each week once even when its day moves within the week', () => {
+    const plan: ChargeablePlan = {
+      id: 'bill:cleaner',
+      recurrence: 'weekly',
+      nextDate: '2026-09-25',
+      startsOn: '2026-09-21',
+    };
+    // Charged Tuesday the 22nd, then moved to Fridays.
+    expect(unrecordedDates(plan, '2026-09-28', new Set(['2026-09-22']))).toEqual([]);
+    expect(unrecordedDates(plan, '2026-10-02', new Set(['2026-09-22']))).toEqual(['2026-10-02']);
   });
 });

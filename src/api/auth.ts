@@ -10,6 +10,30 @@ export type SignUpResult = AuthResult & {
 };
 
 /**
+ * What a refused sign-in says: its own words when the person can fix it.
+ *
+ * The one failure line is for things trying again might mend. A wrong
+ * password, an email already in use or an expired code will not mend on a
+ * retry — each needs something different done — so these say what (the
+ * Founder's call, 2026-09-28). Anything unrecognised, a dropped connection
+ * included, is a failure like any other.
+ */
+function readable(error: { message?: string } | null | undefined): string {
+  const lower = (error?.message ?? '').toLowerCase();
+  if (lower.includes('invalid login credentials')) return 'That email and password do not match.';
+  if (lower.includes('already registered')) return 'That email already has an account.';
+  if (lower.includes('password should be')) return 'Password must be at least 6 characters.';
+  if (lower.includes('unable to validate email')) return 'That email address does not look right.';
+  if (lower.includes('token has expired') || lower.includes('expired'))
+    return 'That code has expired. Send a new one.';
+  if (lower.includes('invalid token') || lower.includes('otp'))
+    return 'That code is not right. Check it and try again.';
+  if (lower.includes('rate limit') || lower.includes('too many'))
+    return 'Too many attempts. Wait a minute and try again.';
+  return failureMessage(error);
+}
+
+/**
  * Six-digit codes, not confirmation links.
  *
  * Supabase sends whichever the email template contains: {{ .Token }} for a
@@ -29,7 +53,7 @@ export async function verifyOtp(
     token: token.trim(),
     type: purpose === 'signup' ? 'signup' : 'recovery',
   });
-  return { error: error ? failureMessage(error) : null };
+  return { error: error ? readable(error) : null };
 }
 
 export async function resendOtp(email: string, purpose: OtpPurpose): Promise<AuthResult> {
@@ -38,13 +62,13 @@ export async function resendOtp(email: string, purpose: OtpPurpose): Promise<Aut
     return sendPasswordReset(email);
   }
   const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
-  return { error: error ? failureMessage(error) : null };
+  return { error: error ? readable(error) : null };
 }
 
 export async function updatePassword(password: string): Promise<AuthResult> {
   // Only works while the recovery session from verifyOtp is active.
   const { error } = await supabase.auth.updateUser({ password });
-  return { error: error ? failureMessage(error) : null };
+  return { error: error ? readable(error) : null };
 }
 
 export async function signUpWithEmail(
@@ -62,7 +86,7 @@ export async function signUpWithEmail(
   // session. Reporting that is the difference between "check your inbox" and a
   // screen that silently does nothing.
   return {
-    error: error ? failureMessage(error) : null,
+    error: error ? readable(error) : null,
     signedIn: Boolean(data.session),
   };
 }
@@ -81,14 +105,14 @@ export async function signInWithEmail(email: string, password: string): Promise<
   const unconfirmed = Boolean(error && /not confirmed|email.*confirm/i.test(error.message));
 
   return {
-    error: error && !unconfirmed ? failureMessage(error) : null,
+    error: error && !unconfirmed ? readable(error) : null,
     needsConfirmation: unconfirmed,
   };
 }
 
 export async function sendPasswordReset(email: string): Promise<AuthResult> {
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
-  return { error: error ? failureMessage(error) : null };
+  return { error: error ? readable(error) : null };
 }
 
 /**
