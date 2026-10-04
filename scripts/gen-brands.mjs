@@ -357,6 +357,7 @@ Levi's|levi.com|clothing|both|55|levis
 # ---- Electronics and office ----
 Best Buy|bestbuy.com|electronics|both|85|bestbuy
 Apple|apple.com|electronics|both|85|apple store;apple;apple tv+;apple tv plus;apple music;apple podcasts;apple arcade;icloud+;icloud;apple fitness+;apple fitness plus;apple news+;apple news plus
+Samsung|samsung.com|electronics|both|75|samsung electronics;galaxy;samsung galaxy
 Staples|staples.com|electronics|both|65|
 GameStop|gamestop.com|electronics|both|55|game stop
 Micro Center|microcenter.com|electronics|us|50|

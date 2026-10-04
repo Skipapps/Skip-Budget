@@ -1,19 +1,20 @@
 import { Image } from 'expo-image';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
+import { useBrandDirectory } from '@/api/brands';
 import { cn } from '@/lib/cn';
 import { isLightColor } from '@/lib/color';
 import { CARD_COLORS } from '@/theme/card-colors';
 
-const CLIENT_ID = process.env.EXPO_PUBLIC_BRANDFETCH_CLIENT_ID;
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 
 type BrandLogoProps = {
   /** Shown in the fallback tile, so it is required even when a logo exists. */
   name: string;
+  /** The brand's website, used to find its logo when `logoPath` is not given. */
   domain?: string | null;
-  /** Set only for self-hosted logos; overrides the CDN when present. */
+  /** Where the logo lives in the brand-logos bucket, e.g. `v1/netflix.png`. */
   logoPath?: string | null;
   size?: number;
   className?: string;
@@ -48,16 +49,32 @@ function monogram(name: string): string {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
-function logoUrl(domain?: string | null, logoPath?: string | null): string | null {
-  // A self-hosted copy wins when one exists — it only does if a caching
-  // agreement is in place, which is why nothing writes logo_path today.
-  if (logoPath && SUPABASE_URL) {
-    return `${SUPABASE_URL}/storage/v1/object/public/brand-logos/${logoPath}`;
-  }
-  if (!domain || !CLIENT_ID) return null;
-  // Brandfetch requires the link to be embedded rather than fetched and
-  // stored; expo-image requests it the same way a browser would.
-  return `https://cdn.brandfetch.io/${domain}/w/200/h/200?c=${CLIENT_ID}`;
+/**
+ * Our own logo for a brand, from the brand-logos bucket.
+ *
+ * Every logo is ours now — official artwork prepared for each catalog brand
+ * and hosted in Supabase — so nothing is fetched from a third party, and a
+ * brand without one simply draws its letters.
+ */
+function logoUrl(logoPath?: string | null): string | null {
+  if (!logoPath || !SUPABASE_URL) return null;
+  return `${SUPABASE_URL}/storage/v1/object/public/brand-logos/${logoPath}`;
+}
+
+/**
+ * A brand's logo path, found by its website.
+ *
+ * Bills, subscriptions and receipts carry only the brand's domain from their
+ * join. The directory is the one cached catalog query the app already holds,
+ * so this costs a lookup in memory, not a request per row.
+ */
+function useLogoPathForDomain(domain?: string | null): string | null {
+  const { data: directory } = useBrandDirectory();
+  const byDomain = useMemo(
+    () => new Map((directory ?? []).map((brand) => [brand.domain, brand.logo_path])),
+    [directory],
+  );
+  return domain ? (byDomain.get(domain) ?? null) : null;
 }
 
 /**
@@ -74,7 +91,8 @@ export function BrandLogo({
   className,
   fallback,
 }: BrandLogoProps) {
-  const url = logoUrl(domain, logoPath);
+  const found = useLogoPathForDomain(logoPath ? null : domain);
+  const url = logoUrl(logoPath ?? found);
   // Remembering which URL failed rather than a bare boolean means a recycled
   // row showing a different brand recovers on its own — no effect, no reset.
   const [failedUrl, setFailedUrl] = useState<string | null>(null);

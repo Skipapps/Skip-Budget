@@ -71,7 +71,6 @@ const SECTIONS: Section[] = [
           'Supabase — hosts the database your data lives in, and handles sign-in.',
           'Apple and Google — only if you choose to sign in with them, and only to confirm it is you.',
           'Sentry — receives crash and error reports so faults can be fixed. These describe what the app was doing, not what your budget contains.',
-          'Brandfetch — supplies the logos shown next to shops and subscriptions. It is sent a brand name or website address to look up. It is not sent anything about you or your spending.',
           'Apple Push Notification service — delivers reminders, if you turn them on.',
         ],
       },
