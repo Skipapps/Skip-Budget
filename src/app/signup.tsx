@@ -8,6 +8,7 @@ import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { TextLink } from '@/components/ui/text-link';
 import { Subtitle, Title } from '@/components/ui/typography';
+import { resetTo } from '@/lib/nav';
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -46,7 +47,8 @@ export default function SignUpScreen() {
     // With confirmation off Supabase signs the user straight in; with it on a
     // code is emailed. Handle both rather than assuming one is configured.
     if (signedIn) {
-      router.replace('/hello');
+      // resetTo: a one-way door — see auth.tsx.
+      resetTo('/hello');
       return;
     }
     router.push({ pathname: '/verify-otp', params: { email: email.trim(), purpose: 'signup' } });

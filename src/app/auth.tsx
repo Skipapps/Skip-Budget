@@ -11,6 +11,7 @@ import { Illustration } from '@/components/ui/illustration';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
 import { Subtitle, Title } from '@/components/ui/typography';
+import { resetTo } from '@/lib/nav';
 
 /**
  * The two-tap way in, and the door to the email one.
@@ -47,7 +48,9 @@ export default function AuthScreen() {
     }
     // Not `/home`: a provider sign-in has no display name yet, and `/hello`
     // is what decides between asking for one and going straight through.
-    router.replace('/hello');
+    // resetTo, not replace: signing in is a one-way door, and replace left the
+    // welcome pages underneath for the edge swipe to walk back into.
+    resetTo('/hello');
   };
 
   const handleGoogle = () => run('google', signInWithGoogle);

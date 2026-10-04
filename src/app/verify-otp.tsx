@@ -8,6 +8,7 @@ import { OtpInput } from '@/components/ui/otp-input';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
 import { Strong, Subtitle, Title } from '@/components/ui/typography';
+import { resetTo } from '@/lib/nav';
 
 const CODE_LENGTH = 6;
 
@@ -41,7 +42,11 @@ export default function VerifyOtpScreen() {
 
     // A verified signup is already signed in; recovery hands over a short-lived
     // session that only exists so the password can be changed.
-    router.replace(mode === 'signup' ? '/hello' : '/reset-password');
+    // Signing up is a one-way door: resetTo, so the new account cannot swipe
+    // back into the pitch and the sign-in screens. Recovery stays a plain
+    // replace — backing out of setting a new password is allowed.
+    if (mode === 'signup') resetTo('/hello');
+    else router.replace('/reset-password');
   };
 
   const handleResend = async () => {
