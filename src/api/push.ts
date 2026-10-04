@@ -32,9 +32,15 @@ Notifications.setNotificationHandler({
   }),
 });
 
-/** Whether notifications are allowed right now, without asking. */
+/**
+ * Whether notifications are allowed right now, without asking.
+ *
+ * On a simulator too: permission is local to the device and works there. Only
+ * the push token is a real-phone thing (see registerDevice), and a simulator
+ * that has said yes shows pushes delivered to it with `xcrun simctl push`.
+ */
 export async function remindersAllowed(): Promise<boolean> {
-  if (!Device.isDevice || Platform.OS !== 'ios') return false;
+  if (Platform.OS !== 'ios') return false;
   const existing = await Notifications.getPermissionsAsync();
   return (
     existing.granted || existing.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
@@ -50,7 +56,8 @@ export async function remindersAllowed(): Promise<boolean> {
  * value, is how most refusals happen. Returns whether reminders can now send.
  */
 export async function enableReminders(userId: string): Promise<boolean> {
-  if (!Device.isDevice || Platform.OS !== 'ios') return false;
+  // The ask works on a simulator; registerDevice is what skips it there.
+  if (Platform.OS !== 'ios') return false;
 
   const allowed = await remindersAllowed();
   const decision = allowed
@@ -171,6 +178,14 @@ export function useRegisterPush(): void {
     return () => sub.remove();
   }, []);
 
+  // The buttons under a pressed-and-held notification. The content extension
+  // (targets/notification-content) names "View" for what it opens; this is the
+  // category iOS needs to know about, and the fallback where that extension
+  // is absent — an older build, a Watch.
+  useEffect(() => {
+    void registerCategories().catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
@@ -209,6 +224,26 @@ export function useRegisterPush(): void {
   useNotificationRouting();
 }
 
+/** The category every Skip notification carries; see send-push/index.ts. */
+export const NOTIFICATION_CATEGORY = 'skip.item';
+
+/** The "View …" button's identifier, routed like a plain tap. */
+export const VIEW_ACTION = 'view';
+
+/** "Remind me in 1 hour", handled by the content extension on the phone. */
+export const SNOOZE_ACTION = 'snooze';
+
+function registerCategories(): Promise<unknown> {
+  return Notifications.setNotificationCategoryAsync(NOTIFICATION_CATEGORY, [
+    { identifier: VIEW_ACTION, buttonTitle: 'View', options: { opensAppToForeground: true } },
+    {
+      identifier: SNOOZE_ACTION,
+      buttonTitle: 'Remind me in 1 hour',
+      options: { opensAppToForeground: false },
+    },
+  ]);
+}
+
 /**
  * Where a tapped notification is allowed to take somebody.
  *
@@ -224,7 +259,35 @@ export function useRegisterPush(): void {
  */
 const TAP_ROUTES: Record<string, Href> = {
   '/add-receipt': '/add-receipt',
+  '/splits': '/splits',
+  '/transactions': '/transactions',
 };
+
+/**
+ * Routes for one item, which also need its id: the bill, subscription, card
+ * or account the notification was about. The id must look like a row id, so
+ * the payload can name a record and nothing else.
+ */
+const ITEM_ROUTES = {
+  '/bill': '/bill/[id]',
+  '/subscription': '/subscription/[id]',
+  '/source': '/source/[id]',
+} as const;
+
+const ROW_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The screen a notification's data asks for, if this build allows it. */
+export function tapTarget(data: Record<string, unknown> | undefined): Href | undefined {
+  const asked = data?.route;
+  if (typeof asked !== 'string') return undefined;
+  if (asked in TAP_ROUTES) return TAP_ROUTES[asked];
+  if (asked in ITEM_ROUTES) {
+    const id = data?.id;
+    if (typeof id !== 'string' || !ROW_ID.test(id)) return undefined;
+    return { pathname: ITEM_ROUTES[asked as keyof typeof ITEM_ROUTES], params: { id } } as Href;
+  }
+  return undefined;
+}
 
 /** How long to wait for a navigator before giving the tap up, in ms. */
 const NAVIGATOR_WAIT = 10_000;
@@ -268,17 +331,17 @@ export function useNotificationRouting(): void {
   useEffect(() => {
     if (!response) return;
 
-    // A plain tap only. Dismissing a notification is not a request to go
-    // anywhere, and this app defines no action buttons.
-    if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
+    // A plain tap, or the card's "View" button. Dismissing is not a request
+    // to go anywhere, and "Remind me in 1 hour" is answered on the phone.
+    const action = response.actionIdentifier;
+    if (action !== Notifications.DEFAULT_ACTION_IDENTIFIER && action !== VIEW_ACTION) return;
 
     // Signed out, every route behind the session is the wrong place to land.
     // userId is a dependency, so a tap that arrives first is honoured once the
     // session has been read rather than being thrown away.
     if (!userId) return;
 
-    const asked = response.notification.request.content.data?.route;
-    const target = typeof asked === 'string' ? TAP_ROUTES[asked] : undefined;
+    const target = tapTarget(response.notification.request.content.data);
     if (!target) return;
 
     let timer: ReturnType<typeof setTimeout> | undefined;

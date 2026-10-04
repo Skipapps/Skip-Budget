@@ -10,6 +10,7 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.skipapps.skip.budget",
+      "appleTeamId": "2YDDY7H6XP",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -72,6 +73,7 @@
         }
       ],
       "expo-notifications",
+      "@bacons/apple-targets",
       [
         "./plugins/with-signing.js",
         {

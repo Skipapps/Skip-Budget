@@ -35,11 +35,24 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
+import {
+  billGlyph,
+  chargePayload,
+  digestPayload,
+  money,
+  noticePayload,
+  receiptsPayload,
+  reminderPayload,
+  type SourceRow,
+  type TapPayload,
+} from './card.ts';
+
 const BUNDLE_ID = 'com.skipapps.skip.budget';
 
-// Where a tapped receipts reminder lands. The phone treats this as a name to
-// look up in its own allow-list, not as a URL to open — see src/api/push.ts.
-const RECEIPT_TAP = { route: '/add-receipt' } as const;
+// The category every Skip notification carries. It is what tells iOS to run
+// the content extension (targets/notification-content) on press-and-hold, and
+// it names the action buttons the app registers in src/api/push.ts.
+const CATEGORY = 'skip.item';
 
 const HOSTS = {
   development: 'https://api.sandbox.push.apple.com',
@@ -101,8 +114,9 @@ async function providerToken(): Promise<string> {
 
 type SendResult = { ok: boolean; reason?: string; environment?: Environment };
 
-/**
- * What the phone should do when the notification is tapped.
+/*
+ * What the phone should do with the notification: where a tap lands, and the
+ * card it draws (see ./card.ts).
  *
  * Sent as a top-level `body` object beside `aps`, which reads like a mistake
  * and is not: expo-notifications takes a *remote* notification's `content.data`
@@ -111,10 +125,11 @@ type SendResult = { ok: boolean; reason?: string; environment?: Environment };
  * installed module's own source, expo-notifications@57.0.13,
  * ios/ExpoNotifications/Notifications/NotificationRecords.swift:328-334.
  *
- * Undefined for every existing notification, which keeps their payloads
- * byte-for-byte what they were.
+ * A payload with a card also sets `mutable-content`, which is what wakes the
+ * service extension (targets/notification-service) to attach the logo before
+ * the banner shows. Without the extension on the phone — an older build — the
+ * flag is ignored and the notification arrives as plain text, as before.
  */
-type TapPayload = { route: string };
 
 async function pushOnce(
   token: string,
@@ -135,7 +150,12 @@ async function pushOnce(
       'apns-priority': '10',
     },
     body: JSON.stringify({
-      aps: { alert: { title, body }, sound: 'default', badge: 1 },
+      aps: {
+        alert: { title, body },
+        sound: 'default',
+        badge: 1,
+        ...(data?.card ? { 'mutable-content': 1, category: CATEGORY } : {}),
+      },
       ...(data ? { body: data } : {}),
     }),
   });
@@ -201,6 +221,304 @@ async function tokensFor(
   return (data ?? []) as TokenRow[];
 }
 
+type Charge = { user_id: string; label: string; amount: number; charged_on: string };
+
+type Context = {
+  reminders: Map<
+    string,
+    {
+      bill_id: string | null;
+      subscription_id: string | null;
+      card_id: string | null;
+      bank_account_id: string | null;
+    }
+  >;
+  bills: Map<
+    string,
+    {
+      category_id: string | null;
+      icon_id: string | null;
+      card_id: string | null;
+      bank_account_id: string | null;
+      logo_path: string | null;
+    }
+  >;
+  subscriptions: Map<
+    string,
+    {
+      category_id: string | null;
+      card_id: string | null;
+      bank_account_id: string | null;
+      logo_path: string | null;
+    }
+  >;
+  sources: Map<string, SourceRow>;
+  /** user|label|charged_on → the plan and payer behind a recorded charge. */
+  charges: Map<
+    string,
+    {
+      bill_id: string | null;
+      subscription_id: string | null;
+      card_id: string | null;
+      bank_account_id: string | null;
+    }
+  >;
+};
+
+const EMPTY: Context = {
+  reminders: new Map(),
+  bills: new Map(),
+  subscriptions: new Map(),
+  sources: new Map(),
+  charges: new Map(),
+};
+
+const chargeKey = (userId: string, label: string, chargedOn: string) =>
+  `${userId}|${label}|${chargedOn}`;
+
+/** A to-one embed arrives as an object, or as a one-row array from some joins. */
+function logoOf(brands: unknown): string | null {
+  const row = Array.isArray(brands) ? brands[0] : brands;
+  return (row as { logo_path?: string | null } | null)?.logo_path ?? null;
+}
+
+/**
+ * What each notification is about, for its card: the bill or subscription
+ * behind it, its brand logo and category, and who pays.
+ *
+ * Best effort. Every notification can go out without this, as plain text, so
+ * a failed read here is logged and the run carries on with an empty context
+ * rather than holding back somebody's reminder for a picture.
+ */
+async function loadContext(
+  supabase: ReturnType<typeof createClient>,
+  reminderIds: string[],
+  charges: Charge[],
+): Promise<Context> {
+  try {
+    const ctx: Context = {
+      reminders: new Map(),
+      bills: new Map(),
+      subscriptions: new Map(),
+      sources: new Map(),
+      charges: new Map(),
+    };
+
+    if (reminderIds.length > 0) {
+      const { data, error } = await supabase
+        .from('reminders')
+        .select('id, bill_id, subscription_id, card_id, bank_account_id')
+        .in('id', reminderIds);
+      if (error) throw error;
+      for (const row of (data ?? []) as { id: string }[]) ctx.reminders.set(row.id, row as never);
+    }
+
+    if (charges.length > 0) {
+      const { data, error } = await supabase
+        .from('charges')
+        .select('user_id, label, charged_on, bill_id, subscription_id, card_id, bank_account_id')
+        .in('user_id', [...new Set(charges.map((c) => c.user_id))])
+        .in('charged_on', [...new Set(charges.map((c) => c.charged_on))]);
+      if (error) throw error;
+      for (const row of (data ?? []) as { user_id: string; label: string; charged_on: string }[]) {
+        ctx.charges.set(chargeKey(row.user_id, row.label, row.charged_on), row as never);
+      }
+    }
+
+    const plans = [...ctx.reminders.values(), ...ctx.charges.values()];
+    const billIds = [...new Set(plans.map((p) => p.bill_id).filter(Boolean))] as string[];
+    const subscriptionIds = [
+      ...new Set(plans.map((p) => p.subscription_id).filter(Boolean)),
+    ] as string[];
+
+    if (billIds.length > 0) {
+      const { data, error } = await supabase
+        .from('bills')
+        .select('id, category_id, icon_id, card_id, bank_account_id, brands(logo_path)')
+        .in('id', billIds);
+      if (error) throw error;
+      type BillRow = {
+        id: string;
+        category_id: string | null;
+        icon_id: string | null;
+        card_id: string | null;
+        bank_account_id: string | null;
+        brands: unknown;
+      };
+      for (const row of (data ?? []) as unknown as BillRow[]) {
+        ctx.bills.set(row.id, {
+          category_id: row.category_id,
+          icon_id: row.icon_id,
+          card_id: row.card_id,
+          bank_account_id: row.bank_account_id,
+          logo_path: logoOf(row.brands),
+        });
+      }
+    }
+
+    if (subscriptionIds.length > 0) {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('id, category_id, card_id, bank_account_id, brands(logo_path)')
+        .in('id', subscriptionIds);
+      if (error) throw error;
+      type SubscriptionRow = {
+        id: string;
+        category_id: string | null;
+        card_id: string | null;
+        bank_account_id: string | null;
+        brands: unknown;
+      };
+      for (const row of (data ?? []) as unknown as SubscriptionRow[]) {
+        ctx.subscriptions.set(row.id, {
+          category_id: row.category_id,
+          card_id: row.card_id,
+          bank_account_id: row.bank_account_id,
+          logo_path: logoOf(row.brands),
+        });
+      }
+    }
+
+    const payers = [...plans, ...ctx.bills.values(), ...ctx.subscriptions.values()];
+    const cardIds = [...new Set(payers.map((p) => p.card_id).filter(Boolean))] as string[];
+    const accountIds = [
+      ...new Set(payers.map((p) => p.bank_account_id).filter(Boolean)),
+    ] as string[];
+
+    if (cardIds.length > 0) {
+      const { data, error } = await supabase
+        .from('cards')
+        .select('id, network, last4')
+        .in('id', cardIds);
+      if (error) throw error;
+      for (const row of (data ?? []) as { id: string; network: string; last4: string | null }[]) {
+        ctx.sources.set(row.id, { kind: 'card', network: row.network, last4: row.last4 });
+      }
+    }
+
+    if (accountIds.length > 0) {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('id, bank_name, nickname, last4')
+        .in('id', accountIds);
+      if (error) throw error;
+      for (const row of (data ?? []) as {
+        id: string;
+        bank_name: string;
+        nickname: string | null;
+        last4: string | null;
+      }[]) {
+        ctx.sources.set(row.id, {
+          kind: 'account',
+          bank_name: row.bank_name,
+          nickname: row.nickname,
+          last4: row.last4,
+        });
+      }
+    }
+
+    return ctx;
+  } catch (error) {
+    console.error('notification context failed', (error as Error)?.message ?? error);
+    return EMPTY;
+  }
+}
+
+/** The card for one reminder; undefined when it is not known what it is about. */
+function reminderData(
+  ctx: Context,
+  supabaseUrl: string,
+  row: { reminder_id: string; title: string; body: string },
+): TapPayload | undefined {
+  const target = ctx.reminders.get(row.reminder_id);
+  if (!target) return undefined;
+  const payerOf = (plan?: { card_id: string | null; bank_account_id: string | null }) =>
+    plan ? ctx.sources.get(plan.card_id ?? plan.bank_account_id ?? '') : undefined;
+
+  if (target.subscription_id) {
+    const plan = ctx.subscriptions.get(target.subscription_id);
+    return reminderPayload(
+      {
+        kind: 'subscription',
+        title: row.title,
+        body: row.body,
+        targetId: target.subscription_id,
+        logoPath: plan?.logo_path,
+        categoryId: plan?.category_id,
+        payer: payerOf(plan),
+      },
+      supabaseUrl,
+    );
+  }
+  if (target.bill_id) {
+    const plan = ctx.bills.get(target.bill_id);
+    return reminderPayload(
+      {
+        kind: 'bill',
+        title: row.title,
+        body: row.body,
+        targetId: target.bill_id,
+        logoPath: plan?.logo_path,
+        categoryId: plan?.category_id,
+        iconId: plan?.icon_id,
+        payer: payerOf(plan),
+      },
+      supabaseUrl,
+    );
+  }
+  if (target.card_id) {
+    return reminderPayload(
+      {
+        kind: 'card',
+        title: row.title,
+        body: row.body,
+        targetId: target.card_id,
+        self: ctx.sources.get(target.card_id),
+      },
+      supabaseUrl,
+    );
+  }
+  if (target.bank_account_id) {
+    return reminderPayload(
+      {
+        kind: 'account',
+        title: row.title,
+        body: row.body,
+        targetId: target.bank_account_id,
+        self: ctx.sources.get(target.bank_account_id),
+      },
+      supabaseUrl,
+    );
+  }
+  return undefined;
+}
+
+/** The card for one recorded charge. */
+function chargeData(ctx: Context, supabaseUrl: string, charge: Charge): TapPayload {
+  const found = ctx.charges.get(chargeKey(charge.user_id, charge.label, charge.charged_on));
+  const bill = found?.bill_id ? ctx.bills.get(found.bill_id) : undefined;
+  const subscription = found?.subscription_id
+    ? ctx.subscriptions.get(found.subscription_id)
+    : undefined;
+  return chargePayload(
+    {
+      label: charge.label,
+      amount: Number(charge.amount),
+      chargedOn: charge.charged_on,
+      billId: found?.bill_id,
+      subscriptionId: found?.subscription_id,
+      logoPath: subscription?.logo_path ?? bill?.logo_path,
+      glyph: subscription
+        ? subscription.category_id
+        : bill
+          ? billGlyph(bill.category_id, bill.icon_id)
+          : undefined,
+      payer: found ? ctx.sources.get(found.card_id ?? found.bank_account_id ?? '') : undefined,
+    },
+    supabaseUrl,
+  );
+}
+
 Deno.serve(async (request) => {
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -245,12 +563,7 @@ Deno.serve(async (request) => {
   const { error: rollError } = await supabase.rpc('roll_schedules_forward');
   if (rollError) console.error('roll_schedules_forward failed', rollError.message);
 
-  const charges = (recorded ?? []) as {
-    user_id: string;
-    label: string;
-    amount: number;
-    charged_on: string;
-  }[];
+  const charges = (recorded ?? []) as Charge[];
 
   const { data: due, error } = await supabase.rpc('reminders_due');
   if (error) {
@@ -308,6 +621,12 @@ Deno.serve(async (request) => {
   }
 
   const jwt = await providerToken();
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const ctx = await loadContext(
+    supabase,
+    rows.map((row) => row.reminder_id),
+    charges,
+  );
   let sent = 0;
   let announced = 0;
 
@@ -328,19 +647,27 @@ Deno.serve(async (request) => {
     const title = theirs.length > 3 ? 'Payments went out' : theirs[0].label;
     const body =
       theirs.length > 3
-        ? `${theirs.length} charges · $${total.toFixed(2)}`
-        : theirs.map((c) => `$${Math.abs(Number(c.amount)).toFixed(2)} went out`).join(' · ');
+        ? `${theirs.length} charges · ${money(total)}`
+        : theirs.map((c) => `${money(Number(c.amount))} went out`).join(' · ');
+    // One card per notification: the charge itself, or the digest. Two or
+    // three charges for one person share a notification today, so the card
+    // shows the first and the body lists them all.
+    const data =
+      theirs.length > 3
+        ? digestPayload(theirs.length, total)
+        : chargeData(ctx, supabaseUrl, theirs[0]);
 
     for (const tokenRow of tokens) {
-      if (await push(supabase, tokenRow, jwt, title, body)) announced += 1;
+      if (await push(supabase, tokenRow, jwt, title, body, data)) announced += 1;
     }
   }
 
   // ---- Remind about what is coming --------------------------------------
   for (const row of rows) {
     let delivered = false;
+    const data = reminderData(ctx, supabaseUrl, row);
     for (const tokenRow of await tokensFor(supabase, row.user_id)) {
-      if (await push(supabase, tokenRow, jwt, row.title, row.body)) delivered = true;
+      if (await push(supabase, tokenRow, jwt, row.title, row.body, data)) delivered = true;
     }
 
     // Stamped only on a delivery. A reminder nobody could be sent stays due,
@@ -358,8 +685,9 @@ Deno.serve(async (request) => {
   let shared = 0;
   for (const notice of notices) {
     let delivered = false;
+    const data = noticePayload(notice.title, notice.body);
     for (const tokenRow of await tokensFor(supabase, notice.user_id)) {
-      if (await push(supabase, tokenRow, jwt, notice.title, notice.body)) delivered = true;
+      if (await push(supabase, tokenRow, jwt, notice.title, notice.body, data)) delivered = true;
     }
 
     // No stamping here any more. split_notices_due claims its rows and marks
@@ -374,7 +702,18 @@ Deno.serve(async (request) => {
   for (const row of receipts) {
     let delivered = false;
     for (const tokenRow of await tokensFor(supabase, row.user_id)) {
-      if (await push(supabase, tokenRow, jwt, row.title, row.body, RECEIPT_TAP)) delivered = true;
+      if (
+        await push(
+          supabase,
+          tokenRow,
+          jwt,
+          row.title,
+          row.body,
+          receiptsPayload(row.title, row.body),
+        )
+      ) {
+        delivered = true;
+      }
     }
 
     // Same rule as a reminder: stamped only on a delivery, so a day nobody

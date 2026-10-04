@@ -11,7 +11,9 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 
 // babel-plugin-jest-hoist lifts every jest.mock() below above this line, so the
 // module under test still loads against the mocks despite being imported here.
-import { forgetDevice, useNotificationRouting } from './push';
+import * as Notifications from 'expo-notifications';
+
+import { enableReminders, forgetDevice, tapTarget, useNotificationRouting } from './push';
 
 const mockPush = jest.fn();
 let mockIsDevice = false;
@@ -31,6 +33,7 @@ jest.mock('expo-notifications', () => ({
   useLastNotificationResponse: () => mockResponse,
   clearLastNotificationResponseAsync: () => mockClear(),
   setBadgeCountAsync: jest.fn(() => Promise.resolve(0)),
+  setNotificationCategoryAsync: jest.fn(() => Promise.resolve(null)),
   getPermissionsAsync: jest.fn(() => Promise.resolve({ granted: false, ios: {} })),
   requestPermissionsAsync: jest.fn(() => Promise.resolve({ granted: false, ios: {} })),
   getDevicePushTokenAsync: jest.fn(() => Promise.resolve({ data: mockToken })),
@@ -59,7 +62,12 @@ jest.mock('@/lib/supabase', () => ({
 const eqCalls: [string, unknown][] = [];
 let deleted = false;
 let deleteError: { message: string } | null = null;
-const mockFrom = jest.fn((_table: string) => ({
+const updates: [string, unknown][] = [];
+const mockFrom = jest.fn((table: string) => ({
+  update: (values: unknown) => {
+    updates.push([table, values]);
+    return { eq: () => Promise.resolve({ error: null }) };
+  },
   delete: () => {
     deleted = true;
     const chain = {
@@ -85,6 +93,37 @@ function tap(data: Record<string, unknown>, actionIdentifier = DEFAULT_ACTION) {
   };
 }
 
+const BILL_ID = '6ba21f34-d139-409a-87ce-5bba6e200646';
+
+/**
+ * Where a notification may send somebody: a name from this build's list,
+ * plus a row id for the per-item screens — and nothing a payload makes up.
+ */
+describe('tapTarget', () => {
+  it.each([
+    ['/bill', '/bill/[id]'],
+    ['/subscription', '/subscription/[id]'],
+    ['/source', '/source/[id]'],
+  ])('opens %s for one item', (route, pathname) => {
+    expect(tapTarget({ route, id: BILL_ID })).toEqual({ pathname, params: { id: BILL_ID } });
+  });
+
+  it('opens the screens that need no id', () => {
+    expect(tapTarget({ route: '/add-receipt' })).toBe('/add-receipt');
+    expect(tapTarget({ route: '/splits' })).toBe('/splits');
+    expect(tapTarget({ route: '/transactions' })).toBe('/transactions');
+  });
+
+  it.each([
+    ['no id', { route: '/bill' }],
+    ['an id that is not a row id', { route: '/bill', id: '../settings' }],
+    ['a route that is not on the list', { route: '/delete-account', id: BILL_ID }],
+    ['nothing at all', undefined],
+  ])('refuses %s', (_label, data) => {
+    expect(tapTarget(data as Record<string, unknown> | undefined)).toBeUndefined();
+  });
+});
+
 describe('useNotificationRouting', () => {
   beforeEach(() => {
     mockPush.mockClear();
@@ -100,6 +139,20 @@ describe('useNotificationRouting', () => {
     await renderHook(() => useNotificationRouting());
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/add-receipt'));
     expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the bill a notification is about from its View button', async () => {
+    mockResponse = tap({ route: '/bill', id: BILL_ID }, 'view');
+    await renderHook(() => useNotificationRouting());
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith({ pathname: '/bill/[id]', params: { id: BILL_ID } }),
+    );
+  });
+
+  it('leaves Remind me in 1 hour to the phone, opening nothing', async () => {
+    mockResponse = tap({ route: '/bill', id: BILL_ID }, 'snooze');
+    await renderHook(() => useNotificationRouting());
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('clears the response so a reload cannot replay the tap', async () => {
@@ -272,5 +325,45 @@ describe('forgetDevice', () => {
     await expect(forgetDevice('user-A')).rejects.toThrow(
       'permission denied for table device_tokens',
     );
+  });
+});
+
+/**
+ * The ask happens on a simulator too. Permission is local and works there;
+ * only the push token needs a real phone. Guarding the ask as well meant a
+ * simulator never showed the prompt, so pushes delivered to it with
+ * `xcrun simctl push` were dropped for want of a yes.
+ */
+describe('enableReminders', () => {
+  beforeEach(() => {
+    jest.mocked(Notifications.requestPermissionsAsync).mockClear();
+    jest.mocked(Notifications.getDevicePushTokenAsync).mockClear();
+    updates.length = 0;
+    mockIsDevice = false;
+  });
+
+  it('asks for permission on a simulator', async () => {
+    await enableReminders('user-A');
+    expect(Notifications.requestPermissionsAsync).toHaveBeenCalled();
+  });
+
+  it('turns reminders on for the account once allowed, without asking a simulator for a token', async () => {
+    jest
+      .mocked(Notifications.requestPermissionsAsync)
+      .mockResolvedValueOnce({ granted: true, ios: {} } as never);
+
+    await expect(enableReminders('user-A')).resolves.toBe(true);
+
+    expect(Notifications.getDevicePushTokenAsync).not.toHaveBeenCalled();
+    expect(
+      updates.some(
+        ([table, values]) => table === 'profiles' && 'reminders_enabled_at' in (values as object),
+      ),
+    ).toBe(true);
+  });
+
+  it('reports a refusal', async () => {
+    await expect(enableReminders('user-A')).resolves.toBe(false);
+    expect(updates).toHaveLength(0);
   });
 });
