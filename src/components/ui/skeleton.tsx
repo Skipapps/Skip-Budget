@@ -10,13 +10,7 @@ import Animated, {
 
 import { cn } from '@/lib/cn';
 
-/**
- * A block that breathes while data loads.
- *
- * Skeletons rather than a spinner: a spinner says "something is happening",
- * a skeleton says "a list is arriving and here is its shape", so the page
- * does not jump when the rows land.
- */
+/** A block that breathes while data loads. A skeleton, not a spinner, so the page does not jump when rows land. */
 export function Skeleton({ className, style }: { className?: string; style?: object }) {
   const pulse = useSharedValue(0.5);
   const reduced = useReducedMotion();
@@ -38,10 +32,7 @@ export function Skeleton({ className, style }: { className?: string; style?: obj
   );
 }
 
-/**
- * Placeholder shaped like a receipt or subscription row: leading mark, two
- * stacked lines, and an amount column on the right.
- */
+/** Placeholder shaped like a receipt or subscription row. */
 export function SkeletonRow() {
   return (
     <View className="w-full flex-row items-center gap-3 py-3.5">

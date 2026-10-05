@@ -5,7 +5,6 @@ export type AccountType = (typeof ACCOUNT_TYPES)[number];
 export type BankAccount = {
   id: string;
   bankName: string;
-  /** User's nickname for the account. */
   nickname: string;
   accountType: AccountType;
   balance: number;

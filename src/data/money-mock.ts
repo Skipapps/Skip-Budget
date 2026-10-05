@@ -1,10 +1,6 @@
 /**
- * The two tiles under Money on the cards screen.
- *
- * Definitions only — a label and which artwork to draw. The figures beside
- * them are the real ones, read from salary sources and savings pots by the
- * screen itself. There used to be sample amounts here as well, and leaving
- * them was an invitation to render an invented balance in a budgeting app.
+ * The two tiles under Money on the cards screen. Label and artwork only: the screen reads the
+ * figures from salary sources and savings pots.
  */
 import type { ArtworkName } from '@/theme/artwork';
 

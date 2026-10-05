@@ -14,14 +14,7 @@ type ChoiceChipsProps<T extends string> = {
   onChange: (value: T) => void;
 };
 
-/**
- * Pick-one chips that wrap. The one "choose" shape in the app.
- *
- * No border: the tonal fill already separates the chip from the page, and a
- * chip that is both filled and outlined is two separations doing one job. The
- * 40pt height plus 4pt of vertical hitSlop clears the 44pt target floor
- * without making the row look like a stack of buttons.
- */
+/** Pick-one chips that wrap. 40pt tall plus 4pt of vertical hitSlop clears the 44pt target floor. */
 export function ChoiceChips<T extends string>({ options, value, onChange }: ChoiceChipsProps<T>) {
   return (
     <View accessibilityRole="radiogroup" className="w-full flex-row flex-wrap gap-2">

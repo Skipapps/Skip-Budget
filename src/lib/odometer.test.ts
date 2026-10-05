@@ -2,7 +2,6 @@ import { faceAt, planTurn } from '@/lib/odometer';
 
 const LINE = 20;
 
-/** What the window actually shows at each end of the turn. */
 const shows = (turn: ReturnType<typeof planTurn>, offset: number) =>
   turn.faces[faceAt(offset, LINE)];
 
@@ -38,9 +37,7 @@ describe('planTurn', () => {
   });
 
   it('crosses the 9-to-0 seam in one step, not nine', () => {
-    // Counting up past 9 is a single step forwards.
     expect(planTurn(9, 0, true, LINE).faces).toEqual([9, 0]);
-    // And counting down past 0 is a single step back.
     expect(planTurn(0, 9, false, LINE).faces).toEqual([9, 0]);
   });
 
@@ -48,7 +45,6 @@ describe('planTurn', () => {
     for (let from = 0; from < 10; from += 1) {
       for (let to = 0; to < 10; to += 1) {
         if (from === to) continue;
-        // Up: the strip slides so later faces come into view from below.
         expect(planTurn(from, to, true, LINE).endOffset).toBeLessThan(
           planTurn(from, to, true, LINE).startOffset,
         );

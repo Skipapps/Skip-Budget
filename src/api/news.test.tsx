@@ -4,11 +4,6 @@ import type { ReactNode } from 'react';
 
 import { useHasUnreadNews, useMarkNewsSeen } from '@/api/news';
 
-/**
- * The dot on the Home bell: lit while the newest published item is newer than
- * the newest one seen, out once Notifications has been opened.
- */
-
 const mockStorage = new Map<string, string>();
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,

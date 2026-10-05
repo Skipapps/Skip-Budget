@@ -18,22 +18,15 @@ type Ask = (request: DialogRequest) => Promise<string | null>;
 const DialogContext = createContext<Ask | null>(null);
 
 /**
- * Makes the app's dialog callable the way Alert.alert was.
- *
- * Awaiting a promise keeps the call sites reading top to bottom — `if (await
- * ask(...)) { delete }` — instead of every screen growing its own open flag and
- * a callback that has to reach back into the handler it came from.
- *
- * One dialog at a time, mounted at the root, so it renders above every screen
- * and modal rather than inside whichever one happened to raise it.
+ * Makes the app's dialog callable like Alert.alert: awaiting a promise keeps call sites reading top
+ * to bottom. One dialog at a time, mounted at the root so it renders above every screen and modal.
  */
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [request, setRequest] = useState<DialogRequest | null>(null);
   const resolver = useRef<((value: string | null) => void) | null>(null);
 
   const ask = useCallback<Ask>((next) => {
-    // A second dialog while one is open would strand the first promise, so the
-    // one being replaced is settled as a cancel.
+    // A second dialog would strand the first promise, so the replaced one settles as a cancel.
     resolver.current?.(null);
 
     return new Promise<string | null>((resolve) => {
@@ -49,9 +42,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     settle?.(actionId);
   }, []);
 
-  // A dialog belongs to the screen that raised it. Navigating away — a deep
-  // link, a notification — would otherwise leave it floating over whatever
-  // came next, asking about a screen that is no longer there.
+  // A dialog belongs to the screen that raised it: navigating away (deep link, notification) would
+  // otherwise leave it floating over the next screen.
   const pathname = usePathname();
   const raisedOn = useRef(pathname);
   useEffect(() => {
@@ -79,7 +71,6 @@ export function useDialog(): Ask {
   return ask;
 }
 
-/** Yes/no shorthand, which is most of the call sites. */
 export function useConfirm() {
   const ask = useDialog();
 

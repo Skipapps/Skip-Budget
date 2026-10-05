@@ -1,7 +1,3 @@
-/**
- * Placeholder wallet contents. Sample data only — replaced once cards come
- * from the database.
- */
 export type PaymentCard = {
   id: string;
   holder: string;

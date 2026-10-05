@@ -11,9 +11,8 @@ import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
 /**
- * Derived from expo-router's public Tabs API. `@react-navigation/bottom-tabs`
- * is vendored inside expo-router rather than installed, so deep-importing its
- * types would break on any internal reshuffle.
+ * Derived from expo-router's public Tabs API: `@react-navigation/bottom-tabs` is vendored inside
+ * it, so deep-importing its types would break on any internal reshuffle.
  */
 type SkipTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
@@ -25,22 +24,12 @@ const TAB_ICONS: Record<string, LucideIcon> = {
 };
 
 /**
- * Floating pill tab bar, with the round Voice button beside it (the Founder's
- * Figma, 2026-10-03).
+ * Floating pill tab bar with the round Voice button beside it, the same height so they read as one
+ * row. The selected tab expands into a filled accent pill carrying its label.
  *
- * The selected destination expands into a filled accent pill carrying its
- * label; the rest stay as plain icons so the bar reads quietly. Filled rather
- * than outlined because an outline is the same weight as the bar's own edge —
- * it says "here is a shape" where a solid says "you are here".
- *
- * The bar and the Voice circle are the same height, so they read as one row:
- * where you can go, then the one thing you can do from anywhere.
- *
- * The outer view is bigger than what it draws: 8pt above, the home
- * indicator's inset below and the gutter either side, all painted in the
- * page's own colour. That band is not part of the control, so it does not take
- * touches — `box-none` lets anything aimed at it through to whatever is behind,
- * and only the pill, its buttons and the Voice circle respond.
+ * The outer view is bigger than the pill (8pt above, the home indicator's inset below, the gutter
+ * either side, all painted in the page colour). That band is not part of the control, so `box-none`
+ * lets touches through to whatever is behind it.
  */
 export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) {
   const colors = useColors();
@@ -81,9 +70,8 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
                 accessibilityState={{ selected: focused }}
                 accessibilityLabel={label}
                 onPress={withTap(handlePress)}
-                // The selected pill keeps its full width; the plain icons give
-                // way around it, from 48pt down to 40, so a 375pt phone still
-                // fits the row without clipping a label.
+                // The selected pill keeps its full width; plain icons give way around it (48pt down
+                // to 40) so a 375pt phone fits the row without clipping a label.
                 className={cn(
                   'h-[48px] flex-row items-center justify-center rounded-full',
                   focused
@@ -94,9 +82,7 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
                 {Icon ? (
                   <Icon
                     size={22}
-                    // The pill's own foreground, the same as the label beside
-                    // it. Hardcoded white sat at 2.11:1 on a pale accent, next
-                    // to a near-black label inside the same pill.
+                    // Same foreground as the label beside it, rather than hardcoded white.
                     color={focused ? colors.onControl : colors.muted}
                     strokeWidth={2}
                     absoluteStrokeWidth

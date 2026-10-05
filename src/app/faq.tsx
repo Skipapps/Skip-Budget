@@ -15,14 +15,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 type Entry = { question: string; answer: string };
 
-/**
- * Answers that ship with the release they describe.
- *
- * In the app rather than on a server, on purpose: it works offline, it opens
- * instantly, and the copy is versioned with the code it explains — an FAQ that
- * can drift ahead of the app is one that lies about it. The trade is that a
- * fix needs a release, which is the right trade while the answers are few.
- */
+/** Bundled with the app, not fetched: works offline and is versioned with the code it explains. */
 const GROUPS: { title: string; entries: Entry[] }[] = [
   {
     title: 'Getting started',
@@ -196,14 +189,7 @@ export default function FaqScreen() {
   );
 }
 
-/**
- * One question, dressed as a card.
- *
- * The same surface as a group or a tour stop — rounded, bordered, gently
- * lifted — so the FAQ reads as a stack of things to pick up rather than a
- * legal document. The whole card is the button: a tap target the size of the
- * question, not a chevron the size of a fingertip.
- */
+/** One question as a card. The whole card is the tap target, not just the chevron. */
 function QuestionCard({ question, answer }: Entry) {
   const colors = useColors();
   const [open, setOpen] = useState(false);
@@ -230,8 +216,6 @@ function QuestionCard({ question, answer }: Entry) {
         >
           {question}
         </Text>
-        {/* Rotation instead of an icon swap: the same chevron turning is the
-            card visibly opening, not one symbol replaced by another. */}
         <View style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
           <ChevronDown size={18} color={colors.muted} strokeWidth={2} />
         </View>

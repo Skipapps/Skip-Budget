@@ -11,12 +11,11 @@ type TextFieldProps = {
   value: string;
   onChangeText: (value: string) => void;
   placeholder?: string;
-  /** Validation message. Wired up with the auth work; unused for now. */
   error?: string;
   className?: string;
   /** Optional-field hint, shown next to the label rather than in the input. */
   optional?: boolean;
-  /** Sits in the field's trailing corner — a tick, a unit, a small action. */
+  /** Sits in the field's trailing corner: a tick, a unit, a small action. */
   trailing?: ReactNode;
 } & Pick<
   TextInputProps,
@@ -33,10 +32,7 @@ type TextFieldProps = {
   | 'maxLength'
 >;
 
-/**
- * Labelled text input with 10px corners. Password fields get a reveal toggle;
- * the eye sits inside the border so the tap target never overlaps the text.
- */
+/** Labelled text input. Password fields get a reveal toggle inside the border, so its tap target never overlaps the text. */
 export function TextField({
   label,
   value,
@@ -69,8 +65,7 @@ export function TextField({
       <View
         className={cn(
           'w-full rounded-[12px] border px-5',
-          // A multiline box grows downward, so the input must sit at the top
-          // rather than be vertically centred like a single-line field.
+          // A multiline box grows downward, so the input sits at the top rather than centred.
           multiline ? 'min-h-24 py-1' : 'min-h-14 flex-row items-center',
           error ? 'border-danger' : focused ? 'border-control' : 'border-line',
         )}
@@ -87,9 +82,8 @@ export function TextField({
           className={cn('flex-1 py-4 font-poppins text-[16px] text-ink', multiline && 'min-h-20')}
           maxFontSizeMultiplier={1.5}
           {...inputProps}
-          // After the spread, and calling through: a caller passing onBlur
-          // would otherwise replace the one that clears the focus ring, and
-          // the field would sit looking focused for the rest of the session.
+          // After the spread, and calling through: a caller's onBlur would otherwise replace the one
+          // that clears the focus ring, leaving the field looking focused.
           onBlur={(event) => {
             setFocused(false);
             inputProps.onBlur?.(event);

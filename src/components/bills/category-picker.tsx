@@ -10,10 +10,7 @@ type CategoryPickerProps = {
   selectedId?: string;
 };
 
-/**
- * Grid of the common recurring bills. Two-up so the label and its hint have
- * room to read — a four-up grid would truncate "Memberships & Services".
- */
+/** Grid of the common recurring bills, two-up so label and hint have room. */
 export function CategoryPicker({ onSelect, selectedId }: CategoryPickerProps) {
   const colors = useColors();
   return (

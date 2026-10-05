@@ -1,22 +1,14 @@
 /**
- * Step 2: self-corrections, slot by slot.
+ * Self-corrections, slot by slot. "Paid forty, no, fifty bucks for Comcast yesterday" corrects the
+ * amount and nothing else. Each value found by the other rules is a span with a slot (amount, date,
+ * merchant, cycle, category); a correction removes only earlier spans of the slot it corrects.
  *
- * "Paid forty, no, fifty bucks for Comcast yesterday" corrects the amount
- * and nothing else: Comcast and yesterday stand. Each value the other rules
- * found is a span with a slot (amount, date, merchant, cycle, category); a
- * correction removes only earlier spans of the slot it corrects.
- *
- * - **Strong triggers** — "no wait", "wait", "actually", "I mean", "sorry",
- *   "scratch that", "make that/it", "or rather", "hold on", "oops" — correct
- *   the slot of the next value said (within three words: "actually it was
- *   45"). Every earlier value of that slot goes. With no earlier value of
- *   that slot, nothing is removed ("Actually, I spent 40").
- * - **A bare "no"** is a correction only between two values of the *same*
- *   slot, side by side ("forty no fifty", "Walmart no Target"). Anywhere
- *   else it is just a word, which is why "No Frills groceries 40" keeps No
- *   Frills (and the brand rules claim "no frills" before this runs anyway).
- * - **"not"** between two values of the same slot drops the second:
- *   "forty not fifty" is forty.
+ * - **Strong triggers** ("no wait", "actually", "I mean", "sorry", "scratch that", "make that",
+ *   "or rather", "hold on", "oops") correct the slot of the next value said, within three words
+ *   ("actually it was 45"). With no earlier value of that slot, nothing is removed.
+ * - **A bare "no"** is a correction only between two values of the same slot, side by side ("forty
+ *   no fifty", "Walmart no Target"). Anywhere else it is just a word ("No Frills groceries 40").
+ * - **"not"** between two values of the same slot drops the second: "forty not fifty" is forty.
  */
 import type { Token } from './clean';
 
@@ -49,10 +41,7 @@ const GLUE = new Set(['it', 'its', 'was', 'is', 'that', 'the', 'i', 'meant', 'me
 const STRONG_REACH = 3;
 const GLUE_REACH = 2;
 
-/**
- * The spans a correction overrules. The caller drops them and reads each
- * slot from what is left.
- */
+/** The spans a correction overrules. The caller drops them and reads each slot from the rest. */
 export function overruledSpans(
   tokens: readonly Token[],
   spans: readonly SlotSpan[],

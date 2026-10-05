@@ -15,11 +15,9 @@ import {
 } from '@/lib/voice-draft';
 
 /**
- * The review page: nothing saves without a tap, one tap makes one row, and
- * what it writes is exactly what the add form would have written.
- *
- * The draft goes through the real store and the real builders; only the
- * network is replaced. Amounts are asserted as numbers, to the cent.
+ * The review page: nothing saves without a tap, one tap makes one row, and what it writes is
+ * exactly what the add form would have written. The draft goes through the real store and the real
+ * builders; only the network is replaced. Amounts are asserted as numbers, to the cent.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -208,7 +206,6 @@ describe('/voice-review — saving', () => {
     expect(success).toHaveBeenCalledTimes(1);
     expect(readVoiceDraft(id)).toBeNull();
     expect(router.dismissTo).toHaveBeenCalledWith('/home');
-    // Nothing was corrected, so nothing is learned.
     expect(mockLearn).not.toHaveBeenCalled();
   });
 

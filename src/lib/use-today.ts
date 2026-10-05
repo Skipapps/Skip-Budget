@@ -4,18 +4,12 @@ import { AppState } from 'react-native';
 import { toIsoDate } from '@/lib/date';
 
 /**
- * The current day, as state.
+ * The current day as state, always the device's local day (never the server's UTC).
  *
- * A date computed once at mount freezes: tab screens never unmount and iOS
- * keeps the app alive for days, so "today" read at first launch is still on
- * screen two mornings later. Reading the clock on every render is no better —
- * a backgrounded app does not re-render, and within one render two reads could
- * straddle midnight and put two sections on different days.
- *
- * Holding the day as state gives both halves: every consumer sees one
- * consistent day, and the page turns when the day actually changes — checked
- * on resume from background and once a minute while open. The date is always
- * the device's own local day; the server's UTC clock has no say here.
+ * Computing it once at mount freezes it: tab screens never unmount and iOS keeps the app alive
+ * for days. Reading the clock every render is no better: a backgrounded app does not re-render,
+ * and two reads in one render could straddle midnight. So the day is held as state and re-checked
+ * on resume from background and once a minute.
  */
 export function useToday(): { today: string; todayDate: Date } {
   const [today, setToday] = useState(() => toIsoDate(new Date()));

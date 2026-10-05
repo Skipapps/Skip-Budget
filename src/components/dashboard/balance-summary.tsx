@@ -20,23 +20,10 @@ type BalanceSummaryProps = {
 };
 
 /**
- * The dashboard's headline: what is left, and the two figures it came from.
- *
- * One card rather than a card and a pair beneath it. The three numbers are a
- * single sentence — income, less expenses, leaves this — and splitting them
- * across two surfaces asked the reader to join them back up. Income and
- * expenses sit inside the bottom edge of the same card at a quieter size, so
- * the hierarchy says which one the screen is about.
- *
- * Charcoal, the same surface the buttons and the add control use. A dark card
- * under its own foreground puts the figure further from its background than
- * any tint could, and it leaves colour to mean one thing on this screen.
- *
- * The two supporting figures are drawn in the card's foreground rather than in
- * the money pair: green and red are tuned to be read on the page, not on the
- * control surface, and on a pale accent the only legible member of that pair
- * is the near-black end of the ramp. Their labels and the minus sign carry the
- * direction instead, which is what they were doing anyway.
+ * The dashboard's headline: what is left and the two figures it came from, in one card. The
+ * supporting figures use the card's foreground, not the money pair: green and red are tuned for the
+ * page, and on a pale accent only the near-black end of the ramp is legible. Their labels and the
+ * minus sign carry the direction.
  */
 export function BalanceSummary({
   leftThisMonth,
@@ -50,14 +37,12 @@ export function BalanceSummary({
   const daysLeft = daysLeftInMonth(today);
   const daysLabel = daysLeft === 0 ? 'Last day' : `${daysLeft} days left`;
 
-  // Wheels cannot shrink to fit, so the size is chosen from the length of the
-  // figure instead. Someone with a seven-figure balance gets smaller type
-  // rather than a number running off the side of the card.
+  // Wheels cannot shrink to fit, so the size is chosen from the figure's length: a seven-figure
+  // balance gets smaller type rather than running off the card.
   const digits = formatCurrency(leftThisMonth).length;
   const fontSize = digits > 12 ? 28 : digits > 10 ? 34 : 40;
 
-  // What share of this month's income is already committed. Only meaningful
-  // once income is known, so the bar simply does not appear until it is.
+  // Share of this month's income already committed; null until income is known, so no bar shows.
   const spentShare = error || payday <= 0 ? null : Math.min(Math.max(expenses / payday, 0), 1);
 
   return (
@@ -89,8 +74,8 @@ export function BalanceSummary({
           </View>
         </View>
 
-        {/* A figure that failed to load is never guessed at: the card shows
-            that it has nothing rather than a total built from half a month. */}
+        {/* A failed figure is never guessed at: show nothing rather than a total built from half a
+            month. */}
         {error ? (
           <Text
             className="mt-3 text-center font-poppins-bold text-[40px] text-on-control"
@@ -133,11 +118,8 @@ export function BalanceSummary({
           accessibilityValue={{ min: 0, max: 100, now: Math.round(spentShare * 100) }}
         >
           <View className="h-2 w-full overflow-hidden rounded-full bg-on-control/15">
-            {/* Flex rather than a percentage width: the track is already the
-                full width, so the fill can share it without measuring. */}
             <View className="h-full flex-row">
-              {/* The card is already the chosen colour, so the fill has to be
-                  the one thing guaranteed to read on it: its own foreground. */}
+              {/* The card's own foreground, the one colour guaranteed to read on it. */}
               <View style={{ flex: spentShare }} className="h-full rounded-full bg-on-control" />
               <View style={{ flex: 1 - spentShare }} />
             </View>
@@ -151,9 +133,6 @@ export function BalanceSummary({
         </View>
       )}
 
-      {/* Inside the card's bottom edge, each on its own quiet tile — the two
-          figures the headline is made of, not two separate statistics that
-          happen to be nearby. */}
       <View className="mt-5 w-full flex-row gap-3">
         <Stat label="Income" amount={payday} icon={ArrowDownLeft} loading={loading} error={error} />
         {/* Stored as a positive magnitude; shown as money going out. */}
@@ -177,7 +156,6 @@ type StatProps = {
   error: boolean;
 };
 
-/** One supporting figure inside the hero's bottom edge. */
 function Stat({ label, amount, icon: Icon, loading, error }: StatProps) {
   const colors = useColors();
 

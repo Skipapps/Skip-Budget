@@ -1,12 +1,8 @@
 import { FALLBACK_GLYPH, GLYPHS, type Glyph } from '@/data/glyphs';
 
 /**
- * Every glyph the app ships, offered for a group.
- *
- * Bills use a shorter list because a bill is filed under a category that
- * already implies its icon. A group is named by the person making it — a
- * flat, a holiday, a car — so it gets the whole set, ordered roughly by how
- * likely a group is to be about that thing.
+ * Every glyph the app ships, for a group. Bills get a shorter list because their category implies
+ * the icon; a group is named by its maker, so it gets the whole set, roughly by likelihood.
  */
 export const GROUP_ICON_CHOICES: { id: string; icon: Glyph }[] = [
   'housing',
@@ -41,12 +37,8 @@ export function groupIconFor(iconId: string | null | undefined): Glyph {
 }
 
 /**
- * Tints for the well an icon sits in.
- *
- * Mid-tone hues rather than the card palette's own values, because these have
- * to carry a glyph on both a white and a near-black surface. The background is
- * the same hue at low alpha, so it tints whatever is behind it instead of
- * painting over it — which is what keeps one set working in both themes.
+ * Tints for the icon well. The background is the same hue at low alpha so it tints whatever is
+ * behind it, which keeps one set working on both a white and a near-black surface.
  */
 export const GROUP_TINTS = [
   { bg: 'rgba(244,121,90,0.16)', fg: '#E2643F' },
@@ -60,12 +52,8 @@ export const GROUP_TINTS = [
 ] as const;
 
 /**
- * A stable tint for a group.
- *
- * Keyed off the group's id rather than its icon, so two flats with the same
- * house glyph still look like different groups — which is the whole reason the
- * colour is there. Being derived rather than stored also means no column, no
- * picker, and no group that was created before colours existed looking wrong.
+ * A stable tint for a group, derived from its id (not its icon) so two flats with the same house
+ * glyph still look different. Derived rather than stored: no column, and no older group lacks one.
  */
 export function groupTint(groupId: string | null | undefined) {
   if (!groupId) return GROUP_TINTS[0];

@@ -1,37 +1,23 @@
-// Skip · send-push
-//
-// The scheduled tick. Every quarter of an hour it does three things in this
-// order, and the order is the important part:
+// The scheduled tick, every quarter of an hour. The order matters:
 //
 //   1. records the charges that have come due
 //   2. rolls the schedules that have gone past
-//   3. sends what is owed — a notice for each new charge, any reminder whose
-//      time has arrived, the waiting shared-group notices, and the daily
-//      receipts nudge for anybody whose chosen hour has come round
+//   3. sends what is owed: charge notices, due reminders, shared-group notices, the receipts nudge
 //
-// Recording before rolling, because the stored anchor is what occurrences are
-// walked from and moving it first steps over the date being written.
+// Posts to Apple directly (no relay). Two APNs behaviours fail quietly:
 //
-// Posts to Apple directly rather than through a relay, using the key already
-// in this project's secrets.
+//   The token is environment-bound. A development-signed build (anything installed over a cable)
+//   is only known to the sandbox host and production answers BadDeviceToken, so a rejection is
+//   retried against the other host and the correction written back.
 //
-// Two things about APNs are worth stating up front, because both fail quietly
-// rather than loudly:
-//
-//   The token is environment-bound. A build signed for development — anything
-//   installed over a cable — is only known to the sandbox host, and production
-//   answers BadDeviceToken. So a rejection is retried against the other host
-//   and the correction is written back, rather than the message being dropped.
-//
-//   The JWT is reusable and rate-limited. Apple accepts one for an hour and
-//   refuses a client that mints them per request, so it is made once per
-//   invocation and held.
+//   The JWT is reusable and rate-limited. Apple accepts one for an hour and refuses a client that
+//   mints one per request, so it is made once per invocation.
 //
 // Secrets: APNS_KEY (the .p8 contents), APNS_KEY_ID, APNS_TEAM_ID.
 // Deploy:  npx supabase functions deploy send-push --no-verify-jwt
 //
-// No JWT, because pg_cron has no session to present. It proves itself with a
-// secret the database generated for the purpose instead — see below.
+// No JWT, because pg_cron has no session to present: it proves itself with a secret the database
+// generated (job_secrets, checked below).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -49,9 +35,9 @@ import {
 
 const BUNDLE_ID = 'com.skipapps.skip.budget';
 
-// The category every Skip notification carries. It is what tells iOS to run
-// the content extension (targets/notification-content) on press-and-hold, and
-// it names the action buttons the app registers in src/api/push.ts.
+// Every Skip notification carries this category: it tells iOS to run the content extension
+// (targets/notification-content) on press-and-hold and names the action buttons registered in
+// src/api/push.ts.
 const CATEGORY = 'skip.item';
 
 const HOSTS = {
@@ -77,12 +63,7 @@ function pemToDer(pem: string): Uint8Array {
   return der;
 }
 
-/**
- * An ES256 provider token.
- *
- * Web Crypto returns the signature as raw r‖s, which is exactly what JWS wants
- * — no DER unwrapping, unlike most server-side crypto libraries.
- */
+/** An ES256 provider token. Web Crypto signs as raw r‖s, which is what JWS wants. */
 async function providerToken(): Promise<string> {
   const keyPem = Deno.env.get('APNS_KEY') ?? '';
   const keyId = Deno.env.get('APNS_KEY_ID') ?? '';
@@ -115,20 +96,15 @@ async function providerToken(): Promise<string> {
 type SendResult = { ok: boolean; reason?: string; environment?: Environment };
 
 /*
- * What the phone should do with the notification: where a tap lands, and the
- * card it draws (see ./card.ts).
+ * Where a tap lands and the card to draw (see ./card.ts) are sent as a top-level `body` object
+ * beside `aps`. That looks like a mistake but is not: expo-notifications reads a remote
+ * notification's `content.data` from `userInfo["body"]` and nowhere else; any other custom key is
+ * dropped by the client (expo-notifications@57.0.13,
+ * ios/ExpoNotifications/Notifications/NotificationRecords.swift:328-334).
  *
- * Sent as a top-level `body` object beside `aps`, which reads like a mistake
- * and is not: expo-notifications takes a *remote* notification's `content.data`
- * from `userInfo["body"]` and from nowhere else. Any other custom key is
- * carried by APNs and then dropped on the floor by the client. Verified in the
- * installed module's own source, expo-notifications@57.0.13,
- * ios/ExpoNotifications/Notifications/NotificationRecords.swift:328-334.
- *
- * A payload with a card also sets `mutable-content`, which is what wakes the
- * service extension (targets/notification-service) to attach the logo before
- * the banner shows. Without the extension on the phone — an older build — the
- * flag is ignored and the notification arrives as plain text, as before.
+ * A payload with a card also sets `mutable-content`, which wakes the service extension
+ * (targets/notification-service) to attach the logo. Without the extension (older build) the flag
+ * is ignored and the notification arrives as plain text.
  */
 
 async function pushOnce(
@@ -145,8 +121,7 @@ async function pushOnce(
       authorization: `bearer ${jwt}`,
       'apns-topic': BUNDLE_ID,
       'apns-push-type': 'alert',
-      // 10 is "deliver now". A reminder that arrives an hour late is no longer
-      // a reminder, and these are low volume.
+      // 10 is "deliver now": a reminder an hour late is no reminder.
       'apns-priority': '10',
     },
     body: JSON.stringify({
@@ -184,9 +159,7 @@ async function push(
   const first = await pushOnce(tokenRow.token, tokenRow.environment, jwt, title, body, data);
   if (first.ok) return true;
 
-  // A token minted for one Apple environment is meaningless to the other, and
-  // the app cannot always tell which build it is. Rather than guess twice,
-  // learn from the rejection.
+  // The app cannot always tell which Apple environment its build is in: learn from the rejection.
   if (first.reason === 'BadDeviceToken') {
     const other: Environment =
       tokenRow.environment === 'development' ? 'production' : 'development';
@@ -198,8 +171,7 @@ async function push(
     }
   }
 
-  // The device uninstalled, or the token was replaced. Keeping it means
-  // failing on it forever.
+  // Uninstalled or replaced token: keeping it means failing on it forever.
   if (first.reason === 'Unregistered' || first.reason === 'BadDeviceToken') {
     await supabase.from('device_tokens').delete().eq('id', tokenRow.id);
   }
@@ -283,12 +255,11 @@ function logoOf(brands: unknown): string | null {
 }
 
 /**
- * What each notification is about, for its card: the bill or subscription
- * behind it, its brand logo and category, and who pays.
+ * What each notification is about, for its card: the bill or subscription behind it, its logo and
+ * category, and who pays.
  *
- * Best effort. Every notification can go out without this, as plain text, so
- * a failed read here is logged and the run carries on with an empty context
- * rather than holding back somebody's reminder for a picture.
+ * Best effort: every notification can go out as plain text, so a failed read is logged and the run
+ * carries on with an empty context rather than holding back a reminder for a picture.
  */
 async function loadContext(
   supabase: ReturnType<typeof createClient>,
@@ -526,13 +497,9 @@ Deno.serve(async (request) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
   );
 
-  // Who is allowed to make this send.
-  //
-  // The caller proves it is the scheduled job by quoting a secret the database
-  // minted for itself. Read here with the service role, which is the only role
-  // that can — job_secrets has row level security on and no policies at all —
-  // so the value never leaves Postgres and never appears in a migration, in
-  // git, or in this file.
+  // The caller proves it is the scheduled job by quoting a secret the database minted for itself.
+  // job_secrets has RLS on and no policies, so only the service role can read it and the value
+  // never appears in a migration, in git, or in this file.
   const { data: secret } = await supabase
     .from('job_secrets')
     .select('value')
@@ -547,19 +514,14 @@ Deno.serve(async (request) => {
     });
   }
 
-  // ---- What actually went out -------------------------------------------
-  //
-  // Recorded here rather than on the phone, which is the whole reason a "this
-  // went out" notice is possible at all: until now nothing on the server knew
-  // a bill had fallen due until somebody opened the app.
-  //
-  // Only rows genuinely inserted come back — the unique indexes refuse a day
-  // the phone already wrote — so nothing is announced twice.
+  // Charges are recorded here rather than on the phone, which is what makes a "this went out"
+  // notice possible. Only rows genuinely inserted come back (the unique indexes refuse a day the
+  // phone already wrote), so nothing is announced twice.
   const { data: recorded, error: recordError } = await supabase.rpc('record_due_charges');
   if (recordError) console.error('record_due_charges failed', recordError.message);
 
-  // Strictly after recording. The stored anchor is what occurrences are walked
-  // from, so moving it first would step over the very date just written.
+  // Strictly after recording: the stored anchor is what occurrences are walked from, so moving it
+  // first would step over the date just written.
   const { error: rollError } = await supabase.rpc('roll_schedules_forward');
   if (rollError) console.error('roll_schedules_forward failed', rollError.message);
 
@@ -579,9 +541,8 @@ Deno.serve(async (request) => {
     body: string;
   }[];
 
-  // Shared-group notices: somebody added an expense, settled up, or asked to
-  // be your friend. Queued by triggers rather than pushed from them, so a slow
-  // Apple never sits inside the transaction that added the expense.
+  // Shared-group notices are queued by triggers rather than pushed from them, so a slow Apple never
+  // sits inside the transaction that added the expense.
   const { data: noticeRows, error: noticeError } = await supabase.rpc('split_notices_due');
   if (noticeError) console.error('split_notices_due failed', noticeError.message);
 
@@ -592,17 +553,10 @@ Deno.serve(async (request) => {
     body: string;
   }[];
 
-  // The daily receipts nudge. Same shape as a reminder, but it points at a
-  // habit rather than at a row, so it is decided per account rather than per
-  // reminder — which is why it needs its own RPC and its own stamp.
-  //
-  // Logged and skipped rather than fatal, unlike reminders_due above. This
-  // block can reach a database where the migration defining
-  // receipt_reminders_due() has not been applied yet, and a missing function
-  // must not take the bill reminders down with it: Postgres answers 42883 and
-  // supabase-js surfaces it as an ordinary error here, so the run continues
-  // with nothing due. That is also what happens if the function is revoked or
-  // renamed — a quiet zero, never a dropped charge notice.
+  // The daily receipts nudge is decided per account, not per reminder row, hence its own RPC and
+  // stamp. Logged and skipped rather than fatal, unlike reminders_due: this can reach a database
+  // where receipt_reminders_due() is not migrated yet (Postgres 42883), and that must not take the
+  // bill reminders down.
   const { data: receiptRows, error: receiptError } = await supabase.rpc('receipt_reminders_due');
   if (receiptError) console.error('receipt_reminders_due failed', receiptError.message);
 
@@ -630,7 +584,6 @@ Deno.serve(async (request) => {
   let sent = 0;
   let announced = 0;
 
-  // ---- Announce what went out -------------------------------------------
   const byUser = new Map<string, typeof charges>();
   for (const charge of charges) {
     byUser.set(charge.user_id, [...(byUser.get(charge.user_id) ?? []), charge]);
@@ -640,18 +593,16 @@ Deno.serve(async (request) => {
     const tokens = await tokensFor(supabase, chargeUser);
     if (tokens.length === 0) continue;
 
-    // One notice per charge reads better than a digest — until it doesn't.
-    // A first run that catches up on a backlog would otherwise arrive as a
-    // wall of notifications, so past a handful it becomes one line.
+    // Past a handful of charges (a first run catching up on a backlog) they collapse into one
+    // digest rather than a wall of notifications.
     const total = theirs.reduce((sum, c) => sum + Math.abs(Number(c.amount)), 0);
     const title = theirs.length > 3 ? 'Payments went out' : theirs[0].label;
     const body =
       theirs.length > 3
         ? `${theirs.length} charges · ${money(total)}`
         : theirs.map((c) => `${money(Number(c.amount))} went out`).join(' · ');
-    // One card per notification: the charge itself, or the digest. Two or
-    // three charges for one person share a notification today, so the card
-    // shows the first and the body lists them all.
+    // One card per notification: when 2-3 charges share it, the card shows the first and the body
+    // lists them all.
     const data =
       theirs.length > 3
         ? digestPayload(theirs.length, total)
@@ -662,7 +613,6 @@ Deno.serve(async (request) => {
     }
   }
 
-  // ---- Remind about what is coming --------------------------------------
   for (const row of rows) {
     let delivered = false;
     const data = reminderData(ctx, supabaseUrl, row);
@@ -670,8 +620,7 @@ Deno.serve(async (request) => {
       if (await push(supabase, tokenRow, jwt, row.title, row.body, data)) delivered = true;
     }
 
-    // Stamped only on a delivery. A reminder nobody could be sent stays due,
-    // so the next run tries again rather than marking it done in silence.
+    // Stamped only on a delivery: a reminder nobody could be sent stays due and is retried.
     if (delivered) {
       await supabase
         .from('reminders')
@@ -681,7 +630,6 @@ Deno.serve(async (request) => {
     }
   }
 
-  // ---- Tell people what happened in their groups ------------------------
   let shared = 0;
   for (const notice of notices) {
     let delivered = false;
@@ -690,14 +638,11 @@ Deno.serve(async (request) => {
       if (await push(supabase, tokenRow, jwt, notice.title, notice.body, data)) delivered = true;
     }
 
-    // No stamping here any more. split_notices_due claims its rows and marks
-    // them in the same statement, so two senders dispatched seconds apart can
-    // never both take the same notice — which they otherwise would, now that
-    // every write dispatches one rather than waiting for a single cron job.
+    // No stamping: split_notices_due claims and marks its rows in the same statement, so two
+    // concurrently dispatched senders never take the same notice.
     if (delivered) shared += 1;
   }
 
-  // ---- Ask about today's receipts ---------------------------------------
   let receiptsSent = 0;
   for (const row of receipts) {
     let delivered = false;
@@ -716,11 +661,8 @@ Deno.serve(async (request) => {
       }
     }
 
-    // Same rule as a reminder: stamped only on a delivery, so a day nobody
-    // could be pushed stays due and the next quarter hour tries again. The
-    // date written is the account's own local date, as the RPC computed it —
-    // not this server's, which is UTC and would mark tomorrow done for
-    // anybody east of it.
+    // Stamped only on a delivery, as for reminders. The date is the account's own local date from
+    // the RPC, not this server's UTC date, which would mark tomorrow done for anyone east of it.
     if (delivered) {
       await supabase
         .from('profiles')
@@ -730,11 +672,9 @@ Deno.serve(async (request) => {
     }
   }
 
-  // Reported separately so a quiet run can be told apart from a broken one:
-  // recorded says what the server found, announced and sent say what Apple took.
-  // receipts/receiptsSent are their own pair for the same reason — folded into
-  // due/sent, a receipts reminder that never reaches Apple would be hidden by a
-  // bill reminder that did.
+  // Counts are reported separately so a quiet run can be told from a broken one: recorded is what
+  // the server found, announced/sent what Apple took. receipts/receiptsSent are their own pair so a
+  // delivered bill reminder cannot hide a receipts reminder that never reached Apple.
   return new Response(
     JSON.stringify({
       recorded: charges.length,

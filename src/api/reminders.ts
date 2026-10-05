@@ -8,30 +8,22 @@ import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
 /**
- * What the user has asked to be told about.
- *
- * One table for every kind of remindable thing, so the page can show them all
- * together and the scheduler can read them in one query. The row holds only the
- * decision — on or off, and how many days ahead — never a copy of the date,
- * which is read from the bill or the card when the push is actually sent.
- *
- * Four kinds, and each one is answered by a different date:
+ * What the user has asked to be told about. One table for every remindable thing; a row holds only
+ * the decision (on/off, days ahead), never a copy of the date, which is read from the bill or card
+ * when the push is sent. Each kind is answered by a different date:
  *
  *   bill          its next due date
  *   subscription  its next renewal
  *   card          the card's own payment day (cards.bill_due_day)
  *   account       the next payday landing in it
  *
- * The account one is the odd one out and worth stating plainly: it is about
- * money arriving, not leaving. An account has no date of its own, so it
- * borrows the payday of whatever salary source pays into it — and an account
- * nothing is paid into has nothing to announce.
+ * The account kind is about money arriving, not leaving: an account has no date of its own, so it
+ * borrows the payday of whatever salary source pays into it, and one nothing is paid into has
+ * nothing to announce.
  */
 
-/** The four things that can carry a reminder. */
 export type ReminderKind = 'bill' | 'subscription' | 'card' | 'account';
 
-/** Which column on `reminders` points at each kind. */
 const COLUMN: Record<ReminderKind, string> = {
   bill: 'bill_id',
   subscription: 'subscription_id',
@@ -69,7 +61,6 @@ export function targetKey(kind: ReminderKind, id: string): string {
   return `${kind}:${id}`;
 }
 
-/** How far ahead a reminder can be set, in the words the page uses. */
 export const LEAD_OPTIONS = [
   { value: 0, label: 'On the day' },
   { value: 1, label: '1 day' },
@@ -83,11 +74,8 @@ export const DEFAULT_LEAD_DAYS = 1;
 export const DEFAULT_REMIND_AT = '09:00';
 
 /**
- * The same choices with an off switch folded in, for the creation forms.
- *
- * The page has room for a toggle and a row of leads because it is showing
- * twenty of them at once. A form has one, and a single row of chips that
- * includes "Off" is one decision instead of two.
+ * The same choices with an off switch folded in, for the creation forms, where one row of chips
+ * including "Off" is one decision instead of two.
  */
 export const REMINDER_CHOICES = [
   { value: 'off', label: 'Off' },
@@ -146,17 +134,13 @@ type SetReminderInput = {
 };
 
 /**
- * Turns a reminder on or off, or changes how far ahead it lands.
+ * Turns a reminder on or off, or changes how far ahead it lands. An upsert, because the unique
+ * index per target is what makes "one reminder per thing" true: two quick taps resolve to one row.
  *
- * An upsert rather than an insert-or-update, because the unique index per
- * target is what makes "one reminder per thing" true — two quick taps on the
- * same switch resolve to one row instead of racing each other into two.
- */
-/**
- * Saving a reminder is the loudest possible yes to being reminded, so it also
- * enables reminders for the account — permission, token and the profile flag —
- * for somebody who never met the Getting Started step. Failures are ignored:
- * the reminder row is worth keeping even when the phone refuses to be pushed.
+ * Saving is the loudest possible yes to being reminded, so it also enables reminders for the
+ * account (permission, token, profile flag) for somebody who never met the Getting Started step.
+ * Failures there are ignored: the reminder row is worth keeping even when the phone refuses to be
+ * pushed.
  */
 export function useSetReminder() {
   const userId = useUserId();
@@ -170,9 +154,8 @@ export function useSetReminder() {
       }
       if (!userId) throw new Error('Sign in first.');
 
-      // All four columns, three of them null, because the constraint spans all
-      // four — naming only the one that is set gives ON CONFLICT nothing it can
-      // infer, which is a planning error rather than a failed row.
+      // All four columns, three null, because the constraint spans all four: naming only the set
+      // one gives ON CONFLICT nothing to infer (a planning error, not a failed row).
       const { error } = await supabase.from('reminders').upsert(
         {
           user_id: userId,
@@ -193,11 +176,8 @@ export function useSetReminder() {
 }
 
 /**
- * The choice already stored for one thing, for a form to open on.
- *
- * Returns 'off' for anything with no row, which is the same answer as "never
- * asked" — the distinction matters to the table and not to the person looking
- * at a form.
+ * The choice already stored for one thing, for a form to open on. 'off' for anything with no row,
+ * which to a person looking at a form is the same as "never asked".
  */
 export function useReminderChoice(
   kind: ReminderKind,
@@ -211,17 +191,13 @@ export function useReminderChoice(
 
   return {
     choice: row?.enabled ? leadToChoice(row.lead_days) : 'off',
-    // Trimmed to HH:MM; the seconds Postgres adds are noise here.
     remindAt: row?.remind_at?.slice(0, 5) ?? DEFAULT_REMIND_AT,
   };
 }
 
 /**
- * Sets or clears the reminder for one thing, in a single call.
- *
- * What the creation forms need: they hold one choice, and after the row is
- * saved they say what it should be. Off deletes rather than storing a disabled
- * row, because a form that was never touched should leave nothing behind.
+ * Sets or clears the reminder for one thing in a single call, for the creation forms. Off deletes
+ * rather than storing a disabled row, so a form never touched leaves nothing behind.
  */
 export function useApplyReminder() {
   const setReminder = useSetReminder();
@@ -245,11 +221,8 @@ export function useApplyReminder() {
 }
 
 /**
- * Removes a reminder entirely.
- *
- * Different from switching it off: off is a decision the user made and can see
- * on the page, while removed is back to never having asked. Both stop the
- * push, so this exists for the person tidying up rather than for the scheduler.
+ * Removes a reminder entirely. Unlike switching it off (a decision visible on the page) this is
+ * back to never having asked; it is for the person tidying up, not the scheduler.
  */
 export function useRemoveReminder() {
   const client = useQueryClient();
@@ -264,18 +237,10 @@ export function useRemoveReminder() {
 }
 
 /**
- * The daily receipts reminder.
- *
- * The odd one out, and deliberately not a `reminders` row: that table's
- * constraint is `num_nonnulls(bill_id, subscription_id, card_id,
- * bank_account_id) = 1`, and the upsert above resolves against all four
- * columns. This reminder points at nothing — it is about the habit, not about
- * a thing — and there is exactly one per account, so it lives as three columns
- * on `profiles` (20260912100001_receipt_reminder.sql).
- *
- * Kept out of `useProfile` on purpose. That query backs the dashboard header
- * and the tile order; invalidating it every time somebody drags the clock is a
- * dashboard re-render for no reason.
+ * The daily receipts reminder is deliberately not a `reminders` row: that table requires exactly
+ * one of its four target columns and the upsert conflicts on all four, while this reminder points
+ * at nothing and there is one per account, so it lives as three columns on `profiles`. Kept out of
+ * `useProfile` so dragging the clock does not invalidate the dashboard header query.
  */
 
 /** Eight in the evening: the day's shopping is done and the receipts are still in a pocket. */
@@ -295,30 +260,22 @@ export type ReceiptReminder = {
 };
 
 /**
- * The stored setting, in the shape a screen wants.
- *
- * Separated from the hook so the defaulting is testable without a query: the
- * columns are `not null` with a stored default of 20:00, but a client that
- * reads a profile written before the migration, or no profile row at all, must
- * still show the Founder's default rather than an empty pill or midnight.
+ * The stored setting in the shape a screen wants. Separate from the hook so the defaulting is
+ * testable: a profile written before the migration, or no row at all, must still show the default
+ * rather than an empty pill or midnight.
  */
 export function receiptReminderFrom(row: ReceiptReminderRow | null | undefined): ReceiptReminder {
   const at =
     typeof row?.receipt_reminder_at === 'string' ? row.receipt_reminder_at.slice(0, 5) : '';
   return {
     enabled: row?.receipt_reminder_enabled === true,
-    // Trimmed to HH:MM; the seconds Postgres adds are noise here.
     remindAt: /^\d{2}:\d{2}$/.test(at) ? at : DEFAULT_RECEIPT_REMIND_AT,
   };
 }
 
 /**
- * Whether the daily receipts reminder is on, and when it lands.
- *
- * Returns the setting flattened, with loading and error alongside it, so a
- * screen can render the row before the read lands and still say when it
- * failed. `enabled` is false and `remindAt` is the default until proven
- * otherwise — the safe way round for something that sends a notification.
+ * Whether the daily receipts reminder is on, and when. `enabled` is false and `remindAt` the
+ * default until proven otherwise, the safe way round for something that sends a notification.
  */
 export function useReceiptReminder() {
   const userId = useUserId();
@@ -360,16 +317,10 @@ type SetReceiptReminderInput = {
 };
 
 /**
- * Turns the daily receipts reminder on or off, or moves it.
- *
- * Switching it on is the loudest possible yes to being reminded, so it enables
- * reminders for the account first — permission, token and the profile flag —
- * exactly as saving any other reminder does. Failure there is ignored on
- * purpose: the setting is worth keeping even when the phone refuses to be
- * pushed, and the next launch retries the registration.
- *
- * The time is only written when one is given, so toggling the switch cannot
- * quietly reset a time the user chose.
+ * Turns the daily receipts reminder on or off, or moves it. Switching it on enables reminders for
+ * the account first, as saving any other reminder does; failure there is ignored and the next
+ * launch retries. The time is only written when given, so toggling cannot reset a time the user
+ * chose.
  */
 export function useSetReceiptReminder() {
   const userId = useUserId();
@@ -392,12 +343,10 @@ export function useSetReceiptReminder() {
         // RLS already scopes this to the caller; naming the row as well means a
         // mistake here cannot become an update across the table.
         .eq('id', userId)
-        // An update that matches no row is a 204 with no error, so without
-        // this a missing profile would let the switch report success and
-        // change nothing — and the next launch would read it back off.
+        // A missing profile is a 204 with no error; without the select the switch would report
+        // success and the next launch would read it back off.
         .select('id');
       if (error) throw error;
-      // A setting, not a list row — NOTHING_SAVED rather than NOTHING_UPDATED.
       if (!data || data.length === 0) throw new Error(NOTHING_SAVED);
     },
     // Its own key: the profile query behind the dashboard is left alone.

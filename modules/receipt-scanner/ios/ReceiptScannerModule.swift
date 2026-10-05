@@ -6,17 +6,14 @@ import UIKit
 import Vision
 import VisionKit
 
-/// Apple Vision, wrapped for the receipt form.
-///
-/// Two jobs: put the system document scanner on screen, and read text out of
-/// an image or PDF. Both run entirely on device — a receipt is a photograph of
-/// someone's spending and never needs to leave the phone.
+/// Apple Vision for the receipt form: the document scanner and text recognition. Everything runs on
+/// device; a receipt never needs to leave the phone.
 public class ReceiptScannerModule: Module {
   public func definition() -> ModuleDefinition {
     Name("ReceiptScanner")
 
-    /// False on the Simulator and on hardware without a usable camera, so the
-    /// UI can offer upload alone rather than a button that always fails.
+    /// False on the Simulator and on hardware without a usable camera, so the UI can offer upload
+    /// alone rather than a button that always fails.
     Function("isScanningAvailable") { () -> Bool in
       VNDocumentCameraViewController.isSupported
     }
@@ -36,27 +33,21 @@ public class ReceiptScannerModule: Module {
         let delegate = ScannerDelegate(promise: promise) { [weak self] in
           self?.activeDelegate = nil
         }
-        // VNDocumentCameraViewController keeps only a weak delegate reference,
-        // so without this the handler is deallocated before the user finishes.
+        // VNDocumentCameraViewController keeps only a weak delegate reference, so without this the
+        // handler is deallocated before the user finishes.
         self.activeDelegate = delegate
         scanner.delegate = delegate
         presenter.present(scanner, animated: true)
       }
     }
 
-    /// Whether the one-shot camera can run: any back-facing capture device.
     Function("isCaptureAvailable") { () -> Bool in
       AVCaptureDevice.default(for: .video) != nil
     }
 
-    /// One shot, and it is over.
-    ///
-    /// VNDocumentCameraViewController is a multi-page session, so every capture
-    /// lands on a review screen and finishing takes a second confirm on top of
-    /// that. Right for a contract; wrong for a receipt, which is one page shot
-    /// in a hurry at a till while someone waits behind you. This puts a plain
-    /// camera on screen with a single shutter and resolves the moment the text
-    /// is read — no review, no confirm.
+    /// One shot, and it is over: a plain camera with a single shutter that resolves the moment the
+    /// text is read. VNDocumentCameraViewController is a multi-page session (review screen plus a
+    /// second confirm), which is wrong for a receipt shot in a hurry at a till.
     AsyncFunction("captureReceipt") { (promise: Promise) in
       DispatchQueue.main.async {
         guard let presenter = self.appContext?.utilities?.currentViewController() else {
@@ -71,8 +62,7 @@ public class ReceiptScannerModule: Module {
           switch outcome {
           case .scanned(let payload):
             promise.resolve(payload)
-          // Backing out is a choice, not a failure — null lets the caller say
-          // nothing, which is the same contract scanDocument already has.
+          // Backing out is a choice, not a failure: null, the same contract as scanDocument.
           case .cancelled:
             promise.resolve(nil)
           case .failed(let message):
@@ -80,15 +70,14 @@ public class ReceiptScannerModule: Module {
           }
         }
 
-        // Held for the same reason the scanner delegate is: once presented,
-        // nothing else owns the controller and its callback would be freed.
+        // Held for the same reason as the scanner delegate: nothing else owns the controller.
         self.activeCamera = camera
         presenter.present(camera, animated: true)
       }
     }
 
-    /// Reads text from a local image or PDF. Returns "" rather than throwing
-    /// when a document genuinely has no text — an empty result is an answer.
+    /// Reads text from a local image or PDF. Returns "" rather than throwing when a document has no
+    /// text: an empty result is an answer.
     AsyncFunction("recognizeText") { (uri: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
         guard let image = Self.loadImage(from: uri) else {
@@ -99,13 +88,9 @@ public class ReceiptScannerModule: Module {
       }
     }
 
-    /// The same recognition, with the layout kept.
-    ///
-    /// A receipt is a two-column document — labels on the left, money on the
-    /// right — and flattening it to lines of text throws away the one signal
-    /// that says which figure belongs to which label. Every line comes back
-    /// with where it sits on the page and how tall it was printed, so the
-    /// parser can find the name by its size and the total by its row.
+    /// The same recognition, with the layout kept. A receipt is two columns (labels left, money
+    /// right), so each line comes back with its position and printed height: the parser finds the
+    /// name by its size and the total by its row.
     AsyncFunction("recognizeReceipt") { (uri: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
         guard let image = Self.loadImage(from: uri) else {
@@ -122,8 +107,7 @@ public class ReceiptScannerModule: Module {
 
   // MARK: - Loading
 
-  /// Accepts anything the picker can hand back: photos, screenshots, and PDFs
-  /// (rendered at 2x so small print survives recognition).
+  /// Accepts photos, screenshots and PDFs (rendered at 2x so small print survives recognition).
   private static func loadImage(from uri: String) -> UIImage? {
     let url = uri.hasPrefix("file://") ? URL(string: uri) : URL(fileURLWithPath: uri)
     guard let url else { return nil }
@@ -148,11 +132,9 @@ public class ReceiptScannerModule: Module {
     return UIImage(data: data)
   }
 
-  /// Redraws an image so its pixels sit the way its orientation claims.
-  ///
-  /// The camera hands back a landscape buffer with a rotation flag rather than
-  /// rotated pixels. Vision is told `.up` everywhere in this file, so the flag
-  /// has to be resolved first or every box comes back on its side.
+  /// Redraws an image so its pixels sit the way its orientation claims. The camera returns a
+  /// landscape buffer plus a rotation flag, and Vision is told `.up` throughout this file, so the
+  /// flag must be resolved first or every box comes back on its side.
   fileprivate static func normalised(_ image: UIImage) -> UIImage {
     guard image.imageOrientation != .up else { return image }
     let format = UIGraphicsImageRendererFormat.default()
@@ -162,18 +144,13 @@ public class ReceiptScannerModule: Module {
     }
   }
 
-  /// Flattens the receipt out of the photograph.
+  /// Flattens the receipt out of the photograph: skew turns a 3 into an 8, so Vision finds the page
+  /// corners and Core Image warps them back to a rectangle (as the system scanner does).
   ///
-  /// A receipt shot at a till is never square to the lens, and skew is what
-  /// turns a 3 into an 8. Vision finds the page corners and Core Image warps
-  /// them back to a rectangle — the same correction the system scanner applies
-  /// before it hands anything back, which is most of why its readings are good.
+  /// Vision and CIImage both measure up from the bottom left, so the corners need no flipping here.
   ///
-  /// Both Vision and CIImage measure up from the bottom left, so the corners
-  /// need no flipping here; the callers that reason top-down flip their own.
-  ///
-  /// Returns the original whenever no page is found. A photo that is already
-  /// mostly receipt reads fine, and a confident wrong crop loses the total.
+  /// Returns the original whenever no page is found: a photo that is already mostly receipt reads
+  /// fine, and a confident wrong crop loses the total.
   fileprivate static func flattened(_ image: UIImage) -> UIImage {
     guard let cgImage = image.cgImage else { return image }
 
@@ -181,8 +158,7 @@ public class ReceiptScannerModule: Module {
     // Receipts are tall and narrow, and a long one is narrower still.
     request.minimumAspectRatio = 0.15
     request.maximumAspectRatio = 1.0
-    // Anything smaller than a fifth of frame is more likely a sign or a tile
-    // than the thing being photographed.
+    // Anything smaller than a fifth of frame is more likely a sign or a tile than the receipt.
     request.minimumSize = 0.2
     request.minimumConfidence = 0.6
     request.maximumObservations = 1
@@ -216,35 +192,27 @@ public class ReceiptScannerModule: Module {
 
   // MARK: - Recognition
 
-  /// How many readings of each line to hand back.
-  ///
-  /// Vision ranks its guesses, and on thermal print the runner-up is often the
-  /// right one — an 8 read as a 3, an O read as a 0. The parser can test a
-  /// second candidate against the receipt's own arithmetic; it cannot invent
-  /// one that was never returned.
+  /// How many readings of each line to hand back. On thermal print Vision's runner-up is often the
+  /// right one (an 8 read as a 3, an O as a 0), and the parser can test it against the receipt's
+  /// own arithmetic.
   private static let candidateCount = 3
 
-  /// Every recognised line, with where it sits and how tall it was printed.
-  ///
-  /// Vision's bounding boxes are normalised with the origin at the bottom
-  /// left. They are flipped here so y grows downward, because every caller
-  /// reasons about a receipt from the top down.
+  /// Every recognised line, with where it sits and how tall it was printed. Vision's normalised
+  /// boxes have their origin at the bottom left; they are flipped here so y grows downward.
   fileprivate static func recognize(in image: UIImage) -> [[String: Any]] {
     guard let cgImage = image.cgImage else { return [] }
 
     let request = VNRecognizeTextRequest()
-    // Receipts are thermal-printed and often skewed; accurate beats fast when
-    // the alternative is a wrong total.
+    // Accurate beats fast when the alternative is a wrong total.
     request.recognitionLevel = .accurate
 
-    // Off, deliberately. Language correction is built for prose: it pulls
-    // unfamiliar tokens towards dictionary words, which is exactly wrong for a
-    // document made of shop names, product codes and prices. It is what turns
-    // the same storefront into a different name on two passes.
+    // Off, deliberately: language correction drags unfamiliar tokens to dictionary words, which
+    // is wrong for shop names, product codes and prices, and can read one storefront as different
+    // names on two passes.
     request.usesLanguageCorrection = false
 
     request.recognitionLanguages = ["en-US", "en-CA", "fr-CA"]
-    // Fine print — the tax line, the card footer — is small but load-bearing.
+    // Fine print (the tax line, the card footer) is small but load-bearing.
     request.minimumTextHeight = 0.008
 
     if #available(iOS 16.0, *) {
@@ -268,7 +236,6 @@ public class ReceiptScannerModule: Module {
         "candidates": candidates.map { $0.string },
         "confidence": best.confidence,
         "x": box.origin.x,
-        // Flipped: Vision measures up from the bottom, receipts read down.
         "y": 1 - box.origin.y - box.size.height,
         "width": box.size.width,
         "height": box.size.height,
@@ -276,7 +243,6 @@ public class ReceiptScannerModule: Module {
     }
   }
 
-  /// The flat reading, for callers that only want the words.
   fileprivate static func recognizeText(in image: UIImage) -> String {
     recognize(in: image)
       .compactMap { $0["text"] as? String }
@@ -284,7 +250,6 @@ public class ReceiptScannerModule: Module {
   }
 }
 
-/// Bridges VNDocumentCameraViewController's delegate callbacks to one promise.
 private class ScannerDelegate: NSObject, VNDocumentCameraViewControllerDelegate {
   private let promise: Promise
   private let onFinish: () -> Void
@@ -295,8 +260,8 @@ private class ScannerDelegate: NSObject, VNDocumentCameraViewControllerDelegate 
     self.onFinish = onFinish
   }
 
-  /// The delegate outlives the controller by a moment; guarding means a stray
-  /// second callback cannot resolve an already-settled promise.
+  /// The delegate outlives the controller by a moment; guarding stops a stray second callback from
+  /// resolving an already-settled promise.
   private func settle(_ work: () -> Void) {
     guard !settled else { return }
     settled = true
@@ -310,8 +275,7 @@ private class ScannerDelegate: NSObject, VNDocumentCameraViewControllerDelegate 
   ) {
     controller.dismiss(animated: true)
 
-    // Multi-page scans are joined into one body of text: a receipt that spills
-    // onto a second page is still one purchase.
+    // Pages are joined into one text: a receipt spilling onto a second page is one purchase.
     var pages: [String] = []
     var lines: [[String: Any]] = []
     var savedPath: String?
@@ -343,7 +307,6 @@ private class ScannerDelegate: NSObject, VNDocumentCameraViewControllerDelegate 
 
   func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
     controller.dismiss(animated: true)
-    // Cancelling is a choice, not a failure — null lets the caller say nothing.
     settle { promise.resolve(nil) }
   }
 
@@ -356,16 +319,10 @@ private class ScannerDelegate: NSObject, VNDocumentCameraViewControllerDelegate 
   }
 }
 
-/// A plain camera with one button.
-///
-/// Deliberately not a document scanner. VisionKit's controller is built around
-/// a multi-page session — capture, review, keep, then save — and every one of
-/// those steps is a tap standing between someone at a till and a logged
-/// receipt. The correction VisionKit is really valued for happens after the
-/// shutter, not in its review screen, and that runs here too (see `flattened`).
-///
-/// So: preview, shutter, done. The only other controls are a way out and a
-/// torch, because receipts get handed over in dim shops.
+/// A plain camera with one button, deliberately not a document scanner: VisionKit's multi-page
+/// session (capture, review, keep, save) is too many taps at a till. The perspective correction it
+/// is valued for happens after the shutter and runs here too (see `flattened`). Only a way out and
+/// a torch (dim shops) besides the shutter.
 private final class ReceiptCameraViewController: UIViewController {
   enum Outcome {
     case scanned([String: Any])
@@ -377,18 +334,15 @@ private final class ReceiptCameraViewController: UIViewController {
 
   private let session = AVCaptureSession()
   private let photoOutput = AVCapturePhotoOutput()
-  // Live frames for finding the receipt while the shot is being lined up.
   private let videoOutput = AVCaptureVideoDataOutput()
   private let detectionQueue = DispatchQueue(label: "com.skipapps.receipt-detect")
-  // startRunning blocks until the camera warms up, which is long enough to drop
-  // frames off the main thread's animation.
+  // startRunning blocks until the camera warms up, so it must stay off the main thread.
   private let sessionQueue = DispatchQueue(label: "com.skipapps.receipt-camera")
 
   private var previewLayer: AVCaptureVideoPreviewLayer?
   private var device: AVCaptureDevice?
 
-  /// The found receipt, drawn over the preview the way the system scanner
-  /// draws its capture area — so "it sees it" is visible before the tap.
+  /// The found receipt, drawn over the preview so "it sees it" is visible before the tap.
   private let outlineLayer = CAShapeLayer()
   private var detecting = false
   private var missCount = 0
@@ -417,7 +371,6 @@ private final class ReceiptCameraViewController: UIViewController {
     outlineLayer.frame = view.bounds
   }
 
-  /// Portrait only, matching the app — a receipt is read down the page anyway.
   override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
   override var prefersStatusBarHidden: Bool { true }
 
@@ -440,7 +393,6 @@ private final class ReceiptCameraViewController: UIViewController {
     hint.font = .systemFont(ofSize: 14, weight: .medium)
     hint.textAlignment = .center
     hint.numberOfLines = 2
-    // Legible over whatever the camera happens to be pointed at.
     hint.layer.shadowColor = UIColor.black.cgColor
     hint.layer.shadowOpacity = 0.6
     hint.layer.shadowRadius = 3
@@ -487,7 +439,6 @@ private final class ReceiptCameraViewController: UIViewController {
     ])
   }
 
-  /// Everything except the preview, dimmed while the shot is being read.
   private func setBusy(_ busy: Bool) {
     if busy { outlineLayer.opacity = 0 }
     shutter.isEnabled = !busy
@@ -524,9 +475,8 @@ private final class ReceiptCameraViewController: UIViewController {
     view.layer.insertSublayer(layer, at: 0)
     previewLayer = layer
 
-    // Above the preview, below the controls. CAShapeLayer animates path and
-    // opacity changes on its own, which is what makes the outline glide with
-    // the receipt rather than snap between detections.
+    // Above the preview, below the controls. CAShapeLayer animates path and opacity changes on its
+    // own, so the outline glides with the receipt rather than snapping between detections.
     outlineLayer.strokeColor = UIColor.systemBlue.cgColor
     outlineLayer.fillColor = UIColor.systemBlue.withAlphaComponent(0.14).cgColor
     outlineLayer.lineWidth = 2
@@ -539,8 +489,8 @@ private final class ReceiptCameraViewController: UIViewController {
       guard let self else { return }
 
       self.session.beginConfiguration()
-      // Photo preset: the total is often 8pt thermal print, and recognition
-      // cannot read detail the capture never resolved.
+      // Photo preset: the total is often 8pt thermal print, and recognition cannot read detail the
+      // capture never resolved.
       self.session.sessionPreset = .photo
 
       guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
@@ -557,9 +507,8 @@ private final class ReceiptCameraViewController: UIViewController {
       self.session.addInput(input)
       self.session.addOutput(self.photoOutput)
 
-      // The same frames the preview shows, handed to Vision. Late frames are
-      // dropped rather than queued: an outline for where the receipt was a
-      // second ago is worse than none.
+      // Preview frames handed to Vision. Late frames are dropped rather than queued: an outline for
+      // where the receipt was a second ago is worse than none.
       if self.session.canAddOutput(self.videoOutput) {
         self.videoOutput.alwaysDiscardsLateVideoFrames = true
         self.videoOutput.setSampleBufferDelegate(self, queue: self.detectionQueue)
@@ -569,7 +518,7 @@ private final class ReceiptCameraViewController: UIViewController {
       self.session.commitConfiguration()
       self.device = camera
 
-      // Close focus, because a receipt is held a hand's width from the lens.
+      // Close focus: a receipt is held a hand's width from the lens.
       if (try? camera.lockForConfiguration()) != nil {
         if camera.isFocusModeSupported(.continuousAutoFocus) {
           camera.focusMode = .continuousAutoFocus
@@ -605,8 +554,7 @@ private final class ReceiptCameraViewController: UIViewController {
   }
 
   @objc private func handleShutter() {
-    // A second tap while the first is still developing would capture twice and
-    // settle the promise twice.
+    // A second tap while the first is developing would capture and settle twice.
     guard !capturing, !settled, session.isRunning else { return }
     capturing = true
     setBusy(true)
@@ -661,8 +609,7 @@ extension ReceiptCameraViewController: AVCapturePhotoCaptureDelegate {
       return
     }
 
-    // Straightening and recognition are both slow enough to freeze the preview,
-    // and the preview is still on screen until this finishes.
+    // Straightening and recognition are slow enough to freeze the preview still on screen.
     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
       let page = ReceiptScannerModule.flattened(ReceiptScannerModule.normalised(image))
       let lines = ReceiptScannerModule.recognize(in: page)
@@ -693,8 +640,7 @@ extension ReceiptCameraViewController: AVCaptureVideoDataOutputSampleBufferDeleg
     didOutput sampleBuffer: CMSampleBuffer,
     from connection: AVCaptureConnection
   ) {
-    // One request in flight at a time is the throttle: rectangle detection is
-    // quicker than the frame rate, and skipped frames cost nothing.
+    // One request in flight at a time is the throttle; skipped frames cost nothing.
     guard !settled, !capturing, !detecting,
           let buffer = CMSampleBufferGetImageBuffer(sampleBuffer)
     else { return }
@@ -707,8 +653,7 @@ extension ReceiptCameraViewController: AVCaptureVideoDataOutputSampleBufferDeleg
         self?.detecting = false
       }
     }
-    // The same shape rules the post-shot flattening uses, so the outline
-    // promises exactly what the correction will deliver.
+    // The same shape rules as the post-shot flattening, so the outline promises what it delivers.
     request.minimumAspectRatio = 0.15
     request.maximumAspectRatio = 1.0
     request.minimumSize = 0.2
@@ -716,9 +661,9 @@ extension ReceiptCameraViewController: AVCaptureVideoDataOutputSampleBufferDeleg
     request.maximumObservations = 1
     request.quadratureTolerance = 35
 
-    // Deliberately .up: the corners come back in the sensor's own landscape
-    // space, and layerPointConverted below does every rotation and crop the
-    // preview applies — doing any of it by hand here would double it.
+    // Deliberately .up: the corners come back in the sensor's landscape space, and
+    // layerPointConverted below applies every rotation and crop the preview does; doing any by hand
+    // here would double it.
     let handler = VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up, options: [:])
     try? handler.perform([request])
   }
@@ -726,15 +671,13 @@ extension ReceiptCameraViewController: AVCaptureVideoDataOutputSampleBufferDeleg
   private func showOutline(for rect: VNRectangleObservation?) {
     guard let previewLayer, let rect, !settled, !capturing else {
       missCount += 1
-      // A few misses before letting go: detection flickers frame to frame,
-      // and an outline that blinks with it reads as a fault.
+      // A few misses before letting go: detection flickers, and a blinking outline reads as a bug.
       if missCount > 4 { outlineLayer.opacity = 0 }
       return
     }
     missCount = 0
 
-    // Vision measures up from the bottom of the buffer; the capture-device
-    // space the preview converts from measures down from the top.
+    // Vision measures up from the bottom of the buffer; the capture-device space down from the top.
     let corners = [rect.topLeft, rect.topRight, rect.bottomRight, rect.bottomLeft].map {
       previewLayer.layerPointConverted(fromCaptureDevicePoint: CGPoint(x: $0.x, y: 1 - $0.y))
     }

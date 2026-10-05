@@ -59,7 +59,6 @@ import {
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
 
-/** Every word on the page that follows the kind, in one place. */
 const KIND_COPY: Record<
   VoiceKind,
   {
@@ -114,12 +113,9 @@ const SUBSCRIPTION_CYCLES = [
 type EditField = 'amount' | 'merchant' | 'date' | 'category';
 
 /**
- * "Is this right?": what Skip heard, before anything is saved.
- *
- * Saves new items through the same value builders the add forms use, so voice
- * cannot drift from the forms' rules. Nothing is written until Save; nothing
- * is guessed — an ambiguous amount has to be picked. Every correction is a
- * page of its own, pushed from the right, and "More options" opens the full
+ * "Is this right?": what Skip heard, before anything is saved. Saves through the same value
+ * builders the add forms use, so voice cannot drift from the forms' rules. Nothing is written until
+ * Save and nothing is guessed (an ambiguous amount has to be picked); "More options" opens the full
  * form with the edited values in it.
  */
 export default function VoiceReviewScreen() {
@@ -132,9 +128,8 @@ function VoiceReviewInner() {
   const { draft: draftId } = useLocalSearchParams<{ draft?: string }>();
   const live = useVoiceSession(draftId);
 
-  // Saving or discarding empties the slot while this page is still sliding
-  // out; what it last showed stays on screen until it is gone, instead of
-  // flashing "Nothing to check yet" on the way.
+  // Saving or discarding empties the slot while this page is still sliding out; keep what it last
+  // showed instead of flashing "Nothing to check yet".
   const [kept, setKept] = useState<VoiceSession | null>(live);
   if (live && live !== kept) setKept(live);
   const [leaving, setLeaving] = useState(false);
@@ -165,12 +160,12 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
 
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
-  // Two taps inside one frame both land before the button re-renders as
-  // disabled; this is what makes one tap one row.
+  // Two taps inside one frame both land before the button re-renders as disabled; this is what
+  // makes one tap one row.
   const busy = useRef(false);
 
-  // Once anything has been changed here, the edge swipe would throw it away
-  // without a word, so it is turned off and back asks first — StepFlow's rule.
+  // Once anything has been changed, the edge swipe would throw it away without a word, so it is
+  // off and back asks first (StepFlow's rule).
   const screenOptions = useMemo(() => ({ gestureEnabled: !edited }), [edited]);
 
   // The question is what VoiceOver lands on, so the page says what it asks.
@@ -184,10 +179,9 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   const built = blocker ? null : buildFor(entry, { todayDate, categoryLabel, sources: sourceRefs });
   const hint = blocker ?? (built && !built.ok ? built.message : null);
 
-  // One move at a time. A fast double tap on a row, "More options" or back
-  // would otherwise push two pages — or, since `router.back()` is a global
-  // "go back", pop this page and the mic page under it. Coming back here
-  // (from an edit page or the form) opens the door again.
+  // One move at a time: a fast double tap on a row, "More options" or back would push two pages or,
+  // since `router.back()` is a global "go back", pop this page and the mic page under it. Coming
+  // back here reopens the door.
   const moving = useRef(false);
   useFocusEffect(
     useCallback(() => {
@@ -234,9 +228,8 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   };
 
   /**
-   * A different kind reads the same words again for it: a receipt's "on the
-   * 5th" is the last 5th, a bill's the next one. Whatever was changed by hand
-   * stays as it was.
+   * A different kind reads the same words again for it: a receipt's "on the 5th" is the last 5th,
+   * a bill's the next one. Whatever was changed by hand stays as it was.
    */
   const changeKind = (next: VoiceKind) => {
     if (next === kind) return;
@@ -259,8 +252,8 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
       else await createSubscription.mutateAsync(built.values);
 
       success();
-      // Taught only now, and only when the person put a different name on
-      // what was heard: "spot a fly" saved as Spotify.
+      // Taught only now, and only when the person put a different name on what was heard: "spot a
+      // fly" saved as Spotify.
       const lesson = lessonFrom(draft, entry, touched);
       // Best-effort and never rejects: a lost lesson is learned next time.
       if (lesson) void learnAlias(lesson.heard, lesson.canonical);
@@ -279,7 +272,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   const ambiguous = entry.amount === null && entry.amountChoices.length >= 2;
   const dateValue = entry.date
     ? formatRelativeDay(entry.date, today)
-    : // A receipt with no day is bought today — the form's own default.
+    : // A receipt with no day is bought today, the form's own default.
       kind === 'receipt'
       ? formatRelativeDay(today, today)
       : null;
@@ -423,8 +416,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
             onPress={() => edit('amount')}
             className="min-h-[112px] w-full items-center justify-center rounded-[16px] bg-accent/10 px-4 active:opacity-80"
           >
-            {/* Ink on the tint: accent ink on accent/10 measured under 4.5:1
-                for seven accent and mode pairs, dark plum among them. */}
+            {/* Ink on the tint: accent ink on accent/10 measured under 4.5:1. */}
             <Text
               className="text-center font-poppins-medium text-[17px] text-ink"
               maxFontSizeMultiplier={1.3}
@@ -552,9 +544,9 @@ type BuiltEntry =
   | { ok: false; message: string };
 
 /**
- * The entry through its form's own builder. A new item: no charge on record
- * and nothing counted yet, so both floors are no-ops — exactly as a new item
- * saved from the form. No reminder: a new item's default is Off.
+ * The entry through its form's own builder. A new item has no charge on record and nothing counted
+ * yet, so both floors are no-ops, as for a new item saved from the form. No reminder: the default
+ * is Off.
  */
 function buildFor(
   entry: VoiceEntry,
@@ -591,12 +583,10 @@ function buildFor(
 /**
  * What a saved correction teaches, if anything: heard words → the name saved.
  *
- * Only a guess can be wrong in a way worth remembering. A store Skip matched
- * exactly in the catalogue and the person then changed is a change of mind,
- * not a mishearing — teaching it is how "Target" once became Walmart for
- * good. So: never from a catalogue match, nothing without a source (no
- * merchant), and otherwise only when the name really changed. A learned name changed
- * back to the person's own words is taught too; that is what removes the pair.
+ * Only a guess can be wrong in a way worth remembering: a store matched exactly in the catalogue
+ * and then changed is a change of mind, not a mishearing. So never from a catalogue match, nothing
+ * without a source (no merchant), and otherwise only when the name really changed. A learned name
+ * changed back to the person's own words is taught too; that is what removes the pair.
  */
 function lessonFrom(
   draft: VoiceDraft,

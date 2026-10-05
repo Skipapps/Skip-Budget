@@ -1,23 +1,18 @@
 /**
- * The wall between Free and Pro, in one place.
+ * The wall between Free and Pro, in one place: every gate reads this map, so moving a feature
+ * between tiers is a one-line change here.
  *
- * Every gate in the app reads this map rather than knowing the tiers itself,
- * so moving a feature between them after real conversion data is a one-line
- * change here — and nowhere else.
- *
- * The wall gates verbs, never nouns (Founder's call, 2026-09-28): Pro is
- * about what an account can *start* from today, never about what it owns.
- * Everything ever created stays fully usable on any tier; only creation is
- * counted, winding down (settling, paying off, closing) is always free, and
- * the pure tools below are the whole of what a lapse switches off. Splitting
- * is deliberately absent: joining, spending and settling in a group are free
- * for everyone, and the only Pro part is opening a group beyond the count.
+ * The wall gates verbs, never nouns: Pro is about what an account can *start*, not what it owns.
+ * Everything already created stays fully usable on any tier; only creation is counted, winding
+ * down (settling, paying off, closing) is always free, and the tools below are all a lapse
+ * switches off. Splitting is deliberately absent: joining, spending and settling in a group are
+ * free for everyone, and the only Pro part is opening a group beyond `FREE_LIMITS.openGroups`.
  */
 export const WALL = {
   loanCalculator: 'pro',
   insights: 'pro',
   receiptScan: 'pro',
-  /** Adding a receipt, bill or subscription by speaking it. Gate id `voice`. */
+  /** Adding a receipt, bill or subscription by speaking it. */
   voice: 'pro',
 } as const;
 

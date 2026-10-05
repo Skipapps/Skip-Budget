@@ -8,15 +8,8 @@ const stream = (terms: Parameters<typeof amortise>[0]) =>
   }));
 
 describe('annualPercentageRate', () => {
-  /**
-   * The one case with a closed form, so it checks the solver against algebra
-   * rather than against another implementation of the same idea.
-   *
-   * Borrow $100, repay $110 one month later: the unit period rate is plainly
-   * 10%, and Appendix J's APR is the unit rate times the number of unit periods
-   * in a year — 10% × 12 = 120%. (Reg Z does not compound the APR; that is what
-   * separates it from an effective annual rate, which would be 213.8%.)
-   */
+  // Closed form: $100 repaid as $110 a month later is a 10% unit rate, so 120% APR (not compounded;
+  // an effective annual rate would be 213.8%).
   it('is the unit period rate times the periods in a year', () => {
     expect(
       annualPercentageRate({
@@ -27,15 +20,8 @@ describe('annualPercentageRate', () => {
     ).toBe(120);
   });
 
-  /**
-   * Two payments, solved by hand with the quadratic formula.
-   *
-   *     1000 = 600/(1+i) + 600/(1+i)²
-   *
-   * Substituting x = 1/(1+i) gives 3x² + 3x − 5 = 0, so x = (−3 + √69)/6 =
-   * 0.8844373…, 1 + i = 1.1306624…, i = 0.13066238… and the APR is 12i =
-   * 156.794864…%. Nothing about that derivation touches this file's code.
-   */
+  // Solved by hand: 1000 = 600/(1+i) + 600/(1+i)^2 gives 3x^2 + 3x - 5 = 0 with x = 1/(1+i), so
+  // x = (-3 + sqrt(69))/6 and the APR is 12i = 156.794864...%.
   it('matches the closed-form answer on a two-payment loan', () => {
     const byHand = ((6 / (-3 + Math.sqrt(69)) - 1) * 12 * 100).toFixed(5);
     expect(
@@ -52,10 +38,7 @@ describe('annualPercentageRate', () => {
   });
 
   it('is exactly the note rate when there are no fees and no odd days', () => {
-    // With a regular monthly stream and nothing deducted at closing, the APR
-    // and the nominal rate are the same number by construction. If the odd-days
-    // handling or the unit period counting were wrong, this would not land on
-    // a flat 7.
+    // A regular monthly stream with nothing deducted at closing: APR equals the nominal rate.
     expect(
       annualPercentageRate({
         advance: 100_000,
@@ -99,16 +82,9 @@ describe('annualPercentageRate', () => {
 });
 
 /**
- * Fixture 5 — the textbook Truth in Lending example: a $100,000 loan at 7.000%
- * over 30 years with $2,000 of points and origination fees paid at closing.
- *
- * The note payment is $665.30 (annuity formula), the borrower receives $98,000,
- * and the disclosed APR comes out above the note rate because the fee buys
- * nothing but the loan. Source for the maths: Appendix J to 12 CFR Part 1026,
- * part (b) — the APR is the rate that discounts the payment stream back to the
- * amount financed. The check below is the definition itself: discount the 360
- * payments at the returned rate and the present value must be $98,000 to the
- * cent, which no wrong rate can satisfy.
+ * Textbook Truth in Lending example: $100,000 at 7.000% over 30 years with $2,000 of points and
+ * fees paid at closing. Note payment $665.30; the borrower receives $98,000, so the APR is above
+ * the note rate.
  */
 describe('fixture: $100,000 at 7% for 30 years with $2,000 in fees (Reg Z Appendix J)', () => {
   const ADVANCED_ON = new Date(2025, 11, 1);
@@ -137,19 +113,12 @@ describe('fixture: $100,000 at 7% for 30 years with $2,000 in fees (Reg Z Append
     expect(disclosure.amountFinanced).toBe(98_000);
     expect(disclosure.totalOfPayments).toBe(239_510.98);
     expect(disclosure.totalInterest).toBe(139_510.98);
-    // The finance charge is the interest plus the prepaid fee (§1026.4).
     expect(disclosure.financeCharge).toBe(141_510.98);
   });
 
   it('satisfies the equation that defines it', () => {
-    // Written out independently: discount each payment at the disclosed rate
-    // and the present value must be the amount financed. Because the rate is
-    // reported to five decimals, the check is that the true root is bracketed
-    // by the last reported digit — a rate half a unit below must overshoot
-    // $98,000 and half a unit above must undershoot it. Nothing but the
-    // correctly rounded rate can do both. (Five decimals of APR is worth about
-    // five cents of present value over thirty years, which is why this is a
-    // bracket and not an equality.)
+    // Discounting each payment at the disclosed rate must give the amount financed. The rate is
+    // reported to five decimals, so this is a bracket (half a unit either side), not an equality.
     const presentValue = (apr: number) => {
       const unitRate = apr / 100 / 12;
       return payments.reduce(
@@ -165,12 +134,9 @@ describe('fixture: $100,000 at 7% for 30 years with $2,000 in fees (Reg Z Append
 });
 
 /**
- * Fixture 6 — the real installment loan from `loan.test.ts`, disclosed.
- *
- * $31,394.33 at 8.14% over 72 months, funded 30 Nov 2025 with a first payment
- * on 14 Jan 2026 and a contract payment of $554.34. No fees, but the 45-day
- * opening period and the lender's cent of rounding on the payment both move the
- * APR off the note rate — which is exactly what a disclosure is for.
+ * The real installment loan from `loan.test.ts`: $31,394.33 at 8.14% over 72 months, funded
+ * 30 Nov 2025, first payment 14 Jan 2026, contract payment $554.34. No fees, but the 45-day opening
+ * period and the lender's rounding of the payment move the APR off the note rate.
  */
 describe('fixture: the real lender statement, disclosed', () => {
   const disclosure = truthInLending({
@@ -189,9 +155,7 @@ describe('fixture: the real lender statement, disclosed', () => {
 
   it('lands within a hundredth of a point of the note rate', () => {
     expect(disclosure.apr).toBe(8.13592);
-    // §1026.22(a)(2) allows an eighth of a percentage point either way; this is
-    // comfortably inside it, which is the test that the odd-days handling is
-    // not wildly wrong.
+    // §1026.22(a)(2) tolerates an eighth of a percentage point either way.
     expect(Math.abs(disclosure.apr - 8.14)).toBeLessThan(0.125);
   });
 
@@ -205,8 +169,7 @@ describe('fixture: the real lender statement, disclosed', () => {
 
 describe('odd days', () => {
   it('costs more APR the longer the money sits before the first payment', () => {
-    // Same note, same payments, funded earlier: the borrower holds the money
-    // longer for the same money back, so the rate it is costing is higher.
+    // Same payments, funded earlier: the money is held longer for the same money back.
     const payments = stream({
       principal: 20_000,
       annualRatePercent: 6,
@@ -232,9 +195,7 @@ describe('odd days', () => {
   });
 
   it('treats a clamped month end as a whole unit period, not as odd days', () => {
-    // Advanced 31 Jan, paid on the 28th, 31st and 30th: three clean unit
-    // periods. Counting forward instead of backward would invent odd days in
-    // February and quote a different rate.
+    // Advanced 31 Jan, paid on the 28th, 31st and 30th: three clean unit periods, no odd days.
     const apr = annualPercentageRate({
       advance: 1000,
       advancedOn: new Date(2026, 0, 31),

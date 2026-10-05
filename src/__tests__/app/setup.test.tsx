@@ -5,13 +5,9 @@ import SetupScreen from '@/app/setup';
 import type { SetupStep } from '@/api/onboarding';
 
 /**
- * The walk-in gate, pinned.
- *
- * Three behaviours carry the whole screen: a returning account — anything
- * saved at all, or the guide dismissed — passes straight to Home without a
- * frame of setup; a fresh account gets the steps with Continue aimed at the
- * first one; and the arrival decision is taken once — saving a step mid-flow
- * must not yank the screen away before the rest have had their moment.
+ * The walk-in gate: a returning account (anything saved, or the guide dismissed) passes straight to
+ * Home without a frame of setup; a fresh account gets the steps with Continue aimed at the first;
+ * and the arrival decision is taken once, so saving a step mid-flow does not yank the screen away.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -20,8 +16,8 @@ jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
 );
 
-// The redirect is asserted through committed output rather than a render
-// side effect, which concurrent rendering is free to replay or discard.
+// The redirect is asserted through committed output, not a render side effect, which concurrent
+// rendering is free to replay or discard.
 jest.mock('expo-router', () => {
   const { Text } = require('react-native');
   return {
@@ -48,8 +44,7 @@ jest.mock('@/providers/theme-provider', () => ({
   }),
 }));
 
-// The screen is tested against the hook's contract; the hook's own
-// derivations live in onboarding.ts and are exercised through the card.
+// The screen is tested against the hook's contract; its derivations live in onboarding.ts.
 const mockGettingStarted = {
   steps: [] as SetupStep[],
   requiredDone: false,
@@ -139,7 +134,6 @@ it('shows the five steps to a fresh account, with Continue aimed at the first', 
 });
 
 it('opens the bills step on its own page, not straight on the form', async () => {
-  // Arrive fresh, then save the first two steps mid-flow.
   const screen = await render(<SetupScreen />);
   mockGettingStarted.steps = makeSteps({ salary: true, wallet: true });
   await screen.rerender(<SetupScreen />);
@@ -173,8 +167,7 @@ it('passes a finished account straight to Home without rendering the flow', asyn
 });
 
 it('passes a returning account straight to Home even with required steps left', async () => {
-  // Signed in again with pay, a card and a bill saved but no subscription:
-  // a returning user, not a new one.
+  // Pay, a card and a bill saved but no subscription: a returning user, not a new one.
   mockGettingStarted.steps = makeSteps({ salary: true, wallet: true, bill: true });
 
   const screen = await render(<SetupScreen />);
@@ -211,7 +204,6 @@ it('renders nothing until the rows are in, rather than flashing the flow', async
 it('holds the arrival decision: finishing the bills mid-flow offers the receipt, not Home', async () => {
   const screen = await render(<SetupScreen />);
 
-  // The last required step completes while the screen is mounted.
   mockGettingStarted.steps = makeSteps({
     salary: true,
     wallet: true,
@@ -222,8 +214,7 @@ it('holds the arrival decision: finishing the bills mid-flow offers the receipt,
   await screen.rerender(<SetupScreen />);
 
   expect(screen.queryByText('redirect:/home')).toBeNull();
-  // Twice on purpose: the step row and the footer button both offer it,
-  // and both lead to the same screen.
+  // Twice on purpose: the step row and the footer button both offer it.
   await fireEvent.press(screen.getAllByText('Add a receipt')[1]);
   expect(router.push).toHaveBeenCalledWith('/add-receipt');
 

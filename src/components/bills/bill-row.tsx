@@ -22,8 +22,7 @@ export const RECURRENCE_LABELS: Record<string, string> = {
 export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
   const colors = useColors();
   const moneyColor = useMoneyColor();
-  // createElement, not JSX: getBillIcon looks a component up rather than
-  // defining one, but assigning it to a capitalised local trips the lint rule.
+  // createElement, not JSX: a capitalised local for a looked-up component trips the lint rule.
   const icon = createElement(getBillIcon(bill), {
     size: 20,
     strokeWidth: GLYPH_STROKE,
@@ -39,8 +38,6 @@ export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
       onPress={onPress}
       className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
     >
-      {/* The issuer's logo when there is one — AEP and T-Mobile are what the
-          eye finds in this list — and the category icon when there is not. */}
       {domain ? (
         <BrandLogo name={bill.name} domain={domain} size={40} />
       ) : (

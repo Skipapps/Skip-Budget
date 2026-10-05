@@ -1,18 +1,8 @@
 import type { ImageSourcePropType } from 'react-native';
 
 /**
- * The faces someone can pick for their account.
- *
- * Bundled with the app rather than uploaded, which is the whole design: the
- * profile stores an id, nothing leaves the phone, and there is no bucket,
- * permission prompt or crop step between wanting a picture and having one.
- *
- * The fifteen Skip avatars, re-framed closer on the face (2026-10-04, from
- * "assets/New Avatars"). Same people in the same order as the set before, so
- * an id someone already picked lands on their own face, just closer. Shipped
- * as 512px palette PNGs: sharp at the 132pt they are ever drawn, a quarter of
- * the 1024px exports' weight. Unnamed on purpose; a screen reader hears their
- * number. `require` takes a literal path, so the list is written out.
+ * Bundled with the app: the profile stores an id, nothing is uploaded. Ids are stable, so a saved
+ * id keeps pointing at the same face. `require` takes a literal path, so the list is written out.
  */
 
 export type Avatar = {

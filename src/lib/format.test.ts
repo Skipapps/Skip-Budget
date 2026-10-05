@@ -17,14 +17,12 @@ describe('formatCurrency', () => {
   it('drops the cents when asked, which the card faces rely on', () => {
     expect(formatCurrency(1234.56, { cents: false })).toBe('$1,234');
     expect(formatCurrency(-950, { cents: false })).toBe('-$950');
-    // Deliberately truncates rather than rounds: $999.99 reads as $999, never
-    // as $1,000. Overstating a balance is the worse of the two mistakes.
+    // Truncates rather than rounds: overstating a balance is the worse mistake.
     expect(formatCurrency(999.99, { cents: false })).toBe('$999');
   });
 
   it('never shows a minus in front of zero', () => {
-    // A third of a cent below zero displays as $0.00; a minus sign there reads
-    // as a debt that is not there, and colours it as money going out.
+    // A minus on a displayed $0.00 would read as a debt and colour it as money going out.
     expect(formatCurrency(-0.004)).toBe('$0.00');
     expect(formatCurrency(-0)).toBe('$0.00');
     expect(formatCurrency(-0.6, { cents: false })).toBe('$0');
@@ -35,9 +33,8 @@ describe('formatCurrency', () => {
     expect(formatCurrency(-0.006)).toBe('-$0.01');
   });
 
-  // Half a cent posts the way money.ts posts it: away from zero, decided on the
-  // decimal the arithmetic meant. toFixed(2) used to decide it on the binary
-  // value, so 10.075 (stored as 10.07499…) showed as $10.07. Hand-rounded.
+  // Half a cent posts the way money.ts posts it: away from zero, decided on the decimal meant,
+  // not the binary value (10.075 is stored as 10.07499…).
   it('rounds half a cent away from zero, as money.ts does', () => {
     expect(formatCurrency(1.005)).toBe('$1.01');
     expect(formatCurrency(10.075)).toBe('$10.08');
@@ -75,8 +72,6 @@ describe('formatCurrency', () => {
   });
 
   it('refuses to render a figure that is not a number', () => {
-    // "$NaN.undefined" on a balance looks like corrupted data rather than a
-    // calculation that failed.
     expect(formatCurrency(NaN)).toBe('—');
     expect(formatCurrency(Infinity)).toBe('—');
     expect(formatCurrency(-Infinity)).toBe('—');

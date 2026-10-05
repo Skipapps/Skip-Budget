@@ -14,9 +14,8 @@ type LedgerRowProps = {
   sourceLabel: string;
   kindLabel: string;
   /**
-   * Opens the record behind the row. Left undefined for an entry with nothing
-   * to open, and then the row is not a button at all — it neither dims under a
-   * thumb nor announces itself to VoiceOver as something that can be pressed.
+   * Opens the record behind the row. Undefined leaves it inert: not a button, no dimming, not
+   * announced by VoiceOver as pressable.
    */
   onPress?: () => void;
 };
@@ -24,9 +23,8 @@ type LedgerRowProps = {
 export function LedgerRow({ entry, sourceLabel, kindLabel, onPress }: LedgerRowProps) {
   const colors = useColors();
   const moneyColor = useMoneyColor();
-  // Income is the one kind with nothing to draw: a paycheque has no merchant,
-  // and a monogram of the employer's name reads as a mistake next to real
-  // logos. Everything that was actually bought somewhere gets its brand.
+  // Income is the one kind with nothing to draw: a paycheque has no merchant, and a monogram of the
+  // employer's name reads as a mistake next to real logos.
   const isIncome = entry.kind === 'income';
   // A bill is not a brand either — it carries the category icon instead.
   const isBill = entry.kind === 'bill';

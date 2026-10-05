@@ -1,39 +1,23 @@
 /**
- * Step 5: who was paid.
+ * Who was paid. Four passes, strict to loose, each on words nothing else has claimed:
  *
- * Four passes, strict to loose, each on words nothing else has claimed:
+ * 1. **Learned aliases** the person taught Skip ("spot a fly" → Spotify). Where one matches the
+ *    same words as pass 2, the longer wins and a tie goes to the catalog (`preferCatalog`), so a
+ *    learned phrase never turns a store the catalog knows into another one.
+ * 2. **Exact** directory names and aliases, whole words with spaces ignored ("star bucks",
+ *    "T-Mobile", "tmobile" agree) and number words read as digits ("seven eleven" finds 7-Eleven).
+ *    Runs before amounts and dates, so the 7 and the 24 in those names are never read as money.
+ * 3. **Fuzzy**, for the recogniser's mishearings ("spot a fly", "come cast"), using the app's
+ *    search rule (`matchesSearch`, src/lib/search.ts): one letter mistake from four letters, two
+ *    from seven. Only two- or three-word stretches, names of six letters or more, matching first
+ *    letter, and both ways round so a longer phrase cannot swallow a short name.
+ * 4. **A name after "at" or "from"** the directory does not know ("at Joe's Diner"), filed with the
+ *    same category guess the store field uses for a typed name.
  *
- * 1. **Learned aliases** the person taught Skip ("spot a fly" → Spotify). Read
- *    over the same words as pass 2; where both match, the longer wins and a
- *    tie goes to the catalog (`preferCatalog`), so a learned phrase never turns
- *    a store the catalog knows into another one.
- * 2. **Exact** directory names and aliases, matched on whole words with the
- *    spaces ignored, so "star bucks", "Starbucks", "T-Mobile", "t mobile"
- *    and "tmobile" agree, and with number words read as digits, so
- *    "seven eleven" finds 7-Eleven and "twenty four hour fitness" finds
- *    24 Hour Fitness. This runs *before* amounts and dates, so the 7 and the
- *    24 in those names are never read as money.
- * 3. **Fuzzy**, for the recogniser's mishearings ("spot a fly", "come cast"),
- *    using the app's own search rule (`matchesSearch`, src/lib/search.ts):
- *    one letter mistake from four letters, two from seven. Only two- or
- *    three-word stretches (see FUZZY_WORDS_MIN), only names of six letters
- *    or more, only when the first letter agrees, and both ways round so a
- *    longer phrase cannot swallow a short name.
- * 4. **A name after "at" or "from"** that the directory does not know
- *    ("at Joe's Diner"), filed with the same category guess the store field
- *    uses for a typed name.
- *
- * ## Everyday words that are also brands
- * Some names and aliases are ordinary words: Shell, Apple, Chase, Root,
- * Medium, Lemonade, "office" (Microsoft), "max" (HBO Max), "prime" (Amazon).
- * Those count only with a sign they mean the company: "at"/"from"/"to"/
- * "with" in front ("at Shell"), or a word like insurance, bank, card or app
- * after ("Progressive insurance", "Chase card"). "A medium coffee" stays a
+ * Names that are also everyday words (Shell, Apple, Chase, Root, Medium, "office", "max", "prime")
+ * count only with a sign they mean the company: "at"/"from"/"to"/"with" in front ("at Shell"), or a
+ * word like insurance, bank, card or app after ("Progressive insurance"). "A medium coffee" stays a
  * coffee.
- *
- * `matchBrand` and `guessCategory` in src/api/brands.ts are not imported:
- * that module loads Supabase and React Query at runtime. The category guess
- * is mirrored below and pinned to the original by catalog.test.ts.
  */
 import { matchesSearch } from '@/lib/search';
 
@@ -43,7 +27,10 @@ import { readGroup } from './numbers';
 import type { BrandRow, VoiceMerchant, VoiceMerchantSource } from './types';
 import { isPlainWord, TRIGGER_WORDS } from './words';
 
-/** Same rules, same order as KEYWORD_CATEGORIES in src/api/brands.ts. */
+/**
+ * Same rules, same order as KEYWORD_CATEGORIES in src/api/brands.ts, which is not imported because
+ * it loads Supabase and React Query. catalog.test.ts pins the two together.
+ */
 const KEYWORD_CATEGORIES: [RegExp, string][] = [
   [/\b(market|grocer|grocery|supermarket|foods?|produce|butcher|bakery)\b/i, 'groceries'],
   [
@@ -61,7 +48,6 @@ const KEYWORD_CATEGORIES: [RegExp, string][] = [
   [/\b(parking|transit|taxi|rail|airlines?|airways)\b/i, 'transport'],
 ];
 
-/** The store field's guess for a name the catalog does not know. */
 export function guessSpendCategory(name: string): string {
   const found = KEYWORD_CATEGORIES.find(([pattern]) => pattern.test(name));
   return found ? found[1] : 'other';
@@ -223,9 +209,8 @@ type BrandIndex = {
 };
 
 /**
- * "twenty four hour fitness" → "24hourfitness", "seven eleven" → "711",
- * "7-Eleven" → "711": number words and digits read the same way on both
- * sides, so a name with a number in it matches however it was said.
+ * "twenty four hour fitness" → "24hourfitness", "seven eleven" and "7-Eleven" → "711", so a name
+ * with a number matches however it was said.
  */
 function digitKey(tokens: readonly Token[], start: number, end: number): string {
   let key = '';
@@ -244,11 +229,10 @@ function digitKey(tokens: readonly Token[], start: number, end: number): string 
 }
 
 /**
- * Fuzzy matching reads two or three words, never one. iOS writes real words,
- * so its mishearing of a brand comes out as several ("spot a fly", "come
- * cast", "net flicks"); a single word one letter off a brand is far more
- * often just that word ("safety" is not Safeway, "public" is not Publix,
- * "fitness" is not Fit4Less). Names with digits are matched exactly only.
+ * Fuzzy matching reads two or three words, never one. iOS writes real words, so its mishearing of a
+ * brand comes out as several ("spot a fly", "net flicks"); a single word one letter off a brand is
+ * far more often just that word ("safety" is not Safeway, "public" is not Publix). Names with
+ * digits are matched exactly only.
  */
 const FUZZY_WORDS_MIN = 2;
 const FUZZY_WORDS_MAX = 3;
@@ -294,7 +278,6 @@ function brandIndex(directory: readonly BrandRow[]): BrandIndex {
   return index;
 }
 
-/** Whether an everyday-word brand at [start, end) is clearly the company. */
 function namedAsCompany(tokens: readonly Token[], start: number, end: number): boolean {
   let before = start - 1;
   while (before >= 0 && SKIPPABLE.has(tokens[before].key)) before -= 1;
@@ -374,7 +357,6 @@ export function findLearnedMerchants(
 
 const EXACT_WINDOW = 6;
 
-/** Pass 2: exact names and aliases, longest first, left to right. */
 export function findExactMerchants(
   tokens: readonly Token[],
   directory: readonly BrandRow[],
@@ -407,7 +389,6 @@ export function findExactMerchants(
   return found;
 }
 
-/** Pass 3: near misses, both ways round through matchesSearch. */
 export function findFuzzyMerchants(
   tokens: readonly Token[],
   directory: readonly BrandRow[],
@@ -472,7 +453,6 @@ export function findFuzzyMerchants(
 
 const FREE_WORDS = 4;
 
-/** Pass 4: "at Joe's Diner", "from Lucy's Bakery". */
 export function findTypedMerchants(tokens: readonly Token[], usable: Usable): MerchantSpan[] {
   const found: MerchantSpan[] = [];
   for (let index = 0; index < tokens.length; index += 1) {
@@ -504,10 +484,7 @@ export function findTypedMerchants(tokens: readonly Token[], usable: Usable): Me
   return found;
 }
 
-/**
- * A catalog name is the most certain thing heard, then a learned phrase, then
- * a near miss, then words used as said.
- */
+/** Most certain first: a catalog name, a learned phrase, a near miss, then words used as said. */
 const SOURCE_RANK: Record<MerchantSource, number> = { catalog: 0, learned: 1, fuzzy: 2, heard: 3 };
 
 /** The merchant to show: the most certain pass, then the first said. */
@@ -519,12 +496,10 @@ export function pickMerchant(spans: readonly MerchantSpan[]): MerchantSpan | nul
 }
 
 /**
- * Learned and catalog matches over the same words: the longer one wins, and on
- * a tie the catalog does. So a learned phrase can name something the catalog
- * does not ("target optical" → "Target Optical"), but can never turn a store
- * the catalog knows into another one ("target" stays Target, whatever was once
- * learned for it). Callers keep to the same rule by never learning when the
- * draft's merchantSource is `catalog`.
+ * Learned and catalog matches over the same words: the longer one wins, and on a tie the catalog
+ * does. A learned phrase can name something the catalog does not ("target optical" → "Target
+ * Optical") but never turns a catalog store into another one. Callers match this by never learning
+ * when the draft's merchantSource is `catalog`.
  */
 export function preferCatalog(
   learned: readonly MerchantSpan[],
@@ -545,14 +520,12 @@ export function preferCatalog(
   return taken.sort((a, b) => a.start - b.start);
 }
 
-/** "at Starbucks", "at the Target": the receipt sign in "paid at". */
 export function introducedWithAt(tokens: readonly Token[], span: MerchantSpan): boolean {
   let before = span.start - 1;
   while (before >= 0 && SKIPPABLE.has(tokens[before].key)) before -= 1;
   return before >= 0 && tokens[before].key === 'at';
 }
 
-/** Words that lead into how something was paid: "with my Amex", "on the Chase card". */
 const PAYMENT_LEADS = new Set(['with', 'using', 'via', 'through', 'by', 'on']);
 const POSSESSIVES = new Set(['my', 'our', 'the', 'a', 'an', 'his', 'her', 'their']);
 /** After a brand, these make it the card or account paid from: "Chase card", "Citi account". */
@@ -568,22 +541,15 @@ const CARD_WORDS = new Set([
 ]);
 
 /**
- * Whether a matched brand is how the person paid rather than who they paid.
+ * Whether a matched brand is how the person paid rather than who they paid, so it is never the
+ * merchant even when it is the only brand heard ("$20 on my Amex" leaves the merchant blank).
  *
  * - A wallet: the brand followed by "pay" ("Apple Pay", "Google Pay").
- * - A card or bank after payment words: with / using / via / through / by /
- *   on (with "my" or "the" allowed between), when the brand is a bank or card
- *   issuer, or a card word follows it ("on my Amex", "with my Chase card",
- *   "on the Citi card").
+ * - A card or bank after payment words (with, using, via, through, by, on; "my" or "the" allowed
+ *   between), when the brand is a bank or card issuer or a card word follows it.
  *
- * Payment words alone are not enough, because "with" also names the company
- * itself ("insurance with GEICO", "a subscription with Netflix"). And a card
- * named first with no payment words ("Chase card payment 300 due on the
- * 25th") is the bill's company, so it stays.
- *
- * A payment method is never the merchant, even when it is the only brand
- * heard: "$20 on my Amex" names the card, not the store, so the merchant is
- * left for the person to fill in.
+ * Payment words alone are not enough: "with" also names the company ("insurance with GEICO"). And a
+ * card named first with no payment words ("Chase card payment 300") is the bill's company.
  */
 export function isPaymentMethod(tokens: readonly Token[], span: MerchantSpan): boolean {
   const after = tokens[span.end]?.key ?? '';

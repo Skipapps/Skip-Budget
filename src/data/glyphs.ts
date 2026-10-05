@@ -38,13 +38,8 @@ import {
 export type Glyph = LucideIcon;
 
 /**
- * Every glyph a bill, a group or a spending category can wear, keyed by the id
- * stored against it.
- *
- * Lucide, like every other icon in the app, so a bill's house sits beside the
- * tab bar's icons stroke for stroke. One table rather than one per feature: a
- * bill filed under Insurance and a receipt filed under Insurance are the same
- * idea, and drawing them differently would say they are not.
+ * Every glyph a bill, group or spending category can wear, keyed by the id stored against it. One
+ * table so the same idea (Insurance, say) is drawn the same way everywhere.
  */
 export const GLYPHS: Record<string, Glyph> = {
   // Bill categories.

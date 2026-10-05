@@ -2,16 +2,6 @@ import { fireEvent, render } from '@testing-library/react-native';
 
 import { DatePicker } from '@/components/ui/date-picker';
 
-/**
- * The floor under the picker.
- *
- * A bill that runs for a "specific period" has a From and a To, and the To was
- * taking any date at all — including one before the From, which saved a period
- * that finished before it began. The fix is that those days are never offered:
- * dimmed, dead, and OK held back if the draft drifts below the floor by some
- * other route.
- */
-
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
 jest.mock('@/providers/theme-provider', () => ({
@@ -23,7 +13,7 @@ jest.mock('@/providers/theme-provider', () => ({
   }),
 }));
 
-// 14 June 2026, a Sunday — the month is fixed so the day labels below are too.
+// 14 June 2026, a Sunday: the month is fixed so the day labels below are too.
 const MIN = new Date(2026, 5, 14);
 
 const spoken = (day: number, weekday: string) => `${weekday} ${day} June 2026`;

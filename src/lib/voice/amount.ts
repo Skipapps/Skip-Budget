@@ -1,61 +1,29 @@
 /**
- * Step 3b: which number is the amount, and is it settled?
+ * Which number is the amount, and is it settled? iOS writes most spoken prices as digits ("$15.99",
+ * "45 bucks"), taken as written; words ("forty five", "a grand") are the fallback, one group each
+ * (numbers.ts).
  *
- * ## Digits first
- * iOS writes most spoken prices as digits ("$15.99", "1,800", "45 bucks",
- * "$1.2k"). Those are taken as written: the recogniser has already decided
- * where the decimal point goes, and the cents come out of `toCents`.
+ * Two groups side by side are never guessed. A 1-99 number followed straight away by a two-digit
+ * number ("twelve fifty", "fifteen ninety nine", "twelve oh five", iOS's "12:50" or "15 99") has
+ * two readings: "twelve fifty" is $12.50 or $1,250 (rent), "fifteen ninety nine" is $15.99 (a
+ * streaming plan) or $1,599 (a laptop). Both are returned in `amountChoices` (ascending), the
+ * review page asks, and `missing` keeps 'amount'. `amount` is pre-selected by kind: hundreds for a
+ * bill (rent, car payment), dollars-and-cents otherwise. The pair is settled only when a unit word
+ * pins the second half ("twelve dollars fifty", "a buck fifty", "twelve fifty cents", "$12 50");
+ * "bucks" after the pair does not. A scale word removes the question: "twelve hundred fifty" is
+ * $1,250.
  *
- * ## Words are the fallback
- * "forty five", "two hundred and five", "a grand", "thirty seven hundred",
- * "eighteen hundred", "twelve dollars and fifty cents", "ninety nine cents",
- * "one point two k" — each is one group (numbers.ts) and one settled amount.
+ * Only whole cents are money. A digit past the cent ("$3.459" a gas price, "twelve point nine nine
+ * nine") is never an amount and never rounded into one. Trailing zeros are fine ("3.450"), and a
+ * scale can make a figure whole ("1.2345k" is $1,234.50).
  *
- * ## The ambiguity rule: two groups side by side are never guessed
- * When a number from 1 to 99 is followed straight away by a two-digit number
- * ("twelve fifty", "fifteen ninety nine", "one twenty", "nine ninety nine",
- * "twelve oh five", or iOS's "12:50" and "15 99"), English allows two
- * readings and nothing in the words decides between them:
- *
- *   - dollars and cents:  "twelve fifty"        → $12.50
- *   - hundreds:           "twelve fifty"        → $1,250   (as rent is said)
- *   - dollars and cents:  "fifteen ninety nine" → $15.99   (a streaming plan)
- *   - hundreds:           "fifteen ninety nine" → $1,599   (a laptop)
- *   - hundreds:           "nine ninety nine"    → $999     (how Apple says it)
- *
- * Both readings are returned in `amountChoices` (ascending) and the review
- * page asks; `missing` keeps 'amount' so the draft never counts as settled.
- * `amount` is pre-selected by kind: the hundreds reading for a bill (rent,
- * car payment and the like are said in hundreds), the dollars-and-cents
- * reading for a receipt or subscription (retail prices are said that way).
- *
- * The pair is settled — one reading — only when a unit word pins the second
- * half: "twelve dollars fifty", "twelve fifty cents", "a buck fifty",
- * "twelve and fifty cents", or "$12 50". "bucks" after the pair does not
- * settle it ("twelve fifty bucks" is said of both).
- *
- * A scale word removes the question: "eighteen hundred" is $1,800,
- * "thirty seven hundred" is $3,700, "twelve hundred fifty" is $1,250.
- *
- * ## Only whole cents are money
- * A figure with a digit past the cent — "$3.459" (a gas price per gallon),
- * "$12.345", "twelve point nine nine nine" — is never an amount and never
- * rounded into one. It is dropped, so "$3.459 a gallon, $45.20 total" is
- * $45.20 and "$3.459 at Shell" has no amount. Trailing zeros are fine
- * ("3.450"); a scale can make a figure whole ("1.2345k" is $1,234.50).
- *
- * ## More than one number
- * Dates claim their numbers first ("on the 5th", "October 3rd 2026"), and
- * cycles theirs ("every 3 months"), so "rent 1800 on the 1st" has one
- * amount. A price per something ("$3.45 a gallon", "$12 each") is never the
- * amount: beside a total the total settles, and alone it is not offered,
- * because a per-gallon price is not what was paid. Of what remains: a number
- * with a money marker ($, bucks, dollars,
- * cents, decimals, k, grand) beats a bare one; a bare count followed by a
- * noun ("2 pizzas", "300 megabits") drops out when another number is left.
- * If two different amounts still remain, they are both offered — never
- * summed, never picked silently. A bare 1–99 straight before a money figure
- * ("twelve fifty thousand") cannot be read, so neither is offered.
+ * With more than one number: dates and cycles claim their numbers first ("on the 5th", "every 3
+ * months"). A price per something ("$3.45 a gallon", "$12 each") is never the amount: beside a
+ * total the total settles, alone it is not offered. Of what remains, a number with a money marker
+ * ($, bucks, cents, decimals, k, grand) beats a bare one, and a bare count followed by a noun ("2
+ * pizzas") drops out when another number is left. Two different amounts that still remain are both
+ * offered, never summed. A bare 1-99 straight before a money figure ("twelve fifty thousand")
+ * cannot be read, so neither is offered.
  */
 import type { Token } from './clean';
 import { readGroup, UNITS, type Group } from './numbers';
@@ -63,7 +31,6 @@ import type { VoiceKind } from './types';
 
 export const DOLLAR_UNITS = new Set(['dollar', 'dollars', 'buck', 'bucks', 'usd']);
 export const CENT_UNITS = new Set(['cent', 'cents']);
-/** A number followed by one of these is a time of day, not money. */
 const TIME_WORDS = new Set(['am', 'pm', 'oclock']);
 
 export type AmountCandidate = {
@@ -85,7 +52,6 @@ function key(tokens: readonly Token[], index: number, usable: Usable): string | 
   return token && usable(index) ? token.key : null;
 }
 
-/** "fifty" or "50" (two digits) after "twelve", or "oh five". Returns the two-digit value. */
 function readSecondHalf(
   tokens: readonly Token[],
   start: number,
@@ -105,7 +71,6 @@ function readSecondHalf(
   return null;
 }
 
-/** The cents after "dollars": "and fifty cents", "fifty", "99 cents". */
 function readCentsTail(
   tokens: readonly Token[],
   start: number,
@@ -131,8 +96,7 @@ function pairReadings(dollars: number, twoDigits: number): number[] {
 function readTime(tokens: readonly Token[], start: number, usable: Usable): AmountCandidate | null {
   const [hours, minutes] = tokens[start].time as [number, number];
   if (TIME_WORDS.has(key(tokens, start + 1, usable) ?? '')) return null;
-  // Only a real clock reading is "twelve fifty". "99:99" is not a time, so it is
-  // not offered as $99.99 / $9,999 either (review L1).
+  // "99:99" is not a time, so it is not offered as $99.99 / $9,999 either.
   if (hours < 1 || hours > 23 || minutes > 59) return null;
   return {
     start,
@@ -149,7 +113,6 @@ function readAmountAt(tokens: readonly Token[], start: number, usable: Usable): 
   const token = tokens[start];
   if (token.type === 'time') return { candidate: readTime(tokens, start, usable), end: start + 1 };
 
-  // "a buck fifty", "a dollar".
   if (
     (token.key === 'a' || token.key === 'an') &&
     DOLLAR_UNITS.has(key(tokens, start + 1, usable) ?? '')
@@ -168,21 +131,18 @@ function readAmountAt(tokens: readonly Token[], start: number, usable: Usable): 
   const next = key(tokens, group.end, usable) ?? '';
   if (TIME_WORDS.has(next) || next === 'percent') return { candidate: null, end: group.end + 1 };
 
-  // A digit past the cent ("$3.459 a gallon", "twelve point nine nine nine")
-  // is not an amount: rounding it would show money nobody said. It is dropped,
-  // with its unit, so another figure can be the amount or none is.
+  // A digit past the cent is not an amount: rounding it would show money nobody said. Dropped with
+  // its unit, so another figure can be the amount or none is.
   if (!group.exact) {
     const unit = DOLLAR_UNITS.has(next) || CENT_UNITS.has(next);
     return { candidate: null, end: unit ? group.end + 1 : group.end };
   }
 
-  // "ninety nine cents".
   if (CENT_UNITS.has(next) && group.whole !== null && !group.dollar) {
     const end = group.end + 1;
     return { candidate: { start, end, readings: [group.whole], marked: true, bare: false }, end };
   }
 
-  // "forty five bucks", "twelve dollars and fifty cents", "$12 dollars".
   if (DOLLAR_UNITS.has(next)) {
     let cents = group.cents;
     let end = group.end + 1;
@@ -194,7 +154,6 @@ function readAmountAt(tokens: readonly Token[], start: number, usable: Usable): 
     return { candidate: { start, end, readings: [cents], marked: true, bare: false }, end };
   }
 
-  // "twelve and fifty cents".
   if (next === 'and' && group.whole !== null && !group.scaled) {
     const tail = readCentsTail(tokens, group.end, usable);
     if (tail) {
@@ -211,7 +170,6 @@ function readAmountAt(tokens: readonly Token[], start: number, usable: Usable): 
     }
   }
 
-  // The pair: "twelve fifty", "15 99", "twelve oh five", "$12 50".
   const dollarFirstHalf =
     group.dollar && group.whole !== null && !group.scaled && group.decimals === 0;
   if ((group.simple || dollarFirstHalf) && group.whole !== null) {
@@ -266,7 +224,6 @@ function readAmountAt(tokens: readonly Token[], start: number, usable: Usable): 
   };
 }
 
-/** Every amount-shaped phrase in the unclaimed tokens, in spoken order. */
 export function findAmounts(
   tokens: readonly Token[],
   claimed: readonly boolean[],
@@ -290,10 +247,8 @@ export function findAmounts(
     index = Math.max(read.end, index + 1);
   }
 
-  // "twelve fifty thousand", "twelve $50": a bare 1–99 straight before a money
-  // figure is neither a count nor a price on its own, and the two cannot be
-  // read as one. Neither is offered, so the amount is left to the person
-  // rather than settled on the marked half.
+  // "twelve fifty thousand", "twelve $50": a bare 1-99 straight before a money figure cannot be
+  // read as one number, so neither is offered rather than settling on the marked half.
   const runsOn = (first: AmountCandidate | undefined, second: AmountCandidate | undefined) =>
     first !== undefined &&
     second !== undefined &&
@@ -306,7 +261,6 @@ export function findAmounts(
   );
 }
 
-/** A plain whole number from 1 to 99, no marker: the first half of a compound. */
 function isSmallBare(candidate: AmountCandidate): boolean {
   const [cents] = candidate.readings;
   return (
@@ -318,9 +272,8 @@ function isSmallBare(candidate: AmountCandidate): boolean {
   );
 }
 
-/** "$20 each", "$5 apiece". */
 const PER_WORDS = new Set(['each', 'apiece', 'ea']);
-/** "$3.45 a gallon", "$150 per night": a, an or per before one of these. */
+/** After a, an or per: "$3.45 a gallon", "$150 per night". */
 const PRICE_UNITS = new Set([
   'gallon',
   'gal',
@@ -347,11 +300,7 @@ const PRICE_UNITS = new Set([
   'head',
 ]);
 
-/**
- * A price per something, not a total: "$3.45 a gallon", "$4 a pound", "$12
- * each", "$150 per night". The amount pick and the several-transactions rule
- * (multiple.ts) both use this one test.
- */
+/** A price per something, not a total ("$3.45 a gallon", "$12 each"). Also used by multiple.ts. */
 export function isUnitPrice(tokens: readonly Token[], candidate: AmountCandidate): boolean {
   const next = tokens[candidate.end]?.key ?? '';
   if (PER_WORDS.has(next)) return true;
@@ -366,16 +315,14 @@ export type AmountResult = {
   choices: number[];
 };
 
-/** The pre-selected reading of an unsettled pair. See the module comment. */
+/** Pre-selected reading of an unsettled pair: hundreds for a bill, dollars-and-cents otherwise. */
 export function likelierReading(readings: readonly number[], kind: VoiceKind): number {
   return kind === 'bill' ? Math.max(...readings) : Math.min(...readings);
 }
 
 /**
- * Settles the amount from the candidates that survived corrections.
- *
- * `isNoun(index)` says whether the token after a bare number is a noun it
- * could be counting ("2 *pizzas*").
+ * Settles the amount from the candidates that survived corrections. `isNoun(index)` says whether
+ * the token after a bare number is a noun it could be counting ("2 pizzas").
  */
 export function chooseAmount(
   candidates: readonly AmountCandidate[],
@@ -386,8 +333,6 @@ export function chooseAmount(
   let pool = [...candidates];
   if (pool.length === 0) return { cents: null, choices: [] };
 
-  // A price per something is never what was paid. With a total beside it the
-  // total is the amount; on its own it is not offered at all.
   pool = pool.filter((candidate) => !isUnitPrice(tokens, candidate));
   if (pool.length === 0) return { cents: null, choices: [] };
 

@@ -9,9 +9,7 @@ describe('toCents', () => {
   });
 
   it('decides the half on the decimal, not on the float', () => {
-    // `Math.round(1.005 * 100)` is 100, because the product is
-    // 100.49999999999999. A lender posts $1.01. This is the whole reason the
-    // helper exists rather than the one-liner.
+    // `Math.round(1.005 * 100)` is 100 (the product is 100.49999999999999); a lender posts $1.01.
     expect(1.005 * 100).toBeLessThan(100.5);
     expect(toCents(1.005)).toBe(101);
     expect(toCents(1.015)).toBe(102);
@@ -20,7 +18,6 @@ describe('toCents', () => {
   });
 
   it('is exact on the largest figure the app allows', () => {
-    // The loan calculator's ceiling is $1,000,000.
     expect(toCents(1_000_000)).toBe(100_000_000);
     expect(toCents(999_999.99)).toBe(99_999_999);
   });
@@ -31,7 +28,6 @@ describe('toCents', () => {
   });
 
   it('turns anything that is not a number into nothing', () => {
-    // A NaN balance would poison every later row of a schedule.
     expect(toCents(Number.NaN)).toBe(0);
     expect(toCents(Number.POSITIVE_INFINITY)).toBe(0);
   });
@@ -39,8 +35,7 @@ describe('toCents', () => {
 
 describe('fromCents', () => {
   it('round-trips every cent of a realistic loan balance', () => {
-    // Collected rather than asserted in the loop: 500,000 expect() calls cost
-    // seconds, and the failure list is what you want to read anyway.
+    // Collected rather than asserted in the loop: 500,000 expect() calls cost seconds.
     const broken: number[] = [];
     for (let cents = 0; cents <= 5_000_000; cents += 137) {
       if (toCents(fromCents(cents)) !== cents) broken.push(cents);
@@ -59,7 +54,6 @@ describe('roundMoney', () => {
 
 describe('sumMoney', () => {
   it('adds without the float drift a running total collects', () => {
-    // 0.1 + 0.2 is 0.30000000000000004 in binary floating point.
     expect(0.1 + 0.2).not.toBe(0.3);
     expect(sumMoney([0.1, 0.2])).toBe(0.3);
 

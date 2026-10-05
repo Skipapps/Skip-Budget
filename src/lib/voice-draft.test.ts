@@ -31,12 +31,9 @@ import {
 } from '@/lib/voice-draft';
 
 /**
- * The hand-over between the voice pages, and from them to the add forms.
- *
- * Everything that crosses arrives re-checked: a kind outside the three, an
- * amount that is not exact to the cent, a day that is not on the calendar and
- * any id or enum that is not one, is blanked (a parser draft) or refused (the
- * working copy), and a form param is dropped rather than coerced.
+ * The hand-over between the voice pages, and from them to the add forms. Everything that crosses is
+ * re-checked: invalid values are blanked (a parser draft) or refused (the working copy), and a form
+ * param is dropped rather than coerced.
  */
 
 const NETFLIX = {
@@ -137,7 +134,7 @@ describe('validateVoiceDraft', () => {
     expect(checked?.missing).toContain('amount');
   });
 
-  // Review S2: "$40 or $4,000,000,000,000" must not open as a settled $40.
+  // "$40 or $4,000,000,000,000" must not open as a settled $40.
   it('never settles an amount whose choices did not all survive', () => {
     const outOfRange = validateVoiceDraft(
       draft({ amount: 40, amountChoices: [40, 4_000_000_000_000] }),

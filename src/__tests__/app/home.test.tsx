@@ -4,16 +4,12 @@ import { router } from 'expo-router';
 import HomeScreen from '@/app/(tabs)/home';
 
 /**
- * Where a row in Recent or Coming up goes when it is pressed.
+ * Where a row in Recent or Coming up goes when pressed. Rows are ledger *occurrences*, so each must
+ * resolve back to the record behind it: the receipt, the bill or subscription that charged, the
+ * salary screen for a payday.
  *
- * Both weeks render the same `TransactionRow`, and both used to render it with
- * no handler at all — the dashboard's two busiest lists were inert. The rows
- * are ledger *occurrences*, so what is asserted here is that each one resolves
- * back to the record behind it: the receipt, the bill or subscription that
- * charged, the salary screen for a payday.
- *
- * One mount, every row pressed in turn: this screen is expensive to mount and
- * a test per row made the file order-dependent.
+ * One mount, every row pressed in turn: the screen is expensive to mount and a test per row made
+ * the file order-dependent.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -26,8 +22,6 @@ jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn() },
 }));
 
-// Everything on the dashboard that is not the transaction lists. Each is
-// covered where it lives; here they are only in the way.
 jest.mock('@/components/dashboard/balance-summary', () => ({ BalanceSummary: () => null }));
 jest.mock('@/components/dashboard/destination-list', () => ({ DestinationList: () => null }));
 jest.mock('@/components/dashboard/dashboard-header', () => ({ DashboardHeader: () => null }));
@@ -56,8 +50,7 @@ jest.mock('@/api/refresh', () => ({
   useKeepSchedulesCurrent: () => {},
 }));
 
-// One charge on the record, so the rows whose ids name a charge rather than a
-// plan have something to resolve through.
+// Rows whose ids name a charge rather than a plan resolve through these.
 jest.mock('@/api/charges', () => ({
   useCharges: () => ({
     data: [
@@ -70,7 +63,6 @@ jest.mock('@/api/charges', () => ({
 /** A Thursday. Recent covers the six days behind it; Coming up the week ahead. */
 const TODAY = '2026-09-10';
 
-/** One row of every kind, all inside the Recent week. */
 const mockRecent = [
   { id: 'receipt-r1', label: 'Bakery', amount: -6, date: TODAY, kind: 'receipt' as const },
   {
@@ -108,7 +100,7 @@ const mockRecent = [
     date: '2026-09-06',
     kind: 'subscription' as const,
   },
-  // A shape nothing produces today, which must open nothing at all.
+  // An id shape nothing produces; it must open nothing.
   { id: 'mystery-1', label: 'Unknown', amount: -1, date: '2026-09-06', kind: 'bill' as const },
 ].map((row) => ({ ...row, sourceId: 's1' }));
 
@@ -126,8 +118,7 @@ const mockUpcoming = [
 
 jest.mock('@/api/queries', () => ({
   useProfile: () => ({ data: { display_name: 'Sam' } }),
-  // Called three times: the month behind the card, then the two weeks. The
-  // month's figures are not what this file is about, so it gets the same rows.
+  // Called for the month behind the card, then the two weeks; the month gets the same rows.
   useLedger: (range: { from: string; to: string } | undefined) => ({
     entries: range && range.from > '2026-09-10' ? mockUpcoming : mockRecent,
     totals: { in: 2000, out: 2147, net: -147, count: 7 },
@@ -147,13 +138,11 @@ describe('Home — where a transaction row opens', () => {
       .map((node) => String(node.props.accessibilityLabel ?? ''))
       .filter((label) => label.includes('$'));
 
-    // Seven rows in Recent, one in Coming up; the unplaceable one is not a
-    // button. It is still on screen, and still readable.
+    // The unplaceable row is not a button, though still on screen and readable.
     expect(labels).toHaveLength(7);
     expect(labels.some((label) => label.startsWith('Unknown'))).toBe(false);
     expect(getByText('Unknown')).toBeTruthy();
 
-    /** The row whose accessibility label starts with `label`. */
     const row = (label: string) => {
       const found = getAllByRole('button').find((node) =>
         String(node.props.accessibilityLabel ?? '').startsWith(`${label},`),
@@ -181,7 +170,7 @@ describe('Home — where a transaction row opens', () => {
       params: { id: 's1' },
     });
     expect(router.push).toHaveBeenNthCalledWith(4, '/salary');
-    // The two written down at the time, placed through the charges query.
+    // Charge rows, placed through the charges query.
     expect(router.push).toHaveBeenNthCalledWith(5, { pathname: '/add-bill', params: { id: 'b9' } });
     expect(router.push).toHaveBeenNthCalledWith(6, {
       pathname: '/add-subscription',

@@ -12,11 +12,7 @@ import {
   splitBody,
 } from '../../../supabase/functions/send-push/card';
 
-/**
- * The card a notification carries: what the press-and-hold view shows, the
- * picture on the right, and where "View" lands. Built by the push sender from
- * the reminder or charge, so a mistake here reaches every phone at once.
- */
+/** The card a notification carries: press-and-hold details, thumbnail, and where "View" lands. */
 
 const BASE = 'https://project.supabase.co';
 const AMEX = { kind: 'card' as const, network: 'Amex', last4: '1004' };

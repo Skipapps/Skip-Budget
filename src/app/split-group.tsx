@@ -29,13 +29,6 @@ import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
-/**
- * One group: where everyone stands, and everything that put them there.
- *
- * Your own position leads, because it is the question people open this screen
- * to ask. The suggested payments come next — a balance tells you the size of
- * the problem, and only the payment list tells you what to do about it.
- */
 export default function SplitGroupScreen() {
   const colors = useColors();
   const artwork = useArtwork();
@@ -55,8 +48,7 @@ export default function SplitGroupScreen() {
   const myBalance = mine?.balance ?? 0;
   const settled = Math.abs(myBalance) < 0.005;
 
-  // The minimum set of payments that clears everybody. Shown only when the
-  // group asked for it — otherwise people settle their own pairs.
+  // The minimum set of payments that clears everybody, only when the group asked for it.
   const payments = useMemo(
     () =>
       group?.simplify_debts
@@ -67,9 +59,6 @@ export default function SplitGroupScreen() {
     [balances, group?.simplify_debts],
   );
 
-  // One list, both kinds. They are the same story — money moved — and reading
-  // them in separate lists means holding two orderings in your head to work out
-  // what happened when.
   const timeline = useMemo(() => {
     type Entry =
       | { kind: 'expense'; id: string; date: string; expense: (typeof expenses)[number] }
@@ -91,10 +80,9 @@ export default function SplitGroupScreen() {
     ];
 
     return groupByDate(entries, (entry) => entry.date, {
-      // Only expenses count towards a day's total. A settlement is money
-      // moving between two people who are both already in the group.
+      // Only expenses count towards a day's total; a settlement moves money within the group.
       amountOf: (entry) => (entry.kind === 'expense' ? -Math.abs(entry.expense.amount) : 0),
-      // Oldest day first, today last — the house rule for every dated list.
+      // Oldest day first, today last, as in every dated list.
       direction: 'asc',
     });
   }, [expenses, settlements]);
@@ -136,7 +124,6 @@ export default function SplitGroupScreen() {
         },
       ]}
     >
-      {/* The group's mark and size, under the name the header now carries. */}
       <View className="mt-1 w-full flex-row items-center justify-center gap-2">
         <GroupIcon iconId={group.icon_id} groupId={group.id} size={22} />
         <Subtitle>
@@ -144,7 +131,6 @@ export default function SplitGroupScreen() {
         </Subtitle>
       </View>
 
-      {/* Where you stand, said in words rather than left to a minus sign. */}
       <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           {settled ? 'Nothing outstanding' : myBalance > 0 ? 'You are owed' : 'You owe'}
@@ -235,11 +221,6 @@ export default function SplitGroupScreen() {
           </>
         ) : null}
 
-        {/* Grouped by day, with the day's spend on the heading. A flat list
-            answers "what happened"; this answers "what did Saturday cost",
-            which is the question people actually arrive with. Settlements are
-            left out of the day total — money moving between two people in the
-            group is not the group spending anything. */}
         {timeline.map((day) => (
           <View key={day.date || 'undated'} className="w-full">
             <DateGroupHeader date={day.date} today={today} total={day.total} />

@@ -1,30 +1,21 @@
 /**
- * Step 4: receipt, bill or subscription.
+ * Receipt, bill or subscription. Salary is out of scope: "got paid" and "paycheck" are not
+ * keywords, so such a sentence falls back to an unsure receipt.
  *
- * Salary is out of scope (Founder, 2026-10-01): "got paid" and "paycheck"
- * are not keywords for anything, so such a sentence falls back to an unsure
- * receipt and its score shows it.
- *
- * ## The order, first match wins
- *  1. A subscription word — subscription, subscribe, renew(s/al/ed),
- *     membership — makes a subscription.
- *  2. A strong bill word — rent, mortgage, electric, internet, insurance,
- *     loan, daycare, "phone bill"… — makes a bill.
- *  3. "bill"/"utilities" makes a bill, unless the merchant is a subscription
- *     ("my Netflix bill").
- *  4. A spoken cycle (monthly, a year, every week…) means it recurs: a bill
- *     when the merchant is a biller or a bill word or "due" is there, a
- *     subscription otherwise ("gym 40 a month").
- *  5. A purchase word — bought, spent, grabbed, ordered, groceries, lunch,
- *     coffee, gas, "at <store>" — makes a receipt. It beats the weaker hints
- *     below ("bought water", "bought a phone at Verizon").
- *  6. A weak bill word — water, phone, cable, trash — makes a bill.
+ * The order, first match wins:
+ *  1. A subscription word (subscription, renew, membership) makes a subscription.
+ *  2. A strong bill word (rent, mortgage, electric, insurance, "phone bill") makes a bill.
+ *  3. "bill"/"utilities" makes a bill, unless the merchant is a subscription ("my Netflix bill").
+ *  4. A spoken cycle means it recurs: a bill when the merchant is a biller or a bill word or "due"
+ *     is there, a subscription otherwise ("gym 40 a month").
+ *  5. A purchase word (bought, spent, groceries, coffee, "at <store>") makes a receipt. It beats
+ *     the weaker hints below ("bought water", "bought a phone at Verizon").
+ *  6. A weak bill word (water, phone, cable, trash) makes a bill.
  *  7. "due" makes a bill, or a subscription for a subscription merchant.
- *  8. The merchant decides: a streaming, software, news or meal-kit brand (or
- *     a subscription product like iCloud, Amazon Prime, Walmart+) is a
- *     subscription; a utility, phone/internet, insurer or bank is a bill; a
- *     shop, restaurant or gas station is a receipt. Gyms, delivery apps and
- *     warehouse clubs say nothing: people pay them both ways.
+ *  8. The merchant decides: streaming, software, news, meal-kit brands and subscription products
+ *     (iCloud, Amazon Prime) are subscriptions; utilities, phone/internet, insurers and banks are
+ *     bills; shops, restaurants and gas stations are receipts. Gyms, delivery apps and warehouse
+ *     clubs say nothing: people pay them both ways.
  *  9. Nothing said it: a receipt, with `kindSure` false.
  */
 import type { Signal } from './bill-category';
@@ -113,9 +104,8 @@ const RECEIPT_WORDS = [
 ];
 
 /**
- * Every word the kind rules read, so the merchant rules never take one for a
- * name. The subscription products are left out on purpose: "apple" and
- * "amazon" are merchants too.
+ * Every word the kind rules read, so the merchant rules never take one for a name. Subscription
+ * products are left out on purpose: "apple" and "amazon" are merchants too.
  */
 export const KIND_WORDS = new Set(
   [...SUBSCRIPTION_WORDS, ...BILL_WORDS, ...RECEIPT_WORDS, 'due'].flatMap((phrase) =>
@@ -123,7 +113,6 @@ export const KIND_WORDS = new Set(
   ),
 );
 
-/** Spend categories (supabase/migrations/…_brands.sql, …_biller_categories.sql) by what they say about kind. */
 const SUBSCRIPTION_CATEGORIES = new Set(['entertainment', 'software', 'news', 'meals']);
 const BILL_CATEGORIES = new Set(['utilities', 'telecom', 'insurance', 'finance']);
 const RECEIPT_CATEGORIES = new Set([
@@ -156,7 +145,6 @@ function phraseAt(tokens: readonly Token[], index: number, phrase: string): numb
   return words.every((word, offset) => tokens[index + offset]?.key === word) ? words.length : 0;
 }
 
-/** Whether any of the phrases is said, starting outside `skip`. */
 function findPhrases(
   tokens: readonly Token[],
   phrases: readonly string[],
@@ -174,9 +162,7 @@ export type KindEvidence = {
   categorySignals: readonly Signal[];
   /** A cycle phrase was said, even one the app cannot store ("every two weeks"). */
   recurring: boolean;
-  /** What the chosen merchant's spend category leans to. */
   brandLean: BrandLean;
-  /** The merchant was introduced with "at" ("at Starbucks"). */
   atMerchant: boolean;
   /** Tokens already read as a category phrase, so "gas" in "gas bill" is not fuel. */
   inCategoryPhrase: (index: number) => boolean;
@@ -184,7 +170,6 @@ export type KindEvidence = {
 
 export type KindResult = { kind: VoiceKind; sure: boolean };
 
-/** The kind, by the ordered rules in the module comment. */
 export function decideKind(tokens: readonly Token[], evidence: KindEvidence): KindResult {
   const never = () => false;
   const subscriptionWord = findPhrases(tokens, SUBSCRIPTION_WORDS, never);

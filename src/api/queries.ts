@@ -21,12 +21,9 @@ import { usePro } from '@/api/pro';
 import { useUserId } from '@/providers/session-provider';
 
 /**
- * Read hooks for the live data.
- *
- * Every table is behind RLS scoped to auth.uid(), so no query filters by
- * user_id — the database already does. Queries stay disabled until a session
- * exists, otherwise the first render fires a request that can only return
- * nothing.
+ * Read hooks for the live data. RLS scopes every table to auth.uid(), so no query filters by
+ * user_id. Queries stay disabled until a session exists, or the first render fires a request that
+ * can only return nothing.
  */
 
 export type CardRow = {
@@ -81,28 +78,16 @@ export type SalarySourceRow = {
 };
 
 /**
- * How long a read may take before it is treated as failed.
- *
- * A request that never answers is worse than one that fails: the query stays
- * pending, the screen keeps its skeleton, and there is nothing to retry
- * because nothing went wrong.
+ * How long a read may take before it counts as failed. A request that never answers leaves the
+ * query pending, the skeleton up and nothing to retry.
  */
 const QUERY_TIMEOUT_MS = 12_000;
 
 /**
- * Whether any read behind a derived figure failed.
- *
- * The hooks below combine several queries into one number — a balance, a
- * running total, a month's spending — and every one of them needs the same
- * answer: if any input is missing, the figure is not the truth and the screen
- * must say so rather than show it.
- *
- * One helper instead of a hand-written boolean chain per hook, because the
- * chains are exactly where the omissions hid. `useLedger` listed three of its
- * five queries, so a failed *charges* read fell back to a bill's **projected**
- * amount in place of the one actually taken, with no error anywhere — a
- * statement figure quietly replaced by a plan figure. Adding a query to one of
- * these hooks now means adding it to one list, not remembering four.
+ * Whether any read behind a derived figure (a balance, a running total, a month's spending) failed:
+ * if any input is missing the figure is not the truth and the screen must say so. One helper rather
+ * than a hand-written chain per hook, because an omitted query (a failed *charges* read) would
+ * silently swap a recorded amount for the plan's projected one. A new input goes in one list.
  */
 function anyError(queries: readonly { isError: boolean }[]): boolean {
   return queries.some((query) => query.isError);
@@ -154,9 +139,7 @@ export type AnnouncementRow = {
 };
 
 /**
- * News from Skip — updates and new features — newest first.
- *
- * Only what is published: the table's policy hides rows dated in the future,
+ * News from Skip, newest first. Only what is published: the table's policy hides future-dated rows,
  * so staged news needs no filter here.
  */
 export function useAnnouncements() {
@@ -218,7 +201,6 @@ export function useSalarySources() {
   });
 }
 
-/** A salary source as the Salary page edits it: hourly inputs and linked accounts too. */
 export type SalaryDetailRow = SalarySourceRow & {
   pay_type: 'fixed' | 'hourly';
   hourly_rate: number | null;
@@ -226,7 +208,6 @@ export type SalaryDetailRow = SalarySourceRow & {
   overtime_hours_per_week: number;
   overtime_multiplier: number;
   deduction_percent: number;
-  /** The accounts this pay lands in. */
   account_ids: string[];
 };
 
@@ -242,17 +223,12 @@ type SalaryDetailResult = {
 };
 
 /**
- * Everything the Salary page needs to edit what is saved, rather than only
- * what the balances read.
+ * Everything the Salary page needs to edit what is saved, including the linked accounts (Save
+ * rewrites the links from this, so leaving them out would unlink every account). Keyed under
+ * salary_sources, so any save that invalidates the sources refreshes this too.
  *
- * The linked accounts come with it: the page used to start every source with
- * none, and Save rewrote the links from that, so saving the page unlinked
- * every account. Keyed under salary_sources, so every save that invalidates
- * the sources refreshes this too.
- *
- * Tolerates a database without the hourly columns (an app build that reaches
- * people before the migration does): it reads the fixed fields alone and
- * says so, and the page offers fixed pay only until the columns arrive.
+ * Tolerates a database without the hourly columns (an app build that reaches people before the
+ * migration): it reads the fixed fields alone and says so via `hourlyAvailable`.
  */
 export function useSalaryDetails() {
   const userId = useUserId();
@@ -310,7 +286,6 @@ export type MonthlySavingRow = {
   saved: number;
   /** What the person says it really left. Null means use the computed figure. */
   adjusted_saved: number | null;
-  /** Why it was corrected. */
   note: string | null;
   /** Set when the month is kept out of the total. */
   excluded_at: string | null;
@@ -323,12 +298,9 @@ export function savedFor(month: MonthlySavingRow): number {
 }
 
 /**
- * What each finished month left behind.
- *
- * Closes anything outstanding before reading, so a month that ended while the
- * phone was shut shows up the moment somebody opens the page rather than
- * whenever the monthly job next runs. The call is idempotent and cheap when
- * there is nothing to close.
+ * What each finished month left behind. Closes anything outstanding first, so a month that ended
+ * while the phone was shut shows up on opening rather than when the monthly job next runs
+ * (idempotent, and cheap when there is nothing to close).
  */
 export function useMonthlySavings() {
   const userId = useUserId();
@@ -351,11 +323,9 @@ export function useMonthlySavings() {
 }
 
 /**
- * Accounts that a salary source pays into.
- *
- * An account has no date of its own, so "remind me when pay lands" only means
- * something for an account something is paid into. This is how the reminders
- * page knows which ones can answer that.
+ * Accounts that a salary source pays into. An account has no date of its own, so "remind me when
+ * pay lands" only means something for one something is paid into; the reminders page uses this to
+ * tell.
  */
 export function useSalaryAccountIds() {
   const query = useOwnerQuery<{ bank_account_id: string }[]>('salary_source_accounts', async () => {
@@ -369,11 +339,8 @@ export function useSalaryAccountIds() {
     [query.data],
   );
 
-  // `isError` is additive on purpose: every caller today destructures `ids`
-  // (and one of them `isLoading`), and those keep their meaning. Without the
-  // flag a failed read is indistinguishable from "no salary lands here", so
-  // the payday reminder simply disappears from the screen instead of the
-  // screen saying it could not be loaded.
+  // `isError` is additive: without it a failed read is indistinguishable from "no salary lands
+  // here", and the payday reminder would vanish instead of the screen saying it could not load.
   return {
     ids,
     isLoading: query.isLoading,
@@ -394,18 +361,16 @@ export function usePaymentSources() {
   const accounts = useBankAccounts();
   const { pro } = usePro();
 
-  // Locked sources take no new spending: beyond the free allowance, only the
-  // oldest card and account appear in "Paid with" pickers. Their history keeps
-  // counting everywhere — this filters where money can go next, never where it
-  // already went. Queries order oldest-first, so slice(0,1) is the allowance.
+  // Locked sources take no new spending: beyond the free allowance, only the oldest card and
+  // account appear in "Paid with" pickers. Their history keeps counting everywhere. Queries order
+  // oldest-first, so slice(0,1) is the allowance.
   const usableCards = pro ? (cards.data ?? []) : (cards.data ?? []).slice(0, 1);
   const usableAccounts = pro ? (accounts.data ?? []) : (accounts.data ?? []).slice(0, 1);
 
   const sources: PaymentSourceRow[] = [
     ...usableCards.map((card) => ({
       id: card.id,
-      // Digits are optional on a card, so the network alone has to still read
-      // as a label rather than leaving a dangling "••".
+      // Digits are optional, so the network alone must still read as a label, not a dangling "••".
       label: card.last4 ? `${card.network} ••${card.last4}` : card.network,
       color: card.color,
       kind: 'card' as const,
@@ -426,13 +391,7 @@ export function usePaymentSources() {
   };
 }
 
-/**
- * Receipts and subscriptions, newest first.
- *
- * The brand is embedded rather than looked up per row: PostgREST resolves it
- * in the same request, so a list of fifty receipts is still one round trip and
- * every row already knows which logo to draw.
- */
+/** A receipt with its brand embedded, so a list is one round trip and each row knows its logo. */
 export type ReceiptRow = {
   id: string;
   brand_id: string | null;
@@ -486,7 +445,6 @@ export function useSubscriptions() {
       .select(
         'id, brand_id, name, amount, cycle, next_renewal_on, started_on, created_at, category_id, card_id, bank_account_id, note, active, brands(domain)',
       )
-      // Renewals with no date sort last rather than jumping the queue.
       .order('next_renewal_on', { ascending: true, nullsFirst: false });
     if (error) throw error;
     return (data ?? []) as unknown as SubscriptionRow[];
@@ -494,10 +452,8 @@ export function useSubscriptions() {
 }
 
 /**
- * A single receipt or subscription, for the edit screen.
- *
- * Fetched rather than read out of the list cache so a deep link into an edit
- * screen works on a cold start, when no list has ever loaded.
+ * A single receipt or subscription for the edit screen. Fetched rather than read from the list
+ * cache so a deep link into an edit screen works on a cold start.
  */
 export function useReceipt(id: string | undefined) {
   const userId = useUserId();
@@ -537,7 +493,6 @@ export function useSubscription(id: string | undefined) {
   });
 }
 
-/** One bill, for the edit screen. */
 export function useBill(id: string | undefined) {
   const userId = useUserId();
   return useQuery({
@@ -557,7 +512,6 @@ export function useBill(id: string | undefined) {
   });
 }
 
-/** One card or bank account, for the edit screens. */
 export function useCard(id: string | undefined) {
   const userId = useUserId();
   return useQuery({
@@ -613,20 +567,10 @@ export function usePayments() {
 }
 
 /**
- * Everything that has hit one card or account, plus what it is at now.
- *
- * Filtering happens here rather than in five scoped queries: the lists are
- * already fetched for their own screens, so opening a card costs nothing new
- * and the numbers cannot disagree with the pages they came from.
- */
-/**
- * Charges in the shape the ledger reads them, and which plans are on record.
- *
- * The set is built from every charge rather than from the ones being shown,
- * because it answers a different question: not "what did this card pay" but
- * "has this plan ever been written down". A bill moved from one card to
- * another has no charges on the new card and a full history on the old one,
- * and only the unfiltered set knows that its past is already accounted for.
+ * Charges in the shape the ledger reads them, plus the set of plans that are on record. The set is
+ * built from every charge, not the ones being shown: it answers "has this plan ever been written
+ * down", and a bill moved to another card has no charges on the new card but a full history on the
+ * old.
  */
 function readCharges(rows: ChargeRow[]): { rows: RecordedCharge[]; plans: Set<string> } {
   return {
@@ -643,7 +587,6 @@ function readCharges(rows: ChargeRow[]): { rows: RecordedCharge[]; plans: Set<st
   };
 }
 
-/** Rows that can be charged to a source, as buildLedger wants them. */
 type LedgerSources = {
   receipts: ReceiptRow[];
   bills: BillRow[];
@@ -653,12 +596,8 @@ type LedgerSources = {
 };
 
 /**
- * One source's ledger, built from lists that were already fetched.
- *
- * Split out so the cards list and the card detail screen run the very same
- * arithmetic. They used to disagree — the list rendered the stored figure and
- * the detail screen rendered the derived one, so a receipt moved the balance on
- * one screen and not the other.
+ * One source's ledger, built from lists that were already fetched. Shared so the cards list and the
+ * card detail screen run the same arithmetic and a receipt moves the balance on both.
  */
 function ledgerForSource(
   source: CardRow | BankAccountRow,
@@ -682,8 +621,8 @@ function ledgerForSource(
       kind: 'receipt' as const,
       domain: row.brands?.domain,
     })),
-    // Filtered on the charge's own source, not the plan's. A bill moved to a
-    // different card keeps last March on the card that actually paid it.
+    // Filtered on the charge's own source, not the plan's: a bill moved to another card keeps last
+    // March on the card that actually paid it.
     recorded: data.charges.rows.filter((row) => (row.cardId ?? row.accountId) === source.id),
     recordedPlans: data.charges.plans,
     recurring: [
@@ -744,8 +683,8 @@ export function useSourceLedger(sourceId: string | undefined, today: string) {
   const source = card ?? account;
   const kind: SourceKind = card ? 'card' : 'account';
 
-  // Walking a source's whole history is not scroll-cheap work, and this screen
-  // re-renders as it scrolls. Held to once per change of the lists behind it.
+  // Walking a source's whole history is not scroll-cheap and this screen re-renders as it scrolls,
+  // so it is held to once per change of the lists behind it.
   const ledger = useMemo(
     () =>
       source
@@ -788,13 +727,10 @@ export function useSourceLedger(sourceId: string | undefined, today: string) {
       subscriptions.isLoading ||
       payments.isLoading ||
       charges.isLoading,
-    // Every list the ledger is built from, not just the three that name the
-    // source: a failed receipts, bills, subscriptions or charges read leaves
-    // rows out of a running balance that still renders as if it were complete.
+    // Every list the ledger is built from, not just the three that name the source: a failed read
+    // leaves rows out of a running balance that still renders as complete.
     isError: anyError([cards, accounts, receipts, bills, subscriptions, payments, charges]),
-    // The screen has an error state and had no way to leave it. Each query
-    // keeps its own retry, so this is the whole set rather than the one that
-    // happened to fail.
+    // Retries the whole set rather than the one query that failed.
     refetch: () => {
       cards.refetch();
       accounts.refetch();
@@ -807,13 +743,7 @@ export function useSourceLedger(sourceId: string | undefined, today: string) {
   };
 }
 
-/**
- * Live balances for every card and account, keyed by id.
- *
- * The cards screen shows a wallet at a glance, so it needs what each source is
- * at now — not the figure typed when it was added. Everything here is already
- * in the cache for other screens, so this costs no extra round trip.
- */
+/** Live balances for every card and account, keyed by id, from lists already in the cache. */
 export function useSourceBalances(today: string) {
   const cards = useCards();
   const accounts = useBankAccounts();
@@ -823,9 +753,8 @@ export function useSourceBalances(today: string) {
   const payments = usePayments();
   const charges = useCharges();
 
-  // Every source's whole history is walked to work these out, so it is done
-  // once per change of the underlying lists rather than once per render — the
-  // cards screen re-renders on scroll, and this is not scroll-cheap work.
+  // Walks every source's whole history, so it is done once per change of the lists, not per render
+  // (the cards screen re-renders on scroll).
   const balances = useMemo(() => {
     const data: LedgerSources = {
       receipts: receipts.data ?? [],
@@ -856,19 +785,10 @@ export function useSourceBalances(today: string) {
 
   return {
     balances,
-    // `isSettled` used to be here, computed from five loading flags and read
-    // by nothing in the tree since the day it was written. Deleted rather than
-    // wired: whether a card should show a stale balance with a warning or a
-    // page-level error is a design call, and a flag sitting unread looks
-    // load-bearing to the next person to open this file. Consumers that want
-    // loading already have it from useCards/useBankAccounts directly.
     /**
-     * A balance is only as good as the lists it was walked from.
-     *
-     * Consumers read `balances.get(id) ?? card.balance`, so without this a
-     * failed read presents the figure typed when the card was added as the
-     * live balance — the one number on that screen a person would check
-     * against their bank.
+     * A balance is only as good as the lists it was walked from. Consumers read `balances.get(id)
+     * ?? card.balance`, so a failed read would present the typed opening figure as the live
+     * balance.
      */
     isError: anyError([cards, accounts, receipts, bills, subscriptions, payments, charges]),
     refetch: () => {
@@ -884,16 +804,13 @@ export function useSourceBalances(today: string) {
 }
 
 /**
- * Everything that moved money inside a window, as one timeline.
+ * Everything that moved money inside a window, as one timeline. Receipts are history. Bills and
+ * subscriptions store only their NEXT date, so they are projected across the window in both
+ * directions, which is what makes "upcoming" possible without a job writing rows ahead of time;
+ * salary is projected from its last payday and lands as money in.
  *
- * Receipts are history — they happened on their date. Bills and subscriptions
- * store only their NEXT date, so they are projected across the window in both
- * directions; that is what makes "upcoming" possible without a job writing rows
- * ahead of time. Salary is projected the same way and lands as money in.
- *
- * Card payments are deliberately absent. Paying a card moves money between two
- * things you already own, so counting it here beside the charge it settles
- * would double the same spending. It belongs on the card, and it is there.
+ * Card payments are deliberately absent: paying a card moves money between two things you own, so
+ * counting it beside the charge it settles would double the spending. It belongs on the card.
  */
 export type LedgerEntry = {
   id: string;
@@ -931,10 +848,8 @@ export function useLedger(range: DateRange | undefined, today: string) {
   // No range means everything, which is what a card screen wants.
   const from = range?.from ?? null;
   const to = range?.to ?? '9999-12-31';
-  // Projecting every bill and payday across the window is real work — a year
-  // range walks each schedule dozens of times. Held to once per change of the
-  // data or the window, rather than repeating on every render of a screen that
-  // re-renders as it scrolls.
+  // Projecting every bill and payday across the window is real work (a year range walks each
+  // schedule dozens of times), so it is held to once per change of the data or the window.
   const entries = useMemo<LedgerEntry[]>(() => {
     const inRange = (date: string) => date <= to && (!from || date >= from);
 
@@ -961,10 +876,9 @@ export function useLedger(range: DateRange | undefined, today: string) {
       });
     }
 
-    // Bills and subscriptions run through the same split: what already went
-    // out is read off the record, what has not happened yet is projected. The
-    // lifetime floor is applied in there, so a plan added today cannot fill
-    // the months behind it with charges nobody was billed for.
+    // Bills and subscriptions run through the same split: what already went out is read off the
+    // record, what has not happened yet is projected. The lifetime floor is applied inside, so a
+    // plan added today cannot fill earlier months with charges nobody was billed for.
     const expand = (
       plan: Parameters<typeof planOccurrences>[0]['plan'],
       draw: (occurrence: PlanOccurrence) => Omit<LedgerEntry, 'id' | 'date' | 'amount'>,
@@ -1031,7 +945,6 @@ export function useLedger(range: DateRange | undefined, today: string) {
           label: occurrence.label,
           kind: 'bill',
           sourceId: occurrence.cardId ?? occurrence.accountId ?? '',
-          // A logo when the bill has an issuer, the category icon when not.
           domain: row.brands?.domain,
           categoryId: row.category_id,
           iconId: row.icon_id,
@@ -1042,10 +955,8 @@ export function useLedger(range: DateRange | undefined, today: string) {
 
     for (const row of salary.data ?? []) {
       if (!row.last_payday) continue;
-      // The floor bills get, in the only form income has. One payday is a
-      // thing the user told us happened; everything before it is the walker
-      // running backwards over years nobody was paid for as far as we know.
-      // Without this a seven-year window invents a career.
+      // The floor bills get, in the only form income has: one payday is what the user told us
+      // happened, and walking backwards over years would invent a career in a long window.
       const floor = from && from > row.last_payday ? from : row.last_payday;
       const dates = paydaysInRange(
         new Date(`${row.last_payday}T00:00:00`),
@@ -1091,10 +1002,8 @@ export function useLedger(range: DateRange | undefined, today: string) {
       bills.isLoading ||
       salary.isLoading ||
       charges.isLoading,
-    // Salary and charges included, which they were not: income missing makes
-    // a net figure wrong, and a failed charges read substitutes the projected
-    // plan amount for the recorded one — a bill charged $61.40 showing its
-    // scheduled $59.99 with nothing to say the figure is a guess.
+    // Salary and charges count: missing income makes a net figure wrong, and a failed charges read
+    // substitutes the projected plan amount for the recorded one with nothing to say it is a guess.
     isError: anyError([receipts, subscriptions, bills, salary, charges]),
     refetch: () => {
       receipts.refetch();
@@ -1118,10 +1027,8 @@ export type LoanRow = {
   /** When interest started running — sets the length of the opening period. */
   funded_on: string | null;
   /**
-   * The convention the lender charges under, including 'monthly' rests — see
-   * `AccrualBasis` in `lib/loan.ts`. Widened by
-   * `20260912100002_monthly_rests.sql`; rows written before it can only hold
-   * the three day counts.
+   * The convention the lender charges under, including 'monthly' rests (see `AccrualBasis` in
+   * lib/loan.ts).
    */
   day_count_basis: AccrualBasis;
   /** A balance read off a statement, and the date it was true. */
@@ -1130,11 +1037,8 @@ export type LoanRow = {
 };
 
 /**
- * The loan behind a bill, when there is one.
- *
- * Most bills are not loans, so this returns null rather than erroring — the
- * edit screen uses its presence to decide whether a payment schedule exists to
- * show.
+ * The loan behind a bill, when there is one. Most bills are not loans, so this returns null rather
+ * than erroring; the edit screen uses its presence to decide whether a payment schedule exists.
  */
 export function useLoanForBill(billId: string | undefined) {
   const userId = useUserId();

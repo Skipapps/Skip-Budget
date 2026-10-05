@@ -1,12 +1,9 @@
 /**
- * Contextual strings for the recogniser: words Skip expects, so the engine
- * leans toward "Netflix" over "net flicks".
+ * Contextual strings for the recogniser, so the engine leans toward "Netflix" over "net flicks".
  *
  * Order is priority, because the list is capped at 100 (Apple's guidance for
- * SFSpeechRecognitionRequest.contextualStrings): the person's own merchants
- * first (the caller passes them most-used first), then the kind words, then
- * the directory's brand names in rank order. Case-insensitive duplicates and
- * blanks are dropped; the first spelling seen is kept.
+ * SFSpeechRecognitionRequest.contextualStrings): the person's own merchants first (most-used
+ * first), then the kind words, then the directory's brand names in rank order.
  */
 import type { BrandRow } from './types';
 

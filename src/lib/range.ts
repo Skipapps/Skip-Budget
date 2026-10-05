@@ -1,13 +1,4 @@
-/**
- * The four windows the dashboard and the transactions page can be read through.
- *
- * A money app that lists everything is unreadable — a year of a busy account is
- * thousands of rows and no answer. Bounding the view to a window turns the list
- * into something with a total at the top of it.
- *
- * Pure: the anchor date is an argument, never the clock.
- */
-
+/** The windows the dashboard and the transactions page are read through. Pure: the anchor is an argument. */
 export const RANGES = [
   { value: 'today', label: 'Today' },
   { value: 'week', label: 'Week' },
@@ -15,11 +6,7 @@ export const RANGES = [
   { value: 'year', label: 'Year' },
 ] as const;
 
-/**
- * The same windows plus everything, for the pages that list one kind of
- * transaction. "All" is history: it ends today, because a charge that has not
- * happened yet is not a transaction to look back at.
- */
+/** The same windows plus "All", which is history: it ends today, as a future charge is not a transaction yet. */
 export const LEDGER_RANGES = [...RANGES, { value: 'all', label: 'All' }] as const;
 
 export type RangeKey = 'today' | 'week' | 'month' | 'year' | 'all';
@@ -37,13 +24,7 @@ function iso(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-/**
- * The window a key describes around a date.
- *
- * Weeks run Sunday to Saturday, matching the calendar elsewhere in the app —
- * WEEKDAY_INITIALS starts on S, and two different week shapes in one product is
- * the kind of inconsistency people notice without being able to name.
- */
+/** The window a key describes around a date. Weeks run Sunday to Saturday, as the calendar does. */
 export function rangeFor(key: RangeKey, anchor: Date): DateRange {
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
@@ -60,28 +41,21 @@ export function rangeFor(key: RangeKey, anchor: Date): DateRange {
     }
 
     case 'month':
-      // Day 0 of the next month is the last day of this one, which sidesteps
-      // every leap-year and 30/31 special case.
+      // Day 0 of the next month is this month's last day, which sidesteps leap-year and 30/31 cases.
       return { from: iso(new Date(year, month, 1)), to: iso(new Date(year, month + 1, 0)) };
 
     case 'year':
       return { from: iso(new Date(year, 0, 1)), to: iso(new Date(year, 11, 31)) };
 
     case 'all':
-      // Bills and subscriptions clamp to their own start date, so reaching
-      // back to the epoch cannot invent history from before they existed.
+      // Bills and subscriptions clamp to their own start date, so the epoch cannot invent history.
       return { from: '1970-01-01', to: iso(anchor) };
   }
 }
 
 export type Bucket = 'day' | 'week' | 'month';
 
-/**
- * How finely to chop a window for a chart.
- *
- * A year as 365 bars is a smear on a phone; a week as 7 is readable. The bucket
- * is chosen so a chart lands between roughly 7 and 31 marks whatever the range.
- */
+/** How finely to chop a window for a chart: roughly 7 to 31 marks whatever the range. */
 export function bucketFor(key: RangeKey): Bucket {
   if (key === 'all' || key === 'year') return 'month';
   if (key === 'month') return 'week';
@@ -105,7 +79,7 @@ export function bucketsIn(range: DateRange, bucket: Bucket): string[] {
   const keys: string[] = [];
   const cursor = new Date(fromYear, fromMonth - 1, fromDay);
 
-  // Bounded: 400 covers a year of days with room to spare.
+  // Bounded: 400 covers a year of days.
   for (let guard = 0; guard < 400; guard += 1) {
     const key = bucketKey(iso(cursor), bucket);
     if (key > range.to && keys.length > 0) break;

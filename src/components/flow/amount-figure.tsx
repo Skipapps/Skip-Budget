@@ -6,17 +6,12 @@ import { formatCurrency } from '@/lib/format';
 type AmountFigureProps = {
   /** The raw draft string, exactly as typed. Never formatted money. */
   value: string;
-  /** `percent` swaps the leading $ for a trailing % — same figure otherwise. */
+  /** `percent` swaps the leading $ for a trailing %. */
   unit?: 'currency' | 'percent';
   className?: string;
 };
 
-/**
- * Groups the whole part so long figures stay readable while typing.
- *
- * A trailing "." survives, so 12. renders as 12. rather than jumping back to
- * 12 under the finger that just pressed the point.
- */
+/** Groups the whole part in threes. A trailing "." survives, so 12. does not jump back to 12 mid-typing. */
 export function displayAmount(raw: string): string {
   if (!raw) return '0';
   const [whole, fraction] = raw.split('.');
@@ -25,43 +20,23 @@ export function displayAmount(raw: string): string {
 }
 
 export type AmountFigureBand = {
-  /** Font size of the number itself. */
   size: number;
-  /** Line height of the number. Fixed, so the figure never reflows the page. */
+  /** Fixed per band, so the figure never reflows the page. */
   lineHeight: number;
-  /** Font size of the $ or %, held at the same proportion of the number. */
+  /** Font size of the $ or %, kept in proportion to the number. */
   affixSize: number;
   /** Top inset that levels the cap of the affix with the cap of the digits. */
   affixTop: number;
 };
 
 /**
- * How big the figure is, decided from the string alone.
+ * Figure size comes from the glyph count, not `adjustsFontSizeToFit`: on iOS that measures against the
+ * first layout pass, so a remount with an amount already entered shrank to the floor and never grew back.
  *
- * This used to be `adjustsFontSizeToFit` with `minimumFontScale={0.5}`, and on
- * iOS that measures against the first layout pass. Coming back to step 1 with
- * an amount already entered, the text exists before the row has settled its
- * width, so it shrank to the floor and never grew back: the "$" stayed at
- * 28px while "3,000" rendered at half size and fell away from it. Nothing in
- * the component knew, because the shrinking happens inside UIKit.
- *
- * So the size is chosen here instead, from the number of glyphs on screen, and
- * it is the same on the first render and the thousandth. The bands were picked
- * against measured Poppins Bold advances (unitsPerEm 1000, widest digit "4" at
- * 0.677em, comma 0.287em, point 0.282em, "$" 0.658em) so that the widest
- * string each band can hold still fits the narrowest screen the app supports —
- * an iPhone SE at 375pt, less the Screen's px-6, is 327pt:
- *
- *   7 glyphs  "444,444"          4.349em x 64 + $ 18.4 = 297pt
- *   10 glyphs "44,444,444"       5.990em x 48 + $ 13.8 = 301pt
- *   14 glyphs "444,444,444.44"   8.303em x 36 + $ 10.5 = 309pt
- *   18 glyphs "444,444,444,444.44" 10.621em x 28 + $ 7.9 = 305pt
- *
- * Fourteen glyphs is everything the keypad can produce ($999,999,999.99). The
- * last band is only ever reached by a figure loaded from a record, which the
- * keypad is forbidden from truncating — it is there so money somebody already
- * saved is shown in full rather than ellipsised, and an ellipsised money
- * figure is a wrong money figure.
+ * Bands use measured Poppins Bold advances (widest digit "4" = 0.677em) so the widest string in each
+ * still fits an iPhone SE (327pt inside the Screen's px-6). 14 glyphs is everything the keypad can
+ * produce ($999,999,999.99); the last band is only for saved figures longer than that, shown in full
+ * because an ellipsised money figure is a wrong one.
  */
 const BANDS: (AmountFigureBand & { maxGlyphs: number })[] = [
   { maxGlyphs: 7, size: 64, lineHeight: 76, affixSize: 28, affixTop: 12 },
@@ -73,15 +48,8 @@ const BANDS: (AmountFigureBand & { maxGlyphs: number })[] = [
 /**
  * The band a display string lands in.
  *
- * `affixTop` is not guesswork either. Poppins puts its ascender at 1.05em and
- * its cap at 0.705em, so the top of a digit sits 0.345 x fontSize below the
- * top of its line — and RN applies no baseline shift here, because it only
- * centres glyphs in the line box when the line height asked for is *taller*
- * than the font's own, which none of these bands are. Aligning the affix's cap
- * with the number's is therefore 0.345 x (size - affixSize), which at 64/28
- * comes out at 12.4 — the `mt-3` the figure has carried all along. Every other
- * band is the same relationship at its own size, rather than one margin that
- * only ever aligned at full size.
+ * `affixTop` = 0.345 x (size - affixSize): Poppins puts a digit's top 0.345em below its line top, and
+ * RN applies no baseline shift because none of these line heights is taller than the font's own.
  */
 export function amountFigureBand(display: string): AmountFigureBand {
   const band = BANDS.find((candidate) => display.length <= candidate.maxGlyphs) ?? BANDS[0];
@@ -94,13 +62,8 @@ export function amountFigureBand(display: string): AmountFigureBand {
 }
 
 /**
- * The big figure being typed.
- *
- * Deliberately not run through `formatCurrency` while typing: that is for
- * money that has been committed, and showing "$0.00" under a finger that has
- * typed a single 0 states a precision nobody entered. The screen reader does
- * get the money reading, because "dollar, one, two, point, five, zero" is not
- * how anyone hears an amount.
+ * The big figure being typed. Not run through `formatCurrency` on screen: "$0.00" after a single 0
+ * would state a precision nobody entered. The screen reader does get the money reading.
  */
 export function AmountFigure({ value, unit = 'currency', className }: AmountFigureProps) {
   const empty = value === '' || Number(value) === 0;
@@ -115,9 +78,7 @@ export function AmountFigure({ value, unit = 'currency', className }: AmountFigu
         unit === 'percent' ? `Rate, ${spoken} percent` : `Amount, ${formatCurrency(spoken)}`
       }
       accessibilityLiveRegion="polite"
-      // Centred as a group, and nothing in the row shrinks: every band above
-      // already fits the narrowest screen, so there is nothing left for a
-      // shrink to rescue and no width for the figure to be measured against.
+      // Nothing in the row shrinks: every band already fits the narrowest screen.
       className={cn('w-full flex-row items-start justify-center', className)}
     >
       {unit === 'currency' ? (

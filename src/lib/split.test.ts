@@ -1,6 +1,5 @@
 import { equalShares, exactRemainder, simplifyDebts } from '@/lib/split';
 
-/** Cents, so assertions never trip over float representation. */
 const cents = (value: number) => Math.round(value * 100);
 
 describe('simplifyDebts', () => {
@@ -22,7 +21,6 @@ describe('simplifyDebts', () => {
   });
 
   it('never needs more payments than there are people, less one', () => {
-    // The guarantee the greedy pass actually makes.
     const balances = [
       { id: 'a', balance: -55.55 },
       { id: 'b', balance: -14.45 },
@@ -84,8 +82,6 @@ describe('equalShares', () => {
   });
 
   it('keeps the same person carrying the cent when an expense is edited', () => {
-    // If this rotated, correcting a typo would quietly move a cent between two
-    // people and neither would know why their balance changed.
     const first = equalShares(['a', 'b', 'c'], 10);
     const again = equalShares(['a', 'b', 'c'], 10);
     expect(first).toEqual(again);
@@ -123,14 +119,7 @@ describe('exactRemainder', () => {
   });
 });
 
-/**
- * Splits round with money.ts, the app's one rule: half a cent away from zero,
- * decided on the decimal the arithmetic meant. Every stored figure is
- * numeric(14,2), so real inputs are whole cents and never reach a half; these
- * pin the rule for the day a computed figure does. Under the old local
- * Math.round(value * 100), 1.005 (stored as 1.00499…) came out as 100 cents
- * and −1.005 as −100.
- */
+/** Splits round with money.ts: stored figures are whole cents, so these pin the half-cent rule. */
 describe('rounding to the cent', () => {
   it('settles a half-cent balance the way money.ts posts it', () => {
     expect(
@@ -142,7 +131,7 @@ describe('rounding to the cent', () => {
   });
 
   it('splits a half-cent total as the posted total', () => {
-    // 10.075 posts as $10.08 (the old rule said $10.07): 1008 cents over two.
+    // 10.075 posts as $10.08: 1008 cents over two.
     const shares = equalShares(['a', 'b'], 10.075);
     expect(shares.map((entry) => entry.share)).toEqual([5.04, 5.04]);
   });
@@ -152,7 +141,6 @@ describe('rounding to the cent', () => {
   });
 
   it('ignores float dust from summing whole cents', () => {
-    // 0.1 + 0.2 is 0.30000000000000004: still 30 cents, no stray payment.
     expect(
       simplifyDebts([
         { id: 'a', balance: -(0.1 + 0.2) },

@@ -42,21 +42,12 @@ const PER_MONTH: Record<string, number> = {
 };
 
 /**
- * The whole picture, in the order people ask for it.
- *
- * Every other screen answers one question — what did I spend, what is due, who
- * owes me. This is the one that puts them beside each other, and the order is
- * the argument: where you stand, what comes in, what goes out, where it went,
- * what is shared, what you kept, what you owe, and what is coming.
- *
- * It reads rather than computes. Every figure here comes from the same hooks
- * the screen that owns it uses, so a number cannot disagree with the page it
- * came from — which is the failure that makes a summary screen worse than
- * having none.
+ * All the figures side by side. It reads rather than computes: every number comes from the same
+ * hooks as the screen that owns it, so this page cannot disagree with them.
  */
 export default function InsightsScreen() {
-  // Wrapper, not inline: an early return above the screen's own hooks
-  // would change the hook count when the entitlement answer lands.
+  // Wrapper, not inline: an early return above the screen's own hooks would change the hook count
+  // when the entitlement answer lands.
   const gate = useProGate('insights');
   if (gate) return gate;
   return <InsightsScreenInner />;
@@ -70,9 +61,7 @@ function InsightsScreenInner() {
   const anchor = useMemo(() => new Date(), []);
   const today = toIsoDate(anchor);
 
-  // Cut off at today: this page is a record of what happened, and a month
-  // halfway through should show the days that have been, not a projection of
-  // the ones still to come. Those get their own section at the bottom.
+  // Cut off at today: the page is a record of what happened, not a projection.
   const range = useMemo(() => {
     const period = periodRange(periodKey, anchor);
     return { from: period.from, to: period.to > today ? today : period.to };
@@ -89,19 +78,12 @@ function InsightsScreenInner() {
   const groups = useMyBalances();
   const categoriesQuery = useSpendCategories();
   const groupBalances = groups.data;
-  // Held stable so the label map below is not rebuilt on every render.
   const spendCategories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data]);
   const { balances, isError: balancesError, refetch: refetchBalances } = useSourceBalances(today);
 
   /**
-   * Any one of these failing makes every total below it a lie.
-   *
-   * The figures on this page are differences — saved less owed, in less out —
-   * so a query that comes back empty because it failed does not show a gap, it
-   * shows a smaller number that looks exactly like good news. Net worth with a
-   * failed cards fetch is the user's whole card debt added to what they have.
-   * So nothing here renders a figure until every source it subtracts from has
-   * actually answered.
+   * Any one failing poisons every total: the figures are differences, so a failed query reads as a
+   * smaller number that looks like good news. No figure renders until every source has answered.
    */
   const isError =
     ledger.isError ||
@@ -111,10 +93,7 @@ function InsightsScreenInner() {
     subscriptions.isError ||
     groups.isError ||
     categoriesQuery.isError ||
-    // The eighth. Card balances are walked from seven lists of their own, and
-    // without this flag a failed walk falls back to the figure typed when the
-    // card was added — so "saved, less what you owe" could be wrong by a whole
-    // card's debt with nothing on screen to say so.
+    // A failed balance walk falls back to the figure typed when the card was added.
     balancesError;
 
   const retry = () => {
@@ -128,15 +107,13 @@ function InsightsScreenInner() {
     refetchBalances();
   };
 
-  // --- Where you stand ------------------------------------------------------
-
   const savedTotal = (savings.data ?? []).reduce((sum, month) => sum + savedFor(month), 0);
   const owedOnCards = (cards.data ?? []).reduce(
     (sum, card) => sum + Math.abs(balances.get(card.id) ?? card.balance),
     0,
   );
 
-  // What the groups add up to. Positive is owed to you, negative is owed by you.
+  // Positive is owed to you, negative is owed by you.
   const splitPosition = useMemo(
     () => [...(groupBalances?.values() ?? [])].reduce((sum, balance) => sum + balance, 0),
     [groupBalances],
@@ -149,8 +126,6 @@ function InsightsScreenInner() {
     0,
   );
 
-  // --- What goes out --------------------------------------------------------
-
   const buckets = useMemo(() => periodBuckets(periodKey, anchor), [periodKey, anchor]);
 
   const chartBuckets = useMemo<FlowBucket[]>(
@@ -158,8 +133,7 @@ function InsightsScreenInner() {
       buckets.map((bucket) => ({
         key: bucket.key,
         label: bucket.label,
-        // Spending only, so every bar measures one thing. Income still counts
-        // in the totals above it.
+        // Spending only, so every bar measures one thing.
         spent: entries
           .filter((entry) => entry.date >= bucket.from && entry.date <= bucket.to)
           .reduce((sum, entry) => sum + (entry.amount < 0 ? Math.abs(entry.amount) : 0), 0),
@@ -175,8 +149,6 @@ function InsightsScreenInner() {
     }
     return out;
   }, [entries]);
-
-  // --- Where it goes --------------------------------------------------------
 
   const categoryLabel = useMemo(() => {
     const labels = new Map<string, string>();
@@ -198,8 +170,6 @@ function InsightsScreenInner() {
       .slice(0, 6);
   }, [entries, categoryLabel]);
 
-  // --- Where you spend most -------------------------------------------------
-
   const merchants = useMemo(() => {
     type Merchant = {
       amount: number;
@@ -217,9 +187,7 @@ function InsightsScreenInner() {
       if (found) {
         found.amount += Math.abs(entry.amount);
         found.visits += 1;
-        // Any row that knows the brand settles it for the group. Keeping only
-        // the first row's domain loses the logo whenever the earliest entry
-        // happened to be the one typed by hand.
+        // Any row that knows the brand settles it for the group, not just the first.
         found.domain = found.domain ?? entry.domain;
         found.categoryId = found.categoryId ?? entry.categoryId;
         found.iconId = found.iconId ?? entry.iconId;
@@ -248,15 +216,7 @@ function InsightsScreenInner() {
     .filter((subscription) => subscription.active)
     .reduce((sum, subscription) => sum + subscription.amount, 0);
 
-  /**
-   * The three months that finished most recently, oldest of the three first.
-   *
-   * Picked by date, never by position. This used to be `slice(0, 3)`, which
-   * meant "the three most recent" only while the query happened to return them
-   * newest-first — flip that order anywhere upstream and this card silently
-   * showed the three *oldest* months with no error and no clue. Sorting here
-   * makes the card immune to whatever order the list arrives in.
-   */
+  /** The three most recent months, oldest first. Sorted by date, not by query order. */
   const recentMonths = useMemo(
     () =>
       sortByDateAscending(
@@ -282,7 +242,6 @@ function InsightsScreenInner() {
 
   return (
     <Screen title="Insights" showBack onRefresh={refresh} refreshing={refreshing}>
-      {/* ---- Where you stand ------------------------------------------- */}
       <Heading>Where you stand</Heading>
       <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
@@ -310,7 +269,6 @@ function InsightsScreenInner() {
         </View>
       </View>
 
-      {/* ---- What comes in --------------------------------------------- */}
       <Heading>What comes in</Heading>
       {monthlyIncome > 0 ? (
         <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
@@ -339,7 +297,6 @@ function InsightsScreenInner() {
         />
       )}
 
-      {/* ---- What goes out --------------------------------------------- */}
       <Heading>What goes out</Heading>
       <ChoiceChips
         options={PERIODS.map((period) => ({ value: period.value, label: period.label }))}
@@ -390,7 +347,6 @@ function InsightsScreenInner() {
         </>
       )}
 
-      {/* ---- Where it goes --------------------------------------------- */}
       {categories.length > 0 ? (
         <>
           <Heading>Where it goes</Heading>
@@ -402,8 +358,6 @@ function InsightsScreenInner() {
                   index > 0 ? 'mt-4 flex-row items-center gap-3' : 'flex-row items-center gap-3'
                 }
               >
-                {/* The same mark a bill row draws, so a category reads the
-                    same way here as it does everywhere else in the app. */}
                 <BillMark categoryId={category.id} size={34} />
                 <View className="min-w-0 flex-1">
                   <View className="w-full flex-row items-baseline justify-between gap-3">
@@ -421,9 +375,6 @@ function InsightsScreenInner() {
                       {formatCurrency(category.amount)}
                     </Text>
                   </View>
-                  {/* Bars are relative to the biggest, not to the total — the
-                    question is which category dominates, and against a total
-                    every bar on a varied month looks equally short. */}
                   <View className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-ink/5">
                     <View
                       className="h-full rounded-full bg-accent"
@@ -437,7 +388,6 @@ function InsightsScreenInner() {
         </>
       ) : null}
 
-      {/* ---- Where you spend most --------------------------------------- */}
       {merchants.length > 0 ? (
         <>
           <Heading>Where you spend most</Heading>
@@ -449,10 +399,6 @@ function InsightsScreenInner() {
                   index > 0 ? 'mt-4 flex-row items-center gap-3' : 'flex-row items-center gap-3'
                 }
               >
-                {/* A bill is not a brand. AEP and T-Mobile have logos, but
-                    rent and HOA fees have a category and nothing else, and a
-                    monogram beside real logos reads as a failed load. BillMark
-                    picks whichever the row actually has. */}
                 {merchant.kind === 'bill' ? (
                   <BillMark
                     categoryId={merchant.categoryId}
@@ -499,7 +445,6 @@ function InsightsScreenInner() {
         </>
       ) : null}
 
-      {/* ---- Shared with others ---------------------------------------- */}
       <Heading>Shared with others</Heading>
       <Row
         label={
@@ -514,7 +459,6 @@ function InsightsScreenInner() {
         onPress={() => router.push('/splits')}
       />
 
-      {/* ---- What you keep --------------------------------------------- */}
       <Heading>What you keep</Heading>
       {recentMonths.length > 0 ? (
         <View className="w-full rounded-[16px] border border-line bg-card px-5 py-4">
@@ -552,7 +496,6 @@ function InsightsScreenInner() {
         />
       )}
 
-      {/* ---- What you owe ---------------------------------------------- */}
       {(cards.data ?? []).length > 0 ? (
         <>
           <Heading>What you owe</Heading>
@@ -570,7 +513,6 @@ function InsightsScreenInner() {
         </>
       ) : null}
 
-      {/* ---- What is coming -------------------------------------------- */}
       {monthlySubs > 0 ? (
         <>
           <Heading>Coming up</Heading>
@@ -588,7 +530,6 @@ function InsightsScreenInner() {
   );
 }
 
-/** The app's section heading, at this screen's rhythm. */
 function Heading({ children }: { children: string }) {
   return <SectionHeading className="mb-3 mt-8">{children}</SectionHeading>;
 }
@@ -698,8 +639,6 @@ function Prompt({
       >
         {message}
       </Text>
-      {/* Inline action, so it is a pill sized to its label rather than a
-          full-width bar competing with the screen's own buttons. */}
       <ActionPill
         className="mt-4 self-start"
         icon={ArrowRight}

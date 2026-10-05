@@ -1,13 +1,6 @@
 import { LegalDocument, type Section } from '@/components/ui/legal-document';
 
-/**
- * A developer's draft, not legal advice.
- *
- * The parts that describe the software are accurate. The parts that describe
- * the business — who is contracting, under which country's law, and what
- * happens in a dispute — are marked and need a lawyer's eye and the owner's
- * decision before this is relied on.
- */
+/** A developer's draft, not legal advice. */
 
 const SECTIONS: Section[] = [
   {

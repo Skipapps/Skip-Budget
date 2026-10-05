@@ -1,7 +1,6 @@
 import UserNotifications
 
-/// Gives a Skip notification its picture: the brand logo, or the category's
-/// icon when the bill or subscription has no brand.
+/// Gives a Skip notification its picture: the brand logo, or the category's icon without a brand.
 final class NotificationService: UNNotificationServiceExtension {
   private var contentHandler: ((UNNotificationContent) -> Void)?
   private var content: UNMutableNotificationContent?
@@ -18,8 +17,8 @@ final class NotificationService: UNNotificationServiceExtension {
 
     guard let card = SkipCard(userInfo: content.userInfo) else { return deliver(nil) }
 
-    // Comfortably inside the time iOS allows, so the picture either arrives or
-    // is given up on before the extension is cut off.
+    // Well inside the time iOS allows, so the picture arrives or is given up on before the
+    // extension is cut off.
     SkipArt.art(for: card, timeout: 15) { [weak self] image in
       self?.deliver(SkipArt.attachment(image, name: "art"))
     }

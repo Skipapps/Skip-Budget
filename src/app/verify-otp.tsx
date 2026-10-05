@@ -40,11 +40,9 @@ export default function VerifyOtpScreen() {
       return;
     }
 
-    // A verified signup is already signed in; recovery hands over a short-lived
-    // session that only exists so the password can be changed.
-    // Signing up is a one-way door: resetTo, so the new account cannot swipe
-    // back into the pitch and the sign-in screens. Recovery stays a plain
-    // replace — backing out of setting a new password is allowed.
+    // A verified signup is already signed in; recovery gets a short-lived session only to change
+    // the password. Signup is a one-way door (resetTo) so the new account cannot swipe back into
+    // the pitch; recovery stays a plain replace.
     if (mode === 'signup') resetTo('/hello');
     else router.replace('/reset-password');
   };
@@ -72,14 +70,7 @@ export default function VerifyOtpScreen() {
       </Subtitle>
 
       <View className="mt-10 w-full">
-        <OtpInput
-          value={code}
-          onChangeText={setCode}
-          length={CODE_LENGTH}
-          // Verify as soon as the last digit lands — nobody wants to type six
-          // digits and then hunt for a button.
-          onComplete={submit}
-        />
+        <OtpInput value={code} onChangeText={setCode} length={CODE_LENGTH} onComplete={submit} />
       </View>
 
       {error ? (

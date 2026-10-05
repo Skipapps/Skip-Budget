@@ -5,19 +5,14 @@ import AddSubscriptionScreen from '@/app/add-subscription';
 import { warn } from '@/lib/haptics';
 
 /**
- * Golden: exactly what the subscription form's Save writes.
+ * Golden: exactly what the subscription form's Save writes. Pins the object handed to
+ * create/update, the two hint words and their steps, and `started_on` through countFromAfterPick
+ * and floorAfterCharges.
  *
- * Written against the form before its values code moved into
- * `src/api/entry-values.ts`, and kept unchanged through that move. It pins the
- * object handed to create/update, the two hint words and their steps, and
- * `started_on` through countFromAfterPick and floorAfterCharges.
- *
- * The leaf inputs are stubs that record their props; the chips are real. The
- * primary button stub accepts a press even while disabled, which is the only
- * way to reach the checks inside Save.
+ * Leaf inputs are stubs that record their props; the chips are real. The primary button stub
+ * accepts a press even while disabled, the only way to reach the checks inside Save.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const mockProps: Record<string, any> = {};
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -178,7 +173,6 @@ const editing = (row: Record<string, unknown>) => {
   mockSubscription = { data: row, isError: false, isFetched: true };
 };
 
-/** Through both steps untouched, to the date step. */
 const toDateStep = async (screen: Screen) => {
   await press(screen, 'Continue');
   await press(screen, 'Continue');

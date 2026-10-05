@@ -12,11 +12,8 @@ type ScheduleCardProps = {
 };
 
 /**
- * The way into the payment-by-payment breakdown.
- *
- * It leads with the first payment's split rather than a label, because that is
- * the number people do not expect: on a normal loan most of the first payment
- * is interest, and seeing it once explains the whole schedule.
+ * The way into the payment-by-payment breakdown. Leads with the first payment's split because on a
+ * normal loan most of it is interest, which explains the whole schedule.
  */
 export function ScheduleCard({ rows, onPress }: ScheduleCardProps) {
   const artwork = useArtwork();
@@ -49,8 +46,7 @@ export function ScheduleCard({ rows, onPress }: ScheduleCardProps) {
           {rows.length} payments
         </Text>
 
-        {/* The same two colours as the summary bar above it, so the split reads
-            as the same idea seen closer up rather than a new one. */}
+        {/* Same two colours as the summary bar above, so the split reads as the same idea. */}
         <View className="mt-2.5 h-2 w-full flex-row overflow-hidden rounded-full bg-ink/5">
           <View style={{ flex: Math.max(first.principal, 0) }} className="bg-body" />
           <View style={{ flex: Math.max(first.interest, 0) }} className="bg-accent" />

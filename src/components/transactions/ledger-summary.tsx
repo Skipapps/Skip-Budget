@@ -8,12 +8,8 @@ import { useColors, useMoneyColor } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
 /**
- * What a window of time came to.
- *
- * A raised white card, like the dashboard hero in miniature: the verdict
- * leads at full size with the count sitting quietly in a chip beside it, the
- * bar shows the shape of the money at a glance, and income and expenses sit
- * underneath as two tiles — the working, not the headline.
+ * What a window of time came to, as the dashboard hero in miniature: the verdict leads, the bar
+ * shows the shape of the money, and income and expenses sit underneath as the working.
  */
 export function LedgerSummary({ totals }: { totals: LedgerTotals }) {
   const colors = useColors();
@@ -73,7 +69,6 @@ export function LedgerSummary({ totals }: { totals: LedgerTotals }) {
   );
 }
 
-/** One of the two figures the verdict is made of, on its own quiet tile. */
 function Stat({ label, icon: Icon, amount }: { label: string; icon: LucideIcon; amount: number }) {
   const colors = useColors();
   const moneyColor = useMoneyColor();
@@ -97,10 +92,8 @@ function Stat({ label, icon: Icon, amount }: { label: string; icon: LucideIcon; 
         </Text>
       </View>
 
-      {/* No adjustsFontSizeToFit here: on iOS it rebuilt the attributed
-          string and dropped the colour, which painted this figure black on
-          the dark theme however white the style said it was. The amounts on
-          these tiles are short enough that shrinking never fires anyway. */}
+      {/* No adjustsFontSizeToFit here: on iOS it rebuilds the attributed string and drops the
+          colour (black on the dark theme). These amounts are short enough that it never fires. */}
       <Text
         className="mt-1 text-center font-poppins-semibold text-[16px]"
         style={{ color: moneyColor(amount) }}

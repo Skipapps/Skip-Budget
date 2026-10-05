@@ -6,22 +6,13 @@ import { NOTHING_UPDATED } from '@/api/mutations';
 import { useArchiveGroup, useUpdateGroup } from '@/api/splits';
 
 /**
- * The two writes to `groups` that do not go through an RPC.
- *
- * Everything else on the shared side is a database function, which answers
- * with a row or an error. These two are table updates, and the groups policy
- * is the reason they need watching: it shows a group to every member and lets
- * only the owner write it. A member's rename is therefore a filter that
- * matches nothing, which PostgREST answers with 204 and no error — the write
- * looks like it worked, the sheet closes, and the name is unchanged on the
- * next read.
- *
- * These tests pin both halves: an update that touched a row still resolves and
- * still refreshes the group, and one that touched nothing is an error carrying
- * the copy the screen shows.
+ * The two writes to `groups` that are table updates rather than RPCs. The groups policy shows a
+ * group to every member but lets only the owner write it, so a member's rename is a filter that
+ * matches nothing, which PostgREST answers with 204 and no error. An update that touched a row must
+ * still resolve and refresh the group; one that touched nothing must be an error carrying the
+ * screen's copy.
  */
 
-/** One update as the fake client saw it. */
 type SeenUpdate = {
   table: string;
   values: Record<string, unknown>;
@@ -32,7 +23,6 @@ type SeenUpdate = {
 };
 
 const mockUpdates: SeenUpdate[] = [];
-/** Rows the update answers with. Empty is the silent no-op. */
 let mockReturnedRows: { id: string }[] = [];
 /** Set to make the update fail outright rather than match nothing. */
 let mockError: { message: string } | null = null;
@@ -51,8 +41,8 @@ jest.mock('@/lib/supabase', () => ({
               seen.selected = columns;
               return Promise.resolve(answer());
             },
-            // Awaiting with no select is the shape this fix removed. Left
-            // reachable so a revert fails here rather than passing quietly.
+            // Awaiting with no select is the shape the fix removed, kept reachable so a revert
+            // fails here.
             then: (resolve: (value: unknown) => unknown) => resolve(answer()),
           };
         },
@@ -108,9 +98,8 @@ describe('useUpdateGroup', () => {
   });
 
   it('writes a false and a null rather than dropping them', async () => {
-    // `if (values.x !== undefined)` is doing real work here: turning simplify
-    // off and clearing an icon are both edits, and a truthiness check would
-    // silently discard them.
+    // `!== undefined` does real work: turning simplify off and clearing an icon are edits, and a
+    // truthiness check would discard them.
     const { result } = await renderHook(() => useUpdateGroup(), { wrapper });
 
     await result.current.mutateAsync({ id: 'group-1', simplifyDebts: false, iconId: null });
@@ -119,8 +108,7 @@ describe('useUpdateGroup', () => {
   });
 
   it('fails instead of reporting success when the update matched no row', async () => {
-    // What a member's rename does: the policy shows them the group and
-    // refuses the write, so the filter matches nothing.
+    // A member's rename: the policy shows them the group but refuses the write.
     mockReturnedRows = [];
     const { result } = await renderHook(() => useUpdateGroup(), { wrapper });
 

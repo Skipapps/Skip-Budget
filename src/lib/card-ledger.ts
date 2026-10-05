@@ -1,13 +1,6 @@
 /**
- * Works out what a card or bank account is actually at.
- *
- * A card is a running total, not a stored number. The user states a balance,
- * and from that moment everything charged to the card pushes it up and every
- * payment brings it down — the same arithmetic a real statement does, except
- * nothing here is automated: every figure comes from a row the user entered.
- *
- * Pure on purpose. No dates read from the clock, no queries — everything is an
- * argument, so the whole thing is testable and produces the same answer twice.
+ * Works out what a card or bank account is at: a running total from a user-stated balance, with
+ * every charge pushing it up and every payment bringing it down. Pure: no clock, no queries.
  */
 
 export type SourceKind = 'card' | 'account';
@@ -101,11 +94,9 @@ function daysInMonth(year: number, month: number): number {
 }
 
 /**
- * Steps a date by whole cycles. Positive steps go back, negative go forward.
- *
- * Month arithmetic is done on the calendar rather than in milliseconds, and the
- * day is clamped to the month's length — a bill due on the 31st charges on the
- * 30th in a 30-day month rather than skidding into the next one.
+ * Steps a date by whole cycles. Positive steps go back, negative go forward. Month arithmetic is on
+ * the calendar, with the day clamped to the month's length (a bill due on the 31st charges on the
+ * 30th in a 30-day month).
  */
 function stepBy(date: string, recurrence: Recurrence, steps: number): string {
   const [year, month, day] = parts(date);
@@ -125,11 +116,8 @@ function stepBy(date: string, recurrence: Recurrence, steps: number): string {
 }
 
 /**
- * Every time a recurring charge landed inside a window.
- *
- * Walks backwards from the next due date, because that is the only date the
- * schema stores. A "period" bill does not repeat, so it contributes at most its
- * one date.
+ * Every time a recurring charge landed inside a window, newest first. Walks outwards from the next
+ * due date, the only date the schema stores. A "period" bill contributes at most its one date.
  */
 export function occurrencesInRange(
   anchor: string,
@@ -144,19 +132,16 @@ export function occurrencesInRange(
   }
 
   const found: string[] = [];
-  // Hard stops, so a corrupt date or an unknown recurrence cannot spin here.
+  // Hard stops, so a corrupt date or an unknown recurrence cannot spin.
   const GUARD = 600;
 
-  // Backwards from the anchor, including the anchor itself.
   for (let step = 0; step < GUARD; step += 1) {
     const date = stepBy(anchor, recurrence, step);
     if (from && date < from) break;
     if (date <= to) found.push(date);
-    // With no lower bound there is nothing to stop the walk but the guard.
     if (!from && found.length > 240) break;
   }
 
-  // Forwards from the anchor, for ranges that reach into the future.
   for (let step = 1; step < GUARD; step += 1) {
     const date = stepBy(anchor, recurrence, -step);
     if (date > to) break;
@@ -167,19 +152,11 @@ export function occurrencesInRange(
 }
 
 /**
- * The first occurrence on or after a given day.
- *
- * A stored "next due" goes stale the moment its date passes — the bill is
- * still monthly, but the app would keep calling a date in the past the next
- * one. Walking forward from the original anchor rather than from today keeps
- * the day-of-month the user chose, so a rent bill set to the 1st stays on the
- * 1st however long the app went unopened.
- *
- * History is unaffected: occurrences are derived by walking back from the
- * anchor, so moving it forward cannot erase what already happened.
+ * The first occurrence on or after a given day. A stored "next due" goes stale once its date passes;
+ * walking forward from the original anchor rather than from today keeps the user's day-of-month
+ * (rent on the 1st stays on the 1st). History is unaffected, as it is derived by walking back.
  */
 export function nextOccurrenceFrom(anchor: string, recurrence: Recurrence, from: string): string {
-  // A one-off has no next: it happens on its date and never again.
   if (!anchor || recurrence === 'period') return anchor;
 
   let date = anchor;
@@ -190,18 +167,14 @@ export function nextOccurrenceFrom(anchor: string, recurrence: Recurrence, from:
 }
 
 /**
- * How the ledger names a plan.
- *
- * Bills and subscriptions are separate tables with their own ids, so the
- * ledger holds them apart by kind. Charges have to be filed under the same
- * name or a plan's history simply never matches it — and it would fail
- * quietly, by projecting, which looks exactly like working.
+ * How the ledger names a plan: bills and subscriptions are separate tables, so ids are held apart by
+ * kind. Charges must be filed under the same name or a plan's history never matches, which fails
+ * quietly (it projects instead).
  */
 export function planKey(kind: 'bill' | 'subscription', id: string): string {
   return `${kind}-${id}`;
 }
 
-/** The same name, worked out from a charge row. */
 export function chargePlanKey(row: {
   bill_id: string | null;
   subscription_id: string | null;
@@ -211,19 +184,16 @@ export function chargePlanKey(row: {
     : planKey('subscription', row.subscription_id as string);
 }
 
-/** The next calendar day. */
 export function dayAfter(date: string): string {
   const [year, month, day] = parts(date);
   const next = new Date(Date.UTC(year, month - 1, day + 1));
   return iso(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate());
 }
 
-/** The later of two lower bounds, where null means "no bound at all". */
 function laterOf(bound: string | null, floor: string): string {
   return bound && bound > floor ? bound : floor;
 }
 
-/** One occurrence as it was written down, narrowed to what a ledger draws. */
 export type RecordedCharge = {
   id: string;
   /** The bill or subscription it came from. */
@@ -237,7 +207,6 @@ export type RecordedCharge = {
   accountId: string | null;
 };
 
-/** One time a plan landed — read from the record where there is one. */
 export type PlanOccurrence = {
   /** The charge's own id, or the plan and the date, so keys stay stable. */
   id: string;
@@ -251,22 +220,12 @@ export type PlanOccurrence = {
 };
 
 /**
- * Every time a plan landed or is going to, inside a window.
+ * Every time a plan landed or is going to, inside a window. The past is read from the charges
+ * written down at the time (their label, amount and source then, so a rent rise or a card change
+ * leaves earlier months alone); only what has not happened yet is projected from the plan.
  *
- * The past and the future are answered by different things, and that split is
- * the whole point. What already went out is read from the charges written down
- * at the time, carrying the label, amount and source they had then — so
- * putting rent up next month leaves last month at the old figure, and moving a
- * bill to a different card leaves March on the card that actually paid it.
- * Only what has not happened yet is projected from the plan, because a
- * forecast is the one thing the plan is still the authority on.
- *
- * `isRecorded` says whether this plan has ever been written down — anywhere,
- * not just inside this window. When it has not, the projection carries the
- * past as well, which is what keeps the screens working before the recorder
- * has caught up, or when it cannot run at all. A plan on the record does not
- * get that fallback: its history is exactly what was recorded, and filling
- * gaps from the plan would put back the very rewriting this replaces.
+ * `isRecorded` is whether the plan has ever been written down, in any window. When it has not, the
+ * projection carries the past too. A plan on the record gets no such fallback: gaps stay gaps.
  */
 export function planOccurrences(input: {
   plan: RecurringCharge;
@@ -281,9 +240,8 @@ export function planOccurrences(input: {
 }): PlanOccurrence[] {
   const { plan, charges, isRecorded, from, to, today } = input;
 
-  // Bounded by the window asked about and nothing else. A charge is not
-  // clipped to the plan's lifetime: it is on the record because it happened,
-  // and shortening a bill afterwards does not unspend the money.
+  // A charge is bounded by the window only, not the plan's lifetime: it happened, and shortening a
+  // bill afterwards does not unspend the money.
   const found: PlanOccurrence[] = charges
     .filter((charge) => charge.date <= to && (!from || charge.date >= from))
     .map((charge) => ({
@@ -303,8 +261,7 @@ export function planOccurrences(input: {
   );
 
   if (!window.from || window.from <= window.to) {
-    // Anything already on the record wins the day it falls on, so a clock
-    // skewed a day forward cannot have it counted twice.
+    // A recorded charge wins its day, so a clock skewed a day forward cannot count it twice.
     const taken = new Set(found.map((occurrence) => occurrence.date));
 
     for (const date of occurrencesInRange(plan.nextDate, plan.recurrence, window.from, window.to)) {
@@ -329,14 +286,9 @@ export function planOccurrences(input: {
 /**
  * Turns everything charged to one source into a ledger and a balance.
  *
- * `statedBalance` is what the user typed and `balanceAsOf` is when it was true.
- * Charges before that date are assumed to be baked into the figure already, so
- * counting them again would double them. When no balance was ever stated, every
- * charge counts — a backdated receipt on a fresh card still has to appear.
- *
- * A card only ever shows what has already happened, so once its bills are on
- * the record the balance is built entirely from `recorded` and the plans are
- * left to describe the future nobody is asking about here.
+ * `statedBalance` is what the user typed and `balanceAsOf` is when it was true. Charges before that
+ * date are already baked into the figure; with no stated balance every charge counts. Only what has
+ * already happened is shown, so once bills are on the record the balance comes from `recorded`.
  */
 export function buildLedger(input: {
   kind: SourceKind;
@@ -381,9 +333,8 @@ export function buildLedger(input: {
   }
 
   for (const item of recurring) {
-    // Recorded where it is recorded, projected only where it is not. The
-    // lifetime bounds live in there too: without them a bill added today would
-    // back-date itself onto the card.
+    // Recorded where it is recorded, projected only where it is not. The lifetime bounds live in
+    // there too, or a bill added today would back-date itself onto the card.
     for (const occurrence of planOccurrences({
       plan: item,
       charges: byPlan.get(item.id) ?? [],
@@ -427,21 +378,16 @@ export function buildLedger(input: {
     .filter((entry) => entry.kind === 'payment')
     .reduce((sum, entry) => sum + entry.amount, 0);
 
-  // A card balance is debt, so spending raises it and paying lowers it. An
-  // account balance is money held, so the same two events do the opposite.
+  // A card balance is debt (spending raises it); an account balance is money held (the opposite).
   const balance = kind === 'card' ? statedBalance + charged - paid : statedBalance - charged + paid;
 
   return { entries, charged, paid, balance };
 }
 
 /**
- * The earliest day a plan could honestly have charged.
- *
- * Occurrences are walked outwards from the stored next date, which on its own
- * reaches back forever: a monthly bill added today fills every month before it
- * with charges nobody made. `startsOn` is the real answer when it is known,
- * and the day the row was created is the honest fallback — the app cannot have
- * recorded anything before it was told about it.
+ * The earliest day a plan could honestly have charged: `startsOn`, else the day the row was created.
+ * Walking outwards from the stored next date alone reaches back forever and would fill every month
+ * before a newly added bill with charges nobody made.
  */
 export function planFloor(
   startsOn: string | null | undefined,
@@ -451,18 +397,7 @@ export function planFloor(
   return createdAt ? createdAt.slice(0, 10) : null;
 }
 
-/**
- * Narrows a window to the stretch a bill was actually running.
- *
- * Occurrences are derived by walking outwards from the stored next date, which
- * on its own reaches back before the bill existed — add a monthly bill today
- * and last spring fills with charges that were never paid. `starts_on` and
- * `ends_on` are the bill's own bounds, so the walk is held inside them.
- *
- * A row saved before those dates were captured falls back to when it was
- * created, which is the last honest bound available: the app cannot have
- * charged anything before it was told the plan existed.
- */
+/** Narrows a window to the stretch a bill was running: `starts_on` (see `planFloor`) to `ends_on`. */
 export function billWindow(
   bill: {
     starts_on?: string | null;

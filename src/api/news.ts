@@ -6,17 +6,10 @@ import { useAnnouncements } from '@/api/queries';
 import { useUserId } from '@/providers/session-provider';
 
 /**
- * Whether there is news from Skip nobody has looked at yet — the dot on the
- * Home bell.
- *
- * "Seen" is the publish date of the newest item on screen the last time
- * Notifications was opened, not the clock: both sides of the comparison then
- * come from the server, so a phone set to the wrong time can neither hide news
- * nor keep a dot lit forever.
- *
- * Kept on the device rather than the profile. A dot seen again on a second
- * phone costs one tap; a column on the profile would sit on the read every
- * screen depends on, for the sake of a dot.
+ * Whether there is news from Skip nobody has looked at yet (the dot on the Home bell). "Seen" is
+ * the publish date of the newest item on screen when Notifications was last opened, not the clock,
+ * so a wrong phone time can neither hide news nor keep the dot lit. Kept on the device, not the
+ * profile: a dot shown again on a second phone costs one tap.
  */
 
 const keyFor = (userId: string) => `skip.news.seenThrough.${userId}`;
@@ -28,8 +21,7 @@ function useSeenThrough() {
     enabled: Boolean(userId),
     staleTime: Infinity,
     queryFn: async () => {
-      // Storage can refuse outright; that reads as "never opened", which at
-      // worst shows a dot that one visit clears.
+      // Storage can refuse; that reads as "never opened", at worst a dot one visit clears.
       try {
         return (await AsyncStorage.getItem(keyFor(userId!))) ?? null;
       } catch {

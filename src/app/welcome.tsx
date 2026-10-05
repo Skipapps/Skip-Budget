@@ -14,17 +14,13 @@ export default function WelcomeScreen() {
   const artwork = useArtwork();
   const { session, ready } = useSession();
 
-  // The front door of the signed-out world. Anybody signed in who lands
-  // here — a stale deep link, a back gesture that slipped through — belongs
-  // in the app, not in the pitch.
+  // Someone signed in who lands here (stale deep link, stray back gesture) belongs in the app.
   if (ready && session) return <Redirect href="/home" />;
 
   return (
     <Screen
       footer={
         <View className="w-full gap-2">
-          {/* Get started walks the promises first: what Skip can do, then why
-              it is built that way, then the account. */}
           <Button label="Get started" onPress={() => router.push('/what-skip-can-do')} />
           <TextLink label="I already have an account" onPress={() => router.push('/login')} />
         </View>

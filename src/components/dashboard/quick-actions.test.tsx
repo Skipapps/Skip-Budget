@@ -2,8 +2,6 @@ import { fireEvent, render } from '@testing-library/react-native';
 
 import { QuickActions } from '@/components/dashboard/quick-actions';
 
-// jest.mock calls are hoisted above these imports by babel-plugin-jest-hoist,
-// so the ordering here is for readability, not execution.
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
 jest.mock('@/providers/theme-provider', () => ({

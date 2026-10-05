@@ -8,7 +8,6 @@ import { formatFullDate } from '@/lib/date';
 
 const asDate = (iso: string) => formatFullDate(new Date(`${iso}T00:00:00`));
 
-/** One subscription: its details, its paid and upcoming renewals, and the pencil to edit it. */
 export default function SubscriptionDetailScreen() {
   const { id = '' } = useLocalSearchParams<{ id: string }>();
   const subscriptions = useSubscriptions();

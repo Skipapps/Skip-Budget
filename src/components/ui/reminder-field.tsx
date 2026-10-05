@@ -22,29 +22,15 @@ type ReminderFieldProps = {
   /** "HH:MM" the reminder is sent at. */
   time: string;
   onTimeChange: (value: string) => void;
-  /**
-   * Why this thing cannot be reminded about yet, if it cannot. Shown instead
-   * of the controls — one that would save a setting nothing can act on is
-   * worse than an explanation.
-   */
+  /** Why this thing cannot be reminded about yet, if it cannot. Shown instead of the controls. */
   unavailable?: string | null;
-  /**
-   * Offered under `unavailable` when the reason is a read that failed rather
-   * than a fact about the thing. "Add the income paid into this account" is
-   * something to go and do; "we could not check" is something to try again.
-   */
+  /** Offered under `unavailable` when the reason is a failed read rather than a fact about the thing. */
   onRetry?: () => void;
 };
 
 /**
- * Setting a reminder where the thing is created, rather than only in Settings.
- *
- * Both places write the same row. This is the moment somebody is thinking
- * about the bill, so it is the moment to ask; the page in Settings is for
- * seeing all of them at once and changing their minds later.
- *
- * The time only appears once there is a reminder to time. Asking when to send
- * something nobody has asked to be sent is a question about nothing.
+ * Sets a reminder where the thing is created; Settings writes the same row. The time only appears
+ * once there is a reminder to time.
  */
 export function ReminderField({
   kind,

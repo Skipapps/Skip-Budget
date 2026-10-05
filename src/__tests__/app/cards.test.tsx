@@ -4,14 +4,9 @@ import CardsScreen from '@/app/(tabs)/cards';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * What the wallet does when the balances could not be worked out.
- *
- * Every face on this screen reads `balances.get(id) ?? card.balance`, and the
- * fallback is the figure typed the day the card was added. That makes a failed
- * read the one case where showing something is worse than showing nothing: the
- * number somebody checks against their bank would be months out of date and
- * look exactly like a live one. So the page says so and offers the retry,
- * which is what every other list in the app does.
+ * When the balances could not be worked out the wallet shows the failure and a retry, not the
+ * fallback. Faces read `balances.get(id) ?? card.balance`, and that fallback is the figure typed
+ * the day the card was added: months stale yet indistinguishable from a live number.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -21,9 +16,8 @@ jest.mock('react-native-keyboard-controller', () =>
 );
 
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
-// Reanimated 4 pulls react-native-worklets, which wants a native module. The
-// money tiles are the only thing on this page that animates, so the stand-in
-// just prints what the page handed it.
+// Reanimated 4 pulls react-native-worklets, which wants a native module; the stand-in just prints
+// what the page handed it.
 jest.mock('@/components/ui/amount-tile', () => {
   const { Text } = jest.requireActual('react-native');
   return {
@@ -53,8 +47,6 @@ jest.mock('@/data/money-mock', () => ({
 
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true }) }));
 
-// The tab reads its params and can raise the account-offer dialog; neither
-// is what these tests are about.
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), setParams: jest.fn() },
   useLocalSearchParams: () => ({}),
@@ -97,8 +89,7 @@ const mockRefetchBalances = jest.fn();
 let mockSavings: object[] = [];
 
 jest.mock('@/api/queries', () => ({
-  // The same rule the Savings page applies (the real module cannot load under
-  // Jest: it pulls in the Supabase client and its native storage).
+  // The Savings page's rule; the real module cannot load under Jest (pulls in Supabase).
   savedFor: (month: {
     excluded_at: string | null;
     adjusted_saved: number | null;
@@ -109,8 +100,6 @@ jest.mock('@/api/queries', () => ({
   useSalarySources: () => ({ data: [], isPending: false, isError: false }),
   useMonthlySavings: () => ({ data: mockSavings, isPending: false, isError: false }),
   useSourceBalances: () => ({
-    // A walk that failed hands back no balances at all, which is exactly how
-    // the screen used to end up drawing `card.balance` as if it were live.
     balances: new Map<string, number>(),
     isError: mockBalancesFailed,
     refetch: mockRefetchBalances,
@@ -127,11 +116,8 @@ beforeEach(() => {
 });
 
 /**
- * The Savings tile is the Savings page's total, seen from one screen back.
- *
- * It used to sum the raw `saved` column, so a month corrected to $500 or left
- * out altogether still counted at what the app had worked out — the tile said
- * $1,783.46 above a page that said $0.00.
+ * The Savings tile is the Savings page's total (via savedFor), not a sum of the raw `saved` column:
+ * a month corrected to $500 or left out must not count at the worked-out figure.
  */
 describe('Cards — the Savings tile', () => {
   const august = { month: '2026-08-01', income: 3760, spent: 1976.54, saved: 1783.46 };

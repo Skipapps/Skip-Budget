@@ -1,12 +1,5 @@
 import { render } from '@testing-library/react-native';
 
-/**
- * Logos come from our own brand-logos bucket and nowhere else.
- *
- * Brandfetch is gone: a logo is either one of ours — named on the row, or
- * found from the brand's website in the catalog — or the brand's letters.
- */
-
 const mockDirectory = [
   { id: 'netflix', name: 'Netflix', domain: 'netflix.com', logo_path: 'v1/netflix.png' },
   { id: 'usaa', name: 'USAA', domain: 'usaa.com', logo_path: null },

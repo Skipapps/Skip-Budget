@@ -1,14 +1,6 @@
 import { LegalDocument, type Section } from '@/components/ui/legal-document';
 
-/**
- * A developer's draft, not legal advice.
- *
- * Every factual claim below was written against what the code actually does —
- * which tables exist, which services are called, what the retention job
- * deletes. That makes it accurate about the software. It does not make it
- * complete about the business: the operating entity, the jurisdiction and the
- * legal bases are the parts only the owner can state, and they are marked.
- */
+/** A developer's draft, not legal advice. Factual claims follow what the code actually does. */
 
 const SECTIONS: Section[] = [
   {

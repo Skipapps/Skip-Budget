@@ -12,7 +12,7 @@ const on = (y: number, m: number, d: number) => new Date(y, m - 1, d);
 
 describe('periodRange', () => {
   it('runs a week Sunday to Saturday whatever day you are on', () => {
-    // 28 Aug 2026 is a Friday; its week is 23–29.
+    // 28 Aug 2026 is a Friday; its week is 23-29.
     for (const day of [23, 25, 28, 29]) {
       expect(periodRange('week', on(2026, 8, day))).toEqual({
         from: '2026-08-23',
@@ -59,7 +59,6 @@ describe('periodBuckets', () => {
 
   it('reads a month as its weeks, clipped to the month', () => {
     const buckets = periodBuckets('month', on(2026, 8, 28));
-    // Never borrows days from the neighbouring months.
     expect(buckets[0].from).toBe('2026-08-01');
     expect(buckets[buckets.length - 1].to).toBe('2026-08-31');
     for (const bucket of buckets) {
@@ -77,7 +76,6 @@ describe('periodBuckets', () => {
   });
 
   it('covers the whole period with no day left out or counted twice', () => {
-    // Every period there is, so adding one cannot skip this check.
     for (const key of PERIODS.map((period) => period.value)) {
       const buckets = periodBuckets(key, on(2026, 8, 28));
       const range = periodRange(key, on(2026, 8, 28));
@@ -101,7 +99,6 @@ describe('stepping bounds', () => {
 
   it('stops going back at the end of the kept history', () => {
     expect(isEarliestPeriod('year', today, today)).toBe(false);
-    // Seven years back is the floor.
     expect(isEarliestPeriod('year', on(2019, 8, 28), today)).toBe(true);
   });
 });
@@ -144,7 +141,6 @@ describe('the All period', () => {
   });
 
   it('does not step, and says so at both ends', () => {
-    // Both arrows read as disabled, rather than looking live and doing nothing.
     expect(stepPeriod('all', today, -1)).toBe(today);
     expect(stepPeriod('all', today, 1)).toBe(today);
     expect(isEarliestPeriod('all', today, today)).toBe(true);

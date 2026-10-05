@@ -11,8 +11,7 @@ type AccountCardProps = {
 };
 
 export function AccountCard({ account, placeholderName, style }: AccountCardProps) {
-  // An account already runs the right way round: the stored number is money
-  // held, so it needs no flipping the way a card's does.
+  // The stored number is money held, so unlike a card's it needs no flipping.
   return (
     <CardFace
       color={account.color}

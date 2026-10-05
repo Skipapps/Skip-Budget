@@ -4,13 +4,8 @@ import { useState } from 'react';
 import { SettingsRow } from '@/components/settings/settings-row';
 
 /**
- * The switch on a settings row, pressed.
- *
- * Written after Settings shipped a switch that could be turned on with a tap
- * and not turned off again: the press has to reach the handler, it has to
- * carry the value the switch should take next rather than the one it has, and
- * it has to happen exactly once — a row that toggled twice on one tap would
- * look identical to one that never toggled at all.
+ * A switch press must reach the handler once, carrying the value the switch should take next: a row
+ * that toggled twice on one tap would look identical to one that never toggled.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -120,8 +115,6 @@ describe('SettingsRow, switch', () => {
 
 describe('SettingsRow, navigating', () => {
   it('is a button that fires once, with nothing over it', async () => {
-    // Settings' "Reminders" row is this shape, and was reported as not
-    // responding. The row itself is a plain press with a chevron.
     const onPress = jest.fn();
     const view = await render(
       <SettingsRow

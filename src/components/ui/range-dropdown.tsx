@@ -11,15 +11,7 @@ type RangeDropdownProps = {
   onChange: (value: RangeKey) => void;
 };
 
-/**
- * The window a page is reporting on.
- *
- * A dropdown rather than a row of chips: five windows do not fit across a
- * phone without shrinking to something that reads as decoration, and the
- * choice belongs next to the figure it changes rather than as a band of its
- * own. Closed, it says which window you are in — which is the thing you need
- * to know when reading the number beside it.
- */
+/** The window a page is reporting on. A dropdown, not chips: five windows do not fit across a phone. */
 export function RangeDropdown({ value, onChange }: RangeDropdownProps) {
   const colors = useColors();
   const [open, setOpen] = useState(false);

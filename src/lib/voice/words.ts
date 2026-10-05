@@ -1,8 +1,6 @@
 /**
- * Which words are "plain": not a number, a unit, a keyword, a date, a cycle,
- * a correction or a small function word. Only plain words can be the edge of
- * a merchant name, so "rent" is never fuzzy-matched to a brand and "the" is
- * never the start of one.
+ * Which words are "plain": not a number, unit, keyword, date, cycle, correction or function word.
+ * Only plain words can be the edge of a merchant name, so "rent" is never fuzzy-matched to a brand.
  */
 import { CENT_UNITS, DOLLAR_UNITS } from './amount';
 import { SINGLE_CATEGORY_WORDS } from './bill-category';
@@ -146,7 +144,6 @@ export const STOPWORDS = new Set([
   'one',
 ]);
 
-/** A word that could belong to a name. */
 export function isPlainWord(token: Token | undefined): boolean {
   if (!token || token.type !== 'word') return false;
   const { key } = token;

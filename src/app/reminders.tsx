@@ -47,30 +47,12 @@ import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
-/**
- * Every reminder in the app, in one place.
- *
- * The alternative was a switch on each of four different forms, which is where
- * this started: the card form had one and nothing else did. That spreads the
- * same decision across four screens and gives nobody a way to answer "what is
- * Skip going to message me about" without visiting all of them.
- *
- * Grouped by what the thing is rather than by when it fires, because that is
- * how people look for them — you come here to turn off the reminder for a
- * subscription you just cancelled, and you know it was a subscription.
- */
-
 type Item = {
   kind: ReminderKind;
   id: string;
   label: string;
   caption: string;
-  /**
-   * Why this one cannot be reminded about, if it cannot. A card with no
-   * payment day and an account nothing is paid into have no date to count
-   * back from, and a switch that saves a setting nothing can act on is a
-   * promise the app cannot keep.
-   */
+  /** Why it cannot be reminded about: with no payment day or no pay arriving there is no date. */
   blocked?: string;
 };
 
@@ -80,11 +62,7 @@ type Group = {
   items: Item[];
 };
 
-/**
- * The one reminder that points at nothing, so it cannot be a row in a group.
- *
- * `targetKey` produces `kind:id`, so this sentinel cannot collide with one.
- */
+/** The one reminder that points at nothing. `targetKey` makes `kind:id`, so this cannot collide. */
 const RECEIPTS_KEY = 'receipts';
 
 export default function RemindersScreen() {
@@ -112,29 +90,16 @@ export default function RemindersScreen() {
     cards.isLoading ||
     accounts.isLoading ||
     reminders.isPending ||
-    // Held back with the rest rather than rendered early: a switch that snaps
-    // itself on a beat after the page draws reads as the app changing its mind.
+    // Held back with the rest so a switch does not snap on after the page draws.
     receipts.isLoading ||
-    // Held back for the same reason, one step further on: until this lands,
-    // no account looks like one pay arrives in, so every account row would
-    // draw "No pay lands here yet" and then quietly grow a switch.
+    // Until this lands no account looks like one pay arrives in, so rows would flash "No pay lands
+    // here yet".
     salaryAccounts.isLoading;
 
   /**
-   * Any read that decides what a switch says.
-   *
-   * A switch drawn off is a statement — "you have turned this off" — and it is
-   * the most misleading answer a notification setting can give to a read that
-   * never landed. The same goes for the two reads that decide whether a row
-   * can be switched at all: without them a card or an account is shown as
-   * nothing Skip could ever remind you about. So a failure anywhere takes the
-   * page rather than being drawn as a setting.
-   *
-   * The daily receipts reminder is the exception, and deliberately so. It is
-   * one row, read from one column, and it is the row whose migration is not on
-   * every database yet — so its failure is its own. Losing it must not take
-   * down the bill, subscription, card and account reminders, which come from
-   * different tables and are the reason most people opened this page.
+   * Any read that decides what a switch says. A switch drawn off for a read that never landed would
+   * misreport the setting, so a failure takes the page. The daily receipts reminder is the
+   * exception: its failure stays its own and must not take down the other reminders.
    */
   const failed =
     bills.isError ||
@@ -144,10 +109,8 @@ export default function RemindersScreen() {
     reminders.isError ||
     salaryAccounts.isError;
 
-  /** The receipts read alone, which takes its own section and nothing else. */
   const receiptsFailed = receipts.isError;
 
-  /** Every read on the page, because any one of them can be the one that failed. */
   const retry = () => {
     void bills.refetch();
     void subscriptions.refetch();
@@ -158,13 +121,11 @@ export default function RemindersScreen() {
     void salaryAccounts.refetch();
   };
 
-  /** "4 May 2026" rather than the stored ISO. Dates here are read, not parsed. */
+  /** "4 May 2026" rather than the stored ISO. */
   const when = (iso: string) => formatFullDate(new Date(`${iso}T00:00:00`));
 
-  /** The receipts reminder's hour, defaulted upstream to the Founder's 8:00 pm. */
   const receiptClock = parseClock(receipts.remindAt);
 
-  /** What is stored, keyed the way the rows ask for it. */
   const stored = useMemo(
     () => new Map((reminders.data ?? []).map((row) => [reminderKey(row), row])),
     [reminders.data],
@@ -225,16 +186,8 @@ export default function RemindersScreen() {
   );
 
   const targets = groups.reduce((sum, group) => sum + group.items.length, 0);
-  /**
-   * Counted over what can actually be switched on, plus the receipts reminder.
-   *
-   * A card with no payment day is not one of nine things you have declined to
-   * be told about. The receipts reminder needs nothing to point at, so it is
-   * always available and always counted — leaving it out of both numbers made
-   * the sentence a lie the moment somebody turned it on. Unless its own read
-   * failed, in which case it is in neither number: the page cannot say whether
-   * it is on, so it cannot count it.
-   */
+  // Counted over what can actually be switched on, plus the receipts reminder (in neither number if
+  // its own read failed, since the page cannot say whether it is on).
   const available =
     (receiptsFailed ? 0 : 1) +
     groups.reduce((sum, group) => sum + group.items.filter((item) => !item.blocked).length, 0);
@@ -244,11 +197,6 @@ export default function RemindersScreen() {
 
   return (
     <Screen title="Reminders" showBack onRefresh={retry}>
-      {/* The count always leads, because there is always at least the receipts
-          reminder to count. On a fresh account it carries the sentence the
-          empty state used to: there is something here to set, and more of it
-          arrives as things are added. Not drawn over a failed read: "0 of 1"
-          would be a figure about settings nobody could see. */}
       {failed ? null : (
         <Subtitle className="mt-2 w-full text-left">
           {available === 0
@@ -306,8 +254,6 @@ export default function RemindersScreen() {
                   </Text>
                 </View>
 
-                {/* No switch over a read that never landed: off would be a
-                    statement about a setting nobody can see. */}
                 {receiptsFailed ? (
                   <TextLink
                     label="Try again"
@@ -318,8 +264,7 @@ export default function RemindersScreen() {
                   <SwitchControl
                     value={receipts.enabled}
                     onValueChange={(next) => {
-                      // No time sent: turning it off and on again keeps whatever
-                      // hour was chosen rather than snapping back to the default.
+                      // No time sent, so toggling keeps the hour already chosen.
                       setReceiptReminder.mutate({ enabled: next });
                     }}
                     accessibilityLabel="Daily receipts reminder"
@@ -327,8 +272,6 @@ export default function RemindersScreen() {
                 )}
               </View>
 
-              {/* No lead-day chips: there is nothing to lead. The time is the
-                  only detail this one has. */}
               {receipts.enabled && !receiptsFailed ? (
                 <View className="mt-3 w-full flex-row flex-wrap items-center gap-2">
                   <Pressable
@@ -386,9 +329,6 @@ export default function RemindersScreen() {
                 </Text>
               </View>
 
-              {/* What the reminder is counted from. Different for each kind,
-                  and the account one runs the other way — it is about money
-                  arriving rather than leaving. */}
               <Text
                 className="mt-1 font-poppins text-[13px] text-muted"
                 maxFontSizeMultiplier={1.3}
@@ -451,9 +391,6 @@ export default function RemindersScreen() {
                         )}
                       </View>
 
-                      {/* The lead time only exists once there is something to
-                          lead. Showing it on an off reminder asks people to
-                          set a detail of a thing that will not happen. */}
                       {enabled && !item.blocked ? (
                         <View className="mt-3 w-full flex-row flex-wrap items-center gap-2">
                           {LEAD_OPTIONS.map((option) => {
@@ -495,9 +432,6 @@ export default function RemindersScreen() {
                             );
                           })}
 
-                          {/* What time of day it arrives. A reminder with no
-                              time lands whenever the job happens to run, which
-                              is how you get told about the rent at 3am. */}
                           <Pressable
                             accessibilityRole="button"
                             accessibilityLabel={`Sent at ${formatClock(
@@ -527,8 +461,7 @@ export default function RemindersScreen() {
                               tap();
                               removeReminder.mutate({ kind: item.kind, targetId: item.id });
                             }}
-                            // The box is 32pt because the row cannot afford 44;
-                            // the target is 44 regardless.
+                            // 32pt box to fit the row; hitSlop brings the target up to 44pt+.
                             hitSlop={8}
                             className="ml-auto h-8 w-8 items-center justify-center rounded-full active:bg-ink/5"
                           >
@@ -560,8 +493,6 @@ export default function RemindersScreen() {
             </View>
           ))}
 
-      {/* Always worth saying now: the receipts reminder means every account has
-          at least one thing that arrives as a notification. */}
       {!loading && !failed ? (
         <View className="mt-8 w-full flex-row items-start gap-3 rounded-[16px] bg-ink/5 px-4 py-3.5">
           <Bell size={18} color={colors.muted} strokeWidth={1.8} />

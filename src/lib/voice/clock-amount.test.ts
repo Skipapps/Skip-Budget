@@ -2,14 +2,9 @@ import { parseVoice } from './parse';
 import { DIRECTORY, TODAY } from './test-fixtures';
 
 /**
- * Review L1: only a real clock reading is read as an amount.
- *
- * iOS sometimes writes "twelve fifty" as "12:50", so a clock time is offered
- * as both readings ($12.50 or $1,250). "99:99", "12:60" or "24:30" are not
- * times anyone said, and must not be offered as money at all.
- *
- * Kept in its own file (by Diego, on the CEO's L1 assignment) so it could not
- * collide with Drew's edits to parse.test.ts; fold it in whenever convenient.
+ * iOS sometimes writes "twelve fifty" as "12:50", so a clock time is offered as both readings
+ * ($12.50 or $1,250). "99:99", "12:60" or "24:30" are not times anyone said and must not be
+ * offered.
  */
 
 const ctx = { today: TODAY, directory: DIRECTORY, aliases: {} };

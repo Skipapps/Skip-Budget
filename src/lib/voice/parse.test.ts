@@ -7,12 +7,8 @@ import { DIRECTORY, TODAY } from './test-fixtures';
 import type { VoiceCycle, VoiceDraft, VoiceKind, VoiceMerchantSource, VoiceMissing } from './types';
 
 /**
- * The parser's promise, one sentence per row. TODAY is Thursday 1 Oct 2026
- * unless a row says otherwise, so: yesterday 30 Sep, last Friday 25 Sep,
- * next Friday 2 Oct, Monday back 28 Sep, Monday ahead 5 Oct.
- *
- * Each row pins kind, amount, amount choices, merchant name, date, cycle,
- * bill category, confidence and what is still missing. Unstated optional
+ * One sentence per row. TODAY is Thursday 1 Oct 2026 unless a row says otherwise: yesterday 30 Sep,
+ * last Friday 25 Sep, next Friday 2 Oct, Monday back 28 Sep, Monday ahead 5 Oct. Unstated optional
  * fields default to null / [].
  */
 type Want = {
@@ -45,7 +41,7 @@ const row = (says: Row['says'], want: Want, extra: Omit<Row, 'says' | 'want'> = 
   ...extra,
 });
 
-// ── The PDF plan's "Messy examples", with the brief's corrections ──────────
+// Messy spoken examples across all three kinds.
 const PLAN: Row[] = [
   // Comcast is an alias of the Xfinity brand in the catalog, so the brand is Xfinity.
   row('uh paid like forty no fifty bucks for comcast yesterday', {
@@ -58,7 +54,6 @@ const PLAN: Row[] = [
     confidence: 'medium',
     missing: ['cycle'],
   }),
-  // In words, "fifteen ninety nine" is $15.99 or $1,599: asked, never guessed.
   row('netflix fifteen ninety nine every month', {
     kind: 'subscription',
     amount: 15.99,
@@ -103,10 +98,8 @@ const PLAN: Row[] = [
   }),
 ];
 
-// ── The nine "Try saying" examples on the voice page (Pia's spec §4.5) ─────
-// The brand the review page shows must be the word the example puts in bold,
-// so no example leans on a catalog alias (catalog.test.ts checks the same nine
-// against the real catalog).
+// The hints on the voice page. The brand the review page shows must be the word the example puts in
+// bold, so none leans on a catalog alias (catalog.test.ts checks them against the real catalog).
 const TRY_SAYING: Row[] = [
   row('Spent $12.50 at Starbucks today', {
     kind: 'receipt',
@@ -187,7 +180,6 @@ const TRY_SAYING: Row[] = [
   }),
 ];
 
-// ── iOS writes numbers as digits: the main path ────────────────────────────
 const DIGITS: Row[] = [
   row('Netflix $15.99', {
     kind: 'subscription',
@@ -305,7 +297,6 @@ const DIGITS: Row[] = [
   }),
 ];
 
-// ── Spoken words: the fallback ─────────────────────────────────────────────
 const WORDS: Row[] = [
   row('forty five at target', {
     kind: 'receipt',
@@ -421,7 +412,6 @@ const WORDS: Row[] = [
   }),
 ];
 
-// ── Two readings: offered, never guessed. Default by kind ──────────────────
 const AMBIGUOUS: Row[] = [
   row('twelve fifty at starbucks', {
     kind: 'receipt',
@@ -505,7 +495,6 @@ const AMBIGUOUS: Row[] = [
   }),
 ];
 
-// ── Settled after all: a unit pins it, or a count drops out ─────────────────
 const SETTLED: Row[] = [
   row('twelve fifty cents at target', {
     kind: 'receipt',
@@ -545,7 +534,6 @@ const SETTLED: Row[] = [
   }),
 ];
 
-// ── Self-correction, slot by slot ──────────────────────────────────────────
 const CORRECTIONS: Row[] = [
   row('comcast forty, no, fifty', {
     kind: 'bill',
@@ -568,7 +556,6 @@ const CORRECTIONS: Row[] = [
     confidence: 'high',
     missing: [],
   }),
-  // A trigger with nothing of its slot before it removes nothing.
   row('actually I spent 40 at target', {
     kind: 'receipt',
     amount: 40,
@@ -583,7 +570,6 @@ const CORRECTIONS: Row[] = [
     confidence: 'high',
     missing: [],
   }),
-  // Only the merchant is corrected; the amount stands.
   row('spent 20 at target actually walmart', {
     kind: 'receipt',
     amount: 20,
@@ -654,7 +640,6 @@ const CORRECTIONS: Row[] = [
   }),
 ];
 
-// ── "No Frills" is a store, not a correction ───────────────────────────────
 const NO_FRILLS: Row[] = [
   row('No Frills groceries 40', {
     kind: 'receipt',
@@ -687,7 +672,6 @@ const NO_FRILLS: Row[] = [
   }),
 ];
 
-// ── Receipt, bill or subscription ──────────────────────────────────────────
 const KINDS: Row[] = [
   row('bought water 3 bucks', {
     kind: 'receipt',
@@ -784,7 +768,7 @@ const KINDS: Row[] = [
     confidence: 'medium',
     missing: ['cycle'],
   }),
-  // A purchase word beats the brand's lean (Founder may want this the other way).
+  // A purchase word beats the brand's lean.
   row('spent 15.49 on netflix', {
     kind: 'receipt',
     amount: 15.49,
@@ -898,7 +882,6 @@ const KINDS: Row[] = [
   }),
 ];
 
-// ── Dates, today Thursday 2026-10-01 ───────────────────────────────────────
 const DATES: Row[] = [
   row('target 45 three days ago', {
     kind: 'receipt',
@@ -982,7 +965,6 @@ const DATES: Row[] = [
     confidence: 'high',
     missing: [],
   }),
-  // A spoken year is taken as said.
   row('target 45 october 3rd 2026', {
     kind: 'receipt',
     amount: 45,
@@ -1090,7 +1072,7 @@ const DATES: Row[] = [
   }),
 ];
 
-// ── Past tense on bills and subscriptions runs back (plan R11) ─────────────
+// Past tense on a bill or subscription runs the date back.
 const TENSE: Row[] = [
   row('netflix renewed on the 10th 15.99', {
     kind: 'subscription',
@@ -1175,7 +1157,6 @@ const TENSE: Row[] = [
   }),
 ];
 
-// ── Month and year ends, on other days ─────────────────────────────────────
 const MONTH_ENDS: Row[] = [
   // Forward clamps a short month to its last day, as a monthly bill rolls.
   row(
@@ -1337,7 +1318,6 @@ const MONTH_ENDS: Row[] = [
   ),
 ];
 
-// ── Amounts are not dates, and dates are not amounts ───────────────────────
 const NUMBERS_VS_DATES: Row[] = [
   row('rent 1800', {
     kind: 'bill',
@@ -1390,7 +1370,6 @@ const NUMBERS_VS_DATES: Row[] = [
   }),
 ];
 
-// ── Merchants: numbers in names, mishearings, typed names, everyday words ──
 const MERCHANTS: Row[] = [
   // Aliases read back as the brand's own name: Comcast is Xfinity, Amazon Prime is Amazon.
   row('Comcast $79.99, due on the 20th every month', {
@@ -1555,7 +1534,7 @@ const MERCHANTS: Row[] = [
   }),
 ];
 
-// ── Several guesses: the best wins, a tie goes to the earlier one ──────────
+// Several guesses: the best score wins, a tie goes to the earlier one.
 const ALTERNATIVES: Row[] = [
   // Tied guesses that heard different amounts: both amounts offered.
   row(['forty fife for gas', 'forty five for gas'], {
@@ -1635,7 +1614,7 @@ const ALTERNATIVES: Row[] = [
   }),
 ];
 
-// ── The kind the person picked on the review page ──────────────────────────
+// The kind the person picked on the review page.
 const FORCED: Row[] = [
   row(
     'netflix 15.99 on the 10th',
@@ -1714,7 +1693,6 @@ const FORCED: Row[] = [
   ),
 ];
 
-// ── Learned aliases ────────────────────────────────────────────────────────
 const ALIASES: Row[] = [
   row(
     'spot a fly 9.99 a month',
@@ -1741,7 +1719,7 @@ const ALIASES: Row[] = [
     },
     { aliases: { joes: "Joe's Diner" } },
   ),
-  // An integer-like heard phrase, as the plan warns about.
+  // An integer-like heard phrase.
   row(
     '711 12.40',
     {
@@ -1767,9 +1745,8 @@ const ALIASES: Row[] = [
   ),
 ];
 
-// ── Only whole cents are money (review B2) ─────────────────────────────────
-// A digit past the cent is never rounded into an amount: gas is priced to
-// three decimals, and "$3.46" would be a figure nobody said.
+// A digit past the cent is never rounded into an amount: gas is priced to three decimals, and
+// "$3.46" would be a figure nobody said.
 const PAST_THE_CENT: Row[] = [
   row('Paid $3.459 at Shell', {
     kind: 'receipt',
@@ -1813,7 +1790,6 @@ const PAST_THE_CENT: Row[] = [
     confidence: 'low',
     missing: ['amount', 'merchant'],
   }),
-  // The price per gallon drops out; the total is the amount.
   row('$3.459 a gallon, $45.20 total at Shell', {
     kind: 'receipt',
     amount: 45.2,
@@ -1866,7 +1842,7 @@ const PAST_THE_CENT: Row[] = [
   }),
 ];
 
-// ── A bare number straight before a money figure (review S3) ───────────────
+// A bare number straight before a money figure cannot be read as one amount.
 const RUN_ON: Row[] = [
   row('Target twelve fifty thousand', {
     kind: 'receipt',
@@ -1899,7 +1875,6 @@ const RUN_ON: Row[] = [
   }),
 ];
 
-// ── Where the merchant came from ───────────────────────────────────────────
 const SOURCES: Row[] = [
   row('$40 at Target', {
     kind: 'receipt',
@@ -2001,9 +1976,8 @@ const SOURCES: Row[] = [
   }),
 ];
 
-// ── How it was paid is not who was paid (review N1) ───────────────────────
-// A card or wallet after payment words ("on my Amex", "with Apple Pay", "on my
-// Chase card") is never the merchant, so the store named with "at" stands.
+// A card or wallet after payment words ("on my Amex", "with Apple Pay") is never the merchant, so
+// the store named with "at" stands.
 const SPOTIFY: Record<string, string> = { 'spot a fly': 'Spotify' };
 const PAID_WITH: Row[] = [
   row(
@@ -2145,10 +2119,8 @@ const PAID_WITH: Row[] = [
   }),
 ];
 
-// ── A price per something is not what was paid (Founder, 2026-10-01) ───────
-// Beside a total, the total settles. Alone, a unit price is not offered: one
-// figure cannot be "offered but unsettled", and a per-gallon price would
-// otherwise settle as the amount. Tips and tax are unchanged (Founder's call).
+// Beside a total, the total settles. Alone, a unit price is not offered: one figure cannot be
+// "offered but unsettled", and a per-gallon price would otherwise settle as the amount.
 const UNIT_PRICES: Row[] = [
   row('$3.45 a gallon, $45.20 total at Shell', {
     kind: 'receipt',
@@ -2227,7 +2199,6 @@ const UNIT_PRICES: Row[] = [
   }),
 ];
 
-// ── Nothing understood: low, never a throw ─────────────────────────────────
 const GARBAGE: Row[] = [
   '',
   'um',
@@ -2457,9 +2428,8 @@ describe('parseVoice never throws', () => {
 });
 
 /**
- * Learning from corrections (review B1). The review page learns
- * (merchantHeard → the name the person chose) after a save, except when
- * merchantSource is 'catalog' — the rule documented on learnAlias.
+ * The review page learns (merchantHeard → the name the person chose) after a save, except when
+ * merchantSource is 'catalog' (the rule documented on learnAlias).
  */
 describe('learning from corrections', () => {
   const said = (text: string, pairs: AliasPair[]) =>
@@ -2492,7 +2462,6 @@ describe('learning from corrections', () => {
       'high',
     ]);
 
-    // Changed back: still nothing learned, still Target.
     pairs = save(pairs, second, 'Target');
     expect(pairs).toEqual([]);
     expect(said('spent $3 at Target', pairs).merchant?.name).toBe('Target');
@@ -2516,14 +2485,12 @@ describe('learning from corrections', () => {
       'spot a fly',
     ]);
 
-    // Confirmed as Spotify: the near miss is learned.
     pairs = save(pairs, first, 'Spotify');
     expect(pairs).toEqual([['spot a fly', 'Spotify']]);
 
     const second = said('spot a fly 9.99 a month', pairs);
     expect([second.merchant?.name, second.merchantSource]).toEqual(['Spotify', 'learned']);
 
-    // Corrected to the heard words themselves: the pair goes.
     pairs = save(pairs, second, 'Spot A Fly');
     expect(pairs).toEqual([]);
     expect(said('spot a fly 9.99 a month', pairs).merchantSource).toBe('fuzzy');
@@ -2546,18 +2513,13 @@ describe('learning from corrections', () => {
   });
 });
 
-/**
- * Several transactions in one sentence (Founder, 2026-10-01): the page asks
- * for one at a time. Conservative: a false "several" blocks a valid entry,
- * a miss still reaches review, which asks which amount. Rule:
- * src/lib/voice/multiple.ts.
- */
+// Conservative: a false "several" blocks a valid entry, a miss still reaches review (see
+// multiple.ts).
 describe('several transactions in one sentence', () => {
   const said = (text: string) =>
     parseVoice([text], { today: TODAY, directory: DIRECTORY, aliases: {} });
 
   it.each([
-    // Two merchants, each with an amount.
     'Netflix 15.99 and Spotify 11.99',
     '$12 at Starbucks and $40 at Target',
     'Netflix and Hulu, 15.99 and 7.99',
@@ -2565,11 +2527,9 @@ describe('several transactions in one sentence', () => {
     'spent 40 at Target, then 25 at Chipotle',
     // A correction inside one of them does not hide the other.
     'Netflix 15.99 no 16.99 and Hulu 7.99',
-    // Two bill categories, each with an amount.
     'rent 1800 and electric bill 85',
     'electric bill $85 due on the 15th, water bill $40 due on the 20th',
     'comcast internet 80 and rent 1800',
-    // A merchant and a bill of a different kind.
     'Netflix 15.99 and rent 1800',
     "spent 40 at Joe's Diner and rent 1800",
   ])('%j is several', (text) => {
@@ -2581,7 +2541,7 @@ describe('several transactions in one sentence', () => {
     ['forty no fifty at Shell', 50, [], 'Shell'],
     ['Netflix, actually Hulu, 7.99', 7.99, [], 'Hulu'],
     ['$3.459 a gallon, $45.20 total at Shell', 45.2, [], 'Shell'],
-    // Unit price left out of the amount pick (Founder, 2026-10-01): the total settles.
+    // Unit price left out of the amount pick: the total settles.
     ['$3.45 a gallon, $45.20 total at Shell', 45.2, [], 'Shell'],
     ['$40 plus $5 tip at Olive Garden', 40, [5, 40], 'Olive Garden'],
     ['$20 and $1.60 tax at Target', 20, [1.6, 20], 'Target'],

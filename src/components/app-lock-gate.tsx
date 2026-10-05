@@ -7,33 +7,22 @@ import { usePreferences } from '@/providers/preferences-provider';
 import { useColors } from '@/providers/theme-provider';
 
 /**
- * Face ID between the app and the person holding the phone.
- *
- * Locks on a cold start and on every return from the background — but not from
- * `inactive`, which is the state iOS passes through while it draws the Face ID
- * sheet, the app switcher preview and any system alert. Re-locking on inactive
- * would fight its own prompt and never settle.
- *
- * A failed or cancelled scan leaves the lock up with a button rather than
- * retrying forever. Somebody who cannot get in should be looking at a way to
- * try again, not at an unexplained dark screen.
+ * Face ID between the app and whoever holds the phone: locks on a cold start and on every return
+ * from the background. A failed scan leaves the lock up with a retry button instead of looping.
  */
 export function AppLockGate({ children }: { children: ReactNode }) {
   const { appLock, ready } = usePreferences();
   const colors = useColors();
 
-  // What is stored is whether this session has been let through; whether the
-  // gate is up is worked out from that. Keeping it derived rather than held
-  // means turning the preference off cannot leave a stale lock on screen.
+  // Holds whether this session has been let through; the gate is derived from it, so turning the
+  // preference off cannot leave a stale lock on screen.
   const [passed, setPassed] = useState(false);
   const [checking, setChecking] = useState(false);
 
-  // Only armed once the stored preference has been read, or a cold start would
-  // flash the app before deciding it should have been covered.
+  // Armed only once the stored preference is read, or a cold start would flash the app uncovered.
   const armed = ready && appLock;
   const locked = armed && !passed;
 
-  /** The manual retry behind the button, which reports that it is waiting. */
   const prompt = useCallback(async () => {
     setChecking(true);
     const ok = await authenticate('Unlock Skip');
@@ -41,10 +30,8 @@ export function AppLockGate({ children }: { children: ReactNode }) {
     if (ok) setPassed(true);
   }, []);
 
-  // Ask as soon as the lock is armed, which is a moment after launch. The
-  // scan is started here and the result is recorded when it lands, rather
-  // than flagging "waiting" on the way in — the system sheet is already the
-  // whole screen, so there is nothing behind it for a label to tell anyone.
+  // Ask as soon as the lock is armed. The result is recorded when it lands rather than flagging
+  // "waiting": the system sheet already fills the screen.
   useEffect(() => {
     if (!armed) return;
 
@@ -69,9 +56,8 @@ export function AppLockGate({ children }: { children: ReactNode }) {
         setPassed(false);
         return;
       }
-      // Only a real return from the background re-prompts. `inactive` is the
-      // Face ID sheet itself, the app switcher and every system alert; asking
-      // again there would fight our own prompt and never settle.
+      // Only a real return from the background re-prompts: `inactive` is the Face ID sheet, the app
+      // switcher and system alerts, and asking there would fight our own prompt.
       if (status === 'active' && wasBackgrounded.current) {
         wasBackgrounded.current = false;
         void prompt();

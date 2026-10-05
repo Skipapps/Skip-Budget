@@ -14,13 +14,7 @@ type TogglePillProps<T extends string> = {
   onChange: (value: T) => void;
 };
 
-/**
- * Toggle pill — "one of exactly two", as one object rather than two chips.
- *
- * One `rounded-full` tonal track with the selected half filled. Used where a
- * binary reads better joined than separated: AM/PM on the clock. Longer or
- * open-ended option sets belong in `ChoiceChips`, which wraps.
- */
+/** "One of exactly two" as one joined track, e.g. AM/PM. Longer or open-ended option sets belong in `ChoiceChips`. */
 export function TogglePill<T extends string>({ options, value, onChange }: TogglePillProps<T>) {
   return (
     <View accessibilityRole="radiogroup" className="w-full flex-row rounded-full bg-ink/5">

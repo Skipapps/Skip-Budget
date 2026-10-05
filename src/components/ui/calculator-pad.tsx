@@ -10,7 +10,6 @@ import { useColors } from '@/providers/theme-provider';
 
 type CalculatorPadProps = {
   title?: string;
-  /** Starting value, e.g. the amount already in the field. */
   value: string;
   onCancel: () => void;
   onConfirm: (value: string) => void;
@@ -20,7 +19,6 @@ type Operator = '+' | '-' | '*' | '/';
 
 type Key = {
   label: string;
-  /** What the key does; digits and '.' carry their own label. */
   action: 'digit' | 'dot' | 'operator' | 'equals' | 'clear' | 'delete';
   operator?: Operator;
   span?: number;
@@ -67,25 +65,12 @@ function group(raw: string): string {
 }
 
 /**
- * How big the running figure is, decided from the string alone.
+ * Figure size comes from the glyph count, not `adjustsFontSizeToFit` (same iOS first-layout-pass bug
+ * and fix as `amountFigureBand` in components/flow/amount-figure): the pad opens over a field that
+ * already has a value. Sizes use measured Poppins Bold advances so each band fits an iPhone SE
+ * (327pt inside the pad's px-6). `affixTop` = 0.345 x (size - affixSize) levels the "$" cap with the digits.
  *
- * The same rule, and the same reason, as `amountFigureBand` in
- * `components/flow/amount-figure`: this used to be `adjustsFontSizeToFit`, and
- * on iOS that measures against the first layout pass. The pad opens as a modal
- * over a field that already has a value, so the text exists before the row has
- * settled — exactly the case where the number shrinks to the floor while the
- * "$" beside it stays at full size and never recovers.
- *
- * Sizes are set against measured Poppins Bold advances (widest digit "4" at
- * 0.677em, comma 0.287em, point 0.282em, "$" 0.658em) so the widest string a
- * band can hold still fits the narrowest screen, an iPhone SE at 375pt less
- * the pad's px-6, or 327pt. `affixTop` puts the cap of the "$" level with the
- * cap of the digits: 0.345 x (size - affixSize), which at 48/24 is the 8pt the
- * pad has today.
- *
- * Unlike the keypad, this pad has no digit cap — a result can be arbitrarily
- * long — so the last band is a floor rather than a fit: past about 18 digits
- * the figure ellipsises, and no sum of real money gets there.
+ * There is no digit cap here, so the last band is a floor: past about 18 digits the figure ellipsises.
  */
 const FIGURE_BANDS = [
   { maxGlyphs: 7, size: 48, affixSize: 24, affixTop: 8 },
@@ -100,11 +85,8 @@ export function calculatorFigureBand(display: string) {
 }
 
 /**
- * Four-function calculator for amount fields.
- *
- * Deliberately a running accumulator rather than an expression parser: it
- * matches how people expect a pocket calculator to behave, and every
- * intermediate result stays rounded to cents.
+ * Four-function calculator for amount fields. A running accumulator, not an expression parser, like a
+ * pocket calculator; every intermediate result is rounded to cents.
  */
 export function CalculatorPad({
   title = 'Calculator',
@@ -130,8 +112,8 @@ export function CalculatorPad({
     setReplaceNext(false);
   };
 
-  // Every result settles at the cent the way src/lib/money.ts posts it (half
-  // away from zero). Math.round(v * 100) / 100 showed 20.15 ÷ 2 as $10.07.
+  // Every result settles at the cent as src/lib/money.ts posts it (half away from zero);
+  // Math.round(v * 100) / 100 would show 20.15 ÷ 2 as $10.07.
   const applyPending = (next: number): number | null => {
     if (accumulator === null || pending === null) return next;
     switch (pending) {

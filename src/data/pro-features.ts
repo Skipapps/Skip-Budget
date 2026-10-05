@@ -9,10 +9,8 @@ export type ProFeature = {
 };
 
 /**
- * The explainer behind each locked door.
- *
- * One page argues for one feature in its own terms — what it does for the
- * person, never "this is locked". The paywall is the last line, not the first.
+ * The explainer behind each locked door. Each page argues for its feature in its own terms, never
+ * "this is locked".
  */
 export const PRO_FEATURES: Record<string, ProFeature> = {
   loans: {

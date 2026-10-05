@@ -11,9 +11,8 @@ export function QueryProvider({ children }: { children: ReactNode }) {
           queries: {
             staleTime: 30_000,
             retry: 1,
-            // There is no window here, but there is a foreground: coming back
-            // to the app is the native equivalent of refocusing a tab, and a
-            // budget that was accurate an hour ago may not be now.
+            // No window here, but there is a foreground: returning to the app is the native
+            // refocus, and a budget accurate an hour ago may not be now.
             refetchOnWindowFocus: true,
           },
         },

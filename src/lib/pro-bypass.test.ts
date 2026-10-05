@@ -1,11 +1,6 @@
 /**
- * The point of these tests is the Release guarantee.
- *
- * The override is only ever as safe as `__DEV__`, so the first block sets
- * `__DEV__` to false — what every non-Debug bundle compiles it to — and proves
- * that the env var, the stored key and the setter are all inert: no read, no
- * write, no position but 'off'. The second block is the mirror, so a passing
- * suite means the switches still work where they are supposed to.
+ * The Release guarantee: with `__DEV__` false (every non-Debug bundle) the env var, the stored key
+ * and the setter are all inert. The second block is the mirror, proving the switches work in dev.
  */
 
 const mockStorage = new Map<string, string>();
@@ -100,7 +95,6 @@ describe('with __DEV__ false — a Release bundle', () => {
     bypass.setProOverride('pro');
     expect(bypass.proOverride()).toBe('pro');
 
-    // Same module instance, same remembered state: only the build changed.
     devFlag.__DEV__ = false;
     expect(bypass.proOverride()).toBe('off');
   });

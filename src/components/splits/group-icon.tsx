@@ -14,20 +14,13 @@ type GroupIconProps = {
 };
 
 /**
- * A group's icon, in a tinted well.
- *
- * The colour comes from the group's id, so it is stable, needs no column and
- * no picker, and a group made before colours existed still gets one.
- *
- * Falls back to the neutral glyph rather than drawing nothing, so retiring an
- * icon from the set cannot leave a hole on somebody's screen.
+ * A group's icon, in a tinted well. The tint comes from the group's id (stable, no column or
+ * picker), and a retired icon falls back to the neutral glyph rather than leaving a hole.
  */
 export function GroupIcon({ iconId, groupId, size = 26, className }: GroupIconProps) {
   const tint = groupTint(groupId);
   const well = Math.round(size * 1.85);
-  // createElement, not JSX, matching BillRow: this looks a component up rather
-  // than defining one, but assigning it to a capitalised local trips the lint
-  // rule against creating components during render.
+  // createElement, not JSX: a capitalised local for a looked-up component trips the lint rule.
   const icon = createElement(groupIconFor(iconId), {
     size,
     strokeWidth: GLYPH_STROKE,

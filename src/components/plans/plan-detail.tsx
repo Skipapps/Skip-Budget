@@ -20,9 +20,9 @@ import { useArtwork } from '@/theme/artwork';
 type Window = 'month' | 'year';
 
 /**
- * Whole calendar months and years, so each runs forward as well as back: this
- * page is as much "what is coming" as "what went". No All (Founder,
- * 2026-10-03) — a plan's whole history is a list nobody reads to the end.
+ * Whole calendar months and years, so each runs forward as well as back: this page is as much "what
+ * is coming" as "what went". No All, since a plan's whole history is a list nobody reads to the
+ * end.
  */
 const WINDOWS = [
   { value: 'month', label: 'Month' },
@@ -48,11 +48,9 @@ type PlanDetailProps = {
 };
 
 /**
- * One bill or subscription, whole: what it is, what it has cost and what is
- * still to come (the Founder's design, 2026-10-03). The charges on Monthly
- * bills and Subscriptions open here, and so do the lists in Settings, so a
- * plan reads the same wherever it is tapped. Changing it is the pencil in the
- * header, which opens the same edit flow as before — Delete included.
+ * One bill or subscription, whole: what it is, what it has cost and what is still to come. The
+ * charges on Monthly bills and Subscriptions open here, and so do the lists in Settings. The header
+ * pencil opens the edit flow, Delete included.
  */
 export function PlanDetail({
   kind,
@@ -82,8 +80,7 @@ export function PlanDetail({
     () => ledger.entries.filter((entry) => entry.kind === kind && entry.planId === id),
     [ledger.entries, kind, id],
   );
-  // One timeline, oldest at the top: Paid, then Upcoming (Founder,
-  // 2026-10-03), so today falls where the two lists meet.
+  // One timeline, oldest at the top: Paid, then Upcoming, so today falls where the two lists meet.
   const byDate = (a: LedgerEntry, b: LedgerEntry) => a.date.localeCompare(b.date);
   const paid = useMemo(() => charges.filter((c) => c.date <= today).sort(byDate), [charges, today]);
   const upcoming = useMemo(
@@ -133,7 +130,6 @@ export function PlanDetail({
         { icon: Pencil, label: `Edit ${plan.name}`, onPress: () => router.push(editHref as never) },
       ]}
     >
-      {/* What it is: the mark, what it costs and how often, then the facts. */}
       <View className="mt-3 w-full items-center rounded-[16px] border border-line bg-card px-5 pb-2 pt-5">
         {mark}
         <Text

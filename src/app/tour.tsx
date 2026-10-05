@@ -14,14 +14,7 @@ type Stop = {
   href: string;
 };
 
-/**
- * The welcome screen's promises, kept somewhere they can be reread.
- *
- * "Your money, your privacy" scrolls past once, before sign-in, and then that
- * knowledge is gone. This is the same story told from inside the app, one card
- * per thing Skip does, each leading to the thing itself — a tour that ends in
- * doors rather than a Done button.
- */
+/** The welcome promises, rereadable in the app: one card per thing Skip does, linking to it. */
 const STOPS: Stop[] = [
   {
     artwork: 'tileSalary',
@@ -89,8 +82,6 @@ export default function TourScreen() {
               onPress={() => router.push(stop.href as never)}
               className="w-full flex-row items-center gap-4 rounded-[16px] border border-line bg-card p-4 active:bg-ink/5"
             >
-              {/* Full strength, like the amount tiles: this set is drawn in
-                  its own muted palette and no longer needs softening. */}
               <View className="h-[64px] w-[64px] shrink-0">
                 <Art width="100%" height="100%" />
               </View>

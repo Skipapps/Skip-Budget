@@ -19,16 +19,8 @@ import { useMoneyColor } from '@/providers/theme-provider';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * What the subscriptions have actually cost, over a window you choose.
- *
- * Same shape as the bills page, for the same reason: it lists the times each
- * plan renewed. A plan cancelled in March still shows the months it ran, which
- * is the whole point of looking back.
- *
- * Adding is the + in the header, and a renewal opens its subscription's own
- * page — details, paid and upcoming renewals, and the pencil to edit (the
- * Founder's call, 2026-10-03). The full list, including paused and
- * cancelled plans that renew nowhere, lives under Settings → Your money.
+ * What the subscriptions have actually cost over a window: the renewals charged, so a cancelled
+ * plan still shows the months it ran. A renewal opens its subscription's own page.
  */
 export default function SubscriptionsScreen() {
   const artwork = useArtwork();
@@ -52,8 +44,7 @@ export default function SubscriptionsScreen() {
   );
   const total = charges.reduce((sum, entry) => sum + entry.amount, 0);
 
-  // Oldest day first, today last — stated rather than inherited, so a reader
-  // does not have to know what `groupByDate` defaults to.
+  // Oldest day first, today last.
   const groups = useMemo(
     () =>
       groupByDate(charges, (entry) => entry.date, {
@@ -74,8 +65,6 @@ export default function SubscriptionsScreen() {
         { icon: Plus, label: 'Add subscription', onPress: () => router.push('/add-subscription') },
       ]}
     >
-      {/* One number, and the window it belongs to, side by side — the figure is
-          meaningless without knowing which stretch of time it covers. */}
       <View className="mt-3 w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
         <View className="w-full flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1">

@@ -4,12 +4,8 @@ import AddSubscriptionScreen from '@/app/add-subscription';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * What the subscription editor does when it cannot read the subscription.
- *
- * `id` is what turns Save into an update. The screen used to mount its form as
- * soon as the read stopped loading, row or no row, so a failed read opened a
- * blank "edit" and one press of Save put those blanks over a real service —
- * name, amount, renewal date and card together.
+ * The subscription editor's form only exists when the record does: `id` turns Save into an update,
+ * so a failed read must not open a blank "edit" over a real service.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -31,7 +27,6 @@ jest.mock('@/theme/artwork', () => ({
 }));
 
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => async () => true }));
-// The past-charges question has its own tests; these are about the edit gate.
 jest.mock('@/api/past-charges', () => ({
   usePastCharges: () => ({
     choose: async () => 'upcoming',
@@ -50,10 +45,7 @@ jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
 }));
 
-/*
- * Spied on as hooks: the form calls `useUpdateSubscription()` at mount, so a
- * hook that was never called is proof the form was never on screen.
- */
+/* Spied on as hooks: a hook never called proves the form was never on screen. */
 const mockUpdate = jest.fn();
 const mockCreate = jest.fn();
 const mockUseUpdate = jest.fn(() => ({ mutateAsync: mockUpdate, isPending: false }));
@@ -139,7 +131,6 @@ describe('Add subscription — an edit whose row could not be read', () => {
     const { getByText, queryByText } = await render(<AddSubscriptionScreen />);
 
     expect(getByText('Edit subscription')).toBeTruthy();
-    // An edit walks the flow from the amount, exactly as adding does.
     expect(getByText('How much does it cost?')).toBeTruthy();
     expect(queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(mockUseUpdate).toHaveBeenCalled();

@@ -15,7 +15,7 @@ export default function ResetPasswordScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Replaces rather than pushes so Back cannot return into a spent reset flow.
+  // Ends with resetTo so Back cannot return into a spent reset flow.
   const handleContinue = async () => {
     if (busy) return;
     setError(null);

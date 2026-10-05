@@ -21,23 +21,12 @@ type AmountTileProps = {
   className?: string;
 };
 
-/** How far the tile sinks. Enough to feel, small enough not to wobble. */
 const PRESSED = 0.955;
 
 /**
- * Square tile: artwork, label, amount, stacked down the middle.
- *
- * Centred rather than pushed to the corners, because the artwork is the thing
- * the eye lands on and a drawing pinned top-left with its caption bottom-left
- * reads as two separate objects sharing a box. One column keeps them a single
- * thing, and the tiles line up with each other across the row.
- *
- * Fills whatever width its parent gives it, so the same tile works in the
- * dashboard's fixed-width carousel and in a flexible two-up row.
- *
- * Sits on a shadow rather than inside a border, and sinks under a finger. Down
- * is quick and linear, back up is a spring: a press should answer immediately,
- * and the release should feel like the tile has weight of its own.
+ * Square tile: artwork, label, amount, stacked down the middle. Fills its parent's width, so it works
+ * in a fixed-width carousel and a flexible two-up row. Sinks under a finger: down is quick and linear,
+ * back up is a spring.
  */
 export function AmountTile({
   label,
@@ -49,9 +38,8 @@ export function AmountTile({
   const reduced = useReducedMotion();
   const [pressed, setPressed] = useState(false);
 
-  // The animation is described by the style rather than pushed into a shared
-  // value from an event handler: the target follows the state, and Reanimated
-  // works out the motion between the two on the UI thread.
+  // Animated from state through the style, not a shared value set in an event handler:
+  // Reanimated works out the motion between targets on the UI thread.
   const surface = useAnimatedStyle(() => {
     'worklet';
     const target = pressed ? PRESSED : 1;
@@ -74,7 +62,6 @@ export function AmountTile({
       accessibilityRole="button"
       accessibilityLabel={amount === undefined ? label : `${label}, ${formatCurrency(amount)}`}
       onPress={onPress}
-      // Nothing to sink into if the tile does not go anywhere.
       onPressIn={sinks ? () => setPressed(true) : undefined}
       onPressOut={sinks ? () => setPressed(false) : undefined}
       className="w-full"
@@ -83,15 +70,11 @@ export function AmountTile({
         style={surface}
         className={cn(
           'aspect-square w-full items-center justify-center rounded-[16px] border border-line bg-card p-3.5',
-          // Someone who has asked for less motion still gets an answer to their
-          // finger, just a static one.
+          // Reduced motion still answers the finger, with a static state.
           reduced && onPress ? 'active:opacity-70' : null,
           className,
         )}
       >
-        {/* Full strength: the current illustrations are drawn in their own
-            muted palette, so they no longer need the opacity that kept the old
-            solid-black drawings from out-shouting the figure. */}
         <View className="h-[84px] w-[84px]">
           <Artwork width="100%" height="100%" />
         </View>
@@ -104,8 +87,7 @@ export function AmountTile({
           >
             {label}
           </Text>
-          {/* A calculator tile has no figure; the row keeps its height so the
-              tiles stay square and aligned beside the ones that do. */}
+          {/* A tool tile has no figure; "Open" keeps the row height so tiles stay aligned. */}
           <Text
             className={cn(
               'mt-1 text-center font-poppins-semibold text-[16px]',

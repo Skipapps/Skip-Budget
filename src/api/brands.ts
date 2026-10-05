@@ -19,11 +19,8 @@ export type SpendCategoryRow = {
 };
 
 /**
- * Ranked brand search for the store field.
- *
- * Matching runs in Postgres rather than over a downloaded list: the catalog is
- * 300+ rows today and only grows, and trigram similarity handles the typos and
- * missing apostrophes ("trader joes") that a client-side startsWith cannot.
+ * Ranked brand search for the store field. Matching runs in Postgres (trigram similarity) so typos
+ * and missing apostrophes ("trader joes") match, which a client-side startsWith cannot.
  */
 export function useBrandSearch(query: string) {
   const needle = query.trim();
@@ -61,11 +58,8 @@ export function useSpendCategories() {
 }
 
 /**
- * Category for a store the catalog does not know.
- *
- * Only runs for names people type themselves — a matched brand carries its own
- * category. Deliberately small: it is a nudge toward the right bucket, not a
- * classifier, and 'other' is a perfectly good answer.
+ * Category guess for a store the catalog does not know (a matched brand carries its own).
+ * Deliberately small: a nudge toward the right bucket, and 'other' is a fine answer.
  */
 const KEYWORD_CATEGORIES: [RegExp, string][] = [
   [/\b(market|grocer|grocery|supermarket|foods?|produce|butcher|bakery)\b/i, 'groceries'],
@@ -90,11 +84,8 @@ export function guessCategory(merchant: string): string {
 }
 
 /**
- * The whole catalog, fetched once per session.
- *
- * ~300 small rows is a few tens of KB — cheaper to hold than to query per
- * list row, and it makes matching offline-capable. The rows come from the
- * same table the search RPC reads, so nothing can drift between them.
+ * The whole catalog, fetched once per session: a few tens of KB, cheaper than a query per list row
+ * and usable offline. Reads the same table as the search RPC.
  */
 export function useBrandDirectory() {
   return useQuery({
@@ -112,12 +103,9 @@ export function useBrandDirectory() {
 }
 
 /**
- * Finds the brand behind a merchant string.
- *
- * Receipts carry whatever the shop printed — "CVS Pharmacy", "WM SUPERCENTER",
- * "THE HOME DEPOT #4021" — so exact equality misses most of them. Matching
- * walks from strict to loose and stops at the first hit, which keeps "Walmart"
- * from being beaten by a longer alias on some other brand.
+ * Finds the brand behind a merchant string. Receipts carry whatever the shop printed ("WM
+ * SUPERCENTER", "THE HOME DEPOT #4021"), so matching walks strict to loose and stops at the first
+ * hit, which keeps "Walmart" from being beaten by a longer alias on another brand.
  */
 export function matchBrand(merchant: string, directory: BrandRow[]): BrandRow | null {
   const needle = merchant.trim().toLowerCase();
@@ -128,8 +116,7 @@ export function matchBrand(merchant: string, directory: BrandRow[]): BrandRow | 
   const exact = directory.find((brand) => names(brand).includes(needle));
   if (exact) return exact;
 
-  // Directory is rank-ordered, so the first containment hit is the most
-  // prominent brand rather than an arbitrary one.
+  // Directory is rank-ordered, so the first containment hit is the most prominent brand.
   const contained = directory.find((brand) =>
     names(brand).some((name) => needle.includes(name) || name.includes(needle)),
   );

@@ -13,9 +13,8 @@ describe('moneyTone', () => {
     for (const card of CARD_COLORS) {
       for (const intent of ['debt', 'asset'] as const) {
         const tone = moneyTone(card.value, intent);
-        // Null would be legal, but the ramps are wide enough that no palette
-        // colour should need the plain-type fallback. If one starts to, the
-        // ramp is too narrow rather than the card being at fault.
+        // Null is legal, but no palette colour should need the plain-type fallback: if one does,
+        // the ramp is too narrow.
         expect(tone).not.toBeNull();
         expect(contrast(tone!, card.value)).toBeGreaterThanOrEqual(3.2);
       }
@@ -29,7 +28,7 @@ describe('moneyTone', () => {
   });
 
   it('goes light on a dark card and dark on a light one', () => {
-    // Ink is nearly black, snow is white; the ramp has to run both ways.
+    // Ink is nearly black, snow is white: the ramp has to run both ways.
     expect(contrast(moneyTone('#161616', 'debt')!, '#FFFFFF')).toBeLessThan(4.5);
     expect(contrast(moneyTone('#FFFFFF', 'debt')!, '#000000')).toBeLessThan(4.5);
   });

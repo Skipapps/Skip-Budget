@@ -12,14 +12,10 @@ type ProfileAvatarProps = {
 };
 
 /**
- * The account's face, or an invitation to pick one.
+ * The account's face, or an invitation to pick one. Always in a ringed circle: the avatars bring their
+ * own round background, and the ring makes an unset avatar read as an empty slot, not a missing image.
  *
- * Always drawn inside a ringed circle. The avatars bring their own round
- * background; the ring is what makes an unset avatar read as an empty slot
- * rather than a missing image.
- *
- * An id the app no longer ships falls back to the placeholder, which is why
- * the column has no foreign key: retiring an avatar should not orphan a row.
+ * An id the app no longer ships falls back to the placeholder, which is why the column has no foreign key.
  */
 export function ProfileAvatar({ avatarId, size = 48, className }: ProfileAvatarProps) {
   const colors = useColors();

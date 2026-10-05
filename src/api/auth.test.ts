@@ -1,23 +1,15 @@
 /**
- * Signing out has to end the session *and* take this phone off the push list.
- *
- * The order is the whole test. device_tokens is guarded by
- * `auth.uid() = user_id`, so a delete attempted after the session is cleared
- * matches nothing and the row survives forever — the scheduler then keeps
- * pushing this account's reminders at a phone nobody is signed in on. The
- * other half is that tidying up is allowed to fail: a simulator, a dead
- * network or a refused delete must not leave somebody signed in to an account
- * they asked to leave.
+ * Signing out must delete this phone's push row *before* the session is cleared (device_tokens is
+ * guarded by `auth.uid() = user_id`, so a later delete matches nothing), and a failed tidy-up must
+ * never block signing out.
  */
 
-// babel-plugin-jest-hoist lifts the jest.mock() calls below above this import,
-// so auth.ts loads against them.
+// babel-plugin-jest-hoist lifts the jest.mock() calls below above this import.
 import { deleteAccount, signInWithEmail, signOut, verifyOtp } from './auth';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 import type { VoiceDraft } from '@/lib/voice';
 import { putVoiceDraft, readVoiceDraft } from '@/lib/voice-draft';
 
-/** An unsaved voice draft: what the person said, still in memory. */
 const HEARD: VoiceDraft = {
   kind: 'receipt',
   kindSure: true,
@@ -61,7 +53,6 @@ jest.mock('@/api/push', () => ({
   forgetDevice: (userId: string) => mockForgetDevice(userId),
 }));
 
-// What the phone learned about how this person says their merchants.
 const mockForgetVoice = jest.fn(async (_userId: string | null | undefined) => {});
 jest.mock('@/api/voice-aliases', () => ({
   forgetVoiceAliases: (userId: string | null | undefined) => mockForgetVoice(userId),
@@ -249,10 +240,6 @@ describe('deleteAccount', () => {
   });
 });
 
-/**
- * A refused sign-in says what to do about it; only what nobody can act on
- * falls back to the one failure line (the Founder's call, 2026-09-28).
- */
 describe('sign-in wording', () => {
   beforeEach(() => {
     mockAuthError = null;

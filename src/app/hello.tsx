@@ -19,23 +19,9 @@ import { useArtwork } from '@/theme/artwork';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * One question, right after signup: what should we call you?
- *
- * Asked now because the answer matters most to other people. A friend request
- * from "Someone on Skip" is one nobody can place, and by the time the split
- * manager nags about it the bad first impression has already been made.
- *
- * Kept to the one question (Founder's call, 2026-09-28): a name field and a
- * face. The pen opens the full picker — the same screen Settings uses, which
- * saves on tap and lands straight back here — instead of a grid that asked
- * for a decision before the screen's actual question.
- *
- * Skippable, and it skips itself: somebody signing back in through Apple or
- * Google lands here too, and if their profile already has a name there is
- * nothing to ask — straight through to setup.
- *
- * That shortcut only works while the profile can actually be read, so a failed
- * read gets its own state rather than falling through to the question.
+ * One question right after signup: what should we call you? The pen opens the avatar picker (the
+ * Settings one, which saves on tap). Skips itself for a returning sign-in whose profile already has
+ * a name.
  */
 export default function HelloScreen() {
   const colors = useColors();
@@ -45,18 +31,14 @@ export default function HelloScreen() {
 
   const [name, setName] = useState('');
 
-  // A returning account has answered already. A reset rather than a
-  // redirect: a Redirect swaps only this screen and leaves onboarding
-  // stacked beneath the app, and the back swipe then walked out of Home
-  // into the pitch. An effect, because navigation cannot run mid-render.
+  // resetTo, not Redirect: a Redirect leaves onboarding stacked beneath the app and the back swipe
+  // walks out of Home into the pitch. An effect, because navigation cannot run mid-render.
   const named = Boolean(profile.data && (profile.data.display_name ?? '').trim());
   useEffect(() => {
     if (named) resetTo('/setup');
   }, [named]);
 
-  // Nothing is asked until the profile is in. Rendering the form first and
-  // navigating away a frame later showed returning accounts a question they
-  // had already answered.
+  // Hold the form until the profile is in, or returning accounts see the question flash.
   if (profile.isLoading) {
     return (
       <Screen>
@@ -69,9 +51,7 @@ export default function HelloScreen() {
     );
   }
 
-  // A failed read is not an empty profile. Without this, a returning account
-  // whose fetch dropped is asked its name again — and answering would write
-  // over the name already on the record. Retry instead of guessing.
+  // A failed read is not an empty profile: answering would overwrite the name already on record.
   if (profile.isError) {
     return (
       <Screen>
@@ -89,8 +69,7 @@ export default function HelloScreen() {
 
   const handleContinue = () => {
     const trimmed = name.trim();
-    // The picture is already saved — the picker writes it on tap — so the
-    // only thing Continue has left to carry is the name.
+    // The picture is already saved by the picker; only the name is left.
     if (trimmed) updateProfile.mutate({ display_name: trimmed });
     resetTo('/setup');
   };
@@ -101,8 +80,6 @@ export default function HelloScreen() {
       footer={
         <View className="w-full gap-3">
           <Button label="Continue" onPress={handleContinue} />
-          {/* A link, not a pill: "Skip for now" sits under the primary action
-              and a second pill there would read as a second thing to do. */}
           <TextLink label="Skip for now" variant="subtle" onPress={() => resetTo('/setup')} />
         </View>
       }

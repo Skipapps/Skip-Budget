@@ -1,9 +1,8 @@
 import UIKit
 import UserNotifications
 
-// Shared by targets/notification-service and targets/notification-content —
-// keep the two copies identical. Each extension is its own target, and the
-// target folders cannot share a source file.
+// Shared by targets/notification-service and targets/notification-content: keep the two copies
+// identical. Each extension is its own target, and target folders cannot share a source file.
 
 /// What a Skip notification carries for its card: `userInfo.body.card`, as
 /// written by supabase/functions/send-push/card.ts. A snoozed copy, being a
@@ -66,10 +65,9 @@ struct SkipCard {
 }
 
 enum SkipArt {
-  /// SF Symbols for the glyph ids the server sends: the bill and spending
-  /// categories of src/data/glyphs.ts, plus payday, card, group and receipts.
-  /// Outline symbols, to sit with the app's Lucide outline icons. Each entry
-  /// lists fallbacks for older iOS versions that lack the first name.
+  /// SF Symbols for the glyph ids the server sends (the categories of src/data/glyphs.ts plus
+  /// payday, card, group and receipts). Outline symbols, to match the app's Lucide icons; later
+  /// names are fallbacks for iOS versions that lack the first.
   private static let symbols: [String: [String]] = [
     "housing": ["house"],
     "energy": ["bolt"],
@@ -119,8 +117,7 @@ enum SkipArt {
     return names.first { UIImage(systemName: $0) != nil } ?? "doc.text"
   }
 
-  /// A square tile with the glyph on it, for the thumbnail. Light and neutral,
-  /// like the category tiles in the app's lists.
+  /// A square thumbnail tile with the glyph on it, light and neutral like the app's category tiles.
   static func glyphTile(_ glyph: String, side: CGFloat = 300) -> UIImage {
     let format = UIGraphicsImageRendererFormat()
     format.scale = 1
@@ -148,7 +145,6 @@ enum SkipArt {
     }.resume()
   }
 
-  /// The picture for a card: its logo, or its glyph when there is none.
   static func art(for card: SkipCard, timeout: TimeInterval, completion: @escaping (UIImage) -> Void) {
     guard let url = card.logo else { return completion(glyphTile(card.fallbackGlyph)) }
     fetchLogo(url, timeout: timeout) { image in
@@ -156,8 +152,8 @@ enum SkipArt {
     }
   }
 
-  /// An image as a notification attachment, written to a file of its own:
-  /// iOS moves the file into its own store when the notification is shown.
+  /// An image as a notification attachment, written to its own file: iOS moves the file into its
+  /// own store when the notification is shown.
   static func attachment(_ image: UIImage, name: String) -> UNNotificationAttachment? {
     guard let data = image.pngData() else { return nil }
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)

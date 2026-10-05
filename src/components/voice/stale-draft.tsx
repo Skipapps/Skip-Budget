@@ -5,12 +5,9 @@ import { Screen } from '@/components/ui/screen';
 import { useArtwork } from '@/theme/artwork';
 
 /**
- * A voice page opened with nothing behind it: a deep link, a draft already
- * saved, or the navigator remounting after a text-size change.
- *
- * The no-results drawing rather than the error one, because nothing failed.
- * "Start again" goes back to the mic page — popping to it when it is already
- * underneath, so the stack never holds two of it.
+ * A voice page opened with nothing behind it: a deep link, a draft already saved, or the navigator
+ * remounting after a text-size change. The no-results drawing, because nothing failed; "Start
+ * again" pops to the mic page when it is already underneath, so the stack never holds two.
  */
 export function StaleDraft() {
   const artwork = useArtwork();

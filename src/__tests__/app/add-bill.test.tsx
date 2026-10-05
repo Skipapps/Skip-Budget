@@ -4,13 +4,8 @@ import AddBillScreen from '@/app/add-bill';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * What the bill editor does when it cannot read the bill.
- *
- * `id` is what turns Save into an update. The screen used to mount its form the
- * moment the read stopped loading, whether or not a row came back — so a failed
- * read opened a blank "edit" over a real bill, and one press of Save wrote the
- * blanks in. The rule this file pins down is that the form only ever exists
- * when the record does.
+ * The bill editor's form only exists when the record does: `id` turns Save into an update, so a
+ * failed read must not open a blank "edit" over a real bill.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -22,8 +17,7 @@ jest.mock('react-native-keyboard-controller', () =>
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 jest.mock('@/components/brands/brand-field', () => ({ BrandField: () => null }));
 
-// The category and icon vocabularies are drawn from SVG files, which only the
-// Metro transformer understands. Nothing here turns on which icons exist.
+// The category and icon vocabularies are drawn from SVG files, which only Metro can load.
 jest.mock('@/data/bills-mock', () => ({
   BILL_CATEGORIES: [{ id: 'energy', label: 'Energy' }],
   BILL_ICON_CHOICES: [],
@@ -41,7 +35,6 @@ jest.mock('@/theme/artwork', () => ({
 }));
 
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => async () => true }));
-// The past-charges question has its own tests; these are about the edit gate.
 jest.mock('@/api/past-charges', () => ({
   usePastCharges: () => ({
     choose: async () => 'upcoming',
@@ -56,16 +49,13 @@ jest.mock('@/api/past-charges', () => ({
 jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn() },
   useLocalSearchParams: () => ({ id: 'bill-1' }),
-  // The step flow takes over the Android back press through it, and sets its
-  // own navigation options.
   useFocusEffect: () => {},
   Stack: { Screen: () => null },
 }));
 
 /*
- * The mutations are spied on as hooks, not just as calls: the form runs
- * `useUpdateBill()` at mount, so a hook that was never called is proof the form was
- * never on screen — a stronger statement than "nobody pressed Save".
+ * Mutations are spied on as hooks: the form runs `useUpdateBill()` at mount, so a hook never called
+ * proves the form was never on screen, which is stronger than "nobody pressed Save".
  */
 const mockUpdate = jest.fn();
 const mockCreate = jest.fn();
@@ -112,12 +102,10 @@ describe('Add bill — an edit whose bill could not be read', () => {
     expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(getByText('Try again')).toBeTruthy();
 
-    // Not the flow at all: no shell, no fields, nothing to press Save on.
     expect(queryByText('Edit bill')).toBeNull();
     expect(queryByText('Continue')).toBeNull();
     expect(queryByText('Save changes')).toBeNull();
 
-    // The form never mounted, so nothing that writes was ever wired up.
     expect(mockUseUpdateBill).not.toHaveBeenCalled();
     expect(mockUseCreateBill).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
@@ -157,11 +145,8 @@ describe('Add bill — an edit whose bill could not be read', () => {
     const { getByText, queryByText } = await render(<AddBillScreen />);
 
     expect(getByText('Edit bill')).toBeTruthy();
-    // An edit walks the flow from the amount, exactly as adding does.
     expect(getByText('How much is the bill?')).toBeTruthy();
     expect(queryByText(FAILURE_MESSAGE)).toBeNull();
-    // The gate is about a missing record, not about editing: the real path
-    // still wires the update up.
     expect(mockUseUpdateBill).toHaveBeenCalled();
   });
 
@@ -170,8 +155,8 @@ describe('Add bill — an edit whose bill could not be read', () => {
     const { getByText, queryByText } = await render(<AddBillScreen />);
 
     expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
-    // An update filtered on a missing id writes nothing and reports success,
-    // and a create here would file a second bill. Neither is offered.
+    // An update on a missing id writes nothing yet reports success, and a create would file a
+    // second bill, so neither is offered.
     expect(queryByText('Edit bill')).toBeNull();
     expect(mockUseUpdateBill).not.toHaveBeenCalled();
     expect(mockUseCreateBill).not.toHaveBeenCalled();

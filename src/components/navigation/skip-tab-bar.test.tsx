@@ -5,17 +5,10 @@ import type { JsonElement } from 'test-renderer';
 import { SkipTabBar } from '@/components/navigation/skip-tab-bar';
 
 /**
- * What the tab bar is allowed to take a touch for.
- *
- * The bar draws a pill, but the view it lives in is taller and wider than that
- * pill: 8pt above it, the home indicator's inset below it, and the page gutter
- * either side — all painted in the page's own colour, so on screen that band
- * is indistinguishable from the page. A touch landing there must go through to
- * whatever is behind rather than counting as a press on the bar.
- *
- * Asserted structurally because there is no layout engine here to tap into: the
- * outer view must be `box-none` (draws, does not receive), the pill and its
- * buttons must not be, and the padding must be exactly what it was.
+ * The bar's view is taller and wider than the pill (8pt above, the home indicator's inset below,
+ * the page gutter either side, all in the page colour), and a touch there must reach whatever is
+ * behind. Asserted structurally, with no layout engine to tap into: the outer view is `box-none`,
+ * the pill and its buttons are not, and the padding is unchanged.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -54,8 +47,7 @@ function renderBar(navigate = jest.fn(), emit = jest.fn(() => ({ defaultPrevente
       routes.map((route) => [route.key, { options: { title: titles[route.name] } }]),
     ),
     navigation: { emit, navigate },
-    // The bar's props come from the navigator; this is as much of them as it
-    // reads, cast rather than reconstructed whole.
+    // Only what the bar reads from the navigator's props, cast rather than reconstructed.
   } as unknown as Parameters<typeof SkipTabBar>[0];
 
   return { props, navigate, emit };
@@ -66,15 +58,11 @@ describe('SkipTabBar — what takes a touch', () => {
     const { props } = renderBar();
     const { toJSON } = await render(<SkipTabBar {...props} />);
 
-    // The rendered host tree: the outer band, the row inside it holding the
-    // pill and the Voice button, and the pill.
     const band = toJSON()!;
     const row = (band.children as JsonElement[])[0];
     const pill = (row.children as JsonElement[])[0];
 
-    // The outer view paints the strip above and below the pill, and the row
-    // spans the gap between the pill and the Voice button. Neither receives
-    // touches, so a tap on empty page there reaches the page.
+    // Neither the band nor the row receives touches, so a tap on empty page there reaches the page.
     expect(band.props.pointerEvents).toBe('box-none');
     expect(row.props.pointerEvents).toBe('box-none');
     // The pill is visible, so it is not see-through to touches.

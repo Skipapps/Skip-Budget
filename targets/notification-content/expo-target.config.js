@@ -1,10 +1,7 @@
 /**
- * The card that opens when a Skip notification is pressed and held: the
- * logo, the amount, when it lands and which card or account pays, with
- * "View …" and "Remind me in 1 hour" underneath.
+ * The card shown when a Skip notification is pressed and held.
  *
- * Shown for notifications in the `skip.item` category, set in Info.plist here
- * and sent by supabase/functions/send-push/index.ts.
+ * Used for notifications in the `skip.item` category, which supabase/functions/send-push sends.
  *
  * @type {import('@bacons/apple-targets/app.plugin').Config}
  */

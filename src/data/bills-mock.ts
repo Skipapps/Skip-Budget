@@ -1,9 +1,3 @@
-/**
- * Bill categories, icon choices, and placeholder bills.
- *
- * The ten categories cover the recurring bills most households have; anything
- * unusual goes under "Other", where people name it themselves and pick an icon.
- */
 import { FALLBACK_GLYPH, GLYPHS, glyphFor, type Glyph } from '@/data/glyphs';
 
 export type BillIcon = Glyph;
@@ -76,10 +70,7 @@ export const RECURRENCES = [
   { value: 'yearly', label: 'Yearly' },
 ] as const;
 
-/**
- * `period` is a bill that runs only between two dates. It is not offered as a
- * filter chip, but the database can hold it, so the type must allow it.
- */
+/** `period` runs only between two dates: not a filter chip, but the database can hold it. */
 export type Recurrence = (typeof RECURRENCES)[number]['value'] | 'period';
 
 export type Bill = {
@@ -105,17 +96,10 @@ export function getBillCategory(id: string): BillCategory | undefined {
 }
 
 /**
- * The glyph for a bill with no logo: the one somebody picked, else its
- * category's, else the neutral bill.
- *
- * 'other' is never a pick. It is where the icon picker starts, and add-bill
- * used to save it onto every bill whatever its category — so a rent payment
- * filed under Housing carried 'other' and drew the Other glyph instead of a
- * house. Reading it as "nothing picked" puts the house back on every bill
- * saved that way, without touching the rows.
- *
- * The category may be a spending one too (groceries, dining): receipts and
- * subscriptions without a logo share this mark in the ledger.
+ * The glyph for a bill with no logo: the one picked, else its category's, else the neutral bill.
+ * 'other' is the icon picker's starting value, so it counts as "nothing picked"; otherwise it would
+ * beat the category glyph on every bill saved with it. The category may be a spending one: receipts
+ * and subscriptions without a logo share this mark.
  */
 export function getBillIcon(bill: Pick<Bill, 'categoryId' | 'iconId'>): BillIcon {
   const picked = bill.iconId === 'other' ? undefined : glyphFor(bill.iconId);

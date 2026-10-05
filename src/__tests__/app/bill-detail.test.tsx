@@ -4,10 +4,9 @@ import { router } from 'expo-router';
 import BillDetailScreen from '@/app/bill/[id]';
 
 /**
- * One bill's own page (Founder, 2026-10-03): the details, its charges as one
- * timeline — Paid on top, then Upcoming, oldest first — with a Month / Year
- * filter, and the pencil in the header to edit. A bill deleted from its
- * edit flow steps this page back out rather than showing an empty one.
+ * One bill's own page: the details, its charges as one timeline (Paid on top, then Upcoming, oldest
+ * first) with a Month / Year filter, and the header pencil to edit. A bill deleted from its edit
+ * flow steps this page back out rather than showing an empty one.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -37,7 +36,6 @@ jest.mock('@/providers/theme-provider', () => ({
   useMoneyColor: () => () => '#000000',
 }));
 
-// Fixed "today" so the paid/upcoming split is deterministic.
 jest.useFakeTimers({
   now: new Date('2026-10-03T12:00:00'),
   doNotFake: ['nextTick', 'setImmediate'],
@@ -107,11 +105,10 @@ it('shows the bill, then its paid and upcoming charges as one timeline', async (
   expect(screen.getByText('Monthly')).toBeTruthy();
   expect(screen.getByText('Chase Checking ••7730')).toBeTruthy();
   expect(screen.getByText('Upcoming')).toBeTruthy();
-  // The heading, and the caption on each of the two paid charges.
+  // The heading, plus the caption on each of the two paid charges.
   expect(screen.getAllByText('Paid')).toHaveLength(3);
 
-  // Paid then Upcoming, oldest first. The first two dates are the Next due
-  // and Started lines in the details.
+  // Paid then Upcoming, oldest first; the first two dates are the Next due and Started lines.
   const dates = screen
     .getAllByText(/^\d{1,2} (Sep|Oct|Nov|Dec) 2026$/)
     .map((node) => node.props.children);

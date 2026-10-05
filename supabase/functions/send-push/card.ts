@@ -1,16 +1,13 @@
 // Skip · send-push · the card a notification carries
 //
-// Everything the phone needs to draw a notification beyond its title and body:
-// the picture for the right-hand thumbnail (a brand logo, or the category's
-// glyph when there is no brand), and the details for the card that opens on
-// press-and-hold — the amount, when it lands, and which card or account pays.
+// What the phone needs beyond title and body: the thumbnail (brand logo, or the category glyph) and
+// the press-and-hold card details (amount, when, who pays).
 //
-// Plain TypeScript with no Deno or Node globals, so the app's Jest suite can
-// test it directly; index.ts imports it as `./card.ts`.
+// Plain TypeScript with no Deno or Node globals, so the app's Jest suite can test it directly;
+// index.ts imports it as `./card.ts`.
 //
-// The phone side reads this from `userInfo.body` — see TapPayload in index.ts
-// for why it lives there — in targets/notification-service and
-// targets/notification-content, and src/api/push.ts routes the tap.
+// The phone reads this from `userInfo.body` (see TapPayload in index.ts) in
+// targets/notification-service and targets/notification-content; src/api/push.ts routes the tap.
 
 export type CardKind =
   'bill' | 'subscription' | 'card' | 'account' | 'charge' | 'group' | 'receipts';
@@ -30,19 +27,16 @@ export type PushCard = {
   source?: string;
   /** Full URL of the brand logo in the brand-logos bucket. */
   logo?: string;
-  /**
-   * A category or kind id the phone draws as an icon — instead of a logo when
-   * there is none, and in its place when the logo will not load.
-   */
+  /** A category or kind id the phone draws as an icon when there is no logo or it will not load. */
   glyph?: string;
   /** Title of the action that opens this in the app. */
   view: string;
 };
 
 /**
- * Where a tap lands, by name. The app maps each name to one of its own routes
- * and ignores anything else, so a payload can never send somebody to an
- * arbitrary screen. `id` is required by the per-item routes.
+ * Where a tap lands, by name. The app maps each name to one of its own routes and ignores anything
+ * else, so a payload can never send somebody to an arbitrary screen. `id` is required by the
+ * per-item routes.
  */
 export type TapRoute =
   '/add-receipt' | '/bill' | '/subscription' | '/source' | '/splits' | '/transactions';
@@ -65,10 +59,7 @@ export function logoUrl(
   return `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/brand-logos/${logoPath}`;
 }
 
-/**
- * A reminder body is "<when> · <amount>" or just "<when>" — reminders_due
- * writes it that way — so the card's pill and figure come straight from it.
- */
+/** A reminder body is "<when> · <amount>" or just "<when>" (reminders_due writes it that way). */
 export function splitBody(body: string): { when: string; amount?: string } {
   const at = body.lastIndexOf(' · ');
   if (at === -1) return { when: body };
@@ -201,7 +192,6 @@ export function shortDate(iso: string): string {
   return `${day} ${MONTHS[month - 1] ?? ''}`.trim();
 }
 
-/** A charge that has just been recorded: money that went out. */
 export function chargePayload(input: ChargeInput, supabaseUrl: string): TapPayload {
   const logo = logoUrl(supabaseUrl, input.logoPath);
   const route: TapRoute = input.subscriptionId
@@ -230,7 +220,6 @@ export function chargePayload(input: ChargeInput, supabaseUrl: string): TapPaylo
   };
 }
 
-/** Several charges at once, folded into one notification. */
 export function digestPayload(count: number, total: number): TapPayload {
   return {
     route: '/transactions',
@@ -245,7 +234,6 @@ export function digestPayload(count: number, total: number): TapPayload {
   };
 }
 
-/** Something happened in a shared group. */
 export function noticePayload(title: string, body: string): TapPayload {
   const { when, amount } = splitBody(body);
   return {
@@ -254,7 +242,6 @@ export function noticePayload(title: string, body: string): TapPayload {
   };
 }
 
-/** The evening nudge to log today's receipts. */
 export function receiptsPayload(title: string, body: string): TapPayload {
   return {
     route: '/add-receipt',

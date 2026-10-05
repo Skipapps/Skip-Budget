@@ -22,17 +22,12 @@ const parseBasis = (value: string | undefined): AccrualBasis =>
   BASES.find((basis) => basis === value) ?? 'actual/365';
 
 /**
- * Names a calculated loan and files it as a monthly bill.
- *
- * The figures arrive as route params rather than being recalculated from
- * scratch — but they ARE recalculated here anyway, from the same three inputs,
- * so a hand-edited link cannot save a payment that does not match its own
- * principal, rate and term.
+ * Names a calculated loan and files it as a monthly bill. The payment is recalculated here from the
+ * params, so a hand-edited link cannot save one that disagrees with its principal, rate and term.
  */
 export default function SaveLoanScreen() {
-  // A wrapper, not an inline return: the screen below runs its own
-  // hooks, and an early return above them would change the hook count
-  // the moment the entitlement answer arrives — which React forbids.
+  // Wrapper, not inline: an early return above the screen's own hooks would change the hook count
+  // when the entitlement answer lands.
   const gate = useProGate('loans');
   if (gate) return gate;
   return <SaveLoanScreenInner />;
@@ -58,8 +53,7 @@ function SaveLoanScreenInner() {
   const firstPaymentDate = firstPaymentOn ? new Date(`${firstPaymentOn}T00:00:00`) : new Date();
   const fundedDate = fundedOn ? new Date(`${fundedOn}T00:00:00`) : undefined;
 
-  // Overpayments are deliberately not carried here: the bill is the contract
-  // payment, which is the figure the lender will actually take.
+  // Overpayments are not carried here: the bill is the contract payment the lender takes.
   const loan = amortise({
     principal,
     annualRatePercent: annualRate,
@@ -70,9 +64,7 @@ function SaveLoanScreenInner() {
   });
 
   const [name, setName] = useState('');
-  // 'other' is the neutral choice that actually exists in BILL_ICON_CHOICES;
-  // there is no dedicated loan glyph, and defaulting to a missing id would
-  // render the picker with nothing selected.
+  // 'other' exists in BILL_ICON_CHOICES; there is no loan glyph, and a missing id selects nothing.
   const [iconId, setIconId] = useState('other');
   const [sourceId, setSourceId] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -104,15 +96,12 @@ function SaveLoanScreenInner() {
         totalInterest: loan.totalInterest,
         firstPaymentOn,
         fundedOn: fundedOn || null,
-        // The convention exactly as it was priced above, monthly rests
-        // included — the column holds all four, so nothing is mapped into a
-        // neighbouring basis and no figure moves between this screen and the
-        // schedule the loan is later shown on.
+        // Saved exactly as priced (the column holds all four bases), so no figure moves later.
         dayCountBasis: basis,
         cardId: chosen?.kind === 'card' ? chosen.id : null,
         bankAccountId: chosen?.kind === 'account' ? chosen.id : null,
       });
-      // Back past the calculator to the bills list, where it now lives.
+      // Back past the calculator to the bills list.
       router.dismissTo('/bills');
     } catch (thrown) {
       setError(failureMessage(thrown));
@@ -125,8 +114,6 @@ function SaveLoanScreenInner() {
         This becomes a monthly bill under Loans, so it counts against what you have left.
       </Subtitle>
 
-      {/* What is actually being saved, restated. The calculator's sliders are
-          gone by now and the numbers should not have to be remembered. */}
       <View className="mt-6 w-full rounded-[16px] border border-line bg-card px-4 py-3">
         <Row label="Monthly payment" value={formatCurrency(loan.payment)} strong />
         <Row label="Borrowed" value={formatCurrency(principal)} />

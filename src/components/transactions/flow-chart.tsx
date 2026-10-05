@@ -4,18 +4,6 @@ import Svg, { Line, Path, Text as SvgText } from 'react-native-svg';
 
 import { useColors } from '@/providers/theme-provider';
 
-/**
- * What each slice of the period cost.
- *
- * Spending only. Income is in the list below and in the totals above, but it
- * is not a bar here: one measure per chart means every bar is comparable to
- * every other at a glance, where mixing two directions asks the reader to
- * work out which is which before they can read the shape at all.
- *
- * Every bar carries its own figure. A chart you have to tap to interrogate is
- * a chart that has not answered the question yet.
- */
-
 export type FlowBucket = {
   /** Identity for the slice; also its React key. */
   key: string;
@@ -33,12 +21,8 @@ const GAP = 2;
 const MIN_MARK = 3;
 
 /**
- * Money short enough to sit on a bar.
- *
- * Twelve months across a phone leaves under thirty points per bar, which is
- * not enough for "$1,234.56" at any readable size. Thousands collapse and
- * cents go: on a bar the figure is for comparing, and the exact number is a
- * row away in the list underneath.
+ * Money short enough to sit on a bar: twelve months across a phone leaves under thirty points per
+ * bar, so thousands collapse and cents go (the exact number is a row away in the list).
  */
 function compact(value: number): string {
   if (value >= 1000) {
@@ -48,7 +32,6 @@ function compact(value: number): string {
   return `$${Math.round(value)}`;
 }
 
-/** A bar with its top corners rounded, anchored square to the baseline. */
 function barPath(x: number, width: number, baseY: number, topY: number): string {
   const radius = Math.min(4, width / 2, baseY - topY);
   return (
@@ -58,10 +41,13 @@ function barPath(x: number, width: number, baseY: number, topY: number): string 
   );
 }
 
+/**
+ * Spending per slice of the period. Income is not a bar, so every bar is comparable at a glance,
+ * and every bar carries its own figure rather than needing a tap.
+ */
 export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
   const colors = useColors();
-  // The bars are the chosen colour — this is one of the charts the accent is
-  // for. The axis is the same hairline every other divider in the app uses.
+  // Bars use the accent; the axis is the same hairline as every other divider.
   const BAR = colors.control;
   const AXIS = colors.line;
 
@@ -93,8 +79,6 @@ export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
                   {bucket.spent > 0 ? (
                     <>
                       <Path d={barPath(x, barWidth, baseY, topY)} fill={BAR} />
-                      {/* Nothing to say about a slice where nothing went out,
-                          so a zero bar carries no figure either. */}
                       <SvgText
                         x={x + barWidth / 2}
                         y={topY - 6}

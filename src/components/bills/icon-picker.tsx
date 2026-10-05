@@ -10,7 +10,6 @@ type IconPickerProps = {
   onChange: (iconId: string) => void;
 };
 
-/** Icon choices for a bill someone names themselves. */
 export function IconPicker({ value, onChange }: IconPickerProps) {
   const colors = useColors();
   return (

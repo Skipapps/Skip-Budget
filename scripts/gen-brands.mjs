@@ -1,15 +1,11 @@
 #!/usr/bin/env node
 /**
- * Generates the brand seed migration.
- *
- * Retailers, restaurants and subscriptions, plus the companies that bill you —
- * utilities, telecoms, insurers and lenders. The second group is here for the
- * same reason as the first: a logo is what someone recognises in a list, and
- * "AEP" is as much a brand as "Netflix".
+ * Generates the brand seed migration: retailers, restaurants, subscriptions and the companies that
+ * bill you (utilities, telecoms, insurers, lenders).
  *
  * Columns: name | domain | category | country | rank | aliases(;-separated)
- * rank only breaks ties in search — daily-shop brands outrank niche ones so
- * "wal" surfaces Walmart before Walgreens.
+ * rank only breaks ties in search: daily-shop brands outrank niche ones so "wal" surfaces Walmart
+ * before Walgreens.
  */
 const DATA = `
 # ---- Electricity and gas ----

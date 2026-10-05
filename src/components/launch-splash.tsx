@@ -14,20 +14,17 @@ import Animated, {
 import splashVideo from '../../assets/videos/skip-splash.mp4';
 
 /**
- * The video's own background, edge to edge in every frame. The native splash
- * (app.json) and the space around the video are painted the same, so the
- * hand-over and the letterboxing are both invisible.
+ * The video's own background, edge to edge in every frame. The native splash (app.json) and the
+ * space around the video use the same colour, so the hand-over and the letterboxing are invisible.
  */
 export const SPLASH_BACKDROP = '#F5F3F1';
 
 /** The video runs 1.8s; this is how long it is given to finish before the app takes over anyway. */
 const STALL_MS = 4000;
 /**
- * How long somebody can be left on the native splash if the video never loads.
- * Generous on purpose: the app is loading underneath the whole time, so a
- * slow phone loses nothing by waiting, and skipping the video would mean it
- * never sees the logo at all — which a 3s limit did on a loaded simulator. A
- * video that fails outright is skipped at once rather than waiting this out.
+ * How long someone can sit on the native splash if the video never loads. Generous: the app is
+ * loading underneath, so a slow phone loses nothing by waiting, whereas skipping would mean never
+ * seeing the logo. A video that fails outright is skipped at once.
  */
 const FALLBACK_MS = 6000;
 /** Loaded but its first frame not reported (a busy main thread): start it anyway after this. */
@@ -40,28 +37,9 @@ const EXIT_MS = 450;
 const FINAL_FRAME_S = 1.75;
 
 /**
- * The launch video (the Founder's, 2026-10-05): the Skip mark grows in and
- * "Skip" appears under it, then the splash fades into the app, which has been
- * loading underneath the whole time.
- *
- * Fitted, never cropped: the video is 9:16 and scaled to fit the screen
- * whole, whatever its shape — a taller phone gets cream above and below, an
- * iPad cream either side — and that cream is the video's own background, so
- * it reads as full-screen on every device without losing the top or bottom.
- *
- * It takes over from the native splash, which is the same plain cream as the
- * video's first frame, and only hides it once that frame is drawn, so the
- * hand-over cannot be seen. It never strands anybody: a video that does not
- * load, errors, or stalls is skipped. Muted and mixed with other audio, so
- * opening the app never pauses someone's music. Reduce Motion shows the
- * finished logo still instead of the animation.
- */
-/**
- * The player, made the moment this module first runs — before React has drawn
- * anything — so the video is loading while the app is still starting up.
- * Made from inside the component, it only began once the splash mounted, by
- * which point the main thread was busy building the app and the video lost
- * the race. Created once per launch, and released once the splash is gone.
+ * Created when this module first runs, before React draws anything, so the video loads while the
+ * app starts; made inside the component it would only start once the main thread is busy building
+ * the app. One per launch, released once the splash is gone.
  */
 let launchPlayer: VideoPlayer | null = null;
 function getLaunchPlayer(): VideoPlayer {
@@ -75,6 +53,13 @@ function getLaunchPlayer(): VideoPlayer {
 }
 getLaunchPlayer();
 
+/**
+ * The launch video: the Skip mark grows in, "Skip" appears under it, then the splash fades into the
+ * app, which has been loading underneath. Scaled to fit, never cropped (9:16 video; the rest is the
+ * video's own cream). The native splash is hidden only once the first frame is drawn. Never strands
+ * anyone: a video that fails to load, errors or stalls is skipped. Muted and mixed with other
+ * audio; Reduce Motion shows the finished logo still.
+ */
 export function LaunchSplash() {
   const reduced = useReducedMotion();
   const [done, setDone] = useState(false);
@@ -119,16 +104,14 @@ export function LaunchSplash() {
     later(STALL_MS, () => leave());
   }, [later, leave, player, reduced]);
 
-  // Started by the view's first drawn frame, not by the player being ready:
-  // the player is ready before the view is on screen, and playing then lost
-  // the first half-second of the animation to a screen that was not there.
+  // Started by the view's first drawn frame, not by the player being ready: playing earlier loses
+  // the first half-second of the animation to a screen that is not there yet.
   useEventListener(player, 'statusChange', ({ status }) => {
     if (status === 'readyToPlay') later(FIRST_FRAME_GRACE_MS, start);
     if (status === 'error') leave();
   });
   useEventListener(player, 'playToEnd', () => leave());
 
-  // Never leave somebody on the native splash if the video never loads.
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!started.current) leave();
@@ -158,8 +141,7 @@ export function LaunchSplash() {
     >
       <VideoView
         player={player}
-        // Cream under the video too, so the instant before its first frame
-        // is drawn is not black.
+        // Cream under the video too, so the instant before its first frame is not black.
         style={[StyleSheet.absoluteFill, styles.backdrop]}
         contentFit="contain"
         onFirstFrameRender={start}

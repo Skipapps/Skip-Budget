@@ -46,7 +46,6 @@ export function useSession() {
   return useContext(SessionContext);
 }
 
-/** Convenience for queries that need the signed-in user's id. */
 export function useUserId() {
   return useSession().session?.user.id ?? null;
 }

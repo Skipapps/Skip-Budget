@@ -26,8 +26,7 @@ describe('resetTo', () => {
   });
 
   it('does not pop from a tab with nothing stacked above it', () => {
-    // Signing out from Settings: the tab bar can go back to Home, so
-    // canGoBack says yes, but no stack has a screen to pop.
+    // Signing out from Settings: canGoBack says yes (tab bar back to Home) but no stack screen to pop.
     mocked.canDismiss.mockReturnValue(false);
 
     resetTo('/welcome');

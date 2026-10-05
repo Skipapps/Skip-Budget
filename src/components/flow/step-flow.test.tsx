@@ -5,16 +5,7 @@ import { BackHandler, Text } from 'react-native';
 
 import { StepFlow } from '@/components/flow/step-flow';
 
-/**
- * Back, on a flow whose steps are views over one piece of state.
- *
- * The whole point of the stepped flows is that going back keeps what has been
- * typed. Every way back therefore has to mean the same thing: the chevron, the
- * iOS edge swipe and the Android hardware key all step back one, and only step
- * 0 leaves the route. Tia found the chevron doing nothing at all on later
- * steps — the centred title was laid over it and swallowing the tap — while
- * the edge swipe popped the whole flow and lost three steps of typing.
- */
+/** Steps are views over one piece of state: the chevron, edge swipe and Android key all step back one, and only step 0 leaves the route. */
 
 const mockBack = jest.fn();
 const mockScreenOptions = jest.fn();
@@ -31,8 +22,7 @@ jest.mock('expo-router', () => ({
       return null;
     },
   },
-  // The real one runs the effect while the screen is focused; in a test the
-  // screen is always focused.
+  // The real one runs the effect while the screen is focused; in a test it always is.
   useFocusEffect: (effect: () => undefined | (() => void)) =>
     jest.requireActual('react').useEffect(effect, [effect]),
 }));
@@ -53,7 +43,6 @@ jest.mock('@/providers/theme-provider', () => ({
 
 const QUESTIONS = ['How much did you spend?', undefined, 'When was it?'];
 
-/** Wired exactly as the seven add screens wire it. */
 function Flow({ from }: { from: number }) {
   const [step, setStep] = useState(from);
   return (
@@ -80,40 +69,23 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // Every spy in here is installed inside a test. Restoring them centrally
-  // means a failed assertion cannot leave one on `BackHandler` for the next
-  // test to read somebody else's call out of.
+  // Spies are installed inside tests; restoring here means a failed assertion cannot leak one.
   jest.restoreAllMocks();
 });
 
 /**
- * Mounts the flow and hands back the hardware-back handler it registered.
- *
- * The `await act` is the point. `useFocusEffect` is a passive effect here, and
- * a passive effect is only guaranteed to have run once an async act has been
- * awaited — reading `addEventListener`'s calls straight after `render` is a
- * race with React's own scheduling, which is how this file managed to fail
- * roughly once in seven full runs while passing on its own every time. The
- * handler is then found by filtering for the event name and insisting on
- * exactly one registration, rather than trusting whichever call happened to
- * land last.
+ * Mounts the flow and hands back the hardware-back handler it registered. `useFocusEffect` is a
+ * passive effect, so only the awaited `act` guarantees it has run; reading the spy straight after
+ * `render` raced React's scheduling and flaked.
  */
 async function renderFlow(from: number) {
   const add = jest.spyOn(BackHandler, 'addEventListener');
 
   const view = await render(<Flow from={from} />);
-  // `render` in this version is async and already awaits an `act`, so the
-  // commit has happened by here; this second, empty `act` drains anything the
-  // commit itself scheduled before the spy is read. Effects are the whole
-  // subject of these two cases, so they are waited for on purpose rather than
-  // assumed.
   await act(async () => {});
 
   const registered = add.mock.calls.filter(([event]) => event === 'hardwareBackPress');
-  // Exactly one, asserted rather than taken with `.at(-1)`: a listener list
-  // that is still empty used to surface as "not a function" against whichever
-  // line called it, and one that had two entries would silently test the
-  // wrong flow.
+  // Exactly one, so an empty or doubled listener list cannot silently test the wrong flow.
   expect(registered).toHaveLength(1);
 
   return { view, onHardwareBack: registered[0][1] };
@@ -141,8 +113,7 @@ describe('the back control', () => {
   it('sits beside the title, not under it', async () => {
     const { getByText, getByLabelText } = await render(<Flow from={1} />);
 
-    // The title has the row's middle to itself; the controls are its siblings
-    // either side, so nothing laid over them can swallow a tap.
+    // The controls are siblings of the title, so nothing laid over them can swallow a tap.
     const title = getByText('Add a receipt');
     const back = getByLabelText('Back');
     let node = back.parent;
@@ -155,10 +126,7 @@ describe('the back control', () => {
 
 describe('the gesture and the hardware key', () => {
   it('turns the dismiss gesture off on every step but the first', async () => {
-    // One tree at a time, each one taken down before the next goes up. Two
-    // mounted flows both re-render whenever anything above them does, and
-    // "the last call" would then be whichever tree rendered most recently
-    // rather than the one the assertion is about.
+    // One tree at a time: with two mounted, "the last call" is whichever rendered most recently.
     const first = await render(<Flow from={0} />);
     expect(mockScreenOptions).toHaveBeenCalledWith({ gestureEnabled: true });
     expect(mockScreenOptions).not.toHaveBeenCalledWith({ gestureEnabled: false });
@@ -199,10 +167,6 @@ describe('the gesture and the hardware key', () => {
   });
 });
 
-/**
- * Close leaves the whole flow from any step — after asking, because it throws
- * away everything typed so far.
- */
 describe('the close control', () => {
   it('asks before leaving, in the words the screen gave it', async () => {
     mockConfirm.mockResolvedValue(true);
@@ -231,7 +195,6 @@ describe('the close control', () => {
   });
 });
 
-/** Back, close and the dots stay on screen while a long step scrolls. */
 describe('the header', () => {
   const insideScroll = (node: { type?: unknown; parent?: unknown } | null): boolean => {
     for (let at = node; at; at = at.parent as typeof node) {

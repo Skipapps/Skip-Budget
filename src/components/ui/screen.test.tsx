@@ -3,13 +3,6 @@ import { Text } from 'react-native';
 
 import { Screen } from '@/components/ui/screen';
 
-/**
- * The back chevron — and a flow's own header — never scroll away.
- *
- * Every page with a back button gets it from here, so pinning it here pins it
- * on all of them: Subscriptions, Receipts, the loan calculator and the rest.
- */
-
 jest.mock('expo-router', () => ({ router: { back: jest.fn(), canGoBack: () => true } }));
 
 jest.mock('react-native-keyboard-controller', () =>

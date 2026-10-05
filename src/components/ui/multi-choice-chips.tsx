@@ -18,7 +18,6 @@ type MultiChoiceChipsProps<T extends string> = {
   emptyHint?: string;
 };
 
-/** Pick-many chips. Used for linking one salary source to several accounts. */
 export function MultiChoiceChips<T extends string>({
   options,
   values,
@@ -49,7 +48,6 @@ export function MultiChoiceChips<T extends string>({
                 selected ? 'bg-control' : 'bg-ink/5 active:bg-ink/10',
               )}
             >
-              {/* The chip's own foreground, matching the label next to it. */}
               {selected ? <Check size={16} color={colors.onControl} strokeWidth={1.8} /> : null}
               <Text
                 className={cn(

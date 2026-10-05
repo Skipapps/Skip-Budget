@@ -14,16 +14,12 @@ import { BILL_CATEGORIES, getBillIcon } from '@/data/bills-mock';
 import { FALLBACK_GLYPH, GLYPHS } from '@/data/glyphs';
 import { groupIconFor } from '@/data/group-icons';
 
-// Lucide ships untransformed ESM; each icon stands in as its own name, which
-// is all these tests compare.
+// Lucide ships untransformed ESM; each icon stands in as its own name.
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 /**
- * A bill with no logo wears its category's glyph.
- *
- * add-bill saved the icon picker's starting value, 'other', onto every bill,
- * and a saved icon beats the category's — so rent, broadband and the phone
- * bill all drew the Other glyph. Those rows are still in the database.
+ * 'other' is the icon picker's starting value, not a pick: bills saved with it (those rows still
+ * exist) must draw their category glyph.
  */
 describe('getBillIcon', () => {
   it.each([

@@ -4,11 +4,6 @@ import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 
 jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
 
-/**
- * However a request fails, the screen says the same line. A dropped
- * connection, a Postgres rule and a Supabase auth refusal used to arrive in
- * their own words; none of them does any more.
- */
 describe('failureMessage', () => {
   beforeEach(() => {
     jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -39,11 +34,6 @@ describe('failureMessage', () => {
   });
 });
 
-/**
- * The screen says one line, so the real cause has to go somewhere a person
- * can read it: Sentry, in a release build. Caught errors never reach the crash
- * handler on their own.
- */
 describe('in a release build', () => {
   const dev = (global as { __DEV__?: boolean }).__DEV__;
 

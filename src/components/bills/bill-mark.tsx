@@ -10,7 +10,6 @@ type BillMarkProps = {
   categoryId?: string | null;
   /** Set when someone picked their own icon instead of the category's. */
   iconId?: string | null;
-  /** The issuer's domain, when the bill has one. AEP, T-Mobile, Xfinity. */
   domain?: string | null;
   /** Falls back to a monogram tile when a logo will not load. */
   name?: string;
@@ -18,26 +17,14 @@ type BillMarkProps = {
 };
 
 /**
- * A bill's mark: its issuer's logo, or its category icon.
- *
- * Both, because bills are two different things wearing one name. The
- * electricity is from AEP and the phone is from T-Mobile — those are brands,
- * and a logo is what someone recognises fastest in a list. Rent, HOA fees and
- * a loan from a relative are not brands, and a monogram tile for them looks
- * like a logo that failed to load rather than a bill that never had one.
- *
- * So the logo is shown when there is a brand and the category icon when there
- * is not — or when the brand's logo will not load — and a bill that has never
- * been given one looks exactly as it always did.
- *
- * Sized and shaped to match BrandMark either way, because in a mixed list the
- * two sit next to each other and any difference reads as a mistake.
+ * A bill's mark: its issuer's logo when it has a brand (AEP, T-Mobile), else its category icon,
+ * since rent or HOA fees are not brands and a monogram would look like a logo that failed to load.
+ * Matches BrandMark in size and shape because the two sit side by side in a mixed list.
  */
 export function BillMark({ categoryId, iconId, domain, name, size = 40 }: BillMarkProps) {
   const colors = useColors();
 
-  // createElement, not JSX: getBillIcon looks a component up rather than
-  // defining one, and assigning it to a capitalised local trips the lint rule.
+  // createElement, not JSX: a capitalised local for a looked-up component trips the lint rule.
   const icon = createElement(
     getBillIcon({ categoryId: categoryId ?? 'other', iconId: iconId ?? undefined }),
     { size: Math.round(size * 0.5), strokeWidth: GLYPH_STROKE, color: colors.body },
@@ -52,8 +39,7 @@ export function BillMark({ categoryId, iconId, domain, name, size = 40 }: BillMa
     </View>
   );
 
-  // A logo that will not load falls back to the glyph too, not to a monogram:
-  // "no logo" should look the same however it came about.
+  // A logo that will not load falls back to the glyph too, so "no logo" looks the same either way.
   return domain ? (
     <BrandLogo name={name ?? ''} domain={domain} size={size} fallback={glyph} />
   ) : (

@@ -11,12 +11,8 @@ type SourceTilesProps = {
 };
 
 /**
- * Pick-one pills for cards and bank accounts.
- *
- * Each carries a swatch of its own card colour, so the choice is recognisable
- * without reading the digits. The swatch stays its own colour when selected —
- * the pill fill says "chosen", the swatch says "which one", and letting the
- * selection repaint the swatch would take away the thing being chosen.
+ * Pick-one pills for cards and bank accounts, each with a swatch of its card colour. The swatch is
+ * never repainted on selection: the pill fill says "chosen", the swatch says "which one".
  */
 export function SourceTiles({ sources, value, onChange }: SourceTilesProps) {
   return (

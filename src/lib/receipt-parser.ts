@@ -1,10 +1,6 @@
 /**
- * Pulls the four things a receipt form needs out of recognised text.
- *
- * Vision returns lines in reading order and nothing more — no structure, no
- * labels. Everything below is heuristics over that, so each field is returned
- * only when the evidence is reasonable and left undefined otherwise. A blank
- * field the user fills in is far better than a confident wrong number.
+ * Pulls the four things a receipt form needs out of recognised text. These are heuristics, so each
+ * field is returned only when the evidence is reasonable: a blank field beats a confident wrong one.
  */
 
 export type ParsedReceipt = {
@@ -30,7 +26,7 @@ const MONTHS: Record<string, number> = {
   dec: 12,
 };
 
-/** Lines that name the grand total, deliberately excluding subtotal and tax. */
+/** Lines that name the grand total, excluding subtotal and tax. */
 const TOTAL_HINT = /\b(grand\s*total|total\s*due|amount\s*due|balance\s*due|total)\b/i;
 const NOT_TOTAL =
   /\b(sub\s*-?\s*total|tax|gst|hst|pst|vat|tip|change|cash\s*back|savings?|discount)\b/i;
@@ -46,10 +42,7 @@ function pad(value: number): string {
   return String(value).padStart(2, '0');
 }
 
-/**
- * Two-digit years are read as 2000s. A receipt is a record of a purchase that
- * already happened, so a far-future year means the guess is wrong.
- */
+/** Two-digit years are read as 2000s. A far-future year means the guess is wrong. */
 function isoDate(year: number, month: number, day: number): string | undefined {
   const fullYear = year < 100 ? 2000 + year : year;
   if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
@@ -58,11 +51,8 @@ function isoDate(year: number, month: number, day: number): string | undefined {
 }
 
 /**
- * Finds the purchase date.
- *
- * Ambiguous numeric dates are read US-first (MM/DD) because both target
- * markets print that way far more often than DD/MM — but a first number above
- * 12 can only be a day, so that case flips.
+ * Finds the purchase date. Ambiguous numeric dates are read US-first (MM/DD), as both target
+ * markets mostly print them; a first number above 12 can only be a day, so that case flips.
  */
 export function parseDate(text: string): string | undefined {
   const iso = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
@@ -91,12 +81,8 @@ export function parseDate(text: string): string | undefined {
 }
 
 /**
- * Finds the amount paid.
- *
- * Preference order matters more than cleverness: a line that says "total" and
- * is not a subtotal wins outright. Only when no such line exists does it fall
- * back to the largest amount on the receipt, which is usually — not always —
- * the total.
+ * Finds the amount paid: a non-subtotal line that says "total" wins outright, otherwise the
+ * largest amount on the receipt (usually, not always, the total).
  */
 export function parseTotal(text: string): number | undefined {
   const lines = text
@@ -113,14 +99,12 @@ export function parseTotal(text: string): number | undefined {
       labelled.push(toAmount(onLine[onLine.length - 1]));
       continue;
     }
-    // Receipts often print the label and the figure on separate lines, or in
-    // columns that Vision reads as two lines.
+    // Receipts often print the label and figure on separate lines, or in columns Vision reads as two.
     const next = lines[index + 1]?.match(MONEY);
     if (next?.length) labelled.push(toAmount(next[0]));
   }
 
-  // Last labelled total wins: reprints and card-copy footers repeat it, and
-  // the final one is the figure actually charged.
+  // Last labelled total wins: reprints and card-copy footers repeat it; the final one was charged.
   if (labelled.length) return labelled[labelled.length - 1];
 
   const all = (text.match(MONEY) ?? []).map(toAmount).filter((n) => n > 0);
@@ -129,11 +113,8 @@ export function parseTotal(text: string): number | undefined {
 }
 
 /**
- * Finds the last four digits of the card used.
- *
- * Masked forms only. A bare four-digit run is never accepted — receipts are
- * full of them (store numbers, times, totals) and a wrong card is worse than
- * no card.
+ * Finds the last four digits of the card used. Masked forms only: a bare four-digit run is never
+ * accepted, as receipts are full of them (store numbers, times, totals).
  */
 export function parseLast4(text: string): string | undefined {
   const masked = text.match(/(?:[*x#•]{2,}\s*|ending\s+(?:in\s+)?|acct\s*#?\s*)(\d{4})\b/i);
@@ -146,12 +127,8 @@ export function parseLast4(text: string): string | undefined {
 }
 
 /**
- * Guesses the merchant from the top of the receipt.
- *
- * Shop names are printed first and largest. This only filters out the lines
- * that are obviously not a name — addresses, phone numbers, bare numbers — and
- * returns the first survivor. The catalog match downstream does the real work,
- * so a rough string here is enough.
+ * Guesses the merchant from the top of the receipt: the first line that is not obviously an
+ * address, phone number or bare number. The catalog match downstream does the real work.
  */
 export function parseMerchant(text: string): string | undefined {
   const candidates = text
@@ -163,7 +140,6 @@ export function parseMerchant(text: string): string | undefined {
   for (const line of candidates) {
     if (line.length < 3 || line.length > 40) continue;
     if (!/[a-z]/i.test(line)) continue;
-    // Addresses, phone numbers, receipt metadata.
     if (/\b(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})\b/.test(line)) continue;
     if (/\b(street|st\.?|road|rd\.?|ave\.?|avenue|suite|unit|blvd|hwy|drive|dr\.?)\b/i.test(line))
       continue;
@@ -184,18 +160,9 @@ export function parseReceipt(text: string): ParsedReceipt {
   };
 }
 
-/* ------------------------------------------------------------------ *
- * Layout-aware parsing
- *
- * The functions above read a receipt as a list of strings, which is all the
- * old scanner returned. That loses the two facts a receipt actually encodes in
- * its layout: the shop's name is the biggest thing at the top, and a total is
- * the money printed on the same ROW as the word "total" — not necessarily the
- * next line, which is what reading order gives you on a two-column bill.
- *
- * Everything below works on positioned lines instead, and falls back to the
- * flat-text versions whenever the layout is unavailable or unconvincing.
- * ------------------------------------------------------------------ */
+// Layout-aware parsing. Flat text loses what the layout encodes: the shop name is the biggest
+// thing at the top, and a total is the money on the same ROW as the word "total", not necessarily
+// the next line. These work on positioned lines and fall back to the flat-text versions above.
 
 export type ParsedLine = {
   text: string;
@@ -219,7 +186,7 @@ const PHONE = /\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/;
 function looksLikeName(text: string): boolean {
   const trimmed = text.trim();
   if (trimmed.length < 3 || trimmed.length > 40) return false;
-  // Needs letters, and must not be mostly digits — "12345678" is a store code.
+  // Needs letters and must not be mostly digits ("12345678" is a store code).
   if (!/[a-z]/i.test(trimmed)) return false;
   if (trimmed.replace(/\D/g, '').length > trimmed.length / 2) return false;
   if (PHONE.test(trimmed)) return false;
@@ -229,13 +196,8 @@ function looksLikeName(text: string): boolean {
 }
 
 /**
- * The shop, chosen by how it was printed rather than where it fell in the
- * reading order.
- *
- * A receipt puts its name at the top and sets it larger than everything around
- * it. Restricting the search to the top of the page and then taking the
- * tallest surviving line gets the name even when a slogan or a store number is
- * printed above it — the case that made the old first-match rule pick wrong.
+ * The shop, chosen by how it was printed: the tallest plausible line in the top of the page. This
+ * still finds the name when a slogan or store number is printed above it.
  */
 export function parseMerchantFromLines(lines: ParsedLine[]): string | undefined {
   const top = lines.filter((line) => line.y <= 0.35 && looksLikeName(line.text));
@@ -243,8 +205,7 @@ export function parseMerchantFromLines(lines: ParsedLine[]): string | undefined 
 
   const tallest = top.reduce((best, line) => (line.height > best.height ? line : best));
 
-  // Only trust size when it is actually decisive. On a receipt printed at one
-  // size throughout, the topmost sensible line is the better answer.
+  // Only trust size when decisive; on a receipt printed at one size the topmost sensible line wins.
   const median = [...top].sort((a, b) => a.height - b.height)[Math.floor(top.length / 2)];
   if (tallest.height < median.height * 1.15) {
     const highest = top.reduce((best, line) => (line.y < best.y ? line : best));
@@ -266,15 +227,9 @@ function moneyIn(text: string): number[] {
 }
 
 /**
- * The amount charged, matched to its label by row.
- *
- * Walks the lines that name a total, and for each one takes the money printed
- * on the same row — preferring what sits to its right, which is where a
- * receipt puts the figure. Only if the label's row carries no money at all
- * does it look at the line below, the way the flat parser always had to.
- *
- * The last labelled total wins: card footers and reprints repeat it, and the
- * final one is what was actually charged.
+ * The amount charged, matched to its label by row: the money on the label's row, preferring what
+ * sits to its right, and only if the row has none, the line below. The last labelled total wins
+ * (card footers and reprints repeat it).
  */
 export function parseTotalFromLines(lines: ParsedLine[]): number | undefined {
   const labelled: { amount: number; y: number }[] = [];
@@ -282,7 +237,6 @@ export function parseTotalFromLines(lines: ParsedLine[]): number | undefined {
   for (const line of lines) {
     if (!TOTAL_HINT.test(line.text) || NOT_TOTAL.test(line.text)) continue;
 
-    // The label's own line may already carry the figure.
     const inline = moneyIn(line.text);
     if (inline.length) {
       labelled.push({ amount: inline[inline.length - 1], y: line.y });
@@ -299,7 +253,6 @@ export function parseTotalFromLines(lines: ParsedLine[]): number | undefined {
       continue;
     }
 
-    // Nothing on the row: fall back to the nearest money below the label.
     const below = lines
       .filter((other) => other.y > line.y)
       .sort((a, b) => a.y - b.y)
@@ -316,10 +269,8 @@ export function parseTotalFromLines(lines: ParsedLine[]): number | undefined {
 }
 
 /**
- * A receipt read from its layout, with the flat parser behind it.
- *
- * Date and card digits do not depend on position — they are matched by shape
- * anywhere on the page — so those still come from the joined text.
+ * A receipt read from its layout, with the flat parser behind it. Date and card digits are matched
+ * by shape anywhere on the page, so they come from the joined text.
  */
 export function parseReceiptFromLines(lines: ParsedLine[]): ParsedReceipt {
   const text = lines.map((line) => line.text).join('\n');

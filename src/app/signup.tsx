@@ -44,8 +44,7 @@ export default function SignUpScreen() {
       return;
     }
 
-    // With confirmation off Supabase signs the user straight in; with it on a
-    // code is emailed. Handle both rather than assuming one is configured.
+    // With confirmation off Supabase signs the user straight in; with it on, a code is emailed.
     if (signedIn) {
       // resetTo: a one-way door — see auth.tsx.
       resetTo('/hello');

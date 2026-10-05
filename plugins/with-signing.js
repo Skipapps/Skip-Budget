@@ -3,14 +3,9 @@ const { withXcodeProject } = require('@expo/config-plugins');
 /**
  * Pins the Apple team and turns on automatic signing.
  *
- * `expo prebuild` regenerates ios/ from scratch, so anything set by hand in
- * Xcode is lost the next time it runs — including the team, which then makes
- * every device build fail with "no account for team". Setting it here means the
- * generated project comes out ready to sign.
- *
- * Automatic, not manual: Xcode fetches and renews the certificate and profile
- * itself, which is the difference between a build that keeps working and one
- * that breaks whenever a profile expires.
+ * `expo prebuild` regenerates ios/ from scratch, so a team set by hand in Xcode is lost and device
+ * builds fail with "no account for team". Automatic signing lets Xcode renew the certificate and
+ * profile itself instead of breaking when a profile expires.
  */
 const withSigning = (config, { teamId }) =>
   withXcodeProject(config, (mod) => {

@@ -23,15 +23,7 @@ import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
 import { failureMessage } from '@/lib/failure';
 
-/**
- * Making friends inside Skip, without publishing who has an account.
- *
- * The whole system runs on codes rather than a search box, and that is a
- * privacy decision before it is a design one. Looking people up by email means
- * anyone can test addresses against the user list one at a time and learn who
- * is registered. A code only works if its owner chose to hand it over, so
- * there is no lookup to abuse.
- */
+/** Friends are added by code, not email search, which would let anyone probe who is registered. */
 export default function FriendsScreen() {
   const colors = useColors();
   const confirm = useConfirm();
@@ -43,11 +35,7 @@ export default function FriendsScreen() {
   const { data: mine } = useMyInviteCode();
   const { data: profile } = useProfile();
 
-  // What everyone else sees is your display name, and it starts empty. Worth
-  // saying here rather than on the settings screen, because this is where the
-  // consequence lands: a friend request from "Someone on Skip" is one nobody
-  // can place, and the person sending it has no way to know that is how they
-  // appear.
+  // The display name starts empty, and a request from "Someone on Skip" is one nobody can place.
   const unnamed = !(profile?.display_name ?? '').trim();
   const { data: friends = [], isLoading } = useFriends();
   const { data: requests } = useFriendRequests();
@@ -115,8 +103,6 @@ export default function FriendsScreen() {
         Share your code with someone and they can add you. Nobody can find you without it.
       </Subtitle>
 
-      {/* The code is the product here, so it is set like one: large, spaced, and
-          unambiguous to read aloud down a phone. */}
       <View className="mt-7 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           Your code

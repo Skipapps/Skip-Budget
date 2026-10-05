@@ -1,17 +1,10 @@
 /**
- * The three hints the voice page shows above its mic, one per kind Skip can
- * add, as plain data (the Founder's redesign, 2026-10-01: starter-prompt
- * style, low-opacity text).
+ * The three hints the voice page shows above its mic, one per kind Skip can add, as plain data.
  *
- * They are a promise: each one parses to exactly its bold values.
- * src/lib/voice/catalog.test.ts reads this list and parses every sentence
- * against the real brand catalog, so the screen and the parser's fixtures
- * cannot drift. Amounts are digits with a $, because that is how iOS writes
- * them down; what is shown is what the review page quotes back. If one stops
- * parsing, change the hint, not the parser's promise.
- *
- * The page shows them as plain sentences; `strong` marks the words Skip picks
- * up, which the catalog test checks against what the parser reads back.
+ * They are a promise: each one parses to exactly its bold values. src/lib/voice/catalog.test.ts
+ * parses every sentence against the real brand catalog, so the screen and the parser cannot drift.
+ * Amounts are digits with a $, because that is how iOS writes them down. If one stops parsing,
+ * change the hint, not the parser's promise.
  */
 
 /** A run of a sentence; `strong` marks what Skip picks up from it. */

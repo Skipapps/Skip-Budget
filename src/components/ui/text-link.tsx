@@ -10,10 +10,9 @@ type TextLinkProps = {
   /** `subtle` is smaller and muted, for secondary links like "Forgot password?". */
   variant?: TextLinkVariant;
   /**
-   * Draws the rule under the label. Off by default, because most links in the
-   * app sit alone where position already says they are tappable. On where a
-   * link has to read as one in a row of other muted type — a paywall's Terms
-   * and Privacy, which App Store review looks for.
+   * Draws the rule under the label. Off by default, since most links sit alone where position says
+   * they are tappable. On where a link must read as one among other muted type, e.g. a paywall's
+   * Terms and Privacy (App Store review looks for them).
    */
   underline?: boolean;
   className?: string;
@@ -26,7 +25,6 @@ const text: Record<TextLinkVariant, string> = {
   subtle: 'font-poppins text-[14px] text-muted',
 };
 
-/** Low-emphasis action rendered as plain tappable text. */
 export function TextLink({
   label,
   onPress,

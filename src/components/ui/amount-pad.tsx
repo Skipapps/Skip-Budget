@@ -10,25 +10,16 @@ import { useColors } from '@/providers/theme-provider';
 
 type AmountPadProps = {
   title: string;
-  /** Caption under the figure, e.g. "Card balance". */
   caption: string;
   value: string;
-  /** `percent` swaps the leading $ for a trailing % — same keypad otherwise. */
   unit?: 'currency' | 'percent';
   onCancel: () => void;
   onConfirm: (value: string) => void;
 };
 
 /**
- * Full-screen amount entry with its own keypad.
- *
- * Replaces the system keyboard for money: the figure stays large and centred,
- * there is no numeric row to mis-hit, and no keyboard to scroll clear of.
- *
- * Kept alongside the stepped flows for the *secondary* amounts — one person's
- * exact share, an expected income, an interest rate — where the figure is not
- * the headline of the screen and a modal is the right weight. The figure and
- * the keys are the same components step 1 uses, so the two cannot drift.
+ * Full-screen amount entry with its own keypad, for the secondary amounts (a share, expected income,
+ * a rate) where a modal is the right weight. Same figure and keys as step 1.
  */
 export function AmountPad({
   title,

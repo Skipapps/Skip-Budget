@@ -5,37 +5,21 @@ import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
 /**
- * Every write in the app.
- *
- * RLS scopes reads by auth.uid(), but inserts still send user_id explicitly:
- * the with-check policy compares the incoming row to auth.uid(), and the
- * column has no default, so a row without it is rejected rather than silently
- * attributed to nobody.
- *
- * Updates and deletes filter on id alone — RLS refuses to touch a row owned by
- * anyone else, so repeating the owner check here would be noise.
+ * Every write in the app. Inserts send user_id explicitly: the with-check policy compares the row
+ * to auth.uid() and the column has no default. Updates and deletes filter on id alone, since RLS
+ * already refuses rows owned by anyone else.
  */
 
 /**
- * What an edit to a *record* says when its filter matched no row.
- *
- * A bill, a receipt, a subscription, a group: things that live in a list and
- * that another device can delete while this edit is open. That is nearly
- * always the cause, so the message names it and points at the one action that
- * helps — re-opening the list, which re-reads it.
+ * An edit to a *record* matched no row: almost always deleted on another device, so the message
+ * points at re-opening the list.
  */
 export const NOTHING_UPDATED =
   'That is no longer there — it may have been deleted on another device. Open the list again.';
 
 /**
- * What a *setting* says when its filter matched no row.
- *
- * Profiles and the receipts reminder are not list rows: there is exactly one
- * per account and nobody deleted it on another device, so NOTHING_UPDATED's
- * explanation would be a guess and its advice would point at a list that does
- * not exist. If that update touched nothing, something is wrong that the
- * person at the screen cannot diagnose, so the message says only what is true
- * and what to try.
+ * A *setting* (profile, receipts reminder) matched no row. There is exactly one per account and no
+ * list to reopen, so NOTHING_UPDATED's explanation would be a guess.
  */
 export const NOTHING_SAVED = 'Skip could not save that. Close this and open it again.';
 
@@ -49,13 +33,8 @@ const AFFECTS_DASHBOARD = new Set([
 ]);
 
 /**
- * Tables whose rows point at another table's rows.
- *
- * Deleting a card does not delete what was charged to it — the foreign keys
- * are "on delete set null", so those rows survive with no source. The database
- * has already changed them by the time the delete returns, so their caches are
- * wrong until they are re-read. Without this a receipt keeps showing the card
- * it was paid with until the app is restarted.
+ * Tables whose rows point at another table's rows. Deleting a card sets the foreign keys on what
+ * was charged to it to null ("on delete set null"), so those caches are stale until re-read.
  */
 const DEPENDENTS: Record<string, string[]> = {
   cards: ['bills', 'receipts', 'subscriptions', 'payments'],
@@ -82,10 +61,8 @@ function useCreate<TInput extends Record<string, unknown>>(table: string) {
   return useMutation({
     mutationFn: async (values: TInput) => {
       if (!userId) throw new Error('Sign in first.');
-      // The client has no generated Database types, so supabase-js cannot
-      // narrow a generic payload against a known row shape. The cast buys one
-      // shared helper instead of a near-identical hook per table; the per-table
-      // Values types above are what actually keep call sites honest.
+      // No generated Database types, so a generic payload cannot be narrowed; the cast buys one
+      // shared helper, and the per-table Values types keep call sites honest.
       const payload = { ...values, user_id: userId } as never;
       const { data, error } = await supabase.from(table).insert(payload).select('id').single();
       if (error) throw error;
@@ -96,18 +73,9 @@ function useCreate<TInput extends Record<string, unknown>>(table: string) {
 }
 
 /**
- * An update that cannot succeed quietly.
- *
- * PostgREST answers an update whose filter matches nothing with 204 and no
- * error, so without the `select` below a save against a row that has been
- * deleted — or that RLS will not show this account — resolves happily: the
- * screen buzzes, the flow pops, and nothing was written. Every edit screen in
- * the app goes through this helper, so that hole was every edit screen's.
- *
- * `select('id')` makes the response carry the rows it touched, and an empty
- * array is then an error the user can act on rather than a silent no-op. Only
- * the id is asked for: the caller already has the values it sent, and reading
- * anything wider would be a second round trip's worth of columns for nothing.
+ * An update that cannot succeed quietly. PostgREST answers an update whose filter matches nothing
+ * (row deleted, or hidden by RLS) with 204 and no error. `select('id')` returns the touched rows,
+ * so an empty result becomes an error the user can act on instead of a silent no-op.
  */
 function useUpdate<TInput extends Record<string, unknown>>(table: string) {
   const invalidate = useInvalidate();
@@ -128,21 +96,11 @@ function useUpdate<TInput extends Record<string, unknown>>(table: string) {
 }
 
 /**
- * A delete that is deliberately allowed to match nothing.
- *
- * `useUpdate` asks for the touched rows back because an update that wrote
- * nothing has left the user's intent unfulfilled. A delete has not: the row
- * the person asked to be rid of is not there, which is exactly the state they
- * were after. Raising NOTHING_UPDATED here would put an error in front of
- * somebody whose only mistake was deleting the same thing twice — most often
- * a double tap, or a row already removed on another device — and the list
- * re-read that follows would show the same absence either way.
- *
- * The case this gives up is a delete RLS refuses, which also answers 204 with
- * no error. No screen can reach one: every delete in the app is dispatched
- * from a row the same account just read, and the one owner-only table,
- * `groups`, is archived through `useArchiveGroup` rather than deleted. If a
- * shared table ever becomes directly deletable, this is the helper to revisit.
+ * A delete that is allowed to match nothing: the row the person wanted gone is already gone (double
+ * tap, removed on another device), so raising NOTHING_UPDATED would be noise. This gives up
+ * detecting a delete that RLS refuses (also 204); no screen reaches one, since `groups`, the one
+ * owner-only table, is archived rather than deleted. Revisit if a shared table becomes directly
+ * deletable.
  */
 function useRemove(table: string) {
   const invalidate = useInvalidate();
@@ -157,8 +115,6 @@ function useRemove(table: string) {
   });
 }
 
-// --- Cards -----------------------------------------------------------------
-
 export type CardValues = {
   holder: string;
   network: string;
@@ -170,21 +126,17 @@ export type CardValues = {
   bill_due_day: number | null;
 };
 
-/** The only editable thing on a profile today; currency is fixed to USD. */
 export type ProfileValues = {
   display_name?: string | null;
   /** Which bundled avatar was chosen; null for none. See theme/avatars.ts. */
   avatar_id?: string | null;
-  /** When the Getting Started card was waved away. */
   getting_started_dismissed_at?: string | null;
-  /** When this account chose to be reminded. */
   reminders_enabled_at?: string | null;
 };
 
 /**
- * Profiles are keyed by the signed-in user rather than by a row id, so this
- * does not go through the shared update helper — and its query key is
- * 'profile', singular, which no table name would ever match.
+ * Keyed by the signed-in user rather than a row id, so it bypasses useUpdate. Its query key is
+ * 'profile', singular, which no table name would match.
  */
 export function useUpdateProfile() {
   const userId = useUserId();
@@ -199,9 +151,7 @@ export function useUpdateProfile() {
         .eq('id', userId)
         .select('id');
       if (error) throw error;
-      // Same trap as useUpdate: a profile row that is missing takes this
-      // update with a 204 and no error, and the setting appears to save. The
-      // wording differs because the cause does — see NOTHING_SAVED.
+      // Same 204 trap as useUpdate; the wording differs because the cause does (see NOTHING_SAVED).
       if (!data || data.length === 0) throw new Error(NOTHING_SAVED);
       return values;
     },
@@ -212,8 +162,6 @@ export function useUpdateProfile() {
 export const useCreateCard = () => useCreate<CardValues>('cards');
 export const useUpdateCard = () => useUpdate<Partial<CardValues>>('cards');
 export const useDeleteCard = () => useRemove('cards');
-
-// --- Bank accounts ---------------------------------------------------------
 
 export type BankAccountValues = {
   bank_name: string;
@@ -228,8 +176,6 @@ export type BankAccountValues = {
 export const useCreateBankAccount = () => useCreate<BankAccountValues>('bank_accounts');
 export const useUpdateBankAccount = () => useUpdate<Partial<BankAccountValues>>('bank_accounts');
 export const useDeleteBankAccount = () => useRemove('bank_accounts');
-
-// --- Bills -----------------------------------------------------------------
 
 export type BillValues = {
   /** Optional. Who issues the bill, for its logo. */
@@ -251,8 +197,6 @@ export const useCreateBill = () => useCreate<BillValues>('bills');
 export const useUpdateBill = () => useUpdate<Partial<BillValues>>('bills');
 export const useDeleteBill = () => useRemove('bills');
 
-// --- Salary ----------------------------------------------------------------
-
 export type SalaryValues = {
   name: string;
   /** What lands each payday. Worked out from the hourly fields when hourly. */
@@ -272,12 +216,9 @@ export const useCreateSalarySource = () => useCreate<SalaryValues>('salary_sourc
 export const useUpdateSalarySource = () => useUpdate<Partial<SalaryValues>>('salary_sources');
 export const useDeleteSalarySource = () => useRemove('salary_sources');
 
-// --- Receipts --------------------------------------------------------------
-
 /**
- * How a receipt got into the app. Mirrors the `public.capture_source` enum;
- * everything but 'manual' is a Pro verb, and the server's
- * `enforce_scan_is_pro` trigger refuses it on a free account.
+ * How a receipt got into the app. Mirrors the `public.capture_source` enum; everything but 'manual'
+ * is a Pro verb, refused on a free account by the server's `enforce_scan_is_pro` trigger.
  */
 export type CaptureSource = 'manual' | 'scan' | 'upload' | 'voice';
 
@@ -298,14 +239,9 @@ export const useCreateReceipt = () => useCreate<ReceiptValues>('receipts');
 export const useUpdateReceipt = () => useUpdate<Partial<ReceiptValues>>('receipts');
 export const useDeleteReceipt = () => useRemove('receipts');
 
-// --- Savings ---------------------------------------------------------------
-
 /**
- * Correcting a month.
- *
- * A null amount clears the correction and puts the month back on what the app
- * worked out — which is what somebody wants after adding the bill they had
- * missed, rather than having to remember the original figure.
+ * Correcting a month. A null amount clears the correction and puts the month back on the computed
+ * figure.
  */
 export function useAdjustSavingsMonth() {
   const invalidate = useInvalidate();
@@ -336,8 +272,6 @@ export function useExcludeSavingsMonth() {
   });
 }
 
-// --- Subscriptions ---------------------------------------------------------
-
 export type SubscriptionValues = {
   brand_id: string | null;
   name: string;
@@ -345,9 +279,9 @@ export type SubscriptionValues = {
   cycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
   next_renewal_on: string | null;
   /**
-   * The first renewal the app counts. Everything is walked back from
-   * `next_renewal_on` no further than this — without it the floor is the day
-   * the row was made, and a renewal earlier that month is never counted.
+   * The first renewal the app counts: renewals are walked back from `next_renewal_on` no further
+   * than this. Without it the floor is the row's creation day, so an earlier renewal that month is
+   * missed.
    */
   started_on: string | null;
   category_id: string;
@@ -362,11 +296,8 @@ export const useUpdateSubscription = () => useUpdate<Partial<SubscriptionValues>
 export const useDeleteSubscription = () => useRemove('subscriptions');
 
 /**
- * Replaces which accounts a salary source is paid into.
- *
- * The screen offers a multi-select, so this is a set operation rather than an
- * insert: delete what is there, write what was chosen. Without it the account
- * chips would look like they saved and quietly do nothing.
+ * Replaces which accounts a salary source is paid into: delete, then insert, because the screen is
+ * a multi-select.
  */
 export function useSetSalaryAccounts() {
   const invalidate = useInvalidate();
@@ -391,19 +322,16 @@ export function useSetSalaryAccounts() {
     },
     onSuccess: () => {
       invalidate('salary_sources');
-      // Which accounts pay lands in is read on its own, for the reminders that
-      // are about money arriving. Without this it stays stale until a restart.
+      // Read on their own (for the money-arriving reminders), so they need their own invalidation.
       invalidate('salary_source_accounts');
     },
   });
 }
 
 /**
- * Points every existing salary source at one more account — the "my pay
- * lands here" switch on a new account. Additive on purpose, unlike
- * useSetSalaryAccounts: the account form knows nothing about the links each
- * source already carries and must not clobber them, so this only ever adds
- * rows, and the composite key makes re-adding a link a no-op.
+ * Points every existing salary source at one more account. Additive, unlike useSetSalaryAccounts:
+ * the account form does not know the links each source already carries, and the composite key makes
+ * re-adding a link a no-op.
  */
 export function useLinkAccountToSalaries() {
   const invalidate = useInvalidate();
@@ -433,8 +361,6 @@ export function useLinkAccountToSalaries() {
   });
 }
 
-// --- Payments ---------------------------------------------------------------
-
 export type PaymentValues = {
   card_id: string | null;
   bank_account_id: string | null;
@@ -445,8 +371,6 @@ export type PaymentValues = {
 
 export const useCreatePayment = () => useCreate<PaymentValues>('payments');
 export const useDeletePayment = () => useRemove('payments');
-
-// --- Loans ------------------------------------------------------------------
 
 export type SaveLoanValues = {
   name: string;
@@ -460,10 +384,8 @@ export type SaveLoanValues = {
   /** When interest starts running. Null lets the server assume a month. */
   fundedOn: string | null;
   /**
-   * The convention the lender charges under, 'monthly' rests included. The
-   * column accepts it from `20260912100002_monthly_rests.sql` onwards; against
-   * an older database the check constraint rejects it, which is the loud
-   * failure we want rather than a loan filed under the wrong convention.
+   * The convention the lender charges under ('monthly' rests included). An older database's check
+   * constraint rejects it: a loud failure, not a loan filed under the wrong convention.
    */
   dayCountBasis: AccrualBasis;
   cardId: string | null;
@@ -471,12 +393,8 @@ export type SaveLoanValues = {
 };
 
 /**
- * Turns a calculated loan into a monthly bill.
- *
- * One RPC rather than two inserts: the bill and its loan detail are created in
- * the same transaction, so there is no window where a bill exists with no loan
- * attached to explain it. The function files it under the 'loans' category and
- * sets the end date from the term.
+ * Turns a calculated loan into a monthly bill. One RPC so the bill and its loan detail are created
+ * in a single transaction; the function files it under 'loans' and sets the end date from the term.
  */
 export function useSaveLoan() {
   const invalidate = useInvalidate();

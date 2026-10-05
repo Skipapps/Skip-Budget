@@ -46,13 +46,7 @@ function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
 /** Salary sources arrive on different cycles; normalise before summing. */
 const PER_MONTH = { weekly: 52 / 12, biweekly: 26 / 12, semimonthly: 2, monthly: 1 } as const;
 
-/**
- * The note that stands in for an empty list.
- *
- * Empty only. A failed read is answered by the page, not by a region: the
- * balances on this screen are walked from seven lists, so when one of them
- * does not land there is no honest figure to draw beside a warning.
- */
+/** Stands in for an empty list only; a failed read is answered by the whole page. */
 function ListNote({ text }: { text: string }) {
   return (
     <View className="w-full items-center rounded-[16px] border border-line bg-card p-5">
@@ -65,10 +59,8 @@ function ListNote({ text }: { text: string }) {
 
 export default function CardsScreen() {
   const artwork = useArtwork();
-  // Read once per render, so every face on the screen is worked out against
-  // the same day rather than drifting apart across a midnight boundary.
-  // As state, not a render-time read: a backgrounded tab does not re-render,
-  // so a plain new Date() here stays on yesterday after an overnight resume.
+  // State, not `new Date()`: a backgrounded tab does not re-render, so a plain date would stay on
+  // yesterday after an overnight resume.
   const { today } = useToday();
 
   const cards = useCards();
@@ -83,11 +75,8 @@ export default function CardsScreen() {
     (sum, source) => sum + source.amount * PER_MONTH[source.frequency],
     0,
   );
-  // What the finished months added up to. A month that was overspent takes
-  // from it, so this can fall as well as rise.
-  // The same figure the Savings screen shows: a corrected month counts its
-  // correction and a month left out counts nothing. Summing the raw `saved`
-  // here put a number on this tile that the page behind it then disowned.
+  // Finished months added up; an overspent month takes from it. `savedFor` is the same figure the
+  // Savings screen shows (a corrected month counts its correction, a left-out month nothing).
   const savingsTotal = (savings.data ?? []).reduce((sum, month) => sum + savedFor(month), 0);
 
   const moneyAmounts: Record<string, number> = {
@@ -95,13 +84,9 @@ export default function CardsScreen() {
     savings: savingsTotal,
   };
 
-  // A wallet is the one screen where a stale figure is worse than no figure:
-  // what is shown here is what somebody checks against their bank. The balances
-  // are walked from seven reads, and when any of them fails the faces would
-  // fall back to `card.balance` — the number typed the day the card was added.
-  // So the page says so and offers the retry, exactly as every other list does,
-  // rather than drawing a wrong balance under a warning. Every hook above runs
-  // first, so the early return never changes the hook order.
+  // A stale balance is worse than none: if any of the seven reads behind `balances` fails, the
+  // faces would fall back to the balance typed when the card was added. After all hooks, so hook
+  // order holds.
   if (balancesError) {
     return (
       <Screen onRefresh={refresh} refreshing={refreshing}>
@@ -122,8 +107,7 @@ export default function CardsScreen() {
           title="Credit cards"
           actionLabel="New credit card"
           onAction={() =>
-            // The second of anything is where Pro begins. The database refuses
-            // it too; this door just explains itself first.
+            // The second of anything is where Pro begins (the database refuses it too).
             !pro && (cards.data?.length ?? 0) >= 1
               ? router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } })
               : router.push('/add-card')
@@ -133,9 +117,8 @@ export default function CardsScreen() {
 
       <View className="mt-5 w-full gap-4">
         {(cards.data ?? []).map((card, index) => (
-          // Wrapped rather than given an onPress: PaymentCard stays purely
-          // presentational, and the same face is reused in the add-card preview
-          // where tapping it would mean nothing.
+          // Wrapped rather than given an onPress: PaymentCard is also used in the add-card preview,
+          // where tapping it means nothing.
           <Pressable
             key={card.id}
             accessibilityRole="button"
@@ -145,8 +128,7 @@ export default function CardsScreen() {
                 : `${card.holder}, view transactions`
             }
             onPress={() =>
-              // Locked, not lost: extras beyond the free allowance survive a
-              // downgrade untouched and open the way back in. The oldest one
+              // Locked, not lost: extras beyond the free allowance survive a downgrade; the oldest
               // stays fully usable.
               !pro && index > 0
                 ? router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } })
@@ -159,8 +141,7 @@ export default function CardsScreen() {
               card={{
                 id: card.id,
                 holder: card.holder,
-                // What the card is at now. The stored figure is only the
-                // starting point; receipts and bills have moved it since.
+                // The stored balance is only the starting point; receipts and bills have moved it.
                 balance: balances.get(card.id) ?? card.balance,
                 last4: card.last4 ?? '',
                 network: card.network,
@@ -170,9 +151,6 @@ export default function CardsScreen() {
           </Pressable>
         ))}
         {cards.isPending ? <Skeleton className="h-44 w-full rounded-[16px]" /> : null}
-        {/* `data?.length === 0` is false when data is undefined, so a failed
-            fetch would leave this region blank — but a failed read never gets
-            this far now: it is answered by the page above. */}
         {!cards.isPending && (cards.data?.length ?? 0) === 0 ? (
           <ListNote text="No credit cards yet. Add one to track what you spend on it." />
         ) : null}
@@ -231,8 +209,7 @@ export default function CardsScreen() {
         <SectionHeading>Money</SectionHeading>
       </View>
 
-      {/* Two-up: tiles flex rather than sit at a fixed width, so they stay
-          side by side on a narrow phone instead of overflowing. */}
+      {/* Tiles flex, not a fixed width, so they stay side by side on a narrow phone. */}
       <View className="mt-5 w-full flex-row gap-3 pb-8">
         {moneyBuckets.map((bucket) => (
           <View key={bucket.id} className="flex-1">

@@ -16,7 +16,6 @@ const MARKS: Record<string, string> = {
   Discover: 'DISC',
 };
 
-/** Circular provider chooser. */
 export function NetworkPicker({ networks, value, onChange }: NetworkPickerProps) {
   return (
     <View className="w-full flex-row flex-wrap gap-4">
@@ -41,10 +40,8 @@ export function NetworkPicker({ networks, value, onChange }: NetworkPickerProps)
                 allowFontScaling={false}
                 className={cn(
                   'font-poppins-bold text-[13px] italic',
-                  // The chip is filled with ink, so the mark is drawn in the
-                  // surface — ink's own inverse in either mode. `on-control`
-                  // here was the accent's pairing, which is white on a navy
-                  // theme: invisible on this chip in dark mode.
+                  // Filled with ink, so the mark takes the surface colour (`on-control` pairs with
+                  // the accent and vanishes here in dark mode).
                   selected ? 'text-surface' : 'text-ink',
                 )}
               >

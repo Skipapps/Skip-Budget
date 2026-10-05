@@ -1,30 +1,23 @@
 /**
- * Step 6: dates, only when one was actually spoken.
+ * Dates, only when one was actually spoken. Finding a date and resolving it are separate, because
+ * the same words point different ways:
  *
- * Finding a date and resolving it are separate, because the same words point
- * different ways:
+ * - **Backward**: the most recent matching day, today or earlier. Receipts always (a purchase has
+ *   happened), and bills or subscriptions spoken in the past tense ("the electric bill was due on
+ *   the 5th", "paid rent on the 1st").
+ * - **Forward**: the next matching day, today or later. Bills and subscriptions said plainly or in
+ *   the future ("due on the 15th", "renews on the 3rd").
  *
- * - **Backward** — the most recent matching day, today or earlier. Receipts
- *   always (a purchase has happened), and bills or subscriptions spoken in
- *   the past tense: "Netflix renewed on the 10th", "the electric bill was
- *   due on the 5th", "paid rent on the 1st".
- * - **Forward** — the next matching day, today or later. Bills and
- *   subscriptions said plainly or in the future: "due on the 15th",
- *   "renews on the 3rd", "rent is due on the first".
+ * Words that fix the day ignore direction: today, yesterday, "3 days ago", "in a week", "last
+ * Friday" (the most recent Friday before today), "next Friday" (the first after today), a date with
+ * a year.
  *
- * Words that fix the day ignore direction: today, yesterday, tomorrow,
- * "3 days ago", "in a week", "last Friday" (the most recent Friday before
- * today), "next Friday" (the first Friday after today), and a date with a
- * year.
- *
- * ## Month ends (a day-count convention; flagged to the CEO)
- * - Forward, a day the month does not have is **clamped** to the month's last
- *   day: "due on the 31st" said on 10 Feb is 28 Feb. This is how the app
- *   rolls a monthly bill (`advanceOneCycle` in src/lib/date.ts clamps) and how
- *   US lenders set a due date in a short month.
- * - Backward, a day the month does not have is **skipped**: "on the 31st"
- *   said on 1 Oct is 31 Aug, because a purchase happened on a real calendar
- *   day and 30 Sep is not the 31st.
+ * ## Month ends
+ * - Forward, a day the month does not have is clamped to the month's last day: "due on the 31st"
+ *   said on 10 Feb is 28 Feb. This matches the monthly clamp in src/lib/date.ts and how US lenders
+ *   set a due date in a short month.
+ * - Backward, a day the month does not have is skipped: "on the 31st" said on 1 Oct is 31 Aug,
+ *   because a purchase happened on a real calendar day.
  * - A named calendar date that does not exist ("September 31st") is no date.
  */
 import { addDays, getDaysInMonth, toIsoDate } from '@/lib/date';
@@ -125,9 +118,8 @@ export const DATE_WORDS = new Set([
 ]);
 
 /**
- * Past tense on a bill or subscription turns a date backward. "was" counts
- * only with what was done ("was due", "was paid", "was on the 5th"): in "no,
- * it was 1850" it is about the amount, not the day.
+ * Past tense on a bill or subscription turns a date backward. "was" counts only with what was done
+ * ("was due", "was on the 5th"): in "no, it was 1850" it is about the amount, not the day.
  */
 const PAST_WORDS = [
   ['paid'],
@@ -192,7 +184,6 @@ export function datesRunBackward(tokens: readonly Token[], kind: string): boolea
   return hasPhrase(tokens, PAST_WORDS) && !hasPhrase(tokens, FUTURE_WORDS);
 }
 
-/** "5th", "fifth", "twenty first", "thirty first". */
 function readOrdinal(
   tokens: readonly Token[],
   start: number,
@@ -215,7 +206,6 @@ function readOrdinal(
   return null;
 }
 
-/** A day number after a month name: "3", "3rd", "three", "third". */
 function readDayNumber(
   tokens: readonly Token[],
   start: number,
@@ -239,7 +229,6 @@ function readYear(tokens: readonly Token[], start: number, usable: Usable): numb
   return integer >= 2000 && integer <= 2099 ? integer : null;
 }
 
-/** "a", "one", "3", "three" before "days ago" / "weeks ago". */
 function readCount(
   tokens: readonly Token[],
   start: number,
@@ -273,7 +262,6 @@ function readDateAt(tokens: readonly Token[], index: number, usable: Usable): Da
   const key = tokens[index].key;
   const at = (words: string[], from = index) => keysAt(tokens, from, words, usable);
 
-  // Fixed days.
   for (const lead of [
     ['the', 'day', 'before', 'yesterday'],
     ['day', 'before', 'yesterday'],
@@ -301,7 +289,6 @@ function readDateAt(tokens: readonly Token[], index: number, usable: Usable): Da
   if (key === 'tomorrow')
     return { start: index, end: index + 1, spec: { type: 'offset', days: 1 } };
 
-  // "3 days ago", "a week ago", "a month ago"; "in 3 days", "in a week".
   const count = readCount(tokens, key === 'in' ? index + 1 : index, usable);
   if (count) {
     const unit = usable(count.end) ? (tokens[count.end]?.key ?? '') : '';
@@ -317,7 +304,6 @@ function readDateAt(tokens: readonly Token[], index: number, usable: Usable): Da
     }
   }
 
-  // Weekdays, with what may lead them.
   const leads: [string[], 'last' | 'next' | 'direction'][] = [
     [['on', 'this', 'past'], 'last'],
     [['this', 'past'], 'last'],
@@ -346,7 +332,6 @@ function readDateAt(tokens: readonly Token[], index: number, usable: Usable): Da
     }
   }
 
-  // Ends and starts of the month.
   for (const phrase of [
     ['the', 'end', 'of', 'the', 'month'],
     ['end', 'of', 'the', 'month'],
@@ -368,13 +353,12 @@ function readDateAt(tokens: readonly Token[], index: number, usable: Usable): Da
       return { start: index, end: index + phrase.length, spec: { type: 'day', day: 1 } };
   }
 
-  // Slash dates: "10/3", "10/3/2026" (US order).
+  // Slash dates are US order: month first.
   if (tokens[index].type === 'slash') {
     const [month, day, year] = tokens[index].slash as [number, number, number | null];
     return { start: index, end: index + 1, spec: { type: 'monthDay', month, day, year } };
   }
 
-  // A month name with its day: "october 3rd", "oct the 3rd", "october 3, 2026".
   const onSkip = key === 'on' ? 1 : 0;
   const monthKey = usable(index + onSkip) ? tokens[index + onSkip]?.key : undefined;
   if (monthKey !== undefined && monthKey in MONTHS) {
@@ -390,18 +374,15 @@ function readDateAt(tokens: readonly Token[], index: number, usable: Usable): Da
     }
   }
 
-  // A day, with what may lead it: "on the 5th", "the fifth", "due the 15th", "on the 5".
   let lead = 0;
   if (at(['on', 'the'])) lead = 2;
   else if (key === 'the' || key === 'on') lead = 1;
   const before = tokens[index - 1]?.key;
   const ordinal = readOrdinal(tokens, index + lead, usable);
   if (ordinal) {
-    // A word ordinal needs "the", "on" or "due" in front ("my first coffee"
-    // is not a date); a written one ("5th") does not.
+    // A word ordinal needs "the", "on" or "due" in front ("my first coffee" is not a date).
     const led = lead > 0 || before === 'due' || before === 'the' || before === 'on';
     if (ordinal.digits || led) {
-      // "the 3rd of october".
       if (at(['of'], ordinal.end)) {
         const ofMonth = usable(ordinal.end + 1) ? tokens[ordinal.end + 1]?.key : undefined;
         if (ofMonth !== undefined && ofMonth in MONTHS) {
@@ -437,7 +418,6 @@ function readDateAt(tokens: readonly Token[], index: number, usable: Usable): Da
   return null;
 }
 
-/** Every spoken date phrase in the unclaimed tokens, in order. */
 export function findDates(tokens: readonly Token[], claimed: readonly boolean[]): DateSpan[] {
   const usable: Usable = (index) => index >= 0 && index < tokens.length && !claimed[index];
   const found: DateSpan[] = [];
@@ -462,7 +442,7 @@ function parseIso(iso: string): Date | null {
   return new Date(year, month - 1, day);
 }
 
-/** Day of a month (month zero-based here, as Date has it), or null when that month has no such day. */
+/** Day of a month (month zero-based, as Date has it), or null when that month has no such day. */
 function realDay(year: number, month: number, day: number): Date | null {
   const date = new Date(year, month, 1);
   const days = getDaysInMonth(date.getFullYear(), date.getMonth());
@@ -479,7 +459,6 @@ function resolveDayOfMonth(day: number, today: Date, backward: boolean): Date | 
   const year = today.getFullYear();
   const month = today.getMonth();
   if (backward) {
-    // Most recent month (this one included) that has this day, on or before today.
     for (let back = 0; back <= 12; back += 1) {
       const candidate = realDay(year, month - back, day);
       if (candidate && candidate <= today) return candidate;
@@ -508,7 +487,6 @@ function resolveMonthDay(
   return null;
 }
 
-/** yyyy-mm-dd for a spoken date, or null when it names no real day. */
 export function resolveDate(spec: DateSpec, backward: boolean, todayIso: string): string | null {
   const today = parseIso(todayIso);
   if (!today) return null;

@@ -6,21 +6,14 @@ import { warn } from '@/lib/haptics';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * Golden: exactly what the bill form's Save writes.
+ * Golden: exactly what the bill form's Save writes. Pins the object handed to create/update, the
+ * four hint words and their steps, the icon rule (only an Other bill keeps an icon of its own),
+ * 'period', and `starts_on` through floorAfterCharges.
  *
- * Written against the form before its values code moved into
- * `src/api/entry-values.ts`, and kept unchanged through that move. It pins the
- * object handed to create/update, the four hint words and the step each one
- * sends the person to, the icon rule (only an Other bill keeps an icon of its
- * own), 'period', and `starts_on` through floorAfterCharges.
- *
- * The leaf inputs are stubs that record their props, so a test can type into
- * them; the chips are the real ones and are pressed by their labels. The
- * primary button stub accepts a press even while disabled, which is the only
- * way to reach the checks inside Save.
+ * Leaf inputs are stubs that record their props; the chips are real. The primary button stub
+ * accepts a press even while disabled, the only way to reach the checks inside Save.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const mockProps: Record<string, any> = {};
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -30,7 +23,7 @@ jest.mock('react-native-keyboard-controller', () =>
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 jest.mock('@/lib/haptics', () => ({ success: jest.fn(), warn: jest.fn(), selection: jest.fn() }));
 
-// Ten categories with the app's labels; the real module draws lucide glyphs.
+// The real module draws lucide glyphs.
 jest.mock('@/data/bills-mock', () => ({
   BILL_CATEGORIES: [
     { id: 'housing', label: 'Housing' },
@@ -421,7 +414,6 @@ describe('Add bill — what an edit saves', () => {
         icon_id: null,
         recurrence: 'monthly',
         next_due_on: '2026-09-01',
-        // The start follows the due date shown, with nothing charged to floor it.
         starts_on: '2026-09-01',
         ends_on: null,
         card_id: 'card-1',

@@ -25,17 +25,11 @@ export type AmountKey = (typeof AMOUNT_KEYS)[number];
 const MAX_WHOLE_DIGITS = 9;
 
 /**
- * One keystroke against the draft amount.
- *
- * The rules are the ones the amount pad has always had; they only moved here
- * so the stepped flow and the modal cannot drift apart. Nothing rounds,
- * nothing is pre-filled, and the cap applies to *appended* keystrokes only —
- * a longer figure loaded from an existing record is never truncated, because
- * silently shortening money somebody already saved would be a lie about it.
+ * One keystroke against the draft amount. Nothing rounds or pre-fills, and the cap applies to
+ * *appended* keystrokes only: a longer figure loaded from a record is never truncated.
  */
 export function applyAmountKey(current: string, key: AmountKey): string {
   if (key === 'delete') return current.slice(0, -1);
-  // One decimal point, and at most two digits after it.
   if (key === '.') return current.includes('.') ? current : `${current || '0'}.`;
 
   const [whole, fraction] = current.split('.');
@@ -49,7 +43,6 @@ type AmountKeypadProps = {
   onKey: (key: AmountKey) => void;
 };
 
-/** The 4x3 layout, read off the one list of keys rather than written again. */
 const KEY_ROWS: AmountKey[][] = [
   AMOUNT_KEYS.slice(0, 3),
   AMOUNT_KEYS.slice(3, 6),
@@ -57,11 +50,6 @@ const KEY_ROWS: AmountKey[][] = [
   AMOUNT_KEYS.slice(9, 12),
 ];
 
-/**
- * The twelve tiles. Tonal fill, no border, no shadow — separation here comes
- * from the fill, and an outline around every key turns a keypad into a grid of
- * boxes to read rather than targets to hit.
- */
 export function AmountKeypad({ onKey }: AmountKeypadProps) {
   const colors = useColors();
 

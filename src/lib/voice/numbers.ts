@@ -1,15 +1,11 @@
 /**
- * Step 3a: one number, said in words or written in digits, as exact cents.
+ * One number, said in words or written in digits, as exact cents. Reads a single group ("forty
+ * five", "a grand", "one point two k", "$1,800", "12 hundred"); what a run of groups means as money
+ * is amount.ts.
  *
- * This reads a single *group*: "forty five", "two hundred and five",
- * "thirty seven hundred", "a grand", "one point two k", "$1,800", "1.2k",
- * "12 hundred". Deciding what a run of groups means as money (is "twelve
- * fifty" one amount or two? dollars-and-cents or hundreds?) is amount.ts.
- *
- * All arithmetic is in whole cents. Where a decimal has to be scaled
- * ("1.2k", "one point two five thousand") the figure goes through toCents,
- * which decides the half on 12 significant digits (src/lib/money.ts), so no
- * float drift reaches a figure.
+ * All arithmetic is in whole cents. A decimal that has to be scaled ("1.2k") goes through toCents,
+ * which decides the half on 12 significant digits (src/lib/money.ts), so no float drift reaches a
+ * figure.
  */
 import { toCents } from '@/lib/money';
 
@@ -70,14 +66,10 @@ export type Group = {
   start: number;
   /** Exclusive. */
   end: number;
-  /** Exact cents. */
   cents: number;
   /** Whole dollars when the group has no decimals; null otherwise. */
   whole: number | null;
-  /**
-   * 1–99 with no "$", no decimals, no scale word, and at most two words or
-   * two digits — the shape that can be the first half of "twelve fifty".
-   */
+  /** 1-99 with no "$", decimals or scale word: can be the first half of "twelve fifty". */
   simple: boolean;
   /** Simple and written or said as two digits (10–99, or "05"): a possible second half. */
   twoDigit: boolean;
@@ -88,14 +80,12 @@ export type Group = {
   /** Any scale word or suffix was used ("hundred", "thousand", "k"). */
   scaled: boolean;
   /**
-   * Whole cents as said: no digit past the cent after any scale ("$3.459" and
-   * "twelve point nine nine nine" are not; "one point two three four five k"
-   * is $1,234.50 and is). amount.ts never takes an inexact group as money.
+   * Whole cents as said: no digit past the cent after any scale ("$3.459" is not; "one point two
+   * three four five k" is $1,234.50 and is). amount.ts never takes an inexact group as money.
    */
   exact: boolean;
 };
 
-/** Decimal places a scale moves the point by: 100 → 2, 1000 → 3. */
 function placesOf(multiplier: number): number {
   return Math.round(Math.log10(multiplier));
 }
@@ -149,7 +139,6 @@ function scaleOf(key: string | null): number | null {
   return null;
 }
 
-/** A digit token, with a scale word after it: "1800", "$15.99", "12 hundred", "1.2 k". */
 function readDigits(tokens: readonly Token[], start: number, usable: Usable): Group | null {
   const literal = tokens[start].num;
   if (!literal) return null;
@@ -164,8 +153,7 @@ function readDigits(tokens: readonly Token[], start: number, usable: Usable): Gr
     const next = keyAt(tokens, end, usable);
     const multiplier = next === 'hundred' ? 100 : scaleOf(next);
     if (multiplier !== null) {
-      // From the figure as written, not its rounded cents: "1.2345 thousand"
-      // is $1,234.50.
+      // From the figure as written, not its rounded cents: "1.2345 thousand" is $1,234.50.
       cents = toCents(literal.value * multiplier);
       exact = literal.significantDecimals - placesOf(multiplier) <= 2;
       end += 1;
@@ -205,16 +193,12 @@ function readDigits(tokens: readonly Token[], start: number, usable: Usable): Gr
 }
 
 /**
- * Number words, the standard English way: units after tens ("forty five"),
- * "hundred" multiplies what came before ("thirty seven hundred" = 3,700,
- * "two hundred" = 200), "thousand"/"grand"/"k" close off a thousands part,
- * "and" may follow a scale ("two hundred and five"), "a" may start one
- * ("a hundred", "a grand").
+ * Number words, the standard English way: "hundred" multiplies what came before ("thirty seven
+ * hundred" = 3,700), "thousand"/"grand"/"k" close off a thousands part, "and" may follow a scale
+ * ("two hundred and five"), "a" may start one ("a grand").
  *
- * The group stops at the first word that cannot continue it. That is what
- * splits "twelve fifty" into twelve | fifty (a tens word cannot follow a
- * teen) and "one fifty" into one | fifty, leaving amount.ts to decide what
- * the pair means.
+ * The group stops at the first word that cannot continue it, which splits "twelve fifty" into
+ * twelve | fifty and leaves amount.ts to decide what the pair means.
  */
 function readWords(tokens: readonly Token[], start: number, usable: Usable): Group | null {
   let total = 0;
@@ -291,7 +275,6 @@ function readWords(tokens: readonly Token[], start: number, usable: Usable): Gro
   let exact = true;
   let end = index;
 
-  // "twelve point five", "one point two k".
   if (keyAt(tokens, end, usable) === 'point' && last !== 'thousand') {
     const fraction = readDecimals(tokens, end + 1, usable);
     if (fraction) {
@@ -329,7 +312,6 @@ function readWords(tokens: readonly Token[], start: number, usable: Usable): Gro
   };
 }
 
-/** One number group starting at `start`, or null when no number starts there. */
 export function readGroup(tokens: readonly Token[], start: number, usable: Usable): Group | null {
   const token = tokens[start];
   if (!token || !usable(start)) return null;

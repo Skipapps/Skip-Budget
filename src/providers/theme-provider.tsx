@@ -15,19 +15,10 @@ import { useColorScheme, View } from 'react-native';
 import { buildTokens, tokenVars, type ModeKey, type Scheme, type Tokens } from '@/theme/palette';
 
 /**
- * One place that decides what colour the app is.
- *
- * Every className in Skip already names a token — `bg-card`, `text-ink`,
- * `bg-control` — and those tokens are CSS variables. So repainting the app is
- * setting thirteen variables on one View rather than re-rendering a thousand
- * styles: the whole tree picks up the new values because it was never told the
- * old ones. `useColors()` covers the rest, the places a className cannot reach
- * — icon props and SVG fills.
- *
- * There is one theme; the only choice is light, dark, or follow the phone.
- * That choice is kept on the device rather than in the profile, because the
- * default is a property of the phone and not of the account, and reading it
- * locally means the first frame is already the right colour.
+ * Every className names a token (`bg-card`, `text-ink`) and tokens are CSS variables, so repainting
+ * is setting the variables on one View. `useColors()` covers what a className cannot reach: icon
+ * props and SVG fills. The mode is stored on the device, not the profile: the default belongs to
+ * the phone, and reading it locally makes the first frame the right colour.
  */
 
 const MODE_KEY = 'skip.theme.mode';
@@ -48,8 +39,7 @@ const isMode = (value: string | null): value is ModeKey =>
   value === 'light' || value === 'dark' || value === 'system';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // react-native's, not nativewind's: the phone's setting is an input here,
-  // not the answer. When the mode is light or dark this is ignored entirely.
+  // react-native's, not nativewind's: the phone's setting is only an input here.
   const phone = useColorScheme();
 
   const [mode, setModeState] = useState<ModeKey>('system');
@@ -61,8 +51,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       .then((stored) => {
         if (!cancelled && isMode(stored)) setModeState(stored);
       })
-      // A device that cannot read its own storage still gets an app, following
-      // the phone.
+      // Unreadable storage still gets an app, following the phone.
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setReady(true);
@@ -75,8 +64,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const scheme: Scheme = mode === 'system' ? (phone === 'dark' ? 'dark' : 'light') : mode;
   const colors = useMemo(() => buildTokens(scheme), [scheme]);
 
-  // Behind the app itself: what shows through during a navigation transition
-  // and under the keyboard. Left as it was, that stays white in dark mode.
+  // Behind the app itself: shows through during navigation transitions and under the keyboard, and
+  // would stay white in dark mode.
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.surface).catch(() => {});
   }, [colors.surface]);
@@ -104,34 +93,20 @@ export function useTheme(): ThemeValue {
   return value;
 }
 
-/**
- * The resolved colours, for the places a className cannot reach.
- *
- * Icon `color` props, SVG fills and native component options all want a raw
- * string. Everything else should stay on its Tailwind class, which follows the
- * theme on its own.
- */
+/** Resolved colours for what a className cannot reach: icon props, SVG fills, native options. */
 export function useColors(): Tokens {
   return useTheme().colors;
 }
 
-/**
- * The colour for a signed amount, in the current scheme.
- *
- * A hook rather than a plain function because the pair is not fixed: the deep
- * green that reads on off-white disappears on near-black, so dark mode carries
- * its own. Call sites are unchanged — they still ask for a colour by amount.
- */
+/** Colour for a signed amount; a hook because the money pair differs per scheme. */
 export function useMoneyColor(): (amount: number) => string {
   const colors = useColors();
   return useCallback(
     (amount: number) => {
       if (amount > 0) return colors.moneyIn;
       if (amount < 0) return colors.moneyOut;
-      // Zero is neither good news nor bad: plain ink. Returned explicitly
-      // rather than as undefined, because `{ color: undefined }` in a style
-      // prop still overrides the className colour when React Native flattens
-      // styles — which is how "$0.00" came out black on the dark theme.
+      // Zero is plain ink. Returned explicitly rather than undefined: `{ color: undefined }` in a
+      // style prop still overrides the className colour when React Native flattens styles.
       return colors.ink;
     },
     [colors],

@@ -12,7 +12,6 @@ import {
   isScanningAvailable,
 } from '../../modules/receipt-scanner';
 
-/** Everything a scan managed to work out, ready to become a receipt. */
 export type ScanDraft = {
   store: BrandSelection | null;
   /** Null when no total could be read with any confidence. */
@@ -24,21 +23,15 @@ export type ScanDraft = {
   /** Which fields were actually read, for telling someone what to check. */
   read: ('store' | 'date' | 'amount' | 'card')[];
   /**
-   * Whether this can be filed without asking anything.
-   *
-   * A receipt needs a store and an amount; everything else has a sensible
-   * default. Deliberately strict — filing a confident wrong total is worse
-   * than one extra screen, because nobody re-checks a row that looks fine.
+   * Whether this can be filed without asking anything: needs a store and an amount. Deliberately
+   * strict, since a confident wrong total is worse than one extra screen.
    */
   complete: boolean;
 };
 
 /**
- * Camera to draft receipt, in one call.
- *
- * Lives here rather than in a screen because two places need it: the receipts
- * list, where a complete scan is filed without leaving the page, and the add
- * form, where it fills the fields in place.
+ * Camera to draft receipt, in one call. Shared by the receipts list (a complete scan is filed in
+ * place) and the add form (it fills the fields).
  */
 export function useReceiptScan() {
   const [scanning, setScanning] = useState(false);
@@ -53,9 +46,8 @@ export function useReceiptScan() {
       const result = await captureReceipt();
       if (!result) return null;
 
-      // Prefer the positioned reading: a receipt is a two-column document, and
-      // flat text loses which figure belongs to which label. A build without it
-      // still returns the words.
+      // Prefer the positioned reading: a receipt is a two-column document, and flat text loses
+      // which figure belongs to which label.
       const parsed = result.lines?.length
         ? parseReceiptFromLines(result.lines)
         : parseReceipt(result.text);

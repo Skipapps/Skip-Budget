@@ -1,6 +1,4 @@
-/** Elevation presets. Kept here so cards and floating elements stay consistent. */
 export const shadows = {
-  /** Resting cards — barely there, just enough to lift off white. */
   card: {
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
@@ -8,13 +6,7 @@ export const shadows = {
     shadowRadius: 8,
     elevation: 2,
   },
-  /**
-   * Things meant to be pressed.
-   *
-   * Deeper than a resting card and paired with no border: an outline and a
-   * shadow together flatten each other out, and it is the shadow alone that
-   * makes a surface look like it would move under a finger.
-   */
+  /** Things meant to be pressed. No border: an outline and a shadow together flatten each other. */
   raised: {
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },

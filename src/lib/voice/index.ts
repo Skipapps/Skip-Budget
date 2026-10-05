@@ -1,7 +1,4 @@
-/**
- * Voice input parser: pure TypeScript, no React, no native, no network.
- * See parse.ts for the pipeline and each rule module for its rule.
- */
+/** Voice input parser: pure TypeScript, no React, native or network. See parse.ts. */
 export type {
   BrandRow,
   VoiceContext,

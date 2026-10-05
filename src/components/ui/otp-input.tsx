@@ -6,20 +6,15 @@ import { cn } from '@/lib/cn';
 type OtpInputProps = {
   value: string;
   onChangeText: (value: string) => void;
-  /** Number of digits. */
   length?: number;
   autoFocus?: boolean;
-  /** Called once the final digit is entered. */
   onComplete?: (value: string) => void;
   className?: string;
 };
 
 /**
- * Segmented code entry.
- *
- * Renders `length` boxes but keeps a single transparent TextInput stretched over
- * them. One input means iOS SMS autofill and paste drop the whole code in at
- * once, which per-box inputs cannot do, and there is no focus juggling.
+ * Segmented code entry: `length` boxes under a single transparent TextInput. One input means iOS SMS
+ * autofill and paste drop the whole code in at once, which per-box inputs cannot do.
  */
 export function OtpInput({
   value,
@@ -45,7 +40,6 @@ export function OtpInput({
       <View className="w-full flex-row justify-between gap-2">
         {Array.from({ length }).map((_, index) => {
           const digit = value[index] ?? '';
-          // Highlight the box the next digit will land in.
           const isCursor = focused && index === Math.min(value.length, length - 1);
 
           return (

@@ -3,14 +3,8 @@ import { render } from '@testing-library/react-native';
 import InsightsScreen from '@/app/insights';
 
 /**
- * Which three months "What you keep" shows.
- *
- * This card used to be `savings.slice(0, 3)`, which meant "the three most
- * recent" only for as long as the query happened to return them newest-first.
- * Flipping that order anywhere upstream would have shown the three *oldest*
- * months with no error and nothing on screen to say so — the exact failure the
- * ascending-order work could have caused. So the fixture hands the same six
- * months over in three different orders and pins the answer.
+ * "What you keep" shows the three most recent months whatever order the query returns them in: the
+ * fixture hands the same six months over in three orders and pins the answer.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -25,8 +19,8 @@ jest.mock('@/components/brands/brand-mark', () => ({ BrandMark: () => null }));
 jest.mock('@/components/bills/bill-mark', () => ({ BillMark: () => null }));
 jest.mock('@/components/pro/pro-gate', () => ({ useProGate: () => null }));
 
-// The category labels import SVGs through `@/assets/*`, which jest's `@/`
-// mapper points at `src/` and cannot resolve. No category is rendered here.
+// The category labels import SVGs through `@/assets/*`, which jest's `@/` mapper points at `src/`
+// and cannot resolve.
 jest.mock('@/data/bills-mock', () => ({ BILL_CATEGORIES: [] }));
 
 jest.mock('@/providers/theme-provider', () => ({

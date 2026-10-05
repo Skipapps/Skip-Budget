@@ -12,29 +12,22 @@ type DatePickerProps = {
   /** Date the picker opens on. */
   value: Date;
   /**
-   * Earliest date that can be chosen, inclusive.
-   *
-   * Earlier days are dimmed and dead, earlier months with them, and OK is held
-   * back while the draft sits before it — so a range that ends before it starts
-   * cannot be built in the first place, rather than being built and then
-   * refused.
+   * Earliest date that can be chosen, inclusive. Earlier days and months are dimmed and dead, and OK
+   * is held back while the draft sits before it, so a range that ends before it starts cannot be built.
    */
   minDate?: Date | null;
   onCancel: () => void;
   onConfirm: (date: Date) => void;
 };
 
-/** Midnight-to-midnight, so a time of day cannot decide a day comparison. */
+/** Midnight, so a time of day cannot decide a day comparison. */
 function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
 /**
- * Two-step date chooser: pick a month, then a day within it.
- *
- * Mount it only while open — the useState initialisers then reseed the draft on
- * every open, so no effect is needed to sync props into state, and Cancel
- * genuinely discards.
+ * Two-step date chooser: pick a month, then a day within it. Mount it only while open: the useState
+ * initialisers then reseed the draft on every open, and Cancel genuinely discards.
  */
 export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DatePickerProps) {
   const colors = useColors();
@@ -47,8 +40,8 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
   // Clamp: 31 → February must not produce an invalid date.
   const safeDay = Math.min(day, daysInMonth);
   const draft = new Date(year, month, safeDay);
-  // The draft can fall below the floor without anybody choosing a blocked day:
-  // stepping the year down keeps the day number and moves the date.
+  // The draft can fall below the floor without a blocked day being chosen: stepping the year down
+  // keeps the day number and moves the date.
   const belowFloor = minDate ? startOfDay(draft) < startOfDay(minDate) : false;
 
   const handleMonthPress = (index: number) => {
@@ -109,8 +102,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
             <View className="flex-row flex-wrap px-3 py-4">
               {MONTHS_SHORT.map((label, index) => {
                 const selected = index === month;
-                // Dead only when the whole month is below the floor; a month
-                // the floor falls inside still has days worth offering.
+                // Dead only when the whole month is below the floor.
                 const blocked = minDate
                   ? startOfDay(new Date(year, index, getDaysInMonth(year, index))) <
                     startOfDay(minDate)
@@ -185,8 +177,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              // On the month step this advances to the days rather than
-              // confirming — a month alone is not a date.
+              // On the month step this advances to the days: a month alone is not a date.
               disabled={step === 'day' && belowFloor}
               onPress={() => (step === 'month' ? setStep('day') : onConfirm(draft))}
               className={cn(

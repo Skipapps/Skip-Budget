@@ -1,22 +1,11 @@
 import { applyAmountKey } from './amount-keypad';
 
-// The rules under test are pure, but they live beside the tiles that draw
-// them. lucide ships ESM that Jest does not transform, so the glyphs are
-// stubbed rather than pulling a transform config in for a function that never
-// renders anything.
+// lucide ships ESM that Jest does not transform; the rules under test never render a glyph.
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
-// Same reason: the theme provider reaches for AsyncStorage's native module,
-// which does not exist under Jest. Neither it nor the glyphs are involved in
-// a keystroke rule — this is the pattern destination-list.test.tsx uses.
+// The theme provider reaches for AsyncStorage's native module, which does not exist under Jest.
 jest.mock('@/providers/theme-provider', () => ({ useColors: () => ({ ink: '#111111' }) }));
 
-/**
- * The keypad decides what string becomes an amount, so these are money rules
- * rather than interaction ones. They are the rules the amount pad has always
- * had; this file exists so moving them into a shared component cannot quietly
- * change what a person's keystrokes add up to.
- */
 describe('applyAmountKey', () => {
   it('appends digits', () => {
     expect(applyAmountKey('', '1')).toBe('1');
@@ -25,7 +14,7 @@ describe('applyAmountKey', () => {
 
   it('replaces a lone leading zero rather than keeping it', () => {
     expect(applyAmountKey('0', '7')).toBe('7');
-    // But only a lone one: 0.5 is a real figure and 10 is not "1" then "0".
+    // Only a lone one: 0.5 is a real figure and 10 is not "1" then "0".
     expect(applyAmountKey('0.', '5')).toBe('0.5');
     expect(applyAmountKey('1', '0')).toBe('10');
   });
@@ -53,7 +42,6 @@ describe('applyAmountKey', () => {
   });
 
   it('never truncates a longer figure that was loaded rather than typed', () => {
-    // The cap refuses new keystrokes; it does not reach into what is there.
     const loaded = '12345678901.23';
     expect(applyAmountKey(loaded, '4')).toBe(loaded);
     expect(applyAmountKey(loaded, 'delete')).toBe('12345678901.2');

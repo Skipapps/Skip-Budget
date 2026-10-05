@@ -14,14 +14,7 @@ import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
-/**
- * Everything shared, in one place.
- *
- * The quick calculator stays at the top and stays stateless. Most split bills
- * are one restaurant with people you will not split with again, and making that
- * cost a group — named, joined, later archived — would be a worse app for the
- * commonest case. Groups are for the flat, the trip, the ongoing thing.
- */
+/** The quick calculator stays stateless: most splits are one-offs that should not need a group. */
 export default function SplitsScreen() {
   const colors = useColors();
   const artwork = useArtwork();
@@ -122,18 +115,7 @@ export default function SplitsScreen() {
   );
 }
 
-/**
- * One group, as a card.
- *
- * A row in a list makes every group look like every other group, and the whole
- * point of opening this screen is to find one. So the name is set large and
- * heavy enough to be the thing the eye lands on, the icon gives it a shape to
- * be recognised by, and the figure sits underneath where it reads as a fact
- * about that group rather than a column to be scanned.
- *
- * Which way the money goes is said in words. A minus sign carries the entire
- * meaning of the number and is the easiest thing on the screen to miss.
- */
+/** One group as a card. Which way the money goes is said in words, not by a minus sign. */
 function GroupCard({
   id,
   name,
@@ -148,8 +130,7 @@ function GroupCard({
   onPress: () => void;
 }) {
   const colors = useColors();
-  // Half a cent, so a balance that is zero only through rounding still reads
-  // as settled rather than as a very small debt.
+  // Half a cent: a balance that is zero only through rounding reads as settled.
   const settled = Math.abs(balance) < 0.005;
   const owed = balance > 0;
 

@@ -3,13 +3,6 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import { LaunchSplash } from '@/components/launch-splash';
 
-/**
- * The launch video stands between the native splash and the app. The ways it
- * can go wrong are all about getting stuck — never hiding the native splash,
- * a video that never loads or never ends, or an invisible layer left over the
- * app eating the first taps — plus showing it wrong: cropped, or with sound.
- */
-
 // Reanimated's worklets need the native runtime, which Jest does not have.
 jest.mock('react-native-reanimated', () => {
   const { View } = jest.requireActual('react-native');
@@ -38,8 +31,8 @@ jest.mock('expo', () => ({
   },
 }));
 
-// The splash makes its player as soon as its module loads, before any test
-// body runs, so the stand-in lives inside the mock and is fetched from it.
+// The splash makes its player when its module loads, before any test body runs, so the stand-in
+// lives inside the mock.
 jest.mock('expo-video', () => {
   const { View } = jest.requireActual('react-native');
   const player = {
@@ -99,7 +92,6 @@ it('fits the whole video on screen, muted, without pausing other audio', async (
   await render(<LaunchSplash />);
 
   const video = screen.getByTestId('launch-video', HIDDEN);
-  // Never cropped: scaled to fit, the rest painted in the video's own cream.
   expect(video.props.contentFit).toBe('contain');
   expect(video.props.nativeControls).toBe(false);
   expect(AT_LOAD.muted).toBe(true);
@@ -146,7 +138,6 @@ it('plays to the end, then fades and leaves nothing over the app', async () => {
   expect(splash()).toBeTruthy();
   await wait(50);
   expect(splash()).toBeNull();
-  // And the decoder is freed rather than kept for the rest of the session.
   expect(mockPlayer.release).toHaveBeenCalledTimes(1);
 });
 

@@ -5,9 +5,8 @@ type IconProps = {
 };
 
 /**
- * Google "G" in its four brand colors. Intentionally has no `color` prop —
- * Google's brand guidelines require the mark keep its own palette, so it is
- * only legible on a light (outline) button, not on the dark filled one.
+ * Google "G" in its four brand colors. No `color` prop: Google's brand guidelines require the mark
+ * to keep its own palette, so it is only legible on a light (outline) button.
  */
 export function GoogleIcon({ size = 24 }: IconProps) {
   return (

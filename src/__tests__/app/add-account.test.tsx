@@ -4,11 +4,9 @@ import AddAccountScreen from '@/app/add-account';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * What the account editor does when it cannot read the account.
- *
- * `id` is what turns Save into an update, so the form used to open blank over a
- * real account the moment a read failed — and the field it would have blanked
- * is a balance. Every figure on the home page is walked forward from that one.
+ * The account editor must not open a blank form over a real account when the read fails: `id`
+ * turns Save into an update, and the field it would blank is the balance every home figure is
+ * walked forward from.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -19,8 +17,7 @@ jest.mock('react-native-keyboard-controller', () =>
 
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 jest.mock('@/components/cards/account-card', () => ({ AccountCard: () => null }));
-// Reanimated 4 wants a native worklets module; the swatches are the only thing
-// on the form that animates.
+// Reanimated 4 wants a native worklets module; the swatches are the only animated part of the form.
 jest.mock('@/components/ui/color-picker', () => ({ ColorPicker: () => null }));
 jest.mock('@/components/flow/amount-step', () => ({ AmountStep: () => null }));
 jest.mock('@/components/flow/inline-calendar', () => ({ InlineCalendar: () => null }));
@@ -134,7 +131,6 @@ describe('Add account — an edit whose account could not be read', () => {
     const { getByText, queryByText } = await render(<AddAccountScreen />);
 
     expect(getByText('Edit account')).toBeTruthy();
-    // An edit walks the flow from the amount, exactly as adding does.
     expect(getByText('What is in the account today?')).toBeTruthy();
     expect(queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(mockUseUpdate).toHaveBeenCalled();
@@ -152,10 +148,8 @@ describe('Add account — an edit whose account could not be read', () => {
 });
 
 /**
- * The walk-in sets pay first, so by the time the bank account is added its
- * payday and cycle are already known. Asking for them again was a second
- * answer nobody could see being used; switching the pay off is the one case
- * where this account needs pay — and a payday — of its own.
+ * The walk-in sets pay first, so the bank account does not ask for payday and cycle again;
+ * switching the pay off is the one case where it needs its own.
  */
 describe('Add account — pay set up before the account', () => {
   const toDetails = async () => {
@@ -213,10 +207,7 @@ describe('Add account — pay set up before the account', () => {
   });
 });
 
-/**
- * Income and payday are only asked for while adding an account, where they
- * make a salary source. An edit never saved them, so it does not ask.
- */
+/** Income and payday are asked only while adding (they make a salary source), not on edit. */
 it('does not ask for income or a payday when editing an account', async () => {
   mockAccount = {
     data: {

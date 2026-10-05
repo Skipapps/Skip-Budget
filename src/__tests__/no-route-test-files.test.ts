@@ -2,15 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * `src/app` is expo-router's route directory: every file under it becomes a
- * navigable screen, `.test.*` included. That has broken the dev client twice
- * on this branch already — a `.test.tsx` there drags
- * `@testing-library/react-native` (and its `require('console')`) into the
- * real app bundle, which Metro cannot resolve outside a test runner.
- *
- * This guard walks `src/app` itself rather than trusting a glob pattern
- * someone could mistype, so it fails loudly the moment a stray test file
- * lands back in the route tree — scratch, probe, or otherwise.
+ * `src/app` is expo-router's route directory: every file under it becomes a screen, `.test.*`
+ * included. A test file there drags `@testing-library/react-native` into the app bundle, which
+ * Metro cannot resolve outside a test runner. This walks `src/app` rather than trusting a glob.
  */
 
 const APP_DIR = path.join(__dirname, '..', 'app');

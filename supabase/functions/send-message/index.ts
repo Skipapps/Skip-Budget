@@ -1,16 +1,8 @@
-// Skip · send-message
+// Emails a note from inside the app to admin@skipapps.net.
 //
-// Takes a note from inside the app and emails it to admin@skipapps.net.
-//
-// It runs on the server for one reason: the alternative is handing the phone
-// an API key. Anything shipped in the app is readable by anyone who downloads
-// it, so a client-side send would publish a key that can email as your domain.
-// Here the key never leaves Supabase, and the function will only send for a
-// caller holding a valid session.
-//
-// The sender's address is not taken from the form either. It is read from the
-// verified session, so nobody can put somebody else's address on a message —
-// and it becomes the reply-to, so answering the email answers the person.
+// Server-side so the Resend API key never ships in the app, and only for a caller with a valid
+// session. The sender's address comes from the verified session, not the form, so nobody can put
+// someone else's address on a message; it becomes the reply-to.
 //
 // Deploy:  npx supabase functions deploy send-message
 // Secrets: npx supabase secrets set RESEND_API_KEY=re_...
@@ -26,7 +18,7 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-/** What the form is allowed to be about, and what it puts in the subject. */
+/** Allowed topics and the subject each puts on the email. */
 const TOPICS: Record<string, string> = {
   support: 'Support request',
   idea: 'Idea',
@@ -58,8 +50,7 @@ Deno.serve(async (request) => {
   const authorization = request.headers.get('Authorization');
   if (!authorization) return json({ error: 'Sign in first.' }, 401);
 
-  // The caller's own token, so getUser resolves to them and RLS would apply to
-  // anything else this function went on to read.
+  // The caller's own token, so getUser resolves to them and RLS applies to anything else read.
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -96,7 +87,6 @@ Deno.serve(async (request) => {
     body: JSON.stringify({
       from,
       to: [to],
-      // Replying to the email replies to the person who wrote it.
       reply_to: email,
       subject: `Skip · ${topic} from ${name || email}`,
       html: [
@@ -111,8 +101,7 @@ Deno.serve(async (request) => {
   });
 
   if (!response.ok) {
-    // The upstream reason is logged for us and not returned to the app: it can
-    // carry the sending domain and key state, which is nobody else's business.
+    // Logged, not returned to the app: the upstream reason can carry the sending domain and key.
     console.error('resend refused', response.status, await response.text());
     return json({ error: 'Could not send that. Try again in a moment.' }, 502);
   }

@@ -14,20 +14,12 @@ import { failureMessage } from '@/lib/failure';
 import { FREE_LIMITS } from '@/lib/wall';
 import { useUserId } from '@/providers/session-provider';
 
-/**
- * Naming a group and choosing how it settles.
- *
- * Two steps rather than three: a group has no amount and no date, so there is
- * no keypad step to open on. Settling is a genuine choice rather than a
- * default worth hiding, which is why it gets a step of its own to be explained
- * on instead of a switch buried under the name.
- */
+/** Two steps: a group has no amount or date, and how it settles is a choice worth explaining. */
 export default function AddGroupScreen() {
-  // Deep-link guard: opening a second group past the free allowance opens
-  // the case for Pro instead of a form the database would refuse. Groups you
-  // merely joined are not counted, and a closed group frees the slot —
-  // joining, spending and settling are never gated. Wrapper-shaped so the
-  // hook count never changes.
+  // Deep-link guard: a second open group past the free allowance opens Pro instead of a form the
+  // database would refuse. Groups you merely joined are not counted, a closed group frees the
+  // slot, and joining, spending and settling are never gated. Wrapper-shaped so the hook count
+  // never changes.
   const { pro, ready } = usePro();
   const userId = useUserId();
   const groups = useGroups();
@@ -43,8 +35,7 @@ export default function AddGroupScreen() {
 function AddGroupScreenInner() {
   const { names } = useLocalSearchParams<{ names?: string }>();
 
-  // Carried over from the quick calculator, so a one-off split that turned out
-  // to be ongoing does not have to be typed in twice.
+  // Carried over from the quick calculator.
   const carried = (names ?? '')
     .split(',')
     .map((entry) => entry.trim())
@@ -52,8 +43,6 @@ function AddGroupScreenInner() {
 
   const [name, setName] = useState('');
   const [simplify, setSimplify] = useState(true);
-  // A house rather than the neutral glyph: most groups are a flat or a shared
-  // household, and a default that is usually right saves a tap.
   const [iconId, setIconId] = useState('housing');
   const [step, setStep] = useState(0);
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
@@ -64,7 +53,6 @@ function AddGroupScreenInner() {
   const handleCreate = async () => {
     setError(null);
     if (!name.trim()) {
-      // The name lives on the first step, so that is where the message goes.
       warn();
       setError({ message: 'Give the group a name so you can tell it from the others.', step: 0 });
       setStep(0);
@@ -78,13 +66,11 @@ function AddGroupScreenInner() {
         iconId,
       });
 
-      // Added as placeholders — they are names off a calculator, not accounts.
-      // Each can be claimed later by whoever it belongs to.
+      // Placeholders (names off a calculator, not accounts); claimable later by whoever they are.
       for (const person of carried) {
         await addMember.mutateAsync({ groupId: group.id, displayName: person });
       }
-      // Replace, so backing out of the new group lands on the list rather than
-      // on the form that just created it.
+      // Replace, so backing out of the new group lands on the list, not this form.
       success();
       router.replace(`/split-group?id=${group.id}`);
     } catch (thrown) {

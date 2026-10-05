@@ -10,13 +10,7 @@ import { PRO_MONTHLY_LABEL, PRO_YEARLY_LABEL } from '@/lib/wall';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 
-/**
- * What a locked feature says for itself.
- *
- * Never "upgrade to continue". Three concrete benefits in the app's voice, a
- * quiet lock, then the price — so somebody who taps "Not now" leaves having
- * learned what the feature does, and that page earns the next tap too.
- */
+/** What a locked feature says for itself: its benefits first, the price last. */
 export default function ProFeatureScreen() {
   const colors = useColors();
   const artwork = useArtwork();
@@ -27,8 +21,6 @@ export default function ProFeatureScreen() {
 
   return (
     <Screen title="Skip Pro" showBack>
-      {/* The drawing stands on the page itself — the set is drawn on
-          transparency, and a grey plate behind it read as a placeholder. */}
       <View className="mt-4 w-full items-center py-4">
         <View className="h-[130px] w-[130px]">
           <Art width="100%" height="100%" />

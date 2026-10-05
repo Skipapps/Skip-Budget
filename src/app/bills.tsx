@@ -19,17 +19,9 @@ import { useMoneyColor } from '@/providers/theme-provider';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * What the bills have actually cost, over a window you choose.
- *
- * It answers the question the app exists for — where the money went — so it
- * lists the times a bill landed rather than the bills that produce them. A
- * monthly bill is one line here per month it has run, not one line forever.
- *
- * Kept to one job (the Founder's call, 2026-10-03): adding is the + in the
- * header, and a charge opens its bill's own page — details, paid and upcoming
- * charges, and the pencil to edit — because that is where people were
- * tapping. The full list of bills, including any with no charge in this
- * window, lives under Settings → Your money → Bills.
+ * What the bills have cost over a window: it lists the times a bill landed (a monthly bill is one
+ * line per month it ran), not the bills themselves. A charge opens its bill's page. The full list
+ * of bills, including any with no charge in the window, is under Settings → Your money → Bills.
  */
 export default function BillsScreen() {
   const artwork = useArtwork();
@@ -50,8 +42,7 @@ export default function BillsScreen() {
   const charges = useMemo(() => entries.filter((entry) => entry.kind === 'bill'), [entries]);
   const total = charges.reduce((sum, entry) => sum + entry.amount, 0);
 
-  // Oldest day first, today last — stated rather than inherited, so a reader
-  // does not have to know what `groupByDate` defaults to.
+  // Oldest day first, today last; stated rather than relying on groupByDate's default.
   const groups = useMemo(
     () =>
       groupByDate(charges, (entry) => entry.date, {
@@ -70,8 +61,6 @@ export default function BillsScreen() {
       onRefresh={refetch}
       headerActions={[{ icon: Plus, label: 'Add bill', onPress: () => router.push('/add-bill') }]}
     >
-      {/* One number, and the window it belongs to, side by side — the figure is
-          meaningless without knowing which stretch of time it covers. */}
       <View className="mt-3 w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
         <View className="w-full flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1">
@@ -79,8 +68,8 @@ export default function BillsScreen() {
               Bills charged
             </Text>
             <Text
-              // text-ink underneath: a zero total gets no money colour, and an
-              // unstyled figure is black — invisible in dark mode.
+              // text-ink underneath: a zero total gets no money colour, and an unstyled figure is
+              // black, invisible in dark mode.
               className="mt-0.5 font-poppins-bold text-[26px] text-ink"
               style={{ color: moneyColor(total) }}
               numberOfLines={1}
@@ -138,9 +127,6 @@ export default function BillsScreen() {
                     amount={entry.amount}
                     kindLabel={sourceLabels.get(entry.sourceId) ?? 'No payment method'}
                     kind="bill"
-                    // The issuer's logo when the bill has one (AEP, T-Mobile),
-                    // the category icon when not — it was never passed here,
-                    // so every bill on this page fell back to its glyph.
                     domain={entry.domain}
                     categoryId={entry.categoryId}
                     iconId={entry.iconId}

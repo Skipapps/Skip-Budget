@@ -21,7 +21,6 @@ const BASES: readonly AccrualBasis[] = ['actual/365', 'actual/360', '30/360', 'm
 const parseBasis = (value: string | undefined): AccrualBasis =>
   BASES.find((basis) => basis === value) ?? 'actual/365';
 
-/** The footnote has to describe the convention actually being shown. */
 const BASIS_FOOTNOTES: Record<AccrualBasis, string> = {
   'actual/365':
     'Interest accrues daily on what is still owed, so a 31-day month costs more than a 28-day one.',
@@ -33,21 +32,10 @@ const BASIS_FOOTNOTES: Record<AccrualBasis, string> = {
     'Interest is charged in monthly rests — one twelfth of the annual rate on what is still owed — so February costs the same as March. Any odd days before the first payment are charged on top, by the day.',
 };
 
-/**
- * Every payment, and where it goes.
- *
- * A total interest figure tells you a loan is expensive. This tells you why:
- * the first payments are mostly interest and the last are almost all balance,
- * and watching the bar flip over the term is the point of the screen.
- *
- * Grouped by year because a thirty-year mortgage is 360 rows, and a flat list
- * that long cannot be navigated — the year totals are also the figure people
- * actually want when they ask what a loan cost them last year.
- */
+/** Every payment and where it goes, grouped by year (a thirty-year loan is 360 rows). */
 export default function LoanScheduleScreen() {
-  // A wrapper, not an inline return: the screen below runs its own
-  // hooks, and an early return above them would change the hook count
-  // the moment the entitlement answer arrives — which React forbids.
+  // Wrapper, not inline: an early return above the screen's own hooks would change the hook count
+  // when the entitlement answer lands.
   const gate = useProGate('loans');
   if (gate) return gate;
   return <LoanScheduleScreenInner />;
@@ -74,9 +62,8 @@ function LoanScheduleScreenInner() {
   const start = params.start ? new Date(`${params.start}T00:00:00`) : new Date();
   const funded = params.funded ? new Date(`${params.funded}T00:00:00`) : undefined;
   const basis = parseBasis(params.basis);
-  // A loan already on file carries the payment the lender actually bills, which
-  // can sit a cent away from anything solved from first principles. When it is
-  // passed, it wins.
+  // A loan on file carries the payment the lender actually bills, which can sit a cent from the
+  // solved one. When passed, it wins.
   const contractPayment = Math.max(0, Number(params.payment) || 0);
   const extraMonthly = Math.max(0, Number(params.extra) || 0);
   const lumpAmount = Math.max(0, Number(params.lump) || 0);
@@ -111,9 +98,6 @@ function LoanScheduleScreenInner() {
 
       {years.map((year) => (
         <Fragment key={year.year}>
-          {/* Already the shared heading's size and weight. Left as its own
-              element because the year total has to be allowed to wrap, and
-              SectionHeading holds its caption to one line. */}
           <View className="mt-8 w-full flex-row items-baseline justify-between gap-3">
             <Text
               className="font-poppins-semibold text-[17px] text-ink"
@@ -168,8 +152,6 @@ function PaymentRow({ row }: { row: ScheduleRow }) {
         </Text>
       </View>
 
-      {/* Principal first, so the dark section growing left to right down the
-          list is the loan being paid off. */}
       <View className="mt-2 h-2 w-full flex-row overflow-hidden rounded-full bg-ink/5">
         <View style={{ flex: Math.max(row.principal, 0) }} className="bg-body" />
         <View style={{ flex: Math.max(row.interest, 0) }} className="bg-accent" />

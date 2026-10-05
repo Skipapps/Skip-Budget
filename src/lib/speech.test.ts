@@ -1,17 +1,13 @@
 /**
- * The speech wrapper, with Apple's recogniser replaced by a fake engine.
+ * The speech wrapper, with Apple's recogniser replaced by a fake engine. Pins the promise the voice
+ * pages build on: importing `src/lib/speech.ts` never throws, every failure comes back as a status,
+ * a session always lets go of its listeners and the audio session, and the alternatives are tidy,
+ * distinct, best first and at most three.
  *
- * What is pinned here is the promise the voice pages build on: importing
- * `src/lib/speech.ts` never throws, whatever the build; every way a session
- * can go wrong comes back as a status; a session always lets go of its
- * listeners and of the audio session; and the alternatives the parser gets
- * are tidy, distinct, best first and at most three.
- *
- * `native` is resolved once, when the file is first imported (the house
- * pattern, see modules/receipt-scanner), so every test re-imports it in an
- * isolated registry. React and the testing library are imported in the same
- * registry so the hook and the renderer share one React. The `/pure` entry
- * does not register its own afterEach, which would be illegal inside a test.
+ * `native` is resolved once, on first import, so every test re-imports in an isolated registry;
+ * React and the testing library are imported in the same registry so the hook and the renderer
+ * share one React. The `/pure` entry does not register its own afterEach, which would be illegal
+ * inside a test.
  */
 
 type Speech = typeof import('./speech');
@@ -74,7 +70,6 @@ const DENIED: Permission = {
 };
 const BEFORE = { category: 'soloAmbient', categoryOptions: [], mode: 'default' };
 
-/** A stand-in for ExpoSpeechRecognition with the calls the wrapper makes. */
 function fakeEngine() {
   const handlers = new Map<string, Set<Handler>>();
   const module = {
@@ -211,14 +206,13 @@ describe('a build without the native module', () => {
 });
 
 describe('the iOS Simulator', () => {
-  // On the Simulator the first microphone use waits on a macOS permission
-  // dialog, and Core Audio aborts the app if nobody answers in ~9s. Voice
-  // there never reaches the audio engine unless a developer opts in.
+  // On the Simulator the first microphone use waits on a macOS permission dialog and Core Audio
+  // aborts the app if nobody answers in ~9s, so voice never reaches the audio engine there unless
+  // a developer opts in.
   it('says unavailable without asking for permission or touching the engine', async () => {
     mockIsDevice = false;
     const engine = fakeEngine();
     const { speech, hook, start } = await mount(engine);
-    // The page and the mic stay visible so the state can be explained.
     expect(speech.isSpeechAvailable()).toBe(true);
     await start();
     expect(hook.result.current.status).toBe('unavailable');
@@ -427,14 +421,12 @@ describe('refreshPermission, for coming back from Settings', () => {
     await start();
     expect(hook.result.current.status).toBe('denied');
 
-    // The person turns both switches on in Settings and comes back.
     engine.module.getPermissionsAsync.mockResolvedValue(GRANTED);
     await rtl.act(() => hook.result.current.refreshPermission());
     expect(hook.result.current.status).toBe('idle');
     expect(engine.module.requestPermissionsAsync).not.toHaveBeenCalled();
     expect(engine.module.start).not.toHaveBeenCalled();
 
-    // And the next tap listens.
     await start();
     expect(hook.result.current.status).toBe('listening');
     await hook.unmount();
@@ -509,7 +501,6 @@ describe('listening', () => {
       iosTaskHint: 'dictation',
       volumeChangeEventOptions: { enabled: true, intervalMillis: 100 },
     });
-    // Trimmed, de-duplicated, blank-free and capped at Apple's 100.
     expect(request.contextualStrings).toHaveLength(100);
     expect(request.contextualStrings.slice(0, 3)).toEqual(['Netflix', 'Comcast', 'Shop 0']);
     expect(hook.result.current.status).toBe('listening');
@@ -545,7 +536,6 @@ describe('listening', () => {
     ]);
     expect(hook.result.current.interim).toBe('Netflix $15.99');
 
-    // The engine's `end` lets go of everything.
     await emit('end');
     expect(engine.listeners()).toBe(0);
     expect(engine.module.setCategoryIOS).toHaveBeenCalledWith(BEFORE);
@@ -729,7 +719,6 @@ describe('level, for the pulse', () => {
     expect(hook.result.current.level).toBeGreaterThan(0);
     await emit('result', final('electric bill 120'));
     expect(hook.result.current.level).toBe(0);
-    // A late meter reading after the outcome changes nothing.
     await emit('volumechange', { value: 9 });
     expect(hook.result.current.level).toBe(0);
     await hook.unmount();
@@ -775,7 +764,6 @@ describe('continuous, for hold-to-talk', () => {
     await emit('result', heard(true, ' $15.99', ' 15.99'));
     expect(hook.result.current.interim).toBe('Netflix $15.99');
 
-    // Release: the final is asked for, and listening holds until it lands.
     await rtl.act(() => hook.result.current.stop());
     expect(engine.module.stop).toHaveBeenCalledTimes(1);
     expect(hook.result.current.status).toBe('listening');
@@ -1009,7 +997,6 @@ describe('cancel and unmount', () => {
     await emit('end');
     expect(engine.listeners()).toBe(0);
 
-    // The next session starts cleanly once the last one has ended.
     await start();
     expect(engine.module.start).toHaveBeenCalledTimes(2);
     expect(hook.result.current.status).toBe('listening');

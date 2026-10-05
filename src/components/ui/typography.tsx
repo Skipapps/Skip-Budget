@@ -9,23 +9,16 @@ type TextProps = {
 };
 
 /**
- * Type scale. Sizes step up at the `compact`/`phone` breakpoints so headings
- * stay on a sensible number of lines from a 320pt phone up to a tablet, and
- * every style caps Dynamic Type growth so accessibility sizes never overflow.
+ * Type scale. Sizes step up at the `compact`/`phone` breakpoints, and every style caps Dynamic Type
+ * growth (`maxFontSizeMultiplier`) so accessibility sizes never overflow.
  */
 
 /**
- * Screen heading — the one big bold line at the top of a page.
+ * Screen heading: the one big bold line at the top of a page.
  *
- * Alignment is a prop, not a class: NativeWind will not let a passed
- * `text-left` beat the built-in `text-center`, so that override silently did
- * nothing on pages wanting a left-aligned heading.
- *
- * The gap under the safe area is the component's too, for the same reason: it
- * had drifted to mt-1, mt-2, mt-4, mt-6 and mt-10 across the app, so the first
- * line of every page landed somewhere slightly different. `flush` drops it for
- * the headings that are not the top of a page — one sitting in a row beside an
- * action, or inside a block that sets its own spacing.
+ * Alignment is a prop, not a class: NativeWind will not let a passed `text-left` beat the built-in
+ * `text-center`. The gap under the safe area belongs to the component so every page's first line
+ * lands in the same place; `flush` drops it for headings that are not the top of a page.
  */
 export function Title({
   children,
@@ -49,17 +42,9 @@ export function Title({
 }
 
 /**
- * The one section heading in the app.
- *
- * Every list, group and block on every screen is introduced by this and
- * nothing else: the same element was 15, 16, 17, 19, 20 and 21px across the
- * tabs, so swiping between Home, Cards and Insights changed the weight of the
- * page for no reason. One size settles that.
- *
- * The optional caption sits on the same baseline at the far right — the range
- * a list covers, or the window its figures are measured over. It is part of
- * the heading rather than a line of its own, because it only ever qualifies
- * the words next to it.
+ * The one section heading in the app: every list, group and block is introduced by this, at one size.
+ * The optional caption sits on the same baseline at the far right (the range a list covers) and only
+ * qualifies the words next to it.
  */
 export function SectionHeading({ children, caption, className }: TextProps & { caption?: string }) {
   return (
@@ -85,11 +70,8 @@ export function SectionHeading({ children, caption, className }: TextProps & { c
 }
 
 /**
- * Supporting line directly under a Title.
- *
- * Alignment is a prop, as on Title, because `cn` joins classes rather than
- * merging them: a `text-left` passed in sits beside the built-in `text-center`,
- * and the centre wins.
+ * Supporting line directly under a Title. Alignment is a prop, as on Title, because `cn` joins
+ * classes rather than merging them: a passed `text-left` sits beside `text-center`, and the centre wins.
  */
 export function Subtitle({
   children,
@@ -110,7 +92,6 @@ export function Subtitle({
   );
 }
 
-/** Paragraph copy. */
 export function Body({ children, className }: TextProps) {
   return (
     <Text
@@ -125,7 +106,6 @@ export function Body({ children, className }: TextProps) {
   );
 }
 
-/** Small label sitting above a form control. */
 export function FieldLabel({ children, className }: TextProps) {
   return (
     <Text
@@ -137,7 +117,6 @@ export function FieldLabel({ children, className }: TextProps) {
   );
 }
 
-/** Inline emphasis inside Body/Subtitle copy. */
 export function Strong({ children, className }: TextProps) {
   return <Text className={cn('font-poppins-semibold text-ink', className)}>{children}</Text>;
 }

@@ -12,9 +12,7 @@ type PaymentCardProps = {
 };
 
 export function PaymentCard({ card, placeholderHolder, style }: PaymentCardProps) {
-  // A card balance is stored as debt — a bigger number means more owed. On the
-  // face it is shown the way it affects you, which is negative: this is money
-  // already spent, not money sitting there waiting.
+  // Stored as debt (a bigger number is more owed); the face shows it as it affects you, negative.
   // Decided in cents: $0.40 still owed is owed, float dust is nothing.
   const owed = toCents(card.balance);
 
@@ -26,8 +24,7 @@ export function PaymentCard({ card, placeholderHolder, style }: PaymentCardProps
       meta={card.network}
       metaStyle="mark"
       amount={-card.balance}
-      // Overpaying a card leaves it in your favour, which is a different thing
-      // from owing nothing at all, and worth saying plainly.
+      // Overpaying leaves the card in your favour, which is not the same as owing nothing.
       caption={owed > 0 ? 'Owed' : owed < 0 ? 'In credit' : 'Nothing owed'}
       last4={card.last4}
       style={style}

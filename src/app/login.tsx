@@ -29,8 +29,7 @@ export default function LoginScreen() {
     setBusy(true);
     const { error: authError, needsConfirmation } = await signInWithEmail(email, password);
 
-    // An unverified account is not a failed login — it just has a step left.
-    // Send a fresh code and carry them to it rather than showing a dead error.
+    // An unverified account is not a failed login: send a fresh code and carry them to it.
     if (needsConfirmation) {
       await resendOtp(email, 'signup');
       setBusy(false);
@@ -92,8 +91,6 @@ export default function LoginScreen() {
       <View className="mt-auto w-full pt-10">
         <Button label={busy ? 'Signing in…' : 'Log in'} onPress={handleLogin} />
 
-        {/* Under the button, not buried in Settings: this is the moment the
-            agreement is actually being made. */}
         <View className="mt-5 w-full flex-row flex-wrap items-center justify-center">
           <Text
             className="font-poppins text-[12px] leading-[18px] text-muted"

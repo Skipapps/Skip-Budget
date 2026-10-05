@@ -52,13 +52,8 @@ const FEATURES: { icon: LucideIcon; title: string; hint: string }[] = [
 ];
 
 /**
- * The Pro page: six loaded rows before any price, yearly first and badged,
- * one Continue. Feature list is the hero — the eye counts what it gets before
- * it reads what it costs.
- *
- * With no store key configured it still renders everything and says purchases
- * are opening soon, because a page that crashes without its billing SDK would
- * fail the exact stability promise the wall was built on.
+ * The Pro page. With no store key configured it still renders and says purchases are opening soon,
+ * so a missing billing SDK never crashes it.
  */
 export default function ProScreen() {
   const colors = useColors();
@@ -72,13 +67,7 @@ export default function ProScreen() {
 
   const canBuy = purchasesAvailable() && Boolean(prices.data?.yearly || prices.data?.monthly);
 
-  /**
-   * What to say when there is nothing to buy, in the user's terms.
-   *
-   * No billing in this build is a fact about the version, so it says so. A
-   * store that could not be reached, or that sent back no plans, is a failure
-   * and says the one line every failure says.
-   */
+  // No billing in this build says so; a store that is unreachable or returns no plans is a failure.
   const storeNote = !purchasesAvailable()
     ? 'Purchases are not open in this version yet. Everything on this page is coming shortly.'
     : !canBuy && prices.isFetched
@@ -118,7 +107,6 @@ export default function ProScreen() {
     }
   };
 
-  // Already paying: status, not a sell.
   if (pro) {
     return (
       <Screen title="Skip Pro" showBack>
@@ -160,9 +148,6 @@ export default function ProScreen() {
             key={feature.title}
             className="w-full flex-row items-center gap-3 rounded-[16px] border border-line bg-card px-4 py-3"
           >
-            {/* A tonal well rather than an emoji: six different emoji fonts in
-                a column read as six different weights, and none of them take
-                the theme. */}
             <View className="h-10 w-10 items-center justify-center rounded-[12px] bg-ink/5">
               <feature.icon size={20} color={colors.body} strokeWidth={1.8} />
             </View>
@@ -185,8 +170,6 @@ export default function ProScreen() {
         ))}
       </View>
 
-      {/* Yearly leads, pre-selected: $19.99 against $23.88 of months is
-          honestly two months free, and the per-month line shrinks the anchor. */}
       <View className="mt-6 w-full gap-2.5">
         <PriceCard
           selected={plan === 'yearly'}
@@ -214,10 +197,7 @@ export default function ProScreen() {
         </Text>
       ) : null}
 
-      {/* When the store gives nothing, say why — a mute disabled button turns
-          every cause into the same mystery. What it never says is what the
-          store literally said: a RevenueCat exception is not a sentence anyone
-          can act on, and it is not what a paying customer should be reading. */}
+      {/* Never the store's own message: a RevenueCat exception means nothing to a customer. */}
       {storeNote ? (
         <Text
           className="mt-4 w-full text-center font-poppins text-[12px] leading-[17px] text-muted"
@@ -227,8 +207,6 @@ export default function ProScreen() {
         </Text>
       ) : null}
 
-      {/* The raw store reason, kept for whoever is wiring billing, and only
-          ever on a development build. */}
       {__DEV__ && devNote ? (
         <Text
           className="mt-2 w-full text-center font-poppins text-[10px] leading-[14px] text-muted"
@@ -254,9 +232,8 @@ export default function ProScreen() {
           onPress={canBuy ? handleContinue : () => void prices.refetch()}
           disabled={busy || prices.isFetching}
         />
-        {/* Text links, never pills: a pill next to the purchase button reads
-            as a second thing to buy. Restore keeps its own tap target — the
-            App Store expects it to be findable without hunting. */}
+        {/* Text links, not pills, so they do not read as a second thing to buy. Restore must stay
+            easy to find (App Store). */}
         <View className="w-full flex-row flex-wrap items-center justify-center gap-5">
           <TextLink label="Restore purchases" variant="subtle" onPress={handleRestore} />
           <TextLink

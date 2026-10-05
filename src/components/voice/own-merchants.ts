@@ -1,10 +1,6 @@
 /**
- * The names this person has already used, for the recogniser's vocabulary.
- *
- * Receipts first and by how often the shop comes up, then bills, then
- * subscriptions; each name once, whatever its case. These are the words most
- * likely to be said next, so they lead the list the speech engine is told to
- * listen for.
+ * The names this person has already used, for the recogniser's vocabulary: receipts first and by
+ * how often the shop comes up, then bills, then subscriptions; each name once, whatever its case.
  */
 export function ownMerchants(
   receipts: readonly { merchant: string }[] | undefined,

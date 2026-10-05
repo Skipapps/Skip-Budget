@@ -22,16 +22,12 @@ type ReviewRowProps = {
 };
 
 /**
- * One line of what Skip heard: label above value, a chevron to change it.
+ * One line of what Skip heard: label above value, a chevron to change it. Unlike SettingsRow it can
+ * say "this is still needed": a missing required field gets an accent well with a plus and "Tap to
+ * add", and no red, because nothing has gone wrong yet.
  *
- * Not SettingsRow, which puts the value first and has no way to say "this is
- * still needed". A missing required field gets an accent well with a plus and
- * the words "Tap to add" — and no red, because nothing has gone wrong yet.
- *
- * The words are ink, not accent ink. Accent ink is made legible against the
- * page, and on a card in dark mode it fell under 4.5:1 for four accents —
- * plum, the default, at 3.82:1. The well keeps the colour; the words keep the
- * contrast.
+ * The words are ink, not accent ink: accent ink is made legible against the page, but on a card in
+ * dark mode it falls under 4.5:1. The well keeps the colour; the words keep the contrast.
  */
 export function ReviewRow({ label, value, required, leading, onPress }: ReviewRowProps) {
   const colors = useColors();

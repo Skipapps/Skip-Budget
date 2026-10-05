@@ -5,9 +5,8 @@ import type { ReactNode } from 'react';
 import { usePastCharges } from '@/api/past-charges';
 
 /**
- * Editing a plan that has already been charged asks whether the charges behind
- * it change too — and only then. A save with nothing to ask about behaves
- * exactly as it did before the question existed.
+ * Editing a plan that has already been charged asks whether the charges behind it change too, and
+ * only then.
  */
 
 const mockAsk = jest.fn();

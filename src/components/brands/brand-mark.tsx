@@ -10,12 +10,8 @@ type BrandMarkProps = {
 };
 
 /**
- * The logo for a list row, resolved from a merchant string.
- *
- * Rows store what the shop printed, not a brand id — older receipts and
- * anything typed by hand never had one. Looking the name up here keeps that
- * detail out of every row component, and the directory is one cached query
- * shared by all of them rather than a request per row.
+ * The logo for a list row, resolved from a merchant string: rows store what the shop printed, not a
+ * brand id. Looking it up here keeps that out of every row, and the directory is one cached query.
  */
 export function BrandMark({ name, domain, size = 44 }: BrandMarkProps) {
   const { data: directory = [] } = useBrandDirectory();

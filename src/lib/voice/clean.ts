@@ -1,10 +1,8 @@
 /**
- * Step 1: lowercase, split into tokens, drop filler words.
+ * Lowercase, split into tokens, drop filler words.
  *
- * iOS writes most numbers as digits ("$15.99", "1,800", "$1.2k", "5th",
- * "12:50"), so the tokenizer keeps each of those whole rather than splitting
- * on the punctuation inside them. Everything else is split on anything that
- * is not a letter, a digit or an apostrophe inside a word.
+ * iOS writes most numbers as digits ("$15.99", "1,800", "$1.2k", "5th", "12:50"), so each is kept
+ * whole rather than split on the punctuation inside it.
  */
 import { toCents } from '@/lib/money';
 
@@ -13,11 +11,7 @@ export type NumberLiteral = {
   value: number;
   /** Cents the digits say, after a "k" suffix. Rounded only if `exact` is false. */
   cents: number;
-  /**
-   * The figure is whole cents as written ("3.450" is, "3.459" is not, "1.2345k"
-   * is $1,234.50 and is). A figure that is not is never an amount: rounding it
-   * would show a number nobody said.
-   */
+  /** Whole cents as written ("3.450" is, "3.459" is not, "1.2345k" is). Otherwise never an amount. */
   exact: boolean;
   /** Decimal places that carry a digit: "3.450" → 2, "3.459" → 3. */
   significantDecimals: number;
@@ -27,7 +21,6 @@ export type NumberLiteral = {
   digits: number;
   decimals: number;
   dollar: boolean;
-  /** Written with thousands commas. */
   grouped: boolean;
   thousands: boolean;
 };
@@ -47,7 +40,6 @@ export type Token = {
   slash?: [number, number, number | null];
 };
 
-/** Words that carry nothing a form needs. "Like" is the big one in speech. */
 const FILLER_WORDS = new Set([
   'um',
   'umm',
@@ -100,10 +92,8 @@ const FILLER_PHRASES: string[][] = [
 ];
 
 /**
- * Slash dates, clock times, digit ordinals, money-shaped numbers, words — in
- * that order, so "10/3" is not read as two numbers and "5th" not as 5.
- * A number must not run straight into a letter: "5pm" stays one word and is
- * never an amount.
+ * Slash dates, clock times, digit ordinals, money-shaped numbers, words, in that order, so "10/3"
+ * is not two numbers and "5th" not 5. A number must not run into a letter: "5pm" stays one word.
  */
 const TOKEN =
   /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)(?![\d/])|(\d{1,2}:\d{2})(?!\d)|(\d{1,2}(?:st|nd|rd|th))(?![a-z\d])|(\$?(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+)k?)(?![a-z\d])|([a-z\d]+(?:'[a-z]+)*)/g;
@@ -115,7 +105,6 @@ function normalise(raw: string): string {
       .replace(/[‘’ʼ`´]/g, "'")
       // "5 p.m." → "5 pm", so the time is one word and not "p" + "m".
       .replace(/\b([ap])\.\s?m\b\.?/g, '$1m')
-      // "$ 15" → "$15".
       .replace(/\$\s+(?=[\d.])/g, '$')
       // "$15.99/mo" → "$15.99 per mo". Digit/digit is a date and stays.
       .replace(/(\d)\s*\/\s*(?=[a-z])/g, '$1 per ')
@@ -123,7 +112,6 @@ function normalise(raw: string): string {
       .replace(/&/g, ' and ')
       .replace(/\+/g, ' plus ')
       .replace(/%/g, ' percent ')
-      // "forty-five", "T-Mobile", "7-Eleven", "wi-fi".
       .replace(/[-‐-―_]/g, ' ')
   );
 }
@@ -143,8 +131,7 @@ function readNumber(raw: string): NumberLiteral {
 
   return {
     value,
-    // toCents decides the half on 12 significant digits, so "1.2k" is
-    // 120000 cents and not 119999.99999999999.
+    // toCents rounds on 12 significant digits, so "1.2k" is 120000 cents, not 119999.99999999999.
     cents: toCents(thousands ? value * 1000 : value),
     exact: significantDecimals - (thousands ? 3 : 0) <= 2,
     significantDecimals,

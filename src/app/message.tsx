@@ -8,15 +8,6 @@ import { Screen } from '@/components/ui/screen';
 import { Strong, Subtitle } from '@/components/ui/typography';
 import { useColors } from '@/providers/theme-provider';
 
-/**
- * The philosophy screen, structured as a belief rather than a disclaimer.
- *
- * The same message it always carried, re-shaped: three paragraphs of equal
- * grey weight read like fine print, so the page now leads with one line,
- * makes its argument as three named pillars the eye can take in at a glance,
- * and lets the ledger line sit on a tinted card where it reads as a
- * conviction instead of a footnote.
- */
 export default function MessageScreen() {
   return (
     <Screen
@@ -46,8 +37,6 @@ export default function MessageScreen() {
         />
       </View>
 
-      {/* The belief, on its own tinted surface. Grey italic floating in the
-          page read as a footnote; the card makes it the point. */}
       <View className="mt-6 w-full rounded-[16px] bg-accent/10 px-5 py-4">
         <QuoteLine>
           “People once recorded every penny in a ledger. Skip brings that same financial awareness
@@ -65,7 +54,6 @@ export default function MessageScreen() {
   );
 }
 
-/** One named pillar: a tinted icon chip, a word, and the line behind it. */
 function Pillar({ icon: Icon, title, line }: { icon: LucideIcon; title: string; line: string }) {
   const colors = useColors();
   return (
@@ -88,7 +76,6 @@ function Pillar({ icon: Icon, title, line }: { icon: LucideIcon; title: string; 
   );
 }
 
-/** The pull quote's type: italic, in the tint's own ink. */
 function QuoteLine({ children }: { children: React.ReactNode }) {
   const colors = useColors();
   return (

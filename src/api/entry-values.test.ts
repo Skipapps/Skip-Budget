@@ -9,10 +9,9 @@ import {
 } from '@/api/entry-values';
 
 /**
- * The shared builders, on their own. The screen-level proof that they are the
- * forms' own Save is `src/__tests__/app/add-*-save.test.tsx`; these pin each
- * rule directly, with the same fixtures, so the voice review page can rely on
- * them without a form on screen.
+ * The shared builders, on their own: these pin each rule directly, with the same fixtures as
+ * `src/__tests__/app/add-*-save.test.tsx`, so the voice review page can rely on them without a
+ * form on screen.
  */
 
 const SOURCES = [

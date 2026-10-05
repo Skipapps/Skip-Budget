@@ -1,9 +1,3 @@
-/**
- * Placeholder subscriptions. Sample data only — replaced once subscriptions
- * come from the database.
- *
- * No icon field yet: what sits in the row's leading circle is still undecided.
- */
 export const BILLING_CYCLES = [
   { value: 'monthly', label: 'Monthly' },
   { value: 'yearly', label: 'Yearly' },

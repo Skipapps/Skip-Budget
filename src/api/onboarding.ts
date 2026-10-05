@@ -23,18 +23,10 @@ export type SetupStep = {
 };
 
 /**
- * The five setup steps, derived rather than stored — the one definition the
- * walk-in flow (/setup) and Home's Getting Started card both read, so the
- * two can never disagree about what is done.
- *
- * Every tick is read from the data the step creates: a salary row means pay
- * is set, the same rule the balances follow. The only stored fact is the
- * dismissal, because "stop showing me this" leaves no other trace.
- *
- * The order is the argument: pay first, because every good number in the app
- * is downstream of income; then somewhere for spending to live, then the
- * bills that drain it. The receipt is optional — the habit matters, but a
- * checklist that cannot be finished without inventing a purchase is a lie.
+ * The five setup steps, derived rather than stored: the one definition that /setup and Home's
+ * Getting Started card both read. Each tick comes from the data the step creates; the only stored
+ * fact is the dismissal. The receipt is optional, since a checklist that needs an invented purchase
+ * is a lie.
  */
 export function useGettingStarted() {
   const profile = useProfile();
@@ -58,9 +50,8 @@ export function useGettingStarted() {
       href: '/salary',
     },
     {
-      // The card is the step; the account is offered right after it saves
-      // (the Cards tab asks), and skipping the offer still ticks the step —
-      // an unticked row after adding a card read as "it did not save".
+      // Skipping the account offer still ticks the step: an unticked row after adding a card read
+      // as "it did not save".
       id: 'wallet',
       title: 'Add your credit card and bank account',
       detail:
@@ -94,13 +85,10 @@ export function useGettingStarted() {
   ];
 
   const doneCount = steps.filter((step) => step.done).length;
-  // What the walk-in flow gates on: the receipt never holds anybody hostage.
   const requiredDone = steps.every((step) => step.optional || step.done);
 
-  // Still loading reads as dismissed, so neither surface can flash at people
-  // who finished setup months ago while their rows are on the way in.
-  // Receipts too: an account whose only entries are receipts is still a
-  // returning one, and the walk-in decides that from these rows.
+  // Still loading reads as dismissed, so neither surface flashes at people who finished setup.
+  // Receipts count: an account whose only entries are receipts is still a returning one.
   const settled =
     Boolean(profile.data) &&
     !salary.isPending &&

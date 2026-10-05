@@ -16,14 +16,11 @@ import {
 } from '@/lib/voice-draft';
 
 /**
- * The add forms opened by "More options" on the voice review page.
- *
- * What arrives is the review page's edited copy as route params
- * (`entryToForm`), and the form opens with it in place: a bill with a known
- * category skips its chooser, and a receipt is filed as a voice capture with
- * no scan report. Saving goes back to Home with `dismissTo`, so nothing can
- * land on the review page again and file the same thing twice; a form opened
- * any other way still goes back.
+ * The add forms opened by "More options" on the voice review page. What arrives is the review
+ * page's edited copy as route params (`entryToForm`): a bill with a known category skips its
+ * chooser, and a receipt is filed as a voice capture with no scan report. Saving goes back to Home
+ * with `dismissTo`, so nothing can land on the review page again and file the same thing twice; a
+ * form opened any other way still goes back.
  */
 
 const mockProps: Record<string, any> = {};

@@ -2,11 +2,6 @@ import { fireEvent, render } from '@testing-library/react-native';
 
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
-/**
- * Two short choices sit side by side; anything longer stacks, so a label is
- * never cut to "Delete every…" on a small phone.
- */
-
 jest.mock('@/theme/shadows', () => ({ shadows: { floating: {} } }));
 
 const rowOf = (node: { parent?: unknown; props?: { className?: string } } | null) => {

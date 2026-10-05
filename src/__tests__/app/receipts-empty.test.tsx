@@ -4,12 +4,8 @@ import { router } from 'expo-router';
 import ReceiptsScreen from '@/app/receipts';
 
 /**
- * The first receipt never starts at a paywall.
- *
- * Scanning is Pro. The empty page used to lead with "Scan a receipt" wherever
- * the device could scan, so a free account's first tap on Receipts landed on
- * the Pro pitch. The empty page adds a receipt by hand; Scan is still in the
- * header for whoever wants it.
+ * The first receipt never starts at a paywall: scanning is Pro, so the empty page adds a receipt by
+ * hand and Scan stays in the header.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -38,7 +34,6 @@ jest.mock('@/api/refresh', () => ({
 }));
 
 const mockScan = jest.fn();
-// A device that can scan: the case where the empty page used to offer it.
 jest.mock('@/api/scan', () => ({
   useReceiptScan: () => ({ scan: mockScan, scanning: false, available: true }),
   draftToParams: () => ({}),

@@ -59,7 +59,7 @@ const FIELD_WORDS: Record<ScanField, string> = {
   card: 'card',
 };
 
-/** "store, date and amount" — an Oxford-free list, because it is read aloud. */
+/** "store, date and amount": no Oxford comma, because it is read aloud. */
 function listWords(fields: ScanField[]): string {
   const words = fields.map((field) => FIELD_WORDS[field]);
   if (words.length <= 1) return words[0] ?? '';
@@ -102,12 +102,8 @@ type ScanParams = {
 };
 
 /**
- * A reading that arrives as route params: a scan, or what the voice review
- * page heard.
- *
- * The fields it did get are already in place and only the gap needs typing.
- * Every param goes through the strict readers, so a link carrying a bad
- * amount, date or id opens with that field blank rather than wrong.
+ * A reading that arrives as route params (a scan, or what the voice review page heard). Every param
+ * goes through the strict readers, so a bad amount, date or id opens blank rather than wrong.
  */
 function fromScanParams(params: ScanParams): { initial: Initial; result: ScanResult | null } {
   const voice = params.scannedVia === 'voice';
@@ -135,19 +131,12 @@ function fromScanParams(params: ScanParams): { initial: Initial; result: ScanRes
       note: '',
       captureSource: voice ? 'voice' : 'scan',
     },
-    // The report is camera wording ("Read the store, date and amount"); a
-    // voice hand-off has none, because its fields being filled is the message.
+    // The report is camera wording ("Read the store, date and amount"); a voice hand-off has none.
     result: voice ? null : { read, missed: ALL_FIELDS.filter((field) => !read.includes(field)) },
   };
 }
 
-/**
- * Loads the row being edited, then hands it to the form as initial state.
- *
- * The form is keyed on the id so it remounts once the row lands, which is how
- * state gets seeded from data without an effect that writes state during
- * render and fights the user's own edits afterwards.
- */
+/** Keyed on the id so the form remounts once the row lands, seeding state without an effect. */
 export default function AddReceiptScreen() {
   const params = useLocalSearchParams<{ id?: string } & ScanParams>();
   const { id } = params;
@@ -158,9 +147,7 @@ export default function AddReceiptScreen() {
   const existing = receipt.data ?? null;
 
   if (id && !existing) {
-    // A read that failed is not a receipt that is gone, and it is certainly
-    // not a new one: silently dropping the id would file a second copy of a
-    // receipt that already exists. So the screen says so and offers the retry.
+    // A failed read is neither a gone receipt nor a new one: dropping the id files a second copy.
     if (receipt.isError) {
       return (
         <Screen showBack>
@@ -178,8 +165,7 @@ export default function AddReceiptScreen() {
       );
     }
 
-    // The shell with the fields greyed out, never a $0 figure: a placeholder
-    // amount on a receipt that is still loading is a wrong number on screen.
+    // Skeletons, never a $0 figure for a receipt still loading.
     if (!receipt.isFetched) {
       return (
         <StepFlow
@@ -201,10 +187,8 @@ export default function AddReceiptScreen() {
       );
     }
 
-    // The lookup ran and came back empty — deleted from another screen, or a
-    // stale link. An update filtered on an id that matches nothing reports
-    // success and writes nothing, so an edit would animate, return to the list
-    // and lose everything typed.
+    // The lookup came back empty (deleted elsewhere, or a stale link). An update on an id that
+    // matches nothing reports success and writes nothing.
     return (
       <Screen showBack>
         <PageState
@@ -268,9 +252,6 @@ function ReceiptForm({
   const [note, setNote] = useState(initial.note);
   const [captureSource, setCaptureSource] = useState(initial.captureSource);
 
-  // Editing walks the flow from the start, amount first, exactly as adding
-  // does — every figure is in front of the person before Save, not just the
-  // ones on the page an edit happened to open on.
   const [step, setStep] = useState(0);
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
@@ -287,10 +268,8 @@ function ReceiptForm({
   const ask = useDialog();
   const { pro } = usePro();
 
-  /**
-   * Any hand edit retires the scan report. Telling someone to check the amount
-   * after they have just corrected it is worse than saying nothing.
-   */
+  // A hand edit retires the scan report: telling someone to check an amount they just corrected is
+  // worse than silence.
   const edited =
     <T,>(set: (value: T) => void) =>
     (value: T) => {
@@ -349,8 +328,6 @@ function ReceiptForm({
 
     setCaptureSource(from);
     setError(null);
-    // Naming what was and was not read is the difference between trusting the
-    // scan and re-checking every field by hand.
     setScanResult(
       filled === 0
         ? { read: [], missed: ['store', 'date', 'amount'] }
@@ -363,15 +340,6 @@ function ReceiptForm({
     );
   };
 
-  /**
-   * Straight to the camera.
-   *
-   * There used to be a dialog here explaining how to hold a receipt. It was a
-   * tap in front of the one thing this button exists to do, and it appeared
-   * every single time — advice you have read once is noise the second time.
-   * The framing hint now lives under the viewfinder, where it is useful while
-   * the shot is being lined up rather than before the camera is even open.
-   */
   const handleScan = async () => {
     setError(null);
     setScanResult(null);
@@ -381,8 +349,7 @@ function ReceiptForm({
       return;
     }
 
-    // Scanning only exists on real hardware. Saying so beats a button that
-    // silently does nothing, and beats hiding it so the feature looks unbuilt.
+    // Scanning needs real hardware; say so rather than leave a button that silently does nothing.
     if (!isCaptureAvailable() && !isScanningAvailable()) {
       await ask({
         title: 'Scanning needs a camera',
@@ -468,22 +435,19 @@ function ReceiptForm({
     else if (where === 'files') await pickFile();
   };
 
-  /** A check for a field on an earlier step sends you back to that step. */
   const fail = (message: string, atStep: number) => {
     warn();
     setError({ message, step: atStep });
     setStep(atStep);
   };
 
-  /** Where a saved receipt leaves to. */
   const leave = () => {
     if (!fromVoice) {
       router.back();
       return;
     }
     router.dismissTo('/home');
-    // Saved, so what was heard has done its job; the person's words do not
-    // stay in memory for the next session to find.
+    // Saved, so the person's words do not stay in memory for the next session.
     clearVoiceDraft();
   };
 
@@ -555,15 +519,11 @@ function ReceiptForm({
         else setStep((current) => current - 1);
       }}
       question={question}
-      // Capture sits above the question, not below the fields: reading a paper
-      // receipt fills the amount, the store and the date at once, so it belongs
-      // before the first of them is asked for.
+      // Capture sits above the question: a paper receipt fills amount, store and date at once.
       headerSlot={
         step === 0 ? (
           <View className="w-full gap-2">
             {!editing && isRecognitionAvailable() ? (
-              // Two full-width capture doors, side by side. The helper line
-              // they used to carry lives on as their accessibility labels.
               <View className="w-full flex-row gap-3">
                 <CaptureButton
                   icon={ScanLine}
@@ -697,25 +657,14 @@ function ReceiptForm({
 type CaptureButtonProps = {
   icon: LucideIcon;
   label: string;
-  /** The words the removed helper line used to say, read out per button. */
+  /** Read out as the accessibility hint. */
   hint: string;
   onPress: () => void;
   disabled?: boolean;
-  /**
-   * Shows the small PRO pill. Passed as `!pro`, so a paying account never
-   * sees a sticker on a door it owns — the pill is the price tag, not the
-   * lock; the tap itself still decides where it leads.
-   */
+  /** The small PRO pill. Passed as `!pro` so a paying account sees no sticker. */
   proBadge?: boolean;
 };
 
-/**
- * One of the two capture doors above the amount step.
- *
- * Half the row each rather than a pill in the middle: reading a paper receipt
- * is the fastest way through this whole flow, so the two ways in are sized
- * like the main event and not like a header accessory.
- */
 function CaptureButton({
   icon: Icon,
   label,

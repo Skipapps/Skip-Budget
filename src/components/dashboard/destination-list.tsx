@@ -19,12 +19,8 @@ import { useColors, useMoneyColor } from '@/providers/theme-provider';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * The glyph for each dashboard destination.
- *
- * The same marks as the Quick add cards above the list: adding a bill and
- * seeing your bills are the same thing to the eye, so they wear the same
- * picture. Anything not listed falls back to a document, so an id added later
- * renders a real icon rather than an empty circle.
+ * Glyph per dashboard destination, matching the Quick add cards. Unknown ids fall back to a
+ * document.
  */
 const DESTINATION_ICONS: Record<string, LucideIcon> = {
   'monthly-bills': Calendar,
@@ -48,14 +44,8 @@ type DestinationListProps = {
 };
 
 /**
- * Where this month's money went, as one list rather than a carousel.
- *
- * Five destinations with five figures is a comparison, and a comparison wants
- * a single column of amounts you can run your eye down — not a horizontal
- * scroller that hides three of them behind a gesture and spends a 150pt
- * square on a drawing to report one number. It also puts these amounts in the
- * same grammar as the transaction rows further down the screen, so the
- * dashboard reads as one page instead of three stacked widgets.
+ * Where this month's money went, as one list rather than a carousel: a comparison wants a single
+ * column of amounts, in the same grammar as the transaction rows below.
  */
 export function DestinationList({
   items,
@@ -76,9 +66,8 @@ export function DestinationList({
           const Icon = DESTINATION_ICONS[category.id] ?? DESTINATION_FALLBACK_ICON;
           const amount = amounts[category.id];
           const isMoneyRow = amount !== undefined;
-          // Locked features keep their row. A hidden feature sells nothing; a
-          // visible locked one is an advert that renders itself, and the
-          // destination screen still does the actual refusing.
+          // Locked features keep their row: a hidden feature sells nothing, and the destination
+          // screen still does the refusing.
           const locked =
             !pro && (category.id === 'loan-calculator' || category.id === 'split-calculator');
 
@@ -100,8 +89,6 @@ export function DestinationList({
                 onPress={() => onPress(category.id)}
                 className="min-h-14 w-full flex-row items-center gap-[12px] px-4 py-3 active:opacity-60"
               >
-                {/* An accent-tinted circle with the glyph in the accent: the
-                    Founder's Figma, 2026-10-03. */}
                 <View className="h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-accent/10">
                   <Icon size={20} color={colors.accentInk} strokeWidth={1.8} />
                 </View>
@@ -114,8 +101,8 @@ export function DestinationList({
                   {category.label}
                 </Text>
 
-                {/* Inline rather than pinned to the corner, so at large type
-                    the badge pushes the label along instead of sitting on it. */}
+                {/* Inline rather than pinned to the corner, so at large type the badge pushes the
+                    label along. */}
                 {locked ? (
                   <View
                     accessibilityElementsHidden
@@ -132,10 +119,8 @@ export function DestinationList({
                 ) : null}
 
                 {isMoneyRow ? (
-                  // A rule before the figure and a chevron after it: the rule
-                  // sets the amounts apart as a column — a shared minimum width
-                  // keeps the rules in line down the card — and the chevron
-                  // says the row opens, as "Open" does on the tool rows.
+                  // A rule before the figure and a chevron after it: the shared minimum width keeps
+                  // the rules aligned down the card, and the chevron says the row opens.
                   <View className="shrink-0 flex-row items-center">
                     <View className="mr-3 h-6 w-px bg-line" />
                     <View className="min-w-[96px] items-end">
@@ -182,8 +167,7 @@ export function DestinationList({
         })}
       </View>
 
-      {/* The rows stay tappable while this shows: each destination loads its
-          own data, so only the figures here are missing. */}
+      {/* The rows stay tappable while this shows: each destination loads its own data. */}
       {error ? (
         <View className="mt-3 w-full flex-row items-center justify-between gap-3">
           <Text className="shrink font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>

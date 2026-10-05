@@ -36,46 +36,34 @@ const KIND_LABELS: Record<string, string> = {
   subscription: 'Subscription',
 };
 
-/** Where each destination goes. The screen keeps owning its own routing. */
 const DESTINATION_ROUTES: Record<string, Href> = {
   'monthly-bills': '/bills',
   receipts: '/receipts',
   subscriptions: '/subscriptions',
 };
 
-/** The calculators live in their own card row now, not the spending list. */
+/** Calculators are drawn as cards below the list, not as destination tiles. */
 const TOOL_IDS = new Set(['loan-calculator', 'split-calculator']);
 
-// The calculators are drawn as cards of their own below the list.
 const TILES = spendingCategories.filter((tile) => !TOOL_IDS.has(tile.id));
 
 export default function HomeScreen() {
   const { pro } = usePro();
-  // Opening the app is the moment to bring stale due dates up to date.
   useKeepSchedulesCurrent();
   const { refresh, refreshing } = useRefreshAll();
 
   const profile = useProfile();
 
-  // One consistent day for every window below — and it turns at midnight and
-  // on resume, so the dashboard never wakes up showing yesterday.
+  // One day for every window below; it turns at midnight and on resume.
   const { today, todayDate } = useToday();
 
-  // The calendar month we are actually in, which is what the card reports on.
-  // Deliberately not the date picker below it: moving the selector to browse
-  // another day changes the list, not the month you are living in.
+  // The calendar month we are in, not the date picker's: browsing another day changes the list,
+  // not this month.
   const monthRange = useMemo(() => rangeFor('month', todayDate), [todayDate]);
   const month = useLedger(monthRange, today);
 
-  /**
-   * This month, as it actually falls.
-   *
-   * Every figure on the card comes from one window of real occurrences — a
-   * bill on its due date, a subscription on its renewal date, a receipt on the
-   * day it was bought, salary on its paydays. Nothing is averaged into a
-   * per-month rate, so a bill due in September belongs to September and this
-   * month starts again at zero on the first.
-   */
+  // One window of real occurrences (bill on its due date, subscription on its renewal, receipt on
+  // the day bought, salary on paydays); nothing is averaged into a monthly rate.
   const spentOn = (kind: string) =>
     month.entries
       .filter((entry) => entry.kind === kind)
@@ -85,25 +73,20 @@ export default function HomeScreen() {
   const receiptsTotal = spentOn('receipt');
   const subscriptionsTotal = spentOn('subscription');
 
-  // Out and in for the same window. The three tiles below add up to expenses
-  // exactly, because they are the same entries grouped by kind.
+  // The three tiles add up to expenses exactly: they are the same entries grouped by kind.
   const expensesThisMonth = month.totals.out;
   const payday = month.totals.in;
 
-  /** Calculators open a tool, so they carry no figure. */
   const tileAmounts: Record<string, number | undefined> = {
     'monthly-bills': -monthlyBillsTotal,
     receipts: -receiptsTotal,
     subscriptions: -subscriptionsTotal,
   };
 
-  // Today, not a hardcoded date: the dashboard opens on the day you are in.
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  // When the day turns while the dashboard is alive, follow it — but only if
-  // the selector was sitting on the old today. A deliberately browsed day is
-  // a choice, and midnight is no reason to overrule it.
+  // Follow midnight only if the selector was on the old today; a deliberately browsed day stays.
   const prevToday = useRef(today);
   useEffect(() => {
     if (prevToday.current !== today) {
@@ -114,13 +97,8 @@ export default function HomeScreen() {
 
   const atLatest = toIsoDate(selectedDate) >= today;
 
-  /**
-   * A week behind the chosen day, and the week in front of it.
-   *
-   * Both are seven days measured from the same point, so stepping the date
-   * back a day slides both windows together — you are always looking at one
-   * week of what happened and the week that followed it.
-   */
+  // The week up to the chosen day and the week after it, measured from the same point so they slide
+  // together.
   const recentFrom = useMemo(() => addDays(selectedDate, -6), [selectedDate]);
   const recent = useLedger(
     useMemo(
@@ -140,14 +118,8 @@ export default function HomeScreen() {
     today,
   );
 
-  /**
-   * Which plan each recorded charge came from.
-   *
-   * A row in either week opens the record behind it, and an occurrence that
-   * was written down at the time is named after the charge rather than the
-   * bill or subscription that made it. The ledger reads the same query, so
-   * this costs no extra fetch.
-   */
+  // Which plan each recorded charge came from, so a row opens the record behind it. The ledger
+  // reads the same query, so this costs no extra fetch.
   const charges = useCharges();
   const unreadNews = useHasUnreadNews();
   const owners = useMemo(() => chargeOwners(charges.data ?? []), [charges.data]);
@@ -161,8 +133,7 @@ export default function HomeScreen() {
   const { weekday, date } = formatDayLabel(selectedDate);
 
   const handleConfirmDate = (date: Date) => {
-    // Forward is not a direction here: the week ahead already has its own
-    // heading, so picking a future day would only duplicate it.
+    // No future days: the week ahead already has its own heading.
     setSelectedDate(date > todayDate ? todayDate : date);
     setPickerOpen(false);
   };
@@ -181,8 +152,6 @@ export default function HomeScreen() {
 
       <View className="mt-6 w-full">
         <BalanceSummary
-          // Derived from the same total, so income minus expenses is exactly
-          // what the card says is left rather than two views of the month.
           leftThisMonth={payday - expensesThisMonth}
           payday={payday}
           expenses={expensesThisMonth}
@@ -191,9 +160,6 @@ export default function HomeScreen() {
         />
       </View>
 
-      {/* Recording something is the one thing on this screen that is not
-          reading: four of them, one tap each, right under the figure they
-          change. */}
       <View className="mt-6 w-full">
         <SectionHeading>Quick add</SectionHeading>
       </View>
@@ -201,16 +167,13 @@ export default function HomeScreen() {
         <QuickActions onPress={(href) => router.push(href)} />
       </View>
 
-      {/* Renders nothing once its five steps are done or it was waved away —
-          margin included, so established accounts get no phantom gap. */}
+      {/* Renders nothing, margin included, once done or dismissed. */}
       <GettingStartedCard />
 
       <View className="mt-8 w-full">
         <SectionHeading caption="This month">Where it goes</SectionHeading>
       </View>
 
-      {/* One column of five, rather than a carousel that hid three of them
-          behind a gesture. The order is whatever they arranged. */}
       <View className="mt-3 w-full">
         <DestinationList
           items={TILES}
@@ -226,9 +189,6 @@ export default function HomeScreen() {
         />
       </View>
 
-      {/* The three Pro destinations, raised off the page as cards: the two
-          calculators shoulder to shoulder, the insights story full width
-          beneath them. They open tools, not figures, so they left the list. */}
       <View className="mt-8 w-full">
         <SectionHeading caption="Included with Pro">Go further</SectionHeading>
       </View>
@@ -239,8 +199,6 @@ export default function HomeScreen() {
         <InsightBanner pro={pro} onPress={() => router.push('/insights')} />
       </View>
 
-      {/* Whitespace separates this from the blocks above it. The rule that
-          used to sit here was drawing a line the gap already drew. */}
       <View className="mt-8 w-full">
         <DateSelector
           weekday={weekday}
@@ -262,9 +220,7 @@ export default function HomeScreen() {
         onRetry={refresh}
         today={today}
         onEntryPress={openEntry}
-        // Oldest day first, the chosen day last — the house rule for every
-        // dated list. Recent covers one week, so the newest day is at most six
-        // headings below the first rather than off the end of the page.
+        // Oldest day first, the chosen day last, like every dated list.
         direction="asc"
       />
 
@@ -296,37 +252,20 @@ export default function HomeScreen() {
 
 type SectionProps = {
   title: string;
-  /** The week this heading covers, which moves with the chosen day. */
   range: string;
   entries: LedgerEntry[];
   empty: string;
   loading: boolean;
-  /** The week could not be fetched. An empty list would be a lie. */
+  /** The week could not be fetched; an empty list would be a lie. */
   error: boolean;
   onRetry: () => void;
   today: string;
-  /**
-   * What a row opens, worked out per entry by the screen — undefined for an
-   * entry with no edit screen, which leaves that row inert.
-   */
+  /** What a row opens; undefined leaves the row inert. */
   onEntryPress: (entry: LedgerEntry) => (() => void) | undefined;
-  /**
-   * Day order. Both weeks run `'asc'` today — oldest heading first — so Recent
-   * ends on the chosen day and Coming up starts the morning after it, and the
-   * two halves of the screen read in one direction. Kept as a prop rather than
-   * hardcoded because the section is shared and the two weeks are not the same
-   * question.
-   */
   direction: 'asc' | 'desc';
 };
 
-/**
- * One headed run of transactions.
- *
- * Recent and Coming up are the same list of the same rows over two different
- * weeks, so they are the same component — anything that made one read
- * differently from the other would be an accident rather than a decision.
- */
+/** One headed run of transactions; Recent and Coming up share it. */
 function Section({
   title,
   range,
@@ -346,13 +285,10 @@ function Section({
 
   return (
     <View className="mt-8 w-full">
-      {/* Each heading carries its own dates: two weeks are on screen at once,
-          and a single caption above them could only ever describe one. */}
       <SectionHeading caption={range}>{title}</SectionHeading>
 
       {error ? (
-        // An empty week and a week that failed to arrive look identical, so
-        // the failure has to say so itself.
+        // A failed week would look like an empty one, so the failure says so itself.
         <View className="mt-2 w-full items-center">
           <Text
             className="w-full text-center font-poppins text-[14px] text-muted"
@@ -363,7 +299,6 @@ function Section({
           <TextLink label="Try again" variant="subtle" onPress={onRetry} />
         </View>
       ) : loading ? (
-        // The shape of what is coming, like every other list in the app.
         <View className="mt-1 w-full">
           <SkeletonList rows={3} />
         </View>

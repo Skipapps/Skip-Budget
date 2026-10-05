@@ -19,14 +19,7 @@ const KINDS: Record<AnnouncementRow['kind'], { label: string; icon: LucideIcon }
   news: { label: 'News', icon: Megaphone },
 };
 
-/**
- * News from Skip: an update to install, a feature that has just shipped.
- *
- * Only that. Reminders about bills and renewals are pushes and are not kept
- * here — this screen once listed every charge the app recorded, which put a
- * second, older copy of the lock screen inside the app. The charges themselves
- * are where they always were: on the bills, the cards and the transactions.
- */
+/** News from Skip only. Bill and renewal reminders are pushes and are not kept here. */
 export default function NotificationsScreen() {
   const artwork = useArtwork();
   const news = useAnnouncements();

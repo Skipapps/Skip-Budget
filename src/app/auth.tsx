@@ -14,16 +14,10 @@ import { Subtitle } from '@/components/ui/typography';
 import { resetTo } from '@/lib/nav';
 
 /**
- * The two-tap way in, and the door to the email one.
+ * Apple and Google sign-in, and the door to email sign-up.
  *
- * Both providers land on `/hello` rather than `/home`. Apple and Google return
- * a session, not a name — `display_name` is only written on email signup — so
- * sending them straight to Home is how somebody ends up in the split manager
- * as "Someone on Skip" with no way back to the question. `/hello` is the one
- * screen that knows the answer: it reads the profile, sends a returning
- * account whose name is already there straight through to Home, and asks only
- * when there is nothing to ask about. Routing every provider sign-in through
- * it keeps that decision in one place instead of two.
+ * Providers return a session but no name (`display_name` is only written on email signup), so they
+ * land on `/hello`, which asks for a name only when the profile has none, rather than on `/home`.
  */
 export default function AuthScreen() {
   const artwork = useArtwork();
@@ -40,16 +34,13 @@ export default function AuthScreen() {
     const { error: authError, cancelled } = await start();
     setBusy(null);
 
-    // Backing out of the sheet is not an error worth shouting about.
     if (cancelled) return;
     if (authError) {
       setError(authError);
       return;
     }
-    // Not `/home`: a provider sign-in has no display name yet, and `/hello`
-    // is what decides between asking for one and going straight through.
-    // resetTo, not replace: signing in is a one-way door, and replace left the
-    // welcome pages underneath for the edge swipe to walk back into.
+    // resetTo, not replace: signing in is a one-way door, and replace leaves the welcome pages
+    // underneath for the edge swipe to walk back into.
     resetTo('/hello');
   };
 

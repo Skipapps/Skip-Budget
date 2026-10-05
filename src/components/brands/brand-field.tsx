@@ -23,12 +23,8 @@ type BrandFieldProps = {
   placeholder?: string;
   error?: string;
   className?: string;
-  /**
-   * The search already typed in when the field opens empty — the store a
-   * voice entry heard but could not match, so its results are showing at once.
-   */
+  /** Pre-filled search, e.g. a store a voice entry could not match, so results show at once. */
   initialQuery?: string;
-  /** Opens with the keyboard up and the search live. */
   autoFocus?: boolean;
 };
 
@@ -43,15 +39,9 @@ function useDebounced(value: string, delay = 220): string {
 }
 
 /**
- * The store field. Types like a text input, answers like a picker.
- *
- * Results render inline below the field rather than as a floating dropdown:
- * an absolutely positioned overlay inside a ScrollView clips at the wrong
- * boundary on Android and fights the keyboard on both platforms.
- *
- * Adding a store the catalog has never heard of is always the last row, never
- * a mode the user has to find first — most receipts are chains, but the local
- * corner shop has to be one tap away rather than a dead end.
+ * The store field: types like a text input, answers like a picker. Results render inline, not as a
+ * dropdown (an absolutely positioned overlay in a ScrollView clips wrongly on Android and fights
+ * the keyboard). Adding an unknown store is always the last row, never a mode.
  */
 export function BrandField({
   label,
@@ -71,8 +61,7 @@ export function BrandField({
 
   const typed = query.trim();
   const searching = focused && typed.length >= 2;
-  // Hide the exact-name row when the catalog already offers that name, so the
-  // list never shows "Walmart" twice.
+  // Hide the exact-name row when the catalog already offers that name ("Walmart" twice).
   const alreadyListed = results.some((brand) => brand.name.toLowerCase() === typed.toLowerCase());
 
   const choose = (brand: BrandRow) => {

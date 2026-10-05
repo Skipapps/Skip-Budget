@@ -89,12 +89,9 @@ function fromPrefill(prefill: SubscriptionPrefill | null): Initial {
 }
 
 /**
- * Loads the row, then seeds the form by remount — see add-receipt for why.
- *
- * An edit that has not got its record never opens as a blank form: `id` is what
- * turns Save into an update, so the empty fields would go straight over a real
- * subscription. Loading, failed and gone each get their own answer, and a
- * failed read is never allowed to become a new subscription instead.
+ * Seeds the form by remount (see add-receipt). An edit without its record never opens as a blank
+ * form: `id` turns Save into an update, so empty fields would go over a real subscription. Loading,
+ * failed and gone each get their own answer; a failed read never becomes a new subscription.
  */
 export default function AddSubscriptionScreen() {
   const params = useLocalSearchParams<{ id?: string; from?: string }>();
@@ -170,7 +167,7 @@ export default function AddSubscriptionScreen() {
         sourceId: existing.card_id ?? existing.bank_account_id ?? '',
         note: existing.note ?? '',
         active: existing.active,
-        // The floor the ledger and the recorder already use for this row.
+        // The same floor the ledger and the recorder use for this row.
         countsFrom: planFloor(existing.started_on, existing.created_at),
       }
     : // Only a new subscription can arrive pre-filled from the voice review page.
@@ -207,9 +204,6 @@ function SubscriptionForm({
   const [note, setNote] = useState(initial.note);
   const [active, setActive] = useState(initial.active);
 
-  // Editing walks the flow from the start, amount first, exactly as adding
-  // does — every figure is in front of the person before Save, not just the
-  // ones on the page an edit happened to open on.
   const [step, setStep] = useState(0);
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
 
@@ -233,32 +227,28 @@ function SubscriptionForm({
   const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
-  /** A check for a field on an earlier step sends you back to that step. */
   const fail = (message: string, atStep: number) => {
     warn();
     setError({ message, step: atStep });
     setStep(atStep);
   };
 
-  /** Where a saved subscription leaves to. */
   const leave = () => {
     if (!fromVoice) {
       router.back();
       return;
     }
     router.dismissTo('/home');
-    // Saved, so what was heard has done its job; the person's words do not
-    // stay in memory for the next session to find.
+    // Saved, so the person's words do not stay in memory for the next session.
     clearVoiceDraft();
   };
 
   const handleSave = async () => {
     setError(null);
 
-    // The checks and the values, started_on included (counted from the
-    // renewal picked, only ever earlier on an edit, never on or before a
-    // renewal already recorded), are the shared builder's; it is what the
-    // voice review page saves through too.
+    // Checks and values live in the shared builder, which the voice review page saves through too.
+    // started_on counts from the renewal picked: only ever earlier on an edit, never on or before a
+    // renewal already recorded.
     const built = buildSubscriptionValues(
       { service, amount, cycle, renewsOn, sourceId, note, active },
       { sources, lastChargedOn: pastCharges.lastChargedOn, countsFrom: initial.countsFrom },
@@ -270,7 +260,7 @@ function SubscriptionForm({
     const { values } = built;
 
     try {
-      // What a recorded renewal copies from the subscription, before and after.
+      // What a recorded renewal copies from the subscription.
       const carried = {
         label: values.name || 'Subscription',
         amount: values.amount,
@@ -421,8 +411,7 @@ function SubscriptionForm({
             autoCapitalize="sentences"
           />
 
-          {/* Cancelling keeps the history. Only offered on something that
-              already exists — nobody adds a subscription as cancelled. */}
+          {/* Cancelling keeps the history; only offered on something that already exists. */}
           {editing ? (
             <View className="w-full">
               <FieldLabel className="mb-2">Status</FieldLabel>
@@ -456,8 +445,7 @@ function SubscriptionForm({
 
       {step === 2 ? (
         <View className="w-full gap-6">
-          {/* Optional: plenty of people know the cost but not the renewal date,
-              so nothing here is pre-selected and nothing insists. */}
+          {/* Optional: many know the cost but not the renewal date, so nothing is pre-selected. */}
           <InlineCalendar value={renewsOn} onChange={setRenewsOn} />
 
           <View className="w-full">

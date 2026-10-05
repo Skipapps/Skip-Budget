@@ -39,8 +39,7 @@ export default function SourceDetailScreen() {
   const artwork = useArtwork();
   const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
-  // Read once per render rather than inside the hook, so the ledger stays a
-  // pure function of its inputs and cannot shift mid-render.
+  // Read here, not inside the hook, so the ledger is a pure function of its inputs.
   const today = toIsoDate(new Date());
 
   const { source, kind, card, account, ledger, isLoading, isError } = useSourceLedger(id, today);
@@ -51,8 +50,7 @@ export default function SourceDetailScreen() {
   const [padOpen, setPadOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Search and filters for the transactions below. Held above the loading
-  // guards like every other hook, so the hook order never changes.
+  // Above the loading guards so the hook order never changes.
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<LedgerFilters>(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -83,26 +81,14 @@ export default function SourceDetailScreen() {
   const isCard = kind === 'card';
   const name = isCard ? card!.holder : account!.nickname || account!.bank_name;
 
-  /**
-   * The ledger's rows, oldest day first.
-   *
-   * `ledgerForSource` sorts newest-first because the balance arithmetic sits
-   * next to that sort and is not a display concern; the order a person reads
-   * is decided here instead. Nothing above this line moves, so `charged`,
-   * `paid` and `balance` are the same figures either way.
-   */
+  // Oldest day first. `ledgerForSource` sorts newest-first for its balance arithmetic, so the
+  // display order is set here.
   const entries = sortByDateAscending(
     ledger.entries,
     (entry) => entry.date,
     (entry) => entry.id,
   );
 
-  /**
-   * The rows that answer the search and the filters, in the same order.
-   *
-   * The search forgives typos (`matchesSearch`); the filters are the shared
-   * ledger ones minus the source — this page already is one.
-   */
   const visible = entries.filter(
     (entry) =>
       matchesSearch(entry.label, query) &&
@@ -112,8 +98,6 @@ export default function SourceDetailScreen() {
   const activeCount = countActiveFilters(filters);
   const narrowed = query.trim().length > 0 || activeCount > 0;
 
-  /** What a row on this page can be — payments included, named for the side
-   *  of the money they sit on. */
   const kindOptions = [
     { value: 'receipt', label: 'Receipts' },
     { value: 'bill', label: 'Monthly Bills' },
@@ -187,8 +171,7 @@ export default function SourceDetailScreen() {
             card={{
               id: card!.id,
               holder: card!.holder,
-              // The face shows what the card is at now, not the figure typed
-              // weeks ago — that is the whole point of the ledger.
+              // The ledger balance, not the figure typed when the card was added.
               balance: ledger.balance,
               last4: card!.last4 ?? '',
               network: card!.network,
@@ -210,8 +193,6 @@ export default function SourceDetailScreen() {
         )}
       </View>
 
-      {/* The arithmetic, spelled out. A balance that moved without explanation
-          is the fastest way to lose someone's trust in a money app. */}
       <View className="mt-6 w-full rounded-[16px] border border-line px-4 py-3">
         <SummaryLine
           label={
@@ -247,8 +228,6 @@ export default function SourceDetailScreen() {
         <SectionHeading>Transactions</SectionHeading>
       </View>
 
-      {/* Only once there is something to search: a search field over an empty
-          ledger is a promise with nothing behind it. */}
       {entries.length > 0 ? (
         <View className="mt-3 w-full flex-row items-center gap-3">
           <SearchField value={query} onChangeText={setQuery} placeholder="Search transactions" />
@@ -334,8 +313,7 @@ export default function SourceDetailScreen() {
       {filterOpen ? (
         <FilterSheet
           filters={filters}
-          // This page is one source already, so the sheet offers no source
-          // section — date and type are the questions left.
+          // This page is one source already, so no source section.
           sourceOptions={[]}
           kindOptions={kindOptions}
           onCancel={() => setFilterOpen(false)}

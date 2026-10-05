@@ -19,7 +19,6 @@ const none = new Set<string>();
 
 describe('unrecordedDates', () => {
   it('finds every time a plan has come due', () => {
-    // Started in June, today is late August: June, July and August have run.
     expect(unrecordedDates(plan(), '2026-08-28', none)).toEqual([
       '2026-06-14',
       '2026-07-14',
@@ -45,8 +44,7 @@ describe('unrecordedDates', () => {
   });
 
   it('falls back to when the row was made', () => {
-    // No start date, but the app cannot have missed anything before it was
-    // told the plan existed — and that is the floor the screens read with.
+    // No start date: the floor is the row's creation, as the screens read it.
     const dates = unrecordedDates(
       plan({ startsOn: null, createdAt: '2026-07-02T09:15:00Z' }),
       '2026-08-28',
@@ -56,7 +54,6 @@ describe('unrecordedDates', () => {
   });
 
   it('does not backfill a plan with neither date', () => {
-    // Nothing is known about whether it ran before, so it starts from today.
     expect(unrecordedDates(plan({ startsOn: null }), '2026-08-28', none)).toEqual([]);
   });
 
@@ -66,7 +63,6 @@ describe('unrecordedDates', () => {
   });
 
   it('does not record a date that has not arrived', () => {
-    // Due on the 14th of each month; on the 10th, August has not happened.
     expect(unrecordedDates(plan({ startsOn: '2026-08-01' }), '2026-08-10', none)).toEqual([]);
   });
 
@@ -92,12 +88,8 @@ describe('unrecordedDates', () => {
 });
 
 /**
- * A subscription added on the 28th that renewed on the 10th went out this
- * month. It used to vanish: nothing wrote a start date for subscriptions, so
- * the floor fell back to the day the row was made and the 10th sat before it —
- * not recorded, not projected, not on the Subscriptions page, not in Home's
- * expenses. By the time anyone looked, the stored date had rolled on to the
- * 10th of next month.
+ * A subscription added on the 28th that renewed on the 10th went out this month. Without a start
+ * date the floor is the row's creation day, which sits after the 10th, so it was never counted.
  */
 describe('a subscription whose renewal was earlier this month', () => {
   const TODAY = '2026-09-28';
@@ -105,7 +97,6 @@ describe('a subscription whose renewal was earlier this month', () => {
     id: 'subscription:netflix',
     label: 'Netflix',
     amount: 15.49,
-    // Already rolled forward past the renewal that was picked.
     nextDate: '2026-10-10',
     recurrence: 'monthly' as const,
     kind: 'subscription' as const,
@@ -163,19 +154,14 @@ describe('countFromAfterPick', () => {
 });
 
 /**
- * Moving a charged bill's due date must not charge the same month twice.
- *
- * The Founder's rent was charged on 28 Sep, then its date was moved to the
- * 1st: both recorders saw 1 Sep as a date nobody had recorded and wrote it,
- * so September had two rents. The start now sits at the next cycle after the
- * newest charge.
+ * Moving a charged bill's due date must not charge the same month twice: rent charged on 28 Sep
+ * then moved to the 1st would otherwise record 1 Sep as a second September.
  */
 describe('a charged bill whose due date is moved', () => {
   const TODAY = '2026-09-28';
 
   it('will not record a second September even when the start was left on the 1st', () => {
-    // What an older build saved — and what the Founder's live bill still
-    // holds. The recorder itself now refuses the second charge in the month.
+    // The recorder itself refuses the second charge in the month, even with the start left on the 1st.
     const plan: ChargeablePlan = {
       id: 'bill:rent',
       recurrence: 'monthly',

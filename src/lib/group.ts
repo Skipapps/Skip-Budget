@@ -1,12 +1,4 @@
-/**
- * Groups dated rows into day sections.
- *
- * Every list in the app that shows dated money — receipts, bills,
- * subscriptions — reads the same way because they all come through here. Rows
- * with no date yet are not dropped; they collect under one trailing group, so
- * a bill waiting on a date is still visible rather than silently missing.
- */
-
+/** Key of the trailing group for rows with no date yet; they are not dropped. */
 export const NO_DATE = '';
 
 export type DateGroup<T> = {
@@ -22,7 +14,7 @@ export function groupByDate<T>(
   dateOf: (item: T) => string | null | undefined,
   options: {
     amountOf?: (item: T) => number;
-    /** 'desc' puts the newest first — right for history. 'asc' for upcoming. */
+    /** 'desc' puts the newest first (history); 'asc' the soonest first (upcoming). */
     direction?: 'asc' | 'desc';
   } = {},
 ): DateGroup<T>[] {
@@ -51,17 +43,8 @@ export function groupByDate<T>(
 }
 
 /**
- * The same day order as {@link groupByDate}'s `'asc'`, for a list that is not
- * grouped.
- *
- * Two screens render dated rows flat — the source ledger and the savings
- * months — and both need the house rule: oldest day first, today last, undated
- * rows trailing, and rows sharing a day left in their existing order (ties
- * broken by id, exactly as every sort in the app already does). Written once
- * here rather than twice inline, so it can be tested rather than eyeballed.
- *
- * Returns a new array; the input is not mutated, because both call sites hand
- * it data owned by a query cache.
+ * The day order of {@link groupByDate}'s `'asc'` for a flat list: oldest first, undated trailing,
+ * ties broken by id. Returns a new array; the input is owned by a query cache.
  */
 export function sortByDateAscending<T>(
   items: readonly T[],
@@ -72,7 +55,6 @@ export function sortByDateAscending<T>(
     const left = dateOf(a) || NO_DATE;
     const right = dateOf(b) || NO_DATE;
     if (left === right) return idOf(a).localeCompare(idOf(b));
-    // Undated rows sort last, the same way they do when grouped.
     if (left === NO_DATE) return 1;
     if (right === NO_DATE) return -1;
     return left.localeCompare(right);

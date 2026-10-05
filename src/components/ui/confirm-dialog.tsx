@@ -24,21 +24,11 @@ type ConfirmDialogProps = DialogRequest & {
 };
 
 /**
- * The app's own confirmation dialog.
+ * The app's own confirmation dialog; `Alert.alert` would draw the system's.
  *
- * Alert.alert draws the system's dialog, which arrives in San Francisco with
- * the system's blues and corner radii — recognisably not this app. This is the
- * same modal language as InfoDialog: Poppins, the ink and coral palette, the
- * app's 10px corners.
- *
- * Two choices sit side by side because that is one glance. Three or more stack,
- * because three side by side truncates the moment a label is longer than a word.
- *
- * The buttons are the app's buttons: the first choice is the filled pill, any
- * other is the outlined one, and a destructive choice is filled red. Plain
- * words floating in the card read as a caption, not as something to press.
- * Cancel sits beside a single choice as an equal outlined pill, and under a
- * stack as a quiet link — the way out, never competing with the choice.
+ * One choice plus Cancel sits side by side; three or more stack, since side by side truncates once
+ * a label is longer than a word. The first choice is the filled pill (red if destructive), any other
+ * is outlined. Cancel is an equal outlined pill beside a single choice and a quiet link under a stack.
  */
 export function ConfirmDialog({
   title,
@@ -49,9 +39,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const choices = actions.length > 0 ? actions : [{ id: 'ok', label: 'OK' }];
   const showCancel = cancelLabel !== null && actions.length > 0;
-  // Side by side only while both labels fit half the card: "Delete" and
-  // "Cancel" do, "Delete everything" and "Keep my account" end in "…" on a
-  // small phone, so those stack like any other longer set of choices.
+  // Side by side only while every label fits half the card; longer ones end in "…" on a small phone.
   const labels = [...choices.map((choice) => choice.label), cancelLabel ?? ''];
   const sideBySide =
     showCancel && choices.length === 1 && labels.every((label) => label.length <= 12);
@@ -87,8 +75,7 @@ export function ConfirmDialog({
           </View>
 
           <View className={cn('gap-2.5 px-5 pb-5 pt-1', sideBySide ? 'flex-row' : 'w-full')}>
-            {/* Stacked layouts put the way out last, where a thumb rests and
-                where it cannot be hit while reaching for the real choice. */}
+            {/* Stacked layouts put the way out last, away from the real choices. */}
             {sideBySide && showCancel ? (
               <DialogButton
                 label={cancelLabel}
@@ -131,7 +118,6 @@ function DialogButton({
   destructive?: boolean;
   /** `filled` is the choice, `outline` another choice, `link` the way out. */
   variant: 'filled' | 'outline' | 'link';
-  /** Two across share the row equally; stacked ones take the full width. */
   sideBySide?: boolean;
 }) {
   return (
@@ -157,8 +143,7 @@ function DialogButton({
           variant === 'link' ? 'font-poppins-medium' : 'font-poppins-semibold',
           variant === 'filled'
             ? destructive
-              ? // The page colour, not white: the dark theme's red is light,
-                // and white on it fails contrast where the page colour clears 7:1.
+              ? // The page colour, not white: the dark theme's red is light and white on it fails contrast.
                 'text-surface'
               : 'text-on-control'
             : destructive

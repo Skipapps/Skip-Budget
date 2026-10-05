@@ -1,7 +1,3 @@
-/**
- * Placeholder transaction history. Sample data only — replaced once
- * transactions come from the database.
- */
 export const TRANSACTION_KINDS = [
   { value: 'income', label: 'Income' },
   { value: 'bill', label: 'Monthly Bills' },

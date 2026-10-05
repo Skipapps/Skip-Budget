@@ -13,22 +13,14 @@ import { useTheme } from '@/providers/theme-provider';
 export const VOICE_FAB_SIZE = 64;
 
 /**
- * The round Voice button at the end of the tab bar: the fastest way to put
- * something in, from any tab (the Founder's design, 2026-10-03).
+ * The round Voice button at the end of the tab bar: the fastest way to put something in, from any
+ * tab. The glyph says "voice", not "recording": the mic belongs to the voice page.
  *
- * The glyph says "voice", not "recording": the mic belongs to the voice page,
- * where it does start recording. Filled with the accent like every other "make
- * something" control, with a shadow of its own colour rather than black, so it
- * reads as lit rather than raised.
- *
- * Absent in a build with no speech module — there is nothing to explain and
- * nothing to sell. Until Pro is known it is drawn but does not answer, so the
- * bar never changes width under someone's thumb and somebody who has paid is
- * never sent to the explainer by a tap that landed too early. A refused
- * permission does not hide it: the voice page says what to do.
- *
- * On a dark page the accent sits too close to the surface to have an edge, and
- * a shadow does not show on near-black, so there it gets a hairline ring.
+ * Absent in a build with no speech module. Until Pro is known it is drawn but does not answer, so
+ * the bar never changes width under someone's thumb and somebody who has paid is never sent to the
+ * explainer by a tap that landed too early. A refused permission does not hide it: the voice page
+ * says what to do. On a dark page the accent sits too close to the surface to have an edge and a
+ * shadow does not show on near-black, so there it gets a hairline ring.
  */
 export function VoiceFab() {
   const { colors, scheme } = useTheme();
@@ -82,10 +74,8 @@ export function VoiceFab() {
       <AudioLines size={28} color={colors.onControl} strokeWidth={2} absoluteStrokeWidth />
 
       {ready && !pro ? (
-        // The dashboard's corner PRO pill (tool cards, insight banner), same
-        // fill, type and padding. Its fill is the button's own colour, so a
-        // ring in the page colour cuts it out of the button; without one it
-        // would melt in.
+        // The dashboard's corner PRO pill, same fill, type and padding. Its fill is the button's
+        // own colour, so a ring in the page colour cuts it out of the button.
         <View
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"

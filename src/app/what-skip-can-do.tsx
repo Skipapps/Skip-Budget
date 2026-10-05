@@ -5,13 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { useArtwork, type ArtworkName } from '@/theme/artwork';
 
-/**
- * The tour's six cards, retold in a line each — the stop between the welcome
- * screen and "Why Skip is different". The tour keeps the full paragraphs and
- * the doors; here the same promises just have to be scannable on the way in,
- * so nothing navigates: there is no account yet, and every door would only
- * lead to sign-in.
- */
+/** The tour's cards in a line each. Nothing navigates: there is no account yet. */
 const CAN_DO: { artwork: ArtworkName; title: string; detail: string }[] = [
   {
     artwork: 'tileSalary',

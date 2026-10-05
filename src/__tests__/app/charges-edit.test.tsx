@@ -5,12 +5,8 @@ import BillsScreen from '@/app/bills';
 import SubscriptionsScreen from '@/app/subscriptions';
 
 /**
- * Monthly bills and Subscriptions, kept to one job (Founder, 2026-10-03).
- *
- * People tapped the charges expecting the bill behind them, and nothing
- * happened. Now a charge opens its bill's or subscription's own page, and
- * adding is the + in the header — the "Your bills" / "Add bill" tiles are
- * gone.
+ * Monthly bills and Subscriptions each do one job: a charge opens its bill's or subscription's own
+ * page, and adding is the + in the header (no "Your bills" / "Add bill" tiles).
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));

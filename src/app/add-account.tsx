@@ -70,14 +70,11 @@ function frequencyLabel(frequency: PayFrequency): string {
   return (match?.label ?? frequency).toLowerCase();
 }
 
-/** Loads the account being edited, then seeds the form by remount. */
 export default function AddAccountScreen() {
-  // Deep-link guard: creating past the free allowance opens the case
-  // for Pro instead of a form the database would refuse. Editing is
-  // untouched. Wrapper-shaped so the hook count never changes.
-  // Decided once, on arrival: the count changes the moment the form saves,
-  // and a live check then shoved the person who just added their first
-  // account onto the Pro page instead of back where they came from.
+  // Deep-link guard: creating past the free allowance opens Pro instead of a form the database
+  // would refuse; editing is untouched. Wrapper-shaped so the hook count never changes. Decided
+  // once on arrival: the count changes the moment the form saves, and a live check would shove the
+  // person who just added their first account onto the Pro page.
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { pro, ready } = usePro();
   const existing = useBankAccounts();
@@ -93,12 +90,9 @@ export default function AddAccountScreen() {
 }
 
 /**
- * An edit only ever runs on a record it actually has.
- *
- * `id` is what makes Save an update, so a form mounted while the read failed
- * would put a blank bank name and a $0 balance over a real account. Loading,
- * could not be read and no longer there are three separate answers; none of
- * them is a blank form, and a failed read never turns into a new account.
+ * An edit only runs on a record it has: `id` makes Save an update, so a form mounted after a failed
+ * read would put a blank bank name and $0 over a real account. Loading, unreadable and gone are
+ * separate answers; none is a blank form.
  */
 function AddAccountScreenInner() {
   const { id, from: origin } = useLocalSearchParams<{ id?: string; from?: string }>();
@@ -186,17 +180,12 @@ function AccountForm({
   const [payFrequency, setPayFrequency] = useState<PayFrequency>('monthly');
   const [lastPayday, setLastPayday] = useState<Date | null>(null);
 
-  // Editing walks the flow from the start, amount first, exactly as adding
-  // does — every figure is in front of the person before Save, not just the
-  // ones on the page an edit happened to open on.
   const [step, setStep] = useState(0);
   const [incomePadOpen, setIncomePadOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
 
-  // Only meaningful once a last pay day is known.
   const nextPayday = lastPayday ? getNextPayday(lastPayday, payFrequency) : null;
 
-  // Saving waits on the data layer; this only closes the screen.
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
 
   const createAccount = useCreateBankAccount();
@@ -226,11 +215,9 @@ function AccountForm({
   const setSalaryAccounts = useSetSalaryAccounts();
   const linkSalaries = useLinkAccountToSalaries();
   const salarySources = useSalarySources();
-  // Pay already set up (the walk-in's first step) means the question here is
-  // not "how much" but "does it land in this account" — a switch naming that
-  // pay, defaulted on when setup sent us. Linked, it brings its own payday and
-  // cycle, so the questions that would ask for them again stand down; switched
-  // off, the income, payday and cycle come back for pay of this account's own.
+  // Pay already set up (the walk-in's first step) turns the question into "does it land in this
+  // account": a switch, on by default from setup. Linked pay brings its own payday and cycle;
+  // switched off, income, payday and cycle are asked for pay of this account's own.
   const salaries = salarySources.data ?? [];
   const hasSalary = salaries.length > 0;
   const [linkPay, setLinkPay] = useState(origin === 'setup');
@@ -244,9 +231,8 @@ function AccountForm({
     ? `${formatCurrency(Number(onlySalary.amount))} ${frequencyLabel(onlySalary.frequency)}` +
       (onlySalary.last_payday ? ' · payday already set' : '')
     : 'Their paydays are already set';
-  // Income and payday belong to pay, not to the account: they are only asked
-  // for while adding one, where they make a salary source. An edit never saved
-  // them, so it does not ask — the reminder is all that step has for an edit.
+  // Income and payday belong to pay, not the account: asked only when adding, where they make a
+  // salary source. An edit never saved them.
   const askPay = !editing && !payLinked;
 
   const savedReminder = useReminderChoice('account', id);
@@ -257,20 +243,15 @@ function AccountForm({
   const applyReminder = useApplyReminder();
 
   const salaryAccounts = useSalaryAccountIds();
-  // An account reminder is about pay arriving, so it means nothing until
-  // something is paid in. On a new account that is the income being entered
-  // right here; on an existing one it is whatever is already linked.
+  // An account reminder is about pay arriving, so it needs something paid in: the income typed here
+  // on a new account, whatever is already linked on an existing one.
   const payLandsHere = editing ? salaryAccounts.ids.has(id ?? '') : payLinked || Number(income) > 0;
-  // Only while editing: a new account's answer comes from the figure typed on
-  // the step before, which no read can fail. An empty set from a read that has
-  // not landed — or has failed — is indistinguishable from "nothing is paid in
-  // here", and the reminder would simply vanish with an explanation that is
-  // not true.
+  // Only while editing: a read that has not landed or has failed gives an empty set, which looks
+  // like "nothing is paid in" and would make the reminder vanish with a false explanation.
   const payLookupPending = Boolean(editing) && salaryAccounts.isLoading;
   const payLookupFailed = Boolean(editing) && salaryAccounts.isError;
   const payLookupUnknown = payLookupPending || payLookupFailed;
 
-  /** A check for a field on an earlier step sends you back to that step. */
   const fail = (message: string, atStep: number) => {
     warn();
     setError({ message, step: atStep });
@@ -301,12 +282,9 @@ function AccountForm({
           ? (await updateAccount.mutateAsync({ id, values }), id)
           : (await createAccount.mutateAsync(values)).id;
 
-      // Income entered here is a salary source in its own right, so it is
-      // saved as one rather than being dropped with the rest of the screen —
-      // and pointed at this account, which is the whole reason it was typed on
-      // this form. Without the link the money existed but landed nowhere.
-      // Not while the existing pay is linked: a figure typed before the switch
-      // went back on would otherwise mint a second salary beside it.
+      // Income entered here becomes a salary source pointed at this account (without the link the
+      // money would land nowhere). Not while existing pay is linked: a figure typed before the
+      // switch went back on would mint a second salary.
       const pay = Number(income);
       if (!editing && !payLinked && Number.isFinite(pay) && pay > 0) {
         const salary = await createSalary.mutateAsync({
@@ -321,18 +299,15 @@ function AccountForm({
         });
       }
 
-      // Pay that already exists as its own source is pointed at this account
-      // rather than typed in again — additive, so links made on the salary
-      // screen survive.
+      // Existing pay is pointed at this account rather than retyped; additive, so links made on the
+      // salary screen survive.
       if (payLinked) {
         await linkSalaries.mutateAsync(accountId);
       }
 
-      // Untouched while the link is unknown. `payLandsHere` is false for an
-      // empty set, and `applyReminder(…, null)` deletes the row — so saving
-      // during a read that failed or has not landed would quietly remove a
-      // payday reminder set weeks ago, on a step that was not even offering
-      // the controls.
+      // Untouched while the link is unknown: `payLandsHere` is false for an empty set and
+      // `applyReminder(…, null)` deletes the row, so a failed or pending read would silently remove
+      // an existing reminder.
       if (!payLookupUnknown) {
         await applyReminder(
           'account',
@@ -343,8 +318,6 @@ function AccountForm({
       }
 
       success();
-      // The walk-in flow gets its checklist back; everyone else goes where
-      // they came from.
       if (!editing && origin === 'setup') {
         if (router.canGoBack()) router.back();
         else router.replace('/setup');
@@ -357,8 +330,7 @@ function AccountForm({
 
   const busy = createAccount.isPending || updateAccount.isPending;
 
-  // A balance of zero is a real answer for an account, so step 1 never blocks
-  // on the figure — only on the one field the mutation itself insists on.
+  // Zero is a real balance, so only the bank name blocks.
   const stepValid = step === 1 ? Boolean(bankName.trim()) : !busy;
 
   const question =
@@ -577,8 +549,8 @@ function AccountForm({
       {incomePadOpen ? (
         <AmountPad
           title="Expected income"
-          // The pay frequency is asked for on the step after this one, so
-          // naming a cycle here would state a choice nobody has made yet.
+          // The pay frequency is asked on the next step, so a cycle named here would state a choice
+          // nobody has made.
           caption="Each pay period"
           value={income}
           onCancel={() => setIncomePadOpen(false)}

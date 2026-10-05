@@ -5,20 +5,11 @@ import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
 /**
- * Reads and writes for the shared side of Skip.
- *
- * Everything else in the app belongs to one account, so its queries never
- * filter by user — the policies already do. That still holds here, but the
- * policies are answering a harder question: not "is this yours" but "do you
- * share a group with whoever wrote it".
- *
- * Writes go through database functions rather than table inserts. A friendship
- * is only created by accepting a request; an expense and its shares have to
- * land in one transaction or the shares will not add up. Neither of those is
- * something a row policy can express, so neither table is directly writable.
+ * Reads and writes for the shared side of Skip. The policies here answer "do you share a group with
+ * whoever wrote it", not "is this yours". Writes go through database functions: a friendship is
+ * only created by accepting a request, and an expense and its shares must land in one transaction
+ * or the shares will not add up, neither of which a row policy can express.
  */
-
-// --- Shapes -----------------------------------------------------------------
 
 export type FriendRow = {
   id: string;
@@ -98,8 +89,6 @@ export function memberAvatar(member: GroupMemberRow | undefined | null): string 
   return member?.profile?.avatar_id ?? null;
 }
 
-// --- Me ---------------------------------------------------------------------
-
 /** Your own invite code, which is the whole of how somebody adds you. */
 export function useMyInviteCode() {
   const userId = useUserId();
@@ -117,8 +106,6 @@ export function useMyInviteCode() {
     },
   });
 }
-
-// --- Friends ----------------------------------------------------------------
 
 export function useFriends() {
   const userId = useUserId();
@@ -186,8 +173,6 @@ export function useFriendRequests() {
   });
 }
 
-// --- Groups -----------------------------------------------------------------
-
 export function useGroups() {
   const userId = useUserId();
   return useQuery({
@@ -254,8 +239,6 @@ export function useGroupMembers(groupId: string | undefined) {
   });
 }
 
-// --- The ledger -------------------------------------------------------------
-
 export function useGroupExpenses(groupId: string | undefined) {
   const userId = useUserId();
   return useQuery({
@@ -302,10 +285,8 @@ export function useGroupSettlements(groupId: string | undefined) {
 }
 
 /**
- * Who is up and who is down.
- *
- * Read from a view that recomputes it from the ledger every time. There is no
- * stored balance anywhere and there must not be — see the note on the view.
+ * Who is up and who is down, read from a view that recomputes it from the ledger every time. There
+ * is no stored balance, and there must not be.
  */
 export function useGroupBalances(groupId: string | undefined) {
   const userId = useUserId();
@@ -324,11 +305,7 @@ export function useGroupBalances(groupId: string | undefined) {
 }
 
 /**
- * Your own balance in every group at once.
- *
- * One query rather than one per group: the list screen needs a figure beside
- * each row, and asking separately for each would make opening the screen cost
- * a request per group someone belongs to.
+ * Your own balance in every group at once: one query, not a request per group on the list screen.
  */
 export function useMyBalances() {
   const userId = useUserId();
@@ -346,15 +323,10 @@ export function useMyBalances() {
   });
 }
 
-// --- Writes -----------------------------------------------------------------
-
 /**
- * Which caches a change touches.
- *
- * Coarser than it could be, deliberately. An expense moves the balances, the
- * expense list and the group's summary line, and working out which of those a
- * particular edit did not affect is a way to be subtly wrong about what is on
- * screen for the sake of a request that costs milliseconds.
+ * Which caches a change touches. Deliberately coarse: an expense moves the balances, the expense
+ * list and the group's summary line, and working out which an edit did not affect risks a subtly
+ * wrong screen to save a millisecond request.
  */
 const LEDGER_KEYS = ['group-expenses', 'group-settlements', 'group-balances', 'groups'];
 
@@ -447,14 +419,10 @@ export function useRemoveGroupMember() {
 }
 
 /**
- * Rename, or change how it settles. Owner-only, enforced by the group policy.
+ * Rename, or change how it settles. Owner-only (group policy).
  *
- * The `select('id')` is the same guard every other edit in the app has, and it
- * matters more here than on a row this account owns outright: the group policy
- * shows a member the row and lets only the owner write it, so a member's
- * rename is a filter that matches nothing, which PostgREST answers with 204
- * and no error. Without the select, Group settings popped with a success
- * haptic having written nothing at all.
+ * `select('id')` is required: for a non-owner the policy shows the row but filters the write out,
+ * and PostgREST answers 204 with no error, so without it a rejected edit looks like success.
  */
 export function useUpdateGroup() {
   const invalidate = useSplitInvalidate();
@@ -483,11 +451,8 @@ export function useUpdateGroup() {
 }
 
 /**
- * Close a group without deleting it.
- *
- * A holiday that ended still has to answer what everyone paid, and other
- * people's balances refer to its rows. Archiving takes it off the list and
- * leaves the history where it is.
+ * Close a group without deleting it: other people's balances refer to its rows, so archiving takes
+ * it off the list and leaves the history.
  */
 export function useArchiveGroup() {
   const invalidate = useSplitInvalidate();
@@ -497,8 +462,7 @@ export function useArchiveGroup() {
         .from('groups')
         .update({ archived_at: new Date().toISOString() })
         .eq('id', id)
-        // As in useUpdateGroup: archiving is owner-only, and an update that
-        // matched no row has to be an error rather than a quiet success.
+        // As in useUpdateGroup: owner-only, and a filter that matches no row must be an error.
         .select('id');
       if (error) throw new Error(error.message);
       if (!data || data.length === 0) throw new Error(NOTHING_UPDATED);

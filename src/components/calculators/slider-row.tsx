@@ -14,12 +14,10 @@ type SliderRowProps = {
   scale?: 'linear' | 'log';
   /** Tapping the value opens a precise-entry pad, when one makes sense. */
   onValuePress?: () => void;
-  /** Range hints shown under the track. */
   minLabel?: string;
   maxLabel?: string;
 };
 
-/** Label, live value, and the track — the standard control on both calculators. */
 export function SliderRow({
   label,
   display,

@@ -8,12 +8,6 @@ type ProportionBarProps = {
   interest: number;
 };
 
-/**
- * One bar showing what you borrowed against what the borrowing costs.
- *
- * The point of the screen in a single glance: when the coral section rivals the
- * dark one, the loan is expensive — no explanation needed.
- */
 export function ProportionBar({ principal, interest }: ProportionBarProps) {
   const colors = useColors();
   const total = principal + interest;

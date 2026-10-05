@@ -24,12 +24,8 @@ import { putVoiceDraft } from '@/lib/voice-draft';
 import { useColors } from '@/providers/theme-provider';
 
 /**
- * What the page is showing.
- *
- * `listening` is the button held with the mic opening or open; `checking` is
- * let go, waiting on the final words; `nothing` is a session that ended with
- * no words (a quick tap, or silence); `multiple` heard more than one entry in
- * one go; `granted` is the first press that only asked for permission.
+ * What the page is showing. `checking` is let go, waiting on the final words; `nothing` is a
+ * session that ended with no words; `granted` is the first press that only asked for permission.
  */
 type Shown =
   | 'idle'
@@ -43,11 +39,8 @@ type Shown =
   | 'unavailable';
 
 /**
- * One hold, from press to outcome.
- *
- * `live` is set once the mic is actually on: the hook passes through `idle` on
- * its way there, and that is not an answer. `outcome` is what the hold came to:
- * words for review, or nothing at all.
+ * One hold, from press to outcome. `live` is set once the mic is actually on: the hook passes
+ * through `idle` on its way there, which is not an answer.
  */
 type Session = {
   id: number;
@@ -78,8 +71,8 @@ function advance(session: Session, status: SpeechStatus, alternatives: string[])
     return { ...session, active: false, stopping: false };
   }
   if (!session.live) return session;
-  // Idle after listening: let go, the 15-second cap, or a call. All the same:
-  // the words heard so far, if any, are the answer.
+  // Idle after listening: let go, the 15-second cap, or a call. All the same: the words heard so
+  // far, if any, are the answer.
   const words = alternatives.filter((text) => text.trim());
   return {
     ...session,
@@ -94,11 +87,9 @@ function advance(session: Session, status: SpeechStatus, alternatives: string[])
 const START_ANNOUNCEMENT = 'Listening';
 
 /**
- * Speaks a line and waits until VoiceOver has finished saying it.
- *
- * The mic must not open while VoiceOver is talking, or its words become the
- * entry. `announcementFinished` says when it is done; the timer covers a
- * VoiceOver that never says so.
+ * Speaks a line and waits until VoiceOver has finished saying it: the mic must not open while
+ * VoiceOver is talking, or its words become the entry. The timer covers a VoiceOver that never
+ * says it is done.
  */
 function announceAndWait(text: string): Promise<void> {
   return new Promise((resolve) => {
@@ -117,9 +108,8 @@ function announceAndWait(text: string): Promise<void> {
 }
 
 /**
- * How much of a long transcript is drawn: the newest words, never the oldest.
- * iOS only head-truncates the last line of multi-line text, which would cut
- * the middle out, so the string is trimmed at a word before it is rendered.
+ * The newest words of a long transcript. iOS only head-truncates the last line of multi-line text,
+ * which would cut the middle out, so the string is trimmed at a word before it is rendered.
  */
 function latestWords(text: string, limit = 140): string {
   const tidy = text.replace(/\s+/g, ' ').trim();
@@ -129,10 +119,7 @@ function latestWords(text: string, limit = 140): string {
   return `…${space > 0 && space < limit / 2 ? tail.slice(space + 1) : tail}`;
 }
 
-/**
- * Whether the parser heard two or more separate entries in one sentence
- * ("Netflix 15.99 and Spotify 11.99"); Drew's rule, src/lib/voice/multiple.ts.
- */
+/** Whether the parser heard two or more separate entries ("Netflix 15.99 and Spotify 11.99"). */
 function heardMoreThanOne(draft: VoiceDraft): boolean {
   return draft.multiple === true;
 }
@@ -140,12 +127,9 @@ function heardMoreThanOne(draft: VoiceDraft): boolean {
 const MULTIPLE_LINE = 'Looks like more than one. Add them one at a time.';
 
 /**
- * "Record a transaction": hold the mic, say it, let go.
- *
- * The Founder's redesign (2026-10-01): no copy to read, four hints, one big
- * button. The words appear as they are heard; letting go sends them to the
- * review page, once. Nothing is saved here, and the mic never opens by
- * itself — not on arrival, not from a link, not on coming back.
+ * "Record a transaction": hold the mic, say it, let go. The words appear as they are heard; letting
+ * go sends them to the review page, once. Nothing is saved here, and the mic never opens by itself
+ * (not on arrival, not from a link, not on coming back).
  */
 export default function VoiceScreen() {
   const gate = useProGate('voice');
@@ -157,8 +141,8 @@ function VoiceScreenInner() {
   const colors = useColors();
   const { today } = useToday();
 
-  // Loaded while the person is speaking. Whatever has arrived is what the
-  // parser gets: a directory that failed means unmatched stores, not a dead mic.
+  // Loaded while the person is speaking. Whatever has arrived is what the parser gets: a directory
+  // that failed means unmatched stores, not a dead mic.
   const directory = useBrandDirectory();
   const { aliases } = useVoiceAliases();
   const receipts = useReceipts();
@@ -174,14 +158,12 @@ function VoiceScreenInner() {
     [directory.data, own],
   );
 
-  // Continuous: a hold is one sentence however long the pauses in it, and
-  // letting go is what ends it.
+  // Continuous: a hold is one sentence however long the pauses in it; letting go ends it.
   const speech = useSpeechCapture({ contextualStrings, continuous: true });
 
   const [session, setSession] = useState<Session>(RESTING);
-  // The hook's status, as last seen. When it moves, the session moves with it
-  // here in render rather than in an effect, so the page never paints a state
-  // the session has already left.
+  // The hook's status, as last seen. When it moves, the session moves with it here in render
+  // rather than in an effect, so the page never paints a state the session has already left.
   const [seen, setSeen] = useState({ status: speech.status, alternatives: speech.alternatives });
   if (seen.status !== speech.status || seen.alternatives !== speech.alternatives) {
     setSeen({ status: speech.status, alternatives: speech.alternatives });
@@ -218,9 +200,8 @@ function VoiceScreenInner() {
     };
   }, []);
 
-  // The hook's own functions are stable; `speech` itself is a new object on
-  // every render, and depending on it would re-run the focus effect below —
-  // and cancel the mic — every time a word arrived.
+  // The hook's own functions are stable; `speech` is a new object every render, and depending on
+  // it would re-run the focus effect below and cancel the mic every time a word arrived.
   const stopSpeech = speech.cancel;
   const cancel = useCallback(() => {
     generation.current += 1;
@@ -254,7 +235,6 @@ function VoiceScreenInner() {
     setNotice(null);
     setHeld(true);
     setSession({ ...RESTING, id: mine, active: true });
-    // The moment the press counts, felt rather than heard.
     toggle();
     if (screenReader) {
       await announceAndWait(START_ANNOUNCEMENT);
@@ -267,7 +247,6 @@ function VoiceScreenInner() {
   const endHold = () => {
     const was = press.current;
     press.current = 'none';
-    // A press that only asked for permission started nothing.
     if (was !== 'hold') return;
     setHeld(false);
     // Let go before the mic was even open: a tap, not a hold. The hook ends
@@ -292,9 +271,8 @@ function VoiceScreenInner() {
     if (session.outcome === 'nothing') warn();
   }, [session.id, session.outcome]);
 
-  // Dev builds only — see DevTestSentence. The typed sentence becomes a
-  // session that heard exactly those words, so from here on it takes the same
-  // road as speech: the parse below, the draft, one push to review.
+  // Dev builds only (see DevTestSentence). The typed sentence becomes a session that heard exactly
+  // those words, so it takes the same road as speech.
   const runTestSentence = useCallback(
     (text: string) => {
       if (!__DEV__) return;
@@ -307,9 +285,9 @@ function VoiceScreenInner() {
     [cancel],
   );
 
-  // Words in: parsed here in render, because parsing is pure and quick, and
-  // a parse that fails then shows as the page's error instead of a spinner
-  // that never ends. The parser promises never to throw; this is the backstop.
+  // Words in: parsed here in render, because parsing is pure and quick, and a parse that fails
+  // shows as the page's error instead of a spinner that never ends. The parser promises never to
+  // throw; this is the backstop.
   const parsed = useMemo(() => {
     if (session.outcome !== 'heard') return null;
     try {
@@ -369,8 +347,7 @@ function VoiceScreenInner() {
     return 'idle';
   })();
 
-  // Leaving the page in any way stops the mic at once — back, swipe, the push
-  // to review. Coming back always finds it idle.
+  // Leaving the page in any way stops the mic at once (back, swipe, the push to review).
   useFocusEffect(
     useCallback(() => {
       focused.current = true;
@@ -382,10 +359,9 @@ function VoiceScreenInner() {
     }, [cancel]),
   );
 
-  // To the background mid-sentence (the home screen, the lock button): stop
-  // and forget. Back to the app while refused — most likely from Settings —
-  // read the permission again: if both are now on the page is ready for a
-  // hold, and if not it still says how to turn them on. Neither opens the mic.
+  // To the background mid-sentence (the home screen, the lock button): stop and forget. Back to the
+  // app while refused, most likely from Settings: read the permission again, so the page is ready
+  // for a hold if both are now on. Neither opens the mic.
   const statusRef = useRef(speech.status);
   const shownRef = useRef(shown);
   const refreshRef = useRef(speech.refreshPermission);
@@ -477,15 +453,12 @@ function VoiceScreenInner() {
   );
 
   return (
-    // Keyboard-aware in dev only, for the test sentence at the bottom; a
-    // Release build has no field on this page.
+    // Keyboard-aware in dev only, for the test sentence; a Release build has no field on this page.
     <Screen title="Record a transaction" showBack footer={footer} avoidKeyboard={__DEV__}>
       <View className="mt-6 w-full flex-1 items-center">
         {shown === 'idle' ? null : shown === 'listening' ? (
-          // Only while the mic is held (Founder, 2026-10-03): "Listening…"
-          // until the first word, then the words. Only this hold's words —
-          // until its mic is live, whatever the hook still holds is the last
-          // session's.
+          // "Listening…" until the first word, then the words. Only this hold's words: until its
+          // mic is live, whatever the hook still holds is the last session's.
           speech.interim && session.live ? (
             <LiveWords text={speech.interim} />
           ) : (
@@ -500,7 +473,6 @@ function VoiceScreenInner() {
             </View>
           </View>
         ) : shown === 'multiple' ? (
-          // What was heard stays, in full ink, so the person sees why.
           <View className="w-full items-center">
             <LiveWords text={session.words[0] ?? ''} />
             <View className="mt-4 w-full">
@@ -571,11 +543,8 @@ function LiveWords({ text }: { text: string }) {
 }
 
 /**
- * Where the words will appear, while the mic is held and before there are
- * any: "Listening…" in the words' own type, ink at 20%, so it marks the place
- * rather than says anything. It gives way to the first word, and is not shown
- * at all until the mic is held. Hidden from VoiceOver, which already hears
- * "Listening" announced when the hold starts.
+ * "Listening…" in the words' own type, ink at 20%, marking where the words will appear. Hidden
+ * from VoiceOver, which already hears "Listening" announced when the hold starts.
  */
 function Placeholder() {
   return (
@@ -603,15 +572,10 @@ function StatusLine({ text }: { text: string }) {
 }
 
 /**
- * Dev builds only: type what you would have said.
- *
- * QA runs on the Simulator, which has no microphone to speak into, and the
- * review, edit and save pages still need testing. This sends a typed sentence
- * down exactly the road real speech takes — `parseVoice([text], …)`, the draft,
- * one push to review — and does nothing else. `__DEV__` is false in Release,
- * so this component, its handler and its place on the page all fold away there.
- * It sits at the foot of the scrolling area rather than in the pinned footer
- * with the hints, so the keyboard can scroll it into view.
+ * Dev builds only: type what you would have said, for the Simulator, which has no microphone. The
+ * typed sentence takes exactly the road real speech takes. `__DEV__` is false in Release, so the
+ * component, its handler and its place on the page fold away. It sits at the foot of the scrolling
+ * area, not the pinned footer, so the keyboard can scroll it into view.
  */
 const DevTestSentence = __DEV__
   ? function DevTestSentence({
@@ -629,9 +593,8 @@ const DevTestSentence = __DEV__
             value={text}
             onChangeText={setText}
             placeholder="Netflix $15.99 every month"
-            // Exactly as typed: autocorrect once turned "um hello" into
-            // "I'm hello" before the parser saw it. On iOS spell-check follows
-            // autoCorrect, so this turns both off.
+            // Exactly as typed: autocorrect would rewrite words before the parser sees them, and on
+            // iOS spell-check follows autoCorrect.
             autoCorrect={false}
             autoCapitalize="none"
             returnKeyType="go"

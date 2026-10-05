@@ -63,11 +63,8 @@ const labelOf = (categoryId: string | null) =>
   BILL_CATEGORIES.find((category) => category.id === categoryId)?.label ?? '';
 
 /**
- * One correction, on a page of its own: `/voice-edit?draft=…&field=…`.
- *
- * Built from the add flows' own parts — the keypad, the store search, the
- * calendar, the category grid — and pushed from the right like every other
- * page, never slid up over the review. Done writes the change to the review's
+ * One correction, on a page of its own: `/voice-edit?draft=…&field=…`. Built from the add flows'
+ * own parts, pushed from the right like every other page. Done writes the change to the review's
  * working copy and pops; back, or the swipe, pops and writes nothing.
  */
 export default function VoiceEditScreen() {
@@ -81,8 +78,7 @@ function VoiceEditInner() {
   const session = useVoiceSession(params.draft);
   const field = FIELDS.find((option) => option === params.field);
 
-  // A category belongs to bills alone; asked for on anything else, there is
-  // nothing here to correct.
+  // A category belongs to bills alone; asked for on anything else, there is nothing to correct.
   if (!session || !field || (field === 'category' && session.entry.kind !== 'bill')) {
     return <StaleDraft />;
   }
@@ -106,11 +102,10 @@ function VoiceEditInner() {
 /**
  * Writes the change and pops; a stale draft stays put and says so.
  *
- * The page leaves exactly once. In expo-router 57 `router.back()` is a global
- * "go back" with no screen attached, so a second tap on Done — or a second
- * category, tapped before the page has gone — would pop the review page too
- * and land on the mic with the draft unseen. After the first leave, nothing
- * here writes or pops again. The back chevron goes through the same door.
+ * The page leaves exactly once. In expo-router 57 `router.back()` is a global "go back" with no
+ * screen attached, so a second tap on Done (or a second category, tapped before the page has gone)
+ * would pop the review page too and land on the mic. After the first leave, nothing here writes or
+ * pops again. The back chevron goes through the same door.
  */
 function useCommit(session: VoiceSession) {
   const [failed, setFailed] = useState(false);
@@ -207,7 +202,6 @@ function EditShell({
 function AmountEdit({ session }: { session: VoiceSession }) {
   const { commit, failed, leave } = useCommit(session);
   const kind = session.entry.kind;
-  // The working amount as the keypad types it: two decimals from whole cents.
   const [text, setText] = useState(() => amountText(session.entry.amount));
   const amount = amountFromText(text);
 
@@ -228,9 +222,8 @@ function AmountEdit({ session }: { session: VoiceSession }) {
 }
 
 /**
- * The store or the service. When what was heard matched nothing in the
- * catalogue, the search opens already holding it — "star bucks" — with its
- * results showing, so the right one is a tap away.
+ * The store or the service. When what was heard matched nothing in the catalogue, the search opens
+ * already holding it ("star bucks"), with its results showing.
  */
 function MerchantEdit({ session }: { session: VoiceSession }) {
   const { commit, failed, leave } = useCommit(session);
@@ -268,8 +261,8 @@ function MerchantEdit({ session }: { session: VoiceSession }) {
 }
 
 /**
- * A bill's company and name, together as add-bill has them. Picking a company
- * names the bill unless it already has a real name — add-bill's rule exactly.
+ * A bill's company and name, together as add-bill has them. Picking a company names the bill
+ * unless it already has a real name (add-bill's rule exactly).
  */
 function BillNameEdit({ session }: { session: VoiceSession }) {
   const { commit, failed, leave } = useCommit(session);
@@ -294,8 +287,8 @@ function BillNameEdit({ session }: { session: VoiceSession }) {
       onDone={() => {
         const typed = name.trim();
         if (!typed) return;
-        // A name that is only what Skip would call it anyway stays unnamed,
-        // so a later change of company or category can still rename it.
+        // A name that is only what Skip would call it anyway stays unnamed, so a later change of
+        // company or category can still rename it.
         const automatic = voiceBillName(
           { ...entry, merchant: issuer, billName: null },
           categoryLabel,
@@ -331,8 +324,8 @@ function DateEdit({ session }: { session: VoiceSession }) {
   const { entry } = session;
   const kind = entry.kind;
 
-  // A receipt with no day was bought today, the form's own default; a bill or
-  // subscription opens with nothing picked.
+  // A receipt with no day was bought today, the form's own default; a bill or subscription opens
+  // with nothing picked.
   const [day, setDay] = useState<Date | null>(() =>
     entry.date ? dayToDate(entry.date) : kind === 'receipt' ? todayDate : null,
   );

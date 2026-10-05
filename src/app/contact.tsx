@@ -15,18 +15,9 @@ import { useColors } from '@/providers/theme-provider';
 import { failureMessage } from '@/lib/failure';
 
 /**
- * One form for both ways of writing in.
- *
- * Support and ideas go to the same inbox and want the same three things, so
- * they are the same screen with a different heading rather than two screens
- * that will drift apart. The topic only changes the words and the subject line
- * the email arrives under.
- *
- * The address is shown but never editable. It is read from the session on the
- * server anyway, so a field here would be a box you can type in that changes
- * nothing — worse than no box at all.
+ * Support and ideas share one inbox and form; the topic only changes the words and the email's
+ * subject line. The address is shown but never editable: the server reads it from the session.
  */
-
 const COPY: Record<MessageTopic, { title: string; subtitle: string; placeholder: string }> = {
   support: {
     title: 'Email support',

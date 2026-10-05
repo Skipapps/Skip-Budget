@@ -1,31 +1,25 @@
 /**
- * Step 9: how sure, and what is still needed.
+ * How sure, and what is still needed.
  *
- * ## Score (brief, unchanged)
- * amount heard 40 · kind decided by a keyword 25 · merchant found 20 ·
- * a date spoken 15. The best alternative wins on score; a tie goes to the
- * earlier one (the recogniser's own ranking).
- *
- * An ambiguous amount still scores 40: it was heard, and the score is for
- * ranking alternatives, not for saying the draft is complete. `missing` and
- * `confidence` say that.
+ * ## Score
+ * amount heard 40 · kind decided by a keyword 25 · merchant found 20 · a date spoken 15. The best
+ * alternative wins on score; a tie goes to the earlier one (the recogniser's own ranking). An
+ * ambiguous amount still scores 40: the score ranks alternatives, it does not say the draft is
+ * complete. `missing` and `confidence` say that.
  *
  * ## Confidence
  * - low: no amount, or a score under 40;
- * - medium: 40–74;
- * - high: 75 and up, **and nothing missing**. A draft with an amount to pick
- *   or a category to choose cannot be one-tap-saved, so it is medium however
- *   high it scored. (Added to the brief's bands so `high` always means "every
- *   field is filled".)
+ * - medium: 40-74;
+ * - high: 75 and up and nothing missing, so `high` always means every field is filled. A draft with
+ *   an amount to pick or a category to choose cannot be one-tap-saved, however high it scored.
  *
- * ## Missing, per kind — mirroring what each add form refuses to save without
- * - amount: not heard, or heard two ways (receipts, bills, subscriptions);
- * - merchant: receipts (store) and subscriptions (service); a bill is named
- *   from its category or company, as add-bill does;
- * - date: bills (the first due date); a receipt defaults to today and a
- *   renewal date is optional;
- * - cycle: bills and subscriptions, when not said — the forms default to
- *   monthly, but monthly vs yearly is a money question, so it is asked;
+ * ## Missing, per kind (mirrors what each add form refuses to save without)
+ * - amount: not heard, or heard two ways;
+ * - merchant: receipts (store) and subscriptions (service); a bill is named from its category or
+ *   company, as add-bill does;
+ * - date: bills (the first due date); a receipt defaults to today and a renewal date is optional;
+ * - cycle: bills and subscriptions, when not said. The forms default to monthly, but monthly vs
+ *   yearly is a money question, so it is asked;
  * - category: bills.
  */
 import type { VoiceDraft, VoiceMissing } from './types';

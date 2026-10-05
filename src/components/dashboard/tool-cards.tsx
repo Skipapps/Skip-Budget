@@ -13,13 +13,7 @@ type Tool = {
   href: Href;
 };
 
-/**
- * The two calculators, out of the spending list.
- *
- * They sat as rows among Monthly Bills, Receipts and Subscriptions, but they
- * are not places money went — they open a tool. Two square cards side by side
- * say "these are different" in a way a fourth and fifth row could not.
- */
+/** The two calculators: tools rather than spending, so cards rather than list rows. */
 const TOOLS: Tool[] = [
   { id: 'loan-calculator', label: 'Loan Calculator', icon: Landmark, href: '/loan-calculator' },
   { id: 'split-calculator', label: 'Split Manager', icon: Users, href: '/splits' },
@@ -31,12 +25,9 @@ type ToolCardsProps = {
 };
 
 /**
- * Two raised cards, shoulder to shoulder.
- *
- * Shadow and no border, per the house rule: these are meant to be pressed, and
- * an outline would flatten the very lift that says so. The PRO badge sits in
- * the card's corner — a locked tool keeps its card, because a hidden feature
- * sells nothing and the destination screen still does the actual refusing.
+ * Two raised cards, shoulder to shoulder: shadow and no border (an outline would flatten the lift).
+ * A locked tool keeps its card with a PRO badge, since a hidden feature sells nothing and the
+ * destination screen still does the refusing.
  */
 export function ToolCards({ pro, onPress }: ToolCardsProps) {
   const colors = useColors();

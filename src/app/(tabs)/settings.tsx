@@ -59,8 +59,6 @@ import {
   useSubscriptions,
 } from '@/api/queries';
 
-/** Straight from the subscriptions list, so the summary cannot drift. */
-
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 const MODE_OPTIONS = [
@@ -69,7 +67,6 @@ const MODE_OPTIONS = [
   { value: 'system', label: 'System' },
 ] as const;
 
-/** What the chosen mode means, so "System" is not a guess. */
 const MODE_CAPTIONS: Record<ModeKey, string> = {
   light: 'Always light',
   dark: 'Always dark',
@@ -100,33 +97,26 @@ export default function SettingsScreen() {
   const accountCount = accounts.data?.length ?? 0;
   const salaryCount = salary.data?.length ?? 0;
   const trackedSubscriptions = subs.data?.length ?? 0;
-  // Null until the field is touched, so the saved name shows through until
-  // someone edits it. Seeding state from the query in an effect instead would
-  // overwrite what they were typing the moment a refetch landed.
+  // Null until the field is touched, so the saved name shows through. Seeding state from the query
+  // in an effect would overwrite what someone is typing when a refetch lands.
   const [draftName, setDraftName] = useState<string | null>(null);
   const savedName = profile.data?.display_name ?? '';
   const displayName = draftName ?? savedName;
 
-  /** Whether what is on screen differs from what is stored. */
   const nameDirty = draftName !== null && draftName.trim() !== savedName;
 
   const commitName = () => {
     if (!nameDirty) return;
     updateProfile.mutate(
       { display_name: displayName.trim() || null },
-      // Back to reading the saved value, so the tick means "this is what is
-      // stored" rather than "this is what you typed".
+      // Back to the saved value, so the tick means "stored", not "typed".
       { onSuccess: () => setDraftName(null) },
     );
   };
 
   /**
-   * Turning the lock on has to prove it works first.
-   *
-   * A switch that flips without a scan is a promise the app has not checked it
-   * can keep — and the moment it matters is the moment somebody is locked out
-   * of their own budget. Turning it off needs nothing: getting far enough to
-   * tap it already meant getting past the lock.
+   * Turning the lock on must pass a scan first, or a broken lock could shut someone out of their
+   * own budget. Turning it off needs nothing: reaching the switch meant passing the lock.
    */
   const handleAppLock = async (next: boolean) => {
     if (!next) {
@@ -148,13 +138,9 @@ export default function SettingsScreen() {
   };
 
   /**
-   * Two dialogs, not one.
-   *
-   * The first counts what is about to go. "Everything" is easy to agree to;
-   * "3 cards, 57 transactions" is the same fact in a form somebody can weigh.
-   * The second is the point of no return. Account deletion is the only action
-   * in the app that cannot be undone by any means, so it does not share the
-   * single-confirm pattern used for deleting a receipt.
+   * Two dialogs: the first counts what is about to go ("3 cards, 57 transactions" can be weighed),
+   * the second is the point of no return. Account deletion cannot be undone, so it does not use the
+   * single-confirm pattern.
    */
   const handleDeleteAccount = async () => {
     const tally = [
@@ -213,9 +199,7 @@ export default function SettingsScreen() {
         />
       </SettingsSection>
 
-      {/* Development builds only. `__DEV__` is false in every Release bundle,
-          so this section does not exist in anything a customer can install —
-          and the switch behind it is inert there too. */}
+      {/* Development builds only: `__DEV__` is false in every Release bundle. */}
       {__DEV__ ? (
         <SettingsSection title="Developer">
           <SettingsRow
@@ -231,9 +215,8 @@ export default function SettingsScreen() {
               onChange: (on) => setProOverride(on ? 'pro' : 'off'),
             }}
           />
-          {/* The other lie, for the device a sandbox purchase has made Pro:
-              RevenueCat cannot be switched off from inside the app, and the
-              free and lapsed experiences still have to be testable on it. */}
+          {/* For a device a sandbox purchase has made Pro: RevenueCat cannot be switched off
+              in-app, and the free and lapsed experiences still need testing. */}
           <SettingsRow
             icon={FlaskConical}
             title="Fake Free"
@@ -252,7 +235,6 @@ export default function SettingsScreen() {
       ) : null}
 
       <SettingsSection title="Profile">
-        {/* Above the name, in the order the dashboard shows them. */}
         <SettingsRow
           icon={UserRound}
           artwork={<ProfileAvatar avatarId={profile.data?.avatar_id} size={34} />}
@@ -275,8 +257,6 @@ export default function SettingsScreen() {
             placeholder="Your name"
             autoCapitalize="words"
             returnKeyType="done"
-            // A tick only once it is stored. Saving on blur alone left people
-            // with no way to tell whether their name had been kept.
             trailing={
               !nameDirty && savedName ? (
                 <Check size={20} color={colors.moneyIn} strokeWidth={2.6} />
@@ -334,8 +314,7 @@ export default function SettingsScreen() {
           icon={ReceiptText}
           title="Bills"
           subtitle={billCount > 0 ? plural(billCount, 'recurring bill') : 'None yet'}
-          // The list of bills themselves, every one including those with no
-          // charge this month; Home's Monthly bills is what they cost.
+          // Every bill, including those with no charge this month; cost is on Home's Monthly bills.
           onPress={() => router.push('/bill-plans')}
         />
         <SettingsRow
@@ -385,8 +364,7 @@ export default function SettingsScreen() {
           title="Getting started"
           subtitle="Put the setup steps back on Home"
           onPress={() => {
-            // Clearing the dismissal is all it takes: the card derives its
-            // steps live, and it still leaves on its own once all five are done.
+            // Clearing the dismissal is enough: the card derives its steps live.
             updateProfile.mutate({ getting_started_dismissed_at: null });
             router.push('/home');
           }}
@@ -417,8 +395,7 @@ export default function SettingsScreen() {
         />
         <SettingsRow
           icon={Coffee}
-          // Their mark, in their colours. Tinting someone else's logo to match
-          // the row would be misrepresenting it.
+          // Their mark in their colours; tinting someone else's logo would misrepresent it.
           artwork={<CoffeeMark width={22} height={22} />}
           title="Buy a coffee for team"
           subtitle="Keep Skip brewing"

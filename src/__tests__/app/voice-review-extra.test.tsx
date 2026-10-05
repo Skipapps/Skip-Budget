@@ -7,15 +7,13 @@ import type { VoiceDraft } from '@/lib/voice';
 import { clearVoiceDraft, putVoiceDraft } from '@/lib/voice-draft';
 
 /**
- * Theo's three money checks for the voice review page, on top of
- * `voice-review.test.tsx` (Dana's): no path shows or saves $0 or NaN, every
- * amount saved equals `fromCents(toCents(x))`, and an ambiguous amount can
- * never reach a create call, pressed or not — the Save handler itself must
- * refuse, not just the button's disabled look.
+ * Three money checks for the voice review page, on top of `voice-review.test.tsx`: no path shows or
+ * saves $0 or NaN, every amount saved equals `fromCents(toCents(x))`, and an ambiguous amount can
+ * never reach a create call, pressed or not: the Save handler itself must refuse, not just the
+ * button's disabled look.
  *
- * Same mocks as `voice-review.test.tsx` by necessity (a sibling file, not an
- * edit of it); the draft goes through the real store and the real builders,
- * only the network is replaced.
+ * Same mocks as `voice-review.test.tsx`; the draft goes through the real store and the real
+ * builders, only the network is replaced.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -36,8 +34,7 @@ jest.mock('expo-router', () => ({
     canGoBack: () => true,
   },
   useLocalSearchParams: () => mockParams,
-  // The page re-opens its navigation guard on focus (review L3); in a test it
-  // is always focused.
+  // The page re-opens its navigation guard on focus; in a test it is always focused.
   useFocusEffect: (effect: () => undefined | (() => void)) =>
     jest.requireActual('react').useEffect(effect, [effect]),
   Stack: {
@@ -202,9 +199,8 @@ describe('money check — an ambiguous amount can never be saved without a pick'
 
 describe('money check — no path shows or saves $0 or NaN', () => {
   it('never renders NaN when the slot somehow holds one, and blocks Save', async () => {
-    // A malformed value as it might arrive from a corrupted module boundary,
-    // not from the parser (which never emits one; see parse.test.ts). The
-    // store re-validates on arrival regardless of where a draft came from.
+    // A malformed value as it might arrive from a corrupted module boundary, not from the parser
+    // (which never emits one). The store re-validates on arrival wherever a draft came from.
     const id = seed({ amount: NaN });
     const screen = await render(<VoiceReviewScreen />);
 

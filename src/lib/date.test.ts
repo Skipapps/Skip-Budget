@@ -27,8 +27,7 @@ describe('getDaysInMonth', () => {
 
 describe('daysLeftInMonth', () => {
   it('counts to the end of the month it is actually in', () => {
-    // The bug this guards: passing a one-based month measured September's
-    // length from an August date, and reported two days left instead of three.
+    // A one-based month would measure September from an August date and report two days, not three.
     expect(daysLeftInMonth(on(2026, 8, 28))).toBe(3);
   });
 
@@ -53,8 +52,7 @@ describe('daysLeftInMonth', () => {
 
 describe('toIsoDate', () => {
   it('uses the device day rather than the UTC one', () => {
-    // Late evening west of Greenwich is already tomorrow in UTC; a receipt
-    // bought tonight must not be filed under tomorrow.
+    // Late evening west of Greenwich is already tomorrow in UTC.
     expect(toIsoDate(new Date(2026, 7, 28, 23, 30))).toBe('2026-08-28');
     expect(toIsoDate(new Date(2026, 0, 1, 0, 5))).toBe('2026-01-01');
   });

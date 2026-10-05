@@ -13,35 +13,18 @@ type SwitchControlProps = {
 };
 
 /**
- * The app's switch: a press target that owns the tap, with the platform switch
- * drawn inside it and never touched directly.
+ * The app's switch: a press target that owns the tap, with the platform switch drawn inside it and
+ * never touched directly.
  *
- * Why it is not a bare `Switch`. Settings shipped switches that could be turned
- * on with a tap and not turned off again — the same on two different stores,
- * and a horizontal swipe did work. The JavaScript is not where that happens:
- * `settings-row.test.tsx` shows one change event producing exactly one call
- * carrying `false`, and the value following it. What is left is the platform
- * control. A `UISwitch` owns its own gestures — a tap on the track, a drag on
- * the thumb — and only reports once it has decided which one finished; a touch
- * it takes for the start of a drag and then loses ends with the switch
- * unchanged and no `onValueChange` at all. On a switch that is on, the thumb is
- * exactly where a finger aiming at the middle lands.
+ * A bare `Switch` could be turned on by a tap but not off again: a `UISwitch` owns its own gestures
+ * (tap on the track, drag on the thumb), and a touch it takes for the start of a drag and then loses
+ * ends with no `onValueChange` at all. On a switch that is on, the thumb is where a finger aiming at
+ * the middle lands. So the platform switch gets `pointerEvents="none"` and is only a picture of the
+ * `value` prop: one press in, one `onValueChange(!value)` out, and a refused change (an app lock that
+ * failed its scan) never moves. The trade is the thumb drag, which this does not support.
  *
- * So the touch is taken one level up, where it is a plain press, and the
- * switch becomes a picture of the value: `pointerEvents="none"` means it never
- * sees a finger, and the only way its value can change is the `value` prop
- * coming back down. One press in, one `onValueChange(!value)` out, and what is
- * drawn is always what the app believes — a refused change (an app lock that
- * failed its scan) simply never moves, instead of flicking over and snapping
- * back.
- *
- * That makes the behaviour ours, and testable, whichever gesture recogniser was
- * really at fault. The trade is the thumb drag, which iOS supports and this
- * does not: a tap is the gesture people use, and a tap is the one that broke.
- *
- * Accessibility is on the press target for the same reason: one element with
- * the `switch` role and a checked state, rather than two. VoiceOver's
- * double-tap runs `onPress`, so it toggles like any other row.
+ * Accessibility lives on the press target: one `switch` element, not two. VoiceOver's double-tap
+ * runs `onPress`.
  */
 export function SwitchControl({
   value,
@@ -60,14 +43,11 @@ export function SwitchControl({
       // The control is 51×31; the press target is the 44pt Apple asks for.
       hitSlop={{ top: 7, bottom: 7, left: 8, right: 8 }}
       onPress={() => {
-        // A switch is a press too, and a firmer one: it changed something
-        // rather than opening something.
         toggleFeedback();
         onValueChange(!value);
       }}
     >
-      {/* Never a touch target and never an accessibility element: the press
-          target above is both, so VoiceOver finds one switch, not two. */}
+      {/* Neither a touch target nor an accessibility element: the press target above is both. */}
       <View
         pointerEvents="none"
         accessibilityElementsHidden

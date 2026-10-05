@@ -7,12 +7,8 @@ import { useGettingStarted } from '@/api/onboarding';
 import { useColors } from '@/providers/theme-provider';
 
 /**
- * Five steps between an empty app and a useful one — the same five the
- * walk-in flow (/setup) runs, read from the same definition.
- *
- * A card, not a wizard: Skip works from the first second, and this sits on
- * Home for whoever set up later or partway. It ticks itself as the data
- * appears, and leaves for good once everything is done or somebody says so.
+ * The five steps the walk-in flow (/setup) runs, read from the same definition. A card, not a
+ * wizard: it ticks itself as data appears and leaves once everything is done or dismissed.
  */
 export function GettingStartedCard() {
   const colors = useColors();
@@ -40,8 +36,6 @@ export function GettingStartedCard() {
         </Pressable>
       </View>
 
-      {/* One bar, not five dots: progress here is an amount, not a sequence
-          of states, and a filling bar says "nearly there" at a glance. */}
       <View className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-ink/5">
         <View
           className="h-full rounded-full bg-accent"
@@ -57,8 +51,8 @@ export function GettingStartedCard() {
               accessibilityRole="button"
               accessibilityState={{ disabled: step.done }}
               accessibilityLabel={step.done ? `${step.title}. Done.` : step.title}
-              // Not drawn (the Founder's call, 2026-10-03: titles only), but
-              // still said, so VoiceOver keeps the why behind each step.
+              // Not drawn (titles only) but still said, so VoiceOver keeps the why behind each
+              // step.
               accessibilityHint={step.done ? undefined : step.detail}
               disabled={step.done}
               onPress={() => router.push(step.href as never)}

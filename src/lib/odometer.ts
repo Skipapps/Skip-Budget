@@ -1,11 +1,8 @@
 /**
  * What one digit wheel does when the figure changes.
  *
- * A wheel only ever shows the faces it actually crosses. Rendering a full
- * 0–9 strip per digit is the obvious way to build this and the wrong one: a
- * dashboard carries dozens of digits, and at thirty faces each that is over a
- * thousand text nodes standing by to do nothing. Most turns cross a single
- * face, so the strip is built per turn and thrown away after.
+ * A wheel only renders the faces it crosses: a full 0–9 strip per digit would mean over a
+ * thousand idle text nodes on a dashboard, and most turns cross a single face.
  */
 
 export type Turn = {
@@ -17,7 +14,6 @@ export type Turn = {
   endOffset: number;
 };
 
-/** Which face a given offset puts in the window. */
 export function faceAt(offset: number, lineHeight: number): number {
   return Math.round(-offset / lineHeight);
 }
@@ -25,14 +21,11 @@ export function faceAt(offset: number, lineHeight: number): number {
 /**
  * Plans the turn from one digit to another.
  *
- * Direction comes from the whole figure, not the digit: going 199 to 200 the
- * tens wheel reads 9 to 0, which is forwards, and deciding that locally would
- * wind it back through every number in between.
+ * Direction comes from the whole figure, not the digit: going 199 to 200 the tens wheel reads
+ * 9 to 0, which is forwards, and deciding locally would wind it back through every number between.
  *
- * Counting up, the incoming digit arrives from below, so the strip starts on
- * the outgoing face and travels up. Counting down it is the other way about —
- * but the faces are listed ascending either way, because that is what makes a
- * wheel read as one continuous surface rather than two.
+ * Counting up the strip travels up; counting down it travels down. Faces are listed ascending
+ * either way so the wheel reads as one continuous surface.
  */
 export function planTurn(from: number, to: number, forwards: boolean, lineHeight: number): Turn {
   const steps = forwards ? (to - from + 10) % 10 : (from - to + 10) % 10;

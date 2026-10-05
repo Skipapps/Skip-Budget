@@ -2,14 +2,7 @@ import { render } from '@testing-library/react-native';
 
 import ReceiptsScreen from '@/app/receipts';
 
-/**
- * Which day heading the receipts list opens with.
- *
- * The Founder's rule is oldest at the top and today at the bottom, and the only
- * way to prove a screen obeys it is to render it and read the headings in the
- * order they came out. This one is the cheapest grouped screen to mount: no
- * keypad, no navigation, no money arithmetic beyond a per-day sum.
- */
+/** The receipts list runs oldest day first, today last; rows within a day keep their order. */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
@@ -19,7 +12,7 @@ jest.mock('react-native-keyboard-controller', () =>
 
 jest.mock('@/components/ui/skeleton', () => ({ SkeletonList: () => null }));
 
-// The brand mark fetches a logo; the list's order does not depend on it.
+// The brand mark fetches a logo.
 jest.mock('@/components/brands/brand-mark', () => ({ BrandMark: () => null }));
 
 jest.mock('@/providers/theme-provider', () => ({
@@ -38,12 +31,7 @@ jest.mock('@/api/scan', () => ({
   draftToParams: () => ({}),
 }));
 
-/**
- * Three days, and three rows sharing the middle one.
- *
- * Handed over newest-first, the way the query returns them, so the screen has
- * to do the flipping rather than inheriting it from the fixture.
- */
+/** Three days, three rows sharing the middle one, newest-first as the query returns them. */
 const TODAY = '2026-09-12';
 const mockReceipts = [
   { id: 'r6', merchant: 'Bakery', amount: 6, purchased_on: TODAY },
@@ -64,12 +52,8 @@ describe('Receipts — day order', () => {
   it('heads the list with the oldest day and ends on today', async () => {
     const { getAllByText } = await render(<ReceiptsScreen />);
 
-    /*
-     * Read in render order. `1 Sep 2026` appears twice — once as the day
-     * heading and once inside its single row, which prints its own date — so
-     * the sequence is asserted whole rather than by position, and the shape of
-     * it is itself the proof that the heading comes before its rows.
-     */
+    // `1 Sep 2026` appears twice (day heading, then its single row's own date), so the sequence is
+    // asserted whole rather than by position.
     const order = getAllByText(/^(1 Sep 2026|Yesterday|Today)$/).map((node) => node.props.children);
 
     expect(order).toEqual(['1 Sep 2026', '1 Sep 2026', 'Yesterday', 'Today']);

@@ -1,15 +1,10 @@
 /**
  * Learned corrections: "spot a fly" → "Spotify", kept on the phone.
  *
- * Pure functions only. Storage (AsyncStorage, per user, capped) is
- * src/api/voice-aliases.ts's job. Pairs are an ordered array, not an
- * object, because JS lists integer-like keys ("711", "24") first whatever
- * order they were added in, which would break oldest-first eviction.
- *
- * A heard phrase is stored the way the parser reads text: lowercase, fillers
- * gone, punctuation gone ("Spot-a-fly!" → "spot a fly"). It matches again
- * with or without the spaces ("spotafly"), since the recogniser splits the
- * same sound differently from one day to the next.
+ * Pairs are an ordered array, not an object: JS lists integer-like keys ("711", "24") first, which
+ * would break oldest-first eviction. A heard phrase is stored the way the parser reads text and
+ * matches with or without spaces ("spotafly"), since the recogniser splits the same sound
+ * differently from one day to the next.
  */
 import { joinKeys, tokenize, type Token } from './clean';
 
@@ -30,24 +25,17 @@ function squash(text: string): string {
 }
 
 /**
- * Records that `heard` meant `canonical`. A pair learned again moves to the
- * newest end; past `cap` the oldest pairs go.
+ * Records that `heard` meant `canonical`. A pair learned again moves to the newest end; past `cap`
+ * the oldest pairs go.
  *
- * Correcting back un-learns: when `canonical` reads as the heard words
- * themselves once normalised like the parser's text ("target" → "Target",
- * "spot a fly" → "Spot A Fly"), any pair for those words is removed. A name
- * that differs only in spacing or an apostrophe ("joes diner" → "Joe's Diner")
- * is a real correction of how it is shown, and is learned. Existing pairs are
- * found with spaces ignored, as the parser matches them.
+ * Correcting back un-learns: when `canonical` reads as the heard words themselves once normalised
+ * ("target" → "Target"), any pair for those words is removed. A name that differs only in spacing
+ * or an apostrophe ("joes diner" → "Joe's Diner") is a real correction and is learned.
  *
- * Returns `pairs` itself when nothing changes (blank input, or a correction
- * back with no pair to remove), so a caller can skip the write.
+ * Returns `pairs` itself when nothing changes, so a caller can skip the write.
  *
- * **Callers: never learn when the draft's `merchantSource` is `catalog`.** The
- * heard words were an exact catalog name, so a change means the person changed
- * their mind, not that Skip misheard; learning it would turn that store into
- * another one on every later sentence. (The parser also never lets a learned
- * phrase override a catalog name over the same words.)
+ * **Callers: never learn when the draft's `merchantSource` is `catalog`.** The heard words were an
+ * exact catalog name, so a change means the person changed their mind, not that Skip misheard.
  */
 export function learnAlias(
   pairs: readonly AliasPair[],
@@ -122,11 +110,7 @@ export function findAliasSpans(
   return found;
 }
 
-/**
- * The cleaned text with each learned phrase swapped for its name:
- * ("paid 9.99 for spot a fly", { "spot a fly": "Spotify" }) →
- * "paid 9.99 for Spotify". parseVoice runs the same matcher on its tokens.
- */
+/** The cleaned text with each learned phrase swapped for its name. */
 export function applyAliases(text: string, aliases: Record<string, string>): string {
   const tokens = tokenize(typeof text === 'string' ? text : '');
   const spans = findAliasSpans(tokens, aliases, () => true);

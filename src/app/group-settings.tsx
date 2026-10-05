@@ -30,27 +30,13 @@ import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 
-/**
- * The parts of a group that are not money.
- *
- * Leaving and removing both refuse while somebody is not square, and the
- * refusal names the amount — "settle up $42.50 first" is something a person
- * can act on, where "cannot leave group" is a wall. That check lives in the
- * database; this screen only has to show what comes back.
- */
 type GroupRecord = NonNullable<ReturnType<typeof useGroup>['data']>;
 type MemberRecord = NonNullable<ReturnType<typeof useGroupMembers>['data']>[number];
 type BalanceRecord = NonNullable<ReturnType<typeof useGroupBalances>['data']>[number];
 
 /**
- * Waits for the group before the form exists, then seeds it by remount.
- *
- * The name field is a `useState` initial value, and an initial value is read
- * once. On a cold cache — opened from a notification, or after a cold start —
- * the row lands after the first render, so without the key the field opens
- * empty and stays empty. Nothing bad is saved (`handleRename` refuses a blank,
- * and refuses a name that matches the one on record), but an empty box under
- * the label "Name" reads as a group that has lost its name.
+ * Waits for the group before the form exists, then seeds it by remount: the name field is a
+ * `useState` initial value, read once, so on a cold cache it would open empty and stay empty.
  */
 export default function GroupSettingsScreen() {
   const artwork = useArtwork();
@@ -72,9 +58,8 @@ export default function GroupSettingsScreen() {
     );
   }
 
-  // A failed read is not a group without members: without this, the page draws
-  // itself as if nobody were in it and every balance were zero, and offers to
-  // rename and close it on that basis.
+  // A failed read is not a group without members: without this the page would show nobody in it and
+  // every balance at zero.
   if (group.isError || members.isError || balances.isError) {
     return (
       <Screen title="Group settings" showBack>
@@ -94,9 +79,7 @@ export default function GroupSettingsScreen() {
     );
   }
 
-  // The read landed and there is no row: a different thing entirely, and the
-  // only one of the three that is worth offering a way out of rather than a
-  // way back in.
+  // The read landed and there is no row: offer a way out, not a retry.
   if (!group.data) {
     return (
       <Screen title="Group settings" showBack>
@@ -275,9 +258,6 @@ function GroupSettingsForm({
       <View className="mt-9 w-full">
         <FieldLabel className="mb-3">Members</FieldLabel>
 
-        {/* Above the list rather than tucked beside the heading. Adding people
-            is what somebody opens this section to do, and a small control in
-            the corner competes with the rows for the same glance. */}
         <Button
           label="Add someone"
           variant="outline"
@@ -319,9 +299,6 @@ function GroupSettingsForm({
           );
         })}
 
-        {/* Sharing the code is how somebody who is not yet a friend gets in, so
-            it belongs with the members rather than on the group's main screen —
-            which is about money, not administration. */}
         <View className="mt-3 w-full flex-row">
           <ActionPill
             icon={Share2}

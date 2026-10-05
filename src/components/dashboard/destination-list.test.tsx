@@ -4,21 +4,14 @@ import { DestinationList } from '@/components/dashboard/destination-list';
 import type { SpendingCategory } from '@/data/dashboard-mock';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
-// jest.mock calls are hoisted above these imports by babel-plugin-jest-hoist,
-// so the ordering here is for readability, not execution. Each factory below
-// uses `require` rather than a module-level import for the same reason: the
-// hoist plugin forbids a mock factory from closing over an out-of-scope
-// import binding.
+// jest.mock is hoisted above the imports, so each factory uses `require` rather than closing over
+// an out-of-scope import binding.
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
-// `Skeleton` pulls in react-native-reanimated, whose own mock.js in this
-// installed version (4.5.1, paired with the split-out react-native-worklets
-// package) itself imports the real native module and throws
-// "Cannot read properties of undefined (reading 'loadUnpackers')" outside a
-// device/simulator — see the report to the team. Stubbing this leaf UI
-// primitive keeps the test about DestinationList's own loading branch
-// (skeleton renders, no figure renders, and the a11y label says "loading")
-// rather than about Reanimated's jest support.
+// `Skeleton` pulls in react-native-reanimated, whose own mock.js in this version (4.5.1 with the
+// split-out react-native-worklets) imports the real native module and throws "Cannot read
+// properties of undefined (reading 'loadUnpackers')" outside a device. Stubbed so the test stays
+// about DestinationList's own loading branch.
 jest.mock('@/components/ui/skeleton', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- required inside the factory, see note above
   const { View } = require('react-native');
@@ -51,8 +44,7 @@ const AMOUNTS = {
 
 describe('DestinationList', () => {
   it('renders rows in the given order, not the fixture order', async () => {
-    // Deliberately reversed from the CATEGORIES fixture, so the list can only
-    // pass by following the order it is given.
+    // Deliberately reversed, so only following the order it is given can pass.
     const reordered = [...CATEGORIES].reverse();
 
     const { getAllByRole } = await render(
@@ -69,13 +61,11 @@ describe('DestinationList', () => {
   });
 
   it('shows a PRO pill on the two calculators only when the account is not pro', async () => {
-    // The PRO badge is deliberately hidden from the accessibility tree (the
-    // row's own a11y label already says "Pro feature"), so the query has to
-    // ask for hidden elements too or it will always come back empty.
+    // The PRO badge is hidden from the accessibility tree (the row's label already says "Pro
+    // feature"), so the query has to include hidden elements.
     const notPro = await render(
       <DestinationList items={CATEGORIES} amounts={AMOUNTS} pro={false} onPress={() => {}} />,
     );
-    // loan-calculator and split-calculator are locked; the other three are not.
     expect(notPro.getAllByText('PRO', { includeHiddenElements: true })).toHaveLength(2);
 
     const isPro = await render(
@@ -89,8 +79,6 @@ describe('DestinationList', () => {
       <DestinationList items={CATEGORIES} amounts={AMOUNTS} pro loading onPress={() => {}} />,
     );
 
-    // The three money rows each get a skeleton and an a11y label that says
-    // the amount is loading; no formatted currency renders meanwhile.
     expect(getAllByTestId('skeleton')).toHaveLength(3);
     expect(getByLabelText('Monthly Bills, amount loading')).toBeTruthy();
     expect(getByLabelText('Receipts, amount loading')).toBeTruthy();
@@ -111,7 +99,6 @@ describe('DestinationList', () => {
       />,
     );
 
-    // One "—" per money row (three of the five categories carry a figure).
     expect(getAllByText('—')).toHaveLength(3);
     expect(getByText(FAILURE_MESSAGE)).toBeTruthy();
 

@@ -26,32 +26,13 @@ function monthName(month: string): string {
   });
 }
 
-/**
- * Correcting a month.
- *
- * The app only knows what it was told. A bill paid in cash, a receipt never
- * scanned, a subscription outside Skip — each one makes a month look better
- * than it was, and without a way to say so the total slowly stops being worth
- * reading.
- *
- * What the app worked out stays on screen next to the correction rather than
- * being replaced by it. Somebody coming back in six months needs to see both
- * to know why the two differ.
- */
 type SavingsMonthRow = NonNullable<ReturnType<typeof useMonthlySavings>['data']>[number];
 
 /**
- * Waits for the month before the form exists, then seeds it by remount.
- *
- * The correction and the note are `useState` initial values, and an initial
- * value is read once. Reached on a cold cache — a deep link, or a cold start
- * onto this route — the row lands a moment after the first render, so without
- * the key a month that already carries a correction opens with an empty
- * amount, and saving it would write that emptiness back over the figure.
- *
- * The three answers are kept apart for the same reason: "that month is not on
- * your savings" is a fact about the account, and answering a still-running or
- * failed read with it tells somebody their record is gone when it is not.
+ * Corrects a month's savings. Waits for the month before the form exists, then seeds it by
+ * remount: the amount and note are `useState` initial values, read once, so on a cold cache (deep
+ * link) saving would write an empty amount over an existing correction. Loading, failed and
+ * missing are kept apart so a failed read never claims the month is gone.
  */
 export default function SavingsMonthScreen() {
   const artwork = useArtwork();
@@ -121,8 +102,7 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
     try {
       await adjust.mutateAsync({
         month,
-        // Empty means "no correction" rather than "zero" — clearing the field
-        // is how somebody puts a month back on the app's own figure.
+        // Empty means "no correction", not zero: it puts the month back on the app's own figure.
         amount: typed === '' ? null : Number(typed),
         note: note.trim() || null,
       });
@@ -171,8 +151,6 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
         real figure here.
       </Subtitle>
 
-      {/* What the app worked out, kept visible. A correction that replaced this
-          would leave nothing to explain the difference later. */}
       <View className="mt-6 w-full rounded-[16px] border border-line bg-card px-5 py-4">
         <Text className="font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
           What Skip worked out

@@ -4,13 +4,10 @@ import { router } from 'expo-router';
 import { VoiceFab } from '@/components/voice/voice-fab';
 
 /**
- * The round Voice button at the end of the tab bar: who sees it, and where a
- * tap goes.
- *
- * Absent in any build without the speech module. Drawn but inert until Pro is
- * known, so a paying person is never sent to the explainer by a tap that
- * landed early and the bar never changes width. Free accounts see the PRO
- * pill and land on the explainer; Pro accounts go straight to the voice page.
+ * The round Voice button at the end of the tab bar: who sees it, and where a tap goes. Absent
+ * without the speech module; drawn but inert until Pro is known, so a paying person is never sent
+ * to the explainer by an early tap; free accounts see the PRO pill and land on the explainer, Pro
+ * accounts go straight to the voice page.
  */
 
 // Every icon draws an empty View named after itself, so the test can tell

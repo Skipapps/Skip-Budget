@@ -14,7 +14,6 @@ type DashboardHeaderProps = {
   unread?: boolean;
 };
 
-/** Avatar, account name, and the way through to news from Skip. */
 export function DashboardHeader({
   name,
   avatarId,
@@ -51,8 +50,7 @@ export function DashboardHeader({
       >
         <Bell size={22} color={colors.ink} strokeWidth={1.8} />
         {unread ? (
-          // Ringed in the page colour so it reads as sitting on the bell, not
-          // as a stray mark beside it, in both themes.
+          // Ringed in the page colour so it reads as sitting on the bell in both themes.
           <View
             pointerEvents="none"
             className="absolute right-[9px] top-[9px] h-3 w-3 rounded-full border-2 border-surface bg-accent"

@@ -1,9 +1,8 @@
 import * as Device from 'expo-device';
 import { getLocales } from 'expo-localization';
 import { requireOptionalNativeModule } from 'expo-modules-core';
-// Types only. The package's own entry calls `requireNativeModule` the moment
-// it is imported, which throws in any build without the pod (Jest, web, an
-// install made before voice shipped). Nothing here may import it as a value.
+// Types only: the package's own entry calls `requireNativeModule` on import, which throws in any
+// build without the pod (Jest, web). Nothing here may import it as a value.
 import type {
   ExpoSpeechRecognitionErrorEvent,
   ExpoSpeechRecognitionModule,
@@ -16,25 +15,12 @@ import { Platform } from 'react-native';
 import { failureMessage } from '@/lib/failure';
 
 /**
- * Speech to text for voice entry: Apple's recogniser, behind one hook.
+ * Speech to text for voice entry: Apple's recogniser, behind one hook, built for hold-to-talk.
+ * Everything that can go wrong (no module, the Simulator, a refused permission, Dictation off, a
+ * call mid-sentence) arrives as a status, never a thrown error or the engine's own wording.
  *
- * Built for hold-to-talk. The page reads `permissionGranted`, calls
- * `requestPermission()` when it is not yet granted (the iOS prompts interrupt
- * a press, so the person holds again afterwards), then calls `start()` on
- * press and `stop()` on release, with `continuous: true` so a pause does not
- * end the sentence. `start()` itself never prompts.
- *
- * Everything that can go wrong — a build without the module, the Simulator, a
- * refused permission, Dictation turned off, a phone call mid-sentence —
- * arrives as a status, never as a thrown error and never as the engine's own
- * wording. The page shows `FAILURE_MESSAGE` for `error`.
- *
- * Reading the result: `idle` with alternatives means something was heard;
- * `idle` with none after a `start()` means nothing was (silence, a release
- * before the microphone opened, or the cap ran out with no words). An
- * interruption (a call, Siri, an alarm) is not an error: it ends the session
- * as `idle` with whatever was said before it. `error` is kept for real
- * failures.
+ * `idle` with alternatives means something was heard; `idle` with none means nothing was. An
+ * interruption (a call, Siri, an alarm) is not an error: it ends as `idle` with what was said.
  */
 export type SpeechStatus = 'idle' | 'asking' | 'listening' | 'denied' | 'unavailable' | 'error';
 
@@ -42,9 +28,9 @@ export type SpeechOptions = {
   /** Merchant and brand names the recogniser should favour. Capped at 100. */
   contextualStrings: string[];
   /**
-   * Keep listening through pauses until `stop()`, the listening limit or an
-   * error. For hold-to-talk. Default false: iOS ends the session at the first
-   * pause (after about three seconds of silence before iOS 18).
+   * Keep listening through pauses until `stop()`, the listening limit or an error (hold-to-talk).
+   * Default false: iOS ends the session at the first pause (after about three seconds of silence
+   * before iOS 18).
    */
   continuous?: boolean;
 };
@@ -58,40 +44,28 @@ export type SpeechCapture = {
   alternatives: string[];
   /** Whether the finished session ran on-device (false = Apple's servers). */
   onDevice: boolean;
-  /**
-   * How loud the microphone is, 0–1, smoothed, about ten updates a second
-   * while listening; 0 otherwise. For the pulse, not for logic.
-   */
+  /** How loud the microphone is, 0–1, smoothed; 0 when not listening. For the pulse only. */
   level: number;
   /**
-   * Whether both the microphone and speech recognition are allowed. Read on
-   * mount and by `refreshPermission()`, `requestPermission()` and `start()`,
-   * never by prompting. Null until the first read, and when there is no module.
+   * Whether both the microphone and speech recognition are allowed. Read without prompting; null
+   * until the first read, and when there is no module.
    */
   permissionGranted: boolean | null;
   /**
-   * Starts listening. Never prompts: without permission it ends in `denied`
-   * (`unavailable` with no module or on the Simulator). A `stop()` or
-   * `cancel()` that arrives before the microphone is open drops the session
-   * quietly: `idle`, no alternatives.
+   * Starts listening. Never prompts: without permission it ends in `denied` (`unavailable` with no
+   * module or on the Simulator). A `stop()` or `cancel()` before the microphone is open ends
+   * quietly as `idle` with no alternatives.
    */
   start: () => Promise<void>;
   /** Asks for the final result. `listening` holds until it arrives. */
   stop: () => void;
   /** Drops the session, nothing kept. */
   cancel: () => void;
-  /**
-   * Re-reads permission without ever prompting, for the page to call when the
-   * app comes back from Settings. Moves `denied` to `idle` once both the
-   * microphone and speech recognition are allowed; otherwise changes nothing
-   * but `permissionGranted`. Never throws.
-   */
+  /** Re-reads permission without prompting (for when the app returns from Settings). */
   refreshPermission: () => Promise<void>;
   /**
-   * Shows the iOS prompts if iOS can still ask (`asking` meanwhile), and
-   * resolves true once both are allowed. Never starts listening. Never throws.
-   * Outside a session it also moves the status to `idle` (granted) or `denied`
-   * (refused, or refused before), and to `unavailable` with no module.
+   * Shows the iOS prompts if iOS can still ask (`asking` meanwhile) and resolves true once both are
+   * allowed. Never starts listening.
    */
   requestPermission: () => Promise<boolean>;
 };
@@ -114,30 +88,23 @@ type SpeechModule = Pick<
 
 type AudioSnapshot = ReturnType<SpeechModule['getAudioSessionCategoryAndOptionsIOS']>;
 
-/** Engine language. USD only, US English only (brief, correction 8). */
+/** Engine language: US English only. */
 const LANG = 'en-US';
 const MAX_ALTERNATIVES = 3;
-/** Apple's guidance for `contextualStrings` is "up to 100 phrases". */
 const MAX_CONTEXTUAL_STRINGS = 100;
 /** However long someone talks, the microphone closes after this. */
 export const LISTEN_LIMIT_MS = 15_000;
-/**
- * After a stop, a cancel or an outcome, how long to wait for the engine's
- * `end` before letting go of it anyway. `end` normally lands within
- * milliseconds; this only matters if the native side misbehaves.
- */
+/** How long to wait for the engine's `end` after a stop, cancel or outcome before letting go. */
 export const SETTLE_LIMIT_MS = 4_000;
 /** Meter updates; the engine's own default on iOS. */
 const LEVEL_INTERVAL_MS = 100;
 /** Share of the gap closed per update: up quickly, down slowly. */
 const LEVEL_ATTACK = 0.6;
 const LEVEL_RELEASE = 0.25;
-/** Smaller moves than this are not worth a render. */
 const LEVEL_STEP = 0.02;
 
-// iOS only until release (brief, correction 10). Resolved once, the same way
-// modules/receipt-scanner does it: `requireOptionalNativeModule` answers null
-// instead of throwing when the module is not in the build.
+// iOS only until release. Resolved once: `requireOptionalNativeModule` answers null instead of
+// throwing when the module is not in the build.
 const native: SpeechModule | null = (() => {
   if (Platform.OS !== 'ios') return null;
   try {
@@ -148,27 +115,18 @@ const native: SpeechModule | null = (() => {
 })();
 
 /**
- * Whether this build can do voice at all. False on web, in Jest, and in any
- * install made before the module shipped. Never throws.
- *
- * Deliberately says nothing about the phone's settings: Dictation switched
- * off or a refused permission come back from `start()` as `unavailable` or
- * `denied`, so the page can explain instead of the mic silently vanishing.
- * The iOS Simulator is the same: true here, `unavailable` from `start()`.
+ * Whether this build can do voice at all. False on web, in Jest, and in any build without the
+ * module. Says nothing about the phone's settings: Dictation off, a refused permission or the
+ * Simulator come back from `start()` as `unavailable` or `denied`, so the page can explain.
  */
 export function isSpeechAvailable(): boolean {
   return native != null;
 }
 
 /**
- * Whether a session started now would stay on the phone, for the privacy line
- * the page shows before anyone speaks. Null when it cannot be known (no
- * module, or the question throws). Never throws.
- *
- * True only when the phone can recognise on-device *and* its first language is
- * US English (see `phoneSpeaksUsEnglish`), which is the same rule `onDevice`
- * reports after a session, so the line before and the answer after agree.
- * Builds a recogniser to answer, so ask once per page, not on every render.
+ * Whether a session started now would stay on the phone, for the privacy line shown before anyone
+ * speaks. Null when unknown. True only when the phone can recognise on-device and its first
+ * language is US English, the same rule `onDevice` reports afterwards. Ask once per page.
  */
 export function supportsOnDevice(): boolean | null {
   if (!native) return null;
@@ -201,12 +159,10 @@ function distinct(texts: readonly unknown[], limit: number): string[] {
 /**
  * Whether the phone's first language is US English.
  *
- * `isRecognitionAvailable()` and `supportsOnDeviceRecognition()` ask about the
- * recogniser for the phone's own language, while every session runs in US
- * English. Their answers only describe this session when the two match, so
- * they are trusted only then. Anywhere else the engine's own en-US checks
- * decide, and the page says "Apple's servers" even if the words stayed on the
- * device — the safe direction for a privacy statement.
+ * `isRecognitionAvailable()` and `supportsOnDeviceRecognition()` answer for the phone's own
+ * language, but every session runs in en-US, so they are trusted only when the two match. Otherwise
+ * the engine's own en-US checks decide and the page says "Apple's servers" even if the words stayed
+ * on the device, the safe direction for a privacy statement.
  */
 function phoneSpeaksUsEnglish(): boolean {
   try {
@@ -217,22 +173,13 @@ function phoneSpeaksUsEnglish(): boolean {
 }
 
 /**
- * Whether this run may open the microphone at all. False only on the iOS
- * Simulator, unless a developer opts in.
+ * Whether this run may open the microphone. False only on the iOS Simulator, unless
+ * `EXPO_PUBLIC_SIMULATOR_VOICE=1` is set in `.env.local`.
  *
- * The Simulator's microphone goes through the Mac's own audio server. The
- * first time any simulated app opens it, macOS asks "Simulator would like to
- * access the microphone", and the server holds the input until someone
- * answers. The Simulator's audio stack gives up after about nine seconds and
- * Core Audio calls `abort()` inside `AVAudioEngine.inputNode`. No JS or Swift
- * handler can catch that. It is what crashed the app on 2026-10-01 (the macOS
- * log shows the prompt at 16:44:15, the abort at 16:44:24 and the answer at
- * 16:45:01). Every public report of the same stack found so far is a Simulator
- * or a CI virtual Mac. Phones do not route through macOS and are unaffected.
- *
- * So on the Simulator `start()` says `unavailable` without touching audio. A
- * developer whose Mac has already answered that prompt can set
- * `EXPO_PUBLIC_SIMULATOR_VOICE=1` in `.env.local` to try voice there anyway.
+ * The Simulator routes the microphone through macOS, which prompts on first use and holds the input
+ * until answered; its audio stack gives up after about nine seconds and Core Audio calls
+ * `abort()` inside `AVAudioEngine.inputNode`, which no JS or Swift handler can catch. Phones do not
+ * route through macOS and are unaffected.
  */
 function microphoneAllowedHere(): boolean {
   if (Device.isDevice) return true;
@@ -262,13 +209,9 @@ function snapshotAudio(module: SpeechModule): AudioSnapshot | null {
 }
 
 /**
- * Hand the audio session back.
- *
- * The recogniser switches the app to play-and-record and activates it, and
- * never undoes either: music or a podcast the person was playing stays
- * interrupted and the app keeps the session. Putting the old category back and
- * deactivating with `notifyOthersOnDeactivation` tells the other app it may
- * resume.
+ * Hand the audio session back. The recogniser switches the app to play-and-record and never undoes
+ * it, so other apps' audio stays interrupted until the session is deactivated with
+ * `notifyOthersOnDeactivation`.
  */
 function restoreAudio(module: SpeechModule, snapshot: AudioSnapshot | null, quiet: boolean) {
   if (snapshot) {
@@ -314,7 +257,6 @@ type Session = {
   module: SpeechModule;
   /** Writes to the hook's state while this is still the page's session. */
   publish: (patch: Partial<CaptureState>) => void;
-  /** Listening through pauses until `stop()` (hold-to-talk). */
   continuous: boolean;
   /** `start()` has been called on the engine. */
   started: boolean;
@@ -328,14 +270,12 @@ type Session = {
   cancelled: boolean;
   /** Ended by an interruption: nothing about it is reported. */
   quiet: boolean;
-  /** Listeners gone, timers cleared, audio handed back. */
   closed: boolean;
   /** Alternatives for the words iOS has already finalised, best first. */
   committed: string[];
   /** Words still in flux, and whether they follow `committed` or replace it. */
   pending: string;
   pendingFollows: boolean;
-  /** Smoothed microphone level, and the last value put on screen. */
   level: number;
   shownLevel: number;
   subscriptions: { remove: () => void }[];
@@ -400,12 +340,7 @@ function closeSession(session: Session) {
   session.resolveDone();
 }
 
-/**
- * Give the engine a moment to say `end`, then let go regardless.
- *
- * Without this a native session that never ends would hold the microphone and
- * keep the page on "listening" forever.
- */
+/** Give the engine a moment to say `end`, then let go: a session that never ends holds the mic. */
 function armSettleTimer(session: Session) {
   if (session.closed || session.settleTimer) return;
   session.settleTimer = setTimeout(() => {
@@ -439,7 +374,6 @@ function joinSegments(before: string[], after: string[]): string[] {
   );
 }
 
-/** Everything heard so far, as alternatives, best first. */
 function spokenSoFar(session: Session): string[] {
   if (!session.pending) return session.committed;
   if (session.pendingFollows) return joinSegments(session.committed, [session.pending]);
@@ -471,13 +405,9 @@ function settle(session: Session, outcome: Outcome) {
 }
 
 /**
- * Whether new words carry on from the ones already final.
- *
- * In continuous mode iOS 18 closes a segment at each pause and marks it final;
- * the engine then sends later words alone, with a leading space. Earlier iOS
- * sends the whole sentence every time and one final at the end. A segment
- * that turns out to repeat the words already final is treated as a
- * replacement, so nothing is said twice.
+ * Whether new words carry on from the ones already final. In continuous mode iOS 18 closes a
+ * segment at each pause and sends later words alone, with a leading space; earlier iOS resends the
+ * whole sentence. A segment that repeats the words already final is a replacement.
  */
 function carriesOn(session: Session, raw: unknown, text: string | undefined): boolean {
   const before = session.committed[0];
@@ -495,8 +425,7 @@ function onResult(session: Session, event: ExpoSpeechRecognitionResultEvent) {
 
   if (!session.continuous) {
     if (event?.isFinal) {
-      // A final result is the end of the sentence; iOS tears the task down
-      // right after it.
+      // A final result ends the sentence; iOS tears the task down right after it.
       settle(session, { status: 'idle', alternatives: texts.length ? texts : salvage(session) });
       return;
     }
@@ -508,8 +437,8 @@ function onResult(session: Session, event: ExpoSpeechRecognitionResultEvent) {
     return;
   }
 
-  // Continuous: nothing settles here. The session ends at `end`, after
-  // `stop()`, the listening limit or an error.
+  // Continuous: nothing settles here. The session ends at `end`, after `stop()`, the listening
+  // limit or an error.
   const follows = carriesOn(session, results[0]?.transcript, texts[0]);
   if (event?.isFinal) {
     if (texts.length) session.committed = follows ? joinSegments(session.committed, texts) : texts;
@@ -545,10 +474,8 @@ function onError(session: Session, event: ExpoSpeechRecognitionErrorEvent) {
       settle(session, { status: 'idle', alternatives: salvage(session) });
       return;
     case 'interrupted':
-      // A phone call, Siri or an alarm took the microphone. Not a failure: the
-      // session just ends, keeping whatever was said before it, so a full
-      // sentence still reaches review. Nothing is reported, including the
-      // audio hand-back, which can fail while the call holds the session.
+      // A call, Siri or an alarm took the microphone. Not a failure: keep what was said. Nothing is
+      // reported, including the audio hand-back, which can fail while the call holds the session.
       session.quiet = true;
       settle(session, { status: 'idle', alternatives: salvage(session) });
       return;
@@ -559,11 +486,8 @@ function onError(session: Session, event: ExpoSpeechRecognitionErrorEvent) {
 }
 
 /**
- * The engine's meter, turned into a calm 0–1.
- *
- * iOS sends -2 to 10, where anything at or below 0 is inaudible (about -50 dB);
- * 10 is full scale. Rises quickly, falls slowly, and only re-renders the page
- * when the value moves enough to see.
+ * The engine's meter as a calm 0–1: iOS sends -2 to 10 (at or below 0 is inaudible). Rises quickly,
+ * falls slowly, and re-renders only when the value moves enough to see.
  */
 function onVolume(session: Session, event: { value: number }) {
   if (session.settled || session.cancelled) return;
@@ -577,9 +501,8 @@ function onVolume(session: Session, event: { value: number }) {
 }
 
 /**
- * The engine says the microphone is open. A session that was dropped while it
- * was opening (a quick tap) is aborted now, when an abort can no longer be
- * overtaken by the start still on its way.
+ * The engine says the microphone is open. A session dropped while opening (a quick tap) is aborted
+ * now, when the abort can no longer be overtaken by the start still on its way.
  */
 function onLive(session: Session) {
   session.live = true;
@@ -603,8 +526,7 @@ function listen(session: Session) {
     module.addListener('error', (event) => onError(session, event)),
     module.addListener('volumechange', (event) => onVolume(session, event)),
     module.addListener('nomatch', () => {
-      // In continuous mode iOS can say this between segments; the session
-      // carries on until `stop()`.
+      // In continuous mode iOS can say this between segments; carry on until `stop()`.
       if (session.continuous) return;
       settle(session, { status: 'idle', alternatives: salvage(session) });
     }),
@@ -643,10 +565,7 @@ function onLimit(session: Session) {
   else settle(session, { status: 'idle', alternatives: salvage(session) });
 }
 
-/**
- * Drop the session without an outcome: cancel, a release before the
- * microphone opened, or the page going away.
- */
+/** Drop the session without an outcome: cancel, a release before the mic opened, or unmount. */
 function abandon(session: Session) {
   if (session.cancelled || session.closed) return;
   session.cancelled = true;
@@ -658,16 +577,14 @@ function abandon(session: Session) {
     return;
   }
   if (session.settled) {
-    // The engine is already winding down and its `end` is on the way (the
-    // settle timer is armed). Aborting now would send a second `end`, which
-    // could land on the next session and close it before it began.
+    // The engine is already winding down and its `end` is on the way. Aborting now would send a
+    // second `end`, which could land on the next session and close it before it began.
     return;
   }
   if (!session.live) {
-    // The microphone is still opening. An abort sent now can be overtaken by
-    // the start already queued in the engine, which would leave the
-    // microphone on with nobody listening. `onLive` aborts when the engine
-    // says `start`; the settle timer covers an engine that never does.
+    // The microphone is still opening. An abort sent now can be overtaken by the start already
+    // queued in the engine, leaving the microphone on with nobody listening. `onLive` aborts when
+    // the engine says `start`; the settle timer covers an engine that never does.
     armSettleTimer(session);
     return;
   }
@@ -677,8 +594,7 @@ function abandon(session: Session) {
     closeSession(session);
     return;
   }
-  // The engine answers with `end`, which closes the session and hands the
-  // audio back; the timer covers an engine that never does.
+  // The engine answers with `end`, which closes the session; the timer covers one that never does.
   armSettleTimer(session);
 }
 
@@ -692,12 +608,9 @@ function inSession(session: Session | null): boolean {
 }
 
 /**
- * One voice capture at a time, owned by the page that calls it.
- *
- * Hold-to-talk: `start()` on press, `stop()` on release, `continuous: true`.
- * `start()` never prompts; `requestPermission()` does, before the press.
- * `cancel()` and unmounting drop the session without a result and hand the
- * audio session back.
+ * One voice capture at a time, owned by the page that calls it. For hold-to-talk:
+ * `requestPermission()` first (the iOS prompts interrupt a press), then `start()` on press and
+ * `stop()` on release. `cancel()` and unmounting drop the session and hand the audio back.
  */
 export function useSpeechCapture(options: SpeechOptions): SpeechCapture {
   const { contextualStrings, continuous = false } = options;
@@ -710,7 +623,6 @@ export function useSpeechCapture(options: SpeechOptions): SpeechCapture {
     mounted.current = true;
     const module = native;
     if (module) {
-      // What the page should offer before anyone presses: read, never asked.
       void (async () => {
         try {
           const permission = await module.getPermissionsAsync();
@@ -735,8 +647,7 @@ export function useSpeechCapture(options: SpeechOptions): SpeechCapture {
   const start = useCallback(async () => {
     const module = native;
     if (!module || !microphoneAllowedHere()) {
-      // No module, or the Simulator (see `microphoneAllowedHere`): explain,
-      // never reach the audio engine.
+      // No module, or the Simulator (see `microphoneAllowedHere`): explain, never touch audio.
       setState((current) => rest(current, 'unavailable'));
       return;
     }
@@ -757,8 +668,7 @@ export function useSpeechCapture(options: SpeechOptions): SpeechCapture {
 
     try {
       if (previous && !previous.closed) {
-        // Let the last session's `end` land first. The engine resets itself on
-        // start, and a late `end` would otherwise close this session.
+        // Let the last session's `end` land first: a late `end` would otherwise close this session.
         await previous.done;
       }
       if (stale()) {
@@ -781,8 +691,7 @@ export function useSpeechCapture(options: SpeechOptions): SpeechCapture {
       const granted = permission.granted === true;
       session.publish({ permissionGranted: granted });
       if (!granted) {
-        // Never prompts here: a prompt would interrupt the press. The page
-        // asks first with `requestPermission()`.
+        // Never prompts here: a prompt would interrupt the press. The page asks first.
         settle(session, { status: 'denied', alternatives: [] });
         return;
       }
@@ -793,23 +702,21 @@ export function useSpeechCapture(options: SpeechOptions): SpeechCapture {
         interimResults: true,
         maxAlternatives: MAX_ALTERNATIVES,
         continuous,
-        // On the phone whenever it can; Apple's servers otherwise (Founder,
-        // 2026-10-01). The engine applies this only when the en-US recogniser
-        // itself supports it.
+        // On the phone whenever it can; Apple's servers otherwise. The engine applies this only
+        // when the en-US recogniser itself supports it.
         requiresOnDeviceRecognition: local,
         addsPunctuation: false,
         contextualStrings: cleanContext(contextualStrings),
         // Closest to the keyboard's own dictation, which is how people will talk.
         iosTaskHint: 'dictation',
-        // The engine's default, spelled out: other audio pauses (rather than
-        // ducking into the microphone) and resumes when `restoreAudio` lets go.
+        // The engine's default, spelled out: other audio pauses (rather than ducking into the
+        // microphone) and resumes when `restoreAudio` lets go.
         iosCategory: {
           category: 'playAndRecord',
           categoryOptions: ['defaultToSpeaker', 'allowBluetooth'],
           mode: 'measurement',
         },
-        // Feeds `level`. A separate tap on its own mixer, off the path the
-        // recogniser listens to.
+        // Feeds `level`: a separate tap on its own mixer, off the path the recogniser listens to.
         volumeChangeEventOptions: { enabled: true, intervalMillis: LEVEL_INTERVAL_MS },
       };
 
@@ -856,7 +763,6 @@ export function useSpeechCapture(options: SpeechOptions): SpeechCapture {
     if (!module) return;
     let granted = false;
     try {
-      // Reads only; `requestPermissionsAsync` is never called from here.
       const permission = await module.getPermissionsAsync();
       granted = permission.granted === true;
     } catch (thrown) {
@@ -864,8 +770,7 @@ export function useSpeechCapture(options: SpeechOptions): SpeechCapture {
       return;
     }
     if (!mounted.current) return;
-    // Only a page showing `denied` moves; a session that started meanwhile is
-    // past `denied` already and is left alone.
+    // Only a page showing `denied` moves; a session that started meanwhile is past it already.
     setState((current) => ({
       ...(current.status === 'denied' && granted ? rest(current) : current),
       permissionGranted: granted,

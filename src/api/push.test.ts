@@ -1,16 +1,13 @@
 /**
- * What a tapped notification is allowed to open.
- *
- * The route comes off the wire, so the interesting cases are the ones where it
- * is wrong: a name this build does not know, a deep link somebody hoped would
- * be followed, a tap that arrives before there is a navigator or a session.
- * Each one must end in nothing happening rather than in a screen opening.
+ * What a tapped notification may open. The route comes off the wire, so the cases that matter are
+ * the wrong ones (an unknown name, a deep link, a tap before there is a navigator or a session),
+ * each of which must end in nothing happening.
  */
 
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 
-// babel-plugin-jest-hoist lifts every jest.mock() below above this line, so the
-// module under test still loads against the mocks despite being imported here.
+// babel-plugin-jest-hoist lifts every jest.mock() below above this import, so the module loads
+// against the mocks.
 import * as Notifications from 'expo-notifications';
 
 import { enableReminders, forgetDevice, tapTarget, useNotificationRouting } from './push';
@@ -55,9 +52,8 @@ jest.mock('@/lib/supabase', () => ({
 }));
 
 /**
- * Enough of a PostgREST builder to record what was asked for. The real one is
- * a thenable that only runs on await, which is why `then` is here rather than
- * a resolved promise: the assertions are about the filters, not the transport.
+ * Enough of a PostgREST builder to record what was asked for. The real one is a thenable that only
+ * runs on await, hence `then` rather than a resolved promise.
  */
 const eqCalls: [string, unknown][] = [];
 let deleted = false;
@@ -95,10 +91,6 @@ function tap(data: Record<string, unknown>, actionIdentifier = DEFAULT_ACTION) {
 
 const BILL_ID = '6ba21f34-d139-409a-87ce-5bba6e200646';
 
-/**
- * Where a notification may send somebody: a name from this build's list,
- * plus a row id for the per-item screens — and nothing a payload makes up.
- */
 describe('tapTarget', () => {
   it.each([
     ['/bill', '/bill/[id]'],
@@ -210,9 +202,7 @@ describe('useNotificationRouting', () => {
     await renderHook(() => useNotificationRouting());
     expect(mockPush).not.toHaveBeenCalled();
 
-    // The navigator arrives a few frames later, as it does on a cold start
-    // from a tap: the root layout renders nothing until the stored session
-    // has been read.
+    // The navigator arrives a few frames later, as on a cold start from a tap.
     mockIsReady.mockReturnValue(true);
     await act(async () => {
       jest.advanceTimersByTime(100);
@@ -238,9 +228,8 @@ describe('useNotificationRouting', () => {
     });
     expect(mockPush).not.toHaveBeenCalled();
 
-    // The 10s deadline at a 50ms poll is 200 retries, and it must have stopped
-    // well inside the minute just advanced. Counted rather than read off
-    // jest.getTimerCount(), which also sees React's own scheduler.
+    // 10s at a 50ms poll is 200 retries; counted rather than read off jest.getTimerCount(), which
+    // also sees React's own scheduler.
     const polls = scheduled.length;
     expect(polls).toBeLessThanOrEqual(201);
 
@@ -255,12 +244,8 @@ describe('useNotificationRouting', () => {
 });
 
 /**
- * Sign-out has to take this phone off the list, and only this phone.
- *
- * device_tokens is one row per device — the token is the unique key, which is
- * what the upsert conflicts on — so the interesting thing to pin is which
- * filters the delete carries. A delete by user_id alone would also silence the
- * same account's other devices, which nobody asked for by signing out here.
+ * Sign-out takes this phone off the list, and only this phone: device_tokens is one row per device,
+ * so the delete must carry the token filter or it would silence the account's other devices.
  */
 describe('forgetDevice', () => {
   beforeEach(() => {
@@ -290,8 +275,7 @@ describe('forgetDevice', () => {
   it("leaves the account's other devices registered", async () => {
     await forgetDevice('user-A');
 
-    // The filter on token is the whole point: without it the same call would
-    // match every row this account owns.
+    // Without the token filter the same call would match every row this account owns.
     expect(eqCalls.map(([column]) => column)).toContain('token');
   });
 
@@ -329,10 +313,7 @@ describe('forgetDevice', () => {
 });
 
 /**
- * The ask happens on a simulator too. Permission is local and works there;
- * only the push token needs a real phone. Guarding the ask as well meant a
- * simulator never showed the prompt, so pushes delivered to it with
- * `xcrun simctl push` were dropped for want of a yes.
+ * The ask happens on a simulator too (permission is local); only the push token needs a real phone.
  */
 describe('enableReminders', () => {
   beforeEach(() => {

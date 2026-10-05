@@ -4,13 +4,8 @@ import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
 /**
- * Sending a note to the team.
- *
- * The send happens in an Edge Function rather than here, because the email
- * provider's key would otherwise have to ship inside the app — where anyone
- * who downloads it can read it and send mail as skipapps.net. The app only
- * says what the message is; the server decides whether to send it and from
- * where.
+ * Messages go through an Edge Function so the email provider's key never ships inside the app.
+ * The app only says what the message is; the server decides whether and from where to send it.
  */
 
 export type MessageTopic = 'support' | 'idea';
@@ -27,9 +22,8 @@ export function useSendMessage() {
       const { error } = await supabase.functions.invoke('send-message', { body: values });
       if (!error) return;
 
-      // A non-2xx arrives as an opaque error with the real reason in the body,
-      // and that reason is written for the user — "Write a message first" is
-      // more use than "Edge Function returned a non-2xx status code".
+      // A non-2xx arrives as an opaque error; the real reason, written for the user, is in the
+      // body.
       if (error instanceof FunctionsHttpError) {
         const body = await error.context.json().catch(() => null);
         throw new Error(body?.error ?? 'Could not send that. Try again in a moment.');

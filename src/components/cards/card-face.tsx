@@ -15,23 +15,16 @@ type CardFaceProps = {
   meta: string;
   /** `mark` is the italic network wordmark; `label` is plain type. */
   metaStyle?: 'mark' | 'label';
-  /**
-   * Signed for display: negative is money owed, positive is money held. The
-   * caller decides which way round its own numbers run.
-   */
+  /** Signed for display: negative is money owed, positive is money held. */
   amount: number;
-  /** Word above the figure — "Owed", "Available". The caption and the minus
-   *  sign carry the meaning; the figure itself stays in the face's own
-   *  foreground rather than a red or a green. */
   caption?: string;
   last4: string;
   style?: ViewStyle;
 };
 
 /**
- * Shared visual shell for anything shown as a card — payment cards and bank
- * accounts. Type colour and the embossed wordmark are derived from the
- * background's luminance, so any palette colour stays readable.
+ * Shared shell for payment cards and bank accounts. Type colour and the embossed wordmark derive
+ * from the background's luminance, so any palette colour stays readable.
  */
 export function CardFace({
   color,
@@ -105,9 +98,8 @@ export function CardFace({
           </Text>
         ) : null}
 
-        {/* The face's own foreground, never a red or a green: "Owed" and the
-            minus sign already say which way the money runs, and a tone picked
-            against eight background colours read as mud on half of them. */}
+        {/* The face's own foreground, never red or green: "Owed" and the minus sign already say
+            which way the money runs. */}
         <Text
           style={{ color: foreground }}
           className={cn('font-poppins-bold text-[22px]', caption ? 'mt-0.5' : 'mt-1')}

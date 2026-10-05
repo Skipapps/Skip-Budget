@@ -10,30 +10,21 @@ import { cn } from '@/lib/cn';
 type PageStateProps = {
   art: FC<SvgProps>;
   title: string;
-  /**
-   * One or two sentences. Says what to do next, not what went wrong twice.
-   * Left off on failure screens, whose title is the whole message.
-   */
+  /** One or two sentences on what to do next. Omitted on failure screens, whose title is the whole message. */
   message?: string;
   actionLabel?: string;
   onAction?: () => void;
-  /** Quieter second option — "Try again" under a primary action. */
   secondaryLabel?: string;
   onSecondary?: () => void;
   className?: string;
 };
 
 /**
- * The screen shown when a list has nothing to show — empty, errored, or
- * filtered down to nothing.
+ * The screen shown when a list has nothing to show: empty, errored, or filtered to nothing. One
+ * layout for all three, with different words.
  *
- * One component for all three because they are the same layout with different
- * words, and because a page that renders a spinner for loading, raw text for
- * errors and a custom block for empty ends up feeling like three apps.
- *
- * Artwork is capped well below the tile art elsewhere: this sits inside a list
- * that already has a header and a search field, and a full-size illustration
- * pushes the action button off a small screen.
+ * Artwork is capped well below the tile art: a full-size illustration pushes the action button off a
+ * small screen.
  */
 export function PageState({
   art,

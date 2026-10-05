@@ -12,14 +12,7 @@ type PersonProps = {
   accent?: boolean;
 };
 
-/**
- * A face and a name, wherever a person appears.
- *
- * Split screens are lists of people, and a column of identical text is hard to
- * scan — the picture is what makes a row findable at a glance. Everything that
- * lists people uses this, so a name is presented the same way on every screen
- * and only the trailing control differs.
- */
+/** A face and a name, wherever a person appears; only the trailing control differs. */
 export function Person({ name, avatarId, subtitle, size = 40, accent = false }: PersonProps) {
   return (
     <View className="min-w-0 flex-1 flex-row items-center gap-3">

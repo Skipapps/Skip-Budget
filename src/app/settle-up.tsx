@@ -27,27 +27,13 @@ import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 
-/**
- * Writing down that a debt was paid.
- *
- * No money moves — Skip has no bank connection and never will. That has to be
- * said on the screen rather than assumed, because a button called "Settle up"
- * in a budgeting app reads like a transfer, and somebody will otherwise sit
- * waiting for one.
- */
 type MemberRecord = NonNullable<ReturnType<typeof useGroupMembers>['data']>[number];
 type BalanceRecord = NonNullable<ReturnType<typeof useGroupBalances>['data']>[number];
 
 /**
- * Waits for the group before the form exists, then seeds it by remount.
- *
- * Who paid, who was paid and how much are all `useState` initial values taken
- * from the suggestion, and an initial value is read once. On a cold cache the
- * balances land after the first render, so without the key this screen opens
- * blank — losing the suggested payment, which is the only reason it exists,
- * and leaving somebody to pick two names and retype a figure the app already
- * knew. The key is the group rather than the suggestion: a later refetch must
- * not remount the form and wipe what has been typed over it.
+ * Records that a debt was paid; no money moves. Waits for the group before the form exists, then
+ * seeds it by remount: the payer, payee and amount are `useState` initial values taken from the
+ * suggestion, read once. Keyed on the group, not the suggestion, so a refetch never wipes typing.
  */
 export default function SettleUpScreen() {
   const artwork = useArtwork();
@@ -69,8 +55,7 @@ export default function SettleUpScreen() {
     );
   }
 
-  // A failed read is not an empty group. Guessing past it would offer a
-  // payment between two people it could not name, for an amount nobody owes.
+  // A failed read is not an empty group: guessing past it would suggest a payment nobody owes.
   if (group.isError || members.isError || balances.isError) {
     return (
       <Screen title="Settle up" showBack>
@@ -115,8 +100,6 @@ function SettleUpForm({
 
   const me = members.find((member) => member.id && member.user_id === userId);
 
-  // What the group would suggest, so the form opens on the payment somebody
-  // actually came here to record rather than on an empty pair.
   const suggested = useMemo(() => {
     const payments = simplifyDebts(
       balances.map((row) => ({ id: row.member_id, balance: Number(row.balance) })),

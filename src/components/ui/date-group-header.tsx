@@ -12,13 +12,7 @@ type DateGroupHeaderProps = {
   total?: number;
 };
 
-/**
- * The sticky-looking day heading above a run of rows.
- *
- * Quiet on purpose — it orients the eye without competing with the rows it
- * introduces, which is why it is muted, small, and carries the day's total on
- * the right where the row amounts already are.
- */
+/** The day heading above a run of rows. Muted so it does not compete with them. */
 export function DateGroupHeader({ date, today, total }: DateGroupHeaderProps) {
   const moneyColor = useMoneyColor();
   return (

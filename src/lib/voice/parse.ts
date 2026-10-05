@@ -1,25 +1,22 @@
 /**
- * parseVoice: up to three recogniser guesses in, one draft out.
- *
- * No AI, no network: every step is a small rule module in this folder.
+ * parseVoice: up to three recogniser guesses in, one draft out. No AI, no network: every step is a
+ * small rule module in this folder.
  *
  *   clean → learned aliases → exact merchants → dates → cycles → amounts →
  *   fuzzy and typed merchants → payment methods set aside → category words →
  *   corrections → kind → amount choice → date direction → bill category →
  *   several transactions? → score
  *
- * The order of the claiming steps is the point. A merchant with a number in
- * it ("7-Eleven", "24 Hour Fitness") is claimed before amounts; a date's
- * numbers ("the 5th", "October 3 2026") and a cycle's ("every 3 months")
- * before amounts too, so "rent 1800 on the 1st" has one amount and one day.
+ * The order of the claiming steps is the point: a merchant with a number in it ("7-Eleven"), a
+ * date's numbers ("the 5th") and a cycle's ("every 3 months") are claimed before amounts, so "rent
+ * 1800 on the 1st" has one amount and one day.
  *
- * Each guess is parsed alone. The best score wins and a tie goes to the
- * earlier guess. If guesses that tie with the winner heard *different*
- * amounts ("forty" against "forty five"), every amount they heard is offered
- * as a choice: the parser cannot tell them apart, so the person picks.
+ * Each guess is parsed alone. The best score wins and a tie goes to the earlier guess. If guesses
+ * that tie with the winner heard different amounts ("forty" against "forty five"), every amount
+ * heard is offered as a choice: the parser cannot tell them apart, so the person picks.
  *
- * Never throws. A guess that trips anything unexpected becomes an empty
- * draft for that guess, so voice can never take the app down.
+ * Never throws: a guess that trips anything unexpected becomes an empty draft, so voice can never
+ * take the app down.
  */
 import { fromCents } from '@/lib/money';
 
@@ -102,8 +99,7 @@ function parseOne(transcript: string, ctx: Context): Parsed {
   };
   const claimedSoFar = () => claims.map((owner) => owner !== null);
 
-  // Merchants the person taught Skip and exact directory names, read over the
-  // same words; where they overlap the catalog keeps its own names.
+  // Learned and exact merchants read over the same words; where they overlap the catalog wins.
   const merchants: MerchantSpan[] = [];
   for (const span of preferCatalog(
     findLearnedMerchants(tokens, ctx.aliases, ctx.directory, free),
@@ -129,12 +125,11 @@ function parseOne(transcript: string, ctx: Context): Parsed {
     claim(span, 'merchant');
   }
 
-  // A card or wallet named as how it was paid ("on my Amex", "with Apple Pay")
-  // keeps its words, but is never the merchant (see isPaymentMethod).
+  // A card or wallet named as how it was paid keeps its words but is never the merchant.
   const payees = merchants.filter((span) => !isPaymentMethod(tokens, span));
 
-  // Category words may sit inside a merchant's name ("Farmers Insurance") but
-  // not inside a number, a date or a cycle.
+  // Category words may sit inside a merchant's name ("Farmers Insurance"), not a number, date or
+  // cycle.
   const categories: CategorySpan[] = findCategoryWords(
     tokens,
     (index) => claims[index] === null || claims[index] === 'merchant',
@@ -142,7 +137,6 @@ function parseOne(transcript: string, ctx: Context): Parsed {
   const insideMerchant = (span: CategorySpan) =>
     claims.slice(span.start, span.end).some((owner) => owner === 'merchant');
 
-  // Corrections, slot by slot.
   const slotted = new Map<SlotSpan, Range>();
   const add = (slot: Slot, sources: readonly Range[]) => {
     for (const source of sources)
@@ -187,7 +181,6 @@ function parseOne(transcript: string, ctx: Context): Parsed {
       });
   const kind = decided.kind;
 
-  // A bare number followed by a noun may be a count: "2 pizzas".
   const isNoun = (index: number) => claims[index] === null && isPlainWord(tokens[index]);
   const amount = chooseAmount(liveAmounts, kind, isNoun, tokens);
 
@@ -245,7 +238,7 @@ function normaliseContext(ctx: VoiceContext | null | undefined): Context {
   };
 }
 
-/** See the module comment. `alternatives` are the recogniser's guesses, best first. */
+/** `alternatives` are the recogniser's guesses, best first. */
 export function parseVoice(alternatives: string[], ctx: VoiceContext): VoiceDraft {
   const context = normaliseContext(ctx);
   const heard = (Array.isArray(alternatives) ? alternatives : []).filter(

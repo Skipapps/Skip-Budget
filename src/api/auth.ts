@@ -12,13 +12,8 @@ export type SignUpResult = AuthResult & {
 };
 
 /**
- * What a refused sign-in says: its own words when the person can fix it.
- *
- * The one failure line is for things trying again might mend. A wrong
- * password, an email already in use or an expired code will not mend on a
- * retry — each needs something different done — so these say what (the
- * Founder's call, 2026-09-28). Anything unrecognised, a dropped connection
- * included, is a failure like any other.
+ * What a refused sign-in says. A wrong password, a taken email or an expired code will not mend on
+ * a retry, so these say what to do instead; anything unrecognised gets the one failure line.
  */
 function readable(error: { message?: string } | null | undefined): string {
   const lower = (error?.message ?? '').toLowerCase();
@@ -36,12 +31,8 @@ function readable(error: { message?: string } | null | undefined): string {
 }
 
 /**
- * Six-digit codes, not confirmation links.
- *
- * Supabase sends whichever the email template contains: {{ .Token }} for a
- * code, {{ .ConfirmationURL }} for a link. Nothing here changes based on that —
- * verifyOtp accepts the token either way — so the app and the template only
- * have to agree on which one the user is shown.
+ * Six-digit codes. verifyOtp accepts the token whichever the email template sends: `{{ .Token }}`
+ * or `{{ .ConfirmationURL }}`.
  */
 export type OtpPurpose = 'signup' | 'recovery';
 
@@ -84,9 +75,8 @@ export async function signUpWithEmail(
     options: { data: displayName ? { display_name: displayName } : undefined },
   });
 
-  // With email confirmation enabled Supabase creates the user but returns no
-  // session. Reporting that is the difference between "check your inbox" and a
-  // screen that silently does nothing.
+  // With email confirmation on, Supabase creates the user but returns no session; `signedIn` is
+  // what lets the screen say "check your inbox".
   return {
     error: error ? readable(error) : null,
     signedIn: Boolean(data.session),
@@ -118,20 +108,11 @@ export async function sendPasswordReset(email: string): Promise<AuthResult> {
 }
 
 /**
- * Signing out, and telling the server to stop pushing to this phone.
- *
- * The delete has to happen first and it has to happen here. `device_tokens`
- * is protected by `auth.uid() = user_id`, so once the session is gone the row
- * is unreachable from the client forever — and until something deletes it the
- * scheduler keeps sending this account's reminders to a phone nobody is
- * signed in on. Only this device's row goes; the account's other devices are
- * none of this sign-out's business.
- *
- * Failure to tidy up is never failure to sign out. The token read can throw
- * (a simulator), the network can be down, and none of that is a reason to
- * leave somebody signed in to an account they asked to leave. It is logged
- * and the sign-out continues; the row is then self-healing but slowly — the
- * sender only drops it once APNs answers Unregistered.
+ * Signs out, first deleting this device's push row. `device_tokens` is protected by
+ * `auth.uid() = user_id`, so once the session is gone the row is unreachable and the scheduler
+ * would keep pushing this account's reminders to the phone. A failed tidy-up (simulator token read,
+ * offline) is logged and never blocks signing out; the sender drops a stale row once APNs answers
+ * Unregistered.
  */
 export async function signOut(): Promise<AuthResult> {
   await forgetThisDevice();
@@ -142,11 +123,8 @@ export async function signOut(): Promise<AuthResult> {
 }
 
 /**
- * Best-effort removal of what this phone holds of the person's voice: an
- * unsaved voice draft still in memory (their words), and the corrections it
- * learned for them ("spot a fly" meant Spotify), which are keyed by user id,
- * so this runs while the session can still say whose they are. Never holds
- * up signing out.
+ * Best-effort removal of the unsaved voice draft and the learned voice corrections. The corrections
+ * are keyed by user id, so this runs while the session can still say whose they are.
  */
 async function forgetThisPersonsVoice(): Promise<void> {
   try {
@@ -179,20 +157,9 @@ async function forgetThisDevice(): Promise<void> {
 /**
  * Deletes the signed-in user and everything belonging to them.
  *
- * The client cannot touch auth.users, so this calls a security-definer RPC
- * that deletes exactly one row — whatever auth.uid() resolves to for this
- * session. There is no id to pass and nothing to tamper with.
- *
- * Every table cascades from auth.users, so the data goes with the account —
- * including this phone's row in device_tokens
- * (`20260829100009_push_devices.sql`: `user_id ... references auth.users (id)
- * on delete cascade`). That is why there is no client-side delete on this
- * path the way there is in signOut: the row is gone before the app could ask
- * for it, and a delete afterwards would match nothing.
- *
- * The local session is cleared afterwards regardless: the user it referred to
- * no longer exists, and leaving a dead token in storage would leave the app
- * in a state where every request 401s with no explanation.
+ * The client cannot touch auth.users, so this calls a security-definer RPC that deletes the row
+ * auth.uid() resolves to; there is no id to pass. Every table cascades from auth.users, including
+ * this device's `device_tokens` row, so unlike signOut there is no client-side push delete.
  */
 export async function deleteAccount(): Promise<AuthResult> {
   const { error } = await supabase.rpc('delete_my_account');
@@ -201,18 +168,15 @@ export async function deleteAccount(): Promise<AuthResult> {
     return { error: failureMessage(error) };
   }
 
-  // Trust, then verify. "No error" once meant "deleted" here, and a server
-  // fault proved able to say nothing while deleting nothing — so the app
-  // announced success over an account that was still alive. The token in hand
-  // stays technically valid after a real deletion, but the auth server checks
-  // the row itself: a deleted account cannot answer getUser.
+  // Verify rather than trust: a server fault can return no error while deleting nothing, and a
+  // deleted account cannot answer getUser.
   const { data } = await supabase.auth.getUser();
   if (data.user) {
     return { error: FAILURE_MESSAGE };
   }
 
-  // The server has nothing left; this phone's learned voice corrections are
-  // the last of the person's words, and the stored session still names them.
+  // The server has nothing left; clear the learned voice corrections while the stored session
+  // still names the person.
   await forgetThisPersonsVoice();
   await supabase.auth.signOut();
   return { error: null };

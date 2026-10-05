@@ -93,7 +93,6 @@ describe('bucketsIn', () => {
 
 describe('occurrencesInRange — forward projection', () => {
   it('projects a monthly charge into the future', () => {
-    // The dashboard asks what is coming, not only what has happened.
     expect(occurrencesInRange('2026-09-04', 'monthly', '2026-09-01', '2026-12-31')).toEqual([
       '2026-12-04',
       '2026-11-04',

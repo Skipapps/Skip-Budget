@@ -28,13 +28,11 @@ import { PreferencesProvider } from '@/providers/preferences-provider';
 import { SessionProvider, useSession } from '@/providers/session-provider';
 import { ThemeProvider, useColors, useTheme } from '@/providers/theme-provider';
 
-// Hold the splash screen until Poppins is ready, so no frame renders in the
-// system font and then reflows once the real face loads.
+// Hold the splash until Poppins is ready, so no frame renders in the system font and then reflows.
 SplashScreen.preventAutoHideAsync();
 
-// As early as the module loads, so a crash during startup is still caught.
-// Off in development on purpose: red boxes are already louder than Sentry,
-// and dev-session noise would bury the reports that matter.
+// At module load so a startup crash is still caught. Off in development: red boxes are already
+// louder, and dev-session noise would bury real reports.
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
   enabled: !__DEV__,
@@ -51,11 +49,10 @@ function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {/* Outermost, because it paints the surface everything else sits on. */}
+      {/* Outermost: it paints the surface everything else sits on. */}
       <ThemeProvider>
         <PreferencesProvider>
-          {/* Errors count as loaded — a missing font should not leave users on
-              a dead splash. */}
+          {/* A font error counts as loaded, so a missing font cannot strand users. */}
           <AppShell fontsReady={fontsLoaded || Boolean(fontError)} />
         </PreferencesProvider>
       </ThemeProvider>
@@ -64,14 +61,8 @@ function RootLayout() {
 }
 
 /**
- * Everything below the theme, held back until there is a theme to draw it in.
- *
- * The splash waits on the stored mode as well as the fonts. Reading it takes a
- * moment, and without the wait someone who chose dark opens on a white screen
- * and then blinks — which looks like a bug rather than a preference.
- *
- * Once both are in, LaunchSplash takes over from the native splash — it is
- * what hides it — and plays the bird's grow while the app loads underneath.
+ * Held back until fonts and the stored theme mode are both read, so someone who chose dark does not
+ * open on a white flash. Then LaunchSplash takes over from the native splash (it is what hides it).
  */
 function AppShell({ fontsReady }: { fontsReady: boolean }) {
   const { ready, scheme } = useTheme();
@@ -84,22 +75,21 @@ function AppShell({ fontsReady }: { fontsReady: boolean }) {
       <SafeAreaProvider>
         <QueryProvider>
           <SessionProvider>
-            {/* Inside the session because it subscribes per user, and above
-                the navigator so one socket serves every screen. */}
+            {/* Inside the session (subscribes per user), above the navigator so one socket serves
+                every screen. */}
             <RealtimeProvider>
-              {/* Inside the session so a dialog can outlive a screen, outside
-                  the navigator so it draws above every route and modal. */}
+              {/* Inside the session so a dialog can outlive a screen; outside the navigator so it
+                  draws above every route and modal. */}
               <DialogProvider>
-                {/* Inside the session, so signing out cannot strand somebody
-                  behind a lock, and above the navigator so no route renders
-                  underneath it. */}
+                {/* Inside the session, so signing out cannot strand somebody behind a lock; above
+                  the navigator so no route renders underneath it. */}
                 <AppLockGate>
-                  {/* Before the navigator: its configure kick starts ahead of
-                      any screen effect that talks to the SDK. */}
+                  {/* Before the navigator: its configure call must start ahead of any screen effect
+                      that talks to the SDK. */}
                   <PurchasesBridge />
                   <RootNavigator />
-                  {/* Inside the lock so it never draws on a locked phone, and
-                      after the navigator so it sits above every route. */}
+                  {/* Inside the lock so it never draws on a locked phone; after the navigator so it
+                      sits above every route. */}
                   <FriendRequestPopup />
                 </AppLockGate>
                 <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
@@ -107,8 +97,7 @@ function AppShell({ fontsReady }: { fontsReady: boolean }) {
             </RealtimeProvider>
           </SessionProvider>
         </QueryProvider>
-        {/* After the app, so it draws over every route and popup until it
-            fades. Outside the providers: it needs none of them. */}
+        {/* After the app, so it draws over every route and popup until it fades. */}
         <LaunchSplash />
       </SafeAreaProvider>
     </KeyboardProvider>
@@ -118,20 +107,15 @@ function AppShell({ fontsReady }: { fontsReady: boolean }) {
 function RootNavigator() {
   const { ready } = useSession();
   const colors = useColors();
-  // Remount the navigator when the phone's text size changes while the app
-  // is alive. React Native re-measures glyphs but keeps stale text-container
-  // layouts, so every heading came back as "Ca…" until a full relaunch. A
-  // font-size change is rare and deliberate, so restarting navigation on the
-  // home screen is a fair trade for a page that is actually readable.
+  // Remount the navigator when the phone's text size changes: React Native re-measures glyphs but
+  // keeps stale text-container layouts, so headings truncate until a full relaunch.
   const { fontScale } = useWindowDimensions();
 
-  // Inside the session, because a token is stored against a user. Re-runs on
-  // every launch: iOS rotates tokens on restore and reinstall, and a stale one
-  // fails silently forever.
+  // Inside the session, because a token is stored against a user. Re-runs on every launch: iOS
+  // rotates tokens on restore and reinstall, and a stale one fails silently.
   useRegisterPush();
 
-  // Render nothing until the stored session has been read, or the first frame
-  // would route a signed-in user through onboarding.
+  // Until the stored session is read, the first frame would route a signed-in user to onboarding.
   if (!ready) return null;
 
   return (
@@ -139,8 +123,6 @@ function RootNavigator() {
       key={`fontscale-${fontScale}`}
       screenOptions={{
         headerShown: false,
-        // Every page is a push: forward slides in from the right, back slides
-        // out to the right. iOS resolves this to its native push transition.
         animation: 'slide_from_right',
         contentStyle: { backgroundColor: colors.surface },
       }}
@@ -148,13 +130,11 @@ function RootNavigator() {
   );
 }
 
-/** Signs RevenueCat in as the Supabase user. Renders nothing; must live
- * inside the session provider, which is why it is a component and not a call. */
+/** Signs RevenueCat in as the Supabase user. Renders nothing; lives inside the session provider. */
 function PurchasesBridge() {
   useConfigurePurchases();
   return null;
 }
 
-// The wrap is what ties uncaught render errors to the report — without it
-// Sentry only hears about errors thrown outside React.
+// The wrap ties uncaught render errors to Sentry; without it only errors outside React arrive.
 export default Sentry.wrap(RootLayout);

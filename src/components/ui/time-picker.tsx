@@ -18,11 +18,11 @@ type TimePickerProps = {
 
 const DIAL = 240;
 const CENTRE = DIAL / 2;
-/** Where the numbers sit. Leaves room for the marker to sit under them. */
+/** Radius the numbers sit on, leaving room for the marker. */
 const RING = CENTRE - 26;
 const MARKER = 22;
 
-/** Minutes land on fives. The dial is labelled in fives, and 9:07 is not a thing anybody sets a reminder for. */
+/** Minutes land on fives, matching the dial's labels. */
 const MINUTE_STEP = 5;
 
 /** Position of a value on the ring, measured clockwise from the top. */
@@ -35,15 +35,8 @@ function pointOn(index: number, count: number, radius: number) {
 }
 
 /**
- * A clock face for choosing a time.
- *
- * Two rings rather than one, the way a clock is actually read: hours first,
- * then minutes, with the field above showing which one the dial is currently
- * editing. Tapping either field switches back, so a wrong hour is one tap to
- * fix rather than a reason to start again.
- *
- * Mounted only while open, so the useState initialisers reseed on every open,
- * no effect is needed to sync the prop in, and Cancel genuinely discards.
+ * A clock face for choosing a time: hours first, then minutes; tapping either field switches back.
+ * Mounted only while open, so the useState initialisers reseed on every open and Cancel genuinely discards.
  */
 export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
   const colors = useColors();
@@ -59,8 +52,7 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
   const isPm = hour >= 12;
   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
 
-  // No tap() here: the toggle fires its own selection tick, and two haptics on
-  // one press reads as a stutter rather than a confirmation.
+  // No tap() here: the toggle fires its own selection tick, and two haptics on one press stutter.
   const setPeriod = (next: 'AM' | 'PM') => {
     setHour((current) => {
       const base = current % 12;
@@ -68,7 +60,6 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
     });
   };
 
-  /** Which value a touch inside the dial is pointing at. */
   const valueAt = (x: number, y: number) => {
     const dx = x - CENTRE;
     const dy = y - CENTRE;
@@ -84,12 +75,8 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
   };
 
   /**
-   * Points the dial at whatever a touch is nearest.
-   *
-   * Compared against what is already selected rather than against the last
-   * touch, so a drag across the face taps once per number it passes instead of
-   * once per pixel — and the comparison is the state itself, which is the
-   * thing the face is actually showing.
+   * Points the dial at whatever a touch is nearest. Compared against the selected state, not the last
+   * touch, so a drag taps once per number it passes rather than once per pixel.
    */
   const apply = (x: number, y: number) => {
     const next = valueAt(x, y);
@@ -107,9 +94,8 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
     setMinute(next);
   };
 
-  // Built each render rather than memoised: the handlers close over the mode
-  // and the AM/PM state, so a cached one would keep setting hours after the
-  // dial had moved on to minutes.
+  // Built each render, not memoised: the handlers close over the mode and AM/PM state, so a cached
+  // one would keep setting hours after the dial moved on to minutes.
   const responder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
@@ -119,8 +105,6 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
     onPanResponderMove: (event) => {
       apply(event.nativeEvent.locationX, event.nativeEvent.locationY);
     },
-    // Choosing an hour moves on to the minutes on its own, which is the order
-    // you were going to do it in anyway.
     onPanResponderRelease: () => {
       if (mode === 'hour') setMode('minute');
     },
@@ -177,8 +161,6 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
             />
           </View>
 
-          {/* One track, two halves: AM and PM are one decision, and two
-              separate chips make them look like two. */}
           <View className="mt-3 w-[184px] self-center">
             <TogglePill
               options={[
@@ -196,8 +178,7 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
               style={{ width: DIAL, height: DIAL }}
               className="rounded-full bg-ink/5"
             >
-              {/* The hand and the marker, under the numbers so the selected
-                  one reads on top of its own circle. */}
+              {/* Under the numbers, so the selected one reads on top of its own circle. */}
               <Svg width={DIAL} height={DIAL} style={{ position: 'absolute' }}>
                 <Line
                   x1={CENTRE}

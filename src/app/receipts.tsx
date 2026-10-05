@@ -38,8 +38,6 @@ export default function ReceiptsScreen() {
   const [scanError, setScanError] = useState<string | null>(null);
 
   const today = toIsoDate(new Date());
-  // A month by default: receipts are day-to-day spending, and the question
-  // people open this page with is what the shopping has come to lately.
   const [rangeKey, setRangeKey] = useState<RangeKey>('month');
   const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
   const { data: receipts = [], isLoading, isError, refetch } = useReceipts();
@@ -49,19 +47,10 @@ export default function ReceiptsScreen() {
   const { pro } = usePro();
   const { refresh, refreshing } = useRefreshAll();
 
-  /**
-   * Camera, shutter, then the form — with everything readable already read.
-   *
-   * The scan used to file a confident read on the spot, and the row appearing
-   * was the confirmation. It saved a tap and cost the check: the one moment to
-   * pick which card paid and catch a misread total was skipped exactly when
-   * the scan was surest of itself. Now every scan lands on the form with the
-   * fields filled in, so saving is one look and one tap — and the look is the
-   * point.
-   */
+  /** A scan lands on the pre-filled form, never filed directly, so a misread total gets checked. */
   const handleScan = async () => {
     setScanError(null);
-    // The camera is the paid feature; typing a receipt stays free forever.
+    // Scanning is Pro; typing a receipt stays free.
     if (!pro) {
       router.push({ pathname: '/pro-feature', params: { id: 'scan' } });
       return;
@@ -87,8 +76,6 @@ export default function ReceiptsScreen() {
 
   const visible = useMemo(() => {
     return receipts.filter((receipt) => {
-      // Receipts happened on a day rather than repeating, so the window is a
-      // plain comparison — nothing to project.
       if (receipt.purchased_on < range.from || receipt.purchased_on > range.to) return false;
       if (!matchesSearch(receipt.merchant, query)) return false;
       if (filters.date && receipt.purchased_on !== filters.date) return false;
@@ -100,11 +87,9 @@ export default function ReceiptsScreen() {
     });
   }, [receipts, query, filters, range]);
 
-  // Reflects what is on screen, so it always agrees with the rows below it.
   const total = visible.reduce((sum, receipt) => sum - Math.abs(receipt.amount), 0);
 
-  // Oldest day first, today last. The last shop is still the one somebody came
-  // here to check, so it is now at the bottom and the page opens there.
+  // Oldest day first, today last: the page opens at the bottom, on the latest shop.
   const groups = useMemo(
     () =>
       groupByDate(visible, (receipt) => receipt.purchased_on, {
@@ -114,8 +99,6 @@ export default function ReceiptsScreen() {
     [visible],
   );
 
-  // A list that has never had anything needs a different answer from one that
-  // has simply been filtered down to nothing.
   const showEmpty = !isLoading && !isError && receipts.length === 0;
   const showNoMatches = !isLoading && !isError && receipts.length > 0 && visible.length === 0;
 
@@ -126,8 +109,6 @@ export default function ReceiptsScreen() {
       avoidKeyboard
       onRefresh={refresh}
       refreshing={refreshing}
-      // Scanning leads: it is one tap to a filed receipt, and typing one out
-      // by hand is the fallback rather than the other way round.
       headerActions={[
         ...(canScan
           ? [
@@ -151,8 +132,6 @@ export default function ReceiptsScreen() {
         </Text>
       ) : null}
 
-      {/* The search and filter controls are pointless before anything exists,
-          and their presence makes an empty list look like a failed search. */}
       {showEmpty || isError ? null : (
         <>
           <View className="mt-5 w-full flex-row items-center gap-3">
@@ -211,8 +190,7 @@ export default function ReceiptsScreen() {
       ) : null}
 
       {showEmpty ? (
-        // Adding, not scanning: scanning is Pro, and the first receipt should
-        // never begin with a paywall. Scan stays one tap away in the header.
+        // Adding, not scanning: the first receipt should never begin with a paywall.
         <PageState
           art={artwork.emptyReceipts}
           title="No receipts yet"

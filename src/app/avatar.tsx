@@ -11,17 +11,8 @@ import { useColors } from '@/providers/theme-provider';
 import { AVATARS } from '@/theme/avatars';
 
 /**
- * Choosing a face for the account.
- *
- * One tap and it is done — chosen, saved, and back to where you came from.
- * There is no Save button because there is nothing to compose: the choice is
- * the whole interaction, it is visible everywhere the moment it lands, and
- * changing your mind is the same single tap again.
- *
- * "No picture" sits alone at the top, centred, rather than buried at the end,
- * because the person most likely to want it is the one who already set one and
- * would otherwise have to hunt for the way back out. The fifteen faces follow
- * three to a row, five even rows (the Founder's layout, 2026-10-03).
+ * One tap saves the choice and goes back, so there is no Save button. "No picture" sits alone at
+ * the top because the person most likely to want it has already set one.
  */
 export default function AvatarScreen() {
   const colors = useColors();
@@ -119,8 +110,6 @@ function Cell({ selected, accessibilityLabel, label, onPress, children }: CellPr
         </Text>
       ) : null}
 
-      {/* The tick sits under the ring rather than on the face, which is small
-          enough already without a badge covering a third of it. */}
       <View className="mt-1.5 h-4 flex-row items-center justify-center">
         {selected ? <Check size={15} color={colors.accentInk} strokeWidth={3} /> : null}
       </View>

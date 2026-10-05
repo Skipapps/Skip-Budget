@@ -11,24 +11,17 @@ import {
 } from '@/api/reminders';
 
 /**
- * The daily receipts reminder setting.
- *
- * Two things are worth pinning here and neither is visible from the screen:
- * the default time is 8pm even when nothing has been stored, and turning the
- * reminder on asks for notification permission before it writes — a reminder
- * saved on a phone that was never asked is a promise we cannot keep.
+ * The daily receipts reminder setting. Two things to pin: the default time is 8pm even when nothing
+ * is stored, and turning it on asks for notification permission before it writes.
  */
 
-/** The profile row the fake client hands back. Set per test. */
 let mockProfile: Record<string, unknown> | null = null;
-/** Every update the hooks send, so the payload can be asserted rather than assumed. */
 const mockUpdates: {
   table: string;
   values: Record<string, unknown>;
   id: unknown;
   selected: string;
 }[] = [];
-/** Rows the update answers with. Empty means the filter matched nothing. */
 let mockUpdatedRows: { id: string }[] = [];
 
 jest.mock('@/lib/supabase', () => {
@@ -38,9 +31,8 @@ jest.mock('@/lib/supabase', () => {
       maybeSingle: () => Promise.resolve({ data: mockProfile, error: null }),
       update: (values: Record<string, unknown>) => ({
         eq: (_column: string, id: unknown) => ({
-          // The update only resolves through `select`, because that is the
-          // only shape the hook uses: an update with no rows asked for is the
-          // silent no-op this mock must not be able to imitate.
+          // The update only resolves through `select`, the only shape the hook uses: an update with
+          // no rows asked for is the silent no-op this mock must not imitate.
           select: (columns: string) => {
             mockUpdates.push({ table, values, id, selected: columns });
             return Promise.resolve({ data: mockUpdatedRows, error: null });
@@ -98,8 +90,7 @@ describe('receiptReminderFrom', () => {
   });
 
   it('falls back to 8pm rather than midnight when the column is null', () => {
-    // The column is `not null default '20:00'`, so this is the row written
-    // before the migration — the app must not answer that with 00:00.
+    // The column is `not null default '20:00'`; this is a row written before the migration.
     expect(
       receiptReminderFrom({ receipt_reminder_enabled: true, receipt_reminder_at: null }),
     ).toEqual({ enabled: true, remindAt: '20:00' });
@@ -164,12 +155,9 @@ describe('useSetReceiptReminder', () => {
   });
 
   it('fails rather than reporting success when no profile row was updated', async () => {
-    // The switch reading "on" after a write that touched nothing is worse than
-    // an error: the next launch reads the setting back off with no explanation.
-    //
-    // The wording is the settings one, not the records one: this reminder is a
-    // column on the profile, so "it may have been deleted on another device"
-    // would be a guess and "open the list again" would point at no list.
+    // A switch reading "on" after a write that touched nothing is worse than an error. The wording
+    // is the settings one: this reminder is a profile column, so "deleted on another device" would
+    // be a guess and "open the list again" would point at no list.
     mockUpdatedRows = [];
     const { result } = await renderHook(() => useSetReceiptReminder(), { wrapper });
 

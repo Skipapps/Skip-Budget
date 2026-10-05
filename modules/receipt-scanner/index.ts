@@ -3,13 +3,12 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 /**
  * One recognised line, and where it sat on the page.
  *
- * Coordinates are normalised to 0–1 with the origin at the TOP left, so y
- * grows the way a receipt is read. Height is the printed size of the line,
- * which is how the shop's name is told apart from its address.
+ * Coordinates are normalised to 0–1 with the origin at the TOP left, so y grows the way a receipt
+ * is read. Height is the printed size of the line, which tells the shop's name from its address.
  */
 export type TextLine = {
   text: string;
-  /** Vision's ranked readings, best first. Useful when digits are ambiguous. */
+  /** Vision's ranked readings, best first. */
   candidates: string[];
   /** 0–1. Low confidence is a reason to prefer another candidate. */
   confidence: number;
@@ -38,8 +37,7 @@ type ReceiptScannerModule = {
   recognizeReceipt?: (uri: string) => Promise<TextLine[]>;
 };
 
-// Optional, so a JS-only context (web, or a build made before the module was
-// added) still loads this file instead of throwing at import time.
+// Optional, so a JS-only context (web, an older build) can import this file without throwing.
 const native = requireOptionalNativeModule<ReceiptScannerModule>('ReceiptScanner');
 
 /** False on the Simulator, on web, and in any build without the native module. */
@@ -72,15 +70,10 @@ export function isCaptureAvailable(): boolean {
 }
 
 /**
- * One shutter tap, then the reading — no review screen in between.
+ * One shutter tap, then the reading, with no review screen. `scanDocument` is Apple's multi-page
+ * scanner (review plus a second confirm); this is the same recognition behind a plain camera.
  *
- * `scanDocument` puts Apple's document scanner on screen, which is a multi-page
- * session: it reviews each capture and needs a second confirm to finish. That
- * is three taps to log something a person is holding in one hand at a till.
- * This is the same recognition behind a plain camera.
- *
- * Falls back to the document scanner on a build that predates the native
- * camera, so an older binary keeps working rather than losing the feature.
+ * Falls back to the document scanner on a build without the native camera.
  * Resolves null when the user backs out.
  */
 export async function captureReceipt(): Promise<ScanResult | null> {
@@ -95,10 +88,8 @@ export async function recognizeText(uri: string): Promise<string> {
 }
 
 /**
- * Recognition that keeps the layout.
- *
- * Returns an empty list on a native build that predates it, which the caller
- * reads as "fall back to the flat text" rather than as a failure.
+ * Recognition that keeps the layout. An empty list (older native build) means "fall back to the
+ * flat text", not a failure.
  */
 export async function recognizeReceipt(uri: string): Promise<TextLine[]> {
   if (!native) throw new Error('Scanning needs a newer build of the app.');

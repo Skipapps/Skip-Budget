@@ -3,13 +3,10 @@ import { fireEvent, render } from '@testing-library/react-native';
 import SalaryScreen from '@/app/salary';
 
 /**
- * The Salary page with hourly pay (Founder, 2026-10-03).
- *
- * Three things pinned: saving keeps the accounts each source was already paid
- * into (it used to start them empty and save that, unlinking every account);
- * an hourly source saves the pay it works out (before tax — there is no tax
- * field) plus the inputs behind it; and until the database has the hourly columns, the page is fixed-only
- * and sends nothing it cannot store.
+ * The Salary page with hourly pay. Pinned: saving keeps the accounts each source was already paid
+ * into; an hourly source saves the pay it works out (before tax, there is no tax field) plus the
+ * inputs behind it; and until the database has the hourly columns the page is fixed-only and sends
+ * nothing it cannot store.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -102,7 +99,7 @@ it('saves an hourly source as the pay it works out to, with its inputs', async (
         hours_per_week: 40,
         overtime_hours_per_week: 5,
         overtime_multiplier: 1.5,
-        // A % saved before the tax field was removed is no longer applied.
+        // A % saved before the tax field was removed is ignored.
         deduction_percent: 20,
       },
     ],

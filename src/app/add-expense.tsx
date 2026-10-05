@@ -33,26 +33,9 @@ import { useColors } from '@/providers/theme-provider';
 type Mode = 'equal' | 'exact';
 
 /**
- * Adding what somebody paid, and who it was for.
- *
- * Three steps over one piece of state: how much, what and who, then when.
- * Nothing is remounted between them, so going back keeps everything typed.
- *
- * The split has to add up to the total exactly — the database refuses anything
- * else, because shares that do not sum make every balance downstream wrong.
- * So the remainder is shown live while typing rather than saved up for an
- * error on submit: "$4.20 left to assign" while you work is help, and the same
- * fact after a failed save is a telling-off.
- */
-/**
- * Waits for the group before the form exists, then seeds it by remount.
- *
- * Both queries matter. Without the expenses, an edit opens as a blank "add"
- * and would save a second expense rather than change the one you came for.
- * Without the members, a new expense starts with nobody ticked, when the whole
- * group is the default. The key remounts the form once the row lands, which is
- * how state gets seeded from data without an effect writing state during
- * render and fighting the first thing you type.
+ * Waits for the group before the form exists, then seeds it by remount. Without the expenses an
+ * edit opens as a blank "add" and saves a second expense; without the members a new expense starts
+ * with nobody ticked. Remounting seeds state without an effect writing state during render.
  */
 export default function AddExpenseScreen() {
   const { group: groupId, id } = useLocalSearchParams<{ group?: string; id?: string }>();
@@ -63,8 +46,7 @@ export default function AddExpenseScreen() {
 
   const waiting = members.isLoading || (Boolean(id) && expenses.isLoading);
 
-  // The shell with skeletons, never a $0 figure: a placeholder amount on an
-  // expense that is still loading is a wrong number about somebody's money.
+  // Skeletons, never a $0 placeholder for an expense still loading.
   if (waiting) {
     return (
       <StepFlow
@@ -136,9 +118,6 @@ function ExpenseForm({
       : {},
   );
 
-  // Editing walks the flow from the start, amount first, exactly as adding
-  // does — every figure is in front of the person before Save, not just the
-  // ones on the page an edit happened to open on.
   const [step, setStep] = useState(0);
   const [padTarget, setPadTarget] = useState<string | null>(null);
   const [payerOpen, setPayerOpen] = useState(false);
@@ -166,10 +145,7 @@ function ExpenseForm({
     );
   };
 
-  /**
-   * A check that belongs to an earlier step sends you back to it. Being told
-   * about a field you cannot see is the same as not being told.
-   */
+  // Sends you back to the step that owns the field; an error about a hidden field is no use.
   const fail = (message: string, atStep: number) => {
     warn();
     setError({ message, step: atStep });
@@ -279,8 +255,7 @@ function ExpenseForm({
         }
         void handleSave();
       }}
-      // Step 1 and 3 carry the message next to the field it belongs to; only
-      // the keypad and the save error have nowhere else to put it.
+      // Step 1 shows its message beside the field; the keypad and the save error have nowhere else.
       error={step === 1 ? null : stepError}
       avoidKeyboard={step === 1}
       footerSlot={
@@ -429,8 +404,7 @@ function ExpenseForm({
             })}
           </View>
 
-          {/* Live, because it is guidance while typing rather than a verdict on
-              what was typed. */}
+          {/* Live while typing: the database refuses shares that do not sum to the total. */}
           {mode === 'exact' && total > 0 ? (
             <Text
               className={

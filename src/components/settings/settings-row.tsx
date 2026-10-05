@@ -10,10 +10,8 @@ import { useColors } from '@/providers/theme-provider';
 type SettingsRowProps = {
   icon: LucideIcon;
   /**
-   * Replaces the icon entirely, for a row that carries somebody else's mark.
-   *
-   * A brand logo is not a glyph: it has its own colours and cannot be tinted
-   * to match the row without misrepresenting it.
+   * Replaces the icon, for a row carrying somebody else's mark: a brand logo has its own colours
+   * and cannot be tinted to match the row without misrepresenting it.
    */
   artwork?: ReactNode;
   title: string;
@@ -23,7 +21,6 @@ type SettingsRowProps = {
   onPress?: () => void;
   /** Renders a switch instead of a chevron. */
   toggle?: { value: boolean; onChange: (next: boolean) => void };
-  /** Red treatment for destructive actions. */
   destructive?: boolean;
   /** Hides the divider on the last row of a group. */
   last?: boolean;
@@ -49,9 +46,8 @@ export function SettingsRow({
 
   const body = (
     <View className="w-full flex-row items-center gap-3 py-3.5">
-      {/* A 40pt leading slot either way, so every row's text starts on the
-          same column and the divider below can be inset to meet it. Glyphs get
-          the tonal well; someone else's mark brings its own shape. */}
+      {/* A 40pt leading slot either way, so every row's text starts on the same column and the
+          divider can be inset to meet it. */}
       {artwork ? (
         <View className="h-10 w-10 items-center justify-center">{artwork}</View>
       ) : (
@@ -115,8 +111,7 @@ export function SettingsRow({
 
       {children ? <View className="-mt-1 ml-[52px] pb-3.5">{children}</View> : null}
 
-      {/* Inset to line up under the text, not the icon — the same 52pt every
-          other list in the app insets to. */}
+      {/* Inset to line up under the text, not the icon: the same 52pt every other list uses. */}
       {last ? null : <View className="ml-[52px] h-px bg-line/60" />}
     </View>
   );

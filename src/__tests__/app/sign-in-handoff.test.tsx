@@ -6,13 +6,8 @@ import SignupScreen from '@/app/signup';
 import { resetTo } from '@/lib/nav';
 
 /**
- * Signing in is a one-way door.
- *
- * The name page used to be reached with router.replace, which swaps only the
- * top screen: welcome, "Why Skip is different" and the sign-in screens stayed
- * underneath, and the iOS edge swipe walked a signed-in person straight back
- * into the pitch. Every way in now uses resetTo, which makes the name page the
- * only screen there is.
+ * Signing in is a one-way door: every way in uses resetTo, not router.replace (which swaps only the
+ * top screen), so the iOS edge swipe cannot walk a signed-in person back into the welcome pitch.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));

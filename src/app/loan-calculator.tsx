@@ -33,14 +33,7 @@ import { sumMoney } from '@/lib/money';
 const AMOUNT_MIN = 500;
 const AMOUNT_MAX = 1_000_000;
 
-/**
- * The three conventions worth offering, in the order they are worth reading.
- *
- * Daily on actual/365 is the default because it is what the app's own fixtures
- * are built on and what a US installment lender bills. Monthly rests is the
- * textbook one every rate table quotes. 30/360 is the older bond and mortgage
- * convention, kept because plenty of loans are still written on it.
- */
+/** Daily actual/365 is the default: what a US installment lender bills; the fixtures use it. */
 const BASIS_CHOICES = [
   { value: 'actual/365' as const, label: 'Daily · 365' },
   { value: 'monthly' as const, label: 'Monthly rests' },
@@ -60,8 +53,8 @@ const BASIS_NOTES: Record<AccrualBasis, string> = {
 };
 
 export default function LoanCalculatorScreen() {
-  // Wrapper, not inline: an early return above the screen's own hooks
-  // would change the hook count when the entitlement answer lands.
+  // Wrapper, not inline: an early return above the screen's own hooks would change the hook count
+  // when the entitlement answer lands.
   const gate = useProGate('loans');
   if (gate) return gate;
   return <LoanCalculatorScreenInner />;
@@ -74,20 +67,15 @@ function LoanCalculatorScreenInner() {
   const [rate, setRate] = useState(7.5);
   const [months, setMonths] = useState(60);
   const [startDate, setStartDate] = useState(new Date());
-  // Interest starts the day the money lands, which is rarely a month before the
-  // first payment. Defaulted, but editable, because on a real loan that gap is
-  // worth more than any other input on this screen.
+  // Interest starts the day the money lands, by default a month before the first payment.
   const [fundedOn, setFundedOn] = useState(() => monthBefore(new Date()));
 
-  // How the lender charges the interest. The default is the convention the
-  // app's fixtures are built on, so the figures here match the ones on file.
   const [basis, setBasis] = useState<AccrualBasis>('actual/365');
   // Paid on top of the contract payment, all of it against the balance.
   const [extraMonthly, setExtraMonthly] = useState(0);
   const [lumpSum, setLumpSum] = useState(0);
   const [lumpOn, setLumpOn] = useState(() => addMonths(new Date(), 12));
-  // Prepaid finance charges — the arrangement fee, points. They do not change
-  // any payment; they change what the credit actually costs, which is the APR.
+  // Prepaid finance charges (arrangement fee, points): they change the APR, not any payment.
   const [fees, setFees] = useState(0);
 
   const [padOpen, setPadOpen] = useState(false);
@@ -115,19 +103,14 @@ function LoanCalculatorScreenInner() {
     [amount, rate, months, startDate, fundedOn, basis, extraMonthly, lumpSum, lumpOn],
   );
 
-  // Recomputed on every drag of a slider, so it is worth not redoing at 60fps.
-  // Both sides of the comparison come out of one call, and when nothing extra
-  // is being paid the two are the same object and only one schedule is built.
+  // Recomputed on every slider drag. With nothing extra paid, both sides are the same object and
+  // only one schedule is built.
   const comparison = useMemo(() => comparePrepayment(terms), [terms]);
   const contract = comparison.base;
   const loan = comparison.accelerated;
   const overpaying = extraMonthly > 0 || lumpSum > 0;
 
-  /**
-   * The disclosure is for the loan as contracted, not as overpaid: a lender
-   * quotes the APR of the credit it is selling, and nobody is required to tell
-   * it in advance that you plan to pay it off early.
-   */
+  // The disclosure is for the loan as contracted, not as overpaid, as a lender quotes it.
   const disclosure = useMemo(
     () =>
       truthInLending({
@@ -150,37 +133,22 @@ function LoanCalculatorScreenInner() {
     ? new Date(`${contract.payoffOn}T00:00:00`)
     : lastPayment;
   const openingDays = daysBetween(fundedOn, startDate);
-  // Half a basis point is the point at which the two figures round differently
-  // on screen; below that, printing both says nothing.
+  // Half a basis point is where the two figures round differently on screen.
   const aprDiffers = Math.abs(disclosure.apr - rate) >= 0.005;
   /**
-   * The leftover days of the opening period under monthly rests.
-   *
-   * A monthly-rest lender bills the gap between the money landing and the first
-   * payment as one whole rest plus per diem interest on the days left over —
-   * rate / 12, then days * rate / 365 (`interestFraction`, `@/lib/loan`, and the
-   * odd-days fixture in `loan.test.ts`). So 15 Jan to 1 March is a rest plus
-   * fourteen days, not forty-five days of anything, and the note below has to
-   * say so or it contradicts the schedule underneath it. The daily conventions
-   * bill every day of the gap and have no stub.
+   * Leftover days of the opening period under monthly rests: one whole rest (rate / 12) plus per
+   * diem (days * rate / 365) on the remainder, as the schedule bills it. The daily conventions
+   * charge every day of the gap and have no stub.
    */
   const stubDays = basis === 'monthly' ? monthsAndDaysBetween(fundedOn, startDate).days : 0;
-  // Worth calling out whenever the first payment is not a plain period.
   const oddOpening =
     basis === 'monthly'
       ? stubDays > 0
       : openingDays > 0 && openingDays !== 30 && openingDays !== 31;
 
   /**
-   * Asks before it files anything. The calculator is a scratchpad — most
-   * people open it to try numbers, not to commit to a debt.
-   *
-   * Whatever is priced above is what gets filed: `basis` goes to `/save-loan`
-   * untouched, monthly rests with an odd first period included, because the
-   * `day_count_basis` column holds all four conventions from
-   * `20260912100002_monthly_rests.sql` onwards. Nothing is mapped into a
-   * neighbouring basis, so no figure on this screen moves on the way to the
-   * bill or to the saved loan's schedule.
+   * Asks before filing anything. `basis` goes to `/save-loan` untouched (`day_count_basis` holds
+   * all four conventions), so no figure moves between here and the saved schedule.
    */
   const handleSave = async () => {
     if (contract.payment <= 0) return;
@@ -210,7 +178,6 @@ function LoanCalculatorScreenInner() {
 
   return (
     <Screen title="Loan calculator" showBack>
-      {/* The answer first — everything below it is how you change it. */}
       <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           Monthly payment
@@ -230,9 +197,6 @@ function LoanCalculatorScreenInner() {
           {schedule.length} payments · last on {formatFullDate(lastPayment)}
         </Text>
 
-        {/* The hero stays the contract payment, because that is what the lender
-            bills and what gets filed as the monthly bill. What the overpayment
-            adds is stated next to it rather than folded into it. */}
         {extraMonthly > 0 ? (
           <Text
             className="mt-2 text-center font-poppins text-[12px] leading-[17px] text-muted"
@@ -244,9 +208,6 @@ function LoanCalculatorScreenInner() {
           </Text>
         ) : null}
 
-        {/* The opening period is the one input people never think about and the
-            one that moves the payment most, so it is called out rather than
-            buried in the schedule. */}
         {oddOpening ? (
           <Text
             className="mt-2 text-center font-poppins text-[12px] leading-[17px] text-muted"
@@ -261,8 +222,6 @@ function LoanCalculatorScreenInner() {
         ) : null}
       </View>
 
-      {/* Three groups, each announced, because nine controls in a row read as
-          one undifferentiated form. */}
       <SectionHeading className="mb-4 mt-8">The loan</SectionHeading>
 
       <View className="w-full gap-6">
@@ -325,8 +284,6 @@ function LoanCalculatorScreenInner() {
         />
       </View>
 
-      {/* Everything here defaults to nothing, and the loan prices without it —
-          the caption says so before anyone reads four more fields. */}
       <SectionHeading caption="Optional" className="mb-4 mt-8">
         Overpayments and fees
       </SectionHeading>
@@ -348,7 +305,6 @@ function LoanCalculatorScreenInner() {
           onPress={() => setLumpPadOpen(true)}
         />
 
-        {/* Only worth asking when there is something to date. */}
         {lumpSum > 0 ? (
           <SelectField
             label="Overpayment lands"
@@ -368,8 +324,6 @@ function LoanCalculatorScreenInner() {
         />
       </View>
 
-      {/* A full section break, not the 24pt that binds a field to the one
-          above it: this is not part of the optional group it follows. */}
       <View className="mt-8 w-full">
         <FieldLabel className="mb-3">How interest is charged</FieldLabel>
         <ChoiceChips options={BASIS_CHOICES} value={basis} onChange={setBasis} />
@@ -392,8 +346,6 @@ function LoanCalculatorScreenInner() {
           ) : null}
           <View className="h-px w-full bg-line" />
           <SummaryLine label="Total you repay" value={formatCurrency(loan.totalPaid)} strong />
-          {/* Shown only when it has something to say. On a plain loan with no
-              fees and no odd days the APR IS the rate, and repeating it is noise. */}
           {aprDiffers ? <SummaryLine label="APR" value={`${disclosure.apr.toFixed(2)}%`} /> : null}
         </View>
 
@@ -409,13 +361,8 @@ function LoanCalculatorScreenInner() {
         ) : null}
       </View>
 
-      {/* What the overpayment buys, kept apart from the summary because it is a
-          different question: not what this loan costs, but what changing it
-          would save. */}
       {overpaying && (comparison.interestSaved > 0 || comparison.monthsSaved > 0) ? (
         <View className="mt-3 w-full gap-3 rounded-[16px] border border-line bg-card p-5">
-          {/* Titled, because two figures with no heading read as more of the
-              summary card above rather than as a different question. */}
           <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
             If you overpay
           </Text>
@@ -437,8 +384,6 @@ function LoanCalculatorScreenInner() {
         </View>
       ) : null}
 
-      {/* Directly under the summary, because it is the same figures opened up
-          rather than a separate idea. */}
       <View className="mt-3 w-full">
         <ScheduleCard
           rows={schedule}
@@ -472,7 +417,6 @@ function LoanCalculatorScreenInner() {
           value={String(amount)}
           onCancel={() => setPadOpen(false)}
           onConfirm={(next) => {
-            // Keep it inside the slider's range so the two controls agree.
             const parsed = Number(next) || 0;
             setAmount(Math.min(AMOUNT_MAX, Math.max(AMOUNT_MIN, parsed)));
             setPadOpen(false);
@@ -488,7 +432,6 @@ function LoanCalculatorScreenInner() {
           value={String(rate)}
           onCancel={() => setRatePadOpen(false)}
           onConfirm={(next) => {
-            // Clamp to the slider's range so the two controls agree.
             setRate(Math.min(30, Math.max(0, Number(next) || 0)));
             setRatePadOpen(false);
           }}
@@ -551,8 +494,7 @@ function LoanCalculatorScreenInner() {
           onCancel={() => setDatePickerOpen(false)}
           onConfirm={(date) => {
             setStartDate(date);
-            // Money cannot land after the first payment is due. Nudging the
-            // funding date along beats rejecting the change with an error.
+            // Money cannot land after the first payment is due: nudge the funding date along.
             if (fundedOn >= date) setFundedOn(monthBefore(date));
             setDatePickerOpen(false);
           }}

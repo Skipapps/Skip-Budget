@@ -7,22 +7,14 @@ import { FAILURE_MESSAGE } from '@/lib/failure';
 import { toIsoDate } from '@/lib/date';
 
 /**
- * Golden: exactly what the receipt form's Save writes.
+ * Golden: exactly what the receipt form's Save writes. Pins the object handed to create/update, the
+ * hint words, and the step each hint sends the person back to.
  *
- * Written against the form before its values code moved into
- * `src/api/entry-values.ts`, and kept unchanged through that move — so a green
- * run is the proof the extraction changed nothing a receipt is saved with: the
- * object handed to create/update, the hint words, and the step each hint sends
- * the person back to.
- *
- * The leaf inputs are stubs that record their props, so a test can type into
- * them; everything that decides what gets written is the real form. The
- * primary button stub accepts a press even while disabled, which is the only
- * way to reach the checks inside Save: the step flow normally holds Continue
- * back, and those checks are the last line behind it.
+ * Leaf inputs are stubs that record their props; everything that decides what gets written is the
+ * real form. The primary button stub accepts a press even while disabled, the only way to reach the
+ * checks inside Save (the step flow normally holds Continue back).
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const mockProps: Record<string, any> = {};
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -301,7 +293,6 @@ describe('Add receipt — a scan that arrives as route params', () => {
     };
     const screen = await render(<AddReceiptScreen />);
 
-    // The scan report names what was read, in the order it was read.
     expect(screen.getByText('Read the store, amount, date and card.')).toBeTruthy();
 
     await press(screen, 'Continue');
@@ -409,7 +400,6 @@ describe('Add receipt — the checks inside Save', () => {
     await press(screen, 'Save receipt');
 
     expect(screen.getByText('Pick a store first.')).toBeTruthy();
-    // The store step: the store field is on screen and no question line is.
     expect(screen.getByText('Store field')).toBeTruthy();
     expect(screen.queryByText('How much did you spend?')).toBeNull();
     expect(screen.queryByText('When was it?')).toBeNull();
@@ -429,7 +419,6 @@ describe('Add receipt — the checks inside Save', () => {
     expect(screen.getByText('How much did you spend?')).toBeTruthy();
     expect(mockCreate).not.toHaveBeenCalled();
 
-    // Zero is not an amount either.
     await type('amount', '0');
     await press(screen, 'Continue');
     await press(screen, 'Continue');

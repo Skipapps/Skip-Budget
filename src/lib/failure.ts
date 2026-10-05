@@ -1,19 +1,10 @@
 import * as Sentry from '@sentry/react-native';
 
 /**
- * What a failure is allowed to say on screen: one line, everywhere.
+ * What a failure is allowed to say on screen: one line, whatever went wrong or whoever raised it.
  *
- * The Founder's call (2026-09-28). A save, load, delete, sign-in, purchase or
- * send that goes wrong says this and nothing else — however it went wrong, and
- * whoever raised it: the connection, Supabase, a Postgres rule, the App Store.
- * A dozen differently worded apologies read as a dozen different problems;
- * one line reads as "try that again", which is the only thing any of them
- * ever asked of the person.
- *
- * Form hints are not failures. "Enter the bank name." is checked before
- * anything is sent and names the field to fix, so it keeps its own words.
- * Neither are statements about the device ("Scanning needs a camera") — those
- * are true every time, and trying again would change nothing.
+ * Form hints ("Enter the bank name.") and statements about the device ("Scanning needs a
+ * camera") are not failures and keep their own words.
  */
 export const FAILURE_MESSAGE = 'Something went wrong. Please try again.';
 
@@ -29,14 +20,9 @@ function asError(thrown: unknown): Error {
 }
 
 /**
- * The line for a caught error — and the error itself, kept where it can be
- * found.
- *
- * The screen no longer says what actually broke, so this is where the real
- * cause goes: to Sentry in a release build, where every one of these would
- * otherwise vanish (caught errors never reach the crash handler), and to the
- * Metro log in development (not a LogBox toast, which would put a second
- * message on the screen this exists to keep to one).
+ * The line for a caught error, which also sends the real cause where it can be found: Sentry in
+ * a release build (caught errors never reach the crash handler), the Metro log in development
+ * (not a LogBox toast, which would add a second message on screen).
  */
 export function failureMessage(thrown?: unknown): string {
   if (thrown !== undefined) {

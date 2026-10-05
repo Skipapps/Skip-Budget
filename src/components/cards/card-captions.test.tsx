@@ -8,14 +8,10 @@ jest.mock('@/providers/theme-provider', () => ({
 }));
 
 /**
- * The caption over a card's figure says which way the money runs, so it is
- * decided in cents, the way money.ts posts them. It used to round to whole
- * dollars first: a $0.40 overdraft read "Available" and $0.40 still owed on a
- * card read "Nothing owed". Float dust (a balance summed to −1e-12) is still
- * nothing.
- *
- * The figure itself stays whole dollars, truncated (formatCurrency with
- * `cents: false`), so a balance under a dollar shows "$0" under the caption.
+ * The caption says which way the money runs, so it is decided in cents (the way money.ts posts
+ * them), not on whole dollars: a $0.40 overdraft is "Overdrawn". Float dust (-1e-12) is still
+ * nothing. The figure itself is truncated whole dollars (`cents: false`), so under a dollar it
+ * shows "$0".
  */
 const account = (balance: number) => ({
   id: 'acct',

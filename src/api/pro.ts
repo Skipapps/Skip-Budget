@@ -11,38 +11,24 @@ import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
 /**
- * The one door to "does this account pay".
- *
- * Two sources agree on the answer. RevenueCat's SDK knows the moment Apple's
- * sheet closes and caches its answer offline; the `entitlements` row is the
- * server's copy, written by the webhook, and what every database check reads.
- * The hook prefers the SDK and falls back to the row — so the app keeps its
- * answer with no key configured at all, which is what lets every gate ship
- * before the App Store side exists.
- *
- * Nothing else in the app imports react-native-purchases. Features ask
- * `usePro()` and render; billing stays in this file. That separation is the
- * stability promise: removing the whole paywall later is deleting gates, not
- * surgery.
+ * The one door to "does this account pay". RevenueCat's SDK knows the moment Apple's sheet closes
+ * and caches its answer offline; the `entitlements` row is the server's copy, written by the
+ * webhook and read by every database check. The hook prefers the SDK and falls back to the row, so
+ * it works with no key configured. Nothing else imports react-native-purchases; features ask
+ * `usePro()`.
  */
 
 const RC_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '';
 
 let configuredFor: string | null = null;
 let configuring: Promise<boolean> | null = null;
-/** The real reason configure last failed — surfaced, never guessed at. */
+/** Why configure last failed, surfaced rather than guessed at. */
 let lastConfigureError: string | null = null;
 
 /**
- * Configure exactly once, and make every SDK caller wait for it.
- *
- * The first version configured in a fire-and-forget effect and swallowed any
- * failure — so one early throw (setLogLevel before configure, as it turned
- * out) silently left the SDK unconfigured forever, and every later call died
- * with "no singleton instance" while the app showed no reason why. Now there
- * is one gate: nobody talks to the SDK until this resolves true, a failure is
- * retried on the next call instead of remembered forever, and setLogLevel
- * runs after configure, where it cannot abort it.
+ * Configure exactly once, and make every SDK caller wait for it. Touching the SDK before configure
+ * succeeds throws "no singleton instance", so nobody talks to it until this resolves true; a
+ * failure is retried on the next call, and setLogLevel runs after configure so it cannot abort it.
  */
 function ensureConfigured(userId: string): Promise<boolean> {
   if (!RC_KEY) return Promise.resolve(false);
@@ -50,9 +36,8 @@ function ensureConfigured(userId: string): Promise<boolean> {
 
   if (!configuring) {
     configuring = (async () => {
-      // Two attempts with a beat between them: the first native call of a
-      // launch can race bridge start-up, and one retry separates a transient
-      // stumble from a real fault worth reporting.
+      // Two attempts: the first native call of a launch can race bridge start-up, and one retry
+      // separates a transient stumble from a real fault.
       for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
           if (configuredFor === null) {
@@ -87,18 +72,15 @@ export function purchasesAvailable(): boolean {
 }
 
 function proFrom(info: CustomerInfo | null): boolean {
-  // Either identifier counts. The dashboard was set up as skip_budget_pro
-  // while the plan said pro; accepting both means a rename there can never
-  // silently lock out paying customers.
+  // Either identifier counts (the dashboard entitlement is skip_budget_pro, the plan said pro), so
+  // a rename can never lock out paying customers.
   return Boolean(info?.entitlements.active['pro'] || info?.entitlements.active['skip_budget_pro']);
 }
 
 /**
- * Signs RevenueCat in as the Supabase user, once per account.
- *
- * The Supabase id is the RevenueCat app user id, which is what makes the
- * entitlement follow the account across reinstalls and devices — and what
- * lets the webhook write the right row without a mapping table.
+ * Signs RevenueCat in as the Supabase user, once per account. The Supabase id is the RevenueCat app
+ * user id, so the entitlement follows the account across reinstalls and devices and the webhook
+ * writes the right row without a mapping table.
  */
 export function useConfigurePurchases(): void {
   const userId = useUserId();
@@ -112,13 +94,10 @@ export function usePro() {
   const userId = useUserId();
   const client = useQueryClient();
   const [sdkPro, setSdkPro] = useState<boolean | null>(null);
-  // Development-only, and only when somebody opted in on purpose. It changes
-  // the answer below and nothing else: the SDK listener, the server query,
-  // offerings, purchase and restore all still run exactly as they do for a
-  // paying account. 'free' exists because a sandbox purchase or a dashboard
-  // grant cannot be switched off from inside the app, and the free and lapsed
-  // experiences still have to be testable on that device. See
-  // src/lib/pro-bypass.ts for the two locks.
+  // Development-only, opt-in. It changes the answer below and nothing else: the SDK listener,
+  // server query, offerings, purchase and restore still run. 'free' exists because a sandbox
+  // purchase or dashboard grant cannot be switched off in-app, yet the free and lapsed experiences
+  // must be testable. See src/lib/pro-bypass.ts for the two locks.
   const override = useProOverride();
 
   // The server's copy — also the only copy when no key is configured.
@@ -144,13 +123,13 @@ export function usePro() {
     const listener = (info: CustomerInfo) => {
       if (!live) return;
       setSdkPro(proFrom(info));
-      // The SDK heard it first; the server row lands via webhook moments
-      // later. Refetching keeps the two visibly agreeing.
+      // The SDK heard it first; the server row lands via webhook later. Refetching keeps them
+      // agreeing.
       client.invalidateQueries({ queryKey: ['entitlement'] });
     };
 
-    // Everything waits behind the configure gate — touching the SDK before it
-    // is what produced "no singleton instance" on every screen.
+    // Everything waits behind the configure gate; touching the SDK earlier gives "no singleton
+    // instance".
     void (async () => {
       if (!(await ensureConfigured(userId)) || !live) return;
       Purchases.addCustomerInfoUpdateListener(listener);
@@ -175,11 +154,8 @@ export function usePro() {
     // An override outranks both, in whichever direction it points.
     pro:
       override === 'free' ? false : override === 'pro' || sdkPro === true || server.data === true,
-    // Ready means "safe to show a gate": the server has answered, or the SDK
-    // has. Until then screens render nothing rather than flashing a paywall
-    // at somebody who paid. An override is ready by definition — it has no
-    // request to wait on, and a tester with no signed-in account would
-    // otherwise sit on a blank gate forever.
+    // Ready means "safe to show a gate": the server or the SDK has answered, so a payer never sees
+    // a paywall flash. An override is ready by definition: it has no request to wait on.
     ready: override !== 'off' || server.isFetched || sdkPro !== null,
   };
 }
@@ -212,10 +188,8 @@ export function useProPrices() {
       const monthly = current?.monthly ?? null;
       const yearly = current?.annual ?? null;
 
-      // When the offering comes back without packages, ask StoreKit for the two
-      // products by id directly. Two products here but no packages means a
-      // RevenueCat offering-linkage problem; zero products means Apple's
-      // sandbox is serving nothing to this device — different fixes entirely.
+      // With no packages, ask StoreKit for the products by id: products but no packages is a
+      // RevenueCat offering-linkage problem; zero products means the sandbox serves nothing here.
       let debug = `offerings=${Object.keys(offerings.all).length} current=${current ? 'yes' : 'none'} pkgs=${current?.availablePackages.length ?? 0}`;
       if (!monthly && !yearly) {
         try {

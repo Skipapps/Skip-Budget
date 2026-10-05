@@ -1,10 +1,4 @@
-/**
- * Date labels without Intl.
- *
- * Same reasoning as the currency formatter: Hermes ships Intl inconsistently
- * across platforms, and a date that renders differently on iOS and Android is
- * a support problem. These are the only two vocabularies the UI needs.
- */
+/** Date labels without Intl, which Hermes ships inconsistently across platforms. */
 export const MONTHS_SHORT = [
   'Jan',
   'Feb',
@@ -32,7 +26,6 @@ export function formatDayLabel(date: Date): { weekday: string; date: string } {
   };
 }
 
-/** Shifts by whole days, leaving month/year rollover to the Date constructor. */
 export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
@@ -65,7 +58,6 @@ export const PAY_FREQUENCIES = [
 
 export type PayFrequency = (typeof PAY_FREQUENCIES)[number]['value'];
 
-/** One pay cycle forward from `date`. */
 function advanceOneCycle(date: Date, frequency: PayFrequency): Date {
   const year = date.getFullYear();
   const month = date.getMonth();
@@ -92,16 +84,14 @@ function advanceOneCycle(date: Date, frequency: PayFrequency): Date {
 }
 
 /**
- * Next payday strictly after today, walking forward from the last one. Rolling
- * forward rather than adding a single cycle means a stale last-pay-day still
- * produces a future date.
+ * Next payday strictly after today, walking forward from the last one, so a stale last-pay-day
+ * still produces a future date.
  */
 export function getNextPayday(lastPayday: Date, frequency: PayFrequency): Date {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   let next = advanceOneCycle(lastPayday, frequency);
-  // Bounded so a bad input cannot spin forever.
   for (let guard = 0; next <= today && guard < 400; guard += 1) {
     next = advanceOneCycle(next, frequency);
   }
@@ -109,10 +99,8 @@ export function getNextPayday(lastPayday: Date, frequency: PayFrequency): Date {
 }
 
 /**
- * yyyy-mm-dd in the device's own timezone.
- *
- * toISOString() would convert to UTC first, which silently moves a late-evening
- * purchase to the next day for anyone west of Greenwich.
+ * yyyy-mm-dd in the device's own timezone. toISOString() converts to UTC first, which moves a
+ * late-evening purchase to the next day for anyone west of Greenwich.
  */
 export function toIsoDate(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -121,13 +109,8 @@ export function toIsoDate(date: Date): string {
 }
 
 /**
- * Every payday inside a window.
- *
- * Pay cycles do not match bill recurrences — "every 2 weeks" and "twice a
- * month" have no equivalent there — so income is projected with its own walker
- * rather than bent into the bill shape. Reuses advanceOneCycle, which already
- * knows that semimonthly means the 15th and the last day, and that monthly
- * clamps rather than rolling past a short month.
+ * Every payday inside a window (inclusive, yyyy-mm-dd). Pay cycles do not map onto bill
+ * recurrences, so income is projected with its own walker built on advanceOneCycle.
  */
 export function paydaysInRange(
   lastPayday: Date,
@@ -138,8 +121,7 @@ export function paydaysInRange(
   const found: string[] = [];
   let cursor = new Date(lastPayday);
 
-  // Walk back to the window, then forward across it. Bounded so a stale date
-  // far in the past cannot spin.
+  // Walk back to the window, then forward across it. Bounded so a stale date cannot spin.
   for (let guard = 0; guard < 500 && toIsoDate(cursor) > from; guard += 1) {
     const previous = new Date(cursor);
     switch (frequency) {
@@ -169,13 +151,7 @@ export function paydaysInRange(
   return found;
 }
 
-/**
- * A day, named the way someone would say it out loud.
- *
- * Section headers are read at a glance, and "Today" lands faster than a date
- * you have to compare against the one in your head. Anything further out keeps
- * its full date, because "in 9 days" is not a thing anyone can plan around.
- */
+/** "Today" / "Yesterday" / "Tomorrow", otherwise the full date. */
 export function formatRelativeDay(iso: string, today: string): string {
   if (!iso) return 'No date yet';
   if (iso === today) return 'Today';
@@ -190,24 +166,14 @@ export function formatRelativeDay(iso: string, today: string): string {
 }
 
 /**
- * Whole days left in the month after today.
- *
- * Note the month convention: getDaysInMonth is zero-based like Date itself, so
- * this passes getMonth() straight through. Adding one to it reads naturally
- * and measures the wrong month — the last day of the next one.
+ * Whole days left in the month after today. getDaysInMonth takes a zero-based month, so
+ * getMonth() goes straight through; adding one would measure the next month.
  */
 export function daysLeftInMonth(today: Date): number {
   return getDaysInMonth(today.getFullYear(), today.getMonth()) - today.getDate();
 }
 
-/**
- * A span of days, said the way a person would.
- *
- * Collapses whatever the two ends share: inside one month only the day
- * changes, inside one year only the month follows it. "22 – 28 Aug 2026"
- * rather than "22 Aug 2026 – 28 Aug 2026", which is the same fact printed
- * twice and reads as two dates rather than one stretch.
- */
+/** Collapses what the two ends share: "22 – 28 Aug 2026", not "22 Aug 2026 – 28 Aug 2026". */
 export function formatDateRange(from: Date, to: Date): string {
   const sameYear = from.getFullYear() === to.getFullYear();
   const sameMonth = sameYear && from.getMonth() === to.getMonth();
@@ -225,12 +191,8 @@ export function formatDateRange(from: Date, to: Date): string {
 }
 
 /**
- * Times of day, as the reminders table stores them.
- *
- * Postgres hands back a `time` as "09:00:00"; the app only ever cares about
- * hours and minutes, and writes the same shape back. Kept as plain strings
- * rather than Dates because a time of day is not a moment — attaching one to a
- * date invites a timezone conversion that would move it.
+ * Parses a Postgres `time` ("09:00:00") into hours and minutes. Times of day stay plain values,
+ * not Dates: attaching one to a date invites a timezone conversion that would move it.
  */
 export function parseClock(value: string | null | undefined): { hour: number; minute: number } {
   const [rawHour, rawMinute] = (value ?? '09:00').split(':');

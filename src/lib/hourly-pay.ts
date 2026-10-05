@@ -2,19 +2,9 @@ import type { PayFrequency } from '@/lib/date';
 import { roundMoney } from '@/lib/money';
 
 /**
- * Hourly pay, turned into the per-paycheck amount the rest of the app runs on.
- *
- * Every salary source stores one figure — what lands each payday — and the
- * balances, Left this month and Insights all read that. An hourly source is
- * only a different way of arriving at it: rate × hours, plus any overtime,
- * spread over the pay period, less what is taken out before it lands.
- */
-
-/**
- * Weeks of work each paycheck covers. Twice-a-month and monthly pay do not
- * line up with weeks, so they take the year's average: 52 weeks over 24 or
- * 12 paychecks. That keeps the monthly total on the Salary page identical to
- * the one the fixed sources produce for the same yearly pay.
+ * Weeks of work each paycheck covers. Twice-a-month and monthly pay take the year's average
+ * (52 weeks over 24 or 12 paychecks), matching the monthly total fixed sources give for the same
+ * yearly pay.
  */
 export const WEEKS_PER_PAYCHECK: Record<PayFrequency, number> = {
   weekly: 1,
@@ -23,7 +13,6 @@ export const WEEKS_PER_PAYCHECK: Record<PayFrequency, number> = {
   monthly: 52 / 12,
 };
 
-/** The two overtime rates US hourly work actually uses. */
 export const OVERTIME_RATES = [
   { value: '1.5', label: 'Time and a half (1.5×)' },
   { value: '2', label: 'Double time (2×)' },
@@ -55,10 +44,7 @@ export type HourlyEstimate = {
 /** The most hours a week holds. Anything above is a typo, not a job. */
 export const HOURS_IN_A_WEEK = 168;
 
-/**
- * Why the hourly inputs cannot be turned into pay yet, or null when they can.
- * Worded for the person filling the form in.
- */
+/** Why the hourly inputs cannot be turned into pay yet (worded for the form), or null when they can. */
 export function hourlyProblem(pay: HourlyPay): string | null {
   if (!(pay.rate > 0)) return 'Enter what you earn per hour.';
   if (!(pay.hoursPerWeek > 0)) return 'Enter how many hours you work in a typical week.';
@@ -73,11 +59,8 @@ export function hourlyProblem(pay: HourlyPay): string | null {
 }
 
 /**
- * The paycheck an hourly week adds up to, to the cent.
- *
- * Rounded once per figure shown, half away from zero (the same rule as every
- * other amount in the app), and the take-home is worked from the rounded
- * gross so the two numbers on screen always agree with each other.
+ * The paycheck an hourly week adds up to. Each figure is rounded once, half away from zero, and
+ * take-home is worked from the rounded gross so the two on screen agree.
  */
 export function estimateHourlyPay(pay: HourlyPay): HourlyEstimate {
   const overtime = pay.overtimeHoursPerWeek > 0 ? pay.overtimeHoursPerWeek : 0;

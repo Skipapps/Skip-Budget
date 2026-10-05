@@ -18,27 +18,17 @@ type SetupCollectionProps = {
   emptyText: string;
   /** "bill", "subscription" — the buttons read "Add a …" and "Add another …". */
   noun: string;
-  /** The real add form, the same one the rest of the app uses. */
   addHref: string;
   count: number;
   isPending: boolean;
   isError: boolean;
   onRetry: () => void;
-  /** The rows added so far. */
   children: ReactNode;
 };
 
 /**
- * A setup step that collects several of something: bills, subscriptions.
- *
- * Nobody has one bill. Opened straight from the checklist, the add form
- * dropped people back on the checklist after the first, and the second had no
- * way in but to leave setup. So the step is this page instead: every one saved
- * lands back here, listed, with "Add another" beside "Done" — and Done is the
- * only thing that returns to the checklist.
- *
- * Only setup opens these pages. The form is still the one the rest of the app
- * uses; this just holds the loop around it.
+ * A setup step that collects several of something. Every one saved lands back here, listed, with
+ * "Add another" beside "Done"; only Done returns to the checklist.
  */
 export function SetupCollection({
   title,

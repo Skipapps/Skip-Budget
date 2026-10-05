@@ -18,20 +18,11 @@ type TransactionRowProps = {
   kind?: 'receipt' | 'bill' | 'subscription' | 'payment' | 'income';
   categoryId?: string | null;
   iconId?: string | null;
-  /**
-   * Opens whatever is behind the row. Undefined leaves it inert — not dimming
-   * under a thumb, and not announced as a button by VoiceOver.
-   */
+  /** Opens whatever is behind the row. Undefined leaves it inert: no dimming, not a button. */
   onPress?: () => void;
 };
 
-/**
- * One line in the day's transaction list.
- *
- * Uses the same brand mark as the receipts and subscriptions lists rather than
- * a category glyph — the merchant's own logo is what people recognise, and it
- * keeps every list in the app reading the same way.
- */
+/** One line in the day's transaction list, with the same brand mark as the other lists. */
 export function TransactionRow({
   label,
   amount,
@@ -58,9 +49,8 @@ export function TransactionRow({
       {kind === 'bill' ? (
         <BillMark categoryId={categoryId} iconId={iconId} domain={domain} name={label} size={40} />
       ) : kind === 'payment' || kind === 'income' ? (
-        // Neither is a purchase from anyone, so neither has a logo. A monogram
-        // of the word "Payment" reads as a logo that failed to load; an arrow
-        // says what actually happened — money came in.
+        // Neither is a purchase from anyone, so neither has a logo: a monogram of "Payment" reads
+        // as a failed logo, an arrow says money came in.
         <View className="h-10 w-10 items-center justify-center rounded-full bg-ink/5">
           <ArrowDownLeft size={18} color={colors.body} strokeWidth={1.8} />
         </View>

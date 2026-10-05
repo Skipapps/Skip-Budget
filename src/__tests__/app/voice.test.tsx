@@ -10,11 +10,9 @@ import { parseVoice } from '@/lib/voice';
 import { readVoiceDraft } from '@/lib/voice-draft';
 
 /**
- * "Record a transaction": hold the mic, talk, let go.
- *
- * The speech hook is replaced by a fake whose status the test moves, the same
- * statuses Dilip's hook publishes. The parser is a spy, so what is asserted is
- * what the page hands it, not how well it parses.
+ * "Record a transaction": hold the mic, talk, let go. The speech hook is replaced by a fake whose
+ * status the test moves. The parser is a spy, so what is asserted is what the page hands it, not
+ * how well it parses.
  */
 
 // Reanimated's worklets need the native runtime, which Jest does not have.
@@ -114,8 +112,6 @@ jest.mock('@/lib/voice', () => ({
   voiceVocabulary: jest.fn((_directory: unknown, own: string[]) => own),
 }));
 
-// --- A speech hook the test drives -------------------------------------------
-
 type FakeState = {
   status: 'idle' | 'asking' | 'listening' | 'denied' | 'unavailable' | 'error';
   interim: string;
@@ -204,8 +200,6 @@ async function press(screen: Screen, label: string) {
 
 const HINTS = VOICE_EXAMPLES.map((example) => sentenceText(example.parts));
 
-// --- The phone around the page -------------------------------------------------
-
 let mockScreenReader = false;
 let mockAppState: ((state: AppStateStatus) => void)[] = [];
 let mockFinished: (() => void)[] = [];
@@ -264,8 +258,8 @@ describe('/voice — hold to talk', () => {
       expect(screen.getByText(hint).props.className).toContain('text-ink/40');
     });
 
-    // Nothing above the hints until the mic is held: "Listening…" belongs to
-    // the hold, not to the page (Founder, 2026-10-03).
+    // Nothing above the hints until the mic is held: "Listening…" belongs to the hold, not to the
+    // page.
     expect(screen.queryByText('Listening…', { includeHiddenElements: true })).toBeNull();
     expect(screen.getByText('Hold to talk', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByLabelText('Record').props.accessibilityHint).toBe(
@@ -336,10 +330,8 @@ describe('/voice — hold to talk', () => {
 
     expect(router.push).not.toHaveBeenCalled();
     expect(screen.getByText('Looks like more than one. Add them one at a time.')).toBeTruthy();
-    // What was heard stays on screen, in full ink.
     expect(screen.getByText(said).props.className).not.toContain('text-ink/20');
     expect(warn).toHaveBeenCalledTimes(1);
-    // Back to idle: hints, and a mic ready for the next hold.
     HINTS.forEach((hint) => expect(screen.getByText(hint)).toBeTruthy());
     expect(screen.getByText('Hold to talk', { includeHiddenElements: true })).toBeTruthy();
 
@@ -357,7 +349,6 @@ describe('/voice — hold to talk', () => {
 
     expect(mockStop).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Hold the button while you talk.')).toBeTruthy();
-    // A status line replaces the placeholder.
     expect(screen.queryByText('Listening…', { includeHiddenElements: true })).toBeNull();
     expect(warn).toHaveBeenCalledTimes(1);
     // The hook ends it quietly as idle: still not a second outcome.
@@ -388,7 +379,6 @@ describe('/voice — hold to talk', () => {
 
     expect(router.push).toHaveBeenCalledTimes(1);
     expect(warn).not.toHaveBeenCalled();
-    // Letting go afterwards changes nothing.
     await onMic(screen, 'pressOut');
     expect(router.push).toHaveBeenCalledTimes(1);
   });

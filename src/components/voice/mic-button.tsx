@@ -17,7 +17,6 @@ type MicButtonProps = {
   held: boolean;
   /** The microphone is actually open: the ring follows `level`. */
   live: boolean;
-  /** Microphone level, 0–1. */
   level: number;
   /**
    * VoiceOver is on. Holding a control is hard with it, so a double-tap
@@ -32,12 +31,9 @@ type MicButtonProps = {
 /**
  * The big round mic: hold to talk, let go when done.
  *
- * Sizes are arbitrary pixel values on purpose. NativeWind's rem is 14 on
- * native, so the spacing scale would draw it an eighth smaller than meant; 92pt
- * is what the Founder asked to see on the phone.
- *
- * A thumb drifts while someone talks, so the press survives moving well off
- * the button; only lifting the finger ends it.
+ * Sizes are arbitrary pixel values on purpose: NativeWind's rem is 14 on native, so the spacing
+ * scale would draw it an eighth smaller than meant. A thumb drifts while someone talks, so the
+ * press survives moving well off the button; only lifting the finger ends it.
  */
 export function MicButton({
   held,
@@ -50,9 +46,8 @@ export function MicButton({
 }: MicButtonProps) {
   const { colors, scheme } = useTheme();
   const reduced = useReducedMotion();
-  // On a dark page the accent can sit too close to the surface to have an
-  // edge (plum, navy), and a shadow does not show on near-black: a hairline
-  // ring, the same rule as the Home Voice button.
+  // On a dark page the accent can sit too close to the surface to have an edge, and a shadow does
+  // not show on near-black: a hairline ring, the same rule as the Home Voice button.
   const ringed = scheme === 'dark' && contrast(colors.control, colors.surface) < 3;
 
   const grow = useSharedValue(1);

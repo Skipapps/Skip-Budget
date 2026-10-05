@@ -9,17 +9,10 @@ type DateSelectorProps = {
   onPrevious?: () => void;
   onNext?: () => void;
   onPickDate?: () => void;
-  /**
-   * Stops the stepper going past today.
-   *
-   * The dashboard looks back over a week that has happened, so there is no
-   * day after today to step onto — the week ahead is already on screen under
-   * its own heading.
-   */
+  /** Stops the stepper going past today: there is no day after today to step onto. */
   atLatest?: boolean;
 };
 
-/** Day stepper for the transaction list below it. */
 export function DateSelector({
   weekday,
   date,

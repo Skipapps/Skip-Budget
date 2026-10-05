@@ -127,7 +127,6 @@ describe('parseLast4', () => {
   });
 
   it('refuses a bare four-digit run', () => {
-    // A store number is not a card, and a wrong card is worse than none.
     expect(parseLast4('STORE 4021\nTOTAL 7.20')).toBeUndefined();
   });
 });
@@ -175,18 +174,13 @@ describe('parseReceipt', () => {
   });
 });
 
-/* ------------------------------------------------------------------ *
- * Layout-aware parsing
- * ------------------------------------------------------------------ */
-
-/** Builds a positioned line; only the fields a test cares about are given. */
 function line(text: string, y: number, options: Partial<ParsedLine> = {}): ParsedLine {
   return { text, x: 0.05, y, width: 0.4, height: 0.02, ...options };
 }
 
 describe('parseMerchantFromLines', () => {
   it('takes the largest line at the top, not the first one', () => {
-    // A slogan is printed above the name on plenty of receipts.
+    // A slogan is printed above the name on many receipts.
     const lines = [
       line('Welcome to', 0.02),
       line('LOBLAWS', 0.06, { height: 0.05 }),
@@ -220,7 +214,7 @@ describe('parseMerchantFromLines', () => {
 
 describe('parseTotalFromLines', () => {
   it('pairs the label with the money on its own row', () => {
-    // The two-column case: reading order would hand back the subtotal.
+    // Two-column layout: reading order would hand back the subtotal.
     const lines = [
       line('SUBTOTAL', 0.6),
       line('6.91', 0.6, { x: 0.7 }),

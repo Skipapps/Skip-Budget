@@ -12,11 +12,8 @@ const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
 /**
- * Apple runs natively through the system sheet rather than a browser.
- *
- * Apple requires native Sign in with Apple on iOS for any app offering other
- * social logins, and it is the better experience anyway — Face ID, no redirect.
- * The identity token it returns is handed straight to Supabase.
+ * Native Sign in with Apple, which iOS requires of an app offering other social logins. The
+ * identity token goes straight to Supabase.
  */
 export async function signInWithApple(): Promise<OAuthResult> {
   if (Platform.OS !== 'ios') {
@@ -53,8 +50,8 @@ export async function signInWithApple(): Promise<OAuthResult> {
       return { error: null, cancelled: true };
     }
 
-    // Apple reports "unknown" when the device has no Apple ID signed in —
-    // by far the most common cause, and one the person can fix.
+    // Apple reports "unknown" when no Apple ID is signed in on the device, by far the most common
+    // cause.
     if (code === 'ERR_REQUEST_UNKNOWN') {
       return { error: 'Sign in to an Apple ID on this device first, then try again.' };
     }
@@ -64,13 +61,9 @@ export async function signInWithApple(): Promise<OAuthResult> {
 }
 
 /**
- * Google uses its own sheet on iOS and the system browser everywhere else.
- *
- * The browser route works, but iOS fronts it with a system prompt naming the
- * site it is about to open — which is the Supabase project URL, a string no
- * user recognises as ours. Talking to Google's SDK directly keeps Supabase out
- * of the flow: the identity token comes back from the sheet and goes to
- * signInWithIdToken, exactly the way Apple's does above.
+ * Google uses its own sheet on iOS and the system browser elsewhere. The browser route makes iOS
+ * prompt with the Supabase project URL, which no user recognises as ours; the SDK keeps Supabase
+ * out of the flow and hands the identity token to signInWithIdToken, as Apple's does.
  */
 export async function signInWithGoogle(): Promise<OAuthResult> {
   if (Platform.OS === 'ios' && GOOGLE_IOS_CLIENT_ID) {
@@ -80,9 +73,8 @@ export async function signInWithGoogle(): Promise<OAuthResult> {
 }
 
 /**
- * The SDK is imported lazily because its native module only exists in a build
- * that included it — web and Expo Go must still be able to load this file and
- * fall through to the browser flow.
+ * The SDK is imported lazily: its native module only exists in a build that included it, and web
+ * and Expo Go must still load this file and fall through to the browser flow.
  */
 async function signInWithGoogleNatively(iosClientId: string): Promise<OAuthResult> {
   const { GoogleSignin, isErrorWithCode, statusCodes } =
@@ -123,8 +115,8 @@ async function signInWithGoogleNatively(iosClientId: string): Promise<OAuthResul
 }
 
 /**
- * With PKCE the redirect carries a one-time code, which is exchanged for a
- * session here — the tokens never travel in a URL.
+ * With PKCE the redirect carries a one-time code, exchanged here for a session; tokens never travel
+ * in a URL.
  */
 async function signInWithGoogleInBrowser(): Promise<OAuthResult> {
   const redirectTo = Linking.createURL('auth-callback');

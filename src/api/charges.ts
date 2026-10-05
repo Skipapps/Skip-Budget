@@ -6,18 +6,13 @@ import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
 /**
- * Writing down what the plans have charged.
+ * Writing down what the plans have charged. A charge is one time a bill actually landed, with its
+ * own label, amount and source copied at that moment, so correcting a bill later leaves past
+ * charges alone.
  *
- * A bill describes what repeats. A charge is one time it actually landed, with
- * its own label, amount and source copied at that moment — so correcting a bill
- * next month leaves what already went out alone.
- *
- * This runs on the client rather than on a schedule, and that is a deliberate
- * first step rather than the finished shape: it means recording works today,
- * without a server, and every charge is written by someone holding the phone.
- * What it cannot do is notice anything while the app is closed, which is why
- * the reminder and "it went out" pushes need a scheduled function of their own.
- * When that lands it writes the same rows against the same constraints.
+ * Runs on the client, so it cannot notice anything while the app is closed; the reminder and "it
+ * went out" pushes need a scheduled function, which would write the same rows against the same
+ * constraints.
  */
 
 export type ChargeRow = {
@@ -68,7 +63,6 @@ type NewCharge = {
   bank_account_id: string | null;
 };
 
-/** A plan of either kind, flattened to the fields recording actually needs. */
 type Plan = ChargeablePlan & {
   label: string;
   amount: number;
@@ -78,11 +72,8 @@ type Plan = ChargeablePlan & {
 };
 
 /**
- * Records every occurrence that has come due and is not written down yet.
- *
- * Returns how many rows it added. Safe to call as often as you like: what is
- * already recorded is read first and skipped, and the unique indexes behind it
- * catch anything that slips through two runs racing each other.
+ * Records every occurrence that has come due and is not written down yet; returns how many rows it
+ * added. Safe to repeat: recorded dates are skipped and the unique indexes catch two runs racing.
  */
 export async function recordDueCharges(userId: string, today: string): Promise<number> {
   const [bills, subscriptions, existing] = await Promise.all([
@@ -102,13 +93,10 @@ export async function recordDueCharges(userId: string, today: string): Promise<n
 
   if (bills.error || subscriptions.error || existing.error) return 0;
 
-  // Grouped once, so each plan is a set lookup rather than a scan of every
-  // charge the user has ever had. Seven years of a busy account is thousands
-  // of rows, and this runs on every launch.
+  // Grouped once so each plan is a set lookup, not a scan of the whole history; this runs on every
+  // launch.
   const recorded = new Map<string, Set<string>>();
   for (const row of existing.data ?? []) {
-    // Keyed by the raw column here, not by the ledger's name for the plan:
-    // this side is matching rows up with the table they came from.
     const planId = (row.bill_id ?? row.subscription_id) as string;
     const dates = recorded.get(planId) ?? new Set<string>();
     dates.add(row.charged_on as string);
@@ -138,8 +126,7 @@ export async function recordDueCharges(userId: string, today: string): Promise<n
       nextDate: row.next_renewal_on as string | null,
       startsOn: row.started_on as string | null,
       createdAt: row.created_at as string | null,
-      // A subscription runs until it is switched off, and switching it off
-      // sets active = false rather than an end date. Nothing to bound it with.
+      // Switching a subscription off sets active = false, not an end date, so nothing bounds it.
       endsOn: null,
       cardId: (row.card_id as string | null) ?? null,
       accountId: (row.bank_account_id as string | null) ?? null,
@@ -165,9 +152,8 @@ export async function recordDueCharges(userId: string, today: string): Promise<n
 
   if (rows.length === 0) return 0;
 
-  // Duplicates are the expected failure here, not an exceptional one: two
-  // launches at once both see the same gap. The index refuses the second,
-  // which is the outcome we want, so it is ignored rather than reported.
+  // Duplicates are expected (two launches at once see the same gap); the unique index refuses the
+  // second, so they are ignored rather than reported.
   const { error } = await supabase
     .from('charges')
     .upsert(rows as never, { ignoreDuplicates: true });

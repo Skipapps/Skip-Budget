@@ -54,8 +54,7 @@ export default function BillPlansScreen() {
         id: row.id,
         name: row.name,
         amount: -row.amount,
-        // Next due, not this month's date: this page is the schedule itself,
-        // and what it has to answer is "when does this land again".
+        // Next due, not this month's date: this page is the schedule itself.
         dueDate: row.next_due_on ?? '',
         domain: row.brands?.domain ?? null,
         recurrence: row.recurrence,
@@ -81,7 +80,6 @@ export default function BillPlansScreen() {
     });
   }, [bills, queryText, filters]);
 
-  // Reflects what is on screen, so it always agrees with the rows below it.
   const total = visible.reduce((sum, bill) => sum + bill.amount, 0);
 
   // Soonest first: a bill list is about what is coming, not what has gone.

@@ -3,7 +3,6 @@ import { contrast } from '@/lib/tone';
 import { CARD_COLORS } from '@/theme/card-colors';
 import { colors } from '@/theme/colors';
 
-/** What a caller does with the answer. */
 const foreground = (background: string) => (isLightColor(background) ? colors.ink : '#FFFFFF');
 
 describe('isLightColor', () => {
@@ -24,8 +23,7 @@ describe('isLightColor', () => {
   });
 
   it('clears the large-text bar on every palette colour', () => {
-    // The bug this guards: coral and violet both took white type on a
-    // luminance threshold, landing at 2.3:1 and 3.4:1 respectively.
+    // A luminance threshold put white on coral (2.3:1) and violet (3.4:1).
     for (const card of CARD_COLORS) {
       expect(contrast(foreground(card.value), card.value)).toBeGreaterThanOrEqual(3);
     }

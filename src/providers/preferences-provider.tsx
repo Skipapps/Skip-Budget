@@ -12,12 +12,8 @@ import {
 import { setHapticsEnabled } from '@/lib/haptics';
 
 /**
- * The switches in Settings that are about this phone rather than this account.
- *
- * Haptics and the app lock both describe the device someone is holding — a
- * shared iPad should not inherit the Face ID lock from the phone, and a phone
- * with the taptic engine turned off system-wide has nothing to sync. So they
- * live in local storage beside the theme rather than on the profile.
+ * Switches that describe this phone, not the account (a shared iPad should not inherit the Face ID
+ * lock), so they live in local storage beside the theme rather than on the profile.
  */
 
 const HAPTICS_KEY = 'skip.prefs.haptics';

@@ -11,13 +11,7 @@ type GroupIconPickerProps = {
   onChange: (iconId: string) => void;
 };
 
-/**
- * The whole glyph set, for naming a group by what it is.
- *
- * Wider than the bill picker on purpose: a bill is filed under a category that
- * already implies its icon, while a group is whatever somebody says it is — a
- * flat, a holiday, a car, a dog.
- */
+/** The whole glyph set, for naming a group by what it is (wider than the bill picker). */
 export function GroupIconPicker({ value, onChange }: GroupIconPickerProps) {
   const colors = useColors();
 

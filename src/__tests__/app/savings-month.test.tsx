@@ -4,17 +4,12 @@ import SavingsMonthScreen from '@/app/savings-month';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * Correcting a month that arrives a moment after the screen does.
+ * Correcting a month whose row arrives after the screen (cold cache, deep link). The correction and
+ * note are `useState` initial values, read once, so they must be seeded when the row lands or Save
+ * would write an empty amount over the figure.
  *
- * The correction and the note are `useState` initial values, and an initial
- * value is read once. Reached on a cold cache — a deep link, or a cold start
- * onto this route — the row lands after the first render, so the screen used
- * to open with an empty amount on a month that already carried one. Saving
- * from there would have written that emptiness back over the figure.
- *
- * The other two cases are about what the screen says while it does not know:
- * "that month is not on your savings" is a fact about the account, and both a
- * still-running and a failed read used to be answered with it.
+ * While the read is running or has failed the screen must not claim "that month is not on your
+ * savings", which is a fact about the account.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -78,13 +73,11 @@ describe('A month on the savings list', () => {
     mockState = { data: [], isLoading: true, isError: false };
     const view = await render(<SavingsMonthScreen />);
 
-    // Nothing about the month is claimed while it is still being read.
     expect(view.queryByText('That month is not on your savings.')).toBeNull();
 
     mockState = { data: [mockRow], isLoading: false, isError: false };
     await view.rerender(<SavingsMonthScreen />);
 
-    // The saved correction, not an empty field that would overwrite it.
     expect(view.getByText('$47.50')).toBeTruthy();
     expect(view.getByDisplayValue('Paid the plumber in cash')).toBeTruthy();
   });

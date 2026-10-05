@@ -14,12 +14,8 @@ import { useColors } from '@/providers/theme-provider';
 
 type StepFlowProps = {
   title: string;
-  /**
-   * What the close button asks before it throws the flow away — "Cancel
-   * adding this bill?", "Cancel editing this receipt?".
-   */
+  /** What the close button asks before it throws the flow away, e.g. "Cancel adding this bill?". */
   closePrompt: string;
-  /** How many dots. One per step. */
   steps: number;
   /** Zero-based. */
   current: number;
@@ -27,22 +23,17 @@ type StepFlowProps = {
   onBack: () => void;
   /** The muted line the step opens with, e.g. "How much did you spend?". */
   question?: string;
-  /** Sits between the dots and the question — the receipt scan pills live here. */
+  /** Sits between the dots and the question (the receipt scan pills). */
   headerSlot?: ReactNode;
   primaryLabel: string;
   primaryDisabled?: boolean;
   onPrimary: () => void;
-  /** Save failures and the like, above the button. */
   error?: string | null;
-  /** Extra action under the primary button — the Delete row when editing. */
+  /** Extra action under the primary button, e.g. the Delete row when editing. */
   footerSlot?: ReactNode;
   /**
-   * On by default, including the keypad step. The pad's own type never scales,
-   * so the step normally fits exactly and does not scroll — but the question
-   * line above it does scale, and on a 4.7" screen at the largest type that is
-   * the difference between a Continue button you can reach and one clipped off
-   * the bottom. A page that bounces is a smaller price than a page that hides
-   * its only action.
+   * On by default, including the keypad step: the question line scales with type size, and on a 4.7"
+   * screen at the largest type a non-scrolling step clips the Continue button off the bottom.
    */
   scrollable?: boolean;
   avoidKeyboard?: boolean;
@@ -50,12 +41,8 @@ type StepFlowProps = {
 };
 
 /**
- * The shell every stepped add flow wears.
- *
- * Chrome only: it holds no form state, knows no mutation and takes the current
- * step as a prop. The steps are views over one piece of state held by the
- * screen, never separate routes — which is what lets Back keep everything
- * typed so far instead of unwinding it.
+ * The shell every stepped add flow wears. Chrome only: no form state, no mutation. Steps are views
+ * over one piece of state held by the screen, never separate routes, so Back keeps everything typed.
  */
 export function StepFlow({
   title,
@@ -77,28 +64,20 @@ export function StepFlow({
   const questionRef = useRef<ComponentRef<typeof Text>>(null);
   const titleRef = useRef<ComponentRef<typeof Text>>(null);
 
-  // On a step change VoiceOver would otherwise keep focus where the Continue
-  // button used to be — on a control that has just been replaced. Moving it to
-  // the question means the step announces what it is asking for; a step with
-  // no question line (the details steps, which have the most to announce)
-  // falls back to the title so focus still leaves the old button.
-  //
-  // `sendAccessibilityEvent`, not `setAccessibilityFocus`: the latter is
-  // deprecated and routes through the pre-Fabric renderer, so with the New
-  // Architecture on it moves nothing at all.
+  // On a step change VoiceOver would keep focus on the replaced Continue button. Move it to the
+  // question, or the title on steps without one.
+  // `sendAccessibilityEvent`, not `setAccessibilityFocus`: the latter is deprecated and routes through
+  // the pre-Fabric renderer, so with the New Architecture on it moves nothing.
   useEffect(() => {
     const target = questionRef.current ?? titleRef.current;
     if (target) AccessibilityInfo.sendAccessibilityEvent(target, 'focus');
   }, [current, question]);
 
-  // The steps are views over one piece of state, so leaving the route throws
-  // away everything typed so far. On any step but the first the edge swipe is
-  // turned off and the hardware back steps back instead — both of them then
-  // mean what the chevron beside them means.
+  // Leaving the route throws away everything typed, so past step 0 the edge swipe is off and
+  // hardware back steps back instead, matching the chevron.
   const screenOptions = useMemo(() => ({ gestureEnabled: current === 0 }), [current]);
 
-  // Read through a ref so a screen passing an inline arrow — all of them do —
-  // does not resubscribe the listener on every keystroke.
+  // Read through a ref so an inline `onBack` does not resubscribe the listener on every keystroke.
   const onBackRef = useRef(onBack);
   useEffect(() => {
     onBackRef.current = onBack;
@@ -119,8 +98,7 @@ export function StepFlow({
     <Screen
       scrollable={scrollable}
       avoidKeyboard={avoidKeyboard}
-      // Pinned: back, close and where you are stay put while a long step
-      // scrolls under them, instead of leaving with the first swipe.
+      // Pinned: back, close and progress stay put while a long step scrolls.
       header={
         <View className="w-full pb-2">
           <FlowHeader title={title} onBack={onBack} closePrompt={closePrompt} titleRef={titleRef} />
@@ -167,13 +145,9 @@ export function StepFlow({
 }
 
 /**
- * Back on the left, close on the right, the flow's name between them.
- *
- * Back steps back; close leaves the whole flow, from any step, after asking —
- * everything typed so far is thrown away, and a stray tap in the corner should
- * not be able to do that. Exported for the screens that open a flow before
- * its steps begin, like the bill category chooser, and for the voice pages,
- * which are separate routes wearing the same chrome.
+ * Back on the left, close on the right, the flow's name between them. Close leaves the whole flow
+ * from any step, after asking. Exported for screens that open a flow before its steps begin and for
+ * the voice pages (separate routes wearing the same chrome).
  */
 export function FlowHeader({
   title,
@@ -184,11 +158,7 @@ export function FlowHeader({
 }: {
   title: string;
   onBack: () => void;
-  /**
-   * What close asks before it throws the flow away. Without one there is no
-   * close at all: a one-field page has nothing to throw away that back does
-   * not already discard.
-   */
+  /** What close asks before it throws the flow away. Without one there is no close button. */
   closePrompt?: string;
   /** Where close goes once confirmed. Defaults to popping this screen. */
   onClose?: () => void;
@@ -222,8 +192,7 @@ export function FlowHeader({
             accessibilityHint={closePrompt}
             onPress={() => void close()}
             hitSlop={8}
-            // Mirrors the back chevron: pulled 8pt right so the cross, not its
-            // touch box, lines up with the page's right edge.
+            // Pulled 8pt right so the cross, not its touch box, lines up with the page edge.
             className="-mr-2 h-[44px] w-[44px] items-center justify-center rounded-full active:bg-ink/5"
           >
             <X size={22} color={colors.ink} strokeWidth={2} />
@@ -234,12 +203,7 @@ export function FlowHeader({
   );
 }
 
-/**
- * Where you are, as one wide pill among dots.
- *
- * Completed and upcoming steps look the same on purpose: the pill alone says
- * where you are, and two different inactive treatments is a code nobody reads.
- */
+/** Where you are, as one wide pill among dots. Completed and upcoming steps look the same on purpose. */
 function StepIndicator({ steps, current }: { steps: number; current: number }) {
   return (
     <View

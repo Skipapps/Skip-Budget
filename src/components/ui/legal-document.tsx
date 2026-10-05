@@ -3,16 +3,6 @@ import { Text, View } from 'react-native';
 import { Screen } from '@/components/ui/screen';
 import { Title } from '@/components/ui/typography';
 
-/**
- * The house style for a document somebody has to actually read.
- *
- * Legal copy fails on phones for layout reasons more than legal ones: solid
- * blocks of justified small print, no hierarchy, nothing to scan. Numbered
- * sections, real headings and a line length that stops well short of the
- * screen edge cost nothing and are the difference between a policy that is
- * published and one that is read.
- */
-
 export type Block =
   | { kind: 'text'; text: string }
   | { kind: 'bullets'; items: string[] }
@@ -25,7 +15,7 @@ export type Section = {
 
 type LegalDocumentProps = {
   title: string;
-  /** Shown under the title. The date the wording last changed. */
+  /** The date the wording last changed. */
   updated: string;
   summary: string;
   sections: Section[];

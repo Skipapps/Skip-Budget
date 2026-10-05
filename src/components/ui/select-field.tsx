@@ -15,19 +15,12 @@ type SelectFieldProps = {
   /** When set, the icon becomes its own control instead of part of the row. */
   onIconPress?: () => void;
   iconAccessibilityLabel?: string;
-  /**
-   * `field` is the bordered box that matches a TextField. `pill` is the tonal
-   * round-ended one used inside the stepped add flows — correct there because
-   * a select always opens something, which is exactly what a pill promises.
-   */
+  /** `field` is the bordered box matching a TextField; `pill` is the tonal round-ended one used in the stepped add flows. */
   variant?: 'field' | 'pill';
   className?: string;
 };
 
-/**
- * Looks like a TextField but opens a picker instead of the keyboard. Used where
- * free typing is worse than choosing — dates and money.
- */
+/** Looks like a TextField but opens a picker instead of the keyboard. */
 export function SelectField({
   label,
   value,

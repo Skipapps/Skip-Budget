@@ -6,24 +6,21 @@ import { withTap } from '@/lib/press';
 import { useColors } from '@/providers/theme-provider';
 
 type BackButtonProps = {
-  /** Defaults to popping the navigation stack. */
   onPress?: () => void;
   /** The stepped flows say "Back": there it steps back, not out. */
   accessibilityLabel?: string;
 };
 
 /**
- * Pops the stack — unless there is no stack. A screen opened cold from a
- * deep link is the first and only entry, and back() from there is a dead
- * button (and a red box in development). Home is where every such link's
- * screen hangs off, so that is where its chevron leads.
+ * Pops the stack, unless there is none: a screen opened cold from a deep link is the only entry, and
+ * back() there is a dead button (and a red box in development). Falls back to home.
  */
 export function goBack(): void {
   if (router.canGoBack()) router.back();
   else router.replace('/home');
 }
 
-/** Top-left chevron. Sized to a 44pt touch target per Apple's minimum. */
+/** Top-left chevron, a 44pt touch target (Apple's minimum). */
 export function BackButton({ onPress, accessibilityLabel = 'Go back' }: BackButtonProps) {
   const colors = useColors();
   return (
@@ -32,8 +29,7 @@ export function BackButton({ onPress, accessibilityLabel = 'Go back' }: BackButt
       accessibilityLabel={accessibilityLabel}
       hitSlop={8}
       onPress={withTap(onPress ?? goBack)}
-      // Pulled 8pt left so the chevron's stroke, not its touch box, lines up
-      // with the page's left edge.
+      // Pulled 8pt left so the chevron's stroke, not its touch box, lines up with the page edge.
       className="-ml-2 h-[44px] w-[44px] items-center justify-center rounded-full active:bg-ink/5"
     >
       <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">

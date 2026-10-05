@@ -14,39 +14,26 @@ import { Pressable, Text, View } from 'react-native';
 import { useColors } from '@/providers/theme-provider';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
-/** "August 2026" — the month is the identity of a row, so it is spelled out. */
+/** "August 2026". */
 function monthName(month: string): string {
   const date = new Date(`${month}T00:00:00`);
   return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
 
 /**
- * What each month left behind, once it was over.
- *
- * The home screen's "Left this month" is a forecast — income minus the bills
- * due — and it answers "can I afford this". This answers the other question:
- * what did I actually keep. A month only appears here once it has finished,
- * because until then the figure is still being spent.
- *
- * Every month says where its number came from. A savings total nobody can
- * account for is one nobody trusts, and "you saved $840" means nothing next to
- * "$4,200 came in, $3,360 went out".
+ * What each month left behind, once it has finished. Unlike the home screen's "Left this month"
+ * forecast, this is what was actually kept.
  */
 export default function SavingsScreen() {
   const artwork = useArtwork();
   const { data: months = [], isLoading, isError, refetch } = useMonthlySavings();
   const { refresh, refreshing } = useRefreshAll();
 
-  // The corrected figure where there is one, and nothing at all from a month
-  // left out — so the total is what the person says they kept, not what the
-  // app guessed.
+  // `savedFor` takes the corrected figure where there is one and nothing from a month left out.
   const total = months.reduce((sum, month) => sum + savedFor(month), 0);
   const kept = months.filter((month) => savedFor(month) > 0).length;
 
-  // Oldest month at the top, the one that just finished at the bottom. The
-  // query hands them over newest-first and that is not this screen's to change,
-  // so the order a person reads is decided here. Neither figure above moves —
-  // a sum does not care which way round it was added.
+  // Oldest month at the top. The query returns newest-first, so the display order is set here.
   const rows = sortByDateAscending(
     months,
     (month) => month.month,
@@ -81,10 +68,6 @@ export default function SavingsScreen() {
 
       {months.length > 0 ? (
         <>
-          {/* The running total leads, because it is the reason anybody opens
-              this page. It can fall as well as rise — a month that was
-              overspent takes from it, which is the whole point of not
-              flooring a negative month at zero. */}
           <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
             <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
               Saved so far
@@ -120,15 +103,6 @@ export default function SavingsScreen() {
   );
 }
 
-/**
- * One month, and the arithmetic behind it.
- *
- * The sentence underneath is the point of the row — it is the difference
- * between a number somebody has to take on trust and one they can check. When
- * a month has been corrected it says so and gives the reason, because a figure
- * that disagrees with the app's own maths needs to explain itself more, not
- * less.
- */
 function MonthRow({ row, onPress }: { row: MonthlySavingRow; onPress: () => void }) {
   const colors = useColors();
 
@@ -164,8 +138,7 @@ function MonthRow({ row, onPress }: { row: MonthlySavingRow; onPress: () => void
             {name}
           </Text>
           <Text
-            // Money takes the money colours, never the accent: this column is
-            // the one place the sign has to be readable at a glance.
+            // Money colours, never the accent: the sign must read at a glance.
             className={
               excluded
                 ? 'font-poppins text-[14px] text-muted line-through'

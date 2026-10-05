@@ -4,17 +4,9 @@ import { router } from 'expo-router';
 import TransactionsScreen from '@/app/(tabs)/transactions';
 
 /**
- * Which day the Transactions list opens with, and what order its rows run in.
- *
- * The Founder's rule for this screen (2026-09-25): today at the top, time
- * running backwards below it — the newest movement is what the tab is opened
- * for. Day headings come from `periodBuckets` reversed; the rows inside each
- * heading come from a sort in the screen itself. Both are asserted here — and
- * the same-day id tiebreak is the one thing that must *not* have moved.
- *
- * The second half is where a row goes when it is pressed. Every row used to go
- * nowhere: the list rendered `LedgerRow` with no handler at all, so the whole
- * tab was inert.
+ * The Transactions list opens on today and runs time backwards. Day headings come from
+ * `periodBuckets` reversed; rows inside a day come from a sort in the screen, and the same-day id
+ * tiebreak must stay as it was. The second half asserts where a pressed row goes.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -42,8 +34,7 @@ jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn() },
 }));
 
-// One charge on the record, so the recorded half of the ledger — the rows
-// whose ids name the charge and not the plan — has something to resolve to.
+// Rows whose ids name the charge rather than the plan resolve through these.
 jest.mock('@/api/charges', () => ({
   useCharges: () => ({
     data: [
@@ -54,10 +45,8 @@ jest.mock('@/api/charges', () => ({
 }));
 
 /**
- * A Thursday, so the default "week" period covers Sunday 6th to Saturday 12th
- * and the range is cut off at today. Three rows land on the 10th, in the order
- * the ledger hands them over — the tiebreak inside a day is by id and must be
- * exactly what it was before the day order flipped.
+ * A Thursday, so the default "week" period covers Sunday 6th to Saturday 12th, cut off at today.
+ * Three rows share the 8th in the order the ledger hands them over; the in-day tiebreak is id.
  */
 const TODAY = '2026-09-10';
 const mockEntries = [
@@ -68,7 +57,6 @@ const mockEntries = [
   { id: 'receipt-e0', label: 'Greengrocer', amount: -2, date: '2026-09-07' },
 ].map((row) => ({ ...row, kind: 'receipt' as const, sourceId: 's1' }));
 
-/** One row of every kind the ledger can produce, all on the same day. */
 const routingEntries = [
   { id: 'receipt-r1', label: 'Bakery', amount: -6, date: TODAY, kind: 'receipt' as const },
   { id: 'bill-b1@2026-09-10', label: 'Rent', amount: -1030, date: TODAY, kind: 'bill' as const },
@@ -86,8 +74,7 @@ const routingEntries = [
     date: TODAY,
     kind: 'income' as const,
   },
-  // The two written down at the time: their ids name the charge, so they can
-  // only be resolved through the charges query.
+  // Their ids name the charge, so they resolve only through the charges query.
   { id: 'charge-c1', label: 'Rent in August', amount: -1030, date: TODAY, kind: 'bill' as const },
   {
     id: 'charge-c2',
@@ -96,7 +83,7 @@ const routingEntries = [
     date: TODAY,
     kind: 'subscription' as const,
   },
-  // A shape nothing produces today. It must open nothing rather than guess.
+  // An id shape nothing produces; it must open nothing rather than guess.
   { id: 'mystery-1', label: 'Unknown', amount: -1, date: TODAY, kind: 'bill' as const },
 ].map((row) => ({ ...row, sourceId: 's1' }));
 
@@ -124,7 +111,6 @@ describe('Transactions — day order', () => {
   it('runs the day headings backwards, starting on today', async () => {
     const { getAllByText } = await render(<TransactionsScreen />);
 
-    // Day buckets on the "week" period: one heading per day that has rows.
     const headings = getAllByText(/^(7 Sep 2026|8 Sep 2026|Today|Yesterday)$/).map(
       (node) => node.props.children,
     );
@@ -139,8 +125,7 @@ describe('Transactions — day order', () => {
       .map((node) => String(node.props.accessibilityLabel ?? ''))
       .filter((label) => label.includes('$'));
 
-    // Three rows share 8 September and keep their id tiebreak — e1, e2, e3 —
-    // which is the order they had when the days ran the other way.
+    // Three rows share 8 September and keep their id tiebreak: e1, e2, e3.
     expect(rows).toEqual([
       expect.stringContaining('Bakery'),
       expect.stringContaining('Chemist'),
@@ -152,14 +137,8 @@ describe('Transactions — day order', () => {
 });
 
 describe('Transactions — where a row opens', () => {
-  /**
-   * One render, every kind pressed in turn.
-   *
-   * Kept as a single mount on purpose: each of these used to be its own test
-   * and the suite went order-dependent — six mounts of a screen this size
-   * under fake timers left the last one with nothing queryable. What is being
-   * asserted is a mapping, and a mapping is one fact.
-   */
+  // One mount, every kind pressed in turn: separate mounts of this screen under fake timers made
+  // the suite order-dependent.
   it('opens each kind of row on the screen that edits it', async () => {
     mockLedgerEntries = routingEntries;
     const { getAllByRole, getByText } = await render(<TransactionsScreen />);
@@ -168,15 +147,11 @@ describe('Transactions — where a row opens', () => {
       .map((node) => String(node.props.accessibilityLabel ?? ''))
       .filter((label) => label.includes('$'));
 
-    // Six of the seven rows are buttons. The seventh — an id of a shape
-    // nothing produces today — opens nothing rather than guessing at a
-    // record, and is not offered as a button at all. It is still on screen
-    // and still readable.
+    // The seventh row opens nothing, so it is not a button, though still on screen and readable.
     expect(pressable).toHaveLength(6);
     expect(pressable.some((label) => label.startsWith('Unknown'))).toBe(false);
     expect(getByText('Unknown')).toBeTruthy();
 
-    /** The row whose accessibility label starts with `label`. */
     const row = (label: string) => {
       const found = getAllByRole('button').find((node) =>
         String(node.props.accessibilityLabel ?? '').startsWith(`${label},`),
@@ -189,9 +164,6 @@ describe('Transactions — where a row opens', () => {
     fireEvent.press(row('Rent'));
     fireEvent.press(row('Netflix'));
     fireEvent.press(row('Payday'));
-    // The two that were written down at the time. Their ids name the charge
-    // and not the plan, so these are the rows that can only be placed by
-    // going through the charges query.
     fireEvent.press(row('Rent in August'));
     fireEvent.press(row('Netflix in August'));
 

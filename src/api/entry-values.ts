@@ -1,22 +1,16 @@
 /**
- * What a new or edited receipt, bill or subscription is saved as.
+ * What a new or edited receipt, bill or subscription is saved as. Lifted out of the three add forms
+ * so the voice review page saves through the same rules: each builder is the form's own Save minus
+ * the writing, with the checks in the same order and the same words.
  *
- * Lifted out of the three add forms so the voice review page saves through
- * the same rules instead of a copy of them. Each builder is the form's own
- * Save, minus the writing: the checks in the same order with the same words,
- * then the exact values object. The forms call these, and
- * `src/__tests__/app/add-*-save.test.tsx` pins what they wrote before the move.
- *
- * Pure on purpose: no hooks, no Supabase, and nothing from
- * `@/data/bills-mock` (it pulls lucide icons into Jest). The caller hands in
- * what it already read: the payment sources, and for an edit the last charge
- * on record and where the plan counts from. A new item passes
+ * Pure on purpose: no hooks, no Supabase, and nothing from `@/data/bills-mock` (it pulls lucide
+ * icons into Jest). The caller hands in what it already read: the payment sources, and for an edit
+ * the last charge on record and where the plan counts from. A new item passes
  * `lastChargedOn: null, countsFrom: null`, which makes both floors no-ops.
  *
- * The amount check is exactly the forms' `Number.isFinite(v) && v > 0`, with
- * no rounding: the keypad already settles at two decimals, and anything
- * stricter here would change what the forms accept. Voice amounts are made
- * cent-exact where they arrive (`src/lib/voice-draft.ts`), not here.
+ * The amount check is exactly the forms' `Number.isFinite(v) && v > 0`, with no rounding: the
+ * keypad already settles at two decimals, and anything stricter would change what the forms
+ * accept. Voice amounts are made cent-exact where they arrive (`src/lib/voice-draft.ts`).
  */
 import type { BillValues, CaptureSource, ReceiptValues, SubscriptionValues } from '@/api/mutations';
 import type { BrandSelection } from '@/components/brands/brand-field';
@@ -26,10 +20,7 @@ import { toIsoDate } from '@/lib/date';
 /** A card or bank account, as `usePaymentSources()` lists it. */
 export type SourceRef = { id: string; kind: 'card' | 'account' };
 
-/**
- * Either the values to write, or the first thing wrong with the input: which
- * field, and the hint the form shows for it, word for word.
- */
+/** The values to write, or the first thing wrong: which field, and the form's hint for it. */
 export type Built<T, F extends string> =
   { ok: true; values: T } | { ok: false; field: F; message: string };
 
@@ -142,9 +133,8 @@ export function buildBillValues(
       amount,
       brand_id: input.issuer?.brandId ?? null,
       category_id: input.categoryId,
-      // Only a self-named bill has an icon of its own; the rest wear their
-      // category's. Saving the picker's untouched 'other' onto a Housing bill
-      // is what once put the Other glyph on every bill without a logo.
+      // Only a self-named bill has an icon of its own; the rest wear their category's. Saving the
+      // picker's untouched 'other' onto a Housing bill would put the Other glyph on it.
       icon_id: input.categoryId === 'other' ? input.iconId || null : null,
       recurrence: input.recurrence,
       next_due_on: start,
@@ -209,9 +199,8 @@ export function buildSubscriptionValues(
 }
 
 /**
- * The name a bill gets when nobody typed one: the company, else the category's
- * label, and nothing for Other (which asks for a name). This is what add-bill's
- * category step and company field fill in between them.
+ * The name a bill gets when nobody typed one: the company, else the category's label, and nothing
+ * for Other (which asks for a name).
  */
 export function defaultBillName(
   categoryId: string,

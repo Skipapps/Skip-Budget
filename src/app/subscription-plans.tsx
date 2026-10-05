@@ -73,8 +73,7 @@ export default function SubscriptionPlansScreen() {
     0,
   );
 
-  // By renewal date, soonest first — the next charge is the useful one.
-  // Cancelled plans still show, but contribute nothing to a group total.
+  // Soonest renewal first. Cancelled plans still show but add nothing to a group total.
   const groups = useMemo(
     () =>
       groupByDate(visible, (subscription) => subscription.next_renewal_on, {

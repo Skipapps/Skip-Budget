@@ -14,12 +14,8 @@ import { failureMessage } from '@/lib/failure';
 import { useColors } from '@/providers/theme-provider';
 
 /**
- * Adding somebody to a group, whether or not they use Skip.
- *
- * The second half is the one that makes the app usable. You add your flatmate
- * tonight and they install it on Thursday — so a member does not have to be an
- * account, and a name is enough to owe and be owed. When they do join, they
- * claim the name and every share already attached to it comes with them.
+ * Adds somebody to a group whether or not they use Skip: a member can be just a name, and when they
+ * join they claim it and keep every share already attached.
  */
 export default function AddMemberScreen() {
   const colors = useColors();
@@ -34,15 +30,7 @@ export default function AddMemberScreen() {
 
   const addMember = useAddGroupMember();
 
-  /**
-   * The way in for somebody who is not a friend yet.
-   *
-   * The group's own code, not a personal one: it puts them straight into this
-   * group rather than making them befriend you first and be added second. It
-   * works whether or not they already have Skip — the link is the same either
-   * way, and somebody without the app is the commonest case for a group that
-   * is short of people.
-   */
+  /** Shares the group's own code, not a personal one, so they join this group directly. */
   const handleInvite = async () => {
     if (!group?.invite_code) return;
     await Share.share({
@@ -84,8 +72,6 @@ export default function AddMemberScreen() {
         now and claim it later.
       </Subtitle>
 
-      {/* First, because it is the answer when the list below is empty — and
-          an empty list is exactly when somebody opens this page. */}
       <View className="mt-8 w-full">
         <FieldLabel className="mb-3">Invite a friend</FieldLabel>
         <Button

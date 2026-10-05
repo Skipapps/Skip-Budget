@@ -11,17 +11,10 @@ type InsightBannerProps = {
 };
 
 /**
- * Full-width dashboard card. Deliberately carries no figure — the list above
- * already reports numbers, and this points at the story behind them.
- *
- * Raised on a shadow with no border, like the tool cards beside it: it is
- * meant to be pressed, and an outline and a shadow together flatten each
- * other out.
- *
- * Only dresses itself as a link when it has somewhere to go. A chevron and a
- * button role on a banner that does nothing is a promise the screen cannot
- * keep: it reads as tappable, announces itself as tappable to a screen reader,
- * and then swallows the tap. Without a destination it is simply a card.
+ * Full-width dashboard card with no figure: the list above reports numbers, this points at the
+ * story behind them. Raised on a shadow with no border, like the tool cards (an outline and a
+ * shadow together flatten each other). It dresses as a link only when it has somewhere to go: a
+ * chevron and button role on a banner that does nothing is a promise the screen cannot keep.
  */
 export function InsightBanner({ pro = true, onPress }: InsightBannerProps) {
   const colors = useColors();
@@ -41,10 +34,6 @@ export function InsightBanner({ pro = true, onPress }: InsightBannerProps) {
         onPress ? 'active:opacity-60' : ''
       }`}
     >
-      {/* A 76pt drawing at 55% opacity was the biggest thing on the dashboard
-          and said nothing the two lines beside it did not. The glyph is the
-          same size as every other leading mark on the screen, so this reads as
-          a peer of the tool cards rather than an advert wedged between two. */}
       {/* The same accent circle as the "Where it goes" rows above. */}
       <View className="h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-accent/10">
         <TrendingUp size={20} color={colors.accentInk} strokeWidth={1.8} />
@@ -79,10 +68,8 @@ export function InsightBanner({ pro = true, onPress }: InsightBannerProps) {
         </View>
       )}
 
-      {/* A row child rather than an absolute corner pin, so the row's own
-          items-center does the vertical centring — and the chevron keeps its
-          distance from the text instead of overlapping it when the label wraps
-          to a second line at large type sizes. */}
+      {/* A row child rather than an absolute corner pin, so items-center centres it and it keeps
+          its distance from the text when the label wraps at large type. */}
       {onPress ? (
         <View className="shrink-0 pl-1">
           <ChevronRight size={18} color={colors.muted} strokeWidth={2} />

@@ -9,7 +9,6 @@ type EyeIconProps = {
   color?: string;
 };
 
-/** Eye / eye-with-slash toggle for password fields. */
 export function EyeIcon({ open, size = 22, color }: EyeIconProps) {
   const colors = useColors();
   // Defaulted here rather than in the signature: the fallback follows the

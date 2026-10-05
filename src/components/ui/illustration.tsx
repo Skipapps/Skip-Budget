@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn';
 type IllustrationProps = {
   /** An SVG imported as a component (see types/svg.d.ts). */
   source: FC<SvgProps>;
-  /** Artwork aspect ratio, width / height. All current art is square. */
+  /** Artwork aspect ratio, width / height. */
   aspectRatio?: number;
   /** Share of the available width to fill, 0–1. */
   widthRatio?: number;
@@ -16,11 +16,7 @@ type IllustrationProps = {
   className?: string;
 };
 
-/**
- * Renders artwork at a share of whatever width the parent gives it, capped by
- * maxWidth. Sizing is never absolute, so art cannot overflow a narrow screen —
- * height follows from aspectRatio, and the SVG's own viewBox keeps proportions.
- */
+/** Renders artwork at a share of the parent's width, capped by maxWidth, so it cannot overflow a narrow screen. */
 export function Illustration({
   source: Artwork,
   aspectRatio = 1,

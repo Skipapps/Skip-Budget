@@ -1,11 +1,6 @@
 import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
 
-/**
- * The ids here are written out by hand on purpose. They are the exact strings
- * `useLedger` builds — `receipt-<id>`, `<plan>-<id>@<date>`, `charge-<id>`,
- * `income-<id>@<date>` — so if one of those formats ever moves, this fails
- * rather than the rows quietly going dead again.
- */
+/** Ids are written out by hand: they are the exact strings `useLedger` builds, so a format change fails here. */
 
 describe('ledgerHref', () => {
   it('opens a receipt on its own record', () => {
@@ -56,8 +51,6 @@ describe('ledgerHref', () => {
   });
 
   it('keeps a record id that contains an @ whole', () => {
-    // Ids are uuids today, but the date is the suffix and the split has to be
-    // the last `@` for that to stay true of anything else.
     expect(ledgerHref({ id: 'bill-a@b@2026-09-12', kind: 'bill' })).toEqual({
       pathname: '/add-bill',
       params: { id: 'a@b' },

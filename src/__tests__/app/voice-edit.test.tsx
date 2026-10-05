@@ -6,9 +6,9 @@ import type { VoiceDraft } from '@/lib/voice';
 import { clearVoiceDraft, putVoiceDraft, readVoiceEntry, useVoiceSession } from '@/lib/voice-draft';
 
 /**
- * The one-field correction pages. Done writes to the review's working copy
- * and pops; back pops and writes nothing. Built from the add flows' own parts,
- * so these drive the real keypad, store search, calendar and category grid.
+ * The one-field correction pages. Done writes to the review's working copy and pops; back pops and
+ * writes nothing. Built from the add flows' own parts, so these drive the real keypad, store
+ * search, calendar and category grid.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));

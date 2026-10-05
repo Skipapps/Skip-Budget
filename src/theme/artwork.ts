@@ -36,31 +36,18 @@ import WelcomeHero from '@/assets/illustrations/welcome-hero.svg';
 import WelcomePrivacy from '@/assets/illustrations/welcome-privacy.svg';
 import WelcomeTrack from '@/assets/illustrations/welcome-track.svg';
 
-/**
- * The artwork, in both modes.
- *
- * Illustrations cannot be recoloured by a token the way the interface can:
- * they are drawn, not styled, and the light versions are drawn on white. On a
- * near-black page they read as bright rectangles pasted onto it. So dark mode
- * gets its own set — the same drawings, redrawn for the background they sit on.
- *
- * A few have no dark version and fall back to the light one. That is a
- * deliberate row in the table rather than a missing import, so it is obvious
- * which ones are still owed artwork.
- */
+/** Illustrations per colour scheme. A drawing with no dark variant reuses the light one. */
 
 type Pair = { light: FC<SvgProps>; dark: FC<SvgProps> };
 
 const ARTWORK = {
   insights: { light: Insights, dark: DarkInsights },
-  // Drawn once for both modes: the artwork sits on transparency and its
-  // palette was chosen to read on light and near-black pages alike.
+  // One drawing for both modes: it sits on transparency and its palette reads on light and dark.
   loginHero: { light: LoginHero, dark: LoginHero },
   welcomeHero: { light: WelcomeHero, dark: DarkWelcomeHero },
   welcomePrivacy: { light: WelcomePrivacy, dark: WelcomePrivacy },
   welcomeTrack: { light: WelcomeTrack, dark: WelcomeTrack },
 
-  // Single-mode drawings, like loginHero.
   tileLoanRepayment: { light: TileLoanRepayment, dark: TileLoanRepayment },
   tileMonthlyBills: { light: TileMonthlyBills, dark: TileMonthlyBills },
   tileReceipts: { light: TileReceipts, dark: TileReceipts },
@@ -77,19 +64,15 @@ const ARTWORK = {
   error: { light: StateError, dark: DarkStateError },
   noResults: { light: StateNoResults, dark: DarkStateNoResults },
 
-  // Still owed a dark version. The light drawing shows through until there is
-  // one, which is worse than a redraw and better than a hole in the screen.
+  // No dark version yet; the light drawing is reused.
   loanSchedule: { light: LoanSchedule, dark: LoanSchedule },
 } satisfies Record<string, Pair>;
 
 export type ArtworkName = keyof typeof ARTWORK;
 
 /**
- * Every illustration, already resolved for the mode in force.
- *
- * Returns the whole set rather than one drawing, because the tiles are held in
- * data as a list and a hook cannot be called per row. One call at the top of a
- * screen, then index it by name — including inside a map.
+ * Every illustration resolved for the mode in force. Returns the whole set because tiles live in
+ * data as a list and a hook cannot be called per row.
  */
 export function useArtwork(): Record<ArtworkName, FC<SvgProps>> {
   const { scheme } = useTheme();

@@ -36,8 +36,7 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
     let card = SkipCard(userInfo: content.userInfo) ?? SkipCard(title: content.title, body: content.body)
     model.card = card
 
-    // The buttons under the card. Set here rather than only in the registered
-    // category so "View" can name what it opens: a bill, a subscription, a card.
+    // Set here, not only in the registered category, so "View" can name what it opens.
     extensionContext?.notificationActions = [
       UNNotificationAction(
         identifier: "view",
@@ -53,8 +52,7 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
       ),
     ]
 
-    // The logo the service extension attached, or fetched now if it did not
-    // get the chance. A card without a brand draws its glyph natively instead.
+    // The logo the service extension attached, or fetched now if it did not get the chance.
     if card.logo != nil {
       if let attached = Self.attachedImage(content) {
         model.logo = attached
@@ -72,8 +70,7 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
     _ response: UNNotificationResponse,
     completionHandler completion: @escaping (UNNotificationContentExtensionResponseOption) -> Void
   ) {
-    // Everything but snooze belongs to the app: "View" opens the screen the
-    // notification was about (src/api/push.ts reads the route).
+    // Everything but snooze belongs to the app (src/api/push.ts reads the route).
     guard response.actionIdentifier == "snooze" else { return completion(.dismissAndForwardAction) }
     snooze(response.notification) { completion(.dismiss) }
   }
@@ -102,9 +99,8 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
     copy.sound = .default
     copy.categoryIdentifier = original.categoryIdentifier
     copy.threadIdentifier = original.threadIdentifier
-    // To expo-notifications a local notification's data is its whole userInfo
-    // (a remote one's is userInfo.body), so the payload moves up a level for
-    // the app to route the copy's tap the same way.
+    // To expo-notifications a local notification's data is its whole userInfo (a remote one's is
+    // userInfo.body), so the payload moves up a level for the app to route the copy's tap.
     copy.userInfo = (original.userInfo["body"] as? [AnyHashable: Any]) ?? original.userInfo
 
     let art = model.logo ?? model.card.map { SkipArt.glyphTile($0.fallbackGlyph) }

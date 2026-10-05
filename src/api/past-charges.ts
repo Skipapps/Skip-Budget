@@ -6,19 +6,11 @@ import { supabase } from '@/lib/supabase';
 import { useDialog } from '@/providers/dialog-provider';
 
 /**
- * Editing a bill or subscription that has already been charged.
- *
- * A charge copies its name, amount and card from the plan on the day it lands
- * and never reads them back — so correcting a plan leaves what already went
- * out alone, and the months behind an edit keep the figures they really had.
- * That is right for an electricity bill that costs a different amount every
- * month, and wrong for a rent typed as $1,030 when it was $1,100: the edit
- * saved and September still said $1,030.
- *
- * Only the person knows which of the two an edit is, so they are asked, and
- * only when the answer would change something: a plan with charges behind it,
- * and a change to one of the fields a charge copies. The due date is not one of
- * them — a charge's date is the day the money actually moved.
+ * Editing a bill or subscription that has already been charged. A charge copies its name, amount
+ * and card from the plan the day it lands and never reads them back, so months behind an edit keep
+ * their figures: right for a varying electricity bill, wrong for a mistyped rent. Only the person
+ * knows which, so they are asked, and only when it would change something: the plan has charges and
+ * a copied field changed. The due date is not copied; a charge's date is the day the money moved.
  */
 
 export type PastChargesScope = 'all' | 'upcoming';
@@ -39,11 +31,9 @@ const COLUMN: Record<Kind, 'bill_id' | 'subscription_id'> = {
 };
 
 /**
- * Rewrites every recorded charge of one plan to the plan's new values.
- *
- * An update, never a delete and re-record: the scheduler pushes a notice for
- * every charge it newly writes, and a correction must not arrive on somebody's
- * lock screen as a fresh batch of charges.
+ * Rewrites every recorded charge of one plan to its new values. An update, never a delete and
+ * re-record: the scheduler pushes a notice for every charge it newly writes, and a correction must
+ * not arrive as a fresh batch.
  */
 export function useRewritePastCharges() {
   const client = useQueryClient();
@@ -72,12 +62,8 @@ export function useRewritePastCharges() {
 }
 
 /**
- * The question, and the rewrite behind "Past and upcoming".
- *
- * `choose` resolves to the scope to save with, or null when the person backed
- * out — the form then stays open with nothing saved. When there is nothing to
- * ask about it resolves 'upcoming' without a dialog, which is exactly what a
- * save did before.
+ * The question behind "Past and upcoming". `choose` resolves to the scope to save with, or null
+ * when the person backed out; with nothing to ask it resolves 'upcoming' without a dialog.
  */
 export function usePastCharges(kind: Kind, planId: string | undefined) {
   const charges = useCharges();
@@ -132,9 +118,8 @@ export function usePastCharges(kind: Kind, planId: string | undefined) {
     apply,
     lastChargedOn,
     /**
-     * Whether an edit can be saved yet. `lastChargedOn` keeps a moved due date
-     * from charging a cycle twice, and it cannot do that from a read that has
-     * not landed — so an edit waits for it rather than guessing.
+     * Whether an edit can be saved yet. `lastChargedOn` stops a moved due date charging a cycle
+     * twice, so an edit waits for the read rather than guessing.
      */
     ready: !planId || charges.isSuccess,
     retry: () => void charges.refetch(),

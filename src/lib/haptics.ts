@@ -2,18 +2,11 @@ import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
 
 /**
- * The taps you feel.
+ * Fire from `onPress`, never `onPressIn`: `onPressIn` also fires for the finger about to scroll
+ * the list, so it would buzz on every scroll.
  *
- * Deliberately fired from `onPress` and never from `onPressIn`. A press event
- * only arrives when a touch went down and came back up on the same control,
- * which is exactly what "the user pressed this" means. `onPressIn` fires the
- * moment a finger lands — including the finger that is about to drag the list
- * away — so wiring it there buzzes on every scroll and turns a confirmation
- * into noise.
- *
- * The switch is read from a module flag rather than a hook, so a handler deep
- * inside a component can ask without every button growing a subscription. The
- * preferences provider owns the value and writes it here when it changes.
+ * The on/off switch is a module flag rather than a hook so a handler anywhere can ask without
+ * subscribing; the preferences provider owns the value and writes it here.
  */
 
 let enabled = true;
@@ -23,22 +16,17 @@ export function setHapticsEnabled(next: boolean) {
   enabled = next;
 }
 
-// Android's generic haptic is coarser than iOS's and lands closer to a buzz
-// than a tap. Kept to iOS rather than shipping something that feels broken.
+// Android's generic haptic is a buzz rather than a tap, so haptics are iOS-only.
 const supported = Platform.OS === 'ios';
 
 function fire(run: () => Promise<void>) {
   if (!enabled || !supported) return;
   try {
-    // A device with no haptic engine rejects rather than throwing synchronously,
-    // and a missed tap is not worth an unhandled rejection.
+    // A device with no haptic engine rejects rather than throwing.
     run().catch(() => {});
   } catch {
-    // The synchronous case, which the `.catch` above cannot reach: a native
-    // module that is missing from the build throws on the call itself. These
-    // run *before* the thing they accompany — `withTap` buzzes and then
-    // navigates — so letting one escape would turn a missing haptic engine
-    // into a row that does nothing when pressed.
+    // A native module missing from the build throws on the call itself. Haptics run before the
+    // action they accompany (`withTap`), so letting this escape would make the press do nothing.
   }
 }
 

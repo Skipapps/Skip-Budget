@@ -4,12 +4,9 @@ import AddReceiptScreen from '@/app/add-receipt';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * What the receipt editor does when it cannot read the receipt.
- *
- * This one already refused to open a blank edit — but it did so by dropping the
- * `id`, which turned the screen into a create. On a read that merely failed
- * that files a second copy of a receipt that is still there. Failed, gone and
- * still loading are three different answers and none of them is "add one".
+ * When the receipt cannot be read the editor must not fall back to a create (that would file a
+ * second copy of a receipt that is still there): failed, gone and still loading are three
+ * different answers and none is "add one".
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -21,7 +18,6 @@ jest.mock('react-native-keyboard-controller', () =>
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 jest.mock('@/components/brands/brand-field', () => ({ BrandField: () => null }));
 
-// The scanner is a native module, and nothing here scans.
 jest.mock('../../../modules/receipt-scanner', () => ({
   captureReceipt: jest.fn(),
   isCaptureAvailable: () => false,
@@ -138,7 +134,6 @@ describe('Add receipt — an edit whose receipt could not be read', () => {
     const { getByText, queryByText } = await render(<AddReceiptScreen />);
 
     expect(getByText('Edit receipt')).toBeTruthy();
-    // An edit walks the flow from the amount, exactly as adding does.
     expect(getByText('How much did you spend?')).toBeTruthy();
     expect(queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(mockUseUpdate).toHaveBeenCalled();

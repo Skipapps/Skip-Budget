@@ -2,8 +2,7 @@ import { BILL_CATEGORIES } from '@/data/bills-mock';
 
 import { BILL_CATEGORY_IDS, categoryFromBrand } from './bill-category';
 
-// Lucide ships untransformed ESM; the icons are irrelevant here (same mock as
-// src/data/bill-icons.test.ts). The parser itself never imports bills-mock.
+// Lucide ships untransformed ESM; the icons are irrelevant here.
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 describe('BILL_CATEGORY_IDS', () => {

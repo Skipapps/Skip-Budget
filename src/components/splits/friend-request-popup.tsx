@@ -6,27 +6,18 @@ import { ProfileAvatar } from '@/components/ui/profile-avatar';
 import { shadows } from '@/theme/shadows';
 
 /**
- * A friend request, wherever somebody happens to be.
+ * A friend request, shown wherever somebody is: it already arrives over the realtime topic, so
+ * showing it is drawing, not fetching. Mounted above the navigator and inside the lock, so it draws
+ * over any route but never on a locked phone.
  *
- * Requests used to sit on the Friends screen and nowhere else, which meant the
- * only way to find one was to go looking for it — and nobody opens a Friends
- * screen speculatively. Since the request already arrives over the realtime
- * topic, showing it is a matter of drawing it rather than fetching anything.
- *
- * Mounted above the navigator and inside the lock, so it draws over any route
- * without ever appearing on a locked phone.
- *
- * Dismissing is not declining. Tapping outside says "not now" and the request
- * stays waiting on the Friends screen; only the buttons answer it. Someone who
- * flicks a sheet away by reflex should not have silently turned a person down.
+ * Dismissing is not declining: tapping outside says "not now" and the request stays on the Friends
+ * screen; only the buttons answer it, so a reflexive flick cannot silently turn someone down.
  */
 export function FriendRequestPopup() {
   const { data: requests } = useFriendRequests();
   const respond = useRespondToFriendRequest();
 
-  // Session-only, and deliberately so. Persisting it would mean a request
-  // waved away once could never resurface, and this is the only place most
-  // people will ever see one.
+  // Session-only on purpose: persisting it would mean a request waved away once never resurfaces.
   const [waved, setWaved] = useState<string[]>([]);
 
   const incoming = requests?.incoming ?? [];
@@ -37,8 +28,8 @@ export function FriendRequestPopup() {
   const name = next.profile?.display_name || 'Someone on Skip';
 
   const answer = (accept: boolean) => {
-    // Hidden immediately rather than on success. The mutation refreshes the
-    // list, and leaving the card up until it lands makes a tap feel ignored.
+    // Hidden immediately rather than on success: leaving the card up until the refresh lands makes
+    // a tap feel ignored.
     setWaved((current) => [...current, next.id]);
     respond.mutate({ id: next.id, accept });
   };

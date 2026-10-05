@@ -12,9 +12,8 @@ import type { BrandRow } from './types';
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 
 /**
- * The real catalog, read from the migration that seeds it, so these checks
- * run against every name and alias the app ships — the place where an
- * everyday word ("medium", "lemonade", "good food") could turn into a brand.
+ * The real catalog, read from the migration that seeds it: where an everyday word ("medium") could
+ * turn into a brand.
  */
 function realCatalog(): BrandRow[] {
   const sql = readFileSync(
@@ -48,10 +47,9 @@ const parse = (said: string) =>
   parseVoice([said], { today: '2026-10-01', directory: CATALOG, aliases: {} });
 
 /**
- * The hints exactly as the voice page shows them (src/data/voice-examples.ts),
- * each pinned below to what it must read back as on Thursday 1 Oct 2026. A
- * sentence added or reworded on the page without a pinned row here fails the
- * suite, so the page and the parser cannot drift.
+ * The hints as the voice page shows them (src/data/voice-examples.ts), each pinned below to its
+ * reading on Thursday 1 Oct 2026. A sentence added or reworded without a pinned row fails the
+ * suite.
  */
 const SHOWN = VOICE_EXAMPLES.map(({ kind, parts }) => ({ kind, parts, said: sentenceText(parts) }));
 
@@ -167,9 +165,8 @@ describe('against the real brand catalog', () => {
         category: draft.billCategoryId,
       }).toEqual({ kind, choices: [], ...pinned });
 
-      // What the page puts in bold is what comes back: the brand shown is one
-      // of the bold words, and the amount is the one bold figure that reads as
-      // money on its own.
+      // The page's bold words are what comes back: the brand, and the one figure that reads as
+      // money.
       const bold = parts.filter((part) => part.strong).map((part) => part.text);
       if (draft.merchant) expect(bold).toContain(draft.merchant.name);
       const boldAmounts = bold

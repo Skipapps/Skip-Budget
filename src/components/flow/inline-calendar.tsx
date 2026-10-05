@@ -8,13 +8,7 @@ import { MONTHS_SHORT, WEEKDAY_INITIALS, getDaysInMonth, getFirstWeekday } from 
 import { selection } from '@/lib/haptics';
 import { useColors } from '@/providers/theme-provider';
 
-/**
- * Spoken names, for the header and the screen reader only.
- *
- * `src/lib/date.ts` owns every date string the app *saves* or *prints*; these
- * two lists are read aloud and read at a glance, never stored, so they stay
- * here rather than widening the shared vocabulary.
- */
+/** Spoken names for the header and screen reader; never stored (`src/lib/date.ts` owns saved and printed dates). */
 const MONTHS_FULL = [
   'January',
   'February',
@@ -56,25 +50,17 @@ type DayGridProps = {
   onSelectDay: (day: number) => void;
   /** Draws the ring. Pass null to draw no today marker. */
   today?: Date | null;
-  /**
-   * Earliest day that can be chosen. Anything before it is drawn dimmed and
-   * cannot be pressed — a date the form would refuse should not be offered.
-   */
+  /** Earliest day that can be chosen; earlier days are dimmed and cannot be pressed. */
   minDate?: Date | null;
   compact?: boolean;
 };
 
-/** Midnight-to-midnight, so a time of day cannot decide a day comparison. */
+/** Midnight, so a time of day cannot decide a day comparison. */
 function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
-/**
- * The month's days, laid out Sunday-first.
- *
- * Shared by the inline step and the date-picker modal so the two grids cannot
- * drift into looking like different calendars in the same app.
- */
+/** The month's days, Sunday-first. Shared by the inline step and the date-picker modal. */
 export function DayGrid({
   year,
   month,
@@ -127,8 +113,7 @@ export function DayGrid({
                   ? null
                   : selected
                     ? 'bg-control'
-                    : // Today keeps a ring rather than a fill: a filled day means
-                      // "this is the one you chose", and two fills say it twice.
+                    : // Today is a ring, not a fill: a fill means "chosen".
                       isToday
                       ? 'border-[1.5px] border-control active:bg-ink/5'
                       : 'active:bg-ink/5',
@@ -161,24 +146,14 @@ type InlineCalendarProps = {
   /** null opens on this month with nothing selected — no date has been picked. */
   value: Date | null;
   onChange: (date: Date) => void;
-  /**
-   * Earliest day that can be chosen, handed straight to the grid: days below it
-   * are dimmed and dead. The modal picker has had this since the bill period
-   * fix; the inline one took the prop nowhere, so a flow that needed a floor
-   * would have offered every day and let the form refuse afterwards.
-   */
+  /** Earliest day that can be chosen, handed to the grid. */
   minDate?: Date | null;
 };
 
 /**
  * A calendar that is the page, not a dialog over it.
  *
- * On the last step of an add flow the date is the only question left, so there
- * is nothing for a modal to protect — and a grid you can see while you decide
- * beats a field that opens one.
- *
- * Paging is chevrons only. A swipeable grid inside a scrolling page fights the
- * scroll, and the chevrons are already 44pt.
+ * Paging is chevrons only: a swipeable grid inside a scrolling page fights the scroll.
  */
 export function InlineCalendar({ value, onChange, minDate = null }: InlineCalendarProps) {
   const colors = useColors();
@@ -189,8 +164,6 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
   const today = new Date();
   const todayBlocked = minDate ? startOfDay(today) < startOfDay(minDate) : false;
 
-  // Nothing is drawn as chosen until something has been chosen: a filled day
-  // on a form that has no date yet is the screen answering its own question.
   const selectedDay =
     value && value.getFullYear() === year && value.getMonth() === month ? value.getDate() : null;
 
@@ -320,8 +293,7 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
         </View>
       )}
 
-      {/* The shortcut goes away when today is below the floor: a button that
-          picks a day the grid next to it has greyed out is a trap. */}
+      {/* Hidden when today is below the floor: it would pick a day the grid greys out. */}
       {todayBlocked ? null : (
         <View className="mt-4 w-full flex-row justify-end">
           <ActionPill

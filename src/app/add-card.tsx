@@ -33,16 +33,11 @@ import { toIsoDate } from '@/lib/date';
 import { useArtwork } from '@/theme/artwork';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
 
-/** Loads the card being edited, then seeds the form by remount. */
 export default function AddCardScreen() {
-  // Deep-link guard: creating past the free allowance opens the case
-  // for Pro instead of a form the database would refuse. Editing is
-  // untouched. Wrapper-shaped so the hook count never changes.
-  //
-  // Decided once, on arrival: the count this reads changes the moment the
-  // form saves, and a live check then shoved the person who just added
-  // their first card onto the Pro page instead of back where they came
-  // from — reading as "your card was not added" when it very much was.
+  // Deep-link guard: creating past the free allowance opens Pro instead of a form the database
+  // would refuse; editing is untouched. Wrapper-shaped so the hook count never changes. Decided
+  // once on arrival: the count changes the moment the form saves, and a live check would shove the
+  // person who just added their first card onto the Pro page.
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { pro, ready } = usePro();
   const existing = useCards();
@@ -58,13 +53,9 @@ export default function AddCardScreen() {
 }
 
 /**
- * An edit only ever runs on a record it actually has.
- *
- * This one has teeth beyond the blanked fields. `id` makes Save an update, and
- * a form with no record has no due day either — so Save would also call
- * `applyReminder('card', id, null, …)`, which deletes the reminder on a card
- * whose only crime was being read on a bad connection. Loading, could not be
- * read and no longer there each get said, and none of them is a blank form.
+ * An edit only runs on a record it has. A form with no record has no due day either, so Save would
+ * call `applyReminder('card', id, null, …)` and delete the reminder on a card that was merely read
+ * on a bad connection. Loading, unreadable and gone are separate answers; none is a blank form.
  */
 function AddCardScreenInner() {
   const { id, from: origin } = useLocalSearchParams<{ id?: string; from?: string }>();
@@ -143,8 +134,7 @@ function CardForm({
   const [color, setColor] = useState<string>(existing?.color ?? DEFAULT_CARD_COLOR);
 
   const [last4, setLast4] = useState(existing?.last4 ?? '');
-  // Stored as a day of the month; the picker wants a Date, so it is placed in
-  // the current month purely to give the wheel something to open on.
+  // Stored as a day of the month; placed in the current month to give the calendar a Date.
   const [dueDate, setDueDate] = useState<Date | null>(
     existing?.bill_due_day
       ? new Date(new Date().getFullYear(), new Date().getMonth(), existing.bill_due_day)
@@ -153,8 +143,7 @@ function CardForm({
   const [balance, setBalance] = useState(existing ? String(existing.balance) : '');
 
   const today = toIsoDate(new Date());
-  // What the card is showing right now, so the warning below can say how much
-  // history a new balance would absorb rather than warning in the abstract.
+  // So the warning below can say how much history a new balance would absorb.
   const { ledger } = useSourceLedger(editing ? id : undefined, today);
 
   const savedReminder = useReminderChoice('card', id);
@@ -164,9 +153,6 @@ function CardForm({
   const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
-  // Editing walks the flow from the start, amount first, exactly as adding
-  // does — every figure is in front of the person before Save, not just the
-  // ones on the page an edit happened to open on.
   const [step, setStep] = useState(0);
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
 
@@ -194,7 +180,6 @@ function CardForm({
     }
   };
 
-  /** A check for a field on an earlier step sends you back to that step. */
   const fail = (message: string, atStep: number) => {
     warn();
     setError({ message, step: atStep });
@@ -208,10 +193,8 @@ function CardForm({
       return;
     }
 
-    // Stating a balance means "this is what the card is at, today", so
-    // everything charged before today is treated as already inside that
-    // figure. That is the right arithmetic and an unpleasant surprise: the
-    // transactions vanish off the card with no explanation. Say it first.
+    // Stating a balance means "this is the card today", so everything charged before today is
+    // treated as already inside it and vanishes off the card. Say so first.
     if (editing && existing && Number(balance) !== existing.balance) {
       const absorbed = (ledger?.entries ?? []).filter((entry) => entry.date < today);
 
@@ -238,8 +221,7 @@ function CardForm({
         last4: last4.length === 4 ? last4 : null,
         color,
         balance: Number(balance) || 0,
-        // Stamped whenever a balance is stated, so charges before today are
-        // treated as already included rather than counted twice.
+        // Stamped whenever a balance is stated, so charges before today are not counted twice.
         balance_as_of: balance ? toIsoDate(new Date()) : null,
         // The bill day is what recurs, not the specific date picked.
         bill_due_day: dueDate ? dueDate.getDate() : null,
@@ -250,15 +232,12 @@ function CardForm({
           ? (await updateCard.mutateAsync({ id, values }), id)
           : (await createCard.mutateAsync(values)).id;
 
-      // A card reminder counts back from its payment day, so it is only
-      // written when there is one to count from.
+      // A card reminder counts back from its payment day, so it needs one.
       await applyReminder('card', cardId, dueDate ? choiceToLead(reminder) : null, remindAt);
 
       success();
-      // From the setup walk-in, the story continues on its own page: the
-      // bank-account offer, with Skip returning to the checklist. A page
-      // rather than a dialog — the dialog read as an interruption, and one
-      // raised mid-navigation never showed at all.
+      // The setup walk-in continues on the bank-account offer page; a dialog raised mid-navigation
+      // never showed.
       if (!editing && origin === 'setup') {
         router.replace('/account-offer');
       } else {
@@ -272,12 +251,9 @@ function CardForm({
 
   const busy = createCard.isPending || updateCard.isPending;
 
-  // A card's balance is allowed to be zero — that is a real answer, and it is
-  // what a new card is at — so step 1 never blocks on it.
+  // Zero is a real balance, so only the name blocks step 1.
   const stepValid = step === 1 ? Boolean(name.trim()) : !busy;
 
-  // "Balance", not "what is on it": the figure can be owed or available, and
-  // balance is the one word people already use for both.
   const question =
     step === 0
       ? 'What is the credit card balance right now?'
@@ -335,8 +311,6 @@ function CardForm({
 
       {step === 1 ? (
         <View className="w-full gap-6">
-          {/* Live preview — the colour picker is otherwise a blind choice, and
-              it now carries the balance typed a step ago. */}
           <PaymentCard
             card={{
               id: 'preview',

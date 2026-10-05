@@ -1,26 +1,15 @@
 /**
- * Step 8: which bill category, for bills only.
+ * Which bill category, for bills only. The ids are copied from BILL_CATEGORIES in
+ * src/data/bills-mock.ts rather than imported (that module pulls in lucide icons); the test fails
+ * if the two lists differ.
  *
- * The ten ids are BILL_CATEGORIES in src/data/bills-mock.ts, copied here
- * rather than imported: that module pulls lucide icons in through glyphs.ts,
- * and this folder stays plain code. bill-category.test.ts fails the moment
- * the two lists differ.
- *
- * ## Order of evidence
- * 1. **Spoken words** always win: "electric", "rent", "water bill",
- *    "car insurance", "student loan". When several are said, the more
- *    specific head noun wins (insurance and loans over housing and family
- *    over the utilities), then the one said first; "car insurance" is
- *    insurance, "rent and electric" is housing.
- * 2. **A known biller** suggests one when no word did: Comcast/Xfinity →
- *    internet, T-Mobile → mobile, Duke Energy → energy, GEICO → insurance.
- *    Only where the company has one obvious category; Verizon and AT&T sell
- *    both phone and home internet, so they suggest nothing.
- *
- *    Note: migration 0021 keeps a bill's brand from ever *setting* its
- *    category in the add-bill form, where the category was already chosen a
- *    step earlier. Here nothing was chosen yet and the review page shows the
- *    suggestion for a tap, so it is a pre-fill, not an override.
+ * Order of evidence:
+ * 1. Spoken words always win. When several are said, the more specific head noun wins (insurance
+ *    and loans, then housing and family, then the utilities), then the one said first: "car
+ *    insurance" is insurance, "rent and electric" is housing.
+ * 2. A known biller suggests one when no word did (Comcast -> internet, GEICO -> insurance), only
+ *    where the company has one obvious category; Verizon and AT&T sell phone and internet, so
+ *    suggest nothing. It is a pre-fill the review page shows for a tap, not an override.
  * 3. Otherwise null, and the review page asks.
  */
 import type { Token } from './clean';
@@ -147,9 +136,8 @@ const ENTRIES: Entry[] = [
 ].sort((a, b) => b.words.length - a.words.length);
 
 /**
- * One-word category names ("rent", "water", "insurance"). Parts of longer
- * phrases ("car" in "car payment", "home" in "home loan") are left out:
- * they can be part of a shop's name.
+ * One-word category names. Words inside longer phrases ("car", "home") are left out: they may be a
+ * shop's name.
  */
 export const SINGLE_CATEGORY_WORDS = new Set(
   ENTRIES.filter((entry) => entry.words.length === 1).map((entry) => entry.words[0]),

@@ -42,9 +42,7 @@ describe('groupByDate', () => {
 });
 
 describe('groupByDate, run forwards', () => {
-  // The Founder's rule for every dated list: oldest at the top, today at the
-  // bottom. "asc works" is not the same assertion — this one pins where today
-  // lands, which is the thing somebody would notice if it regressed.
+  // House rule for every dated list: oldest at the top, today at the bottom.
   it('puts today last, after every older day', () => {
     const withToday: Row[] = [
       { id: 'x', on: '2026-09-12', amount: -3 },

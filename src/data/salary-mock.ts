@@ -1,9 +1,7 @@
-/** The shape of a salary source. */
 import type { PayFrequency } from '@/lib/date';
 
 export type SalarySource = {
   id: string;
-  /** Employer or income name. */
   name: string;
   amount: number;
   frequency: PayFrequency;

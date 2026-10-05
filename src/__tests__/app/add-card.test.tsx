@@ -4,12 +4,9 @@ import AddCardScreen from '@/app/add-card';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * What the card editor does when it cannot read the card.
- *
- * Worse here than anywhere else in the family. `id` makes Save an update, and a
- * form with no record also has no due day — so Save wrote a blank holder, a $0
- * balance *and* called `applyReminder('card', id, null, …)`, which deletes the
- * reminder on a card whose only crime was being opened on a bad connection.
+ * The card editor must not open a blank form when the read fails: with no record there is no due
+ * day, so Save would write a blank holder and a $0 balance and call `applyReminder('card', id,
+ * null, …)`, which deletes the card's reminder.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -21,8 +18,7 @@ jest.mock('react-native-keyboard-controller', () =>
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 jest.mock('@/components/cards/payment-card', () => ({ PaymentCard: () => null }));
 jest.mock('@/components/cards/network-picker', () => ({ NetworkPicker: () => null }));
-// Reanimated 4 wants a native worklets module; the swatches are the only thing
-// on the form that animates.
+// Reanimated 4 wants a native worklets module; the swatches are the only animated part of the form.
 jest.mock('@/components/ui/color-picker', () => ({ ColorPicker: () => null }));
 
 jest.mock('@/providers/theme-provider', () => ({
@@ -58,7 +54,7 @@ jest.mock('@/api/mutations', () => ({
   useDeleteCard: () => mockUseDelete(),
 }));
 
-// The one that deletes a reminder when it is handed a null due day.
+// Deletes the reminder when handed a null due day.
 const mockApplyReminder = jest.fn();
 const mockUseApplyReminder = jest.fn(() => ({ mutateAsync: mockApplyReminder }));
 
@@ -103,8 +99,6 @@ describe('Add card — an edit whose card could not be read', () => {
     expect(queryByText('Continue')).toBeNull();
     expect(queryByText('Save changes')).toBeNull();
 
-    // Nothing that writes was wired up — including the reminder call that used
-    // to arrive with a null due day and wipe the card's reminder.
     expect(mockUseUpdate).not.toHaveBeenCalled();
     expect(mockUseCreate).not.toHaveBeenCalled();
     expect(mockUseApplyReminder).not.toHaveBeenCalled();
@@ -138,7 +132,6 @@ describe('Add card — an edit whose card could not be read', () => {
     const { getByText, queryByText } = await render(<AddCardScreen />);
 
     expect(getByText('Edit credit card')).toBeTruthy();
-    // An edit walks the flow from the amount, exactly as adding does.
     expect(getByText('What is the credit card balance right now?')).toBeTruthy();
     expect(queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(mockUseUpdate).toHaveBeenCalled();

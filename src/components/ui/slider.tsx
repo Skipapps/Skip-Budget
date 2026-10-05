@@ -9,12 +9,11 @@ type SliderProps = {
   min: number;
   max: number;
   step?: number;
-  /** Must be stable (a state setter or useCallback) — see the note below. */
+  /** Must be stable (a state setter or useCallback), or the responder is rebuilt every render. */
   onChange: (value: number) => void;
   /**
-   * `log` spaces the track by orders of magnitude. Use it for money ranges: on
-   * a linear 500–1,000,000 track a $30k loan sits in the leftmost 3% and is
-   * effectively undraggable. Requires min > 0.
+   * `log` spaces the track by orders of magnitude, for money ranges: on a linear 500–1,000,000 track
+   * a $30k loan sits in the leftmost 3% and is undraggable. Requires min > 0.
    */
   scale?: 'linear' | 'log';
   className?: string;
@@ -23,13 +22,11 @@ type SliderProps = {
 const THUMB = 26;
 
 /**
- * Drag-to-set slider built on PanResponder.
+ * Drag-to-set slider built on PanResponder. Not @react-native-community/slider: that is a native
+ * module, and adding one forces a full dev-client rebuild.
  *
- * Deliberately not @react-native-community/slider: that is a native module, and
- * adding one forces a full dev-client rebuild for what is a few lines of maths.
- *
- * No refs — the responder closes over its inputs and is rebuilt only when one
- * of them changes. In practice that is once, when layout reports the width.
+ * No refs: the responder closes over its inputs and is rebuilt only when one changes (once, when
+ * layout reports the width).
  */
 export function Slider({
   value,

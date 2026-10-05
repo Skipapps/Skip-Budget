@@ -8,18 +8,12 @@ import { useColors } from '@/providers/theme-provider';
 type ActionPillProps = {
   label: string;
   onPress: () => void;
-  /** Defaults to a plus, which is what almost every one of these does. */
   icon?: LucideIcon;
   disabled?: boolean;
   className?: string;
 };
 
-/**
- * The "+ New card" / "+ Add bill" header action, shared across list pages.
- *
- * Tonal fill, no border — the same anatomy as a chip, so "act" and "choose"
- * differ by weight and position rather than by shape.
- */
+/** The "+ New card" / "+ Add bill" header action, shared across list pages. */
 export function ActionPill({
   label,
   onPress,

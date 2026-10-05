@@ -12,7 +12,6 @@ export type HeaderActionProps = {
   onPress: () => void;
   hint?: string;
   disabled?: boolean;
-  /** Swaps the glyph for a spinner, for an action that is still running. */
   busy?: boolean;
 };
 
@@ -22,13 +21,10 @@ const ACTION_GAP = 8;
 const MIN_SIDE = 44;
 
 /**
- * Every page's top line: back on the left, the page's name in the centre, its
- * actions on the right (the Founder's call, 2026-10-03).
+ * Every page's top line: back on the left, the name in the centre, actions on the right.
  *
- * The two sides are always the same width — the wider of the two — so the
- * name sits on the true centre of the screen whether a page has no action,
- * one, or two. The name is one line; a long one steps its size down rather
- * than wrapping and pushing the page down.
+ * Both sides take the width of the wider one, so the name sits on the true centre of the screen.
+ * The name is one line; a long one steps its size down rather than wrapping.
  */
 export function PageHeader({
   title,
@@ -38,9 +34,8 @@ export function PageHeader({
   titleRef,
 }: {
   title?: string;
-  /** Usually the back chevron. Empty on a tab, which has nowhere to go back to. */
+  /** Usually the back chevron; empty on a tab. */
   left?: ReactNode;
-  /** Round glyph buttons, right-aligned. */
   actions?: HeaderActionProps[];
   /** A control of a page's own in place of `actions`, 44pt wide. */
   right?: ReactNode;
@@ -76,10 +71,6 @@ export function PageHeader({
   );
 }
 
-/**
- * A page action in the header: a glyph on an accent-tinted circle, the same
- * circle the dashboard's icons sit on.
- */
 export function HeaderAction({
   icon: Icon,
   label,

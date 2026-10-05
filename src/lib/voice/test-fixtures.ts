@@ -1,12 +1,8 @@
 /**
- * A small brand directory for the parser's tests, rank-ordered like the real
- * one. Rows copy supabase/migrations/20260829100005_brands_with_billers.sql
- * where the brand exists there — so Comcast is an alias of Xfinity, iCloud
- * of Apple and Amazon Prime of Amazon, exactly as in production. 24 Hour
- * Fitness is not in the catalog; it is here for the integer-named merchant
- * cases.
- *
- * Test data only: nothing in the app imports this file.
+ * A small brand directory for the parser's tests, rank-ordered like the real one. Rows copy
+ * supabase/migrations/20260829100005_brands_with_billers.sql where the brand exists there (Comcast
+ * is an alias of Xfinity, iCloud of Apple). 24 Hour Fitness is not in the catalog; it is here for
+ * the integer-named merchant cases.
  */
 import type { BrandRow } from './types';
 
@@ -90,5 +86,5 @@ export const DIRECTORY: BrandRow[] = [
   brand('24-hour-fitness', '24 Hour Fitness', '24hourfitness.com', 'fitness'),
 ];
 
-/** Thursday 1 October 2026, the day the feature was briefed. */
+/** The fixed "today" for tests: Thursday 1 October 2026. */
 export const TODAY = '2026-10-01';

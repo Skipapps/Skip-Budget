@@ -16,8 +16,7 @@ export type LedgerFilters = {
   /** ISO yyyy-mm-dd, or null for any date. */
   date: string | null;
   sourceIds: string[];
-  /** Kind values as the hosting screen names them — a card's page filters
-   *  payments too, which the shared kind list does not know about. */
+  /** Kind values as the hosting screen names them (a card's page also filters payments). */
   kinds: string[];
 };
 
@@ -104,9 +103,8 @@ export function FilterSheet({
             ) : null}
           </View>
 
-          {/* Absent, not empty, on a screen that is already one source: the
-              card's own page passes no options, and a section offering a
-              choice of one thing would only restate the title above it. */}
+          {/* Absent on a screen that is already one source (the card's own page passes no options):
+              a choice of one thing would only restate the title. */}
           {sourceOptions.length > 0 ? (
             <View className="mt-6 w-full">
               <FieldLabel className="mb-2">Card or bank account</FieldLabel>

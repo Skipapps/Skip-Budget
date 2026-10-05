@@ -1,15 +1,8 @@
 /**
- * Whether a label answers a search.
- *
- * Case-insensitive, and forgiving of typing: a plain letter-for-letter
- * substring hits first, and failing that the query may sit anywhere in the
- * label with a small number of letter mistakes — a swapped, missing, doubled
- * or wrong letter. "wallmart" and "walmrat" both find Walmart.
- *
- * How many mistakes depends on how much was typed: none for three letters or
- * fewer (at that length every word is one mistake from every other), one for
- * four to six, two from seven up. An empty query matches everything, so a
- * cleared search field never filters.
+ * Whether a label answers a search: case-insensitive, substring first, then tolerant of letter
+ * mistakes ("wallmart" and "walmrat" both find Walmart). Allowed mistakes scale with the query:
+ * none up to three letters (every short word is one mistake from every other), one for four to
+ * six, two from seven. An empty query matches everything.
  */
 export function matchesSearch(label: string, query: string): boolean {
   const needle = query.trim().toLowerCase();
@@ -22,17 +15,11 @@ export function matchesSearch(label: string, query: string): boolean {
   return fuzzyContains(hay, needle, allowed);
 }
 
-/**
- * Approximate substring match (Sellers' algorithm): true when `needle` sits
- * anywhere in `hay` within `max` single-letter edits. One dynamic-programming
- * column per hay character, so a forty-letter label costs a few hundred
- * comparisons — nothing, at list sizes this app sees.
- */
+/** Approximate substring match (Sellers' algorithm): `needle` in `hay` within `max` edits. */
 function fuzzyContains(hay: string, needle: string, max: number): boolean {
   const m = needle.length;
-  // col[i] holds the distance between needle[0..i) and the best substring of
-  // hay ending at the current position. A match may start anywhere, so the
-  // empty-pattern row stays 0 the whole way along.
+  // col[i] is the distance between needle[0..i) and the best substring of hay ending here. A match
+  // may start anywhere, so the empty-pattern row stays 0.
   const col: number[] = [];
   for (let i = 0; i <= m; i += 1) col[i] = i;
 

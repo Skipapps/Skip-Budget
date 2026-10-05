@@ -52,27 +52,18 @@ export default function TransactionsScreen() {
   const [filters, setFilters] = useState<LedgerFilters>(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  // Weeks by default. Fixed edges, not a window measured from today: a ledger
-  // answers "what did that week cost", and two people comparing notes on the
-  // same week have to be looking at the same days.
+  // Fixed period edges, not a window measured from today, so two people comparing a week see the
+  // same days.
   const [periodKey, setPeriodKey] = useState<PeriodKey>('week');
   const [anchor, setAnchor] = useState(() => new Date());
 
-  // The day as state: it turns at midnight and on resume instead of freezing
-  // at whatever day this tab first mounted on.
   const { today, todayDate } = useToday();
 
   const atLatest = isLatestPeriod(periodKey, anchor, todayDate);
   const atEarliest = isEarliestPeriod(periodKey, anchor, todayDate);
 
-  /**
-   * The period, cut off at today.
-   *
-   * This page is a record of what happened, so it never reaches past the
-   * present. Looking at this month in the middle of it shows the days that
-   * have been, not a projection of the ones still to come — those live on the
-   * dashboard under Coming up, where they are labelled as still to happen.
-   */
+  // The period cut off at today: this page records what happened. Future days live on the dashboard
+  // under Coming up.
   const range = useMemo(() => {
     const period = periodRange(periodKey, anchor);
     return { from: period.from, to: period.to > today ? today : period.to };
@@ -82,14 +73,9 @@ export default function TransactionsScreen() {
   const { refresh, refreshing } = useRefreshAll();
   const { sources } = usePaymentSources();
 
-  /**
-   * Which plan each recorded charge came from, so a row that already happened
-   * opens the bill or subscription behind it.
-   *
-   * The same query the ledger itself reads, so this costs no fetch: an
-   * occurrence that was written down carries the charge's id and nothing that
-   * names its plan, and this is the only thing that can answer it.
-   */
+  // Which plan each recorded charge came from, so a past row opens its bill or subscription. A
+  // recorded occurrence carries only the charge id; the ledger reads the same query (no extra
+  // fetch).
   const charges = useCharges();
   const owners = useMemo(() => chargeOwners(charges.data ?? []), [charges.data]);
 
@@ -110,13 +96,6 @@ export default function TransactionsScreen() {
     [sources],
   );
 
-  /**
-   * The period's divisions, used twice.
-   *
-   * The same buckets draw the chart and head the list, so a bar and the run of
-   * rows under it are guaranteed to be the same slice of time. Deriving them
-   * separately is how a chart and a list quietly stop agreeing.
-   */
   const buckets = useMemo(() => periodBuckets(periodKey, anchor), [periodKey, anchor]);
 
   const matching = useMemo(() => {
@@ -129,15 +108,8 @@ export default function TransactionsScreen() {
     });
   }, [ledger, query, filters]);
 
-  /**
-   * Newest first, and empty buckets dropped — a heading over nothing is noise.
-   *
-   * Today is the first thing on the page and time runs backwards from it: the
-   * newest movement is what somebody opening this tab came to check, and it
-   * should not sit below a scroll. `periodBuckets` hands buckets over
-   * oldest-first, so they are reversed here, and the rows inside a bucket run
-   * the same way. Same-day rows keep the id tiebreak they have always had.
-   */
+  // Newest first, empty buckets dropped. `periodBuckets` is oldest-first, so buckets are reversed
+  // and rows within a bucket sorted descending; same-day rows tiebreak on id.
   const groups = useMemo(
     () =>
       buckets
@@ -166,16 +138,12 @@ export default function TransactionsScreen() {
           value={periodKey}
           onChange={(key) => {
             setPeriodKey(key);
-            // Switching between the stepped periods keeps your place, which is
-            // the point of them. "All" is not stepped and always ends now, so
-            // arriving from a browse of 2023 has to come back to the present.
+            // Stepped periods keep your place; "all" always ends now, so it resets the anchor.
             if (key === 'all') setAnchor(new Date());
           }}
         />
       </View>
 
-      {/* The window itself, and the way through it. Forward stops at the
-          period holding today; back stops where the kept history ends. */}
       <View className="mt-4 w-full flex-row items-center justify-between rounded-[16px] border border-line bg-card px-2 py-2">
         <Pressable
           accessibilityRole="button"
@@ -218,8 +186,6 @@ export default function TransactionsScreen() {
         </Pressable>
       </View>
 
-      {/* The verdict card and nothing else: the bar chart moved to Insights,
-          where the story behind the numbers lives. */}
       {!isLoading && !isError ? (
         <View className="mt-4 w-full">
           <LedgerSummary totals={totals} />
@@ -316,10 +282,6 @@ export default function TransactionsScreen() {
                   entry={entry}
                   sourceLabel={sourceLabels.get(entry.sourceId) ?? ''}
                   kindLabel={KIND_LABELS[entry.kind] ?? entry.kind}
-                  // Every row opens the record behind it — a receipt, the bill
-                  // or subscription that charged, the salary screen for a
-                  // payday. `ledgerHref` returns null when there is nothing to
-                  // open, and the row stays inert rather than guessing.
                   onPress={openEntry(entry)}
                 />
               ))}

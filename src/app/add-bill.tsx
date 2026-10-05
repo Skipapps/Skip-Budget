@@ -63,12 +63,7 @@ const RECURRENCE_CHOICES = [...RECURRENCES, { value: PERIOD, label: 'Specific pe
 
 type RecurrenceChoice = Recurrence | typeof PERIOD;
 
-/**
- * What to search for, in the words of the category already chosen.
- *
- * A blank "search for a company" leaves people guessing whether their electric
- * utility counts. Naming three real ones answers that before it is asked.
- */
+/** Placeholder per category, naming real companies so people know what counts. */
 const ISSUER_HINT: Record<string, string> = {
   housing: 'Letting agent or management company',
   energy: 'AEP, Duke Energy, National Grid',
@@ -82,12 +77,7 @@ const ISSUER_HINT: Record<string, string> = {
   other: 'Search for a company',
 };
 
-/**
- * The category chooser stays a screen of its own, before the dots.
- *
- * It is what pre-fills the bill's name, so it has to run first — and folding it
- * into the indicator would make bills the one four-dot flow in the app.
- */
+/** The category chooser is its own screen before the dots: it pre-fills the name, so runs first. */
 type Step = 'category' | 'amount' | 'details' | 'when';
 
 const DOTS: readonly Step[] = ['amount', 'details', 'when'];
@@ -95,14 +85,9 @@ const DOTS: readonly Step[] = ['amount', 'details', 'when'];
 const asDate = (value?: string | null) => (value ? new Date(`${value}T00:00:00`) : null);
 
 /**
- * Loads the bill being edited, then seeds the form by remount.
- *
- * An edit with no record in hand never becomes a blank form. `id` is what
- * makes Save an update, so a form mounted without the row would write its empty
- * fields over a real bill the moment somebody pressed Save — a read that failed
- * would cost the amount, the date and the source. Still loading, could not be
- * read and no longer there are three different answers, and each is said out
- * loud rather than collapsing into an innocent-looking "Add a bill".
+ * An edit with no record in hand never becomes a blank form: `id` makes Save an update, so a form
+ * mounted without the row would write empty fields over a real bill. Loading, unreadable and gone
+ * are separate answers.
  */
 export default function AddBillScreen() {
   const params = useLocalSearchParams<{ id?: string; from?: string }>();
@@ -112,8 +97,7 @@ export default function AddBillScreen() {
   const existing = bill.data ?? null;
 
   if (id && !existing) {
-    // A failed read, offered the retry rather than a form. Never a fall back to
-    // creating: the row is still there, it is this screen that cannot see it.
+    // Retry, never a fall back to creating: the row is still there, this screen cannot see it.
     if (bill.isError) {
       return (
         <Screen showBack>
@@ -131,8 +115,7 @@ export default function AddBillScreen() {
       );
     }
 
-    // Skeletons in the shell rather than a spinner on a blank page — and never a
-    // $0 figure for a bill whose amount has not arrived yet.
+    // Skeletons, never a $0 figure for a bill whose amount has not arrived.
     if (!bill.isFetched) {
       return (
         <StepFlow
@@ -154,9 +137,8 @@ export default function AddBillScreen() {
       );
     }
 
-    // The read landed and there is no row: deleted from another screen, or a
-    // stale link. An update filtered on an id that matches nothing reports
-    // success and writes nothing, so an edit here would quietly lose the lot.
+    // The read landed but there is no row (deleted elsewhere, or a stale link). An update on an id
+    // that matches nothing reports success and writes nothing.
     return (
       <Screen showBack>
         <PageState
@@ -206,25 +188,21 @@ function BillForm({
 }) {
   const colors = useColors();
   const editing = Boolean(id);
-  // Editing walks the whole flow from the amount, like adding does; only the
-  // category chooser is skipped, because the bill already has one. So is a
-  // pre-filled bill whose category is already known.
+  // The category chooser is skipped when editing, or when a pre-filled bill has a category already.
   const [step, setStep] = useState<Step>(editing || prefill?.categoryId ? 'amount' : 'category');
   const dot = Math.max(DOTS.indexOf(step), 0);
 
   const [categoryId, setCategoryId] = useState<string>(
     existing?.category_id ?? prefill?.categoryId ?? '',
   );
-  // Who issues the bill. Optional, and stays that way: a large share of bills
-  // — rent, HOA fees, a loan from a relative — have no company behind them.
+  // Optional: many bills (rent, HOA fees, a loan from a relative) have no company behind them.
   const [issuer, setIssuer] = useState<BrandSelection | null>(
     existing?.brand_id
       ? {
           brandId: existing.brand_id,
           name: existing.name,
           domain: existing.brands?.domain ?? null,
-          // Bills carry their own category vocabulary, chosen a step earlier.
-          // The brand is never allowed to answer that question.
+          // Bills carry their own category, chosen a step earlier; the brand never answers it.
           categoryId: existing.category_id,
         }
       : existing
@@ -237,9 +215,8 @@ function BillForm({
     existing ? String(existing.amount) : (prefill?.amount ?? ''),
   );
   const [startDate, setStartDate] = useState<Date | null>(
-    // A repeating bill shows when it is next due; its start is bookkeeping (see
-    // floorAfterCharges) and can sit after the last charge. A bill that runs
-    // for a set period shows the period's first day.
+    // A repeating bill shows when it is next due; its start is bookkeeping (see floorAfterCharges)
+    // and can sit after the last charge. A period bill shows the period's first day.
     asDate(
       existing?.recurrence === 'period'
         ? (existing.starts_on ?? existing.next_due_on)
@@ -257,24 +234,16 @@ function BillForm({
   );
   const [note, setNote] = useState(existing?.note ?? '');
 
-  // Which date the picker is editing, or null when it is closed.
   const [datePicker, setDatePicker] = useState<'start' | 'end' | null>(null);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
 
   // Only a self-named bill needs its own icon; the rest inherit the category's.
   const isCustom = categoryId === 'other';
 
-  /**
-   * Picking a company names the bill, unless it has been given a real name.
-   *
-   * "Not named yet" is broader than "empty", because choosing a category
-   * already fills the field with its label — so a bill sitting on the default
-   * "Mobile Phone" has been named by the app, not by the person, and T-Mobile
-   * is the better answer. Anything they typed themselves is left alone, as is
-   * "Flat — electric".
-   */
   const categoryLabel = BILL_CATEGORIES.find((option) => option.id === categoryId)?.label ?? '';
 
+  // Picking a company names the bill unless it has a real name: the default category label (named
+  // by the app, not the person) counts as unnamed; anything typed is left alone.
   const handleIssuer = (next: BrandSelection | null) => {
     setIssuer(next);
     if (!next) return;
@@ -283,33 +252,28 @@ function BillForm({
     const untouched = !current || current === categoryLabel || current === issuer?.name;
     if (untouched) setName(next.name);
   };
-  // The date range is only meaningful for a bill that runs between two dates.
   const hasPeriod = recurrence === PERIOD;
 
   const handleRecurrenceChange = (next: RecurrenceChoice) => {
     setRecurrence(next);
-    // The end date belongs to a period bill alone, so it goes when the period
-    // does. The first due date stays: every bill needs one, whatever its cycle.
+    // The end date belongs to a period bill alone; the first due date stays, every bill needs one.
     if (next !== PERIOD) setEndDate(null);
   };
 
   const handleSelectCategory = (category: BillCategory) => {
     setCategoryId(category.id);
-    // Pre-fill the name so common bills are one tap from done — unless it is
-    // already a real name: the company's, or one typed on the voice review
-    // page. Otherwise a pre-filled "Comcast" would become "Internet".
+    // Pre-fill the name so common bills are one tap from done, unless it is already a real name
+    // (the company's, or typed on the voice review page): "Comcast" must not become "Internet".
     const current = name.trim();
     const real = Boolean(current) && (current === issuer?.name || current === prefill?.name);
     if (!real) setName(category.id === 'other' ? '' : category.label);
     setStep('amount');
   };
 
-  // Saving waits on the data layer; this only closes the screen.
   const [error, setError] = useState<{ message: string; step: Step } | null>(null);
 
   const { sources } = usePaymentSources();
-  // Present only when this bill came from the loan calculator, which is what
-  // decides whether there is a schedule worth offering.
+  // Present only when this bill came from the loan calculator.
   const { data: loan } = useLoanForBill(id);
   const terms = loan ? termsFromStored(loan, existing?.next_due_on ?? undefined) : null;
   const schedule = terms ? amortise(terms).rows : [];
@@ -337,8 +301,7 @@ function BillForm({
     }
   };
 
-  // Held as a draft over whatever is stored, so a reminder that loads a moment
-  // after the form does not overwrite what is already being chosen.
+  // A draft over what is stored, so a reminder that loads late does not overwrite the choice.
   const savedReminder = useReminderChoice('bill', id);
   const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
   const [timeDraft, setTimeDraft] = useState<string | null>(null);
@@ -346,30 +309,26 @@ function BillForm({
   const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
-  /** A check for a field on an earlier step sends you back to that step. */
   const fail = (message: string, atStep: Step) => {
     warn();
     setError({ message, step: atStep });
     setStep(atStep);
   };
 
-  /** Where a saved bill leaves to. */
   const leave = () => {
     if (!fromVoice) {
       router.back();
       return;
     }
     router.dismissTo('/home');
-    // Saved, so what was heard has done its job; the person's words do not
-    // stay in memory for the next session to find.
+    // Saved, so the person's words do not stay in memory for the next session.
     clearVoiceDraft();
   };
 
   const handleSave = async () => {
     setError(null);
-    // The checks (name, amount, date, a period the right way round) and the
-    // values, icon rule and starts_on floor included, are the shared
-    // builder's; it is what the voice review page saves through too.
+    // Checks, icon rule and starts_on floor live in the shared builder, which the voice review page
+    // saves through too.
     const built = buildBillValues(
       {
         name,
@@ -392,7 +351,7 @@ function BillForm({
     const { values } = built;
 
     try {
-      // What a recorded charge copies from the bill, before and after.
+      // What a recorded charge copies from the bill.
       const carried = {
         label: values.name || 'Bill',
         amount: values.amount,
@@ -485,9 +444,8 @@ function BillForm({
       onBack={() => {
         setError(null);
         if (step === 'amount') {
-          // Back out to the chooser when it was used; straight out when editing,
-          // and straight back to the voice review page when it already named
-          // the category and the chooser was never shown.
+          // Back to the chooser when it was used; straight out when editing or when the voice page
+          // already named the category.
           if (editing || (fromVoice && prefill?.categoryId)) router.back();
           else setStep('category');
         } else if (step === 'details') setStep('amount');
@@ -545,9 +503,6 @@ function BillForm({
 
       {step === 'details' ? (
         <View className="w-full gap-5">
-          {/* Above the name, because it is the question people can answer
-              first: the company is what they recognise, the name is what they
-              want to call it. */}
           <BrandField
             label="Company"
             value={issuer}
@@ -563,8 +518,7 @@ function BillForm({
             returnKeyType="done"
           />
 
-          {/* The icon is only ever seen when there is no logo to show instead,
-              so offering it beside one is a control that changes nothing. */}
+          {/* The icon only shows when there is no logo, so offering it beside one does nothing. */}
           {isCustom && !issuer ? (
             <View className="w-full">
               <FieldLabel className="mb-2">Icon</FieldLabel>
@@ -593,10 +547,8 @@ function BillForm({
                 router.push({
                   pathname: '/loan-schedule',
                   params: {
-                    // The stored convention and the stored contract payment,
-                    // not re-derived ones: the card above this button is built
-                    // from the saved row, and the full schedule has to be the
-                    // same loan to the cent rather than a fresh solve of it.
+                    // The stored convention and contract payment, not re-derived: the full schedule
+                    // must be the same loan to the cent as the card above.
                     amount: String(loan.principal),
                     rate: String(loan.annual_rate),
                     months: String(loan.term_months),
@@ -639,8 +591,7 @@ function BillForm({
             value={startDate}
             onChange={(date) => {
               setStartDate(date);
-              // An end before the start is meaningless — drop it, exactly as
-              // the modal picker did when it owned this date.
+              // An end before the start is meaningless; drop it.
               if (endDate && date > endDate) setEndDate(null);
             }}
           />
@@ -654,8 +605,7 @@ function BillForm({
             />
           </View>
 
-          {/* Stacked, not side by side: two date fields in one row truncate a
-              full date on a narrow phone. */}
+          {/* Stacked: two date fields in one row truncate a full date on a narrow phone. */}
           {hasPeriod ? (
             <View className="w-full">
               <SelectField
@@ -694,21 +644,16 @@ function BillForm({
       {datePicker ? (
         <DatePicker
           value={(datePicker === 'start' ? startDate : endDate) ?? startDate ?? new Date()}
-          // The end of a period cannot precede its start, so those days are
-          // never offered. The check below stays as the backstop for the one
-          // path that skips the grid: a start date moved after the fact.
+          // Days before the start are not offered; the check below backstops a start moved later.
           minDate={datePicker === 'end' ? startDate : null}
           onCancel={() => setDatePicker(null)}
           onConfirm={(date) => {
             if (datePicker === 'start') {
               setStartDate(date);
-              // An end before the start is meaningless — drop it.
               if (endDate && date > endDate) setEndDate(null);
             } else if (startDate && toIsoDate(date) < toIsoDate(startDate)) {
-              // The other half of the same rule: a period that finishes before
-              // it begins is not a period. Refused rather than quietly kept,
-              // so the field does not sit there reading like a valid date.
-              // Compared as ISO days, which is exact and has no clock in it.
+              // A period that finishes before it begins is refused, not quietly kept. Compared as
+              // ISO days: exact, no clock.
               setDatePicker(null);
               fail('The end date cannot be before the start date.', 'when');
               return;

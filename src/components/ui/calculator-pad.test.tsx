@@ -4,22 +4,13 @@ import type { StyleProp, TextStyle } from 'react-native';
 
 import { CalculatorPad, calculatorFigureBand } from '@/components/ui/calculator-pad';
 
-// Hoisted above the imports by babel-plugin-jest-hoist; the order here is for
-// readability. The pad pulls in icons, theme colours and window insets, and
-// the figure under test needs none of them.
+// The pad pulls in icons, theme colours and window insets; the figure under test needs none of them.
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('@/providers/theme-provider', () => ({ useColors: () => ({ ink: '#000000' }) }));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-/**
- * The pad opens over a field that already holds a value, so its figure is
- * sized from the string rather than by `adjustsFontSizeToFit` — the same fix,
- * for the same iOS measuring bug, as the stepped flow's amount figure. These
- * are the band edges; the affix rides at the same proportion so the "$" can
- * never be left at full size beside a shrunken number again.
- */
 describe('calculatorFigureBand', () => {
   it('keeps a short figure at the pad size it has today', () => {
     expect(calculatorFigureBand('0')).toMatchObject({ size: 48, affixSize: 24, affixTop: 8 });
@@ -47,8 +38,6 @@ describe('calculatorFigureBand', () => {
 
 describe('CalculatorPad figure', () => {
   it('opens at full size on a value it was handed, not a shrunken one', async () => {
-    // The pad is opened from a field that already has an amount in it, which
-    // is the mount-with-text case iOS used to mis-measure.
     const { getByText } = await render(
       <CalculatorPad value="3000" onCancel={() => {}} onConfirm={() => {}} />,
     );
@@ -64,11 +53,9 @@ describe('CalculatorPad figure', () => {
 });
 
 /**
- * Money rounding goes through src/lib/money.ts: half away from zero, decided
- * on 12 significant digits, so the cent a lender would post is the cent the
- * pad shows. `Math.round(v * 100) / 100` used to land on the wrong side of the
- * half — 20.15 ÷ 2 is 10.075 exactly, but 10.075 * 100 is 1007.4999999999999
- * in binary, so the pad said $10.07 — and rounded negative halves toward zero.
+ * Rounding goes through src/lib/money.ts: half away from zero, decided on 12 significant digits, so the
+ * cent a lender would post is the cent the pad shows. 20.15 ÷ 2 is 10.075 exactly, but 10.075 * 100 is
+ * 1007.4999999999999 in binary, so `Math.round(v * 100) / 100` would say $10.07.
  * Every expected value below is the exact decimal result, rounded by hand.
  */
 describe('CalculatorPad arithmetic', () => {

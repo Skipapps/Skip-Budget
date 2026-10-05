@@ -10,13 +10,7 @@ type ColorPickerProps = {
   onChange: (value: string) => void;
 };
 
-/**
- * Swatch grid for choosing a card face colour.
- *
- * Four to a row: quarter-width cells rather than a wrapped row with gaps, so
- * the grid stays four-up and evenly spaced at every screen width instead of
- * breaking seven-and-one wherever the row happens to run out.
- */
+/** Swatch grid for a card face colour. Quarter-width cells, so it stays four-up at every screen width. */
 export function ColorPicker({ value, onChange }: ColorPickerProps) {
   const colors = useColors();
   return (

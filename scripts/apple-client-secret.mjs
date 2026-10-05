@@ -1,13 +1,9 @@
 #!/usr/bin/env node
 /**
- * Builds the Apple "client secret" JWT that Supabase's Apple provider wants.
+ * Builds the Apple "client secret" JWT that Supabase's Apple provider expects as a finished token
+ * (Team ID and Key ID live inside it).
  *
- * Supabase used to take Team ID, Key ID and the .p8 and sign this itself. It
- * now expects the finished token, which is why those fields disappeared from
- * the dashboard — the values live inside this JWT instead.
- *
- * Runs entirely locally. The .p8 is read from disk, used to sign, and never
- * printed or sent anywhere.
+ * Runs entirely locally: the .p8 is read from disk, used to sign, and never printed or sent.
  *
  *   node scripts/apple-client-secret.mjs \
  *     --key ~/Downloads/AuthKey_ABCD123456.p8 \

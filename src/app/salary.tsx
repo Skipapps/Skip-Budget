@@ -68,8 +68,7 @@ function hourlyOf(source: SalarySource): HourlyPay {
     hoursPerWeek: parseHours(source.hoursPerWeek),
     overtimeHoursPerWeek: source.overtime ? parseHours(source.overtimeHours) : 0,
     overtimeMultiplier: source.overtimeMultiplier ?? 1.5,
-    // No tax field (Founder, 2026-10-03): hourly pay is counted as earned,
-    // before tax, and says so on the estimate.
+    // No tax field: hourly pay is counted before tax, and the estimate says so.
     deductionPercent: 0,
     frequency: source.frequency,
   };
@@ -108,7 +107,6 @@ function hourlyValues(source: SalarySource): Partial<SalaryValues> {
 type PadTarget = {
   sourceId: string;
   mode: 'pad' | 'calculator';
-  /** Which figure the keypad is filling in. */
   field: 'amount' | 'rate';
 } | null;
 
@@ -118,11 +116,8 @@ function asDate(iso: string | null | undefined): Date | null {
 }
 
 /**
- * Loads what exists, then hands it to the editor as initial state.
- *
- * Keyed on the row count so the editor remounts once the data lands — the same
- * reason the receipt form does it: seeding state from a query inside an effect
- * fights the user's own edits when a refetch arrives mid-typing.
+ * Loads what exists, then hands it to the editor as initial state. The editor is keyed on the saved
+ * ids so it remounts when data lands: seeding state from an effect fights mid-typing edits.
  */
 export default function SalaryScreen() {
   const colors = useColors();
@@ -140,8 +135,7 @@ export default function SalaryScreen() {
     );
   }
 
-  // Not an empty editor: one that loaded nothing would look like every source
-  // had been deleted, and Save from there would make that true.
+  // Never an empty editor on failure: Save from there would delete every source.
   if (details.isError) {
     return (
       <Screen title="Salary" showBack>
@@ -161,8 +155,7 @@ export default function SalaryScreen() {
     amount: row.amount,
     frequency: row.frequency,
     lastPayday: row.last_payday,
-    // The links as saved. This used to start empty, and Save rewrote the
-    // links from it — so every save unlinked every account.
+    // The links as saved: Save rewrites them, so starting empty would unlink every account.
     accountIds: row.account_ids,
     payType: row.pay_type,
     hourlyRate: row.hourly_rate ?? 0,
@@ -192,16 +185,12 @@ function SalaryEditor({
   const colors = useColors();
   const [sources, setSources] = useState<SalarySource[]>(initial);
   const [padTarget, setPadTarget] = useState<PadTarget>(null);
-  // Which source's payday is being picked, or null when the picker is closed.
   const [dateTarget, setDateTarget] = useState<string | null>(null);
-  // Collapsed by id. Everything starts open — a source you just added is a
-  // source you are still filling in.
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   // Monotonic so ids stay unique even after sources are removed.
   const nextId = useRef(initial.length + 1);
-  // Ids that exist in the database; anything else on screen is new, and
-  // anything here but no longer on screen has been removed.
+  // Ids in the database: anything else on screen is new, and any missing from screen was removed.
   const savedIds = useRef(new Set(initial.map((source) => source.id)));
 
   const { data: accounts = [] } = useBankAccounts();
@@ -232,8 +221,7 @@ function SalaryEditor({
   const { pro } = usePro();
 
   const addSource = () => {
-    // One income is the free allowance; the second opens the case for Pro.
-    // The database refuses it too — this just makes the door say why.
+    // One income is free; the second is Pro. The database refuses it too, so this just says why.
     if (!pro && sources.length >= 1) {
       router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } });
       return;
@@ -257,13 +245,8 @@ function SalaryEditor({
     ]);
   };
 
-  /**
-   * Removing a source takes its income out of every projection with it.
-   *
-   * That is a bigger change than the bin icon suggests — paydays are what the
-   * dashboard measures spending against — so it asks first. The row goes on
-   * Save with the rest of the screen, not on the tap.
-   */
+  // Removing a source drops its income from every projection, so it asks first. The row is deleted
+  // on Save, not on the tap.
   const removeSource = async (id: string) => {
     const source = sources.find((row) => row.id === id);
     const name = source?.name.trim();
@@ -286,8 +269,7 @@ function SalaryEditor({
 
   const handleSave = async () => {
     setError(null);
-    // Hourly sources count once named: their pay is checked just below, with
-    // a reason, rather than silently dropped for working out to nothing yet.
+    // Hourly sources count once named: their pay is checked below, with a reason.
     const named = sources.filter(
       (source) => source.name.trim() && (source.payType === 'hourly' || source.amount > 0),
     );
@@ -303,16 +285,14 @@ function SalaryEditor({
         return;
       }
     }
-    // Every payday is counted forward from the last one, so without that date
-    // the income is saved but never lands anywhere.
+    // Paydays are counted forward from the last one; without it the income never lands anywhere.
     if (named.some((source) => !source.lastPayday)) {
       setError('Pick the last payday for each source, so Skip can work out the next ones.');
       return;
     }
 
     try {
-      // Removed first, so a delete plus a re-add of the same name cannot
-      // collide on the way through.
+      // Deletes first, so a delete plus a re-add of the same name cannot collide.
       const stillPresent = new Set(named.map((source) => source.id));
       for (const id of savedIds.current) {
         if (!stillPresent.has(id)) await deleteSource.mutateAsync(id);
@@ -324,7 +304,6 @@ function SalaryEditor({
           amount: paycheckOf(source),
           frequency: source.frequency,
           last_payday: source.lastPayday,
-          // Only once the database has somewhere to put them.
           ...(hourlyAvailable ? hourlyValues(source) : {}),
         };
         const id = savedIds.current.has(source.id)
@@ -342,9 +321,6 @@ function SalaryEditor({
 
   return (
     <Screen title="Salary" showBack avoidKeyboard>
-      {/* Deliberately not a card. Boxed like the sources below, this read as
-          one more editable field and people tapped it — it is a readout, and
-          plain centred text is what says so. */}
       <View className="mt-3 w-full items-center">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           Total per month
@@ -371,9 +347,6 @@ function SalaryEditor({
               </Text>
 
               <View className="flex-row items-center gap-1">
-                {/* Offered on the only source too. Someone who added income by
-                    mistake, or who has stopped being paid from somewhere, had
-                    no way to take it back out. */}
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Remove source ${index + 1}`}
@@ -384,9 +357,6 @@ function SalaryEditor({
                   <Trash2 size={18} color={colors.muted} strokeWidth={1.8} />
                 </Pressable>
 
-                {/* Several sources fill the screen fast, and most of the time
-                    you are editing one of them. Folding the rest away keeps
-                    the one you are working on in view. */}
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={
@@ -414,7 +384,6 @@ function SalaryEditor({
             </View>
 
             {collapsed[source.id] ? (
-              // Folded: enough to tell one source from another without opening it.
               <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
                 {[
                   source.name.trim() || 'Unnamed',
@@ -649,10 +618,7 @@ function HoursUnit() {
   );
 }
 
-/**
- * The hourly maths, shown as it is typed: each paycheck and the month it adds
- * up to, before tax — said on the card, so nobody mistakes it for take-home.
- */
+/** The hourly estimate as typed: each paycheck and the month it adds up to, shown as before tax. */
 function HourlyEstimateCard({ source }: { source: SalarySource }) {
   const pay = hourlyOf(source);
   const problem = hourlyProblem(pay);

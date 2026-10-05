@@ -6,20 +6,18 @@ import { DEFAULT_ALIAS_CAP, learnAlias, type AliasPair } from '@/lib/voice';
 import { useUserId } from '@/providers/session-provider';
 
 /**
- * What Skip has learned about how one person says their merchants: "spot a
- * fly" meant Spotify. Kept on this phone only, never sent anywhere.
+ * What Skip has learned about how one person says their merchants ("spot a fly" meant Spotify).
+ * Kept on this phone only, never sent anywhere.
  *
- * - **Per user.** The key carries the user id (the house pattern, as
- *   `src/api/news.ts` does), and `signOut()` and `deleteAccount()` also clear it,
+ * - Per user: the key carries the user id, and `signOut()` and `deleteAccount()` also clear it,
  *   because these are a person's own words.
- * - **Ordered pairs, not an object.** JS lists integer-like keys ("711", "24")
- *   first whatever order they were added in, which would break oldest-first
- *   eviction at the cap. Drew's `learnAlias` keeps the order and the cap (200).
- * - **Never throws.** Storage that refuses, or holds something unreadable,
- *   reads as nothing learned. A correction that cannot be written is lost, and
- *   the person corrects it again next time.
- * - **Not kept in memory once nobody is using it** (`gcTime: 0`). The query
- *   cache outlives a sign-out, and cleared storage must not come back from it.
+ * - Ordered pairs, not an object: JS lists integer-like keys ("711", "24") first whatever order
+ *   they were added in, which would break oldest-first eviction at the cap (200, kept by
+ *   `learnAlias`).
+ * - Never throws: storage that refuses, or holds something unreadable, reads as nothing learned. A
+ *   correction that cannot be written is lost, and the person corrects it again next time.
+ * - Not kept in memory once nobody is using it (`gcTime: 0`): the query cache outlives a sign-out,
+ *   and cleared storage must not come back from it.
  */
 
 const keyFor = (userId: string) => `skip.voice.aliases.${userId}`;
@@ -50,10 +48,7 @@ function toMap(pairs: readonly AliasPair[]): Record<string, string> {
   return Object.fromEntries(pairs);
 }
 
-/**
- * The learned corrections for the signed-in person. `{}` until loaded, and
- * `ready` once there is an answer (straight away with nobody signed in).
- */
+/** The learned corrections for the signed-in person. `ready` once there is an answer. */
 export function useVoiceAliases(): { aliases: Record<string, string>; ready: boolean } {
   const userId = useUserId();
   const query = useQuery({
@@ -72,12 +67,9 @@ export function useVoiceAliases(): { aliases: Record<string, string>; ready: boo
 let queue: Promise<void> = Promise.resolve();
 
 /**
- * Teaches Skip that `heard` meant `canonical`. Call it after a successful save,
- * only when the person changed the merchant from what was heard, with the
- * draft's `merchantHeard` and the name that was saved.
- *
- * Best-effort: the promise never rejects, and nothing is written when there
- * is nothing new to learn.
+ * Teaches Skip that `heard` meant `canonical`. Call it after a successful save, only when the
+ * person changed the merchant from what was heard. Best-effort: never rejects, and writes nothing
+ * when there is nothing new to learn.
  */
 export function useLearnVoiceAlias(): (heard: string, canonical: string) => Promise<void> {
   const userId = useUserId();

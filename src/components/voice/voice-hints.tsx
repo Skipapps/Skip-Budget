@@ -5,19 +5,15 @@ import { sentenceText, VOICE_EXAMPLES } from '@/data/voice-examples';
 import { cn } from '@/lib/cn';
 
 /**
- * Three things to say, as quiet text above the mic — the way chat apps show
- * starter prompts (the Founder's call). No cards, no icons, no quotes, and not
- * tappable: suggestions to read, not buttons.
+ * Three things to say, as quiet text above the mic, the way chat apps show starter prompts: not
+ * tappable, no cards or quotes. Ink at 40% (20% is the empty speech area's "Listening…", which
+ * only marks a place).
  *
- * Ink at 40%: low enough to read as a suggestion, high enough to read at all.
- * (20% is the empty speech area's "Listening…", which only marks a place.)
+ * The sentences come from src/data/voice-examples.ts, which the parser's catalog test reads too,
+ * so every hint is one Skip is proven to read back.
  *
- * The sentences come from src/data/voice-examples.ts, which the parser's
- * catalog test reads too, so every hint is one Skip is proven to read back.
- *
- * Hidden by fading out, not by leaving: the mic sits right under them, and a
- * stack that collapsed the moment a thumb went down would pull the button out
- * from under it.
+ * Hidden by fading out, not by leaving: the mic sits right under them, and a stack that collapsed
+ * the moment a thumb went down would pull the button out from under it.
  */
 export const VoiceHints = memo(function VoiceHints({ hidden }: { hidden: boolean }) {
   return (
