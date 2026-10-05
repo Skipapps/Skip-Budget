@@ -18,7 +18,7 @@ import { Screen } from '@/components/ui/screen';
 import { SelectField } from '@/components/ui/select-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TextField } from '@/components/ui/text-field';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { Subtitle } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { simplifyDebts } from '@/lib/split';
@@ -59,8 +59,7 @@ export default function SettleUpScreen() {
 
   if (group.isLoading || members.isLoading || balances.isLoading) {
     return (
-      <Screen showBack>
-        <Title>Settle up</Title>
+      <Screen title="Settle up" showBack>
         <View className="mt-7 w-full gap-6" accessibilityLabel="Loading">
           <Skeleton className="h-12 w-full rounded-full" />
           <Skeleton className="h-14 w-full rounded-[12px]" />
@@ -74,7 +73,7 @@ export default function SettleUpScreen() {
   // payment between two people it could not name, for an amount nobody owes.
   if (group.isError || members.isError || balances.isError) {
     return (
-      <Screen showBack>
+      <Screen title="Settle up" showBack>
         <PageState
           art={artwork.error}
           title={FAILURE_MESSAGE}
@@ -171,8 +170,7 @@ function SettleUpForm({
   };
 
   return (
-    <Screen showBack avoidKeyboard>
-      <Title>Settle up</Title>
+    <Screen title="Settle up" showBack avoidKeyboard>
       <Subtitle className="mt-3">
         Records a payment that happened somewhere else — cash, a bank transfer, a round of drinks.
         Skip does not move any money.

@@ -7,11 +7,11 @@ import type { SetupStep } from '@/api/onboarding';
 /**
  * The walk-in gate, pinned.
  *
- * Three behaviours carry the whole screen: a finished or dismissed account
- * passes straight to Home without a frame of setup; a fresh account gets the
- * four steps with Continue aimed at the first one; and the arrival decision
- * is taken once — finishing the last required step mid-flow must not yank
- * the screen away before the optional receipt has had its moment.
+ * Three behaviours carry the whole screen: a returning account — anything
+ * saved at all, or the guide dismissed — passes straight to Home without a
+ * frame of setup; a fresh account gets the steps with Continue aimed at the
+ * first one; and the arrival decision is taken once — saving a step mid-flow
+ * must not yank the screen away before the rest have had their moment.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -30,6 +30,7 @@ jest.mock('expo-router', () => {
       replace: jest.fn(),
       back: jest.fn(),
       canGoBack: jest.fn(() => false),
+      canDismiss: jest.fn(() => false),
       dismissAll: jest.fn(),
     },
     Redirect: ({ href }: { href: string }) => <Text>{`redirect:${href}`}</Text>,
@@ -59,7 +60,10 @@ const mockGettingStarted = {
   dismiss: jest.fn(),
 };
 jest.mock('@/api/onboarding', () => ({
-  useGettingStarted: () => ({ ...mockGettingStarted }),
+  useGettingStarted: () => ({
+    ...mockGettingStarted,
+    doneCount: mockGettingStarted.steps.filter((step) => step.done).length,
+  }),
 }));
 
 function makeSteps(done: {
@@ -135,16 +139,19 @@ it('shows the five steps to a fresh account, with Continue aimed at the first', 
 });
 
 it('opens the bills step on its own page, not straight on the form', async () => {
-  mockGettingStarted.steps = makeSteps({ salary: true, wallet: true });
+  // Arrive fresh, then save the first two steps mid-flow.
   const screen = await render(<SetupScreen />);
+  mockGettingStarted.steps = makeSteps({ salary: true, wallet: true });
+  await screen.rerender(<SetupScreen />);
 
   await fireEvent.press(screen.getByText('Continue'));
   expect(router.push).toHaveBeenCalledWith('/setup-bills');
 });
 
 it('opens the subscriptions step on its own page too', async () => {
-  mockGettingStarted.steps = makeSteps({ salary: true, wallet: true, bill: true });
   const screen = await render(<SetupScreen />);
+  mockGettingStarted.steps = makeSteps({ salary: true, wallet: true, bill: true });
+  await screen.rerender(<SetupScreen />);
 
   await fireEvent.press(screen.getByText('Continue'));
   expect(router.push).toHaveBeenCalledWith('/setup-subscriptions');
@@ -163,6 +170,25 @@ it('passes a finished account straight to Home without rendering the flow', asyn
 
   expect(screen.getByText('redirect:/home')).toBeTruthy();
   expect(screen.queryByText('Set your pay')).toBeNull();
+});
+
+it('passes a returning account straight to Home even with required steps left', async () => {
+  // Signed in again with pay, a card and a bill saved but no subscription:
+  // a returning user, not a new one.
+  mockGettingStarted.steps = makeSteps({ salary: true, wallet: true, bill: true });
+
+  const screen = await render(<SetupScreen />);
+
+  expect(screen.getByText('redirect:/home')).toBeTruthy();
+  expect(screen.queryByText('Add your subscriptions')).toBeNull();
+});
+
+it('passes an account whose only entry is a receipt straight to Home', async () => {
+  mockGettingStarted.steps = makeSteps({ receipt: true });
+
+  const screen = await render(<SetupScreen />);
+
+  expect(screen.getByText('redirect:/home')).toBeTruthy();
 });
 
 it('passes a dismissed account straight to Home even with steps undone', async () => {

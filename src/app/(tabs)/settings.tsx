@@ -12,13 +12,12 @@ import {
   Lightbulb,
   LogOut,
   Mail,
-  Palette,
   ReceiptText,
   Repeat,
   ScanFace,
   ScrollText,
   Shield,
-  LayoutGrid,
+  SunMoon,
   Trash2,
   UserRound,
   Vibrate,
@@ -42,11 +41,11 @@ import { SettingsSection } from '@/components/settings/settings-section';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm, useDialog } from '@/providers/dialog-provider';
 import { usePreferences } from '@/providers/preferences-provider';
-import { useTheme, useColors } from '@/providers/theme-provider';
+import { useColors, useTheme } from '@/providers/theme-provider';
 import { findAvatar } from '@/theme/avatars';
-import { ACCENTS, MODES } from '@/theme/palette';
+import type { ModeKey } from '@/theme/palette';
+import { ChoiceChips } from '@/components/ui/choice-chips';
 import { TextField } from '@/components/ui/text-field';
-import { Title } from '@/components/ui/typography';
 
 import CoffeeMark from '@/assets/illustrations/buy-me-a-coffee.svg';
 import { useCharges } from '@/api/charges';
@@ -64,6 +63,19 @@ import {
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
+const MODE_OPTIONS = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
+] as const;
+
+/** What the chosen mode means, so "System" is not a guess. */
+const MODE_CAPTIONS: Record<ModeKey, string> = {
+  light: 'Always light',
+  dark: 'Always dark',
+  system: 'Follows your phone',
+};
+
 export default function SettingsScreen() {
   const colors = useColors();
   const confirm = useConfirm();
@@ -76,7 +88,7 @@ export default function SettingsScreen() {
   const { pro } = usePro();
   const proOverride = useProOverride();
   const updateProfile = useUpdateProfile();
-  const { mode, accentId } = useTheme();
+  const { mode, setMode } = useTheme();
   const { haptics, setHaptics, appLock, setAppLock } = usePreferences();
 
   const bills = useBills();
@@ -186,9 +198,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <Screen avoidKeyboard>
-      <Title>Settings</Title>
-
+    <Screen title="Settings" avoidKeyboard>
       <SettingsSection title="Skip Pro">
         <SettingsRow
           icon={Crown}
@@ -248,7 +258,9 @@ export default function SettingsScreen() {
           artwork={<ProfileAvatar avatarId={profile.data?.avatar_id} size={34} />}
           title="Profile picture"
           subtitle={
-            findAvatar(profile.data?.avatar_id)?.label ?? 'Pick one to show on your dashboard'
+            findAvatar(profile.data?.avatar_id)
+              ? 'Tap to change'
+              : 'Pick one to show on your dashboard'
           }
           onPress={() => router.push('/avatar')}
           last
@@ -293,16 +305,9 @@ export default function SettingsScreen() {
       </SettingsSection>
 
       <SettingsSection title="Preferences">
-        <SettingsRow
-          icon={Palette}
-          title="Appearance"
-          // What it is set to, not what it does. Someone opening settings to
-          // change it already knows what appearance means.
-          subtitle={`${MODES.find((option) => option.id === mode)?.label ?? 'System'} · ${
-            ACCENTS.find((accent) => accent.id === accentId)?.label ?? ''
-          }`}
-          onPress={() => router.push('/appearance')}
-        />
+        <SettingsRow icon={SunMoon} title="Appearance" subtitle={MODE_CAPTIONS[mode]}>
+          <ChoiceChips options={MODE_OPTIONS} value={mode} onChange={setMode} />
+        </SettingsRow>
         <SettingsRow
           icon={Vibrate}
           title="Haptics"
@@ -320,12 +325,6 @@ export default function SettingsScreen() {
           title="Reminders"
           subtitle="Before a renewal, a bill or payday"
           onPress={() => router.push('/reminders')}
-        />
-        <SettingsRow
-          icon={LayoutGrid}
-          title="Dashboard order"
-          subtitle="The order of “Where it goes”"
-          onPress={() => router.push('/tiles')}
           last
         />
       </SettingsSection>
@@ -335,13 +334,15 @@ export default function SettingsScreen() {
           icon={ReceiptText}
           title="Bills"
           subtitle={billCount > 0 ? plural(billCount, 'recurring bill') : 'None yet'}
-          onPress={() => router.push('/bills')}
+          // The list of bills themselves, every one including those with no
+          // charge this month; Home's Monthly bills is what they cost.
+          onPress={() => router.push('/bill-plans')}
         />
         <SettingsRow
           icon={Repeat}
           title="Subscriptions"
-          subtitle={trackedSubscriptions > 0 ? plural(trackedSubscriptions, 'tracked') : 'None yet'}
-          onPress={() => router.push('/subscriptions')}
+          subtitle={trackedSubscriptions > 0 ? `${trackedSubscriptions} tracked` : 'None yet'}
+          onPress={() => router.push('/subscription-plans')}
         />
         <SettingsRow
           icon={CreditCard}

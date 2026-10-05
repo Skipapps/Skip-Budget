@@ -1,6 +1,8 @@
 import { forgetDevice } from '@/api/push';
+import { forgetVoiceAliases } from '@/api/voice-aliases';
 import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 import { supabase } from '@/lib/supabase';
+import { clearVoiceDraft } from '@/lib/voice-draft';
 
 export type AuthResult = { error: string | null };
 
@@ -133,9 +135,31 @@ export async function sendPasswordReset(email: string): Promise<AuthResult> {
  */
 export async function signOut(): Promise<AuthResult> {
   await forgetThisDevice();
+  await forgetThisPersonsVoice();
 
   const { error } = await supabase.auth.signOut();
   return { error: error ? failureMessage(error) : null };
+}
+
+/**
+ * Best-effort removal of what this phone holds of the person's voice: an
+ * unsaved voice draft still in memory (their words), and the corrections it
+ * learned for them ("spot a fly" meant Spotify), which are keyed by user id,
+ * so this runs while the session can still say whose they are. Never holds
+ * up signing out.
+ */
+async function forgetThisPersonsVoice(): Promise<void> {
+  try {
+    clearVoiceDraft();
+  } catch (error) {
+    console.warn('Could not clear the voice draft', error);
+  }
+  try {
+    const { data } = await supabase.auth.getSession();
+    await forgetVoiceAliases(data.session?.user?.id);
+  } catch (error) {
+    console.warn('Could not clear learned voice corrections', error);
+  }
 }
 
 /** Best-effort removal of this device's push row, while a session still exists. */
@@ -187,6 +211,9 @@ export async function deleteAccount(): Promise<AuthResult> {
     return { error: FAILURE_MESSAGE };
   }
 
+  // The server has nothing left; this phone's learned voice corrections are
+  // the last of the person's words, and the stored session still names them.
+  await forgetThisPersonsVoice();
   await supabase.auth.signOut();
   return { error: null };
 }

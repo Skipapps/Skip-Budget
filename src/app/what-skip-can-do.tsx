@@ -3,7 +3,6 @@ import { Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
-import { Title } from '@/components/ui/typography';
 import { useArtwork, type ArtworkName } from '@/theme/artwork';
 
 /**
@@ -50,9 +49,11 @@ export default function WhatSkipCanDoScreen() {
   const artwork = useArtwork();
 
   return (
-    <Screen showBack footer={<Button label="Continue" onPress={() => router.push('/message')} />}>
-      <Title>What Skip can do</Title>
-
+    <Screen
+      title="What Skip can do"
+      showBack
+      footer={<Button label="Continue" onPress={() => router.push('/message')} />}
+    >
       <View className="mt-7 w-full gap-3">
         {CAN_DO.map((item) => {
           const Art = artwork[item.artwork];

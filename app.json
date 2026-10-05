@@ -11,6 +11,7 @@
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.skipapps.skip.budget",
       "appleTeamId": "2YDDY7H6XP",
+      "buildNumber": "3",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -39,12 +40,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FBF9F7",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 150,
+          "backgroundColor": "#F5F3F1",
           "dark": {
-            "backgroundColor": "#1B181F",
-            "image": "./assets/images/splash-icon.png"
+            "backgroundColor": "#F5F3F1"
           }
         }
       ],
@@ -79,7 +77,15 @@
         {
           "teamId": "2YDDY7H6XP"
         }
-      ]
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Skip Budget uses the microphone when you add a receipt, bill or subscription by voice.",
+          "speechRecognitionPermission": "Skip Budget turns what you say into an entry you review before saving — on-device when your iPhone supports it, otherwise via Apple’s speech service."
+        }
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,5 +1,5 @@
 import { Redirect, router } from 'expo-router';
-import { useRef } from 'react';
+import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Check, ChevronRight } from 'lucide-react-native';
 
@@ -19,14 +19,17 @@ const SETUP_ROUTES: Partial<Record<SetupStep['id'], string>> = {
 };
 
 /**
- * The walk-in: five steps between signing in and a working app.
+ * The walk-in: five steps between signing up and a working app.
  *
  * Every arrival after login lands here, and the screen decides — once, on
- * arrival — whether there is anything to do. Somebody whose required steps
- * are done, or who waved the guide away, passes straight through to Home
- * without seeing a frame of this. The decision is taken once and held,
- * because it flips mid-flow: finish the bills and "required done" turns true,
- * and a live gate would yank the screen away before the receipt step had its
+ * arrival — whether this is a new account. Only an account with nothing in it
+ * yet gets the walk-in. Anyone who has saved anything at all is a returning
+ * user and passes straight through to Home without seeing a frame of this
+ * (Founder, 2026-10-03: a returning account with no subscription was being
+ * walked through setup again on every login). Home's Getting Started card
+ * still lists what is left for them. The decision is taken once and held,
+ * because it flips mid-flow: save the pay step and the account is no longer
+ * empty, and a live gate would yank the screen away before the rest had their
  * say.
  *
  * A hub, not a wizard: each step opens the real screen — the same salary,
@@ -36,16 +39,19 @@ const SETUP_ROUTES: Partial<Record<SetupStep['id'], string>> = {
  */
 export default function SetupScreen() {
   const colors = useColors();
-  const { steps, requiredDone, settled, dismissed } = useGettingStarted();
+  const { steps, doneCount, requiredDone, settled, dismissed } = useGettingStarted();
 
-  // The arrival decision, taken exactly once when the rows are in.
-  const decided = useRef<'flow' | 'home' | null>(null);
-  if (decided.current === null && settled) {
-    decided.current = dismissed || requiredDone ? 'home' : 'flow';
+  // The arrival decision, taken exactly once when the rows are in: new
+  // accounts walk in, returning ones go home.
+  // State set during render, React's pattern for a value taken from props
+  // once: unlike a ref, reading it here is allowed.
+  const [decided, setDecided] = useState<'flow' | 'home' | null>(null);
+  if (decided === null && settled) {
+    setDecided(dismissed || doneCount > 0 ? 'home' : 'flow');
   }
 
-  if (decided.current === null) return <></>;
-  if (decided.current === 'home') return <Redirect href="/home" />;
+  if (decided === null) return <></>;
+  if (decided === 'home') return <Redirect href="/home" />;
 
   // Three steps go somewhere of their own from here. The wallet carries its
   // origin, so the card form hands over to the account offer, then returns;

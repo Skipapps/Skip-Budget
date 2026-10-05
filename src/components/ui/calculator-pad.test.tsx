@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import type { StyleProp, TextStyle } from 'react-native';
 
@@ -60,5 +60,62 @@ describe('CalculatorPad figure', () => {
     expect(sizeOf(number)).toBe(48);
     expect(number.props.adjustsFontSizeToFit).toBeUndefined();
     expect(sizeOf(getByText('$'))).toBe(24);
+  });
+});
+
+/**
+ * Money rounding goes through src/lib/money.ts: half away from zero, decided
+ * on 12 significant digits, so the cent a lender would post is the cent the
+ * pad shows. `Math.round(v * 100) / 100` used to land on the wrong side of the
+ * half — 20.15 ÷ 2 is 10.075 exactly, but 10.075 * 100 is 1007.4999999999999
+ * in binary, so the pad said $10.07 — and rounded negative halves toward zero.
+ * Every expected value below is the exact decimal result, rounded by hand.
+ */
+describe('CalculatorPad arithmetic', () => {
+  /** Opens the pad on `start`, presses the keys, taps Done; returns what it confirmed. */
+  async function calculate(start: string, keys: string[]): Promise<string> {
+    const onConfirm = jest.fn();
+    const pad = await render(
+      <CalculatorPad value={start} onCancel={() => {}} onConfirm={onConfirm} />,
+    );
+    for (const key of keys) await fireEvent.press(pad.getByLabelText(key));
+    await fireEvent.press(pad.getByLabelText('Done'));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    return onConfirm.mock.calls[0][0];
+  }
+
+  it.each([
+    // [start, keys, exact decimal, posted]
+    ['20.15', ['÷', '2', '='], '10.075', '10.08'],
+    ['2.01', ['÷', '2', '='], '1.005', '1.01'],
+    ['10.05', ['×', '0', '.', '5', '='], '5.025', '5.03'],
+    ['0.01', ['÷', '2', '='], '0.005', '0.01'],
+    ['100', ['÷', '3', '='], '33.333…', '33.33'],
+    ['0.1', ['+', '0', '.', '2', '='], '0.3', '0.3'],
+  ])('%s then %j is %s, posted as $%s', async (start, keys, _exact, posted) => {
+    expect(await calculate(start, keys)).toBe(posted);
+  });
+
+  it('settles a half-finished sum on Done the same way', async () => {
+    expect(await calculate('20.15', ['÷', '2'])).toBe('10.08');
+  });
+
+  // Below zero the half goes away from zero too: 0 − 20.15 ÷ 2 = −10.075 exactly.
+  it.each([
+    [['−', '2', '0', '.', '1', '5', '÷', '2', '='], '-10.08'],
+    [['−', '2', '.', '0', '1', '÷', '2', '='], '-1.01'],
+    [['−', '0', '.', '0', '1', '÷', '2', '='], '-0.01'],
+  ])('0 then %j posts $%s', async (keys, posted) => {
+    expect(await calculate('0', keys)).toBe(posted);
+  });
+
+  // Zero is "0", never "-0": −0.01 ÷ 3 = −0.00333… rounds to nothing.
+  it.each([
+    ['5', ['−', '5', '=']],
+    ['0', ['×', '7', '=']],
+    ['0.01', ['÷', '3', '=']],
+    ['0', ['−', '0', '.', '0', '1', '÷', '3', '=']],
+  ])('%s then %j lands on 0', async (start, keys) => {
+    expect(await calculate(start, keys)).toBe('0');
   });
 });

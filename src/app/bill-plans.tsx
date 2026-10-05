@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { SlidersHorizontal } from 'lucide-react-native';
+import { Plus, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -11,12 +11,10 @@ import {
 } from '@/components/bills/bill-filter-sheet';
 import { useArtwork } from '@/theme/artwork';
 import { BillRow } from '@/components/bills/bill-row';
-import { ActionPill } from '@/components/ui/action-pill';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { PageState } from '@/components/ui/page-state';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { Title } from '@/components/ui/typography';
 
 import { usePaymentSources, useBills } from '@/api/queries';
 import { getBillCategory } from '@/data/bills-mock';
@@ -102,15 +100,12 @@ export default function BillPlansScreen() {
     !query.isPending && !query.isError && bills.length > 0 && visible.length === 0;
 
   return (
-    <Screen showBack avoidKeyboard>
-      <View className="mt-2 w-full flex-row items-center justify-between gap-3">
-        <Title flush align="left" className="flex-1">
-          Your bills
-        </Title>
-
-        <ActionPill label="Add bill" onPress={() => router.push('/add-bill')} />
-      </View>
-
+    <Screen
+      title="Your bills"
+      showBack
+      avoidKeyboard
+      headerActions={[{ icon: Plus, label: 'Add bill', onPress: () => router.push('/add-bill') }]}
+    >
       {showEmpty || query.isError ? null : (
         <>
           <View className="mt-5 w-full flex-row items-center gap-3">
@@ -202,7 +197,7 @@ export default function BillPlansScreen() {
                   key={bill.id}
                   bill={bill}
                   sourceLabel={sourceLabels.get(bill.sourceId) ?? ''}
-                  onPress={() => router.push(`/add-bill?id=${bill.id}`)}
+                  onPress={() => router.push(`/bill/${bill.id}`)}
                 />
               ))}
             </View>

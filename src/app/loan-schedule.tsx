@@ -5,7 +5,7 @@ import { Text, View } from 'react-native';
 import { ProportionBar } from '@/components/calculators/proportion-bar';
 import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { Subtitle } from '@/components/ui/typography';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import {
@@ -99,8 +99,7 @@ function LoanScheduleScreenInner() {
   const years = scheduleByYear(rows);
 
   return (
-    <Screen showBack>
-      <Title className="mt-2">{params.name || 'Payment schedule'}</Title>
+    <Screen title={params.name || 'Payment schedule'} showBack>
       <Subtitle className="mt-3">
         {formatCurrency(loan.payment)} a month for {formatTerm(rows.length)}, at {annualRate}%.{' '}
         {BASIS_FOOTNOTES[basis]}

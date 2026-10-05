@@ -75,7 +75,7 @@ export default function ContactScreen() {
 
   if (sent) {
     return (
-      <Screen showBack>
+      <Screen title={copy.title} showBack>
         <View className="flex-1 items-center justify-center gap-6 px-4">
           <View className="h-20 w-20 items-center justify-center rounded-full bg-accent/15">
             <Check size={36} color={colors.accentInk} strokeWidth={2.4} />
@@ -95,10 +95,7 @@ export default function ContactScreen() {
   }
 
   return (
-    <Screen showBack avoidKeyboard>
-      <Title align="left" className="w-full">
-        {copy.title}
-      </Title>
+    <Screen title={copy.title} showBack avoidKeyboard>
       <Subtitle className="mt-2 w-full text-left">{copy.subtitle}</Subtitle>
 
       <View className="mt-7 w-full gap-5">

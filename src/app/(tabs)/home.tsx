@@ -24,7 +24,6 @@ import { useHasUnreadNews } from '@/api/news';
 import { useKeepSchedulesCurrent, useRefreshAll } from '@/api/refresh';
 import { spendingCategories } from '@/data/dashboard-mock';
 import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
-import { orderByIds } from '@/lib/order';
 import { groupByDate } from '@/lib/group';
 import { rangeFor } from '@/lib/range';
 import { addDays, formatDateRange, formatDayLabel, toIsoDate } from '@/lib/date';
@@ -47,6 +46,9 @@ const DESTINATION_ROUTES: Record<string, Href> = {
 /** The calculators live in their own card row now, not the spending list. */
 const TOOL_IDS = new Set(['loan-calculator', 'split-calculator']);
 
+// The calculators are drawn as cards of their own below the list.
+const TILES = spendingCategories.filter((tile) => !TOOL_IDS.has(tile.id));
+
 export default function HomeScreen() {
   const { pro } = usePro();
   // Opening the app is the moment to bring stale due dates up to date.
@@ -54,16 +56,6 @@ export default function HomeScreen() {
   const { refresh, refreshing } = useRefreshAll();
 
   const profile = useProfile();
-
-  // Whichever order they arranged them in, with anything unmentioned behind.
-  // The two calculators are drawn as cards of their own below the list.
-  const tiles = useMemo(
-    () =>
-      orderByIds(spendingCategories, profile.data?.tile_order).filter(
-        (tile) => !TOOL_IDS.has(tile.id),
-      ),
-    [profile.data?.tile_order],
-  );
 
   // One consistent day for every window below — and it turns at midnight and
   // on resume, so the dashboard never wakes up showing yesterday.
@@ -221,7 +213,7 @@ export default function HomeScreen() {
           behind a gesture. The order is whatever they arranged. */}
       <View className="mt-3 w-full">
         <DestinationList
-          items={tiles}
+          items={TILES}
           amounts={tileAmounts}
           pro={pro}
           loading={month.isLoading}

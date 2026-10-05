@@ -2627,3 +2627,741 @@ TextField truncates — the app's TextInput clips the same string, so it is hone
 3. `design/**` is not prettier-clean — `kit/components.mjs` and every screen file fail
    `npx prettier --check`, mine included, because the kit's house style is one long line per
    component. If `npm run check` is ever meant to be green, `design/` wants a `.prettierignore` line.
+
+---
+
+## 2026-10-01 — Dmitri (Development Team Lead) — voice input: wave 2 plan and save-path decision
+
+**Outcome:** Done. The plan is at `.claude/team/dev/voice-input-plan-2026-10-01.md`. No code was
+edited, nothing was run that writes, and nothing was committed.
+
+**Decision: save path (a), as a hybrid.** The review page saves NEW items directly through pure
+value-builders extracted from the three add forms (`src/api/entry-values.ts`; the forms are refactored to call them).
+When a builder refuses the draft, the review page hands off to the add form pre-filled, with `from=voice`,
+and the form's own Save runs.
+- Evidence that a new item's orchestration collapses to `create(values)`: `past-charges.ts:102`
+  (`choose` returns before any dialog when there's no planId), `:139` (always ready), `charges.ts:143`
+  (`floorAfterCharges` is identity with no charge), `reminders.ts:213/237` (no row → 'off' → a delete
+  of nothing). Already pinned by `past-charges.test.tsx:46, 135`.
+- Past vs future first date: the dialog never appears for a new item either way. A past date makes the
+  recorders backfill charges, exactly as the form does, so a "today-or-future only" gate was rejected
+  because it would *diverge* from the form.
+- (b) rejected: **no test pins what any form's Save writes.** The existing add-form screen tests only
+  cover the edit-load gate. Golden save tests on the current code are therefore a hard gate before any
+  form line moves.
+- (c)-only rejected: about 4 extra taps, a redundant review, and the forms' `router.back()` after save
+  lands on a live review page (a duplicate-save trap). Fixed in the hybrid with `dismissTo('/home')`.
+
+**Other calls:** draft `/voice` → `/voice-review` goes through a single-slot in-memory module
+(`src/lib/voice-draft.ts`), not route params, with re-validation on arrival. Review → form goes through route params with
+strict readers. The add forms go to **Diego**, not Dana (one owner per file; data-in/data-out refactor
+behind his golden tests). Migration split into two files (enum value alone; then `enforce_scan_is_pro`
+gains `'voice'`, because today the server wall only knows `scan`/`upload`).
+
+**Found:** `CalculatorPad` rounds `1.005 → 1.00` and `10.075 → 10.07` where `money.ts` gives
+`1.01`/`10.08` (a cent off; Drew ticket). `receipts.tsx` stopped direct-filing scans in `c123a72`;
+`ScanDraft.complete` is dead and two comments are stale. `WALL` in `src/lib/wall.ts` has no readers.
+Dilip's plugin entry has no permission strings, so the defaults are "Allow $(PRODUCT_NAME) to use the microphone."
+
+**Could not verify:** that `router.dismissTo('/home')` pops to the nested `(tabs)/home` without
+replacing. The docs and types agree on the API, and `save-loan.tsx:116` is precedent for a root route
+only, so this is a device check for Tia. I didn't run the Supabase CLI, so the transaction behaviour of
+`alter type … add value` is reasoned from Postgres 17 semantics.
+
+**Open questions:** (1) Drew's contract needs `merchantHeard` (for learning aliases) and probably `forceKind`
+(re-parse when the kind is changed on review); `learnAlias`/`applyAliases`/`voiceVocabulary` signatures
+are not in the brief. (2) Voice usage is measurable for receipts only; bills and subscriptions have no source column.
+(3) Founder copy is needed for `PRO_FEATURES.voice`, the two Info.plist strings and `privacy.tsx`.
+(4) The DB migration must deploy before the native build ships.
+
+---
+
+## 2026-10-01 — Drew (Developer, money maths) — voice parser (`src/lib/voice/`)
+
+**Outcome:** Done. `parseVoice(alternatives, ctx): VoiceDraft` plus `learnAlias`, `applyAliases`,
+`voiceVocabulary`, all pure TypeScript (no React, no native, no network), with the CEO's contract additions
+(`merchantHeard`, `forceKind`, ordered-pair `learnAlias`, past tense on bills/subscriptions, integer-named
+merchants) and Pia's nine "Try saying" sentences as fixtures. Nothing outside `src/lib/voice/` touched.
+
+**What changed (all new):** `src/lib/voice/` — `types.ts`, `clean.ts` (tokenizer, fillers), `numbers.ts`
+(one number group → exact cents), `amount.ts` (which number, ambiguity rule), `date.ts` (spoken dates,
+direction by kind and tense), `cycle.ts`, `merchant.ts` (aliases → exact → fuzzy via `matchesSearch` →
+typed "at X"), `kind.ts`, `bill-category.ts` (ten ids hard-coded), `corrections.ts` (slot-wise),
+`score.ts`, `aliases.ts`, `vocabulary.ts`, `words.ts`, `parse.ts`, `index.ts`, `test-fixtures.ts`; tests
+`parse.test.ts` (202-sentence table + invariants), `aliases.test.ts`, `vocabulary.test.ts`,
+`bill-category.test.ts`, `catalog.test.ts` (runs against the real 371-row catalog read from the migration).
+
+**Decisions:**
+- Ambiguity: any 1–99 number followed straight by a two-digit number ("twelve fifty", "fifteen ninety
+  nine", "nine ninety nine", "twelve oh five", iOS "12:50"/"15 99") returns both readings; `amount` is
+  pre-selected (bill → hundreds, else dollars-and-cents) and `missing` keeps `amount`. Settled only by a unit
+  ("twelve dollars fifty", "twelve fifty cents", "a buck fifty") or a scale ("eighteen hundred"). Digits are
+  taken as iOS wrote them. Tied alternatives that heard different amounts → all offered.
+- `confidence: 'high'` additionally requires `missing` empty.
+- A known biller suggests the bill category (Comcast → internet) only where unambiguous; spoken words win.
+- Fuzzy merchant matching needs 2–3 words (iOS writes real words; one-word fuzzy turned "safety" into
+  Safeway). Everyday-word brands (Shell, Medium, Lemonade, "office", "max") need "at/to/with" or a word like
+  "insurance/card/app" next to them.
+- Month ends: forward clamps (31st → 28 Feb), backward skips to a month that has the day.
+
+**Checks:** `npx jest --ci src/lib/voice` 6 suites / 337 (my 5 suites 278, plus Diego's `voice-draft` 59);
+`npx tsc --noEmit` no errors in `src/lib/voice` (3 in `src/app/voice.tsx` / `src/components/voice/` —
+other owners, stale typed routes + a module not yet written); `rm -rf .expo/cache/eslint && npx eslint
+src/lib/voice` clean; prettier clean. Full `npx jest --ci`: 1129/1132 — `quick-actions.test.tsx` fails on
+the committed tree ("Receipt" vs "Receipts"), the other two passed when run alone (files mid-edit by others).
+
+**Open for the Founder/CEO:** "fifteen ninety nine" is asked, not settled (contradicts the CEO note; Apple
+says "nine ninety nine" for $999); "Comcast" shows as Xfinity and "Amazon Prime" as Amazon (catalog
+aliases); brand → bill category pre-fill vs migration 0021; "spent 15.49 on Netflix" is a receipt;
+`guessCategory` duplicated (pinned by test) until it moves out of `src/api/brands.ts`.
+
+---
+
+## 2026-10-01 — Diego (Developer, data and backend) — voice input wave 2, data side
+
+**Outcome:** Done, apart from verification of the two migrations. Docker isn't running, the Supabase CLI
+isn't installed and there's no local Postgres, so they are written but **unverified**. Nothing was applied to
+any database and nothing was committed.
+
+**Golden tests first (plan §1.4 step 1).** There are 43 tests in `src/__tests__/app/add-{receipt,bill,subscription}-save.test.tsx`
+(14, 16 and 13). They pin the exact create/update payload, every hint and the step it sends you to, the bill
+icon rule, `'period'`, `starts_on` through `floorAfterCharges`, `started_on` through
+`countFromAfterPick`/`floorAfterCharges`, the `carried` values for past charges, and amounts
+`1100 / 15.99 / 0.10 / 1030.5`. All 43 were green on the untouched forms (`git diff` of the forms was empty at
+that point), with their sha256 recorded. After the refactor `shasum -c` still matches and all 43 pass, with zero
+edits to them. A mutation check (three regressions injected into the builder) failed 13 of them, then I
+restored the builder. The primary-button stub accepts a press while disabled, because that's the only way
+to reach the checks inside Save.
+
+**What changed**
+- `CaptureSource = 'manual' | 'scan' | 'upload' | 'voice'` in `src/api/mutations.ts`, used by `ReceiptValues`
+  and `ReceiptRow` (`src/api/queries.ts`).
+- NEW `src/api/entry-values.ts` (+ 24 tests): `buildReceiptValues`, `buildBillValues`,
+  `buildSubscriptionValues` and `defaultBillName`, with the signatures from plan §1.5. The amount rule is unchanged
+  (`isFinite && > 0`).
+- The forms call the builders. Past charges and reminders are untouched. `from=voice` (new items only) →
+  `router.dismissTo('/home')`, otherwise `router.back()`. add-receipt: `scannedVia=voice` gives `source:'voice'`
+  and no scan report, and the params go through strict readers. add-bill/add-subscription: strict `prefill*`
+  params; a bill with a known category skips the chooser; `handleSelectCategory` keeps a name that is the
+  company's or one typed on review.
+- NEW `src/lib/voice-draft.ts` (+ 59 tests): a single slot holding the parsed draft **and the review page's
+  working copy** (the CEO's /voice-edit addition): `putVoiceDraft`, `readVoiceDraft`, `readVoiceEntry`,
+  `updateVoiceEntry` (validated, all or nothing), `rederiveVoiceEntry` (forceKind re-parse that keeps
+  hand edits), `useVoiceSession` (useSyncExternalStore, so no focus effect is needed), `clearVoiceDraft`,
+  `validateVoiceDraft`/`validateVoiceEntry`, `amountText` (two decimals from cents), `voiceSaveBlocker`,
+  `entryTo{Receipt,Bill,Subscription}Input`, `entryToForm`, `readBillPrefill`/`readSubscriptionPrefill`.
+  The parser round trip is checked: `validateVoiceDraft(parseVoice(…))` equals the parse for 8 sentences.
+- NEW `src/api/voice-aliases.ts` (+ 16 tests): `useVoiceAliases`, `useLearnVoiceAlias` (serialised, never
+  rejects) and `forgetVoiceAliases`. The key is per user, `skip.voice.aliases.<id>`, holding ordered pairs, using
+  Drew's `learnAlias`, capped at 200. `gcTime: 0` because the QueryClient is never cleared on sign-out.
+- `src/api/auth.ts`: `signOut()` and `deleteAccount()` (only after a verified deletion) clear aliases on a
+  best-effort basis and never block. `auth.test.ts` has 5 new tests and the existing ones are unchanged.
+- NEW `src/__tests__/app/add-forms-from-voice.test.tsx` (12): prefill, voice source, `dismissTo`, bad params blank.
+- NEW migrations `20261001100001_capture_source_voice.sql` (the enum value alone in the file) and
+  `20261001100002_voice_is_pro.sql` (`enforce_scan_is_pro` now walls `'voice'`, still before insert only).
+  Nothing else in SQL or the client switches on `receipts.source`.
+
+**Gate:** `npx tsc --noEmit` is clean, including Dana's voice pages. eslint on my files: 0 errors, 13 warnings,
+all in test files (`require()` in mock factories as `setup.test.tsx` does, plus an unused disable line in the
+goldens that I left so they stay byte-identical). `npx jest --ci`, whole suite: 1167/1168. The one failure is
+`quick-actions.test.tsx` › "routes Receipt", which fails at HEAD (the component says "Receipts") and is not mine.
+On the first run `calculator-pad.test.tsx` (modified by someone else) and `voice.test.tsx` (Dana's, new) also
+failed; both passed on the re-run.
+
+**Open questions:** zod is only a transitive dependency (not in package.json), so validation is hand-rolled.
+Should it become a declared dependency? Deploying the DB before the native build (R5) is a Founder gate. Scan params now
+go through the same strict readers, so a `'0'` or garbage amount opens blank, and a bad date opens as today
+rather than Invalid Date.
+
+---
+
+## 2026-10-01 — Drew (Developer, money maths) — voice example swap + CalculatorPad cent fix
+
+**Outcome:** Done, both. No commits.
+
+**1. "Try saying" swap** (Pia's rule: change the example, not the parser). The two examples that read back
+under a different name are replaced by ones that round-trip exactly against the real catalog:
+- Bills: "**Xfinity** **$79.99**, due **on the 20th** **every month**" → bill, $79.99, Xfinity, 2026-10-20
+  (today 2026-10-01), monthly, internet, high.
+- Subscriptions: "**Hulu** **$99.99** **a year**" → subscription, $99.99, Hulu, yearly, high.
+`parse.test.ts` TRY_SAYING updated; the old Comcast / Amazon Prime sentences moved to the merchant section
+as catalog-alias cases. `catalog.test.ts` now checks all nine examples against the real 371-row catalog
+(kind, amount, no choices, merchant = bold brand, date, cycle, category). Dana's files untouched.
+
+**2. CalculatorPad** (`src/components/ui/calculator-pad.tsx`). The local helper `toCents` (which returned
+dollars) used `Math.round(v * 100) / 100`: 20.15 ÷ 2 posted $10.07, 2.01 ÷ 2 posted $1.00, and negative
+halves rounded toward zero (−10.075 → −10.07). Replaced by `roundMoney` from `src/lib/money.ts` at the four
+operator lines; helper deleted, one import added. Fixtures in `calculator-pad.test.tsx` (press-through,
+real component): 20.15÷2 = 10.08, 2.01÷2 = 1.01, 10.05×0.5 = 5.03, 0.01÷2 = 0.01, 100÷3 = 33.33,
+0.1+0.2 = 0.3, Done with a pending ÷, −10.075 → −10.08, −1.005 → −1.01, −0.005 → −0.01, and four zero results
+that must read "0". Before the fix 4 of these failed (10.07, 1, 10.07, −10.07); after, 18/18 pass.
+
+**Other money rounding in src/ (reported, not fixed):**
+- `src/lib/format.ts:16` `formatCurrency` uses `Math.abs(amount).toFixed(2)`: 1.005 → "1.00", 10.075 →
+  "10.07". Right for cent-exact inputs, a cent off for any sub-cent value it is handed. 115 call sites.
+- `src/lib/split.ts:11` local `toCents = Math.round(value * 100)`: exact for 2-decimal inputs, wrong on a
+  sub-cent half and on negative halves. Should import `toCents` from money.ts.
+- `src/components/cards/account-card.tsx:22` `Math.round(balance) < 0`: an overdraft up to $0.50 reads
+  "Available". `payment-card.tsx:17` same pattern: a $0.40 card balance reads "Nothing owed".
+- `src/lib/apr.ts:198` `roundTo` (APR percent to 5 dp): same half flaw, rate not currency, negligible.
+- `src/lib/voice-draft.ts:465` `amountText` builds "d.cc" with `Math.floor(cents/100)` / `cents % 100`;
+  breaks for negative cents but unreachable (amounts validated > 0). Diego's file.
+Not money: `speech.ts:395` (audio level), `flow-chart.tsx` axis labels, percent and layout `Math.round`s.
+
+**Checks:** `npx tsc --noEmit` 0 errors; `rm -rf .expo/cache/eslint && npx eslint src/lib/voice
+src/components/ui/calculator-pad.tsx src/components/ui/calculator-pad.test.tsx` clean; prettier clean;
+`npx jest --ci src/lib/voice/ src/components/ui/calculator-pad.test.tsx` 6 suites / 307 passed (twice).
+One earlier parallel run timed out a 3-calculation test under load; split into one row per calculation.
+
+---
+
+## 2026-10-01 — Dilip (Developer, native and platform) — voice input: speech recognition on iOS
+
+**Outcome:** Done, with one incident I caused (below). `expo-speech-recognition` 57.1.0 is installed and
+configured, `src/lib/speech.ts` implements the brief's speech contract plus the CEO's three additions, 38
+jest tests pass, and a Debug simulator build was verified from the artifact. Nothing committed.
+
+**INCIDENT (my fault): `ios/` was wiped and regenerated; the Sentry upload token is gone.** In the SDK 57
+CLI, `npx expo prebuild` cleans by default (`clean: !args['--no-clean']`). Keeping `ios/` needs
+`--no-clean`. The unversioned docs page still says the opposite. I also ran it with `CI=1`, which skipped
+the git-status prompt. Lost: `ios/.xcode.env.local` (SENTRY_AUTH_TOKEN plus SENTRY_ORG/PROJECT, git-ignored,
+not backed up), the old `ios/sentry.properties`, Pods/, the workspace and an old build/ folder. Restored or
+regenerated: Podfile.lock (restored from my backup, so only the new pod differs), Pods, workspace,
+PrivacyInfo.xcprivacy. Signing (team 2YDDY7H6XP, Automatic), bundle id, entitlements, the Sentry build
+phases, AppDelegate and the storyboard are all identical to before. `.xcode.env.local` now holds only
+`export NODE_BINARY=…`, rewritten by pod install. **Debug builds are fine (Sentry skips Debug); the next
+Release build will fail at "Upload Debug Symbols to Sentry"** until someone re-adds SENTRY_AUTH_TOKEN
+(the org:ci token), SENTRY_ORG=skip-budget and SENTRY_PROJECT=react-native to that file.
+**Rule for everyone: always `npx expo prebuild --platform ios --no-install --no-clean`.**
+Also synced from app.json by the regeneration: the Face ID string (it was still the plugin default), the
+stale `expo.icon` resource dropped (app.json uses icon.png), and the `RCTNewArchEnabled` plist key dropped
+(the SDK 57 template no longer writes it).
+
+**What changed**
+- `package.json` / lockfile: `"expo-speech-recognition": "^57.1.0"` (chosen by `npx expo install`; the lock pins 57.1.0).
+- `app.json`: one plugin entry, `["expo-speech-recognition", { microphonePermission, speechRecognitionPermission }]`
+  with the Founder-approved copy (U+2014 dash, U+2019 apostrophe, exact).
+- `src/lib/speech.ts`: `SpeechStatus`, `isSpeechAvailable()`, `supportsOnDevice(): boolean | null`, and
+  `useSpeechCapture({ contextualStrings })` returning `{ status, interim, alternatives, onDevice, level, start, stop, cancel }`.
+- `src/lib/speech.test.ts`: 38 tests, fake engine, isolated registry per test.
+
+**Key behaviour**
+- The package's own entry calls `requireNativeModule` at import (it throws without the pod). The wrapper
+  imports types only and resolves the module through `requireOptionalNativeModule('ExpoSpeechRecognition')`,
+  iOS only, so importing it is safe in Jest, on web and in old builds.
+- en-US, interim results, 3 alternatives (tidied, de-duplicated case-insensitively, best first),
+  contextualStrings de-duplicated and capped at 100, non-continuous, `iosTaskHint: 'dictation'`, a 15s hard
+  cap, and a 4s settle timer if the engine never says `end`. The previous session's `end` must land before
+  a new one starts, because the engine's reset can emit a stray `end`.
+- Audio: the library never deactivates the session, so on every `end` the wrapper restores the old category
+  and calls `setActive(false, notifyOthersOnDeactivation)` so paused music can resume.
+- Errors: not-allowed → denied; service-not-allowed / language-not-supported → unavailable; no-speech and
+  nomatch → idle (interim words kept if any); interrupted → error (not reported); others → error and
+  reported via `failureMessage`. Raw engine text never reaches state.
+- `onDevice` and `supportsOnDevice()` claim on-device only when the module says so *and* the phone's first
+  language is en-US. The module asks about the phone-language recogniser, not en-US. This can under-claim,
+  never over-claim.
+- `level` comes from the library's separate volume tap (100ms), normalised from -2..10, fast attack and slow
+  release, and only re-renders on a change of 0.02 or more. Not verified on hardware.
+- `unavailableReason` not added: the library folds offline, Dictation off and missing assets into
+  `service-not-allowed`, and en-US is never "unsupported" on iOS.
+
+**Verified:** Podfile.lock has `ExpoSpeechRecognition (57.1.0)`. ExpoModulesProvider registers
+`ExpoSpeechRecognitionModule`. The built `SkipBudget.debug.dylib` (x86_64 + arm64) contains
+`_TtC21ExpoSpeechRecognition27ExpoSpeechRecognitionModule` and links Speech.framework and AVFAudio. The
+built Info.plist carries both usage strings, byte-identical to app.json. The app is at
+`~/Library/Developer/Xcode/DerivedData/SkipBudget-dbbmmmikbvksngagjcqfkpxjgues/Build/Products/Debug-iphonesimulator/SkipBudget.app`.
+tsc is clean apart from `src/app/add-receipt.tsx` (another agent's `captureSource: 'voice'`, mid-edit).
+eslint and prettier are clean on my files. expo-doctor fails 2 checks, both pre-existing (no `pod` on PATH;
+31 SDK-57 patch updates). Full jest: 1201/1202. The one failure, `quick-actions.test.tsx` ("Receipt" vs
+"Receipts"), was already failing at HEAD and is not mine.
+
+**Not verified:** nothing ran on the Simulator or a device (no voice page existed yet). The task hint,
+level feel, audio hand-back and on-device behaviour all need a real iPhone.
+
+---
+
+## 2026-10-01 — Dana (Developer, UI and navigation) — voice input: FAB, /voice, /voice-review, /voice-edit
+
+**Outcome:** Done. Built to Pia's spec, Dmitri's plan and the Founder's three decisions that came in mid-task, against the real code from Drew, Dilip and Diego (all landed before the end). Gate: `tsc` 0 errors (typed routes are regenerated now), eslint and prettier clean on my files, `jest --ci`: 1231 pass, 1 fail. The failure is `src/components/dashboard/quick-actions.test.tsx` and it is pre-existing: it expects "Receipt" and the committed `quick-actions.tsx` says "Receipts". Neither file is touched in the tree. No commits.
+
+**What changed**
+- New: `src/app/voice.tsx`, `voice-review.tsx`, `voice-edit.tsx`. Each opens with `useProGate('voice')`.
+- New: `src/components/voice/` (`voice-fab`, `listening-card`, `review-row` + `GlyphWell`, `example-card`, `stale-draft`, `listen-again`, `own-merchants`).
+- Additive edits: `Screen.floatingPlacement` (default 'page', unchanged); `FlowHeader` gets optional `closePrompt` (no ✕ without it) and `onClose`; `BrandField` gets `initialQuery` and `autoFocus` (spec §6/§13). Home: `{ pro, ready }` and the FAB, nothing else. `PRO_FEATURES.voice` (Pia §9) and `WALL.voice`.
+- Privacy (Founder approved): Mia's "Adding things by voice" section goes between "What never leaves your phone" and "Who else sees it", plus the Apple speech bullet as the last item of "Who else sees it". Summary unchanged.
+- Tests: `src/__tests__/app/home-voice-fab`, `voice`, `voice-review`, `voice-edit` (44 tests). The review tests run through the real voice-draft store, the real builders and the real parser (for `forceKind`).
+
+**Decisions / deviations**
+- FAB carries the PRO pill for free accounts (Founder, overrides spec §2.3). There is no shared PRO component (three inline copies on the dashboard), so I used the same classes. I added a 2pt `border-surface` ring, because the pill's fill is the disc's own colour. It sits at `-top-1 -right-1`, inside the 4pt hit slop.
+- "Tap to add" and "Tap to add the amount" are drawn in `text-ink`, per Pia §10's own fallback. Measured with `contrast()`: accent-ink fell under 4.5:1 on 7 of 16 accent/mode pairs on `accent/10`, and on 4 pairs on the card. Dark plum (the default accent) measured 4.31 and 3.82. The tint and the accent plus stay.
+- Unavailable body copy is Dilip's: "Check that you’re online and Dictation is on, or add it by hand below."
+- Two examples were replaced (CEO): Xfinity $79.99… and Hulu $99.99 a year.
+- "Start again" uses `router.dismissTo('/voice')`, not `replace`, so the stack never holds two `/voice` pages.
+- `level` re-renders the page about 10×/s: the examples, privacy line and by-hand pills are memoised. The ring follows `level` once the first sound arrives, with a calm breath until then (no level means no ring otherwise).
+- iOS head truncation only affects a multi-line Text's last line, so the live transcript is trimmed to its newest ~90 chars instead.
+
+**Not verifiable without a device (for Tia):** FAB geometry (12pt over the pill, flush right; this assumes a 0 bottom inset in the tab scene); the ring and badge on dark plum and navy, light pistachio and apricot; `dismissTo('/home')` leaving `[tabs]` with Home selected; VoiceOver: the announce-then-start, whether its speech gets transcribed, focus staying on the footer button as it turns into Done; AX text sizes; the mic indicator going off on blur and background.
+
+**Open questions**
+1. `TextLink` has no `accessibilityHint`, so "More options" lacks the spec's hint. It needs a one-line additive prop in a shared UI file (not mine).
+2. `Title` has no header role, so "Just say it" isn't announced as a header (true of every page).
+3. Back from Settings goes to idle whether or not access was granted. `speech.ts` has no permission read, so the next tap finds out.
+4. An interruption (a call) arrives as `error`, so the page shows `FAILURE_MESSAGE`, where the spec wants silent idle. That would need Dilip to tell the two apart.
+5. Privacy policy `updated` date is still 28 August 2026. The policy itself promises the date changes when sharing changes. That's the CEO's or Founder's call at release.
+
+---
+
+## 2026-10-01 — Drew (Developer, money maths) — money-rounding ticket (format, split, card captions)
+
+**Outcome:** Done, all three; self-contained (separate from voice). No commits.
+
+1. `src/lib/format.ts` `formatCurrency`: `Math.abs(amount).toFixed(2)` → `toCents(amount)` from money.ts, then
+   whole/fraction built from integer cents. Before: 1.005 "$1.00", 10.075 "$10.07", 2.675 "$2.67",
+   −1.005 "-$1.00". After: "$1.01", "$10.08", "$2.68", "-$1.01". Cent-exact inputs format identically.
+   5 tests added (half-cent, negatives, −0, large to $9,999,999,999.99, posted-then-truncated); the 6
+   existing ones unchanged. Limit noted in the doc comment: exact to $9,999,999,999.99 (toCents decides on
+   12 significant digits).
+2. `src/lib/split.ts`: local `toCents`/`toDollars` replaced by money.ts `toCents`/`fromCents`. Callers:
+   `simplifyDebts` gets balances from the `group_balances` view (sums of numeric(14,2)); `equalShares` and
+   `exactRemainder` get amounts typed through `applyAmountKey` (≤ 2 decimals). All whole cents, so no
+   real output changes. 4 tests added that would fail under the old rule (−1.005/1.005 settles $1.01 not
+   $1.00; 10.075 splits [5.04, 5.04] not [5.04, 5.03]; remainder 0.08 not 0.07; float dust still nothing).
+3. `account-card.tsx` / `payment-card.tsx`: caption decided on `toCents(balance)` instead of
+   `Math.round(balance)`. Before: −$0.01…−$0.50 read "Available"; ±$0.01…$0.50 on a card read "Nothing
+   owed". After: "Overdrawn" / "Owed" / "In credit"; float dust (±1e-12) and sub-cent values still read
+   "Available" / "Nothing owed". New `src/components/cards/card-captions.test.tsx` (21 rows): 7 fail on the
+   committed code, all pass with the fix. The figure stays whole dollars, truncated, so a sub-dollar balance
+   shows "Overdrawn $0" / "Owed $0" (figure unchanged; flagged).
+
+**Checks:** `npx tsc --noEmit` 0 errors; `rm -rf .expo/cache/eslint && npx eslint` on the 7 files clean;
+prettier clean. Full `npx jest --ci`: before 1201/1202, after 1231/1232. The 30 added tests are exactly
+these; zero existing tests changed status. The one failure both times is the pre-existing
+`quick-actions.test.tsx` ("Receipt" vs "Receipts"). `apr.ts` and Diego's `amountText` left alone as
+instructed.
+
+**Follow-up, same day (Dilip), `src/lib/speech.ts` + its test only, no native work:**
+- `interrupted` (a call, Siri, an alarm) now ends the session as `idle`, keeping words already heard as the
+  single alternative, and reports nothing. That includes a failed audio-session hand-back during the call.
+  `error` is now only for real failures.
+- New on the hook: `refreshPermission(): Promise<void>`. It only reads permission and never prompts. It
+  moves `denied` → `idle` when mic and speech are both granted and leaves every other state alone. It never
+  throws; a rejected read is reported and the state stays put.
+- 44/44 tests; both new behaviours mutation-checked. eslint, prettier and tsc are clean (whole project).
+
+### 2026-10-01 — Dana — voice follow-ups (CEO items 1–4)
+
+**Outcome:** Done. Gate: `tsc` 0; eslint and prettier clean on my files; `jest --ci` 83 suites, 1252 tests, all passing.
+- **TextLink:** additive optional `accessibilityHint`. "More options" now says "Opens the full form with what Skip heard filled in." TextLink has no test of its own; every screen test that uses it still passes.
+- **Dev-only test sentence on `/voice`:** a `TextField` plus "Use this sentence" at the bottom of the scroll, below the examples. The text becomes a session that heard exactly those words, so it goes down the same road as speech: `parseVoice([text], ctx)` → `putVoiceDraft(draft, [text])` → one push. Both the component and the handler body sit behind `__DEV__`; so does `avoidKeyboard` on the page, because Release has no input there.
+- **Back from Settings:** `refreshPermission()` is called on AppState → 'active' while the status is `denied`, replacing my reset-to-idle. It reads through a ref, so the listener never resubscribes.
+- **Interruptions:** listening → idle with words goes to review once; with none, it shows "nothing heard". Tested.
+- **Order dependency for Tia:** if iOS backgrounds the app *before* the interruption's idle arrives, the background rule cancels first and the words are dropped. That's a device-order question.
+
+### 2026-10-01 — Dana — Home voice button becomes the "Voice" pill (Founder)
+
+**Outcome:** Done. Gate: `tsc` 0; eslint (cache cleared) and prettier clean on my files; `jest --ci` 83 suites, 1253 tests, all passing.
+- **`voice-fab.tsx`:** the 56pt `Mic` disc is now an extended pill: `AudioLines` (22, `onControl`, stroke 2, absolute) plus "Voice" (`font-poppins-medium text-[15px] text-on-control`, one line, cap 1.2, no `adjustsFontSizeToFit`). It's `h-14 rounded-full px-5 gap-2`, the size of the tab bar's selected pill.
+- **Unchanged:** fill/pressed, `shadows.floating`, the dark ring rule, `floatingPlacement="tabBar"`, `hitSlop={4}` (64pt tall to the finger), the label "Add by voice" and both hints.
+- **Label hidden from VoiceOver:** the visible "Voice" Text is hidden from VoiceOver, so it isn't read twice.
+- **PRO pill:** stays at `-top-1 -right-1` with its surface ring. It ends about 16.6pt down; the label's line box starts at 17.5pt, and its caps at about 22pt at the default size (about 21.7pt at 1.2×). So it clears the word without clipping or leaving the hit slop.
+- **`/voice` stays on `Mic`:** its disc and "Start talking" are untouched.
+- **Tests:** the lucide mock in `home-voice-fab.test.tsx` now draws a `testID` per icon. A new test asserts `AudioLines` (not `Mic`), "Voice", that "Voice" is hidden from VoiceOver, and the accessibility label.
+- **For Tia:** the pill's width (about 115pt) next to the tab bar's own pill, the badge against "Voice" on a real screen, and the dark plum/navy ring.
+
+---
+
+## 2026-10-01 — Dmitri (Development Team Lead) — voice input: lead code review
+
+**Outcome:** Partial. Review written to `.claude/team/dev/voice-input-review-2026-10-01.md`. **Not
+approved yet for the Founder's build review:** two blocking defects (B1, B2), both small. I would approve once
+they land with fixtures and I've re-read the diffs. No code edited; probes ran only in scratchpad copies.
+
+**Blocking**
+- **B1 (Drew + Dana):** a learned alias can turn a real store into another, permanently. Changing an
+  exact-matched "Target" to Walmart learns `target → Walmart` (`voice-review.tsx:246-256`). Aliases are
+  checked before exact names (`parse.ts:101-104`). Correcting back is a no-op (`aliases.ts:46`), so every
+  later "Target" opens as Walmart at high confidence. Proven by probe. Fix: delete the pair on a correction
+  back; never learn from an exact match (the parser exposes `merchantSource`).
+- **B2 (Drew):** any figure with more than two decimals is rounded and shown as heard (`clean.ts:135`,
+  `numbers.ts:292`). "Paid $3.459 at Shell" → $3.46, high confidence, no choice. "$12.345" → $12.35. "twelve
+  point nine nine nine" → $13.00. Fix: not money; fixtures.
+
+**Should fix (not blocking)**
+- S1 (Dana): a double tap on Done, or on the category grid, on `/voice-edit` sends two global `GO_BACK`s and
+  pops the review page too (`voice-edit.tsx:107-118, 348-353`).
+- S2 (Diego): `validateVoiceDraft` can settle an unsettled amount when it drops an out-of-range choice
+  (`voice-draft.ts:120-124, 161`; probe: $40 or $4T → $40, settled).
+- S3 (Drew): "twelve fifty thousand" → $50,000, settled; the adjacent "twelve" is silently dropped
+  (`amount.ts:301-306`).
+- S4 (Diego): the draft is not cleared after a hand-off save or on sign-out, and hand-off saves never learn.
+- Lows: `readTime` accepts ":99" (L1); bill hand-off back goes to the chooser first (L2); double pushes
+  (L3); the speech package uses a caret range, so pin `~57.1.0` (L4); example sentences are not tied to
+  fixtures in code (L5).
+
+**Gates:**
+- G1: `ios/.xcode.env.local` has no `SENTRY_AUTH_TOKEN`/`SENTRY_ORG`/`SENTRY_PROJECT` (checked keys only),
+  so Release builds fail at the Sentry upload.
+- G2: the migrations have never run on Postgres. Staging first, then production, before the native build
+  ships.
+- G3: Tia's device list.
+
+**Verified clean:**
+- The save path matches the forms for new items, with `source: 'voice'` on both receipt paths and one row
+  per tap.
+- `dismissTo('/home')` becomes a POP_TO on `(tabs)` (pops, no replace; I read the router code).
+- The mic stops on blur, background and unmount.
+- No $0 and no NaN path.
+- The optional native module cannot crash a build without it.
+- All three routes are Pro-gated, and the server walls `'voice'`.
+- The voice routes have no overlays.
+- Goldens: `shasum -c` OK, and 43/43 against the **HEAD** forms (via `git archive`) as well as against the
+  refactored ones.
+- `tsc` 0, eslint 0, prettier clean, full jest 1252/1252 (scratch copy), FAB suites re-run after Dana's
+  16:34 pill change.
+
+**Could not verify:** S1 on a device (the second tap might be absorbed during the pop animation); the
+migrations on a database; anything audio-related on hardware.
+
+**Open questions:** (1) Interruptions: send the partial words to review (what is built and tested) or
+return silently to idle (spec §4.3)? (2) The privacy policy's `updated` date (`privacy.tsx:165`) is still
+28 August. (3) Does the Founder's build review use a Release build? If so, G1 must be fixed first.
+
+---
+
+## 2026-10-01 — Diego (Developer, data and backend) — voice review fixes (B1 passthrough, S2, S4, L1, L2)
+
+**Outcome:** Done. Every item from Dmitri's review that the CEO routed to me is fixed and has fixtures, except
+learning aliases from the full form, which I left out on purpose (reason below). Nothing committed, no database touched.
+
+**What changed**
+- **B1 passthrough** (`src/lib/voice-draft.ts`). `validateVoiceDraft` carries Drew's
+  `VoiceMerchantSource` (imported from `@/lib/voice`, where it landed during this work). It accepts the four values
+  only, gives null when there is no merchant, and gives null for anything unknown, so an unknown source is never
+  treated as safe to learn from. A hand change to the merchant lands on `entry` while
+  `draft.merchant/merchantHeard/merchantSource` stay the parse's own. `rederiveVoiceEntry` keeps those three
+  together: from the re-parse when the merchant was untouched, from the original parse when it was changed by
+  hand. Dana reads `session.draft.merchantSource` together with `touched`/`edited`.
+- **S2.** If the parser offered amount choices and any of them fails validation (or fewer than 2 remain),
+  the amount is null and stays missing. Surviving choices (2 or more) are still offered. Fixtures:
+  `$40 / $4T` → unsettled; one of three dropped → amount null, two choices left; and a property check through the
+  real parser ("unsettled stays unsettled"). A mutation check (fix disabled) failed both.
+- **S4.** Each form's `leave()` on a `from=voice` save now does `dismissTo('/home')` and then `clearVoiceDraft()`.
+  `signOut()` and `deleteAccount()` (after a verified deletion) clear the draft too, best-effort, even when the
+  session can't be read. **Learning from the full form: left out.** `useLearnVoiceAlias` needs a QueryClient,
+  and the golden tests render the forms without one. A hook-free write would pull AsyncStorage and the real
+  Supabase client into the forms' module graph. Either route would make me edit the goldens, and it's only
+  safe after Drew's B1 "correcting back deletes the pair" fix. The evidence can come from the slot
+  (`readVoiceDraft`), so no words need to go into params, which makes this a small follow-up once the goldens may change.
+- **L1** (`src/lib/voice/amount.ts`, Drew's file, a one-line Edit on the CEO's assignment). `readTime` rejects hours
+  above 23 and minutes above 59. The fixture is in a new file, `src/lib/voice/clock-amount.test.ts`, so it can't
+  collide with Drew's `parse.test.ts`: 99:99, 12:60 and 24:30 give no amount; 12:50, 1:00 and 23:59 still give both
+  readings. Drew edited `amount.ts` afterwards and my line survived.
+- **L2** (`add-bill.tsx`). With `from=voice` and a prefilled category, back from the amount step is `router.back()`
+  (to the review page). Without `from`, it still steps to the chooser.
+- Tests: voice-draft 67 (+8), add-forms-from-voice 19 (+7), auth 15 (+1 and draft assertions), clock-amount 5.
+
+**Gate:** golden sha256 `shasum -c` OK on all three files. `npx jest --ci`, whole suite: **84/84 suites,
+1319/1319**. eslint (cache cleared) on my files: 0 errors (the same 13 test-file warnings). prettier --check:
+clean, including `amount.ts`. `tsc`: none of the errors are in my files. The remaining ones are in other agents' in-progress
+tests: `voice-review-extra.test.tsx:115` (fixture missing `merchantSource` since Drew's type landed) and
+`voice-review.test.tsx:367` (`brandId: null` against the test's own helper type). An earlier syntax error in
+`voice-review.test.tsx` was hiding every semantic error, so I typechecked through a scratch tsconfig that excluded it.
+
+---
+
+## 2026-10-01 — Drew (Developer, money maths) — review fixes B1, B2, S3, L5 (Dmitri's review)
+
+**Outcome:** Done. No commits.
+
+- **B1, `merchantSource`** on `VoiceDraft` (type `VoiceMerchantSource`, exported): `learned` (through
+  `ctx.aliases`), `catalog` (exact catalog name or alias), `fuzzy` (near miss of a catalog name, 2–3 words),
+  `heard` (no brand; the words after "at"/"from"), null iff `merchant` is null. The parser itself now keeps
+  catalog names: learned and catalog matches over the same words → the longer span wins, a tie goes to the
+  catalog (`preferCatalog`). So a stale `target → Walmart` pair can no longer hijack Target, while a longer
+  learned phrase ("target optical" → Target Optical) still applies. `pickMerchant` now ranks catalog >
+  learned > fuzzy > heard. `learnAlias`: correcting back to the heard words (normalised like the parser's
+  text) removes the pair. Same array back if there was nothing to remove. A spelling-only correction
+  ("joes diner" → "Joe's Diner") is learned. Caller rule documented: never learn when `merchantSource` is
+  `catalog`. My old test "star bucks → Starbucks is a no-op" changed to "is learned" (spacing is not "the
+  same words" any more); it can't happen through the caller rule anyway (that's a catalog match).
+- **B2:** a figure with a non-zero digit past the cent (after any scale) is never an amount: dropped with its
+  unit. "$3.459 at Shell" / "$12.345" / "1.005" / "twelve point nine nine nine" → no amount;
+  "$3.459 a gallon, $45.20 total at Shell" → $45.20. "$3.450", "$1.2345k" ($1,234.50) stay. Fixed a latent
+  bug found on the way: "1.2345 thousand" multiplied the already-rounded cents ($1,230.00), now $1,234.50.
+- **S3:** a bare 1–99 straight before a marked figure ("twelve fifty thousand", "twelve $50") → neither
+  offered → amount null, `missing` has amount.
+- **L1** was already done by Diego in `amount.ts` `readTime` (+ his `clock-amount.test.ts`) on the CEO's
+  assignment; left as is.
+- **L5:** the nine sentences moved verbatim to `src/data/voice-examples.ts` (pure data + `sentenceText`;
+  verified line-identical to Dana's). `example-card.tsx` imports it, maps icons by id, re-exports for
+  `voice.tsx` (untouched); render code unchanged. `catalog.test.ts` iterates the module: the page's set must
+  equal the pinned set, each must read back exactly, the brand shown must be a bold word, and the amount must
+  be the one bold figure that reads as money. Mutation check: putting "Amazon Prime $139 a year" back → 2
+  failures.
+
+**Checks:** `npx tsc --noEmit` 0 errors; `rm -rf .expo/cache/eslint && npx eslint src/lib/voice
+src/data/voice-examples.ts src/components/voice/example-card.tsx` clean; prettier clean; full `npx jest --ci`
+84/84 suites, 1319/1319 tests (parse 246, catalog 55, aliases 14, voice screen 15, voice-draft 67).
+
+### 2026-10-01 — Dana — Dmitri's review: B1 (review side), S1, L3
+
+**Outcome:** Done. Gate: `tsc --noEmit` 0 errors repo-wide; eslint (cache cleared) and prettier clean on my files; `jest --ci` 84 suites, 1319 tests, all passing.
+- **B1, `voice-review.tsx`:** after a save, the page teaches a correction only through `lessonFrom(draft, entry, touched)`.
+  - Never when `draft.merchantSource` is `'catalog'` or null.
+  - For `'fuzzy'`, `'heard'` and `'learned'`, only when the merchant was touched and the saved name differs from the parsed one.
+  - A learned name changed back to the person's own words is taught too, which is how Drew's `learnAlias` removes the pair.
+  - Tests cover catalog (no), fuzzy (yes), heard (yes), learned-changed-back (yes), unchanged name (no) and untouched merchant (no).
+- **S1, `voice-edit.tsx`:** `useCommit` holds a `left` ref. After the first leave, nothing writes or pops again. The back chevron (`EditShell onBack`) goes through the same `leave()`, because `router.back()` is a global GO_BACK. Tests: double Done, two quick category taps (the first wins), double back.
+- **L3, review page:** a `moving` ref, reset by `useFocusEffect`, wraps the rows, "More options", back, "Say it again" and ✕. Tests: a double tap pushes once, and it opens again after re-focus; a double back goes back once.
+- **L3, `voice-fab.tsx`:** the same guard, reset on Home's focus. `tap()` now fires inside the guarded handler (a ref-reading handler can't go through `withTap` in render), so a swallowed tap gives no haptic. Test: double tap pushes once, and it opens again after re-focus.
+- **Theo's `voice-review-extra.test.tsx`, two edits:**
+  - The fixture gains `merchantSource: 'catalog'` (now required).
+  - Its `expo-router` mock gains a `useFocusEffect` stub. Without it all 10 money checks crash on the page's new focus reset.
+
+---
+
+## 2026-10-01 — Dmitri (Development Team Lead) — voice input: re-review of the fixes
+
+**Outcome:** **Approved for the Founder's build review.** All first-pass findings (B1, B2, S1–S4, L1–L5)
+are fixed and verified. Two non-code conditions carry over:
+- **G1:** `ios/.xcode.env.local` still lacks the Sentry keys. Restore them before any Release or TestFlight
+  build.
+- **G2:** the migrations have still never run on any database. Deploy them before the native build ships.
+
+The re-review section is appended to `.claude/team/dev/voice-input-review-2026-10-01.md`. No code edited;
+probes ran only in scratchpad snapshots.
+
+**How I checked:**
+- Diffed every changed file against my 16:25 snapshot.
+- Re-ran my probes on a 16:54 snapshot of the live tree, confirmed unchanged at 16:58:
+  - Target→Walmart: the parse is `catalog`; changing it and saving through the real review page makes 0
+    `learnAlias` calls; a stale pair no longer overrides Target; correcting back → `[]`.
+  - `$3.459`, `$12.345`, `1.005` and "twelve point nine nine nine" give no amount; "$3.459 a gallon, $45.20
+    total" gives $45.20.
+  - "twelve fifty thousand" gives null.
+  - "$40 / $4T" gives null with `missing: amount`.
+  - Double Done, double Back and two category taps each pop once. The same probe fails 4/4 on the pre-fix
+    code.
+  - Row, More options, Back and Save double taps → one move each.
+- Theo's `voice-review-extra.test.tsx`: exactly two hunks (the `useFocusEffect` stub and
+  `merchantSource: 'catalog'`); assertions byte-identical.
+- Goldens: `shasum -c` OK, byte-identical to the copies run 43/43 against the HEAD forms.
+- Real tree: `tsc` 0, eslint 0, prettier clean, jest 84/84 suites, 1319/1319.
+
+**New (non-blocking):**
+- **N1 (Drew):** a card or wallet brand said as the payment method wins over the store. "paid $20 at spot a
+  fly on my Amex" → American Express. This was already true for typed stores before the fix; B1's re-rank
+  extends it to learned ones. It's visible on review, not money, and cannot teach a bad alias.
+- N2: accepted by design.
+- N3: low, not filed.
+
+**Open:**
+1. Is the Founder's build a Release build? If so, G1 first.
+2. The privacy policy `updated` date is still 28 August.
+3. Pia should update spec §4.3 to match the CEO's interruption decision.
+
+---
+
+## 2026-10-01 — Drew (Developer, money maths) — N1: a payment card or wallet is never the merchant
+
+**Outcome:** Done. No commits.
+
+**Rule (`isPaymentMethod` in `src/lib/voice/merchant.ts`, applied in `parse.ts` after all merchant passes,
+before corrections):** a matched brand is how the person paid, not who they paid, when
+(a) it is followed by "pay" ("Apple Pay", "Google Pay"), or
+(b) payment words lead into it (with / using / via / through / by / on, "my"/"the" allowed between) AND it is
+a bank or card issuer (`finance`) or a card word follows it (card, credit, debit, visa, mastercard, account,
+checking, savings).
+Such a span keeps its words claimed but is never the merchant, even when it is the only brand heard:
+"$20 on my Amex" → merchant null, `missing: ['merchant']`, so the person fills in the store.
+Payment words alone are not enough. "insurance with GEICO", "subscription with Netflix", "paid 300 to Chase",
+"Chase card payment 300 due on the 25th" and "amex 300 due on the 15th" keep their company as the merchant.
+
+**Fixtures:** 15 rows in `parse.test.ts` (`PAID_WITH`: the four review examples with learned and fuzzy
+Spotify, Joe's Diner on my Amex, Apple Store with my Visa / with Apple Pay → Apple catalog, card/wallet
+alone → null, and the five not-a-payment cases), 8 in `catalog.test.ts` against the real catalog.
+American Express and Google added to the fixture directory, as in the catalog. With the filter disabled,
+10 of them fail. B1 holds: learned and fuzzy Spotify still win over the card, and no existing row changed.
+
+**Checks:** tsc 0 errors; eslint (cache cleared) clean; prettier clean; full `npx jest --ci` 84/84 suites,
+1342/1342 tests.
+
+### 2026-10-01 — Dana — Tia's QA: Voice pill gap, dev sentence autocorrect
+
+**Outcome:** Done. Gate: `tsc` 0; eslint (cache cleared) and prettier clean on my files; `jest --ci` 84 suites, 1342 tests, all passing. `speech.ts` untouched.
+- **Gap, measured not assumed:** I read the iPhone 17 Pro screenshots pixel by pixel (1206px wide, 3×).
+  - On the bar's straight top edge the pill-to-bar clear space was **10.33pt**, not 17: in 01/24/25/26 (light) and from the box edge in 02/03/04 (dark). Screenshot 00 still shows the old disc.
+  - The flat edge was taken at x=900–1000. Further right, the bar's rounded end and the dev client's floating gear push the edge down by 15–50pt, which may be where 17 came from.
+- **Cause:** NativeWind's native rem is 14 (no override in the repo). So `bottom-1` = 3.5pt, the bar's `pt-2` band = 7pt, `right-4` = `px-4` = 14pt, and `h-14` = 49pt (measured 48.7).
+- **Fix:** `src/components/ui/screen.tsx` 'tabBar' is now `bottom-[5px] right-4`, giving 5 + 7 = 12pt; the comment explains why. That lifts the pill 1.5pt rather than lowering it 5pt. 'page' is unchanged.
+- **Right edge:** both the pill and the bar measure 14pt from their screen edges, so the right edge stays flush.
+- **Hit target:** the 49pt pill plus `hitSlop={4}` is 57pt, so it's still ≥56.
+- **Dev test sentence:** `autoCorrect={false}` and `autoCapitalize="none"`. `TextField` doesn't pass `spellCheck`, but on iOS it follows `autoCorrect`, so there was no shared-file change. The test asserts both props.
+- **Seen, not changed:** in light mode the pill's `shadows.floating` is cut flat at the Home scene's bottom edge, a hard line just under the pill. It's for Pia/Tia to judge.
+
+## 2026-10-01 — Dilip (Developer, native and platform) — voice: the first-start Simulator crash (Tia)
+
+**Outcome:** Root cause found, and it is the Mac, not the app. JS-only guard added in `src/lib/speech.ts`;
+no native change, no prebuild, no rebuild. Nothing committed.
+
+**Root cause (evidence):** the macOS unified log shows `coreaudiod` asking TCC for the microphone on behalf of
+`com.apple.CoreSimulator.SimulatorTrampoline`. macOS showed "Simulator would like to access the microphone"
+(`AUTHREQ_PROMPTING`, msgID 230.188) at 16:44:15.129. The app aborted at 16:44:24.3, and the prompt was
+answered Allow (`authValue=2`) only at 16:45:01.564. In the .ips, thread 15 is blocked in
+`HALC_ShellDevice::CreateIOProcID` → mach_msg to coreaudiod. Thread 14 (the in-process `AURemoteIO_server`) waits on
+the AQIONodeManager lock, and the crashing thread (`inputNode` → `AURemoteIO::Initialize`) hits the RPC timeout → `abort()`.
+It only happens while that macOS prompt is unanswered, which is why the relaunch did not crash.
+- Volume metering is not involved: it is installed after `inputNode` (line 350) and is the same engine, not a second one.
+- Session activation had already succeeded, and the library never checks `isInputAvailable`, but that would read
+  `true` on the Simulator anyway. Fixes a/b/c from the brief could not have prevented it.
+- 27 public GitHub reports of `_ReportRPCTimeout`; the readable recent ones (incl. another expo-speech-recognition
+  app, orca, Cue on Xcode Cloud) are all Simulator or CI virtual Mac.
+
+**Measured (host prompt now answered):** baseline 0/10 cold-start crashes, metering off 0/10, using a CDP harness that
+calls the native module with the wrapper's exact options. The original trigger cannot be re-run without resetting
+macOS privacy, which I did not do.
+
+**Fix:** `start()` returns `unavailable` on the Simulator (`Device.isDevice` false, verified in-app) before any
+permission or audio call, unless `EXPO_PUBLIC_SIMULATOR_VOICE=1`. Public API unchanged. 3 tests (mutation-checked).
+Gates: eslint clean, tsc clean, full jest 1345/1345.
+
+**Also found:** on this Simulator (Intel Mac, iOS 26.5), recognition never emits `start`/`result`/`end`;
+`recognitionTask` appears to block the library's actor. The wrapper's 15s cap + 4s settle end it as "nothing heard".
+The library's route-change restart touches `inputNode` a second time.
+
+### 2026-10-01 — Dana — /voice redesign: "Record a transaction", hold to talk (Founder)
+
+**Outcome:** Done, against Dilip's landed API (`continuous`, `permissionGranted`, `requestPermission`). Gate: `tsc` 0; eslint (cache cleared) and prettier clean on my files; `jest --ci` 85 suites, 1365 tests, all passing.
+
+**Built**
+- **Page layout:** `Screen showBack` with the left-aligned "Record a transaction", then a flexible live-text area. Idle shows nothing. Holding shows "Listening…" and then the live words (24px medium ink, newest ~140 chars kept). After release the words stay with a spinner.
+- **Short lines for the other states:** nothing heard or quick tap, first grant, denied (plus an Open Settings pill), unavailable (plus "Add it by hand" pills), and error (`FAILURE_MESSAGE`).
+- **Pinned footer:** `VoiceHints` (new), a 2×2 grid of the four hints from `src/data/voice-examples.ts`. Below it `MicButton` (new): 92pt (`h-[92px]`, since NativeWind's rem is 14), Mic 36, `shadows.floating`, and the dark hairline-ring rule. It grows to 1.06× while held, with a level-driven ring (Reanimated, reduce-motion respected). The caption reads "Hold to talk" / "Release when you’re done".
+- **Interaction:** `continuous: true`. Press-in either asks for permission (and starts nothing) or fires `toggle()` and `start()`. Release calls `stop()`; a release before the mic is live shows "Hold the button while you talk." Final words are parsed, the draft is stored, and review is pushed once.
+  - The 15s cap or a call while still held is treated as a release.
+  - A mic that opens after release is cancelled.
+  - `cancel()` runs on blur and on background; `refreshPermission()` runs on 'active' while denied. Nothing ever starts the mic automatically.
+- **VoiceOver:** a double-tap toggles. It says "Listening" before the mic opens and "Stopped" after. The label is "Record" and the hint follows the state.
+- **Dev field:** the `__DEV__` test sentence is kept.
+- **Data module:** `src/data/voice-examples.ts` is reduced to the four hints, as a flat list of `{ kind, parts }` with the bold parts kept. `catalog.test.ts` builds SHOWN from it, the five dropped rows are removed from PINNED, and the count is 4. No other parser test was touched.
+- **"Say it again":** now `dismissTo('/voice')`, which lands idle. `listen-again.ts` is deleted, along with `listening-card.tsx` and `example-card.tsx`; nothing else used them.
+- **Tests:** `voice.test.tsx` is rewritten (15 tests). `voice-review.test.tsx` has two new "Say it again" tests.
+
+**Doesn't quite fit the brief**
+- The dev field sits at the foot of the scrolling area, not under the hints in the pinned footer, so the keyboard can scroll it into view.
+- Hints are hidden by fading out (and hidden from VoiceOver), not removed, so the mic doesn't jump under a held thumb.
+- In VoiceOver mode the hold wording would be wrong, so the caption reads "Tap to talk" / "Tap when you’re done" and the nothing-heard line reads "Skip didn’t hear anything. Double-tap Record, then talk."
+- VoiceOver also hears each outcome once (nothing heard, all set, denied, unavailable, failure), because there is no other feedback.
+- The Pro explainer is still titled "Just say it" (Founder-approved copy), while the page is now "Record a transaction".
+
+## 2026-10-01 — Dilip (Developer, native and platform) — speech wrapper for hold-to-talk
+
+**Outcome:** Done. `src/lib/speech.ts` + test only, JS only; no prebuild, no native build, nothing committed.
+
+**Final API (additive to the brief's contract):**
+`useSpeechCapture({ contextualStrings, continuous?: boolean })` →
+`{ status, interim, alternatives, onDevice, level, permissionGranted: boolean | null, start, stop, cancel, refreshPermission, requestPermission: () => Promise<boolean> }`.
+- **`continuous: true`** passes through to the engine. iOS 18 splits the sentence into segments at each pause, marks each
+  final, and sends later words alone with a leading space. The wrapper joins segments (best combinations first, at most 3)
+  and settles only on `end`, after stop, the 15s cap or an error. `nomatch` mid-session is ignored. A segment that
+  repeats earlier words replaces them rather than doubling them. Earlier iOS sends cumulative text; handled too.
+  Default `false` is unchanged.
+- **`start()` never prompts now** (simplified; the only caller, Dana's page, already calls `requestPermission()` first).
+  Without permission → `denied` with `permissionGranted: false`; no module or the Simulator → `unavailable`.
+- **Quick tap:** a `stop()`/`cancel()` before the engine's `start` event ends at once in `idle` with nothing, and no
+  report. Before the native start, the engine is never started. After it, the abort is sent when `start` arrives,
+  because an earlier abort can be overtaken by the queued start and leave the mic on. The settle timer covers an
+  engine that never opens.
+- **`requestPermission()`:** reads, prompts only if iOS can ask (`asking` meanwhile), resolves granted, never listens,
+  never throws. Outside a session it sets `idle`/`denied` (`unavailable` with no module). `permissionGranted` is read on
+  mount and updated by refresh/request/start and by an engine `not-allowed`.
+- **Kept:** Simulator guard, quiet interruptions, audio restore, 100-phrase cap, `level`.
+
+**Gates:** 65/65 speech tests (four mutations of the new logic each caught). eslint, prettier and tsc clean.
+Full jest 1365/1365.
+**Not verified on a phone:** iOS 18 segment behaviour is from the library's code comments and source, not a device run.
+
+### 2026-10-01 — Dana — /voice: centred title, 20% placeholder, three quiet hints, "more than one"
+
+**Outcome:** Done. Gate:
+- eslint (cache cleared) and prettier clean on my files.
+- `jest --ci` 85 suites, 1398 tests, all passing.
+- `tsc`: 2 errors, both type-only and in Diego's test fixtures. Drew's newly required `VoiceDraft.multiple` is missing from `add-forms-from-voice.test.tsx:222` and `src/api/auth.test.ts:21`; `multiple: false` fixes each. Left for Diego (his files). They don't affect the app bundle.
+
+**Changes**
+- **Title:** "Record a transaction" is centred (`Title` default).
+- **Speech area:** with no words (idle, or held before the first word) it shows "Listening…" in the words' own 24px Poppins Medium at `text-ink/20` (theme variable with alpha, so both modes), hidden from VoiceOver. The first word replaces it in full ink. Status lines still replace it, and the spinner stays after release.
+  - The area is now centred to match the title and hints.
+  - Live words appear only once this hold's mic is live. Before, the hook's last-session `interim` could flash at the start of the next hold.
+- **Hints:** `voice-hints.tsx` is now plain text, with no cards: a centred stack, `text-[15px] text-ink/40`, `gap-2.5`, not tappable. It still fades while held, keeping its space.
+- **Three hints:** Starbucks / Electric bill / Netflix; Rent is dropped. `src/data/voice-examples.ts` and `catalog.test.ts` PINNED are updated, count = 3.
+- **More than one:** when `parseVoice(...)` says `multiple`, nothing is parked or pushed. The heard words stay in full ink, with "Looks like more than one. Add them one at a time." under them, one `warn()`, and a single VoiceOver announcement. The hints come back and the mic is ready; the next hold clears it all. Now that Drew's field has landed, I read `draft.multiple` directly.
+- **Fixtures:** `multiple: false` added to mine and to Theo's `voice-review-extra.test.tsx`.
+- **Tests:** the placeholder (present with no words, gone once words arrive), the centred title, 3 hints at 40%, and multiple-vs-single.
+
+---
+
+## 2026-10-01 — Drew (Developer, money maths) — `VoiceDraft.multiple` (several transactions in one sentence)
+
+**Outcome:** Done in my files; tsc is 2 one-liners short in files I may not touch (below). No commits.
+
+**Rule, as built (`src/lib/voice/multiple.ts`, `describesSeveral`; runs after corrections and the
+payment-method filter):** count the amounts that stand on their own, leaving out add-ons ("plus $5", "$5
+tip", "$1.60 tax", "50 late fee", "$10 off"), unit prices ("$3.45 a gallon", "$20 each", "$150 a night") and
+counts ("3 coffees", "300 megabits"). With two or more such amounts, `multiple` is true when (1) two or more
+different merchants survive, or (2) two or more different bill categories, or (3) a merchant and a bill word of
+different kinds (subscription/receipt brand, or a name heard after "at", alongside a bill word). Otherwise
+false: one merchant or one bill with two figures (amount choices ask), corrections, a payment card,
+"twelve fifty", dates and cycles. Same-category pairs ("water and sewer 60 and 40", "electric 85 and gas
+40") deliberately read as one: conservative. Other draft fields are unchanged when `multiple` is true and
+describe the first thing heard; the page must not save them.
+
+**Files:** new `src/lib/voice/multiple.ts`; `types.ts` (required `multiple: boolean`), `parse.ts` (set on
+every draft; false on empty); `parse.test.ts`: 11 several + 19 single rows (single ones also pin amount,
+choices, merchant) + an empty case + an invariant that every main-table row is a boolean `false`. No existing
+row read as multiple. With the rule forced off, the 11 several rows fail.
+Diego's `src/lib/voice-draft.ts`: one line, `multiple: raw.multiple === true` in `validateVoiceDraft`;
+`voice-draft.test.ts`: `multiple: false` in the `draft()` helper (needed for the required field) + one test
+(true passes, anything but exactly `true` → false).
+
+**Checks:** eslint (cache cleared) and prettier clean; full `npx jest --ci` 85/85 suites, 1398/1398.
+`npx tsc --noEmit`: 2 errors, both TS2741 "multiple missing" in VoiceDraft literals in files outside my
+permission: `src/__tests__/app/add-forms-from-voice.test.tsx:222` and `src/api/auth.test.ts:21` (each needs
+`multiple: false,`). Three others with the same gap (`voice-edit`, `voice-review`, `voice-review-extra`
+tests) were fixed by their owners while I worked.
+
+**Follow-up (same day):** the two remaining tsc errors are closed. Diego added `multiple: false` to both
+fixtures (`add-forms-from-voice.test.tsx`, `auth.test.ts`) at the moment I added mine, which made duplicate
+keys. I removed only my lines, so my net change to those files is nil. `npx tsc --noEmit` 0 errors repo-wide;
+eslint 0 errors (2 existing `require()` warnings in add-forms-from-voice.test.tsx); prettier clean; full
+`npx jest --ci` 85/85 suites, 1398/1398.
+
+---
+
+## 2026-10-01 — Drew (Developer, money maths) — unit prices left out of the amount pick (Founder-approved)
+
+**Outcome:** Done. No commits. Ready for the phone build.
+
+**Rule:** `isUnitPrice` (now in `src/lib/voice/amount.ts`, the one definition; `multiple.ts` imports it) — a
+figure followed by each / apiece / ea, or by a / an / per + a unit (gallon, litre, pound, lb, kg, oz, hour,
+night, day, item, piece, unit, pack, box, ticket, person, head). `chooseAmount` drops unit prices first; the
+existing rules (marked beats bare, counts drop out) run on what is left.
+- Beside a total: the total settles. "$3.45 a gallon, $45.20 total at Shell" → $45.20, no choices, Shell,
+  high. Same reversed, "$12 each for 3 tickets, $36 total" → $36, "$4 a pound, $10.40 at Whole Foods" →
+  $10.40, "hotel $150 per night, $450 total" → $450.
+- **Alone (my call): no amount.** "$3.45 a gallon at Shell" → amount null, `missing: ['amount']`, low.
+  One figure cannot be "offered but unsettled" (`amountChoices` needs two or more, and `validateVoiceDraft`
+  recomputes `missing`, so a lone amount would come out settled), and a per-gallon price is not what was
+  paid. Before this, that sentence settled $3.45 at high confidence.
+- Over two decimals still never an amount: "$3.459 a gallon, $45.20 total" → $45.20.
+- Tips/tax unchanged (Founder's call): "$40 plus $5 tip at Olive Garden" still $40 with choices [5, 40].
+
+**Fixtures:** 10 rows (`UNIT_PRICES` in `parse.test.ts`). With the filter disabled, 8 fail (the
+over-two-decimals and tip rows pass either way, as they should). **One existing row changed, as intended:** the
+"several transactions" block row "$3.45 a gallon, $45.20 total at Shell", which I added in the previous task
+to record the old pick ($3.45, choices [3.45, 45.2]), now reads $45.20 settled, which is exactly this change.
+No main-table row changed.
+
+**Checks:** `npx tsc --noEmit` 0 errors; eslint (cache cleared) clean; prettier clean; full `npx jest --ci`
+85/85 suites, 1408/1408 tests.

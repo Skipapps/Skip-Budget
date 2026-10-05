@@ -8,6 +8,8 @@ import { useColors } from '@/providers/theme-provider';
 type BackButtonProps = {
   /** Defaults to popping the navigation stack. */
   onPress?: () => void;
+  /** The stepped flows say "Back": there it steps back, not out. */
+  accessibilityLabel?: string;
 };
 
 /**
@@ -22,15 +24,17 @@ export function goBack(): void {
 }
 
 /** Top-left chevron. Sized to a 44pt touch target per Apple's minimum. */
-export function BackButton({ onPress }: BackButtonProps) {
+export function BackButton({ onPress, accessibilityLabel = 'Go back' }: BackButtonProps) {
   const colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Go back"
+      accessibilityLabel={accessibilityLabel}
       hitSlop={8}
       onPress={withTap(onPress ?? goBack)}
-      className="-ml-2 h-11 w-11 items-center justify-center rounded-[12px] active:bg-ink/5"
+      // Pulled 8pt left so the chevron's stroke, not its touch box, lines up
+      // with the page's left edge.
+      className="-ml-2 h-[44px] w-[44px] items-center justify-center rounded-full active:bg-ink/5"
     >
       <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
         <Path

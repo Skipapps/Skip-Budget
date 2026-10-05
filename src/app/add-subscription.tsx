@@ -10,6 +10,7 @@ import {
   type ReminderChoice,
 } from '@/api/reminders';
 import { useSpendCategories } from '@/api/brands';
+import { buildSubscriptionValues } from '@/api/entry-values';
 import {
   useCreateSubscription,
   useDeleteSubscription,
@@ -31,10 +32,14 @@ import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { planFloor } from '@/lib/card-ledger';
-import { countFromAfterPick, floorAfterCharges } from '@/lib/charges';
-import { toIsoDate } from '@/lib/date';
 import { success, warn } from '@/lib/haptics';
 import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import {
+  cameFromVoice,
+  clearVoiceDraft,
+  readSubscriptionPrefill,
+  type SubscriptionPrefill,
+} from '@/lib/voice-draft';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 
@@ -70,6 +75,19 @@ const BLANK: Initial = {
   countsFrom: null,
 };
 
+/** A new subscription, seeded with what the voice review page heard. */
+function fromPrefill(prefill: SubscriptionPrefill | null): Initial {
+  if (!prefill) return BLANK;
+  return {
+    ...BLANK,
+    service: prefill.service,
+    amount: prefill.amount,
+    cycle: prefill.cycle ?? BLANK.cycle,
+    renewsOn: prefill.renewsOn,
+    sourceId: prefill.sourceId,
+  };
+}
+
 /**
  * Loads the row, then seeds the form by remount — see add-receipt for why.
  *
@@ -79,7 +97,8 @@ const BLANK: Initial = {
  * failed read is never allowed to become a new subscription instead.
  */
 export default function AddSubscriptionScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; from?: string }>();
+  const { id } = params;
   const artwork = useArtwork();
   const subscription = useSubscription(id);
   const existing = subscription.data ?? null;
@@ -154,12 +173,29 @@ export default function AddSubscriptionScreen() {
         // The floor the ledger and the recorder already use for this row.
         countsFrom: planFloor(existing.started_on, existing.created_at),
       }
-    : BLANK;
+    : // Only a new subscription can arrive pre-filled from the voice review page.
+      fromPrefill(id ? null : readSubscriptionPrefill(params));
 
-  return <SubscriptionForm key={existing?.id ?? 'new'} id={id} initial={initial} />;
+  return (
+    <SubscriptionForm
+      key={existing?.id ?? 'new'}
+      id={id}
+      initial={initial}
+      fromVoice={!id && cameFromVoice(params)}
+    />
+  );
 }
 
-function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
+function SubscriptionForm({
+  id,
+  initial,
+  fromVoice = false,
+}: {
+  id?: string;
+  initial: Initial;
+  /** Saved from a voice hand-off: back to Home, never onto the review page again. */
+  fromVoice?: boolean;
+}) {
   const colors = useColors();
   const editing = Boolean(id);
 
@@ -204,52 +240,40 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
     setStep(atStep);
   };
 
+  /** Where a saved subscription leaves to. */
+  const leave = () => {
+    if (!fromVoice) {
+      router.back();
+      return;
+    }
+    router.dismissTo('/home');
+    // Saved, so what was heard has done its job; the person's words do not
+    // stay in memory for the next session to find.
+    clearVoiceDraft();
+  };
+
   const handleSave = async () => {
     setError(null);
 
-    if (!service) {
-      fail('Pick a service first.', 1);
+    // The checks and the values, started_on included (counted from the
+    // renewal picked, only ever earlier on an edit, never on or before a
+    // renewal already recorded), are the shared builder's; it is what the
+    // voice review page saves through too.
+    const built = buildSubscriptionValues(
+      { service, amount, cycle, renewsOn, sourceId, note, active },
+      { sources, lastChargedOn: pastCharges.lastChargedOn, countsFrom: initial.countsFrom },
+    );
+    if (!built.ok) {
+      fail(built.message, built.field === 'service' ? 1 : 0);
       return;
     }
-    const value = Number(amount);
-    if (!Number.isFinite(value) || value <= 0) {
-      fail('Enter what it costs.', 0);
-      return;
-    }
-
-    const chosen = sources.find((source) => source.id === sourceId);
-    const renewal = renewsOn ? toIsoDate(renewsOn) : null;
-    const values = {
-      brand_id: service.brandId,
-      name: service.name,
-      amount: value,
-      cycle,
-      // Optional: plenty of people know the cost but not the renewal date,
-      // and refusing to save over that would be the wrong trade.
-      next_renewal_on: renewal,
-      // Counted from the renewal picked: a subscription added on the 28th that
-      // renewed on the 10th went out this month, and nothing was counting it —
-      // the start fell back to the day the row was made. An edit only ever
-      // moves the start earlier; moving it later would hide renewals that are
-      // already on the books.
-      // Never on or before a renewal already recorded — see floorAfterCharges.
-      started_on: floorAfterCharges(
-        countFromAfterPick(renewal, initial.countsFrom),
-        pastCharges.lastChargedOn,
-        cycle,
-      ),
-      category_id: service.categoryId || 'other',
-      card_id: chosen?.kind === 'card' ? chosen.id : null,
-      bank_account_id: chosen?.kind === 'account' ? chosen.id : null,
-      note: note.trim() || null,
-      active,
-    };
+    const { values } = built;
 
     try {
       // What a recorded renewal copies from the subscription, before and after.
       const carried = {
         label: values.name || 'Subscription',
-        amount: value,
+        amount: values.amount,
         card_id: values.card_id,
         bank_account_id: values.bank_account_id,
       };
@@ -280,7 +304,7 @@ function SubscriptionForm({ id, initial }: { id?: string; initial: Initial }) {
       // After the row exists, because a reminder points at one.
       await applyReminder('subscription', subscriptionId, choiceToLead(reminder), remindAt);
       success();
-      router.back();
+      leave();
     } catch (thrown) {
       warn();
       setError({

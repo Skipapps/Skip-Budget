@@ -24,7 +24,7 @@ import { useProGate } from '@/components/pro/pro-gate';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { SectionHeading, Title } from '@/components/ui/typography';
+import { SectionHeading } from '@/components/ui/typography';
 import { BILL_CATEGORIES } from '@/data/bills-mock';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
@@ -269,8 +269,7 @@ function InsightsScreenInner() {
 
   if (isError) {
     return (
-      <Screen showBack onRefresh={refresh} refreshing={refreshing}>
-        <Title align="left">Insights</Title>
+      <Screen title="Insights" showBack onRefresh={refresh} refreshing={refreshing}>
         <PageState
           art={artwork.error}
           title={FAILURE_MESSAGE}
@@ -282,9 +281,7 @@ function InsightsScreenInner() {
   }
 
   return (
-    <Screen showBack onRefresh={refresh} refreshing={refreshing}>
-      <Title align="left">Insights</Title>
-
+    <Screen title="Insights" showBack onRefresh={refresh} refreshing={refreshing}>
       {/* ---- Where you stand ------------------------------------------- */}
       <Heading>Where you stand</Heading>
       <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">

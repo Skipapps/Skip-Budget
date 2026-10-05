@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ScanLine, SlidersHorizontal } from 'lucide-react-native';
+import { Plus, ScanLine, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -15,12 +15,10 @@ import {
   type ReceiptFilters,
 } from '@/components/receipts/receipt-filter-sheet';
 import { ReceiptRow } from '@/components/receipts/receipt-row';
-import { ActionPill } from '@/components/ui/action-pill';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { Title } from '@/components/ui/typography';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
@@ -122,24 +120,28 @@ export default function ReceiptsScreen() {
   const showNoMatches = !isLoading && !isError && receipts.length > 0 && visible.length === 0;
 
   return (
-    <Screen showBack avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
-      <View className="mt-2 w-full flex-row items-center justify-between gap-3">
-        <Title flush align="left" className="flex-1">
-          Receipts
-        </Title>
-        {/* Scanning leads: it is one tap to a filed receipt, and typing one out
-            by hand is the fallback rather than the other way round. */}
-        {canScan ? (
-          <ActionPill
-            icon={ScanLine}
-            label={scanning ? 'Reading…' : 'Scan'}
-            onPress={handleScan}
-            disabled={scanning}
-          />
-        ) : null}
-        <ActionPill label="Add" onPress={() => router.push('/add-receipt')} />
-      </View>
-
+    <Screen
+      title="Receipts"
+      showBack
+      avoidKeyboard
+      onRefresh={refresh}
+      refreshing={refreshing}
+      // Scanning leads: it is one tap to a filed receipt, and typing one out
+      // by hand is the fallback rather than the other way round.
+      headerActions={[
+        ...(canScan
+          ? [
+              {
+                icon: ScanLine,
+                label: scanning ? 'Reading the receipt' : 'Scan a receipt',
+                onPress: handleScan,
+                busy: scanning,
+              },
+            ]
+          : []),
+        { icon: Plus, label: 'Add a receipt', onPress: () => router.push('/add-receipt') },
+      ]}
+    >
       {scanError ? (
         <Text
           className="mt-3 w-full font-poppins text-[13px] text-danger"

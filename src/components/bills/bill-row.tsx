@@ -14,7 +14,7 @@ type BillRowProps = {
   onPress?: () => void;
 };
 
-const RECURRENCE_LABELS: Record<string, string> = {
+export const RECURRENCE_LABELS: Record<string, string> = {
   ...Object.fromEntries(RECURRENCES.map((option) => [option.value, option.label])),
   period: 'Set period',
 };

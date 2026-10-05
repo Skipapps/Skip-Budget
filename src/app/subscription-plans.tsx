@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { SlidersHorizontal } from 'lucide-react-native';
+import { Plus, SlidersHorizontal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -12,12 +12,10 @@ import {
   type SubscriptionFilters,
 } from '@/components/subscriptions/subscription-filter-sheet';
 import { SubscriptionRow } from '@/components/subscriptions/subscription-row';
-import { ActionPill } from '@/components/ui/action-pill';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { Title } from '@/components/ui/typography';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
@@ -91,14 +89,14 @@ export default function SubscriptionPlansScreen() {
   const showNoMatches = !isLoading && !isError && subscriptions.length > 0 && visible.length === 0;
 
   return (
-    <Screen showBack avoidKeyboard>
-      <View className="mt-2 w-full flex-row items-center justify-between gap-3">
-        <Title flush align="left" className="flex-1">
-          Your subscriptions
-        </Title>
-        <ActionPill label="Add" onPress={() => router.push('/add-subscription')} />
-      </View>
-
+    <Screen
+      title="Your subscriptions"
+      showBack
+      avoidKeyboard
+      headerActions={[
+        { icon: Plus, label: 'Add subscription', onPress: () => router.push('/add-subscription') },
+      ]}
+    >
       {showEmpty || isError ? null : (
         <>
           <View className="mt-5 w-full flex-row items-center gap-3">
@@ -201,7 +199,7 @@ export default function SubscriptionPlansScreen() {
                     sourceLabels.get(subscription.card_id ?? subscription.bank_account_id ?? '') ??
                     ''
                   }
-                  onPress={() => router.push(`/add-subscription?id=${subscription.id}`)}
+                  onPress={() => router.push(`/subscription/${subscription.id}`)}
                 />
               ))}
             </View>

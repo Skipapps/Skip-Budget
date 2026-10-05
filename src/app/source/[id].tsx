@@ -20,7 +20,7 @@ import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { useConfirm } from '@/providers/dialog-provider';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
-import { SectionHeading, Title } from '@/components/ui/typography';
+import { SectionHeading } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { sortByDateAscending } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
@@ -153,8 +153,17 @@ export default function SourceDetailScreen() {
 
   return (
     <Screen
+      title={name}
       showBack
       avoidKeyboard
+      headerActions={[
+        {
+          icon: Pencil,
+          label: `Edit ${name}`,
+          onPress: () =>
+            router.push(isCard ? `/add-card?id=${source.id}` : `/add-account?id=${source.id}`),
+        },
+      ]}
       floating={
         <Pressable
           accessibilityRole="button"
@@ -172,24 +181,7 @@ export default function SourceDetailScreen() {
         </Pressable>
       }
     >
-      <View className="mt-2 w-full flex-row items-center justify-between gap-3">
-        <Title flush align="left" className="flex-1">
-          {name}
-        </Title>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Edit ${name}`}
-          hitSlop={8}
-          onPress={() =>
-            router.push(isCard ? `/add-card?id=${source.id}` : `/add-account?id=${source.id}`)
-          }
-          className="h-11 w-11 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
-        >
-          <Pencil size={18} color={colors.ink} strokeWidth={1.8} />
-        </Pressable>
-      </View>
-
-      <View className="mt-6 w-full">
+      <View className="mt-2 w-full">
         {isCard ? (
           <PaymentCard
             card={{

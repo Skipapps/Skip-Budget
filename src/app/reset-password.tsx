@@ -6,7 +6,7 @@ import { updatePassword } from '@/api/auth';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { Subtitle } from '@/components/ui/typography';
 
 export default function ResetPasswordScreen() {
   const [password, setPassword] = useState('');
@@ -41,8 +41,7 @@ export default function ResetPasswordScreen() {
   };
 
   return (
-    <Screen showBack avoidKeyboard>
-      <Title>Set a new password</Title>
+    <Screen title="Set a new password" showBack avoidKeyboard>
       <Subtitle className="mt-3">Choose a password you have not used before.</Subtitle>
 
       <View className="mt-8 w-full gap-5">

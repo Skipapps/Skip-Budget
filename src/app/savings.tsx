@@ -3,7 +3,7 @@ import { useRefreshAll } from '@/api/refresh';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { Subtitle } from '@/components/ui/typography';
 import { formatCurrency } from '@/lib/format';
 import { sortByDateAscending } from '@/lib/group';
 import { useArtwork } from '@/theme/artwork';
@@ -54,8 +54,7 @@ export default function SavingsScreen() {
   );
 
   return (
-    <Screen showBack onRefresh={refresh} refreshing={refreshing}>
-      <Title align="left">Savings</Title>
+    <Screen title="Savings" showBack onRefresh={refresh} refreshing={refreshing}>
       <Subtitle className="mt-3">
         When a month ends, whatever was left of it is added here. Nothing is moved between your
         accounts — this is a record, not a transfer.

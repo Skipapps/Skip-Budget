@@ -14,7 +14,6 @@ import { LedgerRow } from '@/components/transactions/ledger-row';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
-import { Title } from '@/components/ui/typography';
 import { usePaymentSources, useLedger, type LedgerEntry } from '@/api/queries';
 import { useCharges } from '@/api/charges';
 import { useRefreshAll } from '@/api/refresh';
@@ -160,9 +159,7 @@ export default function TransactionsScreen() {
   );
 
   return (
-    <Screen avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
-      <Title>Transactions</Title>
-
+    <Screen title="Transactions" avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-5 w-full">
         <ChoiceChips
           options={PERIODS}

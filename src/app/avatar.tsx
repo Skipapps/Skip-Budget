@@ -5,7 +5,6 @@ import { Image, Pressable, Text, View } from 'react-native';
 import { useUpdateProfile } from '@/api/mutations';
 import { useProfile } from '@/api/queries';
 import { Screen } from '@/components/ui/screen';
-import { Subtitle, Title } from '@/components/ui/typography';
 import { cn } from '@/lib/cn';
 import { success, tap } from '@/lib/haptics';
 import { useColors } from '@/providers/theme-provider';
@@ -19,9 +18,10 @@ import { AVATARS } from '@/theme/avatars';
  * the whole interaction, it is visible everywhere the moment it lands, and
  * changing your mind is the same single tap again.
  *
- * "No picture" is first rather than buried at the end, because the person most
- * likely to want it is the one who already set one and would otherwise have to
- * hunt for the way back out.
+ * "No picture" sits alone at the top, centred, rather than buried at the end,
+ * because the person most likely to want it is the one who already set one and
+ * would otherwise have to hunt for the way back out. The fifteen faces follow
+ * three to a row, five even rows (the Founder's layout, 2026-10-03).
  */
 export default function AvatarScreen() {
   const colors = useColors();
@@ -44,35 +44,29 @@ export default function AvatarScreen() {
   };
 
   return (
-    <Screen showBack>
-      <Title align="left" className="w-full">
-        Profile picture
-      </Title>
-      <Subtitle className="mt-2 w-full text-left">
-        Pick one and it appears on your dashboard. Nothing is uploaded — these ship with the app.
-      </Subtitle>
-
-      <View className="mt-7 w-full flex-row flex-wrap">
+    <Screen title="Profile picture" showBack>
+      <View className="mt-4 w-full items-center">
         <Cell
           selected={chosen === null}
-          label="No picture"
           onPress={() => choose(null)}
-          accessibilityLabel="No picture"
+          accessibilityLabel="No profile picture"
+          label="No profile"
         >
           <UserRound size={30} color={colors.muted} strokeWidth={1.6} />
         </Cell>
+      </View>
 
+      <View className="mt-2 w-full flex-row flex-wrap">
         {AVATARS.map((avatar) => (
           <Cell
             key={avatar.id}
             selected={chosen === avatar.id}
-            label={avatar.label}
             onPress={() => choose(avatar.id)}
             accessibilityLabel={avatar.label}
           >
             <Image
               source={avatar.source}
-              style={{ width: 68, height: 68 }}
+              style={{ width: 72, height: 72 }}
               resizeMode="cover"
               accessibilityIgnoresInvertColors
             />
@@ -87,13 +81,14 @@ export default function AvatarScreen() {
 
 type CellProps = {
   selected: boolean;
-  label: string;
   accessibilityLabel: string;
+  /** Words under the circle. Only the empty choice has any; the faces speak for themselves. */
+  label?: string;
   onPress: () => void;
   children: React.ReactNode;
 };
 
-function Cell({ selected, label, accessibilityLabel, onPress, children }: CellProps) {
+function Cell({ selected, accessibilityLabel, label, onPress, children }: CellProps) {
   const colors = useColors();
 
   return (
@@ -111,19 +106,24 @@ function Cell({ selected, label, accessibilityLabel, onPress, children }: CellPr
         {children}
       </Pressable>
 
+      {label ? (
+        // Inside the button's own label already, so VoiceOver hears it once.
+        <Text
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+          className="mt-2 text-center font-poppins-medium text-[13px] text-body"
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.3}
+        >
+          {label}
+        </Text>
+      ) : null}
+
       {/* The tick sits under the ring rather than on the face, which is small
           enough already without a badge covering a third of it. */}
       <View className="mt-1.5 h-4 flex-row items-center justify-center">
         {selected ? <Check size={15} color={colors.accentInk} strokeWidth={3} /> : null}
       </View>
-
-      <Text
-        className="mt-0.5 px-1 text-center font-poppins text-[11px] leading-[14px] text-muted"
-        numberOfLines={2}
-        maxFontSizeMultiplier={1.2}
-      >
-        {label}
-      </Text>
     </View>
   );
 }

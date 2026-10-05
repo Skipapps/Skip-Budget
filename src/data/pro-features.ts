@@ -105,23 +105,27 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
       },
     ],
   },
-  theming: {
-    id: 'theming',
-    artwork: 'welcomeHero',
-    title: 'Make Skip look like yours',
-    tagline: 'Accent colours, appearance — the same app, in your colours.',
+  voice: {
+    id: 'voice',
+    artwork: 'welcomeTrack',
+    title: 'Just say it',
+    tagline:
+      'Say what you spent or what’s due. Skip fills it in, and you check it before it’s saved.',
     benefits: [
       {
-        title: 'Every accent',
-        detail: 'Pick the colour the whole app answers to, light or dark.',
+        title: 'Receipts, bills and subscriptions',
+        detail:
+          '“$12.50 at Starbucks today.” “Rent $1,800, due on the 1st.” “Netflix $15.99 every month.” One sentence each.',
       },
       {
-        title: 'Appearance, your way',
-        detail: 'Choose the look rather than following the system.',
+        title: 'Nothing saves until you say so',
+        detail:
+          'Skip shows exactly what it heard. Fix anything it missed, then tap Save. Nothing is filed without you.',
       },
       {
-        title: 'First in line for what is next',
-        detail: 'Pro gets new features early, and support answered first.',
+        title: 'Skip never keeps your voice',
+        detail:
+          'Your iPhone turns what you say into text, on the phone when it can, or with Apple’s speech service when it can’t.',
       },
     ],
   },

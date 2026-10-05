@@ -22,7 +22,7 @@ import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SwitchControl } from '@/components/ui/switch-control';
 import { TextField } from '@/components/ui/text-field';
-import { FieldLabel, Title } from '@/components/ui/typography';
+import { FieldLabel } from '@/components/ui/typography';
 import { formatCurrency } from '@/lib/format';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useUserId } from '@/providers/session-provider';
@@ -62,8 +62,7 @@ export default function GroupSettingsScreen() {
 
   if (group.isLoading || members.isLoading || balances.isLoading) {
     return (
-      <Screen showBack>
-        <Title>Group settings</Title>
+      <Screen title="Group settings" showBack>
         <View className="mt-8 w-full gap-6" accessibilityLabel="Loading">
           <Skeleton className="h-14 w-full rounded-[12px]" />
           <Skeleton className="h-20 w-full rounded-[16px]" />
@@ -78,7 +77,7 @@ export default function GroupSettingsScreen() {
   // rename and close it on that basis.
   if (group.isError || members.isError || balances.isError) {
     return (
-      <Screen showBack>
+      <Screen title="Group settings" showBack>
         <PageState
           art={artwork.error}
           title={FAILURE_MESSAGE}
@@ -100,7 +99,7 @@ export default function GroupSettingsScreen() {
   // way back in.
   if (!group.data) {
     return (
-      <Screen showBack>
+      <Screen title="Group settings" showBack>
         <PageState
           art={artwork.error}
           title={FAILURE_MESSAGE}
@@ -221,9 +220,7 @@ function GroupSettingsForm({
   };
 
   return (
-    <Screen showBack avoidKeyboard>
-      <Title>Group settings</Title>
-
+    <Screen title="Group settings" showBack avoidKeyboard>
       <View className="mt-8 w-full">
         <TextField
           label="Name"

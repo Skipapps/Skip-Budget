@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { useCharges, type ChargeRow } from '@/api/charges';
+import type { CaptureSource } from '@/api/mutations';
 import {
   buildLedger,
   chargePlanKey,
@@ -135,8 +136,6 @@ export type ProfileRow = {
   display_name: string | null;
   currency: string;
   avatar_id: string | null;
-  /** Dashboard tile ids, first to last. Null means the shipped order. */
-  tile_order: string[] | null;
   getting_started_dismissed_at: string | null;
   reminders_enabled_at: string | null;
 };
@@ -146,7 +145,7 @@ export function useProfile() {
     const { data, error } = await supabase
       .from('profiles')
       .select(
-        'id, display_name, currency, avatar_id, tile_order, getting_started_dismissed_at, reminders_enabled_at',
+        'id, display_name, currency, avatar_id, getting_started_dismissed_at, reminders_enabled_at',
       )
       .maybeSingle();
     if (error) throw error;
@@ -224,6 +223,89 @@ export function useSalarySources() {
       .order('created_at', { ascending: true });
     if (error) throw error;
     return data ?? [];
+  });
+}
+
+/** A salary source as the Salary page edits it: hourly inputs and linked accounts too. */
+export type SalaryDetailRow = SalarySourceRow & {
+  pay_type: 'fixed' | 'hourly';
+  hourly_rate: number | null;
+  hours_per_week: number | null;
+  overtime_hours_per_week: number;
+  overtime_multiplier: number;
+  deduction_percent: number;
+  /** The accounts this pay lands in. */
+  account_ids: string[];
+};
+
+const SALARY_BASE = 'id, name, amount, frequency, last_payday';
+const SALARY_HOURLY =
+  'pay_type, hourly_rate, hours_per_week, overtime_hours_per_week, overtime_multiplier, deduction_percent';
+const SALARY_LINKS = 'salary_source_accounts(bank_account_id)';
+
+type SalaryDetailResult = {
+  rows: SalaryDetailRow[];
+  /** False until the hourly columns exist in the database. */
+  hourlyAvailable: boolean;
+};
+
+/**
+ * Everything the Salary page needs to edit what is saved, rather than only
+ * what the balances read.
+ *
+ * The linked accounts come with it: the page used to start every source with
+ * none, and Save rewrote the links from that, so saving the page unlinked
+ * every account. Keyed under salary_sources, so every save that invalidates
+ * the sources refreshes this too.
+ *
+ * Tolerates a database without the hourly columns (an app build that reaches
+ * people before the migration does): it reads the fixed fields alone and
+ * says so, and the page offers fixed pay only until the columns arrive.
+ */
+export function useSalaryDetails() {
+  const userId = useUserId();
+  return useQuery({
+    queryKey: ['salary_sources', userId, 'details'],
+    enabled: Boolean(userId),
+    queryFn: () =>
+      withTimeout(
+        (async (): Promise<SalaryDetailResult> => {
+          const full = await supabase
+            .from('salary_sources')
+            .select(`${SALARY_BASE}, ${SALARY_HOURLY}, ${SALARY_LINKS}`)
+            .order('created_at', { ascending: true });
+
+          // 42703: undefined column. Anything else is a real failure.
+          const hourlyAvailable = full.error?.code !== '42703';
+          const result = hourlyAvailable
+            ? full
+            : await supabase
+                .from('salary_sources')
+                .select(`${SALARY_BASE}, ${SALARY_LINKS}`)
+                .order('created_at', { ascending: true });
+          if (result.error) throw result.error;
+
+          type Raw = Partial<SalaryDetailRow> &
+            SalarySourceRow & { salary_source_accounts?: { bank_account_id: string }[] | null };
+          const rows = ((result.data ?? []) as unknown as Raw[]).map((row): SalaryDetailRow => ({
+            id: row.id,
+            name: row.name,
+            amount: Number(row.amount),
+            frequency: row.frequency,
+            last_payday: row.last_payday,
+            pay_type: row.pay_type === 'hourly' ? 'hourly' : 'fixed',
+            hourly_rate: row.hourly_rate == null ? null : Number(row.hourly_rate),
+            hours_per_week: row.hours_per_week == null ? null : Number(row.hours_per_week),
+            overtime_hours_per_week: Number(row.overtime_hours_per_week ?? 0),
+            overtime_multiplier: Number(row.overtime_multiplier ?? 1.5),
+            deduction_percent: Number(row.deduction_percent ?? 0),
+            account_ids: (row.salary_source_accounts ?? []).map((link) => link.bank_account_id),
+          }));
+          return { rows, hourlyAvailable };
+        })(),
+        QUERY_TIMEOUT_MS,
+        'Could not load salary sources. Check your connection and try again.',
+      ),
   });
 }
 
@@ -398,7 +480,7 @@ export type ReceiptRow = {
   card_id: string | null;
   bank_account_id: string | null;
   note: string | null;
-  source: 'manual' | 'scan' | 'upload';
+  source: CaptureSource;
   image_path: string | null;
   brands: { domain: string | null } | null;
 };
@@ -862,6 +944,8 @@ export type LedgerEntry = {
   /** Bills draw their category icon where a brand logo would go. */
   categoryId?: string | null;
   iconId?: string | null;
+  /** The bill or subscription a charge came from, so tapping it can edit that. */
+  planId?: string;
 };
 
 export type LedgerTotals = {
@@ -959,6 +1043,7 @@ export function useLedger(range: DateRange | undefined, today: string) {
           kind: 'subscription',
           sourceId: occurrence.cardId ?? occurrence.accountId ?? '',
           domain: row.brands?.domain,
+          planId: row.id,
         }),
       );
     }
@@ -987,6 +1072,7 @@ export function useLedger(range: DateRange | undefined, today: string) {
           domain: row.brands?.domain,
           categoryId: row.category_id,
           iconId: row.icon_id,
+          planId: row.id,
         }),
       );
     }

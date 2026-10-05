@@ -26,7 +26,7 @@ export default function ProFeatureScreen() {
   const Art = artwork[feature.artwork];
 
   return (
-    <Screen showBack>
+    <Screen title="Skip Pro" showBack>
       {/* The drawing stands on the page itself — the set is drawn on
           transparency, and a grey plate behind it read as a placeholder. */}
       <View className="mt-4 w-full items-center py-4">

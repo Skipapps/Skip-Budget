@@ -19,7 +19,7 @@ import { PageState } from '@/components/ui/page-state';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
+import { FieldLabel, Subtitle } from '@/components/ui/typography';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
@@ -103,8 +103,7 @@ export default function SplitGroupScreen() {
 
   if (isLoading) {
     return (
-      <Screen showBack>
-        <Title>Group</Title>
+      <Screen title="Group" showBack>
         <SkeletonList rows={5} />
       </Screen>
     );
@@ -112,7 +111,7 @@ export default function SplitGroupScreen() {
 
   if (isError || !group) {
     return (
-      <Screen showBack>
+      <Screen title="Group" showBack>
         <PageState
           art={artwork.error}
           title={FAILURE_MESSAGE}
@@ -124,27 +123,25 @@ export default function SplitGroupScreen() {
   }
 
   return (
-    <Screen showBack onRefresh={refresh} refreshing={refreshing}>
-      <View className="mt-2 w-full flex-row items-start justify-between gap-3">
-        <View className="min-w-0 flex-1 flex-row items-center gap-3">
-          <GroupIcon iconId={group.icon_id} groupId={group.id} size={22} />
-          <View className="min-w-0 flex-1">
-            <Title flush align="left">
-              {group.name}
-            </Title>
-            <Subtitle className="mt-1">
-              {members.length} {members.length === 1 ? 'person' : 'people'}
-            </Subtitle>
-          </View>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Group settings"
-          onPress={() => router.push(`/group-settings?id=${group.id}`)}
-          className="h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
-        >
-          <Settings2 size={20} color={colors.muted} strokeWidth={1.9} />
-        </Pressable>
+    <Screen
+      title={group.name}
+      showBack
+      onRefresh={refresh}
+      refreshing={refreshing}
+      headerActions={[
+        {
+          icon: Settings2,
+          label: 'Group settings',
+          onPress: () => router.push(`/group-settings?id=${group.id}`),
+        },
+      ]}
+    >
+      {/* The group's mark and size, under the name the header now carries. */}
+      <View className="mt-1 w-full flex-row items-center justify-center gap-2">
+        <GroupIcon iconId={group.icon_id} groupId={group.id} size={22} />
+        <Subtitle>
+          {members.length} {members.length === 1 ? 'person' : 'people'}
+        </Subtitle>
       </View>
 
       {/* Where you stand, said in words rather than left to a minus sign. */}

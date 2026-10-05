@@ -1092,3 +1092,43 @@ subscriptions match Home's destination amounts exactly.
    four tall near-duplicates. Keep all four, or ship month plus one contrast (year)?
 3. `loan-schedule` is drawn at full length — 5,890pt for 60 rows. Fine as an SVG; confirm that is
    wanted in Figma rather than a truncated "first year plus last year" frame.
+
+---
+
+## 2026-10-01 — Pia (Product Designer) — voice input design spec
+
+**Outcome:** Done. The spec is `.claude/team/design/voice-input-2026-10-01.md`. It covers the Home mic
+button, page 1 `/voice` ("Just say it"), page 2 `/voice-review` ("Is this right?"), the one-job edit
+pages, the hand-off to the full forms, what happens after save, the `voice` Pro explainer, and light and
+dark, Dynamic Type and VoiceOver. It was written against the live source and aligned with Dmitri's
+engineering plan (`.claude/team/dev/voice-input-plan-2026-10-01.md`), which landed while I was working.
+No code touched.
+
+**Decisions**
+- **FAB:** 56pt, `bg-control` with `Mic` 24 in `onControl` and `shadows.floating`. `control` *is* the
+  accent now, and the "charcoal" in comments is stale. The fill matches every other floating control
+  (the tab bar's pill, `source/[id]`'s floating pill, the retired AddButton). Placed 12pt above the tab
+  bar pill, flush with its right edge, via a new `Screen` prop `floatingPlacement="tabBar"`. Today's slot
+  would float it 48pt up. In dark mode a 1pt `muted` ring is added when the accent is under 3:1 against
+  the page: plum (the default) is 2.09:1 and navy 1.26:1. The FAB is hidden only when the speech module
+  is missing, and shown with no PRO sticker to free accounts, where it opens the explainer.
+- **Page 1:** a constant layout (title, a stage card that changes per state, a privacy line, nine
+  examples), with the action pinned in the footer. Nine example sentences with the picked-up parts in
+  bold. All nine must be Drew's parser fixtures. No auto-start on open.
+- **Page 2:** a summary to check, not a form. Kind chips, the `AmountFigure` hero, an ambiguous-amount
+  chip pick with nothing preselected, label-above-value rows with a "Tap to add" look for missing
+  required fields, and the forms' own cycle chips and "Paid with". Confidence changes only the
+  question line. Save hints reuse the forms' exact words.
+- **Edits are pushed pages** (`/voice-edit?field=…`) built from AmountStep, BrandField, InlineCalendar
+  and CategoryPicker, because AmountPad and DatePicker are bottom-slide and floating modals, which the
+  Founder ruled out. This extends Dmitri's two-route plan, and the shared working copy is flagged to him.
+- **After save:** `success()` then `dismissTo('/home')`, with no toast. It is the same landing as Quick
+  add.
+- **Explainer:** "Just say it", with artwork `welcomeTrack`.
+
+**Could not verify:** nothing rendered. The FAB offset assumes a zero bottom inset inside a tab scene.
+Multi-line head truncation for the live transcript is unchecked. The contrast figures were computed, not
+seen.
+
+**Open questions (Founder):** 1) free accounts see the mic with no sticker; 2) approve the privacy
+one-liners and the explainer copy; 3) save lands on Home rather than the item's list.

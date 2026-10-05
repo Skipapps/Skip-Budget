@@ -30,6 +30,9 @@ jest.mock('@/providers/theme-provider', () => ({
 
 jest.mock('@/lib/press', () => ({ withTap: (handler?: () => void) => handler }));
 
+// Its own test covers it (voice-fab.test.tsx); here it only has to take up room.
+jest.mock('@/components/voice/voice-fab', () => ({ VoiceFab: () => null, VOICE_FAB_SIZE: 64 }));
+
 const routes = [
   { key: 'home-1', name: 'home' },
   { key: 'cards-1', name: 'cards' },
@@ -40,7 +43,7 @@ const routes = [
 const titles: Record<string, string> = {
   home: 'Home',
   cards: 'Cards',
-  transactions: 'Transactions',
+  transactions: 'Activity',
   settings: 'Settings',
 };
 
@@ -63,13 +66,17 @@ describe('SkipTabBar — what takes a touch', () => {
     const { props } = renderBar();
     const { toJSON } = await render(<SkipTabBar {...props} />);
 
-    // The rendered host tree: the outer band, and the pill inside it.
+    // The rendered host tree: the outer band, the row inside it holding the
+    // pill and the Voice button, and the pill.
     const band = toJSON()!;
-    const pill = (band.children as JsonElement[])[0];
+    const row = (band.children as JsonElement[])[0];
+    const pill = (row.children as JsonElement[])[0];
 
-    // The outer view paints the strip above and below the pill. It does not
-    // receive touches, so a tap on empty page there reaches the page.
+    // The outer view paints the strip above and below the pill, and the row
+    // spans the gap between the pill and the Voice button. Neither receives
+    // touches, so a tap on empty page there reaches the page.
     expect(band.props.pointerEvents).toBe('box-none');
+    expect(row.props.pointerEvents).toBe('box-none');
     // The pill is visible, so it is not see-through to touches.
     expect(pill.props.pointerEvents).toBeUndefined();
   });

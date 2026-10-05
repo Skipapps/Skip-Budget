@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { OtpInput } from '@/components/ui/otp-input';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
-import { Strong, Subtitle, Title } from '@/components/ui/typography';
+import { Strong, Subtitle } from '@/components/ui/typography';
 import { resetTo } from '@/lib/nav';
 
 const CODE_LENGTH = 6;
@@ -60,8 +60,7 @@ export default function VerifyOtpScreen() {
   };
 
   return (
-    <Screen showBack avoidKeyboard>
-      <Title>Enter the code</Title>
+    <Screen title="Enter the code" showBack avoidKeyboard>
       <Subtitle className="mt-3">
         {email ? (
           <>

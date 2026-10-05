@@ -5,7 +5,7 @@ import { Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
-import { Strong, Subtitle, Title } from '@/components/ui/typography';
+import { Strong, Subtitle } from '@/components/ui/typography';
 import { useColors } from '@/providers/theme-provider';
 
 /**
@@ -19,9 +19,11 @@ import { useColors } from '@/providers/theme-provider';
  */
 export default function MessageScreen() {
   return (
-    <Screen showBack footer={<Button label="Let's go" onPress={() => router.push('/auth')} />}>
-      <Title>Why Skip is different</Title>
-
+    <Screen
+      title="Why Skip is different"
+      showBack
+      footer={<Button label="Let's go" onPress={() => router.push('/auth')} />}
+    >
       <Subtitle className="mt-3 w-full">
         Built for people who want to truly understand their money — not automate it and forget it.
       </Subtitle>

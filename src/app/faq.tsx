@@ -5,7 +5,7 @@ import { LayoutAnimation, Platform, Pressable, Text, UIManager, View } from 'rea
 
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
-import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
+import { FieldLabel, Subtitle } from '@/components/ui/typography';
 import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
@@ -135,7 +135,7 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
       {
         question: 'What does Pro include?',
         answer:
-          'Unlimited credit cards, accounts and incomes, unlimited receipt scanning, the loan calculator, the split manager, Insights, colour theming, early access to new features and first-in-line support. $1.99 a month or $19.99 a year, billed by Apple.',
+          'Unlimited credit cards, accounts and incomes, unlimited receipt scanning, the loan calculator, the split manager, Insights, early access to new features and first-in-line support. $1.99 a month or $19.99 a year, billed by Apple.',
       },
       {
         question: 'What happens to my things if I cancel?',
@@ -168,8 +168,7 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
 
 export default function FaqScreen() {
   return (
-    <Screen showBack>
-      <Title align="left">Common questions</Title>
+    <Screen title="Common questions" showBack>
       <Subtitle className="mt-3 w-full text-left">
         Short answers to the things people ask. If yours is not here, message us — a person reads
         every one.

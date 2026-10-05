@@ -11,7 +11,6 @@ import * as Sentry from '@sentry/react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -19,6 +18,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useRegisterPush } from '@/api/push';
 import { AppLockGate } from '@/components/app-lock-gate';
+import { LaunchSplash } from '@/components/launch-splash';
 import { DialogProvider } from '@/providers/dialog-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { useConfigurePurchases } from '@/api/pro';
@@ -66,17 +66,16 @@ function RootLayout() {
 /**
  * Everything below the theme, held back until there is a theme to draw it in.
  *
- * The splash waits on the stored colours as well as the fonts. Reading them
- * takes a moment, and without the wait a phone set to dark opens on a white
- * screen and then blinks — which looks like a bug rather than a preference.
+ * The splash waits on the stored mode as well as the fonts. Reading it takes a
+ * moment, and without the wait someone who chose dark opens on a white screen
+ * and then blinks — which looks like a bug rather than a preference.
+ *
+ * Once both are in, LaunchSplash takes over from the native splash — it is
+ * what hides it — and plays the bird's grow while the app loads underneath.
  */
 function AppShell({ fontsReady }: { fontsReady: boolean }) {
   const { ready, scheme } = useTheme();
   const settled = fontsReady && ready;
-
-  useEffect(() => {
-    if (settled) SplashScreen.hideAsync();
-  }, [settled]);
 
   if (!settled) return null;
 
@@ -108,6 +107,9 @@ function AppShell({ fontsReady }: { fontsReady: boolean }) {
             </RealtimeProvider>
           </SessionProvider>
         </QueryProvider>
+        {/* After the app, so it draws over every route and popup until it
+            fades. Outside the providers: it needs none of them. */}
+        <LaunchSplash />
       </SafeAreaProvider>
     </KeyboardProvider>
   );

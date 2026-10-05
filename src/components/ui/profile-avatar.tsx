@@ -14,10 +14,9 @@ type ProfileAvatarProps = {
 /**
  * The account's face, or an invitation to pick one.
  *
- * Always drawn on a tinted circle rather than straight onto the page. The
- * artwork is transparent, so without one a pale avatar would dissolve into
- * light mode and a dark-outlined one into dark mode — and the ring is what
- * makes an unset avatar read as an empty slot rather than a missing image.
+ * Always drawn inside a ringed circle. The avatars bring their own round
+ * background; the ring is what makes an unset avatar read as an empty slot
+ * rather than a missing image.
  *
  * An id the app no longer ships falls back to the placeholder, which is why
  * the column has no foreign key: retiring an avatar should not orphan a row.

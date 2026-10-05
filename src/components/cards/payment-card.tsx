@@ -2,6 +2,7 @@ import type { ViewStyle } from 'react-native';
 
 import { CardFace } from '@/components/cards/card-face';
 import type { PaymentCard as PaymentCardModel } from '@/data/cards-mock';
+import { toCents } from '@/lib/money';
 
 type PaymentCardProps = {
   card: PaymentCardModel;
@@ -14,7 +15,8 @@ export function PaymentCard({ card, placeholderHolder, style }: PaymentCardProps
   // A card balance is stored as debt — a bigger number means more owed. On the
   // face it is shown the way it affects you, which is negative: this is money
   // already spent, not money sitting there waiting.
-  const owed = Math.round(card.balance);
+  // Decided in cents: $0.40 still owed is owed, float dust is nothing.
+  const owed = toCents(card.balance);
 
   return (
     <CardFace

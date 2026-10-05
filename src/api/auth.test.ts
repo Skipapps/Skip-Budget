@@ -12,8 +12,29 @@
 
 // babel-plugin-jest-hoist lifts the jest.mock() calls below above this import,
 // so auth.ts loads against them.
-import { signInWithEmail, signOut, verifyOtp } from './auth';
+import { deleteAccount, signInWithEmail, signOut, verifyOtp } from './auth';
 import { FAILURE_MESSAGE } from '@/lib/failure';
+import type { VoiceDraft } from '@/lib/voice';
+import { putVoiceDraft, readVoiceDraft } from '@/lib/voice-draft';
+
+/** An unsaved voice draft: what the person said, still in memory. */
+const HEARD: VoiceDraft = {
+  kind: 'receipt',
+  kindSure: true,
+  amount: 12.5,
+  amountChoices: [],
+  merchant: null,
+  merchantHeard: null,
+  merchantSource: null,
+  date: null,
+  cycle: null,
+  billCategoryId: null,
+  multiple: false,
+  score: 50,
+  confidence: 'medium',
+  missing: ['merchant'],
+  transcript: 'twelve fifty at the corner shop',
+};
 
 const order: string[] = [];
 
@@ -40,6 +61,15 @@ jest.mock('@/api/push', () => ({
   forgetDevice: (userId: string) => mockForgetDevice(userId),
 }));
 
+// What the phone learned about how this person says their merchants.
+const mockForgetVoice = jest.fn(async (_userId: string | null | undefined) => {});
+jest.mock('@/api/voice-aliases', () => ({
+  forgetVoiceAliases: (userId: string | null | undefined) => mockForgetVoice(userId),
+}));
+
+let mockRpcError: { message: string } | null = null;
+let mockLiveUser: { id: string } | null = null;
+
 jest.mock('@/lib/supabase', () => ({
   supabase: {
     auth: {
@@ -47,7 +77,9 @@ jest.mock('@/lib/supabase', () => ({
       signOut: () => mockAuthSignOut(),
       signInWithPassword: async () => ({ error: mockAuthError }),
       verifyOtp: async () => ({ error: mockAuthError }),
+      getUser: async () => ({ data: { user: mockLiveUser } }),
     },
+    rpc: async () => ({ error: mockRpcError }),
   },
 }));
 
@@ -63,6 +95,8 @@ describe('signOut', () => {
     mockForgetDevice.mockImplementation(async () => {
       order.push('forget');
     });
+    mockForgetVoice.mockReset();
+    mockForgetVoice.mockImplementation(async () => {});
   });
 
   it("deletes this device's push row before the session is cleared", async () => {
@@ -117,6 +151,101 @@ describe('signOut', () => {
 
     expect(order).toEqual(['forget', 'signOut']);
     expect(result.error).toBe(FAILURE_MESSAGE);
+  });
+
+  it("forgets this person's learned voice corrections while the session can still name them", async () => {
+    mockForgetVoice.mockImplementation(async () => {
+      order.push('voice');
+    });
+
+    const result = await signOut();
+
+    expect(mockForgetVoice).toHaveBeenCalledWith('user-A');
+    expect(order).toEqual(['forget', 'voice', 'signOut']);
+    expect(result.error).toBeNull();
+  });
+
+  it('forgets an unsaved voice draft, even when the session cannot be read', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const first = putVoiceDraft(HEARD);
+    await signOut();
+    expect(readVoiceDraft(first)).toBeNull();
+
+    mockSessionError = new Error('storage unavailable');
+    const second = putVoiceDraft(HEARD);
+    const result = await signOut();
+    expect(readVoiceDraft(second)).toBeNull();
+    expect(result.error).toBeNull();
+    warn.mockRestore();
+  });
+
+  it('signs out anyway when the voice corrections cannot be cleared', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockForgetVoice.mockImplementation(async () => {
+      throw new Error('storage unavailable');
+    });
+
+    const result = await signOut();
+
+    expect(order).toEqual(['forget', 'signOut']);
+    expect(result.error).toBeNull();
+    warn.mockRestore();
+  });
+});
+
+describe('deleteAccount', () => {
+  beforeEach(() => {
+    order.length = 0;
+    mockAuthSignOut.mockClear();
+    mockSession = { user: { id: 'user-A' } };
+    mockSessionError = null;
+    mockSignOutError = null;
+    mockRpcError = null;
+    mockLiveUser = null;
+    mockForgetVoice.mockReset();
+    mockForgetVoice.mockImplementation(async () => {
+      order.push('voice');
+    });
+  });
+
+  it("forgets the person's voice corrections once the account is really gone", async () => {
+    const id = putVoiceDraft(HEARD);
+    const result = await deleteAccount();
+
+    expect(readVoiceDraft(id)).toBeNull();
+
+    expect(result.error).toBeNull();
+    expect(mockForgetVoice).toHaveBeenCalledWith('user-A');
+    expect(order).toEqual(['voice', 'signOut']);
+  });
+
+  it('keeps them while the account is still there', async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    const id = putVoiceDraft(HEARD);
+    mockRpcError = { message: 'boom' };
+    expect((await deleteAccount()).error).toBe(FAILURE_MESSAGE);
+
+    mockRpcError = null;
+    mockLiveUser = { id: 'user-A' };
+    expect((await deleteAccount()).error).toBe(FAILURE_MESSAGE);
+
+    expect(mockForgetVoice).not.toHaveBeenCalled();
+    expect(mockAuthSignOut).not.toHaveBeenCalled();
+    expect(readVoiceDraft(id)).not.toBeNull();
+    jest.restoreAllMocks();
+  });
+
+  it('still signs out of a deleted account when they cannot be cleared', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockForgetVoice.mockImplementation(async () => {
+      throw new Error('storage unavailable');
+    });
+
+    const result = await deleteAccount();
+
+    expect(result.error).toBeNull();
+    expect(mockAuthSignOut).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 });
 

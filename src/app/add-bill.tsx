@@ -9,7 +9,8 @@ import {
   useReminderChoice,
   type ReminderChoice,
 } from '@/api/reminders';
-import { useCreateBill, useDeleteBill, useUpdateBill, type BillValues } from '@/api/mutations';
+import { buildBillValues, defaultBillName } from '@/api/entry-values';
+import { useCreateBill, useDeleteBill, useUpdateBill } from '@/api/mutations';
 import { usePastCharges } from '@/api/past-charges';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { ScheduleCard } from '@/components/calculators/schedule-card';
@@ -31,18 +32,23 @@ import { useConfirm } from '@/providers/dialog-provider';
 import { SelectField } from '@/components/ui/select-field';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
-import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
+import { FieldLabel, Title } from '@/components/ui/typography';
 import {
   BILL_CATEGORIES,
   RECURRENCES,
   type BillCategory,
   type Recurrence,
 } from '@/data/bills-mock';
-import { floorAfterCharges } from '@/lib/charges';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { success, warn } from '@/lib/haptics';
 import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 import { amortise, termsFromStored } from '@/lib/loan';
+import {
+  cameFromVoice,
+  clearVoiceDraft,
+  readBillPrefill,
+  type BillPrefill,
+} from '@/lib/voice-draft';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 
@@ -99,7 +105,8 @@ const asDate = (value?: string | null) => (value ? new Date(`${value}T00:00:00`)
  * loud rather than collapsing into an innocent-looking "Add a bill".
  */
 export default function AddBillScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; from?: string }>();
+  const { id } = params;
   const artwork = useArtwork();
   const bill = useBill(id);
   const existing = bill.data ?? null;
@@ -162,24 +169,52 @@ export default function AddBillScreen() {
     );
   }
 
-  return <BillForm key={existing?.id ?? 'new'} id={id} existing={existing} />;
+  // Only a new bill can arrive pre-filled from the voice review page.
+  const prefill = id ? null : readBillPrefill(params);
+
+  return (
+    <BillForm
+      key={existing?.id ?? 'new'}
+      id={id}
+      existing={existing}
+      prefill={prefill}
+      fromVoice={!id && cameFromVoice(params)}
+    />
+  );
+}
+
+/** The name a pre-filled bill opens with: the one typed, the company, else the category. */
+function prefillName(prefill: BillPrefill | null): string {
+  if (!prefill) return '';
+  if (prefill.name) return prefill.name;
+  const label = BILL_CATEGORIES.find((option) => option.id === prefill.categoryId)?.label ?? '';
+  return defaultBillName(prefill.categoryId ?? '', label, prefill.issuer);
 }
 
 function BillForm({
   id,
   existing,
+  prefill = null,
+  fromVoice = false,
 }: {
   id?: string;
   existing: ReturnType<typeof useBill>['data'] | null;
+  /** What the voice review page heard, for a new bill. */
+  prefill?: BillPrefill | null;
+  /** Saved from a voice hand-off: back to Home, never onto the review page again. */
+  fromVoice?: boolean;
 }) {
   const colors = useColors();
   const editing = Boolean(id);
   // Editing walks the whole flow from the amount, like adding does; only the
-  // category chooser is skipped, because the bill already has one.
-  const [step, setStep] = useState<Step>(editing ? 'amount' : 'category');
+  // category chooser is skipped, because the bill already has one. So is a
+  // pre-filled bill whose category is already known.
+  const [step, setStep] = useState<Step>(editing || prefill?.categoryId ? 'amount' : 'category');
   const dot = Math.max(DOTS.indexOf(step), 0);
 
-  const [categoryId, setCategoryId] = useState<string>(existing?.category_id ?? '');
+  const [categoryId, setCategoryId] = useState<string>(
+    existing?.category_id ?? prefill?.categoryId ?? '',
+  );
   // Who issues the bill. Optional, and stays that way: a large share of bills
   // — rent, HOA fees, a loan from a relative — have no company behind them.
   const [issuer, setIssuer] = useState<BrandSelection | null>(
@@ -192,11 +227,15 @@ function BillForm({
           // The brand is never allowed to answer that question.
           categoryId: existing.category_id,
         }
-      : null,
+      : existing
+        ? null
+        : (prefill?.issuer ?? null),
   );
-  const [name, setName] = useState(existing?.name ?? '');
+  const [name, setName] = useState(existing?.name ?? prefillName(prefill));
   const [iconId, setIconId] = useState(existing?.icon_id ?? 'other');
-  const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
+  const [amount, setAmount] = useState(
+    existing ? String(existing.amount) : (prefill?.amount ?? ''),
+  );
   const [startDate, setStartDate] = useState<Date | null>(
     // A repeating bill shows when it is next due; its start is bookkeeping (see
     // floorAfterCharges) and can sit after the last charge. A bill that runs
@@ -205,13 +244,17 @@ function BillForm({
       existing?.recurrence === 'period'
         ? (existing.starts_on ?? existing.next_due_on)
         : (existing?.next_due_on ?? existing?.starts_on),
-    ),
+    ) ??
+      prefill?.startDate ??
+      null,
   );
   const [endDate, setEndDate] = useState<Date | null>(asDate(existing?.ends_on));
   const [recurrence, setRecurrence] = useState<RecurrenceChoice>(
-    (existing?.recurrence as RecurrenceChoice) ?? 'monthly',
+    (existing?.recurrence as RecurrenceChoice) ?? prefill?.recurrence ?? 'monthly',
   );
-  const [sourceId, setSourceId] = useState(existing?.card_id ?? existing?.bank_account_id ?? '');
+  const [sourceId, setSourceId] = useState(
+    existing?.card_id ?? existing?.bank_account_id ?? prefill?.sourceId ?? '',
+  );
   const [note, setNote] = useState(existing?.note ?? '');
 
   // Which date the picker is editing, or null when it is closed.
@@ -252,8 +295,12 @@ function BillForm({
 
   const handleSelectCategory = (category: BillCategory) => {
     setCategoryId(category.id);
-    // Pre-fill the name so common bills are one tap from done.
-    setName(category.id === 'other' ? '' : category.label);
+    // Pre-fill the name so common bills are one tap from done — unless it is
+    // already a real name: the company's, or one typed on the voice review
+    // page. Otherwise a pre-filled "Comcast" would become "Internet".
+    const current = name.trim();
+    const real = Boolean(current) && (current === issuer?.name || current === prefill?.name);
+    if (!real) setName(category.id === 'other' ? '' : category.label);
     setStep('amount');
   };
 
@@ -306,69 +353,49 @@ function BillForm({
     setStep(atStep);
   };
 
+  /** Where a saved bill leaves to. */
+  const leave = () => {
+    if (!fromVoice) {
+      router.back();
+      return;
+    }
+    router.dismissTo('/home');
+    // Saved, so what was heard has done its job; the person's words do not
+    // stay in memory for the next session to find.
+    clearVoiceDraft();
+  };
+
   const handleSave = async () => {
     setError(null);
-    if (!name.trim()) {
-      fail('Give the bill a name.', 'details');
+    // The checks (name, amount, date, a period the right way round) and the
+    // values, icon rule and starts_on floor included, are the shared
+    // builder's; it is what the voice review page saves through too.
+    const built = buildBillValues(
+      {
+        name,
+        amount,
+        issuer,
+        categoryId,
+        iconId,
+        recurrence,
+        startDate,
+        endDate,
+        sourceId,
+        note,
+      },
+      { sources, lastChargedOn: pastCharges.lastChargedOn },
+    );
+    if (!built.ok) {
+      fail(built.message, built.field);
       return;
     }
-    const value = Number(amount);
-    if (!Number.isFinite(value) || value <= 0) {
-      fail('Enter how much it costs.', 'amount');
-      return;
-    }
-    // A bill with no date cannot be scheduled, so it would save and then never
-    // appear anywhere. Better to ask for it than to lose it silently.
-    if (!startDate) {
-      fail(hasPeriod ? 'Pick the date it starts.' : 'Pick the first due date.', 'when');
-      return;
-    }
-    // Last line of defence, and the only one that sees an edited bill whose
-    // stored dates were already the wrong way round. Compared as ISO days: no
-    // clock, no timezone, exact.
-    if (hasPeriod && endDate && toIsoDate(endDate) < toIsoDate(startDate)) {
-      fail('The end date cannot be before the start date.', 'when');
-      return;
-    }
-
-    const chosen = sources.find((source) => source.id === sourceId);
-    // "Specific period" is a recurrence in the UI but a date range in the
-    // database, where the recurrence column carries 'period'.
-    const isPeriod = recurrence === PERIOD;
+    const { values } = built;
 
     try {
-      const values: BillValues = {
-        name: name.trim(),
-        amount: value,
-        brand_id: issuer?.brandId ?? null,
-        category_id: categoryId,
-        // Only a self-named bill has an icon of its own; the rest wear their
-        // category's. Saving the picker's untouched 'other' onto a Housing
-        // bill is what put the Other glyph on every bill without a logo.
-        icon_id: isCustom ? iconId || null : null,
-        recurrence: isPeriod
-          ? 'period'
-          : (recurrence as 'weekly' | 'monthly' | 'quarterly' | 'yearly'),
-        next_due_on: startDate ? toIsoDate(startDate) : null,
-        // Never on or before a charge already recorded, or the edit records
-        // that cycle a second time. A set period keeps its own first day.
-        starts_on: isPeriod
-          ? toIsoDate(startDate)
-          : floorAfterCharges(
-              toIsoDate(startDate),
-              pastCharges.lastChargedOn,
-              recurrence as Recurrence,
-            ),
-        ends_on: endDate ? toIsoDate(endDate) : null,
-        card_id: chosen?.kind === 'card' ? chosen.id : null,
-        bank_account_id: chosen?.kind === 'account' ? chosen.id : null,
-        note: note.trim() || null,
-      };
-
       // What a recorded charge copies from the bill, before and after.
       const carried = {
         label: values.name || 'Bill',
-        amount: value,
+        amount: values.amount,
         card_id: values.card_id,
         bank_account_id: values.bank_account_id,
       };
@@ -402,7 +429,7 @@ function BillForm({
       await applyReminder('bill', billId, choiceToLead(reminder), remindAt);
 
       success();
-      router.back();
+      leave();
     } catch (thrown) {
       warn();
       setError({ message: failureMessage(thrown), step: 'when' });
@@ -421,11 +448,8 @@ function BillForm({
         }
       >
         <Title className="mt-2">What is this bill for?</Title>
-        <Subtitle className="mt-3">
-          Pick what this bill is for. You can rename it on the next step.
-        </Subtitle>
 
-        <View className="mt-7 w-full pb-10">
+        <View className="mt-6 w-full pb-10">
           <CategoryPicker onSelect={handleSelectCategory} selectedId={categoryId} />
         </View>
       </Screen>
@@ -461,8 +485,10 @@ function BillForm({
       onBack={() => {
         setError(null);
         if (step === 'amount') {
-          // Back out to the chooser when it was used; straight out when editing.
-          if (editing) router.back();
+          // Back out to the chooser when it was used; straight out when editing,
+          // and straight back to the voice review page when it already named
+          // the category and the chooser was never shown.
+          if (editing || (fromVoice && prefill?.categoryId)) router.back();
           else setStep('category');
         } else if (step === 'details') setStep('amount');
         else setStep('details');

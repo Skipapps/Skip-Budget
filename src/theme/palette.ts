@@ -4,74 +4,20 @@ import { contrast } from '@/lib/tone';
  * The whole of the app's colour, in one place.
  *
  * Every surface in Skip is a neutral — off-white or near-black — and exactly
- * one colour is the user's. That is why the chrome was kept black: a themed app
- * that tints its greys as well ends up with twelve different apps to design,
- * and eleven of them look like a mistake. Here there is one ramp per mode and
- * one accent laid over it, so choosing sunflower changes what is highlighted
- * and nothing about what is readable.
+ * one colour is the brand's. Here there is one ramp per mode and one accent
+ * laid over it, so the accent changes what is highlighted and nothing about
+ * what is readable.
  */
 
+/**
+ * The one accent (Founder's call, 2026-10-03, retiring the eight-swatch
+ * picker). White type on it clears 5.6:1, so buttons and the tab bar carry
+ * white in both modes.
+ */
+export const ACCENT = { value: '#905479', on: '#FFFFFF' } as const;
+
+/** Light, dark, or whatever the phone is set to — chosen in Settings. */
 export type ModeKey = 'light' | 'dark' | 'system';
-
-/** What the two modes are actually called, in the user's words. */
-export const MODES = [
-  { id: 'light', label: 'Light', caption: 'Warm off-white' },
-  { id: 'dark', label: 'Dark', caption: 'Soft near-black' },
-  { id: 'system', label: 'System', caption: 'Follows your phone' },
-] as const;
-
-/**
- * The eight, curated down from twelve (2026-09-25).
- *
- * Two families of four rather than twelve variations of pale. The warm pastel
- * row carries near-black ink; the deep dusty row carries white. `on` is
- * declared per accent instead of computed, because the computation and the
- * design disagree on the mid tones: black technically scores higher on
- * periwinkle and rose, but white at 3.5:1 is what the large bold figures those
- * surfaces carry actually want — measured against WCAG's large-text bar, not
- * guessed. Every other pairing clears 4.5:1 outright.
- */
-export const ACCENTS = [
-  { id: 'apricot', label: 'Apricot', value: '#EFA168', on: '#111111' },
-  { id: 'coral', label: 'Coral', value: '#FFA896', on: '#111111' },
-  { id: 'pistachio', label: 'Pistachio', value: '#D4DE95', on: '#111111' },
-  { id: 'lavender', label: 'Lavender', value: '#A79CC4', on: '#111111' },
-  { id: 'periwinkle', label: 'Periwinkle', value: '#8686AC', on: '#FFFFFF' },
-  { id: 'rose', label: 'Rose', value: '#B9718F', on: '#FFFFFF' },
-  { id: 'plum', label: 'Plum', value: '#6E3E5C', on: '#FFFFFF' },
-  { id: 'navy', label: 'Navy', value: '#272757', on: '#FFFFFF' },
-] as const;
-
-export type AccentId = (typeof ACCENTS)[number]['id'];
-export type AccentDef = (typeof ACCENTS)[number];
-
-/**
- * Where the retired four-and-three land. A device that stored butter wakes up
- * on the nearest survivor rather than snapping to the default — the choice
- * they made is honoured in spirit when it cannot be honoured exactly.
- */
-export const LEGACY_ACCENTS: Record<string, AccentId> = {
-  butter: 'apricot',
-  honey: 'apricot',
-  blush: 'coral',
-  powder: 'periwinkle',
-  sage: 'pistachio',
-  taupe: 'rose',
-  slate: 'navy',
-};
-
-/**
- * Plum on install (Founder's call, 2026-09-27, superseding navy): deep and
- * dusty with white type in both modes, and the colour every non-Pro user
- * lives with — theming is a Pro feature, so this is effectively the brand.
- * Mode follows the phone until they say otherwise.
- */
-export const DEFAULT_ACCENT: AccentId = 'plum';
-export const DEFAULT_MODE: ModeKey = 'system';
-
-export function accentById(id: AccentId): AccentDef {
-  return ACCENTS.find((accent) => accent.id === id) ?? ACCENTS[0];
-}
 
 // ---------------------------------------------------------------------------
 // Colour maths
@@ -102,11 +48,11 @@ export function mix(hex: string, towards: string, amount: number): string {
 /**
  * The accent, pushed until it can be read as type on a given background.
  *
- * Sunflower and blush are fine as a button fill and illegible as a label; the
- * same swatch has to do both jobs. Rather than banning the light half of the
- * palette, the text form is walked away from the background until it clears
- * the WCAG bar — sunflower becomes a deep amber, blush a dusty rose, and both
- * still read as the colour that was chosen.
+ * The accent is fine as a button fill on both pages but too dim as a label on
+ * near-black (3.1:1), and the same swatch has to do both jobs. Rather than
+ * keeping a second colour by hand, the text form is walked away from the
+ * background until it clears the WCAG bar — in dark mode it lifts to a lighter
+ * mauve that still reads as the same colour.
  */
 export function readable(hex: string, background: string, target = 4.5): string {
   if (contrast(hex, background) >= target) return hex;
@@ -204,9 +150,10 @@ export type Tokens = {
   danger: string;
 };
 
-/** Resolves one mode and one accent into every colour the app draws with. */
-export function buildTokens(scheme: Scheme, accent: AccentDef): Tokens {
+/** Resolves one mode into every colour the app draws with. */
+export function buildTokens(scheme: Scheme): Tokens {
   const ramp = RAMPS[scheme];
+  const accent = ACCENT;
 
   return {
     ...ramp,
@@ -214,8 +161,6 @@ export function buildTokens(scheme: Scheme, accent: AccentDef): Tokens {
     // Pressed reads as "further in", which is darker on light chrome and
     // lighter on dark. Following the scheme keeps the feedback visible either way.
     controlPressed: mix(accent.value, scheme === 'dark' ? '#FFFFFF' : '#000000', 0.18),
-    // Declared with the accent, not computed: the curated pairings are the
-    // palette, and the maths alone would put black on periwinkle and rose.
     onControl: accent.on,
     accent: accent.value,
     accentInk: readable(accent.value, ramp.surface),

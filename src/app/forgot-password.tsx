@@ -6,7 +6,7 @@ import { sendPasswordReset } from '@/api/auth';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { Subtitle } from '@/components/ui/typography';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -38,8 +38,7 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <Screen showBack avoidKeyboard>
-      <Title>Forgot password?</Title>
+    <Screen title="Forgot password?" showBack avoidKeyboard>
       <Subtitle className="mt-3">
         Enter your email and we will send you a 6-digit verification code.
       </Subtitle>

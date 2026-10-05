@@ -122,3 +122,43 @@ describe('exactRemainder', () => {
     expect(exactRemainder(shares, 100)).toBe(0);
   });
 });
+
+/**
+ * Splits round with money.ts, the app's one rule: half a cent away from zero,
+ * decided on the decimal the arithmetic meant. Every stored figure is
+ * numeric(14,2), so real inputs are whole cents and never reach a half; these
+ * pin the rule for the day a computed figure does. Under the old local
+ * Math.round(value * 100), 1.005 (stored as 1.00499…) came out as 100 cents
+ * and −1.005 as −100.
+ */
+describe('rounding to the cent', () => {
+  it('settles a half-cent balance the way money.ts posts it', () => {
+    expect(
+      simplifyDebts([
+        { id: 'a', balance: -1.005 },
+        { id: 'b', balance: 1.005 },
+      ]),
+    ).toEqual([{ from: 'a', to: 'b', amount: 1.01 }]);
+  });
+
+  it('splits a half-cent total as the posted total', () => {
+    // 10.075 posts as $10.08 (the old rule said $10.07): 1008 cents over two.
+    const shares = equalShares(['a', 'b'], 10.075);
+    expect(shares.map((entry) => entry.share)).toEqual([5.04, 5.04]);
+  });
+
+  it('measures a remainder against the posted total', () => {
+    expect(exactRemainder([{ memberId: 'a', share: 10 }], 10.075)).toBe(0.08);
+  });
+
+  it('ignores float dust from summing whole cents', () => {
+    // 0.1 + 0.2 is 0.30000000000000004: still 30 cents, no stray payment.
+    expect(
+      simplifyDebts([
+        { id: 'a', balance: -(0.1 + 0.2) },
+        { id: 'b', balance: 0.3 },
+      ]),
+    ).toEqual([{ from: 'a', to: 'b', amount: 0.3 }]);
+    expect(simplifyDebts([{ id: 'a', balance: 0.1 + 0.2 - 0.3 }])).toEqual([]);
+  });
+});

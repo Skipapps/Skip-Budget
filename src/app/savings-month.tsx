@@ -12,7 +12,7 @@ import { Screen } from '@/components/ui/screen';
 import { SelectField } from '@/components/ui/select-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TextField } from '@/components/ui/text-field';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { Subtitle } from '@/components/ui/typography';
 import { formatCurrency } from '@/lib/format';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
@@ -62,9 +62,8 @@ export default function SavingsMonthScreen() {
 
   if (months.isLoading) {
     return (
-      <Screen showBack>
+      <Screen title="Month" showBack>
         <View className="mt-2 w-full gap-4" accessibilityLabel="Loading">
-          <Skeleton className="h-8 w-2/3 rounded-[12px]" />
           <Skeleton className="h-5 w-full" />
           <Skeleton className="mt-2 h-28 w-full rounded-[16px]" />
           <Skeleton className="h-14 w-full rounded-[12px]" />
@@ -75,7 +74,7 @@ export default function SavingsMonthScreen() {
 
   if (months.isError) {
     return (
-      <Screen showBack>
+      <Screen title="Month" showBack>
         <PageState
           art={artwork.error}
           title={FAILURE_MESSAGE}
@@ -88,8 +87,7 @@ export default function SavingsMonthScreen() {
 
   if (!row || !month) {
     return (
-      <Screen showBack>
-        <Title>Month</Title>
+      <Screen title="Month" showBack>
         <Subtitle className="mt-3">That month is not on your savings.</Subtitle>
       </Screen>
     );
@@ -167,8 +165,7 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
   };
 
   return (
-    <Screen showBack avoidKeyboard>
-      <Title align="left">{monthName(month)}</Title>
+    <Screen title={monthName(month)} showBack avoidKeyboard>
       <Subtitle className="mt-3">
         Skip only knows what it was told. If something was paid in cash or never scanned, put the
         real figure here.

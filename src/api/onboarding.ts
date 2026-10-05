@@ -99,13 +99,16 @@ export function useGettingStarted() {
 
   // Still loading reads as dismissed, so neither surface can flash at people
   // who finished setup months ago while their rows are on the way in.
+  // Receipts too: an account whose only entries are receipts is still a
+  // returning one, and the walk-in decides that from these rows.
   const settled =
     Boolean(profile.data) &&
     !salary.isPending &&
     !cards.isPending &&
     !accounts.isPending &&
     !bills.isPending &&
-    !subscriptions.isPending;
+    !subscriptions.isPending &&
+    !receipts.isPending;
   const dismissed = Boolean(profile.data?.getting_started_dismissed_at);
   const visible = settled && !dismissed && doneCount < steps.length;
 

@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
-import { ChevronRight, Plus, Repeat } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import { Fragment, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
 import { useLedger, usePaymentSources, useSubscriptions } from '@/api/queries';
@@ -11,20 +11,24 @@ import { PageState } from '@/components/ui/page-state';
 import { RangeDropdown } from '@/components/ui/range-dropdown';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { Title } from '@/components/ui/typography';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { groupByDate } from '@/lib/group';
 import { rangeFor, type RangeKey } from '@/lib/range';
-import { useColors, useMoneyColor } from '@/providers/theme-provider';
+import { useMoneyColor } from '@/providers/theme-provider';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * What the subscriptions have actually cost, over a window you choose.
  *
- * Same shape as the bills page, for the same reason: the plans live one tap
- * away and this lists the times each one renewed. A plan cancelled in March
- * still shows the months it ran, which is the whole point of looking back.
+ * Same shape as the bills page, for the same reason: it lists the times each
+ * plan renewed. A plan cancelled in March still shows the months it ran, which
+ * is the whole point of looking back.
+ *
+ * Adding is the + in the header, and a renewal opens its subscription's own
+ * page — details, paid and upcoming renewals, and the pencil to edit (the
+ * Founder's call, 2026-10-03). The full list, including paused and
+ * cancelled plans that renew nowhere, lives under Settings → Your money.
  */
 export default function SubscriptionsScreen() {
   const artwork = useArtwork();
@@ -62,30 +66,17 @@ export default function SubscriptionsScreen() {
   const planCount = plans.data?.length ?? 0;
 
   return (
-    <Screen showBack onRefresh={refetch}>
-      <Title align="left" className="w-full">
-        Subscriptions
-      </Title>
-
-      <View className="mt-5 w-full flex-row gap-3">
-        <Tile
-          icon={Repeat}
-          title="Your plans"
-          caption={planCount === 1 ? '1 subscription' : `${planCount} subscriptions`}
-          onPress={() => router.push('/subscription-plans')}
-          showChevron
-        />
-        <Tile
-          icon={Plus}
-          title="Add plan"
-          caption="Track a new one"
-          onPress={() => router.push('/add-subscription')}
-        />
-      </View>
-
+    <Screen
+      title="Subscriptions"
+      showBack
+      onRefresh={refetch}
+      headerActions={[
+        { icon: Plus, label: 'Add subscription', onPress: () => router.push('/add-subscription') },
+      ]}
+    >
       {/* One number, and the window it belongs to, side by side — the figure is
           meaningless without knowing which stretch of time it covers. */}
-      <View className="mt-4 w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
+      <View className="mt-3 w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
         <View className="w-full flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1">
             <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
@@ -150,6 +141,9 @@ export default function SubscriptionsScreen() {
                     kindLabel={sourceLabels.get(entry.sourceId) ?? 'No payment method'}
                     kind="subscription"
                     domain={entry.domain}
+                    onPress={
+                      entry.planId ? () => router.push(`/subscription/${entry.planId}`) : undefined
+                    }
                   />
                 </Fragment>
               ))}
@@ -158,48 +152,5 @@ export default function SubscriptionsScreen() {
         </View>
       ) : null}
     </Screen>
-  );
-}
-
-type TileProps = {
-  icon: typeof Plus;
-  title: string;
-  caption: string;
-  onPress: () => void;
-  showChevron?: boolean;
-};
-
-/** Compact pair at the top: the plans behind this page, and a way to add. */
-function Tile({ icon: Icon, title, caption, onPress, showChevron }: TileProps) {
-  const colors = useColors();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${title}. ${caption}.`}
-      onPress={onPress}
-      className="flex-1 rounded-[16px] border border-line bg-card p-4 active:opacity-70"
-    >
-      <View className="w-full flex-row items-center justify-between gap-2">
-        <View className="h-9 w-9 items-center justify-center rounded-full bg-ink/5">
-          <Icon size={18} color={colors.ink} strokeWidth={1.8} />
-        </View>
-        {showChevron ? <ChevronRight size={18} color={colors.muted} strokeWidth={2} /> : null}
-      </View>
-
-      <Text
-        className="mt-3 font-poppins-medium text-[15px] text-ink"
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.2}
-      >
-        {title}
-      </Text>
-      <Text
-        className="mt-0.5 font-poppins text-[12px] text-muted"
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.2}
-      >
-        {caption}
-      </Text>
-    </Pressable>
   );
 }

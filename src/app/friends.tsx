@@ -18,7 +18,7 @@ import { Person } from '@/components/splits/person';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
-import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
+import { FieldLabel, Subtitle } from '@/components/ui/typography';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
 import { failureMessage } from '@/lib/failure';
@@ -110,8 +110,7 @@ export default function FriendsScreen() {
   const outgoing = requests?.outgoing ?? [];
 
   return (
-    <Screen showBack avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
-      <Title>Friends</Title>
+    <Screen title="Friends" showBack avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
       <Subtitle className="mt-3">
         Share your code with someone and they can add you. Nobody can find you without it.
       </Subtitle>

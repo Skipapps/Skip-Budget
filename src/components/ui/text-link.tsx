@@ -17,6 +17,8 @@ type TextLinkProps = {
    */
   underline?: boolean;
   className?: string;
+  /** What VoiceOver adds after the label, for a link whose words alone do not say where it goes. */
+  accessibilityHint?: string;
 };
 
 const text: Record<TextLinkVariant, string> = {
@@ -31,11 +33,13 @@ export function TextLink({
   variant = 'default',
   underline = false,
   className,
+  accessibilityHint,
 }: TextLinkProps) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
       onPress={onPress}
       className={cn('items-center py-3 active:opacity-60', className)}
     >

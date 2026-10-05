@@ -13,14 +13,16 @@ import { usePro } from '@/api/pro';
 import { Screen } from '@/components/ui/screen';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
-import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
+import { FieldLabel } from '@/components/ui/typography';
 import {
   useCreateSalarySource,
   useDeleteSalarySource,
   useSetSalaryAccounts,
   useUpdateSalarySource,
+  type SalaryValues,
 } from '@/api/mutations';
-import { useBankAccounts, useSalarySources } from '@/api/queries';
+import { useBankAccounts, useSalaryDetails } from '@/api/queries';
+import { PageState } from '@/components/ui/page-state';
 import { type SalarySource } from '@/data/salary-mock';
 import {
   PAY_FREQUENCIES,
@@ -32,7 +34,9 @@ import {
 import { formatCurrency } from '@/lib/format';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
-import { failureMessage } from '@/lib/failure';
+import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { OVERTIME_RATES, estimateHourlyPay, hourlyProblem, type HourlyPay } from '@/lib/hourly-pay';
+import { useArtwork } from '@/theme/artwork';
 
 /** Normalised to monthly so sources on different cycles can be summed. */
 const PER_MONTH: Record<PayFrequency, number> = {
@@ -42,7 +46,71 @@ const PER_MONTH: Record<PayFrequency, number> = {
   monthly: 1,
 };
 
-type PadTarget = { sourceId: string; mode: 'pad' | 'calculator' } | null;
+const PAY_TYPES = [
+  { value: 'fixed', label: 'Fixed pay' },
+  { value: 'hourly', label: 'Hourly' },
+] as const;
+
+const OVERTIME_CHOICES = [
+  { value: 'none', label: 'None' },
+  { value: 'yes', label: 'Yes' },
+] as const;
+
+/** Hours as typed. A comma is a decimal point to half the world. */
+function parseHours(text: string | undefined): number {
+  const value = Number((text ?? '').trim().replace(',', '.'));
+  return Number.isFinite(value) ? value : 0;
+}
+
+function hourlyOf(source: SalarySource): HourlyPay {
+  return {
+    rate: source.hourlyRate ?? 0,
+    hoursPerWeek: parseHours(source.hoursPerWeek),
+    overtimeHoursPerWeek: source.overtime ? parseHours(source.overtimeHours) : 0,
+    overtimeMultiplier: source.overtimeMultiplier ?? 1.5,
+    // No tax field (Founder, 2026-10-03): hourly pay is counted as earned,
+    // before tax, and says so on the estimate.
+    deductionPercent: 0,
+    frequency: source.frequency,
+  };
+}
+
+/** What lands each payday: typed in when fixed, worked out when hourly. */
+function paycheckOf(source: SalarySource): number {
+  if (source.payType !== 'hourly') return source.amount;
+  const pay = hourlyOf(source);
+  return hourlyProblem(pay) ? 0 : estimateHourlyPay(pay).takeHomePerPaycheck;
+}
+
+/** The hourly columns as saved: emptied out for a fixed source. */
+function hourlyValues(source: SalarySource): Partial<SalaryValues> {
+  if (source.payType !== 'hourly') {
+    return {
+      pay_type: 'fixed',
+      hourly_rate: null,
+      hours_per_week: null,
+      overtime_hours_per_week: 0,
+      overtime_multiplier: 1.5,
+      deduction_percent: 0,
+    };
+  }
+  const pay = hourlyOf(source);
+  return {
+    pay_type: 'hourly',
+    hourly_rate: pay.rate,
+    hours_per_week: pay.hoursPerWeek,
+    overtime_hours_per_week: pay.overtimeHoursPerWeek,
+    overtime_multiplier: pay.overtimeMultiplier,
+    deduction_percent: 0,
+  };
+}
+
+type PadTarget = {
+  sourceId: string;
+  mode: 'pad' | 'calculator';
+  /** Which figure the keypad is filling in. */
+  field: 'amount' | 'rate';
+} | null;
 
 /** Dates cross this screen as yyyy-mm-dd; the picker wants a Date. */
 function asDate(iso: string | null | undefined): Date | null {
@@ -58,15 +126,31 @@ function asDate(iso: string | null | undefined): Date | null {
  */
 export default function SalaryScreen() {
   const colors = useColors();
-  const { data: saved = [], isLoading } = useSalarySources();
+  const artwork = useArtwork();
+  const details = useSalaryDetails();
+  const saved = details.data?.rows ?? [];
 
-  if (isLoading) {
+  if (details.isPending) {
     return (
-      <Screen showBack>
-        <Title>Salary</Title>
+      <Screen title="Salary" showBack>
         <View className="mt-16 w-full items-center">
           <ActivityIndicator size="small" color={colors.muted} />
         </View>
+      </Screen>
+    );
+  }
+
+  // Not an empty editor: one that loaded nothing would look like every source
+  // had been deleted, and Save from there would make that true.
+  if (details.isError) {
+    return (
+      <Screen title="Salary" showBack>
+        <PageState
+          art={artwork.error}
+          title={FAILURE_MESSAGE}
+          actionLabel="Try again"
+          onAction={() => void details.refetch()}
+        />
       </Screen>
     );
   }
@@ -77,13 +161,34 @@ export default function SalaryScreen() {
     amount: row.amount,
     frequency: row.frequency,
     lastPayday: row.last_payday,
-    accountIds: [],
+    // The links as saved. This used to start empty, and Save rewrote the
+    // links from it — so every save unlinked every account.
+    accountIds: row.account_ids,
+    payType: row.pay_type,
+    hourlyRate: row.hourly_rate ?? 0,
+    hoursPerWeek: row.hours_per_week ? String(row.hours_per_week) : '',
+    overtime: row.overtime_hours_per_week > 0,
+    overtimeHours: row.overtime_hours_per_week > 0 ? String(row.overtime_hours_per_week) : '',
+    overtimeMultiplier: row.overtime_multiplier || 1.5,
   }));
 
-  return <SalaryEditor key={saved.map((row) => row.id).join('|') || 'empty'} initial={initial} />;
+  return (
+    <SalaryEditor
+      key={saved.map((row) => row.id).join('|') || 'empty'}
+      initial={initial}
+      hourlyAvailable={details.data?.hourlyAvailable ?? false}
+    />
+  );
 }
 
-function SalaryEditor({ initial }: { initial: SalarySource[] }) {
+function SalaryEditor({
+  initial,
+  hourlyAvailable,
+}: {
+  initial: SalarySource[];
+  /** False until the database has the hourly columns; fixed pay only until then. */
+  hourlyAvailable: boolean;
+}) {
   const colors = useColors();
   const [sources, setSources] = useState<SalarySource[]>(initial);
   const [padTarget, setPadTarget] = useState<PadTarget>(null);
@@ -114,7 +219,7 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
   const setAccounts = useSetSalaryAccounts();
 
   const monthlyTotal = sources.reduce(
-    (sum, source) => sum + source.amount * PER_MONTH[source.frequency],
+    (sum, source) => sum + paycheckOf(source) * PER_MONTH[source.frequency],
     0,
   );
 
@@ -142,6 +247,12 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
         frequency: 'monthly',
         lastPayday: null,
         accountIds: [],
+        payType: 'fixed',
+        hourlyRate: 0,
+        hoursPerWeek: '',
+        overtime: false,
+        overtimeHours: '',
+        overtimeMultiplier: 1.5,
       },
     ]);
   };
@@ -175,10 +286,22 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
 
   const handleSave = async () => {
     setError(null);
-    const named = sources.filter((source) => source.name.trim() && source.amount > 0);
+    // Hourly sources count once named: their pay is checked just below, with
+    // a reason, rather than silently dropped for working out to nothing yet.
+    const named = sources.filter(
+      (source) => source.name.trim() && (source.payType === 'hourly' || source.amount > 0),
+    );
     if (sources.length > 0 && named.length === 0) {
-      setError('Give each source a name and an amount.');
+      setError('Give each source a name and its pay.');
       return;
+    }
+    for (const source of named) {
+      if (source.payType !== 'hourly') continue;
+      const problem = hourlyProblem(hourlyOf(source));
+      if (problem) {
+        setError(`${source.name.trim()}: ${problem}`);
+        return;
+      }
     }
     // Every payday is counted forward from the last one, so without that date
     // the income is saved but never lands anywhere.
@@ -196,11 +319,13 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
       }
 
       for (const source of named) {
-        const values = {
+        const values: SalaryValues = {
           name: source.name.trim(),
-          amount: source.amount,
+          amount: paycheckOf(source),
           frequency: source.frequency,
           last_payday: source.lastPayday,
+          // Only once the database has somewhere to put them.
+          ...(hourlyAvailable ? hourlyValues(source) : {}),
         };
         const id = savedIds.current.has(source.id)
           ? (await updateSource.mutateAsync({ id: source.id, values }), source.id)
@@ -216,14 +341,11 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
   };
 
   return (
-    <Screen showBack avoidKeyboard>
-      <Title>Salary</Title>
-      <Subtitle className="mt-3">Track every source of income and where each one is paid.</Subtitle>
-
+    <Screen title="Salary" showBack avoidKeyboard>
       {/* Deliberately not a card. Boxed like the sources below, this read as
           one more editable field and people tapped it — it is a readout, and
           plain centred text is what says so. */}
-      <View className="mt-6 w-full items-center">
+      <View className="mt-3 w-full items-center">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           Total per month
         </Text>
@@ -296,7 +418,8 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
               <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
                 {[
                   source.name.trim() || 'Unnamed',
-                  source.amount ? formatCurrency(source.amount) : null,
+                  paycheckOf(source) ? formatCurrency(paycheckOf(source)) : null,
+                  source.payType === 'hourly' ? 'Hourly' : null,
                 ]
                   .filter(Boolean)
                   .join(' · ')}
@@ -311,16 +434,91 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
                   returnKeyType="done"
                 />
 
-                <SelectField
-                  label="Amount"
-                  value={source.amount ? formatCurrency(source.amount) : ''}
-                  placeholder="Enter an amount"
-                  icon={Calculator}
-                  variant="pill"
-                  onPress={() => setPadTarget({ sourceId: source.id, mode: 'pad' })}
-                  onIconPress={() => setPadTarget({ sourceId: source.id, mode: 'calculator' })}
-                  iconAccessibilityLabel="Open calculator"
-                />
+                {hourlyAvailable ? (
+                  <View className="w-full">
+                    <FieldLabel className="mb-2">How you are paid</FieldLabel>
+                    <ChoiceChips
+                      options={PAY_TYPES}
+                      value={source.payType ?? 'fixed'}
+                      onChange={(payType) => update(source.id, { payType })}
+                    />
+                  </View>
+                ) : null}
+
+                {source.payType === 'hourly' ? (
+                  <>
+                    <SelectField
+                      label="Hourly rate"
+                      value={
+                        source.hourlyRate ? `${formatCurrency(source.hourlyRate)} an hour` : ''
+                      }
+                      placeholder="What you earn per hour"
+                      icon={Calculator}
+                      variant="pill"
+                      onPress={() =>
+                        setPadTarget({ sourceId: source.id, mode: 'pad', field: 'rate' })
+                      }
+                    />
+
+                    <TextField
+                      label="Hours a week"
+                      value={source.hoursPerWeek ?? ''}
+                      onChangeText={(text) => update(source.id, { hoursPerWeek: text })}
+                      placeholder="40"
+                      keyboardType="decimal-pad"
+                      maxLength={5}
+                      trailing={<HoursUnit />}
+                    />
+
+                    <View className="w-full">
+                      <FieldLabel className="mb-2">Overtime</FieldLabel>
+                      <ChoiceChips
+                        options={OVERTIME_CHOICES}
+                        value={source.overtime ? 'yes' : 'none'}
+                        onChange={(choice) => update(source.id, { overtime: choice === 'yes' })}
+                      />
+                    </View>
+
+                    {source.overtime ? (
+                      <>
+                        <TextField
+                          label="Overtime hours a week"
+                          value={source.overtimeHours ?? ''}
+                          onChangeText={(text) => update(source.id, { overtimeHours: text })}
+                          placeholder="5"
+                          keyboardType="decimal-pad"
+                          maxLength={5}
+                          trailing={<HoursUnit />}
+                        />
+                        <View className="w-full">
+                          <FieldLabel className="mb-2">Overtime pays</FieldLabel>
+                          <ChoiceChips
+                            options={OVERTIME_RATES}
+                            value={String(source.overtimeMultiplier ?? 1.5) as '1.5' | '2'}
+                            onChange={(rate) =>
+                              update(source.id, { overtimeMultiplier: Number(rate) })
+                            }
+                          />
+                        </View>
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  <SelectField
+                    label="Amount"
+                    value={source.amount ? formatCurrency(source.amount) : ''}
+                    placeholder="Enter an amount"
+                    icon={Calculator}
+                    variant="pill"
+                    onPress={() =>
+                      setPadTarget({ sourceId: source.id, mode: 'pad', field: 'amount' })
+                    }
+                    onIconPress={() =>
+                      setPadTarget({ sourceId: source.id, mode: 'calculator', field: 'amount' })
+                    }
+                    iconAccessibilityLabel="Open calculator"
+                  />
+                )}
 
                 <View className="w-full">
                   <FieldLabel className="mb-2">How often</FieldLabel>
@@ -330,6 +528,8 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
                     onChange={(frequency) => update(source.id, { frequency })}
                   />
                 </View>
+
+                {source.payType === 'hourly' ? <HourlyEstimateCard source={source} /> : null}
 
                 <SelectField
                   label="Last payday"
@@ -397,7 +597,20 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
         />
       ) : null}
 
-      {padTarget && activeSource ? (
+      {padTarget && activeSource && padTarget.field === 'rate' ? (
+        <AmountPad
+          title="Hourly rate"
+          caption="Per hour, before tax"
+          value={activeSource.hourlyRate ? String(activeSource.hourlyRate) : ''}
+          onCancel={() => setPadTarget(null)}
+          onConfirm={(next) => {
+            update(activeSource.id, { hourlyRate: Number(next) || 0 });
+            setPadTarget(null);
+          }}
+        />
+      ) : null}
+
+      {padTarget && activeSource && padTarget.field === 'amount' ? (
         padTarget.mode === 'calculator' ? (
           <CalculatorPad
             title="Calculator"
@@ -425,5 +638,60 @@ function SalaryEditor({ initial }: { initial: SalarySource[] }) {
         )
       ) : null}
     </Screen>
+  );
+}
+
+function HoursUnit() {
+  return (
+    <Text className="font-poppins text-[14px] text-muted" maxFontSizeMultiplier={1.2}>
+      hrs
+    </Text>
+  );
+}
+
+/**
+ * The hourly maths, shown as it is typed: each paycheck and the month it adds
+ * up to, before tax — said on the card, so nobody mistakes it for take-home.
+ */
+function HourlyEstimateCard({ source }: { source: SalarySource }) {
+  const pay = hourlyOf(source);
+  const problem = hourlyProblem(pay);
+
+  if (problem) {
+    return (
+      <View className="w-full rounded-[16px] bg-accent/10 px-4 py-3.5">
+        <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+          {problem}
+        </Text>
+      </View>
+    );
+  }
+
+  const estimate = estimateHourlyPay(pay);
+  const perMonth = estimate.grossPerPaycheck * PER_MONTH[source.frequency];
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={`Each paycheck about ${formatCurrency(
+        estimate.grossPerPaycheck,
+      )} before tax. About ${formatCurrency(perMonth)} a month.`}
+      className="w-full rounded-[16px] bg-accent/10 px-4 py-3.5"
+    >
+      <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+        Each paycheck, before tax
+      </Text>
+      <Text
+        className="mt-0.5 font-poppins-semibold text-[22px] text-ink"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        maxFontSizeMultiplier={1.2}
+      >
+        {formatCurrency(estimate.grossPerPaycheck)}
+      </Text>
+      <Text className="mt-1 font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+        About {formatCurrency(perMonth)} a month
+      </Text>
+    </View>
   );
 }

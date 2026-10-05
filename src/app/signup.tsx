@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { TextLink } from '@/components/ui/text-link';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { Subtitle } from '@/components/ui/typography';
 import { resetTo } from '@/lib/nav';
 
 export default function SignUpScreen() {
@@ -55,8 +55,7 @@ export default function SignUpScreen() {
   };
 
   return (
-    <Screen showBack avoidKeyboard>
-      <Title>Create your account</Title>
+    <Screen title="Create your account" showBack avoidKeyboard>
       <Subtitle className="mt-3">Use your email and a password you will remember.</Subtitle>
 
       <View className="mt-8 w-full gap-5">

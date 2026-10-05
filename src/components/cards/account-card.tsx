@@ -2,6 +2,7 @@ import type { ViewStyle } from 'react-native';
 
 import { CardFace } from '@/components/cards/card-face';
 import type { BankAccount } from '@/data/accounts-mock';
+import { toCents } from '@/lib/money';
 
 type AccountCardProps = {
   account: BankAccount;
@@ -19,7 +20,8 @@ export function AccountCard({ account, placeholderName, style }: AccountCardProp
       titlePlaceholder={placeholderName}
       meta={account.accountType}
       amount={account.balance}
-      caption={Math.round(account.balance) < 0 ? 'Overdrawn' : 'Available'}
+      // Decided in cents: a $0.01 overdraft is overdrawn, float dust is not.
+      caption={toCents(account.balance) < 0 ? 'Overdrawn' : 'Available'}
       last4={account.last4}
       style={style}
     />

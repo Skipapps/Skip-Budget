@@ -39,7 +39,10 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="home" options={{ title: 'Home' }} />
       <Tabs.Screen name="cards" options={{ title: 'Cards' }} />
-      <Tabs.Screen name="transactions" options={{ title: 'Transactions' }} />
+      {/* "Activity" in the bar: "Transactions" does not fit the selected pill
+          beside the Voice button (Founder's call, 2026-10-03). The page keeps
+          its own "Transactions" heading. */}
+      <Tabs.Screen name="transactions" options={{ title: 'Activity' }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
     </Tabs>
   );

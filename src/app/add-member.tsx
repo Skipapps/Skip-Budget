@@ -9,7 +9,7 @@ import { ActionPill } from '@/components/ui/action-pill';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
-import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
+import { FieldLabel, Subtitle } from '@/components/ui/typography';
 import { failureMessage } from '@/lib/failure';
 import { useColors } from '@/providers/theme-provider';
 
@@ -78,8 +78,7 @@ export default function AddMemberScreen() {
   };
 
   return (
-    <Screen showBack avoidKeyboard>
-      <Title>Add to {group?.name ?? 'group'}</Title>
+    <Screen title={`Add to ${group?.name ?? 'group'}`} showBack avoidKeyboard>
       <Subtitle className="mt-3">
         Friends join properly and see the group on their own phone. Anyone else can be a name for
         now and claim it later.

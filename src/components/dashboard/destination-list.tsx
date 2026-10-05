@@ -1,10 +1,10 @@
 import {
-  CalendarDays,
+  Calendar,
   ChevronRight,
   FileText,
   Landmark,
-  ReceiptText,
-  Repeat,
+  Receipt,
+  RefreshCw,
   Users,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -21,21 +21,20 @@ import { FAILURE_MESSAGE } from '@/lib/failure';
 /**
  * The glyph for each dashboard destination.
  *
- * Exported so the Arrange screen can show the same mark against the same
- * label: a shortcut that changes its picture depending on which screen you
- * are rearranging it from is a different shortcut as far as the eye is
- * concerned. Anything not listed falls back to a document, so an id added
- * later renders a real icon rather than an empty well.
+ * The same marks as the Quick add cards above the list: adding a bill and
+ * seeing your bills are the same thing to the eye, so they wear the same
+ * picture. Anything not listed falls back to a document, so an id added later
+ * renders a real icon rather than an empty circle.
  */
-export const DESTINATION_ICONS: Record<string, LucideIcon> = {
-  'monthly-bills': CalendarDays,
-  receipts: ReceiptText,
-  subscriptions: Repeat,
+const DESTINATION_ICONS: Record<string, LucideIcon> = {
+  'monthly-bills': Calendar,
+  receipts: Receipt,
+  subscriptions: RefreshCw,
   'loan-calculator': Landmark,
   'split-calculator': Users,
 };
 
-export const DESTINATION_FALLBACK_ICON: LucideIcon = FileText;
+const DESTINATION_FALLBACK_ICON: LucideIcon = FileText;
 
 type DestinationListProps = {
   items: SpendingCategory[];
@@ -57,8 +56,6 @@ type DestinationListProps = {
  * square on a drawing to report one number. It also puts these amounts in the
  * same grammar as the transaction rows further down the screen, so the
  * dashboard reads as one page instead of three stacked widgets.
- *
- * The order is the user's own, straight from `tile_order`.
  */
 export function DestinationList({
   items,
@@ -95,15 +92,18 @@ export function DestinationList({
 
           return (
             <Fragment key={category.id}>
-              {index > 0 ? <View className="ml-[52px] h-px bg-line/60" /> : null}
+              {/* Inset to start under the label, past the icon's circle. */}
+              {index > 0 ? <View className="ml-[70px] h-px bg-line/60" /> : null}
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={label}
                 onPress={() => onPress(category.id)}
-                className="min-h-14 w-full flex-row items-center gap-3 px-4 py-3.5 active:opacity-60"
+                className="min-h-14 w-full flex-row items-center gap-[12px] px-4 py-3 active:opacity-60"
               >
-                <View className="h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-ink/5">
-                  <Icon size={20} color={colors.body} strokeWidth={1.8} />
+                {/* An accent-tinted circle with the glyph in the accent: the
+                    Founder's Figma, 2026-10-03. */}
+                <View className="h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-accent/10">
+                  <Icon size={20} color={colors.accentInk} strokeWidth={1.8} />
                 </View>
 
                 <Text

@@ -1,9 +1,10 @@
 import { Tabs } from 'expo-router';
-import { Bolt, CreditCard, House, ReceiptText, type LucideIcon } from 'lucide-react-native';
+import { Bolt, House, Receipt, Wallet, type LucideIcon } from 'lucide-react-native';
 import type { ComponentProps } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { VOICE_FAB_SIZE, VoiceFab } from '@/components/voice/voice-fab';
 import { withTap } from '@/lib/press';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
@@ -18,26 +19,28 @@ type SkipTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBa
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   home: House,
-  cards: CreditCard,
-  transactions: ReceiptText,
+  cards: Wallet,
+  transactions: Receipt,
   settings: Bolt,
 };
 
 /**
- * Floating pill tab bar.
+ * Floating pill tab bar, with the round Voice button beside it (the Founder's
+ * Figma, 2026-10-03).
  *
- * The selected destination expands into a filled charcoal pill carrying its
+ * The selected destination expands into a filled accent pill carrying its
  * label; the rest stay as plain icons so the bar reads quietly. Filled rather
  * than outlined because an outline is the same weight as the bar's own edge —
- * it says "here is a shape" where a solid says "you are here", and it is the
- * same charcoal as the add button and the dashboard cards.
+ * it says "here is a shape" where a solid says "you are here".
  *
- * The outer view is bigger than the pill it draws: 8pt above it, the home
- * indicator's inset below it and the gutter either side, all painted in the
+ * The bar and the Voice circle are the same height, so they read as one row:
+ * where you can go, then the one thing you can do from anywhere.
+ *
+ * The outer view is bigger than what it draws: 8pt above, the home
+ * indicator's inset below and the gutter either side, all painted in the
  * page's own colour. That band is not part of the control, so it does not take
  * touches — `box-none` lets anything aimed at it through to whatever is behind,
- * and only the pill and the four buttons inside it respond. Padding, and so
- * everything on screen, is unchanged.
+ * and only the pill, its buttons and the Voice circle respond.
  */
 export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) {
   const colors = useColors();
@@ -49,61 +52,71 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
       style={{ paddingBottom: Math.max(insets.bottom, 12) }}
       pointerEvents="box-none"
     >
-      <View
-        style={shadows.floating}
-        className="flex-row items-center justify-around rounded-full border border-line bg-card px-3 py-4"
-      >
-        {state.routes.map((route, index) => {
-          const { options } = descriptors[route.key];
-          const focused = state.index === index;
-          const Icon = TAB_ICONS[route.name];
-          const label = options.title ?? route.name;
+      <View className="flex-row items-center gap-[14px]" pointerEvents="box-none">
+        <View
+          style={[shadows.floating, { height: VOICE_FAB_SIZE }]}
+          className="flex-1 flex-row items-center justify-between rounded-full border border-line bg-card px-[7px]"
+        >
+          {state.routes.map((route, index) => {
+            const { options } = descriptors[route.key];
+            const focused = state.index === index;
+            const Icon = TAB_ICONS[route.name];
+            const label = options.title ?? route.name;
 
-          const handlePress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!focused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          };
+            const handlePress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+              if (!focused && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
+            };
 
-          return (
-            <Pressable
-              key={route.key}
-              accessibilityRole="button"
-              accessibilityState={{ selected: focused }}
-              accessibilityLabel={label}
-              onPress={withTap(handlePress)}
-              className={cn(
-                'flex-row items-center justify-center rounded-full',
-                focused ? 'gap-2 bg-control px-5 py-3.5' : 'h-[52px] w-[52px] active:opacity-60',
-              )}
-            >
-              {Icon ? (
-                <Icon
-                  size={22}
-                  // The pill's own foreground, the same as the label beside
-                  // it. Hardcoded white sat at 2.11:1 on a pale accent, next
-                  // to a near-black label inside the same pill.
-                  color={focused ? colors.onControl : colors.muted}
-                  strokeWidth={2}
-                  absoluteStrokeWidth
-                />
-              ) : null}
-              {focused ? (
-                <Text
-                  className="font-poppins-medium text-[13px] text-on-control"
-                  maxFontSizeMultiplier={1.2}
-                >
-                  {label}
-                </Text>
-              ) : null}
-            </Pressable>
-          );
-        })}
+            return (
+              <Pressable
+                key={route.key}
+                accessibilityRole="button"
+                accessibilityState={{ selected: focused }}
+                accessibilityLabel={label}
+                onPress={withTap(handlePress)}
+                // The selected pill keeps its full width; the plain icons give
+                // way around it, from 48pt down to 40, so a 375pt phone still
+                // fits the row without clipping a label.
+                className={cn(
+                  'h-[48px] flex-row items-center justify-center rounded-full',
+                  focused
+                    ? 'shrink-0 gap-2 bg-control px-[16px]'
+                    : 'min-w-[40px] max-w-[48px] flex-1 active:opacity-60',
+                )}
+              >
+                {Icon ? (
+                  <Icon
+                    size={22}
+                    // The pill's own foreground, the same as the label beside
+                    // it. Hardcoded white sat at 2.11:1 on a pale accent, next
+                    // to a near-black label inside the same pill.
+                    color={focused ? colors.onControl : colors.muted}
+                    strokeWidth={2}
+                    absoluteStrokeWidth
+                  />
+                ) : null}
+                {focused ? (
+                  <Text
+                    className="font-poppins-semibold text-[15px] text-on-control"
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={1.2}
+                  >
+                    {label}
+                  </Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <VoiceFab />
       </View>
     </View>
   );

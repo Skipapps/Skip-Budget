@@ -125,7 +125,7 @@ const mockUpcoming = [
 ];
 
 jest.mock('@/api/queries', () => ({
-  useProfile: () => ({ data: { display_name: 'Sam', tile_order: null } }),
+  useProfile: () => ({ data: { display_name: 'Sam' } }),
   // Called three times: the month behind the card, then the two weeks. The
   // month's figures are not what this file is about, so it gets the same rows.
   useLedger: (range: { from: string; to: string } | undefined) => ({

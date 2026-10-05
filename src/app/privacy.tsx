@@ -59,6 +59,28 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    heading: 'Adding things by voice',
+    blocks: [
+      {
+        kind: 'text',
+        text: 'Tap the microphone and say something like “Netflix $15.99 every month” to add a receipt, bill or subscription without typing. Here is exactly what happens to what you say.',
+      },
+      {
+        kind: 'bullets',
+        items: [
+          'Your words are turned into text by Apple’s speech recognition, built into your iPhone. Skip does not use any third-party speech or transcription service, and has no speech server of its own.',
+          'When your iPhone can run speech recognition on the device, your voice never leaves it. When it can’t, Apple’s speech recognition service processes the audio instead, under Apple’s own privacy terms rather than this one.',
+          'Skip never records or keeps the audio itself, on your phone or on our servers. Only the text you review and confirm becomes a receipt, bill or subscription — stored exactly like one you type in by hand.',
+          'If you correct what Skip heard (for example, turning “spot a fly” into Spotify), Skip remembers that correction on your phone only, so it recognises it next time. These corrections are never uploaded.',
+        ],
+      },
+      {
+        kind: 'note',
+        text: 'Skip asks for microphone and speech recognition access the first time you use voice input. You can turn either off at any time in iOS Settings → Skip Budget — typing still works exactly as before.',
+      },
+    ],
+  },
+  {
     heading: 'Who else sees it',
     blocks: [
       {
@@ -72,6 +94,7 @@ const SECTIONS: Section[] = [
           'Apple and Google — only if you choose to sign in with them, and only to confirm it is you.',
           'Sentry — receives crash and error reports so faults can be fixed. These describe what the app was doing, not what your budget contains.',
           'Apple Push Notification service — delivers reminders, if you turn them on.',
+          'Apple’s speech recognition — if your iPhone can’t run speech recognition on the device, what you say when you use voice input is sent to Apple’s speech service to turn it into text, under Apple’s own privacy terms. Skip never receives the audio itself, only the text it returns.',
         ],
       },
       {

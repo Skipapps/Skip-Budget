@@ -138,9 +138,18 @@ describe('the back control', () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
-  it('is not covered by the title, which is laid out across the whole header', async () => {
-    const { getByText } = await render(<Flow from={1} />);
-    expect(getByText('Add a receipt').props.pointerEvents).toBe('none');
+  it('sits beside the title, not under it', async () => {
+    const { getByText, getByLabelText } = await render(<Flow from={1} />);
+
+    // The title has the row's middle to itself; the controls are its siblings
+    // either side, so nothing laid over them can swallow a tap.
+    const title = getByText('Add a receipt');
+    const back = getByLabelText('Back');
+    let node = back.parent;
+    while (node) {
+      expect(node).not.toBe(title);
+      node = node.parent;
+    }
   });
 });
 

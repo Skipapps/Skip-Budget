@@ -14,7 +14,7 @@ import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm } from '@/providers/dialog-provider';
 import { SelectField } from '@/components/ui/select-field';
-import { FieldLabel, SectionHeading, Title } from '@/components/ui/typography';
+import { FieldLabel, SectionHeading } from '@/components/ui/typography';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { truthInLending } from '@/lib/apr';
@@ -209,11 +209,7 @@ function LoanCalculatorScreenInner() {
   };
 
   return (
-    <Screen showBack>
-      <Title align="left" className="mt-2">
-        Loan calculator
-      </Title>
-
+    <Screen title="Loan calculator" showBack>
       {/* The answer first — everything below it is how you change it. */}
       <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
         <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>

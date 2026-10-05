@@ -51,8 +51,8 @@ const AMOUNTS = {
 
 describe('DestinationList', () => {
   it('renders rows in the given order, not the fixture order', async () => {
-    // Deliberately reversed from the CATEGORIES fixture, standing in for
-    // whatever order `tile_order` produced.
+    // Deliberately reversed from the CATEGORIES fixture, so the list can only
+    // pass by following the order it is given.
     const reordered = [...CATEGORIES].reverse();
 
     const { getAllByRole } = await render(

@@ -1,0 +1,787 @@
+/**
+ * What Skip heard, carried from `/voice` to `/voice-review` and its edit pages,
+ * and on to an add form when the person wants every option.
+ *
+ * ## One slot, in memory
+ * `/voice` parses, `putVoiceDraft` stores the result and returns an id, and the
+ * review page is pushed with `?draft=<id>`. The slot holds two things: the
+ * draft as parsed, and the **working copy** (a `VoiceEntry`) that the review
+ * page and the `/voice-edit` pages change. An edit page writes with
+ * `updateVoiceEntry` on Done and pops; back writes nothing. The review page
+ * reads through `useVoiceSession(id)`, which re-renders on every write, so it
+ * is current when it regains focus without a focus effect.
+ *
+ * Not route params, on purpose: the person's words stay out of navigation
+ * state, and `skipbudget://voice-review?…` cannot open a pre-filled Save page
+ * from a link. A cold link, or the navigator remounting on a text-size change,
+ * finds no matching id and the page says "Nothing to check yet".
+ *
+ * ## Re-validated at every read
+ * The parser is a module boundary, so nothing it hands over is trusted:
+ * `validateVoiceDraft` checks the kind, cent-exact amounts, real dates and
+ * every enum, nulls what fails and recomputes `missing`. The working copy is
+ * checked on every write and every read the same way.
+ *
+ * ## Out to a form: route params
+ * "More options" opens the full add form through `entryToForm`, because route
+ * params are how the forms already take input. The forms read them back
+ * through the strict readers below, which drop anything invalid to blank and
+ * never coerce it.
+ *
+ * Plain module: no Zustand, nothing native, no network.
+ */
+import { useSyncExternalStore } from 'react';
+
+import type { BillInput, ReceiptInput, SubscriptionInput } from '@/api/entry-values';
+import type { BrandSelection } from '@/components/brands/brand-field';
+import { toCents } from '@/lib/money';
+import type {
+  VoiceCycle,
+  VoiceDraft,
+  VoiceKind,
+  VoiceMerchant,
+  VoiceMerchantSource,
+  VoiceMissing,
+} from '@/lib/voice';
+import { BILL_CATEGORY_IDS } from '@/lib/voice/bill-category';
+
+// --- The rules every value passes ------------------------------------------
+
+const KINDS: readonly VoiceKind[] = ['receipt', 'bill', 'subscription'];
+const CYCLES: readonly VoiceCycle[] = ['weekly', 'monthly', 'quarterly', 'yearly'];
+const CONFIDENCES: readonly VoiceDraft['confidence'][] = ['high', 'medium', 'low'];
+
+/**
+ * Where the parser's merchant came from (`VoiceMerchantSource`, Drew's): the
+ * review page learns a correction only when the person changed a merchant
+ * that was not a `catalog` match (review B1).
+ */
+const MERCHANT_SOURCES: readonly VoiceMerchantSource[] = ['learned', 'catalog', 'fuzzy', 'heard'];
+
+/** The keypad's ceiling: nine whole digits and two decimals. */
+export const MAX_VOICE_AMOUNT = 999_999_999.99;
+
+/** Long enough for any real name, short enough that nothing silly is carried. */
+const MAX_NAME = 200;
+const MAX_TRANSCRIPT = 2000;
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+
+/** Dollars that are positive, within the keypad's range and exact to the cent. */
+export function isVoiceAmount(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value > 0 &&
+    value <= MAX_VOICE_AMOUNT &&
+    toCents(value) / 100 === value
+  );
+}
+
+/**
+ * A real calendar day as yyyy-mm-dd: the shape, and a round trip through the
+ * calendar so 2026-02-30 and 2026-13-01 are refused.
+ */
+export function isIsoDay(value: unknown): value is string {
+  if (!isString(value) || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  if (year < 1900 || year > 2999) return false;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.toISOString().slice(0, 10) === value;
+}
+
+/** Brand, category and source ids are slugs or uuids. */
+const isId = (value: unknown): value is string =>
+  isString(value) && /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value);
+
+const isDomain = (value: unknown): value is string =>
+  isString(value) && value.length <= 253 && /^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(value);
+
+const isBillCategory = (value: unknown): value is string =>
+  isString(value) && (BILL_CATEGORY_IDS as readonly string[]).includes(value);
+
+const oneOf = <T extends string>(options: readonly T[], value: unknown): T | null =>
+  isString(value) && (options as readonly string[]).includes(value) ? (value as T) : null;
+
+/** A name with something in it, trimmed; null otherwise. */
+function cleanName(value: unknown): string | null {
+  if (!isString(value)) return null;
+  const name = value.trim();
+  return name && name.length <= MAX_NAME ? name : null;
+}
+
+/**
+ * A merchant whose every field is the right type, or null. The name is the
+ * one thing it cannot do without; a bad brand id or domain only loses the logo.
+ */
+function cleanMerchant(value: unknown): VoiceMerchant | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  const name = cleanName(raw.name);
+  if (!name) return null;
+  if (raw.brandId !== null && !isString(raw.brandId)) return null;
+  if (raw.domain !== null && !isString(raw.domain)) return null;
+  if (!isString(raw.categoryId)) return null;
+  return {
+    brandId: isId(raw.brandId) ? raw.brandId : null,
+    name,
+    domain: isDomain(raw.domain) ? raw.domain : null,
+    categoryId: isId(raw.categoryId) ? raw.categoryId : '',
+  };
+}
+
+/**
+ * Two or more distinct valid amounts, in the order given; otherwise none. The
+ * caller decides what a dropped choice means for the amount (see
+ * `validateVoiceDraft`).
+ */
+function cleanChoices(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  const kept = [...new Set(value.filter(isVoiceAmount))];
+  return kept.length >= 2 ? kept : [];
+}
+
+/**
+ * What the review page should still ask for. The same rules as the parser's
+ * own (`src/lib/voice/score.ts`, `missingOf`), recomputed rather than trusted.
+ */
+function missingFor(fields: {
+  kind: VoiceKind;
+  amount: number | null;
+  amountChoices: readonly number[];
+  merchant: VoiceMerchant | null;
+  date: string | null;
+  cycle: VoiceCycle | null;
+  billCategoryId: string | null;
+}): VoiceMissing[] {
+  const missing: VoiceMissing[] = [];
+  if (fields.amount === null || fields.amountChoices.length > 1) missing.push('amount');
+  if (fields.kind !== 'bill' && fields.merchant === null) missing.push('merchant');
+  if (fields.kind === 'bill' && fields.date === null) missing.push('date');
+  if (fields.kind !== 'receipt' && fields.cycle === null) missing.push('cycle');
+  if (fields.kind === 'bill' && fields.billCategoryId === null) missing.push('category');
+  return missing;
+}
+
+/**
+ * A parser draft, checked field by field. Null only when it is not a draft at
+ * all (no object, or a kind outside the three); anything else that fails is
+ * nulled or emptied, and `missing` is worked out again.
+ *
+ * An amount the parser left unsettled stays unsettled. If it offered choices
+ * and any of them fails the checks (out of range, not cent-exact), the amount
+ * is not taken as heard: "$40 or $4,000,000,000,000" must not open as a
+ * settled $40 just because the second reading was dropped (review S2). The
+ * choices that survive are still offered when there are two or more.
+ */
+export function validateVoiceDraft(input: unknown): VoiceDraft | null {
+  if (!input || typeof input !== 'object') return null;
+  const raw = input as Record<string, unknown>;
+  const kind = oneOf(KINDS, raw.kind);
+  if (!kind) return null;
+
+  const offered = Array.isArray(raw.amountChoices) ? raw.amountChoices : [];
+  const amountChoices = cleanChoices(offered);
+  const unsettled = offered.length > 0 && amountChoices.length !== offered.length;
+  const merchant = cleanMerchant(raw.merchant);
+
+  const fields = {
+    kind,
+    amount: !unsettled && isVoiceAmount(raw.amount) ? raw.amount : null,
+    amountChoices,
+    merchant,
+    date: isIsoDay(raw.date) ? raw.date : null,
+    cycle: oneOf(CYCLES, raw.cycle),
+    billCategoryId: isBillCategory(raw.billCategoryId) ? raw.billCategoryId : null,
+  };
+
+  return {
+    ...fields,
+    kindSure: raw.kindSure === true,
+    merchantHeard: merchant ? cleanName(raw.merchantHeard) : null,
+    // Null whenever there is no merchant, and null for anything outside the
+    // four: an unknown source is never treated as safe to learn from.
+    merchantSource: merchant ? oneOf(MERCHANT_SOURCES, raw.merchantSource) : null,
+    score: typeof raw.score === 'number' && Number.isFinite(raw.score) ? raw.score : 0,
+    confidence: oneOf(CONFIDENCES, raw.confidence) ?? 'low',
+    missing: missingFor(fields),
+    transcript: isString(raw.transcript) ? raw.transcript.slice(0, MAX_TRANSCRIPT) : '',
+    multiple: raw.multiple === true,
+  };
+}
+
+// --- The working copy --------------------------------------------------------
+
+/**
+ * The review page's state: what Save will write, as the person has it now.
+ * Every field the review and edit pages can change, and nothing else.
+ */
+export type VoiceEntry = {
+  kind: VoiceKind;
+  /** Dollars, cent-exact. Null until heard, typed or picked. */
+  amount: number | null;
+  /**
+   * The amounts to choose between when what was heard was ambiguous. While
+   * these are here `amount` is null, because nothing is guessed. Picking one
+   * is `updateVoiceEntry(id, { amount, amountChoices: [] })`.
+   */
+  amountChoices: number[];
+  /** The store, company or service. For a bill, the company. */
+  merchant: VoiceMerchant | null;
+  /**
+   * Bills only: the bill's name when the person typed one. Null means "not
+   * named by hand", and the bill is called `defaultBillName(…)`: the company,
+   * else the category's label.
+   */
+  billName: string | null;
+  /** yyyy-mm-dd. */
+  date: string | null;
+  cycle: VoiceCycle | null;
+  /** Bills only: a BILL_CATEGORIES id. */
+  billCategoryId: string | null;
+  /** A card or bank account id, or null for none (the forms' default). */
+  sourceId: string | null;
+};
+
+export type VoiceEntryField = keyof VoiceEntry;
+
+/** The working copy a fresh draft opens with. An ambiguous amount is left unpicked. */
+export function entryFromDraft(draft: VoiceDraft): VoiceEntry {
+  const ambiguous = draft.amountChoices.length >= 2;
+  return {
+    kind: draft.kind,
+    amount: ambiguous ? null : draft.amount,
+    amountChoices: ambiguous ? [...draft.amountChoices] : [],
+    merchant: draft.merchant ? { ...draft.merchant } : null,
+    billName: null,
+    date: draft.date,
+    cycle: draft.cycle,
+    billCategoryId: draft.billCategoryId,
+    sourceId: null,
+  };
+}
+
+/**
+ * A working copy, checked. Unlike a draft, a bad value here is a bug in a
+ * page rather than noise in a sentence, so it refuses the whole thing (null)
+ * instead of quietly blanking the field somebody just set.
+ */
+export function validateVoiceEntry(input: unknown): VoiceEntry | null {
+  if (!input || typeof input !== 'object') return null;
+  const raw = input as Record<string, unknown>;
+  const kind = oneOf(KINDS, raw.kind);
+  if (!kind) return null;
+  if (raw.amount !== null && !isVoiceAmount(raw.amount)) return null;
+  if (!Array.isArray(raw.amountChoices)) return null;
+  const amountChoices = cleanChoices(raw.amountChoices);
+  if (amountChoices.length !== raw.amountChoices.length) return null;
+  const merchant = raw.merchant === null ? null : cleanMerchant(raw.merchant);
+  if (raw.merchant !== null && !merchant) return null;
+  const billName = raw.billName === null ? null : cleanName(raw.billName);
+  if (raw.billName !== null && billName === null) return null;
+  if (raw.date !== null && !isIsoDay(raw.date)) return null;
+  if (raw.cycle !== null && !oneOf(CYCLES, raw.cycle)) return null;
+  if (raw.billCategoryId !== null && !isBillCategory(raw.billCategoryId)) return null;
+  if (raw.sourceId !== null && !isId(raw.sourceId)) return null;
+
+  return {
+    kind,
+    amount: amountChoices.length > 0 ? null : (raw.amount as number | null),
+    amountChoices,
+    merchant,
+    billName,
+    date: raw.date as string | null,
+    cycle: raw.cycle as VoiceCycle | null,
+    billCategoryId: raw.billCategoryId as string | null,
+    sourceId: raw.sourceId as string | null,
+  };
+}
+
+// --- The slot ------------------------------------------------------------------
+
+type Slot = {
+  id: string;
+  draft: VoiceDraft;
+  /** The recogniser's alternatives, best first, for a re-parse with `forceKind`. */
+  alternatives: string[];
+  entry: VoiceEntry;
+  /** Fields the person has changed. A re-parse leaves these alone. */
+  touched: VoiceEntryField[];
+};
+
+/** What the review page renders from. Frozen: change it through `updateVoiceEntry`. */
+export type VoiceSession = Readonly<{
+  id: string;
+  /**
+   * The draft as parsed. Its merchant, `merchantHeard` and `merchantSource`
+   * stay the parse's own after the person changes the merchant by hand (that
+   * lands on `entry`), so `draft` against `entry` plus `touched` is the
+   * evidence for whether to learn.
+   */
+  draft: Readonly<VoiceDraft>;
+  alternatives: readonly string[];
+  entry: Readonly<VoiceEntry>;
+  touched: readonly VoiceEntryField[];
+  /** True once anything was changed by hand: back and "Say it again" then ask first. */
+  edited: boolean;
+}>;
+
+let slot: Slot | null = null;
+let counter = 0;
+const listeners = new Set<() => void>();
+let snapshot: VoiceSession | null = null;
+
+function freeze<T>(value: T): T {
+  if (value && typeof value === 'object') {
+    for (const inner of Object.values(value)) freeze(inner);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/** Rebuilds the frozen snapshot from the slot, re-validated, and tells the readers. */
+function publish(): void {
+  const draft = slot ? validateVoiceDraft(slot.draft) : null;
+  const entry = slot ? validateVoiceEntry(slot.entry) : null;
+  if (slot && (!draft || !entry)) slot = null;
+  snapshot =
+    slot && draft && entry
+      ? freeze({
+          id: slot.id,
+          draft,
+          alternatives: [...slot.alternatives],
+          entry,
+          touched: [...slot.touched],
+          edited: slot.touched.length > 0,
+        })
+      : null;
+  for (const listener of [...listeners]) listener();
+}
+
+function nextId(): string {
+  counter += 1;
+  return `v${Date.now().toString(36)}${counter.toString(36)}`;
+}
+
+/**
+ * Stores a fresh draft, replacing whatever was there, and returns its id.
+ *
+ * Never throws. A draft that fails validation leaves the slot empty, and the
+ * id it returns then finds nothing, so the review page shows its "Nothing to
+ * check yet" state rather than a page of junk.
+ */
+export function putVoiceDraft(draft: VoiceDraft, alternatives: readonly string[] = []): string {
+  const id = nextId();
+  const checked = validateVoiceDraft(draft);
+  slot = checked
+    ? {
+        id,
+        draft: checked,
+        alternatives: (Array.isArray(alternatives) ? alternatives : [])
+          .filter(isString)
+          .slice(0, 3)
+          .map((text) => text.slice(0, MAX_TRANSCRIPT)),
+        entry: entryFromDraft(checked),
+        touched: [],
+      }
+    : null;
+  publish();
+  return id;
+}
+
+const current = (id: string | undefined): Slot | null =>
+  slot && isString(id) && id === slot.id ? slot : null;
+
+/** The draft as parsed, re-validated. Null unless `id` is the one in the slot. */
+export function readVoiceDraft(id: string | undefined): VoiceDraft | null {
+  const found = current(id);
+  return found ? validateVoiceDraft(found.draft) : null;
+}
+
+/** The working copy, re-validated (a copy: changing it changes nothing). */
+export function readVoiceEntry(id: string | undefined): VoiceEntry | null {
+  const found = current(id);
+  const entry = found ? validateVoiceEntry(found.entry) : null;
+  return entry ? { ...entry, amountChoices: [...entry.amountChoices] } : null;
+}
+
+/**
+ * Changes the working copy: an edit page's Done, a kind chip, a source tile.
+ *
+ * All or nothing. The patched copy is validated whole; if anything in it is
+ * invalid, or the id is stale, nothing is written and the answer is null.
+ * Every key in the patch is remembered as changed by hand. Setting an amount
+ * settles any choices still open, so picking a chip is `{ amount }` alone.
+ */
+export function updateVoiceEntry(
+  id: string | undefined,
+  patch: Partial<VoiceEntry>,
+): VoiceEntry | null {
+  const found = current(id);
+  if (!found || !patch || typeof patch !== 'object') return null;
+  const settles = patch.amount !== undefined && patch.amount !== null && !patch.amountChoices;
+  const merged: Partial<VoiceEntry> = settles ? { ...patch, amountChoices: [] } : patch;
+  const next = validateVoiceEntry({ ...found.entry, ...merged });
+  if (!next) return null;
+
+  const keys = (Object.keys(merged) as VoiceEntryField[]).filter((key) => key in found.entry);
+  found.entry = next;
+  found.touched = [...new Set([...found.touched, ...keys])];
+  publish();
+  return readVoiceEntry(id);
+}
+
+/**
+ * Takes a re-parse of the same words (`parseVoice` with `forceKind`, after a
+ * kind change) and re-derives every field the person has not changed by hand.
+ * The stored draft becomes the re-parse, except that a merchant changed by
+ * hand keeps the original parse's merchant, `merchantHeard` and
+ * `merchantSource` together: they are the evidence for learning, and they
+ * must describe the same match. Null when the id is stale or the re-parse is
+ * not a draft.
+ */
+export function rederiveVoiceEntry(
+  id: string | undefined,
+  reparsed: VoiceDraft,
+): VoiceEntry | null {
+  const found = current(id);
+  const draft = found ? validateVoiceDraft(reparsed) : null;
+  if (!found || !draft) return null;
+
+  const fresh = entryFromDraft(draft);
+  const merged = { ...fresh };
+  for (const key of found.touched) {
+    (merged as Record<VoiceEntryField, unknown>)[key] = found.entry[key];
+  }
+  // The amount and its choices travel together: a hand-picked amount keeps
+  // its choices cleared, and an untouched one takes both from the re-parse.
+  if (found.touched.includes('amount') || found.touched.includes('amountChoices')) {
+    merged.amount = found.entry.amount;
+    merged.amountChoices = found.entry.amountChoices;
+  }
+  const next = validateVoiceEntry(merged);
+  if (!next) return null;
+
+  const kept = found.touched.includes('merchant')
+    ? validateVoiceDraft({
+        ...draft,
+        merchant: found.draft.merchant,
+        merchantHeard: found.draft.merchantHeard,
+        merchantSource: found.draft.merchantSource,
+      })
+    : draft;
+
+  found.draft = kept ?? draft;
+  found.entry = next;
+  publish();
+  return readVoiceEntry(id);
+}
+
+/** Empties the slot. After a successful save, and on discarding the flow. */
+export function clearVoiceDraft(): void {
+  slot = null;
+  publish();
+}
+
+/** For `useSyncExternalStore`, or anything else that needs to hear about writes. */
+export function subscribeVoiceDraft(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/**
+ * The session for `id`, re-rendering on every write. Null for a stale or
+ * missing id, which is the review and edit pages' "Nothing to check yet".
+ */
+export function useVoiceSession(id: string | undefined): VoiceSession | null {
+  const session = useSyncExternalStore(
+    subscribeVoiceDraft,
+    () => snapshot,
+    () => snapshot,
+  );
+  return session && isString(id) && session.id === id ? session : null;
+}
+
+// --- Money as the pages show it ------------------------------------------------
+
+/**
+ * An amount as the keypad and the hero figure take it: two decimals, no commas,
+ * built from whole cents ("12.50", "1250.00"). '' for none.
+ */
+export function amountText(amount: number | null): string {
+  if (!isVoiceAmount(amount)) return '';
+  const cents = toCents(amount);
+  return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
+}
+
+/** A typed amount string, read back to dollars only when it is a valid voice amount. */
+export function amountFromText(text: string): number | null {
+  if (!/^\d{1,9}(\.\d{1,2})?$/.test(text)) return null;
+  const value = Number(text);
+  return isVoiceAmount(value) ? value : null;
+}
+
+// --- What still blocks Save on the review page ---------------------------------
+
+/**
+ * The review page's own two hints, which come before the builders' (Pia's
+ * spec §5.9): an ambiguous amount nobody picked, and a bill with no category.
+ * Null when neither applies; the builder then has the final word.
+ */
+export function voiceSaveBlocker(entry: VoiceEntry): string | null {
+  if (entry.amount === null && entry.amountChoices.length >= 2) return 'Pick the amount you meant.';
+  if (entry.kind === 'bill' && !entry.billCategoryId) return 'Pick what the bill is for.';
+  return null;
+}
+
+// --- Into the builders ---------------------------------------------------------
+
+/** A yyyy-mm-dd day as a local-midnight Date, which is how every form holds dates. */
+export function dayToDate(day: string): Date {
+  const [year, month, date] = day.split('-').map(Number);
+  return new Date(year, month - 1, date);
+}
+
+const asSelection = (merchant: VoiceMerchant | null): BrandSelection | null =>
+  merchant ? { ...merchant } : null;
+
+/** A voice receipt for `buildReceiptValues`. No date heard means today, the form's own default. */
+export function entryToReceiptInput(entry: VoiceEntry, today: Date): ReceiptInput {
+  return {
+    store: asSelection(entry.merchant),
+    amount: amountText(entry.amount),
+    date: entry.date ? dayToDate(entry.date) : today,
+    sourceId: entry.sourceId ?? '',
+    note: '',
+    captureSource: 'voice',
+  };
+}
+
+/** The name a voice bill saves under: the one typed, else the company, else the category. */
+export function voiceBillName(entry: VoiceEntry, categoryLabel: string): string {
+  if (entry.billName) return entry.billName;
+  if (entry.merchant) return entry.merchant.name;
+  return entry.billCategoryId && entry.billCategoryId !== 'other' ? categoryLabel : '';
+}
+
+/**
+ * A voice bill for `buildBillValues`. `categoryLabel` is the BILL_CATEGORIES
+ * label for `entry.billCategoryId`, which this module cannot import. Check
+ * `voiceSaveBlocker` first: a bill with no category is not a bill to save.
+ */
+export function entryToBillInput(entry: VoiceEntry, categoryLabel: string): BillInput {
+  return {
+    name: voiceBillName(entry, categoryLabel),
+    amount: amountText(entry.amount),
+    issuer: asSelection(entry.merchant),
+    categoryId: entry.billCategoryId ?? '',
+    // The form's own starting icon; only an Other bill keeps it.
+    iconId: 'other',
+    recurrence: entry.cycle ?? 'monthly',
+    startDate: entry.date ? dayToDate(entry.date) : null,
+    endDate: null,
+    sourceId: entry.sourceId ?? '',
+    note: '',
+  };
+}
+
+/** A voice subscription for `buildSubscriptionValues`. */
+export function entryToSubscriptionInput(entry: VoiceEntry): SubscriptionInput {
+  return {
+    service: asSelection(entry.merchant),
+    amount: amountText(entry.amount),
+    cycle: entry.cycle ?? 'monthly',
+    renewsOn: entry.date ? dayToDate(entry.date) : null,
+    sourceId: entry.sourceId ?? '',
+    note: '',
+    active: true,
+  };
+}
+
+// --- Out to a form, and back in --------------------------------------------------
+
+export type VoiceFormHref = {
+  pathname: '/add-receipt' | '/add-bill' | '/add-subscription';
+  params: Record<string, string>;
+};
+
+/**
+ * "More options": the full add form for the entry's kind, with the edited
+ * values as route params and `from=voice`. Only what is set is sent.
+ *
+ * Receipts use add-receipt's scan keys plus `scannedVia=voice`; bills and
+ * subscriptions use the `prefill…` keys their forms read with
+ * `readBillPrefill` / `readSubscriptionPrefill`.
+ */
+export function entryToForm(entry: VoiceEntry): VoiceFormHref {
+  const params: Record<string, string> = { from: 'voice' };
+  const put = (key: string, value: string | null | undefined) => {
+    if (value) params[key] = value;
+  };
+  const amount = amountText(entry.amount);
+  const merchant = entry.merchant;
+
+  if (entry.kind === 'receipt') {
+    params.scannedVia = 'voice';
+    put('scannedStore', merchant?.name);
+    put('scannedBrandId', merchant?.brandId);
+    put('scannedDomain', merchant?.domain);
+    put('scannedCategory', merchant?.categoryId);
+    put('scannedAmount', amount);
+    put('scannedDate', entry.date);
+    put('scannedSource', entry.sourceId);
+    return { pathname: '/add-receipt', params };
+  }
+
+  if (entry.kind === 'bill') {
+    put('prefillIssuer', merchant?.name);
+    put('prefillBrandId', merchant?.brandId);
+    put('prefillDomain', merchant?.domain);
+    put('prefillName', entry.billName);
+    put('prefillCategory', entry.billCategoryId);
+    put('prefillAmount', amount);
+    put('prefillDate', entry.date);
+    put('prefillCycle', entry.cycle);
+    put('prefillSource', entry.sourceId);
+    return { pathname: '/add-bill', params };
+  }
+
+  put('prefillName', merchant?.name);
+  put('prefillBrandId', merchant?.brandId);
+  put('prefillDomain', merchant?.domain);
+  put('prefillCategory', merchant?.categoryId);
+  put('prefillAmount', amount);
+  put('prefillDate', entry.date);
+  put('prefillCycle', entry.cycle);
+  put('prefillSource', entry.sourceId);
+  return { pathname: '/add-subscription', params };
+}
+
+/** Route params as expo-router hands them over. */
+export type RouteParams = Record<string, string | string[] | undefined>;
+
+/** One string param, or undefined. A repeated param is not one value, so it is dropped. */
+const param = (params: RouteParams, key: string): string | undefined => {
+  const value = params[key];
+  return isString(value) ? value : undefined;
+};
+
+/** True when the form was opened from the voice review page. */
+export function cameFromVoice(params: RouteParams): boolean {
+  return param(params, 'from') === 'voice';
+}
+
+/**
+ * An amount param as the keypad would have typed it ("15.99", "1100"),
+ * returned unchanged when valid and '' otherwise: never coerced.
+ */
+export function readAmountParam(value: string | undefined): string {
+  return isString(value) && amountFromText(value) !== null ? value : '';
+}
+
+/** A yyyy-mm-dd param as a local-midnight Date, or null when it is not a real day. */
+export function readDayParam(value: string | undefined): Date | null {
+  return isIsoDay(value) ? dayToDate(value) : null;
+}
+
+/** A source id param, or '' (the forms' "none"). */
+export function readSourceParam(value: string | undefined): string {
+  return isId(value) ? value : '';
+}
+
+/**
+ * A store, company or service from its four params, or null without a name.
+ * A bad brand id or domain only loses the logo; a bad category is left blank,
+ * which every builder files under 'other'.
+ */
+export function readMerchantParams(fields: {
+  name: string | undefined;
+  brandId: string | undefined;
+  domain: string | undefined;
+  categoryId: string | undefined;
+}): BrandSelection | null {
+  const name = cleanName(fields.name);
+  if (!name) return null;
+  return {
+    brandId: isId(fields.brandId) ? fields.brandId : null,
+    name,
+    domain: isDomain(fields.domain) ? fields.domain : null,
+    categoryId: isId(fields.categoryId) ? fields.categoryId : '',
+  };
+}
+
+export type BillPrefill = {
+  /** The company, for the logo. */
+  issuer: BrandSelection | null;
+  /** The name typed on the review page, if any. */
+  name: string | null;
+  /** A BILL_CATEGORIES id; with one, the form skips its category chooser. */
+  categoryId: string | null;
+  amount: string;
+  startDate: Date | null;
+  recurrence: VoiceCycle | null;
+  sourceId: string;
+};
+
+const PREFILL_KEYS = [
+  'prefillIssuer',
+  'prefillBrandId',
+  'prefillDomain',
+  'prefillName',
+  'prefillCategory',
+  'prefillAmount',
+  'prefillDate',
+  'prefillCycle',
+  'prefillSource',
+] as const;
+
+const hasPrefill = (params: RouteParams) => PREFILL_KEYS.some((key) => param(params, key));
+
+/** add-bill's prefill, field by field; null when none was sent. */
+export function readBillPrefill(params: RouteParams): BillPrefill | null {
+  if (!hasPrefill(params)) return null;
+  const categoryId = param(params, 'prefillCategory');
+  return {
+    issuer: readMerchantParams({
+      name: param(params, 'prefillIssuer'),
+      brandId: param(params, 'prefillBrandId'),
+      domain: param(params, 'prefillDomain'),
+      // A bill's company never answers the category question; it carries the
+      // bill's own, as an edited bill's issuer does.
+      categoryId: isBillCategory(categoryId) ? categoryId : undefined,
+    }),
+    name: cleanName(param(params, 'prefillName')),
+    categoryId: isBillCategory(categoryId) ? categoryId : null,
+    amount: readAmountParam(param(params, 'prefillAmount')),
+    startDate: readDayParam(param(params, 'prefillDate')),
+    recurrence: oneOf(CYCLES, param(params, 'prefillCycle')),
+    sourceId: readSourceParam(param(params, 'prefillSource')),
+  };
+}
+
+export type SubscriptionPrefill = {
+  service: BrandSelection | null;
+  amount: string;
+  renewsOn: Date | null;
+  cycle: VoiceCycle | null;
+  sourceId: string;
+};
+
+/** add-subscription's prefill, field by field; null when none was sent. */
+export function readSubscriptionPrefill(params: RouteParams): SubscriptionPrefill | null {
+  if (!hasPrefill(params)) return null;
+  return {
+    service: readMerchantParams({
+      name: param(params, 'prefillName'),
+      brandId: param(params, 'prefillBrandId'),
+      domain: param(params, 'prefillDomain'),
+      categoryId: param(params, 'prefillCategory'),
+    }),
+    amount: readAmountParam(param(params, 'prefillAmount')),
+    renewsOn: readDayParam(param(params, 'prefillDate')),
+    cycle: oneOf(CYCLES, param(params, 'prefillCycle')),
+    sourceId: readSourceParam(param(params, 'prefillSource')),
+  };
+}

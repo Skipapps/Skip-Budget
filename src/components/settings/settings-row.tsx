@@ -27,6 +27,8 @@ type SettingsRowProps = {
   destructive?: boolean;
   /** Hides the divider on the last row of a group. */
   last?: boolean;
+  /** A control under the row, lined up with the text, e.g. pick-one chips. */
+  children?: ReactNode;
 };
 
 export function SettingsRow({
@@ -39,6 +41,7 @@ export function SettingsRow({
   toggle,
   destructive = false,
   last = false,
+  children,
 }: SettingsRowProps) {
   const colors = useColors();
   const tint = destructive ? colors.danger : colors.body;
@@ -109,6 +112,8 @@ export function SettingsRow({
       ) : (
         body
       )}
+
+      {children ? <View className="-mt-1 ml-[52px] pb-3.5">{children}</View> : null}
 
       {/* Inset to line up under the text, not the icon — the same 52pt every
           other list in the app insets to. */}

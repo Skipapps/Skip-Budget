@@ -7,7 +7,13 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { guessCategory, matchBrand, useBrandDirectory, useSpendCategories } from '@/api/brands';
 import { usePro } from '@/api/pro';
-import { useCreateReceipt, useDeleteReceipt, useUpdateReceipt } from '@/api/mutations';
+import { buildReceiptValues } from '@/api/entry-values';
+import {
+  useCreateReceipt,
+  useDeleteReceipt,
+  useUpdateReceipt,
+  type CaptureSource,
+} from '@/api/mutations';
 import { usePaymentSources, useReceipt } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { AmountStep } from '@/components/flow/amount-step';
@@ -20,11 +26,17 @@ import { useDialog, useConfirm } from '@/providers/dialog-provider';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
-import { toIsoDate } from '@/lib/date';
 import { success, warn } from '@/lib/haptics';
 import { withTap } from '@/lib/press';
 import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 import { parseReceipt, parseReceiptFromLines, type ParsedReceipt } from '@/lib/receipt-parser';
+import {
+  clearVoiceDraft,
+  readAmountParam,
+  readDayParam,
+  readMerchantParams,
+  readSourceParam,
+} from '@/lib/voice-draft';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import {
@@ -60,7 +72,7 @@ type Initial = {
   amount: string;
   sourceId: string;
   note: string;
-  captureSource: 'manual' | 'scan' | 'upload';
+  captureSource: CaptureSource;
 };
 
 const BLANK: Initial = {
@@ -83,42 +95,49 @@ type ScanParams = {
   scannedDate?: string;
   scannedSource?: string;
   scannedRead?: string;
+  /** 'voice' when the voice review page handed this over ("More options"). */
+  scannedVia?: string;
+  /** 'voice' sends a saved receipt back to Home rather than to the review page. */
+  from?: string;
 };
 
 /**
- * A scan that could not be filed on its own, arriving as route params.
+ * A reading that arrives as route params: a scan, or what the voice review
+ * page heard.
  *
- * The receipts page files anything with both a store and a total without ever
- * opening this screen. What lands here is the remainder — a reading that is
- * missing one of them — so the fields it did get are already in place and only
- * the gap needs typing.
+ * The fields it did get are already in place and only the gap needs typing.
+ * Every param goes through the strict readers, so a link carrying a bad
+ * amount, date or id opens with that field blank rather than wrong.
  */
 function fromScanParams(params: ScanParams): { initial: Initial; result: ScanResult | null } {
+  const voice = params.scannedVia === 'voice';
   const read = (params.scannedRead ?? '')
     .split(',')
     .filter((field): field is ScanField => (ALL_FIELDS as readonly string[]).includes(field));
 
-  if (read.length === 0 && !params.scannedStore && !params.scannedAmount) {
+  if (!voice && read.length === 0 && !params.scannedStore && !params.scannedAmount) {
     return { initial: BLANK, result: null };
   }
 
+  const store = readMerchantParams({
+    name: params.scannedStore,
+    brandId: params.scannedBrandId,
+    domain: params.scannedDomain,
+    categoryId: params.scannedCategory,
+  });
+
   return {
     initial: {
-      store: params.scannedStore
-        ? {
-            brandId: params.scannedBrandId || null,
-            name: params.scannedStore,
-            domain: params.scannedDomain || null,
-            categoryId: params.scannedCategory || 'other',
-          }
-        : null,
-      date: params.scannedDate ? new Date(`${params.scannedDate}T00:00:00`) : new Date(),
-      amount: params.scannedAmount ?? '',
-      sourceId: params.scannedSource ?? '',
+      store: store ? { ...store, categoryId: store.categoryId || 'other' } : null,
+      date: readDayParam(params.scannedDate) ?? new Date(),
+      amount: readAmountParam(params.scannedAmount),
+      sourceId: readSourceParam(params.scannedSource),
       note: '',
-      captureSource: 'scan',
+      captureSource: voice ? 'voice' : 'scan',
     },
-    result: { read, missed: ALL_FIELDS.filter((field) => !read.includes(field)) },
+    // The report is camera wording ("Read the store, date and amount"); a
+    // voice hand-off has none, because its fields being filled is the message.
+    result: voice ? null : { read, missed: ALL_FIELDS.filter((field) => !read.includes(field)) },
   };
 }
 
@@ -132,6 +151,8 @@ function fromScanParams(params: ScanParams): { initial: Initial; result: ScanRes
 export default function AddReceiptScreen() {
   const params = useLocalSearchParams<{ id?: string } & ScanParams>();
   const { id } = params;
+  // Only a new receipt can have come from the voice review page.
+  const fromVoice = !id && params.from === 'voice';
   const artwork = useArtwork();
   const receipt = useReceipt(id);
   const existing = receipt.data ?? null;
@@ -220,6 +241,7 @@ export default function AddReceiptScreen() {
       id={id}
       initial={initial}
       initialScan={existing ? null : scanned.result}
+      fromVoice={fromVoice}
     />
   );
 }
@@ -228,10 +250,13 @@ function ReceiptForm({
   id,
   initial,
   initialScan,
+  fromVoice = false,
 }: {
   id?: string;
   initial: Initial;
   initialScan: ScanResult | null;
+  /** Saved from a voice hand-off: back to Home, never onto the review page again. */
+  fromVoice?: boolean;
 }) {
   const colors = useColors();
   const editing = Boolean(id);
@@ -450,32 +475,30 @@ function ReceiptForm({
     setStep(atStep);
   };
 
+  /** Where a saved receipt leaves to. */
+  const leave = () => {
+    if (!fromVoice) {
+      router.back();
+      return;
+    }
+    router.dismissTo('/home');
+    // Saved, so what was heard has done its job; the person's words do not
+    // stay in memory for the next session to find.
+    clearVoiceDraft();
+  };
+
   const handleSave = async () => {
     setError(null);
 
-    if (!store) {
-      fail('Pick a store first.', 1);
+    const built = buildReceiptValues(
+      { store, amount, date, sourceId, note, captureSource },
+      sources,
+    );
+    if (!built.ok) {
+      fail(built.message, built.field === 'store' ? 1 : 0);
       return;
     }
-    const value = Number(amount);
-    if (!Number.isFinite(value) || value <= 0) {
-      fail('Enter how much you spent.', 0);
-      return;
-    }
-
-    const chosen = sources.find((source) => source.id === sourceId);
-    const values = {
-      brand_id: store.brandId,
-      merchant: store.name,
-      amount: value,
-      purchased_on: toIsoDate(date),
-      category_id: store.categoryId || 'other',
-      card_id: chosen?.kind === 'card' ? chosen.id : null,
-      bank_account_id: chosen?.kind === 'account' ? chosen.id : null,
-      note: note.trim() || null,
-      source: captureSource,
-      image_path: null,
-    };
+    const { values } = built;
 
     try {
       if (editing && id) {
@@ -484,7 +507,7 @@ function ReceiptForm({
         await createReceipt.mutateAsync(values);
       }
       success();
-      router.back();
+      leave();
     } catch (thrown) {
       warn();
       setError({ message: failureMessage(thrown), step: 2 });

@@ -58,14 +58,18 @@ export function ToolCards({ pro, onPress }: ToolCardsProps) {
               importantForAccessibility="no-hide-descendants"
               className="absolute right-3 top-3 rounded-full bg-accent px-2 py-0.5"
             >
-              <Text allowFontScaling={false} className="font-poppins-bold text-[9px] text-on-control">
+              <Text
+                allowFontScaling={false}
+                className="font-poppins-bold text-[9px] text-on-control"
+              >
                 PRO
               </Text>
             </View>
           )}
 
-          <View className="h-12 w-12 items-center justify-center rounded-full bg-ink/5">
-            <tool.icon size={22} color={colors.body} strokeWidth={1.8} />
+          {/* The same accent circle as the "Where it goes" rows above. */}
+          <View className="h-[44px] w-[44px] items-center justify-center rounded-full bg-accent/10">
+            <tool.icon size={20} color={colors.accentInk} strokeWidth={1.8} />
           </View>
 
           <View className="mt-3 w-full flex-row items-center justify-center gap-0.5">

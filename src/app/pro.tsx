@@ -5,7 +5,7 @@ import {
   Check,
   CreditCard,
   Crown,
-  Palette,
+  Sparkles,
   Users,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -45,9 +45,9 @@ const FEATURES: { icon: LucideIcon; title: string; hint: string }[] = [
   },
   { icon: ChartColumn, title: 'Insights', hint: 'Your whole money picture on one page' },
   {
-    icon: Palette,
-    title: 'Themes, early features, first-in-line support',
-    hint: 'Make Skip yours, and get the new things first',
+    icon: Sparkles,
+    title: 'Early features, first-in-line support',
+    hint: 'Get the new things first, and your questions answered first',
   },
 ];
 
@@ -121,7 +121,7 @@ export default function ProScreen() {
   // Already paying: status, not a sell.
   if (pro) {
     return (
-      <Screen showBack>
+      <Screen title="Skip Pro" showBack>
         <View className="mt-8 w-full items-center">
           <View className="h-16 w-16 items-center justify-center rounded-full bg-accent">
             <Crown size={28} color={colors.onControl} strokeWidth={2} />
@@ -149,8 +149,7 @@ export default function ProScreen() {
   }
 
   return (
-    <Screen showBack>
-      <Title align="left">Skip Pro</Title>
+    <Screen title="Skip Pro" showBack>
       <Text className="mt-2 w-full font-poppins text-[14px] text-muted" maxFontSizeMultiplier={1.4}>
         Everything Skip can do, for less than a coffee a month.
       </Text>

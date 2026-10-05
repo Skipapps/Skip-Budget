@@ -1,5 +1,5 @@
 import type { Href } from 'expo-router';
-import { Banknote, CalendarPlus, ReceiptText, Repeat } from 'lucide-react-native';
+import { Banknote, Calendar, Receipt, RefreshCw } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
@@ -27,17 +27,17 @@ type QuickAction = {
 const ACTIONS: QuickAction[] = [
   {
     id: 'receipt',
-    label: 'Receipts',
+    label: 'Receipt',
     hint: 'Add a receipt',
-    icon: ReceiptText,
+    icon: Receipt,
     href: '/add-receipt',
   },
-  { id: 'bill', label: 'Bill', hint: 'Add a bill', icon: CalendarPlus, href: '/add-bill' },
+  { id: 'bill', label: 'Bill', hint: 'Add a bill', icon: Calendar, href: '/add-bill' },
   {
     id: 'subscription',
     label: 'Subscription',
     hint: 'Add a subscription',
-    icon: Repeat,
+    icon: RefreshCw,
     href: '/add-subscription',
   },
   {
@@ -53,31 +53,32 @@ type QuickActionsProps = {
   onPress: (href: Href) => void;
 };
 
-/** Four one-tap shortcuts, directly under the hero. */
+/**
+ * Four one-tap shortcuts, directly under the hero: a row of white cards, the
+ * icon up top and the word along the bottom (the Founder's Figma, 2026-10-03).
+ */
 export function QuickActions({ onPress }: QuickActionsProps) {
   const colors = useColors();
 
   return (
-    <View className="w-full flex-row items-start gap-2">
+    <View className="w-full flex-row gap-3">
       {ACTIONS.map((action) => (
         <Pressable
           key={action.id}
           accessibilityRole="button"
           accessibilityLabel={action.hint}
           onPress={withTap(() => onPress(action.href))}
-          className="min-w-0 flex-1 items-center gap-2 py-1 active:opacity-60"
+          className="min-h-[92px] min-w-0 flex-1 items-center justify-between rounded-[20px] border border-line bg-card px-1.5 pb-[14px] pt-[24px] active:bg-ink/5"
         >
           {/* The one accented thing on this screen. These are the only
               controls here that make something rather than show it. */}
-          <View className="h-12 w-12 items-center justify-center rounded-full bg-accent/10">
-            <action.icon size={20} color={colors.accentInk} strokeWidth={1.8} />
-          </View>
-          {/* One line, shrunk to fit when Dynamic Type outgrows the cell:
+          <action.icon size={22} color={colors.accentInk} strokeWidth={1.8} />
+          {/* One line, shrunk to fit when Dynamic Type outgrows the card:
               "Subscription" is a single word, so the two-line version could
               only break it mid-word — "Subscripti / on" at the larger
               sizes, which reads like a typo. */}
           <Text
-            className="text-center font-poppins-medium text-[12px] text-body"
+            className="text-center font-poppins-medium text-[12px] text-ink"
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.75}

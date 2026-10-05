@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
+import { roundMoney } from '@/lib/money';
 import { useColors } from '@/providers/theme-provider';
 
 type CalculatorPadProps = {
@@ -57,11 +58,6 @@ const ROWS: Key[][] = [
 ];
 
 const SYMBOLS: Record<Operator, string> = { '+': '+', '-': '−', '*': '×', '/': '÷' };
-
-/** Money rounding — results settle at cents rather than drifting in floats. */
-function toCents(value: number): number {
-  return Math.round(value * 100) / 100;
-}
 
 function group(raw: string): string {
   if (raw === '') return '0';
@@ -134,18 +130,20 @@ export function CalculatorPad({
     setReplaceNext(false);
   };
 
+  // Every result settles at the cent the way src/lib/money.ts posts it (half
+  // away from zero). Math.round(v * 100) / 100 showed 20.15 ÷ 2 as $10.07.
   const applyPending = (next: number): number | null => {
     if (accumulator === null || pending === null) return next;
     switch (pending) {
       case '+':
-        return toCents(accumulator + next);
+        return roundMoney(accumulator + next);
       case '-':
-        return toCents(accumulator - next);
+        return roundMoney(accumulator - next);
       case '*':
-        return toCents(accumulator * next);
+        return roundMoney(accumulator * next);
       case '/':
         if (next === 0) return null;
-        return toCents(accumulator / next);
+        return roundMoney(accumulator / next);
     }
   };
 

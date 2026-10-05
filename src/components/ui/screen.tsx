@@ -4,6 +4,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/ui/back-button';
+import { PageHeader, type HeaderActionProps } from '@/components/ui/page-header';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
 
@@ -18,6 +19,14 @@ type ScreenProps = {
   scrollable?: boolean;
   /** Shows a back chevron pinned above the content. Off on entry screens. */
   showBack?: boolean;
+  /**
+   * The page's name, centred in the header on the back chevron's line. Every
+   * page with a name gives it here rather than as a heading in its content,
+   * so the top of every page is the same row at the same height.
+   */
+  title?: string;
+  /** Round glyph buttons at the header's right end: "Add bill", "Scan". */
+  headerActions?: HeaderActionProps[];
   /**
    * A header of the screen's own, pinned above the content in the same place
    * as the back chevron — the add flows' back, title, close and step dots.
@@ -50,6 +59,8 @@ export function Screen({
   className,
   scrollable = true,
   showBack = false,
+  title,
+  headerActions,
   header,
   avoidKeyboard = false,
   floating,
@@ -91,10 +102,20 @@ export function Screen({
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top', 'bottom']}>
-      {header || showBack ? (
+      {header || title || showBack ? (
         // Outside the scroll view so it stays put while content scrolls under it.
         <View className="w-full items-center">
-          <View className="w-full max-w-[520px] px-6 pt-1">{header ?? <BackButton />}</View>
+          <View className="w-full max-w-[520px] px-6 pt-1">
+            {/* The same row with or without a name, so a page's loading
+                state and its loaded state put the chevron in one place. */}
+            {header ?? (
+              <PageHeader
+                title={title}
+                left={showBack ? <BackButton /> : null}
+                actions={headerActions}
+              />
+            )}
+          </View>
         </View>
       ) : null}
 
@@ -110,7 +131,7 @@ export function Screen({
       ) : null}
 
       {floating ? (
-        // Clear of the home indicator: flush against the safe-area edge the
+        // Clear of the home indicator — flush against the safe-area edge the
         // control read as glued to the screen's bottom lip.
         <View className="absolute bottom-10 right-5" pointerEvents="box-none">
           {floating}

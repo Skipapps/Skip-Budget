@@ -11,10 +11,10 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 
-  /* Light on apricot — what the app is before the theme provider mounts.
+  /* Light mode — what the app is before the theme provider mounts.
      Every one of these is overwritten at the root the moment it does, so this
      seeds the first frame rather than describing the app. Generated from
-     buildTokens('light', '#EFA168') in src/theme/palette.ts. */
+     buildTokens('light') in src/theme/palette.ts. */
   --color-surface: 251 249 247;
   --color-card: 255 255 255;
   --color-ink: 17 17 17;
@@ -24,9 +24,9 @@
   --color-money-in: 47 122 85;
   --color-money-out: 184 80 64;
   --color-danger: 176 69 58;
-  --color-control: 239 161 104;
-  --color-control-pressed: 196 132 85;
-  --color-on-control: 17 17 17;
-  --color-accent: 239 161 104;
-  --color-accent-ink: 143 97 62;
+  --color-control: 144 84 121;
+  --color-control-pressed: 118 69 99;
+  --color-on-control: 255 255 255;
+  --color-accent: 144 84 121;
+  --color-accent-ink: 144 84 121;
 }

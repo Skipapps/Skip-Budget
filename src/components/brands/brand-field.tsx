@@ -23,6 +23,13 @@ type BrandFieldProps = {
   placeholder?: string;
   error?: string;
   className?: string;
+  /**
+   * The search already typed in when the field opens empty — the store a
+   * voice entry heard but could not match, so its results are showing at once.
+   */
+  initialQuery?: string;
+  /** Opens with the keyboard up and the search live. */
+  autoFocus?: boolean;
 };
 
 /** Keystrokes are cheap; round trips are not. */
@@ -53,10 +60,12 @@ export function BrandField({
   placeholder = 'Search for a store',
   error,
   className,
+  initialQuery = '',
+  autoFocus = false,
 }: BrandFieldProps) {
   const colors = useColors();
-  const [query, setQuery] = useState('');
-  const [focused, setFocused] = useState(false);
+  const [query, setQuery] = useState(initialQuery);
+  const [focused, setFocused] = useState(autoFocus);
   const debounced = useDebounced(query);
   const { data: results = [], isFetching } = useBrandSearch(debounced);
 
@@ -125,6 +134,7 @@ export function BrandField({
           placeholder={placeholder}
           placeholderTextColor={colors.muted}
           onFocus={() => setFocused(true)}
+          autoFocus={autoFocus}
           autoCapitalize="words"
           autoCorrect={false}
           returnKeyType="search"

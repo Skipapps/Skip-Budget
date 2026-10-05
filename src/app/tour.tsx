@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { Screen } from '@/components/ui/screen';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { Subtitle } from '@/components/ui/typography';
 import { useArtwork, type ArtworkName } from '@/theme/artwork';
 import { useColors } from '@/providers/theme-provider';
 
@@ -72,8 +72,7 @@ export default function TourScreen() {
   const colors = useColors();
 
   return (
-    <Screen showBack>
-      <Title align="left">What Skip can do</Title>
+    <Screen title="What Skip can do" showBack>
       <Subtitle className="mt-3 w-full text-left">
         Six things, each a tap away. No setup order to follow — start wherever your money bothers
         you most.

@@ -11,6 +11,10 @@ import { router } from 'expo-router';
  * nowhere left to go.
  */
 export function resetTo(href: string): void {
-  if (router.canGoBack()) router.dismissAll();
+  // canDismiss, not canGoBack: on a tab, canGoBack is true because the tab
+  // bar can go back to Home, but there is no stack screen to pop — and a
+  // popToTop nothing handles is a red "POP_TO_TOP was not handled" box in
+  // development (seen signing out from Settings, 2026-10-03).
+  if (router.canDismiss()) router.dismissAll();
   router.replace(href as Parameters<typeof router.replace>[0]);
 }

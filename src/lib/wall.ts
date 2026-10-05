@@ -17,7 +17,8 @@ export const WALL = {
   loanCalculator: 'pro',
   insights: 'pro',
   receiptScan: 'pro',
-  theming: 'pro',
+  /** Adding a receipt, bill or subscription by speaking it. Gate id `voice`. */
+  voice: 'pro',
 } as const;
 
 export type WalledFeature = keyof typeof WALL;

@@ -10,7 +10,7 @@ import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
-import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
+import { FieldLabel, Subtitle } from '@/components/ui/typography';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { amortise, formatTerm, type AccrualBasis } from '@/lib/loan';
@@ -120,8 +120,7 @@ function SaveLoanScreenInner() {
   };
 
   return (
-    <Screen showBack avoidKeyboard>
-      <Title>Add to monthly bills</Title>
+    <Screen title="Add to monthly bills" showBack avoidKeyboard>
       <Subtitle className="mt-3">
         This becomes a monthly bill under Loans, so it counts against what you have left.
       </Subtitle>

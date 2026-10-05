@@ -12,19 +12,7 @@ import {
 } from 'react';
 import { useColorScheme, View } from 'react-native';
 
-import {
-  ACCENTS,
-  DEFAULT_ACCENT,
-  DEFAULT_MODE,
-  LEGACY_ACCENTS,
-  accentById,
-  buildTokens,
-  tokenVars,
-  type AccentId,
-  type ModeKey,
-  type Scheme,
-  type Tokens,
-} from '@/theme/palette';
+import { buildTokens, tokenVars, type ModeKey, type Scheme, type Tokens } from '@/theme/palette';
 
 /**
  * One place that decides what colour the app is.
@@ -36,23 +24,20 @@ import {
  * old ones. `useColors()` covers the rest, the places a className cannot reach
  * — icon props and SVG fills.
  *
- * The choice is kept on the device rather than in the profile. Mode follows the
- * phone by default, which is a property of the phone and not of the account,
- * and reading it locally means the first frame is already the right colour
- * instead of the wrong one until the network answers.
+ * There is one theme; the only choice is light, dark, or follow the phone.
+ * That choice is kept on the device rather than in the profile, because the
+ * default is a property of the phone and not of the account, and reading it
+ * locally means the first frame is already the right colour.
  */
 
 const MODE_KEY = 'skip.theme.mode';
-const ACCENT_KEY = 'skip.theme.accent';
 
 type ThemeValue = {
   mode: ModeKey;
-  accentId: AccentId;
   /** What `mode` actually resolves to right now. */
   scheme: Scheme;
   colors: Tokens;
   setMode: (mode: ModeKey) => void;
-  setAccent: (accent: AccentId) => void;
   /** False until the stored choice has been read. */
   ready: boolean;
 };
@@ -62,48 +47,33 @@ const ThemeContext = createContext<ThemeValue | null>(null);
 const isMode = (value: string | null): value is ModeKey =>
   value === 'light' || value === 'dark' || value === 'system';
 
-const isAccent = (value: string | null): value is AccentId =>
-  ACCENTS.some((accent) => accent.id === value);
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
   // react-native's, not nativewind's: the phone's setting is an input here,
   // not the answer. When the mode is light or dark this is ignored entirely.
   const phone = useColorScheme();
 
-  const [mode, setModeState] = useState<ModeKey>(DEFAULT_MODE);
-  const [accentId, setAccentState] = useState<AccentId>(DEFAULT_ACCENT);
+  const [mode, setModeState] = useState<ModeKey>('system');
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const [storedMode, storedAccent] = await AsyncStorage.multiGet([MODE_KEY, ACCENT_KEY]);
-        if (cancelled) return;
-        if (isMode(storedMode[1])) setModeState(storedMode[1]);
-        if (isAccent(storedAccent[1])) {
-          setAccentState(storedAccent[1]);
-        } else if (storedAccent[1] && storedAccent[1] in LEGACY_ACCENTS) {
-          // A colour from the retired set: land on its nearest survivor and
-          // remember that, so the mapping happens once rather than every launch.
-          const mapped = LEGACY_ACCENTS[storedAccent[1]];
-          setAccentState(mapped);
-          AsyncStorage.setItem(ACCENT_KEY, mapped).catch(() => {});
-        }
-      } catch {
-        // A device that cannot read its own storage still gets an app, in the
-        // colours it shipped with.
-      } finally {
+    AsyncStorage.getItem(MODE_KEY)
+      .then((stored) => {
+        if (!cancelled && isMode(stored)) setModeState(stored);
+      })
+      // A device that cannot read its own storage still gets an app, following
+      // the phone.
+      .catch(() => {})
+      .finally(() => {
         if (!cancelled) setReady(true);
-      }
-    })();
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
   const scheme: Scheme = mode === 'system' ? (phone === 'dark' ? 'dark' : 'light') : mode;
-  const colors = useMemo(() => buildTokens(scheme, accentById(accentId)), [scheme, accentId]);
+  const colors = useMemo(() => buildTokens(scheme), [scheme]);
 
   // Behind the app itself: what shows through during a navigation transition
   // and under the keyboard. Left as it was, that stays white in dark mode.
@@ -116,14 +86,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(MODE_KEY, next).catch(() => {});
   }, []);
 
-  const setAccent = useCallback((next: AccentId) => {
-    setAccentState(next);
-    AsyncStorage.setItem(ACCENT_KEY, next).catch(() => {});
-  }, []);
-
   const value = useMemo<ThemeValue>(
-    () => ({ mode, accentId, scheme, colors, setMode, setAccent, ready }),
-    [mode, accentId, scheme, colors, setMode, setAccent, ready],
+    () => ({ mode, scheme, colors, setMode, ready }),
+    [mode, scheme, colors, setMode, ready],
   );
 
   return (

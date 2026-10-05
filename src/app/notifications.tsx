@@ -7,7 +7,7 @@ import { useAnnouncements, type AnnouncementRow } from '@/api/queries';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { Subtitle } from '@/components/ui/typography';
 import { formatFullDate } from '@/lib/date';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 import { useColors } from '@/providers/theme-provider';
@@ -41,10 +41,12 @@ export default function NotificationsScreen() {
   const items = news.data ?? [];
 
   return (
-    <Screen showBack onRefresh={() => void news.refetch()} refreshing={news.isRefetching}>
-      <Title align="left" className="w-full">
-        Notifications
-      </Title>
+    <Screen
+      title="Notifications"
+      showBack
+      onRefresh={() => void news.refetch()}
+      refreshing={news.isRefetching}
+    >
       <Subtitle align="left" className="mt-2 w-full">
         News from Skip — updates to install and features that have just arrived.
       </Subtitle>

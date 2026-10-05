@@ -20,8 +20,6 @@ export function GettingStartedCard() {
 
   if (!visible) return null;
 
-  const next = steps.find((step) => !step.done);
-
   return (
     <View className="mt-6 w-full rounded-[16px] border border-line bg-card p-5">
       <View className="w-full flex-row items-start justify-between gap-3">
@@ -53,15 +51,15 @@ export function GettingStartedCard() {
 
       <View className="mt-2 w-full">
         {steps.map((step) => {
-          const isNext = step.id === next?.id;
           return (
             <Pressable
               key={step.id}
               accessibilityRole="button"
               accessibilityState={{ disabled: step.done }}
-              accessibilityLabel={
-                step.done ? `${step.title}. Done.` : `${step.title}. ${step.detail}`
-              }
+              accessibilityLabel={step.done ? `${step.title}. Done.` : step.title}
+              // Not drawn (the Founder's call, 2026-10-03: titles only), but
+              // still said, so VoiceOver keeps the why behind each step.
+              accessibilityHint={step.done ? undefined : step.detail}
               disabled={step.done}
               onPress={() => router.push(step.href as never)}
               className="w-full flex-row items-center gap-3 py-2.5 active:opacity-70"
@@ -98,16 +96,6 @@ export function GettingStartedCard() {
                     </Text>
                   ) : null}
                 </View>
-                {/* Only the next step explains itself. Five explanations at
-                    once is a wall; one is an invitation. */}
-                {isNext ? (
-                  <Text
-                    className="mt-0.5 font-poppins text-[12px] leading-[17px] text-muted"
-                    maxFontSizeMultiplier={1.3}
-                  >
-                    {step.detail}
-                  </Text>
-                ) : null}
               </View>
 
               {!step.done ? <ChevronRight size={16} color={colors.muted} strokeWidth={2} /> : null}

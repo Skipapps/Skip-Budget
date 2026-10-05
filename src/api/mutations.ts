@@ -175,8 +175,6 @@ export type ProfileValues = {
   display_name?: string | null;
   /** Which bundled avatar was chosen; null for none. See theme/avatars.ts. */
   avatar_id?: string | null;
-  /** Dashboard tile ids, first to last. */
-  tile_order?: string[] | null;
   /** When the Getting Started card was waved away. */
   getting_started_dismissed_at?: string | null;
   /** When this account chose to be reminded. */
@@ -257,9 +255,17 @@ export const useDeleteBill = () => useRemove('bills');
 
 export type SalaryValues = {
   name: string;
+  /** What lands each payday. Worked out from the hourly fields when hourly. */
   amount: number;
   frequency: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
   last_payday: string | null;
+  /** Only sent once the database has the hourly columns. */
+  pay_type?: 'fixed' | 'hourly';
+  hourly_rate?: number | null;
+  hours_per_week?: number | null;
+  overtime_hours_per_week?: number;
+  overtime_multiplier?: number;
+  deduction_percent?: number;
 };
 
 export const useCreateSalarySource = () => useCreate<SalaryValues>('salary_sources');
@@ -267,6 +273,13 @@ export const useUpdateSalarySource = () => useUpdate<Partial<SalaryValues>>('sal
 export const useDeleteSalarySource = () => useRemove('salary_sources');
 
 // --- Receipts --------------------------------------------------------------
+
+/**
+ * How a receipt got into the app. Mirrors the `public.capture_source` enum;
+ * everything but 'manual' is a Pro verb, and the server's
+ * `enforce_scan_is_pro` trigger refuses it on a free account.
+ */
+export type CaptureSource = 'manual' | 'scan' | 'upload' | 'voice';
 
 export type ReceiptValues = {
   brand_id: string | null;
@@ -277,7 +290,7 @@ export type ReceiptValues = {
   card_id: string | null;
   bank_account_id: string | null;
   note: string | null;
-  source: 'manual' | 'scan' | 'upload';
+  source: CaptureSource;
   image_path: string | null;
 };
 

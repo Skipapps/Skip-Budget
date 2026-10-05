@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { TextLink } from '@/components/ui/text-link';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { Subtitle } from '@/components/ui/typography';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -52,8 +52,7 @@ export default function LoginScreen() {
   const handleForgotPassword = () => router.push('/forgot-password');
 
   return (
-    <Screen showBack avoidKeyboard>
-      <Title>Log in</Title>
+    <Screen title="Log in" showBack avoidKeyboard>
       <Subtitle className="mt-3">Welcome back. Pick up where you left off.</Subtitle>
 
       <View className="mt-8 w-full gap-5">

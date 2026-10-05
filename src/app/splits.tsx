@@ -1,15 +1,14 @@
 import { router } from 'expo-router';
-import { ChevronRight, Users } from 'lucide-react-native';
+import { ChevronRight, Plus, Users } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { useRefreshAll } from '@/api/refresh';
 import { useFriendRequests, useFriends, useGroups, useMyBalances } from '@/api/splits';
 import { GroupIcon } from '@/components/splits/group-icon';
-import { ActionPill } from '@/components/ui/action-pill';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { SectionHeading, Title } from '@/components/ui/typography';
+import { SectionHeading } from '@/components/ui/typography';
 import { formatCurrency } from '@/lib/format';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
@@ -37,14 +36,13 @@ export default function SplitsScreen() {
   const live = groups.filter((group) => !group.archived_at);
 
   return (
-    <Screen showBack onRefresh={refresh} refreshing={refreshing}>
-      <View className="mt-2 w-full flex-row items-center justify-between gap-3">
-        <Title flush align="left" className="flex-1">
-          Split manager
-        </Title>
-        <ActionPill label="New group" onPress={() => router.push('/add-group')} />
-      </View>
-
+    <Screen
+      title="Split manager"
+      showBack
+      onRefresh={refresh}
+      refreshing={refreshing}
+      headerActions={[{ icon: Plus, label: 'New group', onPress: () => router.push('/add-group') }]}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={

@@ -38,7 +38,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { SwitchControl } from '@/components/ui/switch-control';
 import { TextLink } from '@/components/ui/text-link';
 import { TimePicker } from '@/components/ui/time-picker';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { Subtitle } from '@/components/ui/typography';
 import { cn } from '@/lib/cn';
 import { formatClock, formatFullDate, parseClock } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
@@ -243,10 +243,7 @@ export default function RemindersScreen() {
     (reminders.data ?? []).filter((row) => row.enabled).length;
 
   return (
-    <Screen showBack onRefresh={retry}>
-      <Title align="left" className="mt-1 w-full">
-        Reminders
-      </Title>
+    <Screen title="Reminders" showBack onRefresh={retry}>
       {/* The count always leads, because there is always at least the receipts
           reminder to count. On a fresh account it carries the sentence the
           empty state used to: there is something here to set, and more of it

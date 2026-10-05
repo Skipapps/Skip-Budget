@@ -8,8 +8,9 @@
  * an expense whose shares do not add up to its total is refused.
  */
 
-const toCents = (value: number) => Math.round(value * 100);
-const toDollars = (cents: number) => cents / 100;
+// The app's one rounding rule (half away from zero, src/lib/money.ts). The
+// stored figures are numeric(14,2), so every real input is already whole cents.
+import { fromCents as toDollars, toCents } from '@/lib/money';
 
 export type Settlement = {
   from: string;

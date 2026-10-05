@@ -1,11 +1,12 @@
 import { Stack, useFocusEffect } from 'expo-router';
-import { ChevronLeft, X } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 import type { ComponentRef, ReactNode, RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AccessibilityInfo, BackHandler, Pressable, Text, View } from 'react-native';
 
-import { goBack } from '@/components/ui/back-button';
+import { BackButton, goBack } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Screen } from '@/components/ui/screen';
 import { cn } from '@/lib/cn';
 import { useConfirm } from '@/providers/dialog-provider';
@@ -171,23 +172,33 @@ export function StepFlow({
  * Back steps back; close leaves the whole flow, from any step, after asking —
  * everything typed so far is thrown away, and a stray tap in the corner should
  * not be able to do that. Exported for the screens that open a flow before
- * its steps begin, like the bill category chooser.
+ * its steps begin, like the bill category chooser, and for the voice pages,
+ * which are separate routes wearing the same chrome.
  */
 export function FlowHeader({
   title,
   onBack,
   closePrompt,
+  onClose,
   titleRef,
 }: {
   title: string;
   onBack: () => void;
-  closePrompt: string;
+  /**
+   * What close asks before it throws the flow away. Without one there is no
+   * close at all: a one-field page has nothing to throw away that back does
+   * not already discard.
+   */
+  closePrompt?: string;
+  /** Where close goes once confirmed. Defaults to popping this screen. */
+  onClose?: () => void;
   titleRef?: RefObject<ComponentRef<typeof Text> | null>;
 }) {
   const colors = useColors();
   const confirm = useConfirm();
 
   const close = async () => {
+    if (!closePrompt) return;
     const ok = await confirm({
       title: closePrompt,
       message: 'Nothing you have entered here will be saved.',
@@ -195,46 +206,31 @@ export function FlowHeader({
       cancelLabel: 'Go back',
       destructive: true,
     });
-    if (ok) goBack();
+    if (ok) (onClose ?? goBack)();
   };
 
   return (
-    <View className="h-11 w-full justify-center">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Back"
-        onPress={onBack}
-        hitSlop={8}
-        className="absolute left-0 z-10 h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
-      >
-        <ChevronLeft size={24} color={colors.ink} strokeWidth={2} />
-      </Pressable>
-
-      {/* The title is laid out over the whole header row, so without this
-          it sits on top of the buttons and swallows every tap on them: a
-          plain Text is still a hit target, and the buttons are its siblings
-          rather than its children, so the tap reaches nothing. */}
-      <Text
-        ref={titleRef}
-        pointerEvents="none"
-        className="px-12 text-center font-poppins-semibold text-[17px] text-ink"
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.3}
-      >
-        {title}
-      </Text>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Close"
-        accessibilityHint={closePrompt}
-        onPress={() => void close()}
-        hitSlop={8}
-        className="absolute right-0 z-10 h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
-      >
-        <X size={22} color={colors.ink} strokeWidth={2} />
-      </Pressable>
-    </View>
+    <PageHeader
+      title={title}
+      titleRef={titleRef}
+      left={<BackButton accessibilityLabel="Back" onPress={onBack} />}
+      right={
+        closePrompt ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            accessibilityHint={closePrompt}
+            onPress={() => void close()}
+            hitSlop={8}
+            // Mirrors the back chevron: pulled 8pt right so the cross, not its
+            // touch box, lines up with the page's right edge.
+            className="-mr-2 h-[44px] w-[44px] items-center justify-center rounded-full active:bg-ink/5"
+          >
+            <X size={22} color={colors.ink} strokeWidth={2} />
+          </Pressable>
+        ) : null
+      }
+    />
   );
 }
 

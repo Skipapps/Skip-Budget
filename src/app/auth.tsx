@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Illustration } from '@/components/ui/illustration';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
-import { Subtitle, Title } from '@/components/ui/typography';
+import { Subtitle } from '@/components/ui/typography';
 import { resetTo } from '@/lib/nav';
 
 /**
@@ -58,10 +58,9 @@ export default function AuthScreen() {
   const handleEmail = () => router.push('/signup');
 
   return (
-    <Screen showBack>
+    <Screen title="Set up your login" showBack>
       <Illustration source={artwork.loginHero} widthRatio={0.78} maxWidth={290} className="pt-2" />
 
-      <Title>Set up your login</Title>
       <Subtitle className="mt-3">
         Keep your data synced across devices and make account recovery easier.
       </Subtitle>

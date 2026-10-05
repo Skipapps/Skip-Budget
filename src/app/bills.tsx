@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
-import { ChevronRight, Plus, ReceiptText } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import { Fragment, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
 import { useBills, useLedger, usePaymentSources } from '@/api/queries';
@@ -11,21 +11,25 @@ import { PageState } from '@/components/ui/page-state';
 import { RangeDropdown } from '@/components/ui/range-dropdown';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { SectionHeading, Title } from '@/components/ui/typography';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { groupByDate } from '@/lib/group';
 import { rangeFor, type RangeKey } from '@/lib/range';
-import { useColors, useMoneyColor } from '@/providers/theme-provider';
+import { useMoneyColor } from '@/providers/theme-provider';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * What the bills have actually cost, over a window you choose.
  *
- * The schedule itself lives one tap away, on its own page. This one answers
- * the question the app exists for — where the money went — so it lists the
- * times a bill landed rather than the bills that produce them. A monthly bill
- * is one line here per month it has run, not one line forever.
+ * It answers the question the app exists for — where the money went — so it
+ * lists the times a bill landed rather than the bills that produce them. A
+ * monthly bill is one line here per month it has run, not one line forever.
+ *
+ * Kept to one job (the Founder's call, 2026-10-03): adding is the + in the
+ * header, and a charge opens its bill's own page — details, paid and upcoming
+ * charges, and the pencil to edit — because that is where people were
+ * tapping. The full list of bills, including any with no charge in this
+ * window, lives under Settings → Your money → Bills.
  */
 export default function BillsScreen() {
   const artwork = useArtwork();
@@ -60,32 +64,12 @@ export default function BillsScreen() {
   const planCount = plans.data?.length ?? 0;
 
   return (
-    <Screen showBack onRefresh={refetch}>
-      <Title align="left" className="w-full">
-        Monthly bills
-      </Title>
-
-      <View className="mt-5 w-full flex-row gap-3">
-        <Tile
-          icon={ReceiptText}
-          title="Your bills"
-          caption={planCount === 1 ? '1 recurring' : `${planCount} recurring`}
-          onPress={() => router.push('/bill-plans')}
-          showChevron
-        />
-        <Tile
-          icon={Plus}
-          title="Add bill"
-          caption="Set up a new one"
-          onPress={() => router.push('/add-bill')}
-        />
-      </View>
-
-      {/* Named, because the tiles above are the plans and everything from here
-          down is what those plans actually took — two different things that
-          otherwise run together on one page. */}
-      <SectionHeading className="mt-7">Charges</SectionHeading>
-
+    <Screen
+      title="Monthly bills"
+      showBack
+      onRefresh={refetch}
+      headerActions={[{ icon: Plus, label: 'Add bill', onPress: () => router.push('/add-bill') }]}
+    >
       {/* One number, and the window it belongs to, side by side — the figure is
           meaningless without knowing which stretch of time it covers. */}
       <View className="mt-3 w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
@@ -154,8 +138,13 @@ export default function BillsScreen() {
                     amount={entry.amount}
                     kindLabel={sourceLabels.get(entry.sourceId) ?? 'No payment method'}
                     kind="bill"
+                    // The issuer's logo when the bill has one (AEP, T-Mobile),
+                    // the category icon when not — it was never passed here,
+                    // so every bill on this page fell back to its glyph.
+                    domain={entry.domain}
                     categoryId={entry.categoryId}
                     iconId={entry.iconId}
+                    onPress={entry.planId ? () => router.push(`/bill/${entry.planId}`) : undefined}
                   />
                 </Fragment>
               ))}
@@ -164,48 +153,5 @@ export default function BillsScreen() {
         </View>
       ) : null}
     </Screen>
-  );
-}
-
-type TileProps = {
-  icon: typeof Plus;
-  title: string;
-  caption: string;
-  onPress: () => void;
-  showChevron?: boolean;
-};
-
-/** Compact pair at the top: the schedule behind this page, and a way to add. */
-function Tile({ icon: Icon, title, caption, onPress, showChevron }: TileProps) {
-  const colors = useColors();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${title}. ${caption}.`}
-      onPress={onPress}
-      className="flex-1 rounded-[16px] border border-line bg-card p-4 active:opacity-70"
-    >
-      <View className="w-full flex-row items-center justify-between gap-2">
-        <View className="h-9 w-9 items-center justify-center rounded-full bg-ink/5">
-          <Icon size={18} color={colors.ink} strokeWidth={1.8} />
-        </View>
-        {showChevron ? <ChevronRight size={18} color={colors.muted} strokeWidth={2} /> : null}
-      </View>
-
-      <Text
-        className="mt-3 font-poppins-medium text-[15px] text-ink"
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.2}
-      >
-        {title}
-      </Text>
-      <Text
-        className="mt-0.5 font-poppins text-[12px] text-muted"
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.2}
-      >
-        {caption}
-      </Text>
-    </Pressable>
   );
 }

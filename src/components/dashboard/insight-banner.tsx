@@ -45,8 +45,9 @@ export function InsightBanner({ pro = true, onPress }: InsightBannerProps) {
           and said nothing the two lines beside it did not. The glyph is the
           same size as every other leading mark on the screen, so this reads as
           a peer of the tool cards rather than an advert wedged between two. */}
-      <View className="h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink/5">
-        <TrendingUp size={20} color={colors.body} strokeWidth={1.8} />
+      {/* The same accent circle as the "Where it goes" rows above. */}
+      <View className="h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-accent/10">
+        <TrendingUp size={20} color={colors.accentInk} strokeWidth={1.8} />
       </View>
 
       <View className="min-w-0 flex-1">

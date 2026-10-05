@@ -1138,3 +1138,187 @@ re-litigate them as app bugs)**
 3. Bug 3 (EA-style logo on a custom subscription name) is a single observation, not re-verified twice —
    flagging rather than asserting; someone with time to check the brand-matching source should confirm
    before treating it as confirmed.
+
+---
+
+## 2026-10-01 — Theo (Tester) — voice input: QuickActions fix + §6 coverage audit
+
+**Outcome:** Done. Fixed the one pre-existing failing test. Audited Dmitri's §6 test plan against the
+team's existing voice tests: every unit and screen item was already covered by Diego/Dana/Drew/Dilip's
+own test files. Added one new file with 10 tests covering the three money checks the CEO called out
+explicitly, since no single test made them an auditable, named assertion. No bugs found — nothing I
+wrote failed on first run against the committed code. Gate green: `tsc --noEmit` 0 errors, `rm -rf
+.expo/cache/eslint && npx eslint` clean on my two files, full `npx jest --ci` 83 suites / 1252 tests,
+all pass. No commits.
+
+**QuickActions:** confirmed intentional — `git log -p` on `826ae7b` shows "Receipt" → "Receipts" changed
+in the same commit as `numberOfLines={2}` → `numberOfLines={1}` + `adjustsFontSizeToFit` (a deliberate
+wording-plus-layout pass), while "Bill"/"Subscription"/"Salary" stayed singular on purpose. Updated the
+`EXPECTED` fixture in `src/components/dashboard/quick-actions.test.tsx` from `'Receipt'` to `'Receipts'`
+— the only line changed. Component untouched.
+
+**Baseline before my changes:** `npm run check` died at `typecheck` (two errors in `src/lib/speech.ts`,
+Dilip/Dana's in-flight file — not mine, and gone by the time I finished, so not reported as a finding
+per the CEO's re-run instruction). `npx jest --ci` baseline: 82 suites / 1232 tests, 2 failures
+(`quick-actions.test.tsx`, expected; `speech.test.ts`, another in-flight-file failure that was also
+gone on re-run).
+
+**§6 coverage map** (file:line references are to the test, not the production code):
+
+| §6 item | Status | Covering test(s) |
+|---|---|---|
+| `entry-values` golden fixtures, every validation message/field, `icon_id`, `'period'`, `floorAfterCharges` with/without `lastChargedOn`, `countFromAfterPick` with/without `countsFrom` | Covered | `src/api/entry-values.test.ts` (all three builders, every branch in the table above) |
+| `validateVoiceDraft` + prefill readers: bad kind/amount/date/cycle/category, one amount choice → `[]`, round trip, garbage → blank | Covered | `src/lib/voice-draft.test.ts:73-278` (`validateVoiceDraft`), `:462-595` ("out to a form and back") |
+| Aliases: per-user isolation, cap 200 oldest-first incl. integer-like keys, corrupt storage → `{}`, `signOut`/`deleteAccount` clear, learn failure never throws | Covered | `src/lib/voice/aliases.test.ts` (pure fn), `src/api/voice-aliases.test.tsx` (storage/hooks), `src/api/auth.test.ts:135-182` (sign-out/delete clear) |
+| Parser 100+ table, incl. "7-Eleven", "24 Hour Fitness", "No Frills" | Covered | `src/lib/voice/parse.test.ts:1826-1973` (table + invariants, incl. the `fromCents(toCents(x))` and "never settled while ambiguous" checks at line 1880 and 1895) |
+| Golden save tests (Diego writes, Theo reviews) | Covered, reviewed | `src/__tests__/app/add-{receipt,bill,subscription}-save.test.tsx` — spot-checked the four fixture amounts (`1100`, `15.99`, `0.10`, `1030.5`) land as numbers to the cent in every create/update call; no issues found |
+| `voice-review`: one create per Save, double tap, failure stays, Save blocked until amount picked, stale draft → "Start again", free → explainer, hand-off | Covered | `src/__tests__/app/voice-review.test.tsx` (34 tests covering every named case per kind) |
+| `/voice` states, parseVoice call shape, blur → cancel, no auto-start without the FAB flag | Covered | `src/__tests__/app/voice.test.tsx` (all six `SpeechStatus` values, the `{ today, directory, aliases }` call shape, unmount-as-blur, the "Say it again" one-shot flag) |
+| Home FAB: hidden/free/Pro, PRO badge on free | Covered | `src/__tests__/app/home-voice-fab.test.tsx` |
+| Forms' `from=voice`: prefill, category-step skip, `dismissTo` vs `back`, `scannedVia=voice` | Covered | `src/__tests__/app/add-forms-from-voice.test.tsx` |
+
+**Gap found and filled:** nothing in the existing suite made the CEO's three money checks an explicit,
+named assertion — they were true only as a consequence of other tests (e.g. the ambiguous-amount case
+in `voice-review.test.tsx` only checked the Save button's `disabled` prop, never pressed it; cent-exactness
+was proven at the parser layer, not end-to-end to the `create` call). Added
+`src/__tests__/app/voice-review-extra.test.tsx` (new file, sibling to Dana's `voice-review.test.tsx`,
+nothing in it edited), 10 tests:
+- **Ambiguous amount can never be saved without a pick:** a direct press on "Save receipt"/"Save
+  subscription" while ambiguous is refused by the handler itself (`voice-review.tsx`'s `save()` checks
+  `!built?.ok` before anything else), not merely styled disabled — proven for receipt and subscription.
+- **No path shows or saves $0 or NaN:** seeded a draft with `amount: NaN` directly into the store (a
+  malformed-module-boundary scenario, since the parser itself never emits one — `parse.test.ts:1876`
+  already proves that) and confirmed `validateVoiceDraft` blanks it before render, so the screen shows
+  "Tap to add the amount", never "NaN" or "$0", and Save is refused. Same for a bill with no figure.
+- **Every amount saved equals `fromCents(toCents(x))`:** `0.01, 0.10, 12.50, 15.99, 1030.50,
+  999999999.99` each round-tripped from a seeded draft through the real store and the real builder to
+  the exact value handed to `useCreateReceipt().mutateAsync`, with no drift.
+
+**Bugs found:** none. Every test I wrote passed against the committed code on the first run — I looked
+specifically for a bypass of the Save-button's `disabled` state and for a NaN/0̶ leak and found the
+production code already guards both (`voice-review.tsx`'s `save()` re-checks `built?.ok`; the amount
+block has an explicit "Never $0" comment and a `entry.amount === null` branch before any `formatCurrency`
+call).
+
+**New test count:** 1 new file, 10 new tests. 1 existing test file edited (one string, `quick-actions.test.tsx`).
+Full count went from 82 suites/1232 tests (baseline, 2 failing) to 83 suites/1252 tests, all passing —
+the gap beyond my own +1 suite/+10 tests is other agents' concurrent in-flight work on `almost-done-all-pages`,
+not mine.
+
+**Open questions**
+1. None blocking. The voice feature's own test coverage was already unusually complete by the time I
+   started — my job ended up being confirmation plus closing one explicit gap, not building from scratch.
+2. Diego's `entry-values.test.ts`, `voice-draft.test.ts`, `voice-aliases.test.ts`/`aliases.test.ts`,
+   Dana's `voice-review.test.tsx`/`voice.test.tsx`/`voice-edit.test.tsx`/`home-voice-fab.test.tsx`, and
+   Drew's `parse.test.ts` are all still theirs — I did not touch any of them, per the brief.
+
+## 2026-10-01 — Tia — Voice input walkthrough (Simulator)
+
+**Build/setup.** iPhone 17 Pro simulator, Dilip's build from
+`~/Library/Developer/Xcode/DerivedData/SkipBudget-dbbmmmikbvksngagjcqfkpxjgues/.../SkipBudget.app`,
+fresh `npx expo start --dev-client --port 8081 --clear` (killed a stale Metro from a prior session
+first). Deep-linked `skipbudget://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081`. Walked
+Pia's spec (`.claude/team/design/voice-input-2026-10-01.md`) and Dmitri's plan §6
+(`.claude/team/dev/voice-input-plan-2026-10-01.md`). Mid-session the CEO reported Dana was swapping the
+mic disc for an "AudioLines + Voice" pill FAB; it had landed by the time I reached Home, and I re-checked
+it after a cold start at the end (item 1 below reflects the new pill, not the old disc).
+
+**Pass/fail, items 1-9 of the CEO's checklist**
+
+1. **Home FAB — pass, one minor deviation.** Pro+light, Free+dark (PRO pill), dark+plum hairline ring,
+   PRO pill clear of the "Voice" label (including at AX-medium text) all confirmed, including after a
+   cold start. Pixel-measured: right edge of the pill is flush with the tab bar's right edge to within
+   ~1pt. Vertical gap measured ~17pt, not the spec's 12pt (bug 2 below). FAB stayed clear of scrolled
+   content (this account's "Coming up" was empty on the test date, so I could not confirm the FAB never
+   overlapping a populated last row specifically, only that there was ample clearance under it).
+2. **`/voice` — pass.** Title, privacy line, all nine examples (Electric $85/Rent $1,800/Xfinity $79.99;
+   Netflix/Spotify/Hulu $99.99/yr) verbatim. idle, asking, listening (with pulse/Done/Cancel), denied
+   (via `simctl privacy revoke microphone`), and error states all matched spec copy exactly. "nothing
+   heard" state not reachable safely in the Simulator (see bug 1).
+3. **Review page — pass.** All 8 required test sentences run via the dev "Test sentence" field (not real
+   speech — Simulator has no mic). "You said" quote, kind chips with the guess hint, big amount in all
+   three looks (clear/not-heard/ambiguous), Tap-to-add rows, footer hint text all matched spec verbatim,
+   including "Pick the amount you meant." blocking Save until a chip is picked. Self-correction
+   ("forty, no, fifty... comcast") resolved to $50 + Xfinity (brand-aliased from "comcast") correctly.
+   Salary ("got my paycheck 3700"), out of scope per the brief, correctly fell back to Receipt with
+   `kindSure: false` and the $3,700 amount — never invented a kind that doesn't exist.
+4. **Edit pages — pass.** Amount, date and store-search edit pages are all full pages sliding from the
+   right (`FlowHeader`, no sheet/slide-up/popover anywhere). Done applies and pops; back pops with no
+   dialog and discards.
+5. **Save — pass for bill and subscription; expected fail for receipt (R5) confirmed.** Bill and
+   subscription both landed on Home via `dismissTo`, and a left-edge swipe on Home afterward did
+   nothing (stack is `[tabs]`). Confirmed the bill in the Bills list and the subscription in the
+   Subscriptions list. The bill's due date (15 Oct) fell outside the demo account's "Coming up" 7-day
+   window, so I couldn't directly confirm a populated Coming-up row, only the list pages. Receipt save
+   (Starbucks, $3,700) failed with exactly **"Something went wrong. Please try again."**, page stayed,
+   Save button re-enabled — this is the expected R5 (voice capture_source migration not deployed), not
+   a new bug.
+6. **More options — pass.** Hands off to the full "Add a receipt" form, pre-filled on step 1 (amount),
+   no scan-report banner. Back returns to the review page unchanged and still savable.
+7. **Close (✕) — pass.** Always raises "Cancel adding this [kind]? / Nothing you have entered here will
+   be saved." verbatim. Back chevron is unblocked while untouched, and becomes blocked (raises the same
+   dialog) once an edit page round-trip has happened, exactly as specified. I did not separately test
+   the edge-swipe-gesture block on the review page itself (only on Home post-save), so that specific
+   path is unverified.
+8. **Large text (AX-medium) — pass.** `/voice` and the review page: footer button stays pinned and
+   visible, all copy wraps, nothing clipped. FAB "Voice" label stays fully visible and the PRO pill
+   does not cover it.
+9. **Pro gate — pass.** `skipbudget://voice` deep link while Fake Free shows the "Just say it" explainer,
+   never the page.
+
+**Bugs, ranked**
+
+1. **BLOCKER — app crash (SIGABRT) on first live mic use after a fresh launch.** Repro: cold-launch the
+   app, open `/voice`, grant mic+speech permissions, tap Start talking. The page correctly enters
+   "Listening…" (pulse, Done, Cancel all render per spec), then a few seconds later the whole app
+   crashes to the Home Screen. Crash report
+   (`~/Library/Logs/DiagnosticReports/SkipBudget-2026-10-01-164429.ips`) shows `SIGABRT` on a background
+   thread: `ExpoSpeechRecognizer.prepareMicrophoneRecognition` → `AVAudioEngine.inputNode` →
+   `AURemoteIO::Initialize` → `_CheckRPCError`/`_ReportRPCTimeout` → `abort`. On relaunch, repeating the
+   same steps did **not** crash again — it correctly showed **"Something went wrong. Please try
+   again."**, meaning the designed error path works, but this particular CoreAudio init failure bypasses
+   it via an uncaught native abort rather than a catchable error. This is very likely a Simulator-only
+   artifact (no real microphone hardware/route backing `AVAudioEngine`'s RemoteIO unit), but it directly
+   violates the Founder-approved stability rule "voice can never crash the app… never a crash" for a
+   failure mode (audio engine init failing) that is not purely hypothetical on a real device either
+   (session takeover, interruption races). Recommend Dilip wrap `prepareMicrophoneRecognition`'s
+   `AVAudioEngine` setup so any init failure surfaces as `status: 'error'` rather than an uncaught trap,
+   and that this gets explicit confirmation on a physical iPhone (flagged in "needs a device" below).
+   Expected: never crashes, any mic/audio failure shows the `error` state. Actual: crashed once,
+   non-deterministically, on the same steps.
+2. **Minor — FAB sits ~17pt above the tab bar, not the spec's 12pt.** Pixel-measured on the Pro/light
+   cold-start screenshot (`24-home-fab-pro-light-coldstart.png`): pill bottom edge at ~747pt, tab bar's
+   top edge at ~764pt → 17pt gap, vs Pia's spec §2.2 target of 12pt. Right-edge-flush is accurate (within
+   ~1pt). Low severity, cosmetic only — worth a quick constant check in `screen.tsx`'s `floatingPlacement`
+   handling.
+3. **Note, not a bug — Expo dev-client's floating debug gear persistently overlaps the back
+   chevron/✕ on pushed pages (top-left, and occasionally directly on the Fake Pro/Free toggles in
+   Settings).** This is the dev-client's own overlay, not app chrome — it will not exist in a
+   TestFlight/production build. It cost real time this session (had to drag it out of the way
+   repeatedly, and it once triggered an accidental Reload). Flagging so the next tester isn't surprised.
+4. **Note, not confirmed as a bug — the dev "Test sentence" field once turned "um hello" into "I'm
+   hello"** before parsing. Only reproduced once; most likely iOS's own autocorrect/spellcheck acting on
+   the TextField as I typed (a tooling artifact of the dev-only test path), not the parser. Flagging for
+   someone with source access to confirm it isn't actually a parser string transform.
+
+**Entries saved this session (for the Founder to remove)**
+
+| Kind | Name | Amount | Date | Cycle |
+|---|---|---|---|---|
+| Bill | Electricity & Gas (auto-named, no company heard) | $85.00 | due 15 Oct 2026 | Monthly |
+| Subscription | Hulu | $99.99 | no renewal date set | Yearly |
+| Subscription | Netflix | $15.99 | no renewal date set | Monthly |
+
+No receipt was saved — the Starbucks/$3,700 receipt attempt correctly failed per R5 and left nothing
+behind. Several other test sentences (Rent $12.50 ambiguous, Xfinity/Comcast self-correction, "um hello",
+the original Starbucks $12.50 receipt) were reviewed but discarded via ✕ → Yes, not saved.
+
+**What needs a physical iPhone** (per the brief, plus what this session surfaced): real speech
+recognition accuracy and the on-device-vs-Apple's-servers distinction (Simulator has no mic), whether
+the bug-1 crash reproduces on real hardware, iOS 18 cutting off at the first pause, phone-call
+interruption ordering, music resuming, AirPods, and VoiceOver (both "VoiceOver's own speech isn't
+transcribed" and the full VoiceOver label/hint sweep from Pia's §12).
+
+**Cleanup done:** Fake Pro and Fake Free both switched off, content size reset to `large`, Appearance
+left on Light · Plum (matches how the account started). Simulator left running on Home.
+Screenshots: `/private/tmp/claude-501/-Users-sampathchowdi-Desktop-SkipBudget/91c83b63-8d6a-473a-a96c-98c7b6a33deb/scratchpad/voice-qa/` (00–26).
