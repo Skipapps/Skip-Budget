@@ -80,14 +80,6 @@ export type SalarySourceRow = {
   last_payday: string | null;
 };
 
-export type SavingsPotRow = { id: string; name: string; amount: number };
-
-export type DashboardRow = {
-  payday: number;
-  expenses: number;
-  left_this_month: number;
-};
-
 /**
  * How long a read may take before it is treated as failed.
  *
@@ -358,35 +350,6 @@ export function useMonthlySavings() {
   });
 }
 
-export function useSavingsPots() {
-  return useOwnerQuery<SavingsPotRow[]>('savings_pots', async () => {
-    const { data, error } = await supabase
-      .from('savings_pots')
-      .select('id, name, amount')
-      .order('created_at', { ascending: true });
-    if (error) throw error;
-    return data ?? [];
-  });
-}
-
-export function useDashboard() {
-  return useOwnerQuery<DashboardRow>('dashboard', async () => {
-    const { data, error } = await supabase
-      .from('v_dashboard')
-      .select('payday, expenses, left_this_month')
-      .maybeSingle();
-    if (error) throw error;
-    return data ?? { payday: 0, expenses: 0, left_this_month: 0 };
-  });
-}
-
-/**
- * Cards and bank accounts as one "paid with" list.
- *
- * Mirrors PAYMENT_SOURCES in lib/sources.ts, which is built from mock data —
- * this is the live equivalent, so anything asking "which card?" reads the same
- * shape whether it renders samples or the real wallet.
- */
 /**
  * Accounts that a salary source pays into.
  *

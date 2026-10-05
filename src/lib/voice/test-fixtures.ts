@@ -92,14 +92,3 @@ export const DIRECTORY: BrandRow[] = [
 
 /** Thursday 1 October 2026, the day the feature was briefed. */
 export const TODAY = '2026-10-01';
-
-export function merchantOf(id: string): {
-  brandId: string;
-  name: string;
-  domain: string | null;
-  categoryId: string;
-} {
-  const row = DIRECTORY.find((candidate) => candidate.id === id);
-  if (!row) throw new Error(`No fixture brand ${id}`);
-  return { brandId: row.id, name: row.name, domain: row.domain, categoryId: row.category_id };
-}

@@ -437,18 +437,6 @@ export function useAddGroupMember() {
   });
 }
 
-export function useJoinGroupByCode() {
-  const invalidate = useSplitInvalidate();
-  return useMutation({
-    mutationFn: (values: { code: string; claimMemberId?: string | null }) =>
-      callRpc<GroupRow>('join_group_by_code', {
-        p_code: values.code,
-        p_claim_member_id: values.claimMemberId ?? null,
-      }),
-    onSuccess: () => invalidate([...LEDGER_KEYS, 'group-members']),
-  });
-}
-
 export function useRemoveGroupMember() {
   const invalidate = useSplitInvalidate();
   return useMutation({

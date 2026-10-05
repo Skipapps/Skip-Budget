@@ -125,21 +125,6 @@ export function Body({ children, className }: TextProps) {
   );
 }
 
-/** Pull quote — italic, muted, used on the message screen. */
-export function Quote({ children, className }: TextProps) {
-  return (
-    <Text
-      className={cn(
-        'font-poppins text-[14px] italic leading-5 text-muted phone:text-[15px] phone:leading-6',
-        className,
-      )}
-      maxFontSizeMultiplier={1.6}
-    >
-      {children}
-    </Text>
-  );
-}
-
 /** Small label sitting above a form control. */
 export function FieldLabel({ children, className }: TextProps) {
   return (

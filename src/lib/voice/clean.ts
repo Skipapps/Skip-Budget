@@ -211,13 +211,6 @@ export function tokenize(raw: string): Token[] {
   return dropFillers(tokens);
 }
 
-/** Cleaned text: what the rules read. "Um so I paid like 40" → "i paid 40". */
-export function cleanText(raw: string): string {
-  return tokenize(raw)
-    .map((token) => token.text)
-    .join(' ');
-}
-
 /** Words joined with nothing between them: "star bucks" and "starbucks" agree. */
 export function joinKeys(tokens: readonly Token[], start: number, end: number): string {
   let joined = '';

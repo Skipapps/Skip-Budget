@@ -1,7 +1,4 @@
-/**
- * Placeholder salary sources. Sample data only — replaced once income comes
- * from the database.
- */
+/** The shape of a salary source. */
 import type { PayFrequency } from '@/lib/date';
 
 export type SalarySource = {
@@ -23,14 +20,3 @@ export type SalarySource = {
   overtimeHours?: string;
   overtimeMultiplier?: number;
 };
-
-export const salarySources: SalarySource[] = [
-  {
-    id: 'salary-1',
-    name: 'Acme Corp',
-    amount: 5600,
-    frequency: 'monthly',
-    lastPayday: null,
-    accountIds: ['acct-1'],
-  },
-];
