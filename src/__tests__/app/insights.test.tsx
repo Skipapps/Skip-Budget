@@ -1,6 +1,7 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 
 import InsightsScreen from '@/app/insights';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * "What you keep" shows the three most recent months whatever order the query returns them in: the
@@ -28,15 +29,12 @@ jest.mock('@/providers/theme-provider', () => ({
   useMoneyColor: () => () => '#000000',
 }));
 
-jest.mock('@/theme/artwork', () => ({ useArtwork: () => ({}) }));
+jest.mock('@/theme/artwork', () => ({ useArtwork: () => ({ error: () => null }) }));
 jest.mock('@/api/brands', () => ({
-  useSpendCategories: () => ({ data: [], isError: false, refetch: jest.fn() }),
+  useSpendCategories: () => mockAnswer('categories', []),
 }));
 jest.mock('@/api/refresh', () => ({
   useRefreshAll: () => ({ refresh: () => {}, refreshing: false }),
-}));
-jest.mock('@/api/splits', () => ({
-  useMyBalances: () => ({ data: new Map(), isError: false, refetch: jest.fn() }),
 }));
 
 /** Six finished months, oldest to newest, with a distinct figure each. */
@@ -56,10 +54,34 @@ const mockMonths = [
   excluded_at: null,
 }));
 
+/** Every read the page waits on before it shows a figure. */
+const SOURCES = [
+  'ledger',
+  'cards',
+  'salary',
+  'savings',
+  'subscriptions',
+  'categories',
+  'balances',
+] as const;
+type Source = (typeof SOURCES)[number];
+
 /** Reassigned per case so the same six months arrive in a different order. */
 let mockSavings = [...mockMonths];
+let mockCards: { id: string; holder: string; last4: string; balance: number }[] = [];
+let mockBalances = new Map<string, number>();
+let mockFailing: Source | null = null;
 
-const mockIdle = { data: [], isError: false, refetch: jest.fn() };
+const mockRefetch = Object.fromEntries(SOURCES.map((source) => [source, jest.fn()])) as Record<
+  Source,
+  jest.Mock
+>;
+
+const mockAnswer = (source: Source, data: unknown) => ({
+  data,
+  isError: mockFailing === source,
+  refetch: mockRefetch[source],
+});
 
 jest.mock('@/api/queries', () => ({
   savedFor: (month: {
@@ -71,15 +93,27 @@ jest.mock('@/api/queries', () => ({
     entries: [],
     totals: { in: 0, out: 0 },
     isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
+    isError: mockFailing === 'ledger',
+    refetch: mockRefetch.ledger,
   }),
-  useCards: () => mockIdle,
-  useSalarySources: () => mockIdle,
-  useMonthlySavings: () => ({ data: mockSavings, isError: false, refetch: jest.fn() }),
-  useSubscriptions: () => mockIdle,
-  useSourceBalances: () => ({ balances: new Map(), refetch: jest.fn() }),
+  useCards: () => mockAnswer('cards', mockCards),
+  useSalarySources: () => mockAnswer('salary', []),
+  useMonthlySavings: () => mockAnswer('savings', mockSavings),
+  useSubscriptions: () => mockAnswer('subscriptions', []),
+  useSourceBalances: () => ({
+    balances: mockBalances,
+    isError: mockFailing === 'balances',
+    refetch: mockRefetch.balances,
+  }),
 }));
+
+beforeEach(() => {
+  mockSavings = [...mockMonths];
+  mockCards = [];
+  mockBalances = new Map();
+  mockFailing = null;
+  for (const refetch of Object.values(mockRefetch)) refetch.mockClear();
+});
 
 /** The three newest of the six, oldest of those three first. */
 const EXPECTED = ['June 2026', 'July 2026', 'August 2026'];
@@ -102,5 +136,68 @@ describe('Insights — what you keep', () => {
     ).map((node) => node.props.children);
 
     expect(shown).toEqual(EXPECTED);
+  });
+});
+
+describe('Insights — where you stand', () => {
+  it('is savings less credit card debt, to the cent', async () => {
+    // By hand: 300 + 400 + 500 + 600 + 700 + 800 = 3,300.00 put aside; 1,234.56 + 0.07 = 1,234.63
+    // owed; 3,300.00 − 1,234.63 = 2,065.37. A card balance is debt, so owed is positive.
+    mockCards = [
+      // The walked balance must win over the figure typed when the card was added.
+      { id: 'card-a', holder: 'Chase Sapphire', last4: '1004', balance: 1200 },
+      // Not walked, so the typed figure stands.
+      { id: 'card-b', holder: 'Amex Gold', last4: '2002', balance: 0.07 },
+    ];
+    mockBalances = new Map([['card-a', 1234.56]]);
+
+    const { getByText } = await render(<InsightsScreen />);
+
+    // A figure is pinned to its own label by sharing a parent with it, so a total cannot pass by
+    // turning up somewhere else on the page.
+    const beside = (label: string, figure: string) =>
+      expect(getByText(figure).parent).toBe(getByText(label).parent);
+
+    beside('Saved, less what you owe', '$2,065.37');
+    beside('Put aside', '$3,300.00');
+    beside('Owed on credit cards', '$1,234.63');
+    beside('Chase Sapphire 1004', '$1,234.56');
+    beside('Amex Gold 2002', '$0.07');
+  });
+
+  it('says nothing about friends or groups', async () => {
+    const { getByText, queryAllByText, queryAllByLabelText } = await render(<InsightsScreen />);
+
+    // The page drew its figures, so the absences below are not just an empty screen.
+    expect(getByText('Saved, less what you owe')).toBeTruthy();
+
+    expect(queryAllByText(/friend/i)).toEqual([]);
+    expect(queryAllByText(/\bgroups?\b/i)).toEqual([]);
+    expect(queryAllByText(/shared with others|settled up/i)).toEqual([]);
+    expect(queryAllByLabelText(/friend|\bgroups?\b|settled up/i)).toEqual([]);
+  });
+
+  it('shows the failure page, and asks every source again, when any one source fails', async () => {
+    for (const source of SOURCES) {
+      mockFailing = source;
+      for (const refetch of Object.values(mockRefetch)) refetch.mockClear();
+
+      const { getByText, queryByText, unmount } = await render(<InsightsScreen />);
+
+      // The source rides along in each comparison so a miss names the read that slipped through.
+      expect({
+        source,
+        failure: queryByText(FAILURE_MESSAGE) !== null,
+        figures: queryByText('Saved, less what you owe') !== null,
+      }).toEqual({ source, failure: true, figures: false });
+
+      await fireEvent.press(getByText('Try again'));
+      expect({
+        source,
+        asked: SOURCES.filter((each) => mockRefetch[each].mock.calls.length === 1),
+      }).toEqual({ source, asked: [...SOURCES] });
+
+      await unmount();
+    }
   });
 });

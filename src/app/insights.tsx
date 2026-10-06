@@ -14,7 +14,6 @@ import {
   useSubscriptions,
 } from '@/api/queries';
 import { useRefreshAll } from '@/api/refresh';
-import { useMyBalances } from '@/api/splits';
 import { BillMark } from '@/components/bills/bill-mark';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { FlowChart, type FlowBucket } from '@/components/transactions/flow-chart';
@@ -75,9 +74,7 @@ function InsightsScreenInner() {
   const salary = useSalarySources();
   const savings = useMonthlySavings();
   const subscriptions = useSubscriptions();
-  const groups = useMyBalances();
   const categoriesQuery = useSpendCategories();
-  const groupBalances = groups.data;
   const spendCategories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data]);
   const { balances, isError: balancesError, refetch: refetchBalances } = useSourceBalances(today);
 
@@ -91,7 +88,6 @@ function InsightsScreenInner() {
     salary.isError ||
     savings.isError ||
     subscriptions.isError ||
-    groups.isError ||
     categoriesQuery.isError ||
     // A failed balance walk falls back to the figure typed when the card was added.
     balancesError;
@@ -102,7 +98,6 @@ function InsightsScreenInner() {
     salary.refetch();
     savings.refetch();
     subscriptions.refetch();
-    groups.refetch();
     categoriesQuery.refetch();
     refetchBalances();
   };
@@ -113,13 +108,7 @@ function InsightsScreenInner() {
     0,
   );
 
-  // Positive is owed to you, negative is owed by you.
-  const splitPosition = useMemo(
-    () => [...(groupBalances?.values() ?? [])].reduce((sum, balance) => sum + balance, 0),
-    [groupBalances],
-  );
-
-  const worth = savedTotal - owedOnCards + splitPosition;
+  const worth = savedTotal - owedOnCards;
 
   const monthlyIncome = (salary.data ?? []).reduce(
     (sum, source) => sum + source.amount * (PER_MONTH[source.frequency] ?? 1),
@@ -260,12 +249,6 @@ function InsightsScreenInner() {
         <View className="mt-4 w-full gap-2.5">
           <StandRow label="Put aside" value={savedTotal} />
           <StandRow label="Owed on credit cards" value={-owedOnCards} />
-          {splitPosition !== 0 ? (
-            <StandRow
-              label={splitPosition > 0 ? 'Owed to you by friends' : 'You owe friends'}
-              value={splitPosition}
-            />
-          ) : null}
         </View>
       </View>
 
@@ -444,20 +427,6 @@ function InsightsScreenInner() {
           </View>
         </>
       ) : null}
-
-      <Heading>Shared with others</Heading>
-      <Row
-        label={
-          splitPosition === 0
-            ? 'All settled up'
-            : splitPosition > 0
-              ? 'Friends owe you'
-              : 'You owe friends'
-        }
-        value={splitPosition === 0 ? undefined : formatCurrency(Math.abs(splitPosition))}
-        hint={`across ${groupBalances?.size ?? 0} ${(groupBalances?.size ?? 0) === 1 ? 'group' : 'groups'}`}
-        onPress={() => router.push('/splits')}
-      />
 
       <Heading>What you keep</Heading>
       {recentMonths.length > 0 ? (

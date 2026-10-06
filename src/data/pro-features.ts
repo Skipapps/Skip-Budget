@@ -66,8 +66,7 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
     benefits: [
       {
         title: 'Where you stand, honestly',
-        detail:
-          'Savings, less what you owe on credit cards, plus what friends owe you — one figure that means something.',
+        detail: 'Savings, less what you owe on credit cards — one figure that means something.',
       },
       {
         title: 'Where it actually goes',
