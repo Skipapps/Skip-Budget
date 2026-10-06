@@ -16,6 +16,7 @@ import {
 } from '@/api/mutations';
 import { usePaymentSources, useReceipt } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
+import { openChangeLogo } from '@/components/brands/change-logo-button';
 import { AmountStep } from '@/components/flow/amount-step';
 import { InlineCalendar } from '@/components/flow/inline-calendar';
 import { StepFlow } from '@/components/flow/step-flow';
@@ -29,6 +30,8 @@ import { FieldLabel } from '@/components/ui/typography';
 import { success, warn } from '@/lib/haptics';
 import { withTap } from '@/lib/press';
 import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { logoColumns } from '@/lib/logo-columns';
+import { logoDomainOf, type LogoFields } from '@/lib/logo-domain';
 import { parseReceipt, parseReceiptFromLines, type ParsedReceipt } from '@/lib/receipt-parser';
 import {
   clearVoiceDraft,
@@ -205,10 +208,11 @@ export default function AddReceiptScreen() {
 
   const initial: Initial = existing
     ? {
+        // No logo choice carried over, so saving the edit leaves the row's own logo alone.
         store: {
           brandId: existing.brand_id,
           name: existing.merchant,
-          domain: existing.brands?.domain ?? null,
+          domain: logoDomainOf(existing),
           categoryId: existing.category_id,
         },
         date: new Date(`${existing.purchased_on}T00:00:00`),
@@ -224,6 +228,7 @@ export default function AddReceiptScreen() {
       key={existing?.id ?? 'new'}
       id={id}
       initial={initial}
+      saved={existing}
       initialScan={existing ? null : scanned.result}
       fromVoice={fromVoice}
     />
@@ -233,11 +238,14 @@ export default function AddReceiptScreen() {
 function ReceiptForm({
   id,
   initial,
+  saved = null,
   initialScan,
   fromVoice = false,
 }: {
   id?: string;
   initial: Initial;
+  /** The row being edited, for the logo it already has. */
+  saved?: LogoFields | null;
   initialScan: ScanResult | null;
   /** Saved from a voice hand-off: back to Home, never onto the review page again. */
   fromVoice?: boolean;
@@ -245,7 +253,15 @@ function ReceiptForm({
   const colors = useColors();
   const editing = Boolean(id);
 
-  const [store, setStore] = useState<BrandSelection | null>(initial.store);
+  const [picked, setPicked] = useState<BrandSelection | null>(initial.store);
+  // Receipts have no page of their own, so Change logo opens from here. Until another store is
+  // picked, the row's own store is the one shown: re-read, it carries a logo changed there.
+  const [storeChanged, setStoreChanged] = useState(false);
+  const store = editing && !storeChanged ? initial.store : picked;
+  const setStore = (next: BrandSelection | null) => {
+    setStoreChanged(true);
+    setPicked(next);
+  };
   const [date, setDate] = useState<Date>(initial.date);
   const [amount, setAmount] = useState(initial.amount);
   const [sourceId, setSourceId] = useState(initial.sourceId);
@@ -462,7 +478,7 @@ function ReceiptForm({
       fail(built.message, built.field === 'store' ? 1 : 0);
       return;
     }
-    const { values } = built;
+    const values = { ...built.values, ...logoColumns(store, saved) };
 
     try {
       if (editing && id) {
@@ -612,7 +628,16 @@ function ReceiptForm({
 
       {step === 1 ? (
         <View className="w-full gap-6">
-          <BrandField label="Store" value={store} onChange={edited(setStore)} />
+          <BrandField
+            label="Store"
+            value={store}
+            onChange={edited(setStore)}
+            onChangeLogo={
+              editing && id && !storeChanged && store
+                ? () => openChangeLogo('receipt', id, store.name)
+                : undefined
+            }
+          />
 
           {sources.length > 0 ? (
             <View className="w-full">

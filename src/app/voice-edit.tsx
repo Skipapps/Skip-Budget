@@ -255,6 +255,8 @@ function MerchantEdit({ session }: { session: VoiceSession }) {
         onChange={setMerchant}
         initialQuery={searchFirst ? (draft.merchantHeard ?? entry.merchant?.name ?? '') : ''}
         autoFocus={searchFirst}
+        // The voice draft keeps no logo, so a choice made here would be lost on save.
+        suggestLogos={false}
       />
     </EditShell>
   );
@@ -305,6 +307,7 @@ function BillNameEdit({ session }: { session: VoiceSession }) {
         placeholder="Search for a company"
         value={issuer}
         onChange={handleIssuer}
+        suggestLogos={false}
       />
       <TextField
         label="Name"

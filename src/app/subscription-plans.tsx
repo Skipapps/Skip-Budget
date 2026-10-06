@@ -19,6 +19,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
+import { logoDomainOf } from '@/lib/logo-domain';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
@@ -192,7 +193,8 @@ export default function SubscriptionPlansScreen() {
                   amount={subscription.amount}
                   cycle={subscription.cycle}
                   renewsOn={subscription.next_renewal_on}
-                  domain={subscription.brands?.domain}
+                  domain={logoDomainOf(subscription)}
+                  logoHidden={subscription.logo_hidden}
                   active={subscription.active}
                   sourceLabel={
                     sourceLabels.get(subscription.card_id ?? subscription.bank_account_id ?? '') ??

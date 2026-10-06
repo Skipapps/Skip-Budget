@@ -445,3 +445,138 @@ describe('Add receipt — the checks inside Save', () => {
     log.mockRestore();
   });
 });
+
+describe('Add receipt — the logo', () => {
+  const PLANET = {
+    brandId: null,
+    name: 'Planet Fitness',
+    domain: null,
+    categoryId: 'fitness',
+  };
+  // A store the catalog does not know, given its logo on Change logo.
+  const DELI = {
+    ...EXISTING,
+    brand_id: null,
+    merchant: 'Corner Deli',
+    brands: null,
+    logo_domain: 'cornerdeli.com',
+    logo_hidden: false,
+  };
+
+  const saveNew = async (store: unknown) => {
+    const screen = await render(<AddReceiptScreen />);
+    await type('amount', '12');
+    await press(screen, 'Continue');
+    await type('brand:Store', store);
+    await press(screen, 'Continue');
+    await press(screen, 'Save receipt');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    return mockCreate.mock.calls[0][0];
+  };
+
+  it('saves the logo confirmed for a new store', async () => {
+    const values = await saveNew({ ...PLANET, logoDomain: 'planetfitness.com', logoHidden: false });
+
+    expect(values).toMatchObject({
+      brand_id: null,
+      merchant: 'Planet Fitness',
+      logo_domain: 'planetfitness.com',
+      logo_hidden: false,
+    });
+  });
+
+  it('saves letters chosen for a new store', async () => {
+    const values = await saveNew({ ...PLANET, logoDomain: null, logoHidden: true });
+
+    expect(values).toMatchObject({ logo_domain: null, logo_hidden: true });
+  });
+
+  it('writes no logo columns when nothing was chosen', async () => {
+    const values = await saveNew({ ...PLANET, logoDomain: null, logoHidden: false });
+
+    expect(values).not.toHaveProperty('logo_domain');
+    expect(values).not.toHaveProperty('logo_hidden');
+  });
+
+  it('an edit that keeps its store shows the row’s logo and leaves it alone', async () => {
+    mockParams = { id: 'receipt-1' };
+    mockReceipt = { data: DELI, isError: false, isFetched: true };
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Continue');
+    expect(mockProps['brand:Store'].value).toMatchObject({
+      name: 'Corner Deli',
+      domain: 'cornerdeli.com',
+    });
+    await press(screen, 'Continue');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_domain');
+    expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_hidden');
+  });
+
+  it('an edit that picks another store drops the old store’s logo', async () => {
+    mockParams = { id: 'receipt-1' };
+    mockReceipt = { data: DELI, isError: false, isFetched: true };
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Continue');
+    // As the field sends a catalog pick.
+    await type('brand:Store', { ...WHOLE_FOODS, logoDomain: null, logoHidden: false });
+    await press(screen, 'Continue');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      brand_id: 'b-wf',
+      logo_domain: null,
+      logo_hidden: false,
+    });
+  });
+
+  it('opens Change logo for this receipt from the store step, until another store is picked', async () => {
+    mockParams = { id: 'receipt-1' };
+    mockReceipt = { data: DELI, isError: false, isFetched: true };
+    const screen = await render(<AddReceiptScreen />);
+    await press(screen, 'Continue');
+
+    await act(() => mockProps['brand:Store'].onChangeLogo());
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/change-logo',
+      params: { kind: 'receipt', id: 'receipt-1', name: 'Corner Deli' },
+    });
+
+    await type('brand:Store', WHOLE_FOODS);
+    expect(mockProps['brand:Store'].onChangeLogo).toBeUndefined();
+  });
+
+  it('shows the logo chosen on Change logo when it comes back, and still leaves it alone', async () => {
+    mockParams = { id: 'receipt-1' };
+    mockReceipt = { data: DELI, isError: false, isFetched: true };
+    const screen = await render(<AddReceiptScreen />);
+    await press(screen, 'Continue');
+
+    // The row as re-read after Change logo saved letters on it.
+    mockReceipt = {
+      data: { ...DELI, logo_domain: null, logo_hidden: true },
+      isError: false,
+      isFetched: true,
+    };
+    await screen.rerender(<AddReceiptScreen />);
+
+    expect(mockProps['brand:Store'].value).toMatchObject({ name: 'Corner Deli', domain: null });
+    await press(screen, 'Continue');
+    await press(screen, 'Save changes');
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_hidden');
+  });
+
+  it('never offers Change logo on a receipt not yet saved', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await press(screen, 'Continue');
+    await type('brand:Store', WHOLE_FOODS);
+
+    expect(mockProps['brand:Store'].onChangeLogo).toBeUndefined();
+  });
+});

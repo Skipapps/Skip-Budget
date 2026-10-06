@@ -14,6 +14,8 @@ type TransactionRowProps = {
   /** What it came from, so the row says more than a name and a number. */
   kindLabel?: string;
   domain?: string | null;
+  /** The owner chose letters for the receipt or subscription behind this row. */
+  logoHidden?: boolean | null;
   /** Bills draw their category icon rather than a brand logo. */
   kind?: 'receipt' | 'bill' | 'subscription' | 'payment' | 'income';
   categoryId?: string | null;
@@ -28,6 +30,7 @@ export function TransactionRow({
   amount,
   kindLabel,
   domain,
+  logoHidden,
   kind,
   categoryId,
   iconId,
@@ -55,7 +58,7 @@ export function TransactionRow({
           <ArrowDownLeft size={18} color={colors.body} strokeWidth={1.8} />
         </View>
       ) : (
-        <BrandMark name={label} domain={domain} size={40} />
+        <BrandMark name={label} domain={domain} hidden={logoHidden} size={40} />
       )}
 
       <View className="min-w-0 flex-1">

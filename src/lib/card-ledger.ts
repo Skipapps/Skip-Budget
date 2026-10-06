@@ -16,6 +16,8 @@ export type Charge = {
   date: string;
   kind: 'receipt' | 'bill' | 'subscription';
   domain?: string | null;
+  /** The owner chose letters: no logo, not even one found by name. Display only. */
+  logoHidden?: boolean | null;
 };
 
 /** What a bill needs to draw its icon, since it has no brand to look up. */
@@ -34,6 +36,8 @@ export type RecurringCharge = {
   recurrence: Recurrence;
   kind: 'bill' | 'subscription';
   domain?: string | null;
+  /** The owner chose letters: no logo, not even one found by name. Display only. */
+  logoHidden?: boolean | null;
   /** yyyy-mm-dd the charge began, when known. Nothing lands before it. */
   startsOn?: string | null;
   /** When the row was made, as the floor of last resort. */
@@ -61,6 +65,8 @@ export type LedgerEntry = {
   amount: number;
   kind: 'receipt' | 'bill' | 'subscription' | 'payment';
   domain?: string | null;
+  /** The owner chose letters: no logo, not even one found by name. Display only. */
+  logoHidden?: boolean | null;
 } & BillMarkFields;
 
 export type Ledger = {
@@ -322,6 +328,7 @@ export function buildLedger(input: {
       amount: -Math.abs(charge.amount),
       kind: charge.kind,
       domain: charge.domain,
+      logoHidden: charge.logoHidden,
     });
   }
 
@@ -350,6 +357,7 @@ export function buildLedger(input: {
         amount: -Math.abs(occurrence.amount),
         kind: item.kind,
         domain: item.domain,
+        logoHidden: item.logoHidden,
         categoryId: item.categoryId,
         iconId: item.iconId,
       });

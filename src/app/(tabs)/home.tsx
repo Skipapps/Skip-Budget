@@ -322,6 +322,7 @@ function Section({
                     amount={entry.amount}
                     kindLabel={KIND_LABELS[entry.kind]}
                     domain={entry.domain}
+                    logoHidden={entry.logoHidden}
                     kind={entry.kind}
                     categoryId={entry.categoryId}
                     iconId={entry.iconId}

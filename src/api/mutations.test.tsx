@@ -5,9 +5,11 @@ import type { ReactNode } from 'react';
 import {
   NOTHING_SAVED,
   NOTHING_UPDATED,
+  useSetRowLogo,
   useUpdateBill,
   useUpdateProfile,
   useUpdateReceipt,
+  useUpdateSubscription,
 } from '@/api/mutations';
 
 /**
@@ -23,6 +25,8 @@ type SeenUpdate = {
   id: unknown;
   /** What `.select()` asked for, or null when it was never called. */
   selected: string | null;
+  /** Filters after the first `.eq`, absent when there were none. */
+  also?: [string, unknown][];
 };
 
 const mockUpdates: SeenUpdate[] = [];
@@ -39,7 +43,11 @@ jest.mock('@/lib/supabase', () => {
         mockUpdates.push(seen);
         const answer = () =>
           mockError ? { data: null, error: mockError } : { data: mockReturnedRows, error: null };
-        return {
+        const filtered: Record<string, unknown> = {
+          eq: (more: string, value: unknown) => {
+            seen.also = [...(seen.also ?? []), [more, value]];
+            return filtered;
+          },
           select: (columns: string) => {
             seen.selected = columns;
             return Promise.resolve(answer());
@@ -48,6 +56,7 @@ jest.mock('@/lib/supabase', () => {
           // instead of silently succeeding.
           then: (resolve: (value: unknown) => unknown) => resolve(answer()),
         };
+        return filtered;
       },
     }),
   });
@@ -144,6 +153,23 @@ describe('useUpdate', () => {
     expect(invalidated).toContainEqual(['dashboard']);
   });
 
+  it.each([
+    ['receipt', () => useUpdateReceipt()],
+    ['subscription', () => useUpdateSubscription()],
+    ['bill', () => useUpdateBill()],
+  ] as const)(
+    'refreshes the edited %s under its own key, so a reopened edit page cannot save stale values',
+    async (single, hook) => {
+      const { result } = await renderHook(hook, { wrapper });
+
+      await result.current.mutateAsync({ id: 'row-7', values: { note: 'paid early' } });
+
+      expect(invalidated).toContainEqual([single, 'row-7']);
+      // Only that row: every other open detail page keeps its cache.
+      expect(invalidated).not.toContainEqual([single]);
+    },
+  );
+
   it('still throws the database error when the update itself fails', async () => {
     mockError = new Error('receipts is unreachable');
     const { result } = await renderHook(() => useUpdateReceipt(), { wrapper });
@@ -198,6 +224,142 @@ describe('useUpdateProfile', () => {
 
     expect(fromProfile?.message).toBe(NOTHING_SAVED);
     expect(fromRecord?.message).toBe(NOTHING_UPDATED);
+  });
+});
+
+describe('useSetRowLogo', () => {
+  it.each([
+    ['receipt', 'receipts'],
+    ['subscription', 'subscriptions'],
+    ['bill', 'bills'],
+  ] as const)(
+    "writes only the two logo columns to the %s, on the signed-in owner's row",
+    async (kind, table) => {
+      const { result } = await renderHook(() => useSetRowLogo(), { wrapper });
+
+      await result.current.mutateAsync({
+        kind,
+        id: 'row-1',
+        logo_domain: 'planetfitness.com',
+        logo_hidden: false,
+      });
+
+      expect(mockUpdates).toEqual([
+        {
+          table,
+          values: { logo_domain: 'planetfitness.com', logo_hidden: false },
+          column: 'id',
+          id: 'row-1',
+          also: [['user_id', 'user-1']],
+          selected: 'id',
+        },
+      ]);
+    },
+  );
+
+  it('saves "use letters" as hidden, keeping whatever domain it was given', async () => {
+    const { result } = await renderHook(() => useSetRowLogo(), { wrapper });
+
+    await result.current.mutateAsync({
+      kind: 'bill',
+      id: 'row-1',
+      logo_domain: null,
+      logo_hidden: true,
+    });
+
+    expect(mockUpdates[0].values).toEqual({ logo_domain: null, logo_hidden: true });
+  });
+
+  it('stores a domain the way the logo store keys it, and a blank one as none', async () => {
+    const { result } = await renderHook(() => useSetRowLogo(), { wrapper });
+
+    await result.current.mutateAsync({
+      kind: 'receipt',
+      id: 'row-1',
+      logo_domain: '  Netflix.COM ',
+      logo_hidden: false,
+    });
+    await result.current.mutateAsync({
+      kind: 'receipt',
+      id: 'row-1',
+      logo_domain: '   ',
+      logo_hidden: false,
+    });
+
+    expect(mockUpdates.map((update) => update.values.logo_domain)).toEqual(['netflix.com', null]);
+  });
+
+  it('refreshes the list, the dashboard and the one row the detail page reads', async () => {
+    const { result } = await renderHook(() => useSetRowLogo(), { wrapper });
+
+    await result.current.mutateAsync({
+      kind: 'subscription',
+      id: 'sub-9',
+      logo_domain: 'hulu.com',
+      logo_hidden: false,
+    });
+
+    expect(invalidated).toContainEqual(['subscriptions']);
+    expect(invalidated).toContainEqual(['dashboard']);
+    expect(invalidated).toContainEqual(['subscription', 'sub-9']);
+    // Not anyone else's table.
+    expect(invalidated).not.toContainEqual(['bills']);
+    expect(invalidated).not.toContainEqual(['receipts']);
+  });
+
+  it('fails, and refreshes nothing, when the row is not there (or not theirs)', async () => {
+    mockReturnedRows = [];
+    const { result } = await renderHook(() => useSetRowLogo(), { wrapper });
+
+    await expect(
+      result.current.mutateAsync({
+        kind: 'bill',
+        id: 'gone',
+        logo_domain: 'aep.com',
+        logo_hidden: false,
+      }),
+    ).rejects.toThrow(NOTHING_UPDATED);
+    expect(invalidated).toEqual([]);
+  });
+
+  it('throws the database error, such as a refused domain, for the page to show', async () => {
+    mockError = new Error('new row violates check constraint "bills_logo_domain_check"');
+    const { result } = await renderHook(() => useSetRowLogo(), { wrapper });
+
+    await expect(
+      result.current.mutateAsync({
+        kind: 'bill',
+        id: 'row-1',
+        logo_domain: 'aep.com',
+        logo_hidden: false,
+      }),
+    ).rejects.toThrow('bills_logo_domain_check');
+    expect(invalidated).toEqual([]);
+  });
+});
+
+describe('the edit forms and the logo columns', () => {
+  it('pass a logo choice through an ordinary edit untouched', async () => {
+    const { result } = await renderHook(() => useUpdateSubscription(), { wrapper });
+
+    await result.current.mutateAsync({
+      id: 'row-1',
+      values: { name: 'Hulu', logo_domain: 'hulu.com', logo_hidden: false },
+    });
+
+    expect(mockUpdates[0].values).toEqual({
+      name: 'Hulu',
+      logo_domain: 'hulu.com',
+      logo_hidden: false,
+    });
+  });
+
+  it('send no logo columns when the form does not name them', async () => {
+    const { result } = await renderHook(() => useUpdateBill(), { wrapper });
+
+    await result.current.mutateAsync({ id: 'row-1', values: { amount: 12 } });
+
+    expect(Object.keys(mockUpdates[0].values)).toEqual(['amount']);
   });
 });
 

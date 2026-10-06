@@ -15,6 +15,7 @@ import {
 import { withTimeout } from '@/lib/deadline';
 import { paydaysInRange } from '@/lib/date';
 import type { AccrualBasis } from '@/lib/loan';
+import { logoDomainOf } from '@/lib/logo-domain';
 import type { DateRange } from '@/lib/range';
 import { supabase } from '@/lib/supabase';
 import { usePro } from '@/api/pro';
@@ -56,6 +57,9 @@ export type BillRow = {
   /** Optional. Who issues it — null for rent, HOA fees and the like. */
   brand_id?: string | null;
   brands?: { domain: string | null } | null;
+  /** The owner's logo choice; read the logo through logoDomainOf, never these directly. */
+  logo_domain?: string | null;
+  logo_hidden?: boolean | null;
   name: string;
   amount: number;
   category_id: string;
@@ -91,6 +95,21 @@ const QUERY_TIMEOUT_MS = 12_000;
  */
 function anyError(queries: readonly { isError: boolean }[]): boolean {
   return queries.some((query) => query.isError);
+}
+
+const LOGO_COLUMNS = 'logo_domain, logo_hidden';
+
+/**
+ * Runs a receipt, subscription or bill read with the per-row logo columns, and again without them
+ * when the database does not have them yet (42703, undefined column). An app build that reaches
+ * people before the migration then still loads every list, with catalog logos only, rather than
+ * failing every screen that reads one.
+ */
+async function withLogoColumns<R extends { error: { code?: string } | null }>(
+  read: (logoColumns: string) => PromiseLike<R>,
+): Promise<R> {
+  const result = await read(`, ${LOGO_COLUMNS}`);
+  return result.error?.code === '42703' ? read('') : result;
 }
 
 function useOwnerQuery<T>(key: string, run: () => Promise<T>) {
@@ -181,12 +200,14 @@ export function useBankAccounts() {
 
 export function useBills() {
   return useOwnerQuery<BillRow[]>('bills', async () => {
-    const { data, error } = await supabase
-      .from('bills')
-      .select(
-        'id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at, brand_id, brands(domain)',
-      )
-      .order('next_due_on', { ascending: true, nullsFirst: false });
+    const { data, error } = await withLogoColumns((logo) =>
+      supabase
+        .from('bills')
+        .select(
+          `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at, brand_id${logo}, brands(domain)`,
+        )
+        .order('next_due_on', { ascending: true, nullsFirst: false }),
+    );
     if (error) throw error;
     // PostgREST types an embedded relation as an array; it is one row here.
     return (data ?? []) as unknown as BillRow[];
@@ -408,17 +429,22 @@ export type ReceiptRow = {
   source: CaptureSource;
   image_path: string | null;
   brands: { domain: string | null } | null;
+  /** The owner's logo choice; read the logo through logoDomainOf, never these directly. */
+  logo_domain?: string | null;
+  logo_hidden?: boolean | null;
 };
 
 export function useReceipts() {
   return useOwnerQuery<ReceiptRow[]>('receipts', async () => {
-    const { data, error } = await supabase
-      .from('receipts')
-      .select(
-        'id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path, brands(domain)',
-      )
-      .order('purchased_on', { ascending: false })
-      .order('created_at', { ascending: false });
+    const { data, error } = await withLogoColumns((logo) =>
+      supabase
+        .from('receipts')
+        .select(
+          `id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path${logo}, brands(domain)`,
+        )
+        .order('purchased_on', { ascending: false })
+        .order('created_at', { ascending: false }),
+    );
     if (error) throw error;
     return (data ?? []) as unknown as ReceiptRow[];
   });
@@ -439,16 +465,21 @@ export type SubscriptionRow = {
   note: string | null;
   active: boolean;
   brands: { domain: string | null } | null;
+  /** The owner's logo choice; read the logo through logoDomainOf, never these directly. */
+  logo_domain?: string | null;
+  logo_hidden?: boolean | null;
 };
 
 export function useSubscriptions() {
   return useOwnerQuery<SubscriptionRow[]>('subscriptions', async () => {
-    const { data, error } = await supabase
-      .from('subscriptions')
-      .select(
-        'id, brand_id, name, amount, cycle, next_renewal_on, started_on, created_at, category_id, card_id, bank_account_id, note, active, brands(domain)',
-      )
-      .order('next_renewal_on', { ascending: true, nullsFirst: false });
+    const { data, error } = await withLogoColumns((logo) =>
+      supabase
+        .from('subscriptions')
+        .select(
+          `id, brand_id, name, amount, cycle, next_renewal_on, started_on, created_at, category_id, card_id, bank_account_id, note, active${logo}, brands(domain)`,
+        )
+        .order('next_renewal_on', { ascending: true, nullsFirst: false }),
+    );
     if (error) throw error;
     return (data ?? []) as unknown as SubscriptionRow[];
   });
@@ -464,13 +495,15 @@ export function useReceipt(id: string | undefined) {
     queryKey: ['receipt', id, userId],
     enabled: Boolean(userId && id),
     queryFn: async (): Promise<ReceiptRow | null> => {
-      const { data, error } = await supabase
-        .from('receipts')
-        .select(
-          'id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path, brands(domain)',
-        )
-        .eq('id', id!)
-        .maybeSingle();
+      const { data, error } = await withLogoColumns((logo) =>
+        supabase
+          .from('receipts')
+          .select(
+            `id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path${logo}, brands(domain)`,
+          )
+          .eq('id', id!)
+          .maybeSingle(),
+      );
       if (error) throw error;
       return data as unknown as ReceiptRow | null;
     },
@@ -483,13 +516,15 @@ export function useSubscription(id: string | undefined) {
     queryKey: ['subscription', id, userId],
     enabled: Boolean(userId && id),
     queryFn: async (): Promise<SubscriptionRow | null> => {
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select(
-          'id, brand_id, name, amount, cycle, next_renewal_on, started_on, created_at, category_id, card_id, bank_account_id, note, active, brands(domain)',
-        )
-        .eq('id', id!)
-        .maybeSingle();
+      const { data, error } = await withLogoColumns((logo) =>
+        supabase
+          .from('subscriptions')
+          .select(
+            `id, brand_id, name, amount, cycle, next_renewal_on, started_on, created_at, category_id, card_id, bank_account_id, note, active${logo}, brands(domain)`,
+          )
+          .eq('id', id!)
+          .maybeSingle(),
+      );
       if (error) throw error;
       return data as unknown as SubscriptionRow | null;
     },
@@ -502,13 +537,15 @@ export function useBill(id: string | undefined) {
     queryKey: ['bill', id, userId],
     enabled: Boolean(userId && id),
     queryFn: async (): Promise<BillRow | null> => {
-      const { data, error } = await supabase
-        .from('bills')
-        .select(
-          'id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, note, brand_id, brands(domain)',
-        )
-        .eq('id', id!)
-        .maybeSingle();
+      const { data, error } = await withLogoColumns((logo) =>
+        supabase
+          .from('bills')
+          .select(
+            `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, note, brand_id${logo}, brands(domain)`,
+          )
+          .eq('id', id!)
+          .maybeSingle(),
+      );
       if (error) throw error;
       return data as unknown as BillRow | null;
     },
@@ -622,7 +659,8 @@ function ledgerForSource(
       amount: row.amount,
       date: row.purchased_on,
       kind: 'receipt' as const,
-      domain: row.brands?.domain,
+      domain: logoDomainOf(row),
+      logoHidden: Boolean(row.logo_hidden),
     })),
     // Filtered on the charge's own source, not the plan's: a bill moved to another card keeps last
     // March on the card that actually paid it.
@@ -643,7 +681,8 @@ function ledgerForSource(
           endsOn: row.ends_on,
           cardId: row.card_id,
           accountId: row.bank_account_id,
-          domain: row.brands?.domain,
+          domain: logoDomainOf(row),
+          logoHidden: Boolean(row.logo_hidden),
           categoryId: row.category_id,
           iconId: row.icon_id,
         })),
@@ -660,7 +699,8 @@ function ledgerForSource(
           createdAt: row.created_at,
           cardId: row.card_id,
           accountId: row.bank_account_id,
-          domain: row.brands?.domain,
+          domain: logoDomainOf(row),
+          logoHidden: Boolean(row.logo_hidden),
         })),
     ],
     payments: mine(data.payments).map((row) => ({
@@ -824,6 +864,8 @@ export type LedgerEntry = {
   kind: 'bill' | 'receipt' | 'subscription' | 'income';
   sourceId: string;
   domain?: string | null;
+  /** The owner chose letters: no logo, not even one found by name. */
+  logoHidden?: boolean;
   /** Bills draw their category icon where a brand logo would go. */
   categoryId?: string | null;
   iconId?: string | null;
@@ -875,7 +917,8 @@ export function useLedger(range: DateRange | undefined, today: string) {
         date: row.purchased_on,
         kind: 'receipt',
         sourceId: row.card_id ?? row.bank_account_id ?? '',
-        domain: row.brands?.domain,
+        domain: logoDomainOf(row),
+        logoHidden: Boolean(row.logo_hidden),
       });
     }
 
@@ -922,7 +965,8 @@ export function useLedger(range: DateRange | undefined, today: string) {
           label: occurrence.label,
           kind: 'subscription',
           sourceId: occurrence.cardId ?? occurrence.accountId ?? '',
-          domain: row.brands?.domain,
+          domain: logoDomainOf(row),
+          logoHidden: Boolean(row.logo_hidden),
           planId: row.id,
         }),
       );
@@ -948,7 +992,8 @@ export function useLedger(range: DateRange | undefined, today: string) {
           label: occurrence.label,
           kind: 'bill',
           sourceId: occurrence.cardId ?? occurrence.accountId ?? '',
-          domain: row.brands?.domain,
+          domain: logoDomainOf(row),
+          logoHidden: Boolean(row.logo_hidden),
           categoryId: row.category_id,
           iconId: row.icon_id,
           planId: row.id,

@@ -4,16 +4,27 @@ import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-nativ
 
 import { guessCategory, useBrandSearch, type BrandRow } from '@/api/brands';
 import { BrandLogo } from '@/components/brands/brand-logo';
+import { LOGO_COPY, LogoConfirm, type NoLogo } from '@/components/brands/logo-choices';
+import { TextLink } from '@/components/ui/text-link';
 import { FieldLabel } from '@/components/ui/typography';
 import { cn } from '@/lib/cn';
+import { selectionLogo } from '@/lib/logo-columns';
+import { logoHints } from '@/lib/logo-lookup';
 import { useColors } from '@/providers/theme-provider';
 
 export type BrandSelection = {
   /** Null for a store the catalog does not know. */
   brandId: string | null;
   name: string;
+  /** The catalog brand's website; on a store opened for editing, the logo the row shows now. */
   domain: string | null;
   categoryId: string;
+  /**
+   * The logo the person chose for this store in the field. Both stay undefined when nothing was
+   * chosen here, so saving an edit leaves the row's own choice (made on Change logo) alone.
+   */
+  logoDomain?: string | null;
+  logoHidden?: boolean;
 };
 
 type BrandFieldProps = {
@@ -26,6 +37,17 @@ type BrandFieldProps = {
   /** Pre-filled search, e.g. a store a voice entry could not match, so results show at once. */
   initialQuery?: string;
   autoFocus?: boolean;
+  /** The form's own category, which tells same-named brands apart; else a guess from the name. */
+  category?: string;
+  /** What "no logo" draws where this store shows: letters, or a bill's category icon. */
+  noLogo?: NoLogo;
+  /**
+   * Offer the logo check for a new store. Off where the choice could not be kept (the voice
+   * draft carries no logo).
+   */
+  suggestLogos?: boolean;
+  /** Opens Change logo for the saved row this store belongs to. */
+  onChangeLogo?: () => void;
 };
 
 /** Keystrokes are cheap; round trips are not. */
@@ -52,10 +74,16 @@ export function BrandField({
   className,
   initialQuery = '',
   autoFocus = false,
+  category,
+  noLogo = 'letters',
+  suggestLogos = true,
+  onChangeLogo,
 }: BrandFieldProps) {
   const colors = useColors();
   const [query, setQuery] = useState(initialQuery);
   const [focused, setFocused] = useState(autoFocus);
+  // Only a store added here is checked; one that arrived filled in (an edit, a scan) was not typed.
+  const [confirming, setConfirming] = useState(false);
   const debounced = useDebounced(query);
   const { data: results = [], isFetching } = useBrandSearch(debounced);
 
@@ -70,14 +98,32 @@ export function BrandField({
       name: brand.name,
       domain: brand.domain,
       categoryId: brand.category_id,
+      // Picking a catalog brand drops any earlier choice: its own logo is the right one.
+      logoDomain: null,
+      logoHidden: false,
     });
     setQuery('');
     setFocused(false);
+    setConfirming(false);
+  };
+
+  const addCustom = () => {
+    onChange({
+      brandId: null,
+      name: typed,
+      domain: null,
+      // Keyword guess, so a custom store still files itself.
+      categoryId: guessCategory(typed),
+      logoDomain: null,
+      logoHidden: false,
+    });
+    setConfirming(true);
   };
 
   const clear = () => {
     onChange(null);
     setQuery('');
+    setConfirming(false);
   };
 
   if (value) {
@@ -85,7 +131,7 @@ export function BrandField({
       <View className={cn('w-full', className)}>
         <FieldLabel className="mb-2">{label}</FieldLabel>
         <View className="min-h-14 w-full flex-row items-center rounded-[10px] border border-line px-4">
-          <BrandLogo name={value.name} domain={value.domain} size={32} />
+          <BrandLogo name={value.name} domain={selectionLogo(value)} size={32} />
           <Text
             className="ml-3 flex-1 py-4 font-poppins text-[16px] text-ink"
             numberOfLines={1}
@@ -103,6 +149,23 @@ export function BrandField({
             <X size={18} color={colors.muted} strokeWidth={2} />
           </Pressable>
         </View>
+
+        {confirming && suggestLogos && value.brandId === null ? (
+          <LogoConfirm
+            key={value.name}
+            name={value.name}
+            hints={logoHints(category ?? value.categoryId)}
+            noLogo={noLogo}
+            onChoose={(choice) => onChange({ ...value, ...choice })}
+          />
+        ) : onChangeLogo ? (
+          <TextLink
+            label={LOGO_COPY.changeLogo}
+            variant="subtle"
+            onPress={onChangeLogo}
+            className="mt-1 self-start"
+          />
+        ) : null}
       </View>
     );
   }
@@ -146,12 +209,7 @@ export function BrandField({
                 index > 0 && 'border-t border-line',
               )}
             >
-              <BrandLogo
-                name={brand.name}
-                domain={brand.domain}
-                logoPath={brand.logo_path}
-                size={32}
-              />
+              <BrandLogo name={brand.name} domain={brand.domain} size={32} />
               <Text
                 className="ml-3 flex-1 font-poppins text-[15px] text-ink"
                 numberOfLines={1}
@@ -166,15 +224,7 @@ export function BrandField({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Add ${typed} as a new store`}
-              onPress={() =>
-                // Keyword guess, so a custom store still files itself.
-                onChange({
-                  brandId: null,
-                  name: typed,
-                  domain: null,
-                  categoryId: guessCategory(typed),
-                })
-              }
+              onPress={addCustom}
               className={cn(
                 'min-h-14 flex-row items-center px-4 py-3 active:bg-ink/5',
                 results.length > 0 && 'border-t border-line',

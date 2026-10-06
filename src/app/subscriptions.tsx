@@ -130,6 +130,7 @@ export default function SubscriptionsScreen() {
                     kindLabel={sourceLabels.get(entry.sourceId) ?? 'No payment method'}
                     kind="subscription"
                     domain={entry.domain}
+                    logoHidden={entry.logoHidden}
                     onPress={
                       entry.planId ? () => router.push(`/subscription/${entry.planId}`) : undefined
                     }

@@ -20,6 +20,8 @@ type SubscriptionRowProps = {
   renewsOn: string | null;
   sourceLabel: string;
   domain?: string | null;
+  /** The owner chose letters for this subscription. */
+  logoHidden?: boolean | null;
   /** Cancelled plans stay in the list, dimmed rather than hidden. */
   active?: boolean;
   onPress?: () => void;
@@ -32,6 +34,7 @@ export function SubscriptionRow({
   renewsOn,
   sourceLabel,
   domain,
+  logoHidden,
   active = true,
   onPress,
 }: SubscriptionRowProps) {
@@ -47,7 +50,7 @@ export function SubscriptionRow({
       className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
       style={active ? undefined : { opacity: 0.5 }}
     >
-      <BrandMark name={name} domain={domain} size={40} />
+      <BrandMark name={name} domain={domain} hidden={logoHidden} size={40} />
 
       <View className="min-w-0 flex-1">
         <Text

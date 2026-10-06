@@ -22,6 +22,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
+import { logoDomainOf } from '@/lib/logo-domain';
 import { RangeDropdown } from '@/components/ui/range-dropdown';
 import { rangeFor, type RangeKey } from '@/lib/range';
 import { formatCurrency } from '@/lib/format';
@@ -224,7 +225,8 @@ export default function ReceiptsScreen() {
                   merchant={receipt.merchant}
                   amount={receipt.amount}
                   date={receipt.purchased_on}
-                  domain={receipt.brands?.domain}
+                  domain={logoDomainOf(receipt)}
+                  logoHidden={receipt.logo_hidden}
                   sourceLabel={
                     sourceLabels.get(receipt.card_id ?? receipt.bank_account_id ?? '') ?? ''
                   }

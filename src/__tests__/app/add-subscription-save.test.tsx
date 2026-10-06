@@ -443,3 +443,62 @@ describe('Add subscription — the checks inside Save', () => {
     expect(mockPast.choose).not.toHaveBeenCalled();
   });
 });
+
+describe('Add subscription — the logo', () => {
+  it('saves the logo confirmed for a service the catalog does not know', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+
+    await set('amount', '24.99');
+    await press(screen, 'Continue');
+    await set('brand:Service', {
+      brandId: null,
+      name: 'Planet Fitness',
+      domain: null,
+      categoryId: 'fitness',
+      logoDomain: 'planetfitness.com',
+      logoHidden: false,
+    });
+    await press(screen, 'Continue');
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: null,
+      name: 'Planet Fitness',
+      logo_domain: 'planetfitness.com',
+      logo_hidden: false,
+    });
+  });
+
+  it('an edit that keeps its service shows the row’s logo and leaves it alone', async () => {
+    editing({ ...SPOTIFY, logo_domain: null, logo_hidden: true });
+    const screen = await render(<AddSubscriptionScreen />);
+
+    await press(screen, 'Continue');
+    // Letters were chosen, so the field shows letters, not the catalog's logo.
+    expect(mockProps['brand:Service'].value).toMatchObject({ name: 'Spotify', domain: null });
+    await press(screen, 'Continue');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_domain');
+    expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_hidden');
+  });
+
+  it('an edit that picks another service drops the letters chosen for the old one', async () => {
+    editing({ ...SPOTIFY, logo_domain: null, logo_hidden: true });
+    const screen = await render(<AddSubscriptionScreen />);
+
+    await press(screen, 'Continue');
+    await set('brand:Service', { ...NETFLIX, logoDomain: null, logoHidden: false });
+    await press(screen, 'Continue');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      brand_id: 'b-nf',
+      logo_domain: null,
+      logo_hidden: false,
+    });
+  });
+});

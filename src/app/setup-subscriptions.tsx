@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { usePaymentSources, useSubscriptions } from '@/api/queries';
 import { SetupCollection } from '@/components/setup/setup-collection';
 import { SubscriptionRow } from '@/components/subscriptions/subscription-row';
+import { logoDomainOf } from '@/lib/logo-domain';
 
 /** The subscriptions step of the setup walk-in: add as many as there are, then Done. */
 export default function SetupSubscriptionsScreen() {
@@ -36,7 +37,8 @@ export default function SetupSubscriptionsScreen() {
           amount={subscription.amount}
           cycle={subscription.cycle}
           renewsOn={subscription.next_renewal_on}
-          domain={subscription.brands?.domain}
+          domain={logoDomainOf(subscription)}
+          logoHidden={subscription.logo_hidden}
           active={subscription.active}
           sourceLabel={
             sourceLabels.get(subscription.card_id ?? subscription.bank_account_id ?? '') ?? ''

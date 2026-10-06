@@ -17,7 +17,13 @@ jest.mock('react-native-keyboard-controller', () =>
 
 jest.mock('@/components/ui/skeleton', () => ({ SkeletonList: () => null }));
 jest.mock('@/components/transactions/flow-chart', () => ({ FlowChart: () => null }));
-jest.mock('@/components/brands/brand-mark', () => ({ BrandMark: () => null }));
+const mockBrandMark = jest.fn();
+jest.mock('@/components/brands/brand-mark', () => ({
+  BrandMark: (props: object) => {
+    mockBrandMark(props);
+    return null;
+  },
+}));
 jest.mock('@/components/bills/bill-mark', () => ({ BillMark: () => null }));
 jest.mock('@/components/pro/pro-gate', () => ({ useProGate: () => null }));
 
@@ -72,6 +78,7 @@ let mockSavings = [...mockMonths];
 let mockCards: { id: string; holder: string; last4: string; balance: number }[] = [];
 let mockBalances = new Map<string, number>();
 let mockFailing: Source | null = null;
+let mockEntries: object[] = [];
 
 const mockRefetch = Object.fromEntries(SOURCES.map((source) => [source, jest.fn()])) as Record<
   Source,
@@ -91,7 +98,7 @@ jest.mock('@/api/queries', () => ({
     saved: number;
   }) => (month.excluded_at ? 0 : Number(month.adjusted_saved ?? month.saved)),
   useLedger: () => ({
-    entries: [],
+    entries: mockEntries,
     totals: { in: 0, out: 0 },
     isLoading: false,
     isError: mockFailing === 'ledger',
@@ -113,6 +120,8 @@ beforeEach(() => {
   mockCards = [];
   mockBalances = new Map();
   mockFailing = null;
+  mockEntries = [];
+  mockBrandMark.mockClear();
   for (const refetch of Object.values(mockRefetch)) refetch.mockClear();
 });
 
@@ -232,5 +241,42 @@ describe('Insights — where you stand', () => {
 
       await unmount();
     }
+  });
+});
+
+describe('Insights — where you spend most', () => {
+  const spend = (id: string, label: string, over: object = {}) => ({
+    id,
+    label,
+    amount: -10,
+    date: '2026-10-01',
+    kind: 'receipt',
+    sourceId: 'card-1',
+    domain: null,
+    ...over,
+  });
+
+  it('keeps letters for a store only when every row of it chose letters and none has a logo', async () => {
+    mockEntries = [
+      spend('n1', 'Netflix', { kind: 'subscription', logoHidden: true }),
+      spend('n2', 'Netflix', { kind: 'subscription', logoHidden: true }),
+      spend('t1', 'Target', { logoHidden: true }),
+      spend('t2', 'Target', { logoHidden: false }),
+      spend('c1', 'Calm', { logoHidden: true }),
+      spend('c2', 'Calm', { domain: 'calm.com' }),
+      // Every row chose letters, yet one carries a website: the website wins.
+      spend('s1', 'Spotify', { kind: 'subscription', logoHidden: true }),
+      spend('s2', 'Spotify', { kind: 'subscription', logoHidden: true, domain: 'spotify.com' }),
+    ];
+
+    await render(<InsightsScreen />);
+
+    const drawn = Object.fromEntries(
+      mockBrandMark.mock.calls.map(([props]: [{ name: string }]) => [props.name, props]),
+    );
+    expect(drawn.Netflix).toMatchObject({ domain: null, hidden: true });
+    expect(drawn.Target).toMatchObject({ domain: null, hidden: false });
+    expect(drawn.Calm).toMatchObject({ domain: 'calm.com', hidden: false });
+    expect(drawn.Spotify).toMatchObject({ domain: 'spotify.com', hidden: false });
   });
 });

@@ -25,7 +25,7 @@ export type PushCard = {
   sourceLabel?: string;
   /** "Amex ••1004", "Chase Checking". */
   source?: string;
-  /** Full URL of the brand logo in the brand-logos bucket. */
+  /** Full URL of the logo image: the logo CDN, or the brand-logos bucket without one. */
   logo?: string;
   /** A category or kind id the phone draws as an icon when there is no logo or it will not load. */
   glyph?: string;
@@ -57,6 +57,47 @@ export function logoUrl(
 ): string | undefined {
   if (!logoPath || !supabaseUrl) return undefined;
   return `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/brand-logos/${logoPath}`;
+}
+
+/** What a bill or subscription says about its logo: the owner's choice and its catalog brand. */
+export type LogoSource = {
+  logoDomain?: string | null;
+  logoHidden?: boolean | null;
+  brandDomain?: string | null;
+  /** The catalog brand's file in the brand-logos bucket. */
+  logoPath?: string | null;
+};
+
+const present = (value: string | null | undefined): string | null =>
+  value?.trim().toLowerCase() || null;
+
+/**
+ * Which website's logo to show, or null for none. Must stay the app's rule (logoDomainOf in
+ * src/lib/logo-domain.ts) so a notification never shows a logo the app does not.
+ */
+export function logoDomainOf(source: LogoSource): string | null {
+  if (source.logoHidden) return null;
+  return present(source.logoDomain) ?? present(source.brandDomain);
+}
+
+/**
+ * The thumbnail's URL. With LOGO_CDN_URL set, any domain's logo by name (a 404 there leaves the
+ * glyph). Without it, only the catalog's bucket files exist, so a row whose owner chose another
+ * website gets the glyph rather than the logo they replaced.
+ */
+export function thumbnailUrl(
+  source: LogoSource,
+  supabaseUrl: string,
+  logoCdnUrl?: string | null,
+): string | undefined {
+  const domain = logoDomainOf(source);
+  const cdn = logoCdnUrl?.trim().replace(/\/+$/, '');
+  if (cdn) return domain ? `${cdn}/${encodeURIComponent(domain)}` : undefined;
+
+  if (source.logoHidden) return undefined;
+  const chosen = present(source.logoDomain);
+  if (chosen && chosen !== present(source.brandDomain)) return undefined;
+  return logoUrl(supabaseUrl, source.logoPath);
 }
 
 /** A reminder body is "<when> · <amount>" or just "<when>" (reminders_due writes it that way). */
@@ -94,18 +135,21 @@ type ReminderInput = {
   body: string;
   /** The bill, subscription, card or account the reminder is about. */
   targetId: string | null;
-  logoPath?: string | null;
   categoryId?: string | null;
   iconId?: string | null;
   /** Who pays: the bill's or subscription's card or account. */
   payer?: SourceRow | null;
   /** The card itself, for a card-payment reminder. */
   self?: SourceRow | null;
-};
+} & LogoSource;
 
-export function reminderPayload(input: ReminderInput, supabaseUrl: string): TapPayload {
+export function reminderPayload(
+  input: ReminderInput,
+  supabaseUrl: string,
+  logoCdnUrl?: string | null,
+): TapPayload {
   const { when, amount } = splitBody(input.body);
-  const logo = logoUrl(supabaseUrl, input.logoPath);
+  const logo = thumbnailUrl(input, supabaseUrl, logoCdnUrl);
   const id = input.targetId ?? undefined;
 
   switch (input.kind) {
@@ -179,10 +223,9 @@ type ChargeInput = {
   chargedOn: string;
   billId?: string | null;
   subscriptionId?: string | null;
-  logoPath?: string | null;
   glyph?: string | null;
   payer?: SourceRow | null;
-};
+} & LogoSource;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -192,8 +235,12 @@ export function shortDate(iso: string): string {
   return `${day} ${MONTHS[month - 1] ?? ''}`.trim();
 }
 
-export function chargePayload(input: ChargeInput, supabaseUrl: string): TapPayload {
-  const logo = logoUrl(supabaseUrl, input.logoPath);
+export function chargePayload(
+  input: ChargeInput,
+  supabaseUrl: string,
+  logoCdnUrl?: string | null,
+): TapPayload {
+  const logo = thumbnailUrl(input, supabaseUrl, logoCdnUrl);
   const route: TapRoute = input.subscriptionId
     ? '/subscription'
     : input.billId

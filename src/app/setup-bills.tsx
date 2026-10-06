@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useBills, usePaymentSources } from '@/api/queries';
 import { BillRow } from '@/components/bills/bill-row';
 import { SetupCollection } from '@/components/setup/setup-collection';
+import { logoDomainOf } from '@/lib/logo-domain';
 
 /** The bills step of the setup walk-in: add as many as there are, then Done. */
 export default function SetupBillsScreen() {
@@ -23,7 +24,7 @@ export default function SetupBillsScreen() {
         name: row.name,
         amount: -row.amount,
         dueDate: row.next_due_on ?? '',
-        domain: row.brands?.domain ?? null,
+        domain: logoDomainOf(row),
         recurrence: row.recurrence,
         categoryId: row.category_id,
         iconId: row.icon_id ?? undefined,

@@ -146,3 +146,14 @@ it('steps back out when the bill is gone, rather than showing an empty page', as
 
   expect(router.back).toHaveBeenCalled();
 });
+
+it('opens Change logo for this bill from its logo', async () => {
+  const screen = await render(<BillDetailScreen />);
+
+  await fireEvent.press(screen.getByLabelText('Change logo'));
+
+  expect(router.push).toHaveBeenCalledWith({
+    pathname: '/change-logo',
+    params: { kind: 'bill', id: 'b1', name: 'Housing' },
+  });
+});

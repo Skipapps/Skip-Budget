@@ -1,26 +1,56 @@
 import { Image } from 'expo-image';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
-import { useBrandDirectory } from '@/api/brands';
+import { logoImageUrl } from '@/api/logos';
 import { cn } from '@/lib/cn';
 import { isLightColor } from '@/lib/color';
 import { CARD_COLORS } from '@/theme/card-colors';
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
-
 type BrandLogoProps = {
   /** Shown in the fallback tile, so it is required even when a logo exists. */
   name: string;
-  /** The brand's website, used to find its logo when `logoPath` is not given. */
+  /** The website whose logo to draw; none draws the monogram. */
   domain?: string | null;
-  /** Where the logo lives in the brand-logos bucket, e.g. `v1/netflix.png`. */
-  logoPath?: string | null;
   size?: number;
   className?: string;
   /** Drawn instead of the monogram when there is no logo, e.g. a bill's own glyph. */
   fallback?: ReactNode;
 };
+
+/** How long a logo that would not load is drawn as letters before it is asked for again. */
+export const FAILED_LOGO_RETRY_MS = 10 * 60 * 1000;
+
+/**
+ * Logo URLs that failed in the last FAILED_LOGO_RETRY_MS. A website with no logo answers 404 every
+ * time, so without this every row showing it would ask again on every mount. Forgotten after the
+ * wait rather than kept for the session, because a phone that was briefly offline fails the same
+ * way and must get its logos back. Rows read it as a store, so a row on screen redraws (and asks
+ * again) when a failure is forgotten, not only rows mounted later.
+ */
+const failedLately = new Set<string>();
+const listeners = new Set<() => void>();
+
+function notify() {
+  for (const listener of listeners) listener();
+}
+
+function rememberFailure(url: string) {
+  if (failedLately.has(url)) return;
+  failedLately.add(url);
+  notify();
+  setTimeout(() => {
+    failedLately.delete(url);
+    notify();
+  }, FAILED_LOGO_RETRY_MS);
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
 
 /**
  * Fallback tile colour. Deterministic per name, so a brand looks the same everywhere; hashing the
@@ -42,45 +72,16 @@ function monogram(name: string): string {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
-/** Our own logo URL, from the brand-logos bucket; nothing is fetched from a third party. */
-function logoUrl(logoPath?: string | null): string | null {
-  if (!logoPath || !SUPABASE_URL) return null;
-  return `${SUPABASE_URL}/storage/v1/object/public/brand-logos/${logoPath}`;
-}
-
 /**
- * A brand's logo path, found by its website. Bills, subscriptions and receipts carry only the
- * domain; the directory is the one cached catalog query, so this is a memory lookup, not a request
- * per row.
+ * A brand's logo, or a coloured monogram. The fallback is not an error state: plenty of websites
+ * have no logo, and the service answers those with a 404.
  */
-function useLogoPathForDomain(domain?: string | null): string | null {
-  const { data: directory } = useBrandDirectory();
-  const byDomain = useMemo(
-    () => new Map((directory ?? []).map((brand) => [brand.domain, brand.logo_path])),
-    [directory],
-  );
-  return domain ? (byDomain.get(domain) ?? null) : null;
-}
+export function BrandLogo({ name, domain, size = 40, className, fallback }: BrandLogoProps) {
+  const url = logoImageUrl(domain);
+  // Keyed by URL, not a flag on the row, so a recycled row showing another brand recovers at once.
+  const failed = useSyncExternalStore(subscribe, () => (url ? failedLately.has(url) : false));
 
-/**
- * A brand's logo, or a coloured monogram. The fallback is not an error state: custom stores never
- * have a logo.
- */
-export function BrandLogo({
-  name,
-  domain,
-  logoPath,
-  size = 40,
-  className,
-  fallback,
-}: BrandLogoProps) {
-  const found = useLogoPathForDomain(logoPath ? null : domain);
-  const url = logoUrl(logoPath ?? found);
-  // Remembering which URL failed, rather than a boolean, lets a recycled row showing another brand
-  // recover with no effect or reset.
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-
-  const showFallback = !url || failedUrl === url;
+  const showFallback = !url || failed;
   const background = monogramColor(name || '?');
 
   if (showFallback && fallback) return fallback;
@@ -111,11 +112,13 @@ export function BrandLogo({
           source={{ uri: url }}
           style={{ width: size, height: size }}
           contentFit="contain"
-          // Logos are immutable per brand, so the disk cache spares the CDN a
-          // request on every render and keeps them working offline.
+          // A logo seldom changes, so the disk cache spares the service a request on every
+          // render and keeps logos showing offline.
           cachePolicy="memory-disk"
           transition={120}
-          onError={() => setFailedUrl(url)}
+          onError={() => {
+            if (url) rememberFailure(url);
+          }}
           accessibilityLabel={`${name} logo`}
         />
       )}

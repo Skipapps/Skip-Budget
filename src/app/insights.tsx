@@ -165,6 +165,8 @@ function InsightsScreenInner() {
       amount: number;
       visits: number;
       domain?: string | null;
+      /** Every row in the group chose letters, so no name match may bring a logo back. */
+      logoHidden: boolean;
       kind: string;
       categoryId?: string | null;
       iconId?: string | null;
@@ -179,6 +181,7 @@ function InsightsScreenInner() {
         found.visits += 1;
         // Any row that knows the brand settles it for the group, not just the first.
         found.domain = found.domain ?? entry.domain;
+        found.logoHidden = found.logoHidden && Boolean(entry.logoHidden);
         found.categoryId = found.categoryId ?? entry.categoryId;
         found.iconId = found.iconId ?? entry.iconId;
       } else {
@@ -186,6 +189,7 @@ function InsightsScreenInner() {
           amount: Math.abs(entry.amount),
           visits: 1,
           domain: entry.domain,
+          logoHidden: Boolean(entry.logoHidden),
           kind: entry.kind,
           categoryId: entry.categoryId,
           iconId: entry.iconId,
@@ -392,7 +396,13 @@ function InsightsScreenInner() {
                     size={40}
                   />
                 ) : (
-                  <BrandMark name={merchant.name} domain={merchant.domain} size={40} />
+                  <BrandMark
+                    name={merchant.name}
+                    domain={merchant.domain}
+                    // Letters only when no row in the group has a logo to show.
+                    hidden={merchant.logoHidden && !merchant.domain}
+                    size={40}
+                  />
                 )}
                 <View className="min-w-0 flex-1">
                   <View className="w-full flex-row items-baseline justify-between gap-3">

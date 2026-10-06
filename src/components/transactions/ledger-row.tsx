@@ -57,7 +57,7 @@ export function LedgerRow({ entry, sourceLabel, kindLabel, onPress }: LedgerRowP
           size={40}
         />
       ) : (
-        <BrandMark name={entry.label} domain={entry.domain} size={40} />
+        <BrandMark name={entry.label} domain={entry.domain} hidden={entry.logoHidden} size={40} />
       )}
 
       <View className="min-w-0 flex-1">

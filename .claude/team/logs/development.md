@@ -3486,3 +3486,195 @@ bill-icons L15 `import/no-unresolved`. Section 10: G2 and G5 empty; G1/G3 only b
 others|settled up/i)` must be empty). Correct, but the plan's "must print nothing" needs an exception for it.
 
 **Not verified:** `expo export` and the simulator walk (CEO/Tia, after Theo finishes).
+
+---
+
+## 2026-10-06 — Diego (Developer, data and backend) — Skip Logos: per-row logo columns, client, push thumbnails
+
+**Outcome:** Done in the logo-service worktree only. Nothing committed, staged or applied to any database.
+The contract Dana builds against is exactly as briefed (additive extras only, listed below). tsc 0
+repo-wide; full jest 104/104 suites, 1625/1625; eslint `--no-cache` clean on my files except the
+pre-existing `jsr:` import/no-unresolved in send-push/index.ts (HEAD has it too); prettier clean.
+
+**Migration** `supabase/migrations/20261006100001_logo_overrides.sql` (written, NOT applied):
+`logo_domain text` + `logo_hidden boolean not null default false` on receipts, subscriptions, bills, with
+column comments; plus a check constraint per table (`<table>_logo_domain_check`: null, or a bare host
+name ≤253 chars, case-insensitive `^[a-z0-9-]+(\.[a-z0-9-]+)+$`). Proved on in-memory PGlite (scratchpad,
+no real database): runs twice clean, existing rows read null/false, 11 accept/refuse cases each table.
+Audit: the only policies are `*_all_own` (whole-row); triggers are `set_updated_at` and
+`receipts_scan_is_pro` (insert, source column only); no view, RPC return type or column grant names these
+tables' columns; realtime publishes them without a column list (replica identity full). Nothing else to
+update.
+
+**App:** `src/lib/logo-domain.ts` (`logoDomainOf`: hidden → null, else trimmed lower-case logo_domain,
+else brands.domain). `src/api/logos.ts`: `resolveLogo` (optional 3rd `signal` arg), `useLogoMatch`,
+`reportWrongLogo`, `logoImageUrl` as briefed. Response validated by hand at the boundary (zod is only an
+extraneous transitive in node_modules, not a dependency). One 10 s deadline covers headers and body;
+never throws; key header only when set, never logged. `useLogoMatch` keeps a real answer 30 min and a
+failed (null) one only until the next mount/focus; `retry: false`. `queries.ts`: the six
+bill/subscription/receipt selects read `logo_domain, logo_hidden`; row types gain both as optional; the
+six ledger `domain:` fields now use `logoDomainOf(row)` (custom-store logos reach card and transaction
+ledgers). Reads fall back to the old select on 42703, like useSalaryDetails, so an unmigrated database
+still loads every list. `mutations.ts`: optional `LogoValues` on Bill/Receipt/Subscription values;
+`useSetRowLogo` updates only the two columns, filters `id` AND `user_id`, throws NOTHING_UPDATED on 0
+rows, invalidates the table (+dashboard) and `[kind, id]`.
+
+**Push:** `card.ts` gains `LogoSource`, `logoDomainOf` (held to the app's by a parity test) and
+`thumbnailUrl`; `reminderPayload`/`chargePayload` take an optional 3rd `logoCdnUrl`. With LOGO_CDN_URL:
+`${cdn}/${domain}`. Without: today's bucket file, except hidden, or a chosen domain different from the
+brand's, which get the glyph. `index.ts` selects `logo_domain, logo_hidden, brands(domain, logo_path)`
+with the same 42703 fallback. Typechecked with a Deno shim: same 7 pre-existing errors as HEAD, none new.
+
+**Tests:** new `logos.test.tsx` (35), `logo-columns.test.tsx` (21), `logo-domain.test.ts` (8);
+`mutations.test.tsx` +12; `push-card.test.ts` +33. 12 mutants on scratchpad copies (jest moduleNameMapper
+redirect, tree untouched) all fail their suites; unmodified controls pass.
+
+**Raised:** `logos.skipapps.net` does not resolve yet, but `.env.local` sets EXPO_PUBLIC_LOGO_CDN_URL to
+it, so every dev-build logo falls to letters; the Worker's `/v1/logo` serves 200 today. Deploy order:
+migration, then app/function; LOGO_CDN_URL only once the domain answers. Dana's `src/lib/logo-columns.ts`
+sits in my directory; it composes with my contract and I left it alone.
+
+---
+
+## 2026-10-06 — Dana (Developer, UI and navigation) — logos from Skip Logos, the add-store check, Change logo
+
+**Outcome:** Done in the logo-service worktree only, nothing committed or staged. Coded against Diego's contract
+(`logoDomainOf`, `useLogoMatch`, `reportWrongLogo`, `logoImageUrl`, `useSetRowLogo`), which landed while I worked.
+Gates: tsc 0; full `jest --ci` 104/104 suites, 1625/1625; prettier clean on my 31 files; eslint `--no-cache` on
+src = 19 findings (= baseline: 8 errors in add-account/add-card, all pre-existing). Mutation-checked: hidden ignored
+by BrandMark, logo columns always written, stale receipt edit state, report sending the suggestion: each fails a test.
+
+**Built**
+- `brand-logo.tsx` loads `logoImageUrl(domain)`; the directory lookup and `logoPath` are gone (the old co-located
+  test is replaced by `src/__tests__/components/brand-logo.test.tsx`). `brand-mark.tsx` takes `hidden`: no name match.
+- Every `row.brands?.domain` read now goes through `logoDomainOf` (lists, plans, setup, detail pages, edit forms);
+  receipt and subscription rows also pass `logoHidden` to BrandMark.
+- Add-store check (`logo-choices.tsx`, inline in `brand-field.tsx`): only for a store added by typing. Card "Looks
+  like **X**" + website + Yes / Not this one (candidates) / Use the website instead (looked up on Find) / No logo,
+  use letters ("use the icon" for a bill's company). Nothing chosen until answered. Unsure or failed: no card, a
+  quiet "Add a website". After an answer: a quiet "Change logo" reopens it. Off on voice-edit (the draft keeps no logo).
+- Saving: `src/lib/logo-columns.ts` writes the two columns only when the field made a choice that differs from what
+  the row holds, so an edit never undoes a Change logo choice and an ordinary save doesn't need the columns. Goldens
+  unchanged. Clearing a bill's company clears its logo.
+- `src/app/change-logo.tsx` (kind, id, name): current logo + the same choices as radio rows, pinned "Save logo"
+  (via `useSetRowLogo`, then back), "Report this logo" thanked in place. Entry: the logo on subscription/bill pages
+  (pencil badge); receipts have no page, so a quiet "Change logo" link under Store on the receipt edit form.
+
+**Gaps raised:** LedgerEntry/card-ledger entries carry no `logoHidden`, so Home, Transactions, Subscriptions charges,
+the card page and Insights can still name-match a logo the owner turned off (Diego/Drew: add it; I wire 5 call
+sites). BrandSelection's logo fields are optional (required would break VoiceMerchant). No country on the profile,
+so it is omitted. `brands.ts` still selects `logo_path` (must go before step 6). iOS SVG arc caveat (SDK 57 docs).
+
+**Not verified:** simulator/device walk (Tia): light/dark, large text, keyboard on the website field, SVG logos.
+
+---
+
+## 2026-10-06 — Dmitri (Development Lead) — review of the logo-service worktree (review only)
+
+**Outcome:** FIX-FIRST. One code fix (hidden flag on ledger entries) and two pre-build ops steps. Everything else
+is non-blocking. I edited nothing except this log; nothing staged, committed or applied.
+
+**Checks (mine, in the worktree):** tsc 0. Full jest 104/104 suites, 1625/1625. Prettier clean on the 42 changed TS/TSX
+files. ESLint `--no-cache` after clearing .expo/cache/eslint: changed files 1 error + 8 warnings, all pre-existing
+(jsr: import in send-push; require() in old lines of the save tests). Full src 19 problems = baseline. tsconfig.json
+unchanged, no tests under src/app. Babel (metro caller, dev and release) inlines the three `EXPO_PUBLIC_LOGO_*?.trim()` reads.
+
+**Blocking:** (1) A: `logoDomainOf` returns null for "letters", ledger entries carry no hidden flag, so BrandMark
+name-matches the logo back on Home, Transactions, Subscriptions charges, the card page and Insights. Diego: `logoHidden`
+on card-ledger Charge/RecurringCharge/LedgerEntry (copy at L324/L352) and queries.ts LedgerEntry, set beside the six
+`domain: logoDomainOf(row)`. Dana: home:320, subscriptions:127, source/[id]:284, ledger-row:60, insights:174-190/395.
+(2) Ops: 9 catalog brands with logos in today's bucket 404 on the CDN (microsoft, openai, wellsfargo, popeyes,
+malwarebytes, one.google, fi.google, fiber.google, gem.cbc.ca). Upload the curated PNGs first. (3) Ops: build from this
+worktree. The main tree's .env.local has no EXPO_PUBLIC_LOGO_* vars, so a build from there would show letters for every logo.
+
+**Rulings:** B country: not blocking for this build, needed before public. One helper in useLogoMatch (Diego).
+C, E, F, G: non-blocking. D: keep optional (undefined means no choice). H: keep the constraint. Migration: safe and
+idempotent. 42703 fallback: correct, not masking. Pre-existing: useUpdate never invalidates single-row keys (30 s stale
+edit form), which logoColumns now trusts. One-line fix recommended.
+
+**Side effect to disclose:** my live /v1/resolve probe for "Microsoft" made the service store a 128px favicon for
+microsoft.com on the CDN. The curated upload in (2) replaces it. The key was read from .env.local and never printed.
+
+---
+
+## 2026-10-06 — Diego (Developer, data and backend) — Skip Logos round 2 (Dmitri FIX-FIRST)
+
+**Outcome:** All three listed items done in the logo-service worktree (the brief said four, listed three).
+Nothing committed, staged or applied. tsc 0; prettier clean; eslint `--no-cache` on my files: only the
+pre-existing `jsr:` import in send-push/index.ts. Full jest 105/106 suites, 1701/1703: the 2 failures are
+Dana's in-flight `src/__tests__/app/change-logo.test.tsx` (it mocks `@/api/logos` wholesale and asserts the
+hints her page passes; `src/app/change-logo.tsx` was edited minutes before the run). Not my code.
+
+**1. Hidden logos on ledgers:** `src/lib/card-ledger.ts`: `logoHidden?: boolean | null` on `Charge`,
+`RecurringCharge`, `LedgerEntry`, copied through at the two entry builders. Passthrough only, no arithmetic;
+`card-ledger.test.ts` green. `src/api/queries.ts`: `logoHidden?: boolean` on `LedgerEntry`;
+`logoHidden: Boolean(row.logo_hidden)` beside all six `domain: logoDomainOf(row)`. `logo-columns.test.tsx`:
+a hidden subscription and a recorded September charge added; both the main and the card ledger prove the flag
+(true on the three hidden rows, false elsewhere, recorded charge included, amount still -81.20), and all-false
+on an unmigrated database.
+
+**2. Country hint:** `src/api/logos.ts` `deviceCountry()` = `getLocales()[0]?.regionCode` only when
+`/^[A-Z]{2}$/`, else undefined (also on a throw). `useLogoMatch` sends `hints.country || deviceCountry()` (read
+once per mount) and keys the cache by the effective country; `resolveLogo` itself unchanged. SDK 57
+Localization docs checked: regionCode is the device Region setting, nullable. Tests: region present, null,
+lower-case, '419', 'USA', empty, throwing module; caller's country wins; new region = new key.
+
+**3. Single-row cache:** `useUpdate` also invalidates `[receipt|subscription|bill, id]`; test per kind.
+
+**Mutants:** 6 on scratch copies (flag dropped in queries / each card-ledger builder, hook ignoring the
+device, no shape check, no single-row invalidation) all fail their suites.
+
+**Raised:** cards and bank accounts have the same single-row exposure (`useCard` `['card', id]`,
+`useBankAccount` `['bank_account', id]`); left out per scope, one map entry each if wanted.
+
+### 2026-10-06 — Dana — logos round 2 (Dmitri's FIX-FIRST)
+
+**Outcome:** Done in the logo-service worktree, nothing committed. tsc 0; full `jest --ci` 106/106 suites,
+1703/1703; prettier clean on my files; eslint `--no-cache` src = 19 (= baseline). Mutation-checked: each change
+below, undone, fails a test.
+
+1. **Hidden logos on ledger lists:** `logoHidden={entry.logoHidden}` on Home, Subscriptions and the card page's
+   TransactionRow, `hidden={entry.logoHidden}` in LedgerRow (Transactions), and Insights' top merchants carry a
+   group flag: letters only when every row is hidden and none has a website. bills.tsx untouched (bill marks never
+   name-match). Diego's `logoHidden` landed in queries.ts and card-ledger.ts (forwarded into the card page's
+   entries). Tests: real BrandMark + catalog match, a hidden Netflix entry draws "NE" in LedgerRow and TransactionRow,
+   a visible one the catalog logo; Insights grouping incl. a hidden row that still carries a website.
+2. **Category mapping:** `src/lib/logo-lookup.ts` `logoCategory`/`logoHints`: same-name spend ids pass through;
+   mobile/internet → telecom, loans/finance → banking, energy and spend `utilities` → energy, insurance → insurance;
+   housing, water, family, other → nothing. Test asserts every app id maps only to a service name.
+3. **Website input:** `websiteHost` trims, lower-cases, strips http(s)://, www., port, path/query/fragment and a
+   trailing dot; anything not a plausible host (labels, a letter TLD or xn--) sends nothing and shows "No logo found
+   for that website."
+4. **Failed-image memo:** module-level Set in brand-logo.tsx; a failed URL is not requested again this session; the
+   per-row failedUrl state stays for recycled rows; rows with no website still request nothing.
+
+**Noted:** the memo cannot tell a 404 from an offline blip (expo-image's onError gives no status), so a logo that
+failed while offline shows letters until relaunch. The Change logo fixture's `wellness` category was not a real id;
+now `fitness`.
+- 2026-10-06 Dana: the failed-logo memo (brand-logo.tsx) now forgets a failed URL after FAILED_LOGO_RETRY_MS (10 min) via a small external store read with useSyncExternalStore, replacing the session Set and the per-row failedUrl state, so an offline blip heals itself, rows already on screen included; a 404 is asked for at most once per 10 min per URL (fake-timer tests both ways; tsc 0, jest 106/106 suites, prettier and eslint clean).
+
+---
+
+## 2026-10-06 — Dmitri (Development Lead) — second review of the logo-service branch (review only)
+
+**Outcome:** SHIP-TO-PHONE. The blocking items from the first review are closed. The branch was committed as 8612279 while
+I reviewed, and I re-ran everything on that commit with a clean tree. Edited nothing but this log.
+
+**Checks on 8612279:** tsc 0. Full jest 106/106 suites, 1704/1704. card-ledger.test.ts unchanged, 41/41. Prettier clean on
+the 52 changed TS/TSX files. ESLint `--no-cache` on those files: 1 error + 8 warnings, all pre-existing (jsr: import, old
+require() lines). The "worker failed to exit" notice is unchanged since the first run.
+
+**Verified:** (1) Every place that draws a receipt or subscription row honours logo_hidden: home, subscriptions,
+source/[id], ledger-row (transactions tab), insights (letters only when every row chose them and none has a website),
+receipts, setup-subscriptions, subscription-plans, subscription/[id], change-logo. bills.tsx needs nothing because
+BillMark never name-matches. (2) brand-logo store: holds only URLs that failed in the last 10 min, each with its own
+timer. Listeners are one per mounted logo. A failure re-renders only the rows showing that URL, and a URL already
+remembered is ignored. onError still falls back to letters or the glyph, and no website means no Image and no request.
+The compiler-safe pattern holds: state changes only in onError and the timer. (3) card-ledger diff adds only logoHidden
+type fields and two copy lines, with no arithmetic. (4) deviceCountry is wrapped in try/catch and accepts only
+`^[A-Z]{2}$`. (5) utilities->energy is fine: the service's energy words include "utility", and there is no penalty
+unless a description matches another category. Ops: the 9 curated CDN logos now 200 image/png, the Mac's DNS resolves
+logos.skipapps.net, and the main tree's .env.local now has the 3 LOGO vars.
+
+**Non-blocking:** useSyncExternalStore has no getServerSnapshot (only matters if web static output is ever built).
+"No logo found for that website." also shows for input that is not a website. The jest worker-exit notice.

@@ -34,6 +34,8 @@ import { FieldLabel } from '@/components/ui/typography';
 import { planFloor } from '@/lib/card-ledger';
 import { success, warn } from '@/lib/haptics';
 import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { logoColumns } from '@/lib/logo-columns';
+import { logoDomainOf, type LogoFields } from '@/lib/logo-domain';
 import {
   cameFromVoice,
   clearVoiceDraft,
@@ -153,10 +155,11 @@ export default function AddSubscriptionScreen() {
 
   const initial: Initial = existing
     ? {
+        // No logo choice carried over, so saving the edit leaves the row's own logo alone.
         service: {
           brandId: existing.brand_id,
           name: existing.name,
-          domain: existing.brands?.domain ?? null,
+          domain: logoDomainOf(existing),
           categoryId: existing.category_id,
         },
         amount: String(existing.amount),
@@ -178,6 +181,7 @@ export default function AddSubscriptionScreen() {
       key={existing?.id ?? 'new'}
       id={id}
       initial={initial}
+      saved={existing}
       fromVoice={!id && cameFromVoice(params)}
     />
   );
@@ -186,10 +190,13 @@ export default function AddSubscriptionScreen() {
 function SubscriptionForm({
   id,
   initial,
+  saved = null,
   fromVoice = false,
 }: {
   id?: string;
   initial: Initial;
+  /** The row being edited, for the logo it already has. */
+  saved?: LogoFields | null;
   /** Saved from a voice hand-off: back to Home, never onto the review page again. */
   fromVoice?: boolean;
 }) {
@@ -257,7 +264,7 @@ function SubscriptionForm({
       fail(built.message, built.field === 'service' ? 1 : 0);
       return;
     }
-    const { values } = built;
+    const values = { ...built.values, ...logoColumns(service, saved) };
 
     try {
       // What a recorded renewal copies from the subscription.

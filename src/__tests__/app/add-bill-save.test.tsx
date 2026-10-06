@@ -632,3 +632,81 @@ describe('Add bill — the checks inside Save', () => {
     expect(router.back).not.toHaveBeenCalled();
   });
 });
+
+describe('Add bill — the logo', () => {
+  it('asks the company field for the bill’s category, with the icon as its "no logo"', async () => {
+    const screen = await render(<AddBillScreen />);
+
+    await set('category', { id: 'energy', label: 'Energy' });
+    await set('amount', '84.2');
+    await press(screen, 'Continue');
+
+    expect(mockProps['brand:Company']).toMatchObject({ category: 'energy', noLogo: 'icon' });
+  });
+
+  it('saves the logo confirmed for a company the catalog does not know', async () => {
+    const screen = await render(<AddBillScreen />);
+
+    await set('category', { id: 'energy', label: 'Energy' });
+    await set('amount', '84.2');
+    await press(screen, 'Continue');
+    await set('brand:Company', {
+      brandId: null,
+      name: 'Town Power',
+      domain: null,
+      categoryId: 'other',
+      logoDomain: 'townpower.example',
+      logoHidden: false,
+    });
+    await press(screen, 'Continue');
+    await set('calendar', new Date(2026, 10, 1));
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: null,
+      logo_domain: 'townpower.example',
+      logo_hidden: false,
+    });
+  });
+
+  it('an edit that keeps its company leaves the row’s logo alone', async () => {
+    editing({
+      ...POWER,
+      brand_id: 'b-cc',
+      brands: { domain: 'comcast.com' },
+      logo_domain: 'x.com',
+    });
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Continue');
+    expect(mockProps['brand:Company'].value).toMatchObject({ domain: 'x.com' });
+    await press(screen, 'Continue');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_domain');
+  });
+
+  it('an edit that takes the company off takes its logo with it', async () => {
+    editing({
+      ...POWER,
+      brand_id: 'b-cc',
+      brands: { domain: 'comcast.com' },
+      logo_domain: 'x.com',
+    });
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Continue');
+    await set('brand:Company', null);
+    await press(screen, 'Continue');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      brand_id: null,
+      logo_domain: null,
+      logo_hidden: false,
+    });
+  });
+});

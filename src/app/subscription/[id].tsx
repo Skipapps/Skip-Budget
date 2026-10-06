@@ -2,9 +2,11 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { usePaymentSources, useSubscriptions } from '@/api/queries';
 import { BrandMark } from '@/components/brands/brand-mark';
+import { ChangeLogoButton } from '@/components/brands/change-logo-button';
 import { PlanDetail, type PlanDetailRow } from '@/components/plans/plan-detail';
 import { CYCLE_LABELS } from '@/components/subscriptions/subscription-row';
 import { formatFullDate } from '@/lib/date';
+import { logoDomainOf } from '@/lib/logo-domain';
 
 const asDate = (iso: string) => formatFullDate(new Date(`${iso}T00:00:00`));
 
@@ -47,7 +49,14 @@ export default function SubscriptionDetailScreen() {
       onRetry={() => void subscriptions.refetch()}
       mark={
         subscription ? (
-          <BrandMark name={subscription.name} domain={subscription.brands?.domain} size={52} />
+          <ChangeLogoButton kind="subscription" id={id} name={subscription.name}>
+            <BrandMark
+              name={subscription.name}
+              domain={logoDomainOf(subscription)}
+              hidden={subscription.logo_hidden}
+              size={52}
+            />
+          </ChangeLogoButton>
         ) : null
       }
       frequency={

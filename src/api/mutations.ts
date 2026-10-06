@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 
 import type { AccrualBasis } from '@/lib/loan';
 import { supabase } from '@/lib/supabase';
@@ -73,11 +73,23 @@ function useCreate<TInput extends Record<string, unknown>>(table: string) {
 }
 
 /**
+ * Where a table's single-row read is cached (useReceipt, useSubscription, useBill). The list key
+ * does not reach it, so an edit page reopened inside staleTime would show the values from before
+ * the save, and could write them back.
+ */
+const SINGLE_ROW_KEY: Record<string, string> = {
+  receipts: 'receipt',
+  subscriptions: 'subscription',
+  bills: 'bill',
+};
+
+/**
  * An update that cannot succeed quietly. PostgREST answers an update whose filter matches nothing
  * (row deleted, or hidden by RLS) with 204 and no error. `select('id')` returns the touched rows,
  * so an empty result becomes an error the user can act on instead of a silent no-op.
  */
 function useUpdate<TInput extends Record<string, unknown>>(table: string) {
+  const client = useQueryClient();
   const invalidate = useInvalidate();
 
   return useMutation({
@@ -91,7 +103,11 @@ function useUpdate<TInput extends Record<string, unknown>>(table: string) {
       if (!data || data.length === 0) throw new Error(NOTHING_UPDATED);
       return { id };
     },
-    onSuccess: () => invalidate(table),
+    onSuccess: ({ id }) => {
+      invalidate(table);
+      const single = SINGLE_ROW_KEY[table];
+      if (single) client.invalidateQueries({ queryKey: [single, id] });
+    },
   });
 }
 
@@ -177,6 +193,18 @@ export const useCreateBankAccount = () => useCreate<BankAccountValues>('bank_acc
 export const useUpdateBankAccount = () => useUpdate<Partial<BankAccountValues>>('bank_accounts');
 export const useDeleteBankAccount = () => useRemove('bank_accounts');
 
+/**
+ * The owner's logo choice on a receipt, subscription or bill (see logoDomainOf). Optional, and best
+ * left out unless the person chose something: a database without these columns refuses any write
+ * that names them.
+ */
+export type LogoValues = {
+  /** A bare host name ("netflix.com"); the database refuses anything else. */
+  logo_domain?: string | null;
+  /** True draws letters instead of any logo. */
+  logo_hidden?: boolean;
+};
+
 export type BillValues = {
   /** Optional. Who issues the bill, for its logo. */
   brand_id: string | null;
@@ -191,7 +219,7 @@ export type BillValues = {
   card_id: string | null;
   bank_account_id: string | null;
   note: string | null;
-};
+} & LogoValues;
 
 export const useCreateBill = () => useCreate<BillValues>('bills');
 export const useUpdateBill = () => useUpdate<Partial<BillValues>>('bills');
@@ -233,7 +261,7 @@ export type ReceiptValues = {
   note: string | null;
   source: CaptureSource;
   image_path: string | null;
-};
+} & LogoValues;
 
 export const useCreateReceipt = () => useCreate<ReceiptValues>('receipts');
 export const useUpdateReceipt = () => useUpdate<Partial<ReceiptValues>>('receipts');
@@ -289,11 +317,55 @@ export type SubscriptionValues = {
   bank_account_id: string | null;
   note: string | null;
   active: boolean;
-};
+} & LogoValues;
 
 export const useCreateSubscription = () => useCreate<SubscriptionValues>('subscriptions');
 export const useUpdateSubscription = () => useUpdate<Partial<SubscriptionValues>>('subscriptions');
 export const useDeleteSubscription = () => useRemove('subscriptions');
+
+const LOGO_TABLES = {
+  receipt: 'receipts',
+  subscription: 'subscriptions',
+  bill: 'bills',
+} as const;
+
+export type RowLogoInput = {
+  kind: keyof typeof LOGO_TABLES;
+  id: string;
+  logo_domain: string | null;
+  logo_hidden: boolean;
+};
+
+/**
+ * Saves the logo choice on one receipt, subscription or bill: those two columns and nothing else,
+ * so a Change logo page cannot write back a stale copy of the rest of the row.
+ */
+export function useSetRowLogo(): UseMutationResult<void, Error, RowLogoInput> {
+  const userId = useUserId();
+  const client = useQueryClient();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async ({ kind, id, logo_domain, logo_hidden }: RowLogoInput) => {
+      if (!userId) throw new Error('Sign in first.');
+      const { data, error } = await supabase
+        .from(LOGO_TABLES[kind])
+        .update({ logo_domain: logo_domain?.trim().toLowerCase() || null, logo_hidden } as never)
+        .eq('id', id)
+        // A choice must never reach anyone else's row, even if a policy is one day widened to
+        // share these tables, so the owner is named rather than left to RLS alone.
+        .eq('user_id', userId)
+        .select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error(NOTHING_UPDATED);
+    },
+    onSuccess: (_, { kind, id }) => {
+      invalidate(LOGO_TABLES[kind]);
+      // The edit and detail pages read a single row under its own key, which the list key misses.
+      client.invalidateQueries({ queryKey: [kind, id] });
+    },
+  });
+}
 
 /**
  * Replaces which accounts a salary source is paid into: delete, then insert, because the screen is

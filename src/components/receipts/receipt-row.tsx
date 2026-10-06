@@ -12,8 +12,10 @@ type ReceiptRowProps = {
   /** yyyy-mm-dd */
   date: string;
   sourceLabel: string;
-  /** Known when the receipt is linked to a catalog brand; skips the lookup. */
+  /** The receipt's own logo (logoDomainOf); skips the lookup. */
   domain?: string | null;
+  /** The owner chose letters for this receipt. */
+  logoHidden?: boolean | null;
   onPress?: () => void;
 };
 
@@ -23,6 +25,7 @@ export function ReceiptRow({
   date,
   sourceLabel,
   domain,
+  logoHidden,
   onPress,
 }: ReceiptRowProps) {
   const moneyColor = useMoneyColor();
@@ -36,7 +39,7 @@ export function ReceiptRow({
       onPress={onPress}
       className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
     >
-      <BrandMark name={merchant} domain={domain} size={40} />
+      <BrandMark name={merchant} domain={domain} hidden={logoHidden} size={40} />
 
       <View className="min-w-0 flex-1">
         <Text

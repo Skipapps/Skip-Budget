@@ -1,7 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+import { logoDomainOf as appLogoDomainOf } from '@/lib/logo-domain';
+
 import {
   billGlyph,
   chargePayload,
   digestPayload,
+  logoDomainOf,
   logoUrl,
   money,
   noticePayload,
@@ -10,6 +16,8 @@ import {
   shortDate,
   sourceName,
   splitBody,
+  thumbnailUrl,
+  type LogoSource,
 } from '../../../supabase/functions/send-push/card';
 
 /** The card a notification carries: press-and-hold details, thumbnail, and where "View" lands. */
@@ -194,5 +202,156 @@ describe('everything else', () => {
     expect(payload.route).toBe('/add-receipt');
     expect(payload.card).toMatchObject({ glyph: 'receipts', view: 'Add a receipt' });
     expect(payload.card?.when).toBeUndefined();
+  });
+});
+
+describe('thumbnails from the logo service', () => {
+  const CDN = 'https://logos.skipapps.net/logos';
+  const BUCKET_NETFLIX = `${BASE}/storage/v1/object/public/brand-logos/v1/netflix.png`;
+  const NETFLIX: LogoSource = { brandDomain: 'netflix.com', logoPath: 'v1/netflix.png' };
+
+  /** Every combination a row can be in, as the app and the function each spell it. */
+  const ROWS: { name: string; source: LogoSource }[] = [
+    { name: 'catalog brand only', source: NETFLIX },
+    { name: "owner's choice over the brand", source: { ...NETFLIX, logoDomain: 'hulu.com' } },
+    { name: 'choice equal to the brand', source: { ...NETFLIX, logoDomain: 'netflix.com' } },
+    { name: 'custom store with a choice', source: { logoDomain: 'planetfitness.com' } },
+    { name: 'hidden brand', source: { ...NETFLIX, logoHidden: true } },
+    { name: 'hidden choice', source: { logoDomain: 'hulu.com', logoHidden: true } },
+    { name: 'nothing', source: {} },
+    { name: 'blank choice', source: { ...NETFLIX, logoDomain: '  ' } },
+    { name: 'odd case', source: { brandDomain: 'Netflix.COM', logoDomain: ' Hulu.com ' } },
+  ];
+
+  it.each(ROWS)('picks the same website as the app for: $name', ({ source }) => {
+    const asTheAppReadsIt = {
+      logo_domain: source.logoDomain,
+      logo_hidden: source.logoHidden,
+      brands: source.brandDomain === undefined ? null : { domain: source.brandDomain },
+    };
+    expect(logoDomainOf(source)).toBe(appLogoDomainOf(asTheAppReadsIt));
+  });
+
+  describe('with LOGO_CDN_URL set', () => {
+    it.each([
+      ['catalog brand only', NETFLIX, `${CDN}/netflix.com`],
+      ["owner's choice over the brand", { ...NETFLIX, logoDomain: 'hulu.com' }, `${CDN}/hulu.com`],
+      [
+        'custom store with a choice',
+        { logoDomain: 'planetfitness.com' },
+        `${CDN}/planetfitness.com`,
+      ],
+      ['hidden brand', { ...NETFLIX, logoHidden: true }, undefined],
+      ['hidden choice', { logoDomain: 'hulu.com', logoHidden: true }, undefined],
+      ['nothing, not even a bucket file', { logoPath: 'v1/netflix.png' }, undefined],
+    ] as [string, LogoSource, string | undefined][])('%s', (_, source, expected) => {
+      expect(thumbnailUrl(source, BASE, CDN)).toBe(expected);
+    });
+
+    it('ignores a trailing slash on the setting', () => {
+      expect(thumbnailUrl(NETFLIX, BASE, `${CDN}/`)).toBe(`${CDN}/netflix.com`);
+    });
+  });
+
+  describe('without LOGO_CDN_URL, as deployed today', () => {
+    it.each([undefined, null, '', '  '])('keeps the bucket logo when the setting is %p', (cdn) => {
+      expect(thumbnailUrl(NETFLIX, BASE, cdn)).toBe(BUCKET_NETFLIX);
+    });
+
+    it.each([
+      ['choice equal to the brand', { ...NETFLIX, logoDomain: 'Netflix.com' }, BUCKET_NETFLIX],
+      // The bucket only holds catalog files: showing Netflix's would undo the owner's choice.
+      ["owner's choice over the brand", { ...NETFLIX, logoDomain: 'hulu.com' }, undefined],
+      ['custom store with a choice', { logoDomain: 'planetfitness.com' }, undefined],
+      ['hidden brand', { ...NETFLIX, logoHidden: true }, undefined],
+    ] as [string, LogoSource, string | undefined][])('%s', (_, source, expected) => {
+      expect(thumbnailUrl(source, BASE)).toBe(expected);
+    });
+  });
+
+  it('puts the CDN logo on a subscription reminder, glyph still sent', () => {
+    const payload = reminderPayload(
+      {
+        kind: 'subscription',
+        title: 'Hulu',
+        body: 'Renews tomorrow · $17.99',
+        targetId: 'sub-2',
+        ...NETFLIX,
+        logoDomain: 'hulu.com',
+        categoryId: 'entertainment',
+      },
+      BASE,
+      CDN,
+    );
+    expect(payload.card).toMatchObject({ logo: `${CDN}/hulu.com`, glyph: 'entertainment' });
+  });
+
+  it('leaves a bill reminder on its icon when its owner chose letters', () => {
+    const payload = reminderPayload(
+      {
+        kind: 'bill',
+        title: 'Electric',
+        body: 'Due tomorrow · $80.00',
+        targetId: 'bill-2',
+        brandDomain: 'aep.com',
+        logoPath: 'v1/aep.png',
+        logoHidden: true,
+        categoryId: 'energy',
+      },
+      BASE,
+      CDN,
+    );
+    expect(payload.card?.logo).toBeUndefined();
+    expect(payload.card?.glyph).toBe('energy');
+  });
+
+  it('puts the CDN logo on a charge from a custom store', () => {
+    const payload = chargePayload(
+      {
+        label: 'Planet Fitness',
+        amount: 24.99,
+        chargedOn: '2026-10-01',
+        subscriptionId: 'sub-3',
+        logoDomain: 'planetfitness.com',
+        glyph: 'fitness',
+      },
+      BASE,
+      CDN,
+    );
+    expect(payload.card).toMatchObject({ logo: `${CDN}/planetfitness.com`, glyph: 'fitness' });
+  });
+
+  it('keeps a charge on the bucket logo without the setting', () => {
+    const payload = chargePayload(
+      { label: 'Netflix', amount: 15.49, chargedOn: '2026-10-01', subscriptionId: 's', ...NETFLIX },
+      BASE,
+    );
+    expect(payload.card?.logo).toBe(BUCKET_NETFLIX);
+  });
+});
+
+describe('the function itself (Deno, so read as source)', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../../../supabase/functions/send-push/index.ts'),
+    'utf8',
+  );
+
+  it.each(['bills', 'subscriptions'])('reads the logo choice and brand for %s', (table) => {
+    const read = source.match(
+      new RegExp(`\\.from\\('${table}'\\)\\s*\\.select\\(\\s*\`([^\`]*)\``),
+    );
+    expect(read).not.toBeNull();
+    expect(read![1]).toContain('${logo}brands(domain, logo_path)');
+    expect(source).toContain("const LOGO_COLUMNS = 'logo_domain, logo_hidden, '");
+  });
+
+  it('falls back to the old read on a database without the columns', () => {
+    expect(source).toMatch(/error\?\.code === '42703' \? read\(''\)/);
+  });
+
+  it('takes the CDN from LOGO_CDN_URL and hands it to both card builders', () => {
+    expect(source).toContain("Deno.env.get('LOGO_CDN_URL')");
+    expect(source).toMatch(/chargeData\(ctx, supabaseUrl, logoCdnUrl,/);
+    expect(source).toMatch(/reminderData\(ctx, supabaseUrl, logoCdnUrl,/);
   });
 });

@@ -42,6 +42,8 @@ import {
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { success, warn } from '@/lib/haptics';
 import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { logoColumns } from '@/lib/logo-columns';
+import { logoDomainOf } from '@/lib/logo-domain';
 import { amortise, termsFromStored } from '@/lib/loan';
 import {
   cameFromVoice,
@@ -196,12 +198,13 @@ function BillForm({
     existing?.category_id ?? prefill?.categoryId ?? '',
   );
   // Optional: many bills (rent, HOA fees, a loan from a relative) have no company behind them.
+  // No logo choice is carried over, so saving the edit leaves the row's own logo alone.
   const [issuer, setIssuer] = useState<BrandSelection | null>(
     existing?.brand_id
       ? {
           brandId: existing.brand_id,
           name: existing.name,
-          domain: existing.brands?.domain ?? null,
+          domain: logoDomainOf(existing),
           // Bills carry their own category, chosen a step earlier; the brand never answers it.
           categoryId: existing.category_id,
         }
@@ -209,6 +212,7 @@ function BillForm({
         ? null
         : (prefill?.issuer ?? null),
   );
+  const [issuerChanged, setIssuerChanged] = useState(false);
   const [name, setName] = useState(existing?.name ?? prefillName(prefill));
   const [iconId, setIconId] = useState(existing?.icon_id ?? 'other');
   const [amount, setAmount] = useState(
@@ -246,6 +250,7 @@ function BillForm({
   // by the app, not the person) counts as unnamed; anything typed is left alone.
   const handleIssuer = (next: BrandSelection | null) => {
     setIssuer(next);
+    setIssuerChanged(true);
     if (!next) return;
 
     const current = name.trim();
@@ -348,7 +353,14 @@ function BillForm({
       fail(built.message, built.field);
       return;
     }
-    const { values } = built;
+    // A company taken off takes its logo with it; one left alone keeps the row's own choice.
+    const values = {
+      ...built.values,
+      ...logoColumns(
+        issuer ?? (issuerChanged ? { logoDomain: null, logoHidden: false } : null),
+        existing,
+      ),
+    };
 
     try {
       // What a recorded charge copies from the bill.
@@ -508,6 +520,8 @@ function BillForm({
             value={issuer}
             onChange={handleIssuer}
             placeholder={ISSUER_HINT[categoryId] ?? ISSUER_HINT.other}
+            category={categoryId}
+            noLogo="icon"
           />
 
           <TextField

@@ -21,6 +21,7 @@ import { getBillCategory } from '@/data/bills-mock';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
+import { logoDomainOf } from '@/lib/logo-domain';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
@@ -56,7 +57,7 @@ export default function BillPlansScreen() {
         amount: -row.amount,
         // Next due, not this month's date: this page is the schedule itself.
         dueDate: row.next_due_on ?? '',
-        domain: row.brands?.domain ?? null,
+        domain: logoDomainOf(row),
         recurrence: row.recurrence,
         categoryId: row.category_id,
         iconId: row.icon_id ?? undefined,

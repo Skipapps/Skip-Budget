@@ -2,10 +2,12 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { useBills, usePaymentSources } from '@/api/queries';
 import { BillMark } from '@/components/bills/bill-mark';
+import { ChangeLogoButton } from '@/components/brands/change-logo-button';
 import { RECURRENCE_LABELS } from '@/components/bills/bill-row';
 import { PlanDetail, type PlanDetailRow } from '@/components/plans/plan-detail';
 import { BILL_CATEGORIES } from '@/data/bills-mock';
 import { formatFullDate } from '@/lib/date';
+import { logoDomainOf } from '@/lib/logo-domain';
 
 const asDate = (iso: string) => formatFullDate(new Date(`${iso}T00:00:00`));
 
@@ -44,13 +46,15 @@ export default function BillDetailScreen() {
       onRetry={() => void bills.refetch()}
       mark={
         bill ? (
-          <BillMark
-            categoryId={bill.category_id}
-            iconId={bill.icon_id}
-            domain={bill.brands?.domain}
-            name={bill.name}
-            size={52}
-          />
+          <ChangeLogoButton kind="bill" id={id} name={bill.name}>
+            <BillMark
+              categoryId={bill.category_id}
+              iconId={bill.icon_id}
+              domain={logoDomainOf(bill)}
+              name={bill.name}
+              size={52}
+            />
+          </ChangeLogoButton>
         ) : null
       }
       frequency={bill ? (RECURRENCE_LABELS[bill.recurrence] ?? bill.recurrence) : ''}

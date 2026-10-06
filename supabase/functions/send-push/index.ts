@@ -14,6 +14,8 @@
 //   mints one per request, so it is made once per invocation.
 //
 // Secrets: APNS_KEY (the .p8 contents), APNS_KEY_ID, APNS_TEAM_ID.
+// Optional: LOGO_CDN_URL (e.g. https://logos.skipapps.net/logos, no trailing slash) loads thumbnails
+// from the logo service by domain; unset, they come from the brand-logos bucket as before.
 // Deploy:  npx supabase functions deploy send-push --no-verify-jwt
 //
 // No JWT, because pg_cron has no session to present: it proves itself with a secret the database
@@ -29,6 +31,7 @@ import {
   noticePayload,
   receiptsPayload,
   reminderPayload,
+  type LogoSource,
   type SourceRow,
   type TapPayload,
 } from './card.ts';
@@ -212,7 +215,7 @@ type Context = {
       icon_id: string | null;
       card_id: string | null;
       bank_account_id: string | null;
-      logo_path: string | null;
+      logo: LogoSource;
     }
   >;
   subscriptions: Map<
@@ -221,7 +224,7 @@ type Context = {
       category_id: string | null;
       card_id: string | null;
       bank_account_id: string | null;
-      logo_path: string | null;
+      logo: LogoSource;
     }
   >;
   sources: Map<string, SourceRow>;
@@ -248,10 +251,38 @@ const EMPTY: Context = {
 const chargeKey = (userId: string, label: string, chargedOn: string) =>
   `${userId}|${label}|${chargedOn}`;
 
+type LogoColumns = {
+  logo_domain?: string | null;
+  logo_hidden?: boolean | null;
+  brands: unknown;
+};
+
 /** A to-one embed arrives as an object, or as a one-row array from some joins. */
-function logoOf(brands: unknown): string | null {
-  const row = Array.isArray(brands) ? brands[0] : brands;
-  return (row as { logo_path?: string | null } | null)?.logo_path ?? null;
+function logoOf(row: LogoColumns): LogoSource {
+  const brand = (Array.isArray(row.brands) ? row.brands[0] : row.brands) as {
+    domain?: string | null;
+    logo_path?: string | null;
+  } | null;
+  return {
+    logoDomain: row.logo_domain ?? null,
+    logoHidden: row.logo_hidden ?? false,
+    brandDomain: brand?.domain ?? null,
+    logoPath: brand?.logo_path ?? null,
+  };
+}
+
+const LOGO_COLUMNS = 'logo_domain, logo_hidden, ';
+
+/**
+ * Reads plans with the per-row logo columns, or without them (42703, undefined column) on a
+ * database not yet migrated: the function may well be deployed first, and a missing column would
+ * otherwise empty the whole context and strip every card from the run.
+ */
+async function withLogoColumns<R extends { error: { code?: string } | null }>(
+  read: (logoColumns: string) => PromiseLike<R>,
+): Promise<R> {
+  const result = await read(LOGO_COLUMNS);
+  return result.error?.code === '42703' ? read('') : result;
 }
 
 /**
@@ -303,18 +334,21 @@ async function loadContext(
     ] as string[];
 
     if (billIds.length > 0) {
-      const { data, error } = await supabase
-        .from('bills')
-        .select('id, category_id, icon_id, card_id, bank_account_id, brands(logo_path)')
-        .in('id', billIds);
+      const { data, error } = await withLogoColumns((logo) =>
+        supabase
+          .from('bills')
+          .select(
+            `id, category_id, icon_id, card_id, bank_account_id, ${logo}brands(domain, logo_path)`,
+          )
+          .in('id', billIds),
+      );
       if (error) throw error;
-      type BillRow = {
+      type BillRow = LogoColumns & {
         id: string;
         category_id: string | null;
         icon_id: string | null;
         card_id: string | null;
         bank_account_id: string | null;
-        brands: unknown;
       };
       for (const row of (data ?? []) as unknown as BillRow[]) {
         ctx.bills.set(row.id, {
@@ -322,30 +356,31 @@ async function loadContext(
           icon_id: row.icon_id,
           card_id: row.card_id,
           bank_account_id: row.bank_account_id,
-          logo_path: logoOf(row.brands),
+          logo: logoOf(row),
         });
       }
     }
 
     if (subscriptionIds.length > 0) {
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select('id, category_id, card_id, bank_account_id, brands(logo_path)')
-        .in('id', subscriptionIds);
+      const { data, error } = await withLogoColumns((logo) =>
+        supabase
+          .from('subscriptions')
+          .select(`id, category_id, card_id, bank_account_id, ${logo}brands(domain, logo_path)`)
+          .in('id', subscriptionIds),
+      );
       if (error) throw error;
-      type SubscriptionRow = {
+      type SubscriptionRow = LogoColumns & {
         id: string;
         category_id: string | null;
         card_id: string | null;
         bank_account_id: string | null;
-        brands: unknown;
       };
       for (const row of (data ?? []) as unknown as SubscriptionRow[]) {
         ctx.subscriptions.set(row.id, {
           category_id: row.category_id,
           card_id: row.card_id,
           bank_account_id: row.bank_account_id,
-          logo_path: logoOf(row.brands),
+          logo: logoOf(row),
         });
       }
     }
@@ -399,6 +434,7 @@ async function loadContext(
 function reminderData(
   ctx: Context,
   supabaseUrl: string,
+  logoCdnUrl: string,
   row: { reminder_id: string; title: string; body: string },
 ): TapPayload | undefined {
   const target = ctx.reminders.get(row.reminder_id);
@@ -414,11 +450,12 @@ function reminderData(
         title: row.title,
         body: row.body,
         targetId: target.subscription_id,
-        logoPath: plan?.logo_path,
+        ...plan?.logo,
         categoryId: plan?.category_id,
         payer: payerOf(plan),
       },
       supabaseUrl,
+      logoCdnUrl,
     );
   }
   if (target.bill_id) {
@@ -429,12 +466,13 @@ function reminderData(
         title: row.title,
         body: row.body,
         targetId: target.bill_id,
-        logoPath: plan?.logo_path,
+        ...plan?.logo,
         categoryId: plan?.category_id,
         iconId: plan?.icon_id,
         payer: payerOf(plan),
       },
       supabaseUrl,
+      logoCdnUrl,
     );
   }
   if (target.card_id) {
@@ -465,7 +503,12 @@ function reminderData(
 }
 
 /** The card for one recorded charge. */
-function chargeData(ctx: Context, supabaseUrl: string, charge: Charge): TapPayload {
+function chargeData(
+  ctx: Context,
+  supabaseUrl: string,
+  logoCdnUrl: string,
+  charge: Charge,
+): TapPayload {
   const found = ctx.charges.get(chargeKey(charge.user_id, charge.label, charge.charged_on));
   const bill = found?.bill_id ? ctx.bills.get(found.bill_id) : undefined;
   const subscription = found?.subscription_id
@@ -478,7 +521,7 @@ function chargeData(ctx: Context, supabaseUrl: string, charge: Charge): TapPaylo
       chargedOn: charge.charged_on,
       billId: found?.bill_id,
       subscriptionId: found?.subscription_id,
-      logoPath: subscription?.logo_path ?? bill?.logo_path,
+      ...(subscription ?? bill)?.logo,
       glyph: subscription
         ? subscription.category_id
         : bill
@@ -487,6 +530,7 @@ function chargeData(ctx: Context, supabaseUrl: string, charge: Charge): TapPaylo
       payer: found ? ctx.sources.get(found.card_id ?? found.bank_account_id ?? '') : undefined,
     },
     supabaseUrl,
+    logoCdnUrl,
   );
 }
 
@@ -576,6 +620,7 @@ Deno.serve(async (request) => {
 
   const jwt = await providerToken();
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const logoCdnUrl = Deno.env.get('LOGO_CDN_URL') ?? '';
   const ctx = await loadContext(
     supabase,
     rows.map((row) => row.reminder_id),
@@ -606,7 +651,7 @@ Deno.serve(async (request) => {
     const data =
       theirs.length > 3
         ? digestPayload(theirs.length, total)
-        : chargeData(ctx, supabaseUrl, theirs[0]);
+        : chargeData(ctx, supabaseUrl, logoCdnUrl, theirs[0]);
 
     for (const tokenRow of tokens) {
       if (await push(supabase, tokenRow, jwt, title, body, data)) announced += 1;
@@ -615,7 +660,7 @@ Deno.serve(async (request) => {
 
   for (const row of rows) {
     let delivered = false;
-    const data = reminderData(ctx, supabaseUrl, row);
+    const data = reminderData(ctx, supabaseUrl, logoCdnUrl, row);
     for (const tokenRow of await tokensFor(supabase, row.user_id)) {
       if (await push(supabase, tokenRow, jwt, row.title, row.body, data)) delivered = true;
     }
