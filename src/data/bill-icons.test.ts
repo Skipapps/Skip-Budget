@@ -12,7 +12,6 @@ import {
 
 import { BILL_CATEGORIES, getBillIcon } from '@/data/bills-mock';
 import { FALLBACK_GLYPH, GLYPHS } from '@/data/glyphs';
-import { groupIconFor } from '@/data/group-icons';
 
 // Lucide ships untransformed ESM; each icon stands in as its own name.
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
@@ -85,10 +84,5 @@ describe('the glyph set', () => {
     'finance',
   ])('has a glyph for the %s spending category', (id) => {
     expect(GLYPHS[id]).toBeDefined();
-  });
-
-  it('draws groups from the same set', () => {
-    expect(groupIconFor('housing')).toBe(House);
-    expect(groupIconFor('gone')).toBe(FALLBACK_GLYPH);
   });
 });

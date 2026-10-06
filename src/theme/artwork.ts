@@ -30,7 +30,6 @@ import TileMonthlyBills from '@/assets/illustrations/tile-monthly-bills.svg';
 import TileReceipts from '@/assets/illustrations/tile-receipts.svg';
 import TileSalary from '@/assets/illustrations/tile-salary.svg';
 import TileSavings from '@/assets/illustrations/tile-savings.svg';
-import TileSplitCalculator from '@/assets/illustrations/tile-split-calculator.svg';
 import TileSubscriptions from '@/assets/illustrations/tile-subscriptions.svg';
 import WelcomeHero from '@/assets/illustrations/welcome-hero.svg';
 import WelcomePrivacy from '@/assets/illustrations/welcome-privacy.svg';
@@ -53,7 +52,6 @@ const ARTWORK = {
   tileReceipts: { light: TileReceipts, dark: TileReceipts },
   tileSalary: { light: TileSalary, dark: TileSalary },
   tileSavings: { light: TileSavings, dark: TileSavings },
-  tileSplitCalculator: { light: TileSplitCalculator, dark: TileSplitCalculator },
   tileSubscriptions: { light: TileSubscriptions, dark: DarkTileSubscriptions },
 
   emptyBills: { light: StateEmptyBills, dark: DarkStateEmptyBills },

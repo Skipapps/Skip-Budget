@@ -98,8 +98,8 @@ function useUpdate<TInput extends Record<string, unknown>>(table: string) {
 /**
  * A delete that is allowed to match nothing: the row the person wanted gone is already gone (double
  * tap, removed on another device), so raising NOTHING_UPDATED would be noise. This gives up
- * detecting a delete that RLS refuses (also 204); no screen reaches one, since `groups`, the one
- * owner-only table, is archived rather than deleted. Revisit if a shared table becomes directly
+ * detecting a delete that RLS refuses (also 204); no screen reaches one, since every table the app
+ * deletes from shows each person only their own rows. Revisit if a shared table becomes directly
  * deletable.
  */
 function useRemove(table: string) {

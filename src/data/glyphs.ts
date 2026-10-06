@@ -38,7 +38,7 @@ import {
 export type Glyph = LucideIcon;
 
 /**
- * Every glyph a bill, group or spending category can wear, keyed by the id stored against it. One
+ * Every glyph a bill or spending category can wear, keyed by the id stored against it. One
  * table so the same idea (Insurance, say) is drawn the same way everywhere.
  */
 export const GLYPHS: Record<string, Glyph> = {
@@ -54,7 +54,7 @@ export const GLYPHS: Record<string, Glyph> = {
   family: Users,
   other: ReceiptText,
 
-  // Icons offered for a bill someone names themselves, and for groups.
+  // Icons offered for a bill someone names themselves.
   education: GraduationCap,
   pets: PawPrint,
   tv: Tv,

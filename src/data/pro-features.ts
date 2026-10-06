@@ -35,29 +35,6 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
       },
     ],
   },
-  splits: {
-    id: 'splits',
-    artwork: 'tileSplitCalculator',
-    title: 'Run every group at once',
-    tagline: 'The flat, the trip, the dinner — all open at the same time.',
-    benefits: [
-      {
-        title: 'As many open groups as life has',
-        detail:
-          'Your first group is on the house, and joining other people’s groups is always free. Pro opens as many of your own as you like — the flat does not close because a holiday started.',
-      },
-      {
-        title: 'Friends without phone numbers',
-        detail:
-          'A private code adds a friend; nobody can find you without it. People not on Skip yet can be a name until they join.',
-      },
-      {
-        title: 'Settling that stays honest',
-        detail:
-          'Payments are written down, not transferred — Skip never touches the money, so the ledger is the truth of what happened.',
-      },
-    ],
-  },
   insights: {
     id: 'insights',
     artwork: 'insights',
