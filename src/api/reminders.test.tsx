@@ -28,6 +28,7 @@ jest.mock('@/lib/supabase', () => {
   const build = (table: string) => {
     const builder: Record<string, unknown> = {
       select: () => builder,
+      eq: () => builder,
       maybeSingle: () => Promise.resolve({ data: mockProfile, error: null }),
       update: (values: Record<string, unknown>) => ({
         eq: (_column: string, id: unknown) => ({

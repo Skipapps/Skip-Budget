@@ -290,6 +290,8 @@ export function useReceiptReminder() {
           const { data, error } = await supabase
             .from('profiles')
             .select('receipt_reminder_enabled, receipt_reminder_at')
+            // The select policy also returns friends' and groupmates' rows, so name this one.
+            .eq('id', userId!)
             .maybeSingle();
           if (error) throw error;
           return (data ?? null) as ReceiptReminderRow | null;

@@ -21,9 +21,9 @@ import { usePro } from '@/api/pro';
 import { useUserId } from '@/providers/session-provider';
 
 /**
- * Read hooks for the live data. RLS scopes every table to auth.uid(), so no query filters by
- * user_id. Queries stay disabled until a session exists, or the first render fires a request that
- * can only return nothing.
+ * Read hooks for the live data. RLS scopes every table but `profiles` to auth.uid(), so only the
+ * profile read filters by id. Queries stay disabled until a session exists, or the first render
+ * fires a request that can only return nothing.
  */
 
 export type CardRow = {
@@ -118,12 +118,15 @@ export type ProfileRow = {
 };
 
 export function useProfile() {
+  const userId = useUserId();
   return useOwnerQuery<ProfileRow | null>('profile', async () => {
     const { data, error } = await supabase
       .from('profiles')
       .select(
         'id, display_name, currency, avatar_id, getting_started_dismissed_at, reminders_enabled_at',
       )
+      // The select policy also returns friends' and groupmates' rows, so name this one.
+      .eq('id', userId!)
       .maybeSingle();
     if (error) throw error;
     return data;
