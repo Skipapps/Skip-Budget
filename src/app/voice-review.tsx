@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } 
 import { AccessibilityInfo, Pressable, Text, View } from 'react-native';
 
 import { useBrandDirectory } from '@/api/brands';
+import { usePro } from '@/api/pro';
 import {
   buildBillValues,
   buildReceiptValues,
@@ -37,6 +38,7 @@ import { BILL_CATEGORIES, RECURRENCES } from '@/data/bills-mock';
 import { formatRelativeDay } from '@/lib/date';
 import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
+import { refusedForPro } from '@/lib/pro-refusal';
 import { success, warn } from '@/lib/haptics';
 import { useToday } from '@/lib/use-today';
 import { parseVoice, type VoiceCycle, type VoiceDraft, type VoiceKind } from '@/lib/voice';
@@ -151,6 +153,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   const createReceipt = useCreateReceipt();
   const createBill = useCreateBill();
   const createSubscription = useCreateSubscription();
+  const { pro } = usePro();
 
   const { id, draft, entry, touched, edited } = session;
   const kind = entry.kind;
@@ -261,11 +264,17 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
       router.dismissTo('/home');
       // `busy` stays set: the page is leaving, and nothing on it may save again.
     } catch (thrown) {
+      setSaving(false);
+      busy.current = false;
+      // The database's Pro wall is an answer only for someone the app also thinks is free; for a
+      // payer it is a disagreement between the two, reported like any failure.
+      if (refusedForPro(thrown) && !pro) {
+        router.push({ pathname: '/pro-feature', params: { id: 'voice' } });
+        return;
+      }
       failureMessage(thrown);
       warn();
       setFailed(true);
-      setSaving(false);
-      busy.current = false;
     }
   };
 

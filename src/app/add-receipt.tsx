@@ -1,7 +1,14 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ImageUp, ScanLine, Trash2, type LucideIcon } from 'lucide-react-native';
+import {
+  Banknote,
+  CreditCard,
+  ImageUp,
+  ScanLine,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
@@ -16,6 +23,7 @@ import {
 } from '@/api/mutations';
 import { usePaymentSources, useReceipt } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
+import { BrandMark } from '@/components/brands/brand-mark';
 import { openChangeLogo } from '@/components/brands/change-logo-button';
 import { AmountStep } from '@/components/flow/amount-step';
 import { InlineCalendar } from '@/components/flow/inline-calendar';
@@ -27,11 +35,14 @@ import { useDialog, useConfirm } from '@/providers/dialog-provider';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
+import { GlyphWell, ReviewRow } from '@/components/voice/review-row';
 import { success, warn } from '@/lib/haptics';
 import { withTap } from '@/lib/press';
 import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
-import { logoColumns } from '@/lib/logo-columns';
+import { formatCurrency } from '@/lib/format';
+import { logoColumns, selectionLogo } from '@/lib/logo-columns';
 import { logoDomainOf, type LogoFields } from '@/lib/logo-domain';
+import { refusedForPro } from '@/lib/pro-refusal';
 import { parseReceipt, parseReceiptFromLines, type ParsedReceipt } from '@/lib/receipt-parser';
 import {
   clearVoiceDraft,
@@ -67,6 +78,16 @@ function listWords(fields: ScanField[]): string {
   const words = fields.map((field) => FIELD_WORDS[field]);
   if (words.length <= 1) return words[0] ?? '';
   return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
+}
+
+/**
+ * Where a reading lands: the review and Save when it holds what Save needs, else the first step
+ * still missing it, so nobody arrives on a Save that cannot save.
+ */
+function landingStep(amount: string, store: BrandSelection | null): number {
+  const value = Number(amount);
+  if (!(Number.isFinite(value) && value > 0)) return 0;
+  return store ? 2 : 1;
 }
 
 type Initial = {
@@ -230,6 +251,10 @@ export default function AddReceiptScreen() {
       initial={initial}
       saved={existing}
       initialScan={existing ? null : scanned.result}
+      // Only a scan opens past the amount; a voice hand-off and an edit start at the beginning.
+      initialStep={
+        !existing && scanned.result ? landingStep(scanned.initial.amount, scanned.initial.store) : 0
+      }
       fromVoice={fromVoice}
     />
   );
@@ -240,6 +265,7 @@ function ReceiptForm({
   initial,
   saved = null,
   initialScan,
+  initialStep = 0,
   fromVoice = false,
 }: {
   id?: string;
@@ -247,6 +273,7 @@ function ReceiptForm({
   /** The row being edited, for the logo it already has. */
   saved?: LogoFields | null;
   initialScan: ScanResult | null;
+  initialStep?: number;
   /** Saved from a voice hand-off: back to Home, never onto the review page again. */
   fromVoice?: boolean;
 }) {
@@ -268,7 +295,7 @@ function ReceiptForm({
   const [note, setNote] = useState(initial.note);
   const [captureSource, setCaptureSource] = useState(initial.captureSource);
 
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(initialStep);
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(initialScan);
@@ -282,7 +309,7 @@ function ReceiptForm({
   const deleteReceipt = useDeleteReceipt();
   const confirm = useConfirm();
   const ask = useDialog();
-  const { pro } = usePro();
+  const { pro, ready } = usePro();
 
   // A hand edit retires the scan report: telling someone to check an amount they just corrected is
   // worse than silence.
@@ -300,37 +327,38 @@ function ReceiptForm({
   /** Turns recognised text into filled fields, leaving anything unsure alone. */
   const applyScan = (parsed: ParsedReceipt, from: 'scan' | 'upload') => {
     const found: ScanField[] = [];
-    let filled = 0;
+    let nextStore = store;
+    let nextAmount = amount;
 
     if (parsed.merchant) {
       const brand = matchBrand(parsed.merchant, directory);
-      setStore(
-        brand
-          ? {
-              brandId: brand.id,
-              name: brand.name,
-              domain: brand.domain,
-              categoryId: brand.category_id,
-            }
-          : {
-              brandId: null,
-              name: parsed.merchant,
-              domain: null,
-              categoryId: guessCategory(parsed.merchant),
-            },
-      );
+      nextStore = brand
+        ? {
+            brandId: brand.id,
+            name: brand.name,
+            domain: brand.domain,
+            categoryId: brand.category_id,
+          }
+        : {
+            brandId: null,
+            name: parsed.merchant,
+            domain: null,
+            categoryId: guessCategory(parsed.merchant),
+          };
+      setStore(nextStore);
       found.push('store');
-      filled += 1;
     }
     if (parsed.total !== undefined) {
-      setAmount(String(parsed.total));
+      nextAmount = String(parsed.total);
+      setAmount(nextAmount);
       found.push('amount');
-      filled += 1;
     }
-    if (parsed.date) {
-      setDate(new Date(`${parsed.date}T00:00:00`));
+    // The parser allows any day up to 31, and "02/30" would save as March or not at all; an
+    // impossible day is dropped and the date stays as it was.
+    const day = readDayParam(parsed.date);
+    if (day) {
+      setDate(day);
       found.push('date');
-      filled += 1;
     }
     if (parsed.last4) {
       const digits = parsed.last4;
@@ -338,14 +366,13 @@ function ReceiptForm({
       if (matched) {
         setSourceId(matched.id);
         found.push('card');
-        filled += 1;
       }
     }
 
     setCaptureSource(from);
     setError(null);
     setScanResult(
-      filled === 0
+      found.length === 0
         ? { read: [], missed: ['store', 'date', 'amount'] }
         : {
             read: found,
@@ -354,9 +381,12 @@ function ReceiptForm({
             ),
           },
     );
+    if (found.length > 0) setStep(landingStep(nextAmount, nextStore));
   };
 
   const handleScan = async () => {
+    // Until Pro is known a tap does nothing, so someone who paid is never sent to the explainer.
+    if (!ready) return;
     setError(null);
     setScanResult(null);
 
@@ -434,6 +464,7 @@ function ReceiptForm({
 
   /** Photos and files are separate pickers on iOS, so ask which one. */
   const handleUpload = async () => {
+    if (!ready) return;
     setError(null);
     if (!pro) {
       router.push({ pathname: '/pro-feature', params: { id: 'scan' } });
@@ -489,6 +520,16 @@ function ReceiptForm({
       success();
       leave();
     } catch (thrown) {
+      // The database's Pro wall is an answer for someone the app also thinks is free: show what Pro
+      // adds, pushed so Back returns to the filled-in form. For someone the app thinks has Pro it is
+      // a disagreement between the two, so it is reported like any failure.
+      if (refusedForPro(thrown) && !pro) {
+        router.push({
+          pathname: '/pro-feature',
+          params: { id: captureSource === 'voice' ? 'voice' : 'scan' },
+        });
+        return;
+      }
       warn();
       setError({ message: failureMessage(thrown), step: 2 });
     }
@@ -522,6 +563,10 @@ function ReceiptForm({
   const primaryLabel =
     step < 2 ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save receipt';
   const stepError = error && error.step === step ? error.message : null;
+  // A new scanned receipt shows what was read above the date, so the last step is a review.
+  const reviewing =
+    step === 2 && !editing && (captureSource === 'scan' || captureSource === 'upload');
+  const sourceLabel = sources.find((source) => source.id === sourceId)?.label ?? null;
 
   return (
     <StepFlow
@@ -537,30 +582,30 @@ function ReceiptForm({
       question={question}
       // Capture sits above the question: a paper receipt fills amount, store and date at once.
       headerSlot={
-        step === 0 ? (
+        step === 0 || scanResult || reviewing ? (
           <View className="w-full gap-2">
-            {!editing && isRecognitionAvailable() ? (
+            {step === 0 && !editing && isRecognitionAvailable() ? (
               <View className="w-full flex-row gap-3">
                 <CaptureButton
                   icon={ScanLine}
                   label="Scan"
                   hint="Point the camera at a paper receipt"
                   onPress={handleScan}
-                  disabled={reading}
-                  proBadge={!pro}
+                  disabled={reading || !ready}
+                  proBadge={ready && !pro}
                 />
                 <CaptureButton
                   icon={ImageUp}
                   label="Upload"
                   hint="Upload a photo or PDF of a receipt"
                   onPress={handleUpload}
-                  disabled={reading}
-                  proBadge={!pro}
+                  disabled={reading || !ready}
+                  proBadge={ready && !pro}
                 />
               </View>
             ) : null}
 
-            {reading ? (
+            {step === 0 && reading ? (
               <View className="mt-2 w-full flex-row items-center justify-center gap-2">
                 <ActivityIndicator size="small" color={colors.muted} />
                 <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
@@ -588,6 +633,43 @@ function ReceiptForm({
                     Check the {listWords(scanResult.missed)} below — it will save either way.
                   </Text>
                 ) : null}
+              </View>
+            ) : null}
+
+            {reviewing ? (
+              <View className="mt-2 w-full overflow-hidden rounded-[16px] border border-line bg-card py-1">
+                <ReviewRow
+                  label="Amount"
+                  value={amountReady ? formatCurrency(total) : null}
+                  required
+                  leading={<GlyphWell icon={Banknote} />}
+                  onPress={() => setStep(0)}
+                />
+                <View className="ml-[52px] h-px bg-line/60" />
+                <ReviewRow
+                  label="Store"
+                  value={store?.name ?? null}
+                  required
+                  leading={
+                    store ? (
+                      <BrandMark
+                        name={store.name}
+                        domain={selectionLogo(store)}
+                        hidden={store.logoHidden}
+                        size={40}
+                      />
+                    ) : null
+                  }
+                  onPress={() => setStep(1)}
+                />
+                <View className="ml-[52px] h-px bg-line/60" />
+                <ReviewRow
+                  label="Paid with"
+                  value={sourceLabel}
+                  required={false}
+                  leading={<GlyphWell icon={CreditCard} />}
+                  onPress={() => setStep(1)}
+                />
               </View>
             ) : null}
           </View>

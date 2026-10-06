@@ -295,8 +295,7 @@ describe('Add receipt — a scan that arrives as route params', () => {
 
     expect(screen.getByText('Read the store, amount, date and card.')).toBeTruthy();
 
-    await press(screen, 'Continue');
-    await press(screen, 'Continue');
+    // Opens on the last step: only review and save.
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -318,8 +317,6 @@ describe('Add receipt — a scan that arrives as route params', () => {
     mockParams = { scannedStore: 'Corner Deli', scannedAmount: '1100' };
     const screen = await render(<AddReceiptScreen />);
 
-    await press(screen, 'Continue');
-    await press(screen, 'Continue');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));

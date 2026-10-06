@@ -5,6 +5,7 @@ import { usePaymentSources } from '@/api/queries';
 import type { BrandSelection } from '@/components/brands/brand-field';
 import { toIsoDate } from '@/lib/date';
 import { parseReceipt, parseReceiptFromLines } from '@/lib/receipt-parser';
+import { readDayParam } from '@/lib/voice-draft';
 import {
   captureReceipt,
   isCaptureAvailable,
@@ -74,7 +75,9 @@ export function useReceiptScan() {
       }
 
       if (parsed.total !== undefined) read.push('amount');
-      if (parsed.date) read.push('date');
+      // The parser allows any day up to 31; an impossible one ("02/30") is not a date that was read.
+      const day = readDayParam(parsed.date);
+      if (day) read.push('date');
 
       const matchedSource = parsed.last4
         ? (sources.find((source) => source.label.endsWith(parsed.last4!)) ?? null)
@@ -86,7 +89,7 @@ export function useReceiptScan() {
       return {
         store,
         amount,
-        date: parsed.date ? new Date(`${parsed.date}T00:00:00`) : new Date(),
+        date: day ?? new Date(),
         sourceId: matchedSource?.id ?? null,
         read,
         complete: Boolean(store) && amount !== null && amount > 0,

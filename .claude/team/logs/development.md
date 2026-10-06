@@ -3678,3 +3678,58 @@ logos.skipapps.net, and the main tree's .env.local now has the 3 LOGO vars.
 
 **Non-blocking:** useSyncExternalStore has no getServerSnapshot (only matters if web static output is ever built).
 "No logo found for that website." also shows for input that is not a website. The jest worker-exit notice.
+
+### 2026-10-06 — Dana — scanned receipts land on review-and-save (Founder's device report)
+
+**Outcome:** Done in the logo-service worktree, nothing committed. tsc 0; full `jest --ci` 108/108 suites,
+1734/1734; prettier clean on the 9 files; eslint `--no-cache` src = 19 (= baseline). Mutation-checked: route scan
+starting at the amount, in-page scan not moving, no wait for `ready`, refusal not routed, impossible day kept,
+landing on Save with no store: each fails a test.
+
+- **Landing:** a scan (route params from the receipts list, or Scan/Upload on the form via applyScan) opens on the
+  last step when it has a usable amount and a store; no amount opens the amount, no store the store. A voice
+  hand-off and an edit still open on the amount. Back from the last step goes to the store step as before.
+- **Review:** on the last step of a new scanned/uploaded receipt, the scan report then a card of three ReviewRows
+  (reused from voice review) above "When was it?": Amount (Banknote well), Store (BrandMark with the selection's
+  logo, `hidden` honoured), Paid with (CreditCard well, optional). Each opens its step. Typed receipts unchanged.
+- **Pro:** in-page Scan/Upload ignore a tap until `usePro().ready` (as the voice button does), then send a free
+  account to /pro-feature?id=scan before the camera or picker; the PRO badge shows only once known. A save refused
+  by the database's Pro wall (`refusedForPro`, new src/lib/pro-refusal.ts) pushes /pro-feature (scan, or voice for
+  a voice capture) instead of FAILURE_MESSAGE, in add-receipt and in voice-review's receipt save.
+- **Save path:** payload checked for scan and upload (source, image_path null, brand null for a custom store, a
+  valid category, card from the last four, no logo columns). Fixed: the parser allows day 31 in any month, and
+  "02/30" went into `new Date()` unchecked on the in-page path (V8 rolls it into March; NaN would be refused). Both
+  scan paths now read the day through `readDayParam` and drop an impossible one (report no longer claims it).
+
+**Not verified:** on a device (Founder): camera and photo-library paths end to end, and the save once his server
+Pro row exists. Raised: the parser's `isoDate` itself should reject impossible days (receipt-parser, not mine).
+
+---
+
+## 2026-10-06 — Dmitri (Development Lead) — review of Dana's scan-landing / Pro-refusal fix (uncommitted, on 0ccd23c)
+
+**Outcome:** FIX-FIRST, one small blocking item. Edited nothing but this log.
+
+**Checks:** tsc 0. Full jest 108/108 suites, 1734/1734 (the "worker failed to exit" notice is unchanged). Prettier clean
+on the 9 changed TS/TSX files. ESLint `--no-cache` on them: 0 errors, 4 warnings, all pre-existing require() lines.
+src total 19 = baseline.
+
+**Blocking:** the refused-save routing sends a client-Pro user to the paywall. Both save paths are only reachable when
+the client already believes the person is Pro: in-page scan checks `pro`, the list scan checks `pro`, and voice-review
+is behind useProGate. So a server "part of Skip Pro" refusal there is almost always an entitlement desync, which is the
+Founder's own bug. The change shows that person "See Skip Pro" and sends Sentry nothing. Fix (Dana):
+`refusedForPro(thrown) && !pro` in add-receipt.tsx (save catch) and voice-review.tsx (add `usePro()` in Review); else
+fall through to failureMessage. Add a test for "client Pro, server refuses -> FAILURE_MESSAGE, no push".
+
+**Verified fine:** Landing step: comes from params only for a new route-param scan; edit, voice hand-off and typed
+receipts start at 0; no remount race, because the key stays 'new' for new receipts. In-page scan lands on the first
+missing step. The review card shows only on new scan/upload. The free user is stopped before the camera and picker,
+and typing stays free. The message match is exact (only Pro-wall messages contain it, and the trigger is
+before-insert). The explainer is pushed, so Back keeps the form and there is no loop. Voice vs scan id is right. The
+date guard (isIsoDay UTC round-trip) keeps leap days and month ends, and amounts are untouched.
+
+**Non-blocking:** receipts.tsx:52 list Scan has no `ready` wait (pre-existing). The capture buttons should be
+`disabled` while !ready. usePro's `ready` is true once the server answers even if the SDK has not. The root cause in
+receipt-parser.ts isoDate (day <= 31 for any month) can be fixed later, owner Diego, with a fixture (both consumers are
+now guarded).
+- 2026-10-06 Dana: Pro-wall refusal now opens the explainer only when the app also thinks the person is free (add-receipt and voice-review); a payer the server refuses gets the failure line, reported as before. Receipts-list Scan waits for Pro status; the form's Scan/Upload are dimmed until it is known. Tests for each (incl. new receipts-scan.test.tsx); tsc 0, jest 109/109 suites, prettier and eslint clean (src 19 = baseline).

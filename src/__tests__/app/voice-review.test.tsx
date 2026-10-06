@@ -330,6 +330,27 @@ describe('/voice-review — saving', () => {
     expect(mockCreateReceipt).toHaveBeenCalledTimes(2);
     expect(router.dismissTo).toHaveBeenCalledWith('/home');
   });
+
+  it('shows and reports the failure line when the database refuses for Pro someone the app thinks has it', async () => {
+    // A free account never reaches this page (the gate sends it to the explainer), so a Pro-wall
+    // refusal here is the app and the server disagreeing, which is a failure to report.
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const id = seed();
+    const refusal = { code: 'P0001', message: 'Adding receipts by voice is part of Skip Pro.' };
+    mockCreateReceipt.mockRejectedValueOnce(refusal);
+    const screen = await render(<VoiceReviewScreen />);
+
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    expect(log).toHaveBeenCalledWith('[failure]', refusal);
+    expect(router.push).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/pro-feature' }),
+    );
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(readVoiceDraft(id)).not.toBeNull();
+    log.mockRestore();
+  });
 });
 
 describe('/voice-review — what a saved correction teaches', () => {

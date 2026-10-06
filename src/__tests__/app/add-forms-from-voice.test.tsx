@@ -345,10 +345,9 @@ describe('Add receipt from voice', () => {
 
   it('gives a scan with a day that is not on the calendar today, not an invalid date', async () => {
     mockParams = { scannedStore: 'Corner Deli', scannedAmount: '9.50', scannedDate: '2026-13-01' };
-    const screen = await render(<AddReceiptScreen />);
+    await render(<AddReceiptScreen />);
 
-    await press(screen, 'Continue');
-    await press(screen, 'Continue');
+    // A scan with a store and an amount opens on the last step.
     expect(toIsoDate(mockProps.calendar.value)).toBe(toIsoDate(new Date()));
   });
 

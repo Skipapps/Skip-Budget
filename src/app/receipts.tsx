@@ -45,11 +45,13 @@ export default function ReceiptsScreen() {
   const { sources } = usePaymentSources();
 
   const { scan, scanning, available: canScan } = useReceiptScan();
-  const { pro } = usePro();
+  const { pro, ready } = usePro();
   const { refresh, refreshing } = useRefreshAll();
 
   /** A scan lands on the pre-filled form, never filed directly, so a misread total gets checked. */
   const handleScan = async () => {
+    // Until Pro is known a tap does nothing, so someone who paid is never sent to the explainer.
+    if (!ready) return;
     setScanError(null);
     // Scanning is Pro; typing a receipt stays free.
     if (!pro) {
