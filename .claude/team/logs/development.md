@@ -3365,3 +3365,124 @@ No main-table row changed.
 
 **Checks:** `npx tsc --noEmit` 0 errors; eslint (cache cleared) clean; prettier clean; full `npx jest --ci`
 85/85 suites, 1408/1408 tests.
+
+---
+
+## 2026-10-06 — Diego (Developer, data and backend) — Phase 7 C1 (profile reads name the signed-in row) and C2 (detach Splits from layout, realtime, push)
+
+**Outcome:** Done, in the remove-splits worktree only. Nothing committed. C1 and C2 touch disjoint files and
+each is green on its own against a pristine b4cb0a1 copy: C1 = tsc 0, 92/1461, eslint 19 (= baseline);
+C1+C2 = tsc 0, 93/1465, eslint 19 (= baseline). Typed routes were present for every tsc run.
+
+**C1:** `src/api/queries.ts` `useProfile` and `src/api/reminders.ts` `useReceiptReminder` add
+`.eq('id', userId!)` before `.maybeSingle()`, because the profiles select policy also returns friends' and
+groupmates' rows. `src/api/reminders.test.tsx`: `eq` added to the select builder. NEW
+`src/api/own-profile.test.tsx` (2 tests; its mock answers like PostgREST: two visible rows, `eq` filters, an
+unknown column → 42703, more than one row left → PGRST116). Red first, on unfixed code: both failed with PGRST116
+(useProfile error `{"code":"PGRST116",…}`; useReceiptReminder `isError: true, enabled: false, remindAt: "20:00"`).
+Green after the fix. Audit (`grep -rn -A6 "from('profiles')" src`): every non-Splits read and write now names
+the row. The only other reads without an owner filter are splits.ts's three `.in('id', …)` reads of other
+people's profiles (deleted in C6). The only other read of a widened table was realtime's `group_members` (gone in C2).
+
+**C2:** `_layout.tsx` drops FriendRequestPopup (it had no side effects beyond its modal).
+`realtime-provider.tsx` keeps only the `skip:<userId>` channel (L2-64 byte-identical to b4cb0a1) and returns
+`<>{children}</>`. `push.ts` drops the `/splits` allow-list entry. `push.test.ts`: refusal row + Splits tap/Open
+Splits test (+2). NEW `src/providers/realtime-provider.test.tsx` (+2). Mutation-proved on a scratch copy:
+b4cb0a1's provider, group channel only, and `user:` channel only all fail the suite, and `/splits` back on the
+allow-list fails both new push tests. The invalidated keys (groups, group-*, friends, friend-requests) have no
+reader outside the Splits files, except Insights' useMyBalances (`group-balances`), which C3 removes.
+
+**Not verified:** `expo export` (left to the CEO at C6); runtime on a simulator (Tia).
+
+---
+
+## 2026-10-06 — Drew (Developer, money maths) — Phase 7 C3 (Insights net worth = savings less card debt) and C4 (a $0.00 headline is not red)
+
+**Outcome:** Done in the remove-splits worktree only, nothing committed. C4 was proven (the fixture failed on the
+C3 code) and fixed. Final state: tsc 0; full jest 97/1477 green (baseline worker-leak warning only); eslint src
+19 findings = baseline, none new; prettier clean on the three files.
+
+**C3:** `src/app/insights.tsx` drops useMyBalances, splitPosition, the friends StandRow and the "Shared with
+others" section (the Row that pushed `/splits`); `worth = savedTotal - owedOnCards`; isError/retry lose the groups
+query. `src/data/pro-features.ts`: the insights "Where you stand, honestly" sentence loses "plus what friends owe
+you" (prettier joins it onto the `detail:` line, so the diff is 2 lines → 1). `src/__tests__/app/insights.test.tsx`
+(3 → 6): drops the `@/api/splits` mock; adds the to-the-cent fixture ($3,300.00 put aside − $1,234.63 owed =
+$2,065.37, each figure pinned beside its own label, card A's walked balance 1,234.56 beating its typed 1,200.00,
+card B unwalked at 0.07), a no-friends/no-groups check (text and accessibility labels), and a failure-page test
+that fails each of the 7 remaining sources in turn and checks "Try again" refetches all 7. Fixture balances are
+positive because a card balance is debt (`card-ledger.ts` L381); the plan's negative values only passed through
+Math.abs.
+
+**C4 (proven):** on the C3 code the headline drew `$0.00` in money-out red (saved 0.30 less cards 0.10 + 0.20 →
+worth -5.55e-17). Fix: `toCents(worth) < 0` (import from `@/lib/money`), the same sign rule as formatCurrency.
+The test also renders one cent more of debt and requires `-$0.01` red, so a never-red rule fails. Test 6 → 7.
+
+**Mutation proof (scratchpad copies only, redirected by a jest moduleNameMapper):** b4cb0a1's page fails the
+friends test; dropping `cards.isError` / `balancesError` / `cards.refetch()` fails the failure-page test; using the
+typed card balance or subtracting card debt twice fails the to-the-cent test; the unfixed C3 page and a never-red
+page fail the C4 test.
+
+**Raised, not changed:** Insights takes `Math.abs` of each card balance, so a card in credit (negative balance,
+"In credit" on its face) is counted as debt on the headline and in "What you owe". Needs a Founder ruling.
+
+---
+
+## 2026-10-06 — Diego (Developer, data and backend) — Phase 7 C6: wall.ts and the useRemove comment
+
+**Outcome:** Done in the remove-splits worktree only, nothing committed. Both edits are comment/constant only;
+my two files are clean on tsc, eslint (`--no-cache`, exit 0) and prettier; `jest src/lib src/api` 39/39 suites,
+1040/1040 tests. The one tsc error in the tree (`bill-icons.test.ts` L15, deleted `@/data/group-icons`) is
+Theo's in-flight file.
+
+**`src/lib/wall.ts` (plan item 23):** the doc block ends at "switches off."; the sentence on splitting and
+`FREE_LIMITS.openGroups` is gone, as is the `openGroups` key and its comment. `FREE_LIMITS` keeps `cards`,
+`bankAccounts`, `incomeSources`, `as const`. Proof: before Dana's deletions the only reader was
+`add-group.tsx` L29; after them `openGroups` has 0 hits repo-wide (src, supabase, tests, scripts, design) and
+`FREE_LIMITS` has no reader in `src` (decision 6). No test pins `WALL` or `FREE_LIMITS`.
+
+**`src/api/mutations.ts` (plan item 27):** the useRemove doc now says no screen reaches an RLS-refused delete
+"since every table the app deletes from shows each person only their own rows". Worded slightly differently from
+the plan ("holds only"), which is literally false: the tables hold every account's rows; RLS shows each
+person theirs. Checked in the migrations: cards, bank_accounts, bills, salary_sources, receipts,
+subscriptions, payments (`*_all_own`), salary_source_accounts (via its own salary source), reminders and
+device_tokens (`*_own` select/delete) are owner-only, and no later migration (Splits ones included) touches
+their policies. `NOTHING_UPDATED` still has readers: `mutations.ts` L91 and `mutations.test.tsx`.
+
+**Sweep of src/api, src/lib, src/providers:** every split/friend/group/settle/invite hit is either unrelated
+(`.split()` calls, speech/voice "settle", `settleWithin`, `groupByDate`, loan maths "splits every payment",
+receipt `SPLIT_COLUMNS`, Sentry "group") or deliberate and still true (C1's "friends' and groupmates' rows"
+comments in `queries.ts` L128 / `reminders.ts` L293 and `own-profile.test.tsx`, because the server policy is unchanged;
+C2's `push.test.ts` and `realtime-provider.test.tsx` refusal cases). Raised, not changed: `wall.ts` L7 still
+lists "settling" as a wind-down verb; outside the deleted files no screen settles anything.
+
+---
+
+## 2026-10-06 — Dana (Developer, UI and navigation) — Phase 7 C6: delete the 17 Splits files; pro-features, artwork, glyphs
+
+**Outcome:** Done in the remove-splits worktree only, nothing committed or staged (deleted with plain `rm`). My
+three edited files are clean on tsc, eslint (`--no-cache`) and prettier. The only red left in the tree is Theo's
+in-flight `bill-icons.test.ts` L15 (its `@/data/group-icons` import).
+
+**Proof before deleting:** the plan's module greps (`@/api/splits'`, `@/lib/split'`, `@/data/group-icons'`,
+`@/components/splits/`, plus relative imports and any-quote jest.mock/require) found importers only inside the
+delete set, plus `bill-icons.test.ts` L15. All 47 exports of the non-route files were checked with `grep -rlw`:
+the only outside hits were `Person` (fixture text 'A Person' in add-card/cards tests: false positive) and
+`groupIconFor` (bill-icons.test, Theo's). Nothing outside `src` refers to the files. 17 files, 3,525 lines.
+
+**Deleted:** `src/app/{splits,split-group,add-group,add-member,group-settings,settle-up,friends,add-expense}.tsx`,
+`src/components/splits/{friend-request-popup,group-icon-picker,group-icon,person}.tsx` (the directory is gone),
+`src/api/splits.ts`, `src/api/splits.test.tsx`, `src/lib/split.ts`, `src/lib/split.test.ts`, `src/data/group-icons.ts`.
+
+**Edited:** `src/data/pro-features.ts`: the `splits` entry is gone; a stale `/pro-feature?id=splits` falls back to
+`PRO_FEATURES.unlimited` (`pro-feature.tsx` L19): emptyWallet art, "All your credit cards. All your accounts.".
+`src/theme/artwork.ts`: `TileSplitCalculator` import and the `tileSplitCalculator` key are gone (0 hits in src);
+the SVG stays on disk for the design kit. `src/data/glyphs.ts`: the two comments no longer mention groups.
+
+**Checks:** typed routes regenerated in the worktree (`expo customize tsconfig.json`; no tracked file changed);
+the 8 removed routes appear 0 times in `router.d.ts`; tsc: one error, bill-icons.test.ts L15. Full jest: 94/95
+suites, 1420 tests pass; the failing suite is bill-icons (fails to load). ESLint src: 20 = baseline 19 +
+bill-icons L15 `import/no-unresolved`. Section 10: G2 and G5 empty; G1/G3 only bill-icons.test; G4 hits
+`src/__tests__/app/insights.test.tsx` L209, Drew's negative assertion (`queryAllByText(/shared with
+others|settled up/i)` must be empty). Correct, but the plan's "must print nothing" needs an exception for it.
+
+**Not verified:** `expo export` and the simulator walk (CEO/Tia, after Theo finishes).

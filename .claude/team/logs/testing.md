@@ -1322,3 +1322,43 @@ transcribed" and the full VoiceOver label/hint sweep from Pia's §12).
 **Cleanup done:** Fake Pro and Fake Free both switched off, content size reset to `large`, Appearance
 left on Light · Plum (matches how the account started). Simulator left running on Home.
 Screenshots: `/private/tmp/claude-501/-Users-sampathchowdi-Desktop-SkipBudget/91c83b63-8d6a-473a-a96c-98c7b6a33deb/scratchpad/voice-qa/` (00–26).
+
+## 2026-10-06 — Theo (Tester) — Phase 7 C6: tests for the Split Manager deletion
+
+**Outcome:** Done. Full suite is **96 suites / 1454 tests, all pass**, the number the CEO predicted. Lint on
+the two files is clean, prettier is clean, `tsc --noEmit` exits 0, and plan section 10's greps print nothing
+beyond one expected negative assertion in `insights.test.tsx` (G4). Nothing committed.
+
+**What changed (tests only, both inside the worktree)**
+- `src/data/bill-icons.test.ts`: removed the `@/data/group-icons` import and the one "draws groups from the
+  same set" test. Suite went red (module not found) before the edit and green after; its other 30 tests are untouched.
+- NEW `src/__tests__/no-splits.test.ts` (outside `src/app`), three cases: (1) names no removed route and no
+  screen answers one, with `/splits` allowed only in `api/push.test.ts` and `__tests__/supabase/push-card.test.ts`
+  and each of those naming nothing else; (2) imports or mocks no deleted module (resolved from the importing
+  file, so `./splits` beside `api/` is caught, not only `@/api/splits`), and none of the deleted files is back on
+  disk; (3) every route string in non-test code, including everything the `as never` pushers use, resolves to a
+  real screen under `src/app`.
+- Count reconciliation: 97/1477 baseline, minus two suites (`splits.test.tsx` 9 + `split.test.ts` 16 = 25 tests,
+  counted from HEAD), minus 1 (bill-icons), plus 3 (guard) = **96 / 1454**.
+
+**Mutation proof (scratch copy of `src` in the scratchpad, never the worktree; copy deleted afterwards):**
+24 runs against the final file, one unmutated control. Reinstated `/splits` push in `home.tsx`, `@/lib/split`
+import, relative `./splits` sibling import, `jest.mock('@/api/splits')`, a removed-route href in each of the five
+`as never` pushers' sources (`tour.tsx`, `setup.tsx`, `onboarding.ts`, `bill/[id].tsx`, `setup-bills.tsx`), a
+removed screen file and module file put back, a widened or stale exemption, and both hard-coded lists emptied:
+every one fails the guard. An unlisted dead route and a typo route fail case 3 alone. A `node_modules` folder
+under `src` and a comment naming a nonexistent route correctly pass.
+
+**Notes**
+- Two of my first mutation runs did not apply (wrong path in my harness) and "passed"; I caught it from the
+  Python traceback, fixed the harness to abort on an unapplied mutation, and re-ran all 24.
+- Case 3 first flagged `api/push.ts`: its allow-list keys (`'/bill'`, `'/subscription'`, `'/source'`) are tokens
+  the server sends, not hrefs; their values (`'/bill/[id]'`) are the destinations. Object keys are skipped,
+  values are checked. The file is not exempted.
+- Comments that quote a removed route in quotes or backticks fail case 1 on purpose; comments are ignored by case 3.
+
+**Open questions**
+1. G4 prints `src/__tests__/app/insights.test.tsx:209` (`/shared with others|settled up/i` inside
+   `queryAllByText(...).toEqual([])`). It is Drew's absence assertion, so the grep needs an exclusion for it.
+2. The guard requires `api/push.test.ts` and `push-card.test.ts` to keep naming `/splits`. If either stops, the
+   guard fails and says to drop the exemption. Intentional, but it is a red caused by a cleanup.
