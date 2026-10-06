@@ -6,7 +6,6 @@ import {
   CreditCard,
   Crown,
   Sparkles,
-  Users,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useState } from 'react';
@@ -37,11 +36,6 @@ const FEATURES: { icon: LucideIcon; title: string; hint: string }[] = [
     icon: Calculator,
     title: 'Loan calculator, to the cent',
     hint: 'Daily interest, the way your bank actually charges',
-  },
-  {
-    icon: Users,
-    title: 'Split manager',
-    hint: 'Groups, friends, who-owes-who — settled without an app in the middle',
   },
   { icon: ChartColumn, title: 'Insights', hint: 'Your whole money picture on one page' },
   {

@@ -30,7 +30,7 @@ npm run check        # all four, in order
 | `src/app`            | Screens, one file per route (expo-router). No test files here.         |
 | `src/__tests__`      | Screen tests. Unit tests sit next to the code they cover.              |
 | `src/api`            | Supabase queries and mutations (TanStack Query).                       |
-| `src/lib`            | Pure logic: loan and split maths, voice parsing, formatting.           |
+| `src/lib`            | Pure logic: loan maths, voice parsing, formatting.                     |
 | `src/components`     | Shared UI, grouped by feature.                                         |
 | `src/theme`          | Palette, colours, artwork and avatar registries.                       |
 | `assets`             | Illustrations, avatars, app icons and the launch video.                |

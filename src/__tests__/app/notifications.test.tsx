@@ -43,7 +43,7 @@ const RELEASE = {
 const FEATURE = {
   id: 'n-2',
   kind: 'feature',
-  title: 'Split bills with friends',
+  title: 'Add a receipt by voice',
   body: '',
   published_at: '2026-09-20T09:00:00+00:00',
 };
@@ -58,7 +58,7 @@ it('shows the news, labelled by what kind it is', async () => {
 
   expect(screen.getByText('Version 1.2 is out')).toBeTruthy();
   expect(screen.getByText('Update from the App Store for faster scanning.')).toBeTruthy();
-  expect(screen.getByText('Split bills with friends')).toBeTruthy();
+  expect(screen.getByText('Add a receipt by voice')).toBeTruthy();
   expect(screen.getByText(/^Update · /)).toBeTruthy();
   expect(screen.getByText(/^New feature · /)).toBeTruthy();
 });

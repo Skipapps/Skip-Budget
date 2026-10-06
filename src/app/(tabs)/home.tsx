@@ -42,8 +42,8 @@ const DESTINATION_ROUTES: Record<string, Href> = {
   subscriptions: '/subscriptions',
 };
 
-/** Calculators are drawn as cards below the list, not as destination tiles. */
-const TOOL_IDS = new Set(['loan-calculator', 'split-calculator']);
+/** The loan calculator is drawn as a card below the list, not as a destination tile. */
+const TOOL_IDS = new Set(['loan-calculator']);
 
 const TILES = spendingCategories.filter((tile) => !TOOL_IDS.has(tile.id));
 

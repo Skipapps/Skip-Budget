@@ -1,5 +1,5 @@
 import type { Href } from 'expo-router';
-import { ChevronRight, Landmark, Users } from 'lucide-react-native';
+import { ChevronRight, Landmark } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
@@ -13,10 +13,9 @@ type Tool = {
   href: Href;
 };
 
-/** The two calculators: tools rather than spending, so cards rather than list rows. */
+/** The loan calculator: a tool rather than spending, so a card rather than a list row. */
 const TOOLS: Tool[] = [
   { id: 'loan-calculator', label: 'Loan Calculator', icon: Landmark, href: '/loan-calculator' },
-  { id: 'split-calculator', label: 'Split Manager', icon: Users, href: '/splits' },
 ];
 
 type ToolCardsProps = {
@@ -25,7 +24,7 @@ type ToolCardsProps = {
 };
 
 /**
- * Two raised cards, shoulder to shoulder: shadow and no border (an outline would flatten the lift).
+ * A raised card: shadow and no border (an outline would flatten the lift).
  * A locked tool keeps its card with a PRO badge, since a hidden feature sells nothing and the
  * destination screen still does the refusing.
  */

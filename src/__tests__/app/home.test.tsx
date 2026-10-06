@@ -130,6 +130,10 @@ jest.mock('@/api/queries', () => ({
 
 jest.useFakeTimers().setSystemTime(new Date(`${TODAY}T09:00:00`));
 
+beforeEach(() => {
+  jest.mocked(router.push).mockClear();
+});
+
 describe('Home — where a transaction row opens', () => {
   it('opens each kind of row on the screen that edits it', async () => {
     const { getAllByRole, getByText } = await render(<HomeScreen />);
@@ -151,14 +155,14 @@ describe('Home — where a transaction row opens', () => {
       return found!;
     };
 
-    fireEvent.press(row('Bakery'));
-    fireEvent.press(row('Rent'));
-    fireEvent.press(row('Netflix'));
-    fireEvent.press(row('Payday'));
-    fireEvent.press(row('Rent in August'));
-    fireEvent.press(row('Netflix in August'));
+    await fireEvent.press(row('Bakery'));
+    await fireEvent.press(row('Rent'));
+    await fireEvent.press(row('Netflix'));
+    await fireEvent.press(row('Payday'));
+    await fireEvent.press(row('Rent in August'));
+    await fireEvent.press(row('Netflix in August'));
     // Coming up, a week the other side of the chosen day.
-    fireEvent.press(row('Power'));
+    await fireEvent.press(row('Power'));
 
     expect(router.push).toHaveBeenNthCalledWith(1, {
       pathname: '/add-receipt',
@@ -178,5 +182,27 @@ describe('Home — where a transaction row opens', () => {
     });
     expect(router.push).toHaveBeenNthCalledWith(7, { pathname: '/add-bill', params: { id: 'b2' } });
     expect(router.push).toHaveBeenCalledTimes(7);
+  });
+});
+
+describe('Home — Go further', () => {
+  it('offers one tool, the Loan Calculator, alone across its row', async () => {
+    const { getAllByRole } = await render(<HomeScreen />);
+
+    const tools = getAllByRole('button').filter((node) =>
+      String(node.props.accessibilityLabel ?? '').endsWith('Opens the tool.'),
+    );
+    expect(tools).toHaveLength(1);
+
+    const [loan] = tools;
+    expect(loan.props.accessibilityLabel).toBe('Loan Calculator. Pro feature. Opens the tool.');
+    // The only child of its row and flex-1, so it fills the width instead of half of it.
+    expect(loan.props.className).toContain('flex-1');
+    expect(loan.parent?.props.className).toContain('flex-row');
+    expect(loan.parent?.children).toHaveLength(1);
+
+    await fireEvent.press(loan);
+    expect(router.push).toHaveBeenCalledWith('/loan-calculator');
+    expect(router.push).toHaveBeenCalledTimes(1);
   });
 });

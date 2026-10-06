@@ -31,13 +31,6 @@ const STOPS: Stop[] = [
     href: '/receipts',
   },
   {
-    artwork: 'tileSplitCalculator',
-    title: 'Split bills with friends',
-    detail:
-      'Groups for the flat or the trip. Everyone sees the same running total, and settling up is written down, not transferred.',
-    href: '/splits',
-  },
-  {
     artwork: 'tileLoanRepayment',
     title: 'Loans, to the cent',
     detail:
@@ -67,7 +60,7 @@ export default function TourScreen() {
   return (
     <Screen title="What Skip can do" showBack>
       <Subtitle className="mt-3 w-full text-left">
-        Six things, each a tap away. No setup order to follow — start wherever your money bothers
+        Five things, each a tap away. No setup order to follow — start wherever your money bothers
         you most.
       </Subtitle>
 

@@ -5,7 +5,6 @@ import {
   Landmark,
   Receipt,
   RefreshCw,
-  Users,
   type LucideIcon,
 } from 'lucide-react-native';
 import { Fragment } from 'react';
@@ -27,7 +26,6 @@ const DESTINATION_ICONS: Record<string, LucideIcon> = {
   receipts: Receipt,
   subscriptions: RefreshCw,
   'loan-calculator': Landmark,
-  'split-calculator': Users,
 };
 
 const DESTINATION_FALLBACK_ICON: LucideIcon = FileText;
@@ -68,8 +66,7 @@ export function DestinationList({
           const isMoneyRow = amount !== undefined;
           // Locked features keep their row: a hidden feature sells nothing, and the destination
           // screen still does the refusing.
-          const locked =
-            !pro && (category.id === 'loan-calculator' || category.id === 'split-calculator');
+          const locked = !pro && category.id === 'loan-calculator';
 
           const label = isMoneyRow
             ? loading

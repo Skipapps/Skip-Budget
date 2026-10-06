@@ -33,7 +33,6 @@ const CATEGORIES: SpendingCategory[] = [
   { id: 'receipts', label: 'Receipts' },
   { id: 'subscriptions', label: 'Subscriptions' },
   { id: 'loan-calculator', label: 'Loan calculator' },
-  { id: 'split-calculator', label: 'Split manager' },
 ];
 
 const AMOUNTS = {
@@ -60,13 +59,14 @@ describe('DestinationList', () => {
     });
   });
 
-  it('shows a PRO pill on the two calculators only when the account is not pro', async () => {
+  it('shows a PRO pill on the loan calculator only when the account is not pro', async () => {
     // The PRO badge is hidden from the accessibility tree (the row's label already says "Pro
     // feature"), so the query has to include hidden elements.
     const notPro = await render(
       <DestinationList items={CATEGORIES} amounts={AMOUNTS} pro={false} onPress={() => {}} />,
     );
-    expect(notPro.getAllByText('PRO', { includeHiddenElements: true })).toHaveLength(2);
+    expect(notPro.getAllByText('PRO', { includeHiddenElements: true })).toHaveLength(1);
+    expect(notPro.getByLabelText('Loan calculator. Pro feature. Opens the tool.')).toBeTruthy();
 
     const isPro = await render(
       <DestinationList items={CATEGORIES} amounts={AMOUNTS} pro onPress={() => {}} />,

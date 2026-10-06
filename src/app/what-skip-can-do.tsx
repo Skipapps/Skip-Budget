@@ -18,11 +18,6 @@ const CAN_DO: { artwork: ArtworkName; title: string; detail: string }[] = [
     detail: 'Read on your phone — the photo never leaves it.',
   },
   {
-    artwork: 'tileSplitCalculator',
-    title: 'Split bills with friends',
-    detail: 'One running total everyone can see.',
-  },
-  {
     artwork: 'tileLoanRepayment',
     title: 'Loans, to the cent',
     detail: 'Daily interest, so the payoff matches your statement.',

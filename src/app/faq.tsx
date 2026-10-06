@@ -78,31 +78,6 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
     ],
   },
   {
-    title: 'Splitting with friends',
-    entries: [
-      {
-        question: 'How do friends find me?',
-        answer:
-          'Only by your code, on the Friends screen. There is no search by name or email, so nobody can find out you use Skip unless you hand them your code yourself.',
-      },
-      {
-        question: 'Does settling up move real money?',
-        answer:
-          'No. Skip never touches your money. Settling up writes down that a payment happened somewhere else — cash, a bank transfer, a round of drinks — so the group’s ledger stays honest.',
-      },
-      {
-        question: 'What does “simplify who pays whom” do?',
-        answer:
-          'It collapses chains: if A owes B and B owes C, it suggests A pays C directly, so fewer payments settle the group. The trade is that you may be asked to pay somebody you never ate with — which is why it is a switch on the group, not a rule.',
-      },
-      {
-        question: 'Can I split with somebody who doesn’t have Skip?',
-        answer:
-          'Yes. Add them to a group by name — they can owe and be owed like anyone else. When they join Skip with the group’s code, they claim their name and their whole history comes with it.',
-      },
-    ],
-  },
-  {
     title: 'Loans',
     entries: [
       {
@@ -128,7 +103,7 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
       {
         question: 'What does Pro include?',
         answer:
-          'Unlimited credit cards, accounts and incomes, unlimited receipt scanning, the loan calculator, the split manager, Insights, early access to new features and first-in-line support. $1.99 a month or $19.99 a year, billed by Apple.',
+          'Unlimited credit cards, accounts and incomes, unlimited receipt scanning, the loan calculator, Insights, early access to new features and first-in-line support. $1.99 a month or $19.99 a year, billed by Apple.',
       },
       {
         question: 'What happens to my things if I cancel?',
@@ -148,12 +123,12 @@ const GROUPS: { title: string; entries: Entry[] }[] = [
       {
         question: 'What leaves my phone?',
         answer:
-          'Only what you save: the bills, receipts and groups on your account, stored so your own devices agree with each other. No bank connection, no receipt photos, no contact list, no tracking of what you do in the app to sell.',
+          'Only what you save: the bills, receipts and cards on your account, stored so your own devices agree with each other. No bank connection, no receipt photos, no contact list, no tracking of what you do in the app to sell.',
       },
       {
         question: 'How do I delete my account?',
         answer:
-          'Settings → Account → Delete account. Everything that is yours goes with it immediately — there is no grace copy kept. The one exception is shared groups: bills you were part of stay in your groupmates’ ledgers under just your name, because their history belongs to them too.',
+          'Settings → Account → Delete account. Everything that is yours goes with it immediately — there is no grace copy kept.',
       },
     ],
   },

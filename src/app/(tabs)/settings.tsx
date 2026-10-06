@@ -378,7 +378,7 @@ export default function SettingsScreen() {
         <SettingsRow
           icon={Compass}
           title="What Skip can do"
-          subtitle="The six things, each a tap away"
+          subtitle="The five things, each a tap away"
           onPress={() => router.push('/tour')}
         />
         <SettingsRow
