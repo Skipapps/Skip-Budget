@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/react-native';
+import { StyleSheet, type StyleProp, type TextStyle } from 'react-native';
 
 import InsightsScreen from '@/app/insights';
 import { FAILURE_MESSAGE } from '@/lib/failure';
@@ -115,6 +116,14 @@ beforeEach(() => {
   for (const refetch of Object.values(mockRefetch)) refetch.mockClear();
 });
 
+/** The figures drawn in the mocked money-out colour, in page order. */
+const redFigures = (nodes: { props: { style?: unknown; children?: unknown } }[]) =>
+  nodes
+    .filter(
+      (node) => StyleSheet.flatten(node.props.style as StyleProp<TextStyle>)?.color === '#B85040',
+    )
+    .map((node) => node.props.children);
+
 /** The three newest of the six, oldest of those three first. */
 const EXPECTED = ['June 2026', 'July 2026', 'August 2026'];
 
@@ -163,6 +172,30 @@ describe('Insights — where you stand', () => {
     beside('Owed on credit cards', '$1,234.63');
     beside('Chase Sapphire 1004', '$1,234.56');
     beside('Amex Gold 2002', '$0.07');
+  });
+
+  it('a net worth that rounds to $0.00 is not drawn as a debt', async () => {
+    // 0.1 + 0.2 is 0.30000000000000004, so 0.30 saved less these two cards is -5.55e-17: $0.00 on
+    // screen, yet below zero to a raw comparison.
+    mockSavings = [{ ...mockMonths[0], saved: 0.3, spent: 3999.7 }];
+    mockCards = [
+      { id: 'card-a', holder: 'Chase Sapphire', last4: '1004', balance: 0.1 },
+      { id: 'card-b', holder: 'Amex Gold', last4: '2002', balance: 0.2 },
+    ];
+
+    const dust = await render(<InsightsScreen />);
+
+    const label = dust.getByText('Saved, less what you owe');
+    expect(dust.getAllByText('$0.00').some((node) => node.parent === label.parent)).toBe(true);
+    // The card debt is the only red figure; finding it proves the colour can be seen here, so the
+    // headline missing from the list is a real answer.
+    expect(redFigures(dust.getAllByText(/\$/))).toEqual(['$0.30']);
+    await dust.unmount();
+
+    // One cent more on a card is a real debt, so a rule that never colours the headline fails here.
+    mockCards = [mockCards[0], { ...mockCards[1], balance: 0.21 }];
+    const cent = await render(<InsightsScreen />);
+    expect(redFigures(cent.getAllByText(/\$/))).toEqual(['-$0.01', '$0.31']);
   });
 
   it('says nothing about friends or groups', async () => {

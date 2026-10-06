@@ -28,6 +28,7 @@ import { BILL_CATEGORIES } from '@/data/bills-mock';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { sortByDateAscending } from '@/lib/group';
+import { toCents } from '@/lib/money';
 import { PERIODS, periodBuckets, periodRange, type PeriodKey } from '@/lib/period';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
@@ -241,7 +242,7 @@ function InsightsScreenInner() {
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}
-          style={worth < 0 ? { color: colors.moneyOut } : undefined}
+          style={toCents(worth) < 0 ? { color: colors.moneyOut } : undefined}
         >
           {formatCurrency(worth)}
         </Text>
