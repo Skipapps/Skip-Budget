@@ -22,7 +22,6 @@ import { LaunchSplash } from '@/components/launch-splash';
 import { DialogProvider } from '@/providers/dialog-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { useConfigurePurchases } from '@/api/pro';
-import { FriendRequestPopup } from '@/components/splits/friend-request-popup';
 import { RealtimeProvider } from '@/providers/realtime-provider';
 import { PreferencesProvider } from '@/providers/preferences-provider';
 import { SessionProvider, useSession } from '@/providers/session-provider';
@@ -88,9 +87,6 @@ function AppShell({ fontsReady }: { fontsReady: boolean }) {
                       that talks to the SDK. */}
                   <PurchasesBridge />
                   <RootNavigator />
-                  {/* Inside the lock so it never draws on a locked phone; after the navigator so it
-                      sits above every route. */}
-                  <FriendRequestPopup />
                 </AppLockGate>
                 <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
               </DialogProvider>

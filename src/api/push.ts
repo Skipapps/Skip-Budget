@@ -219,7 +219,6 @@ function registerCategories(): Promise<unknown> {
  */
 const TAP_ROUTES: Record<string, Href> = {
   '/add-receipt': '/add-receipt',
-  '/splits': '/splits',
   '/transactions': '/transactions',
 };
 

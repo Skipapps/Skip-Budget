@@ -102,7 +102,6 @@ describe('tapTarget', () => {
 
   it('opens the screens that need no id', () => {
     expect(tapTarget({ route: '/add-receipt' })).toBe('/add-receipt');
-    expect(tapTarget({ route: '/splits' })).toBe('/splits');
     expect(tapTarget({ route: '/transactions' })).toBe('/transactions');
   });
 
@@ -110,6 +109,7 @@ describe('tapTarget', () => {
     ['no id', { route: '/bill' }],
     ['an id that is not a row id', { route: '/bill', id: '../settings' }],
     ['a route that is not on the list', { route: '/delete-account', id: BILL_ID }],
+    ['the retired Splits screen', { route: '/splits' }],
     ['nothing at all', undefined],
   ])('refuses %s', (_label, data) => {
     expect(tapTarget(data as Record<string, unknown> | undefined)).toBeUndefined();
@@ -169,6 +169,20 @@ describe('useNotificationRouting', () => {
     mockResponse = tap({ route });
     await renderHook(() => useNotificationRouting());
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('opens nothing for an old Splits notice, from a tap or its Open Splits button', async () => {
+    // The server still sends these notices, and this build has no screen for them.
+    for (const action of [DEFAULT_ACTION, 'view']) {
+      mockPush.mockClear();
+      mockResponse = tap(
+        { route: '/splits', card: { kind: 'group', view: 'Open Splits' } },
+        action,
+      );
+      const { unmount } = await renderHook(() => useNotificationRouting());
+      expect(mockPush).not.toHaveBeenCalled();
+      await unmount();
+    }
   });
 
   it('ignores anything that is not a plain tap', async () => {
