@@ -131,7 +131,7 @@ export const loanMessages = defineMessages({
   'loan.calculator.plusExtra': {
     en: 'Plus {extra} extra — {total} leaves your account each month.',
     es: 'Más {extra} extra: cada mes salen {total} de tu cuenta.',
-    fr: 'Plus {extra} en supplément — {total} sont prélevés sur ton compte chaque mois.',
+    fr: 'Plus {extra} en supplément — ton compte est débité de {total} chaque mois.',
   },
   'loan.calculator.firstCoversMonthPlus': {
     en: {

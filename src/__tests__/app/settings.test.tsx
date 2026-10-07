@@ -253,7 +253,6 @@ describe('Settings, Preferences', () => {
       'Français',
       'Currency',
       'US dollar · $1,234.56',
-      'Same as my phone',
       'US dollar (USD $)',
       'Pound sterling (GBP £)',
       'Canadian dollar (CAD $)',

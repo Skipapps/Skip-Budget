@@ -58,7 +58,7 @@ export const savingsMessages = defineMessages({
   'savings.row.kept': {
     en: '{income} came in and {spent} went out on bills, subscriptions and receipts — the rest stayed.',
     es: 'Entraron {income} y salieron {spent} en facturas, suscripciones y recibos; el resto se quedó.',
-    fr: '{income} sont entrés et {spent} sont sortis en factures, abonnements et reçus — le reste est resté.',
+    fr: 'Revenus de {income}, dépenses de {spent} en factures, abonnements et reçus — le reste est resté.',
   },
   'savings.row.label': {
     en: '{month}. {amount}. {explain} Tap to correct.',
@@ -91,7 +91,7 @@ export const savingsMessages = defineMessages({
   'savings.month.flow': {
     en: '{income} came in and {spent} went out on bills, subscriptions and receipts.',
     es: 'Entraron {income} y salieron {spent} en facturas, suscripciones y recibos.',
-    fr: '{income} sont entrés et {spent} sont sortis en factures, abonnements et reçus.',
+    fr: 'Revenus de {income}, dépenses de {spent} en factures, abonnements et reçus.',
   },
   'savings.month.reallyLeft': {
     en: 'What it really left',

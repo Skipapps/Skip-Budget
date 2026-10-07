@@ -112,7 +112,7 @@ export const remindersMessages = defineMessages({
     fr: 'Rappel pour {name}',
   },
   'reminders.lead.sameDay': {
-    en: 'Remind on the day before',
+    en: 'Remind on the same day',
     es: 'Recordar el mismo día',
     fr: 'Rappeler le jour même',
   },

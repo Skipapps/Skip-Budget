@@ -56,8 +56,8 @@ describe('dates follow the language on screen', () => {
     expect(formatClock(12, 30)).toBe('12:30 PM');
     expect(clockText(14, 30, 'es')).toBe('2:30 p. m.');
     expect(clockText(9, 0, 'es')).toBe('9:00 a. m.');
-    expect(clockText(9, 0, 'fr')).toBe('9 h 00');
-    expect(clockText(14, 30, 'fr')).toBe('14 h 30');
+    expect(clockText(9, 0, 'fr')).toBe('9\u00A0h\u00A000');
+    expect(clockText(14, 30, 'fr')).toBe('14\u00A0h\u00A030');
   });
 
   it('relabels the option lists without being rebuilt', () => {

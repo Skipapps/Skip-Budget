@@ -72,7 +72,7 @@ beforeEach(() => {
 const chip = (view: View, name: string | RegExp) => view.getAllByRole('radio', { name });
 
 describe('a Spanish phone set to Mexico', () => {
-  it('opens in Spanish and pesos with the automatic chips selected', async () => {
+  it('opens in Spanish and pesos, the language following the phone', async () => {
     const view = await open();
 
     await waitFor(() => expect(getLocaleSnapshot().ready).toBe(true));
@@ -84,10 +84,15 @@ describe('a Spanish phone set to Mexico', () => {
     expect(view.getByText('Peso mexicano · $1,234.56')).toBeTruthy();
 
     const automatic = chip(view, 'Igual que mi teléfono');
-    expect(automatic).toHaveLength(2);
-    for (const node of automatic) {
-      expect(node.props.accessibilityState).toMatchObject({ selected: true });
-    }
+    expect(automatic).toHaveLength(1);
+    expect(automatic[0].props.accessibilityState).toMatchObject({ selected: true });
+
+    // The currency has no automatic chip: it is pinned to what the phone implied at first launch.
+    expect(chip(view, /Peso mexicano/)[0].props.accessibilityState).toMatchObject({
+      selected: true,
+    });
+    await waitFor(() => expect(mockStore.get(CURRENCY_KEY)).toBe('MXN'));
+    expect(mockStore.has(LANGUAGE_KEY)).toBe(false);
   });
 });
 
@@ -103,7 +108,7 @@ describe('choosing a language', () => {
     expect(mockStore.get(LANGUAGE_KEY)).toBe('fr');
     expect(chip(view, 'Français')[0].props.accessibilityState).toMatchObject({ selected: true });
     // The currency did not move with the language.
-    expect(mockStore.has(CURRENCY_KEY)).toBe(false);
+    expect(mockStore.get(CURRENCY_KEY)).toBe('MXN');
   });
 
   it('goes back to the phone when asked', async () => {

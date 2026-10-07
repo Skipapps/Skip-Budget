@@ -17,9 +17,7 @@ import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
 import { Title } from '@/components/ui/typography';
 import { t, type MessageKey } from '@/i18n';
-import { formatMoney } from '@/i18n/number';
-import { getLocaleSnapshot } from '@/i18n/store';
-import { proMonthlyLabel, proYearlyLabel } from '@/lib/wall';
+import { proMonthlyLabel, proYearlyLabel, usdText } from '@/lib/wall';
 import { router } from 'expo-router';
 import { useColors } from '@/providers/theme-provider';
 import { failureMessage, failureText } from '@/lib/failure';
@@ -72,9 +70,7 @@ export default function ProScreen() {
   const monthlyPrice = monthly
     ? t('pro.price.monthly', { price: monthly.priceString })
     : proMonthlyLabel();
-  const yearlyPerMonth =
-    yearly?.pricePerMonthString ??
-    formatMoney(PRO_YEARLY_PER_MONTH_USD, getLocaleSnapshot().language, 'USD');
+  const yearlyPerMonth = yearly?.pricePerMonthString ?? usdText(PRO_YEARLY_PER_MONTH_USD);
   const trial = prices.data?.trialText ?? null;
 
   const handleContinue = async () => {

@@ -86,7 +86,9 @@ export function formatPercent(value: number, language: Language, decimals = 2): 
   if (!Number.isFinite(value)) return '—';
 
   const style = STYLES[language];
-  const fixed = value.toFixed(decimals);
+  // As with money, the sign is decided after rounding: -0.001 at two decimals is a plain 0.00.
+  const rounded = value.toFixed(decimals);
+  const fixed = Number(rounded) === 0 ? rounded.replace('-', '') : rounded;
   const [whole, fraction] = fixed.split('.');
   const figure = fraction === undefined ? whole : `${whole}${style.decimal}${fraction}`;
 
@@ -94,7 +96,7 @@ export function formatPercent(value: number, language: Language, decimals = 2): 
 }
 
 /**
- * A figure short enough to sit on a chart bar: "$1.5k" in English, "1,5 k $" in French, whole
+ * A figure short enough to sit on a chart bar: "$1.5k" in English, "1,5k $" in French, whole
  * units below a thousand. Rounds rather than truncates, and is only for labels where precision is
  * not the point; every balance goes through formatMoney.
  */
@@ -110,9 +112,11 @@ export function formatCompactMoney(
   const abs = Math.abs(amount);
 
   let body: string;
-  if (abs >= 1000) {
+  if (Math.round(abs) >= 1000) {
     const thousands = abs / 1000;
-    body = `${thousands >= 10 ? Math.round(thousands) : thousands.toFixed(1).replace('.', style.decimal)}k`;
+    // 9,999 is "10k", not "10.0k": the tenths are rounded first and 10 or more drops them.
+    const tenths = Math.round(thousands * 10) / 10;
+    body = `${tenths >= 10 ? Math.round(thousands) : tenths.toFixed(1).replace('.', style.decimal)}k`;
   } else {
     body = String(Math.round(abs));
   }

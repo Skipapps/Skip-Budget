@@ -179,7 +179,7 @@ describe('Savings in French', () => {
     expect(screen.getByText('sur 1 mois qui s’est terminé avec un reste')).toBeTruthy();
     expect(
       screen.getByText(
-        '4 000,00 $ sont entrés et 1 765,43 $ sont sortis en factures, abonnements et reçus — le reste est resté.',
+        'Revenus de 4 000,00 $, dépenses de 1 765,43 $ en factures, abonnements et reçus — le reste est resté.',
       ),
     ).toBeTruthy();
     expectNoRawText(screen.toJSON());

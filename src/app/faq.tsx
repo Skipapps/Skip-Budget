@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { FieldLabel, Subtitle } from '@/components/ui/typography';
 import { t } from '@/i18n';
-import { proMonthlyLabel, proYearlyLabel } from '@/lib/wall';
+import { proMonthlyAmount, proYearlyAmount } from '@/lib/wall';
 import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
@@ -18,12 +18,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 type Entry = { question: string; answer: string };
 type Group = { title: string; entries: Entry[] };
-
-/** "$1.99/mo" without its "/mo": the answer words the period itself. */
-function amountOf(label: string, period: 'pro.price.monthly' | 'pro.price.yearly'): string {
-  const suffix = t(period, { price: '' });
-  return label.endsWith(suffix) ? label.slice(0, label.length - suffix.length) : label;
-}
 
 /**
  * Bundled with the app, not fetched: works offline and is versioned with the code it explains.
@@ -86,9 +80,8 @@ export default function FaqScreen() {
   // only shows while the store has not answered.
   const store = useProPrices().data;
   const groups = faqGroups({
-    monthly:
-      store?.monthly?.product.priceString ?? amountOf(proMonthlyLabel(), 'pro.price.monthly'),
-    yearly: store?.yearly?.product.priceString ?? amountOf(proYearlyLabel(), 'pro.price.yearly'),
+    monthly: store?.monthly?.product.priceString ?? proMonthlyAmount(),
+    yearly: store?.yearly?.product.priceString ?? proYearlyAmount(),
   });
 
   return (

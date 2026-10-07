@@ -280,7 +280,7 @@ describe('Reminders in English', () => {
     for (const label of [
       'Sent at 8:00 PM. Change the time for the daily receipts reminder.',
       'Remind me about Renta',
-      'Remind on the day before',
+      'Remind on the same day',
       'Remind 1 day before',
       'Remind 1 week before',
       'Sent at 8:00 PM. Change the time for Renta.',

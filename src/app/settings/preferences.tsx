@@ -11,7 +11,6 @@ import {
   CURRENCY_SYMBOL,
   LANGUAGE_NATIVE_NAMES,
   LANGUAGES,
-  type CurrencyCode,
   type Language,
 } from '@/i18n/config';
 import { setCurrency, setLanguage } from '@/i18n/store';
@@ -31,7 +30,7 @@ export default function PreferencesScreen() {
   const ask = useDialog();
   const { mode, setMode } = useTheme();
   const { haptics, setHaptics, appLock, setAppLock } = usePreferences();
-  const { language, currency, chosenLanguage, chosenCurrency } = useLocale();
+  const { language, currency, chosenLanguage } = useLocale();
 
   const modeOptions = MODE_VALUES.map((value) => ({
     value,
@@ -47,13 +46,10 @@ export default function PreferencesScreen() {
     { value: AUTOMATIC, label: t('locale.automatic') },
     ...LANGUAGES.map((value) => ({ value, label: LANGUAGE_NATIVE_NAMES[value] })),
   ];
-  const currencyOptions = [
-    { value: AUTOMATIC, label: t('locale.automatic') },
-    ...CURRENCIES.map((value) => ({
-      value,
-      label: `${t(`locale.currency.${value}`)} (${value} ${CURRENCY_SYMBOL[value]})`,
-    })),
-  ];
+  const currencyOptions = CURRENCIES.map((value) => ({
+    value,
+    label: `${t(`locale.currency.${value}`)} (${value} ${CURRENCY_SYMBOL[value]})`,
+  }));
 
   /**
    * Turning the lock on must pass a scan first, or a broken lock could shut someone out of their
@@ -105,11 +101,7 @@ export default function PreferencesScreen() {
         title={t('locale.currency.title')}
         subtitle={`${t(`locale.currency.${currency}`)} · ${formatCurrency(1234.56)}`}
       >
-        <ChoiceChips
-          options={currencyOptions}
-          value={chosenCurrency ?? AUTOMATIC}
-          onChange={(value) => setCurrency(value === AUTOMATIC ? null : (value as CurrencyCode))}
-        />
+        <ChoiceChips options={currencyOptions} value={currency} onChange={setCurrency} />
         <Text
           className="mt-2.5 font-app text-[12px] text-muted"
           maxFontSizeMultiplier={TEXT_CAP.row}

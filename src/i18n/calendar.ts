@@ -110,7 +110,7 @@ export const weekdayInitials = (): readonly string[] => WEEKDAY_INITIALS[current
 export function clockText(hour: number, minute: number, language: Language = current()): string {
   const mm = String(minute).padStart(2, '0');
 
-  if (language === 'fr') return `${hour} h ${mm}`;
+  if (language === 'fr') return `${hour}\u00A0h\u00A0${mm}`;
 
   const shown = hour % 12 === 0 ? 12 : hour % 12;
   const pm = hour >= 12;

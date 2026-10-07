@@ -96,6 +96,7 @@ describe('LocaleProvider', () => {
 
   it('does not write back what it just read', async () => {
     mockStorage.set(LANGUAGE_KEY, 'fr');
+    mockStorage.set(CURRENCY_KEY, 'CAD');
     const storage = jest.requireMock('@react-native-async-storage/async-storage').default;
     storage.setItem.mockClear();
     storage.removeItem.mockClear();
@@ -109,6 +110,58 @@ describe('LocaleProvider', () => {
 
     expect(storage.setItem).not.toHaveBeenCalled();
     expect(storage.removeItem).not.toHaveBeenCalled();
+  });
+
+  it('pins the currency the phone implied the first time, and the language keeps following', async () => {
+    await render(
+      <LocaleProvider>
+        <Probe />
+      </LocaleProvider>,
+    );
+    await waitFor(() => expect(getLocaleSnapshot().ready).toBe(true));
+
+    await waitFor(() => expect(mockStorage.get(CURRENCY_KEY)).toBe('MXN'));
+    expect(mockStorage.has(LANGUAGE_KEY)).toBe(false);
+    expect(getLocaleSnapshot()).toMatchObject({ chosenCurrency: 'MXN', chosenLanguage: null });
+  });
+
+  it('keeps a pinned currency when the phone region changes later', async () => {
+    mockStorage.set(CURRENCY_KEY, 'GBP');
+
+    await render(
+      <LocaleProvider>
+        <Probe />
+      </LocaleProvider>,
+    );
+    await waitFor(() => expect(getLocaleSnapshot().ready).toBe(true));
+
+    expect(getLocaleSnapshot().currency).toBe('GBP');
+    expect(mockStorage.get(CURRENCY_KEY)).toBe('GBP');
+  });
+
+  it('opens on the phone defaults, without pinning, when storage never answers', async () => {
+    jest.useFakeTimers();
+    try {
+      const storage = jest.requireMock('@react-native-async-storage/async-storage').default;
+      storage.multiGet.mockReturnValueOnce(new Promise(() => {}));
+      storage.setItem.mockClear();
+
+      await render(
+        <LocaleProvider>
+          <Probe />
+        </LocaleProvider>,
+      );
+      expect(getLocaleSnapshot().ready).toBe(false);
+
+      await act(async () => {
+        jest.advanceTimersByTime(1600);
+      });
+
+      expect(getLocaleSnapshot()).toMatchObject({ ready: true, language: 'es', currency: 'MXN' });
+      expect(storage.setItem).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('survives storage that cannot be read', async () => {

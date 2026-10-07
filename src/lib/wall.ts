@@ -1,5 +1,5 @@
 import { t } from '@/i18n';
-import { formatMoney } from '@/i18n/number';
+import { formatMoney, NBSP } from '@/i18n/number';
 import { getLocaleSnapshot } from '@/i18n/store';
 
 /**
@@ -33,18 +33,28 @@ export const PRO_YEARLY_LABEL = '$19.99/yr';
 
 /**
  * The prices Skip Pro is set at in US dollars, the fallback when the store has not answered.
- * Written as dollars whatever currency the app shows: Apple prices each storefront itself, so
- * putting another currency's mark on these figures would state a price nobody is charged.
+ * Apple prices each storefront itself, so these figures are never written as another currency's:
+ * when the app shows pesos or pounds they carry "US" ("US$1.99", "1,99 $ US"), or a bare "$"
+ * would read as a local price nobody is charged.
  */
 const PRO_MONTHLY_USD = 1.99;
 const PRO_YEARLY_USD = 19.99;
 
+export function usdText(amount: number): string {
+  const { language, currency } = getLocaleSnapshot();
+  const plain = formatMoney(amount, language, 'USD');
+  if (currency === 'USD') return plain;
+  return language === 'fr' ? `${plain}${NBSP}US` : `US${plain}`;
+}
+
+/** The fallback price alone, for sentences that word the period themselves. */
+export const proMonthlyAmount = () => usdText(PRO_MONTHLY_USD);
+export const proYearlyAmount = () => usdText(PRO_YEARLY_USD);
+
 export function proMonthlyLabel(): string {
-  const { language } = getLocaleSnapshot();
-  return t('pro.price.monthly', { price: formatMoney(PRO_MONTHLY_USD, language, 'USD') });
+  return t('pro.price.monthly', { price: proMonthlyAmount() });
 }
 
 export function proYearlyLabel(): string {
-  const { language } = getLocaleSnapshot();
-  return t('pro.price.yearly', { price: formatMoney(PRO_YEARLY_USD, language, 'USD') });
+  return t('pro.price.yearly', { price: proYearlyAmount() });
 }
