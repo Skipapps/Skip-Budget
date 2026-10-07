@@ -180,6 +180,26 @@ describe('Cards — money tiles at large text sizes', () => {
     );
   });
 
+  it('draws side-by-side tiles at one height, the shorter filling the height of the taller', async () => {
+    // Jest has no layout engine, so this pins the chain that makes it so: the row stretches each
+    // cell to its tallest member (no items-* override), and the tile and its surface grow into it.
+    const screen = await render(<CardsScreen />);
+    const row = screen.getByTestId('money-tile-figures');
+    expect(String(row.props.className)).toContain('flex-row');
+    expect(String(row.props.className)).not.toMatch(/(^|\s)items-/);
+
+    for (const label of ['Salary, $12,345.67', 'Savings, $260.00']) {
+      const tile = screen.getByLabelText(label);
+      const cell = tile.parent;
+      const surface = tile.children[0] as unknown as { props: { className?: string } };
+      expect(cell?.parent).toBe(row);
+      expect(String(cell?.props.className)).toMatch(/(^|\s)flex-1(\s|$)/);
+      expect(String(cell?.props.className)).not.toMatch(/(^|\s)(self-|items-)/);
+      expect(String(tile.props.className)).toMatch(/(^|\s)grow(\s|$)/);
+      expect(String(surface.props.className)).toMatch(/(^|\s)grow(\s|$)/);
+    }
+  });
+
   it('shrinks both figures together when the wider one needs it, side by side', async () => {
     const screen = await render(<CardsScreen />);
     // 100pt each: "$12,345.67" needs 112.4pt, so both go to 99 / 112.4 = 0.88.

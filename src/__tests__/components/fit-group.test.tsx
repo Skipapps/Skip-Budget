@@ -387,6 +387,7 @@ describe('FitFigure', () => {
     expect(figure.props.maxFontSizeMultiplier).toBe(1.2);
     expect(figure.props.numberOfLines).toBeUndefined();
     expect(figure.props.adjustsFontSizeToFit).toBeUndefined();
+    expect(screen.queryByTestId('fit-scroll-total')).toBeNull();
   });
 
   it('shrinks alone to the width it has, even under its default size', async () => {
@@ -395,9 +396,19 @@ describe('FitFigure', () => {
     expect(fontSizeOf(screen, '-$12,345.67')).toBeCloseTo(26 * 0.74, 5);
   });
 
-  it('stops at 11pt', async () => {
+  it('stops at 11pt, and past that scrolls sideways rather than break between digits', async () => {
     const screen = await figureIn(150, 600);
     expect(fontSizeOf(screen, '-$12,345.67') * 1.2).toBeCloseTo(11, 5);
+
+    const scroller = screen.getByTestId('fit-scroll-total');
+    expect(scroller.props.horizontal).toBe(true);
+    // Whole, on one line inside the scroller; the slot it sits in keeps its measured width.
+    const figure = screen.getByText('-$12,345.67');
+    expect(figure.props.numberOfLines).toBeUndefined();
+    let node = figure.parent;
+    while (node && node !== scroller) node = node.parent;
+    expect(node === scroller).toBe(true);
+    expect(scroller.parent === screen.getByTestId('fit-slot-total')).toBe(true);
   });
 });
 

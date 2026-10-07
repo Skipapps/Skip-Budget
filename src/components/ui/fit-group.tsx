@@ -11,6 +11,7 @@ import {
   type RefObject,
 } from 'react';
 import {
+  ScrollView,
   Text,
   View,
   useWindowDimensions,
@@ -336,6 +337,11 @@ type FitTextProps = {
    * is not checked and needs no measuring copy; a change in its words still re-runs the decision.
    */
   hug?: boolean;
+  /**
+   * A lone figure that would have to go under the floor scrolls sideways at the floor size, so a
+   * figure with no space in it is never broken between its digits.
+   */
+  scrollWhenTooWide?: boolean;
   accessibilityRole?: AccessibilityRole;
   textRef?: Ref<ComponentRef<typeof Text>>;
   children: string;
@@ -358,6 +364,7 @@ export function FitText({
   after,
   reserve = 0,
   hug = false,
+  scrollWhenTooWide = false,
   accessibilityRole,
   textRef,
   children,
@@ -388,6 +395,26 @@ export function FitText({
 
   const words = children.trim().split(BREAKABLE_SPACE).join('\n');
 
+  const shown = (
+    <Text
+      ref={textRef}
+      accessibilityRole={accessibilityRole}
+      className={className}
+      style={[
+        style,
+        {
+          fontSize: size * scale,
+          lineHeight: lineHeight === undefined ? undefined : lineHeight * scale,
+        },
+        // Beside an icon the text sits in a row, where it would otherwise keep its one-line width.
+        before || after ? { flexShrink: 1 } : null,
+      ]}
+      maxFontSizeMultiplier={TEXT_CAP[role]}
+    >
+      {children}
+    </Text>
+  );
+
   return (
     <View
       ref={slot}
@@ -396,23 +423,14 @@ export function FitText({
       onLayout={(event) => noteLayout?.(`${id}:slot`, event.nativeEvent.layout.width)}
     >
       {before}
-      <Text
-        ref={textRef}
-        accessibilityRole={accessibilityRole}
-        className={className}
-        style={[
-          style,
-          {
-            fontSize: size * scale,
-            lineHeight: lineHeight === undefined ? undefined : lineHeight * scale,
-          },
-          // Beside an icon the text sits in a row, where it would otherwise keep its one-line width.
-          before || after ? { flexShrink: 1 } : null,
-        ]}
-        maxFontSizeMultiplier={TEXT_CAP[role]}
-      >
-        {children}
-      </Text>
+      {scrollWhenTooWide && handle?.fits === false ? (
+        // Inside the slot, so the slot keeps the width the group measures against.
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} testID={`fit-scroll-${id}`}>
+          {shown}
+        </ScrollView>
+      ) : (
+        shown
+      )}
       {after}
 
       {hug ? null : (
@@ -479,6 +497,7 @@ export function FitFigure({
         style={style}
         slotClassName="w-full"
         textRef={textRef}
+        scrollWhenTooWide
       >
         {children}
       </FitText>

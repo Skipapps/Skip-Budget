@@ -83,12 +83,13 @@ export function AmountTile({
       onPress={onPress}
       onPressIn={sinks ? () => setPressed(true) : undefined}
       onPressOut={sinks ? () => setPressed(false) : undefined}
-      className="w-full"
+      // Grows into the height its row stretches it to, so a tile beside a taller one matches it.
+      className="w-full grow"
     >
       <Animated.View
         style={surface}
         className={cn(
-          'w-full flex-row rounded-[16px] border border-line bg-card',
+          'w-full grow flex-row rounded-[16px] border border-line bg-card',
           // Reduced motion still answers the finger, with a static state.
           reduced && onPress ? 'active:opacity-70' : null,
           className,

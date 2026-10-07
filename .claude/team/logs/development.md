@@ -4064,3 +4064,29 @@ suites, 2637 tests (baseline 180 / 2582; 4 new suites, 55 new tests, none remove
 (Style.h computePadding with widthSize), not a trace. Card faces keep whole dollars (`cents: false`, pinned by tests),
 which the spec's "always with cents" contradicts: a product call. salary and loan-calculator keep Save at the end of
 the scroll (`mt-auto`), not in Screen's footer.
+
+---
+
+## 2026-10-07 — Dmitri (Development Lead) — review of cbe48d8 "Large text, phase 2a"
+
+**Outcome:** SHIP-TO-PHONE. No blocking issues. Edited nothing but this log.
+
+**Checks (tree clean at cbe48d8 while they ran):** tsc 0. Full jest 184/184 suites, 2637/2637. Prettier and ESLint
+`--no-cache` clean on the 40 changed TS/TSX files.
+
+**Verified:** The Phase 1 guarantees hold. The decision key is now in a ref, so a layout pass that only confirms the
+decision draws nothing. Hug members key by text, so a new amount or date re-registers, changes the key and is judged
+again. Members register before the group's first effect, so a fitting row mounts with one render; TransactionRow
+draws 2 copies, for label and kind. BREAKABLE_SPACE keeps NBSP, U+2007 and U+202F inside a word, which matches what
+iOS will not break at. Yoga (RN 0.86 BoundAxis.h, CalculateLayout.cpp) resolves percentage padding on both axes
+against ownerWidth, so a 100% spacer gives a square tile and 56.18% gives the old 1.78 face, the same as the old
+aspect ratio at default text. Card faces have had cents:false since the initial commit (20f0d89), now applied through
+FitFigure. No new English (APR is a pre-existing disclosure term), no catalogue change, no module-scope t(). The edits
+to existing tests are helpers only: boxOf skips fit- wrappers, and the layout events go to fit-slot instead of the
+removed hug copy. Every assertion is kept. The guard only moves files from allowances to adopted.
+
+**Non-blocking:** In Cards' two-up row, the wrapper stretches but the tile inside does not fill it, so at large text a
+tile whose label wraps more ends taller than its neighbour. Give the Pressable and tile flex-1/h-full in the row.
+A single-word figure below the 11pt floor would break mid-character (only at an extreme width and amount).
+
+**2026-10-07 — Dana — follow-up to Dmitri's review of cbe48d8:** side-by-side money tiles now grow to their row's height (Pressable and surface `grow`), and a lone figure that would need to go under 11pt scrolls sideways at 11pt instead of breaking between digits (`FitText scrollWhenTooWide`, used by `FitFigure`); tsc 0, jest 184/184 suites, 2638 tests, prettier and ESLint `--no-cache` clean; pinned by the stretch-chain test in cards-large-text (Jest has no layout engine) and the 11pt test in fit-group.
