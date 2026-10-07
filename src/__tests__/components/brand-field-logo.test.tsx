@@ -6,6 +6,7 @@ import type { KnownStore } from '@/api/known-stores';
 import type { LogoMatch } from '@/api/logos';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { FAILURE_MESSAGE } from '@/lib/failure';
+import { publishProStatus, resetProStatusForTests } from '@/lib/pro-status';
 
 /**
  * The add-store check inside the store field. A store the catalog does not know shows the logo
@@ -912,5 +913,33 @@ describe('stores this person added before', () => {
     await fireEvent.press(screen.getByLabelText('Vercel'));
 
     expect(screen.getByLabelText('Change company, currently Vercel')).toBeTruthy();
+  });
+});
+
+describe('on the free plan, where logos are Pro', () => {
+  beforeEach(async () => {
+    await act(async () => publishProStatus({ pro: false, ready: true }));
+  });
+  afterEach(() => resetProStatusForTests());
+
+  it('asks nothing, shows no Change logo, and costs the service no lookup', async () => {
+    const screen = await render(<Harness />);
+    await addStore(screen, 'Planet Fitness');
+
+    expect(screen.queryByText('Looks like Planet Fitness')).toBeNull();
+    expect(screen.queryByLabelText('Change logo')).toBeNull();
+    expect(screen.queryByLabelText('Add a website')).toBeNull();
+    expect(mockLogoMatch.mock.calls.every(([query]) => query === '')).toBe(true);
+    expect(lastValue()).toMatchObject({ name: 'Planet Fitness', logoDomain: null });
+  });
+
+  it('does not apply even a sure match', async () => {
+    const screen = await render(<Harness />);
+    await addStore(screen, 'Vercel');
+
+    // On Pro the same store would be given its logo at once; on free it keeps its initials.
+
+    expect(lastValue()).toMatchObject({ name: 'Vercel', logoDomain: null, logoHidden: false });
+    expect(screen.queryByLabelText('Change logo')).toBeNull();
   });
 });

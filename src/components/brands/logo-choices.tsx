@@ -10,6 +10,7 @@ import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { failureText } from '@/lib/failure';
 import { isSureMatch, websiteHost } from '@/lib/logo-lookup';
+import { useKnownFree } from '@/lib/pro-status';
 import { withTap } from '@/lib/press';
 import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
@@ -350,9 +351,11 @@ export function LogoConfirm({ name, hints, noLogo, onChoose, decided = false }: 
   // wants to choose, so it is never applied over them.
   const [auto, setAuto] = useState(!decided);
   const applied = useRef(false);
+  // Logos are Pro: a free account is asked nothing and costs the service no lookup.
+  const free = useKnownFree();
   // Nothing is asked of the service while the person is not choosing: an answered store costs no
   // lookup, and opening "Change logo" reuses the cached one.
-  const match = useLogoMatch(step === 'done' ? '' : name, hints);
+  const match = useLogoMatch(step === 'done' || free ? '' : name, hints);
   const found = confidentMatch(match.data);
   const plain = noLogoLabel(noLogo);
   const sureDomain = auto && step === 'ask' && isSureMatch(match.data) ? match.data.domain : null;
@@ -385,6 +388,8 @@ export function LogoConfirm({ name, hints, noLogo, onChoose, decided = false }: 
       className="mt-1 self-start"
     />
   );
+
+  if (free) return null;
 
   if (step === 'done') return quiet(LOGO_COPY.changeLogo, 'ask');
 

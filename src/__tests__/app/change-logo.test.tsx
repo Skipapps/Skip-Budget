@@ -1,10 +1,11 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import type { LogoMatch } from '@/api/logos';
 import ChangeLogoScreen from '@/app/change-logo';
 import { success, warn } from '@/lib/haptics';
 import { FAILURE_MESSAGE } from '@/lib/failure';
+import { publishProStatus, resetProStatusForTests } from '@/lib/pro-status';
 
 /**
  * Change logo: one receipt, subscription or bill, the logo it shows now, the add-store check's
@@ -71,10 +72,17 @@ jest.mock('@/components/bills/bill-mark', () => {
 });
 
 let mockParams: Record<string, string | undefined> = {};
-jest.mock('expo-router', () => ({
-  router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), canGoBack: () => true },
-  useLocalSearchParams: () => mockParams,
-}));
+jest.mock('expo-router', () => {
+  const { Text } = jest.requireActual('react-native');
+  return {
+    router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), canGoBack: () => true },
+    useLocalSearchParams: () => mockParams,
+    // Where a redirect would go, readable as text.
+    Redirect: ({ href }: { href: { pathname: string; params: { id: string } } }) => (
+      <Text>{`redirect:${href.pathname}?id=${href.params.id}`}</Text>
+    ),
+  };
+});
 
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 const mockDirectory = [
@@ -426,5 +434,17 @@ describe('when there is no row to change', () => {
     await fireEvent.press(screen.getByText('Go back'));
     expect(router.back).toHaveBeenCalledTimes(1);
     expect(screen.queryByLabelText('Save logo')).toBeNull();
+  });
+});
+
+describe('on the free plan, where logos are Pro', () => {
+  afterEach(() => resetProStatusForTests());
+
+  it('shows what Pro adds instead of the page', async () => {
+    await act(async () => publishProStatus({ pro: false, ready: true }));
+    const screen = await render(<ChangeLogoScreen />);
+
+    expect(screen.getByText('redirect:/pro-feature?id=logos')).toBeTruthy();
+    expect(screen.queryByText('Change logo')).toBeNull();
   });
 });

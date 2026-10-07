@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { useCharges, type ChargeRow } from '@/api/charges';
-import { useListsFree } from '@/api/history';
 import type { CaptureSource } from '@/api/mutations';
 import {
   buildLedger,
@@ -20,6 +19,7 @@ import { paydaysInRange } from '@/lib/date';
 import type { AccrualBasis } from '@/lib/loan';
 import { logoDomainOf } from '@/lib/logo-domain';
 import type { DateRange } from '@/lib/range';
+import { useKnownFree } from '@/lib/pro-status';
 import { supabase } from '@/lib/supabase';
 import { usePro } from '@/api/pro';
 import { useUserId } from '@/providers/session-provider';
@@ -894,7 +894,7 @@ export function useLedger(range: DateRange | undefined, today: string) {
   const bills = useBills();
   const salary = useSalarySources();
   const charges = useCharges();
-  const free = useListsFree();
+  const free = useKnownFree();
 
   // Nothing is listed from before the plan's window: 90 days back on free, seven years on Pro.
   // Only the listing is cut; balances walk the whole history elsewhere (ledgerForSource), and the

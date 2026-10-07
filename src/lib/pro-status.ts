@@ -39,6 +39,15 @@ export function useProStatus(): ProStatus {
   return useSyncExternalStore(subscribe, proStatus, proStatus);
 }
 
+/**
+ * Known to be free. What is drawn (history, logos) changes only on this, so someone who paid never
+ * sees the free version flash while Pro is still being checked.
+ */
+export function useKnownFree(): boolean {
+  const { pro, ready } = useProStatus();
+  return ready && !pro;
+}
+
 export function resetProStatusForTests(): void {
   current = UNKNOWN;
   listeners.clear();

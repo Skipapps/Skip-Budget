@@ -23,6 +23,7 @@ describe('PRO_FEATURES', () => {
       'scan',
       'voice',
       'history',
+      'logos',
       'unlimited',
     ]);
   });

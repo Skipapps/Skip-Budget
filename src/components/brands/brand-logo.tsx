@@ -6,6 +6,7 @@ import { logoImageUrl } from '@/api/logos';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { isLightColor } from '@/lib/color';
+import { useKnownFree } from '@/lib/pro-status';
 import { CARD_COLORS } from '@/theme/card-colors';
 
 type BrandLogoProps = {
@@ -78,7 +79,9 @@ function monogram(name: string): string {
  * have no logo, and the service answers those with a 404.
  */
 export function BrandLogo({ name, domain, size = 40, className, fallback }: BrandLogoProps) {
-  const url = logoImageUrl(domain);
+  // Logos are Pro: free draws the store's initials (or the given fallback, e.g. a bill's glyph).
+  const free = useKnownFree();
+  const url = free ? null : logoImageUrl(domain);
   // Keyed by URL, not a flag on the row, so a recycled row showing another brand recovers at once.
   const failed = useSyncExternalStore(subscribe, () => (url ? failedLately.has(url) : false));
 

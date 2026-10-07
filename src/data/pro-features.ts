@@ -101,6 +101,21 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
       benefit('pro.history.balances.title', 'pro.history.balances.detail'),
     ],
   },
+  logos: {
+    id: 'logos',
+    artwork: 'tileSubscriptions',
+    get title() {
+      return t('pro.logos.title');
+    },
+    get tagline() {
+      return t('pro.logos.tagline');
+    },
+    benefits: [
+      benefit('pro.logos.glance.title', 'pro.logos.glance.detail'),
+      benefit('pro.logos.brands.title', 'pro.logos.brands.detail'),
+      benefit('pro.logos.yours.title', 'pro.logos.yours.detail'),
+    ],
+  },
   unlimited: {
     id: 'unlimited',
     artwork: 'emptyWallet',

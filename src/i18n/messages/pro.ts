@@ -148,6 +148,46 @@ export const proMessages = defineMessages({
     fr: 'Skip redresse la page avant de la lire, ce qui fait la différence entre un 3 et un 8.',
   },
 
+  'pro.logos.title': {
+    en: 'Every store, its own logo',
+    es: 'Cada tienda, con su logo',
+    fr: 'Chaque magasin, avec son logo',
+  },
+  'pro.logos.tagline': {
+    en: 'Free shows each store’s initials. Skip Pro shows the real logo, from thousands of brands.',
+    es: 'El plan Gratis muestra las iniciales de cada tienda. Skip Pro muestra el logo real, entre miles de marcas.',
+    fr: 'Le forfait Gratuit affiche les initiales de chaque magasin. Skip Pro affiche le vrai logo, parmi des milliers de marques.',
+  },
+  'pro.logos.glance.title': {
+    en: 'Spot it at a glance',
+    es: 'Lo reconoces de un vistazo',
+    fr: 'Repéré d’un coup d’œil',
+  },
+  'pro.logos.glance.detail': {
+    en: 'A list of logos reads faster than a list of names, on every page.',
+    es: 'Una lista de logos se lee más rápido que una lista de nombres, en cada página.',
+    fr: 'Une liste de logos se lit plus vite qu’une liste de noms, sur chaque page.',
+  },
+  'pro.logos.brands.title': {
+    en: 'Thousands of brands',
+    es: 'Miles de marcas',
+    fr: 'Des milliers de marques',
+  },
+  'pro.logos.brands.detail': {
+    en: 'Shops, services and billers are matched by name as you add them.',
+    es: 'Tiendas, servicios y facturadores se reconocen por su nombre al agregarlos.',
+    fr: 'Magasins, services et factureurs sont reconnus par leur nom quand tu les ajoutes.',
+  },
+  'pro.logos.yours.title': {
+    en: 'Yours to change',
+    es: 'Tú decides',
+    fr: 'C’est toi qui choisis',
+  },
+  'pro.logos.yours.detail': {
+    en: 'Pick another logo, or keep the initials, for anything you have added.',
+    es: 'Elige otro logo, o quédate con las iniciales, en cualquier cosa que hayas agregado.',
+    fr: 'Choisis un autre logo, ou garde les initiales, pour tout ce que tu as ajouté.',
+  },
   'pro.history.title': {
     en: 'Seven years of your money',
     es: 'Siete años de tu dinero',
