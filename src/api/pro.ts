@@ -8,6 +8,7 @@ import Purchases, {
 
 import { t } from '@/i18n';
 import { useProOverride } from '@/lib/pro-bypass';
+import { publishProStatus, useProStatus, type ProStatus } from '@/lib/pro-status';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
@@ -17,6 +18,9 @@ import { useUserId } from '@/providers/session-provider';
  * webhook and read by every database check. The hook prefers the SDK and falls back to the row, so
  * it works with no key configured. Nothing else imports react-native-purchases; features ask
  * `usePro()`.
+ *
+ * The answer is worked out once, by the purchases bridge at the root, and published to a shared
+ * store; `usePro()` only reads that store, so it is cheap enough to call from every row of a list.
  */
 
 const RC_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '';
@@ -89,12 +93,29 @@ export function useConfigurePurchases(): void {
   useEffect(() => {
     if (userId) void ensureConfigured(userId);
   }, [userId]);
+
+  const { pro, ready } = useProSource();
+  useEffect(() => {
+    publishProStatus({ pro, ready });
+  }, [pro, ready]);
 }
 
-export function usePro() {
+/** Whether this account pays, as the purchases bridge last worked it out. */
+export function usePro(): ProStatus {
+  return useProStatus();
+}
+
+/**
+ * Works the answer out: the SDK listener, the server row and the development override. Runs once,
+ * in the purchases bridge; everything else reads the published result through `usePro()`.
+ */
+export function useProSource(): ProStatus {
   const userId = useUserId();
   const client = useQueryClient();
-  const [sdkPro, setSdkPro] = useState<boolean | null>(null);
+  // Remembered with the account it belongs to, so after a sign-out the next account never inherits
+  // the previous one's answer while its own is on the way.
+  const [sdk, setSdk] = useState<{ userId: string; pro: boolean } | null>(null);
+  const sdkPro = sdk && sdk.userId === userId ? sdk.pro : null;
   // Development-only, opt-in. It changes the answer below and nothing else: the SDK listener,
   // server query, offerings, purchase and restore still run. 'free' exists because a sandbox
   // purchase or dashboard grant cannot be switched off in-app, yet the free and lapsed experiences
@@ -123,7 +144,7 @@ export function usePro() {
 
     const listener = (info: CustomerInfo) => {
       if (!live) return;
-      setSdkPro(proFrom(info));
+      setSdk({ userId, pro: proFrom(info) });
       // The SDK heard it first; the server row lands via webhook later. Refetching keeps them
       // agreeing.
       client.invalidateQueries({ queryKey: ['entitlement'] });
@@ -137,7 +158,7 @@ export function usePro() {
       listening = true;
       try {
         const info = await Purchases.getCustomerInfo();
-        if (live) setSdkPro(proFrom(info));
+        if (live) setSdk({ userId, pro: proFrom(info) });
       } catch {
         // The server row still answers.
       }
