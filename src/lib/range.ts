@@ -83,6 +83,15 @@ export function rangeFor(key: RangeKey, anchor: Date): DateRange {
   }
 }
 
+/**
+ * The day after `day` through the last day of its month. On the last day it ends before it starts,
+ * which every consumer reads as an empty window.
+ */
+export function restOfMonth(day: Date): DateRange {
+  const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+  return { from: iso(next), to: rangeFor('month', day).to };
+}
+
 export type Bucket = 'day' | 'week' | 'month';
 
 /** How finely to chop a window for a chart: roughly 7 to 31 marks whatever the range. */

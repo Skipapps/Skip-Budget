@@ -6,7 +6,7 @@ import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
 
 /**
  * Home with its real cards, read in Spanish and in French: the headline figure and its labels,
- * Quick add, Where it goes, Go further, the day stepper and the two weeks of rows.
+ * Quick add, Where it goes, Go further, the day stepper, and the Recent and Coming up rows.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -182,7 +182,7 @@ describe('Home in Spanish', () => {
     expectNoRawText(screen);
   });
 
-  it('reads Go further, the day stepper and the two weeks', async () => {
+  it('reads Go further, the day stepper, Recent and Coming up', async () => {
     const screen = await render(<HomeScreen />);
 
     expect(screen.getByText('Ve más allá')).toBeTruthy();
@@ -203,7 +203,7 @@ describe('Home in Spanish', () => {
     expect(screen.getByLabelText('Bakery, -$6.00, Recibo')).toBeTruthy();
     expect(screen.getByLabelText('Netflix, -$15.00, Suscripción')).toBeTruthy();
     expect(screen.getByText('Próximos')).toBeTruthy();
-    expect(screen.getByText('Nada vence en la próxima semana.')).toBeTruthy();
+    expect(screen.getByText('Nada vence en lo que queda del mes.')).toBeTruthy();
     expectNoRawText(screen);
   });
 
@@ -247,7 +247,7 @@ describe('Home in French', () => {
     expectNoRawText(screen);
   });
 
-  it('reads Where it goes, Go further and the two weeks', async () => {
+  it('reads Where it goes, Go further, Recent and Coming up', async () => {
     const screen = await render(<HomeScreen />);
 
     expect(screen.getByText('Où va ton argent')).toBeTruthy();
@@ -264,7 +264,7 @@ describe('Home in French', () => {
     expect(screen.getByText('Récents')).toBeTruthy();
     expect(screen.getByLabelText(`Rent, -1${NBSP}030,00${NBSP}$, Facture`)).toBeTruthy();
     expect(screen.getByText('À venir')).toBeTruthy();
-    expect(screen.getByText('Rien à payer dans la semaine qui vient.')).toBeTruthy();
+    expect(screen.getByText('Rien à payer jusqu’à la fin du mois.')).toBeTruthy();
     expectNoRawText(screen);
   });
 });

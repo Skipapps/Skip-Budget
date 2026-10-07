@@ -24,6 +24,8 @@ export type LogoMatch = {
   margin: number;
   /** The next-best brands, for "Not this one?". */
   candidates: LogoCandidate[];
+  /** How it was found: "alias" and "domain" are exact, "fuzzy" is a close spelling. */
+  kind?: string | null;
 };
 
 export type LogoHints = { country?: string; category?: string };
@@ -122,6 +124,7 @@ function readLogoMatch(raw: unknown): LogoMatch | null {
     confidence: unit(raw.confidence),
     margin: unit(raw.margin),
     candidates,
+    kind: typeof raw.match === 'string' ? raw.match.trim().slice(0, 20) || null : null,
   };
 }
 

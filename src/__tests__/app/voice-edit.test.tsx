@@ -2,13 +2,23 @@ import { act, fireEvent, render } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import VoiceEditScreen from '@/app/voice-edit';
+import { LOGO_COPY } from '@/components/brands/logo-choices';
+import { FAILURE_MESSAGE } from '@/lib/failure';
+import { warn } from '@/lib/haptics';
 import type { VoiceDraft } from '@/lib/voice';
-import { clearVoiceDraft, putVoiceDraft, readVoiceEntry, useVoiceSession } from '@/lib/voice-draft';
+import {
+  clearVoiceDraft,
+  putVoiceDraft,
+  readVoiceEntry,
+  updateVoiceEntry,
+  useVoiceSession,
+} from '@/lib/voice-draft';
 
 /**
  * The one-field correction pages. Done writes to the review's working copy and pops; back pops and
  * writes nothing. Built from the add flows' own parts, so these drive the real keypad, store
- * search, calendar and category grid.
+ * search, calendar, category grid, card tiles and note field (the last two are the forms' own
+ * pages).
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -27,6 +37,8 @@ jest.mock('expo-router', () => ({
     canGoBack: () => true,
   },
   useLocalSearchParams: () => mockParams,
+  useFocusEffect: () => {},
+  Stack: { Screen: () => null },
   Redirect: () => null,
 }));
 
@@ -46,6 +58,12 @@ jest.mock('@/theme/artwork', () => ({
 }));
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => async () => true }));
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
+jest.mock('@/api/known-stores', () => ({
+  matchKnownStores: () => [],
+  storeKey: (name: string) => name.trim().toLowerCase(),
+  useKnownStores: () => [],
+  useRememberStore: () => async () => {},
+}));
 jest.mock('@/lib/haptics', () => ({
   tap: jest.fn(),
   toggle: jest.fn(),
@@ -74,6 +92,22 @@ jest.mock('@/api/brands', () => ({
   }),
   guessCategory: () => 'other',
 }));
+
+const mockSources = [
+  { id: 'card-1', label: 'VISA ••4821', color: '#123456', kind: 'card' as const },
+  { id: 'acct-1', label: 'Checking', color: '#654321', kind: 'account' as const },
+];
+jest.mock('@/api/queries', () => ({ usePaymentSources: () => ({ sources: mockSources }) }));
+// The forms' reminder page shares a module with the note page; nothing here opens it.
+jest.mock('@/components/ui/reminder-field', () => ({ ReminderField: () => null }));
+
+// The logo service's answer for a store added by hand.
+let mockLogoLookup: { data: unknown; isLoading: boolean; isFetching: boolean } = {
+  data: null,
+  isLoading: false,
+  isFetching: false,
+};
+jest.mock('@/api/logos', () => ({ useLogoMatch: () => mockLogoLookup }));
 
 const RECEIPT: VoiceDraft = {
   kind: 'receipt',
@@ -123,6 +157,7 @@ function snapshot(id: string) {
 beforeEach(() => {
   jest.clearAllMocks();
   clearVoiceDraft();
+  mockLogoLookup = { data: null, isLoading: false, isFetching: false };
 });
 
 describe('/voice-edit', () => {
@@ -181,6 +216,42 @@ describe('/voice-edit', () => {
       categoryId: 'dining',
     });
     expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks the logo question for a store added by hand, and Done keeps the answer', async () => {
+    mockLogoLookup = {
+      data: {
+        matched: true,
+        name: 'Rainbow Shops',
+        domain: 'rainbowshops.com',
+        confidence: 1,
+        margin: 1,
+        candidates: [],
+      },
+      isLoading: false,
+      isFetching: false,
+    };
+    const id = open('merchant', {
+      merchant: { brandId: null, name: 'Rainbow Shops', domain: null, categoryId: 'other' },
+      merchantHeard: 'Rainbow Shops',
+      merchantSource: 'heard',
+    });
+    const screen = await render(<VoiceEditScreen />);
+
+    await press(screen, 'Add Rainbow Shops as a new store');
+    expect(screen.getByText('rainbowshops.com')).toBeTruthy();
+    await press(screen, LOGO_COPY.yes);
+    await press(screen, 'Done');
+
+    // The draft keeps the choice now, so the review page and the save see it.
+    expect(readVoiceEntry(id)?.merchant).toEqual({
+      brandId: null,
+      name: 'Rainbow Shops',
+      domain: null,
+      categoryId: 'other',
+      logoDomain: 'rainbowshops.com',
+      logoHidden: false,
+    });
   });
 
   it('shows a matched store as chosen, ready to keep', async () => {
@@ -343,10 +414,165 @@ describe('/voice-edit', () => {
     mockParams = { draft: 'gone', field: 'amount' };
     const stale = await render(<VoiceEditScreen />);
     expect(stale.getByText('Nothing to check yet')).toBeTruthy();
-    stale.unmount();
+    await stale.unmount();
 
     open('category');
     const receipt = await render(<VoiceEditScreen />);
     expect(receipt.getByText('Nothing to check yet')).toBeTruthy();
+  });
+
+  it('has nothing to correct on the card or note page of a stale draft', async () => {
+    for (const field of ['source', 'note']) {
+      mockParams = { draft: 'gone', field };
+      const stale = await render(<VoiceEditScreen />);
+      expect(stale.getByText('Nothing to check yet')).toBeTruthy();
+      await stale.unmount();
+    }
+  });
+});
+
+describe('/voice-edit — the card', () => {
+  it('asks the forms’ question, and Done writes the card picked', async () => {
+    const id = open('source');
+    const screen = await render(<VoiceEditScreen />);
+
+    expect(screen.getByText('Paid with')).toBeTruthy();
+    expect(screen.getByText('What did you pay with?')).toBeTruthy();
+    expect(screen.queryByLabelText('Close')).toBeNull();
+
+    await press(screen, 'VISA ••4821');
+    expect(screen.getByLabelText('VISA ••4821').props.accessibilityState.selected).toBe(true);
+    await press(screen, 'Done');
+
+    expect(readVoiceEntry(id)?.sourceId).toBe('card-1');
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens on the card already chosen, and "No card or account" clears it', async () => {
+    const id = open('source');
+    updateVoiceEntry(id, { sourceId: 'acct-1' });
+    const screen = await render(<VoiceEditScreen />);
+
+    expect(screen.getByLabelText('Checking').props.accessibilityState.selected).toBe(true);
+    await press(screen, 'No card or account');
+    await press(screen, 'Done');
+
+    expect(readVoiceEntry(id)?.sourceId).toBeNull();
+  });
+
+  it('writes nothing when it is left by back', async () => {
+    const id = open('source');
+    const screen = await render(<VoiceEditScreen />);
+
+    await press(screen, 'Checking');
+    await press(screen, 'Back');
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    const { entry, Probe, touched } = snapshot(id);
+    await render(<Probe />);
+    expect(entry?.sourceId).toBeNull();
+    expect(touched()).toEqual([]);
+  });
+
+  it('is titled by the row that opened it: Charged to, for a subscription', async () => {
+    open('source', {
+      kind: 'subscription',
+      cycle: 'monthly',
+      merchant: { brandId: null, name: 'Spotify', domain: null, categoryId: 'streaming' },
+    });
+    const screen = await render(<VoiceEditScreen />);
+    expect(screen.getByText('Charged to')).toBeTruthy();
+  });
+
+  it('leaves once for a double tap on Done', async () => {
+    const id = open('source');
+    const screen = await render(<VoiceEditScreen />);
+
+    await press(screen, 'VISA ••4821');
+    const done = screen.getByLabelText('Done');
+    await act(async () => {
+      fireEvent.press(done);
+      fireEvent.press(done);
+    });
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(readVoiceEntry(id)?.sourceId).toBe('card-1');
+  });
+});
+
+describe('/voice-edit — the note', () => {
+  it('types a note, and Done writes it trimmed', async () => {
+    const id = open('note');
+    const screen = await render(<VoiceEditScreen />);
+
+    expect(screen.getAllByText('Note').length).toBeGreaterThan(0);
+    await act(async () => {
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Anything worth remembering'),
+        '  Team lunch ',
+      );
+    });
+    await press(screen, 'Done');
+
+    expect(readVoiceEntry(id)?.note).toBe('Team lunch');
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens on the note already typed, and emptied it is no note', async () => {
+    const id = open('note');
+    updateVoiceEntry(id, { note: 'Team lunch' });
+    const screen = await render(<VoiceEditScreen />);
+
+    await act(async () => {
+      fireEvent.changeText(screen.getByDisplayValue('Team lunch'), '   ');
+    });
+    await press(screen, 'Done');
+
+    expect(readVoiceEntry(id)?.note).toBeNull();
+  });
+
+  it('writes nothing when it is left by back', async () => {
+    const id = open('note');
+    const screen = await render(<VoiceEditScreen />);
+
+    await act(async () => {
+      fireEvent.changeText(screen.getByPlaceholderText('Anything worth remembering'), 'Lunch');
+    });
+    await press(screen, 'Back');
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    const { entry, Probe, touched } = snapshot(id);
+    await render(<Probe />);
+    expect(entry?.note).toBeNull();
+    expect(touched()).toEqual([]);
+  });
+
+  it('uses each form’s own hint for the note', async () => {
+    open('note', {
+      kind: 'subscription',
+      cycle: 'monthly',
+      merchant: { brandId: null, name: 'Spotify', domain: null, categoryId: 'streaming' },
+    });
+    const screen = await render(<VoiceEditScreen />);
+    expect(screen.getByPlaceholderText('Which plan, for example')).toBeTruthy();
+  });
+
+  it('stays with the one failure line when Done cannot keep the note', async () => {
+    const id = open('note');
+    const screen = await render(<VoiceEditScreen />);
+
+    // Past the field's own limit, which a paste can get round.
+    await act(async () => {
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Anything worth remembering'),
+        'x'.repeat(201),
+      );
+    });
+    await press(screen, 'Done');
+
+    expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(router.back).not.toHaveBeenCalled();
+    expect(readVoiceEntry(id)?.note).toBeNull();
   });
 });

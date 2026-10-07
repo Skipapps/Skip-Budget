@@ -73,7 +73,7 @@ export function QuickActions({ onPress }: QuickActionsProps) {
       accessibilityLabel={t(action.hint)}
       onPress={withTap(() => onPress(action.href))}
       className={cn(
-        'min-h-14 flex-row items-center gap-2 rounded-[20px] border border-line bg-card px-3 py-2 active:bg-ink/5',
+        'min-h-14 flex-row items-center gap-2 rounded-[10px] border border-line bg-card px-3 py-2 active:bg-ink/5',
         labels.fits ? 'min-w-0 flex-1' : 'w-full',
       )}
     >

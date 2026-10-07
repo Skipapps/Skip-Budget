@@ -1,5 +1,5 @@
 import { occurrencesInRange } from '@/lib/card-ledger';
-import { bucketKey, bucketsIn, bucketFor, rangeFor } from '@/lib/range';
+import { bucketKey, bucketsIn, bucketFor, rangeFor, restOfMonth } from '@/lib/range';
 
 // A Thursday, so the week boundaries are not accidentally symmetric.
 const THURSDAY = new Date(2026, 7, 27);
@@ -47,6 +47,31 @@ describe('rangeFor', () => {
 
   it('year covers January to December', () => {
     expect(rangeFor('year', THURSDAY)).toEqual({ from: '2026-01-01', to: '2026-12-31' });
+  });
+});
+
+describe('restOfMonth', () => {
+  it('runs from the day after to the last day of the same month', () => {
+    expect(restOfMonth(THURSDAY)).toEqual({ from: '2026-08-28', to: '2026-08-31' });
+  });
+
+  it('starts on the 2nd when the day is the 1st, in a 30-day month', () => {
+    expect(restOfMonth(new Date(2026, 8, 1))).toEqual({ from: '2026-09-02', to: '2026-09-30' });
+  });
+
+  it('knows February in a leap year', () => {
+    expect(restOfMonth(new Date(2028, 1, 10))).toEqual({ from: '2028-02-11', to: '2028-02-29' });
+  });
+
+  it('is empty on the last day: it would start in the next month, after it ends', () => {
+    const { from, to } = restOfMonth(new Date(2026, 9, 31));
+    expect(from).toBe('2026-11-01');
+    expect(to).toBe('2026-10-31');
+    expect(from > to).toBe(true);
+  });
+
+  it('crosses no year boundary: December ends on the 31st', () => {
+    expect(restOfMonth(new Date(2026, 11, 30))).toEqual({ from: '2026-12-31', to: '2026-12-31' });
   });
 });
 

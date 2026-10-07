@@ -3,70 +3,45 @@ import { router } from 'expo-router';
 
 import AddReceiptScreen from '@/app/add-receipt';
 import { FAILURE_MESSAGE } from '@/lib/failure';
-import { toIsoDate } from '@/lib/date';
 
 /**
- * A scanned receipt opens on the last step, a review of what was read above the date and Save, on
- * both ways in: a scan from the receipts list (route params) and Scan / Upload on the form itself.
- * A reading missing the amount or the store opens on that step instead. Scanning is Pro: a free
+ * A scanned receipt opens on the final page, a report of what was read above the amount and Save,
+ * on both ways in: a scan from the receipts list (route params) and Scan / Upload on the form
+ * itself. Whatever the reading missed is a gap on that page (the amount, the store) rather than a
+ * different page; a reading of nothing leaves the person on the amount page. Scanning is Pro: a free
  * account is shown the explainer before the camera opens, and a save the database refuses for Pro
  * goes to the explainer rather than the failure line.
  */
-
-const mockProps: Record<string, any> = {};
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
 );
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
+jest.mock('@/components/ui/reminder-field', () => ({ ReminderField: () => null }));
 jest.mock('@/lib/haptics', () => ({
   tap: jest.fn(),
+  toggle: jest.fn(),
   success: jest.fn(),
   warn: jest.fn(),
   selection: jest.fn(),
 }));
 
-// Leaf inputs record their props; the primary button accepts a press even while disabled.
-jest.mock('@/components/ui/button', () => {
-  const { Pressable, Text } = jest.requireActual('react-native');
-  return {
-    Button: ({ label, onPress }: { label: string; onPress: () => void }) => (
-      <Pressable accessibilityRole="button" onPress={onPress}>
-        <Text>{label}</Text>
-      </Pressable>
-    ),
-  };
-});
-jest.mock('@/components/flow/amount-step', () => ({
-  AmountStep: (props: any) => {
-    mockProps.amount = props;
-    return null;
-  },
-}));
-jest.mock('@/components/brands/brand-field', () => {
+// The logo a mark drew, readable as text: "Corner Deli|cornerdeli.com", or "Corner Deli|" for letters.
+jest.mock('@/components/brands/brand-logo', () => {
   const { Text } = jest.requireActual('react-native');
   return {
-    BrandField: (props: any) => {
-      mockProps.store = props;
-      return <Text>Store field</Text>;
-    },
+    BrandLogo: ({
+      name,
+      domain,
+      size,
+    }: {
+      name: string;
+      domain?: string | null;
+      size?: number;
+    }) => <Text testID={`logo-${size}`}>{`${name}|${domain ?? ''}`}</Text>,
   };
 });
-jest.mock('@/components/brands/brand-mark', () => ({
-  BrandMark: (props: any) => {
-    mockProps.mark = props;
-    return null;
-  },
-}));
-jest.mock('@/components/ui/source-tiles', () => ({ SourceTiles: () => null }));
-jest.mock('@/components/ui/text-field', () => ({ TextField: () => null }));
-jest.mock('@/components/flow/inline-calendar', () => ({
-  InlineCalendar: (props: any) => {
-    mockProps.calendar = props;
-    return null;
-  },
-}));
 
 const mockScanner = { available: true };
 const mockCapture = jest.fn();
@@ -102,8 +77,10 @@ jest.mock('@/providers/theme-provider', () => ({
     ink: '#000000',
     muted: '#777777',
     body: '#333333',
+    line: '#DDDDDD',
     danger: '#CC0000',
     accentInk: '#905479',
+    onControl: '#FFFFFF',
   }),
   useMoneyColor: () => () => '#000000',
 }));
@@ -141,11 +118,26 @@ jest.mock('@/api/mutations', () => ({
   useDeleteReceipt: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
 
+const BRANDS = [
+  { id: 'b-wf', name: 'Whole Foods', domain: 'wholefoods.com', category_id: 'groceries' },
+];
+
+// The real keyword guess and brand matching; only the reads that go to the network are replaced.
+jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/api/brands', () => ({
-  guessCategory: () => 'groceries',
-  matchBrand: () => null,
-  useBrandDirectory: () => ({ data: [] }),
+  ...jest.requireActual('@/api/brands'),
+  useBrandSearch: (query: string) => ({
+    data:
+      query.trim().length >= 2
+        ? BRANDS.filter((brand) => brand.name.toLowerCase().includes(query.trim().toLowerCase()))
+        : [],
+    isFetching: false,
+  }),
+  useBrandDirectory: () => ({ data: BRANDS }),
   useSpendCategories: () => ({ data: [] }),
+}));
+jest.mock('@/api/logos', () => ({
+  useLogoMatch: () => ({ data: null, isLoading: false, isFetching: false }),
 }));
 
 jest.mock('@/api/queries', () => ({
@@ -154,6 +146,27 @@ jest.mock('@/api/queries', () => ({
     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
   }),
 }));
+
+// Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
+jest.useFakeTimers({
+  doNotFake: [
+    'hrtime',
+    'nextTick',
+    'performance',
+    'queueMicrotask',
+    'requestAnimationFrame',
+    'cancelAnimationFrame',
+    'requestIdleCallback',
+    'cancelIdleCallback',
+    'setImmediate',
+    'clearImmediate',
+    'setInterval',
+    'clearInterval',
+    'setTimeout',
+    'clearTimeout',
+  ],
+});
+jest.setSystemTime(new Date('2026-10-07T09:00:00'));
 
 type Screen = Awaited<ReturnType<typeof render>>;
 
@@ -170,23 +183,43 @@ const ROUTE = {
   scannedRead: 'store,amount,date,card',
 };
 
-const onLastStep = (screen: Screen) => {
-  expect(screen.getByText('When was it?')).toBeTruthy();
-  expect(screen.getByText('Save receipt')).toBeTruthy();
+const press = (screen: Screen, label: string) => fireEvent.press(screen.getByLabelText(label));
+
+/** The amount is a button on the page and a figure inside it, both worded alike: by role, the button. */
+const pressButton = (screen: Screen, name: string) =>
+  fireEvent.press(screen.getByRole('button', { name }));
+
+async function typeAmount(screen: Screen, digits: string) {
+  for (const key of digits) await press(screen, key === '.' ? 'Decimal point' : key);
+}
+
+/** Types into the store box the way a finger does: a tap into it, then the letters. */
+async function searchStore(screen: Screen, text: string) {
+  const input = screen.getByPlaceholderText('Search for a store');
+  await fireEvent(input, 'focus');
+  await fireEvent.changeText(input, text);
+}
+
+/** Searches the store box on the final page and taps the catalogue result of that name. */
+async function chooseStore(screen: Screen, search: string, result: string) {
+  await searchStore(screen, search);
+  await fireEvent.press(await screen.findByLabelText(result));
+}
+
+const onFinalPage = (screen: Screen) => {
+  expect(screen.getByText('You can edit this later.')).toBeTruthy();
+  expect(screen.queryByText('How much did you spend?')).toBeNull();
 };
-const onAmountStep = (screen: Screen) => {
+const onAmountPage = (screen: Screen) => {
   expect(screen.getByText('How much did you spend?')).toBeTruthy();
-  expect(screen.queryByText('Save receipt')).toBeNull();
-};
-const onStoreStep = (screen: Screen) => {
-  expect(screen.getByText('Store field')).toBeTruthy();
-  expect(screen.queryByText('Save receipt')).toBeNull();
+  expect(screen.getByLabelText('Continue')).toBeTruthy();
+  expect(screen.queryByLabelText('Save receipt')).toBeNull();
 };
 
 const scanOnForm = async (screen: Screen, parsed: Record<string, unknown>) => {
   mockParsed = parsed;
   mockCapture.mockResolvedValueOnce({ text: 'receipt', lines: [] });
-  await fireEvent.press(screen.getByLabelText('Scan'));
+  await press(screen, 'Scan');
 };
 
 const SAVED_SCAN = {
@@ -204,7 +237,6 @@ const SAVED_SCAN = {
 beforeEach(() => {
   mockHasLayout = true;
   jest.clearAllMocks();
-  for (const key of Object.keys(mockProps)) delete mockProps[key];
   mockParams = {};
   mockParsed = {};
   mockScanner.available = true;
@@ -213,98 +245,218 @@ beforeEach(() => {
 });
 
 describe('a scan from the receipts list', () => {
-  it('opens on the last step with what was read, and saves it as a scan', async () => {
+  it('opens on the final page with what was read, and saves it as a scan', async () => {
     mockParams = ROUTE;
     const screen = await render(<AddReceiptScreen />);
 
-    onLastStep(screen);
-    expect(screen.getByLabelText('Amount, $15.99')).toBeTruthy();
-    expect(screen.getByLabelText("Store, Trader Joe's")).toBeTruthy();
+    onFinalPage(screen);
+    expect(screen.getByText('Read the store, amount, date and card.')).toBeTruthy();
+    expect(screen.queryByText(/^Check the/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Amount, $15.99' })).toBeTruthy();
+    expect(screen.getByLabelText("Change store, currently Trader Joe's")).toBeTruthy();
+    expect(screen.getByTestId('logo-32')).toHaveTextContent("Trader Joe's|");
+    expect(screen.getByText('Filed under Groceries')).toBeTruthy();
+    expect(screen.getByLabelText('Date, Mon Sep 28')).toBeTruthy();
     expect(screen.getByLabelText('Paid with, VISA ••4421')).toBeTruthy();
-    expect(mockProps.mark).toMatchObject({ name: "Trader Joe's", size: 40 });
-    expect(toIsoDate(mockProps.calendar.value)).toBe('2026-09-28');
+    expect(screen.getByLabelText('Save receipt')).toBeEnabled();
 
-    await fireEvent.press(screen.getByText('Save receipt'));
+    await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate).toHaveBeenCalledWith({ ...SAVED_SCAN, source: 'scan' });
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
-  it('opens on the amount when no total was read', async () => {
+  it('draws the amount as a gap when no total was read, and holds Save until it is filled', async () => {
     mockParams = { ...ROUTE, scannedAmount: '', scannedRead: 'store,date,card' };
     const screen = await render(<AddReceiptScreen />);
 
-    onAmountStep(screen);
+    onFinalPage(screen);
+    expect(screen.getByText('Read the store, date and card.')).toBeTruthy();
+    expect(screen.getByText('Check the amount below — it will save either way.')).toBeTruthy();
+    expect(screen.getByText('Tap to add the amount')).toBeTruthy();
+    expect(screen.getByLabelText('Amount, needed')).toBeTruthy();
+    expect(screen.queryByText(/\$0/)).toBeNull();
+    expect(screen.getByLabelText('Save receipt')).toBeDisabled();
+
+    await press(screen, 'Amount, needed');
+    await typeAmount(screen, '15.99');
+    await press(screen, 'Done');
+
+    expect(screen.getByRole('button', { name: 'Amount, $15.99' })).toBeTruthy();
+    expect(screen.getByLabelText('Save receipt')).toBeEnabled();
+    await press(screen, 'Save receipt');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate).toHaveBeenCalledWith({ ...SAVED_SCAN, source: 'scan' });
   });
 
-  it('opens on the store when no store was read', async () => {
+  it('draws the store as a gap when no store was read, and holds Save until it is chosen', async () => {
     mockParams = { ...ROUTE, scannedStore: '', scannedRead: 'amount,date,card' };
     const screen = await render(<AddReceiptScreen />);
 
-    onStoreStep(screen);
+    onFinalPage(screen);
+    expect(screen.getByText('Read the amount, date and card.')).toBeTruthy();
+    expect(screen.getByText('Check the store below — it will save either way.')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Search for a store')).toBeTruthy();
+    expect(screen.queryByText('Filed under', { exact: false })).toBeNull();
+    expect(screen.getByLabelText('Save receipt')).toBeDisabled();
+
+    await chooseStore(screen, 'Whole', 'Whole Foods');
+
+    expect(screen.getByLabelText('Change store, currently Whole Foods')).toBeTruthy();
+    expect(screen.getByLabelText('Save receipt')).toBeEnabled();
   });
 
-  it('leaves a voice hand-off where it always opened, on the amount', async () => {
+  it('opens a voice hand-off on the final page too, without the camera’s report', async () => {
     mockParams = { ...ROUTE, scannedVia: 'voice', from: 'voice' };
     const screen = await render(<AddReceiptScreen />);
 
-    onAmountStep(screen);
+    onFinalPage(screen);
+    expect(screen.queryByText(/^Read the/)).toBeNull();
+    expect(screen.queryByText(/^Check the/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Amount, $15.99' })).toBeTruthy();
+    expect(screen.getByLabelText("Change store, currently Trader Joe's")).toBeTruthy();
+  });
+
+  it('opens blank, on the amount page, when the params carry nothing', async () => {
+    mockParams = { scannedRead: '', scannedAmount: '', scannedStore: '' };
+    const screen = await render(<AddReceiptScreen />);
+
+    onAmountPage(screen);
+    expect(screen.queryByText(/^Read the/)).toBeNull();
   });
 });
 
-describe('the review on the last step', () => {
-  it('opens the step behind each line to fix it, and Back still walks back one step', async () => {
+describe('the report on the final page', () => {
+  it('goes once the person corrects anything it read', async () => {
+    mockParams = ROUTE;
+    const screen = await render(<AddReceiptScreen />);
+    expect(screen.getByText('Read the store, amount, date and card.')).toBeTruthy();
+
+    await press(screen, 'Yesterday');
+
+    expect(screen.queryByText(/^Read the/)).toBeNull();
+    expect(screen.getByLabelText('Date, Yesterday, Tue Oct 6')).toBeTruthy();
+  });
+
+  it('goes once the store is cleared, or another one is picked', async () => {
+    mockParams = ROUTE;
+    const screen = await render(<AddReceiptScreen />);
+    expect(screen.getByText('Read the store, amount, date and card.')).toBeTruthy();
+
+    await press(screen, "Change store, currently Trader Joe's");
+    expect(screen.queryByText(/^Read the/)).toBeNull();
+    expect(screen.queryByText(/^Check the/)).toBeNull();
+
+    await chooseStore(screen, 'Whole', 'Whole Foods');
+    expect(screen.queryByText(/^Read the/)).toBeNull();
+    expect(screen.getByLabelText('Change store, currently Whole Foods')).toBeTruthy();
+  });
+
+  it('goes with a corrected amount as well', async () => {
     mockParams = ROUTE;
     const screen = await render(<AddReceiptScreen />);
 
-    await fireEvent.press(screen.getByLabelText('Amount, $15.99'));
-    onAmountStep(screen);
+    await pressButton(screen, 'Amount, $15.99');
+    for (let i = 0; i < 5; i += 1) await press(screen, 'Delete last digit');
+    await typeAmount(screen, '16');
+    await press(screen, 'Done');
 
-    await fireEvent.press(screen.getByText('Continue'));
-    await fireEvent.press(screen.getByText('Continue'));
-    await fireEvent.press(screen.getByLabelText("Store, Trader Joe's"));
-    onStoreStep(screen);
+    expect(screen.queryByText(/^Read the/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Amount, $16.00' })).toBeTruthy();
+  });
 
-    await fireEvent.press(screen.getByText('Continue'));
-    await fireEvent.press(screen.getByLabelText('Paid with, VISA ••4421'));
-    onStoreStep(screen);
+  it('stays when a page is left with Back', async () => {
+    mockParams = ROUTE;
+    const screen = await render(<AddReceiptScreen />);
 
-    await fireEvent.press(screen.getByText('Continue'));
-    onLastStep(screen);
-    await fireEvent.press(screen.getByLabelText('Back'));
-    onStoreStep(screen);
+    await press(screen, 'Paid with, VISA ••4421');
+    await press(screen, 'Back');
+
+    expect(screen.getByText('Read the store, amount, date and card.')).toBeTruthy();
   });
 
   it('is not shown on a receipt typed by hand', async () => {
     const screen = await render(<AddReceiptScreen />);
 
-    await act(() => mockProps.amount.onChange('12'));
-    await fireEvent.press(screen.getByText('Continue'));
-    await act(() =>
-      mockProps.store.onChange({ brandId: null, name: 'Deli', domain: null, categoryId: '' }),
-    );
-    await fireEvent.press(screen.getByText('Continue'));
+    await typeAmount(screen, '12');
+    await press(screen, 'Continue');
 
-    onLastStep(screen);
-    expect(screen.queryByLabelText(/^Amount, /)).toBeNull();
+    onFinalPage(screen);
+    expect(screen.queryByText(/^Read the/)).toBeNull();
+    expect(screen.queryByText(/^Check the/)).toBeNull();
   });
 });
 
 describe('Scan and Upload on the form', () => {
-  it('Scan opens on the last step with what was read, and saves it as a scan', async () => {
+  it('Scan lands on the final page with what was read, and saves it as a scan', async () => {
     const screen = await render(<AddReceiptScreen />);
-    onAmountStep(screen);
+    onAmountPage(screen);
 
     await scanOnForm(screen, READ);
 
-    onLastStep(screen);
-    expect(screen.getByLabelText('Amount, $15.99')).toBeTruthy();
+    onFinalPage(screen);
+    expect(screen.getByRole('button', { name: 'Amount, $15.99' })).toBeTruthy();
+    expect(screen.getByLabelText("Change store, currently Trader Joe's")).toBeTruthy();
+    expect(screen.getByLabelText('Date, Mon Sep 28')).toBeTruthy();
+    expect(screen.getByLabelText('Paid with, VISA ••4421')).toBeTruthy();
     expect(screen.getByText('Read the store, amount, date and card.')).toBeTruthy();
-    await fireEvent.press(screen.getByText('Save receipt'));
+    await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    expect(mockCreate).toHaveBeenCalledWith({ ...SAVED_SCAN, source: 'scan' });
+    // The shop printed no category: a name with no keyword in it is filed under Other.
+    expect(mockCreate).toHaveBeenCalledWith({
+      ...SAVED_SCAN,
+      category_id: 'other',
+      source: 'scan',
+    });
+  });
+
+  it('Scan files a store the catalogue does not know by the keywords in its name', async () => {
+    const screen = await render(<AddReceiptScreen />);
+
+    await scanOnForm(screen, { ...READ, merchant: 'Sunrise Bakery' });
+
+    onFinalPage(screen);
+    await press(screen, 'Save receipt');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: null,
+      merchant: 'Sunrise Bakery',
+      category_id: 'groceries',
+      source: 'scan',
+    });
+  });
+
+  it('Scan files a store the catalogue knows under its brand', async () => {
+    const screen = await render(<AddReceiptScreen />);
+
+    await scanOnForm(screen, { ...READ, merchant: 'WHOLE FOODS' });
+
+    onFinalPage(screen);
+    expect(screen.getByLabelText('Change store, currently Whole Foods')).toBeTruthy();
+    expect(screen.getByTestId('logo-32')).toHaveTextContent('Whole Foods|wholefoods.com');
+    expect(screen.getByText('Filed under Groceries')).toBeTruthy();
+    await press(screen, 'Save receipt');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: 'b-wf',
+      merchant: 'Whole Foods',
+      category_id: 'groceries',
+      source: 'scan',
+    });
+  });
+
+  it('Back from a scanned receipt returns to the amount page, with the scan kept', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await scanOnForm(screen, READ);
+
+    await press(screen, 'Back');
+
+    onAmountPage(screen);
+    expect(router.back).not.toHaveBeenCalled();
+    await press(screen, 'Continue');
+    expect(screen.getByLabelText("Change store, currently Trader Joe's")).toBeTruthy();
   });
 
   it('Upload reads flat text only on a native build without layout recognition', async () => {
@@ -316,12 +468,16 @@ describe('Scan and Upload on the form', () => {
     mockParsed = READ;
     const screen = await render(<AddReceiptScreen />);
 
-    await fireEvent.press(screen.getByLabelText('Upload'));
+    await press(screen, 'Upload');
 
-    await waitFor(() => onLastStep(screen));
-    await fireEvent.press(screen.getByText('Save receipt'));
+    await waitFor(() => onFinalPage(screen));
+    await press(screen, 'Save receipt');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    expect(mockCreate).toHaveBeenCalledWith({ ...SAVED_SCAN, source: 'upload' });
+    expect(mockCreate).toHaveBeenCalledWith({
+      ...SAVED_SCAN,
+      category_id: 'other',
+      source: 'upload',
+    });
     expect(mockRecognizeText).toHaveBeenCalledTimes(1);
   });
 
@@ -332,26 +488,60 @@ describe('Scan and Upload on the form', () => {
     mockParsed = {};
     const screen = await render(<AddReceiptScreen />);
 
-    await fireEvent.press(screen.getByLabelText('Upload'));
+    await press(screen, 'Upload');
 
     await waitFor(() => expect(mockRecognize).toHaveBeenCalledTimes(1));
     expect(mockRecognizeText).not.toHaveBeenCalled();
   });
 
-  it('stays on the amount when no total was read', async () => {
+  it('draws the amount as a gap when no total was read', async () => {
     const screen = await render(<AddReceiptScreen />);
 
     await scanOnForm(screen, { ...READ, total: undefined });
 
-    onAmountStep(screen);
+    onFinalPage(screen);
+    expect(screen.getByText('Read the store, date and card.')).toBeTruthy();
+    expect(screen.getByText('Check the amount below — it will save either way.')).toBeTruthy();
+    expect(screen.getByLabelText('Amount, needed')).toBeTruthy();
+    expect(screen.getByLabelText('Save receipt')).toBeDisabled();
+    expect(screen.queryByText(/\$0/)).toBeNull();
   });
 
-  it('opens on the store when no store was read', async () => {
+  it('keeps an amount already typed when the reading has no total', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await typeAmount(screen, '5');
+
+    await scanOnForm(screen, { ...READ, total: undefined });
+
+    onFinalPage(screen);
+    expect(screen.getByRole('button', { name: 'Amount, $5.00' })).toBeTruthy();
+    expect(screen.getByLabelText('Save receipt')).toBeEnabled();
+  });
+
+  it('draws the store as a gap when no store was read', async () => {
     const screen = await render(<AddReceiptScreen />);
 
     await scanOnForm(screen, { ...READ, merchant: undefined });
 
-    onStoreStep(screen);
+    onFinalPage(screen);
+    expect(screen.getByText('Read the amount, date and card.')).toBeTruthy();
+    expect(screen.getByText('Check the store below — it will save either way.')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Search for a store')).toBeTruthy();
+    expect(screen.getByLabelText('Save receipt')).toBeDisabled();
+  });
+
+  it('stays on the amount page, and says so, when nothing at all was read', async () => {
+    const screen = await render(<AddReceiptScreen />);
+
+    await scanOnForm(screen, {});
+
+    onAmountPage(screen);
+    expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    expect(
+      screen.getByText('Check the store, date and amount below — it will save either way.'),
+    ).toBeTruthy();
+    expect(screen.getByLabelText('Continue')).toBeDisabled();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it('drops a day that is not on the calendar rather than saving another one', async () => {
@@ -359,12 +549,42 @@ describe('Scan and Upload on the form', () => {
 
     await scanOnForm(screen, { ...READ, date: '2026-02-30' });
 
-    onLastStep(screen);
+    onFinalPage(screen);
     expect(screen.getByText('Read the store, amount and card.')).toBeTruthy();
-    expect(toIsoDate(mockProps.calendar.value)).toBe(toIsoDate(new Date()));
-    await fireEvent.press(screen.getByText('Save receipt'));
+    expect(screen.getByLabelText('Date, Today, Wed Oct 7')).toBeTruthy();
+    await press(screen, 'Save receipt');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    expect(mockCreate.mock.calls[0][0].purchased_on).toBe(toIsoDate(new Date()));
+    expect(mockCreate.mock.calls[0][0].purchased_on).toBe('2026-10-07');
+  });
+
+  it('says it is reading while the camera works, and holds both buttons', async () => {
+    let finish: (value: unknown) => void = () => {};
+    mockCapture.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    mockParsed = READ;
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Scan');
+    expect(screen.getByText('Reading the receipt…')).toBeTruthy();
+    expect(screen.getByLabelText('Scan')).toBeDisabled();
+    expect(screen.getByLabelText('Upload')).toBeDisabled();
+
+    await act(async () => finish({ text: 'receipt', lines: [] }));
+
+    await waitFor(() => onFinalPage(screen));
+    expect(screen.queryByText('Reading the receipt…')).toBeNull();
+  });
+
+  it('says the one failure line, and stays on the amount page, when the camera fails', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockCapture.mockRejectedValueOnce(new Error('camera gone'));
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Scan');
+
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    onAmountPage(screen);
+    expect(screen.queryByText('Reading the receipt…')).toBeNull();
+    log.mockRestore();
   });
 });
 
@@ -375,7 +595,7 @@ describe('scanning is Pro', () => {
       mockPro = { pro: false, ready: true };
       const screen = await render(<AddReceiptScreen />);
 
-      await fireEvent.press(screen.getByLabelText(label));
+      await press(screen, label);
 
       expect(router.push).toHaveBeenCalledWith({
         pathname: '/pro-feature',
@@ -393,7 +613,7 @@ describe('scanning is Pro', () => {
       const screen = await render(<AddReceiptScreen />);
 
       expect(screen.getByLabelText(label)).toBeDisabled();
-      await fireEvent.press(screen.getByLabelText(label));
+      await press(screen, label);
 
       expect(router.push).not.toHaveBeenCalled();
       expect(mockCapture).not.toHaveBeenCalled();
@@ -405,13 +625,11 @@ describe('scanning is Pro', () => {
     mockPro = { pro: false, ready: true };
     const screen = await render(<AddReceiptScreen />);
 
-    await act(() => mockProps.amount.onChange('12'));
-    await fireEvent.press(screen.getByText('Continue'));
-    await act(() =>
-      mockProps.store.onChange({ brandId: null, name: 'Deli', domain: null, categoryId: '' }),
-    );
-    await fireEvent.press(screen.getByText('Continue'));
-    await fireEvent.press(screen.getByText('Save receipt'));
+    await typeAmount(screen, '12');
+    await press(screen, 'Continue');
+    await searchStore(screen, 'Deli');
+    await press(screen, 'Add Deli as a new store');
+    await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0].source).toBe('manual');
@@ -433,12 +651,8 @@ describe('scanning is Pro', () => {
       mockCreate.mockRejectedValueOnce({ code: 'P0001', message });
       mockParams = params;
       const screen = await render(<AddReceiptScreen />);
-      if (id === 'voice') {
-        await fireEvent.press(screen.getByText('Continue'));
-        await fireEvent.press(screen.getByText('Continue'));
-      }
 
-      await fireEvent.press(screen.getByText('Save receipt'));
+      await press(screen, 'Save receipt');
 
       await waitFor(() =>
         expect(router.push).toHaveBeenCalledWith({ pathname: '/pro-feature', params: { id } }),
@@ -446,6 +660,9 @@ describe('scanning is Pro', () => {
       expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
       expect(router.back).not.toHaveBeenCalled();
       expect(router.dismissTo).not.toHaveBeenCalled();
+      // Pushed, so Back returns to the filled-in form.
+      onFinalPage(screen);
+      expect(screen.getByRole('button', { name: 'Amount, $15.99' })).toBeTruthy();
     },
   );
 
@@ -456,7 +673,7 @@ describe('scanning is Pro', () => {
     mockParams = ROUTE;
     const screen = await render(<AddReceiptScreen />);
 
-    await fireEvent.press(screen.getByText('Save receipt'));
+    await press(screen, 'Save receipt');
 
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
     expect(router.push).not.toHaveBeenCalled();
@@ -471,9 +688,10 @@ describe('scanning is Pro', () => {
     mockParams = ROUTE;
     const screen = await render(<AddReceiptScreen />);
 
-    await fireEvent.press(screen.getByText('Save receipt'));
+    await press(screen, 'Save receipt');
 
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(screen.getAllByText(FAILURE_MESSAGE)).toHaveLength(1);
     expect(router.push).not.toHaveBeenCalled();
     log.mockRestore();
   });

@@ -15,8 +15,13 @@ import { useColors } from '@/providers/theme-provider';
 
 type StepFlowProps = {
   title: string;
-  /** What the close button asks before it throws the flow away, e.g. "Cancel adding this bill?". */
-  closePrompt: string;
+  /**
+   * What the close button asks before it throws the flow away, e.g. "Cancel adding this bill?".
+   * Without one there is no close button: a page that is one field of a larger form has nothing to
+   * throw away that Back does not.
+   */
+  closePrompt?: string;
+  /** One step or fewer draws no dots: a page on its own is not "step 1 of 1". */
   steps: number;
   /** Zero-based. */
   current: number;
@@ -26,9 +31,10 @@ type StepFlowProps = {
   question?: string;
   /** Sits between the dots and the question (the receipt scan pills). */
   headerSlot?: ReactNode;
-  primaryLabel: string;
+  /** Omitted on a page where a tap is the answer (a category grid): there is no button. */
+  primaryLabel?: string;
   primaryDisabled?: boolean;
-  onPrimary: () => void;
+  onPrimary?: () => void;
   error?: string | null;
   /** Extra action under the primary button, e.g. the Delete row when editing. */
   footerSlot?: ReactNode;
@@ -103,7 +109,7 @@ export function StepFlow({
       header={
         <View className="w-full pb-2">
           <FlowHeader title={title} onBack={onBack} closePrompt={closePrompt} titleRef={titleRef} />
-          <StepIndicator steps={steps} current={current} />
+          {steps > 1 ? <StepIndicator steps={steps} current={current} /> : null}
         </View>
       }
     >
@@ -138,7 +144,9 @@ export function StepFlow({
           </Text>
         ) : null}
 
-        <Button label={primaryLabel} onPress={onPrimary} disabled={primaryDisabled} />
+        {primaryLabel && onPrimary ? (
+          <Button label={primaryLabel} onPress={onPrimary} disabled={primaryDisabled} />
+        ) : null}
         {footerSlot}
       </View>
     </Screen>

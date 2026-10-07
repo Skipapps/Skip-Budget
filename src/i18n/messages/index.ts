@@ -5,6 +5,7 @@ import { billsMessages } from '@/i18n/messages/bills';
 import { cardsMessages } from '@/i18n/messages/cards';
 import { commonMessages } from '@/i18n/messages/common';
 import { dateMessages } from '@/i18n/messages/dates';
+import { entryMessages } from '@/i18n/messages/entry';
 import { faqMessages } from '@/i18n/messages/faq';
 import { homeMessages } from '@/i18n/messages/home';
 import { insightsMessages } from '@/i18n/messages/insights';
@@ -36,6 +37,7 @@ export const MESSAGE_AREAS = {
   cards: cardsMessages,
   common: commonMessages,
   dates: dateMessages,
+  entry: entryMessages,
   faq: faqMessages,
   home: homeMessages,
   insights: insightsMessages,
@@ -71,6 +73,7 @@ export const MESSAGES = {
   ...MESSAGE_AREAS.cards,
   ...MESSAGE_AREAS.common,
   ...MESSAGE_AREAS.dates,
+  ...MESSAGE_AREAS.entry,
   ...MESSAGE_AREAS.faq,
   ...MESSAGE_AREAS.home,
   ...MESSAGE_AREAS.insights,

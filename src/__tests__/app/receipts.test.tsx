@@ -1,4 +1,5 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
+import { router } from 'expo-router';
 
 import ReceiptsScreen from '@/app/receipts';
 
@@ -9,6 +10,11 @@ jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }))
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
 );
+
+jest.mock('expo-router', () => ({
+  router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
+}));
+jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
 
 jest.mock('@/components/ui/skeleton', () => ({ SkeletonList: () => null }));
 
@@ -76,5 +82,16 @@ describe('Receipts — day order', () => {
       'Hardware, -$3.00',
       'Bakery, -$6.00',
     ]);
+  });
+});
+
+describe('Receipts — opening a row', () => {
+  it('opens the receipt’s own page, never its edit form', async () => {
+    const { getByLabelText } = await render(<ReceiptsScreen />);
+
+    await fireEvent.press(getByLabelText('Bakery, -$6.00'));
+
+    expect(router.push).toHaveBeenCalledWith('/receipt/r6');
+    expect(router.push).toHaveBeenCalledTimes(1);
   });
 });

@@ -171,14 +171,14 @@ export const homeMessages = defineMessages({
 
   'home.recent': { en: 'Recent', es: 'Recientes', fr: 'Récents' },
   'home.recent.empty': {
-    en: 'Nothing in this week.',
-    es: 'Nada en esta semana.',
-    fr: 'Rien cette semaine.',
+    en: 'Nothing on this day.',
+    es: 'Nada en este día.',
+    fr: 'Rien ce jour-là.',
   },
   'home.comingUp': { en: 'Coming up', es: 'Próximos', fr: 'À venir' },
   'home.comingUp.empty': {
-    en: 'Nothing due in the week ahead.',
-    es: 'Nada vence en la próxima semana.',
-    fr: 'Rien à payer dans la semaine qui vient.',
+    en: 'Nothing due for the rest of this month.',
+    es: 'Nada vence en lo que queda del mes.',
+    fr: 'Rien à payer jusqu’à la fin du mois.',
   },
 });

@@ -59,6 +59,11 @@ jest.mock('@/api/voice-aliases', () => ({
   forgetVoiceAliases: (userId: string | null | undefined) => mockForgetVoice(userId),
 }));
 
+const mockForgetStores = jest.fn(async (_userId: string | null | undefined) => {});
+jest.mock('@/api/known-stores', () => ({
+  forgetKnownStores: (userId: string | null | undefined) => mockForgetStores(userId),
+}));
+
 let mockRpcError: { message: string } | null = null;
 let mockLiveUser: { id: string } | null = null;
 
@@ -89,6 +94,8 @@ describe('signOut', () => {
     });
     mockForgetVoice.mockReset();
     mockForgetVoice.mockImplementation(async () => {});
+    mockForgetStores.mockReset();
+    mockForgetStores.mockImplementation(async () => {});
   });
 
   it("deletes this device's push row before the session is cleared", async () => {
@@ -157,6 +164,47 @@ describe('signOut', () => {
     expect(result.error).toBeNull();
   });
 
+  it('forgets the stores this person added, by their id, once the voice corrections are gone', async () => {
+    mockForgetVoice.mockImplementation(async () => {
+      order.push('voice');
+    });
+    mockForgetStores.mockImplementation(async () => {
+      order.push('stores');
+    });
+
+    const result = await signOut();
+
+    expect(mockForgetStores).toHaveBeenCalledTimes(1);
+    expect(mockForgetStores).toHaveBeenCalledWith('user-A');
+    expect(order).toEqual(['forget', 'voice', 'stores', 'signOut']);
+    expect(result.error).toBeNull();
+  });
+
+  it('cannot name whose stores to forget when the session cannot be read, and signs out anyway', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSessionError = new Error('storage unavailable');
+
+    const result = await signOut();
+
+    expect(mockForgetStores).not.toHaveBeenCalled();
+    expect(mockAuthSignOut).toHaveBeenCalledTimes(1);
+    expect(result.error).toBeNull();
+    warn.mockRestore();
+  });
+
+  it('signs out anyway when the remembered stores cannot be cleared', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockForgetStores.mockImplementation(async () => {
+      throw new Error('storage unavailable');
+    });
+
+    const result = await signOut();
+
+    expect(order).toEqual(['forget', 'signOut']);
+    expect(result.error).toBeNull();
+    warn.mockRestore();
+  });
+
   it('forgets an unsaved voice draft, even when the session cannot be read', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const first = putVoiceDraft(HEARD);
@@ -198,6 +246,8 @@ describe('deleteAccount', () => {
     mockForgetVoice.mockImplementation(async () => {
       order.push('voice');
     });
+    mockForgetStores.mockReset();
+    mockForgetStores.mockImplementation(async () => {});
   });
 
   it("forgets the person's voice corrections once the account is really gone", async () => {
@@ -211,6 +261,19 @@ describe('deleteAccount', () => {
     expect(order).toEqual(['voice', 'signOut']);
   });
 
+  it('forgets the stores they added too, by their id, before signing out', async () => {
+    mockForgetStores.mockImplementation(async () => {
+      order.push('stores');
+    });
+
+    const result = await deleteAccount();
+
+    expect(result.error).toBeNull();
+    expect(mockForgetStores).toHaveBeenCalledTimes(1);
+    expect(mockForgetStores).toHaveBeenCalledWith('user-A');
+    expect(order).toEqual(['voice', 'stores', 'signOut']);
+  });
+
   it('keeps them while the account is still there', async () => {
     jest.spyOn(console, 'log').mockImplementation(() => {});
     const id = putVoiceDraft(HEARD);
@@ -222,9 +285,23 @@ describe('deleteAccount', () => {
     expect((await deleteAccount()).error).toBe(FAILURE_MESSAGE);
 
     expect(mockForgetVoice).not.toHaveBeenCalled();
+    expect(mockForgetStores).not.toHaveBeenCalled();
     expect(mockAuthSignOut).not.toHaveBeenCalled();
     expect(readVoiceDraft(id)).not.toBeNull();
     jest.restoreAllMocks();
+  });
+
+  it('still signs out of a deleted account when the remembered stores cannot be cleared', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockForgetStores.mockImplementation(async () => {
+      throw new Error('storage unavailable');
+    });
+
+    const result = await deleteAccount();
+
+    expect(result.error).toBeNull();
+    expect(mockAuthSignOut).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 
   it('still signs out of a deleted account when they cannot be cleared', async () => {

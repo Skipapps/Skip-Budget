@@ -26,8 +26,8 @@ import { spendingCategories, type SpendingCategory } from '@/data/dashboard-mock
 import { t, type MessageKey } from '@/i18n';
 import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
 import { groupByDate } from '@/lib/group';
-import { rangeFor } from '@/lib/range';
-import { addDays, formatDateRange, formatDayLabel, toIsoDate } from '@/lib/date';
+import { rangeFor, restOfMonth } from '@/lib/range';
+import { addDays, formatDayLabel, toIsoDate } from '@/lib/date';
 import { useToday } from '@/lib/use-today';
 import { failureText } from '@/lib/failure';
 import { TEXT_CAP } from '@/theme/text-scale';
@@ -113,24 +113,18 @@ export default function HomeScreen() {
 
   const atLatest = toIsoDate(selectedDate) >= today;
 
-  // The week up to the chosen day and the week after it, measured from the same point so they slide
-  // together.
-  const recentFrom = useMemo(() => addDays(selectedDate, -6), [selectedDate]);
+  // Recent is the chosen day alone. Coming up is what the bills still schedule for the rest of this
+  // month, from today whichever day is chosen: the selector never passes today, so anchoring it to
+  // the chosen day would list days that have already happened as coming up.
   const recent = useLedger(
-    useMemo(
-      () => ({ from: toIsoDate(recentFrom), to: toIsoDate(selectedDate) }),
-      [recentFrom, selectedDate],
-    ),
+    useMemo(() => {
+      const day = toIsoDate(selectedDate);
+      return { from: day, to: day };
+    }, [selectedDate]),
     today,
   );
   const upcoming = useLedger(
-    useMemo(
-      () => ({
-        from: toIsoDate(addDays(selectedDate, 1)),
-        to: toIsoDate(addDays(selectedDate, 7)),
-      }),
-      [selectedDate],
-    ),
+    useMemo(() => restOfMonth(todayDate), [todayDate]),
     today,
   );
 
@@ -149,7 +143,7 @@ export default function HomeScreen() {
   const { weekday, date } = formatDayLabel(selectedDate);
 
   const handleConfirmDate = (date: Date) => {
-    // No future days: the week ahead already has its own heading.
+    // No future days: what is ahead already has its own heading.
     setSelectedDate(date > todayDate ? todayDate : date);
     setPickerOpen(false);
   };
@@ -228,7 +222,6 @@ export default function HomeScreen() {
 
       <Section
         title={t('home.recent')}
-        range={formatDateRange(recentFrom, selectedDate)}
         entries={recent.entries}
         empty={t('home.recent.empty')}
         loading={recent.isLoading}
@@ -243,7 +236,6 @@ export default function HomeScreen() {
       <View className="w-full pb-24">
         <Section
           title={t('home.comingUp')}
-          range={formatDateRange(addDays(selectedDate, 1), addDays(selectedDate, 7))}
           entries={upcoming.entries}
           empty={t('home.comingUp.empty')}
           loading={upcoming.isLoading}
@@ -268,11 +260,10 @@ export default function HomeScreen() {
 
 type SectionProps = {
   title: string;
-  range: string;
   entries: LedgerEntry[];
   empty: string;
   loading: boolean;
-  /** The week could not be fetched; an empty list would be a lie. */
+  /** The list could not be fetched; an empty one would be a lie. */
   error: boolean;
   onRetry: () => void;
   today: string;
@@ -284,7 +275,6 @@ type SectionProps = {
 /** One headed run of transactions; Recent and Coming up share it. */
 function Section({
   title,
-  range,
   entries,
   empty,
   loading,
@@ -301,10 +291,10 @@ function Section({
 
   return (
     <View className="mt-8 w-full">
-      <SectionHeading caption={range}>{title}</SectionHeading>
+      <SectionHeading>{title}</SectionHeading>
 
       {error ? (
-        // A failed week would look like an empty one, so the failure says so itself.
+        // A failed fetch would look like an empty list, so the failure says so itself.
         <View className="mt-2 w-full items-center">
           <Text
             className="w-full text-center font-app text-[14px] text-muted"

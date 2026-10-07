@@ -68,6 +68,16 @@ export const subscriptionsMessages = defineMessages({
     es: '¿Cuándo se renueva?',
     fr: 'Quand se renouvelle-t-il ?',
   },
+  'subscriptions.add.askService': {
+    en: 'Which service is it?',
+    es: '¿Qué servicio es?',
+    fr: 'Quel est le service ?',
+  },
+  'subscriptions.add.noRenewal': {
+    en: 'No renewal date',
+    es: 'Sin fecha de renovación',
+    fr: 'Aucune date de renouvellement',
+  },
   'subscriptions.add.saving': { en: 'Saving…', es: 'Guardando…', fr: 'Enregistrement…' },
   'subscriptions.add.saveChanges': {
     en: 'Save changes',
@@ -99,6 +109,16 @@ export const subscriptionsMessages = defineMessages({
     en: 'Delete subscription',
     es: 'Eliminar suscripción',
     fr: 'Supprimer l’abonnement',
+  },
+  'subscriptions.add.changeService': {
+    en: 'Change service, currently {name}',
+    es: 'Cambiar servicio, ahora es {name}',
+    fr: 'Changer de service, actuellement {name}',
+  },
+  'subscriptions.add.addServiceAs': {
+    en: 'Add {name} as a new service',
+    es: 'Agregar {name} como servicio nuevo',
+    fr: 'Ajouter {name} comme nouveau service',
   },
   'subscriptions.add.servicePlaceholder': {
     en: 'Search for a service',

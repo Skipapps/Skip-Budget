@@ -1,7 +1,7 @@
-import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { CalendarDays, Pencil } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { AccessibilityInfo, Pressable, Text, View } from 'react-native';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { AlignLeft, CalendarDays, CreditCard, RefreshCw, Repeat, Tag } from 'lucide-react-native';
+import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
+import { AccessibilityInfo, Text, View } from 'react-native';
 
 import { useBrandDirectory } from '@/api/brands';
 import { usePro } from '@/api/pro';
@@ -20,26 +20,33 @@ import {
   type SubscriptionValues,
 } from '@/api/mutations';
 import { usePaymentSources } from '@/api/queries';
+import { useRememberStore } from '@/api/known-stores';
 import { useLearnVoiceAlias, useVoiceAliases } from '@/api/voice-aliases';
 import { BillMark } from '@/components/bills/bill-mark';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
-import { BrandLogo } from '@/components/brands/brand-logo';
-import { AmountFigure } from '@/components/flow/amount-figure';
-import { FlowHeader } from '@/components/flow/step-flow';
+import { BrandMark } from '@/components/brands/brand-mark';
+import { LogoConfirm } from '@/components/brands/logo-choices';
+import {
+  DateChips,
+  EntryReview,
+  GlyphWell,
+  SegmentedChips,
+  type EntryRowSpec,
+} from '@/components/entry/entry-review';
 import { useProGate } from '@/components/pro/pro-gate';
-import { Button } from '@/components/ui/button';
+import { cycleLabel } from '@/components/subscriptions/subscription-row';
 import { ChoiceChips } from '@/components/ui/choice-chips';
-import { Screen } from '@/components/ui/screen';
-import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextLink } from '@/components/ui/text-link';
 import { FieldLabel } from '@/components/ui/typography';
-import { GlyphWell, ReviewRow } from '@/components/voice/review-row';
 import { StaleDraft } from '@/components/voice/stale-draft';
 import { BILL_CATEGORIES, RECURRENCES } from '@/data/bills-mock';
 import { t, type MessageKey } from '@/i18n';
-import { formatRelativeDay } from '@/lib/date';
+import { toIsoDate } from '@/lib/date';
+import { formatEntryDay } from '@/lib/entry-day';
 import { failureMessage, failureText } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
+import { logoChosen, logoColumns, selectionLogo } from '@/lib/logo-columns';
+import { logoHints } from '@/lib/logo-lookup';
 import { refusedForPro } from '@/lib/pro-refusal';
 import { success, warn } from '@/lib/haptics';
 import { useToday } from '@/lib/use-today';
@@ -48,6 +55,7 @@ import {
   amountFromText,
   amountText,
   clearVoiceDraft,
+  dayToDate,
   entryToBillInput,
   entryToForm,
   entryToReceiptInput,
@@ -61,7 +69,7 @@ import {
   type VoiceSession,
 } from '@/lib/voice-draft';
 import { useConfirm } from '@/providers/dialog-provider';
-import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type KindCopy = {
   title: string;
@@ -70,16 +78,19 @@ type KindCopy = {
   merchant: string;
   date: string;
   paidWith: string;
+  note: string;
 };
 
+/** Each kind's rows wear its add form's own names, so the two final pages read the same. */
 const KIND_COPY: Record<VoiceKind, Record<keyof KindCopy, MessageKey>> = {
   receipt: {
     title: 'voice.receipt.title',
     closePrompt: 'voice.receipt.closePrompt',
     save: 'voice.receipt.save',
     merchant: 'voice.receipt.merchant',
-    date: 'voice.receipt.date',
+    date: 'receipts.field.date',
     paidWith: 'voice.receipt.paidWith',
+    note: 'receipts.field.note',
   },
   bill: {
     title: 'voice.bill.title',
@@ -88,14 +99,16 @@ const KIND_COPY: Record<VoiceKind, Record<keyof KindCopy, MessageKey>> = {
     merchant: 'voice.bill.merchant',
     date: 'voice.bill.date',
     paidWith: 'voice.bill.paidWith',
+    note: 'bills.field.note',
   },
   subscription: {
     title: 'voice.subscription.title',
     closePrompt: 'voice.subscription.closePrompt',
     save: 'voice.subscription.save',
     merchant: 'voice.subscription.merchant',
-    date: 'voice.subscription.date',
+    date: 'subscriptions.detail.nextRenewal',
     paidWith: 'voice.subscription.paidWith',
+    note: 'subscriptions.field.note',
   },
 };
 
@@ -108,6 +121,7 @@ function kindCopy(kind: VoiceKind): KindCopy {
     merchant: t(keys.merchant),
     date: t(keys.date),
     paidWith: t(keys.paidWith),
+    note: t(keys.note),
   };
 }
 
@@ -132,41 +146,16 @@ const KIND_OPTIONS = [
   },
 ] as const;
 
-/** add-subscription's own billing cycles, word for word. */
-const SUBSCRIPTION_CYCLES = [
-  {
-    value: 'weekly',
-    get label() {
-      return t('dates.weekly');
-    },
-  },
-  {
-    value: 'monthly',
-    get label() {
-      return t('dates.monthly');
-    },
-  },
-  {
-    value: 'quarterly',
-    get label() {
-      return t('subscriptions.cycle.quarterly');
-    },
-  },
-  {
-    value: 'yearly',
-    get label() {
-      return t('subscriptions.cycle.yearly');
-    },
-  },
-] as const;
+/** add-subscription's own billing cycles. */
+const SUBSCRIPTION_CYCLES: readonly VoiceCycle[] = ['weekly', 'monthly', 'quarterly', 'yearly'];
 
-type EditField = 'amount' | 'merchant' | 'date' | 'category';
+type EditField = 'amount' | 'merchant' | 'date' | 'category' | 'source' | 'note';
 
 /**
- * "Is this right?": what Skip heard, before anything is saved. Saves through the same value
- * builders the add forms use, so voice cannot drift from the forms' rules. Nothing is written until
- * Save and nothing is guessed (an ambiguous amount has to be picked); "More options" opens the full
- * form with the edited values in it.
+ * "Is this right?": what Skip heard, on the same final page the add forms end on, before anything
+ * is saved. Saves through the same value builders the forms use, so voice cannot drift from the
+ * forms' rules. Nothing is written until Save and nothing is guessed (an ambiguous amount has to be
+ * picked); "More options" opens the form's own final page with the edited values in it.
  */
 export default function VoiceReviewScreen() {
   const gate = useProGate('voice');
@@ -190,13 +179,13 @@ function VoiceReviewInner() {
 }
 
 function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => void }) {
-  const colors = useColors();
   const confirm = useConfirm();
   const { today, todayDate } = useToday();
   const { sources } = usePaymentSources();
   const directory = useBrandDirectory();
   const { aliases } = useVoiceAliases();
   const learnAlias = useLearnVoiceAlias();
+  const remember = useRememberStore();
 
   const createReceipt = useCreateReceipt();
   const createBill = useCreateBill();
@@ -217,11 +206,8 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   // makes one tap one row.
   const busy = useRef(false);
 
-  // Once anything has been changed, the edge swipe would throw it away without a word, so it is
-  // off and back asks first (StepFlow's rule).
-  const screenOptions = useMemo(() => ({ gestureEnabled: !edited }), [edited]);
-
-  // The question is what VoiceOver lands on, so the page says what it asks.
+  // The question is what VoiceOver lands on, so the page says what it asks. This runs after the
+  // final page's own focus on its title, so the question wins.
   const questionRef = useRef<ComponentRef<typeof Text>>(null);
   useEffect(() => {
     if (questionRef.current) AccessibilityInfo.sendAccessibilityEvent(questionRef.current, 'focus');
@@ -301,9 +287,12 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
     setSaving(true);
     setFailed(false);
     try {
-      if (built.kind === 'receipt') await createReceipt.mutateAsync(built.values);
-      else if (built.kind === 'bill') await createBill.mutateAsync(built.values);
-      else await createSubscription.mutateAsync(built.values);
+      // The logo the person chose for a store the catalogue does not know; nothing when they did
+      // not answer, so such a store saves as letters, as in the forms.
+      const logo = logoColumns(entry.merchant);
+      if (built.kind === 'receipt') await createReceipt.mutateAsync({ ...built.values, ...logo });
+      else if (built.kind === 'bill') await createBill.mutateAsync({ ...built.values, ...logo });
+      else await createSubscription.mutateAsync({ ...built.values, ...logo });
 
       success();
       // Taught only now, and only when the person put a different name on what was heard: "spot a
@@ -329,118 +318,188 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
     }
   };
 
+  const merchant = entry.merchant;
+  // The logo the saved row will show: the catalogue's, or the one the person chose.
+  const merchantLogo = merchant ? selectionLogo(merchant) : null;
+  // A receipt with no day heard is bought today, the form's own default.
+  const receiptDay = entry.date ? dayToDate(entry.date) : todayDate;
+  const dayValue = entry.date ? formatEntryDay(dayToDate(entry.date), todayDate) : null;
+  const sourceLabel = sources.find((source) => source.id === entry.sourceId)?.label ?? null;
+
+  // A chip already lit is no change, so tapping it does not make back ask.
+  const pickDay = (day: Date) => {
+    const iso = toIsoDate(day);
+    if (iso !== toIsoDate(receiptDay)) updateVoiceEntry(id, { date: iso });
+  };
+  const cycle = entry.cycle ?? 'monthly';
+  const pickCycle = (next: VoiceCycle) => {
+    if (next !== cycle) updateVoiceEntry(id, { cycle: next });
+  };
+
+  const brandMark = merchant ? (
+    <BrandMark name={merchant.name} domain={merchantLogo} hidden={merchant.logoHidden} size={40} />
+  ) : null;
+
+  const merchantRow: EntryRowSpec =
+    kind === 'bill'
+      ? {
+          key: 'name',
+          label: copy.merchant,
+          value: voiceBillName(entry, categoryLabel) || null,
+          required: true,
+          // As a saved bill draws it: the company's logo, else the category's icon.
+          leading: (
+            <BillMark
+              categoryId={entry.billCategoryId}
+              domain={merchantLogo}
+              name={merchant?.name}
+              size={40}
+            />
+          ),
+          onPress: () => edit('merchant'),
+        }
+      : {
+          key: kind === 'receipt' ? 'store' : 'service',
+          label: copy.merchant,
+          value: merchant?.name ?? null,
+          required: true,
+          leading: brandMark,
+          onPress: () => edit('merchant'),
+        };
+
+  const kindRows: EntryRowSpec[] =
+    kind === 'receipt'
+      ? [
+          {
+            key: 'date',
+            label: copy.date,
+            value: formatEntryDay(receiptDay, todayDate),
+            leading: <GlyphWell icon={CalendarDays} />,
+            onPress: () => edit('date'),
+            below: (
+              <DateChips
+                value={receiptDay}
+                today={todayDate}
+                onPick={pickDay}
+                onOpenCalendar={() => edit('date')}
+              />
+            ),
+          },
+        ]
+      : kind === 'bill'
+        ? [
+            {
+              key: 'category',
+              label: t('voice.review.category'),
+              value: categoryLabel || null,
+              required: true,
+              leading: <GlyphWell icon={category?.icon ?? Tag} />,
+              onPress: () => edit('category'),
+            },
+            {
+              key: 'due',
+              label: copy.date,
+              value: dayValue,
+              required: true,
+              leading: <GlyphWell icon={CalendarDays} />,
+              onPress: () => edit('date'),
+            },
+            {
+              key: 'recurrence',
+              label: t('voice.review.recurring'),
+              value: recurrenceLabel(cycle),
+              leading: <GlyphWell icon={Repeat} />,
+              below: (
+                <SegmentedChips
+                  variant="pills"
+                  options={RECURRENCES.map((option) => ({
+                    key: option.value,
+                    label: recurrenceLabel(option.value),
+                    selected: option.value === cycle,
+                    onPress: () => pickCycle(option.value),
+                  }))}
+                />
+              ),
+            },
+          ]
+        : [
+            {
+              key: 'cycle',
+              label: t('voice.review.billingCycle'),
+              value: cycleLabel(cycle),
+              leading: <GlyphWell icon={RefreshCw} />,
+              below: (
+                <SegmentedChips
+                  variant="pills"
+                  options={SUBSCRIPTION_CYCLES.map((option) => ({
+                    key: option,
+                    label: cycleLabel(option),
+                    selected: option === cycle,
+                    onPress: () => pickCycle(option),
+                  }))}
+                />
+              ),
+            },
+            {
+              key: 'renewal',
+              label: copy.date,
+              value: dayValue,
+              leading: <GlyphWell icon={CalendarDays} />,
+              onPress: () => edit('date'),
+            },
+          ];
+
+  const rows: EntryRowSpec[] = [
+    merchantRow,
+    ...kindRows,
+    // Without a card or account there is nothing to choose between, as in the forms.
+    ...(sources.length > 0
+      ? [
+          {
+            key: 'paidWith',
+            label: copy.paidWith,
+            value: sourceLabel,
+            leading: <GlyphWell icon={CreditCard} />,
+            onPress: () => edit('source'),
+          },
+        ]
+      : []),
+    {
+      key: 'note',
+      label: copy.note,
+      value: entry.note,
+      placeholder: t('entry.addNote'),
+      leading: <GlyphWell icon={AlignLeft} />,
+      onPress: () => edit('note'),
+    },
+  ];
+
   const ambiguous = entry.amount === null && entry.amountChoices.length >= 2;
-  const dateValue = entry.date
-    ? formatRelativeDay(entry.date, today)
-    : // A receipt with no day is bought today, the form's own default.
-      kind === 'receipt'
-      ? formatRelativeDay(today, today)
-      : null;
-  const merchantValue =
-    kind === 'bill' ? voiceBillName(entry, categoryLabel) || null : (entry.merchant?.name ?? null);
-
-  const footer = (
-    <View className="w-full gap-2">
-      {failed ? (
-        <Text
-          className="w-full text-center font-app text-[13px] text-danger"
-          maxFontSizeMultiplier={1.4}
-        >
-          {failureText()}
-        </Text>
-      ) : hint ? (
-        <Text
-          className="w-full text-center font-app text-[13px] text-muted"
-          maxFontSizeMultiplier={1.4}
-        >
-          {hint}
-        </Text>
-      ) : null}
-
-      <Button
-        label={saving ? t('voice.review.saving') : copy.save}
-        onPress={() => void save()}
-        disabled={saving || !built?.ok}
-        accessibilityHint={hint ?? undefined}
-      />
-
-      <View className="w-full flex-row flex-wrap justify-center gap-x-8">
-        <TextLink
-          label={t('voice.review.sayAgain')}
-          variant="subtle"
-          onPress={() => void handleSayAgain()}
-        />
-        <TextLink
-          label={t('voice.review.moreOptions')}
-          variant="subtle"
-          accessibilityHint={t('voice.review.moreOptionsHint')}
-          onPress={() => go(() => router.push(entryToForm(entry)))}
-        />
-      </View>
-    </View>
-  );
 
   return (
-    <Screen
-      header={
-        <View className="w-full pb-2">
-          <FlowHeader
-            title={copy.title}
-            onBack={() => void handleBack()}
-            closePrompt={copy.closePrompt}
-            onClose={() =>
-              go(() => {
-                discard();
-                router.dismissTo('/home');
-              })
-            }
-          />
-        </View>
+    <EntryReview
+      title={copy.title}
+      closePrompt={copy.closePrompt}
+      onClose={() =>
+        go(() => {
+          discard();
+          router.dismissTo('/home');
+        })
       }
-      footer={footer}
-    >
-      <Stack.Screen options={screenOptions} />
-
-      <Text
-        ref={questionRef}
-        accessibilityRole="header"
-        className="mt-6 w-full text-center font-app text-[20px] text-muted"
-        numberOfLines={2}
-        maxFontSizeMultiplier={1.3}
-      >
-        {draft.confidence === 'low' ? t('voice.review.heardRight') : t('voice.review.isThisRight')}
-      </Text>
-
-      <View
-        accessible
-        accessibilityLabel={t('voice.review.youSaidLabel', { words: draft.transcript })}
-        className="mt-4 w-full rounded-[16px] bg-ink/5 px-4 py-3"
-      >
-        <Text className="font-app-medium text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-          {t('voice.review.youSaid')}
-        </Text>
-        <Text className="mt-1 font-app text-[15px] leading-6 text-ink" maxFontSizeMultiplier={1.6}>
-          {t('voice.review.quoted', { words: draft.transcript })}
-        </Text>
-      </View>
-
-      <FieldLabel className="mt-6 w-full">{t('voice.review.addAs')}</FieldLabel>
-      <View className="mt-2 w-full">
-        <ChoiceChips options={KIND_OPTIONS} value={kind} onChange={changeKind} />
-      </View>
-      {!draft.kindSure && !touched.includes('kind') ? (
-        <Text className="mt-2 w-full font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-          {t('voice.review.guessed')}
-        </Text>
-      ) : null}
-
-      <View className="mt-6 w-full">
-        {ambiguous ? (
-          <View className="w-full rounded-[16px] bg-accent/10 p-4">
+      onBack={() => void handleBack()}
+      // Once anything has been changed, the edge swipe would throw it away without a word, so it is
+      // off and back asks first.
+      root={!edited}
+      amountLabel={t('voice.review.amount')}
+      amount={amountText(entry.amount)}
+      onEditAmount={() => edit('amount')}
+      amountSlot={
+        ambiguous ? (
+          <View className="mt-6 w-full rounded-[16px] bg-accent/10 p-4">
             <Text
               accessibilityRole="header"
               className="font-app-semibold text-[15px] text-ink"
-              maxFontSizeMultiplier={1.3}
+              maxFontSizeMultiplier={TEXT_CAP.heading}
             >
               {t('voice.review.whichAmount')}
             </Text>
@@ -465,138 +524,99 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
               onPress={() => edit('amount')}
             />
           </View>
-        ) : entry.amount === null ? (
-          // Never $0: a zero for an amount nobody said is a false figure.
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('voice.row.spoken', {
-              label: t('voice.review.amount'),
-              value: t('voice.row.notHeard'),
-            })}
-            accessibilityHint={t('voice.review.amountNeededHint')}
-            onPress={() => edit('amount')}
-            className="min-h-[112px] w-full items-center justify-center rounded-[16px] bg-accent/10 px-4 active:opacity-80"
+        ) : undefined
+      }
+      topSlot={
+        <View className="w-full">
+          <Text
+            ref={questionRef}
+            accessibilityRole="header"
+            className="w-full text-center font-app text-[20px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.heading}
           >
-            {/* Ink on the tint: accent ink on accent/10 measured under 4.5:1. */}
+            {draft.confidence === 'low'
+              ? t('voice.review.heardRight')
+              : t('voice.review.isThisRight')}
+          </Text>
+
+          <View
+            accessible
+            accessibilityLabel={t('voice.review.youSaidLabel', { words: draft.transcript })}
+            className="mt-4 w-full rounded-[16px] bg-ink/5 px-4 py-3"
+          >
             <Text
-              className="text-center font-app-medium text-[17px] text-ink"
-              maxFontSizeMultiplier={1.3}
+              className="font-app-medium text-[12px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.row}
             >
-              {t('voice.review.tapToAddAmount')}
+              {t('voice.review.youSaid')}
             </Text>
             <Text
-              className="mt-1 text-center font-app text-[13px] text-muted"
-              maxFontSizeMultiplier={1.4}
+              className="mt-1 font-app text-[15px] leading-6 text-ink"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
             >
-              {t('voice.review.amountNotCaught')}
+              {t('voice.review.quoted', { words: draft.transcript })}
             </Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('voice.row.spoken', {
-              label: t('voice.review.amount'),
-              value: formatCurrency(entry.amount),
-            })}
-            accessibilityHint={t('voice.review.amountChangeHint')}
-            onPress={() => edit('amount')}
-            className="w-full items-center rounded-[16px] py-4 active:bg-ink/5"
-          >
-            <AmountFigure value={amountText(entry.amount)} />
-            <View className="mt-3 min-h-8 flex-row items-center gap-1.5 rounded-full bg-ink/5 px-3.5">
-              <Pencil size={14} color={colors.ink} strokeWidth={1.8} />
-              <Text className="font-app-medium text-[13px] text-ink" maxFontSizeMultiplier={1.2}>
-                {t('common.change')}
-              </Text>
-            </View>
-          </Pressable>
-        )}
-      </View>
+          </View>
 
-      <View className="mt-6 w-full overflow-hidden rounded-[16px] border border-line bg-card py-1">
-        <ReviewRow
-          label={copy.merchant}
-          value={merchantValue}
-          required
-          leading={
-            kind === 'bill' && !entry.merchant ? (
-              <BillMark categoryId={entry.billCategoryId} size={40} />
-            ) : (
-              <BrandLogo
-                name={entry.merchant?.name ?? merchantValue ?? ''}
-                domain={entry.merchant?.domain}
-                size={40}
-              />
-            )
-          }
-          onPress={() => edit('merchant')}
-        />
-
-        {kind === 'bill' ? (
-          <>
-            <View className="ml-[52px] h-px bg-line/60" />
-            <ReviewRow
-              label={t('voice.review.category')}
-              value={categoryLabel || null}
-              required
-              leading={category ? <GlyphWell icon={category.icon} /> : null}
-              onPress={() => edit('category')}
-            />
-          </>
-        ) : null}
-
-        <View className="ml-[52px] h-px bg-line/60" />
-        <ReviewRow
-          label={copy.date}
-          value={dateValue}
-          required={kind !== 'subscription'}
-          leading={<GlyphWell icon={CalendarDays} />}
-          onPress={() => edit('date')}
-        />
-      </View>
-
-      {kind === 'bill' ? (
-        <>
-          <FieldLabel className="mt-6 w-full">{t('voice.review.recurring')}</FieldLabel>
+          <FieldLabel className="mt-6 w-full">{t('voice.review.addAs')}</FieldLabel>
           <View className="mt-2 w-full">
-            <ChoiceChips
-              options={RECURRENCES.map((option) => ({
-                value: option.value,
-                label: recurrenceLabel(option.value),
-              }))}
-              value={entry.cycle ?? 'monthly'}
-              onChange={(cycle: VoiceCycle) => updateVoiceEntry(id, { cycle })}
-            />
+            <ChoiceChips options={KIND_OPTIONS} value={kind} onChange={changeKind} />
           </View>
-        </>
-      ) : kind === 'subscription' ? (
-        <>
-          <FieldLabel className="mt-6 w-full">{t('voice.review.billingCycle')}</FieldLabel>
-          <View className="mt-2 w-full">
-            <ChoiceChips
-              options={SUBSCRIPTION_CYCLES}
-              value={entry.cycle ?? 'monthly'}
-              onChange={(cycle: VoiceCycle) => updateVoiceEntry(id, { cycle })}
-            />
-          </View>
-        </>
-      ) : null}
-
-      {sources.length > 0 ? (
-        <View className="mt-6 w-full pb-4">
-          <FieldLabel>{copy.paidWith}</FieldLabel>
-          <View className="mt-3 w-full">
-            <SourceTiles
-              sources={sources}
-              value={entry.sourceId ?? ''}
-              onChange={(sourceId) => updateVoiceEntry(id, { sourceId })}
-            />
-          </View>
+          {!draft.kindSure && !touched.includes('kind') ? (
+            <Text
+              className="mt-2 w-full font-app text-[13px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
+            >
+              {t('voice.review.guessed')}
+            </Text>
+          ) : null}
         </View>
-      ) : (
-        <View className="pb-4" />
-      )}
-    </Screen>
+      }
+      rows={rows}
+      bottomSlot={
+        // A store the catalogue does not know gets the add forms' own logo check, in the same words.
+        // Nothing is chosen until the person answers: unanswered, it saves as letters.
+        merchant && merchant.brandId === null ? (
+          <LogoConfirm
+            key={merchant.name}
+            name={merchant.name}
+            hints={logoHints(kind === 'bill' ? entry.billCategoryId : merchant.categoryId)}
+            noLogo={kind === 'bill' ? 'icon' : 'letters'}
+            decided={logoChosen(merchant)}
+            onChoose={(choice) => {
+              updateVoiceEntry(id, { merchant: { ...merchant, ...choice } });
+              void remember({
+                name: merchant.name,
+                categoryId: merchant.categoryId,
+                logoDomain: choice.logoDomain,
+                logoHidden: choice.logoHidden,
+              });
+            }}
+          />
+        ) : undefined
+      }
+      primaryLabel={saving ? t('voice.review.saving') : copy.save}
+      primaryDisabled={saving || !built?.ok}
+      onPrimary={() => void save()}
+      // What still blocks Save, in the forms' own words, until a save has failed.
+      error={failed ? failureText() : null}
+      hint={failed ? null : hint}
+      footerSlot={
+        <View className="w-full flex-row flex-wrap justify-center gap-x-8">
+          <TextLink
+            label={t('voice.review.sayAgain')}
+            variant="subtle"
+            onPress={() => void handleSayAgain()}
+          />
+          <TextLink
+            label={t('voice.review.moreOptions')}
+            variant="subtle"
+            accessibilityHint={t('voice.review.moreOptionsHint')}
+            onPress={() => go(() => router.push(entryToForm(entry)))}
+          />
+        </View>
+      }
+    />
   );
 }
 

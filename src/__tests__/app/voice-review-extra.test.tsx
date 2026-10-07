@@ -84,7 +84,10 @@ jest.mock('@/lib/use-today', () => ({
 jest.mock('@/components/brands/brand-logo', () => ({ BrandLogo: () => null }));
 jest.mock('@/components/bills/bill-mark', () => ({ BillMark: () => null }));
 
-jest.mock('@/api/brands', () => ({ useBrandDirectory: () => ({ data: [] }) }));
+jest.mock('@/api/brands', () => ({
+  useBrandDirectory: () => ({ data: [] }),
+  matchBrand: () => null,
+}));
 
 const mockSources = [
   { id: 'card-1', label: 'VISA ••4821', color: '#123456', kind: 'card' as const },
@@ -99,6 +102,13 @@ jest.mock('@/api/mutations', () => ({
   useCreateReceipt: () => ({ mutateAsync: mockCreateReceipt }),
   useCreateBill: () => ({ mutateAsync: mockCreateBill }),
   useCreateSubscription: () => ({ mutateAsync: mockCreateSubscription }),
+}));
+
+jest.mock('@/api/known-stores', () => ({
+  matchKnownStores: () => [],
+  storeKey: (name: string) => name.trim().toLowerCase(),
+  useKnownStores: () => [],
+  useRememberStore: () => async () => {},
 }));
 
 jest.mock('@/api/voice-aliases', () => ({
@@ -191,9 +201,16 @@ describe('money check — an ambiguous amount can never be saved without a pick'
     await press(screen, 'Save subscription');
     expect(mockCreateSubscription).not.toHaveBeenCalled();
 
+    // A hand edit elsewhere settles nothing: the amount still has to be picked.
+    await press(screen, 'Yearly');
+    await press(screen, 'Save subscription');
+    expect(mockCreateSubscription).not.toHaveBeenCalled();
+
     await press(screen, '$1,250.00');
     await press(screen, 'Save subscription');
-    expect(mockCreateSubscription).toHaveBeenCalledWith(expect.objectContaining({ amount: 1250 }));
+    expect(mockCreateSubscription).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 1250, cycle: 'yearly' }),
+    );
   });
 });
 

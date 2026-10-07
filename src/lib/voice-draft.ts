@@ -47,6 +47,8 @@ const MERCHANT_SOURCES: readonly VoiceMerchantSource[] = ['learned', 'catalog', 
 export const MAX_VOICE_AMOUNT = 999_999_999.99;
 
 const MAX_NAME = 200;
+/** The note field's own limit, as the forms' note page types it. */
+const MAX_NOTE = 200;
 const MAX_TRANSCRIPT = 2000;
 
 const isString = (value: unknown): value is string => typeof value === 'string';
@@ -94,8 +96,19 @@ function cleanName(value: unknown): string | null {
 }
 
 /**
+ * A note as text, trimmed: '' for an empty one (a fine note: it is optional), null for anything
+ * that is not a note at all (not text, or over the limit).
+ */
+function cleanNote(value: unknown): string | null {
+  if (!isString(value)) return null;
+  const note = value.trim();
+  return note.length <= MAX_NOTE ? note : null;
+}
+
+/**
  * A merchant whose every field is the right type, or null. The name is the one thing it cannot do
- * without; a bad brand id or domain only loses the logo.
+ * without; a bad brand id or domain only loses the logo, and so does a bad logo choice (which is
+ * then simply not made, rather than refusing the entry).
  */
 function cleanMerchant(value: unknown): VoiceMerchant | null {
   if (!value || typeof value !== 'object') return null;
@@ -105,11 +118,23 @@ function cleanMerchant(value: unknown): VoiceMerchant | null {
   if (raw.brandId !== null && !isString(raw.brandId)) return null;
   if (raw.domain !== null && !isString(raw.domain)) return null;
   if (!isString(raw.categoryId)) return null;
+
+  // Only an answer is kept: letters (which win, as on a saved row), or a logo. The store field marks
+  // a store it has not asked about with null and false, which is the same as nothing, and so is a
+  // bad value; both are dropped so such a merchant looks exactly as it did before logos.
+  const chosen: Pick<VoiceMerchant, 'logoDomain' | 'logoHidden'> =
+    raw.logoHidden === true
+      ? { logoDomain: null, logoHidden: true }
+      : isDomain(raw.logoDomain)
+        ? { logoDomain: raw.logoDomain, logoHidden: false }
+        : {};
+
   return {
     brandId: isId(raw.brandId) ? raw.brandId : null,
     name,
     domain: isDomain(raw.domain) ? raw.domain : null,
     categoryId: isId(raw.categoryId) ? raw.categoryId : '',
+    ...chosen,
   };
 }
 
@@ -204,6 +229,8 @@ export type VoiceEntry = {
   billCategoryId: string | null;
   /** A card or bank account id, or null for none (the forms' default). */
   sourceId: string | null;
+  /** Typed on the review page, never heard; null for none. */
+  note: string | null;
 };
 
 export type VoiceEntryField = keyof VoiceEntry;
@@ -221,6 +248,7 @@ export function entryFromDraft(draft: VoiceDraft): VoiceEntry {
     cycle: draft.cycle,
     billCategoryId: draft.billCategoryId,
     sourceId: null,
+    note: null,
   };
 }
 
@@ -245,6 +273,8 @@ export function validateVoiceEntry(input: unknown): VoiceEntry | null {
   if (raw.cycle !== null && !oneOf(CYCLES, raw.cycle)) return null;
   if (raw.billCategoryId !== null && !isBillCategory(raw.billCategoryId)) return null;
   if (raw.sourceId !== null && !isId(raw.sourceId)) return null;
+  const note = raw.note === null ? '' : cleanNote(raw.note);
+  if (note === null) return null;
 
   return {
     kind,
@@ -256,6 +286,8 @@ export function validateVoiceEntry(input: unknown): VoiceEntry | null {
     cycle: raw.cycle as VoiceCycle | null,
     billCategoryId: raw.billCategoryId as string | null,
     sourceId: raw.sourceId as string | null,
+    // A note of only spaces is no note, so it reads the same as one never written.
+    note: note || null,
   };
 }
 
@@ -412,6 +444,8 @@ export function rederiveVoiceEntry(
     merged.amount = found.entry.amount;
     merged.amountChoices = found.entry.amountChoices;
   }
+  // Nothing said is ever a note, so a re-parse has none to offer: the one typed stays.
+  merged.note = found.entry.note;
   const next = validateVoiceEntry(merged);
   if (!next) return null;
 
@@ -495,7 +529,7 @@ export function entryToReceiptInput(entry: VoiceEntry, today: Date): ReceiptInpu
     amount: amountText(entry.amount),
     date: entry.date ? dayToDate(entry.date) : today,
     sourceId: entry.sourceId ?? '',
-    note: '',
+    note: entry.note ?? '',
     captureSource: 'voice',
   };
 }
@@ -525,7 +559,7 @@ export function entryToBillInput(entry: VoiceEntry, categoryLabel: string): Bill
     startDate: entry.date ? dayToDate(entry.date) : null,
     endDate: null,
     sourceId: entry.sourceId ?? '',
-    note: '',
+    note: entry.note ?? '',
   };
 }
 
@@ -536,7 +570,7 @@ export function entryToSubscriptionInput(entry: VoiceEntry): SubscriptionInput {
     cycle: entry.cycle ?? 'monthly',
     renewsOn: entry.date ? dayToDate(entry.date) : null,
     sourceId: entry.sourceId ?? '',
-    note: '',
+    note: entry.note ?? '',
     active: true,
   };
 }
@@ -559,6 +593,11 @@ export function entryToForm(entry: VoiceEntry): VoiceFormHref {
   };
   const amount = amountText(entry.amount);
   const merchant = entry.merchant;
+  // A logo the person already chose goes with the store, so the form does not ask them again.
+  const putLogo = (domainKey: string, hiddenKey: string) => {
+    if (merchant?.logoHidden) params[hiddenKey] = '1';
+    else put(domainKey, merchant?.logoDomain);
+  };
 
   if (entry.kind === 'receipt') {
     params.scannedVia = 'voice';
@@ -566,9 +605,11 @@ export function entryToForm(entry: VoiceEntry): VoiceFormHref {
     put('scannedBrandId', merchant?.brandId);
     put('scannedDomain', merchant?.domain);
     put('scannedCategory', merchant?.categoryId);
+    putLogo('scannedLogoDomain', 'scannedLogoHidden');
     put('scannedAmount', amount);
     put('scannedDate', entry.date);
     put('scannedSource', entry.sourceId);
+    put('scannedNote', entry.note);
     return { pathname: '/add-receipt', params };
   }
 
@@ -576,23 +617,27 @@ export function entryToForm(entry: VoiceEntry): VoiceFormHref {
     put('prefillIssuer', merchant?.name);
     put('prefillBrandId', merchant?.brandId);
     put('prefillDomain', merchant?.domain);
+    putLogo('prefillLogoDomain', 'prefillLogoHidden');
     put('prefillName', entry.billName);
     put('prefillCategory', entry.billCategoryId);
     put('prefillAmount', amount);
     put('prefillDate', entry.date);
     put('prefillCycle', entry.cycle);
     put('prefillSource', entry.sourceId);
+    put('prefillNote', entry.note);
     return { pathname: '/add-bill', params };
   }
 
   put('prefillName', merchant?.name);
   put('prefillBrandId', merchant?.brandId);
   put('prefillDomain', merchant?.domain);
+  putLogo('prefillLogoDomain', 'prefillLogoHidden');
   put('prefillCategory', merchant?.categoryId);
   put('prefillAmount', amount);
   put('prefillDate', entry.date);
   put('prefillCycle', entry.cycle);
   put('prefillSource', entry.sourceId);
+  put('prefillNote', entry.note);
   return { pathname: '/add-subscription', params };
 }
 
@@ -623,24 +668,43 @@ export function readSourceParam(value: string | undefined): string {
   return isId(value) ? value : '';
 }
 
+/** A note param, trimmed, or '' when it is not one: one over the limit is dropped, never cut. */
+export function readNoteParam(value: string | undefined): string {
+  return cleanNote(value) ?? '';
+}
+
 /**
- * A store, company or service from its four params, or null without a name.
+ * A store, company or service from its params, or null without a name.
  * A bad brand id or domain only loses the logo; a bad category is left blank,
  * which every builder files under 'other'.
+ *
+ * The logo the person chose rides along when there is one: letters win over a domain (as a saved
+ * row's do), and neither param leaves the choice unmade, so the form saves no logo columns.
  */
 export function readMerchantParams(fields: {
   name: string | undefined;
   brandId: string | undefined;
   domain: string | undefined;
   categoryId: string | undefined;
+  logoDomain?: string | undefined;
+  logoHidden?: string | undefined;
 }): BrandSelection | null {
   const name = cleanName(fields.name);
   if (!name) return null;
+
+  const chosen: Pick<BrandSelection, 'logoDomain' | 'logoHidden'> =
+    fields.logoHidden === '1'
+      ? { logoDomain: null, logoHidden: true }
+      : isDomain(fields.logoDomain)
+        ? { logoDomain: fields.logoDomain, logoHidden: false }
+        : {};
+
   return {
     brandId: isId(fields.brandId) ? fields.brandId : null,
     name,
     domain: isDomain(fields.domain) ? fields.domain : null,
     categoryId: isId(fields.categoryId) ? fields.categoryId : '',
+    ...chosen,
   };
 }
 
@@ -654,18 +718,22 @@ export type BillPrefill = {
   startDate: Date | null;
   recurrence: VoiceCycle | null;
   sourceId: string;
+  note: string;
 };
 
 const PREFILL_KEYS = [
   'prefillIssuer',
   'prefillBrandId',
   'prefillDomain',
+  'prefillLogoDomain',
+  'prefillLogoHidden',
   'prefillName',
   'prefillCategory',
   'prefillAmount',
   'prefillDate',
   'prefillCycle',
   'prefillSource',
+  'prefillNote',
 ] as const;
 
 const hasPrefill = (params: RouteParams) => PREFILL_KEYS.some((key) => param(params, key));
@@ -681,6 +749,8 @@ export function readBillPrefill(params: RouteParams): BillPrefill | null {
       domain: param(params, 'prefillDomain'),
       // A bill's company never answers the category question; it carries the bill's own.
       categoryId: isBillCategory(categoryId) ? categoryId : undefined,
+      logoDomain: param(params, 'prefillLogoDomain'),
+      logoHidden: param(params, 'prefillLogoHidden'),
     }),
     name: cleanName(param(params, 'prefillName')),
     categoryId: isBillCategory(categoryId) ? categoryId : null,
@@ -688,6 +758,7 @@ export function readBillPrefill(params: RouteParams): BillPrefill | null {
     startDate: readDayParam(param(params, 'prefillDate')),
     recurrence: oneOf(CYCLES, param(params, 'prefillCycle')),
     sourceId: readSourceParam(param(params, 'prefillSource')),
+    note: readNoteParam(param(params, 'prefillNote')),
   };
 }
 
@@ -697,6 +768,7 @@ export type SubscriptionPrefill = {
   renewsOn: Date | null;
   cycle: VoiceCycle | null;
   sourceId: string;
+  note: string;
 };
 
 /** add-subscription's prefill, field by field; null when none was sent. */
@@ -708,10 +780,13 @@ export function readSubscriptionPrefill(params: RouteParams): SubscriptionPrefil
       brandId: param(params, 'prefillBrandId'),
       domain: param(params, 'prefillDomain'),
       categoryId: param(params, 'prefillCategory'),
+      logoDomain: param(params, 'prefillLogoDomain'),
+      logoHidden: param(params, 'prefillLogoHidden'),
     }),
     amount: readAmountParam(param(params, 'prefillAmount')),
     renewsOn: readDayParam(param(params, 'prefillDate')),
     cycle: oneOf(CYCLES, param(params, 'prefillCycle')),
     sourceId: readSourceParam(param(params, 'prefillSource')),
+    note: readNoteParam(param(params, 'prefillNote')),
   };
 }

@@ -4217,3 +4217,41 @@ New `hasLayoutRecognition()` in modules/receipt-scanner/index.ts (+ test) for th
 **Not verified:** a device; whether real photos picked from Photos keep ExposureTime (iPhone files do; a photo whose
 EXIF was stripped takes the non-camera branch, which only differs for square pages); 12 and 24 MP JPEG uploads still
 peak at 314 / 448 MB on the Mac (the shipping camera path peaks at 408 MB on a 12 MP shot there).
+
+---
+
+## 2026-10-07 — Dana (Developer, UI and navigation) — voice review on the shared final page
+
+**Outcome:** Done in the main tree (branch almost-done-all-pages), nothing committed or staged. `/voice-review` now renders
+`EntryReview` and reads like the add forms' final page; every behaviour kept. Owned suites 7/7 green (238 tests:
+voice-review 58, voice-review-extra 10, voice-review-languages 14, voice-edit 26, voice-edit-languages 22, voice-draft 79,
+add-forms-from-voice 29); with the voice/lib/guard set 16 suites, 656 tests. Neighbours untouched by me still green: i18n,
+all add-receipt/bill/subscription suites, components (42 suites, 900). tsc 0 (whole project), ESLint clean (cache cleared),
+prettier clean. No simulator (not mine).
+
+- **Page:** topSlot = question (VoiceOver focus kept; runs after EntryReview's title focus so it wins), "You said", "Add as"
+  chips, "guessed" hint. Ambiguous amount = amountSlot chooser (never guessed); unset amount = EntryReview's gap. Rows per
+  kind with the forms' own labels: receipt Store / Date (+Today, Yesterday, Pick date) / Paid with / Note; bill Name /
+  Category / Due on / Recurring (+chips) / Paid with / Note; subscription Service / Billing cycle (+chips) / Next renewal /
+  Charged to / Note. No reminder row (voice saves none). LogoConfirm = bottomSlot. Footer: blocker or failure line as
+  `error`, Save, then Say it again + More options. `root={!edited}`. A chip already lit writes nothing (back does not ask).
+- **Draft:** `VoiceEntry.note` (trimmed, <=200, empty -> null, refused whole past 200), kept through a kind change, into
+  all three builders; `scannedNote` / `prefillNote` out, `readNoteParam` in (bad -> '', never cut); the three forms seed
+  their note from it (one-line edits in add-receipt, add-bill, add-subscription).
+- **/voice-edit:** `field=source` (PaidWithEditPage) and `field=note` (NoteEditPage); other four pages unchanged except the
+  date page title follows its row ("Date", "Next renewal"). EditShell on TEXT_CAP roles; both route files moved to ADOPTED
+  in the large-text guard. `FieldPage`/`PaidWithEditPage`/`NoteEditPage` gained an optional `error` (additive) so a failed
+  Done still says FAILURE_MESSAGE.
+- **Removed:** 6 voice strings nothing uses now (receipt/subscription date labels, the old amount block's four lines).
+- **Tests:** voice-edit stale test now awaits `unmount()` (RNTL 14 is async; un-awaited it broke every later render).
+
+**Not verified:** on a device. Open: hint text now draws in danger red via `error`; `components/voice/review-row.tsx`
+(`ReviewRow`) is dead code (only `GlyphWell` is used); the source/note voice pages have the edge swipe off (FieldPage),
+the other voice-edit pages keep it.
+
+**2026-10-07 — Dana — follow-up for the inline store fields:** tests only. `add-forms-from-voice` now reads the store /
+service / company as the inline box on the final page ("Change store, currently <name>", logo, "Filed under", empty box
+for nothing heard; the receipt store is searched for in place after a focus, no page). The bill's logo now shows twice
+(company box and Name mark). `voice-review` pins the blocker as Save's accessibility hint with no failure line. `jest voice
+add-forms-from-voice large-text` 23/23 suites, 717 tests; tsc 0; ESLint and prettier clean. Suspected copy bug: BrandField's
+clear button says "Change store, currently …" on a subscription's Service and a bill's Company too.

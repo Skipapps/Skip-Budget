@@ -1,9 +1,7 @@
-import { openBrowserAsync } from 'expo-web-browser';
 import { router } from 'expo-router';
-import { CircleHelp, Coffee, Compass, Lightbulb, ListChecks, Mail } from 'lucide-react-native';
+import { CircleHelp, Compass, Lightbulb, ListChecks, Mail } from 'lucide-react-native';
 
 import { useUpdateProfile } from '@/api/mutations';
-import { CoffeeMark } from '@/components/settings/coffee-mark';
 import { SettingsPage } from '@/components/settings/settings-page';
 import { SettingsRow } from '@/components/settings/settings-row';
 import { t } from '@/i18n';
@@ -47,14 +45,6 @@ export default function SupportScreen() {
         title={t('support.idea')}
         subtitle={t('support.ideaDetail')}
         onPress={() => router.push('/contact?topic=idea')}
-      />
-      <SettingsRow
-        icon={Coffee}
-        // Their mark in their colours; tinting someone else's logo would misrepresent it.
-        artwork={<CoffeeMark width={22} height={22} />}
-        title={t('support.coffee')}
-        subtitle={t('support.coffeeDetail')}
-        onPress={() => openBrowserAsync('https://buymeacoffee.com/Weknd_team')}
         last
       />
     </SettingsPage>

@@ -1,5 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Calculator, Calendar, Trash2 } from 'lucide-react-native';
+import {
+  AlignLeft,
+  Bell,
+  CalendarDays,
+  CreditCard,
+  Calculator,
+  Repeat,
+  Trash2,
+  Tag,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -15,25 +24,35 @@ import { usePastCharges } from '@/api/past-charges';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { ScheduleCard } from '@/components/calculators/schedule-card';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
+import { BillMark } from '@/components/bills/bill-mark';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
 import { CategoryPicker } from '@/components/bills/category-picker';
 import { IconPicker } from '@/components/bills/icon-picker';
+import {
+  AmountEditPage,
+  DateEditPage,
+  FieldPage,
+  NoteEditPage,
+  PaidWithEditPage,
+  ReminderEditPage,
+} from '@/components/entry/edit-pages';
+import {
+  EntryReview,
+  GlyphWell,
+  SegmentedChips,
+  type EntryRowSpec,
+} from '@/components/entry/entry-review';
 import { AmountStep } from '@/components/flow/amount-step';
-import { InlineCalendar } from '@/components/flow/inline-calendar';
 import { FlowHeader, StepFlow } from '@/components/flow/step-flow';
 import { ActionPill } from '@/components/ui/action-pill';
-import { ReminderField } from '@/components/ui/reminder-field';
 import { CalculatorPad } from '@/components/ui/calculator-pad';
-import { ChoiceChips } from '@/components/ui/choice-chips';
-import { DatePicker } from '@/components/ui/date-picker';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useConfirm } from '@/providers/dialog-provider';
-import { SelectField } from '@/components/ui/select-field';
-import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
+import { TextLink } from '@/components/ui/text-link';
 import { FieldLabel, Title } from '@/components/ui/typography';
+import { useConfirm } from '@/providers/dialog-provider';
 import {
   BILL_CATEGORIES,
   RECURRENCES,
@@ -41,10 +60,13 @@ import {
   type Recurrence,
 } from '@/data/bills-mock';
 import { t } from '@/i18n';
-import { formatFullDate, toIsoDate } from '@/lib/date';
+import { formatEntryDay } from '@/lib/entry-day';
+import { reminderSummary } from '@/lib/entry-reminder';
+import { useToday } from '@/lib/use-today';
+import { TEXT_CAP } from '@/theme/text-scale';
 import { success, warn } from '@/lib/haptics';
 import { failureMessage, failureText } from '@/lib/failure';
-import { logoColumns } from '@/lib/logo-columns';
+import { logoColumns, selectionLogo } from '@/lib/logo-columns';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { amortise, termsFromStored } from '@/lib/loan';
 import {
@@ -90,10 +112,22 @@ function issuerHint(categoryId: string): string {
   }
 }
 
-/** The category chooser is its own screen before the dots: it pre-fills the name, so runs first. */
-type Step = 'category' | 'amount' | 'details' | 'when';
-
-const DOTS: readonly Step[] = ['amount', 'details', 'when'];
+/**
+ * The pages of one bill: the category chooser it starts on (it pre-fills the name, so it runs
+ * first), the keypad, the final page, and one per field.
+ */
+type Page =
+  | 'category'
+  | 'amount'
+  | 'review'
+  | 'amountEdit'
+  | 'name'
+  | 'categoryEdit'
+  | 'paidWith'
+  | 'note'
+  | 'due'
+  | 'endDate'
+  | 'reminder';
 
 const asDate = (value?: string | null) => (value ? new Date(`${value}T00:00:00`) : null);
 
@@ -134,7 +168,7 @@ export default function AddBillScreen() {
         <StepFlow
           title={t('bills.add.titleEdit')}
           closePrompt={t('bills.add.closeEdit')}
-          steps={3}
+          steps={1}
           current={0}
           onBack={() => router.back()}
           primaryLabel={t('common.continue')}
@@ -173,6 +207,9 @@ export default function AddBillScreen() {
       id={id}
       existing={existing}
       prefill={prefill}
+      // An edit, or what the voice review page heard, opens on the final page; a blank bill starts
+      // by asking what it is for.
+      initialView={existing || prefill ? 'review' : 'category'}
       fromVoice={!id && cameFromVoice(params)}
     />
   );
@@ -202,10 +239,12 @@ function BillForm({
   id,
   existing,
   prefill = null,
+  initialView,
   fromVoice = false,
 }: {
   id?: string;
   existing: ReturnType<typeof useBill>['data'] | null;
+  initialView: 'category' | 'review';
   /** What the voice review page heard, for a new bill. */
   prefill?: BillPrefill | null;
   /** Saved from a voice hand-off: back to Home, never onto the review page again. */
@@ -213,9 +252,10 @@ function BillForm({
 }) {
   const colors = useColors();
   const editing = Boolean(id);
-  // The category chooser is skipped when editing, or when a pre-filled bill has a category already.
-  const [step, setStep] = useState<Step>(editing || prefill?.categoryId ? 'amount' : 'category');
-  const dot = Math.max(DOTS.indexOf(step), 0);
+  // Pages over one piece of state, never routes, so Back keeps everything filled in. The final
+  // page is `review`; each line of it opens a page for that one thing and returns here.
+  const [view, setView] = useState<Page>(initialView);
+  const { todayDate } = useToday();
 
   const [categoryId, setCategoryId] = useState<string>(
     existing?.category_id ?? prefill?.categoryId ?? '',
@@ -236,6 +276,8 @@ function BillForm({
         : (prefill?.issuer ?? null),
   );
   const [issuerChanged, setIssuerChanged] = useState(false);
+  // The name a company gave the bill: replacing the company renames it, a name typed since stays.
+  const [companyNamed, setCompanyNamed] = useState<string | null>(null);
   const [name, setName] = useState(existing?.name ?? prefillName(prefill));
   const [iconId, setIconId] = useState(existing?.icon_id ?? 'other');
   const [amount, setAmount] = useState(
@@ -259,9 +301,8 @@ function BillForm({
   const [sourceId, setSourceId] = useState(
     existing?.card_id ?? existing?.bank_account_id ?? prefill?.sourceId ?? '',
   );
-  const [note, setNote] = useState(existing?.note ?? '');
+  const [note, setNote] = useState(existing?.note ?? prefill?.note ?? '');
 
-  const [datePicker, setDatePicker] = useState<'start' | 'end' | null>(null);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
 
   // Only a self-named bill needs its own icon; the rest inherit the category's.
@@ -270,36 +311,25 @@ function BillForm({
   // Exactly what pre-fills the name, so a name still equal to it was never typed.
   const categoryLabel = categoryName(categoryId);
 
-  // Picking a company names the bill unless it has a real name: the default category label (named
-  // by the app, not the person) counts as unnamed; anything typed is left alone.
-  const handleIssuer = (next: BrandSelection | null) => {
-    setIssuer(next);
-    setIssuerChanged(true);
-    if (!next) return;
-
-    const current = name.trim();
-    const untouched = !current || current === categoryLabel || current === issuer?.name;
-    if (untouched) setName(next.name);
-  };
   const hasPeriod = recurrence === PERIOD;
 
   const handleRecurrenceChange = (next: RecurrenceChoice) => {
+    setError(null);
     setRecurrence(next);
     // The end date belongs to a period bill alone; the first due date stays, every bill needs one.
     if (next !== PERIOD) setEndDate(null);
   };
 
-  const handleSelectCategory = (category: BillCategory) => {
-    setCategoryId(category.id);
-    // Pre-fill the name so common bills are one tap from done, unless it is already a real name
-    // (the company's, or typed on the voice review page): "Comcast" must not become "Internet".
+  const applyCategory = (category: BillCategory) => {
+    // The name follows the category only while it is empty or still the old category's own default:
+    // what the person typed, or the company's name ("Comcast" must not become "Internet"), stays.
     const current = name.trim();
-    const real = Boolean(current) && (current === issuer?.name || current === prefill?.name);
-    if (!real) setName(category.id === 'other' ? '' : categoryName(category.id));
-    setStep('amount');
+    const unnamed = !current || current === categoryLabel;
+    setCategoryId(category.id);
+    if (unnamed) setName(category.id === 'other' ? '' : categoryName(category.id));
   };
 
-  const [error, setError] = useState<{ message: string; step: Step } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const { sources } = usePaymentSources();
   // Present only when this bill came from the loan calculator.
@@ -326,7 +356,7 @@ function BillForm({
       await deleteBill.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError({ message: failureMessage(thrown), step });
+      setError(failureMessage(thrown));
     }
   };
 
@@ -338,10 +368,10 @@ function BillForm({
   const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
-  const fail = (message: string, atStep: Step) => {
+  const fail = (message: string) => {
     warn();
-    setError({ message, step: atStep });
-    setStep(atStep);
+    setError(message);
+    setView('review');
   };
 
   const leave = () => {
@@ -374,7 +404,7 @@ function BillForm({
       { sources, lastChargedOn: pastCharges.lastChargedOn },
     );
     if (!built.ok) {
-      fail(built.message, built.field);
+      fail(built.message);
       return;
     }
     // A company taken off takes its logo with it; one left alone keeps the row's own choice.
@@ -406,7 +436,7 @@ function BillForm({
       if (!pastCharges.ready) {
         pastCharges.retry();
         warn();
-        setError({ message: failureText(), step: 'when' });
+        setError(failureText());
         return;
       }
 
@@ -427,84 +457,58 @@ function BillForm({
       leave();
     } catch (thrown) {
       warn();
-      setError({ message: failureMessage(thrown), step: 'when' });
+      setError(failureMessage(thrown));
     }
   };
 
-  if (step === 'category') {
+  const busy = createBill.isPending || updateBill.isPending || pastCharges.saving;
+  const value = Number(amount);
+  const amountReady = Number.isFinite(value) && value > 0;
+  const sourceLabel = sources.find((source) => source.id === sourceId)?.label ?? null;
+  // The page this form opened on. Anywhere else the edge swipe is off, and Back steps back.
+  const isRoot = view === initialView;
+
+  const title = editing ? t('bills.add.titleEdit') : t('bills.addABill');
+  const closePrompt = editing ? t('bills.add.closeEdit') : t('bills.add.closeNew');
+  const toReview = () => setView('review');
+  // A line that came from Save names what was wrong with the page as it was: once something there
+  // is kept, it no longer applies.
+  const settle = () => {
+    setError(null);
+    toReview();
+  };
+
+  if (view === 'category') {
     return (
       <Screen
-        header={
-          <FlowHeader
-            title={t('bills.addABill')}
-            onBack={() => router.back()}
-            closePrompt={t('bills.add.closeNew')}
-          />
-        }
+        header={<FlowHeader title={title} onBack={() => router.back()} closePrompt={closePrompt} />}
       >
         <Title className="mt-2">{t('bills.add.categoryQuestion')}</Title>
 
         <View className="mt-6 w-full pb-10">
-          <CategoryPicker onSelect={handleSelectCategory} selectedId={categoryId} />
+          <CategoryPicker
+            onSelect={(category) => {
+              applyCategory(category);
+              setView('amount');
+            }}
+            selectedId={categoryId}
+          />
         </View>
       </Screen>
     );
   }
 
-  const busy = createBill.isPending || updateBill.isPending || pastCharges.saving;
-  const value = Number(amount);
-  const amountReady = Number.isFinite(value) && value > 0;
-  const stepValid =
-    step === 'amount' ? amountReady : step === 'details' ? Boolean(name.trim()) : !busy;
-
-  const question =
-    step === 'amount'
-      ? t('bills.add.amountQuestion')
-      : step === 'when'
-        ? hasPeriod
-          ? t('bills.add.startQuestion')
-          : t('bills.add.dueQuestion')
-        : undefined;
-
-  const primaryLabel =
-    step !== 'when'
-      ? t('common.continue')
-      : busy
-        ? t('bills.add.saving')
-        : editing
-          ? t('bills.add.saveChanges')
-          : t('bills.add.saveBill');
-
-  const categoryOptions = BILL_CATEGORIES.map((category) => ({
-    value: category.id,
-    label: billCategoryLabel(category.id, category.label),
-  }));
-  const recurrenceChoices: { value: RecurrenceChoice; label: string }[] = [
-    ...RECURRENCES.map((option) => ({ value: option.value, label: recurrenceLabel(option.value) })),
-    { value: PERIOD, label: t('bills.add.specificPeriod') },
-  ];
-
-  const stepError = error && error.step === step ? error.message : null;
-
-  return (
-    <StepFlow
-      title={editing ? t('bills.add.titleEdit') : t('bills.addABill')}
-      closePrompt={editing ? t('bills.add.closeEdit') : t('bills.add.closeNew')}
-      steps={3}
-      current={dot}
-      onBack={() => {
-        setError(null);
-        if (step === 'amount') {
-          // Back to the chooser when it was used; straight out when editing or when the voice page
-          // already named the category.
-          if (editing || (fromVoice && prefill?.categoryId)) router.back();
-          else setStep('category');
-        } else if (step === 'details') setStep('amount');
-        else setStep('details');
-      }}
-      question={question}
-      headerSlot={
-        step === 'amount' ? (
+  if (view === 'amount') {
+    return (
+      <StepFlow
+        title={title}
+        closePrompt={closePrompt}
+        steps={1}
+        // Never the first page: the chooser comes before it.
+        current={isRoot ? 0 : 1}
+        onBack={() => setView('category')}
+        question={t('bills.add.amountQuestion')}
+        headerSlot={
           <View className="w-full flex-row justify-center">
             <ActionPill
               icon={Calculator}
@@ -512,25 +516,355 @@ function BillForm({
               onPress={() => setCalculatorOpen(true)}
             />
           </View>
+        }
+        primaryLabel={t('common.continue')}
+        primaryDisabled={!amountReady}
+        onPrimary={() => {
+          settle();
+        }}
+        error={error}
+      >
+        <AmountStep value={amount} onChange={setAmount} />
+
+        {calculatorOpen ? (
+          <CalculatorPad
+            title={t('bills.add.calculator')}
+            value={amount}
+            onCancel={() => setCalculatorOpen(false)}
+            onConfirm={(next) => {
+              setAmount(next);
+              setCalculatorOpen(false);
+            }}
+          />
+        ) : null}
+      </StepFlow>
+    );
+  }
+
+  if (view === 'amountEdit') {
+    return (
+      <AmountEditPage
+        title={t('receipts.field.amount')}
+        question={t('bills.add.amountQuestion')}
+        value={amount}
+        calculator={t('bills.add.calculator')}
+        onBack={toReview}
+        onDone={(next) => {
+          setAmount(next);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'name') {
+    return (
+      <NameEditPage
+        name={name}
+        iconId={iconId}
+        showIcon={isCustom && !issuer}
+        onBack={toReview}
+        onDone={(next) => {
+          setName(next.name);
+          setIconId(next.iconId);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'categoryEdit') {
+    return (
+      <FieldPage
+        title={t('bills.field.category')}
+        question={t('bills.add.categoryQuestion')}
+        onBack={toReview}
+      >
+        {/* A tap is the answer, so there is no Done. */}
+        <View className="w-full pb-10">
+          <CategoryPicker
+            onSelect={(next) => {
+              applyCategory(next);
+              settle();
+            }}
+            selectedId={categoryId}
+          />
+        </View>
+      </FieldPage>
+    );
+  }
+
+  if (view === 'paidWith') {
+    return (
+      <PaidWithEditPage
+        title={t('bills.field.paidWith')}
+        sources={sources}
+        value={sourceId}
+        onBack={toReview}
+        onDone={(next) => {
+          setSourceId(next);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'note') {
+    return (
+      <NoteEditPage
+        title={t('bills.field.note')}
+        label={t('bills.field.note')}
+        placeholder={t('bills.add.notePlaceholder')}
+        value={note}
+        onBack={toReview}
+        onDone={(next) => {
+          setNote(next);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'due') {
+    return (
+      <DateEditPage
+        title={hasPeriod ? t('bills.field.starts') : t('bills.field.due')}
+        question={hasPeriod ? t('bills.add.startQuestion') : t('bills.add.dueQuestion')}
+        value={startDate}
+        onBack={toReview}
+        onDone={(day) => {
+          if (day) {
+            setStartDate(day);
+            // An end before the start is meaningless; drop it.
+            if (endDate && day > endDate) setEndDate(null);
+          }
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'endDate') {
+    return (
+      <DateEditPage
+        title={t('bills.field.to')}
+        value={endDate}
+        // Days before the start are not offered.
+        minDate={startDate}
+        footerExtra={(clear) => (
+          <TextLink
+            label={t('bills.add.clearEnd')}
+            variant="subtle"
+            onPress={clear}
+            className="mt-2 self-start"
+          />
+        )}
+        onBack={toReview}
+        onDone={(day) => {
+          setEndDate(day);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'reminder') {
+    return (
+      <ReminderEditPage
+        title={t('ui.reminder.label')}
+        kind="bill"
+        value={reminder}
+        time={remindAt}
+        onBack={toReview}
+        onDone={(choice, at) => {
+          setReminderDraft(choice);
+          setTimeDraft(at);
+          settle();
+        }}
+      />
+    );
+  }
+
+  const recurrenceChoices: { value: RecurrenceChoice; label: string }[] = [
+    ...RECURRENCES.map((option) => ({ value: option.value, label: recurrenceLabel(option.value) })),
+    { value: PERIOD, label: t('bills.add.specificPeriod') },
+  ];
+  const chosenCategory = BILL_CATEGORIES.find((option) => option.id === categoryId);
+
+  // Picking a company names the bill unless it already has a real name of its own.
+  const chooseCompany = (next: BrandSelection | null) => {
+    setError(null);
+    if (next !== issuer) setIssuerChanged(true);
+    if (next) {
+      const current = name.trim();
+      if (!current || current === categoryLabel || current === companyNamed) {
+        setName(next.name);
+        setCompanyNamed(next.name);
+      }
+    }
+    setIssuer(next);
+  };
+
+  const rows: EntryRowSpec[] = [
+    {
+      key: 'company',
+      field: (
+        <BrandField
+          label={t('entry.row.optional', { label: t('bills.field.company') })}
+          value={issuer}
+          onChange={chooseCompany}
+          placeholder={issuerHint(categoryId)}
+          category={categoryId}
+          noLogo="icon"
+          changeLabel={(name) => t('bills.add.changeCompany', { name })}
+          addLabel={(name) => t('bills.add.addCompanyAs', { name })}
+        />
+      ),
+    },
+    {
+      key: 'name',
+      label: t('bills.field.name'),
+      value: name.trim() || null,
+      required: true,
+      // The company's logo when it has one, else the category's icon, as a saved bill draws it.
+      leading: (
+        <BillMark
+          categoryId={categoryId}
+          iconId={iconId}
+          domain={issuer ? selectionLogo(issuer) : null}
+          name={name}
+          size={40}
+        />
+      ),
+      onPress: () => setView('name'),
+    },
+    {
+      key: 'category',
+      label: t('bills.field.category'),
+      value: categoryId ? categoryLabel : null,
+      required: true,
+      leading: <GlyphWell icon={chosenCategory?.icon ?? Tag} />,
+      onPress: () => setView('categoryEdit'),
+    },
+    {
+      key: 'due',
+      label: hasPeriod ? t('bills.field.starts') : t('bills.field.due'),
+      value: startDate ? formatEntryDay(startDate, todayDate) : null,
+      required: true,
+      leading: <GlyphWell icon={CalendarDays} />,
+      onPress: () => setView('due'),
+    },
+    {
+      key: 'recurrence',
+      label: t('bills.field.recurring'),
+      value: recurrenceChoices.find((option) => option.value === recurrence)?.label ?? null,
+      leading: <GlyphWell icon={Repeat} />,
+      below: (
+        <SegmentedChips
+          variant="pills"
+          options={recurrenceChoices.map((option) => ({
+            key: option.value,
+            label: option.label,
+            selected: option.value === recurrence,
+            onPress: () => handleRecurrenceChange(option.value),
+          }))}
+        />
+      ),
+    },
+    ...(hasPeriod
+      ? [
+          {
+            key: 'end',
+            label: t('bills.field.to'),
+            value: endDate ? formatEntryDay(endDate, todayDate) : null,
+            placeholder: t('bills.add.noEndDate'),
+            leading: <GlyphWell icon={CalendarDays} />,
+            onPress: () => setView('endDate'),
+          },
+        ]
+      : []),
+    // Without a card or account there is nothing to choose between, as before.
+    ...(sources.length > 0
+      ? [
+          {
+            key: 'paidWith',
+            label: t('bills.field.paidWith'),
+            value: sourceLabel,
+            leading: <GlyphWell icon={CreditCard} />,
+            onPress: () => setView('paidWith'),
+          },
+        ]
+      : []),
+    {
+      key: 'reminder',
+      label: t('ui.reminder.label'),
+      value: reminderSummary(reminder, remindAt),
+      placeholder: t('api.reminders.off'),
+      leading: <GlyphWell icon={Bell} />,
+      onPress: () => setView('reminder'),
+    },
+    {
+      key: 'note',
+      label: t('bills.field.note'),
+      value: note.trim() || null,
+      placeholder: t('entry.addNote'),
+      leading: <GlyphWell icon={AlignLeft} />,
+      onPress: () => setView('note'),
+    },
+  ];
+
+  return (
+    <EntryReview
+      title={title}
+      closePrompt={closePrompt}
+      root={isRoot}
+      onBack={() => {
+        if (isRoot) {
+          router.back();
+          return;
+        }
+        // A failed save's line belongs to the final page, not the keypad it steps back to.
+        setError(null);
+        setView('amount');
+      }}
+      amountLabel={t('receipts.field.amount')}
+      amount={amount}
+      onEditAmount={() => setView('amountEdit')}
+      rows={rows}
+      bottomSlot={
+        schedule.length > 0 && loan ? (
+          <ScheduleCard
+            rows={schedule}
+            onPress={() =>
+              router.push({
+                pathname: '/loan-schedule',
+                params: {
+                  // The stored convention and contract payment, not re-derived: the full schedule
+                  // must be the same loan to the cent as the card above.
+                  amount: String(loan.principal),
+                  rate: String(loan.annual_rate),
+                  months: String(loan.term_months),
+                  start: loan.first_payment_on ?? '',
+                  funded: loan.funded_on ?? '',
+                  basis: loan.day_count_basis,
+                  payment: String(loan.monthly_payment),
+                  name: name || t('bills.add.paymentSchedule'),
+                },
+              })
+            }
+          />
         ) : null
       }
-      primaryLabel={primaryLabel}
-      primaryDisabled={!stepValid}
-      onPrimary={() => {
-        if (step === 'amount') {
-          setError(null);
-          setStep('details');
-          return;
-        }
-        if (step === 'details') {
-          setError(null);
-          setStep('when');
-          return;
-        }
-        void handleSave();
-      }}
-      error={step === 'details' ? null : stepError}
-      avoidKeyboard={step === 'details'}
+      primaryLabel={
+        busy
+          ? t('bills.add.saving')
+          : editing
+            ? t('bills.add.saveChanges')
+            : t('bills.add.saveBill')
+      }
+      primaryDisabled={!amountReady || !name.trim() || !categoryId || !startDate || busy}
+      onPrimary={() => void handleSave()}
+      error={error}
       footerSlot={
         editing ? (
           <Pressable
@@ -540,190 +874,61 @@ function BillForm({
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
-            <Text className="font-app-medium text-[15px] text-danger" maxFontSizeMultiplier={1.4}>
+            <Text
+              className="font-app-medium text-[15px] text-danger"
+              maxFontSizeMultiplier={TEXT_CAP.row}
+            >
               {deleteBill.isPending ? t('bills.add.deleting') : t('bills.add.deleteBill')}
             </Text>
           </Pressable>
         ) : null
       }
+    />
+  );
+}
+
+/** A bill's name and, for a bill with no company, its icon. The company is chosen on the page. */
+function NameEditPage({
+  name,
+  iconId,
+  showIcon,
+  onBack,
+  onDone,
+}: {
+  name: string;
+  iconId: string;
+  /** The icon only shows when there is no logo, so offering it beside one does nothing. */
+  showIcon: boolean;
+  onBack: () => void;
+  onDone: (next: { name: string; iconId: string }) => void;
+}) {
+  const [nameDraft, setNameDraft] = useState(name);
+  const [iconDraft, setIconDraft] = useState(iconId);
+
+  return (
+    <FieldPage
+      title={t('bills.field.name')}
+      onBack={onBack}
+      onDone={() => onDone({ name: nameDraft, iconId: iconDraft })}
+      doneDisabled={!nameDraft.trim()}
+      avoidKeyboard
     >
-      {step === 'amount' ? <AmountStep value={amount} onChange={setAmount} /> : null}
-
-      {step === 'details' ? (
-        <View className="w-full gap-5">
-          <BrandField
-            label={t('bills.field.company')}
-            value={issuer}
-            onChange={handleIssuer}
-            placeholder={issuerHint(categoryId)}
-            category={categoryId}
-            noLogo="icon"
-          />
-
-          <TextField
-            label={t('bills.field.name')}
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-            returnKeyType="done"
-          />
-
-          {/* The icon only shows when there is no logo, so offering it beside one does nothing. */}
-          {isCustom && !issuer ? (
-            <View className="w-full">
-              <FieldLabel className="mb-2">{t('bills.field.icon')}</FieldLabel>
-              <IconPicker value={iconId} onChange={setIconId} />
-            </View>
-          ) : null}
-
-          <View className="w-full">
-            <FieldLabel className="mb-2">{t('bills.field.category')}</FieldLabel>
-            <ChoiceChips
-              options={categoryOptions}
-              value={categoryId}
-              onChange={(next) => setCategoryId(next)}
-            />
-          </View>
-
-          <View className="w-full">
-            <FieldLabel className="mb-2">{t('bills.field.paidWith')}</FieldLabel>
-            <SourceTiles sources={sources} value={sourceId} onChange={setSourceId} />
-          </View>
-
-          {schedule.length > 0 && loan ? (
-            <ScheduleCard
-              rows={schedule}
-              onPress={() =>
-                router.push({
-                  pathname: '/loan-schedule',
-                  params: {
-                    // The stored convention and contract payment, not re-derived: the full schedule
-                    // must be the same loan to the cent as the card above.
-                    amount: String(loan.principal),
-                    rate: String(loan.annual_rate),
-                    months: String(loan.term_months),
-                    start: loan.first_payment_on ?? '',
-                    funded: loan.funded_on ?? '',
-                    basis: loan.day_count_basis,
-                    payment: String(loan.monthly_payment),
-                    name: name || t('bills.add.paymentSchedule'),
-                  },
-                })
-              }
-            />
-          ) : null}
-
-          <TextField
-            label={t('bills.field.note')}
-            optional
-            value={note}
-            onChangeText={setNote}
-            placeholder={t('bills.add.notePlaceholder')}
-            multiline
-            maxLength={200}
-            autoCapitalize="sentences"
-          />
-
-          {stepError ? (
-            <Text className="w-full font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
-              {stepError}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      {step === 'when' ? (
-        <View className="w-full gap-6">
-          <InlineCalendar
-            value={startDate}
-            onChange={(date) => {
-              setStartDate(date);
-              // An end before the start is meaningless; drop it.
-              if (endDate && date > endDate) setEndDate(null);
-            }}
-          />
-
-          <View className="w-full">
-            <FieldLabel className="mb-2">{t('bills.field.recurring')}</FieldLabel>
-            <ChoiceChips
-              options={recurrenceChoices}
-              value={recurrence}
-              onChange={handleRecurrenceChange}
-            />
-          </View>
-
-          {/* Stacked: two date fields in one row truncate a full date on a narrow phone. */}
-          {hasPeriod ? (
-            <View className="w-full">
-              <SelectField
-                label={t('bills.field.to')}
-                variant="pill"
-                value={endDate ? formatFullDate(endDate) : ''}
-                placeholder={t('bills.add.noEndDate')}
-                icon={Calendar}
-                onPress={() => setDatePicker('end')}
-              />
-              {endDate ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('bills.add.clearEndA11y')}
-                  onPress={() => setEndDate(null)}
-                  className="mt-1.5 self-start rounded-full px-1 py-1 active:opacity-60"
-                >
-                  <Text className="ml-4 font-app text-[13px] text-muted">
-                    {t('bills.add.clearEnd')}
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-
-          <ReminderField
-            kind="bill"
-            value={reminder}
-            onChange={setReminderDraft}
-            time={remindAt}
-            onTimeChange={setTimeDraft}
-          />
-        </View>
-      ) : null}
-
-      {datePicker ? (
-        <DatePicker
-          value={(datePicker === 'start' ? startDate : endDate) ?? startDate ?? new Date()}
-          // Days before the start are not offered; the check below backstops a start moved later.
-          minDate={datePicker === 'end' ? startDate : null}
-          onCancel={() => setDatePicker(null)}
-          onConfirm={(date) => {
-            if (datePicker === 'start') {
-              setStartDate(date);
-              if (endDate && date > endDate) setEndDate(null);
-            } else if (startDate && toIsoDate(date) < toIsoDate(startDate)) {
-              // A period that finishes before it begins is refused, not quietly kept. Compared as
-              // ISO days: exact, no clock.
-              setDatePicker(null);
-              fail(t('api.entry.endBeforeStart'), 'when');
-              return;
-            } else {
-              setError(null);
-              setEndDate(date);
-            }
-            setDatePicker(null);
-          }}
+      <View className="mt-2 w-full gap-5">
+        <TextField
+          label={t('bills.field.name')}
+          value={nameDraft}
+          onChangeText={setNameDraft}
+          autoCapitalize="words"
+          returnKeyType="done"
         />
-      ) : null}
 
-      {calculatorOpen ? (
-        <CalculatorPad
-          title={t('bills.add.calculator')}
-          value={amount}
-          onCancel={() => setCalculatorOpen(false)}
-          onConfirm={(next) => {
-            setAmount(next);
-            setCalculatorOpen(false);
-          }}
-        />
-      ) : null}
-    </StepFlow>
+        {showIcon ? (
+          <View className="w-full">
+            <FieldLabel className="mb-2">{t('bills.field.icon')}</FieldLabel>
+            <IconPicker value={iconDraft} onChange={setIconDraft} />
+          </View>
+        ) : null}
+      </View>
+    </FieldPage>
   );
 }

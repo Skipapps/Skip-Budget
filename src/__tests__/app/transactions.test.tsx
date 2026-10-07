@@ -161,7 +161,7 @@ describe('Transactions — at large text sizes', () => {
 describe('Transactions — where a row opens', () => {
   // One mount, every kind pressed in turn: separate mounts of this screen under fake timers made
   // the suite order-dependent.
-  it('opens each kind of row on the screen that edits it', async () => {
+  it('opens each kind of row on its own page, never on a form', async () => {
     mockLedgerEntries = routingEntries;
     const { getAllByRole, getByText } = await render(<TransactionsScreen />);
 
@@ -190,19 +190,25 @@ describe('Transactions — where a row opens', () => {
     fireEvent.press(row('Netflix in August'));
 
     expect(router.push).toHaveBeenNthCalledWith(1, {
-      pathname: '/add-receipt',
+      pathname: '/receipt/[id]',
       params: { id: 'r1' },
     });
-    expect(router.push).toHaveBeenNthCalledWith(2, { pathname: '/add-bill', params: { id: 'b1' } });
+    expect(router.push).toHaveBeenNthCalledWith(2, {
+      pathname: '/bill/[id]',
+      params: { id: 'b1' },
+    });
     expect(router.push).toHaveBeenNthCalledWith(3, {
-      pathname: '/add-subscription',
+      pathname: '/subscription/[id]',
       params: { id: 's1' },
     });
-    // Salary edits every source on one screen and takes no id.
+    // Salary is one screen for every source and takes no id.
     expect(router.push).toHaveBeenNthCalledWith(4, '/salary');
-    expect(router.push).toHaveBeenNthCalledWith(5, { pathname: '/add-bill', params: { id: 'b9' } });
+    expect(router.push).toHaveBeenNthCalledWith(5, {
+      pathname: '/bill/[id]',
+      params: { id: 'b9' },
+    });
     expect(router.push).toHaveBeenNthCalledWith(6, {
-      pathname: '/add-subscription',
+      pathname: '/subscription/[id]',
       params: { id: 's9' },
     });
     expect(router.push).toHaveBeenCalledTimes(6);

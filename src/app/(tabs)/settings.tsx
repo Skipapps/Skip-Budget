@@ -1,6 +1,8 @@
 import { router, type Href } from 'expo-router';
+import { openBrowserAsync } from 'expo-web-browser';
 import {
   Check,
+  Coffee,
   Crown,
   FlaskConical,
   Info,
@@ -23,6 +25,7 @@ import { proMonthlyLabel, proYearlyLabel } from '@/lib/wall';
 import { setProOverride, useProOverride } from '@/lib/pro-bypass';
 import { useUpdateProfile } from '@/api/mutations';
 import { ProfileAvatar } from '@/components/ui/profile-avatar';
+import { CoffeeMark } from '@/components/settings/coffee-mark';
 import { SettingsRow } from '@/components/settings/settings-row';
 import { SettingsSection } from '@/components/settings/settings-section';
 import { plural, useMoneyCounts, type Counted } from '@/components/settings/use-money-counts';
@@ -34,6 +37,9 @@ import { TextField } from '@/components/ui/text-field';
 
 import { useCharges } from '@/api/charges';
 import { useProfile, useReceipts } from '@/api/queries';
+
+/** The voluntary tip page, opened in the in-app browser. */
+const COFFEE_URL = 'https://buymeacoffee.com/Weknd_team';
 
 /** Each opens a page of its own, so the rows carry no summary line. */
 const PAGES: { readonly title: string; icon: LucideIcon; href: Href }[] = [
@@ -252,15 +258,23 @@ export default function SettingsScreen() {
       </SettingsSection>
 
       <SettingsSection>
-        {PAGES.map((page, index) => (
+        {PAGES.map((page) => (
           <SettingsRow
             key={page.title}
             icon={page.icon}
             title={page.title}
             onPress={() => router.push(page.href)}
-            last={index === PAGES.length - 1}
           />
         ))}
+        <SettingsRow
+          icon={Coffee}
+          // Their mark in their colours; tinting someone else's logo would misrepresent it.
+          artwork={<CoffeeMark width={22} height={22} />}
+          title={t('support.coffee')}
+          subtitle={t('support.coffeeDetail')}
+          onPress={() => openBrowserAsync(COFFEE_URL)}
+          last
+        />
       </SettingsSection>
 
       <SettingsSection title={t('settings.account.title')}>

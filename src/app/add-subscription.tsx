@@ -1,5 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Trash2 } from 'lucide-react-native';
+import {
+  AlignLeft,
+  Bell,
+  CalendarDays,
+  CircleCheck,
+  CreditCard,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -19,24 +27,36 @@ import {
 import { usePastCharges } from '@/api/past-charges';
 import { usePaymentSources, useSubscription } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
+import {
+  AmountEditPage,
+  DateEditPage,
+  NoteEditPage,
+  PaidWithEditPage,
+  ReminderEditPage,
+} from '@/components/entry/edit-pages';
+import {
+  EntryReview,
+  GlyphWell,
+  SegmentedChips,
+  type EntryRowSpec,
+} from '@/components/entry/entry-review';
 import { AmountStep } from '@/components/flow/amount-step';
 import { cycleLabel } from '@/components/subscriptions/subscription-row';
-import { InlineCalendar } from '@/components/flow/inline-calendar';
 import { StepFlow } from '@/components/flow/step-flow';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TextLink } from '@/components/ui/text-link';
 import { useConfirm } from '@/providers/dialog-provider';
-import { ChoiceChips } from '@/components/ui/choice-chips';
-import { ReminderField } from '@/components/ui/reminder-field';
-import { SourceTiles } from '@/components/ui/source-tiles';
-import { TextField } from '@/components/ui/text-field';
-import { FieldLabel } from '@/components/ui/typography';
 import { t, type MessageKey } from '@/i18n';
+import { formatEntryDay } from '@/lib/entry-day';
+import { reminderSummary } from '@/lib/entry-reminder';
+import { logoColumns } from '@/lib/logo-columns';
+import { useToday } from '@/lib/use-today';
+import { TEXT_CAP } from '@/theme/text-scale';
 import { planFloor } from '@/lib/card-ledger';
 import { success, warn } from '@/lib/haptics';
 import { failureMessage, failureText } from '@/lib/failure';
-import { logoColumns } from '@/lib/logo-columns';
 import { logoDomainOf, type LogoFields } from '@/lib/logo-domain';
 import {
   cameFromVoice,
@@ -85,6 +105,9 @@ function spendCategoryLabel(id: string, stored: string): string {
   return key ? t(key) : stored;
 }
 
+/** The pages of one subscription: the keypad it starts on, the final page, and one per field. */
+type Page = 'amount' | 'review' | 'amountEdit' | 'paidWith' | 'note' | 'renewal' | 'reminder';
+
 type Initial = {
   service: BrandSelection | null;
   amount: string;
@@ -118,6 +141,7 @@ function fromPrefill(prefill: SubscriptionPrefill | null): Initial {
     cycle: prefill.cycle ?? BLANK.cycle,
     renewsOn: prefill.renewsOn,
     sourceId: prefill.sourceId,
+    note: prefill.note,
   };
 }
 
@@ -156,7 +180,7 @@ export default function AddSubscriptionScreen() {
         <StepFlow
           title={t('subscriptions.add.titleEdit')}
           closePrompt={t('subscriptions.add.closeEdit')}
-          steps={3}
+          steps={1}
           current={0}
           onBack={() => router.back()}
           primaryLabel={t('common.continue')}
@@ -213,6 +237,9 @@ export default function AddSubscriptionScreen() {
       id={id}
       initial={initial}
       saved={existing}
+      // An edit, or what the voice review page heard, opens on the final page; only a blank one
+      // starts at the amount.
+      initialView={existing || (!id && cameFromVoice(params)) ? 'review' : 'amount'}
       fromVoice={!id && cameFromVoice(params)}
     />
   );
@@ -222,12 +249,14 @@ function SubscriptionForm({
   id,
   initial,
   saved = null,
+  initialView,
   fromVoice = false,
 }: {
   id?: string;
   initial: Initial;
   /** The row being edited, for the logo it already has. */
   saved?: LogoFields | null;
+  initialView: 'amount' | 'review';
   /** Saved from a voice hand-off: back to Home, never onto the review page again. */
   fromVoice?: boolean;
 }) {
@@ -242,8 +271,11 @@ function SubscriptionForm({
   const [note, setNote] = useState(initial.note);
   const [active, setActive] = useState(initial.active);
 
-  const [step, setStep] = useState(0);
-  const [error, setError] = useState<{ message: string; step: number } | null>(null);
+  // Pages over one piece of state, never routes, so Back keeps everything filled in. The final
+  // page is `review`; each line of it opens a page for that one thing and returns here.
+  const [view, setView] = useState<Page>(initialView);
+  const [error, setError] = useState<string | null>(null);
+  const { todayDate } = useToday();
 
   const { sources } = usePaymentSources();
   const { data: categories = [] } = useSpendCategories();
@@ -254,15 +286,6 @@ function SubscriptionForm({
   const deleteSubscription = useDeleteSubscription();
   const confirm = useConfirm();
 
-  const category = service
-    ? categories.find((option) => option.id === service.categoryId)
-    : undefined;
-  const categoryLabel = service
-    ? category
-      ? spendCategoryLabel(category.id, category.label)
-      : t('subscriptions.spendCategory.other')
-    : null;
-
   const savedReminder = useReminderChoice('subscription', id);
   const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
   const [timeDraft, setTimeDraft] = useState<string | null>(null);
@@ -270,10 +293,10 @@ function SubscriptionForm({
   const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
 
-  const fail = (message: string, atStep: number) => {
+  const fail = (message: string) => {
     warn();
-    setError({ message, step: atStep });
-    setStep(atStep);
+    setError(message);
+    setView('review');
   };
 
   const leave = () => {
@@ -297,7 +320,7 @@ function SubscriptionForm({
       { sources, lastChargedOn: pastCharges.lastChargedOn, countsFrom: initial.countsFrom },
     );
     if (!built.ok) {
-      fail(built.message, built.field === 'service' ? 1 : 0);
+      fail(built.message);
       return;
     }
     const values = { ...built.values, ...logoColumns(service, saved) };
@@ -320,7 +343,7 @@ function SubscriptionForm({
       if (!pastCharges.ready) {
         pastCharges.retry();
         warn();
-        setError({ message: failureText(), step: 2 });
+        setError(failureText());
         return;
       }
 
@@ -340,10 +363,7 @@ function SubscriptionForm({
       leave();
     } catch (thrown) {
       warn();
-      setError({
-        message: failureMessage(thrown),
-        step: 2,
-      });
+      setError(failureMessage(thrown));
     }
   };
 
@@ -361,10 +381,7 @@ function SubscriptionForm({
       await deleteSubscription.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError({
-        message: failureMessage(thrown),
-        step,
-      });
+      setError(failureMessage(thrown));
     }
   };
 
@@ -372,49 +389,284 @@ function SubscriptionForm({
 
   const value = Number(amount);
   const amountReady = Number.isFinite(value) && value > 0;
-  const stepValid = step === 0 ? amountReady : step === 1 ? Boolean(service) : !busy;
+  const sourceLabel = sources.find((source) => source.id === sourceId)?.label ?? null;
+  // The page this form opened on. Anywhere else the edge swipe is off, and Back steps back.
+  const isRoot = view === initialView;
 
-  const question =
-    step === 0
-      ? t('subscriptions.add.amountQuestion')
-      : step === 2
-        ? t('subscriptions.add.renewQuestion')
-        : undefined;
-  const primaryLabel =
-    step < 2
-      ? t('common.continue')
-      : busy
-        ? t('subscriptions.add.saving')
-        : editing
-          ? t('subscriptions.add.saveChanges')
-          : t('subscriptions.add.saveSubscription');
-  const cycleOptions = CYCLES.map((value) => ({ value, label: cycleLabel(value) }));
-  const stepError = error && error.step === step ? error.message : null;
+  const title = editing ? t('subscriptions.add.titleEdit') : t('subscriptions.addASubscription');
+  const closePrompt = editing ? t('subscriptions.add.closeEdit') : t('subscriptions.add.closeNew');
+  const toReview = () => setView('review');
+  // A line that came from Save names what was wrong with the page as it was: once something there
+  // is kept, it no longer applies.
+  const settle = () => {
+    setError(null);
+    toReview();
+  };
+
+  if (view === 'amountEdit') {
+    return (
+      <AmountEditPage
+        title={t('receipts.field.amount')}
+        question={t('subscriptions.add.amountQuestion')}
+        value={amount}
+        onBack={toReview}
+        onDone={(next) => {
+          setAmount(next);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'paidWith') {
+    return (
+      <PaidWithEditPage
+        title={t('subscriptions.field.chargedTo')}
+        sources={sources}
+        value={sourceId}
+        onBack={toReview}
+        onDone={(next) => {
+          setSourceId(next);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'note') {
+    return (
+      <NoteEditPage
+        title={t('subscriptions.field.note')}
+        label={t('subscriptions.field.note')}
+        placeholder={t('subscriptions.add.notePlaceholder')}
+        value={note}
+        onBack={toReview}
+        onDone={(next) => {
+          setNote(next);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'renewal') {
+    return (
+      <DateEditPage
+        title={t('subscriptions.detail.nextRenewal')}
+        question={t('subscriptions.add.renewQuestion')}
+        // Optional: many know the cost but not the renewal date, so nothing is pre-selected.
+        value={renewsOn}
+        footerExtra={(clear) => (
+          <TextLink
+            label={t('subscriptions.add.noRenewal')}
+            variant="subtle"
+            onPress={clear}
+            className="mt-2 self-start"
+          />
+        )}
+        onBack={toReview}
+        onDone={(day) => {
+          setRenewsOn(day);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'reminder') {
+    return (
+      <ReminderEditPage
+        title={t('ui.reminder.label')}
+        kind="subscription"
+        value={reminder}
+        time={remindAt}
+        onBack={toReview}
+        onDone={(choice, at) => {
+          setReminderDraft(choice);
+          setTimeDraft(at);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'amount') {
+    return (
+      <StepFlow
+        title={title}
+        closePrompt={closePrompt}
+        steps={1}
+        current={0}
+        onBack={() => router.back()}
+        question={t('subscriptions.add.amountQuestion')}
+        primaryLabel={t('common.continue')}
+        primaryDisabled={!amountReady}
+        onPrimary={() => {
+          settle();
+        }}
+        error={error}
+      >
+        <AmountStep value={amount} onChange={setAmount} />
+      </StepFlow>
+    );
+  }
+
+  const filedUnderLabel = (categoryId: string) => {
+    const known = categories.find((option) => option.id === categoryId);
+    return known
+      ? spendCategoryLabel(known.id, known.label)
+      : t('subscriptions.spendCategory.other');
+  };
+
+  const rows: EntryRowSpec[] = [
+    {
+      key: 'service',
+      field: (
+        <>
+          <BrandField
+            label={t('subscriptions.field.service')}
+            value={service}
+            onChange={(next) => {
+              setError(null);
+              setService(next);
+            }}
+            placeholder={t('subscriptions.add.servicePlaceholder')}
+            changeLabel={(name) => t('subscriptions.add.changeService', { name })}
+            addLabel={(name) => t('subscriptions.add.addServiceAs', { name })}
+          />
+          {service ? (
+            <Text
+              className="mt-3 w-full font-app text-[13px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
+            >
+              {t('subscriptions.add.filedUnder', {
+                category: filedUnderLabel(service.categoryId),
+              })}
+            </Text>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      key: 'cycle',
+      label: t('subscriptions.field.billingCycle'),
+      value: cycleLabel(cycle),
+      leading: <GlyphWell icon={RefreshCw} />,
+      below: (
+        <SegmentedChips
+          variant="pills"
+          options={CYCLES.map((option) => ({
+            key: option,
+            label: cycleLabel(option),
+            selected: option === cycle,
+            onPress: () => {
+              setError(null);
+              setCycle(option);
+            },
+          }))}
+        />
+      ),
+    },
+    {
+      key: 'renewal',
+      label: t('subscriptions.detail.nextRenewal'),
+      value: renewsOn ? formatEntryDay(renewsOn, todayDate) : null,
+      leading: <GlyphWell icon={CalendarDays} />,
+      onPress: () => setView('renewal'),
+    },
+    // Without a card or account there is nothing to choose between, as before.
+    ...(sources.length > 0
+      ? [
+          {
+            key: 'paidWith',
+            label: t('subscriptions.field.chargedTo'),
+            value: sourceLabel,
+            leading: <GlyphWell icon={CreditCard} />,
+            onPress: () => setView('paidWith'),
+          },
+        ]
+      : []),
+    {
+      key: 'reminder',
+      label: t('ui.reminder.label'),
+      value: reminderSummary(reminder, remindAt),
+      placeholder: t('api.reminders.off'),
+      leading: <GlyphWell icon={Bell} />,
+      onPress: () => setView('reminder'),
+    },
+    {
+      key: 'note',
+      label: t('subscriptions.field.note'),
+      value: note.trim() || null,
+      placeholder: t('entry.addNote'),
+      leading: <GlyphWell icon={AlignLeft} />,
+      onPress: () => setView('note'),
+    },
+    // Cancelling keeps the history; only offered on something that already exists.
+    ...(editing
+      ? [
+          {
+            key: 'status',
+            label: t('subscriptions.field.status'),
+            value: active ? t('subscriptions.active') : t('subscriptions.cancelled'),
+            leading: <GlyphWell icon={CircleCheck} />,
+            below: (
+              <SegmentedChips
+                options={[
+                  {
+                    key: 'active',
+                    label: t('subscriptions.active'),
+                    selected: active,
+                    onPress: () => {
+                      setError(null);
+                      setActive(true);
+                    },
+                  },
+                  {
+                    key: 'cancelled',
+                    label: t('subscriptions.cancelled'),
+                    selected: !active,
+                    onPress: () => {
+                      setError(null);
+                      setActive(false);
+                    },
+                  },
+                ]}
+              />
+            ),
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <StepFlow
-      title={editing ? t('subscriptions.add.titleEdit') : t('subscriptions.addASubscription')}
-      closePrompt={editing ? t('subscriptions.add.closeEdit') : t('subscriptions.add.closeNew')}
-      steps={3}
-      current={step}
+    <EntryReview
+      title={title}
+      closePrompt={closePrompt}
+      root={isRoot}
       onBack={() => {
-        setError(null);
-        if (step === 0) router.back();
-        else setStep((current) => current - 1);
-      }}
-      question={question}
-      primaryLabel={primaryLabel}
-      primaryDisabled={!stepValid}
-      onPrimary={() => {
-        if (step < 2) {
-          setError(null);
-          setStep((current) => current + 1);
+        if (isRoot) {
+          router.back();
           return;
         }
-        void handleSave();
+        // A failed save's line belongs to the final page, not the keypad it steps back to.
+        setError(null);
+        setView('amount');
       }}
-      error={step === 1 ? null : stepError}
-      avoidKeyboard={step === 1}
+      amountLabel={t('receipts.field.amount')}
+      amount={amount}
+      onEditAmount={() => setView('amountEdit')}
+      rows={rows}
+      primaryLabel={
+        busy
+          ? t('subscriptions.add.saving')
+          : editing
+            ? t('subscriptions.add.saveChanges')
+            : t('subscriptions.add.saveSubscription')
+      }
+      primaryDisabled={!amountReady || !service || busy}
+      onPrimary={() => void handleSave()}
+      error={error}
       footerSlot={
         editing ? (
           <Pressable
@@ -424,7 +676,10 @@ function SubscriptionForm({
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
-            <Text className="font-app-medium text-[15px] text-danger" maxFontSizeMultiplier={1.4}>
+            <Text
+              className="font-app-medium text-[15px] text-danger"
+              maxFontSizeMultiplier={TEXT_CAP.row}
+            >
               {deleteSubscription.isPending
                 ? t('subscriptions.add.deleting')
                 : t('subscriptions.add.deleteSubscription')}
@@ -432,84 +687,6 @@ function SubscriptionForm({
           </Pressable>
         ) : null
       }
-    >
-      {step === 0 ? <AmountStep value={amount} onChange={setAmount} /> : null}
-
-      {step === 1 ? (
-        <View className="w-full gap-6">
-          <BrandField
-            label={t('subscriptions.field.service')}
-            value={service}
-            onChange={setService}
-            placeholder={t('subscriptions.add.servicePlaceholder')}
-          />
-
-          {sources.length > 0 ? (
-            <View className="w-full">
-              <FieldLabel className="mb-3">{t('subscriptions.field.chargedTo')}</FieldLabel>
-              <SourceTiles sources={sources} value={sourceId} onChange={setSourceId} />
-            </View>
-          ) : null}
-
-          <TextField
-            label={t('subscriptions.field.note')}
-            optional
-            value={note}
-            onChangeText={setNote}
-            placeholder={t('subscriptions.add.notePlaceholder')}
-            multiline
-            maxLength={200}
-            autoCapitalize="sentences"
-          />
-
-          {/* Cancelling keeps the history; only offered on something that already exists. */}
-          {editing ? (
-            <View className="w-full">
-              <FieldLabel className="mb-2">{t('subscriptions.field.status')}</FieldLabel>
-              <ChoiceChips
-                options={[
-                  { value: 'active', label: t('subscriptions.active') },
-                  { value: 'cancelled', label: t('subscriptions.cancelled') },
-                ]}
-                value={active ? 'active' : 'cancelled'}
-                onChange={(next) => setActive(next === 'active')}
-              />
-            </View>
-          ) : null}
-
-          {categoryLabel ? (
-            <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-              {t('subscriptions.add.filedUnder', { category: categoryLabel })}
-            </Text>
-          ) : null}
-
-          {stepError ? (
-            <Text className="w-full font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
-              {stepError}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      {step === 2 ? (
-        <View className="w-full gap-6">
-          {/* Optional: many know the cost but not the renewal date, so nothing is pre-selected. */}
-          <InlineCalendar value={renewsOn} onChange={setRenewsOn} />
-
-          <View className="w-full">
-            <FieldLabel className="mb-2">{t('subscriptions.field.billingCycle')}</FieldLabel>
-            <ChoiceChips options={cycleOptions} value={cycle} onChange={setCycle} />
-          </View>
-
-          <ReminderField
-            kind="subscription"
-            value={reminder}
-            onChange={setReminderDraft}
-            time={remindAt}
-            onTimeChange={setTimeDraft}
-          />
-        </View>
-      ) : null}
-    </StepFlow>
+    />
   );
 }

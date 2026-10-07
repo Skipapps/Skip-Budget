@@ -1,4 +1,5 @@
-import { logoCategory, logoHints, websiteHost } from '@/lib/logo-lookup';
+import type { LogoMatch } from '@/api/logos';
+import { isSureMatch, logoCategory, logoHints, websiteHost } from '@/lib/logo-lookup';
 
 /**
  * What the app tells the logo service. Categories are translated into the service's own names,
@@ -140,5 +141,103 @@ describe('websiteHost', () => {
     'ftp://planetfitness.com',
   ])('refuses %p, which cannot be a website', (typed) => {
     expect(websiteHost(typed)).toBeNull();
+  });
+});
+
+/**
+ * When the add forms stop asking "is this the right logo?". Only the service's exact answers count
+ * (a name or website in its own list), at high confidence, with no other brand nearly as good: a
+ * wrong logo is worse than a question.
+ */
+describe('isSureMatch', () => {
+  const sure = (over: Partial<LogoMatch> = {}): LogoMatch => ({
+    matched: true,
+    name: 'Walmart',
+    domain: 'walmart.com',
+    confidence: 0.98,
+    margin: 0.4,
+    kind: 'alias',
+    candidates: [{ domain: 'walmart.com', name: 'Walmart', confidence: 0.98 }],
+    ...over,
+  });
+
+  it.each([
+    ['an exact name (alias) at high confidence', sure()],
+    ['an exact website (domain)', sure({ kind: 'domain', confidence: 1 })],
+    ['exactly the confidence floor', sure({ confidence: 0.95 })],
+    ['no candidates at all', sure({ candidates: [] })],
+    [
+      'a runner-up that is a little unlikely',
+      sure({
+        candidates: [
+          { domain: 'walmart.com', name: 'Walmart', confidence: 0.98 },
+          { domain: 'walmart.ca', name: 'Walmart Canada', confidence: 0.79 },
+        ],
+      }),
+    ],
+    [
+      'the same brand listed again on its own domain ("walmart supercenter")',
+      sure({
+        margin: 0.1,
+        candidates: [
+          { domain: 'walmart.com', name: 'Walmart', confidence: 0.98 },
+          { domain: 'walmart.com', name: 'Walmart Supercenter', confidence: 0.97 },
+        ],
+      }),
+    ],
+  ])('is sure of %s', (_, match) => {
+    expect(isSureMatch(match)).toBe(true);
+  });
+
+  it.each([
+    ['a close spelling (fuzzy), however confident', sure({ kind: 'fuzzy', confidence: 0.85 })],
+    ['a fuzzy match at full confidence', sure({ kind: 'fuzzy', confidence: 1 })],
+    ['an exact name below the floor', sure({ confidence: 0.9 })],
+    ['just below the floor', sure({ confidence: 0.949 })],
+    ['an answer that never said how it was found', sure({ kind: undefined })],
+    ['a null kind', sure({ kind: null })],
+    ['a kind it does not know', sure({ kind: 'guess' })],
+    ['an empty kind', sure({ kind: '' })],
+    ['"none"', sure({ kind: 'none' })],
+    ['an answer that did not match', sure({ matched: false })],
+    ['a match with no domain', sure({ domain: null })],
+    ['a match with an empty domain', sure({ domain: '' })],
+    [
+      'two plausible brands ("Delta")',
+      sure({
+        name: 'Delta Air Lines',
+        domain: 'delta.com',
+        candidates: [
+          { domain: 'delta.com', name: 'Delta Air Lines', confidence: 0.96 },
+          { domain: 'deltafaucet.com', name: 'Delta Faucet', confidence: 0.8 },
+        ],
+      }),
+    ],
+    [
+      'a runner-up on another domain even when it is listed first',
+      sure({
+        candidates: [
+          { domain: 'walmart.ca', name: 'Walmart Canada', confidence: 0.9 },
+          { domain: 'walmart.com', name: 'Walmart', confidence: 0.98 },
+        ],
+      }),
+    ],
+  ])('is not sure of %s', (_, match) => {
+    expect(isSureMatch(match)).toBe(false);
+  });
+
+  it('is not sure of no answer at all', () => {
+    expect(isSureMatch(null)).toBe(false);
+    expect(isSureMatch(undefined)).toBe(false);
+  });
+
+  it('does not let a same-domain runner-up hide a second brand behind it', () => {
+    const match = sure({
+      candidates: [
+        { domain: 'walmart.com', name: 'Walmart Supercenter', confidence: 0.97 },
+        { domain: 'walmartone.com', name: 'Walmart One', confidence: 0.85 },
+      ],
+    });
+    expect(isSureMatch(match)).toBe(false);
   });
 });

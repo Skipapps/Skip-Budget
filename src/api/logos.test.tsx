@@ -105,6 +105,8 @@ describe('resolveLogo', () => {
         { domain: 'planetfitness.com', name: 'Planet Fitness', confidence: 0.98 },
         { domain: 'planet.com', name: 'Planet Labs', confidence: 0.67 },
       ],
+      // This answer says nothing of how it was found.
+      kind: null,
     });
   });
 
@@ -146,6 +148,7 @@ describe('resolveLogo', () => {
       confidence: 0.41,
       margin: 0.02,
       candidates: [{ domain: 'calm.com', name: 'Calm', confidence: 0.41 }],
+      kind: null,
     });
   });
 
@@ -238,6 +241,62 @@ describe('resolveLogo', () => {
         { domain: 'netflix.com', name: 'Netflix', confidence: 0.9 },
         { domain: 'max.com', name: 'Max', confidence: 0 },
       ],
+      kind: null,
+    });
+  });
+
+  describe('how the service found the brand', () => {
+    it('reads the match field of an exact name, as the kind', async () => {
+      answer = () => json({ ...PLANET, match: 'alias' });
+      await expect(resolveLogo('Planet Fitness', {})).resolves.toEqual({
+        matched: true,
+        name: 'Planet Fitness',
+        domain: 'planetfitness.com',
+        confidence: 0.98,
+        margin: 0.31,
+        candidates: [
+          { domain: 'planetfitness.com', name: 'Planet Fitness', confidence: 0.98 },
+          { domain: 'planet.com', name: 'Planet Labs', confidence: 0.67 },
+        ],
+        kind: 'alias',
+      });
+    });
+
+    it.each(['alias', 'domain', 'fuzzy', 'none'])('passes on %p as it is', async (found) => {
+      answer = () => json({ ...PLANET, match: found });
+      await expect(resolveLogo('Planet Fitness', {})).resolves.toMatchObject({ kind: found });
+    });
+
+    it('trims it, and keeps at most 20 characters of it', async () => {
+      answer = () => json({ ...PLANET, match: '  domain  ' });
+      await expect(resolveLogo('Planet Fitness', {})).resolves.toMatchObject({ kind: 'domain' });
+
+      answer = () => json({ ...PLANET, match: 'a'.repeat(30) });
+      await expect(resolveLogo('Planet Fitness', {})).resolves.toMatchObject({
+        kind: 'a'.repeat(20),
+      });
+    });
+
+    it.each([
+      ['missing', undefined],
+      ['empty', ''],
+      ['only spaces', '   '],
+      ['a number', 3],
+      ['a boolean', true],
+      ['an object', { kind: 'alias' }],
+      ['null', null],
+    ])('is null when the match field is %s', async (_, found) => {
+      answer = () => json({ ...PLANET, match: found });
+      await expect(resolveLogo('Planet Fitness', {})).resolves.toMatchObject({ kind: null });
+    });
+
+    it('is read from an answer that found nothing too', async () => {
+      answer = () =>
+        json({ matched: false, name: null, domain: null, confidence: 0, margin: 0, match: 'none' });
+      await expect(resolveLogo('Zed Zed', {})).resolves.toMatchObject({
+        matched: false,
+        kind: 'none',
+      });
     });
   });
 

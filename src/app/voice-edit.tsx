@@ -2,9 +2,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { AccessibilityInfo, Text, View } from 'react-native';
 
+import { usePaymentSources } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { billCategoryLabel } from '@/components/bills/bill-row';
 import { CategoryPicker } from '@/components/bills/category-picker';
+import { NoteEditPage, PaidWithEditPage } from '@/components/entry/edit-pages';
 import { AmountStep } from '@/components/flow/amount-step';
 import { InlineCalendar } from '@/components/flow/inline-calendar';
 import { FlowHeader } from '@/components/flow/step-flow';
@@ -31,13 +33,14 @@ import {
   type VoiceEntry,
   type VoiceSession,
 } from '@/lib/voice-draft';
+import { TEXT_CAP } from '@/theme/text-scale';
 
-type Field = 'amount' | 'merchant' | 'date' | 'category';
+type Field = 'amount' | 'merchant' | 'date' | 'category' | 'source' | 'note';
 
-const FIELDS: readonly Field[] = ['amount', 'merchant', 'date', 'category'];
+const FIELDS: readonly Field[] = ['amount', 'merchant', 'date', 'category', 'source', 'note'];
 
 /** The add flows' own questions, so a correction asks what the form would. */
-const QUESTIONS: Record<Exclude<Field, 'category'>, Record<VoiceKind, MessageKey>> = {
+const QUESTIONS: Record<'amount' | 'merchant' | 'date', Record<VoiceKind, MessageKey>> = {
   amount: {
     receipt: 'voice.receipt.askAmount',
     bill: 'voice.bill.askAmount',
@@ -57,9 +60,25 @@ const QUESTIONS: Record<Exclude<Field, 'category'>, Record<VoiceKind, MessageKey
 
 /** The review row's own names, so the page is titled by the row that opened it. */
 const DATE_TITLES: Record<VoiceKind, MessageKey> = {
-  receipt: 'voice.receipt.date',
+  receipt: 'receipts.field.date',
   bill: 'voice.bill.date',
-  subscription: 'voice.subscription.date',
+  subscription: 'subscriptions.detail.nextRenewal',
+};
+
+const PAID_WITH_TITLES: Record<VoiceKind, MessageKey> = {
+  receipt: 'voice.receipt.paidWith',
+  bill: 'voice.bill.paidWith',
+  subscription: 'voice.subscription.paidWith',
+};
+
+/** Each form's own note page, word for word. */
+const NOTE_COPY: Record<VoiceKind, { label: MessageKey; placeholder: MessageKey }> = {
+  receipt: { label: 'receipts.field.note', placeholder: 'receipts.add.notePlaceholder' },
+  bill: { label: 'bills.field.note', placeholder: 'bills.add.notePlaceholder' },
+  subscription: {
+    label: 'subscriptions.field.note',
+    placeholder: 'subscriptions.add.notePlaceholder',
+  },
 };
 
 /**
@@ -106,6 +125,10 @@ function VoiceEditInner() {
       return <DateEdit session={session} />;
     case 'category':
       return <CategoryEdit session={session} />;
+    case 'source':
+      return <SourceEdit session={session} />;
+    case 'note':
+      return <NoteEdit session={session} />;
   }
 }
 
@@ -174,7 +197,7 @@ function EditShell({
         {failed ? (
           <Text
             className="w-full text-center font-app text-[13px] text-danger"
-            maxFontSizeMultiplier={1.4}
+            maxFontSizeMultiplier={TEXT_CAP.reading}
           >
             {failureText()}
           </Text>
@@ -201,8 +224,7 @@ function EditShell({
         ref={questionRef}
         accessibilityRole="header"
         className="mt-6 w-full text-center font-app text-[20px] text-muted"
-        numberOfLines={2}
-        maxFontSizeMultiplier={1.3}
+        maxFontSizeMultiplier={TEXT_CAP.heading}
       >
         {question}
       </Text>
@@ -267,8 +289,6 @@ function MerchantEdit({ session }: { session: VoiceSession }) {
         onChange={setMerchant}
         initialQuery={searchFirst ? (draft.merchantHeard ?? entry.merchant?.name ?? '') : ''}
         autoFocus={searchFirst}
-        // The voice draft keeps no logo, so a choice made here would be lost on save.
-        suggestLogos={false}
       />
     </EditShell>
   );
@@ -319,7 +339,8 @@ function BillNameEdit({ session }: { session: VoiceSession }) {
         placeholder={t('voice.edit.searchCompany')}
         value={issuer}
         onChange={handleIssuer}
-        suggestLogos={false}
+        category={entry.billCategoryId ?? undefined}
+        noLogo="icon"
       />
       <TextField
         label={t('voice.bill.merchant')}
@@ -395,5 +416,41 @@ function CategoryEdit({ session }: { session: VoiceSession }) {
         <CategoryPicker onSelect={pick} selectedId={entry.billCategoryId ?? undefined} />
       </View>
     </EditShell>
+  );
+}
+
+/** The forms' own "Paid with" page; clearing it leaves no card or account. */
+function SourceEdit({ session }: { session: VoiceSession }) {
+  const { commit, failed, leave } = useCommit(session);
+  const { sources } = usePaymentSources();
+  const { entry } = session;
+
+  return (
+    <PaidWithEditPage
+      title={t(PAID_WITH_TITLES[entry.kind])}
+      sources={sources}
+      value={entry.sourceId ?? ''}
+      error={failed ? failureText() : null}
+      onBack={leave}
+      onDone={(sourceId) => commit({ sourceId: sourceId || null })}
+    />
+  );
+}
+
+/** The forms' own note page. Emptied, it is no note. */
+function NoteEdit({ session }: { session: VoiceSession }) {
+  const { commit, failed, leave } = useCommit(session);
+  const copy = NOTE_COPY[session.entry.kind];
+
+  return (
+    <NoteEditPage
+      title={t(copy.label)}
+      label={t(copy.label)}
+      placeholder={t(copy.placeholder)}
+      value={session.entry.note ?? ''}
+      error={failed ? failureText() : null}
+      onBack={leave}
+      onDone={(note) => commit({ note: note.trim() || null })}
+    />
   );
 }

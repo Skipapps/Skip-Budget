@@ -3,13 +3,20 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 
 import { guessCategory, useBrandSearch, type BrandRow } from '@/api/brands';
+import {
+  matchKnownStores,
+  storeKey,
+  useKnownStores,
+  useRememberStore,
+  type KnownStore,
+} from '@/api/known-stores';
 import { BrandLogo } from '@/components/brands/brand-logo';
 import { LOGO_COPY, LogoConfirm, type NoLogo } from '@/components/brands/logo-choices';
 import { TextLink } from '@/components/ui/text-link';
 import { FieldLabel } from '@/components/ui/typography';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
-import { selectionLogo } from '@/lib/logo-columns';
+import { logoChosen, selectionLogo } from '@/lib/logo-columns';
 import { logoHints } from '@/lib/logo-lookup';
 import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
@@ -50,6 +57,10 @@ type BrandFieldProps = {
   suggestLogos?: boolean;
   /** Opens Change logo for the saved row this store belongs to. */
   onChangeLogo?: () => void;
+  /** What the clear button says for the chosen one, when it is not a store ("Change service, …"). */
+  changeLabel?: (name: string) => string;
+  /** What the add-unknown row says, when it is not a store. */
+  addLabel?: (name: string) => string;
 };
 
 /** Keystrokes are cheap; round trips are not. */
@@ -80,6 +91,8 @@ export function BrandField({
   noLogo = 'letters',
   suggestLogos = true,
   onChangeLogo,
+  changeLabel = (name) => t('settings.store.change', { name }),
+  addLabel = (name) => t('settings.store.addAs', { name }),
 }: BrandFieldProps) {
   const colors = useColors();
   const [query, setQuery] = useState(initialQuery);
@@ -88,11 +101,22 @@ export function BrandField({
   const [confirming, setConfirming] = useState(false);
   const debounced = useDebounced(query);
   const { data: results = [], isFetching } = useBrandSearch(debounced);
+  const knownStores = useKnownStores();
+  const remember = useRememberStore();
 
   const typed = query.trim();
   const searching = focused && typed.length >= 2;
-  // Hide the exact-name row when the catalog already offers that name ("Walmart" twice).
-  const alreadyListed = results.some((brand) => brand.name.toLowerCase() === typed.toLowerCase());
+  // Stores this person added before come first, with the logo they settled on: they are asked
+  // nothing a second time. One the catalog now offers under the same name is not shown twice.
+  const known = suggestLogos
+    ? matchKnownStores(knownStores, typed).filter(
+        (store) => !results.some((brand) => storeKey(brand.name) === storeKey(store.name)),
+      )
+    : [];
+  // Hide the exact-name row when the catalog (or this person's own list) already offers that name.
+  const alreadyListed =
+    results.some((brand) => brand.name.toLowerCase() === typed.toLowerCase()) ||
+    known.some((store) => storeKey(store.name) === storeKey(typed));
 
   const choose = (brand: BrandRow) => {
     onChange({
@@ -107,6 +131,21 @@ export function BrandField({
     setQuery('');
     setFocused(false);
     setConfirming(false);
+  };
+
+  const chooseKnown = (store: KnownStore) => {
+    onChange({
+      brandId: null,
+      name: store.name,
+      domain: null,
+      categoryId: store.categoryId,
+      logoDomain: store.logoDomain,
+      logoHidden: store.logoHidden,
+    });
+    setQuery('');
+    setFocused(false);
+    // Opens on "Change logo", not on the question: it was answered last time.
+    setConfirming(true);
   };
 
   const addCustom = () => {
@@ -142,7 +181,7 @@ export function BrandField({
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t('settings.store.change', { name: value.name })}
+            accessibilityLabel={changeLabel(value.name)}
             hitSlop={10}
             onPress={clear}
             className="-mr-1 h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/10"
@@ -157,7 +196,17 @@ export function BrandField({
             name={value.name}
             hints={logoHints(category ?? value.categoryId)}
             noLogo={noLogo}
-            onChoose={(choice) => onChange({ ...value, ...choice })}
+            decided={logoChosen(value)}
+            onChoose={(choice) => {
+              const answered = { ...value, ...choice };
+              onChange(answered);
+              void remember({
+                name: answered.name,
+                categoryId: answered.categoryId,
+                logoDomain: choice.logoDomain,
+                logoHidden: choice.logoHidden,
+              });
+            }}
           />
         ) : onChangeLogo ? (
           <TextLink
@@ -199,6 +248,31 @@ export function BrandField({
 
       {searching ? (
         <View className="mt-2 w-full overflow-hidden rounded-[10px] border border-line">
+          {known.map((store, index) => (
+            <Pressable
+              key={`known-${storeKey(store.name)}`}
+              accessibilityRole="button"
+              accessibilityLabel={store.name}
+              onPress={() => chooseKnown(store)}
+              className={cn(
+                'min-h-14 flex-row items-center px-4 py-3 active:bg-ink/5',
+                index > 0 && 'border-t border-line',
+              )}
+            >
+              <BrandLogo
+                name={store.name}
+                domain={store.logoHidden ? null : store.logoDomain}
+                size={32}
+              />
+              <Text
+                className="ml-3 min-w-0 flex-1 font-app text-[15px] text-ink"
+                maxFontSizeMultiplier={TEXT_CAP.row}
+              >
+                {store.name}
+              </Text>
+            </Pressable>
+          ))}
+
           {results.map((brand, index) => (
             <Pressable
               key={brand.id}
@@ -207,7 +281,7 @@ export function BrandField({
               onPress={() => choose(brand)}
               className={cn(
                 'min-h-14 flex-row items-center px-4 py-3 active:bg-ink/5',
-                index > 0 && 'border-t border-line',
+                (index > 0 || known.length > 0) && 'border-t border-line',
               )}
             >
               <BrandLogo name={brand.name} domain={brand.domain} size={32} />
@@ -223,11 +297,11 @@ export function BrandField({
           {alreadyListed ? null : (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t('settings.store.addAs', { name: typed })}
+              accessibilityLabel={addLabel(typed)}
               onPress={addCustom}
               className={cn(
                 'min-h-14 flex-row items-center px-4 py-3 active:bg-ink/5',
-                results.length > 0 && 'border-t border-line',
+                (results.length > 0 || known.length > 0) && 'border-t border-line',
               )}
             >
               <View className="h-8 w-8 items-center justify-center rounded-full border border-dashed border-line">

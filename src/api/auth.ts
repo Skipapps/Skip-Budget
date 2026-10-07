@@ -1,4 +1,5 @@
 import { forgetDevice } from '@/api/push';
+import { forgetKnownStores } from '@/api/known-stores';
 import { forgetVoiceAliases } from '@/api/voice-aliases';
 import { t } from '@/i18n';
 import { failureMessage, failureText } from '@/lib/failure';
@@ -122,8 +123,8 @@ export async function signOut(): Promise<AuthResult> {
 }
 
 /**
- * Best-effort removal of the unsaved voice draft and the learned voice corrections. The corrections
- * are keyed by user id, so this runs while the session can still say whose they are.
+ * Best-effort removal of the unsaved voice draft, the learned voice corrections and the stores this
+ * person added. Both are keyed by user id, so this runs while the session can still say whose they are.
  */
 async function forgetThisPersonsVoice(): Promise<void> {
   try {
@@ -134,6 +135,7 @@ async function forgetThisPersonsVoice(): Promise<void> {
   try {
     const { data } = await supabase.auth.getSession();
     await forgetVoiceAliases(data.session?.user?.id);
+    await forgetKnownStores(data.session?.user?.id);
   } catch (error) {
     console.warn('Could not clear learned voice corrections', error);
   }

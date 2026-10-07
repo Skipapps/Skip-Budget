@@ -233,7 +233,7 @@ export default function ReceiptsScreen() {
                   sourceLabel={
                     sourceLabels.get(receipt.card_id ?? receipt.bank_account_id ?? '') ?? ''
                   }
-                  onPress={() => router.push(`/add-receipt?id=${receipt.id}`)}
+                  onPress={() => router.push(`/receipt/${receipt.id}`)}
                 />
               ))}
             </View>

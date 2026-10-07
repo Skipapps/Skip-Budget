@@ -2,7 +2,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
-  Banknote,
+  AlignLeft,
+  CalendarDays,
   CreditCard,
   ImageUp,
   ScanLine,
@@ -24,38 +25,47 @@ import {
 } from '@/api/mutations';
 import { usePaymentSources, useReceipt } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
-import { BrandMark } from '@/components/brands/brand-mark';
 import { openChangeLogo } from '@/components/brands/change-logo-button';
+import {
+  AmountEditPage,
+  NoteEditPage,
+  PaidWithEditPage,
+  DateEditPage,
+} from '@/components/entry/edit-pages';
+import {
+  DateChips,
+  EntryReview,
+  GlyphWell,
+  type EntryRowSpec,
+} from '@/components/entry/entry-review';
 import { AmountStep } from '@/components/flow/amount-step';
-import { InlineCalendar } from '@/components/flow/inline-calendar';
 import { StepFlow } from '@/components/flow/step-flow';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDialog, useConfirm } from '@/providers/dialog-provider';
-import { SourceTiles } from '@/components/ui/source-tiles';
-import { TextField } from '@/components/ui/text-field';
-import { FieldLabel } from '@/components/ui/typography';
-import { GlyphWell, ReviewRow } from '@/components/voice/review-row';
 import { t, type MessageKey } from '@/i18n';
-import { MESSAGES } from '@/i18n/messages';
 import { success, warn } from '@/lib/haptics';
 import { withTap } from '@/lib/press';
+import { formatEntryDay } from '@/lib/entry-day';
 import { failureMessage, failureText } from '@/lib/failure';
-import { formatCurrency } from '@/lib/format';
-import { logoColumns, selectionLogo } from '@/lib/logo-columns';
+import { logoColumns } from '@/lib/logo-columns';
 import { logoDomainOf, type LogoFields } from '@/lib/logo-domain';
 import { refusedForPro } from '@/lib/pro-refusal';
+import { receiptCategoryName } from '@/lib/receipt-category';
 import { parseReceipt, parseReceiptFromLines, type ParsedReceipt } from '@/lib/receipt-parser';
 import {
   clearVoiceDraft,
   readAmountParam,
   readDayParam,
   readMerchantParams,
+  readNoteParam,
   readSourceParam,
 } from '@/lib/voice-draft';
+import { useToday } from '@/lib/use-today';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
+import { TEXT_CAP } from '@/theme/text-scale';
 import {
   captureReceipt,
   hasLayoutRecognition,
@@ -87,22 +97,8 @@ function listWords(fields: ScanField[]): string {
   });
 }
 
-/** A shop category's name by its stored id; an id the app has no words for keeps its stored label. */
-function categoryName(id: string, stored: string | undefined): string {
-  const key = `receipts.category.${id}`;
-  if (key in MESSAGES) return t(key as MessageKey);
-  return stored ?? t('receipts.category.other');
-}
-
-/**
- * Where a reading lands: the review and Save when it holds what Save needs, else the first step
- * still missing it, so nobody arrives on a Save that cannot save.
- */
-function landingStep(amount: string, store: BrandSelection | null): number {
-  const value = Number(amount);
-  if (!(Number.isFinite(value) && value > 0)) return 0;
-  return store ? 2 : 1;
-}
+/** The pages of one receipt: the amount keypad it starts on, the final page, and one per field. */
+type Page = 'amount' | 'review' | 'amountEdit' | 'paidWith' | 'note' | 'date';
 
 type Initial = {
   store: BrandSelection | null;
@@ -113,14 +109,15 @@ type Initial = {
   captureSource: CaptureSource;
 };
 
-const BLANK: Initial = {
+/** Read when a form opens, not when the app starts, so "today" is today. */
+const blank = (): Initial => ({
   store: null,
   date: new Date(),
   amount: '',
   sourceId: '',
   note: '',
   captureSource: 'manual',
-};
+});
 
 const ALL_FIELDS = ['store', 'date', 'amount', 'card'] as const;
 
@@ -128,10 +125,15 @@ type ScanParams = {
   scannedStore?: string;
   scannedBrandId?: string;
   scannedDomain?: string;
+  /** The logo chosen on the voice review page, so this form does not ask again. */
+  scannedLogoDomain?: string;
+  scannedLogoHidden?: string;
   scannedCategory?: string;
   scannedAmount?: string;
   scannedDate?: string;
   scannedSource?: string;
+  /** Typed on the voice review page. */
+  scannedNote?: string;
   scannedRead?: string;
   /** 'voice' when the voice review page handed this over ("More options"). */
   scannedVia?: string;
@@ -150,7 +152,7 @@ function fromScanParams(params: ScanParams): { initial: Initial; result: ScanRes
     .filter((field): field is ScanField => (ALL_FIELDS as readonly string[]).includes(field));
 
   if (!voice && read.length === 0 && !params.scannedStore && !params.scannedAmount) {
-    return { initial: BLANK, result: null };
+    return { initial: blank(), result: null };
   }
 
   const store = readMerchantParams({
@@ -158,6 +160,8 @@ function fromScanParams(params: ScanParams): { initial: Initial; result: ScanRes
     brandId: params.scannedBrandId,
     domain: params.scannedDomain,
     categoryId: params.scannedCategory,
+    logoDomain: params.scannedLogoDomain,
+    logoHidden: params.scannedLogoHidden,
   });
 
   return {
@@ -166,7 +170,7 @@ function fromScanParams(params: ScanParams): { initial: Initial; result: ScanRes
       date: readDayParam(params.scannedDate) ?? new Date(),
       amount: readAmountParam(params.scannedAmount),
       sourceId: readSourceParam(params.scannedSource),
-      note: '',
+      note: readNoteParam(params.scannedNote),
       captureSource: voice ? 'voice' : 'scan',
     },
     // The report is camera wording ("Read the store, date and amount"); a voice hand-off has none.
@@ -209,7 +213,7 @@ export default function AddReceiptScreen() {
         <StepFlow
           title={t('receipts.add.titleEdit')}
           closePrompt={t('receipts.add.closeEdit')}
-          steps={3}
+          steps={1}
           current={0}
           onBack={() => router.back()}
           primaryLabel={t('common.continue')}
@@ -265,10 +269,9 @@ export default function AddReceiptScreen() {
       initial={initial}
       saved={existing}
       initialScan={existing ? null : scanned.result}
-      // Only a scan opens past the amount; a voice hand-off and an edit start at the beginning.
-      initialStep={
-        !existing && scanned.result ? landingStep(scanned.initial.amount, scanned.initial.store) : 0
-      }
+      // Anything that arrives with a receipt already filled in (an edit, a scan, a voice hand-off)
+      // opens on the final page; only a blank one starts at the amount.
+      initialView={existing || scanned.result || fromVoice ? 'review' : 'amount'}
       fromVoice={fromVoice}
     />
   );
@@ -279,7 +282,7 @@ function ReceiptForm({
   initial,
   saved = null,
   initialScan,
-  initialStep = 0,
+  initialView,
   fromVoice = false,
 }: {
   id?: string;
@@ -287,7 +290,7 @@ function ReceiptForm({
   /** The row being edited, for the logo it already has. */
   saved?: LogoFields | null;
   initialScan: ScanResult | null;
-  initialStep?: number;
+  initialView: 'amount' | 'review';
   /** Saved from a voice hand-off: back to Home, never onto the review page again. */
   fromVoice?: boolean;
 }) {
@@ -309,10 +312,13 @@ function ReceiptForm({
   const [note, setNote] = useState(initial.note);
   const [captureSource, setCaptureSource] = useState(initial.captureSource);
 
-  const [step, setStep] = useState(initialStep);
+  // Pages over one piece of state, never routes, so Back keeps everything filled in. The final
+  // page is `review`; each line of it opens a page for that one thing and returns here.
+  const [view, setView] = useState<Page>(initialView);
   const [reading, setReading] = useState(false);
-  const [error, setError] = useState<{ message: string; step: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(initialScan);
+  const { todayDate } = useToday();
 
   const { sources } = usePaymentSources();
   const { data: categories = [] } = useSpendCategories();
@@ -326,20 +332,14 @@ function ReceiptForm({
   const { pro, ready } = usePro();
 
   // A hand edit retires the scan report: telling someone to check an amount they just corrected is
-  // worse than silence.
+  // worse than silence. It retires a failed save's line too, which was about the page as it was.
   const edited =
     <T,>(set: (value: T) => void) =>
     (value: T) => {
       setScanResult(null);
+      setError(null);
       set(value);
     };
-
-  const categoryLabel = store
-    ? categoryName(
-        store.categoryId,
-        categories.find((category) => category.id === store.categoryId)?.label,
-      )
-    : null;
 
   /** Turns recognised text into filled fields, leaving anything unsure alone. */
   const applyScan = (parsed: ParsedReceipt, from: 'scan' | 'upload') => {
@@ -398,7 +398,8 @@ function ReceiptForm({
             ),
           },
     );
-    if (found.length > 0) setStep(landingStep(nextAmount, nextStore));
+    // Whatever was read lands on the final page, with a gap where the reading missed.
+    if (found.length > 0) setView('review');
   };
 
   const handleScan = async () => {
@@ -436,7 +437,7 @@ function ReceiptForm({
         );
       }
     } catch (thrown) {
-      setError({ message: failureMessage(thrown), step: 0 });
+      setError(failureMessage(thrown));
     } finally {
       setReading(false);
     }
@@ -456,7 +457,7 @@ function ReceiptForm({
         'upload',
       );
     } catch (thrown) {
-      setError({ message: failureMessage(thrown), step: 0 });
+      setError(failureMessage(thrown));
     } finally {
       setReading(false);
     }
@@ -465,10 +466,7 @@ function ReceiptForm({
   const pickPhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setError({
-        message: t('receipts.scan.photoAccess'),
-        step: 0,
-      });
+      setError(t('receipts.scan.photoAccess'));
       return;
     }
     const picked = await ImagePicker.launchImageLibraryAsync({
@@ -506,10 +504,10 @@ function ReceiptForm({
     else if (where === 'files') await pickFile();
   };
 
-  const fail = (message: string, atStep: number) => {
+  const fail = (message: string) => {
     warn();
-    setError({ message, step: atStep });
-    setStep(atStep);
+    setError(message);
+    setView('review');
   };
 
   const leave = () => {
@@ -530,7 +528,7 @@ function ReceiptForm({
       sources,
     );
     if (!built.ok) {
-      fail(built.message, built.field === 'store' ? 1 : 0);
+      fail(built.message);
       return;
     }
     const values = { ...built.values, ...logoColumns(store, saved) };
@@ -555,7 +553,7 @@ function ReceiptForm({
         return;
       }
       warn();
-      setError({ message: failureMessage(thrown), step: 2 });
+      setError(failureMessage(thrown));
     }
   };
 
@@ -573,7 +571,7 @@ function ReceiptForm({
       await deleteReceipt.mutateAsync(id);
       router.back();
     } catch (thrown) {
-      setError({ message: failureMessage(thrown), step });
+      setError(failureMessage(thrown));
     }
   };
 
@@ -581,41 +579,114 @@ function ReceiptForm({
 
   const total = Number(amount);
   const amountReady = Number.isFinite(total) && total > 0;
-  const stepValid = step === 0 ? amountReady : step === 1 ? Boolean(store) : !busy;
-
-  const question =
-    step === 0 ? t('receipts.add.askAmount') : step === 2 ? t('receipts.add.askDate') : undefined;
-  const primaryLabel =
-    step < 2
-      ? t('common.continue')
-      : busy
-        ? t('receipts.add.saving')
-        : editing
-          ? t('receipts.add.saveChanges')
-          : t('receipts.add.saveReceipt');
-  const stepError = error && error.step === step ? error.message : null;
-  // A new scanned receipt shows what was read above the date, so the last step is a review.
-  const reviewing =
-    step === 2 && !editing && (captureSource === 'scan' || captureSource === 'upload');
   const sourceLabel = sources.find((source) => source.id === sourceId)?.label ?? null;
+  // The page this form opened on. Anywhere else the edge swipe is off, and Back steps back.
+  const isRoot = view === initialView;
 
-  return (
-    <StepFlow
-      title={editing ? t('receipts.add.titleEdit') : t('receipts.add.titleNew')}
-      closePrompt={editing ? t('receipts.add.closeEdit') : t('receipts.add.closeNew')}
-      steps={3}
-      current={step}
-      onBack={() => {
-        setError(null);
-        if (step === 0) router.back();
-        else setStep((current) => current - 1);
-      }}
-      question={question}
-      // Capture sits above the question: a paper receipt fills amount, store and date at once.
-      headerSlot={
-        step === 0 || scanResult || reviewing ? (
+  const title = editing ? t('receipts.add.titleEdit') : t('receipts.add.titleNew');
+  const closePrompt = editing ? t('receipts.add.closeEdit') : t('receipts.add.closeNew');
+  const toReview = () => setView('review');
+  // A line that came from Save names what was wrong with the page as it was: once something there
+  // is kept, it no longer applies.
+  const settle = () => {
+    setError(null);
+    toReview();
+  };
+
+  // What a scan read, and what still wants a look. A hand edit retires it.
+  const scanReport = scanResult ? (
+    <View className="w-full rounded-[16px] bg-ink/5 px-4 py-3">
+      {scanResult.read.length > 0 ? (
+        <Text className="font-app text-[13px] text-ink" maxFontSizeMultiplier={TEXT_CAP.row}>
+          {t('receipts.scan.read', { fields: listWords(scanResult.read) })}
+        </Text>
+      ) : (
+        <Text className="font-app text-[13px] text-ink" maxFontSizeMultiplier={TEXT_CAP.row}>
+          {failureText()}
+        </Text>
+      )}
+      {scanResult.missed.length > 0 ? (
+        <Text className="mt-1 font-app text-[13px] text-muted" maxFontSizeMultiplier={TEXT_CAP.row}>
+          {t('receipts.scan.check', { fields: listWords(scanResult.missed) })}
+        </Text>
+      ) : null}
+    </View>
+  ) : null;
+
+  if (view === 'amountEdit') {
+    return (
+      <AmountEditPage
+        title={t('receipts.field.amount')}
+        question={t('receipts.add.askAmount')}
+        value={amount}
+        onBack={toReview}
+        onDone={(next) => {
+          edited(setAmount)(next);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'paidWith') {
+    return (
+      <PaidWithEditPage
+        title={t('receipts.field.paidWith')}
+        sources={sources}
+        value={sourceId}
+        onBack={toReview}
+        onDone={(next) => {
+          edited(setSourceId)(next);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'note') {
+    return (
+      <NoteEditPage
+        title={t('receipts.field.note')}
+        label={t('receipts.field.note')}
+        placeholder={t('receipts.add.notePlaceholder')}
+        value={note}
+        onBack={toReview}
+        onDone={(next) => {
+          setNote(next);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'date') {
+    return (
+      <DateEditPage
+        title={t('receipts.field.date')}
+        question={t('receipts.add.askDate')}
+        value={date}
+        onBack={toReview}
+        onDone={(day) => {
+          if (day) edited(setDate)(day);
+          settle();
+        }}
+      />
+    );
+  }
+
+  if (view === 'amount') {
+    return (
+      <StepFlow
+        title={title}
+        closePrompt={closePrompt}
+        steps={1}
+        current={0}
+        onBack={() => router.back()}
+        question={t('receipts.add.askAmount')}
+        // Capture sits above the question: a paper receipt fills amount, store and date at once.
+        headerSlot={
           <View className="w-full gap-2">
-            {step === 0 && !editing && isRecognitionAvailable() ? (
+            {isRecognitionAvailable() ? (
               <View className="w-full flex-row gap-3">
                 <CaptureButton
                   icon={ScanLine}
@@ -636,88 +707,132 @@ function ReceiptForm({
               </View>
             ) : null}
 
-            {step === 0 && reading ? (
+            {reading ? (
               <View className="mt-2 w-full flex-row items-center justify-center gap-2">
                 <ActivityIndicator size="small" color={colors.muted} />
-                <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+                <Text
+                  className="font-app text-[13px] text-muted"
+                  maxFontSizeMultiplier={TEXT_CAP.row}
+                >
                   {t('receipts.scan.reading')}
                 </Text>
               </View>
             ) : null}
 
-            {scanResult ? (
-              <View className="mt-2 w-full rounded-[16px] bg-ink/5 px-4 py-3">
-                {scanResult.read.length > 0 ? (
-                  <Text className="font-app text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
-                    {t('receipts.scan.read', { fields: listWords(scanResult.read) })}
-                  </Text>
-                ) : (
-                  <Text className="font-app text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
-                    {failureText()}
-                  </Text>
-                )}
-                {scanResult.missed.length > 0 ? (
-                  <Text
-                    className="mt-1 font-app text-[13px] text-muted"
-                    maxFontSizeMultiplier={1.4}
-                  >
-                    {t('receipts.scan.check', { fields: listWords(scanResult.missed) })}
-                  </Text>
-                ) : null}
-              </View>
-            ) : null}
-
-            {reviewing ? (
-              <View className="mt-2 w-full overflow-hidden rounded-[16px] border border-line bg-card py-1">
-                <ReviewRow
-                  label={t('receipts.field.amount')}
-                  value={amountReady ? formatCurrency(total) : null}
-                  required
-                  leading={<GlyphWell icon={Banknote} />}
-                  onPress={() => setStep(0)}
-                />
-                <View className="ml-[52px] h-px bg-line/60" />
-                <ReviewRow
-                  label={t('receipts.field.store')}
-                  value={store?.name ?? null}
-                  required
-                  leading={
-                    store ? (
-                      <BrandMark
-                        name={store.name}
-                        domain={selectionLogo(store)}
-                        hidden={store.logoHidden}
-                        size={40}
-                      />
-                    ) : null
-                  }
-                  onPress={() => setStep(1)}
-                />
-                <View className="ml-[52px] h-px bg-line/60" />
-                <ReviewRow
-                  label={t('receipts.field.paidWith')}
-                  value={sourceLabel}
-                  required={false}
-                  leading={<GlyphWell icon={CreditCard} />}
-                  onPress={() => setStep(1)}
-                />
-              </View>
-            ) : null}
+            {scanReport ? <View className="mt-2 w-full">{scanReport}</View> : null}
           </View>
-        ) : null
-      }
-      primaryLabel={primaryLabel}
-      primaryDisabled={!stepValid}
-      onPrimary={() => {
-        if (step < 2) {
-          setError(null);
-          setStep((current) => current + 1);
+        }
+        primaryLabel={t('common.continue')}
+        primaryDisabled={!amountReady}
+        onPrimary={() => {
+          settle();
+        }}
+        error={error}
+      >
+        <AmountStep value={amount} onChange={edited(setAmount)} />
+      </StepFlow>
+    );
+  }
+
+  const rows: EntryRowSpec[] = [
+    {
+      key: 'store',
+      field: (
+        <>
+          <BrandField
+            label={t('receipts.field.store')}
+            value={store}
+            onChange={edited(setStore)}
+            // Receipts have no page of their own, so Change logo opens from here. Until another
+            // store is picked, the row's own store is the one shown.
+            onChangeLogo={
+              editing && id && !storeChanged && store
+                ? () => openChangeLogo('receipt', id, store.name)
+                : undefined
+            }
+          />
+          {store ? (
+            <Text
+              className="mt-3 w-full font-app text-[13px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
+            >
+              {t('receipts.add.filedUnder', {
+                category: receiptCategoryName(
+                  store.categoryId,
+                  categories.find((category) => category.id === store.categoryId)?.label,
+                ),
+              })}
+            </Text>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      key: 'date',
+      label: t('receipts.field.date'),
+      value: formatEntryDay(date, todayDate),
+      leading: <GlyphWell icon={CalendarDays} />,
+      onPress: () => setView('date'),
+      below: (
+        <DateChips
+          value={date}
+          today={todayDate}
+          onPick={edited(setDate)}
+          onOpenCalendar={() => setView('date')}
+        />
+      ),
+    },
+    // Without a card or account there is nothing to choose between, as before.
+    ...(sources.length > 0
+      ? [
+          {
+            key: 'paidWith',
+            label: t('receipts.field.paidWith'),
+            value: sourceLabel,
+            leading: <GlyphWell icon={CreditCard} />,
+            onPress: () => setView('paidWith'),
+          },
+        ]
+      : []),
+    {
+      key: 'note',
+      label: t('receipts.field.note'),
+      value: note.trim() || null,
+      placeholder: t('entry.addNote'),
+      leading: <GlyphWell icon={AlignLeft} />,
+      onPress: () => setView('note'),
+    },
+  ];
+
+  return (
+    <EntryReview
+      title={title}
+      closePrompt={closePrompt}
+      root={isRoot}
+      onBack={() => {
+        if (isRoot) {
+          router.back();
           return;
         }
-        void handleSave();
+        // A failed save's line belongs to the final page, not the keypad it steps back to.
+        setError(null);
+        setView('amount');
       }}
-      error={step === 1 ? null : stepError}
-      avoidKeyboard={step === 1}
+      amountLabel={t('receipts.field.amount')}
+      amount={amount}
+      onEditAmount={() => setView('amountEdit')}
+      topSlot={scanReport}
+      rows={rows}
+      primaryLabel={
+        busy
+          ? t('receipts.add.saving')
+          : editing
+            ? t('receipts.add.saveChanges')
+            : t('receipts.add.saveReceipt')
+      }
+      primaryDisabled={!amountReady || !store || busy}
+      onPrimary={() => void handleSave()}
+      error={error}
       footerSlot={
         editing ? (
           <Pressable
@@ -727,7 +842,10 @@ function ReceiptForm({
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
-            <Text className="font-app-medium text-[15px] text-danger" maxFontSizeMultiplier={1.4}>
+            <Text
+              className="font-app-medium text-[15px] text-danger"
+              maxFontSizeMultiplier={TEXT_CAP.row}
+            >
               {deleteReceipt.isPending
                 ? t('receipts.add.deleting')
                 : t('receipts.add.deleteReceipt')}
@@ -735,56 +853,7 @@ function ReceiptForm({
           </Pressable>
         ) : null
       }
-    >
-      {step === 0 ? <AmountStep value={amount} onChange={edited(setAmount)} /> : null}
-
-      {step === 1 ? (
-        <View className="w-full gap-6">
-          <BrandField
-            label={t('receipts.field.store')}
-            value={store}
-            onChange={edited(setStore)}
-            onChangeLogo={
-              editing && id && !storeChanged && store
-                ? () => openChangeLogo('receipt', id, store.name)
-                : undefined
-            }
-          />
-
-          {sources.length > 0 ? (
-            <View className="w-full">
-              <FieldLabel className="mb-3">{t('receipts.field.paidWith')}</FieldLabel>
-              <SourceTiles sources={sources} value={sourceId} onChange={edited(setSourceId)} />
-            </View>
-          ) : null}
-
-          <TextField
-            label={t('receipts.field.note')}
-            optional
-            value={note}
-            onChangeText={setNote}
-            placeholder={t('receipts.add.notePlaceholder')}
-            multiline
-            maxLength={200}
-            autoCapitalize="sentences"
-          />
-
-          {categoryLabel ? (
-            <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-              {t('receipts.add.filedUnder', { category: categoryLabel })}
-            </Text>
-          ) : null}
-
-          {stepError ? (
-            <Text className="w-full font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
-              {stepError}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      {step === 2 ? <InlineCalendar value={date} onChange={edited(setDate)} /> : null}
-    </StepFlow>
+    />
   );
 }
 

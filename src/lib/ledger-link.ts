@@ -1,8 +1,10 @@
 import type { Href } from 'expo-router';
 
 /**
- * Where a row in the ledger opens. A `useLedger` row is one occurrence, not a record (two months of
- * rent are two rows of one bill), and its id is the only evidence of which record it belongs to:
+ * Where a row in the ledger opens: the page of the record behind it (a receipt's store, a bill, a
+ * subscription), never its edit form; the pencil on that page leads there. A `useLedger` row is one
+ * occurrence, not a record (two months of rent are two rows of one bill), and its id is the only
+ * evidence of which record it belongs to:
  *
  * - `receipt-<id>`: the id is the record's.
  * - `bill-<id>@<date>` / `subscription-<id>@<date>`: a projected occurrence of that plan.
@@ -43,8 +45,8 @@ function recordIdFrom(entryId: string, prefix: string): string | null {
 }
 
 /**
- * The screen that edits the record behind a ledger row, or null. Null means nothing to open: the
- * caller leaves the row non-pressable rather than route somewhere approximate.
+ * The page of the record behind a ledger row, or null. Null means nothing to open: the caller
+ * leaves the row non-pressable rather than route somewhere approximate.
  */
 export function ledgerHref(
   entry: LedgerLinkEntry,
@@ -56,7 +58,7 @@ export function ledgerHref(
 
   if (entry.kind === 'receipt') {
     const id = recordIdFrom(entry.id, 'receipt');
-    return id ? { pathname: '/add-receipt', params: { id } } : null;
+    return id ? { pathname: '/receipt/[id]', params: { id } } : null;
   }
 
   const id = entry.id.startsWith('charge-')
@@ -66,6 +68,6 @@ export function ledgerHref(
   if (!id) return null;
 
   return entry.kind === 'bill'
-    ? { pathname: '/add-bill', params: { id } }
-    : { pathname: '/add-subscription', params: { id } };
+    ? { pathname: '/bill/[id]', params: { id } }
+    : { pathname: '/subscription/[id]', params: { id } };
 }

@@ -18,6 +18,7 @@ import {
   readBillPrefill,
   readDayParam,
   readMerchantParams,
+  readNoteParam,
   readSubscriptionPrefill,
   readVoiceDraft,
   readVoiceEntry,
@@ -206,6 +207,29 @@ describe('validateVoiceDraft', () => {
     ).toBeNull();
   });
 
+  it('keeps a logo the person chose, and only an answer', () => {
+    const custom = { brandId: null, name: 'Rainbow Shops', domain: null, categoryId: 'shopping' };
+    const kept = (extra: object) =>
+      validateVoiceDraft({ ...draft(), merchant: { ...custom, ...extra } })?.merchant;
+
+    expect(kept({ logoDomain: 'rainbowshops.com', logoHidden: false })).toEqual({
+      ...custom,
+      logoDomain: 'rainbowshops.com',
+      logoHidden: false,
+    });
+    // Letters win over a domain, as on a saved row.
+    expect(kept({ logoDomain: 'rainbowshops.com', logoHidden: true })).toEqual({
+      ...custom,
+      logoDomain: null,
+      logoHidden: true,
+    });
+    // What the store field writes for a store it has not asked about is no answer at all.
+    expect(kept({ logoDomain: null, logoHidden: false })).toEqual(custom);
+    // A bad value is no answer either, and never costs the merchant.
+    expect(kept({ logoDomain: 'not a domain' })).toEqual(custom);
+    expect(kept({ logoDomain: 7, logoHidden: 'yes' })).toEqual(custom);
+  });
+
   it('works out what is missing instead of trusting it', () => {
     expect(validateVoiceDraft(draft({ missing: ['amount', 'date'] }))?.missing).toEqual([]);
     expect(
@@ -283,6 +307,8 @@ describe('the working copy', () => {
       cycle: 'monthly',
       billCategoryId: null,
       sourceId: null,
+      // Nothing said is ever a note.
+      note: null,
     });
     const ambiguous = entryFromDraft(draft({ amount: 12.5, amountChoices: [12.5, 1250] }));
     expect(ambiguous.amount).toBeNull();
@@ -308,7 +334,9 @@ describe('the working copy', () => {
       { sourceId: 'not an id!' },
       { billName: '   ' },
       { merchant: { ...NETFLIX, name: '' } },
-    ] as Partial<VoiceEntry>[]) {
+      { note: 'x'.repeat(201) },
+      { note: 7 },
+    ] as unknown as Partial<VoiceEntry>[]) {
       expect(updateVoiceEntry(id, { sourceId: 'card-1', ...patch })).toBeNull();
     }
     expect(readVoiceEntry(id)).toEqual(entryFromDraft(draft()));
@@ -422,6 +450,46 @@ describe('the working copy', () => {
     expect(validateVoiceEntry({ ...entry(), amountChoices: [12.5] })).toBeNull();
     expect(validateVoiceEntry({ ...entry(), amountChoices: 'x' })).toBeNull();
     expect(validateVoiceEntry(null)).toBeNull();
+    // A working copy is whole: one with no note at all is not one the pages made.
+    const noNote: Partial<VoiceEntry> = entry();
+    delete noNote.note;
+    expect(validateVoiceEntry(noNote)).toBeNull();
+  });
+
+  it('keeps a typed note trimmed, and one of only spaces as none', () => {
+    const id = putVoiceDraft(draft());
+    expect(updateVoiceEntry(id, { note: '  Family plan  ' })?.note).toBe('Family plan');
+    expect(readVoiceEntry(id)?.note).toBe('Family plan');
+    expect(updateVoiceEntry(id, { note: '   ' })?.note).toBeNull();
+    // The note page's own limit is a note; one past it is refused whole, never cut.
+    expect(updateVoiceEntry(id, { note: 'x'.repeat(200) })?.note).toBe('x'.repeat(200));
+    expect(updateVoiceEntry(id, { note: 'y'.repeat(201) })).toBeNull();
+    expect(readVoiceEntry(id)?.note).toBe('x'.repeat(200));
+  });
+
+  it('counts a typed note as a hand edit', async () => {
+    const id = putVoiceDraft(draft());
+    const { result } = await renderHook(() => useVoiceSession(id));
+    await act(() => {
+      updateVoiceEntry(id, { note: 'Family plan' });
+    });
+    expect(result.current?.touched).toEqual(['note']);
+    expect(result.current?.edited).toBe(true);
+  });
+
+  it('keeps a typed note through a re-parse for a new kind', () => {
+    const id = putVoiceDraft(draft({ kind: 'receipt', cycle: null }));
+    updateVoiceEntry(id, { note: 'Team lunch', sourceId: 'card-1' });
+    updateVoiceEntry(id, { kind: 'bill' });
+    expect(
+      rederiveVoiceEntry(id, draft({ kind: 'bill', billCategoryId: 'internet', amount: 40 })),
+    ).toMatchObject({
+      kind: 'bill',
+      amount: 40,
+      billCategoryId: 'internet',
+      note: 'Team lunch',
+      sourceId: 'card-1',
+    });
   });
 });
 
@@ -610,6 +678,35 @@ describe('into the builders', () => {
       values: { next_renewal_on: null, started_on: null, cycle: 'monthly' },
     });
   });
+
+  it('saves a typed note with every kind, and none as null', () => {
+    const noted = { note: 'Family plan' };
+    expect(
+      buildReceiptValues(
+        entryToReceiptInput(entry({ kind: 'receipt', ...noted }), new Date(2026, 9, 1)),
+        SOURCES,
+      ),
+    ).toMatchObject({ ok: true, values: { note: 'Family plan' } });
+    expect(
+      buildBillValues(
+        entryToBillInput(
+          entry({ kind: 'bill', billCategoryId: 'internet', date: '2026-10-15', ...noted }),
+          'Internet',
+        ),
+        { sources: SOURCES, lastChargedOn: null },
+      ),
+    ).toMatchObject({ ok: true, values: { note: 'Family plan' } });
+    expect(
+      buildSubscriptionValues(entryToSubscriptionInput(entry(noted)), {
+        sources: SOURCES,
+        lastChargedOn: null,
+        countsFrom: null,
+      }),
+    ).toMatchObject({ ok: true, values: { note: 'Family plan' } });
+    expect(
+      buildReceiptValues(entryToReceiptInput(entry({ kind: 'receipt' }), new Date()), SOURCES),
+    ).toMatchObject({ ok: true, values: { note: null } });
+  });
 });
 
 describe('out to a form and back', () => {
@@ -661,6 +758,7 @@ describe('out to a form and back', () => {
       startDate: new Date(2026, 9, 12),
       recurrence: 'yearly',
       sourceId: 'acct-1',
+      note: '',
     });
   });
 
@@ -673,7 +771,68 @@ describe('out to a form and back', () => {
       renewsOn: new Date(2026, 9, 12),
       cycle: 'monthly',
       sourceId: 'card-1',
+      note: '',
     });
+  });
+
+  it('sends a typed note to each form, and reads it back', () => {
+    const note = 'Split with Sam, café';
+    const receipt = entryToForm(entry({ kind: 'receipt', note }));
+    expect(receipt.params.scannedNote).toBe(note);
+    expect(readNoteParam(receipt.params.scannedNote)).toBe(note);
+
+    const bill = entryToForm(entry({ kind: 'bill', billCategoryId: 'internet', note }));
+    expect(bill.params.prefillNote).toBe(note);
+    expect(readBillPrefill(bill.params)?.note).toBe(note);
+
+    expect(readSubscriptionPrefill(entryToForm(entry({ note })).params)?.note).toBe(note);
+
+    // A note on its own is still something to carry over.
+    expect(
+      readSubscriptionPrefill(
+        entryToForm(entry({ merchant: null, amount: null, date: null, cycle: null, note })).params,
+      ),
+    ).toMatchObject({ service: null, amount: '', note });
+  });
+
+  it('reads a note param trimmed, and drops one that is not a note rather than cutting it', () => {
+    expect(readNoteParam(' Family plan ')).toBe('Family plan');
+    expect(readNoteParam('x'.repeat(200))).toBe('x'.repeat(200));
+    expect(readNoteParam('x'.repeat(201))).toBe('');
+    expect(readNoteParam(undefined)).toBe('');
+    expect(readNoteParam('   ')).toBe('');
+    expect(readSubscriptionPrefill({ prefillName: 'Gym', prefillNote: ['a', 'b'] })?.note).toBe('');
+  });
+
+  it('sends the logo the person chose on the same keys, and reads it back', () => {
+    const custom = { brandId: null, name: 'Rainbow Shops', domain: null, categoryId: 'shopping' };
+    const chosen = { ...custom, logoDomain: 'rainbowshops.com', logoHidden: false };
+    const letters = { ...custom, logoDomain: null, logoHidden: true };
+
+    const receipt = entryToForm(entry({ kind: 'receipt', merchant: chosen }));
+    expect(receipt.params.scannedLogoDomain).toBe('rainbowshops.com');
+    expect(receipt.params).not.toHaveProperty('scannedLogoHidden');
+    const receiptLetters = entryToForm(entry({ kind: 'receipt', merchant: letters }));
+    expect(receiptLetters.params.scannedLogoHidden).toBe('1');
+    expect(receiptLetters.params).not.toHaveProperty('scannedLogoDomain');
+
+    const bill = entryToForm(entry({ kind: 'bill', merchant: chosen, billCategoryId: 'internet' }));
+    expect(readBillPrefill(bill.params)?.issuer).toEqual({ ...chosen, categoryId: 'internet' });
+
+    expect(
+      readSubscriptionPrefill(entryToForm(entry({ merchant: chosen })).params)?.service,
+    ).toEqual(chosen);
+    expect(
+      readSubscriptionPrefill(entryToForm(entry({ merchant: letters })).params)?.service,
+    ).toEqual(letters);
+  });
+
+  it('sends no logo keys for a store nobody answered about', () => {
+    const custom = { brandId: null, name: 'Rainbow Shops', domain: null, categoryId: 'shopping' };
+    for (const kind of ['receipt', 'bill', 'subscription'] as const) {
+      const { params } = entryToForm(entry({ kind, merchant: custom }));
+      expect(Object.keys(params).filter((key) => /logo/i.test(key))).toEqual([]);
+    }
   });
 
   it('sends only what is set', () => {
@@ -696,6 +855,7 @@ describe('out to a form and back', () => {
       prefillDate: '2026-02-30',
       prefillCycle: 'daily',
       prefillSource: '../etc',
+      prefillNote: 'x'.repeat(201),
     };
     expect(cameFromVoice(garbage)).toBe(false);
     expect(readBillPrefill(garbage)).toEqual({
@@ -706,6 +866,7 @@ describe('out to a form and back', () => {
       startDate: null,
       recurrence: null,
       sourceId: '',
+      note: '',
     });
     // A subscription's category is a spend category (any well-formed slug);
     // only a bill's must be one of the ten.
@@ -717,6 +878,7 @@ describe('out to a form and back', () => {
       renewsOn: null,
       cycle: null,
       sourceId: '',
+      note: '',
     });
     expect(readBillPrefill({ id: 'bill-1' })).toBeNull();
   });
@@ -744,5 +906,28 @@ describe('out to a form and back', () => {
         categoryId: 'entertainment',
       }),
     ).toEqual(NETFLIX);
+  });
+
+  it('reads a logo choice, letters over a domain, and ignores a bad one', () => {
+    const base = {
+      name: 'Rainbow Shops',
+      brandId: undefined,
+      domain: undefined,
+      categoryId: 'shopping',
+    };
+    expect(readMerchantParams({ ...base, logoDomain: 'rainbowshops.com' })).toMatchObject({
+      logoDomain: 'rainbowshops.com',
+      logoHidden: false,
+    });
+    expect(
+      readMerchantParams({ ...base, logoDomain: 'rainbowshops.com', logoHidden: '1' }),
+    ).toMatchObject({ logoDomain: null, logoHidden: true });
+
+    // Neither param (or only junk) leaves the choice unmade, so the form saves no logo columns.
+    for (const junk of [{}, { logoDomain: 'not a domain', logoHidden: 'true' }]) {
+      const read = readMerchantParams({ ...base, ...junk });
+      expect(read).not.toHaveProperty('logoDomain');
+      expect(read).not.toHaveProperty('logoHidden');
+    }
   });
 });

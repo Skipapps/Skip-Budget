@@ -33,6 +33,8 @@ jest.mock('expo-router', () => ({
     canGoBack: () => true,
   },
   useLocalSearchParams: () => mockParams,
+  useFocusEffect: () => {},
+  Stack: { Screen: () => null },
   Redirect: () => null,
 }));
 
@@ -52,6 +54,12 @@ jest.mock('@/theme/artwork', () => ({
 }));
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => async () => true }));
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
+jest.mock('@/api/known-stores', () => ({
+  matchKnownStores: () => [],
+  storeKey: (name: string) => name.trim().toLowerCase(),
+  useKnownStores: () => [],
+  useRememberStore: () => async () => {},
+}));
 jest.mock('@/lib/haptics', () => ({
   tap: jest.fn(),
   toggle: jest.fn(),
@@ -67,6 +75,13 @@ jest.mock('@/api/brands', () => ({
   useBrandSearch: () => ({ data: [], isFetching: false }),
   guessCategory: () => 'other',
 }));
+
+const mockSources = [
+  { id: 'card-1', label: 'VISA ••4821', color: '#123456', kind: 'card' as const },
+];
+jest.mock('@/api/queries', () => ({ usePaymentSources: () => ({ sources: mockSources }) }));
+// The forms' reminder page shares a module with the note page; nothing here opens it.
+jest.mock('@/components/ui/reminder-field', () => ({ ReminderField: () => null }));
 
 const NBSP = ' ';
 
@@ -181,7 +196,8 @@ describe('/voice-edit in Spanish', () => {
     const id = open('date', { kind: 'subscription', date: '2026-10-20' });
     const screen = await render(<VoiceEditScreen />);
 
-    expect(screen.getByText('Fecha de renovación')).toBeTruthy();
+    // Titled by the review's row, which is the subscription form's own.
+    expect(screen.getByText('Próxima renovación')).toBeTruthy();
     expect(screen.getByText('¿Cuándo se renueva?')).toBeTruthy();
     await press(screen, 'Sin fecha de renovación');
     expect(readVoiceEntry(id)?.date).toBeNull();
@@ -195,6 +211,35 @@ describe('/voice-edit in Spanish', () => {
     expect(screen.getByText('Categoría')).toBeTruthy();
     expect(screen.getByText('¿De qué es esta factura?')).toBeTruthy();
     expectNoRawKeys(screen);
+  });
+
+  it('asks what paid in Spanish, and clears the card with its own words', async () => {
+    const id = open('source');
+    updateVoiceEntry(id, { sourceId: 'card-1' });
+    const screen = await render(<VoiceEditScreen />);
+
+    expect(screen.getByText('Pagado con')).toBeTruthy();
+    expect(screen.getByText('¿Con qué pagaste?')).toBeTruthy();
+    expectNoRawKeys(screen);
+    await press(screen, 'Sin tarjeta ni cuenta');
+    await press(screen, 'Listo');
+    expect(readVoiceEntry(id)?.sourceId).toBeNull();
+  });
+
+  it('takes a note in Spanish, with the form’s own hint', async () => {
+    const id = open('note', { kind: 'bill', billCategoryId: 'housing', date: '2026-11-01' });
+    const screen = await render(<VoiceEditScreen />);
+
+    expect(screen.getAllByText('Nota').length).toBeGreaterThan(0);
+    await act(async () => {
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Algo que quieras recordar'),
+        'Pagar en efectivo',
+      );
+    });
+    expectNoRawKeys(screen);
+    await press(screen, 'Listo');
+    expect(readVoiceEntry(id)?.note).toBe('Pagar en efectivo');
   });
 });
 
@@ -228,6 +273,41 @@ describe('/voice-edit in French', () => {
     expect(screen.getByText('Date d’échéance')).toBeTruthy();
     expect(screen.getByText(`Quelle est la date d’échéance${NBSP}?`)).toBeTruthy();
     expectNoRawKeys(screen);
+  });
+
+  it('asks when a receipt was, titled as its row', async () => {
+    open('date');
+    const screen = await render(<VoiceEditScreen />);
+
+    expect(screen.getByText('Date')).toBeTruthy();
+    expect(screen.getByText(`C’était quand${NBSP}?`)).toBeTruthy();
+  });
+
+  it('asks what a subscription is charged to, in French', async () => {
+    const id = open('source', { kind: 'subscription', cycle: 'monthly' });
+    const screen = await render(<VoiceEditScreen />);
+
+    expect(screen.getByText('Prélevé sur')).toBeTruthy();
+    expect(screen.getByText(`Tu as payé avec quoi${NBSP}?`)).toBeTruthy();
+    expectNoRawKeys(screen);
+    await press(screen, 'VISA ••4821');
+    await press(screen, 'Terminé');
+    expect(readVoiceEntry(id)?.sourceId).toBe('card-1');
+  });
+
+  it('takes a note in French, with the form’s own hint', async () => {
+    const id = open('note', { kind: 'subscription', cycle: 'monthly' });
+    const screen = await render(<VoiceEditScreen />);
+
+    await act(async () => {
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Quel forfait, par exemple'),
+        ' Forfait famille ',
+      );
+    });
+    expectNoRawKeys(screen);
+    await press(screen, 'Terminé');
+    expect(readVoiceEntry(id)?.note).toBe('Forfait famille');
   });
 });
 

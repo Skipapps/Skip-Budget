@@ -1,19 +1,17 @@
 import { router } from 'expo-router';
 import { Pencil } from 'lucide-react-native';
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { useLedger, type LedgerEntry } from '@/api/queries';
+import { ChargeSection, DetailCard, type PlanDetailRow } from '@/components/plans/detail-parts';
 import { goBack } from '@/components/ui/back-button';
 import { ChoiceChips } from '@/components/ui/choice-chips';
-import { FitFigure, FitRows, FitText, useGroupFits } from '@/components/ui/fit-group';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { SectionHeading } from '@/components/ui/typography';
 import { t } from '@/i18n';
-import { cn } from '@/lib/cn';
-import { formatFullDate, toIsoDate } from '@/lib/date';
+import { toIsoDate } from '@/lib/date';
 import { failureText } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
 import { rangeFor } from '@/lib/range';
@@ -43,7 +41,7 @@ const WINDOWS = [
   },
 ] as const;
 
-export type PlanDetailRow = { label: string; value: string };
+export type { PlanDetailRow };
 
 type PlanDetailProps = {
   kind: 'bill' | 'subscription';
@@ -146,29 +144,12 @@ export function PlanDetail({
         },
       ]}
     >
-      <View className="mt-3 w-full items-center rounded-[16px] border border-line bg-card px-5 pb-2 pt-5">
-        {mark}
-        <FitFigure
-          id="plan-amount"
-          size={28}
-          className="text-center font-app-bold text-ink"
-          boxClassName="mt-3"
-        >
-          {formatCurrency(Math.abs(plan.amount))}
-        </FitFigure>
-        <Text
-          className="text-center font-app text-[14px] text-muted"
-          maxFontSizeMultiplier={TEXT_CAP.control}
-        >
-          {frequency}
-        </Text>
-
-        <FitRows className="mt-4 w-full" testID="plan-details">
-          {details.map((row, index) => (
-            <DetailRow key={row.label} id={`detail-${index}`} row={row} divider={index > 0} />
-          ))}
-        </FitRows>
-      </View>
+      <DetailCard
+        mark={mark}
+        amount={formatCurrency(Math.abs(plan.amount))}
+        subtitle={frequency}
+        rows={details}
+      />
 
       <View className="mt-7 w-full">
         <ChoiceChips options={WINDOWS} value={windowKey} onChange={setWindowKey} />
@@ -200,129 +181,22 @@ export function PlanDetail({
 
       {!ledger.isLoading && !ledger.isError ? (
         <View className="w-full pb-10">
-          <ChargeSection when="paid" entries={paid} moneyColor={moneyColor} />
-          <ChargeSection when="upcoming" entries={upcoming} moneyColor={moneyColor} />
+          <ChargeSection
+            title={t('bills.planDetail.paid')}
+            entries={paid}
+            status={() => t('bills.planDetail.paidRow')}
+            moneyColor={moneyColor}
+            testID="charges-paid"
+          />
+          <ChargeSection
+            title={t('bills.planDetail.upcoming')}
+            entries={upcoming}
+            status={() => t('bills.planDetail.due')}
+            moneyColor={moneyColor}
+            testID="charges-upcoming"
+          />
         </View>
       ) : null}
     </Screen>
-  );
-}
-
-/**
- * A fact about the plan. Side by side, the label keeps its own width and the value wraps in the rest;
- * once a word of either cannot fit, every row in the card puts its value under its label.
- */
-function DetailRow({ id, row, divider }: { id: string; row: PlanDetailRow; divider: boolean }) {
-  const stacked = !useGroupFits();
-  return (
-    <View
-      className={cn(
-        'w-full py-3',
-        divider && 'border-t border-line/60',
-        stacked ? 'items-start' : 'flex-row items-start justify-between gap-4',
-      )}
-    >
-      <FitText
-        id={`${id}-label`}
-        role="row"
-        size={14}
-        className="font-app text-muted"
-        slotClassName={stacked ? 'w-full' : 'shrink'}
-      >
-        {row.label}
-      </FitText>
-      <FitText
-        id={`${id}-value`}
-        role="row"
-        size={14}
-        className={cn('font-app-medium text-ink', !stacked && 'text-right')}
-        slotClassName={stacked ? 'mt-0.5 w-full' : 'min-w-0 flex-1'}
-      >
-        {row.value}
-      </FitText>
-    </View>
-  );
-}
-
-function ChargeSection({
-  when,
-  entries,
-  moneyColor,
-}: {
-  when: 'paid' | 'upcoming';
-  entries: LedgerEntry[];
-  moneyColor: (amount: number) => string;
-}) {
-  if (entries.length === 0) return null;
-  const total = entries.reduce((sum, entry) => sum + entry.amount, 0);
-
-  return (
-    <View className="mt-6 w-full">
-      <SectionHeading caption={`${entries.length} · ${formatCurrency(Math.abs(total))}`}>
-        {t(when === 'paid' ? 'bills.planDetail.paid' : 'bills.planDetail.upcoming')}
-      </SectionHeading>
-      <FitRows
-        className="mt-2 w-full overflow-hidden rounded-[16px] border border-line bg-card"
-        testID={`charges-${when}`}
-      >
-        {entries.map((entry, index) => (
-          <Fragment key={entry.id}>
-            {index > 0 ? <View className="ml-4 h-px bg-line/60" /> : null}
-            <ChargeRow
-              entry={entry}
-              status={t(when === 'paid' ? 'bills.planDetail.paidRow' : 'bills.planDetail.due')}
-              color={moneyColor(entry.amount)}
-            />
-          </Fragment>
-        ))}
-      </FitRows>
-    </View>
-  );
-}
-
-/** A charge's date and amount; stacked with the rest of its card, the amount goes under the date. */
-function ChargeRow({
-  entry,
-  status,
-  color,
-}: {
-  entry: LedgerEntry;
-  status: string;
-  color: string;
-}) {
-  const stacked = !useGroupFits();
-  const amount = (
-    <FitText
-      id={`${entry.id}-amount`}
-      hug
-      role="row"
-      size={15}
-      className="font-app-semibold text-ink"
-      style={{ color }}
-      slotClassName={stacked ? 'mt-0.5' : 'shrink-0'}
-    >
-      {formatCurrency(entry.amount)}
-    </FitText>
-  );
-
-  return (
-    <View className="min-h-14 w-full flex-row items-center justify-between gap-3 px-4 py-3">
-      <View className="min-w-0 flex-1 items-start">
-        <FitText
-          id={`${entry.id}-date`}
-          role="row"
-          size={15}
-          className="font-app-medium text-ink"
-          slotClassName="w-full"
-        >
-          {formatFullDate(new Date(`${entry.date}T00:00:00`))}
-        </FitText>
-        {stacked ? amount : null}
-        <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={TEXT_CAP.row}>
-          {status}
-        </Text>
-      </View>
-      {stacked ? null : amount}
-    </View>
   );
 }

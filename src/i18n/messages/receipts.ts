@@ -5,6 +5,7 @@ export const receiptsMessages = defineMessages({
   'receipts.field.store': { en: 'Store', es: 'Tienda', fr: 'Magasin' },
   'receipts.field.paidWith': { en: 'Paid with', es: 'Pagado con', fr: 'Payé avec' },
   'receipts.field.note': { en: 'Note', es: 'Nota', fr: 'Note' },
+  'receipts.field.date': { en: 'Date', es: 'Fecha', fr: 'Date' },
 
   'receipts.add.titleNew': {
     en: 'Add a receipt',
@@ -28,6 +29,11 @@ export const receiptsMessages = defineMessages({
     fr: 'Combien as-tu dépensé ?',
   },
   'receipts.add.askDate': { en: 'When was it?', es: '¿Cuándo fue?', fr: 'C’était quand ?' },
+  'receipts.add.askStore': {
+    en: 'Where did you buy it?',
+    es: '¿Dónde lo compraste?',
+    fr: 'Où l’as-tu acheté ?',
+  },
   'receipts.add.saving': { en: 'Saving…', es: 'Guardando…', fr: 'Enregistrement…' },
   'receipts.add.saveChanges': {
     en: 'Save changes',
@@ -189,6 +195,31 @@ export const receiptsMessages = defineMessages({
     en: 'Clear filters',
     es: 'Borrar filtros',
     fr: 'Effacer les filtres',
+  },
+
+  'receipts.field.category': { en: 'Category', es: 'Categoría', fr: 'Catégorie' },
+
+  'receipts.detail.edit': { en: 'Edit {name}', es: 'Editar {name}', fr: 'Modifier {name}' },
+  'receipts.detail.boughtOn': {
+    en: 'Bought on {date}',
+    es: 'Comprado el {date}',
+    fr: 'Acheté le {date}',
+  },
+  'receipts.detail.noPaymentMethod': {
+    en: 'No card or account',
+    es: 'Sin tarjeta ni cuenta',
+    fr: 'Aucune carte ni aucun compte',
+  },
+  'receipts.detail.history': {
+    en: 'Receipts from {store}',
+    es: 'Recibos de {store}',
+    fr: 'Reçus de {store}',
+  },
+  'receipts.detail.thisOne': { en: 'This receipt', es: 'Este recibo', fr: 'Ce reçu' },
+  'receipts.detail.empty': {
+    en: 'No receipts from {store} in this period.',
+    es: 'No hay recibos de {store} en este período.',
+    fr: 'Aucun reçu de {store} sur cette période.',
   },
 
   'receipts.row.paidWith': {

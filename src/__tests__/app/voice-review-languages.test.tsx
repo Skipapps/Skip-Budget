@@ -65,7 +65,10 @@ jest.mock('@/lib/use-today', () => ({
 }));
 jest.mock('@/components/brands/brand-logo', () => ({ BrandLogo: () => null }));
 jest.mock('@/components/bills/bill-mark', () => ({ BillMark: () => null }));
-jest.mock('@/api/brands', () => ({ useBrandDirectory: () => ({ data: [] }) }));
+jest.mock('@/api/brands', () => ({
+  useBrandDirectory: () => ({ data: [] }),
+  matchBrand: () => null,
+}));
 
 const mockSources = [
   { id: 'card-1', label: 'VISA ••4821', color: '#123456', kind: 'card' as const },
@@ -79,6 +82,13 @@ jest.mock('@/api/mutations', () => ({
   useCreateBill: () => ({ mutateAsync: mockCreateBill }),
   useCreateSubscription: () => ({ mutateAsync: jest.fn() }),
 }));
+jest.mock('@/api/known-stores', () => ({
+  matchKnownStores: () => [],
+  storeKey: (name: string) => name.trim().toLowerCase(),
+  useKnownStores: () => [],
+  useRememberStore: () => async () => {},
+}));
+
 jest.mock('@/api/voice-aliases', () => ({
   useVoiceAliases: () => ({ aliases: {}, ready: true }),
   useLearnVoiceAlias: () => jest.fn(async () => {}),
@@ -186,18 +196,24 @@ describe('/voice-review in Spanish', () => {
     expect(screen.getByLabelText('Dijiste: Spent $1,234.56 at Starbucks today')).toBeTruthy();
     expect(screen.getByText('“Spent $1,234.56 at Starbucks today”')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Importe, $1,234.56' }).props.accessibilityHint).toBe(
-      'Abre el importe para cambiarlo.',
+      'Toca para editar',
     );
-    expect(screen.getByText('Cambiar')).toBeTruthy();
+    expect(screen.getByText('Toca para editar')).toBeTruthy();
     expect(screen.getByLabelText('Tienda, Starbucks').props.accessibilityHint).toBe(
       'Abre «tienda» para cambiarlo.',
     );
-    expect(screen.getByLabelText('Fecha de compra, Hoy')).toBeTruthy();
+    expect(screen.getByLabelText('Fecha, Hoy, jue 1 oct')).toBeTruthy();
+    expect(screen.getByLabelText('Hoy')).toBeTruthy();
+    expect(screen.getByLabelText('Ayer')).toBeTruthy();
+    expect(screen.getByLabelText('Elegir fecha')).toBeTruthy();
     expect(screen.getByText('Agregar como')).toBeTruthy();
     expect(screen.getByLabelText('Recibo')).toBeTruthy();
     expect(screen.getByLabelText('Factura')).toBeTruthy();
     expect(screen.getByLabelText('Suscripción')).toBeTruthy();
-    expect(screen.getByText('Pagado con')).toBeTruthy();
+    expect(screen.getByText('Pagado con · Opcional')).toBeTruthy();
+    expect(screen.getByLabelText('Nota, sin definir, opcional')).toBeTruthy();
+    expect(screen.getByText('Agregar una nota')).toBeTruthy();
+    expect(screen.getByText('Puedes editarlo más tarde.')).toBeTruthy();
     expect(screen.getByLabelText('Dilo otra vez')).toBeTruthy();
     expect(screen.getByLabelText('Más opciones').props.accessibilityHint).toBe(
       'Abre el formulario completo con lo que Skip escuchó ya llenado.',
@@ -251,22 +267,40 @@ describe('/voice-review in Spanish', () => {
     const screen = await render(<VoiceReviewScreen />);
 
     expect(screen.getByText('Agregar una suscripción')).toBeTruthy();
-    const amount = screen.getByLabelText('Importe, no se escuchó');
+    const amount = screen.getByLabelText('Importe, obligatorio');
     expect(amount.props.accessibilityHint).toBe(
-      'Hace falta para guardar. Abre el importe para agregarlo.',
+      'Hace falta para guardar. Abre «importe» para agregarlo.',
     );
     expect(screen.getByText('Toca para agregar el importe')).toBeTruthy();
-    expect(screen.getByText('Skip no entendió cuánto fue.')).toBeTruthy();
-    expect(screen.getByLabelText('Fecha de renovación, sin definir, opcional')).toBeTruthy();
-    expect(screen.getByText('Fecha de renovación · opcional')).toBeTruthy();
-    expect(screen.getByText('Sin definir')).toBeTruthy();
+    expect(screen.getByLabelText('Próxima renovación, sin definir, opcional')).toBeTruthy();
+    expect(screen.getByText('Próxima renovación · Opcional')).toBeTruthy();
+    expect(screen.getAllByText('Sin definir').length).toBeGreaterThan(0);
     expect(screen.getByText('Ciclo de cobro')).toBeTruthy();
     expect(screen.getByLabelText('Semanal')).toBeTruthy();
-    expect(screen.getByLabelText('Mensual')).toBeTruthy();
+    expect(screen.getByLabelText('Mensual').props.accessibilityState.selected).toBe(true);
     expect(screen.getByLabelText('Trimestral')).toBeTruthy();
     expect(screen.getByLabelText('Anual')).toBeTruthy();
-    expect(screen.getByText('Se cobra a')).toBeTruthy();
+    expect(screen.getByText('Se cobra a · Opcional')).toBeTruthy();
+    expect(screen.getByText('Ingresa cuánto cuesta.')).toBeTruthy();
     expectNoRawKeys(screen);
+  });
+
+  it('sets yesterday in one tap and saves the same day it would in English', async () => {
+    const id = seed(RECEIPT);
+    const screen = await render(<VoiceReviewScreen />);
+
+    await press(screen, 'Ayer');
+    expect(screen.getByLabelText('Fecha, Ayer, mié 30 sep')).toBeTruthy();
+    expect(screen.getByLabelText('Ayer').props.accessibilityState.selected).toBe(true);
+    await act(async () => {
+      updateVoiceEntry(id, { note: 'Comida del equipo' });
+    });
+    expect(screen.getByLabelText('Nota, Comida del equipo')).toBeTruthy();
+    await press(screen, 'Guardar recibo');
+
+    expect(mockCreateReceipt).toHaveBeenCalledWith(
+      expect.objectContaining({ purchased_on: '2026-09-30', note: 'Comida del equipo' }),
+    );
   });
 });
 
@@ -285,8 +319,12 @@ describe('/voice-review in French', () => {
     expect(screen.getByText(`«${NBSP}Spent $1,234.56 at Starbucks today${NBSP}»`)).toBeTruthy();
     expect(screen.getByRole('button', { name: `Montant, 1${NBSP}234,56${NBSP}$` })).toBeTruthy();
     expect(screen.getByLabelText('Magasin, Starbucks')).toBeTruthy();
-    expect(screen.getByLabelText('Date d’achat, Aujourd’hui')).toBeTruthy();
-    expect(screen.getByText('Payé avec')).toBeTruthy();
+    expect(screen.getByLabelText('Date, Aujourd’hui, jeu. 1 oct.')).toBeTruthy();
+    expect(screen.getByLabelText('Hier')).toBeTruthy();
+    expect(screen.getByLabelText('Choisir une date')).toBeTruthy();
+    expect(screen.getByText('Payé avec · Facultatif')).toBeTruthy();
+    expect(screen.getByText('Ajouter une note')).toBeTruthy();
+    expect(screen.getByText('Tu pourras le modifier plus tard.')).toBeTruthy();
     expectNoRawKeys(screen);
   });
 
@@ -312,18 +350,31 @@ describe('/voice-review in French', () => {
     expect(screen.getByLabelText('Catégorie, Électricité et gaz')).toBeTruthy();
     // A bill with no name of its own is named after its category as read, as add-bill does.
     expect(screen.getByLabelText('Nom, Électricité et gaz')).toBeTruthy();
-    const due = screen.getByLabelText('Date d’échéance, non entendu');
+    const due = screen.getByLabelText('Date d’échéance, requis');
     expect(due.props.accessibilityHint).toBe(
       `Requis pour enregistrer. Ouvre «${NBSP}date d’échéance${NBSP}» pour l’ajouter.`,
     );
     expect(screen.getByText('Touche pour ajouter')).toBeTruthy();
     expect(screen.getByText('Récurrence')).toBeTruthy();
     expect(screen.getByLabelText('Chaque semaine')).toBeTruthy();
-    expect(screen.getByLabelText('Chaque mois')).toBeTruthy();
+    expect(screen.getByLabelText('Chaque mois').props.accessibilityState.selected).toBe(true);
     expect(screen.getByLabelText('Tous les 3 mois')).toBeTruthy();
     expect(screen.getByLabelText('Chaque année')).toBeTruthy();
-    expect(screen.getByText('Payée avec')).toBeTruthy();
+    expect(screen.getByText('Payée avec · Facultatif')).toBeTruthy();
+    expect(screen.getByLabelText('Note, non défini, facultatif')).toBeTruthy();
     expectNoRawKeys(screen);
+  });
+
+  it('repeats a bill as picked on its French chips', async () => {
+    seed({ ...BILL, date: '2026-10-15' });
+    const screen = await render(<VoiceReviewScreen />);
+
+    await press(screen, 'Chaque année');
+    expect(screen.getByLabelText('Chaque année').props.accessibilityState.selected).toBe(true);
+    await press(screen, 'Enregistrer la facture');
+    expect(mockCreateBill).toHaveBeenCalledWith(
+      expect.objectContaining({ recurrence: 'yearly', next_due_on: '2026-10-15' }),
+    );
   });
 
   it('offers the amounts it could not choose between, written the French way', async () => {

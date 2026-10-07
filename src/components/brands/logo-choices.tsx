@@ -1,5 +1,5 @@
 import { Check, ChevronDown, ChevronRight } from 'lucide-react-native';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { useLogoMatch, type LogoHints, type LogoMatch } from '@/api/logos';
@@ -9,7 +9,7 @@ import { TextLink } from '@/components/ui/text-link';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { failureText } from '@/lib/failure';
-import { websiteHost } from '@/lib/logo-lookup';
+import { isSureMatch, websiteHost } from '@/lib/logo-lookup';
 import { withTap } from '@/lib/press';
 import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
@@ -330,6 +330,8 @@ type LogoConfirmProps = {
   hints: LogoHints;
   noLogo: NoLogo;
   onChoose: (choice: LogoChoice) => void;
+  /** Already answered elsewhere (an earlier page): opens on "Change logo" instead of asking again. */
+  decided?: boolean;
 };
 
 type ConfirmStep = 'ask' | 'others' | 'website' | 'done';
@@ -337,25 +339,49 @@ type ConfirmStep = 'ask' | 'others' | 'website' | 'done';
 /**
  * The add-store check: before a store the catalog does not know is saved, show the logo the
  * service thinks it is and let the person say yes, pick another, give the website, or keep letters.
- * Nothing is chosen until they answer, because a wrong logo is worse than letters. An unsure or
- * failed lookup shows no card at all, only a quiet way to add the website.
+ * Nothing is chosen until they answer, because a wrong logo is worse than letters, with one
+ * exception: a store the service knows by its exact name or website (our own logo list) is simply
+ * given its logo, with "Change logo" if that is wrong. An unsure or failed lookup shows no card at
+ * all, only a quiet way to add the website.
  */
-export function LogoConfirm({ name, hints, noLogo, onChoose }: LogoConfirmProps) {
-  const match = useLogoMatch(name, hints);
-  const [step, setStep] = useState<ConfirmStep>('ask');
+export function LogoConfirm({ name, hints, noLogo, onChoose, decided = false }: LogoConfirmProps) {
+  const [step, setStep] = useState<ConfirmStep>(decided ? 'done' : 'ask');
+  // A sure match is applied once, when this opens on its own. Someone who pressed "Change logo"
+  // wants to choose, so it is never applied over them.
+  const [auto, setAuto] = useState(!decided);
+  const applied = useRef(false);
+  // Nothing is asked of the service while the person is not choosing: an answered store costs no
+  // lookup, and opening "Change logo" reuses the cached one.
+  const match = useLogoMatch(step === 'done' ? '' : name, hints);
   const found = confidentMatch(match.data);
   const plain = noLogoLabel(noLogo);
+  const sureDomain = auto && step === 'ask' && isSureMatch(match.data) ? match.data.domain : null;
 
   const choose = (choice: LogoChoice) => {
     onChoose(choice);
     setStep('done');
   };
 
+  // The answer is given once, whatever the parent re-renders with in the meantime.
+  const onChooseRef = useRef(onChoose);
+  useEffect(() => {
+    onChooseRef.current = onChoose;
+  });
+  useEffect(() => {
+    if (!sureDomain || applied.current) return;
+    applied.current = true;
+    onChooseRef.current({ logoDomain: sureDomain, logoHidden: false });
+    setStep('done');
+  }, [sureDomain]);
+
   const quiet = (label: string, next: ConfirmStep) => (
     <TextLink
       label={label}
       variant="subtle"
-      onPress={() => setStep(next)}
+      onPress={() => {
+        setAuto(false);
+        setStep(next);
+      }}
       className="mt-1 self-start"
     />
   );
@@ -363,6 +389,8 @@ export function LogoConfirm({ name, hints, noLogo, onChoose }: LogoConfirmProps)
   if (step === 'done') return quiet(LOGO_COPY.changeLogo, 'ask');
 
   if (step === 'ask') {
+    // Applying: the logo is about to appear in the field, so there is nothing to ask or show.
+    if (sureDomain) return null;
     if (match.isLoading) {
       return (
         <View className="mt-2 w-full">

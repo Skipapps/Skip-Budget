@@ -10,6 +10,13 @@ export function selectionLogo(selection: BrandSelection): string | null {
   });
 }
 
+/** Whether the person has answered the logo question for a store: picked a logo or chosen letters. */
+export function logoChosen(
+  selection: Pick<BrandSelection, 'logoDomain' | 'logoHidden'> | null | undefined,
+): boolean {
+  return Boolean(selection?.logoDomain) || selection?.logoHidden === true;
+}
+
 /**
  * The logo columns to save with a selection, given what the row holds now (nothing for a new one).
  * Empty when the field chose nothing, so an edit that kept its store never overwrites the row's

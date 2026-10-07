@@ -121,7 +121,10 @@ describe('Settings, the main page', () => {
       'Preferencias',
       'Tu dinero',
       'Acerca de',
-      'Soporte',
+      'Soporte y comentarios',
+      // The tip link sits under it, worded in Spanish too.
+      'Invita un café al equipo',
+      'Para que Skip siga con energía',
       'Cuenta',
       'Cerrar sesión',
       'Eliminar cuenta',
@@ -146,7 +149,9 @@ describe('Settings, the main page', () => {
       'Préférences',
       'Ton argent',
       'À propos',
-      'Assistance',
+      'Assistance et commentaires',
+      'Offre un café à l’équipe',
+      'Pour que Skip continue de carburer',
       'Compte',
       'Se déconnecter',
       'Supprimer le compte',
@@ -309,7 +314,7 @@ describe('Settings, Support', () => {
     const screen = await render(<SupportScreen />);
 
     expect(textsOf(screen)).toEqual([
-      'Soporte',
+      'Soporte y comentarios',
       'Primeros pasos',
       'Vuelve a mostrar los pasos de configuración en Inicio',
       'Preguntas frecuentes',
@@ -320,8 +325,6 @@ describe('Settings, Support', () => {
       'Algo falla o no está claro',
       'Comparte una idea',
       '¿Qué debería hacer Skip ahora?',
-      'Invita un café al equipo',
-      'Para que Skip siga con energía',
     ]);
   });
 
@@ -331,17 +334,18 @@ describe('Settings, Support', () => {
 
     const texts = textsOf(screen);
     for (const line of [
-      'Assistance',
+      'Assistance et commentaires',
       'Premiers pas',
       'Questions fréquentes',
       'Ce que Skip peut faire',
       'Écrire à l’assistance',
       'Partage une idée',
       'Que devrait faire Skip ensuite ?',
-      'Offre un café à l’équipe',
     ]) {
       expect(texts).toContain(line);
     }
+    // The tip link moved to the main Settings page.
+    expect(texts).not.toContain('Offre un café à l’équipe');
     expectAllWorded([...texts, ...labelsOf(screen)]);
   });
 });

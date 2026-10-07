@@ -16,10 +16,8 @@ type Counts = [multiplier: number, oneLine: number, shrinkToFit: number];
 const ALLOWED: Record<string, Counts> = {
   'app/(tabs)/settings.tsx': [1, 0, 0],
   'app/add-account.tsx': [5, 0, 0],
-  'app/add-bill.tsx': [2, 0, 0],
   'app/add-card.tsx': [2, 0, 0],
-  'app/add-receipt.tsx': [9, 0, 0],
-  'app/add-subscription.tsx': [3, 0, 0],
+  'app/add-receipt.tsx': [2, 0, 0],
   'app/auth.tsx': [1, 0, 0],
   'app/avatar.tsx': [1, 1, 0],
   'app/bill-plans.tsx': [2, 0, 0],
@@ -40,8 +38,6 @@ const ALLOWED: Record<string, Counts> = {
   'app/subscription-plans.tsx': [2, 0, 0],
   'app/tour.tsx': [2, 0, 0],
   'app/verify-otp.tsx': [2, 0, 0],
-  'app/voice-edit.tsx': [2, 0, 0],
-  'app/voice-review.tsx': [10, 0, 0],
   'app/voice.tsx': [4, 0, 0],
   'app/what-skip-can-do.tsx': [2, 0, 0],
   'components/app-lock-gate.tsx': [3, 0, 0],
@@ -79,7 +75,6 @@ const ALLOWED: Record<string, Counts> = {
   'components/ui/text-field.tsx': [3, 0, 0],
   'components/ui/time-picker.tsx': [6, 0, 0],
   'components/ui/toggle-pill.tsx': [1, 1, 0],
-  'components/voice/review-row.tsx': [2, 0, 0],
   'components/voice/voice-hints.tsx': [1, 0, 0],
 };
 
@@ -95,6 +90,8 @@ const ADOPTED = [
   'app/savings.tsx',
   'app/source/[id].tsx',
   'app/subscriptions.tsx',
+  'app/voice-edit.tsx',
+  'app/voice-review.tsx',
   'components/bills/bill-row.tsx',
   'components/brands/brand-field.tsx',
   'components/brands/brand-logo.tsx',

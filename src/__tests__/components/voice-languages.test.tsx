@@ -1,7 +1,6 @@
 import { act, render } from '@testing-library/react-native';
 
 import { MicButton } from '@/components/voice/mic-button';
-import { ReviewRow } from '@/components/voice/review-row';
 import { StaleDraft } from '@/components/voice/stale-draft';
 import { VoiceFab } from '@/components/voice/voice-fab';
 import { VoiceHints } from '@/components/voice/voice-hints';
@@ -62,7 +61,6 @@ let mockPro = { pro: true, ready: true };
 jest.mock('@/api/pro', () => ({ usePro: () => mockPro }));
 jest.mock('@/lib/speech', () => ({ isSpeechAvailable: () => true }));
 
-const NBSP = ' ';
 const HINTS = VOICE_EXAMPLES.map((example) => sentenceText(example.parts));
 
 type Screen = Awaited<ReturnType<typeof render>>;
@@ -153,48 +151,6 @@ describe('MicButton', () => {
       />,
     );
     expect(screen.getByLabelText(name)).toBeTruthy();
-  });
-});
-
-describe('ReviewRow', () => {
-  const row = (props: { label: string; value: string | null; required: boolean }) => (
-    <ReviewRow {...props} leading={null} onPress={() => {}} />
-  );
-
-  it('says what is missing in Spanish', async () => {
-    setLanguage('es');
-    const screen = await render(row({ label: 'Tienda', value: null, required: true }));
-    expect(screen.getByText('Toca para agregar')).toBeTruthy();
-    expect(screen.getByLabelText('Tienda, no se escuchó').props.accessibilityHint).toBe(
-      'Hace falta para guardar. Abre «tienda» para agregarlo.',
-    );
-    expectNoRawKeys(screen);
-  });
-
-  it('says what is optional in Spanish', async () => {
-    setLanguage('es');
-    const screen = await render(
-      row({ label: 'Fecha de renovación', value: null, required: false }),
-    );
-    expect(screen.getByText('Fecha de renovación · opcional')).toBeTruthy();
-    expect(screen.getByText('Sin definir')).toBeTruthy();
-    expect(screen.getByLabelText('Fecha de renovación, sin definir, opcional')).toBeTruthy();
-  });
-
-  it('says what is set, and how to change it, in French', async () => {
-    setLanguage('fr');
-    const screen = await render(row({ label: 'Magasin', value: 'Starbucks', required: true }));
-    expect(screen.getByLabelText('Magasin, Starbucks').props.accessibilityHint).toBe(
-      `Ouvre «${NBSP}magasin${NBSP}» pour le modifier.`,
-    );
-    expectNoRawKeys(screen);
-  });
-
-  it('reads exactly as before in English', async () => {
-    const screen = await render(row({ label: 'Due on', value: null, required: true }));
-    expect(screen.getByLabelText('Due on, not heard').props.accessibilityHint).toBe(
-      'Needed to save. Opens due on to add it.',
-    );
   });
 });
 

@@ -116,8 +116,11 @@ const PAGES = [
   { title: 'Preferences', href: '/settings/preferences' },
   { title: 'Your money', href: '/settings/your-money' },
   { title: 'About', href: '/settings/about' },
-  { title: 'Support', href: '/settings/support' },
+  { title: 'Support and feedback', href: '/settings/support' },
 ];
+
+/** The tip link sits under Support: it opens a web page, so it has a small line and no route. */
+const COFFEE = 'Buy a coffee for team. Keep Skip brewing';
 
 /** Every line of text on the page, top to bottom. */
 const textsOf = (screen: Awaited<ReturnType<typeof render>>) =>
@@ -132,13 +135,14 @@ beforeEach(() => {
 });
 
 describe('Settings, the main page', () => {
-  it('keeps Skip Pro and Profile above four rows, and the account actions below them', async () => {
+  it('keeps Skip Pro and Profile above four rows and the coffee link, and the account actions below', async () => {
     const screen = await render(<SettingsScreen />);
 
     expect(buttonLabels(screen)).toEqual([
       'Skip Pro. Unlimited everything, $1.99/mo or $19.99/yr',
       'Profile picture. Pick one to show on your dashboard',
       ...PAGES.map((page) => page.title),
+      COFFEE,
       'Sign out',
       'Delete account. Permanent, and it cannot be undone',
     ]);
@@ -150,7 +154,7 @@ describe('Settings, the main page', () => {
     ]);
   });
 
-  it('draws the four rows with a title only, no summary line', async () => {
+  it('draws the four page rows with a title only, no summary line', async () => {
     const screen = await render(<SettingsScreen />);
 
     for (const page of PAGES) {
@@ -183,11 +187,34 @@ describe('Settings, the main page', () => {
       'What Skip can do',
       'Email support',
       'Share an idea',
-      'Buy a coffee for team',
-      'Support and feedback',
     ]) {
       expect(screen.queryByText(moved)).toBeNull();
     }
+  });
+
+  it('puts the coffee link directly under Support and feedback, in the same list', async () => {
+    const screen = await render(<SettingsScreen />);
+
+    const labels = buttonLabels(screen);
+    expect(labels.indexOf(COFFEE)).toBe(labels.indexOf('Support and feedback') + 1);
+
+    // Its small line sits under its title, as it did on the Support page.
+    const row = screen.getByRole('button', { name: COFFEE });
+    expect(
+      within(row)
+        .getAllByText(/./)
+        .map((node) => node.props.children),
+    ).toEqual(['Buy a coffee for team', 'Keep Skip brewing']);
+  });
+
+  it('opens the coffee page in the browser, not as a route of its own', async () => {
+    const screen = await render(<SettingsScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: COFFEE }));
+
+    expect(openBrowserAsync).toHaveBeenCalledTimes(1);
+    expect(openBrowserAsync).toHaveBeenCalledWith('https://buymeacoffee.com/Weknd_team');
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it('opens each page from its row, pushed above the tabs', async () => {
@@ -362,11 +389,11 @@ describe('Settings, About', () => {
 });
 
 describe('Settings, Support', () => {
-  it('shows exactly its six items, each with its small line', async () => {
+  it('shows exactly its five items, each with its small line', async () => {
     const screen = await render(<SupportScreen />);
 
     expect(textsOf(screen)).toEqual([
-      'Support',
+      'Support and feedback',
       'Getting started',
       'Put the setup steps back on Home',
       'Common questions',
@@ -377,9 +404,9 @@ describe('Settings, Support', () => {
       'Something is wrong or unclear',
       'Share an idea',
       'What should Skip do next?',
-      'Buy a coffee for team',
-      'Keep Skip brewing',
     ]);
+    // The tip link moved to the main Settings page, under this one.
+    expect(screen.queryByText('Buy a coffee for team')).toBeNull();
   });
 
   it('puts the setup steps back and lands on the Home tab', async () => {
@@ -392,7 +419,7 @@ describe('Settings, Support', () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it('opens each help page, and the coffee page in the browser', async () => {
+  it('opens each help page, and has no coffee link of its own', async () => {
     const screen = await render(<SupportScreen />);
 
     for (const name of [
@@ -400,7 +427,6 @@ describe('Settings, Support', () => {
       /^What Skip can do/,
       /^Email support/,
       /^Share an idea/,
-      /^Buy a coffee/,
     ]) {
       await fireEvent.press(screen.getByRole('button', { name }));
     }
@@ -411,6 +437,6 @@ describe('Settings, Support', () => {
       '/contact?topic=support',
       '/contact?topic=idea',
     ]);
-    expect(openBrowserAsync).toHaveBeenCalledWith('https://buymeacoffee.com/Weknd_team');
+    expect(openBrowserAsync).not.toHaveBeenCalled();
   });
 });

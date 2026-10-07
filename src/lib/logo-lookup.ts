@@ -1,4 +1,4 @@
-import type { LogoHints } from '@/api/logos';
+import type { LogoHints, LogoMatch } from '@/api/logos';
 
 /**
  * The logo service's categories, keyed by the app's spend and bill category ids. The service only
@@ -69,4 +69,22 @@ export function websiteHost(typed: string): string | null {
   const labels = host.split('.');
   if (labels.length < 2 || !labels.every((label) => LABEL.test(label))) return null;
   return TOP_LEVEL.test(labels[labels.length - 1]) ? host : null;
+}
+
+/** An exact name, alias or website: the brand is known, not guessed from a spelling. */
+const EXACT_KINDS = new Set(['alias', 'domain']);
+
+/**
+ * The service found this brand by an exact name or website, with no other brand nearly as good:
+ * there is nothing to ask. A close spelling ("starbuck") or two plausible brands ("Delta") is still
+ * a question, because a wrong logo is worse than letters.
+ */
+export function isSureMatch(
+  match: LogoMatch | null | undefined,
+): match is LogoMatch & { domain: string } {
+  if (!match?.matched || !match.domain) return false;
+  if (!match.kind || !EXACT_KINDS.has(match.kind) || match.confidence < 0.95) return false;
+  return !match.candidates.some(
+    (candidate) => candidate.domain !== match.domain && candidate.confidence >= 0.8,
+  );
 }

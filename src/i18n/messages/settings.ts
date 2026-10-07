@@ -56,7 +56,11 @@ export const settingsMessages = defineMessages({
   },
   'settings.pages.yourMoney': { en: 'Your money', es: 'Tu dinero', fr: 'Ton argent' },
   'settings.pages.about': { en: 'About', es: 'Acerca de', fr: 'À propos' },
-  'settings.pages.support': { en: 'Support', es: 'Soporte', fr: 'Assistance' },
+  'settings.pages.support': {
+    en: 'Support and feedback',
+    es: 'Soporte y comentarios',
+    fr: 'Assistance et commentaires',
+  },
 
   'settings.account.title': { en: 'Account', es: 'Cuenta', fr: 'Compte' },
   'settings.account.signOut': { en: 'Sign out', es: 'Cerrar sesión', fr: 'Se déconnecter' },

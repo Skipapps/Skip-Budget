@@ -120,6 +120,8 @@ export const billsMessages = defineMessages({
   'bills.field.note': { en: 'Note', es: 'Nota', fr: 'Note' },
   'bills.field.recurring': { en: 'Recurring', es: 'Se repite', fr: 'Récurrence' },
   'bills.field.to': { en: 'To', es: 'Hasta', fr: 'Jusqu’au' },
+  'bills.field.due': { en: 'Due on', es: 'Fecha de vencimiento', fr: 'Date d’échéance' },
+  'bills.field.starts': { en: 'Starts on', es: 'Empieza el', fr: 'Commence le' },
 
   'bills.add.titleEdit': { en: 'Edit bill', es: 'Editar factura', fr: 'Modifier la facture' },
   'bills.add.closeNew': {
@@ -191,6 +193,16 @@ export const billsMessages = defineMessages({
     en: 'Ongoing — no end date',
     es: 'Continúa — sin fecha de fin',
     fr: 'En cours — sans date de fin',
+  },
+  'bills.add.changeCompany': {
+    en: 'Change company, currently {name}',
+    es: 'Cambiar empresa, ahora es {name}',
+    fr: 'Changer d’entreprise, actuellement {name}',
+  },
+  'bills.add.addCompanyAs': {
+    en: 'Add {name} as a new company',
+    es: 'Agregar {name} como empresa nueva',
+    fr: 'Ajouter {name} comme nouvelle entreprise',
   },
   'bills.add.clearEndA11y': {
     en: 'Clear end date',

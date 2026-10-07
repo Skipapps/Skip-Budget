@@ -13,6 +13,12 @@ export type VoiceMerchant = {
   name: string;
   domain: string | null;
   categoryId: string;
+  /**
+   * The logo the person chose for a store the catalogue does not know. Both stay undefined until
+   * they answer, so a store they never answered about saves with the row's logo columns untouched.
+   */
+  logoDomain?: string | null;
+  logoHidden?: boolean;
 };
 
 export type VoiceMissing = 'amount' | 'merchant' | 'date' | 'cycle' | 'category';

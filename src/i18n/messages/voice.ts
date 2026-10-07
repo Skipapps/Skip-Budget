@@ -17,7 +17,6 @@ export const voiceMessages = defineMessages({
   },
   'voice.receipt.save': { en: 'Save receipt', es: 'Guardar recibo', fr: 'Enregistrer le reçu' },
   'voice.receipt.merchant': { en: 'Store', es: 'Tienda', fr: 'Magasin' },
-  'voice.receipt.date': { en: 'Bought on', es: 'Fecha de compra', fr: 'Date d’achat' },
   'voice.receipt.paidWith': { en: 'Paid with', es: 'Pagado con', fr: 'Payé avec' },
   'voice.receipt.askAmount': {
     en: 'How much did you spend?',
@@ -73,11 +72,6 @@ export const voiceMessages = defineMessages({
     fr: 'Enregistrer l’abonnement',
   },
   'voice.subscription.merchant': { en: 'Service', es: 'Servicio', fr: 'Service' },
-  'voice.subscription.date': {
-    en: 'Renews on',
-    es: 'Fecha de renovación',
-    fr: 'Date de renouvellement',
-  },
   'voice.subscription.paidWith': { en: 'Charged to', es: 'Se cobra a', fr: 'Prélevé sur' },
   'voice.subscription.askAmount': {
     en: 'How much does it cost?',
@@ -250,26 +244,6 @@ export const voiceMessages = defineMessages({
     fr: 'Aucun, je vais le taper',
   },
   'voice.review.amount': { en: 'Amount', es: 'Importe', fr: 'Montant' },
-  'voice.review.amountNeededHint': {
-    en: 'Needed to save. Opens the amount to add it.',
-    es: 'Hace falta para guardar. Abre el importe para agregarlo.',
-    fr: 'Requis pour enregistrer. Ouvre le montant pour l’ajouter.',
-  },
-  'voice.review.tapToAddAmount': {
-    en: 'Tap to add the amount',
-    es: 'Toca para agregar el importe',
-    fr: 'Touche pour ajouter le montant',
-  },
-  'voice.review.amountNotCaught': {
-    en: 'Skip didn’t catch how much.',
-    es: 'Skip no entendió cuánto fue.',
-    fr: 'Skip n’a pas saisi le montant.',
-  },
-  'voice.review.amountChangeHint': {
-    en: 'Opens the amount to change it.',
-    es: 'Abre el importe para cambiarlo.',
-    fr: 'Ouvre le montant pour le modifier.',
-  },
   'voice.review.category': { en: 'Category', es: 'Categoría', fr: 'Catégorie' },
   'voice.review.recurring': { en: 'Recurring', es: 'Se repite', fr: 'Récurrence' },
   'voice.review.billingCycle': {
@@ -277,31 +251,6 @@ export const voiceMessages = defineMessages({
     es: 'Ciclo de cobro',
     fr: 'Cycle de facturation',
   },
-
-  'voice.row.spoken': { en: '{label}, {value}', es: '{label}, {value}', fr: '{label}, {value}' },
-  'voice.row.notHeard': { en: 'not heard', es: 'no se escuchó', fr: 'non entendu' },
-  'voice.row.notSetOptional': {
-    en: 'not set, optional',
-    es: 'sin definir, opcional',
-    fr: 'non défini, facultatif',
-  },
-  'voice.row.optionalLabel': {
-    en: '{label} · optional',
-    es: '{label} · opcional',
-    fr: '{label} · facultatif',
-  },
-  'voice.row.neededHint': {
-    en: 'Needed to save. Opens {label} to add it.',
-    es: 'Hace falta para guardar. Abre «{label}» para agregarlo.',
-    fr: 'Requis pour enregistrer. Ouvre « {label} » pour l’ajouter.',
-  },
-  'voice.row.changeHint': {
-    en: 'Opens {label} to change it.',
-    es: 'Abre «{label}» para cambiarlo.',
-    fr: 'Ouvre « {label} » pour le modifier.',
-  },
-  'voice.row.tapToAdd': { en: 'Tap to add', es: 'Toca para agregar', fr: 'Touche pour ajouter' },
-  'voice.row.notSet': { en: 'Not set', es: 'Sin definir', fr: 'Non défini' },
 
   'voice.edit.searchStore': {
     en: 'Search for a store',

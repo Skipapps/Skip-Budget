@@ -1483,3 +1483,171 @@ a device; handwriting and glare are drawn, not photographed.
 keeping them. I first named them `hard-adv-*`, which Drew's `hard-` filter would have counted in his hard numbers; they live in a subfolder now. Drew's
 `receipt-parser.accuracy.test.ts` fails its hard-set total floor (82%) on the parser as it stands (77.5%) and one rule test fails: both are his work in
 progress (his file was being edited as I measured), not the fixtures. Drew and Dilip: the stored `fixed` pass is gone and fixtures now carry `next`.
+
+## 2026-10-07 — Theo (Tester) — add-receipt tests rewritten for the amount page / final page / one-field pages
+
+**Outcome:** Done, uncommitted. Tests only: `src/__tests__/app/add-receipt.test.tsx` (39), `add-receipt-save.test.tsx` (38), `add-receipt-scan.test.tsx` (31),
+`add-receipt-i18n.test.tsx` (14) = 122 pass; prettier, eslint (cache cleared) and tsc clean for these four. Baseline before touching: the same four suites were red
+against the new source (38 of 55 failing, all stale interactions). `npm run check` not run (lead asked for the four files only; other suites are changing).
+
+**Approach:** real StepFlow, EntryReview, edit pages, keypad, calendar, BrandField + LogoConfirm, SourceTiles, TextField; mocked only lucide, keyboard-controller, Skeleton,
+ReminderField (edit-pages now imports it, which drags in expo-notifications), BrandLogo (drawn as `name|domain` text so a logo can be asserted), haptics, scanner, pickers,
+the data hooks (`@/api/brands` keeps the real `guessCategory`/`matchBrand` via requireActual with `@/lib/supabase` stubbed), expo-router. Clock pinned (Date only) to Wed 2026-10-07.
+The save file keeps a Button stub that accepts a press while disabled (still reports `disabled`) to reach the checks inside Save, as before.
+
+**Newly covered:** amount page has no dots, Continue held until amount > 0 to the cent (0, 0., 0.0 held; 0.01 passes), Continue lands on the final page; every row opens its
+page and Done writes / Back discards (amount, store, date, paid with, note); chips set the day in one tap and light the right chip, Pick date opens the calendar; Paid with hidden
+with no sources and cleared by "No card or account"; note placeholder then text, spaces-only note is no note; Save held until amount and store; gap rows for a missing amount/store
+(never $0); Back: amount page for typed, `router.back()` for edit / scan params / voice hand-off, same for hardware back, gestureEnabled per page; close prompts; Delete receipt
+confirm / cancel / success / failure; in-form scan landing (report, gaps, nothing-read stays on amount, typed amount kept, catalogue brand, keyword category, reading state, camera
+failure); a hand edit retires the report; voice hand-off save (source voice, dismissTo /home, clearVoiceDraft, logo carried, failure keeps the draft); Spanish and French pages.
+
+**Suspected source bugs (tests marked `it.failing`, flip to `it` after the fix):**
+1. `add-receipt.tsx` ~635 + `edit-pages.tsx` ~153/173: Change logo stays offered after another store is picked on the store page (before Done) and would open Change logo for the saved receipt's name.
+2. `add-receipt.tsx` ~305-310, ~648: Done on the store page with the store untouched sets `storeChanged`, so the next visit has no Change logo and the form keeps a first-render snapshot instead of the re-read row.
+3. `edit-pages.tsx` ~153: StoreEditPage copies `value` once, so a logo changed on Change logo (pushed over the open page) is not shown when Back returns.
+4. `src/i18n/messages/entry.ts`: French `entry.askPaidWith`, `entry.row.neededHint`, `entry.row.changeHint` use plain spaces before ? and around « »; every other French message (voice.ts's equivalent hint too) uses U+00A0.
+
+**Not verified:** anything on a device (swipe-back is asserted through the mocked `Stack.Screen` options); `tsc` still reports errors in `add-subscription.test.tsx` (281-282) and
+`add-subscription-save.test.tsx` (748), not mine (same `HardwareBackPressEvent` handler type I had to satisfy in my own hardware-back helper).
+
+## 2026-10-07 — Theo (Tester) — add-subscription tests rewritten for the amount page + final page
+
+**Outcome:** Done, uncommitted. Tests only: `src/__tests__/app/add-subscription.test.tsx` (55), `add-subscription-save.test.tsx` (65) and
+`add-subscription-i18n.test.tsx` (14), 134 passing (two of them `it.failing`, below). Baseline before I touched them: the same three suites, 20
+failed / 4 passed of 24, because the screen is now a page state machine (amount page, one final page, one-field pages). No other test file renders
+`@/app/add-subscription` except `add-forms-from-voice.test.tsx`, which another engineer owns and I did not open for edit. I did not run the whole
+`npm run check` (the tree is being edited by others); prettier, eslint (cache cleared) and `tsc --noEmit` are clean for my three files.
+
+**Approach:** the receipt tester's model: the real pages (keypad, calendar, service field, source tiles, reminder chips and time picker) walked as a
+person walks them; only the network, the logo images and the two reminder hooks are replaced (`@/api/reminders` keeps its real chips, leads and
+wording). The save file stubs the primary button so it accepts a press while disabled (it still reports `disabled`): the only way to reach the checks
+inside Save. Clock pinned to 2026-10-07 with Date-only fake timers.
+
+**Covered:** every assertion of the old three files carried over (exact values to the cent, cycle, `next_renewal_on`, `started_on` floor and
+`countsFrom`, category via the service, source columns, trimmed note, active flag, past-charges choice and reminder order, custom-service logo, "Filed
+under" words, es/fr cycles, categories, dates, reminders, delete confirm). New: no dots, Continue held until amount > 0, Continue lands on the final
+page, each row opens its page and Done writes / Back discards (amount, service, renewal, charged to, reminder, note), cycle chips in one tap, renewal
+optional with "No renewal date", Charged to hidden with no sources, Status chips only when editing, Save held until amount > 0 and a service, Back per
+entry path (typed, edit, voice) with hardware back and swipe gesture, close prompts new/edit, delete with confirm/failure/Deleting…, Saving…, the
+"changed" flag passed to the past-charges question per field, reminder lead and time written (including PM), voice hand-off leave + `clearVoiceDraft`.
+
+**Suspected source bugs (both are `it.failing` in `add-subscription-save.test.tsx`, each checked to fail on the intended assertion):**
+1. A failed save's line follows the person back to the amount page. `error` is passed to the `amount` StepFlow and only `Continue` or the next Save
+   clears it.
+2. A saved subscription whose owner chose letters (`logo_hidden`) and whose name is in the catalogue shows the catalogue's logo on the final page's
+   Service row: the edit's selection carries no `logoHidden` (on purpose, so Save leaves the columns alone) and a null domain, so `BrandMark` looks the
+   name up again. The service page itself shows letters correctly. Receipts and bills probably share it (not verified).
+
+**Not verified / not covered:** the real `useReminders` query (reminders not yet loaded when an edit is saved would write "Off"; unchanged by this
+work); the Deleting… / update pending flags only via mocks; nothing on a device.
+
+## 2026-10-07 — Theo (Tester) — add-bill tests rewritten for the category page, amount page and final page
+
+**Outcome:** Done, uncommitted. Tests only: `src/__tests__/app/add-bill.test.tsx` (85), `add-bill-save.test.tsx` (50) and `add-bill-i18n.test.tsx`
+(34), 169 passing (one is `it.failing`, below). Baseline before I touched them: the same three suites, 38 failed / 5 passed of 43, because the screen is
+now a page state machine. No other test file renders `@/app/add-bill` except `add-forms-from-voice.test.tsx` (owned by another engineer, not edited): it is
+red, 24 of 24, because it still presses `Continue` on the old details step. I did not run the whole `npm run check` (the tree is being edited by others);
+prettier, eslint (cache cleared) and `tsc --noEmit` are clean for my three files, and three runs in a row were green.
+
+**Approach:** the receipt tester's model: the real pages (category grid, keypad, calendar, company search with its logo question, card tiles, reminder
+chips, icon picker) walked as a person walks them; only the network, the logo images and the two reminder hooks are replaced (`@/api/reminders` keeps its
+real chips, leads and wording). `add-bill.test.tsx` uses the real Save button, so a disabled Save really refuses a press; the save file stubs it to accept
+a press while disabled (it still reports `disabled`), the only way to reach the checks inside Save. The calculator pad is a stub that hands back a result.
+Clock pinned to 2026-10-07 with Date-only fake timers.
+
+**Covered:** everything the old files proved (exact values to the cent, name trimmed, icon only for Other, recurrence incl. period, `starts_on` floor, `ends_on`,
+source columns, note, name/amount/date/period checks, edit loads and updates, delete with confirm, past-charges choice then write then reminder order, logo
+columns for a custom company / kept company / company taken off, loan schedule card and its `/loan-schedule` params ($20,000, 6%, 60 months: $100.00 interest and
+$286.66 principal in the first payment), es/fr categories, chips, dates, reminders, failure line). New: category page then amount page (no dots, Calculator,
+Continue held until amount > 0) then the final page; each row opens its page and Done writes / Back discards (amount, name and company, category with no Done,
+due, end date with earlier days disabled and the clear link, paid with and No card or account, reminder, note); recurrence chips incl. Specific period
+(`Starts on`, `To` row, end dropped on the way back, end dropped when the start passes it); Save held until amount, name, category and due date; the category
+changing a name only while it is a default; Back and hardware back and swipe gesture per entry path (typed, edit, voice); close prompts new/edit; "You can edit
+this later."; delete with confirm, decline, failure and Deleting…; Saving…; es/fr one-field pages.
+
+**Suspected source bug (`it.failing` in `add-bill-save.test.tsx`, checked to fail on the intended assertion):** a validation message stays after the problem is
+fixed. Save on a period that ends before it starts shows "The end date cannot be before the start date."; clearing the end date on its page returns to the final
+page with the red line still above an enabled Save. The old stepper cleared it when the person moved on from the step; only the next Save clears it now.
+
+**Observations, not tested:** (1) a name filled in from company A stays when A is taken off and B is picked (`issuerDraft` is null by then, so the "still the
+company's own name" check no longer matches); the old code did the same. (2) `bills.add.clearEndA11y` ("Clear end date") is defined and used nowhere; the link says
+"Clear — make it ongoing". (3) The company field of a bill says "store" to VoiceOver ("Change store, currently Power", "Add X as a new store"): shared `BrandField` copy.
+(4) The other tester's finding about a hidden logo showing the catalogue's logo does not reproduce on bills (covered: logo turned off draws the category icon).
+(5) Reminder `Done` keeps the time the page showed, so a saved reminder that loads late does not move the time of a lead the person just chose (asserted).
+
+**Not verified:** nothing on a device; the real calculator pad and time picker are not walked here (the pad is a stub, the time pill is only checked for its label).
+
+## 2026-10-07 — Theo (Tester) — add-receipt tests updated for the inline store box
+
+**Outcome:** Done, uncommitted, tests only. `add-receipt.test.tsx` (43), `add-receipt-save.test.tsx` (44), `add-receipt-scan.test.tsx` (32), `add-receipt-i18n.test.tsx` (16) = 135 pass,
+none `it.failing` (the four earlier source fixes landed; the three Change-logo tests and the French NBSP test are plain `it` again). prettier, eslint (cache cleared) and `tsc --noEmit` clean.
+
+**Changed:** the Store line is a search box in the card, so every `press('Store, X')` -> search -> pick -> `Done` became type into the box on the final page and tap a result (no Done);
+"Store, needed" / "Tap to add" / "Where did you buy it?" queries became the placeholder (`Search for a store`) or the chosen-state X (`Change store, currently <name>`). The store logo is now
+BrandField's (`logo-32`), not a 40pt mark. Dropped: "Back leaves the store as it was" (no store page to leave), the Done-with-store-untouched test (no Done; replaced by "Change logo stays while the store is
+untouched, whatever else is changed"), the Spanish/French store-page walk (the box and its "Filed under" line are covered on the final page instead).
+**Added:** box tests (empty box, inline results, pick sets at once, X clears and holds Save, added store with inline logo question, replace after X, keyword category); Change logo gone after X / after another
+pick; owner-chose-letters shows letters on the box; edit replacing its store is asked the new store's logo; scan report retired by clearing/picking a store; a failed save's line goes on Back to the keypad and
+when a page keeps a change; voice note param carried; voice hand-off with a chosen logo is not asked again; Spanish/French box wording incl. NBSP sweep over the typed-search state.
+
+**Observation (not a test):** after a failed Save, the failure line stays when the person changes something inline (picks a store, taps a date chip: `edited(setStore)` / `edited(setDate)` do not clear `error`), while a
+one-field page's Done does (`settle()`); the `settle` comment says a line goes once something there is kept. Not asserted either way.
+**Not verified:** `avoidKeyboard` on the final page when a row is a field (the keyboard-controller jest mock cannot show it).
+
+## 2026-10-07 — Theo (Tester) — add-bill tests updated for the inline company box and the Name-only page
+
+**Outcome:** Done, uncommitted. Tests only: `add-bill.test.tsx` (103), `add-bill-save.test.tsx` (52, one `it.failing`) and `add-bill-i18n.test.tsx` (36), 191 passing
+in three runs; prettier, eslint (cache cleared) and `tsc --noEmit` clean.
+
+**Changed:** the company is now a box on the final page (first row, "Company · Optional"), so every company walk (pick, add an unknown company and answer its logo
+question, take it off, swap it) happens there with no Name page and no Done; the Name page holds the name (and the icons for an Other bill with no company). New
+`the company box` describe in `add-bill.test.tsx` (examples per category and after a category change, saved company shown with its remove button, matches inline, unknown
+company with the logo question in place, survives a visit to another page, optional to save); naming rules: company names the bill while the name is empty or the
+category's, never over a typed name or a saved bill's, taking it off keeps the name. Logo columns: custom company (logo, letters), kept, removed, removed then catalogue
+pick, swap. Spanish and French: label, placeholder, add row, logo question and "Change" label of the box. The end-date message test is a plain `it` (fixed in source).
+**Dropped:** "take the company off and back out keeps it" (there is no Back out of a box; the edit is immediate) and the Name-page company assertions.
+
+**Suspected source bug (`it.failing` in `add-bill-save.test.tsx`, checked to fail on the intended assertion):** the "equals the previous company's name" rule in
+`chooseCompany` can never apply. A company is replaced only by taking it off first (`BrandField` shows a box with an X, no search), and taking it off sets `issuer`
+to null, so the next pick sees no previous company: pick Comcast (name becomes "Comcast"), press X, pick Greystar, and the bill is Greystar's but still named "Comcast".
+The old code behaved the same way.
+
+## 2026-10-07 — Theo (Tester) — add-subscription tests follow the inline service box
+
+**Outcome:** Done, uncommitted. The three add-subscription files updated to the source change (Service row is now an inline `BrandField` box on the
+final page; the `service` view, `StoreEditPage` and `markHidden` are gone; every page's Done and Continue go through `settle()`). 146 passing
+(57 + 73 + 16), no `it.failing` left; prettier, eslint (cache cleared) and `tsc --noEmit` clean.
+
+**Changed:** service tests now search the box on the final page and pick (no Done, no "Service, X" row); a "service box" block covers the pick, the
+inline "Filed under", the X (`Change store, currently X`) that lets go and holds Save back, a saved service shown with its category and logo, and the
+service surviving a visit to another line's page. Logo tests read the box's own mark (`logo-32`): an edit with letters chosen shows letters there, and
+Save leaves the columns alone (the old `it.failing` is a plain test now). The stale-line test is a plain test. New block "a line that came from Save":
+the line goes when Done keeps something on the amount, card, renewal, reminder or note page, when Continue is pressed again, and when the amount or the
+service is given; it stays when a page is left with Back. Spanish and French cover the box (category words, X label, the inline logo question and its
+choices, Save held back, refusals).
+
+**Dropped (no longer exist):** "Which service is it?" / "Quel est le service ?" page text, Done disabled until a service, Back discarding a service pick,
+"Done with a saved service untouched keeps it", the "Service, needed/X" and "Tap to add" row labels, the 40pt mark on the final page.
+
+**Suspected source bug found on the way (now fixed in the tree, test is plain):** a pick in the box did not clear "Pick a service first.".
+
+## 2026-10-07 — Theo (Tester) — logo certainty: sure matches, remembered stores
+
+**Outcome:** Done, uncommitted, tests only. Baseline before touching: 189 of 190 suites green, 3 red (`logos.test.tsx` `kind: null`). Now `npx jest` 192 suites / 3511 tests green, `tsc --noEmit`
+clean, eslint (cache cleared) and prettier clean on every file touched.
+
+**Changed:** `src/api/logos.test.tsx` (3 fixed with `kind: null`, 18 new on reading `match` as `kind`); `src/__tests__/lib/logo-lookup.test.ts` (`isSureMatch` table: boundaries 0.95 / 0.8, same-domain
+runner-up, fuzzy, no kind, unmatched); `src/api/known-stores.test.tsx` (new, 57) and `known-stores-no-storage.test.tsx` (new, 4); `src/api/auth.test.ts` (signOut / deleteAccount call `forgetKnownStores` with the
+id, after the voice aliases, never block sign-out, not called while the account is still there); `src/__tests__/components/brand-field-logo.test.tsx` (sure match applied once with no card then Change logo,
+Change logo shows the card, fuzzy / half-trusted / two plausible brands / no kind still ask, each answer calls remember with the right fields, remembered stores listed first with their logo and letters,
+deduped against catalogue rows, add row hidden for an exact remembered name, picking asks nothing); end-to-end per form in `add-receipt-save`, `add-subscription-save`, `add-bill-save` (sure match: no
+question, logo in the box, Save writes `logo_domain`; fuzzy still asks; remembered store picked asks nothing and saves its logo; confirmed once then offered the next time); `voice-review.test.tsx`
+(answers remembered, a sure match applied and remembered, nothing remembered without an answer).
+
+**Source finding (important):** `src/api/known-stores.ts` loads storage with `await import('@react-native-async-storage/async-storage')`. Under this repo's plain `jest` that native `import()` is refused
+("A dynamic import callback was invoked without --experimental-vm-modules"), `storage()` returns null and the module remembers nothing, so no test can exercise its reading or writing. With
+`NODE_OPTIONS=--experimental-vm-modules` they pass (57/57) but that flag breaks 6 unrelated suites, so it is not an option. A lazy `require('…/async-storage').default` in `storage()` made all 57 pass in plain
+jest (checked on a throwaway copy, deleted). The 18 storage-bound tests in `known-stores.test.tsx` use `itStored` (`it.failing` unless the flag is present), so the suite is green and says why; once `storage()`
+uses `require`, they will start failing ("expected to fail") and the `itStored` line should become `it`.
+**Smaller:** `readKnownStores` does not dedupe by name, so a hand-edited or corrupt list with two spellings of one name gives duplicate React keys (`known-<name>`) in BrandField.
