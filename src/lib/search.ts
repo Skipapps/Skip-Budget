@@ -1,3 +1,36 @@
+const ACCENTS: Record<string, string> = {
+  á: 'a',
+  à: 'a',
+  â: 'a',
+  ä: 'a',
+  ã: 'a',
+  å: 'a',
+  é: 'e',
+  è: 'e',
+  ê: 'e',
+  ë: 'e',
+  í: 'i',
+  ì: 'i',
+  î: 'i',
+  ï: 'i',
+  ó: 'o',
+  ò: 'o',
+  ô: 'o',
+  ö: 'o',
+  õ: 'o',
+  ú: 'u',
+  ù: 'u',
+  û: 'u',
+  ü: 'u',
+  ñ: 'n',
+  ç: 'c',
+};
+
+/** Lower case without accents, so "electricite" finds "Électricité" and "nino" finds "Niño". */
+function plain(text: string): string {
+  return text.toLowerCase().replace(/[\u00C0-\u017F]/g, (letter) => ACCENTS[letter] ?? letter);
+}
+
 /**
  * Whether a label answers a search: case-insensitive, substring first, then tolerant of letter
  * mistakes ("wallmart" and "walmrat" both find Walmart). Allowed mistakes scale with the query:
@@ -5,9 +38,9 @@
  * six, two from seven. An empty query matches everything.
  */
 export function matchesSearch(label: string, query: string): boolean {
-  const needle = query.trim().toLowerCase();
+  const needle = plain(query.trim());
   if (!needle) return true;
-  const hay = label.toLowerCase();
+  const hay = plain(label);
   if (hay.includes(needle)) return true;
 
   const allowed = needle.length >= 7 ? 2 : needle.length >= 4 ? 1 : 0;

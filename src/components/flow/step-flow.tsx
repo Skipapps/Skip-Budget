@@ -8,6 +8,7 @@ import { BackButton, goBack } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { Screen } from '@/components/ui/screen';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
@@ -171,9 +172,9 @@ export function FlowHeader({
     if (!closePrompt) return;
     const ok = await confirm({
       title: closePrompt,
-      message: 'Nothing you have entered here will be saved.',
-      confirmLabel: 'Yes',
-      cancelLabel: 'Go back',
+      message: t('ui.flow.discardMessage'),
+      confirmLabel: t('common.yes'),
+      cancelLabel: t('ui.flow.stay'),
       destructive: true,
     });
     if (ok) (onClose ?? goBack)();
@@ -183,12 +184,12 @@ export function FlowHeader({
     <PageHeader
       title={title}
       titleRef={titleRef}
-      left={<BackButton accessibilityLabel="Back" onPress={onBack} />}
+      left={<BackButton accessibilityLabel={t('common.back')} onPress={onBack} />}
       right={
         closePrompt ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close"
+            accessibilityLabel={t('common.close')}
             accessibilityHint={closePrompt}
             onPress={() => void close()}
             hitSlop={8}
@@ -208,7 +209,7 @@ function StepIndicator({ steps, current }: { steps: number; current: number }) {
   return (
     <View
       accessibilityRole="progressbar"
-      accessibilityLabel={`Step ${current + 1} of ${steps}`}
+      accessibilityLabel={t('ui.flow.stepOf', { step: current + 1, steps })}
       accessibilityValue={{ min: 1, max: steps, now: current + 1 }}
       className="mt-4 w-full flex-row items-center justify-center gap-2"
     >

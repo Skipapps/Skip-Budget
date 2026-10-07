@@ -23,7 +23,8 @@ import { usePro } from '@/api/pro';
 import { useRefreshAll } from '@/api/refresh';
 import { useToday } from '@/lib/use-today';
 import { moneyBuckets } from '@/data/money-mock';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { t, type MessageKey } from '@/i18n';
+import { failureText } from '@/lib/failure';
 
 type SectionHeaderProps = {
   title: string;
@@ -45,6 +46,12 @@ function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
 
 /** Salary sources arrive on different cycles; normalise before summing. */
 const PER_MONTH = { weekly: 52 / 12, biweekly: 26 / 12, semimonthly: 2, monthly: 1 } as const;
+
+/** The tiles' words by bucket id; the bucket list itself holds only the English. */
+const BUCKET_LABELS: Record<string, MessageKey> = {
+  salary: 'cards.list.salary',
+  savings: 'cards.list.savings',
+};
 
 /** Stands in for an empty list only; a failed read is answered by the whole page. */
 function ListNote({ text }: { text: string }) {
@@ -92,8 +99,8 @@ export default function CardsScreen() {
       <Screen onRefresh={refresh} refreshing={refreshing}>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={() => refetchBalances()}
         />
       </Screen>
@@ -104,8 +111,8 @@ export default function CardsScreen() {
     <Screen onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-2 w-full">
         <SectionHeader
-          title="Credit cards"
-          actionLabel="New credit card"
+          title={t('cards.list.creditCards')}
+          actionLabel={t('cards.list.newCard')}
           onAction={() =>
             // The second of anything is where Pro begins (the database refuses it too).
             !pro && (cards.data?.length ?? 0) >= 1
@@ -124,8 +131,8 @@ export default function CardsScreen() {
             accessibilityRole="button"
             accessibilityLabel={
               !pro && index > 0
-                ? `${card.holder}, locked on the free plan. Opens Skip Pro.`
-                : `${card.holder}, view transactions`
+                ? t('cards.list.cardLocked', { name: card.holder })
+                : t('cards.list.viewTransactions', { name: card.holder })
             }
             onPress={() =>
               // Locked, not lost: extras beyond the free allowance survive a downgrade; the oldest
@@ -152,14 +159,14 @@ export default function CardsScreen() {
         ))}
         {cards.isPending ? <Skeleton className="h-44 w-full rounded-[16px]" /> : null}
         {!cards.isPending && (cards.data?.length ?? 0) === 0 ? (
-          <ListNote text="No credit cards yet. Add one to track what you spend on it." />
+          <ListNote text={t('cards.list.noCards')} />
         ) : null}
       </View>
 
       <View className="mt-10 w-full">
         <SectionHeader
-          title="Bank accounts"
-          actionLabel="Add account"
+          title={t('cards.list.bankAccounts')}
+          actionLabel={t('cards.list.addAccount')}
           onAction={() =>
             !pro && (accounts.data?.length ?? 0) >= 1
               ? router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } })
@@ -175,8 +182,8 @@ export default function CardsScreen() {
             accessibilityRole="button"
             accessibilityLabel={
               !pro && index > 0
-                ? `${account.nickname || account.bank_name}, locked on the free plan. Opens Skip Pro.`
-                : `${account.nickname || account.bank_name}, view transactions`
+                ? t('cards.list.accountLocked', { name: account.nickname || account.bank_name })
+                : t('cards.list.viewTransactions', { name: account.nickname || account.bank_name })
             }
             onPress={() =>
               !pro && index > 0
@@ -201,12 +208,12 @@ export default function CardsScreen() {
         ))}
         {accounts.isPending ? <Skeleton className="h-36 w-full rounded-[16px]" /> : null}
         {!accounts.isPending && (accounts.data?.length ?? 0) === 0 ? (
-          <ListNote text="No bank accounts yet. Add one to see money coming in and out." />
+          <ListNote text={t('cards.list.noAccounts')} />
         ) : null}
       </View>
 
       <View className="mt-10 w-full">
-        <SectionHeading>Money</SectionHeading>
+        <SectionHeading>{t('cards.list.money')}</SectionHeading>
       </View>
 
       {/* Tiles flex, not a fixed width, so they stay side by side on a narrow phone. */}
@@ -214,7 +221,7 @@ export default function CardsScreen() {
         {moneyBuckets.map((bucket) => (
           <View key={bucket.id} className="flex-1">
             <AmountTile
-              label={bucket.label}
+              label={BUCKET_LABELS[bucket.id] ? t(BUCKET_LABELS[bucket.id]) : bucket.label}
               amount={moneyAmounts[bucket.id] ?? 0}
               artwork={artwork[bucket.artwork]}
               onPress={

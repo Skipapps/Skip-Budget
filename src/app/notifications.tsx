@@ -8,15 +8,31 @@ import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Subtitle } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 
-const KINDS: Record<AnnouncementRow['kind'], { label: string; icon: LucideIcon }> = {
-  update: { label: 'Update', icon: Download },
-  feature: { label: 'New feature', icon: Sparkles },
-  news: { label: 'News', icon: Megaphone },
+const KINDS: Record<AnnouncementRow['kind'], { readonly label: string; icon: LucideIcon }> = {
+  update: {
+    get label() {
+      return t('reminders.news.update');
+    },
+    icon: Download,
+  },
+  feature: {
+    get label() {
+      return t('reminders.news.feature');
+    },
+    icon: Sparkles,
+  },
+  news: {
+    get label() {
+      return t('reminders.news.news');
+    },
+    icon: Megaphone,
+  },
 };
 
 /** News from Skip only. Bill and renewal reminders are pushes and are not kept here. */
@@ -35,13 +51,13 @@ export default function NotificationsScreen() {
 
   return (
     <Screen
-      title="Notifications"
+      title={t('reminders.news.title')}
       showBack
       onRefresh={() => void news.refetch()}
       refreshing={news.isRefetching}
     >
       <Subtitle align="left" className="mt-2 w-full">
-        News from Skip — updates to install and features that have just arrived.
+        {t('reminders.news.intro')}
       </Subtitle>
 
       {news.isPending ? (
@@ -51,8 +67,8 @@ export default function NotificationsScreen() {
       ) : news.isError ? (
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={() => void news.refetch()}
         />
       ) : items.length === 0 ? (
@@ -61,13 +77,13 @@ export default function NotificationsScreen() {
             className="text-center font-app-semibold text-[17px] text-ink"
             maxFontSizeMultiplier={1.4}
           >
-            No news yet
+            {t('reminders.news.empty')}
           </Text>
           <Text
             className="mt-2 text-center font-app text-[14px] leading-5 text-muted"
             maxFontSizeMultiplier={1.4}
           >
-            Updates and new features from Skip will show up here.
+            {t('reminders.news.emptyDetail')}
           </Text>
         </View>
       ) : (

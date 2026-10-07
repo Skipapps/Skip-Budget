@@ -2,6 +2,7 @@ import type { ViewStyle } from 'react-native';
 
 import { CardFace } from '@/components/cards/card-face';
 import type { PaymentCard as PaymentCardModel } from '@/data/cards-mock';
+import { t } from '@/i18n';
 import { toCents } from '@/lib/money';
 
 type PaymentCardProps = {
@@ -21,11 +22,14 @@ export function PaymentCard({ card, placeholderHolder, style }: PaymentCardProps
       color={card.color}
       title={card.holder}
       titlePlaceholder={placeholderHolder}
+      // A network name is a brand and reads the same in every language.
       meta={card.network}
       metaStyle="mark"
       amount={-card.balance}
       // Overpaying leaves the card in your favour, which is not the same as owing nothing.
-      caption={owed > 0 ? 'Owed' : owed < 0 ? 'In credit' : 'Nothing owed'}
+      caption={t(
+        owed > 0 ? 'cards.face.owed' : owed < 0 ? 'cards.face.inCredit' : 'cards.face.nothingOwed',
+      )}
       last4={card.last4}
       style={style}
     />

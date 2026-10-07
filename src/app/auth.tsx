@@ -11,6 +11,7 @@ import { Illustration } from '@/components/ui/illustration';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
 import { Subtitle } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { resetTo } from '@/lib/nav';
 
 /**
@@ -49,26 +50,24 @@ export default function AuthScreen() {
   const handleEmail = () => router.push('/signup');
 
   return (
-    <Screen title="Set up your login" showBack>
+    <Screen title={t('auth.start.title')} showBack>
       <Illustration source={artwork.loginHero} widthRatio={0.78} maxWidth={290} className="pt-2" />
 
-      <Subtitle className="mt-3">
-        Keep your data synced across devices and make account recovery easier.
-      </Subtitle>
+      <Subtitle className="mt-3">{t('auth.start.subtitle')}</Subtitle>
 
       <View className="mt-auto w-full gap-4 pt-10">
         <Button
-          label={busy === 'google' ? 'Opening Google…' : 'Continue with google'}
+          label={busy === 'google' ? t('auth.start.openingGoogle') : t('auth.start.google')}
           variant="outline"
           icon={<GoogleIcon size={22} />}
           onPress={handleGoogle}
         />
         <Button
-          label={busy === 'apple' ? 'Signing in…' : 'Continue with Apple'}
+          label={busy === 'apple' ? t('auth.signingIn') : t('auth.start.apple')}
           icon={<AppleIcon size={22} />}
           onPress={handleApple}
         />
-        <TextLink label="Continue with Email" onPress={handleEmail} />
+        <TextLink label={t('auth.start.email')} onPress={handleEmail} />
 
         {error ? (
           <Text

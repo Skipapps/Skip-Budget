@@ -13,29 +13,31 @@ import { success, warn } from '@/lib/haptics';
 import { useUserEmail } from '@/providers/session-provider';
 import { useColors } from '@/providers/theme-provider';
 import { failureMessage } from '@/lib/failure';
+import { t } from '@/i18n';
 
 /**
  * Support and ideas share one inbox and form; the topic only changes the words and the email's
  * subject line. The address is shown but never editable: the server reads it from the session.
  */
-const COPY: Record<MessageTopic, { title: string; subtitle: string; placeholder: string }> = {
-  support: {
-    title: 'Email support',
-    subtitle: 'Tell us what went wrong and we will look into it.',
-    placeholder: 'What happened, and what were you doing when it did?',
-  },
-  idea: {
-    title: 'Share an idea',
-    subtitle: 'What should Skip do next?',
-    placeholder: 'Describe the thing you wish Skip could do.',
-  },
-};
+function copyFor(topic: MessageTopic): { title: string; subtitle: string; placeholder: string } {
+  return topic === 'idea'
+    ? {
+        title: t('support.idea'),
+        subtitle: t('support.ideaDetail'),
+        placeholder: t('support.contact.ideaPlaceholder'),
+      }
+    : {
+        title: t('support.email'),
+        subtitle: t('support.contact.supportSubtitle'),
+        placeholder: t('support.contact.supportPlaceholder'),
+      };
+}
 
 export default function ContactScreen() {
   const colors = useColors();
   const params = useLocalSearchParams<{ topic?: string }>();
   const topic: MessageTopic = params.topic === 'idea' ? 'idea' : 'support';
-  const copy = COPY[topic];
+  const copy = copyFor(topic);
 
   const email = useUserEmail();
   const profile = useProfile();
@@ -48,7 +50,7 @@ export default function ContactScreen() {
 
   const handleSend = async () => {
     if (!message.trim()) {
-      setError('Write a message first.');
+      setError(t('support.contact.writeFirst'));
       warn();
       return;
     }
@@ -73,13 +75,13 @@ export default function ContactScreen() {
           </View>
 
           <View className="items-center gap-2">
-            <Title flush>Sent</Title>
+            <Title flush>{t('support.contact.sent')}</Title>
             <Subtitle className="text-center">
-              Thanks — we read every one. If it needs an answer it will come to {email}.
+              {t('support.contact.thanks', { email: email ?? '' })}
             </Subtitle>
           </View>
 
-          <Button label="Done" onPress={() => router.back()} />
+          <Button label={t('common.done')} onPress={() => router.back()} />
         </View>
       </Screen>
     );
@@ -91,28 +93,28 @@ export default function ContactScreen() {
 
       <View className="mt-7 w-full gap-5">
         <TextField
-          label="Your name"
+          label={t('support.contact.nameLabel')}
           value={name}
           onChangeText={setName}
-          placeholder="What should we call you?"
+          placeholder={t('support.contact.namePlaceholder')}
           autoCapitalize="words"
           returnKeyType="next"
         />
 
         <View className="w-full">
-          <FieldLabel className="mb-2">Your email</FieldLabel>
+          <FieldLabel className="mb-2">{t('support.contact.emailLabel')}</FieldLabel>
           <View className="w-full rounded-[10px] border border-line bg-ink/[0.03] px-4 py-3.5">
             <Text className="font-app text-[15px] text-muted" maxFontSizeMultiplier={1.3}>
-              {email ?? 'Signed in'}
+              {email ?? t('support.contact.signedIn')}
             </Text>
           </View>
           <Text className="mt-1.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-            We reply to the address you signed in with.
+            {t('support.contact.replyNote')}
           </Text>
         </View>
 
         <View className="w-full">
-          <FieldLabel className="mb-2">Message</FieldLabel>
+          <FieldLabel className="mb-2">{t('support.contact.message')}</FieldLabel>
           <TextInput
             value={message}
             onChangeText={setMessage}
@@ -144,7 +146,7 @@ export default function ContactScreen() {
 
       <View className="mt-auto w-full pt-8">
         <Button
-          label={send.isPending ? 'Sending…' : 'Send'}
+          label={send.isPending ? t('support.contact.sending') : t('support.contact.send')}
           onPress={() => void handleSend()}
           disabled={send.isPending}
         />

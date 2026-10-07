@@ -2,6 +2,7 @@ import { LockKeyhole } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState, type AppStateStatus, Pressable, Text, View } from 'react-native';
 
+import { t, useLocale } from '@/i18n';
 import { authenticate } from '@/lib/app-lock';
 import { usePreferences } from '@/providers/preferences-provider';
 import { useColors } from '@/providers/theme-provider';
@@ -13,6 +14,8 @@ import { useColors } from '@/providers/theme-provider';
 export function AppLockGate({ children }: { children: ReactNode }) {
   const { appLock, ready } = usePreferences();
   const colors = useColors();
+  // Above every screen's remount boundary, so it follows the language itself.
+  useLocale();
 
   // Holds whether this session has been let through; the gate is derived from it, so turning the
   // preference off cannot leave a stale lock on screen.
@@ -25,7 +28,7 @@ export function AppLockGate({ children }: { children: ReactNode }) {
 
   const prompt = useCallback(async () => {
     setChecking(true);
-    const ok = await authenticate('Unlock Skip');
+    const ok = await authenticate();
     setChecking(false);
     if (ok) setPassed(true);
   }, []);
@@ -36,7 +39,7 @@ export function AppLockGate({ children }: { children: ReactNode }) {
     if (!armed) return;
 
     let cancelled = false;
-    authenticate('Unlock Skip').then((ok) => {
+    authenticate().then((ok) => {
       if (!cancelled && ok) setPassed(true);
     });
 
@@ -77,25 +80,25 @@ export function AppLockGate({ children }: { children: ReactNode }) {
 
       <View className="items-center gap-2">
         <Text className="font-app-bold text-[22px] text-ink" maxFontSizeMultiplier={1.3}>
-          Skip is locked
+          {t('nav.locked.title')}
         </Text>
         <Text
           className="text-center font-app text-[14px] leading-[21px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
-          Your budget is behind Face ID on this phone.
+          {t('nav.locked.body')}
         </Text>
       </View>
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Unlock Skip"
+        accessibilityLabel={t('nav.locked.unlockLabel')}
         disabled={checking}
         onPress={() => void prompt()}
         className="rounded-full bg-control px-7 py-3.5 active:bg-control-pressed"
       >
         <Text className="font-app-medium text-[15px] text-on-control" maxFontSizeMultiplier={1.2}>
-          {checking ? 'Waiting…' : 'Unlock'}
+          {checking ? t('nav.locked.waiting') : t('nav.locked.unlock')}
         </Text>
       </Pressable>
     </View>

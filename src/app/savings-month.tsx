@@ -13,17 +13,24 @@ import { SelectField } from '@/components/ui/select-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TextField } from '@/components/ui/text-field';
 import { Subtitle } from '@/components/ui/typography';
+import { t } from '@/i18n';
+import { monthLong } from '@/i18n/calendar';
 import { formatCurrency } from '@/lib/format';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { failureMessage, failureText } from '@/lib/failure';
 
+/** "August 2026", "agosto de 2026": as it reads inside a sentence. */
+function monthInSentence(month: string): string {
+  const date = new Date(`${month}T00:00:00`);
+  return t('savings.monthYear', { month: monthLong(date.getMonth()), year: date.getFullYear() });
+}
+
+/** The same at the start of a line, where every language takes a capital. */
 function monthName(month: string): string {
-  return new Date(`${month}T00:00:00`).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-  });
+  const name = monthInSentence(month);
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 type SavingsMonthRow = NonNullable<ReturnType<typeof useMonthlySavings>['data']>[number];
@@ -43,8 +50,8 @@ export default function SavingsMonthScreen() {
 
   if (months.isLoading) {
     return (
-      <Screen title="Month" showBack>
-        <View className="mt-2 w-full gap-4" accessibilityLabel="Loading">
+      <Screen title={t('savings.month.title')} showBack>
+        <View className="mt-2 w-full gap-4" accessibilityLabel={t('savings.month.loading')}>
           <Skeleton className="h-5 w-full" />
           <Skeleton className="mt-2 h-28 w-full rounded-[16px]" />
           <Skeleton className="h-14 w-full rounded-[12px]" />
@@ -55,11 +62,11 @@ export default function SavingsMonthScreen() {
 
   if (months.isError) {
     return (
-      <Screen title="Month" showBack>
+      <Screen title={t('savings.month.title')} showBack>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={() => void months.refetch()}
         />
       </Screen>
@@ -68,8 +75,8 @@ export default function SavingsMonthScreen() {
 
   if (!row || !month) {
     return (
-      <Screen title="Month" showBack>
-        <Subtitle className="mt-3">That month is not on your savings.</Subtitle>
+      <Screen title={t('savings.month.title')} showBack>
+        <Subtitle className="mt-3">{t('savings.month.missing')}</Subtitle>
       </Screen>
     );
   }
@@ -127,10 +134,9 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
     setError(null);
     if (!excluded) {
       const ok = await confirm({
-        title: `Leave ${monthName(month)} out?`,
-        message:
-          'It stops counting towards your savings total. Nothing is deleted, and you can put it back.',
-        confirmLabel: 'Leave it out',
+        title: t('savings.month.excludeTitle', { month: monthInSentence(month) }),
+        message: t('savings.month.excludeMessage'),
+        confirmLabel: t('savings.month.excludeConfirm'),
         destructive: true,
       });
       if (!ok) return;
@@ -146,14 +152,11 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
 
   return (
     <Screen title={monthName(month)} showBack avoidKeyboard>
-      <Subtitle className="mt-3">
-        Skip only knows what it was told. If something was paid in cash or never scanned, put the
-        real figure here.
-      </Subtitle>
+      <Subtitle className="mt-3">{t('savings.month.intro')}</Subtitle>
 
       <View className="mt-6 w-full rounded-[16px] border border-line bg-card px-5 py-4">
         <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-          What Skip worked out
+          {t('savings.month.workedOut')}
         </Text>
         <Text className="mt-1 font-app-semibold text-[20px] text-ink" maxFontSizeMultiplier={1.2}>
           {formatCurrency(computed)}
@@ -162,26 +165,28 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
           className="mt-1.5 font-app text-[12px] leading-[18px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
-          {formatCurrency(Number(row.income))} came in and {formatCurrency(Number(row.spent))} went
-          out on bills, subscriptions and receipts.
+          {t('savings.month.flow', {
+            income: formatCurrency(Number(row.income)),
+            spent: formatCurrency(Number(row.spent)),
+          })}
         </Text>
       </View>
 
       <View className="mt-6 w-full gap-6">
         <SelectField
-          label="What it really left"
+          label={t('savings.month.reallyLeft')}
           value={amount.trim() === '' ? '' : formatCurrency(Number(amount))}
-          placeholder="Leave empty to use Skip’s figure"
+          placeholder={t('savings.month.reallyLeftPlaceholder')}
           icon={Wallet}
           onPress={() => setPadOpen(true)}
         />
 
         <TextField
-          label="Why"
+          label={t('savings.month.why')}
           optional
           value={note}
           onChangeText={setNote}
-          placeholder="Paid the plumber in cash"
+          placeholder={t('savings.month.whyPlaceholder')}
           maxLength={200}
           autoCapitalize="sentences"
         />
@@ -195,7 +200,7 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
 
       <View className="mb-10 mt-auto w-full gap-3 pt-10">
         <Button
-          label={adjust.isPending ? 'Saving…' : 'Save'}
+          label={adjust.isPending ? t('savings.month.saving') : t('common.save')}
           onPress={handleSave}
           disabled={adjust.isPending}
         />
@@ -203,17 +208,13 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
         {amount.trim() !== '' || note.trim() !== '' ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Put this month back on Skip’s own figure"
+            accessibilityLabel={t('savings.month.resetLabel')}
             onPress={handleReset}
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full bg-ink/5 active:bg-ink/10"
           >
             <RotateCcw size={18} color={colors.ink} strokeWidth={1.8} />
-            <Text
-              className="font-app-medium text-[14px] text-ink"
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.4}
-            >
-              Back to Skip’s figure
+            <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.4}>
+              {t('savings.month.reset')}
             </Text>
           </Pressable>
         ) : null}
@@ -221,7 +222,7 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
-            excluded ? 'Count this month again' : 'Leave this month out of your savings'
+            excluded ? t('savings.month.include') : t('savings.month.excludeLabel')
           }
           onPress={handleExclude}
           className="min-h-12 w-full items-center justify-center rounded-full active:bg-ink/5"
@@ -232,17 +233,16 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
                 ? 'font-app-medium text-[14px] text-ink'
                 : 'font-app-medium text-[14px] text-danger'
             }
-            numberOfLines={1}
             maxFontSizeMultiplier={1.4}
           >
-            {excluded ? 'Count this month again' : 'Leave this month out'}
+            {excluded ? t('savings.month.include') : t('savings.month.exclude')}
           </Text>
         </Pressable>
       </View>
 
       {padOpen ? (
         <AmountPad
-          title="What it really left"
+          title={t('savings.month.reallyLeft')}
           caption={monthName(month)}
           value={amount}
           onCancel={() => setPadOpen(false)}

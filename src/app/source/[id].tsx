@@ -21,19 +21,33 @@ import { SearchField } from '@/components/ui/search-field';
 import { useConfirm } from '@/providers/dialog-provider';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { SectionHeading } from '@/components/ui/typography';
+import { t, type MessageKey } from '@/i18n';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { sortByDateAscending } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { failureMessage, failureText } from '@/lib/failure';
 
-const KIND_LABELS: Record<string, string> = {
-  receipt: 'Receipt',
-  bill: 'Bill',
-  subscription: 'Subscription',
-  payment: 'Payment',
+const KIND_KEYS: Record<string, MessageKey> = {
+  receipt: 'accounts.source.kind.receipt',
+  bill: 'accounts.source.kind.bill',
+  subscription: 'accounts.source.kind.subscription',
+  payment: 'accounts.source.kind.payment',
 };
+
+function kindLabel(kind: string): string {
+  return KIND_KEYS[kind] ? t(KIND_KEYS[kind]) : kind;
+}
+
+/** The ledger names a payment with no note "Payment" in English; that name is drawn translated. */
+const UNNAMED_PAYMENT = 'Payment';
+
+function entryLabel(entry: { kind: string; label: string }): string {
+  return entry.kind === 'payment' && entry.label === UNNAMED_PAYMENT
+    ? t('accounts.source.kind.payment')
+    : entry.label;
+}
 
 export default function SourceDetailScreen() {
   const artwork = useArtwork();
@@ -70,8 +84,8 @@ export default function SourceDetailScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Go back"
+          title={failureText()}
+          actionLabel={t('cards.form.goBack')}
           onAction={() => router.back()}
         />
       </Screen>
@@ -91,7 +105,7 @@ export default function SourceDetailScreen() {
 
   const visible = entries.filter(
     (entry) =>
-      matchesSearch(entry.label, query) &&
+      matchesSearch(entryLabel(entry), query) &&
       (!filters.date || entry.date === filters.date) &&
       (filters.kinds.length === 0 || filters.kinds.includes(entry.kind)),
   );
@@ -99,10 +113,13 @@ export default function SourceDetailScreen() {
   const narrowed = query.trim().length > 0 || activeCount > 0;
 
   const kindOptions = [
-    { value: 'receipt', label: 'Receipts' },
-    { value: 'bill', label: 'Monthly Bills' },
-    { value: 'subscription', label: 'Subscriptions' },
-    { value: 'payment', label: isCard ? 'Payments' : 'Money in' },
+    { value: 'receipt', label: t('transactions.kind.receipt') },
+    { value: 'bill', label: t('transactions.kind.bill') },
+    { value: 'subscription', label: t('transactions.kind.subscription') },
+    {
+      value: 'payment',
+      label: isCard ? t('accounts.source.payments') : t('accounts.source.moneyIn'),
+    },
   ];
 
   const handlePay = async (amount: string) => {
@@ -127,9 +144,12 @@ export default function SourceDetailScreen() {
   /** Only payments can be removed here; a charge is edited where it lives. */
   const handleRemovePayment = async (entryId: string, label: string) => {
     const ok = await confirm({
-      title: `Remove ${label.toLowerCase()}?`,
-      message: 'The balance goes back up by that amount.',
-      confirmLabel: 'Remove',
+      title:
+        label === UNNAMED_PAYMENT
+          ? t('accounts.source.removePaymentTitle')
+          : t('accounts.source.removeNamedTitle', { label: label.toLowerCase() }),
+      message: t('accounts.source.removeMessage'),
+      confirmLabel: t('common.remove'),
       destructive: true,
     });
     if (ok) deletePayment.mutate(entryId.replace(/^payment-/, ''));
@@ -143,7 +163,7 @@ export default function SourceDetailScreen() {
       headerActions={[
         {
           icon: Pencil,
-          label: `Edit ${name}`,
+          label: t('accounts.source.editLabel', { name }),
           onPress: () =>
             router.push(isCard ? `/add-card?id=${source.id}` : `/add-account?id=${source.id}`),
         },
@@ -151,13 +171,15 @@ export default function SourceDetailScreen() {
       floating={
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={isCard ? 'Make a payment' : 'Add a deposit'}
+          accessibilityLabel={
+            isCard ? t('accounts.source.makePayment') : t('accounts.source.addDeposit')
+          }
           onPress={() => setPadOpen(true)}
           className="h-14 flex-row items-center gap-2 rounded-full bg-control px-5 active:opacity-80"
         >
           <Plus size={20} color={colors.onControl} strokeWidth={2} />
           <Text className="font-app-medium text-[15px] text-on-control" maxFontSizeMultiplier={1.3}>
-            {isCard ? 'Make a payment' : 'Add money'}
+            {isCard ? t('accounts.source.makePayment') : t('accounts.source.addMoney')}
           </Text>
         </Pressable>
       }
@@ -194,19 +216,24 @@ export default function SourceDetailScreen() {
         <SummaryLine
           label={
             source.balance_as_of
-              ? `Balance on ${formatFullDate(new Date(`${source.balance_as_of}T00:00:00`))}`
-              : 'Starting balance'
+              ? t('accounts.source.balanceOn', {
+                  date: formatFullDate(new Date(`${source.balance_as_of}T00:00:00`)),
+                })
+              : t('accounts.source.startingBalance')
           }
           value={formatCurrency(source.balance)}
         />
         <SummaryLine
-          label={isCard ? 'Charged since' : 'Spent since'}
+          label={isCard ? t('accounts.source.chargedSince') : t('accounts.source.spentSince')}
           value={formatCurrency(-ledger.charged)}
         />
-        <SummaryLine label={isCard ? 'Payments' : 'Money in'} value={formatCurrency(ledger.paid)} />
+        <SummaryLine
+          label={isCard ? t('accounts.source.payments') : t('accounts.source.moneyIn')}
+          value={formatCurrency(ledger.paid)}
+        />
         <View className="my-2 h-px w-full bg-line" />
         <SummaryLine
-          label={isCard ? 'Owed now' : 'Balance now'}
+          label={isCard ? t('accounts.source.owedNow') : t('accounts.source.balanceNow')}
           value={formatCurrency(ledger.balance)}
           strong
         />
@@ -222,17 +249,23 @@ export default function SourceDetailScreen() {
       ) : null}
 
       <View className="mt-8 w-full">
-        <SectionHeading>Transactions</SectionHeading>
+        <SectionHeading>{t('transactions.title')}</SectionHeading>
       </View>
 
       {entries.length > 0 ? (
         <View className="mt-3 w-full flex-row items-center gap-3">
-          <SearchField value={query} onChangeText={setQuery} placeholder="Search transactions" />
+          <SearchField
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('transactions.search')}
+          />
 
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
-              activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter transactions'
+              activeCount > 0
+                ? t('transactions.filtersActive', { count: activeCount })
+                : t('transactions.filterButton')
             }
             onPress={() => setFilterOpen(true)}
             className="h-11 w-11 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
@@ -255,19 +288,15 @@ export default function SourceDetailScreen() {
       {entries.length === 0 ? (
         <PageState
           art={artwork.emptyWallet}
-          title="Nothing on this one yet"
-          message={
-            isCard
-              ? 'Receipts, bills and subscriptions paid with this card land here as their dates arrive.'
-              : 'Anything paid from this account lands here as its date arrives.'
-          }
+          title={t('accounts.source.emptyTitle')}
+          message={isCard ? t('accounts.source.emptyCard') : t('accounts.source.emptyAccount')}
         />
       ) : visible.length === 0 && narrowed ? (
         <PageState
           art={artwork.noResults}
-          title="Nothing matches"
-          message="No transaction on this one fits that search and those filters."
-          actionLabel="Clear search"
+          title={t('transactions.noMatchTitle')}
+          message={t('accounts.source.noMatch')}
+          actionLabel={t('accounts.source.clearSearch')}
           onAction={() => {
             setQuery('');
             setFilters(EMPTY_FILTERS);
@@ -279,9 +308,9 @@ export default function SourceDetailScreen() {
             <Fragment key={entry.id}>
               {index > 0 ? <View className="ml-[52px] h-px bg-line/60" /> : null}
               <TransactionRow
-                label={entry.label}
+                label={entryLabel(entry)}
                 amount={entry.amount}
-                kindLabel={`${KIND_LABELS[entry.kind]} · ${formatFullDate(new Date(`${entry.date}T00:00:00`))}`}
+                kindLabel={`${kindLabel(entry.kind)} · ${formatFullDate(new Date(`${entry.date}T00:00:00`))}`}
                 domain={entry.domain}
                 logoHidden={entry.logoHidden}
                 kind={entry.kind}
@@ -300,7 +329,7 @@ export default function SourceDetailScreen() {
 
       {padOpen ? (
         <AmountPad
-          title={isCard ? 'Payment' : 'Money in'}
+          title={isCard ? t('accounts.source.kind.payment') : t('accounts.source.moneyIn')}
           caption={name}
           value=""
           onCancel={() => setPadOpen(false)}

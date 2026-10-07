@@ -5,6 +5,7 @@ import { fireEvent, render } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import TourScreen from '@/app/tour';
+import { t } from '@/i18n';
 
 /**
  * The tour pushes each stop `as never`, so typed routes cannot check where a card goes. This presses
@@ -85,8 +86,9 @@ describe('Tour', () => {
 
   it('is counted the same way by the Settings row that opens it', () => {
     const support = fs.readFileSync(path.join(APP, 'settings', 'support.tsx'), 'utf8');
-    expect(support).toContain(
-      `subtitle="The ${COUNT_WORDS[STOPS.length]} things, each a tap away"`,
+    expect(support).toContain(`subtitle={t('support.tourDetail')}`);
+    expect(t('support.tourDetail')).toBe(
+      `The ${COUNT_WORDS[STOPS.length]} things, each a tap away`,
     );
   });
 });

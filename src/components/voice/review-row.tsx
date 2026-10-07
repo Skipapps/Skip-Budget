@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { GLYPH_STROKE } from '@/data/glyphs';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
 
@@ -34,16 +35,21 @@ export function ReviewRow({ label, value, required, leading, onPress }: ReviewRo
   const missing = value === null;
   const gap = missing && required;
 
-  const spokenValue = !missing ? value : required ? 'not heard' : 'not set, optional';
-  const shownLabel = missing && !required ? `${label} · optional` : label;
+  const spokenValue = !missing
+    ? value
+    : required
+      ? t('voice.row.notHeard')
+      : t('voice.row.notSetOptional');
+  const shownLabel = missing && !required ? t('voice.row.optionalLabel', { label }) : label;
+  const field = label.toLowerCase();
   const hint = gap
-    ? `Needed to save. Opens ${label.toLowerCase()} to add it.`
-    : `Opens ${label.toLowerCase()} to change it.`;
+    ? t('voice.row.neededHint', { label: field })
+    : t('voice.row.changeHint', { label: field });
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${label}, ${spokenValue}`}
+      accessibilityLabel={t('voice.row.spoken', { label, value: spokenValue })}
       accessibilityHint={hint}
       onPress={onPress}
       className="min-h-14 w-full flex-row items-center gap-3 px-4 py-3 active:opacity-60"
@@ -72,7 +78,7 @@ export function ReviewRow({ label, value, required, leading, onPress }: ReviewRo
           numberOfLines={2}
           maxFontSizeMultiplier={1.4}
         >
-          {gap ? 'Tap to add' : missing ? 'Not set' : value}
+          {gap ? t('voice.row.tapToAdd') : missing ? t('voice.row.notSet') : value}
         </Text>
       </View>
 

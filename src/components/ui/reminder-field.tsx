@@ -12,6 +12,7 @@ import { ChoiceChips } from '@/components/ui/choice-chips';
 import { TextLink } from '@/components/ui/text-link';
 import { TimePicker } from '@/components/ui/time-picker';
 import { FieldLabel } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { formatClock, parseClock } from '@/lib/date';
 import { useColors } from '@/providers/theme-provider';
 
@@ -44,17 +45,18 @@ export function ReminderField({
   const colors = useColors();
   const [pickerOpen, setPickerOpen] = useState(false);
   const clock = parseClock(time);
+  const clockLabel = formatClock(clock.hour, clock.minute);
 
   return (
     <View className="w-full">
-      <FieldLabel className="mb-1">Reminder</FieldLabel>
+      <FieldLabel className="mb-1">{t('ui.reminder.label')}</FieldLabel>
       <Text className="mb-2.5 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
         {unavailable ?? REMINDER_CAPTION[kind]}
       </Text>
 
       {unavailable && onRetry ? (
         <TextLink
-          label="Try again"
+          label={t('common.tryAgain')}
           variant="subtle"
           onPress={onRetry}
           className="mb-1 self-start"
@@ -68,7 +70,7 @@ export function ReminderField({
           {value === 'off' ? null : (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Sent at ${formatClock(clock.hour, clock.minute)}. Change the time.`}
+              accessibilityLabel={t('ui.reminder.sentAt', { time: clockLabel })}
               onPress={() => setPickerOpen(true)}
               // The pill is 40pt tall by design; the target is the 44pt floor.
               hitSlop={{ top: 4, bottom: 4 }}
@@ -76,7 +78,7 @@ export function ReminderField({
             >
               <Clock size={18} color={colors.body} strokeWidth={1.8} />
               <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
-                at {formatClock(clock.hour, clock.minute)}
+                {t('ui.reminder.at', { time: clockLabel, count: clock.hour % 12 || 12 })}
               </Text>
             </Pressable>
           )}

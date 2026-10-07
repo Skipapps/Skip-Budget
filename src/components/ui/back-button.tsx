@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Pressable } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
+import { t } from '@/i18n';
 import { withTap } from '@/lib/press';
 import { useColors } from '@/providers/theme-provider';
 
@@ -21,12 +22,12 @@ export function goBack(): void {
 }
 
 /** Top-left chevron, a 44pt touch target (Apple's minimum). */
-export function BackButton({ onPress, accessibilityLabel = 'Go back' }: BackButtonProps) {
+export function BackButton({ onPress, accessibilityLabel }: BackButtonProps) {
   const colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={accessibilityLabel ?? t('ui.goBack')}
       hitSlop={8}
       onPress={withTap(onPress ?? goBack)}
       // Pulled 8pt left so the chevron's stroke, not its touch box, lines up with the page edge.

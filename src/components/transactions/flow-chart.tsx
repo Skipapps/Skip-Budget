@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react';
 import { Text, View } from 'react-native';
 import Svg, { Line, Path, Text as SvgText } from 'react-native-svg';
 
+import { compactMoney } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
 
 export type FlowBucket = {
@@ -19,18 +20,6 @@ const LABEL_ROOM = 18;
 const GAP = 2;
 /** So a real but tiny amount is still a visible mark rather than nothing. */
 const MIN_MARK = 3;
-
-/**
- * Money short enough to sit on a bar: twelve months across a phone leaves under thirty points per
- * bar, so thousands collapse and cents go (the exact number is a row away in the list).
- */
-function compact(value: number): string {
-  if (value >= 1000) {
-    const thousands = value / 1000;
-    return `$${thousands >= 10 ? Math.round(thousands) : thousands.toFixed(1)}k`;
-  }
-  return `$${Math.round(value)}`;
-}
 
 function barPath(x: number, width: number, baseY: number, topY: number): string {
   const radius = Math.min(4, width / 2, baseY - topY);
@@ -79,6 +68,8 @@ export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
                   {bucket.spent > 0 ? (
                     <>
                       <Path d={barPath(x, barWidth, baseY, topY)} fill={BAR} />
+                      {/* Twelve months across a phone leave under thirty points a bar, so
+                          thousands collapse and cents go; the exact figure is a row away. */}
                       <SvgText
                         x={x + barWidth / 2}
                         y={topY - 6}
@@ -87,7 +78,7 @@ export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
                         fontWeight="600"
                         textAnchor="middle"
                       >
-                        {compact(bucket.spent)}
+                        {compactMoney(bucket.spent)}
                       </SvgText>
                     </>
                   ) : null}

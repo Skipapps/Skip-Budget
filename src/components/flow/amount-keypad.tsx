@@ -1,9 +1,11 @@
 import { Delete } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
+import { numberMarks, t } from '@/i18n';
 import { selection } from '@/lib/haptics';
 import { useColors } from '@/providers/theme-provider';
 
+/** Key identities, not faces: '.' is the decimal key in every language and is drawn with its mark. */
 export const AMOUNT_KEYS = [
   '1',
   '2',
@@ -52,6 +54,7 @@ const KEY_ROWS: AmountKey[][] = [
 
 export function AmountKeypad({ onKey }: AmountKeypadProps) {
   const colors = useColors();
+  const { decimal } = numberMarks();
 
   return (
     <View className="w-full gap-3">
@@ -62,7 +65,11 @@ export function AmountKeypad({ onKey }: AmountKeypadProps) {
               key={key}
               accessibilityRole="button"
               accessibilityLabel={
-                key === 'delete' ? 'Delete last digit' : key === '.' ? 'Decimal point' : key
+                key === 'delete'
+                  ? t('loan.keypad.deleteLast')
+                  : key === '.'
+                    ? t('loan.keypad.decimal')
+                    : key
               }
               onPress={() => {
                 selection();
@@ -74,7 +81,7 @@ export function AmountKeypad({ onKey }: AmountKeypadProps) {
                 <Delete size={24} color={colors.ink} strokeWidth={1.8} />
               ) : (
                 <Text allowFontScaling={false} className="font-app text-[26px] text-ink">
-                  {key}
+                  {key === '.' ? decimal : key}
                 </Text>
               )}
             </Pressable>

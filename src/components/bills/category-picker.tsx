@@ -1,16 +1,21 @@
 import { Pressable, Text, View } from 'react-native';
 
+import { billCategoryHint, billCategoryLabel } from '@/components/bills/bill-row';
 import { BILL_CATEGORIES, type BillCategory } from '@/data/bills-mock';
 import { GLYPH_STROKE } from '@/data/glyphs';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
 
 type CategoryPickerProps = {
+  /** Hands back the category itself, English label included: a new bill is named after it. */
   onSelect: (category: BillCategory) => void;
   selectedId?: string;
 };
 
-/** Grid of the common recurring bills, two-up so label and hint have room. */
+/**
+ * Grid of the common recurring bills, two-up so label and hint have room. Neither line is capped:
+ * Spanish and French hints run longer, and a taller tile beats a cut one.
+ */
 export function CategoryPicker({ onSelect, selectedId }: CategoryPickerProps) {
   const colors = useColors();
   return (
@@ -18,13 +23,15 @@ export function CategoryPicker({ onSelect, selectedId }: CategoryPickerProps) {
       {BILL_CATEGORIES.map((category) => {
         const Icon = category.icon;
         const selected = category.id === selectedId;
+        const label = billCategoryLabel(category.id, category.label);
+        const hint = billCategoryHint(category.id, category.hint);
 
         return (
           <Pressable
             key={category.id}
             accessibilityRole="button"
             accessibilityState={{ selected }}
-            accessibilityLabel={`${category.label}. ${category.hint}`}
+            accessibilityLabel={`${label}. ${hint}`}
             onPress={() => onSelect(category)}
             style={{ width: '47.5%' }}
             className={cn(
@@ -47,17 +54,15 @@ export function CategoryPicker({ onSelect, selectedId }: CategoryPickerProps) {
 
             <Text
               className="mt-3 font-app-medium text-[14px] leading-[19px] text-ink"
-              numberOfLines={2}
               maxFontSizeMultiplier={1.3}
             >
-              {category.label}
+              {label}
             </Text>
             <Text
               className="mt-1 font-app text-[11px] leading-[15px] text-muted"
-              numberOfLines={2}
               maxFontSizeMultiplier={1.2}
             >
-              {category.hint}
+              {hint}
             </Text>
           </Pressable>
         );

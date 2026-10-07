@@ -22,6 +22,7 @@ import {
 import { usePaymentSources } from '@/api/queries';
 import { useLearnVoiceAlias, useVoiceAliases } from '@/api/voice-aliases';
 import { BillMark } from '@/components/bills/bill-mark';
+import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
 import { BrandLogo } from '@/components/brands/brand-logo';
 import { AmountFigure } from '@/components/flow/amount-figure';
 import { FlowHeader } from '@/components/flow/step-flow';
@@ -35,8 +36,9 @@ import { FieldLabel } from '@/components/ui/typography';
 import { GlyphWell, ReviewRow } from '@/components/voice/review-row';
 import { StaleDraft } from '@/components/voice/stale-draft';
 import { BILL_CATEGORIES, RECURRENCES } from '@/data/bills-mock';
+import { t, type MessageKey } from '@/i18n';
 import { formatRelativeDay } from '@/lib/date';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { failureMessage, failureText } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
 import { refusedForPro } from '@/lib/pro-refusal';
 import { success, warn } from '@/lib/haptics';
@@ -61,55 +63,101 @@ import {
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
 
-const KIND_COPY: Record<
-  VoiceKind,
-  {
-    title: string;
-    closePrompt: string;
-    save: string;
-    merchant: string;
-    date: string;
-    paidWith: string;
-  }
-> = {
+type KindCopy = {
+  title: string;
+  closePrompt: string;
+  save: string;
+  merchant: string;
+  date: string;
+  paidWith: string;
+};
+
+const KIND_COPY: Record<VoiceKind, Record<keyof KindCopy, MessageKey>> = {
   receipt: {
-    title: 'Add a receipt',
-    closePrompt: 'Cancel adding this receipt?',
-    save: 'Save receipt',
-    merchant: 'Store',
-    date: 'Bought on',
-    paidWith: 'Paid with',
+    title: 'voice.receipt.title',
+    closePrompt: 'voice.receipt.closePrompt',
+    save: 'voice.receipt.save',
+    merchant: 'voice.receipt.merchant',
+    date: 'voice.receipt.date',
+    paidWith: 'voice.receipt.paidWith',
   },
   bill: {
-    title: 'Add a bill',
-    closePrompt: 'Cancel adding this bill?',
-    save: 'Save bill',
-    merchant: 'Name',
-    date: 'Due on',
-    paidWith: 'Paid with',
+    title: 'voice.bill.title',
+    closePrompt: 'voice.bill.closePrompt',
+    save: 'voice.bill.save',
+    merchant: 'voice.bill.merchant',
+    date: 'voice.bill.date',
+    paidWith: 'voice.bill.paidWith',
   },
   subscription: {
-    title: 'Add a subscription',
-    closePrompt: 'Cancel adding this subscription?',
-    save: 'Save subscription',
-    merchant: 'Service',
-    date: 'Renews on',
-    paidWith: 'Charged to',
+    title: 'voice.subscription.title',
+    closePrompt: 'voice.subscription.closePrompt',
+    save: 'voice.subscription.save',
+    merchant: 'voice.subscription.merchant',
+    date: 'voice.subscription.date',
+    paidWith: 'voice.subscription.paidWith',
   },
 };
 
+function kindCopy(kind: VoiceKind): KindCopy {
+  const keys = KIND_COPY[kind];
+  return {
+    title: t(keys.title),
+    closePrompt: t(keys.closePrompt),
+    save: t(keys.save),
+    merchant: t(keys.merchant),
+    date: t(keys.date),
+    paidWith: t(keys.paidWith),
+  };
+}
+
 const KIND_OPTIONS = [
-  { value: 'receipt', label: 'Receipt' },
-  { value: 'bill', label: 'Bill' },
-  { value: 'subscription', label: 'Subscription' },
+  {
+    value: 'receipt',
+    get label() {
+      return t('voice.kind.receipt');
+    },
+  },
+  {
+    value: 'bill',
+    get label() {
+      return t('voice.kind.bill');
+    },
+  },
+  {
+    value: 'subscription',
+    get label() {
+      return t('voice.kind.subscription');
+    },
+  },
 ] as const;
 
 /** add-subscription's own billing cycles, word for word. */
 const SUBSCRIPTION_CYCLES = [
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'yearly', label: 'Yearly' },
+  {
+    value: 'weekly',
+    get label() {
+      return t('dates.weekly');
+    },
+  },
+  {
+    value: 'monthly',
+    get label() {
+      return t('dates.monthly');
+    },
+  },
+  {
+    value: 'quarterly',
+    get label() {
+      return t('subscriptions.cycle.quarterly');
+    },
+  },
+  {
+    value: 'yearly',
+    get label() {
+      return t('subscriptions.cycle.yearly');
+    },
+  },
 ] as const;
 
 type EditField = 'amount' | 'merchant' | 'date' | 'category';
@@ -157,9 +205,11 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
 
   const { id, draft, entry, touched, edited } = session;
   const kind = entry.kind;
-  const copy = KIND_COPY[kind];
+  const copy = kindCopy(kind);
   const category = BILL_CATEGORIES.find((option) => option.id === entry.billCategoryId) ?? null;
-  const categoryLabel = category?.label ?? '';
+  // A bill with no name of its own is saved under this, in the language on screen, as add-bill
+  // pre-fills it.
+  const categoryLabel = category ? billCategoryLabel(category.id, category.label) : '';
 
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -203,9 +253,10 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   const askToDiscard = () =>
     confirm({
       title: copy.closePrompt,
-      message: 'Nothing you have entered here will be saved.',
-      confirmLabel: 'Yes',
-      cancelLabel: 'Go back',
+      // The header's close asks the same question, so both dialogs share its words.
+      message: t('ui.flow.discardMessage'),
+      confirmLabel: t('common.yes'),
+      cancelLabel: t('ui.flow.stay'),
       destructive: true,
     });
 
@@ -295,7 +346,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
           className="w-full text-center font-app text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
-          {FAILURE_MESSAGE}
+          {failureText()}
         </Text>
       ) : hint ? (
         <Text
@@ -307,18 +358,22 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
       ) : null}
 
       <Button
-        label={saving ? 'Saving…' : copy.save}
+        label={saving ? t('voice.review.saving') : copy.save}
         onPress={() => void save()}
         disabled={saving || !built?.ok}
         accessibilityHint={hint ?? undefined}
       />
 
       <View className="w-full flex-row flex-wrap justify-center gap-x-8">
-        <TextLink label="Say it again" variant="subtle" onPress={() => void handleSayAgain()} />
         <TextLink
-          label="More options"
+          label={t('voice.review.sayAgain')}
           variant="subtle"
-          accessibilityHint="Opens the full form with what Skip heard filled in."
+          onPress={() => void handleSayAgain()}
+        />
+        <TextLink
+          label={t('voice.review.moreOptions')}
+          variant="subtle"
+          accessibilityHint={t('voice.review.moreOptionsHint')}
           onPress={() => go(() => router.push(entryToForm(entry)))}
         />
       </View>
@@ -353,29 +408,29 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
         numberOfLines={2}
         maxFontSizeMultiplier={1.3}
       >
-        {draft.confidence === 'low' ? 'Did Skip hear you right?' : 'Is this right?'}
+        {draft.confidence === 'low' ? t('voice.review.heardRight') : t('voice.review.isThisRight')}
       </Text>
 
       <View
         accessible
-        accessibilityLabel={`You said: ${draft.transcript}`}
+        accessibilityLabel={t('voice.review.youSaidLabel', { words: draft.transcript })}
         className="mt-4 w-full rounded-[16px] bg-ink/5 px-4 py-3"
       >
         <Text className="font-app-medium text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-          You said
+          {t('voice.review.youSaid')}
         </Text>
         <Text className="mt-1 font-app text-[15px] leading-6 text-ink" maxFontSizeMultiplier={1.6}>
-          “{draft.transcript}”
+          {t('voice.review.quoted', { words: draft.transcript })}
         </Text>
       </View>
 
-      <FieldLabel className="mt-6 w-full">Add as</FieldLabel>
+      <FieldLabel className="mt-6 w-full">{t('voice.review.addAs')}</FieldLabel>
       <View className="mt-2 w-full">
         <ChoiceChips options={KIND_OPTIONS} value={kind} onChange={changeKind} />
       </View>
       {!draft.kindSure && !touched.includes('kind') ? (
         <Text className="mt-2 w-full font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-          Skip guessed this one. Pick another if it’s wrong.
+          {t('voice.review.guessed')}
         </Text>
       ) : null}
 
@@ -387,7 +442,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
               className="font-app-semibold text-[15px] text-ink"
               maxFontSizeMultiplier={1.3}
             >
-              Which amount did you mean?
+              {t('voice.review.whichAmount')}
             </Text>
             <View className="mt-3 w-full">
               {/* Nothing selected: the parser could not tell, so nor does the page. */}
@@ -404,7 +459,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
               />
             </View>
             <TextLink
-              label="Neither, I’ll type it"
+              label={t('voice.review.typeIt')}
               variant="subtle"
               className="mt-1 items-start"
               onPress={() => edit('amount')}
@@ -414,8 +469,11 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
           // Never $0: a zero for an amount nobody said is a false figure.
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Amount, not heard"
-            accessibilityHint="Needed to save. Opens the amount to add it."
+            accessibilityLabel={t('voice.row.spoken', {
+              label: t('voice.review.amount'),
+              value: t('voice.row.notHeard'),
+            })}
+            accessibilityHint={t('voice.review.amountNeededHint')}
             onPress={() => edit('amount')}
             className="min-h-[112px] w-full items-center justify-center rounded-[16px] bg-accent/10 px-4 active:opacity-80"
           >
@@ -424,20 +482,23 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
               className="text-center font-app-medium text-[17px] text-ink"
               maxFontSizeMultiplier={1.3}
             >
-              Tap to add the amount
+              {t('voice.review.tapToAddAmount')}
             </Text>
             <Text
               className="mt-1 text-center font-app text-[13px] text-muted"
               maxFontSizeMultiplier={1.4}
             >
-              Skip didn’t catch how much.
+              {t('voice.review.amountNotCaught')}
             </Text>
           </Pressable>
         ) : (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Amount, ${formatCurrency(entry.amount)}`}
-            accessibilityHint="Opens the amount to change it."
+            accessibilityLabel={t('voice.row.spoken', {
+              label: t('voice.review.amount'),
+              value: formatCurrency(entry.amount),
+            })}
+            accessibilityHint={t('voice.review.amountChangeHint')}
             onPress={() => edit('amount')}
             className="w-full items-center rounded-[16px] py-4 active:bg-ink/5"
           >
@@ -445,7 +506,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
             <View className="mt-3 min-h-8 flex-row items-center gap-1.5 rounded-full bg-ink/5 px-3.5">
               <Pencil size={14} color={colors.ink} strokeWidth={1.8} />
               <Text className="font-app-medium text-[13px] text-ink" maxFontSizeMultiplier={1.2}>
-                Change
+                {t('common.change')}
               </Text>
             </View>
           </Pressable>
@@ -475,8 +536,8 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
           <>
             <View className="ml-[52px] h-px bg-line/60" />
             <ReviewRow
-              label="Category"
-              value={category ? category.label : null}
+              label={t('voice.review.category')}
+              value={categoryLabel || null}
               required
               leading={category ? <GlyphWell icon={category.icon} /> : null}
               onPress={() => edit('category')}
@@ -496,10 +557,13 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
 
       {kind === 'bill' ? (
         <>
-          <FieldLabel className="mt-6 w-full">Recurring</FieldLabel>
+          <FieldLabel className="mt-6 w-full">{t('voice.review.recurring')}</FieldLabel>
           <View className="mt-2 w-full">
             <ChoiceChips
-              options={RECURRENCES}
+              options={RECURRENCES.map((option) => ({
+                value: option.value,
+                label: recurrenceLabel(option.value),
+              }))}
               value={entry.cycle ?? 'monthly'}
               onChange={(cycle: VoiceCycle) => updateVoiceEntry(id, { cycle })}
             />
@@ -507,7 +571,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
         </>
       ) : kind === 'subscription' ? (
         <>
-          <FieldLabel className="mt-6 w-full">Billing cycle</FieldLabel>
+          <FieldLabel className="mt-6 w-full">{t('voice.review.billingCycle')}</FieldLabel>
           <View className="mt-2 w-full">
             <ChoiceChips
               options={SUBSCRIPTION_CYCLES}

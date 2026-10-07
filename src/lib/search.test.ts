@@ -33,3 +33,17 @@ describe('matchesSearch', () => {
     expect(matchesSearch('Uber', 'ube')).toBe(true);
   });
 });
+
+describe('accents', () => {
+  it('are ignored in either direction', () => {
+    expect(matchesSearch('Électricité et gaz', 'electricite')).toBe(true);
+    expect(matchesSearch('Electricity', 'électricity')).toBe(true);
+    expect(matchesSearch('Niño Ahorro', 'nino')).toBe(true);
+    expect(matchesSearch('Cuenta de ahorros', 'cuenta')).toBe(true);
+    expect(matchesSearch('Café', 'cafe')).toBe(true);
+  });
+
+  it('still tells words apart', () => {
+    expect(matchesSearch('Épicerie', 'pharmacie')).toBe(false);
+  });
+});

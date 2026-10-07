@@ -9,6 +9,7 @@ import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { TextLink } from '@/components/ui/text-link';
 import { Subtitle } from '@/components/ui/typography';
+import { t } from '@/i18n';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -22,7 +23,7 @@ export default function LoginScreen() {
     setError(null);
 
     if (!email.trim() || !password) {
-      setError('Enter your email and password.');
+      setError(t('auth.login.missing'));
       return;
     }
 
@@ -50,13 +51,17 @@ export default function LoginScreen() {
   };
   const handleForgotPassword = () => router.push('/forgot-password');
 
+  // One sentence with the two links inside it, cut at the links so each can be its own element.
+  const [beforeTerms, rest = ''] = t('auth.login.agreement').split('{terms}');
+  const [betweenLinks] = rest.split('{privacy}');
+
   return (
-    <Screen title="Log in" showBack avoidKeyboard>
-      <Subtitle className="mt-3">Welcome back. Pick up where you left off.</Subtitle>
+    <Screen title={t('auth.login.title')} showBack avoidKeyboard>
+      <Subtitle className="mt-3">{t('auth.login.subtitle')}</Subtitle>
 
       <View className="mt-8 w-full gap-5">
         <TextField
-          label="Email"
+          label={t('auth.email')}
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -69,7 +74,7 @@ export default function LoginScreen() {
 
         <View className="w-full">
           <TextField
-            label="Password"
+            label={t('auth.password')}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -80,7 +85,7 @@ export default function LoginScreen() {
             error={error ?? undefined}
           />
           <TextLink
-            label="Forgot password?"
+            label={t('auth.forgot.title')}
             variant="subtle"
             onPress={handleForgotPassword}
             className="self-end py-2 pr-1"
@@ -89,17 +94,17 @@ export default function LoginScreen() {
       </View>
 
       <View className="mt-auto w-full pt-10">
-        <Button label={busy ? 'Signing in…' : 'Log in'} onPress={handleLogin} />
+        <Button label={busy ? t('auth.signingIn') : t('auth.login.title')} onPress={handleLogin} />
 
         <View className="mt-5 w-full flex-row flex-wrap items-center justify-center">
           <Text
             className="font-app text-[12px] leading-[18px] text-muted"
             maxFontSizeMultiplier={1.3}
           >
-            By continuing you agree to our{' '}
+            {beforeTerms}
           </Text>
           <TextLink
-            label="Terms of service"
+            label={t('auth.login.terms')}
             variant="subtle"
             onPress={() => router.push('/terms')}
           />
@@ -107,11 +112,10 @@ export default function LoginScreen() {
             className="font-app text-[12px] leading-[18px] text-muted"
             maxFontSizeMultiplier={1.3}
           >
-            {' '}
-            and{' '}
+            {betweenLinks}
           </Text>
           <TextLink
-            label="Privacy policy"
+            label={t('auth.login.privacy')}
             variant="subtle"
             onPress={() => router.push('/privacy')}
           />

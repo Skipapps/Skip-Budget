@@ -119,8 +119,11 @@ type RollingNumberProps = {
 
 /**
  * A currency figure whose digits turn like an odometer. Only digits that changed move; an identical
- * figure stays still, since the animation says "this changed". Separators hold still. Wheels are
- * keyed by distance from the right, so the cents stay on the same wheel when a figure grows a digit.
+ * figure stays still, since the animation says "this changed". Everything that is not a digit holds
+ * still: the group mark (a comma, or French's no-break space), the decimal mark and the currency
+ * mark on either side. Wheels are keyed by distance from the right, so the cents stay on the same
+ * wheel when a figure grows a digit; a mark written after the figure is the same length every time,
+ * so that holds in French too.
  */
 export function RollingNumber({
   value,

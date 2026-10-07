@@ -1,6 +1,7 @@
 import { Search, X } from 'lucide-react-native';
 import { Pressable, TextInput, View } from 'react-native';
 
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
 
@@ -35,7 +36,7 @@ export function SearchField({ value, onChangeText, placeholder, className }: Sea
       {value ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Clear search"
+          accessibilityLabel={t('ui.search.clear')}
           hitSlop={8}
           onPress={() => onChangeText('')}
           className="h-7 w-7 items-center justify-center rounded-full active:bg-ink/5"

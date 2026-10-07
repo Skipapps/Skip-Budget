@@ -2,6 +2,8 @@ import { Text, View } from 'react-native';
 
 import { Screen } from '@/components/ui/screen';
 import { Title } from '@/components/ui/typography';
+import { t, useLocale } from '@/i18n';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 export type Block =
   | { kind: 'text'; text: string }
@@ -15,13 +17,15 @@ export type Section = {
 
 type LegalDocumentProps = {
   title: string;
-  /** The date the wording last changed. */
+  /** The date the wording last changed, already written in the language on screen. */
   updated: string;
   summary: string;
   sections: Section[];
 };
 
 export function LegalDocument({ title, updated, summary, sections }: LegalDocumentProps) {
+  const { language } = useLocale();
+
   return (
     <Screen showBack>
       <Title align="left" className="w-full">
@@ -29,8 +33,20 @@ export function LegalDocument({ title, updated, summary, sections }: LegalDocume
       </Title>
 
       <Text className="mt-2 w-full font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-        Last updated {updated}
+        {t('legal.lastUpdated', { date: updated })}
       </Text>
+
+      {/* The English is the original; every other language is a courtesy translation of it. */}
+      {language !== 'en' ? (
+        <View className="mt-4 w-full rounded-[12px] bg-ink/[0.04] px-4 py-3">
+          <Text
+            className="font-app text-[14px] leading-[21px] text-body"
+            maxFontSizeMultiplier={TEXT_CAP.reading}
+          >
+            {t('legal.translationNotice')}
+          </Text>
+        </View>
+      ) : null}
 
       <Text
         className="mt-5 w-full font-app text-[15px] leading-[24px] text-body"

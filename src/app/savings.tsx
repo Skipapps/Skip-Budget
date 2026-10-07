@@ -4,6 +4,8 @@ import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { Subtitle } from '@/components/ui/typography';
+import { t } from '@/i18n';
+import { monthLong } from '@/i18n/calendar';
 import { formatCurrency } from '@/lib/format';
 import { sortByDateAscending } from '@/lib/group';
 import { useArtwork } from '@/theme/artwork';
@@ -12,12 +14,16 @@ import { ChevronRight } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { useColors } from '@/providers/theme-provider';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 
-/** "August 2026". */
+/** "August 2026", "Agosto de 2026": it starts its line, so it takes a capital in every language. */
 function monthName(month: string): string {
   const date = new Date(`${month}T00:00:00`);
-  return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const name = t('savings.monthYear', {
+    month: monthLong(date.getMonth()),
+    year: date.getFullYear(),
+  });
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 /**
@@ -41,19 +47,16 @@ export default function SavingsScreen() {
   );
 
   return (
-    <Screen title="Savings" showBack onRefresh={refresh} refreshing={refreshing}>
-      <Subtitle className="mt-3">
-        When a month ends, whatever was left of it is added here. Nothing is moved between your
-        accounts — this is a record, not a transfer.
-      </Subtitle>
+    <Screen title={t('savings.list.title')} showBack onRefresh={refresh} refreshing={refreshing}>
+      <Subtitle className="mt-3">{t('savings.list.intro')}</Subtitle>
 
       {isLoading ? <SkeletonList rows={4} /> : null}
 
       {isError ? (
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={() => refetch()}
         />
       ) : null}
@@ -61,8 +64,8 @@ export default function SavingsScreen() {
       {!isLoading && !isError && months.length === 0 ? (
         <PageState
           art={artwork.tileSavings}
-          title="Nothing yet"
-          message="Your first month appears here once it has finished. Until then the figure is still being spent, so there is nothing honest to show."
+          title={t('savings.list.emptyTitle')}
+          message={t('savings.list.emptyMessage')}
         />
       ) : null}
 
@@ -70,7 +73,7 @@ export default function SavingsScreen() {
         <>
           <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
             <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-              Saved so far
+              {t('savings.list.savedSoFar')}
             </Text>
             <Text
               className="mt-1 font-app-bold text-[38px] text-ink"
@@ -84,7 +87,7 @@ export default function SavingsScreen() {
               className="mt-1 text-center font-app text-[13px] text-muted"
               maxFontSizeMultiplier={1.3}
             >
-              across {kept} {kept === 1 ? 'month' : 'months'} that ended with something left
+              {t('savings.list.across', { count: kept })}
             </Text>
           </View>
 
@@ -113,18 +116,33 @@ function MonthRow({ row, onPress }: { row: MonthlySavingRow; onPress: () => void
   const over = shown < 0;
   const name = monthName(row.month);
 
+  const income = formatCurrency(Number(row.income));
+  const spent = formatCurrency(Number(row.spent));
   const explain = excluded
-    ? 'Left out of your savings. Tap to count it again.'
+    ? t('savings.row.excluded')
     : corrected
-      ? `You said this month left ${formatCurrency(shown)}${row.note ? ` — ${row.note}` : ''}. Skip worked out ${formatCurrency(computed)}.`
+      ? row.note
+        ? t('savings.row.correctedNote', {
+            amount: formatCurrency(shown),
+            note: row.note,
+            computed: formatCurrency(computed),
+          })
+        : t('savings.row.corrected', {
+            amount: formatCurrency(shown),
+            computed: formatCurrency(computed),
+          })
       : over
-        ? `${formatCurrency(Number(row.spent))} went out against ${formatCurrency(Number(row.income))} coming in, so this month took from your savings rather than adding to them.`
-        : `${formatCurrency(Number(row.income))} came in and ${formatCurrency(Number(row.spent))} went out on bills, subscriptions and receipts — the rest stayed.`;
+        ? t('savings.row.over', { spent, income })
+        : t('savings.row.kept', { income, spent });
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${name}. ${excluded ? 'Left out of your savings.' : `${formatCurrency(shown)}.`} ${explain} Tap to correct.`}
+      accessibilityLabel={
+        excluded
+          ? t('savings.row.labelExcluded', { month: name, explain })
+          : t('savings.row.label', { month: name, amount: formatCurrency(shown), explain })
+      }
       onPress={onPress}
       className="w-full flex-row items-center gap-3 border-b border-line py-4 active:bg-ink/5"
     >

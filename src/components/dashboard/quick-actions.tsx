@@ -4,15 +4,16 @@ import type { LucideIcon } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
+import { t, type MessageKey } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { withTap } from '@/lib/press';
 import { useColors } from '@/providers/theme-provider';
 
 type QuickAction = {
   id: string;
-  label: string;
+  label: MessageKey;
   /** Read out in full, because "Bill" on its own does not say what happens. */
-  hint: string;
+  hint: MessageKey;
   icon: LucideIcon;
   href: Href;
 };
@@ -21,23 +22,29 @@ type QuickAction = {
 const ACTIONS: QuickAction[] = [
   {
     id: 'receipt',
-    label: 'Receipt',
-    hint: 'Add a receipt',
+    label: 'home.kind.receipt',
+    hint: 'home.quickAdd.receiptHint',
     icon: Receipt,
     href: '/add-receipt',
   },
-  { id: 'bill', label: 'Bill', hint: 'Add a bill', icon: Calendar, href: '/add-bill' },
+  {
+    id: 'bill',
+    label: 'home.kind.bill',
+    hint: 'home.quickAdd.billHint',
+    icon: Calendar,
+    href: '/add-bill',
+  },
   {
     id: 'subscription',
-    label: 'Subscription',
-    hint: 'Add a subscription',
+    label: 'home.kind.subscription',
+    hint: 'home.quickAdd.subscriptionHint',
     icon: RefreshCw,
     href: '/add-subscription',
   },
   {
     id: 'salary',
-    label: 'Salary',
-    hint: 'Your salary and where it lands',
+    label: 'home.quickAdd.salary',
+    hint: 'home.quickAdd.salaryHint',
     icon: Banknote,
     href: '/salary',
   },
@@ -63,7 +70,7 @@ export function QuickActions({ onPress }: QuickActionsProps) {
     <Pressable
       key={action.id}
       accessibilityRole="button"
-      accessibilityLabel={action.hint}
+      accessibilityLabel={t(action.hint)}
       onPress={withTap(() => onPress(action.href))}
       className={cn(
         'min-h-14 flex-row items-center gap-2 rounded-[20px] border border-line bg-card px-3 py-2 active:bg-ink/5',
@@ -78,7 +85,7 @@ export function QuickActions({ onPress }: QuickActionsProps) {
         className="font-app-medium text-ink"
         slotClassName="min-w-0 flex-1"
       >
-        {action.label}
+        {t(action.label)}
       </FitText>
     </Pressable>
   );

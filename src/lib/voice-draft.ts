@@ -508,9 +508,10 @@ export function voiceBillName(entry: VoiceEntry, categoryLabel: string): string 
 }
 
 /**
- * A voice bill for `buildBillValues`. `categoryLabel` is the BILL_CATEGORIES
- * label for `entry.billCategoryId`, which this module cannot import. Check
- * `voiceSaveBlocker` first: a bill with no category is not a bill to save.
+ * A voice bill for `buildBillValues`. `categoryLabel` is `entry.billCategoryId`'s
+ * name in the language on screen (billCategoryLabel), which this module cannot
+ * import. Check `voiceSaveBlocker` first: a bill with no category is not a bill
+ * to save.
  */
 export function entryToBillInput(entry: VoiceEntry, categoryLabel: string): BillInput {
   return {

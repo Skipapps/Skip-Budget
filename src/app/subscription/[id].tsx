@@ -4,7 +4,8 @@ import { usePaymentSources, useSubscriptions } from '@/api/queries';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { ChangeLogoButton } from '@/components/brands/change-logo-button';
 import { PlanDetail, type PlanDetailRow } from '@/components/plans/plan-detail';
-import { CYCLE_LABELS } from '@/components/subscriptions/subscription-row';
+import { cycleLabel } from '@/components/subscriptions/subscription-row';
+import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { logoDomainOf } from '@/lib/logo-domain';
 
@@ -25,18 +26,28 @@ export default function SubscriptionDetailScreen() {
       (option) => option.id === (subscription.card_id ?? subscription.bank_account_id),
     );
     details.push({
-      label: subscription.active ? 'Next renewal' : 'Status',
+      label: subscription.active
+        ? t('subscriptions.detail.nextRenewal')
+        : t('subscriptions.field.status'),
       value: !subscription.active
-        ? 'Cancelled'
+        ? t('subscriptions.cancelled')
         : subscription.next_renewal_on
           ? asDate(subscription.next_renewal_on)
-          : 'No date yet',
+          : t('dates.noDate'),
     });
-    details.push({ label: 'Paid from', value: source?.label ?? 'No payment method' });
+    details.push({
+      label: t('subscriptions.detail.paidFrom'),
+      value: source?.label ?? t('subscriptions.noPaymentMethod'),
+    });
     if (subscription.started_on) {
-      details.push({ label: 'Started', value: asDate(subscription.started_on) });
+      details.push({
+        label: t('subscriptions.detail.started'),
+        value: asDate(subscription.started_on),
+      });
     }
-    if (subscription.note?.trim()) details.push({ label: 'Note', value: subscription.note.trim() });
+    if (subscription.note?.trim()) {
+      details.push({ label: t('subscriptions.field.note'), value: subscription.note.trim() });
+    }
   }
 
   return (
@@ -62,8 +73,8 @@ export default function SubscriptionDetailScreen() {
       frequency={
         subscription
           ? subscription.active
-            ? (CYCLE_LABELS[subscription.cycle] ?? subscription.cycle)
-            : 'Cancelled'
+            ? cycleLabel(subscription.cycle)
+            : t('subscriptions.cancelled')
           : ''
       }
       details={details}

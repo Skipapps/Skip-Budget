@@ -4046,3 +4046,28 @@ training. Cap 12-48 MP on 48 MP small-receipt shots: non-monotonic, within 3 of 
 
 **Not verified:** anything on a device (HEIC decode, memory, Vision model on iOS), PDFs (no PDF corpus), the camera
 path's own decode (UIImage + `normalised`, unchanged) against the bench's ImageIO decode.
+
+## 2026-10-07 — Dana (agent H, UI) — a new bill is pre-named in the language on screen
+
+**Outcome:** Done in the `i18n-currency-language` worktree only, nothing committed. tsc 0; eslint clean on my
+files (cache cleared; 2 pre-existing require() warnings in the test's mocks); prettier on my files only; bills/voice
+suites 17/17 (297 tests); full jest 179/179 suites, 2565 tests green.
+
+**Changed:** `src/app/add-bill.tsx`: one `categoryName(id)` (billCategoryLabel over BILL_CATEGORIES) feeds the
+category-tile pre-fill, `prefillName` (voice hand-off) and the `handleIssuer` "nobody typed it" compare, so they
+always match. `src/app/voice-edit.tsx` `labelOf` and `src/app/voice-review.tsx` `categoryLabel` use the same
+translated name (so `voiceBillName` / `entryToBillInput` save it); voice-review's own RECURRENCE_LABELS map replaced by
+`recurrenceLabel()`. Comments only: `voice-draft.ts` (entryToBillInput), `bill-row.tsx` (billCategoryLabel said new
+bills were named in English). English unchanged: a test pins billCategoryLabel(id) === BILL_CATEGORIES label in en.
+Category ids and existing bills' names untouched (edit test: a bill saved as "Vivienda" stays so in French).
+
+**Tests:** add-bill-i18n (Spanish pre-fill now "Vivienda"; the saved-object test is identical except the name; new:
+Housing/Vivienda/Logement pre-fill + saved name + id, typed name kept even after a company, company replaces the
+untyped name, voice hand-off pre-fill, English identity, no rename on edit). voice-edit-languages (Spanish name now
+"Vivienda"; new per-language unchanged/typed name, category follow in Spanish). voice-review-languages (French row
+now "Nom, Électricité et gaz"; new: saved bill identical across languages except name, typed name kept). Mutation:
+English compare in add-bill alone fails 2 tests; English labels in all three screens fail 10.
+
+**Stays English:** `carried.label: values.name || 'Bill'` in add-bill (stored in charges.label; unreachable, a bill
+cannot save without a name). Pre-existing, not changed: going back to the category grid and picking again
+overwrites a hand-typed name (only a company's or the voice page's name counts as real), in every language.

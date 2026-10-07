@@ -1,10 +1,11 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { Slider } from '@/components/ui/slider';
+import { t } from '@/i18n';
 
 type SliderRowProps = {
   label: string;
-  /** Already formatted for display — currency, percent, "3 yrs 6 mo". */
+  /** Already formatted for display in the language on screen: currency, percent, a term. */
   display: string;
   value: number;
   min: number;
@@ -51,7 +52,7 @@ export function SliderRow({
         {onValuePress ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${label}, ${display}. Edit`}
+            accessibilityLabel={t('loan.sliderRow.edit', { label, value: display })}
             onPress={onValuePress}
             hitSlop={8}
             className="min-h-10 justify-center rounded-full bg-ink/5 px-4 active:bg-ink/10"

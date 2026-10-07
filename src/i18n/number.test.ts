@@ -77,6 +77,13 @@ describe('formatPercent', () => {
     expect(formatPercent(0, 'fr')).toBe(`0,00${NBSP}%`);
     expect(formatPercent(NaN, 'en')).toBe('—');
   });
+
+  it('never shows a minus in front of a rate that rounds to zero', () => {
+    expect(formatPercent(-0.001, 'en')).toBe('0.00%');
+    expect(formatPercent(-0.004, 'fr')).toBe(`0,00${NBSP}%`);
+    expect(formatPercent(-0.5, 'en', 0)).toBe('-1%');
+    expect(formatPercent(-1.25, 'en')).toBe('-1.25%');
+  });
 });
 
 describe('formatCompactMoney', () => {
@@ -89,7 +96,10 @@ describe('formatCompactMoney', () => {
 
   it('rounds whole units below a thousand', () => {
     expect(formatCompactMoney(950.4, 'en', 'USD')).toBe('$950');
-    expect(formatCompactMoney(999.5, 'en', 'USD')).toBe('$1000');
+    expect(formatCompactMoney(999.5, 'en', 'USD')).toBe('$1.0k');
+    expect(formatCompactMoney(9999, 'en', 'USD')).toBe('$10k');
+    expect(formatCompactMoney(9949, 'en', 'USD')).toBe('$9.9k');
+    expect(formatCompactMoney(10500, 'en', 'USD')).toBe('$11k');
     expect(formatCompactMoney(0, 'en', 'USD')).toBe('$0');
     expect(formatCompactMoney(-0.2, 'en', 'USD')).toBe('$0');
     expect(formatCompactMoney(NaN, 'en', 'USD')).toBe('—');

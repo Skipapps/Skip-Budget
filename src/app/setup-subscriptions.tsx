@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 
 import { usePaymentSources, useSubscriptions } from '@/api/queries';
 import { SetupCollection } from '@/components/setup/setup-collection';
+import { t } from '@/i18n';
 import { SubscriptionRow } from '@/components/subscriptions/subscription-row';
 import { logoDomainOf } from '@/lib/logo-domain';
 
@@ -20,10 +21,11 @@ export default function SetupSubscriptionsScreen() {
 
   return (
     <SetupCollection
-      title="Add your subscriptions"
-      subtitle="Netflix, Spotify, the gym — add every one that renews on its own, one at a time."
-      emptyText="Your subscriptions show up here as you add them."
-      noun="subscription"
+      title={t('onboarding.subscriptions.title')}
+      subtitle={t('onboarding.subscriptions.subtitle')}
+      emptyText={t('onboarding.subscriptions.empty')}
+      addLabel={t('onboarding.subscriptions.add')}
+      addAnotherLabel={t('onboarding.subscriptions.addAnother')}
       addHref="/add-subscription"
       count={subscriptions.length}
       isPending={query.isPending}

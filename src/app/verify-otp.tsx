@@ -8,6 +8,7 @@ import { OtpInput } from '@/components/ui/otp-input';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
 import { Strong, Subtitle } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { resetTo } from '@/lib/nav';
 
 const CODE_LENGTH = 6;
@@ -27,7 +28,7 @@ export default function VerifyOtpScreen() {
     setNotice(null);
 
     if (value.length !== CODE_LENGTH) {
-      setError(`Enter all ${CODE_LENGTH} digits.`);
+      setError(t('auth.otp.enterAll', { digits: CODE_LENGTH }));
       return;
     }
 
@@ -53,19 +54,24 @@ export default function VerifyOtpScreen() {
     setBusy(true);
     const { error: resendError } = await resendOtp(email, mode);
     setBusy(false);
-    setNotice(resendError ? null : 'A new code is on its way.');
+    setNotice(resendError ? null : t('auth.otp.resent'));
     setError(resendError);
   };
 
+  // The address is drawn in bold, so the sentence is cut around it rather than filled.
+  const [beforeEmail, afterEmail] = t('auth.otp.sentTo', { digits: CODE_LENGTH }).split('{email}');
+
   return (
-    <Screen title="Enter the code" showBack avoidKeyboard>
+    <Screen title={t('auth.otp.title')} showBack avoidKeyboard>
       <Subtitle className="mt-3">
         {email ? (
           <>
-            We sent a {CODE_LENGTH}-digit code to <Strong>{email}</Strong>.
+            {beforeEmail}
+            <Strong>{email}</Strong>
+            {afterEmail}
           </>
         ) : (
-          `We sent a ${CODE_LENGTH}-digit code to your email.`
+          t('auth.otp.sentToYou', { digits: CODE_LENGTH })
         )}
       </Subtitle>
 
@@ -92,8 +98,11 @@ export default function VerifyOtpScreen() {
       ) : null}
 
       <View className="mt-auto w-full gap-2 pt-10">
-        <Button label={busy ? 'Checking…' : 'Continue'} onPress={() => submit(code)} />
-        <TextLink label="Resend code" variant="subtle" onPress={handleResend} />
+        <Button
+          label={busy ? t('auth.otp.checking') : t('common.continue')}
+          onPress={() => submit(code)}
+        />
+        <TextLink label={t('auth.otp.resend')} variant="subtle" onPress={handleResend} />
       </View>
     </Screen>
   );

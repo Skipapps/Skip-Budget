@@ -22,8 +22,23 @@ describe('the Pro price labels', () => {
     expect(proYearlyLabel()).toBe('19,99 $/an');
   });
 
-  it('stay a dollar price whatever currency the app shows', () => {
+  it('say US dollars out loud when the app shows another currency', () => {
     setCurrency('GBP');
+    expect(proMonthlyLabel()).toBe('US$1.99/mo');
+    expect(proYearlyLabel()).toBe('US$19.99/yr');
+
+    setCurrency('MXN');
+    setLanguage('es');
+    expect(proMonthlyLabel()).toBe('US$1.99/mes');
+
+    setCurrency('CAD');
+    setLanguage('fr');
+    expect(proMonthlyLabel()).toBe('1,99\u00A0$\u00A0US/mois');
+    expect(proYearlyLabel()).toBe('19,99\u00A0$\u00A0US/an');
+  });
+
+  it('stay a plain dollar price in US dollars', () => {
+    setCurrency('USD');
     expect(proMonthlyLabel()).toBe('$1.99/mo');
   });
 

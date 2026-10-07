@@ -5,6 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { usePro } from '@/api/pro';
 import { ROW_HEIGHT } from '@/components/navigation/tab-layout';
+import { t, useLocale } from '@/i18n';
 import { tap } from '@/lib/haptics';
 import { isSpeechAvailable } from '@/lib/speech';
 import { contrast } from '@/lib/tone';
@@ -26,6 +27,8 @@ export const VOICE_FAB_SIZE = ROW_HEIGHT;
 export function VoiceFab() {
   const { colors, scheme } = useTheme();
   const { pro, ready } = usePro();
+  // The tab bar sits outside the screens that remount on a language change.
+  useLocale();
   const ringed = scheme === 'dark' && contrast(colors.control, colors.surface) < 3;
 
   // One page per press: a quick double tap would otherwise stack two voice
@@ -51,12 +54,8 @@ export function VoiceFab() {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Add by voice"
-      accessibilityHint={
-        !ready || pro
-          ? 'Say a receipt, bill or subscription. You check it before it’s saved.'
-          : 'Part of Skip Pro. Shows what adding by voice can do.'
-      }
+      accessibilityLabel={t('voice.fab.label')}
+      accessibilityHint={!ready || pro ? t('voice.fab.hint') : t('voice.fab.hintFree')}
       onPress={open}
       style={[
         {

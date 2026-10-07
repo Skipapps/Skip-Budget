@@ -3,6 +3,7 @@ import { Pressable, Text, TextInput, View, type TextInputProps } from 'react-nat
 
 import { EyeIcon } from '@/components/icons/eye-icon';
 import { FieldLabel } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
 
@@ -57,7 +58,7 @@ export function TextField({
         <FieldLabel>{label}</FieldLabel>
         {optional ? (
           <Text className="ml-1.5 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-            (optional)
+            {t('ui.field.optional')}
           </Text>
         ) : null}
       </View>
@@ -95,7 +96,7 @@ export function TextField({
         {isPassword ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
+            accessibilityLabel={revealed ? t('ui.field.hidePassword') : t('ui.field.showPassword')}
             hitSlop={10}
             onPress={() => setRevealed((previous) => !previous)}
             className="-mr-1 ml-2 h-11 w-11 items-center justify-center active:opacity-60"

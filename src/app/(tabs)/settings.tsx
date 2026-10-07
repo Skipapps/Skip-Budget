@@ -17,13 +17,15 @@ import { Pressable, Text, View } from 'react-native';
 
 import { deleteAccount, signOut } from '@/api/auth';
 import { resetTo } from '@/lib/nav';
-import { usePro } from '@/api/pro';
+import { usePro, useProPrices } from '@/api/pro';
+import { t } from '@/i18n';
+import { proMonthlyLabel, proYearlyLabel } from '@/lib/wall';
 import { setProOverride, useProOverride } from '@/lib/pro-bypass';
 import { useUpdateProfile } from '@/api/mutations';
 import { ProfileAvatar } from '@/components/ui/profile-avatar';
 import { SettingsRow } from '@/components/settings/settings-row';
 import { SettingsSection } from '@/components/settings/settings-section';
-import { plural, useMoneyCounts } from '@/components/settings/use-money-counts';
+import { plural, useMoneyCounts, type Counted } from '@/components/settings/use-money-counts';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm, useDialog } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
@@ -34,11 +36,35 @@ import { useCharges } from '@/api/charges';
 import { useProfile, useReceipts } from '@/api/queries';
 
 /** Each opens a page of its own, so the rows carry no summary line. */
-const PAGES: { title: string; icon: LucideIcon; href: Href }[] = [
-  { title: 'Preferences', icon: SlidersHorizontal, href: '/settings/preferences' },
-  { title: 'Your money', icon: Wallet, href: '/settings/your-money' },
-  { title: 'About', icon: Info, href: '/settings/about' },
-  { title: 'Support', icon: LifeBuoy, href: '/settings/support' },
+const PAGES: { readonly title: string; icon: LucideIcon; href: Href }[] = [
+  {
+    get title() {
+      return t('settings.pages.preferences');
+    },
+    icon: SlidersHorizontal,
+    href: '/settings/preferences',
+  },
+  {
+    get title() {
+      return t('settings.pages.yourMoney');
+    },
+    icon: Wallet,
+    href: '/settings/your-money',
+  },
+  {
+    get title() {
+      return t('settings.pages.about');
+    },
+    icon: Info,
+    href: '/settings/about',
+  },
+  {
+    get title() {
+      return t('settings.pages.support');
+    },
+    icon: LifeBuoy,
+    href: '/settings/support',
+  },
 ];
 
 export default function SettingsScreen() {
@@ -48,6 +74,7 @@ export default function SettingsScreen() {
   const counts = useMoneyCounts();
   const profile = useProfile();
   const { pro } = usePro();
+  const prices = useProPrices();
   const proOverride = useProOverride();
   const updateProfile = useUpdateProfile();
 
@@ -77,34 +104,34 @@ export default function SettingsScreen() {
    * single-confirm pattern.
    */
   const handleDeleteAccount = async () => {
-    const tally = [
+    const tally: [number, Counted][] = [
       [counts.cards, 'card'],
-      [counts.accounts, 'bank account'],
+      [counts.accounts, 'bankAccount'],
       [counts.bills, 'bill'],
       [counts.subscriptions, 'subscription'],
       [receipts.data?.length ?? 0, 'receipt'],
-      [charges.data?.length ?? 0, 'recorded charge'],
-      [counts.salarySources, 'salary source'],
-    ] as const;
+      [charges.data?.length ?? 0, 'recordedCharge'],
+      [counts.salarySources, 'salarySource'],
+    ];
 
-    const held = tally.filter(([count]) => count > 0).map(([count, word]) => plural(count, word));
+    const held = tally.filter(([count]) => count > 0).map(([count, thing]) => plural(count, thing));
 
     const first = await confirm({
-      title: 'Delete your account?',
+      title: t('settings.delete.title'),
       message: held.length
-        ? `This removes ${held.join(', ')} — everything Skip holds for you. It cannot be undone.`
-        : 'This removes your account and everything Skip holds for you. It cannot be undone.',
-      confirmLabel: 'Continue',
-      cancelLabel: 'Keep my account',
+        ? t('settings.delete.held', { held: held.join(', ') })
+        : t('settings.delete.nothingHeld'),
+      confirmLabel: t('common.continue'),
+      cancelLabel: t('settings.delete.keep'),
       destructive: true,
     });
     if (!first) return;
 
     const second = await confirm({
-      title: 'Delete everything, for good?',
-      message: 'There is no way back from here, and no copy kept.',
-      confirmLabel: 'Delete everything',
-      cancelLabel: 'Keep my account',
+      title: t('settings.delete.finalTitle'),
+      message: t('settings.delete.finalMessage'),
+      confirmLabel: t('settings.delete.everything'),
+      cancelLabel: t('settings.delete.keep'),
       destructive: true,
     });
     if (!second) return;
@@ -117,16 +144,22 @@ export default function SettingsScreen() {
     resetTo('/welcome');
   };
 
+  // The store's own prices for this storefront; the US dollar fallback only until it answers.
+  const monthly = prices.data?.monthly
+    ? t('pro.price.monthly', { price: prices.data.monthly.product.priceString })
+    : proMonthlyLabel();
+  const yearly = prices.data?.yearly
+    ? t('pro.price.yearly', { price: prices.data.yearly.product.priceString })
+    : proYearlyLabel();
+
   return (
-    <Screen title="Settings" avoidKeyboard>
+    <Screen title={t('settings.title')} avoidKeyboard>
       <SettingsSection title="Skip Pro">
         <SettingsRow
           icon={Crown}
-          title={pro ? 'Skip Pro — active' : 'Skip Pro'}
+          title={pro ? t('settings.pro.active') : 'Skip Pro'}
           subtitle={
-            pro
-              ? 'Everything unlocked · manage in the App Store'
-              : 'Unlimited everything, $1.99/mo or $19.99/yr'
+            pro ? t('settings.pro.activeDetail') : t('settings.pro.pitch', { monthly, yearly })
           }
           onPress={() => router.push('/pro')}
           last
@@ -168,15 +201,15 @@ export default function SettingsScreen() {
         </SettingsSection>
       ) : null}
 
-      <SettingsSection title="Profile">
+      <SettingsSection title={t('settings.profile.title')}>
         <SettingsRow
           icon={UserRound}
           artwork={<ProfileAvatar avatarId={profile.data?.avatar_id} size={34} />}
-          title="Profile picture"
+          title={t('settings.profile.picture')}
           subtitle={
             findAvatar(profile.data?.avatar_id)
-              ? 'Tap to change'
-              : 'Pick one to show on your dashboard'
+              ? t('settings.profile.tapToChange')
+              : t('settings.profile.pickOne')
           }
           onPress={() => router.push('/avatar')}
           last
@@ -184,11 +217,11 @@ export default function SettingsScreen() {
 
         <View className="mt-4 w-full">
           <TextField
-            label="Display name"
+            label={t('settings.profile.displayName')}
             value={displayName}
             onChangeText={setDraftName}
             onSubmitEditing={commitName}
-            placeholder="Your name"
+            placeholder={t('settings.profile.namePlaceholder')}
             autoCapitalize="words"
             returnKeyType="done"
             trailing={
@@ -201,7 +234,7 @@ export default function SettingsScreen() {
           {nameDirty ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Save your display name"
+              accessibilityLabel={t('settings.profile.saveName')}
               onPress={commitName}
               disabled={updateProfile.isPending}
               hitSlop={{ top: 4, bottom: 4 }}
@@ -211,7 +244,7 @@ export default function SettingsScreen() {
                 className="font-app-medium text-[14px] text-on-control"
                 maxFontSizeMultiplier={1.2}
               >
-                {updateProfile.isPending ? 'Saving…' : 'Save'}
+                {updateProfile.isPending ? t('settings.saving') : t('common.save')}
               </Text>
             </Pressable>
           ) : null}
@@ -230,10 +263,10 @@ export default function SettingsScreen() {
         ))}
       </SettingsSection>
 
-      <SettingsSection title="Account">
+      <SettingsSection title={t('settings.account.title')}>
         <SettingsRow
           icon={LogOut}
-          title="Sign out"
+          title={t('settings.account.signOut')}
           onPress={async () => {
             await signOut();
             resetTo('/welcome');
@@ -241,8 +274,8 @@ export default function SettingsScreen() {
         />
         <SettingsRow
           icon={Trash2}
-          title="Delete account"
-          subtitle="Permanent, and it cannot be undone"
+          title={t('settings.account.delete')}
+          subtitle={t('settings.account.deleteDetail')}
           destructive
           onPress={handleDeleteAccount}
           last

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
+import { t } from '@/i18n';
 import { useArtwork } from '@/theme/artwork';
 
 /**
@@ -15,9 +16,9 @@ export function StaleDraft() {
     <Screen showBack>
       <PageState
         art={artwork.noResults}
-        title="Nothing to check yet"
-        message="Say what you want to add and Skip will show it here."
-        actionLabel="Start again"
+        title={t('voice.stale.title')}
+        message={t('voice.stale.message')}
+        actionLabel={t('voice.stale.action')}
         onAction={() => router.dismissTo('/voice')}
       />
     </Screen>

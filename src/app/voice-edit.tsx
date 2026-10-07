@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from '
 import { AccessibilityInfo, Text, View } from 'react-native';
 
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
+import { billCategoryLabel } from '@/components/bills/bill-row';
 import { CategoryPicker } from '@/components/bills/category-picker';
 import { AmountStep } from '@/components/flow/amount-step';
 import { InlineCalendar } from '@/components/flow/inline-calendar';
@@ -14,8 +15,9 @@ import { TextField } from '@/components/ui/text-field';
 import { TextLink } from '@/components/ui/text-link';
 import { StaleDraft } from '@/components/voice/stale-draft';
 import { BILL_CATEGORIES, type BillCategory } from '@/data/bills-mock';
+import { t, type MessageKey } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 import { warn } from '@/lib/haptics';
 import { useToday } from '@/lib/use-today';
 import type { VoiceKind } from '@/lib/voice';
@@ -35,32 +37,40 @@ type Field = 'amount' | 'merchant' | 'date' | 'category';
 const FIELDS: readonly Field[] = ['amount', 'merchant', 'date', 'category'];
 
 /** The add flows' own questions, so a correction asks what the form would. */
-const QUESTIONS: Record<Exclude<Field, 'category'>, Record<VoiceKind, string>> = {
+const QUESTIONS: Record<Exclude<Field, 'category'>, Record<VoiceKind, MessageKey>> = {
   amount: {
-    receipt: 'How much did you spend?',
-    bill: 'How much is the bill?',
-    subscription: 'How much does it cost?',
+    receipt: 'voice.receipt.askAmount',
+    bill: 'voice.bill.askAmount',
+    subscription: 'voice.subscription.askAmount',
   },
   merchant: {
-    receipt: 'Where did you buy it?',
-    bill: 'Who is the bill from?',
-    subscription: 'Which service is it?',
+    receipt: 'voice.receipt.askMerchant',
+    bill: 'voice.bill.askMerchant',
+    subscription: 'voice.subscription.askMerchant',
   },
   date: {
-    receipt: 'When was it?',
-    bill: 'When is it due?',
-    subscription: 'When does it renew?',
+    receipt: 'voice.receipt.askDate',
+    bill: 'voice.bill.askDate',
+    subscription: 'voice.subscription.askDate',
   },
 };
 
-const DATE_TITLES: Record<VoiceKind, string> = {
-  receipt: 'Bought on',
-  bill: 'Due on',
-  subscription: 'Renews on',
+/** The review row's own names, so the page is titled by the row that opened it. */
+const DATE_TITLES: Record<VoiceKind, MessageKey> = {
+  receipt: 'voice.receipt.date',
+  bill: 'voice.bill.date',
+  subscription: 'voice.subscription.date',
 };
 
+/**
+ * A bill with no name of its own is saved under its category in the language on screen, as
+ * add-bill pre-fills it.
+ */
 const labelOf = (categoryId: string | null) =>
-  BILL_CATEGORIES.find((category) => category.id === categoryId)?.label ?? '';
+  billCategoryLabel(
+    categoryId,
+    BILL_CATEGORIES.find((category) => category.id === categoryId)?.label ?? '',
+  );
 
 /**
  * One correction, on a page of its own: `/voice-edit?draft=…&field=…`. Built from the add flows'
@@ -166,10 +176,12 @@ function EditShell({
             className="w-full text-center font-app text-[13px] text-danger"
             maxFontSizeMultiplier={1.4}
           >
-            {FAILURE_MESSAGE}
+            {failureText()}
           </Text>
         ) : null}
-        {onDone ? <Button label="Done" onPress={onDone} disabled={doneDisabled} /> : null}
+        {onDone ? (
+          <Button label={t('common.done')} onPress={onDone} disabled={doneDisabled} />
+        ) : null}
         {footerExtra}
       </View>
     ) : undefined;
@@ -207,8 +219,8 @@ function AmountEdit({ session }: { session: VoiceSession }) {
 
   return (
     <EditShell
-      title="Amount"
-      question={QUESTIONS.amount[kind]}
+      title={t('voice.review.amount')}
+      question={t(QUESTIONS.amount[kind])}
       onDone={() => {
         if (amount !== null) commit({ amount });
       }}
@@ -238,8 +250,8 @@ function MerchantEdit({ session }: { session: VoiceSession }) {
 
   return (
     <EditShell
-      title={receipt ? 'Store' : 'Service'}
-      question={QUESTIONS.merchant[entry.kind]}
+      title={receipt ? t('voice.receipt.merchant') : t('voice.subscription.merchant')}
+      question={t(QUESTIONS.merchant[entry.kind])}
       onDone={() => {
         if (merchant) commit({ merchant });
       }}
@@ -249,8 +261,8 @@ function MerchantEdit({ session }: { session: VoiceSession }) {
       avoidKeyboard
     >
       <BrandField
-        label={receipt ? 'Store' : 'Service'}
-        placeholder={receipt ? 'Search for a store' : 'Search for a service'}
+        label={receipt ? t('voice.receipt.merchant') : t('voice.subscription.merchant')}
+        placeholder={receipt ? t('voice.edit.searchStore') : t('voice.edit.searchService')}
         value={merchant}
         onChange={setMerchant}
         initialQuery={searchFirst ? (draft.merchantHeard ?? entry.merchant?.name ?? '') : ''}
@@ -284,8 +296,8 @@ function BillNameEdit({ session }: { session: VoiceSession }) {
 
   return (
     <EditShell
-      title="Name"
-      question={QUESTIONS.merchant.bill}
+      title={t('voice.bill.merchant')}
+      question={t(QUESTIONS.merchant.bill)}
       onDone={() => {
         const typed = name.trim();
         if (!typed) return;
@@ -303,14 +315,14 @@ function BillNameEdit({ session }: { session: VoiceSession }) {
       avoidKeyboard
     >
       <BrandField
-        label="Company"
-        placeholder="Search for a company"
+        label={t('voice.edit.company')}
+        placeholder={t('voice.edit.searchCompany')}
         value={issuer}
         onChange={handleIssuer}
         suggestLogos={false}
       />
       <TextField
-        label="Name"
+        label={t('voice.bill.merchant')}
         value={name}
         onChangeText={setName}
         autoCapitalize="words"
@@ -335,8 +347,8 @@ function DateEdit({ session }: { session: VoiceSession }) {
 
   return (
     <EditShell
-      title={DATE_TITLES[kind]}
-      question={QUESTIONS.date[kind]}
+      title={t(DATE_TITLES[kind])}
+      question={t(QUESTIONS.date[kind])}
       onDone={() => {
         if (day) commit({ date: toIsoDate(day) });
         // A renewal date is optional: Done with none picked keeps it unset.
@@ -348,7 +360,7 @@ function DateEdit({ session }: { session: VoiceSession }) {
       footerExtra={
         kind === 'subscription' && entry.date ? (
           <TextLink
-            label="No renewal date"
+            label={t('voice.edit.noRenewal')}
             variant="subtle"
             onPress={() => commit({ date: null })}
           />
@@ -373,7 +385,12 @@ function CategoryEdit({ session }: { session: VoiceSession }) {
   };
 
   return (
-    <EditShell title="Category" question="What is this bill for?" failed={failed} onBack={leave}>
+    <EditShell
+      title={t('voice.review.category')}
+      question={t('voice.edit.categoryQuestion')}
+      failed={failed}
+      onBack={leave}
+    >
       <View className="w-full pb-10">
         <CategoryPicker onSelect={pick} selectedId={entry.billCategoryId ?? undefined} />
       </View>

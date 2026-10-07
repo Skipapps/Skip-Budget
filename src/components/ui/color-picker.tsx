@@ -1,9 +1,22 @@
 import { Check } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
+import { t, type MessageKey } from '@/i18n';
 import { isLightColor } from '@/lib/color';
 import { CARD_COLORS } from '@/theme/card-colors';
 import { useColors } from '@/providers/theme-provider';
+
+/** The swatch's name as read aloud; the stored value is the hex. */
+const COLOR_NAME: Record<(typeof CARD_COLORS)[number]['id'], MessageKey> = {
+  coral: 'ui.color.coral',
+  ink: 'ui.color.ink',
+  snow: 'ui.color.snow',
+  lime: 'ui.color.lime',
+  sky: 'ui.color.sky',
+  violet: 'ui.color.violet',
+  sand: 'ui.color.sand',
+  forest: 'ui.color.forest',
+};
 
 type ColorPickerProps = {
   value: string;
@@ -22,7 +35,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              accessibilityLabel={option.label}
+              accessibilityLabel={t(COLOR_NAME[option.id])}
               onPress={() => onChange(option.value)}
               style={{
                 backgroundColor: option.value,

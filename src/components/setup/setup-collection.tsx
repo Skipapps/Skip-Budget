@@ -8,7 +8,8 @@ import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { TextLink } from '@/components/ui/text-link';
 import { Subtitle, Title } from '@/components/ui/typography';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { t } from '@/i18n';
+import { failureText } from '@/lib/failure';
 import { useColors } from '@/providers/theme-provider';
 
 type SetupCollectionProps = {
@@ -16,8 +17,10 @@ type SetupCollectionProps = {
   subtitle: string;
   /** What the dashed box says before the first one is added. */
   emptyText: string;
-  /** "bill", "subscription" — the buttons read "Add a …" and "Add another …". */
-  noun: string;
+  /** The button before the first one is added ("Add a bill"). */
+  addLabel: string;
+  /** The button once there are some ("Add another bill"). */
+  addAnotherLabel: string;
   addHref: string;
   count: number;
   isPending: boolean;
@@ -34,7 +37,8 @@ export function SetupCollection({
   title,
   subtitle,
   emptyText,
-  noun,
+  addLabel,
+  addAnotherLabel,
   addHref,
   count,
   isPending,
@@ -55,17 +59,17 @@ export function SetupCollection({
         hasAny ? (
           <View className="w-full gap-3">
             <Button
-              label={`Add another ${noun}`}
+              label={addAnotherLabel}
               variant="outline"
               icon={<Plus size={18} color={colors.ink} strokeWidth={2} />}
               onPress={add}
             />
-            <Button label="Done" onPress={done} />
+            <Button label={t('common.done')} onPress={done} />
           </View>
         ) : (
           <View className="w-full gap-2">
-            <Button label={`Add a ${noun}`} onPress={add} />
-            <TextLink label="Skip for now" variant="subtle" onPress={done} />
+            <Button label={addLabel} onPress={add} />
+            <TextLink label={t('onboarding.skipForNow')} variant="subtle" onPress={done} />
           </View>
         )
       }
@@ -82,9 +86,9 @@ export function SetupCollection({
               className="text-center font-app text-[14px] text-muted"
               maxFontSizeMultiplier={1.4}
             >
-              {FAILURE_MESSAGE}
+              {failureText()}
             </Text>
-            <TextLink label="Try again" variant="subtle" onPress={onRetry} />
+            <TextLink label={t('common.tryAgain')} variant="subtle" onPress={onRetry} />
           </View>
         ) : hasAny ? (
           <View className="w-full rounded-[16px] border border-line bg-card px-4 py-1">

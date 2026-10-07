@@ -14,9 +14,10 @@ import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TextLink } from '@/components/ui/text-link';
 import type { SpendingCategory } from '@/data/dashboard-mock';
+import { t } from '@/i18n';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 import { TEXT_CAP } from '@/theme/text-scale';
 
 /**
@@ -33,6 +34,7 @@ const DESTINATION_ICONS: Record<string, LucideIcon> = {
 const DESTINATION_FALLBACK_ICON: LucideIcon = FileText;
 
 type DestinationListProps = {
+  /** Each row shows its label as given, so the caller words it in the language on screen. */
   items: SpendingCategory[];
   /** Signed month totals by id. Absent means the row opens a tool, not a figure. */
   amounts: Record<string, number | undefined>;
@@ -80,11 +82,14 @@ export function DestinationList({
 
           const label = isMoneyRow
             ? loading
-              ? `${category.label}, amount loading`
+              ? t('home.destination.loading', { label: category.label })
               : error
-                ? `${category.label}, amount unavailable`
-                : `${category.label}, ${formatCurrency(amount)}, this month`
-            : `${category.label}.${locked ? ' Pro feature.' : ''} Opens the tool.`;
+                ? t('home.destination.unavailable', { label: category.label })
+                : t('home.destination.amount', {
+                    label: category.label,
+                    amount: formatCurrency(amount),
+                  })
+            : t(locked ? 'home.tool.opensLocked' : 'home.tool.opens', { label: category.label });
 
           const name = (
             <FitText
@@ -106,7 +111,7 @@ export function DestinationList({
               size={13}
               className="font-app text-muted"
             >
-              Open
+              {t('home.destination.open')}
             </FitText>
           ) : loading ? (
             <Skeleton className="h-3.5 w-20" />
@@ -195,10 +200,15 @@ export function DestinationList({
             className="shrink font-app text-[13px] text-muted"
             maxFontSizeMultiplier={TEXT_CAP.reading}
           >
-            {FAILURE_MESSAGE}
+            {failureText()}
           </Text>
           {onRetry ? (
-            <TextLink label="Try again" variant="subtle" onPress={onRetry} className="py-0" />
+            <TextLink
+              label={t('common.tryAgain')}
+              variant="subtle"
+              onPress={onRetry}
+              className="py-0"
+            />
           ) : null}
         </View>
       ) : null}

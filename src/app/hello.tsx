@@ -16,7 +16,8 @@ import { TextLink } from '@/components/ui/text-link';
 import { Title } from '@/components/ui/typography';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { t } from '@/i18n';
+import { failureText } from '@/lib/failure';
 
 /**
  * One question right after signup: what should we call you? The pen opens the avatar picker (the
@@ -42,7 +43,7 @@ export default function HelloScreen() {
   if (profile.isLoading) {
     return (
       <Screen>
-        <View className="mt-10 w-full gap-4" accessibilityLabel="Loading">
+        <View className="mt-10 w-full gap-4" accessibilityLabel={t('onboarding.hello.loading')}>
           <Skeleton className="h-8 w-3/4 rounded-[12px]" />
           <Skeleton className="h-5 w-full" />
           <Skeleton className="mt-4 h-14 w-full rounded-[12px]" />
@@ -57,8 +58,8 @@ export default function HelloScreen() {
       <Screen>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={() => void profile.refetch()}
         />
       </Screen>
@@ -79,17 +80,21 @@ export default function HelloScreen() {
       avoidKeyboard
       footer={
         <View className="w-full gap-3">
-          <Button label="Continue" onPress={handleContinue} />
-          <TextLink label="Skip for now" variant="subtle" onPress={() => resetTo('/setup')} />
+          <Button label={t('common.continue')} onPress={handleContinue} />
+          <TextLink
+            label={t('onboarding.skipForNow')}
+            variant="subtle"
+            onPress={() => resetTo('/setup')}
+          />
         </View>
       }
     >
-      <Title>What should we call you?</Title>
+      <Title>{t('onboarding.hello.title')}</Title>
 
       <View className="mt-10 w-full items-center">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Choose a profile picture"
+          accessibilityLabel={t('onboarding.hello.pickPicture')}
           onPress={() => router.push('/avatar')}
           className="active:opacity-80"
         >
@@ -102,7 +107,7 @@ export default function HelloScreen() {
 
       <View className="mt-9 w-full">
         <TextField
-          label="Your name"
+          label={t('onboarding.hello.name')}
           value={name}
           onChangeText={setName}
           maxLength={80}

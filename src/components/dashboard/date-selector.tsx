@@ -1,6 +1,7 @@
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
+import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
 
@@ -27,7 +28,7 @@ export function DateSelector({
     <View className="w-full flex-row items-center justify-between rounded-[12px] border border-line px-1.5 py-2">
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Previous day"
+        accessibilityLabel={t('home.day.previous')}
         onPress={onPrevious}
         hitSlop={8}
         className="h-10 w-10 items-center justify-center rounded-full active:bg-ink/5"
@@ -37,7 +38,7 @@ export function DateSelector({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${weekday} ${date}. Choose a date`}
+        accessibilityLabel={t('home.day.pick', { weekday, date })}
         onPress={onPickDate}
         className="flex-1 flex-row items-center justify-center gap-2 active:opacity-70"
       >
@@ -60,7 +61,7 @@ export function DateSelector({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Next day"
+        accessibilityLabel={t('home.day.next')}
         accessibilityState={{ disabled: atLatest }}
         disabled={atLatest}
         onPress={onNext}

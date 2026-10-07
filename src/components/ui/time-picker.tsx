@@ -3,6 +3,7 @@ import { Modal, PanResponder, Pressable, Text, View } from 'react-native';
 import Svg, { Circle, Line } from 'react-native-svg';
 
 import { TogglePill } from '@/components/ui/toggle-pill';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { parseClock, toClockValue } from '@/lib/date';
 import { tap } from '@/lib/haptics';
@@ -129,7 +130,7 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable
-        accessibilityLabel="Close time picker"
+        accessibilityLabel={t('ui.timePicker.close')}
         onPress={onCancel}
         className="flex-1 items-center justify-center bg-black/40 px-8"
       >
@@ -139,7 +140,7 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
           className="w-full max-w-[340px] overflow-hidden rounded-[16px] bg-card px-5 pb-4 pt-5"
         >
           <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={1.2}>
-            Select time
+            {t('ui.timePicker.title')}
           </Text>
 
           {/* The two fields double as the switch for what the dial edits. */}
@@ -148,7 +149,7 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
               label={String(hour12)}
               active={mode === 'hour'}
               onPress={() => setMode('hour')}
-              accessibilityLabel={`Hour, ${hour12}`}
+              accessibilityLabel={t('ui.timePicker.hour', { hour: hour12 })}
             />
             <Text className="font-app-bold text-[34px] text-ink" maxFontSizeMultiplier={1.2}>
               :
@@ -157,15 +158,15 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
               label={String(minute).padStart(2, '0')}
               active={mode === 'minute'}
               onPress={() => setMode('minute')}
-              accessibilityLabel={`Minute, ${minute}`}
+              accessibilityLabel={t('ui.timePicker.minute', { minute })}
             />
           </View>
 
           <View className="mt-3 w-[184px] self-center">
             <TogglePill
               options={[
-                { value: 'AM', label: 'AM' },
-                { value: 'PM', label: 'PM' },
+                { value: 'AM', label: t('ui.timePicker.am') },
+                { value: 'PM', label: t('ui.timePicker.pm') },
               ]}
               value={isPm ? 'PM' : 'AM'}
               onChange={(next) => setPeriod(next as 'AM' | 'PM')}
@@ -225,18 +226,18 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
           <View className="mt-5 w-full flex-row items-center justify-end gap-2">
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cancel"
+              accessibilityLabel={t('common.cancel')}
               onPress={onCancel}
               className="min-h-11 justify-center rounded-full px-5 active:bg-ink/5"
             >
               <Text className="font-app-medium text-[15px] text-body" maxFontSizeMultiplier={1.2}>
-                Cancel
+                {t('common.cancel')}
               </Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Confirm time"
+              accessibilityLabel={t('ui.timePicker.confirm')}
               onPress={() => {
                 tap();
                 onConfirm(toClockValue(hour, minute));
@@ -247,7 +248,7 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
                 className="font-app-semibold text-[15px] text-on-control"
                 maxFontSizeMultiplier={1.2}
               >
-                OK
+                {t('common.ok')}
               </Text>
             </Pressable>
           </View>

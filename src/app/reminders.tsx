@@ -45,7 +45,8 @@ import { formatCurrency } from '@/lib/format';
 import { tap } from '@/lib/haptics';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
+import { t } from '@/i18n';
 
 type Item = {
   kind: ReminderKind;
@@ -134,19 +135,22 @@ export default function RemindersScreen() {
   const groups = useMemo<Group[]>(
     () => [
       {
-        title: 'Bills',
+        title: t('reminders.group.bills'),
         icon: ReceiptText,
         items: (bills.data ?? []).map((row) => ({
           kind: 'bill' as const,
           id: row.id,
           label: row.name,
           caption: row.next_due_on
-            ? `${formatCurrency(row.amount)} · due ${when(row.next_due_on)}`
+            ? t('reminders.bill.due', {
+                amount: formatCurrency(row.amount),
+                date: when(row.next_due_on),
+              })
             : formatCurrency(row.amount),
         })),
       },
       {
-        title: 'Subscriptions',
+        title: t('reminders.group.subscriptions'),
         icon: Repeat,
         items: (subscriptions.data ?? [])
           .filter((row) => row.active)
@@ -155,30 +159,40 @@ export default function RemindersScreen() {
             id: row.id,
             label: row.name,
             caption: row.next_renewal_on
-              ? `${formatCurrency(row.amount)} · renews ${when(row.next_renewal_on)}`
+              ? t('reminders.subscription.renews', {
+                  amount: formatCurrency(row.amount),
+                  date: when(row.next_renewal_on),
+                })
               : formatCurrency(row.amount),
           })),
       },
       {
-        title: 'Cards',
+        title: t('reminders.group.cards'),
         icon: CreditCard,
         items: (cards.data ?? []).map((row) => ({
           kind: 'card' as const,
           id: row.id,
-          label: row.holder || 'Card',
+          label: row.holder || t('reminders.card.fallback'),
+          // The network is a brand name ("VISA"), the same in every language.
           caption: row.last4 ? `•••• ${row.last4}` : row.network,
-          blocked: row.bill_due_day ? undefined : 'Add a payment day to this card first',
+          blocked: row.bill_due_day ? undefined : t('reminders.card.noPaymentDay'),
         })),
       },
       {
-        title: 'Bank accounts',
+        title: t('reminders.group.accounts'),
         icon: Landmark,
         items: (accounts.data ?? []).map((row) => ({
           kind: 'account' as const,
           id: row.id,
-          label: row.nickname || row.bank_name || 'Account',
-          caption: row.last4 ? `•••• ${row.last4}` : row.account_type,
-          blocked: salaryAccounts.ids.has(row.id) ? undefined : 'No pay lands here yet',
+          label: row.nickname || row.bank_name || t('reminders.account.fallback'),
+          caption: row.last4
+            ? `•••• ${row.last4}`
+            : t(
+                row.account_type === 'savings'
+                  ? 'reminders.account.savings'
+                  : 'reminders.account.checking',
+              ),
+          blocked: salaryAccounts.ids.has(row.id) ? undefined : t('reminders.account.noPay'),
         })),
       },
     ],
@@ -196,14 +210,15 @@ export default function RemindersScreen() {
     (reminders.data ?? []).filter((row) => row.enabled).length;
 
   return (
-    <Screen title="Reminders" showBack onRefresh={retry}>
+    <Screen title={t('reminders.title')} showBack onRefresh={retry}>
       {failed ? null : (
         <Subtitle className="mt-2 w-full text-left">
           {available === 0
-            ? 'Add a bill, a subscription, a card or an account and Skip can remind you about those.'
-            : targets === 0
-              ? `${on} of ${available} will let you know. Add a bill, a subscription, a card or an account and Skip can remind you about those too.`
-              : `${on} of ${available} will let you know.`}
+            ? t('reminders.summary.nothing')
+            : t(targets === 0 ? 'reminders.summary.countAndAdd' : 'reminders.summary.count', {
+                count: on,
+                available,
+              })}
         </Subtitle>
       )}
 
@@ -212,8 +227,8 @@ export default function RemindersScreen() {
       {failed ? (
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={retry}
         />
       ) : null}
@@ -223,12 +238,12 @@ export default function RemindersScreen() {
           <View className="flex-row items-center gap-2">
             <ReceiptText size={18} color={colors.muted} strokeWidth={1.8} />
             <Text className="font-app-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
-              Receipts
+              {t('reminders.receipts.title')}
             </Text>
           </View>
 
           <Text className="mt-1 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-            Every day, so nothing gets forgotten.
+            {t('reminders.receipts.caption')}
           </Text>
 
           <View className="mt-2 w-full">
@@ -240,20 +255,20 @@ export default function RemindersScreen() {
                     numberOfLines={1}
                     maxFontSizeMultiplier={1.3}
                   >
-                    Daily receipts reminder
+                    {t('reminders.receipts.daily')}
                   </Text>
                   <Text
                     className="font-app text-[13px] text-muted"
                     numberOfLines={2}
                     maxFontSizeMultiplier={1.3}
                   >
-                    {receiptsFailed ? FAILURE_MESSAGE : 'A nudge to log what you bought today.'}
+                    {receiptsFailed ? failureText() : t('reminders.receipts.nudge')}
                   </Text>
                 </View>
 
                 {receiptsFailed ? (
                   <TextLink
-                    label="Try again"
+                    label={t('common.tryAgain')}
                     variant="subtle"
                     onPress={() => void receipts.refetch()}
                   />
@@ -264,7 +279,7 @@ export default function RemindersScreen() {
                       // No time sent, so toggling keeps the hour already chosen.
                       setReceiptReminder.mutate({ enabled: next });
                     }}
-                    accessibilityLabel="Daily receipts reminder"
+                    accessibilityLabel={t('reminders.receipts.daily')}
                   />
                 )}
               </View>
@@ -273,10 +288,9 @@ export default function RemindersScreen() {
                 <View className="mt-3 w-full flex-row flex-wrap items-center gap-2">
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Sent at ${formatClock(
-                      receiptClock.hour,
-                      receiptClock.minute,
-                    )}. Change the time for the daily receipts reminder.`}
+                    accessibilityLabel={t('reminders.receipts.time', {
+                      time: formatClock(receiptClock.hour, receiptClock.minute),
+                    })}
                     onPress={() => {
                       tap();
                       setTimeFor(RECEIPTS_KEY);
@@ -380,7 +394,7 @@ export default function RemindersScreen() {
                                 leadDays,
                               });
                             }}
-                            accessibilityLabel={`Remind me about ${item.label}`}
+                            accessibilityLabel={t('reminders.remindAbout', { name: item.label })}
                           />
                         )}
                       </View>
@@ -394,7 +408,13 @@ export default function RemindersScreen() {
                                 key={option.value}
                                 accessibilityRole="radio"
                                 accessibilityState={{ selected }}
-                                accessibilityLabel={`Remind ${option.label.toLowerCase()} before`}
+                                accessibilityLabel={
+                                  option.value === 0
+                                    ? t('reminders.lead.sameDay')
+                                    : t('reminders.lead.before', {
+                                        lead: option.label.toLowerCase(),
+                                      })
+                                }
                                 onPress={() => {
                                   tap();
                                   setReminder.mutate({
@@ -428,10 +448,10 @@ export default function RemindersScreen() {
 
                           <Pressable
                             accessibilityRole="button"
-                            accessibilityLabel={`Sent at ${formatClock(
-                              clock.hour,
-                              clock.minute,
-                            )}. Change the time for ${item.label}.`}
+                            accessibilityLabel={t('reminders.time', {
+                              time: formatClock(clock.hour, clock.minute),
+                              name: item.label,
+                            })}
                             onPress={() => {
                               tap();
                               setTimeFor(key);
@@ -450,7 +470,7 @@ export default function RemindersScreen() {
 
                           <Pressable
                             accessibilityRole="button"
-                            accessibilityLabel={`Remove the reminder for ${item.label}`}
+                            accessibilityLabel={t('reminders.remove', { name: item.label })}
                             onPress={() => {
                               tap();
                               removeReminder.mutate({ kind: item.kind, targetId: item.id });
@@ -494,8 +514,7 @@ export default function RemindersScreen() {
             className="flex-1 font-app text-[13px] leading-[19px] text-muted"
             maxFontSizeMultiplier={1.4}
           >
-            Reminders arrive as a notification. Turn them off for Skip in your phone&apos;s settings
-            and nothing here will reach you.
+            {t('reminders.footer')}
           </Text>
         </View>
       ) : null}

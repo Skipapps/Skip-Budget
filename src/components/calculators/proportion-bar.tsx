@@ -1,5 +1,6 @@
 import { Text, View } from 'react-native';
 
+import { percent, t } from '@/i18n';
 import { formatCurrency } from '@/lib/format';
 import { useColors } from '@/providers/theme-provider';
 
@@ -24,14 +25,16 @@ export function ProportionBar({ principal, interest }: ProportionBarProps) {
         <View className="flex-row items-center gap-2">
           <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colors.body }} />
           <Text className="font-app text-[12px] text-body" maxFontSizeMultiplier={1.3}>
-            Borrowed {formatCurrency(principal, { cents: false })}
+            {t('loan.proportion.borrowed', {
+              amount: formatCurrency(principal, { cents: false }),
+            })}
           </Text>
         </View>
 
         <View className="flex-row items-center gap-2">
           <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colors.accent }} />
           <Text className="font-app text-[12px] text-body" maxFontSizeMultiplier={1.3}>
-            Interest {Math.round(interestShare * 100)}%
+            {t('loan.proportion.interest', { share: percent(Math.round(interestShare * 100), 0) })}
           </Text>
         </View>
       </View>

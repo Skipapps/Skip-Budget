@@ -4,20 +4,26 @@ import type { LucideIcon } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
+import { t, type MessageKey } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { shadows } from '@/theme/shadows';
 import { useColors } from '@/providers/theme-provider';
 
 type Tool = {
   id: string;
-  label: string;
+  label: MessageKey;
   icon: LucideIcon;
   href: Href;
 };
 
 /** The loan calculator: a tool rather than spending, so a card rather than a list row. */
 const TOOLS: Tool[] = [
-  { id: 'loan-calculator', label: 'Loan Calculator', icon: Landmark, href: '/loan-calculator' },
+  {
+    id: 'loan-calculator',
+    label: 'home.tool.loanCalculator',
+    icon: Landmark,
+    href: '/loan-calculator',
+  },
 ];
 
 type ToolCardsProps = {
@@ -44,7 +50,9 @@ export function ToolCards({ pro, onPress }: ToolCardsProps) {
         <Pressable
           key={tool.id}
           accessibilityRole="button"
-          accessibilityLabel={`${tool.label}.${pro ? '' : ' Pro feature.'} Opens the tool.`}
+          accessibilityLabel={t(pro ? 'home.tool.opens' : 'home.tool.opensLocked', {
+            label: t(tool.label),
+          })}
           onPress={() => onPress(tool.href)}
           style={shadows.raised}
           className={cn(
@@ -78,7 +86,7 @@ export function ToolCards({ pro, onPress }: ToolCardsProps) {
             after={<ChevronRight size={16} color={colors.muted} strokeWidth={2} />}
             reserve={CHEVRON_ROOM}
           >
-            {tool.label}
+            {t(tool.label)}
           </FitText>
         </Pressable>
       ))}

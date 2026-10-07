@@ -8,7 +8,8 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { SelectField } from '@/components/ui/select-field';
 import { FieldLabel } from '@/components/ui/typography';
-import { TRANSACTION_KINDS } from '@/data/transactions-mock';
+import { TRANSACTION_KINDS, type TransactionKind } from '@/data/transactions-mock';
+import { t, type MessageKey } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { useColors } from '@/providers/theme-provider';
 
@@ -39,16 +40,30 @@ type FilterSheetProps = {
   onApply: (filters: LedgerFilters) => void;
 };
 
-const KIND_OPTIONS = TRANSACTION_KINDS.map((kind) => ({ value: kind.value, label: kind.label }));
+const KIND_KEYS: Record<TransactionKind, MessageKey> = {
+  income: 'transactions.kind.income',
+  bill: 'transactions.kind.bill',
+  receipt: 'transactions.kind.receipt',
+  subscription: 'transactions.kind.subscription',
+};
+
+/** What a ledger kind is called on screen; the value itself is what rows and filters compare. */
+export function ledgerKindLabel(kind: string): string {
+  const key = KIND_KEYS[kind as TransactionKind];
+  return key ? t(key) : kind;
+}
 
 /** Draft filters live here and only reach the list on Apply. */
 export function FilterSheet({
   filters,
   sourceOptions,
-  kindOptions = KIND_OPTIONS,
+  kindOptions,
   onCancel,
   onApply,
 }: FilterSheetProps) {
+  const kinds =
+    kindOptions ??
+    TRANSACTION_KINDS.map((kind) => ({ value: kind.value, label: ledgerKindLabel(kind.value) }));
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<LedgerFilters>(filters);
@@ -63,7 +78,7 @@ export function FilterSheet({
         <View className="flex-row items-center px-4 py-2">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close filters"
+            accessibilityLabel={t('transactions.filter.close')}
             hitSlop={8}
             onPress={onCancel}
             className="h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
@@ -74,7 +89,7 @@ export function FilterSheet({
             className="flex-1 pr-11 text-center font-app-semibold text-[18px] text-ink"
             maxFontSizeMultiplier={1.2}
           >
-            Filter
+            {t('transactions.filter.title')}
           </Text>
         </View>
 
@@ -84,9 +99,9 @@ export function FilterSheet({
         >
           <View className="mt-4 w-full">
             <SelectField
-              label="Date"
+              label={t('transactions.filter.date')}
               value={draft.date ? formatFullDate(new Date(`${draft.date}T00:00:00`)) : ''}
-              placeholder="Any date"
+              placeholder={t('transactions.filter.anyDate')}
               icon={Calendar}
               onPress={() => setDatePickerOpen(true)}
             />
@@ -97,7 +112,7 @@ export function FilterSheet({
                 className="mt-2 self-start rounded-full px-1 py-1 active:opacity-60"
               >
                 <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-                  Clear date
+                  {t('transactions.filter.clearDate')}
                 </Text>
               </Pressable>
             ) : null}
@@ -107,23 +122,23 @@ export function FilterSheet({
               a choice of one thing would only restate the title. */}
           {sourceOptions.length > 0 ? (
             <View className="mt-6 w-full">
-              <FieldLabel className="mb-2">Card or bank account</FieldLabel>
+              <FieldLabel className="mb-2">{t('transactions.filter.source')}</FieldLabel>
               <MultiChoiceChips
                 options={sourceOptions}
                 values={draft.sourceIds}
                 onChange={(sourceIds) => setDraft((current) => ({ ...current, sourceIds }))}
-                emptyHint="Showing every credit card and account."
+                emptyHint={t('transactions.filter.everySource')}
               />
             </View>
           ) : null}
 
           <View className="mt-6 w-full">
-            <FieldLabel className="mb-2">Type of transaction</FieldLabel>
+            <FieldLabel className="mb-2">{t('transactions.filter.kind')}</FieldLabel>
             <MultiChoiceChips
-              options={kindOptions}
+              options={kinds}
               values={draft.kinds}
-              onChange={(kinds) => setDraft((current) => ({ ...current, kinds }))}
-              emptyHint="Showing every type."
+              onChange={(next) => setDraft((current) => ({ ...current, kinds: next }))}
+              emptyHint={t('transactions.filter.everyKind')}
             />
           </View>
         </ScrollView>
@@ -135,11 +150,11 @@ export function FilterSheet({
             className="min-h-16 flex-1 items-center justify-center rounded-full border border-control active:bg-ink/5"
           >
             <Text className="font-app-medium text-[17px] text-ink" maxFontSizeMultiplier={1.4}>
-              Reset
+              {t('transactions.filter.reset')}
             </Text>
           </Pressable>
           <View className="flex-[2]">
-            <Button label="Apply" onPress={() => onApply(draft)} />
+            <Button label={t('transactions.filter.apply')} onPress={() => onApply(draft)} />
           </View>
         </View>
 

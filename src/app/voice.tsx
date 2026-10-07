@@ -15,7 +15,8 @@ import { FieldLabel } from '@/components/ui/typography';
 import { MicButton } from '@/components/voice/mic-button';
 import { ownMerchants } from '@/components/voice/own-merchants';
 import { VoiceHints } from '@/components/voice/voice-hints';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { t } from '@/i18n';
+import { failureMessage, failureText } from '@/lib/failure';
 import { toggle, warn } from '@/lib/haptics';
 import { useSpeechCapture, type SpeechStatus } from '@/lib/speech';
 import { useToday } from '@/lib/use-today';
@@ -83,9 +84,6 @@ function advance(session: Session, status: SpeechStatus, alternatives: string[])
   };
 }
 
-/** Said before the mic opens, and only then: once it is open it would be transcribed. */
-const START_ANNOUNCEMENT = 'Listening';
-
 /**
  * Speaks a line and waits until VoiceOver has finished saying it: the mic must not open while
  * VoiceOver is talking, or its words become the entry. The timer covers a VoiceOver that never
@@ -123,8 +121,6 @@ function latestWords(text: string, limit = 140): string {
 function heardMoreThanOne(draft: VoiceDraft): boolean {
   return draft.multiple === true;
 }
-
-const MULTIPLE_LINE = 'Looks like more than one. Add them one at a time.';
 
 /**
  * "Record a transaction": hold the mic, say it, let go. The words appear as they are heard; letting
@@ -237,7 +233,8 @@ function VoiceScreenInner() {
     setSession({ ...RESTING, id: mine, active: true });
     toggle();
     if (screenReader) {
-      await announceAndWait(START_ANNOUNCEMENT);
+      // Said before the mic opens, and only then: once it is open it would be transcribed.
+      await announceAndWait(t('voice.record.listeningAnnouncement'));
       // Stopped, or left, while VoiceOver was talking: no mic after all.
       if (!focused.current || generation.current !== mine) return;
     }
@@ -259,7 +256,7 @@ function VoiceScreenInner() {
           : { ...current, active: false, outcome: 'nothing' },
     );
     speech.stop();
-    if (screenReader) AccessibilityInfo.announceForAccessibility('Stopped');
+    if (screenReader) AccessibilityInfo.announceForAccessibility(t('voice.record.stopped'));
   };
 
   // A mic that opened after the person had already let go is closed again.
@@ -380,8 +377,9 @@ function VoiceScreenInner() {
   }, [cancel]);
 
   const nothingLine = screenReader
-    ? 'Skip didn’t hear anything. Double-tap Record, then talk.'
-    : 'Hold the button while you talk.';
+    ? t('voice.record.nothingScreenReader', { button: t('voice.mic.label') })
+    : t('voice.record.nothing');
+  const multipleLine = t('voice.record.multiple');
 
   // VoiceOver hears what changed, never the live words.
   const announced = useRef(shown);
@@ -393,18 +391,18 @@ function VoiceScreenInner() {
       shown === 'nothing'
         ? nothingLine
         : shown === 'multiple'
-          ? MULTIPLE_LINE
+          ? multipleLine
           : shown === 'granted'
-            ? 'You’re all set.'
+            ? t('voice.record.allSet')
             : shown === 'error'
-              ? FAILURE_MESSAGE
+              ? failureText()
               : shown === 'denied'
-                ? 'Microphone or speech recognition is off.'
+                ? t('voice.record.deniedAnnouncement')
                 : shown === 'unavailable'
-                  ? 'Voice isn’t available right now.'
+                  ? t('voice.record.unavailableAnnouncement')
                   : null;
     if (line) AccessibilityInfo.announceForAccessibility(line);
-  }, [shown, screenReader, nothingLine]);
+  }, [shown, screenReader, nothingLine, multipleLine]);
 
   const hintsShown =
     shown === 'idle' ||
@@ -416,16 +414,16 @@ function VoiceScreenInner() {
 
   const caption = screenReader
     ? recording
-      ? 'Tap when you’re done'
-      : 'Tap to talk'
+      ? t('voice.record.tapWhenDone')
+      : t('voice.record.tapToTalk')
     : recording
-      ? 'Release when you’re done'
-      : 'Hold to talk';
+      ? t('voice.record.releaseWhenDone')
+      : t('voice.record.holdToTalk');
   const hint = screenReader
     ? recording
-      ? 'Double-tap to stop.'
-      : 'Double-tap to start talking, and again when you’re done.'
-    : 'Hold while you talk, then let go.';
+      ? t('voice.record.hintStop')
+      : t('voice.record.hintStart')
+    : t('voice.record.hintHold');
 
   const footer = (
     <View className="w-full items-center">
@@ -454,7 +452,7 @@ function VoiceScreenInner() {
 
   return (
     // Keyboard-aware in dev only, for the test sentence; a Release build has no field on this page.
-    <Screen title="Record a transaction" showBack footer={footer} avoidKeyboard={__DEV__}>
+    <Screen title={t('voice.record.title')} showBack footer={footer} avoidKeyboard={__DEV__}>
       <View className="mt-6 w-full flex-1 items-center">
         {shown === 'idle' ? null : shown === 'listening' ? (
           // "Listening…" until the first word, then the words. Only this hold's words: until its
@@ -476,46 +474,46 @@ function VoiceScreenInner() {
           <View className="w-full items-center">
             <LiveWords text={session.words[0] ?? ''} />
             <View className="mt-4 w-full">
-              <StatusLine text={MULTIPLE_LINE} />
+              <StatusLine text={multipleLine} />
             </View>
           </View>
         ) : shown === 'nothing' ? (
           <StatusLine text={nothingLine} />
         ) : shown === 'granted' ? (
-          <StatusLine text="You’re all set. Hold to talk." />
+          <StatusLine text={t('voice.record.allSetHold')} />
         ) : shown === 'error' ? (
-          <StatusLine text={FAILURE_MESSAGE} />
+          <StatusLine text={failureText()} />
         ) : shown === 'denied' ? (
           <View className="w-full">
-            <StatusLine text="Turn on Microphone and Speech Recognition for Skip Budget in Settings." />
+            <StatusLine text={t('voice.record.denied')} />
             <View className="mt-4 w-full flex-row justify-center">
               <ActionPill
                 icon={Settings}
-                label="Open Settings"
+                label={t('voice.record.openSettings')}
                 onPress={() => void Linking.openSettings()}
               />
             </View>
           </View>
         ) : shown === 'unavailable' ? (
           <View className="w-full">
-            <StatusLine text="Voice isn’t available on this iPhone right now." />
-            <FieldLabel className="mt-6 text-center">Add it by hand</FieldLabel>
+            <StatusLine text={t('voice.record.unavailable')} />
+            <FieldLabel className="mt-6 text-center">{t('voice.record.addByHand')}</FieldLabel>
             {/* The form takes this page's place, so back or save from it
                 returns to Home rather than to a mic that cannot work. */}
             <View className="mt-3 w-full flex-row flex-wrap justify-center gap-2">
               <ActionPill
                 icon={ReceiptText}
-                label="Receipt"
+                label={t('voice.kind.receipt')}
                 onPress={() => router.replace('/add-receipt')}
               />
               <ActionPill
                 icon={CalendarPlus}
-                label="Bill"
+                label={t('voice.kind.bill')}
                 onPress={() => router.replace('/add-bill')}
               />
               <ActionPill
                 icon={Repeat}
-                label="Subscription"
+                label={t('voice.kind.subscription')}
                 onPress={() => router.replace('/add-subscription')}
               />
             </View>
@@ -554,7 +552,7 @@ function Placeholder() {
       className="w-full text-center font-app-medium text-[24px] leading-8 text-ink/20"
       maxFontSizeMultiplier={1.3}
     >
-      Listening…
+      {t('voice.record.listening')}
     </Text>
   );
 }
@@ -589,9 +587,10 @@ const DevTestSentence = __DEV__
       return (
         <View className="mt-8 w-full gap-3 pb-4">
           <TextField
-            label="Test sentence (dev only)"
+            label={t('voice.record.devLabel')}
             value={text}
             onChangeText={setText}
+            // A sentence the English-only parser reads, so it stays English in every language.
             placeholder="Netflix $15.99 every month"
             // Exactly as typed: autocorrect would rewrite words before the parser sees them, and on
             // iOS spell-check follows autoCorrect.
@@ -603,7 +602,7 @@ const DevTestSentence = __DEV__
             }}
           />
           <Button
-            label="Use this sentence"
+            label={t('voice.record.devUse')}
             variant="outline"
             onPress={() => onRun(text)}
             disabled={disabled || !text.trim()}

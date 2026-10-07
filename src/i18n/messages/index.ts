@@ -12,7 +12,9 @@ import { legalMessages } from '@/i18n/messages/legal';
 import { libMessages } from '@/i18n/messages/lib';
 import { loanMessages } from '@/i18n/messages/loan';
 import { localeMessages } from '@/i18n/messages/locale';
+import { navMessages } from '@/i18n/messages/nav';
 import { onboardingMessages } from '@/i18n/messages/onboarding';
+import { preferencesMessages } from '@/i18n/messages/preferences';
 import { proMessages } from '@/i18n/messages/pro';
 import { receiptsMessages } from '@/i18n/messages/receipts';
 import { remindersMessages } from '@/i18n/messages/reminders';
@@ -41,6 +43,8 @@ export const MESSAGE_AREAS = {
   lib: libMessages,
   loan: loanMessages,
   locale: localeMessages,
+  nav: navMessages,
+  preferences: preferencesMessages,
   onboarding: onboardingMessages,
   pro: proMessages,
   receipts: receiptsMessages,
@@ -74,6 +78,8 @@ export const MESSAGES = {
   ...MESSAGE_AREAS.lib,
   ...MESSAGE_AREAS.loan,
   ...MESSAGE_AREAS.locale,
+  ...MESSAGE_AREAS.nav,
+  ...MESSAGE_AREAS.preferences,
   ...MESSAGE_AREAS.onboarding,
   ...MESSAGE_AREAS.pro,
   ...MESSAGE_AREAS.receipts,
