@@ -31,11 +31,104 @@ const TOTAL_HINT = /\b(grand\s*total|total\s*due|amount\s*due|balance\s*due|tota
 const NOT_TOTAL =
   /\b(sub\s*-?\s*total|tax|gst|hst|pst|vat|tip|change|cash\s*back|savings?|discount)\b/i;
 
+// French labels are matched on folded text (see `fold`): JavaScript's \b treats "À" and "û" as
+// non-letters, and receipts and OCR drop accents unevenly. "Dû" folds to "du", so it only counts at
+// the end of a label: "montant du pourboire" is the tip, not the total.
+const FR_TOTAL_HINT = /\b(montant|solde)\s+du\b(?!\s*[a-z])|\ba\s*payer\b/;
+const FR_NOT_TOTAL =
+  /\b(sous\s*-?\s*total|total\s+partiel|avant\s+taxes?|des\s+taxes|taxe|tps|tvq|tvh|pourboire|monnaie|rendu|remise|rabais|escompte|economies?)\b/;
+/**
+ * The whole label, figures aside, that lets a comma figure without "$" count as money. It must be the
+ * entire label: "TOTAL QTY 2,50" or "TOTAL 2 @ 2,50" could be a count or a unit price.
+ */
+const FR_MONEY_LABEL =
+  /^(grand\s*total|total(\s+(a\s*payer|du))?|sous\s*-?\s*total|montant(\s+(total|du|a\s*payer))?|solde(\s+(du|a\s*payer))?|a\s*payer)$/;
+
 /** 1,234.56 / 1234.56 / 12.34 — comma grouping optional, cents required. */
 const MONEY = /\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2}/g;
 
+/**
+ * Comma-decimal money as Quebec prints it: "12,99 $", "12,99$", "1 234,56 $" (grouped by a space,
+ * U+00A0 or U+202F). Exactly two decimals with no digit after, so "1,299" stays a thousand and
+ * "9,975 %" a tax rate. Group 3 is a trailing "$", but not when a digit follows it: in "A1,23 $4"
+ * the "$" belongs to the next figure.
+ */
+const COMMA_MONEY =
+  /(\d{1,3}(?:[ \u00A0\u202F]\d{3})+|\d+),(\d{2})(?!\d|[.,]\d)(?:[ \u00A0\u202F]?(\$)(?![ \u00A0\u202F]?\d))?/g;
+const LONE_COMMA_MONEY = /^-?(\d{1,3}([ \u00A0\u202F]\d{3})+|\d+),\d{2}([ \u00A0\u202F]?\$)?$/;
+
 function toAmount(raw: string): number {
   return Number(raw.replace(/,/g, ''));
+}
+
+/** Lower case without accents, so "À PAYER", "à payer" and "A PAYER" read alike. */
+function fold(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[àâä]/g, 'a')
+    .replace(/[éèêë]/g, 'e')
+    .replace(/[îï]/g, 'i')
+    .replace(/[ôö]/g, 'o')
+    .replace(/[ùûü]/g, 'u')
+    .replace(/ç/g, 'c');
+}
+
+/** A line naming the amount charged, in English or French, and not a subtotal, tax, tip or change. */
+function isTotalLine(text: string): boolean {
+  const folded = fold(text);
+  return (
+    (TOTAL_HINT.test(text) || FR_TOTAL_HINT.test(folded)) &&
+    !NOT_TOTAL.test(text) &&
+    !FR_NOT_TOTAL.test(folded)
+  );
+}
+
+function hasMoneyLabel(text: string): boolean {
+  const label = fold(text)
+    .replace(COMMA_MONEY, ' ')
+    .replace(/[\s:]+/g, ' ')
+    .trim();
+  return FR_MONEY_LABEL.test(label);
+}
+
+function isLoneFigure(text: string): boolean {
+  return LONE_COMMA_MONEY.test(text.trim());
+}
+
+/**
+ * A figure must begin a word: "A1,23" is a code, and the "42" of "15:42" or the "06" of
+ * "2026-10-06" belongs to the time or date, not to a "42 123,45" thousand. One mark may join a label
+ * or sign to its figure ("TOTAL:45,67", "-2,00 $"), but not one number to another.
+ */
+function startsWord(line: string, index: number): boolean {
+  if (index === 0) return true;
+  const before = line[index - 1];
+  if (/\s/.test(before)) return true;
+  if (/[\w,.\u00C0-\u024F]/.test(before)) return false;
+  return index < 2 || !/\d/.test(line[index - 2]);
+}
+
+/**
+ * The amounts on one line, in order. A line with a dot-decimal amount is read by `MONEY` alone, so
+ * no comma look-alike on an English line can add a figure. Otherwise a comma figure counts when "$"
+ * follows it, or when `bare` says it is the figure of a French money label.
+ */
+function amountsOn(line: string, bare: boolean): number[] {
+  const dotted = line.match(MONEY);
+  if (dotted) return dotted.map(toAmount);
+
+  const amounts: number[] = [];
+  const pattern = new RegExp(COMMA_MONEY);
+  for (let match = pattern.exec(line); match; match = pattern.exec(line)) {
+    if (!startsWord(line, match.index)) {
+      // Rescan one digit on: in "15:42 123,45 $" the figure starts at "123".
+      pattern.lastIndex = match.index + 1;
+      continue;
+    }
+    if (match[3] || bare) amounts.push(Number(`${match[1].replace(/\D/g, '')}.${match[2]}`));
+  }
+  return amounts;
 }
 
 function pad(value: number): string {
@@ -81,8 +174,9 @@ export function parseDate(text: string): string | undefined {
 }
 
 /**
- * Finds the amount paid: a non-subtotal line that says "total" wins outright, otherwise the
- * largest amount on the receipt (usually, not always, the total).
+ * Finds the amount paid: a line naming the total ("Total", "Amount due", "À payer", "Montant dû";
+ * never a subtotal or tax) wins outright, otherwise the largest amount on the receipt (usually, not
+ * always, the total).
  */
 export function parseTotal(text: string): number | undefined {
   const lines = text
@@ -92,22 +186,24 @@ export function parseTotal(text: string): number | undefined {
 
   const labelled: number[] = [];
   for (const [index, line] of lines.entries()) {
-    if (!TOTAL_HINT.test(line) || NOT_TOTAL.test(line)) continue;
+    if (!isTotalLine(line)) continue;
 
-    const onLine = line.match(MONEY);
-    if (onLine?.length) {
-      labelled.push(toAmount(onLine[onLine.length - 1]));
+    const bare = hasMoneyLabel(line);
+    const onLine = amountsOn(line, bare);
+    if (onLine.length) {
+      labelled.push(onLine[onLine.length - 1]);
       continue;
     }
     // Receipts often print the label and figure on separate lines, or in columns Vision reads as two.
-    const next = lines[index + 1]?.match(MONEY);
-    if (next?.length) labelled.push(toAmount(next[0]));
+    const nextLine = lines[index + 1];
+    const next = nextLine === undefined ? [] : amountsOn(nextLine, bare && isLoneFigure(nextLine));
+    if (next.length) labelled.push(next[0]);
   }
 
   // Last labelled total wins: reprints and card-copy footers repeat it; the final one was charged.
   if (labelled.length) return labelled[labelled.length - 1];
 
-  const all = (text.match(MONEY) ?? []).map(toAmount).filter((n) => n > 0);
+  const all = lines.flatMap((line) => amountsOn(line, hasMoneyLabel(line))).filter((n) => n > 0);
   if (!all.length) return undefined;
   return Math.max(...all);
 }
@@ -222,8 +318,8 @@ function sameRow(a: ParsedLine, b: ParsedLine): boolean {
   return Math.abs(centreA - centreB) <= Math.max(a.height, b.height) * 0.6;
 }
 
-function moneyIn(text: string): number[] {
-  return (text.match(MONEY) ?? []).map(toAmount).filter((value) => value > 0);
+function moneyIn(text: string, bare: boolean): number[] {
+  return amountsOn(text, bare).filter((value) => value > 0);
 }
 
 /**
@@ -235,28 +331,36 @@ export function parseTotalFromLines(lines: ParsedLine[]): number | undefined {
   const labelled: { amount: number; y: number }[] = [];
 
   for (const line of lines) {
-    if (!TOTAL_HINT.test(line.text) || NOT_TOTAL.test(line.text)) continue;
+    if (!isTotalLine(line.text)) continue;
 
-    const inline = moneyIn(line.text);
+    const bare = hasMoneyLabel(line.text);
+    const inline = moneyIn(line.text, bare);
     if (inline.length) {
       labelled.push({ amount: inline[inline.length - 1], y: line.y });
       continue;
     }
 
+    // Away from its label, a comma figure without "$" is the label's only when it stands alone.
+    const loneFigure = (other: ParsedLine) => bare && isLoneFigure(other.text);
+
     const rowMates = lines
       .filter((other) => other !== line && sameRow(other, line) && other.x >= line.x)
       .sort((a, b) => a.x - b.x)
-      .flatMap((other) => moneyIn(other.text));
+      .flatMap((other) => moneyIn(other.text, loneFigure(other)));
 
     if (rowMates.length) {
       labelled.push({ amount: rowMates[rowMates.length - 1], y: line.y });
       continue;
     }
 
-    const below = lines
-      .filter((other) => other.y > line.y)
-      .sort((a, b) => a.y - b.y)
-      .flatMap((other) => moneyIn(other.text));
+    const lower = lines.filter((other) => other.y > line.y).sort((a, b) => a.y - b.y);
+    // Below the label, a bare figure is its own only when it is the whole next row, as the flat
+    // parser takes it only as the whole next line; further down it could be anyone's.
+    const next = lower.find((other) => !sameRow(other, line));
+    const nextIsAlone = !lines.some((other) => other !== next && next && sameRow(other, next));
+    const below = lower.flatMap((other) =>
+      moneyIn(other.text, other === next && nextIsAlone && loneFigure(other)),
+    );
     if (below.length) labelled.push({ amount: below[0], y: line.y });
   }
 
@@ -264,7 +368,7 @@ export function parseTotalFromLines(lines: ParsedLine[]): number | undefined {
     return labelled.sort((a, b) => a.y - b.y)[labelled.length - 1].amount;
   }
 
-  const all = lines.flatMap((line) => moneyIn(line.text));
+  const all = lines.flatMap((line) => moneyIn(line.text, hasMoneyLabel(line.text)));
   return all.length ? Math.max(...all) : undefined;
 }
 
