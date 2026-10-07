@@ -3754,3 +3754,27 @@ no style.minWidth. They pin the classes as written, not real layout, and say so.
 **Non-blocking:** When the row is tight (375pt, 1.2x text, Settings selected) adjacent tabs touch. Hit slop then only
 shifts each target, because the later sibling wins the overlap, so icon targets are about 36pt wide, not 44. Before,
 the floor was 40pt (and it overflowed). A test that runs the Yoga layout engine could pin the arithmetic later.
+- 2026-10-06 Dana: tab bar widths are now fixed from the window width (new pure tab-layout.ts tabLayout(width, routes); voice-fab takes ROW_HEIGHT from it): icons 32..48pt with slop to 44, pill 128pt (98 at 320pt), label capped at the pill's room with adjustsFontSizeToFit instead of an ellipsis; same style keys selected or not. Yoga 3.2 did not reproduce the shipped glitch (so it lies outside flexbox, unconfirmed on device); new layout: 0 overflow in all 12 transitions x3 at 320-430pt, Settings whole at 1.2x from 360pt, 11pt at 320pt. tsc 0, jest 110/110 (1931), prettier/eslint clean.
+
+---
+
+## 2026-10-06 — Dmitri (Development Lead) — review of Dana's fixed-geometry tab bar (uncommitted, on 9e18275)
+
+**Outcome:** SHIP-TO-PHONE. No blocking issues. Edited nothing but this log.
+
+**Checks:** tsc 0. Full jest 110/110 suites, 1931/1931. Prettier and ESLint `--no-cache` clean on tab-layout.ts, its test,
+skip-tab-bar.tsx and its test, and voice-fab.tsx.
+
+**Verified:** tabLayout's constants match the real layout: px-4 = 16 each side, gap-[14px], the Voice button at 64, and a
+1pt border + px-[7px] = 8 each side, so inner = W - 126. The sum is always <= inner (icon <= floor(inner/4)). The
+widths are integers except on windows under ~350pt, so there is no sub-pixel overflow. 375 gives 40/128 (1pt spare),
+393 gives 46/128, 402.33 and 428 give 48/128, 320 gives 32/98. The label widths come from the shipped
+Poppins_600SemiBold.ttf: Settings 62.46pt at 15pt and 74.95pt at 18pt, against 76pt of room at 128. In RN 0.86 Fabric
+iOS, adjustsFontSizeToFit scales down to `minimumFontSize` (default 4pt); minimumFontScale is not read on iOS. So the
+label shrinks rather than ellipsizing (an ellipsis is only possible below 4pt). No stale state: useWindowDimensions is
+read every render. role/state/label are unchanged.
+
+**Non-blocking:** The geometry constants are duplicated as class strings and no test ties them together. Packed rows
+(375/360pt) let hit slop overlap, so icon targets are about 40/35pt wide. active:opacity-60 now also dims the selected
+pill. Home and Cards sit with about 15pt of air each side in the fixed 128pt pill. If speech is unavailable the
+VoiceFab renders nothing, so the bar only gets wider.

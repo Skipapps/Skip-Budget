@@ -1362,3 +1362,29 @@ under `src` and a comment naming a nonexistent route correctly pass.
    `queryAllByText(...).toEqual([])`). It is Drew's absence assertion, so the grep needs an exclusion for it.
 2. The guard requires `api/push.test.ts` and `push-card.test.ts` to keep naming `/splits`. If either stops, the
    guard fails and says to drop the exemption. Intentional, but it is a red caused by a cleanup.
+
+## 2026-10-06 — Tia — Tab bar "..." pill repro (STOPPED by the CEO before any test ran)
+
+**Outcome:** Aborted on the CEO's instruction (the Founder will check fixes on his own iPhone). No tab was ever switched, no
+screenshot of the tab bar taken, nothing reproduced or ruled out.
+
+**What I did before stopping**
+- Read the log and memory, then started Metro from `/Users/sampathchowdi/Desktop/SkipBudget-logo-service` (branch `logo-service`,
+  HEAD `9e18275`) with `CI=1 npx expo start --dev-client --port 8091 --clear`. It bundled (4632 modules, ~23s) and served fine.
+- Booted the existing `SkipBudget-SE` simulator (B867C5EC, iPhone SE 3rd gen, 375pt) and deep-linked it to localhost:8091. Its
+  installed Skip Budget binary is dated Sep 10, so it is an old dev client; it stayed on the old green snap-hand splash with only
+  the dev-client gear showing, never reaching the app. (The CEO reports this build shows a red "Cannot find native module
+  'ExpoVideo'" screen; I did not see that screen myself, only the stuck splash.)
+- Findings that matter for whoever retests: (1) `9e18275` is itself titled "Tab bar: the selected pill can no longer overflow the
+  bar", so the code in that commit already contains an overflow fix (pill `min-w-0 shrink`, icon tabs down to 36pt, label
+  `ellipsizeMode="tail"`); at 428pt there is roughly 318pt of row width against about 256pt needed, so a real ellipsis there
+  would point at a layout-pass bug or font/zoom difference, not plain lack of room. (2) No iPhone 13 Pro Max (428pt) simulator
+  exists; the device type is installable. (3) The only up-to-date simulator binary (iPhone 17 Pro 983D7DBD, Oct 5 16:04) matches
+  `Release-iphonesimulator` (embedded bundle, no dev launcher), and the newest `Debug-iphonesimulator` dev client is Oct 5 13:49;
+  neither was installed or run. (4) The Supabase session is AsyncStorage (file based), so it could be copied between simulators;
+  I did not find which simulator holds a signed-in session.
+
+**Cleanup:** Metro on 8091 killed (nothing listens there, no `expo start` left). SkipBudget-SE app terminated and the simulator
+shut down (it was shut down when I started); 0 simulators booted. Content size was never changed (it read `large`). Live tree:
+branch `almost-done-all-pages`, no source file touched, status clean before this log entry; the worktree is untouched at
+`9e18275` on `logo-service`. Scratch log: the scratchpad's `metro-8091.log`.

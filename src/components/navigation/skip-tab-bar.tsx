@@ -1,10 +1,18 @@
 import { Tabs } from 'expo-router';
 import { Bolt, House, Receipt, Wallet, type LucideIcon } from 'lucide-react-native';
 import type { ComponentProps } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { VOICE_FAB_SIZE, VoiceFab } from '@/components/voice/voice-fab';
+import {
+  PILL_GAP,
+  PILL_PADDING,
+  ROW_HEIGHT,
+  TAB_HEIGHT,
+  TAB_ICON,
+  tabLayout,
+} from '@/components/navigation/tab-layout';
+import { VoiceFab } from '@/components/voice/voice-fab';
 import { withTap } from '@/lib/press';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
@@ -15,10 +23,6 @@ import { shadows } from '@/theme/shadows';
  * it, so deep-importing its types would break on any internal reshuffle.
  */
 type SkipTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
-
-/** How narrow a plain icon tab may get; ICON_TAB_SLOP either side makes it a 44pt target. */
-const ICON_TAB_MIN = 36;
-const ICON_TAB_SLOP = { left: 4, right: 4 };
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   home: House,
@@ -31,10 +35,10 @@ const TAB_ICONS: Record<string, LucideIcon> = {
  * Floating pill tab bar with the round Voice button beside it, the same height so they read as one
  * row. The selected tab expands into a filled accent pill carrying its label.
  *
- * It cannot overflow, whatever the width or text size: the plain icons give way first (down to
- * ICON_TAB_MIN, with hit slop keeping a 44pt target), then the selected pill shrinks and its label
- * ends in an ellipsis. On a 375pt-wide screen every label still fits whole at the largest text
- * size it allows, so the ellipsis only shows on narrower layouts.
+ * Widths come from the window width (tabLayout), never from the label: the selected pill and the
+ * icon tabs have fixed sizes that fit the bar, and a label too long for its pill shrinks its font
+ * rather than truncating or pushing the pill out. Every tab gets the same style keys whether it
+ * is selected or not, so a switch only changes values.
  *
  * The outer view is bigger than the pill (8pt above, the home indicator's inset below, the gutter
  * either side, all painted in the page colour). That band is not part of the control, so `box-none`
@@ -43,6 +47,9 @@ const TAB_ICONS: Record<string, LucideIcon> = {
 export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const layout = tabLayout(width, state.routes.length);
+  const iconSlop = { top: 0, bottom: 0, left: layout.slop, right: layout.slop };
 
   return (
     <View
@@ -52,7 +59,7 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
     >
       <View className="flex-row items-center gap-[14px]" pointerEvents="box-none">
         <View
-          style={[shadows.floating, { height: VOICE_FAB_SIZE }]}
+          style={[shadows.floating, { height: ROW_HEIGHT }]}
           className="flex-1 flex-row items-center justify-between rounded-full border border-line bg-card px-[7px]"
         >
           {state.routes.map((route, index) => {
@@ -79,21 +86,22 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
                 accessibilityState={{ selected: focused }}
                 accessibilityLabel={label}
                 onPress={withTap(handlePress)}
-                hitSlop={focused ? undefined : ICON_TAB_SLOP}
-                // Plain icons have no basis of their own (flex-1), so they only fill what the pill
-                // leaves, up to 48pt; when space runs out they stop at ICON_TAB_MIN and the pill,
-                // the only thing left that can, shrinks.
+                hitSlop={focused ? undefined : iconSlop}
                 className={cn(
-                  'h-[48px] flex-row items-center justify-center rounded-full',
-                  focused
-                    ? 'min-w-0 shrink gap-[6px] bg-control px-[12px]'
-                    : 'max-w-[48px] flex-1 active:opacity-60',
+                  'flex-row items-center justify-center rounded-full active:opacity-60',
+                  focused && 'bg-control',
                 )}
-                style={focused ? undefined : { minWidth: ICON_TAB_MIN }}
+                style={{
+                  height: TAB_HEIGHT,
+                  width: focused ? layout.pill : layout.icon,
+                  flexShrink: 0,
+                  paddingHorizontal: focused ? PILL_PADDING : 0,
+                  gap: focused ? PILL_GAP : 0,
+                }}
               >
                 {Icon ? (
                   <Icon
-                    size={22}
+                    size={TAB_ICON}
                     // Same foreground as the label beside it, rather than hardcoded white.
                     color={focused ? colors.onControl : colors.muted}
                     strokeWidth={2}
@@ -102,9 +110,13 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
                 ) : null}
                 {focused ? (
                   <Text
-                    className="min-w-0 shrink font-poppins-semibold text-[15px] text-on-control"
+                    className="font-poppins-semibold text-[15px] text-on-control"
+                    // A ceiling, not a share of free space: the label's room is fixed per window.
+                    style={{ maxWidth: layout.label }}
                     numberOfLines={1}
-                    ellipsizeMode="tail"
+                    adjustsFontSizeToFit
+                    // Read on Android; iOS shrinks as far as the width needs.
+                    minimumFontScale={0.6}
                     maxFontSizeMultiplier={1.2}
                   >
                     {label}

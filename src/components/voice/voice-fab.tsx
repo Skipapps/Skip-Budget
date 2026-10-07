@@ -4,13 +4,14 @@ import { useCallback, useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { usePro } from '@/api/pro';
+import { ROW_HEIGHT } from '@/components/navigation/tab-layout';
 import { tap } from '@/lib/haptics';
 import { isSpeechAvailable } from '@/lib/speech';
 import { contrast } from '@/lib/tone';
 import { useTheme } from '@/providers/theme-provider';
 
 /** As tall as the tab bar's pill beside it, so the two sit on one line. */
-export const VOICE_FAB_SIZE = 64;
+export const VOICE_FAB_SIZE = ROW_HEIGHT;
 
 /**
  * The round Voice button at the end of the tab bar: the fastest way to put something in, from any

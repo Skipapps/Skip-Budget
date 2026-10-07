@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 
 import type { JsonElement } from 'test-renderer';
 
@@ -103,46 +104,108 @@ describe('SkipTabBar — what takes a touch', () => {
 });
 
 const SETTINGS = routes.findIndex((route) => route.name === 'settings');
-const tokens = (props: { className?: string }) => (props.className ?? '').split(/\s+/);
+
+/** A phone window this wide; useWindowDimensions follows Dimensions. */
+function windowOf(width: number) {
+  const window = { width, height: 844, scale: 3, fontScale: 1 };
+  Dimensions.set({ window, screen: window });
+}
+
+const flat = (style: unknown) => StyleSheet.flatten(style as never) as Record<string, unknown>;
+
+/** Each tab's width and whether it shows its name, in route order. */
+function widths(screen: Awaited<ReturnType<typeof render>>) {
+  return routes.map((route) => flat(screen.getByLabelText(titles[route.name]).props.style).width);
+}
 
 /**
- * The selected "Settings" pill ran past the bar on a 375pt-wide layout at a larger text size. No
- * layout engine runs here, so what makes the row unable to overflow is pinned as written: the pill
- * and its label may shrink (the label ending in an ellipsis), and plain icons have no width of
- * their own beyond a 36pt floor that hit slop brings to a 44pt target.
+ * The selected label once came out as "…" with the pill past the bar after a few switches, when
+ * the pill was sized by shrinking around its measured label. Widths now come from the window width
+ * alone, so they are pinned here as numbers, for every switch between every pair of tabs.
  */
-describe('SkipTabBar — the row cannot overflow', () => {
-  it('lets the selected pill shrink, with its label ending in an ellipsis rather than overflowing', async () => {
+describe('SkipTabBar — widths come from the window, not the label', () => {
+  beforeEach(() => windowOf(375));
+
+  it('gives the selected pill and the icon tabs fixed widths that fit a 375pt window', async () => {
     const { props } = renderBar(undefined, undefined, SETTINGS);
-    const { getByLabelText, getByText } = await render(<SkipTabBar {...props} />);
+    const screen = await render(<SkipTabBar {...props} />);
 
-    const pill = tokens(getByLabelText('Settings').props);
-    expect(pill).toEqual(expect.arrayContaining(['shrink', 'min-w-0', 'px-[12px]', 'gap-[6px]']));
-    expect(pill).not.toContain('shrink-0');
-
-    const label = getByText('Settings');
-    expect(tokens(label.props)).toEqual(expect.arrayContaining(['shrink', 'min-w-0']));
-    expect(label.props.numberOfLines).toBe(1);
-    expect(label.props.ellipsizeMode).toBe('tail');
-    // Grows with text size, to a cap that still fits whole on a 375pt-wide screen.
-    expect(label.props.maxFontSizeMultiplier).toBe(1.2);
+    // 249pt inside the bar: three 40pt icons and a 128pt pill.
+    expect(widths(screen)).toEqual([40, 40, 40, 128]);
+    for (const route of routes) {
+      const style = flat(screen.getByLabelText(titles[route.name]).props.style);
+      expect(style).toEqual(expect.objectContaining({ height: 48, flexShrink: 0 }));
+    }
   });
 
-  it('gives plain icons only what the pill leaves, never less than a 44pt target', async () => {
+  it('gives every tab the same style keys, selected or not, so a switch only changes values', async () => {
+    const { props } = renderBar(undefined, undefined, SETTINGS);
+    const screen = await render(<SkipTabBar {...props} />);
+
+    const keys = routes.map((route) =>
+      Object.keys(flat(screen.getByLabelText(titles[route.name]).props.style)).sort(),
+    );
+    for (const set of keys) expect(set).toEqual(keys[0]);
+  });
+
+  it('shrinks the label’s font as the last resort, never truncating it', async () => {
+    const { props } = renderBar(undefined, undefined, SETTINGS);
+    const { getByText } = await render(<SkipTabBar {...props} />);
+
+    const label = getByText('Settings');
+    expect(flat(label.props.style).maxWidth).toBe(76);
+    expect(label.props.numberOfLines).toBe(1);
+    expect(label.props.adjustsFontSizeToFit).toBe(true);
+    expect(label.props.minimumFontScale).toBe(0.6);
+    expect(label.props.maxFontSizeMultiplier).toBe(1.2);
+    expect(label.props.ellipsizeMode).toBeUndefined();
+  });
+
+  it('keeps an icon tab narrower than 44pt reachable with hit slop', async () => {
     const { props } = renderBar(undefined, undefined, SETTINGS);
     const { getByLabelText } = await render(<SkipTabBar {...props} />);
 
     for (const label of ['Home', 'Cards', 'Activity']) {
       const tab = getByLabelText(label);
-      expect(tokens(tab.props)).toEqual(
-        expect.arrayContaining(['flex-1', 'max-w-[48px]', 'h-[48px]']),
-      );
-      const { minWidth } = tab.props.style as { minWidth: number };
       const { left, right } = tab.props.hitSlop as { left: number; right: number };
-      expect(minWidth + left + right).toBeGreaterThanOrEqual(44);
+      expect((flat(tab.props.style).width as number) + left + right).toBeGreaterThanOrEqual(44);
     }
   });
 
+  it('follows the window width (Display Zoom, Split View)', async () => {
+    windowOf(428);
+    const { props } = renderBar(undefined, undefined, SETTINGS);
+    const screen = await render(<SkipTabBar {...props} />);
+
+    expect(widths(screen)).toEqual([48, 48, 48, 128]);
+  });
+
+  const pairs = routes.flatMap((from, a) =>
+    routes.flatMap((to, b) => (a === b ? [] : [[from.name, to.name, a, b] as const])),
+  );
+
+  it.each(pairs)(
+    'switching from %s to %s lays the bar out as if it opened there, every time',
+    async (_from, to, a, b) => {
+      const expected = routes.map((_, index) => (index === b ? 128 : 40));
+      const at = (index: number) => renderBar(undefined, undefined, index).props;
+
+      const screen = await render(<SkipTabBar {...at(a)} />);
+      for (let round = 0; round < 3; round++) {
+        await screen.rerender(<SkipTabBar {...at(b)} />);
+        expect(widths(screen)).toEqual(expected);
+        expect(screen.getByText(titles[to])).toBeTruthy();
+        expect(flat(screen.getByText(titles[to]).props.style).maxWidth).toBe(76);
+        await screen.rerender(<SkipTabBar {...at(a)} />);
+      }
+
+      const fresh = await render(<SkipTabBar {...at(b)} />);
+      expect(widths(fresh)).toEqual(expected);
+    },
+  );
+});
+
+describe('SkipTabBar — what each tab says and does', () => {
   it('labels every tab, says which one is open, and shows only that one’s name', async () => {
     const { props } = renderBar(undefined, undefined, SETTINGS);
     const { getByLabelText, getByText, queryByText } = await render(<SkipTabBar {...props} />);
