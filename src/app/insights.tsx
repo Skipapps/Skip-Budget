@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { ArrowRight, ChevronRight } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useSpendCategories } from '@/api/brands';
@@ -19,6 +19,14 @@ import { BrandMark } from '@/components/brands/brand-mark';
 import { FlowChart, type FlowBucket } from '@/components/transactions/flow-chart';
 import { ActionPill } from '@/components/ui/action-pill';
 import { ChoiceChips } from '@/components/ui/choice-chips';
+import {
+  FitFigure,
+  FitGroup,
+  FitRows,
+  FitText,
+  useFitGroup,
+  useGroupFits,
+} from '@/components/ui/fit-group';
 import { useProGate } from '@/components/pro/pro-gate';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
@@ -36,6 +44,7 @@ import { PERIODS, periodBuckets, periodRange, type PeriodKey } from '@/lib/perio
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { failureText } from '@/lib/failure';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 const PER_MONTH: Record<string, number> = {
   weekly: 52 / 12,
@@ -279,40 +288,41 @@ function InsightsScreenInner() {
     <Screen title={t('insights.title')} showBack onRefresh={refresh} refreshing={refreshing}>
       <Heading>{t('insights.stand.heading')}</Heading>
       <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
-        <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={TEXT_CAP.control}>
           {t('insights.stand.worth')}
         </Text>
-        <Text
-          className="mt-1 font-app-bold text-[34px] text-ink"
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          maxFontSizeMultiplier={1.2}
+        <FitFigure
+          id="worth"
+          size={34}
+          className="font-app-bold text-ink"
           style={toCents(worth) < 0 ? { color: colors.moneyOut } : undefined}
+          boxClassName="mt-1"
         >
           {formatCurrency(worth)}
-        </Text>
+        </FitFigure>
 
-        <View className="mt-4 w-full gap-2.5">
-          <StandRow label={t('insights.stand.putAside')} value={savedTotal} />
-          <StandRow label={t('insights.stand.owedOnCards')} value={-owedOnCards} />
-        </View>
+        <FitRows className="mt-4 w-full gap-2.5" testID="insights-stand">
+          <StandRow id="aside" label={t('insights.stand.putAside')} value={savedTotal} />
+          <StandRow id="owed" label={t('insights.stand.owedOnCards')} value={-owedOnCards} />
+        </FitRows>
       </View>
 
       <Heading>{t('insights.in.heading')}</Heading>
       {monthlyIncome > 0 ? (
         <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
-          <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+          <Text
+            className="font-app text-[13px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.control}
+          >
             {t('insights.in.everyMonth')}
           </Text>
-          <Text
-            className="mt-1 font-app-bold text-[28px] text-ink"
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            maxFontSizeMultiplier={1.2}
-          >
+          <FitFigure id="income" size={28} className="font-app-bold text-ink" boxClassName="mt-1">
             {formatCurrency(monthlyIncome)}
-          </Text>
-          <Text className="mt-1 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+          </FitFigure>
+          <Text
+            className="mt-1 font-app text-[12px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.reading}
+          >
             {t('insights.in.sources', { count: (salary.data ?? []).length })}
           </Text>
         </View>
@@ -337,159 +347,127 @@ function InsightsScreenInner() {
       ) : (
         <>
           <View className="mt-4 w-full rounded-[16px] border border-line bg-card px-5 py-5">
-            <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+            <Text
+              className="font-app text-[13px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.control}
+            >
               {t(PERIOD_TOTAL[periodKey])}
             </Text>
-            <Text
-              className="mt-1 font-app-bold text-[30px] text-ink"
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              maxFontSizeMultiplier={1.2}
-            >
+            <FitFigure id="out" size={30} className="font-app-bold text-ink" boxClassName="mt-1">
               {formatCurrency(totals.out)}
-            </Text>
+            </FitFigure>
             <View className="mt-4 w-full">
               <FlowChart buckets={chartBuckets} />
             </View>
           </View>
 
-          <View className="mt-3 w-full rounded-[16px] border border-line bg-card px-5 py-4">
+          <FitRows
+            className="mt-3 w-full rounded-[16px] border border-line bg-card px-5 py-4"
+            testID="insights-kinds"
+          >
             <StandRow
+              id="receipts"
               label={t('insights.out.receipts')}
               value={-(byKind.get('receipt') ?? 0)}
               plain
             />
             <View className="h-2" />
-            <StandRow label={t('insights.out.bills')} value={-(byKind.get('bill') ?? 0)} plain />
+            <StandRow
+              id="bills"
+              label={t('insights.out.bills')}
+              value={-(byKind.get('bill') ?? 0)}
+              plain
+            />
             <View className="h-2" />
             <StandRow
+              id="subscriptions"
               label={t('insights.out.subscriptions')}
               value={-(byKind.get('subscription') ?? 0)}
               plain
             />
             <View className="my-3 h-px w-full bg-line" />
-            <View className="w-full flex-row items-center justify-between gap-3">
-              <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
-                {t('insights.out.recorded')}
-              </Text>
-              <Text className="font-app-bold text-[16px] text-ink" maxFontSizeMultiplier={1.3}>
-                {formatCurrency(totals.out)}
-              </Text>
-            </View>
-          </View>
+            <StandRow id="recorded" label={t('insights.out.recorded')} value={totals.out} strong />
+          </FitRows>
         </>
       )}
 
       {categories.length > 0 ? (
         <>
           <Heading>{t('insights.goes.heading')}</Heading>
-          <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
+          <FitRows
+            className="w-full rounded-[16px] border border-line bg-card px-5 py-5"
+            testID="insights-categories"
+          >
             {categories.map((category, index) => (
-              <View
+              <BarRow
                 key={category.id}
-                className={
-                  index > 0 ? 'mt-4 flex-row items-center gap-3' : 'flex-row items-center gap-3'
-                }
-              >
-                <BillMark categoryId={category.id} size={34} />
-                <View className="min-w-0 flex-1">
-                  <View className="w-full flex-row items-baseline justify-between gap-3">
-                    <Text
-                      className="min-w-0 flex-1 font-app-medium text-[14px] text-ink"
-                      numberOfLines={1}
-                      maxFontSizeMultiplier={1.3}
-                    >
-                      {category.label}
-                    </Text>
-                    <Text
-                      className="font-app-semibold text-[14px] text-ink"
-                      maxFontSizeMultiplier={1.3}
-                    >
-                      {formatCurrency(category.amount)}
-                    </Text>
-                  </View>
-                  <View className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-ink/5">
-                    <View
-                      className="h-full rounded-full bg-accent"
-                      style={{ width: `${biggest > 0 ? (category.amount / biggest) * 100 : 0}%` }}
-                    />
-                  </View>
-                </View>
-              </View>
+                id={`category-${index}`}
+                first={index === 0}
+                mark={<BillMark categoryId={category.id} size={34} />}
+                label={category.label}
+                amount={category.amount}
+                share={biggest > 0 ? category.amount / biggest : 0}
+              />
             ))}
-          </View>
+          </FitRows>
         </>
       ) : null}
 
       {merchants.length > 0 ? (
         <>
           <Heading>{t('insights.most.heading')}</Heading>
-          <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
+          <FitRows
+            className="w-full rounded-[16px] border border-line bg-card px-5 py-5"
+            testID="insights-merchants"
+          >
             {merchants.map((merchant, index) => (
-              <View
+              <BarRow
                 key={merchant.name}
-                className={
-                  index > 0 ? 'mt-4 flex-row items-center gap-3' : 'flex-row items-center gap-3'
-                }
-              >
-                {merchant.kind === 'bill' ? (
-                  <BillMark
-                    categoryId={merchant.categoryId}
-                    iconId={merchant.iconId}
-                    domain={merchant.domain}
-                    name={merchant.name}
-                    size={40}
-                  />
-                ) : (
-                  <BrandMark
-                    name={merchant.name}
-                    domain={merchant.domain}
-                    // Letters only when no row in the group has a logo to show.
-                    hidden={merchant.logoHidden && !merchant.domain}
-                    size={40}
-                  />
-                )}
-                <View className="min-w-0 flex-1">
-                  <View className="w-full flex-row items-baseline justify-between gap-3">
-                    <Text
-                      className="min-w-0 flex-1 font-app-medium text-[14px] text-ink"
-                      numberOfLines={1}
-                      maxFontSizeMultiplier={1.3}
-                    >
-                      {merchant.name}
-                    </Text>
-                    <Text
-                      className="font-app-semibold text-[14px] text-ink"
-                      maxFontSizeMultiplier={1.3}
-                    >
-                      {formatCurrency(merchant.amount)}
-                    </Text>
-                  </View>
-                  <View className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-ink/5">
-                    <View
-                      className="h-full rounded-full bg-accent"
-                      style={{ width: `${busiest > 0 ? (merchant.amount / busiest) * 100 : 0}%` }}
+                id={`merchant-${index}`}
+                first={index === 0}
+                mark={
+                  merchant.kind === 'bill' ? (
+                    <BillMark
+                      categoryId={merchant.categoryId}
+                      iconId={merchant.iconId}
+                      domain={merchant.domain}
+                      name={merchant.name}
+                      size={40}
                     />
-                  </View>
-                  <Text
-                    className="mt-1 font-app text-[12px] text-muted"
-                    maxFontSizeMultiplier={1.3}
-                  >
-                    {t('insights.most.times', { count: merchant.visits })}
-                  </Text>
-                </View>
-              </View>
+                  ) : (
+                    <BrandMark
+                      name={merchant.name}
+                      domain={merchant.domain}
+                      // Letters only when no row in the group has a logo to show.
+                      hidden={merchant.logoHidden && !merchant.domain}
+                      size={40}
+                    />
+                  )
+                }
+                label={merchant.name}
+                amount={merchant.amount}
+                share={busiest > 0 ? merchant.amount / busiest : 0}
+                note={t('insights.most.times', { count: merchant.visits })}
+              />
             ))}
-          </View>
+          </FitRows>
         </>
       ) : null}
 
       <Heading>{t('insights.keep.heading')}</Heading>
       {recentMonths.length > 0 ? (
-        <View className="w-full rounded-[16px] border border-line bg-card px-5 py-4">
+        <FitRows
+          className="w-full rounded-[16px] border border-line bg-card px-5 py-4"
+          testID="insights-months"
+        >
           {recentMonths.map((month, index) => (
             <View key={month.month} className={index > 0 ? 'mt-3' : undefined}>
-              <StandRow label={monthName(month.month)} value={savedFor(month)} plain />
+              <StandRow
+                id={month.month}
+                label={monthName(month.month)}
+                value={savedFor(month)}
+                plain
+              />
             </View>
           ))}
           <View className="my-3 h-px w-full bg-line" />
@@ -497,14 +475,17 @@ function InsightsScreenInner() {
             accessibilityRole="button"
             accessibilityLabel={t('insights.keep.seeEvery')}
             onPress={() => router.push('/savings')}
-            className="min-h-11 w-full flex-row items-center justify-between active:opacity-70"
+            className="min-h-11 w-full flex-row items-center justify-between gap-3 active:opacity-70"
           >
-            <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.3}>
+            <Text
+              className="min-w-0 flex-1 font-app-medium text-[14px] text-ink"
+              maxFontSizeMultiplier={TEXT_CAP.row}
+            >
               {t('insights.keep.everyMonth')}
             </Text>
             <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
           </Pressable>
-        </View>
+        </FitRows>
       ) : (
         <Prompt
           title={t('insights.keep.emptyTitle')}
@@ -517,17 +498,21 @@ function InsightsScreenInner() {
       {(cards.data ?? []).length > 0 ? (
         <>
           <Heading>{t('insights.owe.heading')}</Heading>
-          <View className="w-full rounded-[16px] border border-line bg-card px-5 py-4">
+          <FitRows
+            className="w-full rounded-[16px] border border-line bg-card px-5 py-4"
+            testID="insights-cards"
+          >
             {(cards.data ?? []).map((card, index) => (
               <View key={card.id} className={index > 0 ? 'mt-3' : undefined}>
                 <StandRow
+                  id={card.id}
                   label={`${card.holder}${card.last4 ? ` ${card.last4}` : ''}`}
                   value={-Math.abs(balances.get(card.id) ?? card.balance)}
                   plain
                 />
               </View>
             ))}
-          </View>
+          </FitRows>
         </>
       ) : null}
 
@@ -552,37 +537,126 @@ function Heading({ children }: { children: string }) {
   return <SectionHeading className="mb-3 mt-8">{children}</SectionHeading>;
 }
 
-/** A label and a signed figure. Money out is tinted, money in is not shouted about. */
+/**
+ * A label and a signed figure. Money out is tinted, money in is not shouted about. Every row in the
+ * card keeps its figure beside its label, or every row puts it underneath.
+ */
 function StandRow({
+  id,
   label,
   value,
   plain = false,
+  strong = false,
 }: {
+  /** Names the fit slots; unique in its card. */
+  id: string;
   label: string;
   value: number;
   plain?: boolean;
+  /** The card's total line. */
+  strong?: boolean;
 }) {
   const colors = useColors();
+  const stacked = !useGroupFits();
   const negative = value < 0;
 
   return (
-    <View className="w-full flex-row items-center justify-between gap-3">
-      <Text
-        className="min-w-0 flex-1 font-app text-[14px] text-muted"
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.3}
+    <View
+      className={
+        stacked ? 'w-full items-start' : 'w-full flex-row items-center justify-between gap-3'
+      }
+    >
+      <FitText
+        id={`${id}-label`}
+        role="row"
+        size={strong ? 15 : 14}
+        className={strong ? 'font-app-semibold text-ink' : 'font-app text-muted'}
+        slotClassName={stacked ? 'w-full' : 'min-w-0 flex-1'}
       >
         {label}
-      </Text>
-      <Text
+      </FitText>
+      <FitText
+        id={`${id}-value`}
+        hug
+        role="row"
+        size={strong ? 16 : 14}
         className={
-          plain ? 'font-app-medium text-[14px] text-ink' : 'font-app-semibold text-[14px] text-ink'
+          strong
+            ? 'font-app-bold text-ink'
+            : plain
+              ? 'font-app-medium text-ink'
+              : 'font-app-semibold text-ink'
         }
-        maxFontSizeMultiplier={1.3}
-        style={negative && !plain ? { color: colors.moneyOut } : undefined}
+        style={negative && !plain && !strong ? { color: colors.moneyOut } : undefined}
+        slotClassName={stacked ? 'mt-0.5' : 'shrink-0'}
       >
         {formatCurrency(Math.abs(value))}
-      </Text>
+      </FitText>
+    </View>
+  );
+}
+
+/** A name, its figure and a bar of its share; stacked with the rest of its card, the figure goes under the name. */
+function BarRow({
+  id,
+  first,
+  mark,
+  label,
+  amount,
+  share,
+  note,
+}: {
+  id: string;
+  first: boolean;
+  mark: ReactNode;
+  label: string;
+  amount: number;
+  /** Of the card's biggest, 0 to 1. */
+  share: number;
+  note?: string;
+}) {
+  const stacked = !useGroupFits();
+  return (
+    <View className={first ? 'flex-row items-center gap-3' : 'mt-4 flex-row items-center gap-3'}>
+      {mark}
+      <View className="min-w-0 flex-1">
+        <View
+          className={
+            stacked ? 'w-full items-start' : 'w-full flex-row items-baseline justify-between gap-3'
+          }
+        >
+          <FitText
+            id={`${id}-label`}
+            role="row"
+            size={14}
+            className="font-app-medium text-ink"
+            slotClassName={stacked ? 'w-full' : 'min-w-0 flex-1'}
+          >
+            {label}
+          </FitText>
+          <FitText
+            id={`${id}-amount`}
+            hug
+            role="row"
+            size={14}
+            className="font-app-semibold text-ink"
+            slotClassName={stacked ? 'mt-0.5' : 'shrink-0'}
+          >
+            {formatCurrency(amount)}
+          </FitText>
+        </View>
+        <View className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-ink/5">
+          <View className="h-full rounded-full bg-accent" style={{ width: `${share * 100}%` }} />
+        </View>
+        {note ? (
+          <Text
+            className="mt-1 font-app text-[12px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.row}
+          >
+            {note}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -599,34 +673,54 @@ function Row({
   onPress: () => void;
 }) {
   const colors = useColors();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${label}${value ? `, ${value}` : ''}${hint ? `, ${hint}` : ''}`}
-      onPress={onPress}
-      className="w-full flex-row items-center gap-3 rounded-[16px] border border-line bg-card px-5 py-4 active:bg-ink/5"
+  const words = useFitGroup({ mode: 'switch' });
+  const stacked = !words.fits;
+  const figure = value ? (
+    <FitText
+      id="value"
+      hug
+      role="row"
+      size={15}
+      className="font-app-semibold text-ink"
+      slotClassName={stacked ? 'mt-0.5' : 'shrink-0'}
     >
-      <View className="min-w-0 flex-1">
-        <Text
-          className="font-app-medium text-[15px] text-ink"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.3}
-        >
-          {label}
-        </Text>
-        {hint ? (
-          <Text className="mt-0.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-            {hint}
-          </Text>
-        ) : null}
-      </View>
-      {value ? (
-        <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
-          {value}
-        </Text>
-      ) : null}
-      <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
-    </Pressable>
+      {value}
+    </FitText>
+  ) : null;
+
+  return (
+    <FitGroup group={words} className="w-full">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label}${value ? `, ${value}` : ''}${hint ? `, ${hint}` : ''}`}
+        onPress={onPress}
+        className="w-full flex-row items-center gap-3 rounded-[16px] border border-line bg-card px-5 py-4 active:bg-ink/5"
+      >
+        {/* Stacked, the figure follows the name, in the order VoiceOver reads the row. */}
+        <View className="min-w-0 flex-1 items-start">
+          <FitText
+            id="label"
+            role="row"
+            size={15}
+            className="font-app-medium text-ink"
+            slotClassName="w-full"
+          >
+            {label}
+          </FitText>
+          {stacked ? figure : null}
+          {hint ? (
+            <Text
+              className="mt-0.5 font-app text-[12px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.row}
+            >
+              {hint}
+            </Text>
+          ) : null}
+        </View>
+        {stacked ? null : figure}
+        <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
+      </Pressable>
+    </FitGroup>
   );
 }
 
@@ -645,13 +739,13 @@ function Prompt({
     <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
       <Text
         className="font-app-semibold text-[15px] leading-6 text-ink"
-        maxFontSizeMultiplier={1.3}
+        maxFontSizeMultiplier={TEXT_CAP.heading}
       >
         {title}
       </Text>
       <Text
         className="mt-2 font-app text-[13px] leading-[19px] text-muted"
-        maxFontSizeMultiplier={1.4}
+        maxFontSizeMultiplier={TEXT_CAP.reading}
       >
         {message}
       </Text>

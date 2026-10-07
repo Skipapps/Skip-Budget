@@ -136,6 +136,28 @@ describe('Transactions — day order', () => {
   });
 });
 
+describe('Transactions — at large text sizes', () => {
+  // One mount for every check, as below: separate mounts under fake timers are order-dependent.
+  it('wraps the period name and the week headings rather than cutting them', async () => {
+    const { getByText } = await render(<TransactionsScreen />);
+
+    const period = getByText('6 – 12 Sep');
+    expect(period.props.numberOfLines).toBeUndefined();
+    expect(period.props.maxFontSizeMultiplier).toBe(1.3);
+
+    // A month is read in weeks; each week's heading keeps its total, under it when both do not fit.
+    await fireEvent.press(getByText('Month'));
+    const week = getByText('6–12');
+    expect(week.props.numberOfLines).toBeUndefined();
+    expect(week.props.maxFontSizeMultiplier).toBe(1.3);
+    expect(String(week.parent?.props.className)).toContain('flex-wrap');
+    const total = week.parent?.children.find(
+      (node) => typeof node !== 'string' && node.props.children === '-$20.00',
+    );
+    expect(total).toBeTruthy();
+  });
+});
+
 describe('Transactions — where a row opens', () => {
   // One mount, every kind pressed in turn: separate mounts of this screen under fake timers made
   // the suite order-dependent.

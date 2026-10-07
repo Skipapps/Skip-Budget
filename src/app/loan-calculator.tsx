@@ -10,6 +10,7 @@ import { SliderRow } from '@/components/calculators/slider-row';
 import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
+import { FitFigure, FitRows, FitText, useGroupFits } from '@/components/ui/fit-group';
 import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm } from '@/providers/dialog-provider';
@@ -29,6 +30,7 @@ import {
   type LoanTerms,
 } from '@/lib/loan';
 import { sumMoney } from '@/lib/money';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 const AMOUNT_MIN = 500;
 const AMOUNT_MAX = 1_000_000;
@@ -183,20 +185,23 @@ function LoanCalculatorScreenInner() {
   return (
     <Screen title={t('loan.calculator.title')} showBack>
       <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
-        <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text
+          className="text-center font-app text-[13px] text-muted"
+          maxFontSizeMultiplier={TEXT_CAP.control}
+        >
           {t('loan.monthlyPayment')}
         </Text>
-        <Text
-          className="mt-1 font-app-bold text-[40px] text-ink"
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          maxFontSizeMultiplier={1.2}
+        <FitFigure
+          id="payment"
+          size={40}
+          className="text-center font-app-bold text-ink"
+          boxClassName="mt-1"
         >
           {formatCurrency(contract.payment)}
-        </Text>
+        </FitFigure>
         <Text
           className="mt-1 text-center font-app text-[13px] text-muted"
-          maxFontSizeMultiplier={1.3}
+          maxFontSizeMultiplier={TEXT_CAP.reading}
         >
           {t('loan.calculator.paymentsLastOn', {
             count: schedule.length,
@@ -207,7 +212,7 @@ function LoanCalculatorScreenInner() {
         {extraMonthly > 0 ? (
           <Text
             className="mt-2 text-center font-app text-[12px] leading-[17px] text-muted"
-            maxFontSizeMultiplier={1.3}
+            maxFontSizeMultiplier={TEXT_CAP.reading}
           >
             {t('loan.calculator.plusExtra', {
               extra: formatCurrency(extraMonthly),
@@ -219,7 +224,7 @@ function LoanCalculatorScreenInner() {
         {oddOpening ? (
           <Text
             className="mt-2 text-center font-app text-[12px] leading-[17px] text-muted"
-            maxFontSizeMultiplier={1.3}
+            maxFontSizeMultiplier={TEXT_CAP.reading}
           >
             {basis === 'monthly'
               ? t('loan.calculator.firstCoversMonthPlus', {
@@ -341,7 +346,7 @@ function LoanCalculatorScreenInner() {
         <ChoiceChips options={basisChoices()} value={basis} onChange={setBasis} />
         <Text
           className="mt-3 font-app text-[12px] leading-[17px] text-muted"
-          maxFontSizeMultiplier={1.4}
+          maxFontSizeMultiplier={TEXT_CAP.reading}
         >
           {basisNote(basis)}
         </Text>
@@ -350,15 +355,17 @@ function LoanCalculatorScreenInner() {
       <View className="mt-6 w-full rounded-[16px] border border-line bg-card p-5">
         <ProportionBar principal={amount} interest={loan.totalInterest} />
 
-        <View className="mt-5 w-full gap-3">
-          <SummaryLine label={t('loan.borrowed')} value={formatCurrency(amount)} />
+        <FitRows className="mt-5 w-full gap-3" testID="loan-summary">
+          <SummaryLine id="borrowed" label={t('loan.borrowed')} value={formatCurrency(amount)} />
           <SummaryLine
+            id="interest"
             label={t('loan.calculator.interestPaid')}
             value={formatCurrency(loan.totalInterest)}
             accent
           />
           {fees > 0 ? (
             <SummaryLine
+              id="fees"
               label={t('loan.calculator.feesAtClosing')}
               value={formatCurrency(fees)}
               accent
@@ -366,18 +373,21 @@ function LoanCalculatorScreenInner() {
           ) : null}
           <View className="h-px w-full bg-line" />
           <SummaryLine
+            id="total"
             label={t('loan.calculator.totalRepay')}
             value={formatCurrency(loan.totalPaid)}
             strong
           />
           {/* APR is a disclosure term and stays as written. */}
-          {aprDiffers ? <SummaryLine label="APR" value={percent(disclosure.apr, 2)} /> : null}
-        </View>
+          {aprDiffers ? (
+            <SummaryLine id="apr" label="APR" value={percent(disclosure.apr, 2)} />
+          ) : null}
+        </FitRows>
 
         {aprDiffers ? (
           <Text
             className="mt-4 font-app text-[12px] leading-[17px] text-muted"
-            maxFontSizeMultiplier={1.4}
+            maxFontSizeMultiplier={TEXT_CAP.reading}
           >
             {t('loan.calculator.aprNote')}
           </Text>
@@ -385,24 +395,32 @@ function LoanCalculatorScreenInner() {
       </View>
 
       {overpaying && (comparison.interestSaved > 0 || comparison.monthsSaved > 0) ? (
-        <View className="mt-3 w-full gap-3 rounded-[16px] border border-line bg-card p-5">
-          <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+        <FitRows
+          className="mt-3 w-full gap-3 rounded-[16px] border border-line bg-card p-5"
+          testID="loan-overpaying"
+        >
+          <Text
+            className="font-app-semibold text-[15px] text-ink"
+            maxFontSizeMultiplier={TEXT_CAP.heading}
+          >
             {t('loan.calculator.ifYouOverpay')}
           </Text>
           <SummaryLine
+            id="saved"
             label={t('loan.calculator.interestSaved')}
             value={formatCurrency(comparison.interestSaved)}
             positive
           />
           {comparison.monthsSaved > 0 ? (
             <SummaryLine
+              id="early"
               label={t('loan.calculator.paidOffEarlyBy')}
               value={loanTermText(comparison.monthsSaved)}
             />
           ) : null}
           <Text
             className="font-app text-[12px] leading-[17px] text-muted"
-            maxFontSizeMultiplier={1.4}
+            maxFontSizeMultiplier={TEXT_CAP.reading}
           >
             {t('loan.calculator.clearOn', {
               date: formatFullDate(lastPayment),
@@ -410,7 +428,7 @@ function LoanCalculatorScreenInner() {
               payment: formatCurrency(contract.payment),
             })}
           </Text>
-        </View>
+        </FitRows>
       ) : null}
 
       <View className="mt-3 w-full">
@@ -554,13 +572,20 @@ function monthBefore(date: Date): Date {
   return earlier;
 }
 
+/**
+ * A label and its figure. Every line in the card keeps its figure beside its label, or every line
+ * puts it underneath.
+ */
 function SummaryLine({
+  id,
   label,
   value,
   strong = false,
   accent = false,
   positive = false,
 }: {
+  /** Names the fit slots; unique in its card. */
+  id: string;
   label: string;
   value: string;
   strong?: boolean;
@@ -569,30 +594,40 @@ function SummaryLine({
   /** Money not going out. Interest saved is the only one on this screen. */
   positive?: boolean;
 }) {
+  const stacked = !useGroupFits();
   return (
-    <View className="w-full flex-row items-center justify-between gap-3">
-      <Text
-        className={
-          strong ? 'font-app-medium text-[15px] text-ink' : 'font-app text-[14px] text-body'
-        }
-        maxFontSizeMultiplier={1.3}
+    <View
+      className={
+        stacked ? 'w-full items-start' : 'w-full flex-row items-center justify-between gap-3'
+      }
+    >
+      <FitText
+        id={`${id}-label`}
+        role="row"
+        size={strong ? 15 : 14}
+        className={strong ? 'font-app-medium text-ink' : 'font-app text-body'}
+        slotClassName={stacked ? 'w-full' : 'min-w-0 flex-1'}
       >
         {label}
-      </Text>
-      <Text
+      </FitText>
+      <FitText
+        id={`${id}-value`}
+        hug
+        role="row"
+        size={strong ? 17 : 15}
         className={
           strong
-            ? 'font-app-bold text-[17px] text-ink'
+            ? 'font-app-bold text-ink'
             : accent
-              ? 'font-app-semibold text-[15px] text-money-out'
+              ? 'font-app-semibold text-money-out'
               : positive
-                ? 'font-app-semibold text-[15px] text-money-in'
-                : 'font-app-semibold text-[15px] text-ink'
+                ? 'font-app-semibold text-money-in'
+                : 'font-app-semibold text-ink'
         }
-        maxFontSizeMultiplier={1.3}
+        slotClassName={stacked ? 'mt-0.5' : 'shrink-0'}
       >
         {value}
-      </Text>
+      </FitText>
     </View>
   );
 }

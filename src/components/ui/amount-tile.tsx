@@ -1,5 +1,5 @@
 import { useState, type FC } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { SvgProps } from 'react-native-svg';
 
+import { FitText, type FitGroupHandle } from '@/components/ui/fit-group';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { formatCurrency } from '@/lib/format';
@@ -20,9 +21,22 @@ type AmountTileProps = {
   artwork: FC<SvgProps>;
   onPress?: () => void;
   className?: string;
+  /** Names the fit slots; the same in every language, unlike the label. */
+  id?: string;
+  /** Tiles side by side: their labels share one size, and so do their figures. */
+  labels?: FitGroupHandle;
+  figures?: FitGroupHandle;
+  /** One tile per line, where a square would only be empty space. */
+  stacked?: boolean;
 };
 
 const PRESSED = 0.955;
+
+/**
+ * Padding in percent is taken from the parent's width, so this keeps the tile at least as tall as it
+ * is wide while letting larger text make it taller.
+ */
+const AT_LEAST_SQUARE: ViewStyle = { width: 0, paddingTop: '100%' };
 
 /**
  * Square tile: artwork, label, amount, stacked down the middle. Fills its parent's width, so it works
@@ -35,6 +49,10 @@ export function AmountTile({
   artwork: Artwork,
   onPress,
   className,
+  id = 'tile',
+  labels,
+  figures,
+  stacked = false,
 }: AmountTileProps) {
   const reduced = useReducedMotion();
   const [pressed, setPressed] = useState(false);
@@ -65,41 +83,51 @@ export function AmountTile({
       onPress={onPress}
       onPressIn={sinks ? () => setPressed(true) : undefined}
       onPressOut={sinks ? () => setPressed(false) : undefined}
-      className="w-full"
+      // Grows into the height its row stretches it to, so a tile beside a taller one matches it.
+      className="w-full grow"
     >
       <Animated.View
         style={surface}
         className={cn(
-          'aspect-square w-full items-center justify-center rounded-[16px] border border-line bg-card p-3.5',
+          'w-full grow flex-row rounded-[16px] border border-line bg-card',
           // Reduced motion still answers the finger, with a static state.
           reduced && onPress ? 'active:opacity-70' : null,
           className,
         )}
       >
-        <View className="h-[84px] w-[84px]">
-          <Artwork width="100%" height="100%" />
-        </View>
+        {stacked ? null : <View style={AT_LEAST_SQUARE} />}
+        <View className="min-w-0 flex-1 items-center justify-center p-3.5">
+          <View className="h-[84px] w-[84px]">
+            <Artwork width="100%" height="100%" />
+          </View>
 
-        <View className="mt-2.5 w-full items-center">
-          <Text
-            className="text-center font-app-medium text-[13px] leading-[18px] text-body"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.3}
-          >
-            {label}
-          </Text>
-          {/* A tool tile has no figure; "Open" keeps the row height so tiles stay aligned. */}
-          <Text
-            className={cn(
-              'mt-1 text-center font-app-semibold text-[16px]',
-              amount === undefined ? 'text-muted' : 'text-ink',
-            )}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            maxFontSizeMultiplier={1.3}
-          >
-            {amount === undefined ? t('loan.amountTile.open') : formatCurrency(amount)}
-          </Text>
+          <View className="mt-2.5 w-full items-center">
+            <FitText
+              group={labels}
+              id={`${id}-label`}
+              role="control"
+              size={13}
+              lineHeight={18}
+              className="text-center font-app-medium text-body"
+              slotClassName="w-full"
+            >
+              {label}
+            </FitText>
+            {/* A tool tile has no figure; "Open" keeps the row height so tiles stay aligned. */}
+            <FitText
+              group={figures}
+              id={`${id}-figure`}
+              role="figure"
+              size={16}
+              className={cn(
+                'text-center font-app-semibold',
+                amount === undefined ? 'text-muted' : 'text-ink',
+              )}
+              slotClassName="mt-1 w-full"
+            >
+              {amount === undefined ? t('loan.amountTile.open') : formatCurrency(amount)}
+            </FitText>
+          </View>
         </View>
       </Animated.View>
     </Pressable>

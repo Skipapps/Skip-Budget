@@ -189,6 +189,40 @@ describe('in French', () => {
     expectNoRawText();
   });
 
+  it('keeps the payment whole and moves every summary figure under its label together', async () => {
+    const copy = screen.getByTestId('fit-copy-payment', { includeHiddenElements: true });
+    const payment = copy.props.children as string;
+    // Measured and drawn as one piece, with its cents.
+    expect(payment).toMatch(/^[\d\u00a0]+,\d{2}\u00a0\$$/);
+    const figure = screen.getByText(payment, RAW);
+    expect(figure.props.numberOfLines).toBeUndefined();
+    expect(figure.props.adjustsFontSizeToFit).toBeUndefined();
+    expect(figure.props.maxFontSizeMultiplier).toBe(1.2);
+
+    const lines = ['borrowed', 'interest', 'fees', 'total', 'apr'].filter((id) =>
+      screen.queryByTestId(`fit-slot-${id}-label`),
+    );
+    expect(lines).toEqual(expect.arrayContaining(['borrowed', 'interest', 'total']));
+    const layout = async (testID: string, width: number) =>
+      fireEvent(screen.getByTestId(testID, { includeHiddenElements: true }), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width, height: 20 } },
+      });
+    const besideBefore = String(screen.getByTestId('fit-slot-total-label').parent?.props.className);
+    expect(besideBefore).toContain('flex-row');
+    // "Remboursé" in Total remboursé is the one word too wide to sit beside its figure.
+    for (const id of lines) {
+      await layout(`fit-slot-${id}-label`, 150);
+      await layout(`fit-copy-${id}-label`, id === 'total' ? 160 : 90);
+    }
+    await layout('loan-summary', 290);
+
+    for (const id of lines) {
+      const row = screen.getByTestId(`fit-slot-${id}-label`).parent;
+      expect([id, String(row?.props.className).includes('flex-row')]).toEqual([id, false]);
+      expect(screen.getByTestId(`fit-slot-${id}-value`).parent).toBe(row);
+    }
+  });
+
   it('takes a rate typed with the decimal comma and files the same ASCII figure', async () => {
     await fireEvent.press(screen.getByLabelText(`Taux d’intérêt, 7,50${NBSP}%. Modifier`, RAW));
     expect(screen.getByText('Taux annuel en pourcentage', RAW)).toBeTruthy();

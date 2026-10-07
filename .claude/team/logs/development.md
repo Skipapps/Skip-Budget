@@ -4071,3 +4071,83 @@ English compare in add-bill alone fails 2 tests; English labels in all three scr
 **Stays English:** `carried.label: values.name || 'Bill'` in add-bill (stored in charges.label; unreachable, a bill
 cannot save without a name). Pre-existing, not changed: going back to the category grid and picking again
 overwrites a hand-typed name (only a company's or the voice page's name counts as real), in every language.
+
+---
+
+## 2026-10-06 — Dmitri (Development Lead) — review of f453724 "Large text, phase 1"
+
+**Outcome:** SHIP-TO-PHONE. No blocking issues. Edited nothing but this log.
+
+**Checks (tree clean at f453724 while they ran):** tsc 0. Full jest 119/119 suites, 2008/2008. Prettier and ESLint
+`--no-cache` clean on the 24 changed TS/TSX files.
+
+**Verified:** Measuring copies are absolute and opacity 0, with pointerEvents none, aria-hidden,
+accessibilityElementsHidden and no-hide-descendants. iOS RCTRecursiveAccessibilityLabel skips hidden subviews, and
+opacity plus the a11y props stop Fabric flattening the layer. Absolute children do not change parent or scroll size.
+The copies are excluded from default RNTL queries. Fabric host refs are ReactNativeElement in RN 0.86, so
+getBoundingClientRect works in the layout effect. The decision key covers font scale, window, container and texts, a
+late width change re-judges in the first layout, the fallback holds until the key changes (no flapping), and
+MAX_PASSES caps updates. Nothing on Home is cut: the only overflow-hidden are the progress tracks and rounded cards
+with growing heights. Amounts keep cents. Quick add drops to one column only below the floor. No code assumes a
+52pt header. The guard test's allow-list is exact (both directions are tested).
+
+**Non-blocking:** Each TransactionRow now mounts with about 3 renders and 3 hidden Text nodes. source/[id] and the
+charges lists are not virtualised, so check a long card history on the phone. The React Compiler is on, which limits
+BrandMark re-render cost. A two-line PageHeader keeps back and actions centred. Side-by-side buttons can differ in
+height. Hitting MAX_PASSES fails silently, and a dev warning would help.
+
+---
+
+## 2026-10-07 — Dana (Developer, UI and navigation) — large text, phase 2a: Activity, Cards, rows, hero figures
+
+**Outcome:** Done in the logo-service worktree on e4f65d5, nothing committed or staged. tsc 0; full `jest --ci` 184/184
+suites, 2637 tests (baseline 180 / 2582; 4 new suites, 55 new tests, none removed); prettier and ESLint `--no-cache`
+(cache cleared) clean on the 40 changed TS/TSX files. No device or simulator run.
+
+- **Core (`fit-group.tsx`):** measuring copies split only at breakable spaces, so a French amount ("1 234,56 $",
+  no-break spaces) is measured whole (phase 1 measured "234,56" alone, which under-shrank French figures on Home).
+  Mount cost per group: no re-render for members registering before the group's first pass, the decision key kept in
+  a ref (a key change alone draws nothing), hug slots noted so their onLayout is not news; a fitting row now mounts
+  in 1 render (was about 3). Hug members draw no measuring copy (TransactionRow 3 hidden Texts -> 2). Dev
+  `console.warn` once when a group hits MAX_PASSES. New `FitFigure` (lone figure, group of one), `FitRows` + `useGroupFits()`
+  (a card of label/value rows that stack together).
+- **Adopted (guard -> 0, moved to ADOPTED):** (tabs)/transactions, (tabs)/cards, ledger-summary (count pill now
+  `control`), ledger-row, amount-tile (square is a minimum via percent padding; pair stacks below the floor),
+  card-face (card ratio is a minimum; name and caption wrap; network mark stays fixed, account type scales), bill-row,
+  subscription-row, receipt-row, plan-detail, logo-choices, brand-field, brand-logo (monogram kept unscaled, numeric 1
+  removed), bills, subscriptions, savings, salary, loan-calculator, insights, source/[id] (floating pill h-14 ->
+  min-h-14). pro.tsx: the "2 MONTHS FREE" sticker now scales (control): its words are not in the card's label.
+  Guard allowances 87 files 316/57/14 -> 67 files 202/15/1 (the 1 is the tab bar).
+- **Test edits to existing suites:** transaction-row and destination-list helpers lay out the amount's slot instead
+  of its removed copy; insights `beside` compares the text's own box past the `fit-*` boxes. Assertions unchanged.
+
+**Not verified:** on a device: percent padding resolving against the parent's width is from Yoga's source
+(Style.h computePadding with widthSize), not a trace. Card faces keep whole dollars (`cents: false`, pinned by tests),
+which the spec's "always with cents" contradicts: a product call. salary and loan-calculator keep Save at the end of
+the scroll (`mt-auto`), not in Screen's footer.
+
+---
+
+## 2026-10-07 — Dmitri (Development Lead) — review of cbe48d8 "Large text, phase 2a"
+
+**Outcome:** SHIP-TO-PHONE. No blocking issues. Edited nothing but this log.
+
+**Checks (tree clean at cbe48d8 while they ran):** tsc 0. Full jest 184/184 suites, 2637/2637. Prettier and ESLint
+`--no-cache` clean on the 40 changed TS/TSX files.
+
+**Verified:** The Phase 1 guarantees hold. The decision key is now in a ref, so a layout pass that only confirms the
+decision draws nothing. Hug members key by text, so a new amount or date re-registers, changes the key and is judged
+again. Members register before the group's first effect, so a fitting row mounts with one render; TransactionRow
+draws 2 copies, for label and kind. BREAKABLE_SPACE keeps NBSP, U+2007 and U+202F inside a word, which matches what
+iOS will not break at. Yoga (RN 0.86 BoundAxis.h, CalculateLayout.cpp) resolves percentage padding on both axes
+against ownerWidth, so a 100% spacer gives a square tile and 56.18% gives the old 1.78 face, the same as the old
+aspect ratio at default text. Card faces have had cents:false since the initial commit (20f0d89), now applied through
+FitFigure. No new English (APR is a pre-existing disclosure term), no catalogue change, no module-scope t(). The edits
+to existing tests are helpers only: boxOf skips fit- wrappers, and the layout events go to fit-slot instead of the
+removed hug copy. Every assertion is kept. The guard only moves files from allowances to adopted.
+
+**Non-blocking:** In Cards' two-up row, the wrapper stretches but the tile inside does not fill it, so at large text a
+tile whose label wraps more ends taller than its neighbour. Give the Pressable and tile flex-1/h-full in the row.
+A single-word figure below the 11pt floor would break mid-character (only at an extreme width and amount).
+
+**2026-10-07 — Dana — follow-up to Dmitri's review of cbe48d8:** side-by-side money tiles now grow to their row's height (Pressable and surface `grow`), and a lone figure that would need to go under 11pt scrolls sideways at 11pt instead of breaking between digits (`FitText scrollWhenTooWide`, used by `FitFigure`); tsc 0, jest 184/184 suites, 2638 tests, prettier and ESLint `--no-cache` clean; pinned by the stretch-chain test in cards-large-text (Jest has no layout engine) and the 11pt test in fit-group.

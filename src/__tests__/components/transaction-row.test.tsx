@@ -30,7 +30,7 @@ async function layOut(screen: Screen, room: number, word: number) {
   await layout(part(screen, 'fit-copy-label'), word);
   await layout(part(screen, 'fit-slot-kind'), room);
   await layout(part(screen, 'fit-copy-kind'), 60);
-  await layout(part(screen, 'fit-copy-amount'), 104);
+  await layout(part(screen, 'fit-slot-amount'), 104);
   // The group's box is the row's parent.
   const row = screen.getByLabelText('Ticketmaster Entertainment, -$1,234.50, Receipt');
   if (row.parent) await layout(row.parent as Element, 327);

@@ -11,6 +11,7 @@ import {
   type RefObject,
 } from 'react';
 import {
+  ScrollView,
   Text,
   View,
   useWindowDimensions,
@@ -20,6 +21,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { cn } from '@/lib/cn';
 import { MIN_TEXT_SIZE, TEXT_CAP, renderedSize, type TextRole } from '@/theme/text-scale';
 
 /**
@@ -102,8 +104,6 @@ type Member = {
   copy: RefObject<Text | null>;
 };
 
-type Decision = FitResult & { key: string };
-
 export type FitGroupHandle = {
   mode: FitMode;
   /** Every member draws at its design size times this. */
@@ -152,9 +152,13 @@ export function useFitGroup({ mode }: { mode: FitMode }): FitGroupHandle {
   const laidOutRef = useRef(new Map<string, number>());
   /** The widths the current decision was made from, per part. */
   const usedRef = useRef(new Map<string, number>());
+  /** The conditions the decision was made under. A ref, so new conditions alone draw nothing. */
+  const keyRef = useRef('');
+  /** Whether the group's own layout effect has run yet. */
+  const settledRef = useRef(false);
   const passesRef = useRef({ key: '', count: 0 });
-  const [decision, setDecision] = useState<Decision>({ key: '', scale: 1, fits: true });
-  // Bumped by every registration and every changed width, so each one measures again.
+  const [decision, setDecision] = useState<FitResult>({ scale: 1, fits: true });
+  // Bumped by every later registration and every changed width, so each one measures again.
   const [version, setVersion] = useState(0);
 
   const remeasure = useCallback(() => setVersion((version) => version + 1), []);
@@ -162,7 +166,9 @@ export function useFitGroup({ mode }: { mode: FitMode }): FitGroupHandle {
   const register = useCallback(
     (id: string, member: Member) => {
       membersRef.current.set(id, member);
-      remeasure();
+      // Members mounting with the group register in their own layout effects, which run before the
+      // group's, so its first pass sees them all without drawing the list once more.
+      if (settledRef.current) remeasure();
       return () => {
         if (membersRef.current.get(id) !== member) return;
         membersRef.current.delete(id);
@@ -183,6 +189,7 @@ export function useFitGroup({ mode }: { mode: FitMode }): FitGroupHandle {
   );
 
   useLayoutEffect(() => {
+    settledRef.current = true;
     const members = [...membersRef.current.entries()].sort(([a], [b]) => (a < b ? -1 : 1));
     const laidOut = laidOutRef.current;
     const box = widthOf(container.current, laidOut.get(CONTAINER));
@@ -190,46 +197,59 @@ export function useFitGroup({ mode }: { mode: FitMode }): FitGroupHandle {
 
     const used = new Map<string, number>([[CONTAINER, box]]);
     const inputs: FitInput[] = [];
-    const naturals: string[] = [];
+    const parts: string[] = [];
     for (const [id, member] of members) {
+      const slot = widthOf(member.slot.current, laidOut.get(`${id}:slot`));
+      if (member.hug) {
+        // Never short of room, so only its words key the decision. Its width is noted all the
+        // same, so its own layout pass is not taken for a change.
+        parts.push(`${id}=${member.text}`);
+        if (slot !== undefined) used.set(`${id}:slot`, slot);
+        continue;
+      }
       const natural = widthOf(member.copy.current, laidOut.get(`${id}:copy`));
       // Not laid out yet: decide nothing rather than decide from half the group.
       if (natural === undefined || (natural === 0 && member.text.trim() !== '')) return;
-      used.set(`${id}:copy`, natural);
-      naturals.push(`${id}=${member.text}@${natural.toFixed(2)}`);
-      if (member.hug) continue;
-      const slot = widthOf(member.slot.current, laidOut.get(`${id}:slot`));
       if (!slot) return;
+      used.set(`${id}:copy`, natural);
       used.set(`${id}:slot`, slot);
+      parts.push(`${id}=${member.text}@${natural.toFixed(2)}`);
       inputs.push({ slot: slot - member.reserve, natural });
     }
     if (__DEV__) assertAlike(mode, members);
     usedRef.current = used;
 
     // Everything the right layout depends on except the slots, which move with the layout itself.
-    const key = [fontScale, windowWidth, Math.round(box), ...naturals].join('|');
+    const key = [fontScale, windowWidth, Math.round(box), ...parts].join('|');
     const [, first] = members[0];
     const result = fitScale(inputs, { mode, size: first.size, role: first.role, fontScale });
 
-    let next: Decision;
-    if (key !== decision.key) {
+    let next: FitResult;
+    if (key !== keyRef.current) {
       // New conditions are judged in the first layout again, so a fallback picked for the old ones
       // cannot outlive them.
-      next = decision.fits ? { key, ...result } : { key, scale: 1, fits: true };
+      next = decision.fits ? result : { scale: 1, fits: true };
     } else if (decision.fits) {
-      next = { key, ...result };
+      next = result;
     } else {
       // Held in the fallback until the conditions change: judged from the fallback's own wider
       // slots it would fit, flip back, and flip again.
-      next = { key, scale: result.scale, fits: false };
+      next = { scale: result.scale, fits: false };
     }
-    if (next.scale === decision.scale && next.fits === decision.fits && next.key === decision.key) {
-      return;
-    }
+    keyRef.current = key;
+    if (next.scale === decision.scale && next.fits === decision.fits) return;
 
     const passes = passesRef.current;
     passesRef.current = passes.key === key ? { key, count: passes.count + 1 } : { key, count: 1 };
-    if (passesRef.current.count > MAX_PASSES) return;
+    if (passesRef.current.count > MAX_PASSES) {
+      if (__DEV__ && passesRef.current.count === MAX_PASSES + 1) {
+        console.warn(
+          `FitGroup (${members.map(([id]) => id).join(', ')}) stopped after ${MAX_PASSES} changes ` +
+            'under the same conditions: a slot is probably as wide as its own text.',
+        );
+      }
+      return;
+    }
     setDecision(next);
   }, [mode, fontScale, windowWidth, decision, version]);
 
@@ -237,6 +257,11 @@ export function useFitGroup({ mode }: { mode: FitMode }): FitGroupHandle {
 }
 
 const FitGroupContext = createContext<FitGroupHandle | null>(null);
+
+/** Whether the nearest group's first layout holds; a row reads it to know when to stack. */
+export function useGroupFits(): boolean {
+  return useContext(FitGroupContext)?.fits ?? true;
+}
 
 type FitGroupProps = {
   group: FitGroupHandle;
@@ -278,6 +303,12 @@ const COPY_LAYER: ViewStyle = {
 
 const FAMILY = /(?:^|\s)(font-app(?:-[a-z]+)?)(?=\s|$)/;
 
+/**
+ * Spaces a line may break at. French amounts hold together with no-break spaces ("1 234,56 $"), so
+ * those stay inside the word being measured.
+ */
+const BREAKABLE_SPACE = /[^\S\u00A0\u2007\u202F]+/;
+
 type FitTextProps = {
   /** Unique within its group. */
   id: string;
@@ -302,10 +333,15 @@ type FitTextProps = {
   /** Points of the slot taken by `before`, `after` and the gaps around them. */
   reserve?: number;
   /**
-   * The slot is only as wide as this text (an amount beside a label), so it is never short of room
-   * and is not checked; its width still re-runs the decision when it changes.
+   * The slot is only as wide as this text (an amount beside a label), so it is never short of room,
+   * is not checked and needs no measuring copy; a change in its words still re-runs the decision.
    */
   hug?: boolean;
+  /**
+   * A lone figure that would have to go under the floor scrolls sideways at the floor size, so a
+   * figure with no space in it is never broken between its digits.
+   */
+  scrollWhenTooWide?: boolean;
   accessibilityRole?: AccessibilityRole;
   textRef?: Ref<ComponentRef<typeof Text>>;
   children: string;
@@ -328,6 +364,7 @@ export function FitText({
   after,
   reserve = 0,
   hug = false,
+  scrollWhenTooWide = false,
   accessibilityRole,
   textRef,
   children,
@@ -356,7 +393,27 @@ export function FitText({
     });
   }, [register, id, children, size, lineHeight, role, family, reserve, hug]);
 
-  const words = children.trim().split(/\s+/).join('\n');
+  const words = children.trim().split(BREAKABLE_SPACE).join('\n');
+
+  const shown = (
+    <Text
+      ref={textRef}
+      accessibilityRole={accessibilityRole}
+      className={className}
+      style={[
+        style,
+        {
+          fontSize: size * scale,
+          lineHeight: lineHeight === undefined ? undefined : lineHeight * scale,
+        },
+        // Beside an icon the text sits in a row, where it would otherwise keep its one-line width.
+        before || after ? { flexShrink: 1 } : null,
+      ]}
+      maxFontSizeMultiplier={TEXT_CAP[role]}
+    >
+      {children}
+    </Text>
+  );
 
   return (
     <View
@@ -366,42 +423,106 @@ export function FitText({
       onLayout={(event) => noteLayout?.(`${id}:slot`, event.nativeEvent.layout.width)}
     >
       {before}
-      <Text
-        ref={textRef}
-        accessibilityRole={accessibilityRole}
-        className={className}
-        style={[
-          style,
-          {
-            fontSize: size * scale,
-            lineHeight: lineHeight === undefined ? undefined : lineHeight * scale,
-          },
-          // Beside an icon the text sits in a row, where it would otherwise keep its one-line width.
-          before || after ? { flexShrink: 1 } : null,
-        ]}
-        maxFontSizeMultiplier={TEXT_CAP[role]}
-      >
-        {children}
-      </Text>
+      {scrollWhenTooWide && handle?.fits === false ? (
+        // Inside the slot, so the slot keeps the width the group measures against.
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} testID={`fit-scroll-${id}`}>
+          {shown}
+        </ScrollView>
+      ) : (
+        shown
+      )}
       {after}
 
-      <View
-        style={COPY_LAYER}
-        aria-hidden
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      >
-        <Text
-          ref={copy}
-          testID={`fit-copy-${id}`}
-          className={className}
-          style={[style, { fontSize: size, lineHeight }]}
-          maxFontSizeMultiplier={TEXT_CAP[role]}
-          onLayout={(event) => noteLayout?.(`${id}:copy`, event.nativeEvent.layout.width)}
+      {hug ? null : (
+        <View
+          style={COPY_LAYER}
+          aria-hidden
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
         >
-          {words}
-        </Text>
-      </View>
+          <Text
+            ref={copy}
+            testID={`fit-copy-${id}`}
+            className={className}
+            style={[style, { fontSize: size, lineHeight }]}
+            maxFontSizeMultiplier={TEXT_CAP[role]}
+            onLayout={(event) => noteLayout?.(`${id}:copy`, event.nativeEvent.layout.width)}
+          >
+            {words}
+          </Text>
+        </View>
+      )}
     </View>
+  );
+}
+
+type FitFigureProps = {
+  /** Names its slot; unique on the page when a test needs to find it. */
+  id?: string;
+  /** Points at the default text setting. */
+  size: number;
+  lineHeight?: number;
+  /** Weight, colour and alignment. */
+  className?: string;
+  style?: StyleProp<TextStyle>;
+  /** The figure's box: its margins. It takes the whole width it is given. */
+  boxClassName?: string;
+  textRef?: Ref<ComponentRef<typeof Text>>;
+  children: string;
+};
+
+/**
+ * A figure alone on its line, as a group of one: smaller only when its box is too narrow, never
+ * under 11pt, and always whole, cents included.
+ */
+export function FitFigure({
+  id = 'figure',
+  size,
+  lineHeight,
+  className,
+  style,
+  boxClassName,
+  textRef,
+  children,
+}: FitFigureProps) {
+  const group = useFitGroup({ mode: 'shrink' });
+  return (
+    <FitGroup group={group} className={cn('w-full', boxClassName)} testID={`fit-figure-${id}`}>
+      <FitText
+        id={id}
+        role="figure"
+        size={size}
+        lineHeight={lineHeight}
+        className={className}
+        style={style}
+        slotClassName="w-full"
+        textRef={textRef}
+        scrollWhenTooWide
+      >
+        {children}
+      </FitText>
+    </FitGroup>
+  );
+}
+
+/**
+ * Rows of a label and a value in one card. Each row reads useGroupFits(): while every label's widest
+ * word fits beside its value they sit side by side, and once one cannot, every row in the card puts
+ * its value under its label.
+ */
+export function FitRows({
+  className,
+  testID,
+  children,
+}: {
+  className?: string;
+  testID?: string;
+  children: ReactNode;
+}) {
+  const group = useFitGroup({ mode: 'switch' });
+  return (
+    <FitGroup group={group} className={className} testID={testID}>
+      {children}
+    </FitGroup>
   );
 }

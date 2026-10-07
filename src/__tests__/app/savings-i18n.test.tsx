@@ -1,4 +1,5 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { Dimensions } from 'react-native';
 import type { ReactTestRendererJSON } from 'react-test-renderer';
 
 import SavingsScreen from '@/app/savings';
@@ -183,6 +184,61 @@ describe('Savings in French', () => {
       ),
     ).toBeTruthy();
     expectNoRawText(screen.toJSON());
+  });
+});
+
+describe('Savings at large text sizes', () => {
+  type Screen = Awaited<ReturnType<typeof render>>;
+  const MONTH_IDS = ['2026-05-01', '2026-06-01', '2026-07-01', '2026-08-01'];
+
+  const layout = async (screen: Screen, testID: string, width: number) =>
+    fireEvent(screen.getByTestId(testID, { includeHiddenElements: true }), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width, height: 20 } },
+    });
+
+  /** Each month's name beside its amount, July's widest word given, then the list's box. */
+  async function layOut(screen: Screen, julyWord: number) {
+    for (const month of MONTH_IDS) {
+      await layout(screen, `fit-slot-${month}-name`, 170);
+      await layout(screen, `fit-copy-${month}-name`, month === '2026-07-01' ? julyWord : 90);
+      await layout(screen, `fit-slot-${month}-amount`, 100);
+    }
+    await layout(screen, 'saving-months', 327);
+  }
+
+  const beside = (screen: Screen, month: string) =>
+    String(screen.getByTestId(`fit-slot-${month}-name`).parent?.props.className).includes(
+      'flex-row',
+    );
+
+  beforeEach(() => {
+    setLanguage('es');
+    const window = { width: 375, height: 812, scale: 3, fontScale: 1.4 };
+    Dimensions.set({ window, screen: window });
+  });
+
+  it('prints the total and every month whole, with cents, and never cuts a name', async () => {
+    const screen = await render(<SavingsScreen />);
+    const total = screen.getByText('$2,031.57');
+    expect(total.props.numberOfLines).toBeUndefined();
+    expect(total.props.adjustsFontSizeToFit).toBeUndefined();
+    expect(total.props.maxFontSizeMultiplier).toBe(1.2);
+    for (const name of ['Mayo de 2026', 'Junio de 2026', 'Julio de 2026', 'Agosto de 2026']) {
+      expect(screen.getByText(name).props.numberOfLines).toBeUndefined();
+    }
+  });
+
+  it('keeps every amount beside its month while every word fits', async () => {
+    const screen = await render(<SavingsScreen />);
+    await layOut(screen, 90);
+    expect(MONTH_IDS.map((month) => beside(screen, month))).toEqual([true, true, true, true]);
+  });
+
+  it('puts every amount under its month once one month cannot fit beside its amount', async () => {
+    const screen = await render(<SavingsScreen />);
+    await layOut(screen, 180);
+    expect(MONTH_IDS.map((month) => beside(screen, month))).toEqual([false, false, false, false]);
+    expect(screen.getByText('$2,234.57')).toBeTruthy();
   });
 });
 

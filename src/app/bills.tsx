@@ -7,6 +7,7 @@ import { useArtwork } from '@/theme/artwork';
 import { useBills, useLedger, usePaymentSources } from '@/api/queries';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
+import { FitFigure } from '@/components/ui/fit-group';
 import { PageState } from '@/components/ui/page-state';
 import { RangeDropdown } from '@/components/ui/range-dropdown';
 import { Screen } from '@/components/ui/screen';
@@ -18,6 +19,7 @@ import { groupByDate } from '@/lib/group';
 import { rangeFor, type RangeKey } from '@/lib/range';
 import { useMoneyColor } from '@/providers/theme-provider';
 import { failureText } from '@/lib/failure';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 /**
  * What the bills have cost over a window: it lists the times a bill landed (a monthly bill is one
@@ -67,25 +69,31 @@ export default function BillsScreen() {
       <View className="mt-3 w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
         <View className="w-full flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1">
-            <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+            <Text
+              className="font-app text-[13px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.control}
+            >
               {t('bills.charged.label')}
             </Text>
-            <Text
+            <FitFigure
+              id="total"
+              size={26}
               // text-ink underneath: a zero total gets no money colour, and an unstyled figure is
               // black, invisible in dark mode.
-              className="mt-0.5 font-app-bold text-[26px] text-ink"
+              className="font-app-bold text-ink"
               style={{ color: moneyColor(total) }}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              maxFontSizeMultiplier={1.2}
+              boxClassName="mt-0.5"
             >
               {formatCurrency(total)}
-            </Text>
+            </FitFigure>
           </View>
           <RangeDropdown value={rangeKey} onChange={setRangeKey} />
         </View>
 
-        <Text className="mt-2 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.2}>
+        <Text
+          className="mt-2 font-app text-[12px] text-muted"
+          maxFontSizeMultiplier={TEXT_CAP.reading}
+        >
           {charges.length === 0
             ? t('bills.charged.nothing')
             : t('bills.charged.count', { count: charges.length })}

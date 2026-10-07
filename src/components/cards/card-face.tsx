@@ -1,10 +1,12 @@
 import { Text, View, type ViewStyle } from 'react-native';
 
+import { FitFigure } from '@/components/ui/fit-group';
 import { cn } from '@/lib/cn';
 import { isLightColor } from '@/lib/color';
 import { formatCurrency } from '@/lib/format';
 import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type CardFaceProps = {
   color: string;
@@ -21,6 +23,12 @@ type CardFaceProps = {
   last4: string;
   style?: ViewStyle;
 };
+
+/**
+ * A payment card's proportions (1.78 : 1) at the least. Padding in percent is taken from the
+ * parent's width, so the face only grows taller when larger text needs the room.
+ */
+const CARD_RATIO: ViewStyle = { width: 0, paddingTop: '56.18%' };
 
 /**
  * Shared shell for payment cards and bank accounts. Type colour and the embossed wordmark derive
@@ -44,6 +52,7 @@ export function CardFace({
   const watermark = onLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)';
   // A white face would otherwise sit invisibly on a white screen.
   const needsOutline = color.toUpperCase() === '#FFFFFF';
+  const mark = metaStyle === 'mark';
 
   return (
     <View
@@ -53,7 +62,7 @@ export function CardFace({
         needsOutline && { borderWidth: 1, borderColor: colors.line },
         style,
       ]}
-      className="aspect-[1.78] w-[94%] justify-between self-center overflow-hidden rounded-[14px] p-4"
+      className="w-[94%] flex-row self-center overflow-hidden rounded-[14px]"
     >
       <Text
         pointerEvents="none"
@@ -64,61 +73,64 @@ export function CardFace({
         Skip
       </Text>
 
-      <View>
-        <View className="flex-row items-start justify-between gap-3">
-          <Text
-            style={{ color: title ? foreground : mutedForeground }}
-            className="flex-1 font-app-medium text-[14px]"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.2}
+      <View style={CARD_RATIO} />
+
+      <View className="min-w-0 flex-1 justify-between p-4">
+        <View>
+          <View className="flex-row items-start justify-between gap-3">
+            <Text
+              style={{ color: title ? foreground : mutedForeground }}
+              className="min-w-0 flex-1 font-app-medium text-[14px]"
+              maxFontSizeMultiplier={TEXT_CAP.control}
+            >
+              {title || titlePlaceholder || ' '}
+            </Text>
+            {/* The network wordmark is a logo and stays its size; an account type is words. */}
+            <Text
+              allowFontScaling={mark ? false : undefined}
+              maxFontSizeMultiplier={mark ? undefined : TEXT_CAP.control}
+              style={{ color: mark ? foreground : mutedForeground }}
+              className={cn(
+                'shrink-0',
+                mark ? 'font-app-bold text-[16px] italic' : 'font-app-medium text-[12px]',
+              )}
+            >
+              {meta}
+            </Text>
+          </View>
+
+          {caption ? (
+            <Text
+              style={{ color: mutedForeground }}
+              className="mt-1.5 font-app-medium text-[10px] uppercase tracking-wide"
+              maxFontSizeMultiplier={TEXT_CAP.control}
+            >
+              {caption}
+            </Text>
+          ) : null}
+
+          {/* The face's own foreground, never red or green: "Owed" and the minus sign already say
+              which way the money runs. */}
+          <FitFigure
+            id="balance"
+            size={22}
+            className="font-app-bold"
+            style={{ color: foreground }}
+            boxClassName={caption ? 'mt-0.5' : 'mt-1'}
           >
-            {title || titlePlaceholder || ' '}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            style={{ color: metaStyle === 'mark' ? foreground : mutedForeground }}
-            className={cn(
-              metaStyle === 'mark'
-                ? 'font-app-bold text-[16px] italic'
-                : 'font-app-medium text-[12px]',
-            )}
-          >
-            {meta}
-          </Text>
+            {formatCurrency(amount, { cents: false })}
+          </FitFigure>
         </View>
 
-        {caption ? (
-          <Text
-            style={{ color: mutedForeground }}
-            className="mt-1.5 font-app-medium text-[10px] uppercase tracking-wide"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.2}
-          >
-            {caption}
-          </Text>
-        ) : null}
-
-        {/* The face's own foreground, never red or green: "Owed" and the minus sign already say
-            which way the money runs. */}
         <Text
-          style={{ color: foreground }}
-          className={cn('font-app-bold text-[22px]', caption ? 'mt-0.5' : 'mt-1')}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          maxFontSizeMultiplier={1.2}
+          style={{ color: mutedForeground }}
+          className="font-app-medium text-[13px]"
+          maxFontSizeMultiplier={TEXT_CAP.control}
         >
-          {formatCurrency(amount, { cents: false })}
+          ••••{'  '}
+          {last4 || '••••'}
         </Text>
       </View>
-
-      <Text
-        style={{ color: mutedForeground }}
-        className="font-app-medium text-[13px]"
-        maxFontSizeMultiplier={1.2}
-      >
-        ••••{'  '}
-        {last4 || '••••'}
-      </Text>
     </View>
   );
 }
