@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
+import { Dimensions } from 'react-native';
 
 import { DestinationList } from '@/components/dashboard/destination-list';
 import type { SpendingCategory } from '@/data/dashboard-mock';
@@ -105,5 +106,104 @@ describe('DestinationList', () => {
     const retry = getByText('Try again');
     await fireEvent.press(retry);
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** Home's three rows: no tool row, so every row has an amount. */
+const HOME = CATEGORIES.slice(0, 3);
+
+/** Montserrat at 15pt with the phone at 1.4x: each label's widest word, and each amount. */
+const WIDEST_WORD = { 'monthly-bills': 88.3, receipts: 92.4, subscriptions: 145.6 };
+const FIGURE = { 'monthly-bills': 89.0, receipts: 79.3, subscriptions: 65.9 };
+
+type Screen = Awaited<ReturnType<typeof render>>;
+
+function phone(width: number, fontScale: number) {
+  const window = { width, height: 844, scale: 3, fontScale };
+  Dimensions.set({ window, screen: window });
+}
+
+async function layout(screen: Screen, testID: string, width: number) {
+  await fireEvent(screen.getByTestId(testID, { includeHiddenElements: true }), 'layout', {
+    nativeEvent: { layout: { x: 0, y: 0, width, height: 20 } },
+  });
+}
+
+/** One layout pass: each label's room beside its amount and the measured widths, then the card. */
+async function layOut(screen: Screen, room: number, scale = 1) {
+  for (const { id } of HOME) {
+    const key = id as keyof typeof WIDEST_WORD;
+    await layout(screen, `fit-slot-${id}-label`, room);
+    await layout(screen, `fit-copy-${id}-label`, WIDEST_WORD[key] * scale);
+    await layout(screen, `fit-copy-${id}-amount`, FIGURE[key] * scale);
+  }
+  await layout(screen, 'where-it-goes', 380);
+}
+
+const slot = (screen: Screen, id: string) =>
+  screen.getByTestId(`fit-slot-${id}`, { includeHiddenElements: true });
+
+/** The amount sits under its label: both in one column, label first. */
+function isStacked(screen: Screen, id: string) {
+  const label = slot(screen, `${id}-label`);
+  const amount = slot(screen, `${id}-amount`);
+  if (label.parent !== amount.parent) return false;
+  const order = label.parent?.children ?? [];
+  return order.indexOf(label) < order.indexOf(amount);
+}
+
+describe('DestinationList at large text sizes', () => {
+  beforeEach(() => phone(428, 1.4));
+
+  it('lets labels wrap and prints every amount whole, with its cents', async () => {
+    const screen = await render(
+      <DestinationList items={HOME} amounts={AMOUNTS} pro onPress={() => {}} />,
+    );
+
+    for (const { label } of HOME) {
+      const text = screen.getByText(label);
+      expect(text.props.numberOfLines).toBeUndefined();
+      expect(text.props.maxFontSizeMultiplier).toBe(1.4);
+    }
+    for (const figure of ['-$120.00', '-$45.50', '-$9.99']) {
+      const text = screen.getByText(figure);
+      expect(text.props.numberOfLines).toBeUndefined();
+      expect(text.props.adjustsFontSizeToFit).toBeUndefined();
+      expect(text.props.maxFontSizeMultiplier).toBe(1.4);
+    }
+  });
+
+  it('keeps each amount beside its label while every word fits', async () => {
+    const screen = await render(
+      <DestinationList items={HOME} amounts={AMOUNTS} pro onPress={() => {}} />,
+    );
+    await layOut(screen, 150);
+    for (const { id } of HOME) expect(isStacked(screen, id)).toBe(false);
+  });
+
+  it('puts every amount under its label once one word cannot fit beside its amount', async () => {
+    // 428pt at 1.4x leaves about 137pt beside the amount; "Subscriptions" needs 145.6pt. The other
+    // two labels fit, and stack anyway: the card switches as one.
+    const screen = await render(
+      <DestinationList items={HOME} amounts={AMOUNTS} pro onPress={() => {}} />,
+    );
+    await layOut(screen, 137);
+
+    for (const { id } of HOME) expect(isStacked(screen, id)).toBe(true);
+    expect(screen.getByText('-$9.99')).toBeTruthy();
+    expect(screen.getByLabelText('Subscriptions, -$9.99, this month')).toBeTruthy();
+  });
+
+  it('goes back beside the labels when a smaller text size makes the words fit', async () => {
+    const screen = await render(
+      <DestinationList items={HOME} amounts={AMOUNTS} pro onPress={() => {}} />,
+    );
+    await layOut(screen, 137);
+    expect(isStacked(screen, 'subscriptions')).toBe(true);
+
+    // The default size: every width is 1/1.4 of what it was, and 104pt fits in 137pt.
+    await act(() => phone(428, 1));
+    await layOut(screen, 137, 1 / 1.4);
+    for (const { id } of HOME) expect(isStacked(screen, id)).toBe(false);
   });
 });

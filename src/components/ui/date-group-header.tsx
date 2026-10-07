@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import { formatRelativeDay } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { useMoneyColor } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type DateGroupHeaderProps = {
   /** yyyy-mm-dd, or '' for the undated group. */
@@ -12,15 +13,17 @@ type DateGroupHeaderProps = {
   total?: number;
 };
 
-/** The day heading above a run of rows. Muted so it does not compete with them. */
+/**
+ * The day heading above a run of rows. Muted so it does not compete with them. When the day and its
+ * total do not fit on one line the total moves under the day, so neither is cut.
+ */
 export function DateGroupHeader({ date, today, total }: DateGroupHeaderProps) {
   const moneyColor = useMoneyColor();
   return (
-    <View className="w-full flex-row items-center justify-between gap-3 bg-surface pb-1.5 pt-4">
+    <View className="w-full flex-row flex-wrap items-center justify-between gap-x-3 bg-surface pb-1.5 pt-4">
       <Text
-        className="font-app-medium text-[13px] uppercase tracking-wide text-muted"
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.3}
+        className="shrink font-app-medium text-[13px] uppercase tracking-wide text-muted"
+        maxFontSizeMultiplier={TEXT_CAP.heading}
       >
         {formatRelativeDay(date, today)}
       </Text>
@@ -29,7 +32,7 @@ export function DateGroupHeader({ date, today, total }: DateGroupHeaderProps) {
         <Text
           className="font-app text-[13px] text-muted"
           style={{ color: moneyColor(total) }}
-          maxFontSizeMultiplier={1.3}
+          maxFontSizeMultiplier={TEXT_CAP.heading}
         >
           {formatCurrency(total)}
         </Text>

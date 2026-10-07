@@ -29,6 +29,7 @@ import { rangeFor } from '@/lib/range';
 import { addDays, formatDateRange, formatDayLabel, toIsoDate } from '@/lib/date';
 import { useToday } from '@/lib/use-today';
 import { FAILURE_MESSAGE } from '@/lib/failure';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 const KIND_LABELS: Record<string, string> = {
   receipt: 'Receipt',
@@ -292,7 +293,7 @@ function Section({
         <View className="mt-2 w-full items-center">
           <Text
             className="w-full text-center font-app text-[14px] text-muted"
-            maxFontSizeMultiplier={1.4}
+            maxFontSizeMultiplier={TEXT_CAP.reading}
           >
             {FAILURE_MESSAGE}
           </Text>
@@ -305,7 +306,7 @@ function Section({
       ) : entries.length === 0 ? (
         <Text
           className="w-full py-6 text-center font-app text-[14px] text-muted"
-          maxFontSizeMultiplier={1.4}
+          maxFontSizeMultiplier={TEXT_CAP.reading}
         >
           {empty}
         </Text>

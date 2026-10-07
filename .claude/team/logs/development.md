@@ -3860,3 +3860,69 @@ src 19 (= baseline). tsconfig.json and package.json unchanged (typed routes rege
 
 **Not verified:** on a device. Pre-existing, left as is: Your money says "None yet" while loading and on a failed
 read (no FAILURE_MESSAGE); PageHeader titles still shrink-to-fit rather than wrap.
+
+---
+
+## 2026-10-06 — Dmitri (Development Lead) — review of 9c35463 "Settings: four rows, each opening its own page"
+
+**Outcome:** SHIP-TO-PHONE. No blocking issues. Edited nothing but this log.
+
+**Checks (tree clean at 9c35463 while they ran):** tsc 0. Full jest 114/114 suites, 1970/1970. Prettier and ESLint
+`--no-cache` clean on the 15 changed TS/TSX files.
+
+**Verified:** settings-routes.test runs expo-router's real route resolution over the real src/app file tree:
+/settings opens (tabs)/settings, /settings/<page> is pushed in the root Stack, back returns to the tab, a cold link
+works, and dismissTo leaves no second tab bar. `.expo/types/router.d.ts` has the new routes. The root Stack's
+screenOptions apply, as for every other detail page; no Stack.Screen entry is needed. dismissTo, in expo-router
+57.0.15, is POP_TO: pop to the nearest (tabs) route below, then switch the tab through params.screen, or replace if
+there is none. It is the same pattern add-bill/add-receipt/add-subscription/voice-review already ship with, and it
+cannot pop past (tabs). The main page keeps Skip Pro, the dev-only Developer switches, Profile with avoidKeyboard and
+the save check, Account, and the delete tally through useMoneyCounts (same queries). Moved logic exists exactly once:
+app lock, mode chips, plural, coffee, getting-started. SettingsRow has no fixed height, so the wrap cannot clip. Every
+"Settings ->" phrase still points somewhere that exists.
+
+**Non-blocking:** Back on a cold-opened /settings/<page> falls back to /home, not /settings (goBack's general
+fallback). privacy.tsx says "Settings -> Delete account" where the FAQ says "Settings -> Account -> Delete account".
+use-money-counts.ts is a hook living in components/.
+
+---
+
+## 2026-10-06 — Dana — large text, phase 1: TEXT_CAP, FitGroup, Home (Founder's request)
+
+**Outcome:** Done in the logo-service worktree, nothing committed or staged. tsc 0; full `jest --ci` 119/119 suites,
+2008/2008 (5 new suites, 2 extended); prettier clean on the 24 changed TS/TSX files; eslint `--no-cache` changed
+files 0, src 19 (= baseline). No device or simulator run.
+
+- **Shared pieces:** `src/theme/text-scale.ts` (TEXT_CAP reading 1.6 / row 1.4 / control 1.3 / heading 1.3 /
+  figure 1.2, MIN_TEXT_SIZE 11, `renderedSize`). `src/components/ui/fit-group.tsx` (`fitScale`, `useFitGroup`,
+  `FitGroup`, `FitText`), per large-text.md section 2. Measured in useLayoutEffect via `getBoundingClientRect`;
+  checked in RN 0.86.2: Fabric refs are ReactNativeElement (ReactFabricPublicInstance.js:37), completeSurface
+  lays out in the commit and updates the revision JS reads at once (UIManager.cpp:188-213, ShadowTree.cpp:409),
+  and React commits only mount at the end of the JS task (Scheduler.cpp scheduleRenderingUpdate,
+  RuntimeScheduler_Modern.cpp:322), so the corrected size is the first frame. onLayout catches late passes.
+  The decision is keyed by fontScale, window width, the group box's width and each member's text and measured
+  width, so a size made against a passing width is redone (the tab bar lesson); a fallback holds until the key
+  changes, so it cannot flip-flop.
+- **Deviations:** the measuring copy sits in each member's slot (absolute, 4000pt, opacity 0, hidden from
+  accessibility) and draws one word per line, so its width is the widest word. Added `hug` (an amount beside a
+  label: keyed, not checked), `before`/`after` + `reserve` (an icon or chevron beside a centred label). Switch
+  mode's dev check compares role only. Tests in src/__tests__ (the two co-located dashboard tests extended in
+  place). A guard test instead of the ESLint rule while 316 numeric ceilings remain.
+- **Home:** Quick add is a 2x2 grid of wide tiles (icon beside label), the four labels one group at 15pt
+  (control), one column only below the 15pt floor (320pt Display Zoom). Where it goes is a switch group: labels
+  wrap, amounts whole with cents, and all three rows put the amount under the label once one word cannot fit
+  (428pt at 1.4x: "Subscriptions" 145.6pt vs about 137pt; 375pt even at default). Hero card: the days pill
+  scales (control), Income/Expenses labels and figures are two shrink groups, the pair stacks below the floor.
+  Go further: tool names a group, label wraps beside the chevron. TransactionRow: per-row switch group (also on
+  bills, subscriptions, source/[id]). Header name, Insights banner, getting-started titles wrap; caps from TEXT_CAP.
+- **Shared controls:** typography (ceilings from TEXT_CAP; Title 1.4 -> 1.3; SectionHeading wraps and the caption
+  drops under it), Button wraps (1.5 -> 1.4), PageHeader title wraps in min-h-[52px] (a single word too wide
+  shrinks, group of one), DateGroupHeader wraps, TextLink 1.5 -> 1.4.
+- **Guard:** src/__tests__/large-text-guard.test.ts: per-file allowance of numeric maxFontSizeMultiplier,
+  numberOfLines={1} and adjustsFontSizeToFit (316 / 60 / 14 in 87 files); counts may only go down and the
+  adopted files must be clean. Mutants (a new ceiling in quick-actions, a one-line cut in action-pill, a removed
+  site left on the list) each fail.
+
+**Not verified:** on a device: the first-frame claim is from the RN source, not a trace; Montserrat kerning (my
+widths are advance sums). Phase 2 list in the report. Note: I ran one `git stash` / `stash pop` to compare test
+console output with the baseline; restored at once, stash list empty, Dmitri's uncommitted entry intact.

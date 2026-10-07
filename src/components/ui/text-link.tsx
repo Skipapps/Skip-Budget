@@ -1,6 +1,7 @@
 import { Pressable, Text } from 'react-native';
 
 import { cn } from '@/lib/cn';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type TextLinkVariant = 'default' | 'subtle';
 
@@ -41,7 +42,10 @@ export function TextLink({
       onPress={onPress}
       className={cn('items-center py-3 active:opacity-60', className)}
     >
-      <Text className={cn(text[variant], underline && 'underline')} maxFontSizeMultiplier={1.5}>
+      <Text
+        className={cn(text[variant], underline && 'underline')}
+        maxFontSizeMultiplier={TEXT_CAP.row}
+      >
         {label}
       </Text>
     </Pressable>

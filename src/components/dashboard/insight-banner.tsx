@@ -2,6 +2,7 @@ import { ChevronRight, TrendingUp } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { shadows } from '@/theme/shadows';
+import { TEXT_CAP } from '@/theme/text-scale';
 import { useColors } from '@/providers/theme-provider';
 
 type InsightBannerProps = {
@@ -40,17 +41,12 @@ export function InsightBanner({ pro = true, onPress }: InsightBannerProps) {
       </View>
 
       <View className="min-w-0 flex-1">
-        <Text
-          className="font-app-medium text-[15px] text-ink"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.4}
-        >
+        <Text className="font-app-medium text-[15px] text-ink" maxFontSizeMultiplier={TEXT_CAP.row}>
           Insights
         </Text>
         <Text
           className="mt-0.5 font-app text-[12px] leading-[17px] text-muted"
-          numberOfLines={2}
-          maxFontSizeMultiplier={1.3}
+          maxFontSizeMultiplier={TEXT_CAP.row}
         >
           See the story behind your spending
         </Text>

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { cn } from '@/lib/cn';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type TextProps = {
   children: ReactNode;
@@ -9,8 +10,8 @@ type TextProps = {
 };
 
 /**
- * Type scale. Sizes step up at the `compact`/`phone` breakpoints, and every style caps Dynamic Type
- * growth (`maxFontSizeMultiplier`) so accessibility sizes never overflow.
+ * Type scale. Sizes step up at the `compact`/`phone` breakpoints, and every style stops growing with
+ * the phone's text size at its role's ceiling (TEXT_CAP).
  */
 
 /**
@@ -34,7 +35,7 @@ export function Title({
         flush ? undefined : 'mt-2',
         className,
       )}
-      maxFontSizeMultiplier={1.4}
+      maxFontSizeMultiplier={TEXT_CAP.heading}
     >
       {children}
     </Text>
@@ -44,23 +45,27 @@ export function Title({
 /**
  * The one section heading in the app: every list, group and block is introduced by this, at one size.
  * The optional caption sits on the same baseline at the far right (the range a list covers) and only
- * qualifies the words next to it.
+ * qualifies the words next to it. When the two do not fit on one line the caption moves under the
+ * heading, so neither is cut.
  */
 export function SectionHeading({ children, caption, className }: TextProps & { caption?: string }) {
   return (
-    <View className={cn('w-full flex-row items-baseline justify-between gap-3', className)}>
+    <View
+      className={cn(
+        'w-full flex-row flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5',
+        className,
+      )}
+    >
       <Text
         className="shrink font-app-semibold text-[17px] text-ink"
-        numberOfLines={1}
-        maxFontSizeMultiplier={1.3}
+        maxFontSizeMultiplier={TEXT_CAP.heading}
       >
         {children}
       </Text>
       {caption ? (
         <Text
-          className="shrink-0 font-app text-[13px] text-muted"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.2}
+          className="shrink font-app text-[13px] text-muted"
+          maxFontSizeMultiplier={TEXT_CAP.heading}
         >
           {caption}
         </Text>
@@ -85,7 +90,7 @@ export function Subtitle({
         align === 'left' ? 'text-left' : 'text-center',
         className,
       )}
-      maxFontSizeMultiplier={1.6}
+      maxFontSizeMultiplier={TEXT_CAP.reading}
     >
       {children}
     </Text>
@@ -99,7 +104,7 @@ export function Body({ children, className }: TextProps) {
         'font-app text-[14px] leading-5 text-body phone:text-[15px] phone:leading-6',
         className,
       )}
-      maxFontSizeMultiplier={1.6}
+      maxFontSizeMultiplier={TEXT_CAP.reading}
     >
       {children}
     </Text>
@@ -110,7 +115,7 @@ export function FieldLabel({ children, className }: TextProps) {
   return (
     <Text
       className={cn('font-app-medium text-[13px] text-body', className)}
-      maxFontSizeMultiplier={1.4}
+      maxFontSizeMultiplier={TEXT_CAP.row}
     >
       {children}
     </Text>

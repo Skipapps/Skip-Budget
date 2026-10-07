@@ -10,12 +10,14 @@ import {
 import { Fragment } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TextLink } from '@/components/ui/text-link';
 import type { SpendingCategory } from '@/data/dashboard-mock';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
 import { FAILURE_MESSAGE } from '@/lib/failure';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 /**
  * Glyph per dashboard destination, matching the Quick add cards. Unknown ids fall back to a
@@ -43,7 +45,9 @@ type DestinationListProps = {
 
 /**
  * Where this month's money went, as one list rather than a carousel: a comparison wants a single
- * column of amounts, in the same grammar as the transaction rows below.
+ * column of amounts, in the same grammar as the transaction rows below. Labels wrap between words;
+ * once any label has a word that cannot fit beside its amount, every row puts its amount under its
+ * label, so the column of amounts stays one column.
  */
 export function DestinationList({
   items,
@@ -56,10 +60,16 @@ export function DestinationList({
 }: DestinationListProps) {
   const colors = useColors();
   const moneyColor = useMoneyColor();
+  const rows = useFitGroup({ mode: 'switch' });
+  const stacked = !rows.fits;
 
   return (
     <View className="w-full">
-      <View className="w-full overflow-hidden rounded-[16px] border border-line bg-card py-1">
+      <FitGroup
+        group={rows}
+        className="w-full overflow-hidden rounded-[16px] border border-line bg-card py-1"
+        testID="where-it-goes"
+      >
         {items.map((category, index) => {
           const Icon = DESTINATION_ICONS[category.id] ?? DESTINATION_FALLBACK_ICON;
           const amount = amounts[category.id];
@@ -76,6 +86,59 @@ export function DestinationList({
                 : `${category.label}, ${formatCurrency(amount)}, this month`
             : `${category.label}.${locked ? ' Pro feature.' : ''} Opens the tool.`;
 
+          const name = (
+            <FitText
+              id={`${category.id}-label`}
+              role="row"
+              size={15}
+              className="font-app-medium text-ink"
+              slotClassName={stacked ? 'w-full' : 'min-w-0 flex-1'}
+            >
+              {category.label}
+            </FitText>
+          );
+
+          const value = !isMoneyRow ? (
+            <FitText
+              id={`${category.id}-open`}
+              hug
+              role="row"
+              size={13}
+              className="font-app text-muted"
+            >
+              Open
+            </FitText>
+          ) : loading ? (
+            <Skeleton className="h-3.5 w-20" />
+          ) : (
+            <FitText
+              id={`${category.id}-amount`}
+              hug
+              role="row"
+              size={15}
+              className={error ? 'font-app-semibold text-muted' : 'font-app-semibold text-ink'}
+              style={error ? undefined : { color: moneyColor(amount) }}
+            >
+              {error ? '—' : formatCurrency(amount)}
+            </FitText>
+          );
+
+          // Inline rather than pinned to the corner, so at large type the badge pushes the label
+          // along.
+          const badge = locked ? (
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              className="shrink-0 rounded-full bg-accent px-2 py-0.5"
+            >
+              <Text allowFontScaling={false} className="font-app-bold text-[9px] text-on-control">
+                PRO
+              </Text>
+            </View>
+          ) : null;
+
+          const chevron = <ChevronRight size={18} color={colors.muted} strokeWidth={2} />;
+
           return (
             <Fragment key={category.id}>
               {/* Inset to start under the label, past the icon's circle. */}
@@ -90,84 +153,48 @@ export function DestinationList({
                   <Icon size={20} color={colors.accentInk} strokeWidth={1.8} />
                 </View>
 
-                <Text
-                  className="min-w-0 flex-1 font-app-medium text-[15px] text-ink"
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={1.4}
-                >
-                  {category.label}
-                </Text>
-
-                {/* Inline rather than pinned to the corner, so at large type the badge pushes the
-                    label along. */}
-                {locked ? (
-                  <View
-                    accessibilityElementsHidden
-                    importantForAccessibility="no-hide-descendants"
-                    className="shrink-0 rounded-full bg-accent px-2 py-0.5"
-                  >
-                    <Text
-                      allowFontScaling={false}
-                      className="font-app-bold text-[9px] text-on-control"
-                    >
-                      PRO
-                    </Text>
+                {stacked ? (
+                  // Label first, then the amount on its own line at the same size, in the order
+                  // VoiceOver reads them.
+                  <View className="min-w-0 flex-1 items-start gap-0.5">
+                    {name}
+                    {value}
                   </View>
-                ) : null}
+                ) : (
+                  name
+                )}
 
-                {isMoneyRow ? (
+                {badge}
+
+                {stacked ? (
+                  <View className="shrink-0">{chevron}</View>
+                ) : isMoneyRow ? (
                   // A rule before the figure and a chevron after it: the shared minimum width keeps
                   // the rules aligned down the card, and the chevron says the row opens.
                   <View className="shrink-0 flex-row items-center">
                     <View className="mr-3 h-6 w-px bg-line" />
-                    <View className="min-w-[96px] items-end">
-                      {loading ? (
-                        <Skeleton className="h-3.5 w-20" />
-                      ) : error ? (
-                        <Text
-                          className="font-app-semibold text-[15px] text-muted"
-                          numberOfLines={1}
-                          maxFontSizeMultiplier={1.4}
-                        >
-                          —
-                        </Text>
-                      ) : (
-                        <Text
-                          className="font-app-semibold text-[15px] text-ink"
-                          style={{ color: moneyColor(amount) }}
-                          numberOfLines={1}
-                          maxFontSizeMultiplier={1.4}
-                        >
-                          {formatCurrency(amount)}
-                        </Text>
-                      )}
-                    </View>
-                    <View className="ml-1.5">
-                      <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
-                    </View>
+                    <View className="min-w-[96px] items-end">{value}</View>
+                    <View className="ml-1.5">{chevron}</View>
                   </View>
                 ) : (
                   <View className="shrink-0 flex-row items-center gap-1">
-                    <Text
-                      className="font-app text-[13px] text-muted"
-                      numberOfLines={1}
-                      maxFontSizeMultiplier={1.3}
-                    >
-                      Open
-                    </Text>
-                    <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
+                    {value}
+                    {chevron}
                   </View>
                 )}
               </Pressable>
             </Fragment>
           );
         })}
-      </View>
+      </FitGroup>
 
       {/* The rows stay tappable while this shows: each destination loads its own data. */}
       {error ? (
         <View className="mt-3 w-full flex-row items-center justify-between gap-3">
-          <Text className="shrink font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+          <Text
+            className="shrink font-app text-[13px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.reading}
+          >
             {FAILURE_MESSAGE}
           </Text>
           {onRetry ? (

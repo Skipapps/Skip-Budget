@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { withTap } from '@/lib/press';
 import { cn } from '@/lib/cn';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type ButtonVariant = 'primary' | 'outline';
 
@@ -53,13 +54,10 @@ export function Button({
       )}
     >
       {icon ? <View className="mr-3 shrink-0">{icon}</View> : null}
-      {/* One line, always: two buttons side by side would differ in height if one wrapped, so the type shrinks. */}
+      {/* Wraps between words and the pill grows, rather than shrinking one label away from the rest. */}
       <Text
         className={cn('shrink text-center font-app-medium text-[17px]', label[variant])}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.8}
-        maxFontSizeMultiplier={1.5}
+        maxFontSizeMultiplier={TEXT_CAP.row}
       >
         {labelText}
       </Text>

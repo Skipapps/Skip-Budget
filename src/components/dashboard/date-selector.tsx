@@ -2,6 +2,7 @@ import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type DateSelectorProps = {
   weekday: string;
@@ -41,10 +42,16 @@ export function DateSelector({
         className="flex-1 flex-row items-center justify-center gap-2 active:opacity-70"
       >
         <View className="items-center">
-          <Text className="font-app-medium text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+          <Text
+            className="font-app-medium text-[12px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.control}
+          >
             {weekday}
           </Text>
-          <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+          <Text
+            className="font-app-semibold text-[15px] text-ink"
+            maxFontSizeMultiplier={TEXT_CAP.control}
+          >
             {date}
           </Text>
         </View>

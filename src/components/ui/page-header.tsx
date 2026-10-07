@@ -1,7 +1,8 @@
 import type { LucideIcon } from 'lucide-react-native';
 import type { ComponentRef, ReactNode, RefObject } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, View, type Text } from 'react-native';
 
+import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
 import { withTap } from '@/lib/press';
 import { useColors } from '@/providers/theme-provider';
 
@@ -24,7 +25,8 @@ const MIN_SIDE = 44;
  * Every page's top line: back on the left, the name in the centre, actions on the right.
  *
  * Both sides take the width of the wider one, so the name sits on the true centre of the screen.
- * The name is one line; a long one steps its size down rather than wrapping.
+ * A long name wraps between words and the line grows; only a single word too wide for the room
+ * steps the size down.
  */
 export function PageHeader({
   title,
@@ -45,29 +47,30 @@ export function PageHeader({
     MIN_SIDE,
     actions.length * ACTION_SIZE + Math.max(0, actions.length - 1) * ACTION_GAP,
   );
+  const name = useFitGroup({ mode: 'shrink' });
 
   return (
-    <View className="h-[52px] w-full flex-row items-center">
+    <FitGroup group={name} className="min-h-[52px] w-full flex-row items-center">
       <View style={{ width: side }} className="flex-row items-center justify-start">
         {left}
       </View>
 
-      <Text
-        ref={titleRef}
+      <FitText
+        id="page-title"
+        role="heading"
+        size={20}
+        className="text-center font-app-bold text-ink"
+        slotClassName="mx-2 min-w-0 flex-1"
         accessibilityRole="header"
-        className="flex-1 px-2 text-center font-app-bold text-[20px] text-ink"
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.8}
-        maxFontSizeMultiplier={1.2}
+        textRef={titleRef}
       >
-        {title}
-      </Text>
+        {title ?? ''}
+      </FitText>
 
       <View style={{ width: side, gap: ACTION_GAP }} className="flex-row items-center justify-end">
         {right ?? actions.map((action) => <HeaderAction key={action.label} {...action} />)}
       </View>
-    </View>
+    </FitGroup>
   );
 }
 

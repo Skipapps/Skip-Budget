@@ -3,6 +3,8 @@ import { ChevronRight, Landmark } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
+import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
+import { cn } from '@/lib/cn';
 import { shadows } from '@/theme/shadows';
 import { useColors } from '@/providers/theme-provider';
 
@@ -23,16 +25,21 @@ type ToolCardsProps = {
   onPress: (href: Href) => void;
 };
 
+/** The chevron after the label: 16pt and the 2pt gap before it. */
+const CHEVRON_ROOM = 18;
+
 /**
  * A raised card: shadow and no border (an outline would flatten the lift).
  * A locked tool keeps its card with a PRO badge, since a hidden feature sells nothing and the
- * destination screen still does the refusing.
+ * destination screen still does the refusing. Side by side, the tool names share one size; cards
+ * that cannot hold it stack.
  */
 export function ToolCards({ pro, onPress }: ToolCardsProps) {
   const colors = useColors();
+  const names = useFitGroup({ mode: 'shrink' });
 
   return (
-    <View className="w-full flex-row gap-3">
+    <FitGroup group={names} className={names.fits ? 'w-full flex-row gap-3' : 'w-full gap-3'}>
       {TOOLS.map((tool) => (
         <Pressable
           key={tool.id}
@@ -40,7 +47,10 @@ export function ToolCards({ pro, onPress }: ToolCardsProps) {
           accessibilityLabel={`${tool.label}.${pro ? '' : ' Pro feature.'} Opens the tool.`}
           onPress={() => onPress(tool.href)}
           style={shadows.raised}
-          className="min-w-0 flex-1 items-center rounded-[16px] bg-card px-3 pb-4 pt-5 active:opacity-60"
+          className={cn(
+            'items-center rounded-[16px] bg-card px-3 pb-4 pt-5 active:opacity-60',
+            names.fits ? 'min-w-0 flex-1' : 'w-full',
+          )}
         >
           {pro ? null : (
             <View
@@ -59,18 +69,19 @@ export function ToolCards({ pro, onPress }: ToolCardsProps) {
             <tool.icon size={20} color={colors.accentInk} strokeWidth={1.8} />
           </View>
 
-          <View className="mt-3 w-full flex-row items-center justify-center gap-0.5">
-            <Text
-              className="shrink text-center font-app-medium text-[14px] text-ink"
-              numberOfLines={1}
-              maxFontSizeMultiplier={1.3}
-            >
-              {tool.label}
-            </Text>
-            <ChevronRight size={16} color={colors.muted} strokeWidth={2} />
-          </View>
+          <FitText
+            id={tool.id}
+            role="control"
+            size={14}
+            className="text-center font-app-medium text-ink"
+            slotClassName="mt-3 w-full flex-row items-center justify-center gap-0.5"
+            after={<ChevronRight size={16} color={colors.muted} strokeWidth={2} />}
+            reserve={CHEVRON_ROOM}
+          >
+            {tool.label}
+          </FitText>
         </Pressable>
       ))}
-    </View>
+    </FitGroup>
   );
 }

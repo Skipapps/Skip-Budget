@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { ProfileAvatar } from '@/components/ui/profile-avatar';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type DashboardHeaderProps = {
   name: string;
@@ -35,8 +36,7 @@ export function DashboardHeader({
         </Pressable>
         <Text
           className="flex-1 font-app-semibold text-[20px] text-ink"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.3}
+          maxFontSizeMultiplier={TEXT_CAP.heading}
         >
           {name}
         </Text>

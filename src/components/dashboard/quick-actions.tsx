@@ -1,8 +1,10 @@
 import type { Href } from 'expo-router';
 import { Banknote, Calendar, Receipt, RefreshCw } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
+import { cn } from '@/lib/cn';
 import { withTap } from '@/lib/press';
 import { useColors } from '@/providers/theme-provider';
 
@@ -45,33 +47,51 @@ type QuickActionsProps = {
   onPress: (href: Href) => void;
 };
 
+/** Two rows of two, in reading order. */
+const ROWS = [ACTIONS.slice(0, 2), ACTIONS.slice(2)];
+
+/**
+ * Two by two on every phone at every text size, the four labels at one size: a label that outgrows
+ * its tile shrinks all four together. One column only if that would take them under their default
+ * size.
+ */
 export function QuickActions({ onPress }: QuickActionsProps) {
   const colors = useColors();
+  const labels = useFitGroup({ mode: 'shrink' });
+
+  const tile = (action: QuickAction) => (
+    <Pressable
+      key={action.id}
+      accessibilityRole="button"
+      accessibilityLabel={action.hint}
+      onPress={withTap(() => onPress(action.href))}
+      className={cn(
+        'min-h-14 flex-row items-center gap-2 rounded-[20px] border border-line bg-card px-3 py-2 active:bg-ink/5',
+        labels.fits ? 'min-w-0 flex-1' : 'w-full',
+      )}
+    >
+      <action.icon size={22} color={colors.accentInk} strokeWidth={1.8} />
+      <FitText
+        id={action.id}
+        role="control"
+        size={15}
+        className="font-app-medium text-ink"
+        slotClassName="min-w-0 flex-1"
+      >
+        {action.label}
+      </FitText>
+    </Pressable>
+  );
 
   return (
-    <View className="w-full flex-row gap-3">
-      {ACTIONS.map((action) => (
-        <Pressable
-          key={action.id}
-          accessibilityRole="button"
-          accessibilityLabel={action.hint}
-          onPress={withTap(() => onPress(action.href))}
-          className="min-h-[92px] min-w-0 flex-1 items-center justify-between rounded-[20px] border border-line bg-card px-1.5 pb-[14px] pt-[24px] active:bg-ink/5"
-        >
-          <action.icon size={22} color={colors.accentInk} strokeWidth={1.8} />
-          {/* One line, shrunk to fit when Dynamic Type outgrows the card: "Subscription" is one
-              word, so a two-line version would break it mid-word. */}
-          <Text
-            className="text-center font-app-medium text-[12px] text-ink"
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.75}
-            maxFontSizeMultiplier={1.3}
-          >
-            {action.label}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
+    <FitGroup group={labels} className="w-full gap-3" testID="quick-add">
+      {labels.fits
+        ? ROWS.map((row) => (
+            <View key={row[0].id} className="w-full flex-row gap-3">
+              {row.map(tile)}
+            </View>
+          ))
+        : ACTIONS.map(tile)}
+    </FitGroup>
   );
 }
