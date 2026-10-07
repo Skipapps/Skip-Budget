@@ -12,6 +12,8 @@
  * clients.
  */
 
+import { t } from '@/i18n';
+
 type LocalAuthentication = typeof import('expo-local-authentication');
 
 let cached: LocalAuthentication | null | undefined;
@@ -47,7 +49,7 @@ export async function lockCapability(): Promise<LockCapability> {
       ? 'Face ID'
       : types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)
         ? 'Touch ID'
-        : 'your passcode';
+        : t('lib.appLock.passcode');
 
     return { available: true, label };
   } catch {
@@ -59,14 +61,14 @@ export async function lockCapability(): Promise<LockCapability> {
  * Asks for a face, a fingerprint or the device passcode. The passcode fallback stays on so a face
  * that will not scan never locks the user out.
  */
-export async function authenticate(reason = 'Unlock Skip'): Promise<boolean> {
+export async function authenticate(reason = t('lib.appLock.unlock')): Promise<boolean> {
   const LocalAuthentication = load();
   if (!LocalAuthentication) return false;
 
   try {
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage: reason,
-      cancelLabel: 'Cancel',
+      cancelLabel: t('common.cancel'),
       disableDeviceFallback: false,
     });
     return result.success;
@@ -78,10 +80,10 @@ export async function authenticate(reason = 'Unlock Skip'): Promise<boolean> {
 export function unavailableMessage(reason: Exclude<LockCapability, { available: true }>['reason']) {
   switch (reason) {
     case 'no-hardware':
-      return 'This phone has no Face ID or Touch ID.';
+      return t('lib.appLock.noHardware');
     case 'not-enrolled':
-      return 'Set up Face ID or Touch ID in your phone’s settings first, then come back.';
+      return t('lib.appLock.notEnrolled');
     case 'unsupported':
-      return 'App lock is not available in this build of Skip.';
+      return t('lib.appLock.unsupported');
   }
 }

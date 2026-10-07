@@ -14,6 +14,7 @@
  */
 import type { BillValues, CaptureSource, ReceiptValues, SubscriptionValues } from '@/api/mutations';
 import type { BrandSelection } from '@/components/brands/brand-field';
+import { t } from '@/i18n';
 import { countFromAfterPick, floorAfterCharges } from '@/lib/charges';
 import { toIsoDate } from '@/lib/date';
 
@@ -64,9 +65,9 @@ export function buildReceiptValues(
   sources: readonly SourceRef[],
 ): Built<ReceiptValues, 'store' | 'amount'> {
   const { store } = input;
-  if (!store) return refuse('store', 'Pick a store first.');
+  if (!store) return refuse('store', t('api.entry.pickStore'));
   const amount = positive(input.amount);
-  if (amount === null) return refuse('amount', 'Enter how much you spent.');
+  if (amount === null) return refuse('amount', t('api.entry.receiptAmount'));
 
   return {
     ok: true,
@@ -111,19 +112,19 @@ export function buildBillValues(
   ctx: { sources: readonly SourceRef[]; lastChargedOn: string | null },
 ): Built<BillValues, 'details' | 'amount' | 'when'> {
   const name = input.name.trim();
-  if (!name) return refuse('details', 'Give the bill a name.');
+  if (!name) return refuse('details', t('api.entry.billName'));
   const amount = positive(input.amount);
-  if (amount === null) return refuse('amount', 'Enter how much it costs.');
+  if (amount === null) return refuse('amount', t('api.entry.billAmount'));
 
   const isPeriod = input.recurrence === 'period';
   // A bill with no date cannot be scheduled, so it would save and never show.
   if (!input.startDate) {
-    return refuse('when', isPeriod ? 'Pick the date it starts.' : 'Pick the first due date.');
+    return refuse('when', isPeriod ? t('api.entry.periodStart') : t('api.entry.firstDue'));
   }
   const start = toIsoDate(input.startDate);
   // Compared as ISO days: no clock, no timezone, exact.
   if (isPeriod && input.endDate && toIsoDate(input.endDate) < start) {
-    return refuse('when', 'The end date cannot be before the start date.');
+    return refuse('when', t('api.entry.endBeforeStart'));
   }
 
   return {
@@ -170,9 +171,9 @@ export function buildSubscriptionValues(
   },
 ): Built<SubscriptionValues, 'service' | 'amount'> {
   const { service } = input;
-  if (!service) return refuse('service', 'Pick a service first.');
+  if (!service) return refuse('service', t('api.entry.pickService'));
   const amount = positive(input.amount);
-  if (amount === null) return refuse('amount', 'Enter what it costs.');
+  if (amount === null) return refuse('amount', t('api.entry.subscriptionAmount'));
 
   const renewal = input.renewsOn ? toIsoDate(input.renewsOn) : null;
   return {

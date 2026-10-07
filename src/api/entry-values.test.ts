@@ -7,6 +7,7 @@ import {
   type ReceiptInput,
   type SubscriptionInput,
 } from '@/api/entry-values';
+import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
 /**
  * The shared builders, on their own: these pin each rule directly, with the same fixtures as
@@ -344,5 +345,93 @@ describe('defaultBillName', () => {
     expect(defaultBillName('internet', 'Internet', null)).toBe('Internet');
     expect(defaultBillName('other', 'Other bill', null)).toBe('');
     expect(defaultBillName('other', 'Other bill', COMCAST)).toBe('Comcast');
+  });
+});
+
+describe('the form hints in Spanish and French', () => {
+  beforeEach(() => resetLocaleForTests());
+  afterAll(() => resetLocaleForTests());
+
+  const receipt: ReceiptInput = {
+    store: null,
+    amount: '12.50',
+    date: day(2026, 9, 28),
+    sourceId: '',
+    note: '',
+    captureSource: 'manual',
+  };
+
+  const bill: BillInput = {
+    name: 'Rent',
+    amount: '1800',
+    issuer: null,
+    categoryId: 'housing',
+    iconId: 'other',
+    recurrence: 'monthly',
+    startDate: null,
+    endDate: null,
+    sourceId: '',
+    note: '',
+  };
+
+  const subscription: SubscriptionInput = {
+    service: null,
+    amount: '15.99',
+    cycle: 'monthly',
+    renewsOn: null,
+    sourceId: '',
+    note: '',
+    active: true,
+  };
+
+  const subscriptionCtx = { sources: SOURCES, lastChargedOn: null, countsFrom: null };
+
+  it('keeps the field and words the hint in Spanish', () => {
+    setLanguage('es');
+    expect(buildReceiptValues(receipt, SOURCES)).toEqual({
+      ok: false,
+      field: 'store',
+      message: 'Primero elige una tienda.',
+    });
+    expect(buildReceiptValues({ ...receipt, store: WHOLE_FOODS, amount: '0' }, SOURCES)).toEqual({
+      ok: false,
+      field: 'amount',
+      message: 'Ingresa cuánto gastaste.',
+    });
+    expect(buildBillValues(bill, { sources: SOURCES, lastChargedOn: null })).toMatchObject({
+      field: 'when',
+      message: 'Elige la primera fecha de vencimiento.',
+    });
+    expect(buildSubscriptionValues(subscription, subscriptionCtx)).toMatchObject({
+      field: 'service',
+      message: 'Primero elige un servicio.',
+    });
+  });
+
+  it('keeps the field and words the hint in French', () => {
+    setLanguage('fr');
+    expect(
+      buildBillValues({ ...bill, name: '  ' }, { sources: SOURCES, lastChargedOn: null }),
+    ).toMatchObject({ field: 'details', message: 'Donne un nom à la facture.' });
+    expect(
+      buildBillValues(
+        {
+          ...bill,
+          recurrence: 'period',
+          startDate: day(2026, 9, 10),
+          endDate: day(2026, 9, 1),
+        },
+        { sources: SOURCES, lastChargedOn: null },
+      ),
+    ).toMatchObject({
+      field: 'when',
+      message: 'La date de fin ne peut pas précéder la date de début.',
+    });
+    expect(
+      buildSubscriptionValues(
+        { ...subscription, service: WHOLE_FOODS, amount: '' },
+        subscriptionCtx,
+      ),
+    ).toMatchObject({ field: 'amount', message: 'Indique ce que ça coûte.' });
   });
 });

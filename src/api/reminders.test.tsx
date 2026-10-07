@@ -5,10 +5,15 @@ import type { ReactNode } from 'react';
 import { NOTHING_SAVED } from '@/api/mutations';
 import {
   DEFAULT_RECEIPT_REMIND_AT,
+  LEAD_OPTIONS,
+  leadToChoice,
   receiptReminderFrom,
+  REMINDER_CAPTION,
+  REMINDER_CHOICES,
   useReceiptReminder,
   useSetReceiptReminder,
 } from '@/api/reminders';
+import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
 /**
  * The daily receipts reminder setting. Two things to pin: the default time is 8pm even when nothing
@@ -165,5 +170,43 @@ describe('useSetReceiptReminder', () => {
     await expect(result.current.mutateAsync({ enabled: true, remindAt: '20:00' })).rejects.toThrow(
       NOTHING_SAVED,
     );
+  });
+});
+
+describe('the reminder choices in each language', () => {
+  beforeEach(() => resetLocaleForTests());
+  afterAll(() => resetLocaleForTests());
+
+  const labels = (options: readonly { label: string }[]) => options.map((option) => option.label);
+
+  it('keeps the English labels and every stored value', () => {
+    expect(labels(LEAD_OPTIONS)).toEqual(['On the day', '1 day', '3 days', '1 week']);
+    expect(labels(REMINDER_CHOICES)).toEqual(['Off', 'On the day', '1 day', '3 days', '1 week']);
+    expect(REMINDER_CAPTION.card).toBe("Before this card's payment day");
+
+    setLanguage('fr');
+    expect(LEAD_OPTIONS.map((option) => option.value)).toEqual([0, 1, 3, 7]);
+    expect(REMINDER_CHOICES.map((option) => option.value)).toEqual(['off', '0', '1', '3', '7']);
+    expect(leadToChoice(3)).toBe('3');
+  });
+
+  it('reads in Spanish', () => {
+    setLanguage('es');
+    expect(labels(REMINDER_CHOICES)).toEqual([
+      'Desactivado',
+      'El mismo día',
+      '1 día',
+      '3 días',
+      '1 semana',
+    ]);
+    expect(REMINDER_CAPTION.bill).toBe('Antes de que venza la factura');
+    expect(REMINDER_CAPTION.account).toBe('Cuando tu salario llegue aquí');
+  });
+
+  it('reads in French', () => {
+    setLanguage('fr');
+    expect(labels(LEAD_OPTIONS)).toEqual(['Le jour même', '1 jour', '3 jours', '1 semaine']);
+    expect(REMINDER_CAPTION.subscription).toBe('Avant le renouvellement');
+    expect(REMINDER_CAPTION.card).toBe('Avant la date de paiement de cette carte');
   });
 });

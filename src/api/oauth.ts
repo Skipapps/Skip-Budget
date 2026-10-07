@@ -3,7 +3,8 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { t } from '@/i18n';
+import { failureMessage, failureText } from '@/lib/failure';
 import { supabase } from '@/lib/supabase';
 
 export type OAuthResult = { error: string | null; cancelled?: boolean };
@@ -17,13 +18,13 @@ const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
  */
 export async function signInWithApple(): Promise<OAuthResult> {
   if (Platform.OS !== 'ios') {
-    return { error: 'Sign in with Apple is only available on iOS.' };
+    return { error: t('api.oauth.appleIosOnly') };
   }
 
   try {
     const available = await AppleAuthentication.isAvailableAsync();
     if (!available) {
-      return { error: 'Sign in with Apple is not available on this device.' };
+      return { error: t('api.oauth.appleUnavailable') };
     }
 
     const credential = await AppleAuthentication.signInAsync({
@@ -34,7 +35,7 @@ export async function signInWithApple(): Promise<OAuthResult> {
     });
 
     if (!credential.identityToken) {
-      return { error: FAILURE_MESSAGE };
+      return { error: failureText() };
     }
 
     const { error } = await supabase.auth.signInWithIdToken({
@@ -53,7 +54,7 @@ export async function signInWithApple(): Promise<OAuthResult> {
     // Apple reports "unknown" when no Apple ID is signed in on the device, by far the most common
     // cause.
     if (code === 'ERR_REQUEST_UNKNOWN') {
-      return { error: 'Sign in to an Apple ID on this device first, then try again.' };
+      return { error: t('api.oauth.appleNoAccount') };
     }
 
     return { error: failureMessage(thrown) };
@@ -96,7 +97,7 @@ async function signInWithGoogleNatively(iosClientId: string): Promise<OAuthResul
 
     const { idToken } = response.data;
     if (!idToken) {
-      return { error: FAILURE_MESSAGE };
+      return { error: failureText() };
     }
 
     const { error } = await supabase.auth.signInWithIdToken({
@@ -131,7 +132,7 @@ async function signInWithGoogleInBrowser(): Promise<OAuthResult> {
   });
 
   if (error) return { error: failureMessage(error) };
-  if (!data?.url) return { error: FAILURE_MESSAGE };
+  if (!data?.url) return { error: failureText() };
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
@@ -139,12 +140,12 @@ async function signInWithGoogleInBrowser(): Promise<OAuthResult> {
     return { error: null, cancelled: true };
   }
   if (result.type !== 'success') {
-    return { error: FAILURE_MESSAGE };
+    return { error: failureText() };
   }
 
   const code = new URL(result.url).searchParams.get('code');
   if (!code) {
-    return { error: FAILURE_MESSAGE };
+    return { error: failureText() };
   }
 
   const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);

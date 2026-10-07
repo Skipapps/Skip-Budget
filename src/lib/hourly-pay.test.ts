@@ -1,4 +1,5 @@
-import { estimateHourlyPay, hourlyProblem, type HourlyPay } from '@/lib/hourly-pay';
+import { resetLocaleForTests, setLanguage } from '@/i18n/store';
+import { estimateHourlyPay, hourlyProblem, OVERTIME_RATES, type HourlyPay } from '@/lib/hourly-pay';
 
 const base: HourlyPay = {
   rate: 20,
@@ -76,5 +77,41 @@ describe('hourlyProblem', () => {
 
   it('refuses deductions of all the pay or more', () => {
     expect(hourlyProblem({ ...base, deductionPercent: 100 })).toMatch(/under 100/);
+  });
+});
+
+describe('in Spanish and French', () => {
+  beforeEach(() => resetLocaleForTests());
+  afterAll(() => resetLocaleForTests());
+
+  it('words each form hint in the language on screen', () => {
+    setLanguage('es');
+    expect(hourlyProblem({ ...base, rate: 0 })).toBe('Ingresa cuánto ganas por hora.');
+    expect(hourlyProblem({ ...base, hoursPerWeek: 160, overtimeHoursPerWeek: 10 })).toBe(
+      'Una semana solo tiene 168 horas. Revisa las horas que ingresaste.',
+    );
+
+    setLanguage('fr');
+    expect(hourlyProblem({ ...base, overtimeHoursPerWeek: -1 })).toBe(
+      'Les heures supplémentaires ne peuvent pas être négatives.',
+    );
+    expect(hourlyProblem({ ...base, deductionPercent: 100 })).toBe(
+      'Les impôts et les retenues doivent être un pourcentage inférieur à 100.',
+    );
+  });
+
+  it('names the overtime rates but keeps their values', () => {
+    expect(OVERTIME_RATES.map((rate) => rate.label)).toEqual([
+      'Time and a half (1.5×)',
+      'Double time (2×)',
+    ]);
+    setLanguage('es');
+    expect(OVERTIME_RATES[0].label).toBe('Tiempo y medio (1.5×)');
+    setLanguage('fr');
+    expect(OVERTIME_RATES.map((rate) => rate.label)).toEqual([
+      'Temps et demi (1,5×)',
+      'Temps double (2×)',
+    ]);
+    expect(OVERTIME_RATES.map((rate) => rate.value)).toEqual(['1.5', '2']);
   });
 });

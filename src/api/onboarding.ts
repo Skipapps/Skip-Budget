@@ -10,6 +10,7 @@ import {
   useSalarySources,
   useSubscriptions,
 } from '@/api/queries';
+import { t } from '@/i18n';
 
 export type SetupStep = {
   id: 'salary' | 'wallet' | 'bill' | 'subscription' | 'receipt';
@@ -44,8 +45,8 @@ export function useGettingStarted() {
   const steps: SetupStep[] = [
     {
       id: 'salary',
-      title: 'Set your pay',
-      detail: 'Left this month, savings and Insights all start from what comes in.',
+      title: t('api.setup.salary.title'),
+      detail: t('api.setup.salary.detail'),
       done: (salary.data?.length ?? 0) > 0,
       href: '/salary',
     },
@@ -53,31 +54,29 @@ export function useGettingStarted() {
       // Skipping the account offer still ticks the step: an unticked row after adding a card read
       // as "it did not save".
       id: 'wallet',
-      title: 'Add your credit card and bank account',
-      detail:
-        'Card first; the bank account is offered right after, and skipping it still completes the step.',
+      title: t('api.setup.wallet.title'),
+      detail: t('api.setup.wallet.detail'),
       done: hasCard || hasAccount,
       href: '/add-card',
     },
     {
       id: 'bill',
-      title: 'Add your bills',
-      detail: 'Rent or the phone bill — one is enough to light up Coming up.',
+      title: t('api.setup.bill.title'),
+      detail: t('api.setup.bill.detail'),
       done: (bills.data?.length ?? 0) > 0,
       href: '/add-bill',
     },
     {
       id: 'subscription',
-      title: 'Add your subscriptions',
-      detail: 'Netflix, the gym — the charges that come back on their own land in Coming up.',
+      title: t('api.setup.subscription.title'),
+      detail: t('api.setup.subscription.detail'),
       done: (subscriptions.data?.length ?? 0) > 0,
       href: '/add-subscription',
     },
     {
       id: 'receipt',
-      title: 'Add a receipt',
-      detail:
-        'What you spend day to day, next to your bills. Skippable — the app works without it.',
+      title: t('api.setup.receipt.title'),
+      detail: t('api.setup.receipt.detail'),
       done: (receipts.data ?? []).length > 0,
       href: '/add-receipt',
       optional: true,

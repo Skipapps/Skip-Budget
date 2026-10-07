@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 
 import { usePastCharges } from '@/api/past-charges';
+import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
 /**
  * Editing a plan that has already been charged asks whether the charges behind it change too, and
@@ -135,5 +136,69 @@ describe('before an edit can save', () => {
     mockCharges = { data: undefined, isSuccess: false };
     const { result } = await renderHook(() => usePastCharges('bill', undefined), { wrapper });
     expect(result.current.ready).toBe(true);
+  });
+});
+
+describe('the question, word for word', () => {
+  beforeEach(() => {
+    resetLocaleForTests();
+    mockAsk.mockResolvedValue('upcoming');
+  });
+
+  afterAll(() => resetLocaleForTests());
+
+  async function asked(planId: string, name: string) {
+    const { result } = await renderHook(() => usePastCharges('bill', planId), { wrapper });
+    await result.current.choose(name, true);
+    return mockAsk.mock.calls[mockAsk.mock.calls.length - 1][0];
+  }
+
+  it('keeps every English sentence as it was', async () => {
+    expect((await asked('rent', 'Rent')).message).toBe(
+      'Rent has already been charged 2 times. Change those as well, or only the ones still to come?',
+    );
+    expect((await asked('power', 'Power')).message).toBe(
+      'Power has already been charged once. Change that charge as well, or only the ones still to come?',
+    );
+
+    mockCharges = { data: undefined, isSuccess: false };
+    expect((await asked('rent', 'Rent')).message).toBe(
+      'Rent may already have been charged. Change those as well, or only the ones still to come?',
+    );
+
+    mockCharges = { data: [RENT_CHARGES[2]], isSuccess: false };
+    expect((await asked('power', 'Power')).message).toBe(
+      'Power may already have been charged. Change that charge as well, or only the ones still to come?',
+    );
+  });
+
+  it('asks in Spanish', async () => {
+    setLanguage('es');
+    const request = await asked('rent', 'Renta');
+    expect(request.title).toBe('¿Cambiar también los cargos anteriores?');
+    expect(request.message).toBe(
+      'Ya hubo 2 cargos de Renta. ¿Cambiarlos también o solo los próximos?',
+    );
+    expect(request.actions.map((action: { label: string }) => action.label)).toEqual([
+      'Anteriores y próximos',
+      'Solo los próximos',
+    ]);
+    expect(request.cancelLabel).toBe('Cancelar');
+  });
+
+  it('asks in French, with "that charge" only for one charge', async () => {
+    setLanguage('fr');
+    const one = await asked('power', 'Hydro');
+    expect(one.title).toBe('Modifier aussi les prélèvements passés\u00a0?');
+    expect(one.message).toBe(
+      'Un prélèvement a déjà eu lieu pour Hydro. Modifier aussi ce prélèvement, ou seulement ceux à venir\u00a0?',
+    );
+    expect(one.cancelLabel).toBe('Annuler');
+
+    mockCharges = { data: undefined, isSuccess: false };
+    const unknown = await asked('rent', 'Loyer');
+    expect(unknown.message).toBe(
+      'Des prélèvements ont peut-être déjà eu lieu pour Loyer. Les modifier aussi, ou seulement ceux à venir\u00a0?',
+    );
   });
 });

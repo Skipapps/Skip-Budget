@@ -1,6 +1,7 @@
 import { forgetDevice } from '@/api/push';
 import { forgetVoiceAliases } from '@/api/voice-aliases';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { t } from '@/i18n';
+import { failureMessage, failureText } from '@/lib/failure';
 import { supabase } from '@/lib/supabase';
 import { clearVoiceDraft } from '@/lib/voice-draft';
 
@@ -17,16 +18,14 @@ export type SignUpResult = AuthResult & {
  */
 function readable(error: { message?: string } | null | undefined): string {
   const lower = (error?.message ?? '').toLowerCase();
-  if (lower.includes('invalid login credentials')) return 'That email and password do not match.';
-  if (lower.includes('already registered')) return 'That email already has an account.';
-  if (lower.includes('password should be')) return 'Password must be at least 6 characters.';
-  if (lower.includes('unable to validate email')) return 'That email address does not look right.';
+  if (lower.includes('invalid login credentials')) return t('api.auth.wrongPassword');
+  if (lower.includes('already registered')) return t('api.auth.emailTaken');
+  if (lower.includes('password should be')) return t('api.auth.shortPassword');
+  if (lower.includes('unable to validate email')) return t('api.auth.badEmail');
   if (lower.includes('token has expired') || lower.includes('expired'))
-    return 'That code has expired. Send a new one.';
-  if (lower.includes('invalid token') || lower.includes('otp'))
-    return 'That code is not right. Check it and try again.';
-  if (lower.includes('rate limit') || lower.includes('too many'))
-    return 'Too many attempts. Wait a minute and try again.';
+    return t('api.auth.codeExpired');
+  if (lower.includes('invalid token') || lower.includes('otp')) return t('api.auth.codeWrong');
+  if (lower.includes('rate limit') || lower.includes('too many')) return t('api.auth.tooMany');
   return failureMessage(error);
 }
 
@@ -172,7 +171,7 @@ export async function deleteAccount(): Promise<AuthResult> {
   // deleted account cannot answer getUser.
   const { data } = await supabase.auth.getUser();
   if (data.user) {
-    return { error: FAILURE_MESSAGE };
+    return { error: failureText() };
   }
 
   // The server has nothing left; clear the learned voice corrections while the stored session

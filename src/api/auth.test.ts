@@ -6,6 +6,7 @@
 
 // babel-plugin-jest-hoist lifts the jest.mock() calls below above this import.
 import { deleteAccount, signInWithEmail, signOut, verifyOtp } from './auth';
+import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 import type { VoiceDraft } from '@/lib/voice';
 import { putVoiceDraft, readVoiceDraft } from '@/lib/voice-draft';
@@ -272,5 +273,59 @@ describe('sign-in wording', () => {
     mockAuthError = { message: 'Network request failed' };
     const result = await signInWithEmail('sam@example.com', 'nope');
     expect(result.error).toBe(FAILURE_MESSAGE);
+  });
+});
+
+describe('sign-in wording in Spanish and French', () => {
+  beforeEach(() => {
+    resetLocaleForTests();
+    mockAuthError = null;
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  afterAll(() => resetLocaleForTests());
+
+  it('names each refusal in Spanish', async () => {
+    setLanguage('es');
+    mockAuthError = { message: 'Invalid login credentials' };
+    expect((await signInWithEmail('sam@example.com', 'nope')).error).toBe(
+      'Ese correo y esa contraseña no coinciden.',
+    );
+    mockAuthError = { message: 'Token has expired or is invalid' };
+    expect((await verifyOtp('sam@example.com', '123456', 'signup')).error).toBe(
+      'Ese código ya expiró. Pide uno nuevo.',
+    );
+    mockAuthError = { message: 'Network request failed' };
+    expect((await signInWithEmail('sam@example.com', 'nope')).error).toBe(
+      'Algo salió mal. Inténtalo de nuevo.',
+    );
+  });
+
+  it('names each refusal in French', async () => {
+    setLanguage('fr');
+    mockAuthError = { message: 'Email rate limit exceeded' };
+    expect((await signInWithEmail('sam@example.com', 'nope')).error).toBe(
+      'Trop de tentatives. Attends une minute et réessaie.',
+    );
+    mockAuthError = { message: 'User already registered' };
+    expect((await signInWithEmail('sam@example.com', 'nope')).error).toBe(
+      'Ce courriel a déjà un compte.',
+    );
+    mockAuthError = { message: 'Invalid token' };
+    expect((await verifyOtp('sam@example.com', '123456', 'recovery')).error).toBe(
+      'Ce code n’est pas le bon. Vérifie-le et réessaie.',
+    );
+  });
+
+  it('says the failure line in French when the account is still there after deleting', async () => {
+    setLanguage('fr');
+    mockRpcError = null;
+    mockLiveUser = { id: 'user-A' };
+    expect((await deleteAccount()).error).toBe('Une erreur est survenue. Réessaie.');
+    mockLiveUser = null;
   });
 });

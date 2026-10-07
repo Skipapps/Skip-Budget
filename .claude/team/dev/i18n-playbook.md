@@ -96,6 +96,22 @@ in the string, not a normal space).
 | Voice | Voz | Voix |
 | Pro (paywall) | Pro | Pro |
 | Free | Gratis | Gratuit |
+| amount | importe | montant |
+| charge (a bill or subscription that went out) | cargo | prélèvement |
+| pay (what lands on payday) | salario | paie |
+| due date | fecha de vencimiento | date d’échéance |
+| Left this month (Home figure, quoted when inside a sentence) | Te queda este mes | Reste ce mois-ci |
+| Coming up | Próximos | À venir |
+| Insights (page name) | Análisis | Aperçu |
+| email (address) | correo | courriel |
+| Enter … (form hint) | Ingresa … | Indique … |
+| Pick … (form hint) | Elige … | Choisis … |
+| store, shop | tienda | magasin |
+| passcode | código | code |
+| Off (a reminder) | Desactivado | Désactivé |
+| overtime | horas extra | heures supplémentaires |
+| tax and deductions (pay) | impuestos y deducciones | impôts et retenues |
+| statement (bank) | estado de cuenta | relevé |
 
 A term not in the table: choose the plain everyday word a Mexican or Canadian banking app uses,
 add a line to this table, and be consistent across every file.

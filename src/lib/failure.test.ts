@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/react-native';
 
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { resetLocaleForTests, setLanguage } from '@/i18n/store';
+import { FAILURE_MESSAGE, failureMessage, failureText } from '@/lib/failure';
 
 jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
 
@@ -64,5 +65,35 @@ describe('in a release build', () => {
   it('reports nothing when nothing was thrown', () => {
     failureMessage();
     expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+});
+
+describe('in the language on screen', () => {
+  beforeEach(() => {
+    resetLocaleForTests();
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  afterAll(() => resetLocaleForTests());
+
+  it('says the one line in Spanish and in French', () => {
+    setLanguage('es');
+    expect(failureMessage(new Error('fetch failed'))).toBe('Algo salió mal. Inténtalo de nuevo.');
+    expect(failureText()).toBe('Algo salió mal. Inténtalo de nuevo.');
+
+    setLanguage('fr');
+    expect(failureMessage(new Error('fetch failed'))).toBe('Une erreur est survenue. Réessaie.');
+    expect(failureText()).toBe('Une erreur est survenue. Réessaie.');
+  });
+
+  it('keeps the old constant in English for screens not yet switched over', () => {
+    setLanguage('fr');
+    expect(FAILURE_MESSAGE).toBe('Something went wrong. Please try again.');
+    setLanguage('en');
+    expect(failureText()).toBe(FAILURE_MESSAGE);
   });
 });

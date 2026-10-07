@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react-native';
 
 import { buildBillValues, buildReceiptValues, buildSubscriptionValues } from '@/api/entry-values';
+import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 import { parseVoice, type VoiceDraft } from '@/lib/voice';
 import { DIRECTORY, TODAY } from '@/lib/voice/test-fixtures';
 import {
@@ -485,6 +486,19 @@ describe('voiceSaveBlocker', () => {
     );
     expect(voiceSaveBlocker(entry({ kind: 'bill', billCategoryId: 'internet' }))).toBeNull();
     expect(voiceSaveBlocker(entry({ amount: null }))).toBeNull();
+  });
+
+  it('asks in the language on screen', () => {
+    resetLocaleForTests();
+    setLanguage('es');
+    expect(voiceSaveBlocker(entry({ amount: null, amountChoices: [12.5, 1250] }))).toBe(
+      'Elige el importe que quisiste decir.',
+    );
+    setLanguage('fr');
+    expect(voiceSaveBlocker(entry({ kind: 'bill', billCategoryId: null }))).toBe(
+      'Choisis à quoi correspond la facture.',
+    );
+    resetLocaleForTests();
   });
 });
 

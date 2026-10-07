@@ -1,12 +1,21 @@
 import * as Sentry from '@sentry/react-native';
 
+import { t } from '@/i18n';
+
 /**
  * What a failure is allowed to say on screen: one line, whatever went wrong or whoever raised it.
  *
  * Form hints ("Enter the bank name.") and statements about the device ("Scanning needs a
  * camera") are not failures and keep their own words.
+ *
+ * This constant is the English line only, frozen at import; failureText() follows the language.
  */
 export const FAILURE_MESSAGE = 'Something went wrong. Please try again.';
+
+/** The one failure line in the language on screen. */
+export function failureText(): string {
+  return t('common.failure');
+}
 
 /** An Error Sentry can group, from whatever was thrown. */
 function asError(thrown: unknown): Error {
@@ -29,5 +38,5 @@ export function failureMessage(thrown?: unknown): string {
     if (__DEV__) console.log('[failure]', thrown);
     else Sentry.captureException(asError(thrown), { tags: { handled: 'failure-message' } });
   }
-  return FAILURE_MESSAGE;
+  return failureText();
 }

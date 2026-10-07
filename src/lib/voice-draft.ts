@@ -21,6 +21,7 @@ import { useSyncExternalStore } from 'react';
 
 import type { BillInput, ReceiptInput, SubscriptionInput } from '@/api/entry-values';
 import type { BrandSelection } from '@/components/brands/brand-field';
+import { t } from '@/i18n';
 import { toCents } from '@/lib/money';
 import type {
   VoiceCycle,
@@ -473,8 +474,8 @@ export function amountFromText(text: string): number | null {
  * picked, and a bill with no category. Null when neither applies.
  */
 export function voiceSaveBlocker(entry: VoiceEntry): string | null {
-  if (entry.amount === null && entry.amountChoices.length >= 2) return 'Pick the amount you meant.';
-  if (entry.kind === 'bill' && !entry.billCategoryId) return 'Pick what the bill is for.';
+  if (entry.amount === null && entry.amountChoices.length >= 2) return t('lib.voice.pickAmount');
+  if (entry.kind === 'bill' && !entry.billCategoryId) return t('lib.voice.pickBillCategory');
   return null;
 }
 

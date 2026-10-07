@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { useCharges } from '@/api/charges';
+import { t } from '@/i18n';
 import { supabase } from '@/lib/supabase';
 import { useDialog } from '@/providers/dialog-provider';
 
@@ -87,18 +88,20 @@ export function usePastCharges(kind: Kind, planId: string | undefined) {
     async (name: string, changed: boolean): Promise<PastChargesScope | null> => {
       if (!planId || !changed || (count === 0 && !unknown)) return 'upcoming';
 
-      const already = unknown
-        ? `${name} may already have been charged.`
-        : `${name} has already been charged ${count === 1 ? 'once' : `${count} times`}.`;
+      // Unanswered, the count is usually 0, and French plural rules would read 0 as "that charge";
+      // so this case picks its sentence on count === 1 itself.
+      const message = unknown
+        ? t(count === 1 ? 'api.pastCharges.maybeOne' : 'api.pastCharges.maybeMany', { name })
+        : t('api.pastCharges.charged', { name, count });
 
       const choice = await ask({
-        title: 'Change past charges too?',
-        message: `${already} Change ${count === 1 ? 'that charge' : 'those'} as well, or only the ones still to come?`,
+        title: t('api.pastCharges.title'),
+        message,
         actions: [
-          { id: 'all', label: 'Past and upcoming' },
-          { id: 'upcoming', label: 'Upcoming only' },
+          { id: 'all', label: t('api.pastCharges.all') },
+          { id: 'upcoming', label: t('api.pastCharges.upcoming') },
         ],
-        cancelLabel: 'Cancel',
+        cancelLabel: t('common.cancel'),
       });
       return choice === 'all' || choice === 'upcoming' ? choice : null;
     },

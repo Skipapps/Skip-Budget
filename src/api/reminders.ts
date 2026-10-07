@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { NOTHING_SAVED } from '@/api/mutations';
 import { withTimeout } from '@/lib/deadline';
 import { enableReminders } from '@/api/push';
+import { t } from '@/i18n';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
@@ -61,11 +62,32 @@ export function targetKey(kind: ReminderKind, id: string): string {
   return `${kind}:${id}`;
 }
 
+/** Labels are read when drawn, never at import, so they follow the language on screen. */
 export const LEAD_OPTIONS = [
-  { value: 0, label: 'On the day' },
-  { value: 1, label: '1 day' },
-  { value: 3, label: '3 days' },
-  { value: 7, label: '1 week' },
+  {
+    value: 0,
+    get label() {
+      return t('api.reminders.onTheDay');
+    },
+  },
+  {
+    value: 1,
+    get label() {
+      return t('api.reminders.days', { count: 1 });
+    },
+  },
+  {
+    value: 3,
+    get label() {
+      return t('api.reminders.days', { count: 3 });
+    },
+  },
+  {
+    value: 7,
+    get label() {
+      return t('api.reminders.weeks', { count: 1 });
+    },
+  },
 ] as const;
 
 export const DEFAULT_LEAD_DAYS = 1;
@@ -78,11 +100,36 @@ export const DEFAULT_REMIND_AT = '09:00';
  * including "Off" is one decision instead of two.
  */
 export const REMINDER_CHOICES = [
-  { value: 'off', label: 'Off' },
-  { value: '0', label: 'On the day' },
-  { value: '1', label: '1 day' },
-  { value: '3', label: '3 days' },
-  { value: '7', label: '1 week' },
+  {
+    value: 'off',
+    get label() {
+      return t('api.reminders.off');
+    },
+  },
+  {
+    value: '0',
+    get label() {
+      return t('api.reminders.onTheDay');
+    },
+  },
+  {
+    value: '1',
+    get label() {
+      return t('api.reminders.days', { count: 1 });
+    },
+  },
+  {
+    value: '3',
+    get label() {
+      return t('api.reminders.days', { count: 3 });
+    },
+  },
+  {
+    value: '7',
+    get label() {
+      return t('api.reminders.weeks', { count: 1 });
+    },
+  },
 ] as const;
 
 export type ReminderChoice = (typeof REMINDER_CHOICES)[number]['value'];
@@ -100,10 +147,18 @@ export function leadToChoice(lead: number | null | undefined): ReminderChoice {
 
 /** What the reminder for each kind is actually counted from. */
 export const REMINDER_CAPTION: Record<ReminderKind, string> = {
-  bill: 'Before the bill is due',
-  subscription: 'Before it renews',
-  card: "Before this card's payment day",
-  account: 'When your pay lands here',
+  get bill() {
+    return t('api.reminders.caption.bill');
+  },
+  get subscription() {
+    return t('api.reminders.caption.subscription');
+  },
+  get card() {
+    return t('api.reminders.caption.card');
+  },
+  get account() {
+    return t('api.reminders.caption.account');
+  },
 };
 
 export function useReminders() {

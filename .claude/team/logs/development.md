@@ -3926,3 +3926,60 @@ files 0, src 19 (= baseline). No device or simulator run.
 **Not verified:** on a device: the first-frame claim is from the RN source, not a trace; Montserrat kerning (my
 widths are advance sums). Phase 2 list in the report. Note: I ran one `git stash` / `stash pop` to compare test
 console output with the baseline; restored at once, stash list empty, Dmitri's uncommitted entry intact.
+
+## 2026-10-07 — Diego (Developer, data and backend) — i18n wave 1: src/lib, src/data, src/api text into the message system
+
+**Outcome:** Done in the `i18n-currency-language` worktree only, nothing committed. tsc 0; eslint clean on every
+touched file (cache cleared); prettier clean; full jest 109/109 suites, 1552 tests green.
+
+**Keys:** `lib` 14, `api` 43, `pro` 46 (103 total; `common.cancel` and `common.failure` reused). French has U+00A0
+before `? ; :` and inside « » (the Write tool turns it into a plain space, so it was put in by script afterwards).
+
+**Converted:** `failure.ts` (failureMessage now returns `t('common.failure')`), `app-lock.ts`, `hourly-pay.ts`,
+`voice-draft.ts` (voiceSaveBlocker), `wall.ts`, `data/pro-features.ts` (lazy getters), `api/auth.ts` readable(),
+`oauth.ts`, `entry-values.ts`, `past-charges.ts` (whole sentences per case), `onboarding.ts`, `reminders.ts` (lazy
+labels/captions), `pro.ts` (trial text worded in `select`, so a cached answer follows the language).
+
+**Shims kept (English, frozen at import):** `FAILURE_MESSAGE` → `failureText()`; `PRO_MONTHLY_LABEL` /
+`PRO_YEARLY_LABEL` → `proMonthlyLabel()` / `proYearlyLabel()`. Lazy in place (no screen change needed):
+`PRO_FEATURES`, `OVERTIME_RATES`, `LEAD_OPTIONS`, `REMINDER_CHOICES`, `REMINDER_CAPTION`; `ProPrices.trialText`.
+
+**Left English on purpose:** withTimeout/contact/pro.ts thrown causes (screens show the failure line; dev note
+only); `api/charges.ts` 'Bill'/'Subscription' (stored in `charges.label`); push category buttons (native
+extension and server text are English); `data/voice-examples.ts` (the parser contract). Not touched (logo branch):
+`queries.ts` L973 'Income', `card-ledger.ts` L363 'Payment'.
+
+**Tests:** new `src/lib/{app-lock,wall}.test.ts`, `src/data/pro-features.test.ts`, `src/api/{oauth,pro,onboarding}.test.*`;
+es/fr blocks added to failure, hourly-pay, voice-draft, auth, entry-values, past-charges, reminders tests.
+Glossary rows added to the playbook.
+
+---
+
+## 2026-10-07 — Drew (Developer, money maths) — receipt parser reads Canadian-French money
+
+**Outcome:** Done in the `i18n-currency-language` worktree only, nothing committed. Only `src/lib/receipt-parser.ts`
+and its test touched. tsc 0; eslint clean (cache cleared); prettier clean; parser suite 79/79 (35 existing,
+unchanged, + 44); full jest 109/109 suites, 1596/1596.
+
+**Accepted:** a comma figure with exactly two decimals and no digit after (`1,299` and `9,975 %` never read),
+grouped thousands by space / U+00A0 / U+202F, counted only when (a) "$" follows after at most one space and no digit
+follows the "$", or (b) it is the figure of a French money label: the line minus its figures is exactly total,
+grand total, total à payer/dû, sous-total, montant (total/dû/à payer), solde (dû/à payer) or à payer, or it stands
+alone on the next line / is the whole next row / is a lone cell on the label's row. A figure must start a word
+(`A1,23`, the `42` of `15:42`, the `06` of `2026-10-06` cannot). French total hints: montant dû, solde dû,
+à payer (+ total). Non-totals: sous-total, total partiel, avant taxes, des taxes, taxe, TPS, TVQ, TVH, pourboire,
+monnaie, rendu, remise, rabais, escompte, économies. Labels matched on accent-folded text.
+
+**English unchanged, proven:** `MONEY` byte-identical; any line with a dot amount is read by `MONEY` alone. Same test
+file run against HEAD's parser via moduleNameMapper: all 35 old tests + the 6 English and 5 never-guess tests pass
+there; the 32 French tests fail there. Differential fuzz old vs new (scratchpad): 2,700-text label×bait grid and
+100,000 English receipts with comma bait on item lines and under labels: 0 differences (flat and positioned). With
+bait deliberately on total lines: 310 differences, all positioned, all from a cell reading exactly like a French
+total. Mutation: 11/12 guards caught by a test; the 12th (no digit after the cents) is redundant behind the
+"$"/whole-label rules (0/200,000 French-shaped texts differ) and is kept as the stated rule.
+
+**Raised, not changed:** "TOTAL TAXES" (plural, no "des") counts as a total in both languages, as English
+"TOTAL TAXES 1.57" already does (`\btax\b` misses TAXES); fixing it changes an English result. A 1–3-digit number
+one space before a 3-digit comma figure reads as thousands ("2 123,45 $" → 2123.45). A line with a dot figure and
+a comma one (e.g. "TVQ 9.975 % 2,97 $") reads only the dot figure. `parseDate` reads 06/10/2026 US-first and has
+no French month names.

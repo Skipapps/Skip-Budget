@@ -1,3 +1,4 @@
+import { t } from '@/i18n';
 import type { PayFrequency } from '@/lib/date';
 import { roundMoney } from '@/lib/money';
 
@@ -13,9 +14,20 @@ export const WEEKS_PER_PAYCHECK: Record<PayFrequency, number> = {
   monthly: 52 / 12,
 };
 
+/** Labels are read when drawn, never at import, so they follow the language on screen. */
 export const OVERTIME_RATES = [
-  { value: '1.5', label: 'Time and a half (1.5×)' },
-  { value: '2', label: 'Double time (2×)' },
+  {
+    value: '1.5',
+    get label() {
+      return t('lib.hourly.timeAndAHalf');
+    },
+  },
+  {
+    value: '2',
+    get label() {
+      return t('lib.hourly.doubleTime');
+    },
+  },
 ] as const;
 
 export type HourlyPay = {
@@ -46,14 +58,14 @@ export const HOURS_IN_A_WEEK = 168;
 
 /** Why the hourly inputs cannot be turned into pay yet (worded for the form), or null when they can. */
 export function hourlyProblem(pay: HourlyPay): string | null {
-  if (!(pay.rate > 0)) return 'Enter what you earn per hour.';
-  if (!(pay.hoursPerWeek > 0)) return 'Enter how many hours you work in a typical week.';
-  if (pay.overtimeHoursPerWeek < 0) return 'Overtime hours cannot be negative.';
+  if (!(pay.rate > 0)) return t('lib.hourly.enterRate');
+  if (!(pay.hoursPerWeek > 0)) return t('lib.hourly.enterHours');
+  if (pay.overtimeHoursPerWeek < 0) return t('lib.hourly.negativeOvertime');
   if (pay.hoursPerWeek + pay.overtimeHoursPerWeek > HOURS_IN_A_WEEK) {
-    return `A week only has ${HOURS_IN_A_WEEK} hours — check the hours you entered.`;
+    return t('lib.hourly.tooManyHours', { hours: HOURS_IN_A_WEEK });
   }
   if (pay.deductionPercent < 0 || pay.deductionPercent >= 100) {
-    return 'Tax and deductions should be a percentage under 100.';
+    return t('lib.hourly.deductions');
   }
   return null;
 }

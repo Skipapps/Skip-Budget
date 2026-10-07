@@ -6,6 +6,7 @@ import Purchases, {
   type PurchasesPackage,
 } from 'react-native-purchases';
 
+import { t } from '@/i18n';
 import { useProOverride } from '@/lib/pro-bypass';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
@@ -169,13 +170,37 @@ export type ProPrices = {
   debug: string;
 };
 
+/** A free introductory period as the store describes it: a number of DAY, WEEK, MONTH or YEAR. */
+export type TrialPeriod = { count: number; unit: string };
+
+type StorePrices = Omit<ProPrices, 'trialText'> & { trial: TrialPeriod | null };
+
+const TRIAL_KEYS = {
+  DAY: 'pro.trial.day',
+  WEEK: 'pro.trial.week',
+  MONTH: 'pro.trial.month',
+  YEAR: 'pro.trial.year',
+} as const;
+
+/** "7 days free" in the language on screen. */
+export function trialLabel({ count, unit }: TrialPeriod): string {
+  const key = TRIAL_KEYS[unit.toUpperCase() as keyof typeof TRIAL_KEYS];
+  if (key) return t(key, { count });
+  return `${count} ${unit.toLowerCase()}${count === 1 ? '' : 's'} free`;
+}
+
 /** The live prices, straight from the store — never hardcoded when buyable. */
 export function useProPrices() {
   const userId = useUserId();
   return useQuery({
     queryKey: ['pro-prices', userId],
     enabled: purchasesAvailable() && Boolean(userId),
-    queryFn: async (): Promise<ProPrices> => {
+    // Worded on read, not on fetch, so a cached answer still follows a change of language.
+    select: ({ trial, ...prices }: StorePrices): ProPrices => ({
+      ...prices,
+      trialText: trial ? trialLabel(trial) : null,
+    }),
+    queryFn: async (): Promise<StorePrices> => {
       if (!(await ensureConfigured(userId!))) {
         throw new Error(
           lastConfigureError
@@ -204,12 +229,12 @@ export function useProPrices() {
       }
 
       const intro = yearly?.product.introPrice ?? monthly?.product.introPrice;
-      const trialText =
+      const trial =
         intro && intro.price === 0
-          ? `${intro.periodNumberOfUnits} ${intro.periodUnit.toLowerCase()}${intro.periodNumberOfUnits === 1 ? '' : 's'} free`
+          ? { count: intro.periodNumberOfUnits, unit: intro.periodUnit }
           : null;
 
-      return { monthly, yearly, trialText, debug };
+      return { monthly, yearly, trial, debug };
     },
   });
 }

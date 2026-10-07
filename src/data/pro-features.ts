@@ -1,3 +1,4 @@
+import { t, type MessageKey } from '@/i18n';
 import type { ArtworkName } from '@/theme/artwork';
 
 export type ProFeature = {
@@ -8,6 +9,18 @@ export type ProFeature = {
   benefits: { title: string; detail: string }[];
 };
 
+/** Read when drawn, never at import, so the words follow the language on screen. */
+function benefit(title: MessageKey, detail: MessageKey): ProFeature['benefits'][number] {
+  return {
+    get title() {
+      return t(title);
+    },
+    get detail() {
+      return t(detail);
+    },
+  };
+}
+
 /**
  * The explainer behind each locked door. Each page argues for its feature in its own terms, never
  * "this is locked".
@@ -16,112 +29,76 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
   loans: {
     id: 'loans',
     artwork: 'tileLoanRepayment',
-    title: 'Know a loan to the cent',
-    tagline:
-      'Most calculators guess with a twelfth of a year. Lenders charge by the day — and so does Skip.',
+    get title() {
+      return t('pro.loans.title');
+    },
+    get tagline() {
+      return t('pro.loans.tagline');
+    },
     benefits: [
-      {
-        title: 'Matches your bank’s statement exactly',
-        detail:
-          'Payoff, next payment, accrued interest — the same figures your lender shows, to the cent.',
-      },
-      {
-        title: 'Every payment, mapped out',
-        detail: 'See how much of each month is interest, and what paying extra actually saves.',
-      },
-      {
-        title: 'Filed as a bill, reminded on time',
-        detail: 'Save a loan once and its payment joins your bills, reminders and dashboard.',
-      },
+      benefit('pro.loans.exact.title', 'pro.loans.exact.detail'),
+      benefit('pro.loans.schedule.title', 'pro.loans.schedule.detail'),
+      benefit('pro.loans.bill.title', 'pro.loans.bill.detail'),
     ],
   },
   insights: {
     id: 'insights',
     artwork: 'insights',
-    title: 'Your whole money picture, one page',
-    tagline: 'Where you stand, what comes in, where it goes, what you keep.',
+    get title() {
+      return t('pro.insights.title');
+    },
+    get tagline() {
+      return t('pro.insights.tagline');
+    },
     benefits: [
-      {
-        title: 'Where you stand, honestly',
-        detail: 'Savings, less what you owe on credit cards — one figure that means something.',
-      },
-      {
-        title: 'Where it actually goes',
-        detail: 'By category and by shop, with the chart that shows which weeks did the damage.',
-      },
-      {
-        title: 'What each month left behind',
-        detail:
-          'Finished months, added up — the difference between feeling careful and being right.',
-      },
+      benefit('pro.insights.stand.title', 'pro.insights.stand.detail'),
+      benefit('pro.insights.goes.title', 'pro.insights.goes.detail'),
+      benefit('pro.insights.months.title', 'pro.insights.months.detail'),
     ],
   },
   scan: {
     id: 'scan',
     artwork: 'tileReceipts',
-    title: 'Point, tap, filed',
-    tagline: 'The camera finds the receipt, reads it, and fills the form. You just check it.',
+    get title() {
+      return t('pro.scan.title');
+    },
+    get tagline() {
+      return t('pro.scan.tagline');
+    },
     benefits: [
-      {
-        title: 'Read on your phone, never uploaded',
-        detail:
-          'The photo is thrown away after reading — only the store, date and total are kept, on your account.',
-      },
-      {
-        title: 'Skew, glare, thermal print — handled',
-        detail:
-          'Skip straightens the page before reading it, which is the difference between a 3 and an 8.',
-      },
-      {
-        title: 'The credit card comes pre-picked',
-        detail:
-          'When the last four digits match a credit card you track, it is already selected to save.',
-      },
+      benefit('pro.scan.private.title', 'pro.scan.private.detail'),
+      benefit('pro.scan.handled.title', 'pro.scan.handled.detail'),
+      benefit('pro.scan.card.title', 'pro.scan.card.detail'),
     ],
   },
   voice: {
     id: 'voice',
     artwork: 'welcomeTrack',
-    title: 'Just say it',
-    tagline:
-      'Say what you spent or what’s due. Skip fills it in, and you check it before it’s saved.',
+    get title() {
+      return t('pro.voice.title');
+    },
+    get tagline() {
+      return t('pro.voice.tagline');
+    },
     benefits: [
-      {
-        title: 'Receipts, bills and subscriptions',
-        detail:
-          '“$12.50 at Starbucks today.” “Rent $1,800, due on the 1st.” “Netflix $15.99 every month.” One sentence each.',
-      },
-      {
-        title: 'Nothing saves until you say so',
-        detail:
-          'Skip shows exactly what it heard. Fix anything it missed, then tap Save. Nothing is filed without you.',
-      },
-      {
-        title: 'Skip never keeps your voice',
-        detail:
-          'Your iPhone turns what you say into text, on the phone when it can, or with Apple’s speech service when it can’t.',
-      },
+      benefit('pro.voice.kinds.title', 'pro.voice.kinds.detail'),
+      benefit('pro.voice.check.title', 'pro.voice.check.detail'),
+      benefit('pro.voice.private.title', 'pro.voice.private.detail'),
     ],
   },
   unlimited: {
     id: 'unlimited',
     artwork: 'emptyWallet',
-    title: 'All your credit cards. All your accounts.',
-    tagline: 'Free keeps one of each. Real wallets are bigger than that.',
+    get title() {
+      return t('pro.unlimited.title');
+    },
+    get tagline() {
+      return t('pro.unlimited.tagline');
+    },
     benefits: [
-      {
-        title: 'Every credit card and account you actually have',
-        detail: 'Track them all, with live balances and their own ledgers.',
-      },
-      {
-        title: 'Every income, counted',
-        detail: 'Salary, side work, the second job — Left this month gets the whole truth.',
-      },
-      {
-        title: 'Nothing ever locked or deleted',
-        detail:
-          'If Pro lapses, everything you made keeps working exactly as it is — you just cannot add past the free allowance until you are back.',
-      },
+      benefit('pro.unlimited.all.title', 'pro.unlimited.all.detail'),
+      benefit('pro.unlimited.income.title', 'pro.unlimited.income.detail'),
+      benefit('pro.unlimited.kept.title', 'pro.unlimited.kept.detail'),
     ],
   },
 };
