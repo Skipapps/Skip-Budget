@@ -20,6 +20,7 @@ import { TextLink } from '@/components/ui/text-link';
 import { SectionHeading } from '@/components/ui/typography';
 import { useLedger, useProfile, type LedgerEntry } from '@/api/queries';
 import { useCharges } from '@/api/charges';
+import { useHistoryFloor } from '@/api/history';
 import { useHasUnreadNews } from '@/api/news';
 import { useKeepSchedulesCurrent, useRefreshAll } from '@/api/refresh';
 import { spendingCategories, type SpendingCategory } from '@/data/dashboard-mock';
@@ -112,6 +113,9 @@ export default function HomeScreen() {
   }, [today, todayDate]);
 
   const atLatest = toIsoDate(selectedDate) >= today;
+  // Free lists 90 days back, Pro seven years: the stepper and the picker stop there.
+  const { floor } = useHistoryFloor();
+  const atEarliest = toIsoDate(selectedDate) <= floor;
 
   // Recent is the chosen day alone. Coming up is what the bills still schedule for the rest of this
   // month, from today whichever day is chosen: the selector never passes today, so anchoring it to
@@ -143,8 +147,9 @@ export default function HomeScreen() {
   const { weekday, date } = formatDayLabel(selectedDate);
 
   const handleConfirmDate = (date: Date) => {
-    // No future days: what is ahead already has its own heading.
-    setSelectedDate(date > todayDate ? todayDate : date);
+    // No future days: what is ahead already has its own heading. Nothing before the plan's window.
+    const first = new Date(`${floor}T00:00:00`);
+    setSelectedDate(date > todayDate ? todayDate : date < first ? first : date);
     setPickerOpen(false);
   };
 
@@ -217,6 +222,7 @@ export default function HomeScreen() {
           onNext={() => setSelectedDate((current) => addDays(current, 1))}
           onPickDate={() => setPickerOpen(true)}
           atLatest={atLatest}
+          atEarliest={atEarliest}
         />
       </View>
 

@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { useLedger, type LedgerEntry } from '@/api/queries';
+import { hidOlder } from '@/lib/allowance';
 import { ChargeSection, DetailCard, type PlanDetailRow } from '@/components/plans/detail-parts';
+import { HistoryNotice } from '@/components/pro/history-notice';
 import { goBack } from '@/components/ui/back-button';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { PageState } from '@/components/ui/page-state';
@@ -87,6 +89,8 @@ export function PlanDetail({
     [windowKey, today],
   );
   const ledger = useLedger(range, today);
+  // Free lists 90 days back: say this plan's older charges are kept rather than look like none.
+  const hiddenOlder = hidOlder(ledger.hidden, kind, id);
 
   const charges = useMemo(
     () => ledger.entries.filter((entry) => entry.kind === kind && entry.planId === id),
@@ -166,7 +170,11 @@ export function PlanDetail({
         />
       ) : null}
 
-      {!ledger.isLoading && !ledger.isError && charges.length === 0 ? (
+      {!ledger.isLoading && !ledger.isError && hiddenOlder ? (
+        <HistoryNotice className="mt-6" />
+      ) : null}
+
+      {!ledger.isLoading && !ledger.isError && charges.length === 0 && !hiddenOlder ? (
         <Text
           className="mt-6 w-full text-center font-app text-[14px] text-muted"
           maxFontSizeMultiplier={TEXT_CAP.reading}

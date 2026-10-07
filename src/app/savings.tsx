@@ -1,5 +1,7 @@
+import { useHistoryFloor } from '@/api/history';
 import { savedFor, useMonthlySavings, type MonthlySavingRow } from '@/api/queries';
 import { useRefreshAll } from '@/api/refresh';
+import { HistoryNotice } from '@/components/pro/history-notice';
 import { FitFigure, FitRows, FitText, useGroupFits } from '@/components/ui/fit-group';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
@@ -34,8 +36,15 @@ function monthName(month: string): string {
  */
 export default function SavingsScreen() {
   const artwork = useArtwork();
-  const { data: months = [], isLoading, isError, refetch } = useMonthlySavings();
+  const { data: allMonths = [], isLoading, isError, refetch } = useMonthlySavings();
   const { refresh, refreshing } = useRefreshAll();
+
+  // A month shows while any of it is inside the plan's window (90 days on free). Older months stay
+  // stored and come back with Pro.
+  const { floor, free } = useHistoryFloor();
+  const firstMonth = `${floor.slice(0, 7)}-01`;
+  const months = allMonths.filter((month) => month.month >= firstMonth);
+  const hiddenOlder = free && months.length < allMonths.length;
 
   // `savedFor` takes the corrected figure where there is one and nothing from a month left out.
   const total = months.reduce((sum, month) => sum + savedFor(month), 0);
@@ -63,7 +72,11 @@ export default function SavingsScreen() {
         />
       ) : null}
 
-      {!isLoading && !isError && months.length === 0 ? (
+      {!isLoading && !isError && months.length === 0 && hiddenOlder ? (
+        <HistoryNotice className="mt-6" />
+      ) : null}
+
+      {!isLoading && !isError && months.length === 0 && !hiddenOlder ? (
         <PageState
           art={artwork.tileSavings}
           title={t('savings.list.emptyTitle')}
@@ -96,6 +109,8 @@ export default function SavingsScreen() {
             </Text>
           </View>
 
+          {/* Oldest first, so the list starts where the plan's window does. */}
+          {hiddenOlder ? <HistoryNotice className="mt-8" /> : null}
           {/* One column of amounts: once one month's name cannot sit beside its amount, every
               month puts its amount under its name. */}
           <FitRows className="mb-10 mt-8 w-full" testID="saving-months">

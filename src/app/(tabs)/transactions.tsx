@@ -16,7 +16,10 @@ import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { usePaymentSources, useLedger, type LedgerEntry } from '@/api/queries';
+import { hidOlder } from '@/lib/allowance';
 import { useCharges } from '@/api/charges';
+import { useHistoryFloor } from '@/api/history';
+import { HistoryNotice } from '@/components/pro/history-notice';
 import { useRefreshAll } from '@/api/refresh';
 import { PageState } from '@/components/ui/page-state';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -56,9 +59,11 @@ export default function TransactionsScreen() {
   const [anchor, setAnchor] = useState(() => new Date());
 
   const { today, todayDate } = useToday();
+  // Free lists 90 days back, Pro seven years; stepping stops where the plan's list does.
+  const { floor } = useHistoryFloor();
 
   const atLatest = isLatestPeriod(periodKey, anchor, todayDate);
-  const atEarliest = isEarliestPeriod(periodKey, anchor, todayDate);
+  const atEarliest = isEarliestPeriod(periodKey, anchor, todayDate, floor);
 
   // The period cut off at today: this page records what happened. Future days live on the dashboard
   // under Coming up.
@@ -67,7 +72,8 @@ export default function TransactionsScreen() {
     return { from: period.from, to: period.to > today ? today : period.to };
   }, [periodKey, anchor, today]);
 
-  const { entries: ledger, totals, isLoading, isError, refetch } = useLedger(range, today);
+  const { entries: ledger, totals, hidden, isLoading, isError, refetch } = useLedger(range, today);
+  const hiddenOlder = hidOlder(hidden);
   const { refresh, refreshing } = useRefreshAll();
   const { sources } = usePaymentSources();
 
@@ -232,7 +238,7 @@ export default function TransactionsScreen() {
         />
       ) : null}
 
-      {!isLoading && !isError && ledger.length === 0 ? (
+      {!isLoading && !isError && ledger.length === 0 && !hiddenOlder ? (
         <PageState
           art={artwork.emptyWallet}
           title={t('transactions.emptyTitle')}
@@ -253,6 +259,12 @@ export default function TransactionsScreen() {
             setFilters(EMPTY_FILTERS);
           }}
         />
+      ) : null}
+
+      {!isLoading && !isError && ledger.length === 0 && hiddenOlder ? (
+        <View className="mt-5 w-full pb-24">
+          <HistoryNotice />
+        </View>
       ) : null}
 
       {!isLoading && !isError && groups.length > 0 ? (
@@ -291,6 +303,8 @@ export default function TransactionsScreen() {
               ))}
             </View>
           ))}
+          {/* Newest first, so the list ends where the plan's window does. */}
+          {hiddenOlder ? <HistoryNotice className="mt-5" /> : null}
         </View>
       ) : null}
 

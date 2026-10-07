@@ -1,3 +1,4 @@
+import { planKey } from '@/lib/card-ledger';
 import { toIsoDate } from '@/lib/date';
 import { FREE_HISTORY_DAYS, FREE_LIMITS, PRO_HISTORY_YEARS } from '@/lib/wall';
 
@@ -84,4 +85,29 @@ export function historyFloor(pro: boolean, today: Date): string {
 /** Whether a day is inside what the plan shows. */
 export function isWithinHistory(date: string, floor: string): boolean {
   return date >= floor;
+}
+
+/** What a plan's window left out of a ledger. */
+export type HiddenHistory = {
+  receipts: boolean;
+  /** planKey of every bill or subscription with a charge from before the window. */
+  plans: ReadonlySet<string>;
+};
+
+export const NOTHING_HIDDEN: HiddenHistory = { receipts: false, plans: new Set() };
+
+/**
+ * Whether the window hid anything at all, anything of one kind, or anything of one plan. Missing
+ * (a ledger that never cuts) is nothing hidden.
+ */
+export function hidOlder(
+  hidden: HiddenHistory | undefined,
+  kind?: 'receipt' | 'bill' | 'subscription',
+  planId?: string,
+): boolean {
+  if (!hidden) return false;
+  if (kind === 'receipt') return hidden.receipts;
+  if (kind && planId) return hidden.plans.has(planKey(kind, planId));
+  if (kind) return [...hidden.plans].some((key) => key.startsWith(`${kind}-`));
+  return hidden.receipts || hidden.plans.size > 0;
 }

@@ -148,6 +148,56 @@ export const proMessages = defineMessages({
     fr: 'Skip redresse la page avant de la lire, ce qui fait la différence entre un 3 et un 8.',
   },
 
+  'pro.history.title': {
+    en: 'Seven years of your money',
+    es: 'Siete años de tu dinero',
+    fr: 'Sept ans de ton argent',
+  },
+  'pro.history.tagline': {
+    en: 'Free shows your last 90 days. Everything older is kept, and Skip Pro shows it all, up to seven years back.',
+    es: 'El plan Gratis muestra tus últimos 90 días. Todo lo anterior se guarda, y Skip Pro te lo muestra todo, hasta siete años atrás.',
+    fr: 'Le forfait Gratuit affiche tes 90 derniers jours. Tout ce qui est plus ancien est conservé, et Skip Pro te montre tout, jusqu’à sept ans en arrière.',
+  },
+  'pro.history.kept.title': {
+    en: 'Nothing is deleted',
+    es: 'No se borra nada',
+    fr: 'Rien n’est supprimé',
+  },
+  'pro.history.kept.detail': {
+    en: 'Entries older than 90 days stay on your account and come back the moment you have Pro.',
+    es: 'Los movimientos de hace más de 90 días siguen en tu cuenta y vuelven en cuanto tengas Pro.',
+    fr: 'Les opérations de plus de 90 jours restent sur ton compte et reviennent dès que tu as Pro.',
+  },
+  'pro.history.years.title': {
+    en: 'Every year, side by side',
+    es: 'Cada año, uno junto al otro',
+    fr: 'Chaque année, côte à côte',
+  },
+  'pro.history.years.detail': {
+    en: 'Step back through weeks, months and years of spending and income.',
+    es: 'Recorre semanas, meses y años de gastos e ingresos.',
+    fr: 'Remonte les semaines, les mois et les années de dépenses et de revenus.',
+  },
+  'pro.history.balances.title': {
+    en: 'Balances always add up',
+    es: 'Los saldos siempre cuadran',
+    fr: 'Les soldes tombent toujours juste',
+  },
+  'pro.history.balances.detail': {
+    en: 'Card and account balances count every entry, whichever plan you are on.',
+    es: 'Los saldos de tarjetas y cuentas cuentan cada movimiento, tengas el plan que tengas.',
+    fr: 'Les soldes des cartes et des comptes comptent chaque opération, quel que soit ton forfait.',
+  },
+  'pro.history.notice.title': {
+    en: 'Older history is saved',
+    es: 'Tu historial anterior está guardado',
+    fr: 'Ton historique plus ancien est conservé',
+  },
+  'pro.history.notice.detail': {
+    en: 'Free shows the last 90 days. Skip Pro shows up to 7 years.',
+    es: 'Gratis muestra los últimos 90 días. Skip Pro muestra hasta 7 años.',
+    fr: 'Gratuit affiche les 90 derniers jours. Skip Pro affiche jusqu’à 7 ans.',
+  },
   'pro.voice.title': { en: 'Just say it', es: 'Solo dilo', fr: 'Dis-le, tout simplement' },
   'pro.voice.tagline': {
     en: 'Say what you spent or what’s due. Skip fills it in, and you check it before it’s saved.',

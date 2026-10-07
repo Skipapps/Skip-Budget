@@ -1,8 +1,10 @@
 import {
   captureAllowance,
   capturesThisMonth,
+  hidOlder,
   historyFloor,
   isWithinHistory,
+  NOTHING_HIDDEN,
 } from '@/lib/allowance';
 import { FREE_LIMITS } from '@/lib/wall';
 
@@ -124,5 +126,31 @@ describe('historyFloor', () => {
     expect(isWithinHistory('2026-07-09', floor)).toBe(true);
     expect(isWithinHistory('2026-07-08', floor)).toBe(false);
     expect(isWithinHistory('2026-10-07', floor)).toBe(true);
+  });
+});
+
+describe('hidOlder', () => {
+  const hidden = { receipts: true, plans: new Set(['bill-b1', 'subscription-s1']) };
+
+  it('answers for everything, one kind, or one plan', () => {
+    expect(hidOlder(hidden)).toBe(true);
+    expect(hidOlder(hidden, 'receipt')).toBe(true);
+    expect(hidOlder(hidden, 'bill')).toBe(true);
+    expect(hidOlder(hidden, 'bill', 'b1')).toBe(true);
+    expect(hidOlder(hidden, 'bill', 'b2')).toBe(false);
+    expect(hidOlder(hidden, 'subscription', 's1')).toBe(true);
+  });
+
+  it('treats nothing hidden, or no answer at all, as nothing hidden', () => {
+    expect(hidOlder(NOTHING_HIDDEN)).toBe(false);
+    expect(hidOlder(NOTHING_HIDDEN, 'bill')).toBe(false);
+    expect(hidOlder(undefined)).toBe(false);
+    expect(hidOlder(undefined, 'receipt')).toBe(false);
+  });
+
+  it('does not mistake one kind for another', () => {
+    const billsOnly = { receipts: false, plans: new Set(['bill-b1']) };
+    expect(hidOlder(billsOnly, 'subscription')).toBe(false);
+    expect(hidOlder(billsOnly, 'receipt')).toBe(false);
   });
 });

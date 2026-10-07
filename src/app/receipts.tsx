@@ -5,6 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
 import { useCaptureAllowance } from '@/api/capture-allowance';
+import { useHistoryFloor } from '@/api/history';
 import { usePaymentSources, useReceipts } from '@/api/queries';
 import { useRefreshAll } from '@/api/refresh';
 import { draftToParams, useReceiptScan } from '@/api/scan';
@@ -14,6 +15,7 @@ import {
   countActiveReceiptFilters,
   type ReceiptFilters,
 } from '@/components/receipts/receipt-filter-sheet';
+import { HistoryNotice } from '@/components/pro/history-notice';
 import { ReceiptRow } from '@/components/receipts/receipt-row';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
@@ -43,6 +45,8 @@ export default function ReceiptsScreen() {
   const [rangeKey, setRangeKey] = useState<RangeKey>('month');
   const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
   const { data: receipts = [], isLoading, isError, refetch } = useReceipts();
+  // Free lists 90 days back, Pro seven years. Older receipts stay stored and say so.
+  const { floor, free } = useHistoryFloor();
   const { sources } = usePaymentSources();
 
   const { scan, scanning, available: canScan } = useReceiptScan();
@@ -82,6 +86,7 @@ export default function ReceiptsScreen() {
   const visible = useMemo(() => {
     return receipts.filter((receipt) => {
       if (receipt.purchased_on < range.from || receipt.purchased_on > range.to) return false;
+      if (receipt.purchased_on < floor) return false;
       if (!matchesSearch(receipt.merchant, query)) return false;
       if (filters.date && receipt.purchased_on !== filters.date) return false;
       if (filters.sourceIds.length > 0) {
@@ -90,7 +95,19 @@ export default function ReceiptsScreen() {
       }
       return true;
     });
-  }, [receipts, query, filters, range]);
+  }, [receipts, query, filters, range, floor]);
+
+  const hiddenOlder = useMemo(
+    () =>
+      free &&
+      receipts.some(
+        (receipt) =>
+          receipt.purchased_on < floor &&
+          receipt.purchased_on >= range.from &&
+          receipt.purchased_on <= range.to,
+      ),
+    [free, receipts, floor, range],
+  );
 
   const total = visible.reduce((sum, receipt) => sum - Math.abs(receipt.amount), 0);
 
@@ -105,7 +122,8 @@ export default function ReceiptsScreen() {
   );
 
   const showEmpty = !isLoading && !isError && receipts.length === 0;
-  const showNoMatches = !isLoading && !isError && receipts.length > 0 && visible.length === 0;
+  const showNoMatches =
+    !isLoading && !isError && receipts.length > 0 && visible.length === 0 && !hiddenOlder;
 
   return (
     <Screen
@@ -218,8 +236,14 @@ export default function ReceiptsScreen() {
         />
       ) : null}
 
+      {!isLoading && !isError && visible.length === 0 && hiddenOlder ? (
+        <HistoryNotice className="mt-5" />
+      ) : null}
+
       {!isLoading && !isError && visible.length > 0 ? (
         <View className="w-full pb-10">
+          {/* Oldest first, so the list starts where the plan's window does. */}
+          {hiddenOlder ? <HistoryNotice className="mt-5" /> : null}
           {groups.map((group) => (
             <View key={group.date || 'undated'} className="w-full">
               <DateGroupHeader date={group.date} today={today} total={group.total} />

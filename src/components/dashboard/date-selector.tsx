@@ -13,6 +13,8 @@ type DateSelectorProps = {
   onPickDate?: () => void;
   /** Stops the stepper going past today: there is no day after today to step onto. */
   atLatest?: boolean;
+  /** Stops it going before the first day the plan lists. */
+  atEarliest?: boolean;
 };
 
 export function DateSelector({
@@ -22,6 +24,7 @@ export function DateSelector({
   onNext,
   onPickDate,
   atLatest = false,
+  atEarliest = false,
 }: DateSelectorProps) {
   const colors = useColors();
   return (
@@ -29,9 +32,15 @@ export function DateSelector({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('home.day.previous')}
+        accessibilityState={{ disabled: atEarliest }}
+        disabled={atEarliest}
         onPress={onPrevious}
         hitSlop={8}
-        className="h-10 w-10 items-center justify-center rounded-full active:bg-ink/5"
+        className={
+          atEarliest
+            ? 'h-10 w-10 items-center justify-center rounded-full opacity-30'
+            : 'h-10 w-10 items-center justify-center rounded-full active:bg-ink/5'
+        }
       >
         <ChevronLeft size={20} color={colors.ink} strokeWidth={2} />
       </Pressable>

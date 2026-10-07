@@ -3,11 +3,13 @@ import { Pencil } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 
+import { useHistoryFloor } from '@/api/history';
 import { useReceipts, usePaymentSources, type ReceiptRow } from '@/api/queries';
 import { useSpendCategories } from '@/api/brands';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { ChangeLogoButton } from '@/components/brands/change-logo-button';
 import { ChargeSection, DetailCard, type PlanDetailRow } from '@/components/plans/detail-parts';
+import { HistoryNotice } from '@/components/pro/history-notice';
 import { goBack } from '@/components/ui/back-button';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { PageState } from '@/components/ui/page-state';
@@ -74,13 +76,20 @@ export default function ReceiptDetailScreen() {
     : undefined;
 
   const today = toIsoDate(new Date());
-  const history = useMemo(() => {
-    if (!receipt || !receipts.data) return [];
-    const from = receiptsFromStore(receipts.data, receipt);
-    if (windowKey === 'all') return from;
-    const range = rangeFor(windowKey, new Date(`${today}T00:00:00`));
-    return from.filter((row) => row.purchased_on >= range.from && row.purchased_on <= range.to);
-  }, [receipt, receipts.data, windowKey, today]);
+  // Free lists 90 days back, Pro seven years; older receipts from the store stay stored.
+  const { floor, free } = useHistoryFloor();
+  const { history, hiddenOlder } = useMemo(() => {
+    if (!receipt || !receipts.data) return { history: [], hiddenOlder: false };
+    const fromStore = receiptsFromStore(receipts.data, receipt);
+    const range = windowKey === 'all' ? null : rangeFor(windowKey, new Date(`${today}T00:00:00`));
+    const inWindow = fromStore.filter(
+      (row) => !range || (row.purchased_on >= range.from && row.purchased_on <= range.to),
+    );
+    return {
+      history: inWindow.filter((row) => row.purchased_on >= floor),
+      hiddenOlder: free && inWindow.some((row) => row.purchased_on < floor),
+    };
+  }, [receipt, receipts.data, windowKey, today, floor, free]);
 
   // Deleted from its own edit flow: that flow steps back to here, and there is nothing left to
   // show, so take one more step back to the list it came from.
@@ -170,14 +179,16 @@ export default function ReceiptDetailScreen() {
         <ChoiceChips options={WINDOWS} value={windowKey} onChange={setWindowKey} />
       </View>
 
-      {lines.length === 0 ? (
+      {hiddenOlder ? <HistoryNotice className="mt-6" /> : null}
+
+      {lines.length === 0 && !hiddenOlder ? (
         <Text
           className="mt-6 w-full text-center font-app text-[14px] text-muted"
           maxFontSizeMultiplier={TEXT_CAP.reading}
         >
           {t('receipts.detail.empty', { store: receipt.merchant })}
         </Text>
-      ) : (
+      ) : lines.length === 0 ? null : (
         <View className="w-full pb-10">
           <ChargeSection
             title={t('receipts.detail.history', { store: receipt.merchant })}

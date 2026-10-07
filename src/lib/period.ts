@@ -181,9 +181,20 @@ export function isLatestPeriod(key: PeriodKey, anchor: Date, today: Date): boole
   return periodRange(key, anchor).to >= periodRange(key, today).to;
 }
 
-/** Whether stepping back would leave the years the app keeps. */
-export function isEarliestPeriod(key: PeriodKey, anchor: Date, today: Date): boolean {
+/**
+ * Whether stepping back would leave what can be shown: the years the app keeps, or an earlier
+ * floor (yyyy-mm-dd) when the plan shows less.
+ */
+export function isEarliestPeriod(
+  key: PeriodKey,
+  anchor: Date,
+  today: Date,
+  floor?: string,
+): boolean {
   if (key === 'all') return true;
-  const floor = new Date(today.getFullYear() - HISTORY_YEARS, today.getMonth(), today.getDate());
-  return periodRange(key, stepPeriod(key, anchor, -1)).to < toIsoDate(floor);
+  const kept = toIsoDate(
+    new Date(today.getFullYear() - HISTORY_YEARS, today.getMonth(), today.getDate()),
+  );
+  const earliest = floor && floor > kept ? floor : kept;
+  return periodRange(key, stepPeriod(key, anchor, -1)).to < earliest;
 }

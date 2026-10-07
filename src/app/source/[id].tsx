@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
 import { useCreatePayment, useDeletePayment } from '@/api/mutations';
+import { useHistoryFloor } from '@/api/history';
 import { useSourceLedger } from '@/api/queries';
 import { AccountCard } from '@/components/cards/account-card';
 import { PaymentCard } from '@/components/cards/payment-card';
@@ -16,6 +17,7 @@ import {
 } from '@/components/transactions/filter-sheet';
 import { AmountPad } from '@/components/ui/amount-pad';
 import { FitRows, FitText, useGroupFits } from '@/components/ui/fit-group';
+import { HistoryNotice } from '@/components/pro/history-notice';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
@@ -67,6 +69,7 @@ export default function SourceDetailScreen() {
   const [error, setError] = useState<string | null>(null);
 
   // Above the loading guards so the hook order never changes.
+  const { floor, free } = useHistoryFloor();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<LedgerFilters>(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -98,12 +101,14 @@ export default function SourceDetailScreen() {
   const name = isCard ? card!.holder : account!.nickname || account!.bank_name;
 
   // Oldest day first. `ledgerForSource` sorts newest-first for its balance arithmetic, so the
-  // display order is set here.
+  // display order is set here. Only the list stops at the plan's window (90 days on free); the
+  // balance above walked every entry.
   const entries = sortByDateAscending(
-    ledger.entries,
+    ledger.entries.filter((entry) => entry.date >= floor),
     (entry) => entry.date,
     (entry) => entry.id,
   );
+  const hiddenOlder = free && ledger.entries.some((entry) => entry.date < floor);
 
   const visible = entries.filter(
     (entry) =>
@@ -297,7 +302,9 @@ export default function SourceDetailScreen() {
         </View>
       ) : null}
 
-      {entries.length === 0 ? (
+      {entries.length === 0 && hiddenOlder ? (
+        <HistoryNotice className="mb-28 mt-3" />
+      ) : entries.length === 0 ? (
         <PageState
           art={artwork.emptyWallet}
           title={t('accounts.source.emptyTitle')}
@@ -316,6 +323,8 @@ export default function SourceDetailScreen() {
         />
       ) : (
         <View className="mt-1 w-full pb-28">
+          {/* Oldest first, so the list starts where the plan's window does. */}
+          {hiddenOlder ? <HistoryNotice className="mb-2 mt-2" /> : null}
           {visible.map((entry, index) => (
             <Fragment key={entry.id}>
               {index > 0 ? <View className="ml-[52px] h-px bg-line/60" /> : null}

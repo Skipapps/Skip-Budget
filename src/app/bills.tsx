@@ -5,9 +5,11 @@ import { Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
 import { useBills, useLedger, usePaymentSources } from '@/api/queries';
+import { hidOlder } from '@/lib/allowance';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { FitFigure } from '@/components/ui/fit-group';
+import { HistoryNotice } from '@/components/pro/history-notice';
 import { PageState } from '@/components/ui/page-state';
 import { RangeDropdown } from '@/components/ui/range-dropdown';
 import { Screen } from '@/components/ui/screen';
@@ -34,7 +36,9 @@ export default function BillsScreen() {
   const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
 
   const plans = useBills();
-  const { entries, isLoading, isError, refetch } = useLedger(range, today);
+  const { entries, hidden, isLoading, isError, refetch } = useLedger(range, today);
+  // Free lists 90 days back: say the older charges are kept rather than look like none.
+  const hiddenOlder = hidOlder(hidden, 'bill');
   const { sources } = usePaymentSources();
 
   const sourceLabels = useMemo(
@@ -111,7 +115,11 @@ export default function BillsScreen() {
         />
       ) : null}
 
-      {!isLoading && !isError && charges.length === 0 ? (
+      {!isLoading && !isError && charges.length === 0 && hiddenOlder ? (
+        <HistoryNotice className="mt-5" />
+      ) : null}
+
+      {!isLoading && !isError && charges.length === 0 && !hiddenOlder ? (
         <PageState
           art={artwork.emptyBills}
           title={planCount === 0 ? t('bills.noBillsYet') : t('bills.charged.nothing')}
@@ -125,6 +133,8 @@ export default function BillsScreen() {
 
       {!isLoading && !isError && charges.length > 0 ? (
         <View className="w-full pb-10">
+          {/* Oldest first, so the list starts where the plan's window does. */}
+          {hiddenOlder ? <HistoryNotice className="mt-5" /> : null}
           {groups.map((group) => (
             <View key={group.date || 'undated'} className="w-full">
               <DateGroupHeader date={group.date} today={today} total={group.total} />
