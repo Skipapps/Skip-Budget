@@ -43,6 +43,7 @@ describe('receipt-scanner without the native module', () => {
     expect(scanner.isScanningAvailable()).toBe(false);
     expect(scanner.isCaptureAvailable()).toBe(false);
     expect(scanner.isRecognitionAvailable()).toBe(false);
+    expect(scanner.hasLayoutRecognition()).toBe(false);
   });
 
   it('rejects with a readable sentence rather than a TypeError', async () => {
@@ -74,6 +75,28 @@ describe('receipt-scanner on an older native build', () => {
     expect(scanDocument).toHaveBeenCalledTimes(1);
     // An empty list means "use the flat text".
     await expect(scanner.recognizeReceipt('file:///receipt.jpg')).resolves.toEqual([]);
+  });
+
+  it('says whether layout recognition exists, so "no text" is not read twice', async () => {
+    const recognizeText = jest.fn().mockResolvedValue('');
+    const base = { isScanningAvailable: () => true, scanDocument: jest.fn(), recognizeText };
+
+    // An older binary running newer JS: the empty list means "ask recognizeText instead".
+    mockRequireOptionalNativeModule.mockReset();
+    mockRequireOptionalNativeModule.mockReturnValue(base);
+    const old = loadScanner();
+    expect(old.hasLayoutRecognition()).toBe(false);
+    await expect(old.recognizeReceipt('file:///receipt.jpg')).resolves.toEqual([]);
+
+    // A current binary: the empty list is the answer, "no text found".
+    const recognizeReceipt = jest.fn().mockResolvedValue([]);
+    mockRequireOptionalNativeModule.mockReset();
+    mockRequireOptionalNativeModule.mockReturnValue({ ...base, recognizeReceipt });
+    const current = loadScanner();
+    expect(current.hasLayoutRecognition()).toBe(true);
+    await expect(current.recognizeReceipt('file:///blank.png')).resolves.toEqual([]);
+    expect(recognizeReceipt).toHaveBeenCalledWith('file:///blank.png');
+    expect(recognizeText).not.toHaveBeenCalled();
   });
 
   it('hands the native lines and text on untouched, in the order native returns them', async () => {

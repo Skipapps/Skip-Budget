@@ -240,8 +240,8 @@ Two new sets sit beside the 300 (training). The training images and ground truth
 before (all 300 regenerated and compared). All numbers below are the ORIGINAL parser, commit `c7a607c`
 (`git show c7a607c:src/lib/receipt-parser.ts`), because the parser in the tree has since been changed:
 run `RECEIPT_PARSER=<that file, inside the repo tree, e.g. scripts/receipt-corpus/out/parser-v0/receipt-parser.ts>`.
-They are frozen in `scripts/receipt-corpus/baseline-v0.json` (the live `baseline.json` is rewritten by every
-test run, by whichever parser is in the tree).
+They are frozen in `src/__tests__/fixtures/receipts/baseline.json` (see the later addendum: a normal test run no
+longer rewrites it; it used to live in `scripts/receipt-corpus/baseline-v0.json`, now removed).
 
 ## What was added
 
@@ -373,3 +373,45 @@ Measured on 2026-10-07 at about 11:00 against the same fixtures (not part of the
 
 The in-progress parser generalises to the holdout (96.0 against 96.0 on training, flat merchant); the hard set is where it
 still loses most, with `two` receipts, creases, motion and faded print the likely culprits.
+
+---
+
+# Addendum 2026-10-07 (later): harness follow-ups
+
+- **One frozen baseline.** `src/__tests__/fixtures/receipts/baseline.json` is the frozen baseline of the ORIGINAL parser
+  (commit `c7a607c`), with a header (`_about`) saying so; it is the only copy (the duplicate in `scripts/receipt-corpus/`
+  is gone). `npm test` no longer writes anything. Numbers are written only on request: `RECEIPT_BASELINE_OUT=<file>`, or
+  `RECEIPT_BASELINE_WRITE=1` to refreeze over `baseline.json`. Verified: a full default run leaves its md5 unchanged.
+- **`today` pinned** to 2026-10-07: passed to the parser as `{ today }` and `Date` is held there while it runs (the original
+  parser has no such option and asks the clock). The raw and flat numbers did not move (the real clock reads the same day).
+- **Parse-time limit** is 250 ms best of three (it was 50 ms). A parse takes a few ms (slowest in the bench under 10); busy
+  machines add tens of ms of noise (147 ms once), a quadratic or backtracking pattern on a 300-line receipt costs seconds.
+- **`next` pass in the fixtures**, the three passes now being `raw`, `flat`, `next` (`build-fixtures.py` reads
+  `<id>.next.json` and `<id>.next-timing.json`; `meta.next` keeps what the pass did). The old `fixed` pass is no longer stored
+  (it matched `flat` to within one receipt, merchant 59.0 against 59.3; nothing else read it: the parser's accuracy test reads
+  raw and flat only). Fixture size was 8.94 MB and is 9.09 MB, because `next` takes about the space `fixed` freed; the
+  baseline file is 0.9 MB. `raw`, `flat` and the ground truth of all 531 fixtures are byte-identical to before.
+- **Two hand-written adversarial receipts** in `fixtures/receipts/adversarial/` (a folder the parser's own accuracy test
+  does not read, so its numbers do not move): `adv-card-app` (an app screen on a bordered card: the page title
+  "Purchase details" and a promo line are taller than the shop's name inside the card; the flattened crop is the card alone) and
+  `adv-gift-card` (a till that labels its total BALANCE, paid with a gift card whose remaining balance 174.84, a loyalty balance
+  and a rewards balance print below it, with BALANCE DUE 0.00). Written from the one-line descriptions I was given, not from
+  the reviewer's own text. The original parser fails both (the title as the shop on the raw pass; 174.84 as the total on all
+  three); the parser in the tree reads every field on every pass, so nothing is marked known-failing. Assertions run as
+  `it.failing` when marked, so a mark that outlives its fix fails.
+
+## Numbers by set, passes raw / flat / next (percent correct)
+
+| set | parser | merchant | total | date |
+| --- | ------ | -------- | ----- | ---- |
+| training (300) | original, frozen | 42.7 / 59.3 / 60.3 | 73.3 / 89.3 / 90.7 | 63.3 / 62.3 / 64.0 |
+| holdout (151) | original, frozen | 51.7 / 70.9 / 72.2 | 73.5 / 78.1 / 76.8 | 71.5 / 70.2 / 71.5 |
+| hard (80) | original, frozen | 28.7 / 53.8 / 52.5 | 50.0 / 75.0 / 75.0 | 55.0 / 53.8 / 52.5 |
+| training | the tree, 14:20 | 95.3 / 96.0 / **97.0** | 89.3 / 96.0 / **97.0** | 98.0 / 97.0 / **99.0** |
+| holdout | the tree, 14:20 | 93.4 / 96.7 / **96.7** | 90.7 / 95.4 / **96.0** | 97.4 / 96.0 / **97.4** |
+| hard | the tree, 14:20 | 63.7 / 76.3 / **75.0** | 65.0 / 77.5 / **76.3** | 80.0 / 86.3 / **85.0** |
+
+The tree's parser is Drew's work in progress and was being edited while this was measured (its own hard-set total floor, 82%,
+failed at 77.5% at that moment, and one of its rule tests failed): treat those three rows as a snapshot. `next` equals
+`flat` on photographs (original parser, training total 91.8 on the 256 photographs for both) and recovers the clean scans (total 75.0 to
+84.1 on the 44 scans), which is where its training gain (89.3 to 90.7) comes from.

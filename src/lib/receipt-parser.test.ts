@@ -66,8 +66,12 @@ describe('parseTotal', () => {
     expect(parseTotal('TOTAL 10.00\nCARD COPY\nTOTAL 10.00')).toBe(10);
   });
 
-  it('falls back to the largest amount when nothing is labelled', () => {
-    expect(parseTotal('ITEM A 3.00\nITEM B 12.50')).toBe(12.5);
+  // Was: the largest amount whenever nothing is labelled (12.50 here). Decided 2026-10-07: a lone
+  // largest figure is as often the cash handed over or a misread as the total, so it now needs a
+  // second row printing the same figure.
+  it('takes the largest amount when nothing is labelled only if a second row repeats it', () => {
+    expect(parseTotal('ITEM A 3.00\nITEM B 12.50')).toBeUndefined();
+    expect(parseTotal('ITEM A 3.00\nITEM B 12.50\nAPPROVED 12.50')).toBe(12.5);
   });
 
   it('handles thousands separators', () => {
@@ -247,9 +251,11 @@ describe('parseTotalFromLines', () => {
     expect(parseTotalFromLines(lines)).toBe(42);
   });
 
-  it('falls back to the largest amount when nothing is labelled', () => {
+  // Was 3.49 (the largest amount); see "only if a second row repeats it" above.
+  it('takes the largest amount when nothing is labelled only if a second row repeats it', () => {
     const lines = [line('BREAD 1.28', 0.4), line('MILK 3.49', 0.45)];
-    expect(parseTotalFromLines(lines)).toBe(3.49);
+    expect(parseTotalFromLines(lines)).toBeUndefined();
+    expect(parseTotalFromLines([...lines, line('3.49', 0.5, { x: 0.7 })])).toBe(3.49);
   });
 });
 
@@ -400,7 +406,9 @@ describe('parseTotal on Canadian-French receipts', () => {
     ['a no-break space', '12,99\u00A0$'],
     ['a narrow no-break space', '12,99\u202F$'],
   ])('reads a figure anywhere when "$" follows it after %s', (_name, figure) => {
-    expect(parseTotal(`FROMAGE ${figure}`)).toBe(12.99);
+    // On the card line, which carries no French money label: only the "$" makes it money. (A
+    // single unlabelled figure is no longer taken as the total at all.)
+    expect(parseTotal(`FROMAGE ${figure}\nINTERAC ${figure}`)).toBe(12.99);
   });
 
   it('reads a figure on the line after its label', () => {
@@ -446,8 +454,8 @@ describe('parseTotal on Canadian-French receipts', () => {
   });
 
   it('reads money printed after a time or a date, not glued to it', () => {
-    expect(parseTotal('2026-10-06 15:42 123,45 $')).toBe(123.45);
-    expect(parseTotal('06/10/26 123,45 $')).toBe(123.45);
+    expect(parseTotal('VISA 2026-10-06 15:42 123,45 $')).toBe(123.45);
+    expect(parseTotal('VISA 06/10/26 123,45 $')).toBe(123.45);
   });
 });
 
@@ -584,9 +592,11 @@ describe('parseTotalFromLines on Canadian-French receipts', () => {
     expect(parseTotalFromLines(further)).toBeUndefined();
   });
 
-  it('ignores bare figures with no label, and takes the largest "$" figure', () => {
+  it('ignores bare figures with no label, and reads "$" figures as money', () => {
     expect(parseTotalFromLines([line('PAIN 3,99', 0.4), line('LAIT 5,79', 0.45)])).toBeUndefined();
-    expect(parseTotalFromLines([line('PAIN 3,99 $', 0.4), line('LAIT 5,79 $', 0.45)])).toBe(5.79);
+    // Repeated on a second row, as the largest-amount rule now needs.
+    const lines = [line('PAIN 3,99 $', 0.4), line('LAIT 5,79 $', 0.45), line('LAIT 5,79 $', 0.5)];
+    expect(parseTotalFromLines(lines)).toBe(5.79);
   });
 
   it('reads a whole positioned grocery receipt', () => {

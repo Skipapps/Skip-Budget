@@ -26,7 +26,10 @@ export type ScanResult = {
   text: string;
   /** The same text with its layout kept. Empty on older native builds. */
   lines: TextLine[];
-  /** file:// path to the first page, or null if it could not be written. */
+  /**
+   * Always null on current builds: nothing showed the photo, so it is no longer saved. Older builds
+   * may still return a file:// path to the first page.
+   */
   imageUri: string | null;
   pageCount: number;
 };
@@ -86,10 +89,20 @@ export async function captureReceipt(): Promise<ScanResult | null> {
 }
 
 /**
+ * Whether `recognizeReceipt` can return a layout. False without the module and on a native build
+ * older than this JS (an over-the-air update can bring new JS to an old binary): only then is
+ * `recognizeText` worth calling after an empty `recognizeReceipt`, which otherwise means no text.
+ */
+export function hasLayoutRecognition(): boolean {
+  return typeof native?.recognizeReceipt === 'function';
+}
+
+/**
  * The text of a photo or of a PDF's first page, one line per row in reading order. A photo is read
  * as the camera reads one: turned upright from its EXIF orientation and flattened when the receipt
- * can be found in it. Resolves "" for a file without text; rejects (`ERR_UNREADABLE`) only when the
- * file cannot be opened as an image or PDF.
+ * can be found in it, except that a screenshot or scan is never cropped to a card inside it.
+ * Resolves "" for a file without text; rejects (`ERR_UNREADABLE`) only when the file cannot be
+ * opened as an image or PDF.
  */
 export async function recognizeText(uri: string): Promise<string> {
   if (!native) throw new Error('Scanning needs a newer build of the app.');
