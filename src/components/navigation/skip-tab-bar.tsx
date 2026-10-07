@@ -16,6 +16,10 @@ import { shadows } from '@/theme/shadows';
  */
 type SkipTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
+/** How narrow a plain icon tab may get; ICON_TAB_SLOP either side makes it a 44pt target. */
+const ICON_TAB_MIN = 36;
+const ICON_TAB_SLOP = { left: 4, right: 4 };
+
 const TAB_ICONS: Record<string, LucideIcon> = {
   home: House,
   cards: Wallet,
@@ -26,6 +30,11 @@ const TAB_ICONS: Record<string, LucideIcon> = {
 /**
  * Floating pill tab bar with the round Voice button beside it, the same height so they read as one
  * row. The selected tab expands into a filled accent pill carrying its label.
+ *
+ * It cannot overflow, whatever the width or text size: the plain icons give way first (down to
+ * ICON_TAB_MIN, with hit slop keeping a 44pt target), then the selected pill shrinks and its label
+ * ends in an ellipsis. On a 375pt-wide screen every label still fits whole at the largest text
+ * size it allows, so the ellipsis only shows on narrower layouts.
  *
  * The outer view is bigger than the pill (8pt above, the home indicator's inset below, the gutter
  * either side, all painted in the page colour). That band is not part of the control, so `box-none`
@@ -70,14 +79,17 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
                 accessibilityState={{ selected: focused }}
                 accessibilityLabel={label}
                 onPress={withTap(handlePress)}
-                // The selected pill keeps its full width; plain icons give way around it (48pt down
-                // to 40) so a 375pt phone fits the row without clipping a label.
+                hitSlop={focused ? undefined : ICON_TAB_SLOP}
+                // Plain icons have no basis of their own (flex-1), so they only fill what the pill
+                // leaves, up to 48pt; when space runs out they stop at ICON_TAB_MIN and the pill,
+                // the only thing left that can, shrinks.
                 className={cn(
                   'h-[48px] flex-row items-center justify-center rounded-full',
                   focused
-                    ? 'shrink-0 gap-2 bg-control px-[16px]'
-                    : 'min-w-[40px] max-w-[48px] flex-1 active:opacity-60',
+                    ? 'min-w-0 shrink gap-[6px] bg-control px-[12px]'
+                    : 'max-w-[48px] flex-1 active:opacity-60',
                 )}
+                style={focused ? undefined : { minWidth: ICON_TAB_MIN }}
               >
                 {Icon ? (
                   <Icon
@@ -90,8 +102,9 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
                 ) : null}
                 {focused ? (
                   <Text
-                    className="font-poppins-semibold text-[15px] text-on-control"
+                    className="min-w-0 shrink font-poppins-semibold text-[15px] text-on-control"
                     numberOfLines={1}
+                    ellipsizeMode="tail"
                     maxFontSizeMultiplier={1.2}
                   >
                     {label}

@@ -3733,3 +3733,24 @@ date guard (isIsoDay UTC round-trip) keeps leap days and month ends, and amounts
 receipt-parser.ts isoDate (day <= 31 for any month) can be fixed later, owner Diego, with a fixture (both consumers are
 now guarded).
 - 2026-10-06 Dana: Pro-wall refusal now opens the explainer only when the app also thinks the person is free (add-receipt and voice-review); a payer the server refuses gets the failure line, reported as before. Receipts-list Scan waits for Pro status; the form's Scan/Upload are dimmed until it is known. Tests for each (incl. new receipts-scan.test.tsx); tsc 0, jest 109/109 suites, prettier and eslint clean (src 19 = baseline).
+- 2026-10-06 Dana: tab bar can no longer overflow (skip-tab-bar.tsx): selected pill shrink + min-w-0 with an ellipsizing label, px 12 / gap 6, plain icons flex-1 to 48pt with a 36pt floor + 4pt hit slop (44pt target). Laid out in Yoga 3.2 with Poppins SemiBold widths: old bar overflowed 7pt at 375pt x1.2; new bar 0pt at 320-428pt, every label whole at 375pt up to the 1.2 cap (Settings worst: icons 40.7pt, ~14pt left before any ellipsis). tsc 0, jest 109/109, prettier/eslint clean.
+
+---
+
+## 2026-10-06 — Dmitri (Development Lead) — review of Dana's tab-bar overflow fix (uncommitted, on f7bf5bb)
+
+**Outcome:** SHIP-TO-PHONE. No blocking issues. Edited nothing but this log.
+
+**Checks:** tsc 0. Full jest 109/109 suites, 1742/1742. Prettier and ESLint `--no-cache` clean on skip-tab-bar.tsx and its
+test.
+
+**Verified:** The old pill was `shrink-0`, which was the root cause: it could not shrink, so it overflowed. Now it is
+`shrink`: the icons sit at their 36pt floor and the pill takes the rest, with the label shrinking and ending in
+ellipsis. The icon tabs have no width of their own (flex-1), a 36pt floor and a 48pt cap, so they size equally and
+never collapse unevenly. role/state/label, theme tokens, VoiceFab, safe area and navigation are unchanged. Nothing
+else renders beside VoiceFab. Both new layout tests fail against HEAD: `shrink-0` is present there, and icon tabs had
+no style.minWidth. They pin the classes as written, not real layout, and say so.
+
+**Non-blocking:** When the row is tight (375pt, 1.2x text, Settings selected) adjacent tabs touch. Hit slop then only
+shifts each target, because the later sibling wins the overlap, so icon targets are about 36pt wide, not 44. Before,
+the floor was 40pt (and it overflowed). A test that runs the Yoga layout engine could pin the arithmetic later.

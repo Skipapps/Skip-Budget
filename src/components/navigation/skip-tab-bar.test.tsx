@@ -40,9 +40,13 @@ const titles: Record<string, string> = {
   settings: 'Settings',
 };
 
-function renderBar(navigate = jest.fn(), emit = jest.fn(() => ({ defaultPrevented: false }))) {
+function renderBar(
+  navigate = jest.fn(),
+  emit = jest.fn(() => ({ defaultPrevented: false })),
+  index = 0,
+) {
   const props = {
-    state: { index: 0, routes },
+    state: { index, routes },
     descriptors: Object.fromEntries(
       routes.map((route) => [route.key, { options: { title: titles[route.name] } }]),
     ),
@@ -95,5 +99,71 @@ describe('SkipTabBar — what takes a touch', () => {
     fireEvent.press(getByLabelText('Home'));
 
     expect(navigate).not.toHaveBeenCalled();
+  });
+});
+
+const SETTINGS = routes.findIndex((route) => route.name === 'settings');
+const tokens = (props: { className?: string }) => (props.className ?? '').split(/\s+/);
+
+/**
+ * The selected "Settings" pill ran past the bar on a 375pt-wide layout at a larger text size. No
+ * layout engine runs here, so what makes the row unable to overflow is pinned as written: the pill
+ * and its label may shrink (the label ending in an ellipsis), and plain icons have no width of
+ * their own beyond a 36pt floor that hit slop brings to a 44pt target.
+ */
+describe('SkipTabBar — the row cannot overflow', () => {
+  it('lets the selected pill shrink, with its label ending in an ellipsis rather than overflowing', async () => {
+    const { props } = renderBar(undefined, undefined, SETTINGS);
+    const { getByLabelText, getByText } = await render(<SkipTabBar {...props} />);
+
+    const pill = tokens(getByLabelText('Settings').props);
+    expect(pill).toEqual(expect.arrayContaining(['shrink', 'min-w-0', 'px-[12px]', 'gap-[6px]']));
+    expect(pill).not.toContain('shrink-0');
+
+    const label = getByText('Settings');
+    expect(tokens(label.props)).toEqual(expect.arrayContaining(['shrink', 'min-w-0']));
+    expect(label.props.numberOfLines).toBe(1);
+    expect(label.props.ellipsizeMode).toBe('tail');
+    // Grows with text size, to a cap that still fits whole on a 375pt-wide screen.
+    expect(label.props.maxFontSizeMultiplier).toBe(1.2);
+  });
+
+  it('gives plain icons only what the pill leaves, never less than a 44pt target', async () => {
+    const { props } = renderBar(undefined, undefined, SETTINGS);
+    const { getByLabelText } = await render(<SkipTabBar {...props} />);
+
+    for (const label of ['Home', 'Cards', 'Activity']) {
+      const tab = getByLabelText(label);
+      expect(tokens(tab.props)).toEqual(
+        expect.arrayContaining(['flex-1', 'max-w-[48px]', 'h-[48px]']),
+      );
+      const { minWidth } = tab.props.style as { minWidth: number };
+      const { left, right } = tab.props.hitSlop as { left: number; right: number };
+      expect(minWidth + left + right).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  it('labels every tab, says which one is open, and shows only that one’s name', async () => {
+    const { props } = renderBar(undefined, undefined, SETTINGS);
+    const { getByLabelText, getByText, queryByText } = await render(<SkipTabBar {...props} />);
+
+    for (const route of routes) {
+      const tab = getByLabelText(titles[route.name]);
+      expect(tab.props.accessibilityRole).toBe('button');
+      expect(tab.props.accessibilityState).toEqual({ selected: route.name === 'settings' });
+    }
+    expect(getByText('Settings')).toBeTruthy();
+    for (const label of ['Home', 'Cards', 'Activity']) expect(queryByText(label)).toBeNull();
+  });
+
+  it('still opens every other tab from the Settings tab', async () => {
+    const { props, navigate } = renderBar(undefined, undefined, SETTINGS);
+    const { getByLabelText } = await render(<SkipTabBar {...props} />);
+
+    for (const label of ['Home', 'Cards', 'Activity', 'Settings']) {
+      fireEvent.press(getByLabelText(label));
+    }
+
+    expect(navigate.mock.calls).toEqual([['home'], ['cards'], ['transactions']]);
   });
 });
