@@ -116,6 +116,54 @@ in the string, not a normal space).
 A term not in the table: choose the plain everyday word a Mexican or Canadian banking app uses,
 add a line to this table, and be consistent across every file.
 
+## Screens and components (wave 2)
+
+**Work only in your assigned files.** Each file belongs to exactly one agent; several agents work
+in this worktree at the same time. If you find English in a file that is not yours, list it in
+your report, do not edit it. Run your own tests, not the whole suite until the end, and ignore a
+type error or failing test in a file you were not given: it is another agent mid-edit.
+
+**Large text.** The large-text guard (`src/__tests__/large-text-guard.test.ts`, rules in
+`.claude/team/design/large-text.md`) counts numeric `maxFontSizeMultiplier`, one-line
+`numberOfLines` and `adjustsFontSizeToFit` per file and allows each count only to go down.
+Spanish and French run 20 to 30 percent longer than English, so: never add any of the three; do
+not shrink or cut a long translation to make it fit; use the existing wrap and `FitGroup` /
+`FitText` mechanism as the English does. If a translated word cannot fit where the English did,
+report the place rather than cutting text.
+
+**Shims left by wave 1 (switch screens over to these):**
+- `FAILURE_MESSAGE` is the English constant. For anything shown on screen use `failureText()`
+  from `@/lib/failure` (same text, translated). Keep `FAILURE_MESSAGE` only where a test or a log
+  needs the English.
+- `PRO_MONTHLY_LABEL` / `PRO_YEARLY_LABEL` (`@/lib/wall`): use `proMonthlyLabel()` /
+  `proYearlyLabel()`.
+- `authenticate()` in `@/lib/app-lock` already has a translated default prompt: call it with no
+  argument rather than passing an English one.
+- A sentence built from `lockCapability().label`, or the Pro trial text (`trialLabel()` in
+  `@/api/pro`): put the whole sentence in a message with a `{label}` or `{trial}` parameter.
+- `MONTHS_SHORT`, `WEEKDAYS_SHORT`, `WEEKDAY_INITIALS` in `@/lib/date` are English-only. Use
+  `monthsShort()`, `monthShort(i)`, `weekdayShort(i)`, `weekdayInitials()` from
+  `@/i18n/calendar` instead. When the last user of an old array is gone, delete it from date.ts.
+
+**Prices written into text.** A sentence that says "$1.99 a month or $19.99 a year" is wrong
+outside the US. Give the message `{monthly}` and `{yearly}` parameters and fill them with the
+store prices from `useProPrices()` (`@/api/pro`), falling back to `proMonthlyLabel()` /
+`proYearlyLabel()` when the store has not answered. The English then reads exactly as before when
+the fallback is used (tests rely on that). Never invent a local price.
+
+**Amount entry (money-critical).** The draft string a person types stays ASCII with a "." as
+the decimal point all the way to the code that parses it; only what is drawn changes. Draw the
+decimal and group marks from `numberMarks()`, draw the currency mark with `currencyMark()` (before
+or after the digits), and label the keypad's decimal key with the language's decimal mark. Every
+change here needs tests with "1,234.56" typed in English and the same digits shown as "1 234,56"
+in French, and a test that the stored number is identical in every language.
+
+**Remaining wave-2 areas and owners** (the file list for each is in your brief):
+auth, onboarding, home, pro (Dana-A); cards, accounts, transactions (Dana-B); bills,
+subscriptions (Dana-C); receipts, insights (Dana-D); settings, support, brands (Dana-E);
+voice (Dana-F); ui components (Dana-G); loan, salary, amount entry (Drew); legal, faq (Mia).
+The root layouts, the tab layout, the tab bar and the app lock gate are the CEO's.
+
 ## Verifying your area
 
 1. `npx tsc --noEmit` clean.
