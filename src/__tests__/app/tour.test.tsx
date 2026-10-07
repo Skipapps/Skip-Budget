@@ -84,8 +84,8 @@ describe('Tour', () => {
   });
 
   it('is counted the same way by the Settings row that opens it', () => {
-    const settings = fs.readFileSync(path.join(APP, '(tabs)', 'settings.tsx'), 'utf8');
-    expect(settings).toContain(
+    const support = fs.readFileSync(path.join(APP, 'settings', 'support.tsx'), 'utf8');
+    expect(support).toContain(
       `subtitle="The ${COUNT_WORDS[STOPS.length]} things, each a tap away"`,
     );
   });

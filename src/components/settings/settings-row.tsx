@@ -57,19 +57,16 @@ export function SettingsRow({
       )}
 
       <View className="min-w-0 flex-1">
+        {/* No line limit on either: at large text sizes the row grows and the words wrap, rather
+            than ending in an ellipsis. */}
         <Text
           className={cn('font-app-medium text-[15px]', destructive ? 'text-danger' : 'text-ink')}
-          numberOfLines={1}
           maxFontSizeMultiplier={1.4}
         >
           {title}
         </Text>
         {subtitle ? (
-          <Text
-            className="mt-0.5 font-app text-[12px] text-muted"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.3}
-          >
+          <Text className="mt-0.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
             {subtitle}
           </Text>
         ) : null}

@@ -1,30 +1,16 @@
-import Constants from 'expo-constants';
-import { openBrowserAsync } from 'expo-web-browser';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import {
-  Bell,
-  CalendarDays,
   Check,
-  Coffee,
-  CreditCard,
-  FileText,
+  Crown,
   FlaskConical,
-  Lightbulb,
+  Info,
+  LifeBuoy,
   LogOut,
-  Mail,
-  ReceiptText,
-  Repeat,
-  ScanFace,
-  ScrollText,
-  Shield,
-  SunMoon,
+  SlidersHorizontal,
   Trash2,
   UserRound,
-  Vibrate,
-  CircleHelp,
-  Compass,
-  ListChecks,
-  Crown,
+  Wallet,
+  type LucideIcon,
 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -32,71 +18,42 @@ import { Pressable, Text, View } from 'react-native';
 import { deleteAccount, signOut } from '@/api/auth';
 import { resetTo } from '@/lib/nav';
 import { usePro } from '@/api/pro';
-import { authenticate, lockCapability, unavailableMessage } from '@/lib/app-lock';
 import { setProOverride, useProOverride } from '@/lib/pro-bypass';
 import { useUpdateProfile } from '@/api/mutations';
 import { ProfileAvatar } from '@/components/ui/profile-avatar';
 import { SettingsRow } from '@/components/settings/settings-row';
 import { SettingsSection } from '@/components/settings/settings-section';
+import { plural, useMoneyCounts } from '@/components/settings/use-money-counts';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm, useDialog } from '@/providers/dialog-provider';
-import { usePreferences } from '@/providers/preferences-provider';
-import { useColors, useTheme } from '@/providers/theme-provider';
+import { useColors } from '@/providers/theme-provider';
 import { findAvatar } from '@/theme/avatars';
-import type { ModeKey } from '@/theme/palette';
-import { ChoiceChips } from '@/components/ui/choice-chips';
 import { TextField } from '@/components/ui/text-field';
 
-import CoffeeMark from '@/assets/illustrations/buy-me-a-coffee.svg';
 import { useCharges } from '@/api/charges';
-import {
-  useBankAccounts,
-  useBills,
-  useCards,
-  useProfile,
-  useReceipts,
-  useSalarySources,
-  useSubscriptions,
-} from '@/api/queries';
+import { useProfile, useReceipts } from '@/api/queries';
 
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
-
-const MODE_OPTIONS = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
-] as const;
-
-const MODE_CAPTIONS: Record<ModeKey, string> = {
-  light: 'Always light',
-  dark: 'Always dark',
-  system: 'Follows your phone',
-};
+/** Each opens a page of its own, so the rows carry no summary line. */
+const PAGES: { title: string; icon: LucideIcon; href: Href }[] = [
+  { title: 'Preferences', icon: SlidersHorizontal, href: '/settings/preferences' },
+  { title: 'Your money', icon: Wallet, href: '/settings/your-money' },
+  { title: 'About', icon: Info, href: '/settings/about' },
+  { title: 'Support', icon: LifeBuoy, href: '/settings/support' },
+];
 
 export default function SettingsScreen() {
   const colors = useColors();
   const confirm = useConfirm();
   const ask = useDialog();
-  const cards = useCards();
-  const accounts = useBankAccounts();
-  const salary = useSalarySources();
-  const subs = useSubscriptions();
+  const counts = useMoneyCounts();
   const profile = useProfile();
   const { pro } = usePro();
   const proOverride = useProOverride();
   const updateProfile = useUpdateProfile();
-  const { mode, setMode } = useTheme();
-  const { haptics, setHaptics, appLock, setAppLock } = usePreferences();
 
-  const bills = useBills();
   const receipts = useReceipts();
   const charges = useCharges();
 
-  const billCount = bills.data?.length ?? 0;
-  const cardCount = cards.data?.length ?? 0;
-  const accountCount = accounts.data?.length ?? 0;
-  const salaryCount = salary.data?.length ?? 0;
-  const trackedSubscriptions = subs.data?.length ?? 0;
   // Null until the field is touched, so the saved name shows through. Seeding state from the query
   // in an effect would overwrite what someone is typing when a refetch lands.
   const [draftName, setDraftName] = useState<string | null>(null);
@@ -115,42 +72,19 @@ export default function SettingsScreen() {
   };
 
   /**
-   * Turning the lock on must pass a scan first, or a broken lock could shut someone out of their
-   * own budget. Turning it off needs nothing: reaching the switch meant passing the lock.
-   */
-  const handleAppLock = async (next: boolean) => {
-    if (!next) {
-      setAppLock(false);
-      return;
-    }
-
-    const capability = await lockCapability();
-    if (!capability.available) {
-      await ask({
-        title: 'App lock is not available',
-        message: unavailableMessage(capability.reason),
-        cancelLabel: null,
-      });
-      return;
-    }
-
-    if (await authenticate(`Turn on ${capability.label} for Skip`)) setAppLock(true);
-  };
-
-  /**
    * Two dialogs: the first counts what is about to go ("3 cards, 57 transactions" can be weighed),
    * the second is the point of no return. Account deletion cannot be undone, so it does not use the
    * single-confirm pattern.
    */
   const handleDeleteAccount = async () => {
     const tally = [
-      [cardCount, 'card'],
-      [accountCount, 'bank account'],
-      [billCount, 'bill'],
-      [trackedSubscriptions, 'subscription'],
+      [counts.cards, 'card'],
+      [counts.accounts, 'bank account'],
+      [counts.bills, 'bill'],
+      [counts.subscriptions, 'subscription'],
       [receipts.data?.length ?? 0, 'receipt'],
       [charges.data?.length ?? 0, 'recorded charge'],
-      [salaryCount, 'salary source'],
+      [counts.salarySources, 'salary source'],
     ] as const;
 
     const held = tally.filter(([count]) => count > 0).map(([count, word]) => plural(count, word));
@@ -284,124 +218,16 @@ export default function SettingsScreen() {
         </View>
       </SettingsSection>
 
-      <SettingsSection title="Preferences">
-        <SettingsRow icon={SunMoon} title="Appearance" subtitle={MODE_CAPTIONS[mode]}>
-          <ChoiceChips options={MODE_OPTIONS} value={mode} onChange={setMode} />
-        </SettingsRow>
-        <SettingsRow
-          icon={Vibrate}
-          title="Haptics"
-          subtitle="A tap when you press something"
-          toggle={{ value: haptics, onChange: setHaptics }}
-        />
-        <SettingsRow
-          icon={ScanFace}
-          title="App lock"
-          subtitle="Face ID before Skip opens"
-          toggle={{ value: appLock, onChange: (next) => void handleAppLock(next) }}
-        />
-        <SettingsRow
-          icon={Bell}
-          title="Reminders"
-          subtitle="Before a renewal, a bill or payday"
-          onPress={() => router.push('/reminders')}
-          last
-        />
-      </SettingsSection>
-
-      <SettingsSection title="Your money">
-        <SettingsRow
-          icon={ReceiptText}
-          title="Bills"
-          subtitle={billCount > 0 ? plural(billCount, 'recurring bill') : 'None yet'}
-          // Every bill, including those with no charge this month; cost is on Home's Monthly bills.
-          onPress={() => router.push('/bill-plans')}
-        />
-        <SettingsRow
-          icon={Repeat}
-          title="Subscriptions"
-          subtitle={trackedSubscriptions > 0 ? `${trackedSubscriptions} tracked` : 'None yet'}
-          onPress={() => router.push('/subscription-plans')}
-        />
-        <SettingsRow
-          icon={CreditCard}
-          title="Cards and accounts"
-          subtitle={`${plural(cardCount, 'card')} · ${plural(accountCount, 'bank account')}`}
-          onPress={() => router.push('/cards')}
-        />
-        <SettingsRow
-          icon={CalendarDays}
-          title="Payday"
-          subtitle={salaryCount > 0 ? plural(salaryCount, 'salary source') : 'Not set up yet'}
-          onPress={() => router.push('/salary')}
-          last
-        />
-      </SettingsSection>
-
-      <SettingsSection title="About">
-        <SettingsRow
-          icon={Shield}
-          title="Privacy policy"
-          subtitle="What is stored, and who else can see it"
-          onPress={() => router.push('/privacy')}
-        />
-        <SettingsRow
-          icon={FileText}
-          title="Terms of service"
-          onPress={() => router.push('/terms')}
-        />
-        <SettingsRow
-          icon={ScrollText}
-          title="Version"
-          value={Constants.expoConfig?.version ?? '—'}
-          last
-        />
-      </SettingsSection>
-
-      <SettingsSection title="Support and feedback">
-        <SettingsRow
-          icon={ListChecks}
-          title="Getting started"
-          subtitle="Put the setup steps back on Home"
-          onPress={() => {
-            // Clearing the dismissal is enough: the card derives its steps live.
-            updateProfile.mutate({ getting_started_dismissed_at: null });
-            router.push('/home');
-          }}
-        />
-        <SettingsRow
-          icon={CircleHelp}
-          title="Common questions"
-          subtitle="Short answers, no waiting"
-          onPress={() => router.push('/faq')}
-        />
-        <SettingsRow
-          icon={Compass}
-          title="What Skip can do"
-          subtitle="The five things, each a tap away"
-          onPress={() => router.push('/tour')}
-        />
-        <SettingsRow
-          icon={Mail}
-          title="Email support"
-          subtitle="Something is wrong or unclear"
-          onPress={() => router.push('/contact?topic=support')}
-        />
-        <SettingsRow
-          icon={Lightbulb}
-          title="Share an idea"
-          subtitle="What should Skip do next?"
-          onPress={() => router.push('/contact?topic=idea')}
-        />
-        <SettingsRow
-          icon={Coffee}
-          // Their mark in their colours; tinting someone else's logo would misrepresent it.
-          artwork={<CoffeeMark width={22} height={22} />}
-          title="Buy a coffee for team"
-          subtitle="Keep Skip brewing"
-          onPress={() => openBrowserAsync('https://buymeacoffee.com/Weknd_team')}
-          last
-        />
+      <SettingsSection>
+        {PAGES.map((page, index) => (
+          <SettingsRow
+            key={page.title}
+            icon={page.icon}
+            title={page.title}
+            onPress={() => router.push(page.href)}
+            last={index === PAGES.length - 1}
+          />
+        ))}
       </SettingsSection>
 
       <SettingsSection title="Account">

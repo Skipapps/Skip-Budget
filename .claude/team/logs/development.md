@@ -3803,3 +3803,60 @@ changed files; eslint `--no-cache` src = 19 (= baseline; the 8 errors are add-ac
   (77.0 at 1.2x) > 76pt room, so PILL_MAX 128 → 130 is proposed (whole at the cap from 360pt; 0 overflow in Yoga).
 
 **Not verified:** on a device: the look of the shorter line boxes, the "$" alignment, Metro needs `--clear`.
+
+---
+
+## 2026-10-06 — Dmitri (Development Lead) — review of 17990fe "Montserrat for the whole app"
+
+**Outcome:** SHIP-TO-PHONE. No blocking issues. Edited nothing but this log.
+
+**Checks (tree clean at 17990fe while they ran):** tsc 0. Full jest 111/111 suites, 1936/1936. Prettier clean on all 113
+TS/TSX/JS files the commit touches. ESLint `--no-cache` on the same 113: 8 errors, all the known react-hooks/refs in
+add-account/add-card on lines the commit did not change; 0 warnings.
+
+**Verified:** No Poppins reference in tracked code outside design/ and .md. The tokens font-app/-medium/-semibold/-bold
+map to Montserrat_400Regular/500Medium/600SemiBold/700Bold, which are exactly the useFonts keys (expo-font registers
+by key). The splash hold and the error fallback are unchanged. The TTFs are static (no fvar) and are bundled by Metro
+through require() assets. No config plugin and no native rebuild are needed. package.json and the lockfile change
+only the font package. Metrics read from the installed TTFs: upem 1000, hhea 968/-251/0, which gives the 1.219em line
+box; cap 700, which puts the cap line 0.268em below the top. affixTop values are 0.268 x (size - affix), rounded to
+the half point. The calculator is exact because its digits have no lineHeight. AmountFigure assumes the same
+top-anchored placement the Poppins values relied on, and the set lineHeights are within 2pt of Montserrat's natural
+box, so the worst case is about 2pt at the 64pt band. Tab bar: Settings is 64.23/77.08pt, with 78pt of room in a 130pt
+pill. Sums: 375 gives 39/130 (247 of 249), 360 gives 34/130, 393 gives 45/130, 430 gives 48/130, 320 gives 32/98.
+Slop keeps targets at 44pt or more. The notification extensions use system fonts.
+
+**Non-blocking:** brand-logo.tsx:100 monogram uses `font-app font-semibold` (a weight on a one-face family; use
+font-app-semibold). The package root import bundles all 18 Montserrat TTFs, as Poppins did; per-weight subpaths would
+ship only 4. The amount-figure comment ("no line height taller than the font's own") is off for the 36pt band by
+0.06pt. fonts.test has an empty PENDING scaffold. node_modules still holds poppins (extraneous). The design/ kit still
+says Poppins.
+
+### 2026-10-06 — Dana — Settings split into four pages (Founder's request)
+
+**Outcome:** Done in the logo-service worktree, nothing committed or staged. tsc 0; full `jest --ci` 114/114 suites,
+1970/1970 (3 new suites, 34 tests); prettier clean on the 15 changed files; eslint `--no-cache` changed files 0,
+src 19 (= baseline). tsconfig.json and package.json unchanged (typed routes regenerated into .expo/types only).
+
+- **Main page:** Skip Pro, Developer (dev only), Profile and Account unchanged; between Profile and Account one
+  heading-less group of four rows, title + chevron, no subtitle: Preferences (SlidersHorizontal), Your money (Wallet),
+  About (Info), Support (LifeBuoy). `SettingsSection.title` is now optional.
+- **Routes:** `src/app/settings/{preferences,your-money,about,support}.tsx` → `/settings/preferences` etc. No
+  `settings/index`, so `/settings` is still only the tab; pushed on the root stack above the tabs, `Screen showBack`
+  (shared shell `components/settings/settings-page.tsx`). Items, small lines, controls, counts and handlers moved
+  verbatim; app-lock handler and mode chips moved into preferences.tsx (one copy); `useMoneyCounts` + `plural`
+  shared by Your money and the delete-account tally.
+- **Tabs from a pushed page:** "Cards and accounts" and "Getting started" now `router.dismissTo('/cards' | '/home')`.
+  `push` from above the tabs would have stacked a second tab navigator; from the old tab page it switched tabs.
+- **Also:** SettingsRow title/subtitle lose `numberOfLines={1}` (large-text §1.4, all settings rows wrap now). FAQ
+  answer now says "Settings → Support → Getting started". Coffee SVG behind `components/settings/coffee-mark.ts`
+  so a test can stand it in. "Buy a coffee for team" stays on Support (it was in that section).
+- **Tests:** settings.test.tsx (main page order, no subtitle, each row's push, Pro/Profile/Sign out/delete tally;
+  each page's exact text top to bottom; every row's target), settings-preferences.test.tsx (real Theme and
+  Preferences providers over fake storage: chip, haptics and app lock persist across remount; unavailable dialog;
+  failed scan), settings-routes.test.tsx (renderRouter over the real src/app tree: /settings is the tab, each page
+  pushes and backs to it, cold links, dismissTo leaves no stack). Mutants (push instead of dismissTo, a
+  `settings/index` route) fail.
+
+**Not verified:** on a device. Pre-existing, left as is: Your money says "None yet" while loading and on a failed
+read (no FAILURE_MESSAGE); PageHeader titles still shrink-to-fit rather than wrap.
