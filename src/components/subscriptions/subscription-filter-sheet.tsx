@@ -60,7 +60,7 @@ export function SubscriptionFilterSheet({
             <X size={22} color={colors.ink} strokeWidth={2} />
           </Pressable>
           <Text
-            className="flex-1 pr-11 text-center font-poppins-semibold text-[18px] text-ink"
+            className="flex-1 pr-11 text-center font-app-semibold text-[18px] text-ink"
             maxFontSizeMultiplier={1.2}
           >
             Filter subscriptions
@@ -95,7 +95,7 @@ export function SubscriptionFilterSheet({
             onPress={() => setDraft(EMPTY_SUBSCRIPTION_FILTERS)}
             className="min-h-16 flex-1 items-center justify-center rounded-full border border-control active:bg-ink/5"
           >
-            <Text className="font-poppins-medium text-[17px] text-ink">Reset</Text>
+            <Text className="font-app-medium text-[17px] text-ink">Reset</Text>
           </Pressable>
           <View className="flex-[2]">
             <Button label="Apply" onPress={() => onApply(draft)} />

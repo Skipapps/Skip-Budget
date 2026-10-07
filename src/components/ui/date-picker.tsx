@@ -62,16 +62,13 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
           className="w-full max-w-[340px] overflow-hidden rounded-[16px] bg-card"
         >
           <View className="bg-control px-5 py-4">
-            <Text
-              className="font-poppins text-[13px] text-on-control/85"
-              maxFontSizeMultiplier={1.2}
-            >
+            <Text className="font-app text-[13px] text-on-control/85" maxFontSizeMultiplier={1.2}>
               {safeDay} {MONTHS_SHORT[month]} {year}
             </Text>
 
             <View className="mt-1 flex-row items-center justify-between">
               <Text
-                className="font-poppins-bold text-[30px] text-on-control"
+                className="font-app-bold text-[30px] text-on-control"
                 maxFontSizeMultiplier={1.2}
               >
                 {year}
@@ -124,10 +121,10 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
                         className={cn(
                           'text-[15px]',
                           blocked
-                            ? 'font-poppins text-muted/40'
+                            ? 'font-app text-muted/40'
                             : selected
-                              ? 'font-poppins-semibold text-on-control'
-                              : 'font-poppins text-ink',
+                              ? 'font-app-semibold text-on-control'
+                              : 'font-app text-ink',
                         )}
                         maxFontSizeMultiplier={1.2}
                       >
@@ -147,10 +144,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
                 className="mb-2 flex-row items-center gap-1 self-start rounded-[12px] px-2 py-1.5 active:bg-ink/5"
               >
                 <ChevronLeft size={16} color={colors.muted} strokeWidth={2} />
-                <Text
-                  className="font-poppins-medium text-[14px] text-body"
-                  maxFontSizeMultiplier={1.2}
-                >
+                <Text className="font-app-medium text-[14px] text-body" maxFontSizeMultiplier={1.2}>
                   {MONTHS_SHORT[month]} {year}
                 </Text>
               </Pressable>
@@ -173,7 +167,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
               onPress={onCancel}
               className="min-h-11 justify-center rounded-full px-5 active:bg-ink/5"
             >
-              <Text className="font-poppins-medium text-[15px] text-body">Cancel</Text>
+              <Text className="font-app-medium text-[15px] text-body">Cancel</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -187,7 +181,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
                   : 'bg-control active:bg-control-pressed',
               )}
             >
-              <Text className="font-poppins-semibold text-[15px] text-on-control">
+              <Text className="font-app-semibold text-[15px] text-on-control">
                 {step === 'month' ? 'Next' : 'OK'}
               </Text>
             </Pressable>

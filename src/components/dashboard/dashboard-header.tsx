@@ -34,7 +34,7 @@ export function DashboardHeader({
           <ProfileAvatar avatarId={avatarId} size={48} />
         </Pressable>
         <Text
-          className="flex-1 font-poppins-semibold text-[20px] text-ink"
+          className="flex-1 font-app-semibold text-[20px] text-ink"
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >

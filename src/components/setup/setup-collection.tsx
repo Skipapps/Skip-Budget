@@ -79,7 +79,7 @@ export function SetupCollection({
         ) : isError ? (
           <View className="w-full items-center gap-1">
             <Text
-              className="text-center font-poppins text-[14px] text-muted"
+              className="text-center font-app text-[14px] text-muted"
               maxFontSizeMultiplier={1.4}
             >
               {FAILURE_MESSAGE}
@@ -93,7 +93,7 @@ export function SetupCollection({
         ) : (
           <View className="w-full items-center rounded-[16px] border border-dashed border-line px-6 py-8">
             <Text
-              className="text-center font-poppins text-[14px] leading-5 text-muted"
+              className="text-center font-app text-[14px] leading-5 text-muted"
               maxFontSizeMultiplier={1.4}
             >
               {emptyText}

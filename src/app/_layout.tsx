@@ -1,13 +1,7 @@
 import '@/global.css';
 
-import {
-  Poppins_400Regular,
-  Poppins_500Medium,
-  Poppins_600SemiBold,
-  Poppins_700Bold,
-  useFonts,
-} from '@expo-google-fonts/poppins';
 import * as Sentry from '@sentry/react-native';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -26,8 +20,9 @@ import { RealtimeProvider } from '@/providers/realtime-provider';
 import { PreferencesProvider } from '@/providers/preferences-provider';
 import { SessionProvider, useSession } from '@/providers/session-provider';
 import { ThemeProvider, useColors, useTheme } from '@/providers/theme-provider';
+import { APP_FONTS } from '@/theme/fonts';
 
-// Hold the splash until Poppins is ready, so no frame renders in the system font and then reflows.
+// Hold the splash until the app font is ready, so no frame renders in the system font and reflows.
 SplashScreen.preventAutoHideAsync();
 
 // At module load so a startup crash is still caught. Off in development: red boxes are already
@@ -39,12 +34,7 @@ Sentry.init({
 });
 
 function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
-  });
+  const [fontsLoaded, fontError] = useFonts(APP_FONTS);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

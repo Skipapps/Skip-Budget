@@ -59,14 +59,14 @@ export function ConfirmDialog({
         >
           <View className="px-5 pb-4 pt-5">
             <Text
-              className="font-poppins-semibold text-[17px] leading-6 text-ink"
+              className="font-app-semibold text-[17px] leading-6 text-ink"
               maxFontSizeMultiplier={1.3}
             >
               {title}
             </Text>
             {message ? (
               <Text
-                className="mt-2 font-poppins text-[15px] leading-6 text-body"
+                className="mt-2 font-app text-[15px] leading-6 text-body"
                 maxFontSizeMultiplier={1.5}
               >
                 {message}
@@ -140,7 +140,7 @@ function DialogButton({
       <Text
         className={cn(
           'text-center text-[15px]',
-          variant === 'link' ? 'font-poppins-medium' : 'font-poppins-semibold',
+          variant === 'link' ? 'font-app-medium' : 'font-app-semibold',
           variant === 'filled'
             ? destructive
               ? // The page colour, not white: the dark theme's red is light and white on it fails contrast.

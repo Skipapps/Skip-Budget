@@ -115,7 +115,7 @@ export function StepFlow({
           ref={questionRef}
           accessibilityRole="header"
           className={cn(
-            'w-full text-center font-poppins text-[20px] text-muted',
+            'w-full text-center font-app text-[20px] text-muted',
             headerSlot ? 'mt-8' : 'mt-6',
           )}
           numberOfLines={2}
@@ -130,7 +130,7 @@ export function StepFlow({
       <View className="mt-8 w-full gap-3 pb-2">
         {error ? (
           <Text
-            className="w-full text-center font-poppins text-[13px] text-danger"
+            className="w-full text-center font-app text-[13px] text-danger"
             maxFontSizeMultiplier={1.4}
           >
             {error}

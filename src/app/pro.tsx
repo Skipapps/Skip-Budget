@@ -112,7 +112,7 @@ export default function ProScreen() {
             You have Skip Pro
           </Title>
           <Text
-            className="mt-3 max-w-[300px] text-center font-poppins text-[14px] leading-[21px] text-muted"
+            className="mt-3 max-w-[300px] text-center font-app text-[14px] leading-[21px] text-muted"
             maxFontSizeMultiplier={1.4}
           >
             Everything is unlocked. Billing is handled by Apple — renewals, changes and cancellation
@@ -132,7 +132,7 @@ export default function ProScreen() {
 
   return (
     <Screen title="Skip Pro" showBack>
-      <Text className="mt-2 w-full font-poppins text-[14px] text-muted" maxFontSizeMultiplier={1.4}>
+      <Text className="mt-2 w-full font-app text-[14px] text-muted" maxFontSizeMultiplier={1.4}>
         Everything Skip can do, for less than a coffee a month.
       </Text>
 
@@ -147,13 +147,13 @@ export default function ProScreen() {
             </View>
             <View className="min-w-0 flex-1">
               <Text
-                className="font-poppins-semibold text-[13.5px] text-ink"
+                className="font-app-semibold text-[13.5px] text-ink"
                 maxFontSizeMultiplier={1.3}
               >
                 {feature.title}
               </Text>
               <Text
-                className="mt-0.5 font-poppins text-[11.5px] leading-[16px] text-muted"
+                className="mt-0.5 font-app text-[11.5px] leading-[16px] text-muted"
                 maxFontSizeMultiplier={1.3}
               >
                 {feature.hint}
@@ -184,7 +184,7 @@ export default function ProScreen() {
 
       {message ? (
         <Text
-          className="mt-4 w-full text-center font-poppins text-[13px] text-ink"
+          className="mt-4 w-full text-center font-app text-[13px] text-ink"
           maxFontSizeMultiplier={1.4}
         >
           {message}
@@ -194,7 +194,7 @@ export default function ProScreen() {
       {/* Never the store's own message: a RevenueCat exception means nothing to a customer. */}
       {storeNote ? (
         <Text
-          className="mt-4 w-full text-center font-poppins text-[12px] leading-[17px] text-muted"
+          className="mt-4 w-full text-center font-app text-[12px] leading-[17px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
           {storeNote}
@@ -203,7 +203,7 @@ export default function ProScreen() {
 
       {__DEV__ && devNote ? (
         <Text
-          className="mt-2 w-full text-center font-poppins text-[10px] leading-[14px] text-muted"
+          className="mt-2 w-full text-center font-app text-[10px] leading-[14px] text-muted"
           maxFontSizeMultiplier={1.2}
         >
           {devNote}
@@ -244,7 +244,7 @@ export default function ProScreen() {
           />
         </View>
         <Text
-          className="mt-1 w-full text-center font-poppins text-[10.5px] leading-[15px] text-muted"
+          className="mt-1 w-full text-center font-app text-[10.5px] leading-[15px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
           Billed by Apple. Renews automatically until cancelled in your App Store subscriptions.
@@ -286,21 +286,21 @@ function PriceCard({
         <View className="absolute -top-2.5 right-3 rounded-full bg-accent px-2.5 py-0.5">
           <Text
             allowFontScaling={false}
-            className="font-poppins-bold text-[9px] tracking-wide text-on-control"
+            className="font-app-bold text-[9px] tracking-wide text-on-control"
           >
             {badge}
           </Text>
         </View>
       ) : null}
       <View className="w-full flex-row items-baseline justify-between gap-3">
-        <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
           {name}
         </Text>
-        <Text className="font-poppins-bold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app-bold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
           {price}
         </Text>
       </View>
-      <Text className="mt-0.5 font-poppins text-[11.5px] text-muted" maxFontSizeMultiplier={1.3}>
+      <Text className="mt-0.5 font-app text-[11.5px] text-muted" maxFontSizeMultiplier={1.3}>
         {hint}
       </Text>
     </Pressable>

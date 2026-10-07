@@ -297,10 +297,7 @@ function CardForm({
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
-            <Text
-              className="font-poppins-medium text-[15px] text-danger"
-              maxFontSizeMultiplier={1.4}
-            >
+            <Text className="font-app-medium text-[15px] text-danger" maxFontSizeMultiplier={1.4}>
               {deleteCard.isPending ? 'Deleting…' : 'Delete card'}
             </Text>
           </Pressable>
@@ -350,10 +347,7 @@ function CardForm({
           />
 
           {stepError ? (
-            <Text
-              className="w-full font-poppins text-[13px] text-danger"
-              maxFontSizeMultiplier={1.4}
-            >
+            <Text className="w-full font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
               {stepError}
             </Text>
           ) : null}

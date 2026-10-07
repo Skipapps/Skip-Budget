@@ -91,7 +91,7 @@ export function DestinationList({
                 </View>
 
                 <Text
-                  className="min-w-0 flex-1 font-poppins-medium text-[15px] text-ink"
+                  className="min-w-0 flex-1 font-app-medium text-[15px] text-ink"
                   numberOfLines={1}
                   maxFontSizeMultiplier={1.4}
                 >
@@ -108,7 +108,7 @@ export function DestinationList({
                   >
                     <Text
                       allowFontScaling={false}
-                      className="font-poppins-bold text-[9px] text-on-control"
+                      className="font-app-bold text-[9px] text-on-control"
                     >
                       PRO
                     </Text>
@@ -125,7 +125,7 @@ export function DestinationList({
                         <Skeleton className="h-3.5 w-20" />
                       ) : error ? (
                         <Text
-                          className="font-poppins-semibold text-[15px] text-muted"
+                          className="font-app-semibold text-[15px] text-muted"
                           numberOfLines={1}
                           maxFontSizeMultiplier={1.4}
                         >
@@ -133,7 +133,7 @@ export function DestinationList({
                         </Text>
                       ) : (
                         <Text
-                          className="font-poppins-semibold text-[15px] text-ink"
+                          className="font-app-semibold text-[15px] text-ink"
                           style={{ color: moneyColor(amount) }}
                           numberOfLines={1}
                           maxFontSizeMultiplier={1.4}
@@ -149,7 +149,7 @@ export function DestinationList({
                 ) : (
                   <View className="shrink-0 flex-row items-center gap-1">
                     <Text
-                      className="font-poppins text-[13px] text-muted"
+                      className="font-app text-[13px] text-muted"
                       numberOfLines={1}
                       maxFontSizeMultiplier={1.3}
                     >
@@ -167,7 +167,7 @@ export function DestinationList({
       {/* The rows stay tappable while this shows: each destination loads its own data. */}
       {error ? (
         <View className="mt-3 w-full flex-row items-center justify-between gap-3">
-          <Text className="shrink font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+          <Text className="shrink font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
             {FAILURE_MESSAGE}
           </Text>
           {onRetry ? (

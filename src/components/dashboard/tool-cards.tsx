@@ -48,10 +48,7 @@ export function ToolCards({ pro, onPress }: ToolCardsProps) {
               importantForAccessibility="no-hide-descendants"
               className="absolute right-3 top-3 rounded-full bg-accent px-2 py-0.5"
             >
-              <Text
-                allowFontScaling={false}
-                className="font-poppins-bold text-[9px] text-on-control"
-              >
+              <Text allowFontScaling={false} className="font-app-bold text-[9px] text-on-control">
                 PRO
               </Text>
             </View>
@@ -64,7 +61,7 @@ export function ToolCards({ pro, onPress }: ToolCardsProps) {
 
           <View className="mt-3 w-full flex-row items-center justify-center gap-0.5">
             <Text
-              className="shrink text-center font-poppins-medium text-[14px] text-ink"
+              className="shrink text-center font-app-medium text-[14px] text-ink"
               numberOfLines={1}
               maxFontSizeMultiplier={1.3}
             >

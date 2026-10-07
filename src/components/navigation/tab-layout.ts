@@ -25,10 +25,11 @@ const TOUCH_TARGET = 44;
 
 /**
  * The widest the selected pill gets: room for "Settings" whole at the largest text size the label
- * allows (75pt of label at 1.2x, measured from Poppins SemiBold), plus its padding, icon and gap.
+ * allows (77pt of label at 1.2x, measured from the app font's semibold), plus its padding, icon
+ * and gap.
  * Every label is narrower, and a fixed width means the pill does not change size between tabs.
  */
-const PILL_MAX = 128;
+const PILL_MAX = 130;
 
 export type TabLayout = {
   /** The width inside the bar's border and padding that the tabs share. */

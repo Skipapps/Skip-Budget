@@ -238,11 +238,11 @@ function InsightsScreenInner() {
     <Screen title="Insights" showBack onRefresh={refresh} refreshing={refreshing}>
       <Heading>Where you stand</Heading>
       <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
-        <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           Saved, less what you owe
         </Text>
         <Text
-          className="mt-1 font-poppins-bold text-[34px] text-ink"
+          className="mt-1 font-app-bold text-[34px] text-ink"
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}
@@ -260,18 +260,18 @@ function InsightsScreenInner() {
       <Heading>What comes in</Heading>
       {monthlyIncome > 0 ? (
         <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
-          <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+          <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
             Every month
           </Text>
           <Text
-            className="mt-1 font-poppins-bold text-[28px] text-ink"
+            className="mt-1 font-app-bold text-[28px] text-ink"
             numberOfLines={1}
             adjustsFontSizeToFit
             maxFontSizeMultiplier={1.2}
           >
             {formatCurrency(monthlyIncome)}
           </Text>
-          <Text className="mt-1 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+          <Text className="mt-1 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
             from {(salary.data ?? []).length}{' '}
             {(salary.data ?? []).length === 1 ? 'source' : 'sources'}
           </Text>
@@ -297,11 +297,11 @@ function InsightsScreenInner() {
       ) : (
         <>
           <View className="mt-4 w-full rounded-[16px] border border-line bg-card px-5 py-5">
-            <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+            <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
               {periodKey === 'all' ? 'All time' : `This ${periodKey}`}
             </Text>
             <Text
-              className="mt-1 font-poppins-bold text-[30px] text-ink"
+              className="mt-1 font-app-bold text-[30px] text-ink"
               numberOfLines={1}
               adjustsFontSizeToFit
               maxFontSizeMultiplier={1.2}
@@ -321,13 +321,10 @@ function InsightsScreenInner() {
             <StandRow label="Subscriptions" value={-(byKind.get('subscription') ?? 0)} plain />
             <View className="my-3 h-px w-full bg-line" />
             <View className="w-full flex-row items-center justify-between gap-3">
-              <Text
-                className="font-poppins-semibold text-[15px] text-ink"
-                maxFontSizeMultiplier={1.3}
-              >
+              <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
                 Recorded in this period
               </Text>
-              <Text className="font-poppins-bold text-[16px] text-ink" maxFontSizeMultiplier={1.3}>
+              <Text className="font-app-bold text-[16px] text-ink" maxFontSizeMultiplier={1.3}>
                 {formatCurrency(totals.out)}
               </Text>
             </View>
@@ -350,14 +347,14 @@ function InsightsScreenInner() {
                 <View className="min-w-0 flex-1">
                   <View className="w-full flex-row items-baseline justify-between gap-3">
                     <Text
-                      className="min-w-0 flex-1 font-poppins-medium text-[14px] text-ink"
+                      className="min-w-0 flex-1 font-app-medium text-[14px] text-ink"
                       numberOfLines={1}
                       maxFontSizeMultiplier={1.3}
                     >
                       {category.label}
                     </Text>
                     <Text
-                      className="font-poppins-semibold text-[14px] text-ink"
+                      className="font-app-semibold text-[14px] text-ink"
                       maxFontSizeMultiplier={1.3}
                     >
                       {formatCurrency(category.amount)}
@@ -407,14 +404,14 @@ function InsightsScreenInner() {
                 <View className="min-w-0 flex-1">
                   <View className="w-full flex-row items-baseline justify-between gap-3">
                     <Text
-                      className="min-w-0 flex-1 font-poppins-medium text-[14px] text-ink"
+                      className="min-w-0 flex-1 font-app-medium text-[14px] text-ink"
                       numberOfLines={1}
                       maxFontSizeMultiplier={1.3}
                     >
                       {merchant.name}
                     </Text>
                     <Text
-                      className="font-poppins-semibold text-[14px] text-ink"
+                      className="font-app-semibold text-[14px] text-ink"
                       maxFontSizeMultiplier={1.3}
                     >
                       {formatCurrency(merchant.amount)}
@@ -427,7 +424,7 @@ function InsightsScreenInner() {
                     />
                   </View>
                   <Text
-                    className="mt-1 font-poppins text-[12px] text-muted"
+                    className="mt-1 font-app text-[12px] text-muted"
                     maxFontSizeMultiplier={1.3}
                   >
                     {merchant.visits} {merchant.visits === 1 ? 'time' : 'times'}
@@ -461,7 +458,7 @@ function InsightsScreenInner() {
             onPress={() => router.push('/savings')}
             className="min-h-11 w-full flex-row items-center justify-between active:opacity-70"
           >
-            <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.3}>
+            <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.3}>
               Every month
             </Text>
             <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
@@ -530,7 +527,7 @@ function StandRow({
   return (
     <View className="w-full flex-row items-center justify-between gap-3">
       <Text
-        className="min-w-0 flex-1 font-poppins text-[14px] text-muted"
+        className="min-w-0 flex-1 font-app text-[14px] text-muted"
         numberOfLines={1}
         maxFontSizeMultiplier={1.3}
       >
@@ -538,9 +535,7 @@ function StandRow({
       </Text>
       <Text
         className={
-          plain
-            ? 'font-poppins-medium text-[14px] text-ink'
-            : 'font-poppins-semibold text-[14px] text-ink'
+          plain ? 'font-app-medium text-[14px] text-ink' : 'font-app-semibold text-[14px] text-ink'
         }
         maxFontSizeMultiplier={1.3}
         style={negative && !plain ? { color: colors.moneyOut } : undefined}
@@ -572,20 +567,20 @@ function Row({
     >
       <View className="min-w-0 flex-1">
         <Text
-          className="font-poppins-medium text-[15px] text-ink"
+          className="font-app-medium text-[15px] text-ink"
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
           {label}
         </Text>
         {hint ? (
-          <Text className="mt-0.5 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+          <Text className="mt-0.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
             {hint}
           </Text>
         ) : null}
       </View>
       {value ? (
-        <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
           {value}
         </Text>
       ) : null}
@@ -608,13 +603,13 @@ function Prompt({
   return (
     <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
       <Text
-        className="font-poppins-semibold text-[15px] leading-6 text-ink"
+        className="font-app-semibold text-[15px] leading-6 text-ink"
         maxFontSizeMultiplier={1.3}
       >
         {title}
       </Text>
       <Text
-        className="mt-2 font-poppins text-[13px] leading-[19px] text-muted"
+        className="mt-2 font-app text-[13px] leading-[19px] text-muted"
         maxFontSizeMultiplier={1.4}
       >
         {message}

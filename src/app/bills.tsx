@@ -64,13 +64,13 @@ export default function BillsScreen() {
       <View className="mt-3 w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
         <View className="w-full flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1">
-            <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+            <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
               Bills charged
             </Text>
             <Text
               // text-ink underneath: a zero total gets no money colour, and an unstyled figure is
               // black, invisible in dark mode.
-              className="mt-0.5 font-poppins-bold text-[26px] text-ink"
+              className="mt-0.5 font-app-bold text-[26px] text-ink"
               style={{ color: moneyColor(total) }}
               numberOfLines={1}
               adjustsFontSizeToFit
@@ -82,7 +82,7 @@ export default function BillsScreen() {
           <RangeDropdown value={rangeKey} onChange={setRangeKey} />
         </View>
 
-        <Text className="mt-2 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.2}>
+        <Text className="mt-2 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.2}>
           {charges.length === 0
             ? 'Nothing in this window'
             : `${charges.length} ${charges.length === 1 ? 'charge' : 'charges'}`}

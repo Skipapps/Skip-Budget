@@ -35,11 +35,11 @@ export function ScheduleCard({ rows, onPress }: ScheduleCardProps) {
       </View>
 
       <View className="min-w-0 flex-1">
-        <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
           Where each payment goes
         </Text>
         <Text
-          className="mt-1 font-poppins text-[12px] leading-[17px] text-muted"
+          className="mt-1 font-app text-[12px] leading-[17px] text-muted"
           maxFontSizeMultiplier={1.3}
         >
           {Math.round(interestShare * 100)}% of your first payment is interest — see all{' '}

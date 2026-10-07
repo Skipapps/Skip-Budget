@@ -608,7 +608,7 @@ function ReceiptForm({
             {step === 0 && reading ? (
               <View className="mt-2 w-full flex-row items-center justify-center gap-2">
                 <ActivityIndicator size="small" color={colors.muted} />
-                <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+                <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
                   Reading the receipt…
                 </Text>
               </View>
@@ -617,17 +617,17 @@ function ReceiptForm({
             {scanResult ? (
               <View className="mt-2 w-full rounded-[16px] bg-ink/5 px-4 py-3">
                 {scanResult.read.length > 0 ? (
-                  <Text className="font-poppins text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
+                  <Text className="font-app text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
                     Read the {listWords(scanResult.read)}.
                   </Text>
                 ) : (
-                  <Text className="font-poppins text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
+                  <Text className="font-app text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
                     {FAILURE_MESSAGE}
                   </Text>
                 )}
                 {scanResult.missed.length > 0 ? (
                   <Text
-                    className="mt-1 font-poppins text-[13px] text-muted"
+                    className="mt-1 font-app text-[13px] text-muted"
                     maxFontSizeMultiplier={1.4}
                   >
                     Check the {listWords(scanResult.missed)} below — it will save either way.
@@ -696,10 +696,7 @@ function ReceiptForm({
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
-            <Text
-              className="font-poppins-medium text-[15px] text-danger"
-              maxFontSizeMultiplier={1.4}
-            >
+            <Text className="font-app-medium text-[15px] text-danger" maxFontSizeMultiplier={1.4}>
               {deleteReceipt.isPending ? 'Deleting…' : 'Delete receipt'}
             </Text>
           </Pressable>
@@ -740,16 +737,13 @@ function ReceiptForm({
           />
 
           {categoryLabel ? (
-            <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+            <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
               Filed under {categoryLabel}
             </Text>
           ) : null}
 
           {stepError ? (
-            <Text
-              className="w-full font-poppins text-[13px] text-danger"
-              maxFontSizeMultiplier={1.4}
-            >
+            <Text className="w-full font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
               {stepError}
             </Text>
           ) : null}
@@ -793,13 +787,13 @@ function CaptureButton({
       className="min-h-14 flex-1 flex-row items-center justify-center gap-2 rounded-[10px] bg-ink/5 active:bg-ink/10"
     >
       <Icon size={20} color={colors.ink} strokeWidth={1.8} />
-      <Text className="font-poppins-medium text-[15px] text-ink" maxFontSizeMultiplier={1.2}>
+      <Text className="font-app-medium text-[15px] text-ink" maxFontSizeMultiplier={1.2}>
         {label}
       </Text>
       {proBadge ? (
         <View className="rounded-full bg-accent/15 px-2 py-0.5">
           <Text
-            className="font-poppins-semibold text-[10px] tracking-widest"
+            className="font-app-semibold text-[10px] tracking-widest"
             style={{ color: colors.accentInk }}
             maxFontSizeMultiplier={1.2}
           >

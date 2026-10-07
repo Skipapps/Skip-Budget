@@ -133,7 +133,7 @@ export function BrandField({
         <View className="min-h-14 w-full flex-row items-center rounded-[10px] border border-line px-4">
           <BrandLogo name={value.name} domain={selectionLogo(value)} size={32} />
           <Text
-            className="ml-3 flex-1 py-4 font-poppins text-[16px] text-ink"
+            className="ml-3 flex-1 py-4 font-app text-[16px] text-ink"
             numberOfLines={1}
             maxFontSizeMultiplier={1.5}
           >
@@ -190,7 +190,7 @@ export function BrandField({
           autoCapitalize="words"
           autoCorrect={false}
           returnKeyType="search"
-          className="flex-1 py-4 font-poppins text-[16px] text-ink"
+          className="flex-1 py-4 font-app text-[16px] text-ink"
           maxFontSizeMultiplier={1.5}
         />
         {searching && isFetching ? <ActivityIndicator size="small" color={colors.muted} /> : null}
@@ -211,7 +211,7 @@ export function BrandField({
             >
               <BrandLogo name={brand.name} domain={brand.domain} size={32} />
               <Text
-                className="ml-3 flex-1 font-poppins text-[15px] text-ink"
+                className="ml-3 flex-1 font-app text-[15px] text-ink"
                 numberOfLines={1}
                 maxFontSizeMultiplier={1.4}
               >
@@ -234,7 +234,7 @@ export function BrandField({
                 <Plus size={16} color={colors.muted} strokeWidth={2} />
               </View>
               <Text
-                className="ml-3 flex-1 font-poppins text-[15px] text-body"
+                className="ml-3 flex-1 font-app text-[15px] text-body"
                 numberOfLines={1}
                 maxFontSizeMultiplier={1.4}
               >
@@ -246,10 +246,7 @@ export function BrandField({
       ) : null}
 
       {error ? (
-        <Text
-          className="ml-5 mt-1.5 font-poppins text-[13px] text-danger"
-          maxFontSizeMultiplier={1.4}
-        >
+        <Text className="ml-5 mt-1.5 font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
           {error}
         </Text>
       ) : null}

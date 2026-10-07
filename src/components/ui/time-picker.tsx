@@ -138,7 +138,7 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
           style={shadows.floating}
           className="w-full max-w-[340px] overflow-hidden rounded-[16px] bg-card px-5 pb-4 pt-5"
         >
-          <Text className="font-poppins text-[14px] text-muted" maxFontSizeMultiplier={1.2}>
+          <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={1.2}>
             Select time
           </Text>
 
@@ -150,7 +150,7 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
               onPress={() => setMode('hour')}
               accessibilityLabel={`Hour, ${hour12}`}
             />
-            <Text className="font-poppins-bold text-[34px] text-ink" maxFontSizeMultiplier={1.2}>
+            <Text className="font-app-bold text-[34px] text-ink" maxFontSizeMultiplier={1.2}>
               :
             </Text>
             <Field
@@ -209,7 +209,7 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
                   >
                     <Text
                       className={cn(
-                        'font-poppins text-[16px]',
+                        'font-app text-[16px]',
                         mark.selected ? 'text-on-control' : 'text-body',
                       )}
                       maxFontSizeMultiplier={1.1}
@@ -229,10 +229,7 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
               onPress={onCancel}
               className="min-h-11 justify-center rounded-full px-5 active:bg-ink/5"
             >
-              <Text
-                className="font-poppins-medium text-[15px] text-body"
-                maxFontSizeMultiplier={1.2}
-              >
+              <Text className="font-app-medium text-[15px] text-body" maxFontSizeMultiplier={1.2}>
                 Cancel
               </Text>
             </Pressable>
@@ -247,7 +244,7 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
               className="min-h-11 justify-center rounded-full bg-control px-5 active:bg-control-pressed"
             >
               <Text
-                className="font-poppins-semibold text-[15px] text-on-control"
+                className="font-app-semibold text-[15px] text-on-control"
                 maxFontSizeMultiplier={1.2}
               >
                 OK
@@ -280,7 +277,7 @@ function Field({ label, active, onPress, accessibilityLabel }: FieldProps) {
       )}
     >
       <Text
-        className={cn('font-poppins-bold text-[38px]', active ? 'text-on-control' : 'text-ink')}
+        className={cn('font-app-bold text-[38px]', active ? 'text-on-control' : 'text-ink')}
         maxFontSizeMultiplier={1.2}
       >
         {label}

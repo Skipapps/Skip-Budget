@@ -1,12 +1,12 @@
 import { tabLayout } from '@/components/navigation/tab-layout';
 
 /**
- * The tab bar's widths, from the window width alone. "Settings" is the widest label: 62.5pt at
- * 15pt and 75pt at the 1.2x text cap, measured from the shipped Poppins SemiBold.
+ * The tab bar's widths, from the window width alone. "Settings" is the widest label: 64.2pt at
+ * 15pt and 77pt at the 1.2x text cap, measured from the shipped Montserrat SemiBold.
  */
 
-const SETTINGS_DEFAULT = 62.5;
-const SETTINGS_AT_CAP = 75;
+const SETTINGS_DEFAULT = 64.2;
+const SETTINGS_AT_CAP = 77;
 const WIDTHS = Array.from({ length: 111 }, (_, index) => 320 + index); // 320..430
 
 describe('tabLayout', () => {
@@ -36,10 +36,10 @@ describe('tabLayout', () => {
 
   it.each([
     [320, { inner: 194, icon: 32, pill: 98, label: 46, slop: 6 }],
-    [375, { inner: 249, icon: 40, pill: 128, label: 76, slop: 2 }],
-    [390, { inner: 264, icon: 45, pill: 128, label: 76, slop: 0 }],
-    [414, { inner: 288, icon: 48, pill: 128, label: 76, slop: 0 }],
-    [428, { inner: 302, icon: 48, pill: 128, label: 76, slop: 0 }],
+    [375, { inner: 249, icon: 39, pill: 130, label: 78, slop: 3 }],
+    [390, { inner: 264, icon: 44, pill: 130, label: 78, slop: 0 }],
+    [414, { inner: 288, icon: 48, pill: 130, label: 78, slop: 0 }],
+    [428, { inner: 302, icon: 48, pill: 130, label: 78, slop: 0 }],
   ])('lays out a %ipt window as worked out', (width, expected) => {
     expect(tabLayout(width, 4)).toEqual(expected);
   });

@@ -57,17 +57,17 @@ export function ReviewRow({ label, value, required, leading, onPress }: ReviewRo
       )}
 
       <View className="min-w-0 flex-1">
-        <Text className="font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
           {shownLabel}
         </Text>
         <Text
           className={cn(
             'mt-0.5 text-[15px]',
             gap
-              ? 'font-poppins-medium text-ink'
+              ? 'font-app-medium text-ink'
               : missing
-                ? 'font-poppins text-muted'
-                : 'font-poppins-medium text-ink',
+                ? 'font-app text-muted'
+                : 'font-app-medium text-ink',
           )}
           numberOfLines={2}
           maxFontSizeMultiplier={1.4}

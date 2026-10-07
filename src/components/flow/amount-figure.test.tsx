@@ -116,7 +116,8 @@ describe('AmountFigure sizing', () => {
   it('keeps the $ and the % in proportion to the number at every size', async () => {
     const { getByText, rerender } = await render(<AmountFigure value="3000" />);
     expect(sizeOf(getByText('$'))).toBe(28);
-    expect(StyleSheet.flatten(getByText('$').props.style)?.marginTop).toBe(12);
+    // Levels the $'s cap line with the digits': 0.268 x (64 - 28), to the half point.
+    expect(StyleSheet.flatten(getByText('$').props.style)?.marginTop).toBe(9.5);
 
     await rerender(<AmountFigure value="444444444.44" />);
     expect(sizeOf(getByText('$'))).toBe(16);

@@ -18,7 +18,7 @@ export function DateGroupHeader({ date, today, total }: DateGroupHeaderProps) {
   return (
     <View className="w-full flex-row items-center justify-between gap-3 bg-surface pb-1.5 pt-4">
       <Text
-        className="font-poppins-medium text-[13px] uppercase tracking-wide text-muted"
+        className="font-app-medium text-[13px] uppercase tracking-wide text-muted"
         numberOfLines={1}
         maxFontSizeMultiplier={1.3}
       >
@@ -27,7 +27,7 @@ export function DateGroupHeader({ date, today, total }: DateGroupHeaderProps) {
 
       {total === undefined ? null : (
         <Text
-          className="font-poppins text-[13px] text-muted"
+          className="font-app text-[13px] text-muted"
           style={{ color: moneyColor(total) }}
           maxFontSizeMultiplier={1.3}
         >

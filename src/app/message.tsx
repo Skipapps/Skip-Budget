@@ -45,7 +45,7 @@ export default function MessageScreen() {
       </View>
 
       <Text
-        className="mt-6 w-full text-center font-poppins text-[14px] leading-5 text-body"
+        className="mt-6 w-full text-center font-app text-[14px] leading-5 text-body"
         maxFontSizeMultiplier={1.4}
       >
         Know where your money goes. <Strong>Decide where it goes next.</Strong>
@@ -62,11 +62,11 @@ function Pillar({ icon: Icon, title, line }: { icon: LucideIcon; title: string; 
         <Icon size={19} color={colors.accentInk} strokeWidth={1.8} />
       </View>
       <View className="min-w-0 flex-1">
-        <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
           {title}
         </Text>
         <Text
-          className="mt-0.5 font-poppins text-[13px] leading-[19px] text-body"
+          className="mt-0.5 font-app text-[13px] leading-[19px] text-body"
           maxFontSizeMultiplier={1.4}
         >
           {line}
@@ -80,7 +80,7 @@ function QuoteLine({ children }: { children: React.ReactNode }) {
   const colors = useColors();
   return (
     <Text
-      className="font-poppins text-[14px] italic leading-[22px]"
+      className="font-app text-[14px] italic leading-[22px]"
       style={{ color: colors.accentInk }}
       maxFontSizeMultiplier={1.4}
     >

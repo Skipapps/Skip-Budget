@@ -58,13 +58,13 @@ export default function NotificationsScreen() {
       ) : items.length === 0 ? (
         <View className="mt-16 w-full items-center px-4">
           <Text
-            className="text-center font-poppins-semibold text-[17px] text-ink"
+            className="text-center font-app-semibold text-[17px] text-ink"
             maxFontSizeMultiplier={1.4}
           >
             No news yet
           </Text>
           <Text
-            className="mt-2 text-center font-poppins text-[14px] leading-5 text-muted"
+            className="mt-2 text-center font-app text-[14px] leading-5 text-muted"
             maxFontSizeMultiplier={1.4}
           >
             Updates and new features from Skip will show up here.
@@ -98,18 +98,18 @@ function NewsCard({ item }: { item: AnnouncementRow }) {
       </View>
 
       <View className="min-w-0 flex-1">
-        <Text className="font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
           {kind.label} · {date}
         </Text>
         <Text
-          className="mt-1 font-poppins-semibold text-[15px] leading-5 text-ink"
+          className="mt-1 font-app-semibold text-[15px] leading-5 text-ink"
           maxFontSizeMultiplier={1.4}
         >
           {item.title}
         </Text>
         {item.body ? (
           <Text
-            className="mt-1 font-poppins text-[14px] leading-5 text-body"
+            className="mt-1 font-app text-[14px] leading-5 text-body"
             maxFontSizeMultiplier={1.4}
           >
             {item.body}

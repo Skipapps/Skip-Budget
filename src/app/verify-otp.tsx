@@ -75,7 +75,7 @@ export default function VerifyOtpScreen() {
 
       {error ? (
         <Text
-          className="mt-4 w-full text-center font-poppins text-[13px] text-danger"
+          className="mt-4 w-full text-center font-app text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {error}
@@ -84,7 +84,7 @@ export default function VerifyOtpScreen() {
 
       {notice ? (
         <Text
-          className="mt-4 w-full text-center font-poppins text-[13px] text-muted"
+          className="mt-4 w-full text-center font-app text-[13px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
           {notice}

@@ -62,14 +62,14 @@ export function LedgerRow({ entry, sourceLabel, kindLabel, onPress }: LedgerRowP
 
       <View className="min-w-0 flex-1">
         <Text
-          className="font-poppins text-[15px] text-ink"
+          className="font-app text-[15px] text-ink"
           numberOfLines={1}
           maxFontSizeMultiplier={1.4}
         >
           {entry.label}
         </Text>
         <Text
-          className="mt-0.5 font-poppins text-[12px] text-muted"
+          className="mt-0.5 font-app text-[12px] text-muted"
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
@@ -78,7 +78,7 @@ export function LedgerRow({ entry, sourceLabel, kindLabel, onPress }: LedgerRowP
       </View>
 
       <Text
-        className="font-poppins-semibold text-[15px] text-ink"
+        className="font-app-semibold text-[15px] text-ink"
         style={{ color: moneyColor(entry.amount) }}
         maxFontSizeMultiplier={1.4}
       >

@@ -81,14 +81,14 @@ export function LogoOption({ name, domain, onPress, selected, divider = false }:
       <BrandLogo name={name} domain={domain} size={36} className="border border-line" />
       <View className="min-w-0 flex-1">
         <Text
-          className="font-poppins-medium text-[15px] text-ink"
+          className="font-app-medium text-[15px] text-ink"
           numberOfLines={1}
           maxFontSizeMultiplier={1.4}
         >
           {name}
         </Text>
         <Text
-          className="font-poppins text-[12px] text-muted"
+          className="font-app text-[12px] text-muted"
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
@@ -129,7 +129,7 @@ export function ChoiceRow({ label, onPress, selected, expanded, divider = false 
       )}
     >
       <Text
-        className="min-w-0 flex-1 font-poppins-medium text-[15px] text-ink"
+        className="min-w-0 flex-1 font-app-medium text-[15px] text-ink"
         maxFontSizeMultiplier={1.4}
       >
         {label}
@@ -146,7 +146,7 @@ export function LookingLine({ label }: { label: string }) {
   return (
     <View className="min-h-11 w-full flex-row items-center gap-2">
       <ActivityIndicator size="small" color={colors.muted} />
-      <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+      <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
         {label}
       </Text>
     </View>
@@ -168,11 +168,11 @@ export function MatchHeader({ name, domain }: { name: string; domain: string }) 
     <View className="w-full flex-row items-center gap-3 py-3">
       <BrandLogo name={name} domain={domain} size={44} className="border border-line" />
       <View className="min-w-0 flex-1">
-        <Text className="font-poppins text-[15px] text-ink" maxFontSizeMultiplier={1.4}>
-          {LOGO_COPY.looksLike} <Text className="font-poppins-semibold">{name}</Text>
+        <Text className="font-app text-[15px] text-ink" maxFontSizeMultiplier={1.4}>
+          {LOGO_COPY.looksLike} <Text className="font-app-semibold">{name}</Text>
         </Text>
         <Text
-          className="font-poppins text-[13px] text-muted"
+          className="font-app text-[13px] text-muted"
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
@@ -231,7 +231,7 @@ export function WebsiteFinder({ hints, onPick, selectedDomain }: WebsiteFinderPr
             hitSlop={8}
             className="-mr-2 min-h-11 justify-center px-2 active:opacity-60"
           >
-            <Text className="font-poppins-medium text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+            <Text className="font-app-medium text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
               {LOGO_COPY.find}
             </Text>
           </Pressable>
@@ -245,13 +245,13 @@ export function WebsiteFinder({ hints, onPick, selectedDomain }: WebsiteFinderPr
       ) : null}
 
       {answered && lookup.data === null ? (
-        <Text className="mt-2 font-poppins text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
+        <Text className="mt-2 font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
           {FAILURE_MESSAGE}
         </Text>
       ) : null}
 
       {nothingThere ? (
-        <Text className="mt-2 font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+        <Text className="mt-2 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
           {LOGO_COPY.noLogoForWebsite}
         </Text>
       ) : null}
@@ -352,14 +352,14 @@ export function LogoConfirm({ name, hints, noLogo, onChoose }: LogoConfirmProps)
     return (
       <ChoiceCard className="mt-3">
         <Text
-          className="py-3 font-poppins-semibold text-[15px] text-ink"
+          className="py-3 font-app-semibold text-[15px] text-ink"
           accessibilityRole="header"
           maxFontSizeMultiplier={1.4}
         >
           {LOGO_COPY.whichOne}
         </Text>
         {others.length === 0 ? (
-          <Text className="pb-3 font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+          <Text className="pb-3 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
             {LOGO_COPY.noOthers}
           </Text>
         ) : (

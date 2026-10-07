@@ -21,8 +21,8 @@ type TextLinkProps = {
 };
 
 const text: Record<TextLinkVariant, string> = {
-  default: 'font-poppins-medium text-[17px] text-ink',
-  subtle: 'font-poppins text-[14px] text-muted',
+  default: 'font-app-medium text-[17px] text-ink',
+  subtle: 'font-app text-[14px] text-muted',
 };
 
 export function TextLink({

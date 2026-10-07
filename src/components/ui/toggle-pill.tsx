@@ -38,7 +38,7 @@ export function TogglePill<T extends string>({ options, value, onChange }: Toggl
             <Text
               className={cn(
                 'text-[14px]',
-                selected ? 'font-poppins-medium text-on-control' : 'font-poppins text-body',
+                selected ? 'font-app-medium text-on-control' : 'font-app text-body',
               )}
               numberOfLines={1}
               maxFontSizeMultiplier={1.2}

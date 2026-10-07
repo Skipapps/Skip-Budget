@@ -102,11 +102,11 @@ export default function ContactScreen() {
         <View className="w-full">
           <FieldLabel className="mb-2">Your email</FieldLabel>
           <View className="w-full rounded-[10px] border border-line bg-ink/[0.03] px-4 py-3.5">
-            <Text className="font-poppins text-[15px] text-muted" maxFontSizeMultiplier={1.3}>
+            <Text className="font-app text-[15px] text-muted" maxFontSizeMultiplier={1.3}>
               {email ?? 'Signed in'}
             </Text>
           </View>
-          <Text className="mt-1.5 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+          <Text className="mt-1.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
             We reply to the address you signed in with.
           </Text>
         </View>
@@ -121,11 +121,11 @@ export default function ContactScreen() {
             multiline
             textAlignVertical="top"
             maxLength={4000}
-            className="min-h-[160px] w-full rounded-[10px] border border-line bg-card px-4 py-3.5 font-poppins text-[15px] text-ink"
+            className="min-h-[160px] w-full rounded-[10px] border border-line bg-card px-4 py-3.5 font-app text-[15px] text-ink"
             maxFontSizeMultiplier={1.3}
           />
           <Text
-            className="mt-1.5 self-end font-poppins text-[12px] text-muted"
+            className="mt-1.5 self-end font-app text-[12px] text-muted"
             maxFontSizeMultiplier={1.2}
           >
             {message.length} / 4000
@@ -135,7 +135,7 @@ export default function ContactScreen() {
 
       {error ? (
         <Text
-          className="mt-4 w-full text-center font-poppins text-[13px] text-money-out"
+          className="mt-4 w-full text-center font-app text-[13px] text-money-out"
           maxFontSizeMultiplier={1.4}
         >
           {error}

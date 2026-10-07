@@ -52,7 +52,7 @@ export function MultiChoiceChips<T extends string>({
               <Text
                 className={cn(
                   'text-[14px]',
-                  selected ? 'font-poppins-medium text-on-control' : 'font-poppins text-body',
+                  selected ? 'font-app-medium text-on-control' : 'font-app text-body',
                 )}
                 maxFontSizeMultiplier={1.2}
               >
@@ -64,7 +64,7 @@ export function MultiChoiceChips<T extends string>({
       </View>
 
       {values.length === 0 && emptyHint ? (
-        <Text className="mt-2 font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+        <Text className="mt-2 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
           {emptyHint}
         </Text>
       ) : null}

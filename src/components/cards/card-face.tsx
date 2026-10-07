@@ -59,7 +59,7 @@ export function CardFace({
         pointerEvents="none"
         allowFontScaling={false}
         style={{ color: watermark }}
-        className="absolute -bottom-3 left-3 font-poppins-bold text-[80px] leading-[92px]"
+        className="absolute -bottom-3 left-3 font-app-bold text-[80px] leading-[92px]"
       >
         Skip
       </Text>
@@ -68,7 +68,7 @@ export function CardFace({
         <View className="flex-row items-start justify-between gap-3">
           <Text
             style={{ color: title ? foreground : mutedForeground }}
-            className="flex-1 font-poppins-medium text-[14px]"
+            className="flex-1 font-app-medium text-[14px]"
             numberOfLines={1}
             maxFontSizeMultiplier={1.2}
           >
@@ -79,8 +79,8 @@ export function CardFace({
             style={{ color: metaStyle === 'mark' ? foreground : mutedForeground }}
             className={cn(
               metaStyle === 'mark'
-                ? 'font-poppins-bold text-[16px] italic'
-                : 'font-poppins-medium text-[12px]',
+                ? 'font-app-bold text-[16px] italic'
+                : 'font-app-medium text-[12px]',
             )}
           >
             {meta}
@@ -90,7 +90,7 @@ export function CardFace({
         {caption ? (
           <Text
             style={{ color: mutedForeground }}
-            className="mt-1.5 font-poppins-medium text-[10px] uppercase tracking-wide"
+            className="mt-1.5 font-app-medium text-[10px] uppercase tracking-wide"
             numberOfLines={1}
             maxFontSizeMultiplier={1.2}
           >
@@ -102,7 +102,7 @@ export function CardFace({
             which way the money runs. */}
         <Text
           style={{ color: foreground }}
-          className={cn('font-poppins-bold text-[22px]', caption ? 'mt-0.5' : 'mt-1')}
+          className={cn('font-app-bold text-[22px]', caption ? 'mt-0.5' : 'mt-1')}
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}
@@ -113,7 +113,7 @@ export function CardFace({
 
       <Text
         style={{ color: mutedForeground }}
-        className="font-poppins-medium text-[13px]"
+        className="font-app-medium text-[13px]"
         maxFontSizeMultiplier={1.2}
       >
         ••••{'  '}

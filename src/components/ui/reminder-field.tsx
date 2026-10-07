@@ -48,7 +48,7 @@ export function ReminderField({
   return (
     <View className="w-full">
       <FieldLabel className="mb-1">Reminder</FieldLabel>
-      <Text className="mb-2.5 font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+      <Text className="mb-2.5 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
         {unavailable ?? REMINDER_CAPTION[kind]}
       </Text>
 
@@ -75,10 +75,7 @@ export function ReminderField({
               className="mt-3 min-h-10 flex-row items-center gap-2 self-start rounded-full bg-ink/5 px-4 active:bg-ink/10"
             >
               <Clock size={18} color={colors.body} strokeWidth={1.8} />
-              <Text
-                className="font-poppins-medium text-[14px] text-ink"
-                maxFontSizeMultiplier={1.2}
-              >
+              <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
                 at {formatClock(clock.hour, clock.minute)}
               </Text>
             </Pressable>

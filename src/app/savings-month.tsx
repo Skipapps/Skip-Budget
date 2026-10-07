@@ -152,17 +152,14 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
       </Subtitle>
 
       <View className="mt-6 w-full rounded-[16px] border border-line bg-card px-5 py-4">
-        <Text className="font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
           What Skip worked out
         </Text>
-        <Text
-          className="mt-1 font-poppins-semibold text-[20px] text-ink"
-          maxFontSizeMultiplier={1.2}
-        >
+        <Text className="mt-1 font-app-semibold text-[20px] text-ink" maxFontSizeMultiplier={1.2}>
           {formatCurrency(computed)}
         </Text>
         <Text
-          className="mt-1.5 font-poppins text-[12px] leading-[18px] text-muted"
+          className="mt-1.5 font-app text-[12px] leading-[18px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
           {formatCurrency(Number(row.income))} came in and {formatCurrency(Number(row.spent))} went
@@ -191,10 +188,7 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
       </View>
 
       {error ? (
-        <Text
-          className="mt-5 w-full font-poppins text-[13px] text-danger"
-          maxFontSizeMultiplier={1.4}
-        >
+        <Text className="mt-5 w-full font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
           {error}
         </Text>
       ) : null}
@@ -215,7 +209,7 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
           >
             <RotateCcw size={18} color={colors.ink} strokeWidth={1.8} />
             <Text
-              className="font-poppins-medium text-[14px] text-ink"
+              className="font-app-medium text-[14px] text-ink"
               numberOfLines={1}
               maxFontSizeMultiplier={1.4}
             >
@@ -235,8 +229,8 @@ function SavingsMonthForm({ month, row }: { month: string; row: SavingsMonthRow 
           <Text
             className={
               excluded
-                ? 'font-poppins-medium text-[14px] text-ink'
-                : 'font-poppins-medium text-[14px] text-danger'
+                ? 'font-app-medium text-[14px] text-ink'
+                : 'font-app-medium text-[14px] text-danger'
             }
             numberOfLines={1}
             maxFontSizeMultiplier={1.4}

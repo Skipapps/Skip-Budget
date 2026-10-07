@@ -38,7 +38,7 @@ export function ActionPill({
       )}
     >
       <Icon size={18} color={colors.ink} strokeWidth={1.8} />
-      <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
+      <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
         {label}
       </Text>
     </Pressable>

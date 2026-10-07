@@ -206,7 +206,7 @@ function LogoChooser({ kind, id, row }: { kind: LogoKind; id: string; row: LogoR
         <View className="w-full">
           {error ? (
             <Text
-              className="mb-2 w-full text-center font-poppins text-[13px] text-danger"
+              className="mb-2 w-full text-center font-app text-[13px] text-danger"
               maxFontSizeMultiplier={1.4}
             >
               {error}
@@ -233,13 +233,13 @@ function LogoChooser({ kind, id, row }: { kind: LogoKind; id: string; row: LogoR
           <BrandMark name={row.name} domain={pickedDomain} hidden={picked.hidden} size={72} />
         )}
         <Text
-          className="mt-3 text-center font-poppins-semibold text-[17px] text-ink"
+          className="mt-3 text-center font-app-semibold text-[17px] text-ink"
           maxFontSizeMultiplier={1.4}
         >
           {row.name}
         </Text>
         <Text
-          className="mt-0.5 text-center font-poppins text-[13px] text-muted"
+          className="mt-0.5 text-center font-app text-[13px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
           {pickedDomain ?? 'No logo'}
@@ -270,10 +270,7 @@ function LogoChooser({ kind, id, row }: { kind: LogoKind; id: string; row: LogoR
             />
             {open === 'others' ? (
               others.length === 0 ? (
-                <Text
-                  className="pb-3 font-poppins text-[13px] text-muted"
-                  maxFontSizeMultiplier={1.4}
-                >
+                <Text className="pb-3 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
                   {LOGO_COPY.noOthers}
                 </Text>
               ) : (
@@ -318,14 +315,14 @@ function LogoChooser({ kind, id, row }: { kind: LogoKind; id: string; row: LogoR
         <View className="mt-4 w-full items-center pb-6">
           {report === 'sent' ? (
             <Text
-              className="py-3 text-center font-poppins text-[14px] text-muted"
+              className="py-3 text-center font-app text-[14px] text-muted"
               maxFontSizeMultiplier={1.4}
             >
               {LOGO_COPY.reported}
             </Text>
           ) : report === 'sending' ? (
             <Text
-              className="py-3 text-center font-poppins text-[14px] text-muted"
+              className="py-3 text-center font-app text-[14px] text-muted"
               maxFontSizeMultiplier={1.4}
             >
               {LOGO_COPY.reporting}
@@ -334,7 +331,7 @@ function LogoChooser({ kind, id, row }: { kind: LogoKind; id: string; row: LogoR
             <>
               {report === 'failed' ? (
                 <Text
-                  className="pt-3 text-center font-poppins text-[13px] text-danger"
+                  className="pt-3 text-center font-app text-[13px] text-danger"
                   maxFontSizeMultiplier={1.4}
                 >
                   {FAILURE_MESSAGE}

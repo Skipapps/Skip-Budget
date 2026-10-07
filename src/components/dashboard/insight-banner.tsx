@@ -41,14 +41,14 @@ export function InsightBanner({ pro = true, onPress }: InsightBannerProps) {
 
       <View className="min-w-0 flex-1">
         <Text
-          className="font-poppins-medium text-[15px] text-ink"
+          className="font-app-medium text-[15px] text-ink"
           numberOfLines={1}
           maxFontSizeMultiplier={1.4}
         >
           Insights
         </Text>
         <Text
-          className="mt-0.5 font-poppins text-[12px] leading-[17px] text-muted"
+          className="mt-0.5 font-app text-[12px] leading-[17px] text-muted"
           numberOfLines={2}
           maxFontSizeMultiplier={1.3}
         >
@@ -62,7 +62,7 @@ export function InsightBanner({ pro = true, onPress }: InsightBannerProps) {
           importantForAccessibility="no-hide-descendants"
           className="shrink-0 rounded-full bg-accent px-2 py-0.5"
         >
-          <Text allowFontScaling={false} className="font-poppins-bold text-[9px] text-on-control">
+          <Text allowFontScaling={false} className="font-app-bold text-[9px] text-on-control">
             PRO
           </Text>
         </View>

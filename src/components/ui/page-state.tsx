@@ -41,7 +41,7 @@ export function PageState({
       <Illustration source={art} widthRatio={0.58} maxWidth={220} />
 
       <Text
-        className="mt-7 text-center font-poppins-semibold text-[19px] leading-6 text-ink"
+        className="mt-7 text-center font-app-semibold text-[19px] leading-6 text-ink"
         maxFontSizeMultiplier={1.4}
       >
         {title}
@@ -49,7 +49,7 @@ export function PageState({
 
       {message ? (
         <Text
-          className="mt-2.5 max-w-[320px] text-center font-poppins text-[14px] leading-5 text-muted"
+          className="mt-2.5 max-w-[320px] text-center font-app text-[14px] leading-5 text-muted"
           maxFontSizeMultiplier={1.4}
         >
           {message}

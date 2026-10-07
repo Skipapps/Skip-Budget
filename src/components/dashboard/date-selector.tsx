@@ -41,10 +41,10 @@ export function DateSelector({
         className="flex-1 flex-row items-center justify-center gap-2 active:opacity-70"
       >
         <View className="items-center">
-          <Text className="font-poppins-medium text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+          <Text className="font-app-medium text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
             {weekday}
           </Text>
-          <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+          <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
             {date}
           </Text>
         </View>

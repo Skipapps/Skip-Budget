@@ -55,7 +55,7 @@ export function Button({
       {icon ? <View className="mr-3 shrink-0">{icon}</View> : null}
       {/* One line, always: two buttons side by side would differ in height if one wrapped, so the type shrinks. */}
       <Text
-        className={cn('shrink text-center font-poppins-medium text-[17px]', label[variant])}
+        className={cn('shrink text-center font-app-medium text-[17px]', label[variant])}
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.8}

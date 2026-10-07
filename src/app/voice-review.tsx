@@ -292,14 +292,14 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
     <View className="w-full gap-2">
       {failed ? (
         <Text
-          className="w-full text-center font-poppins text-[13px] text-danger"
+          className="w-full text-center font-app text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {FAILURE_MESSAGE}
         </Text>
       ) : hint ? (
         <Text
-          className="w-full text-center font-poppins text-[13px] text-muted"
+          className="w-full text-center font-app text-[13px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
           {hint}
@@ -349,7 +349,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
       <Text
         ref={questionRef}
         accessibilityRole="header"
-        className="mt-6 w-full text-center font-poppins text-[20px] text-muted"
+        className="mt-6 w-full text-center font-app text-[20px] text-muted"
         numberOfLines={2}
         maxFontSizeMultiplier={1.3}
       >
@@ -361,13 +361,10 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
         accessibilityLabel={`You said: ${draft.transcript}`}
         className="mt-4 w-full rounded-[16px] bg-ink/5 px-4 py-3"
       >
-        <Text className="font-poppins-medium text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app-medium text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
           You said
         </Text>
-        <Text
-          className="mt-1 font-poppins text-[15px] leading-6 text-ink"
-          maxFontSizeMultiplier={1.6}
-        >
+        <Text className="mt-1 font-app text-[15px] leading-6 text-ink" maxFontSizeMultiplier={1.6}>
           “{draft.transcript}”
         </Text>
       </View>
@@ -377,10 +374,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
         <ChoiceChips options={KIND_OPTIONS} value={kind} onChange={changeKind} />
       </View>
       {!draft.kindSure && !touched.includes('kind') ? (
-        <Text
-          className="mt-2 w-full font-poppins text-[13px] text-muted"
-          maxFontSizeMultiplier={1.4}
-        >
+        <Text className="mt-2 w-full font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
           Skip guessed this one. Pick another if it’s wrong.
         </Text>
       ) : null}
@@ -390,7 +384,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
           <View className="w-full rounded-[16px] bg-accent/10 p-4">
             <Text
               accessibilityRole="header"
-              className="font-poppins-semibold text-[15px] text-ink"
+              className="font-app-semibold text-[15px] text-ink"
               maxFontSizeMultiplier={1.3}
             >
               Which amount did you mean?
@@ -427,13 +421,13 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
           >
             {/* Ink on the tint: accent ink on accent/10 measured under 4.5:1. */}
             <Text
-              className="text-center font-poppins-medium text-[17px] text-ink"
+              className="text-center font-app-medium text-[17px] text-ink"
               maxFontSizeMultiplier={1.3}
             >
               Tap to add the amount
             </Text>
             <Text
-              className="mt-1 text-center font-poppins text-[13px] text-muted"
+              className="mt-1 text-center font-app text-[13px] text-muted"
               maxFontSizeMultiplier={1.4}
             >
               Skip didn’t catch how much.
@@ -450,10 +444,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
             <AmountFigure value={amountText(entry.amount)} />
             <View className="mt-3 min-h-8 flex-row items-center gap-1.5 rounded-full bg-ink/5 px-3.5">
               <Pencil size={14} color={colors.ink} strokeWidth={1.8} />
-              <Text
-                className="font-poppins-medium text-[13px] text-ink"
-                maxFontSizeMultiplier={1.2}
-              >
+              <Text className="font-app-medium text-[13px] text-ink" maxFontSizeMultiplier={1.2}>
                 Change
               </Text>
             </View>

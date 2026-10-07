@@ -186,7 +186,7 @@ function QuestionCard({ question, answer }: Entry) {
     >
       <View className="w-full flex-row items-center gap-3">
         <Text
-          className="min-w-0 flex-1 font-poppins-semibold text-[15px] leading-[21px] text-ink"
+          className="min-w-0 flex-1 font-app-semibold text-[15px] leading-[21px] text-ink"
           maxFontSizeMultiplier={1.4}
         >
           {question}
@@ -198,7 +198,7 @@ function QuestionCard({ question, answer }: Entry) {
 
       {open ? (
         <Text
-          className="mt-3 font-poppins text-[14px] leading-[21px] text-body"
+          className="mt-3 font-app text-[14px] leading-[21px] text-body"
           maxFontSizeMultiplier={1.5}
         >
           {answer}

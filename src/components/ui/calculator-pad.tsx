@@ -67,17 +67,18 @@ function group(raw: string): string {
 /**
  * Figure size comes from the glyph count, not `adjustsFontSizeToFit` (same iOS first-layout-pass bug
  * and fix as `amountFigureBand` in components/flow/amount-figure): the pad opens over a field that
- * already has a value. Sizes use measured Poppins Bold advances so each band fits an iPhone SE
- * (327pt inside the pad's px-6). `affixTop` = 0.345 x (size - affixSize) levels the "$" cap with the digits.
+ * already has a value. Sizes use measured advances of the app font's bold so each band fits an
+ * iPhone SE (327pt inside the pad's px-6). `affixTop` = 0.268 x (size - affixSize), to the half
+ * point, levels the "$" cap with the digits.
  *
  * There is no digit cap here, so the last band is a floor: past about 18 digits the figure ellipsises.
  */
 const FIGURE_BANDS = [
-  { maxGlyphs: 7, size: 48, affixSize: 24, affixTop: 8 },
-  { maxGlyphs: 10, size: 40, affixSize: 20, affixTop: 7 },
-  { maxGlyphs: 14, size: 32, affixSize: 16, affixTop: 5.5 },
-  { maxGlyphs: 18, size: 26, affixSize: 13, affixTop: 4.5 },
-  { maxGlyphs: Infinity, size: 20, affixSize: 12, affixTop: 3 },
+  { maxGlyphs: 7, size: 48, affixSize: 24, affixTop: 6.5 },
+  { maxGlyphs: 10, size: 40, affixSize: 20, affixTop: 5.5 },
+  { maxGlyphs: 14, size: 32, affixSize: 16, affixTop: 4.5 },
+  { maxGlyphs: 18, size: 26, affixSize: 13, affixTop: 3.5 },
+  { maxGlyphs: Infinity, size: 20, affixSize: 12, affixTop: 2 },
 ];
 
 export function calculatorFigureBand(display: string) {
@@ -218,7 +219,7 @@ export function CalculatorPad({
             <ChevronLeft size={24} color={colors.ink} strokeWidth={2} />
           </Pressable>
           <Text
-            className="flex-1 pr-11 text-center font-poppins-semibold text-[18px] text-ink"
+            className="flex-1 pr-11 text-center font-app-semibold text-[18px] text-ink"
             maxFontSizeMultiplier={1.2}
           >
             {title}
@@ -227,7 +228,7 @@ export function CalculatorPad({
 
         <View className="flex-1 items-end justify-center px-6">
           <Text
-            className="font-poppins text-[15px] text-muted"
+            className="font-app text-[15px] text-muted"
             numberOfLines={1}
             maxFontSizeMultiplier={1.2}
           >
@@ -241,14 +242,14 @@ export function CalculatorPad({
             <Text
               allowFontScaling={false}
               style={{ fontSize: figure.affixSize, marginTop: figure.affixTop }}
-              className={cn('font-poppins-bold', isEmpty ? 'text-muted' : 'text-body')}
+              className={cn('font-app-bold', isEmpty ? 'text-muted' : 'text-body')}
             >
               $
             </Text>
             <Text
               allowFontScaling={false}
               style={{ fontSize: figure.size }}
-              className={cn('font-poppins-bold', isEmpty ? 'text-muted' : 'text-ink')}
+              className={cn('font-app-bold', isEmpty ? 'text-muted' : 'text-ink')}
               numberOfLines={1}
             >
               {shownFigure}
@@ -287,7 +288,7 @@ export function CalculatorPad({
                         <Text
                           allowFontScaling={false}
                           className={cn(
-                            'font-poppins text-[24px]',
+                            'font-app text-[24px]',
                             isEquals || isActiveOperator ? 'text-on-control' : 'text-ink',
                           )}
                         >

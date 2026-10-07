@@ -222,15 +222,12 @@ export default function RemindersScreen() {
         <View className="mt-8 w-full">
           <View className="flex-row items-center gap-2">
             <ReceiptText size={18} color={colors.muted} strokeWidth={1.8} />
-            <Text
-              className="font-poppins-semibold text-[17px] text-ink"
-              maxFontSizeMultiplier={1.3}
-            >
+            <Text className="font-app-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
               Receipts
             </Text>
           </View>
 
-          <Text className="mt-1 font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+          <Text className="mt-1 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
             Every day, so nothing gets forgotten.
           </Text>
 
@@ -239,14 +236,14 @@ export default function RemindersScreen() {
               <View className="w-full flex-row items-center gap-3">
                 <View className="flex-1">
                   <Text
-                    className="font-poppins-semibold text-[15px] text-ink"
+                    className="font-app-semibold text-[15px] text-ink"
                     numberOfLines={1}
                     maxFontSizeMultiplier={1.3}
                   >
                     Daily receipts reminder
                   </Text>
                   <Text
-                    className="font-poppins text-[13px] text-muted"
+                    className="font-app text-[13px] text-muted"
                     numberOfLines={2}
                     maxFontSizeMultiplier={1.3}
                   >
@@ -289,7 +286,7 @@ export default function RemindersScreen() {
                   >
                     <Clock size={18} color={colors.body} strokeWidth={1.8} />
                     <Text
-                      className="font-poppins-medium text-[14px] text-body"
+                      className="font-app-medium text-[14px] text-body"
                       maxFontSizeMultiplier={1.2}
                     >
                       {formatClock(receiptClock.hour, receiptClock.minute)}
@@ -322,17 +319,14 @@ export default function RemindersScreen() {
               <View className="flex-row items-center gap-2">
                 <group.icon size={18} color={colors.muted} strokeWidth={1.8} />
                 <Text
-                  className="font-poppins-semibold text-[17px] text-ink"
+                  className="font-app-semibold text-[17px] text-ink"
                   maxFontSizeMultiplier={1.3}
                 >
                   {group.title}
                 </Text>
               </View>
 
-              <Text
-                className="mt-1 font-poppins text-[13px] text-muted"
-                maxFontSizeMultiplier={1.3}
-              >
+              <Text className="mt-1 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
                 {REMINDER_CAPTION[group.items[0].kind]}
               </Text>
 
@@ -353,14 +347,14 @@ export default function RemindersScreen() {
                       <View className="w-full flex-row items-center gap-3">
                         <View className="flex-1">
                           <Text
-                            className="font-poppins-semibold text-[15px] text-ink"
+                            className="font-app-semibold text-[15px] text-ink"
                             numberOfLines={1}
                             maxFontSizeMultiplier={1.3}
                           >
                             {item.label}
                           </Text>
                           <Text
-                            className="font-poppins text-[13px] text-muted"
+                            className="font-app text-[13px] text-muted"
                             numberOfLines={1}
                             maxFontSizeMultiplier={1.3}
                           >
@@ -370,7 +364,7 @@ export default function RemindersScreen() {
 
                         {item.blocked ? (
                           <Text
-                            className="max-w-[45%] text-right font-poppins text-[12px] text-muted"
+                            className="max-w-[45%] text-right font-app text-[12px] text-muted"
                             maxFontSizeMultiplier={1.2}
                           >
                             {item.blocked}
@@ -421,8 +415,8 @@ export default function RemindersScreen() {
                                   className={cn(
                                     'text-[14px]',
                                     selected
-                                      ? 'font-poppins-medium text-on-control'
-                                      : 'font-poppins text-body',
+                                      ? 'font-app-medium text-on-control'
+                                      : 'font-app text-body',
                                   )}
                                   maxFontSizeMultiplier={1.2}
                                 >
@@ -447,7 +441,7 @@ export default function RemindersScreen() {
                           >
                             <Clock size={18} color={colors.body} strokeWidth={1.8} />
                             <Text
-                              className="font-poppins-medium text-[14px] text-body"
+                              className="font-app-medium text-[14px] text-body"
                               maxFontSizeMultiplier={1.2}
                             >
                               {formatClock(clock.hour, clock.minute)}
@@ -497,7 +491,7 @@ export default function RemindersScreen() {
         <View className="mt-8 w-full flex-row items-start gap-3 rounded-[16px] bg-ink/5 px-4 py-3.5">
           <Bell size={18} color={colors.muted} strokeWidth={1.8} />
           <Text
-            className="flex-1 font-poppins text-[13px] leading-[19px] text-muted"
+            className="flex-1 font-app text-[13px] leading-[19px] text-muted"
             maxFontSizeMultiplier={1.4}
           >
             Reminders arrive as a notification. Turn them off for Skip in your phone&apos;s settings

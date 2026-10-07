@@ -55,7 +55,7 @@ export function PageHeader({
       <Text
         ref={titleRef}
         accessibilityRole="header"
-        className="flex-1 px-2 text-center font-poppins-bold text-[20px] text-ink"
+        className="flex-1 px-2 text-center font-app-bold text-[20px] text-ink"
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.8}

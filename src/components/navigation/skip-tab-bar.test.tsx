@@ -130,8 +130,8 @@ describe('SkipTabBar — widths come from the window, not the label', () => {
     const { props } = renderBar(undefined, undefined, SETTINGS);
     const screen = await render(<SkipTabBar {...props} />);
 
-    // 249pt inside the bar: three 40pt icons and a 128pt pill.
-    expect(widths(screen)).toEqual([40, 40, 40, 128]);
+    // 249pt inside the bar: three 39pt icons and a 130pt pill.
+    expect(widths(screen)).toEqual([39, 39, 39, 130]);
     for (const route of routes) {
       const style = flat(screen.getByLabelText(titles[route.name]).props.style);
       expect(style).toEqual(expect.objectContaining({ height: 48, flexShrink: 0 }));
@@ -153,7 +153,7 @@ describe('SkipTabBar — widths come from the window, not the label', () => {
     const { getByText } = await render(<SkipTabBar {...props} />);
 
     const label = getByText('Settings');
-    expect(flat(label.props.style).maxWidth).toBe(76);
+    expect(flat(label.props.style).maxWidth).toBe(78);
     expect(label.props.numberOfLines).toBe(1);
     expect(label.props.adjustsFontSizeToFit).toBe(true);
     expect(label.props.minimumFontScale).toBe(0.6);
@@ -177,7 +177,7 @@ describe('SkipTabBar — widths come from the window, not the label', () => {
     const { props } = renderBar(undefined, undefined, SETTINGS);
     const screen = await render(<SkipTabBar {...props} />);
 
-    expect(widths(screen)).toEqual([48, 48, 48, 128]);
+    expect(widths(screen)).toEqual([48, 48, 48, 130]);
   });
 
   const pairs = routes.flatMap((from, a) =>
@@ -187,7 +187,7 @@ describe('SkipTabBar — widths come from the window, not the label', () => {
   it.each(pairs)(
     'switching from %s to %s lays the bar out as if it opened there, every time',
     async (_from, to, a, b) => {
-      const expected = routes.map((_, index) => (index === b ? 128 : 40));
+      const expected = routes.map((_, index) => (index === b ? 130 : 39));
       const at = (index: number) => renderBar(undefined, undefined, index).props;
 
       const screen = await render(<SkipTabBar {...at(a)} />);
@@ -195,7 +195,7 @@ describe('SkipTabBar — widths come from the window, not the label', () => {
         await screen.rerender(<SkipTabBar {...at(b)} />);
         expect(widths(screen)).toEqual(expected);
         expect(screen.getByText(titles[to])).toBeTruthy();
-        expect(flat(screen.getByText(titles[to]).props.style).maxWidth).toBe(76);
+        expect(flat(screen.getByText(titles[to]).props.style).maxWidth).toBe(78);
         await screen.rerender(<SkipTabBar {...at(a)} />);
       }
 

@@ -56,7 +56,7 @@ export function TextField({
       <View className="mb-2 flex-row items-baseline">
         <FieldLabel>{label}</FieldLabel>
         {optional ? (
-          <Text className="ml-1.5 font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+          <Text className="ml-1.5 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
             (optional)
           </Text>
         ) : null}
@@ -79,7 +79,7 @@ export function TextField({
           secureTextEntry={isPassword && !revealed}
           multiline={multiline}
           textAlignVertical={multiline ? 'top' : 'center'}
-          className={cn('flex-1 py-4 font-poppins text-[16px] text-ink', multiline && 'min-h-20')}
+          className={cn('flex-1 py-4 font-app text-[16px] text-ink', multiline && 'min-h-20')}
           maxFontSizeMultiplier={1.5}
           {...inputProps}
           // After the spread, and calling through: a caller's onBlur would otherwise replace the one
@@ -106,10 +106,7 @@ export function TextField({
       </View>
 
       {error ? (
-        <Text
-          className="ml-5 mt-1.5 font-poppins text-[13px] text-danger"
-          maxFontSizeMultiplier={1.4}
-        >
+        <Text className="ml-5 mt-1.5 font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
           {error}
         </Text>
       ) : null}

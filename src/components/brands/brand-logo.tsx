@@ -97,7 +97,7 @@ export function BrandLogo({ name, domain, size = 40, className, fallback }: Bran
     >
       {showFallback ? (
         <Text
-          className="font-poppins font-semibold"
+          className="font-app font-semibold"
           style={{
             fontSize: size * 0.36,
             color: isLightColor(background) ? '#161616' : '#FFFFFF',

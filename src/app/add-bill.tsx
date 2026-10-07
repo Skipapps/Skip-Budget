@@ -501,10 +501,7 @@ function BillForm({
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
-            <Text
-              className="font-poppins-medium text-[15px] text-danger"
-              maxFontSizeMultiplier={1.4}
-            >
+            <Text className="font-app-medium text-[15px] text-danger" maxFontSizeMultiplier={1.4}>
               {deleteBill.isPending ? 'Deleting…' : 'Delete bill'}
             </Text>
           </Pressable>
@@ -589,10 +586,7 @@ function BillForm({
           />
 
           {stepError ? (
-            <Text
-              className="w-full font-poppins text-[13px] text-danger"
-              maxFontSizeMultiplier={1.4}
-            >
+            <Text className="w-full font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
               {stepError}
             </Text>
           ) : null}
@@ -637,7 +631,7 @@ function BillForm({
                   onPress={() => setEndDate(null)}
                   className="mt-1.5 self-start rounded-full px-1 py-1 active:opacity-60"
                 >
-                  <Text className="ml-4 font-poppins text-[13px] text-muted">
+                  <Text className="ml-4 font-app text-[13px] text-muted">
                     Clear — make it ongoing
                   </Text>
                 </Pressable>

@@ -37,14 +37,11 @@ export default function ProFeatureScreen() {
               <Check size={14} color={colors.onControl} strokeWidth={2} />
             </View>
             <View className="min-w-0 flex-1">
-              <Text
-                className="font-poppins-semibold text-[15px] text-ink"
-                maxFontSizeMultiplier={1.3}
-              >
+              <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
                 {benefit.title}
               </Text>
               <Text
-                className="mt-0.5 font-poppins text-[13px] leading-[19px] text-muted"
+                className="mt-0.5 font-app text-[13px] leading-[19px] text-muted"
                 maxFontSizeMultiplier={1.4}
               >
                 {benefit.detail}
@@ -57,10 +54,10 @@ export default function ProFeatureScreen() {
       <View className="mt-6 w-full flex-row items-center gap-3 rounded-[16px] border border-line bg-card px-4 py-3.5">
         <Lock size={18} color={colors.muted} strokeWidth={1.8} />
         <View className="min-w-0 flex-1">
-          <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.3}>
+          <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.3}>
             Part of Skip Pro
           </Text>
-          <Text className="mt-0.5 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+          <Text className="mt-0.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
             With everything else Pro unlocks
           </Text>
         </View>
@@ -74,7 +71,7 @@ export default function ProFeatureScreen() {
           onPress={() => router.back()}
           className="min-h-11 w-full items-center justify-center rounded-full active:bg-ink/5"
         >
-          <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+          <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
             or {PRO_YEARLY_LABEL} · Not now
           </Text>
         </Pressable>

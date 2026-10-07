@@ -5,12 +5,13 @@ module.exports = {
   theme: {
     extend: {
       // React Native cannot synthesize weights from one file, so every weight is its own family.
-      // Use these instead of font-bold/font-semibold.
+      // Use these instead of font-bold/font-semibold. The names are the faces src/theme/fonts.ts
+      // loads; the tokens say nothing about the typeface, so changing it touches only those two.
       fontFamily: {
-        poppins: ['Poppins_400Regular'],
-        'poppins-medium': ['Poppins_500Medium'],
-        'poppins-semibold': ['Poppins_600SemiBold'],
-        'poppins-bold': ['Poppins_700Bold'],
+        app: ['Montserrat_400Regular'],
+        'app-medium': ['Montserrat_500Medium'],
+        'app-semibold': ['Montserrat_600SemiBold'],
+        'app-bold': ['Montserrat_700Bold'],
       },
       // Every colour is a CSS variable so one provider can repaint the app at runtime (light/dark)
       // without a className changing. Values live in src/theme/palette.ts; src/global.css only

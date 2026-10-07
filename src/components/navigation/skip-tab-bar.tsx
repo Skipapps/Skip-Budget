@@ -110,7 +110,7 @@ export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) 
                 ) : null}
                 {focused ? (
                   <Text
-                    className="font-poppins-semibold text-[15px] text-on-control"
+                    className="font-app-semibold text-[15px] text-on-control"
                     // A ceiling, not a share of free space: the label's room is fixed per window.
                     style={{ maxWidth: layout.label }}
                     numberOfLines={1}

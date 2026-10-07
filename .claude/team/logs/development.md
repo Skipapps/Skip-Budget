@@ -3778,3 +3778,28 @@ read every render. role/state/label are unchanged.
 (375/360pt) let hit slop overlap, so icon targets are about 40/35pt wide. active:opacity-60 now also dims the selected
 pill. Home and Cards sit with about 15pt of air each side in the fixed 128pt pill. If speech is unavailable the
 VoiceFab renders nothing, so the bar only gets wider.
+
+### 2026-10-06 — Dana — the app font is Montserrat (Founder's request)
+
+**Outcome:** Done except the tab bar's two files, held for the coordinator's go (patch prepared and verified in a
+scratch copy). Nothing committed. tsc 0; full `jest --ci` 111/111 suites, 1936/1936; prettier clean on the 111
+changed files; eslint `--no-cache` src = 19 (= baseline; the 8 errors are add-account/add-card refs, unchanged).
+
+- **Font:** `@expo-google-fonts/montserrat` 0.4.2 (static faces; variable fonts need SDK 58). New
+  `src/theme/fonts.ts` (APP_FONTS) is what `_layout.tsx` loads, `useFonts` now from `expo-font`; same splash gating
+  and error fallback. Poppins dropped from package.json and the lock with `--package-lock-only` (lock diff: those
+  two packages only). npm replaced this worktree's node_modules symlink with a real install (1.1 GB); the live
+  tree's node_modules was not touched and has no Montserrat.
+- **Tokens:** `font-app`, `font-app-medium`, `font-app-semibold`, `font-app-bold` (not `font-body`: the app has a
+  `text-body` colour). Codemod over 103 files, 420 tokens; every file proven equal to the committed one with only
+  the tokens swapped, after removing whitespace (prettier re-wrapped some shortened lines). `src/__tests__/theme/fonts.test.ts`
+  pins the map against the loaded faces and fails on any family class the map lacks (a PENDING entry holds the
+  tab bar until the go, and fails once it has moved).
+- **Metrics (measured from the TTFs):** iOS line box 1.219em vs 1.500em (text without an explicit line height is
+  about 19% shorter); cap line 0.268em below line top vs 0.345em, so the "$" levelling in AmountFigure and the
+  calculator pad was off by up to 2.5pt: affixTop recomputed (64pt band 12 → 9.5, etc.). Strings a median 2-3%
+  wider. Nothing clips at 375/390/428: figure bands max 311pt of 333; destination labels, money tiles fit; Quick
+  add "Subscription" now also uses its shrink-to-fit at 428pt (77.2 vs 76.1pt room). Tab bar: "Settings" 64.2pt
+  (77.0 at 1.2x) > 76pt room, so PILL_MAX 128 → 130 is proposed (whole at the cap from 360pt; 0 overflow in Yoga).
+
+**Not verified:** on a device: the look of the shorter line boxes, the "$" alignment, Metro needs `--clear`.

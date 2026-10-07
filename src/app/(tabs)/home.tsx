@@ -291,7 +291,7 @@ function Section({
         // A failed week would look like an empty one, so the failure says so itself.
         <View className="mt-2 w-full items-center">
           <Text
-            className="w-full text-center font-poppins text-[14px] text-muted"
+            className="w-full text-center font-app text-[14px] text-muted"
             maxFontSizeMultiplier={1.4}
           >
             {FAILURE_MESSAGE}
@@ -304,7 +304,7 @@ function Section({
         </View>
       ) : entries.length === 0 ? (
         <Text
-          className="w-full py-6 text-center font-poppins text-[14px] text-muted"
+          className="w-full py-6 text-center font-app text-[14px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
           {empty}

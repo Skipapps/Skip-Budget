@@ -162,7 +162,7 @@ export default function TransactionsScreen() {
         </Pressable>
 
         <Text
-          className="flex-1 text-center font-poppins-semibold text-[15px] text-ink"
+          className="flex-1 text-center font-app-semibold text-[15px] text-ink"
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
@@ -208,7 +208,7 @@ export default function TransactionsScreen() {
             <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
               <Text
                 allowFontScaling={false}
-                className="font-poppins-medium text-[11px] text-on-control"
+                className="font-app-medium text-[11px] text-on-control"
               >
                 {activeCount}
               </Text>
@@ -260,14 +260,14 @@ export default function TransactionsScreen() {
               ) : (
                 <View className="w-full flex-row items-center justify-between gap-3 bg-surface pb-1.5 pt-4">
                   <Text
-                    className="font-poppins-medium text-[13px] uppercase tracking-wide text-muted"
+                    className="font-app-medium text-[13px] uppercase tracking-wide text-muted"
                     numberOfLines={1}
                     maxFontSizeMultiplier={1.3}
                   >
                     {group.label}
                   </Text>
                   <Text
-                    className="font-poppins text-[13px] text-muted"
+                    className="font-app text-[13px] text-muted"
                     style={{ color: moneyColor(group.total) }}
                     maxFontSizeMultiplier={1.3}
                   >

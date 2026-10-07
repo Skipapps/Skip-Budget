@@ -56,13 +56,13 @@ export default function WhatSkipCanDoScreen() {
               </View>
               <View className="min-w-0 flex-1">
                 <Text
-                  className="font-poppins-semibold text-[15px] text-ink"
+                  className="font-app-semibold text-[15px] text-ink"
                   maxFontSizeMultiplier={1.3}
                 >
                   {item.title}
                 </Text>
                 <Text
-                  className="mt-1 font-poppins text-[12px] leading-[18px] text-muted"
+                  className="mt-1 font-app text-[12px] leading-[18px] text-muted"
                   maxFontSizeMultiplier={1.4}
                 >
                   {item.detail}

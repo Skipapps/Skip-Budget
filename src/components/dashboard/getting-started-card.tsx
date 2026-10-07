@@ -21,7 +21,7 @@ export function GettingStartedCard() {
       <View className="w-full flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">
           <SectionHeading>Getting started</SectionHeading>
-          <Text className="mt-0.5 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+          <Text className="mt-0.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
             {doneCount} of {steps.length} done
           </Text>
         </View>
@@ -73,8 +73,8 @@ export function GettingStartedCard() {
                   <Text
                     className={
                       step.done
-                        ? 'shrink font-poppins text-[14px] text-muted line-through'
-                        : 'shrink font-poppins-medium text-[14px] text-ink'
+                        ? 'shrink font-app text-[14px] text-muted line-through'
+                        : 'shrink font-app-medium text-[14px] text-ink'
                     }
                     numberOfLines={2}
                     maxFontSizeMultiplier={1.3}
@@ -82,10 +82,7 @@ export function GettingStartedCard() {
                     {step.title}
                   </Text>
                   {step.optional && !step.done ? (
-                    <Text
-                      className="font-poppins text-[11px] text-muted"
-                      maxFontSizeMultiplier={1.2}
-                    >
+                    <Text className="font-app text-[11px] text-muted" maxFontSizeMultiplier={1.2}>
                       Optional
                     </Text>
                   ) : null}

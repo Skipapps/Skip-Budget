@@ -99,13 +99,10 @@ function LoanScheduleScreenInner() {
       {years.map((year) => (
         <Fragment key={year.year}>
           <View className="mt-8 w-full flex-row items-baseline justify-between gap-3">
-            <Text
-              className="font-poppins-semibold text-[17px] text-ink"
-              maxFontSizeMultiplier={1.3}
-            >
+            <Text className="font-app-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
               {year.year}
             </Text>
-            <Text className="font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+            <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
               {formatCurrency(year.interest)} interest · {formatCurrency(year.principal)} off
             </Text>
           </View>
@@ -119,7 +116,7 @@ function LoanScheduleScreenInner() {
       ))}
 
       <Text
-        className="mb-10 mt-8 w-full text-center font-poppins text-[12px] leading-[18px] text-muted"
+        className="mb-10 mt-8 w-full text-center font-app text-[12px] leading-[18px] text-muted"
         maxFontSizeMultiplier={1.4}
       >
         {BASIS_FOOTNOTES[basis]} Assumes every payment lands on time and the rate never moves —
@@ -141,13 +138,13 @@ function PaymentRow({ row }: { row: ScheduleRow }) {
     >
       <View className="w-full flex-row items-baseline justify-between gap-3">
         <Text
-          className="font-poppins-medium text-[14px] text-ink"
+          className="font-app-medium text-[14px] text-ink"
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
           {row.number}. {formatFullDate(new Date(`${row.date}T00:00:00`))}
         </Text>
-        <Text className="font-poppins-semibold text-[14px] text-ink" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app-semibold text-[14px] text-ink" maxFontSizeMultiplier={1.3}>
           {formatCurrency(row.payment)}
         </Text>
       </View>
@@ -158,11 +155,11 @@ function PaymentRow({ row }: { row: ScheduleRow }) {
       </View>
 
       <View className="mt-1.5 w-full flex-row items-center justify-between gap-3">
-        <Text className="font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
           {formatCurrency(row.principal)} off · {formatCurrency(row.interest)} interest
           {row.extra > 0 ? ` · ${formatCurrency(row.extra)} extra` : ` · ${row.days}d`}
         </Text>
-        <Text className="font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
           {formatCurrency(row.balance)} left
         </Text>
       </View>

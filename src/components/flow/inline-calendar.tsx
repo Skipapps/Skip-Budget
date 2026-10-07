@@ -77,7 +77,7 @@ export function DayGrid({
     <View role="grid" className="w-full flex-row flex-wrap">
       {WEEKDAY_INITIALS.map((initial, index) => (
         <View key={`${initial}-${index}`} className="w-[14.28%] items-center py-1">
-          <Text allowFontScaling={false} className="font-poppins-medium text-[11px] text-muted">
+          <Text allowFontScaling={false} className="font-app-medium text-[11px] text-muted">
             {initial}
           </Text>
         </View>
@@ -124,12 +124,12 @@ export function DayGrid({
                 className={cn(
                   'text-[15px]',
                   blocked
-                    ? 'font-poppins text-muted/40'
+                    ? 'font-app text-muted/40'
                     : selected
-                      ? 'font-poppins-semibold text-on-control'
+                      ? 'font-app-semibold text-on-control'
                       : isToday
-                        ? 'font-poppins-medium text-accent-ink'
-                        : 'font-poppins text-ink',
+                        ? 'font-app-medium text-accent-ink'
+                        : 'font-app text-ink',
                 )}
               >
                 {dayNumber}
@@ -193,7 +193,7 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
           className="min-h-11 shrink flex-row items-center justify-center rounded-full px-4 active:bg-ink/5"
         >
           <Text
-            className="font-poppins-semibold text-[17px] text-ink"
+            className="font-app-semibold text-[17px] text-ink"
             numberOfLines={1}
             maxFontSizeMultiplier={1.3}
           >
@@ -225,10 +225,7 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
             >
               <ChevronLeft size={22} color={colors.ink} strokeWidth={2} />
             </Pressable>
-            <Text
-              className="font-poppins-semibold text-[17px] text-ink"
-              maxFontSizeMultiplier={1.3}
-            >
+            <Text className="font-app-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
               {year}
             </Text>
             <Pressable
@@ -266,9 +263,7 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
                     <Text
                       className={cn(
                         'text-[15px]',
-                        selected
-                          ? 'font-poppins-semibold text-on-control'
-                          : 'font-poppins text-ink',
+                        selected ? 'font-app-semibold text-on-control' : 'font-app text-ink',
                       )}
                       maxFontSizeMultiplier={1.2}
                     >

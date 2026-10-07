@@ -76,11 +76,11 @@ export function AppLockGate({ children }: { children: ReactNode }) {
       </View>
 
       <View className="items-center gap-2">
-        <Text className="font-poppins-bold text-[22px] text-ink" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app-bold text-[22px] text-ink" maxFontSizeMultiplier={1.3}>
           Skip is locked
         </Text>
         <Text
-          className="text-center font-poppins text-[14px] leading-[21px] text-muted"
+          className="text-center font-app text-[14px] leading-[21px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
           Your budget is behind Face ID on this phone.
@@ -94,10 +94,7 @@ export function AppLockGate({ children }: { children: ReactNode }) {
         onPress={() => void prompt()}
         className="rounded-full bg-control px-7 py-3.5 active:bg-control-pressed"
       >
-        <Text
-          className="font-poppins-medium text-[15px] text-on-control"
-          maxFontSizeMultiplier={1.2}
-        >
+        <Text className="font-app-medium text-[15px] text-on-control" maxFontSizeMultiplier={1.2}>
           {checking ? 'Waiting…' : 'Unlock'}
         </Text>
       </Pressable>

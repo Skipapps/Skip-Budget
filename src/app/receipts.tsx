@@ -127,10 +127,7 @@ export default function ReceiptsScreen() {
       ]}
     >
       {scanError ? (
-        <Text
-          className="mt-3 w-full font-poppins text-[13px] text-danger"
-          maxFontSizeMultiplier={1.4}
-        >
+        <Text className="mt-3 w-full font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
           {scanError}
         </Text>
       ) : null}
@@ -153,7 +150,7 @@ export default function ReceiptsScreen() {
                 <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
                   <Text
                     allowFontScaling={false}
-                    className="font-poppins-medium text-[11px] text-on-control"
+                    className="font-app-medium text-[11px] text-on-control"
                   >
                     {activeCount}
                   </Text>
@@ -165,16 +162,13 @@ export default function ReceiptsScreen() {
           <View className="mt-5 w-full flex-row items-center justify-between">
             <View className="flex-row items-center gap-3">
               <RangeDropdown value={rangeKey} onChange={setRangeKey} />
-              <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+              <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
                 {isLoading
                   ? 'Loading'
                   : `${visible.length} ${visible.length === 1 ? 'receipt' : 'receipts'}`}
               </Text>
             </View>
-            <Text
-              className="font-poppins-semibold text-[15px] text-ink"
-              maxFontSizeMultiplier={1.3}
-            >
+            <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
               {isLoading ? '' : formatCurrency(total)}
             </Text>
           </View>

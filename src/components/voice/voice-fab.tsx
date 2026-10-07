@@ -83,7 +83,7 @@ export function VoiceFab() {
           pointerEvents="none"
           className="absolute -right-1 -top-1 rounded-full border-2 border-surface bg-accent px-2 py-0.5"
         >
-          <Text allowFontScaling={false} className="font-poppins-bold text-[9px] text-on-control">
+          <Text allowFontScaling={false} className="font-app-bold text-[9px] text-on-control">
             PRO
           </Text>
         </View>

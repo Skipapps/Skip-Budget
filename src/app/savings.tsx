@@ -69,11 +69,11 @@ export default function SavingsScreen() {
       {months.length > 0 ? (
         <>
           <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
-            <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+            <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
               Saved so far
             </Text>
             <Text
-              className="mt-1 font-poppins-bold text-[38px] text-ink"
+              className="mt-1 font-app-bold text-[38px] text-ink"
               numberOfLines={1}
               adjustsFontSizeToFit
               maxFontSizeMultiplier={1.2}
@@ -81,7 +81,7 @@ export default function SavingsScreen() {
               {formatCurrency(total)}
             </Text>
             <Text
-              className="mt-1 text-center font-poppins text-[13px] text-muted"
+              className="mt-1 text-center font-app text-[13px] text-muted"
               maxFontSizeMultiplier={1.3}
             >
               across {kept} {kept === 1 ? 'month' : 'months'} that ended with something left
@@ -131,7 +131,7 @@ function MonthRow({ row, onPress }: { row: MonthlySavingRow; onPress: () => void
       <View className="min-w-0 flex-1">
         <View className="w-full flex-row items-baseline justify-between gap-3">
           <Text
-            className="min-w-0 flex-1 font-poppins-medium text-[15px] text-ink"
+            className="min-w-0 flex-1 font-app-medium text-[15px] text-ink"
             numberOfLines={1}
             maxFontSizeMultiplier={1.3}
           >
@@ -141,10 +141,10 @@ function MonthRow({ row, onPress }: { row: MonthlySavingRow; onPress: () => void
             // Money colours, never the accent: the sign must read at a glance.
             className={
               excluded
-                ? 'font-poppins text-[14px] text-muted line-through'
+                ? 'font-app text-[14px] text-muted line-through'
                 : over
-                  ? 'font-poppins-semibold text-[15px] text-money-out'
-                  : 'font-poppins-semibold text-[15px] text-money-in'
+                  ? 'font-app-semibold text-[15px] text-money-out'
+                  : 'font-app-semibold text-[15px] text-money-in'
             }
             maxFontSizeMultiplier={1.4}
           >
@@ -153,7 +153,7 @@ function MonthRow({ row, onPress }: { row: MonthlySavingRow; onPress: () => void
         </View>
 
         <Text
-          className="mt-1.5 font-poppins text-[12px] leading-[18px] text-muted"
+          className="mt-1.5 font-app text-[12px] leading-[18px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
           {explain}

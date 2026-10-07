@@ -23,7 +23,7 @@ export function LedgerSummary({ totals }: { totals: LedgerTotals }) {
     <View style={shadows.card} className="w-full rounded-[20px] bg-card p-5">
       <View className="w-full flex-row items-center justify-between gap-3">
         <Text
-          className="min-w-0 flex-1 font-poppins text-[13px] text-muted"
+          className="min-w-0 flex-1 font-app text-[13px] text-muted"
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
@@ -32,7 +32,7 @@ export function LedgerSummary({ totals }: { totals: LedgerTotals }) {
 
         <View className="shrink-0 rounded-full bg-ink/5 px-3 py-1.5">
           <Text
-            className="font-poppins-medium text-[12px] text-body"
+            className="font-app-medium text-[12px] text-body"
             numberOfLines={1}
             allowFontScaling={false}
           >
@@ -44,7 +44,7 @@ export function LedgerSummary({ totals }: { totals: LedgerTotals }) {
       </View>
 
       <Text
-        className="mt-1 font-poppins-bold text-[26px] text-ink"
+        className="mt-1 font-app-bold text-[26px] text-ink"
         style={{ color: moneyColor(totals.net) }}
         numberOfLines={1}
         adjustsFontSizeToFit
@@ -84,7 +84,7 @@ function Stat({ label, icon: Icon, amount }: { label: string; icon: LucideIcon; 
           <Icon size={13} color={colors.body} strokeWidth={1.8} />
         </View>
         <Text
-          className="shrink font-poppins-medium text-[12px] text-body"
+          className="shrink font-app-medium text-[12px] text-body"
           numberOfLines={1}
           maxFontSizeMultiplier={1.2}
         >
@@ -95,7 +95,7 @@ function Stat({ label, icon: Icon, amount }: { label: string; icon: LucideIcon; 
       {/* No adjustsFontSizeToFit here: on iOS it rebuilds the attributed string and drops the
           colour (black on the dark theme). These amounts are short enough that it never fires. */}
       <Text
-        className="mt-1 text-center font-poppins-semibold text-[16px]"
+        className="mt-1 text-center font-app-semibold text-[16px]"
         style={{ color: moneyColor(amount) }}
         numberOfLines={1}
         maxFontSizeMultiplier={1.2}

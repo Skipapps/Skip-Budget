@@ -102,7 +102,7 @@ function Cell({ selected, accessibilityLabel, label, onPress, children }: CellPr
         <Text
           accessibilityElementsHidden
           importantForAccessibility="no"
-          className="mt-2 text-center font-poppins-medium text-[13px] text-body"
+          className="mt-2 text-center font-app-medium text-[13px] text-body"
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >

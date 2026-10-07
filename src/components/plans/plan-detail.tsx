@@ -133,14 +133,14 @@ export function PlanDetail({
       <View className="mt-3 w-full items-center rounded-[16px] border border-line bg-card px-5 pb-2 pt-5">
         {mark}
         <Text
-          className="mt-3 font-poppins-bold text-[28px] text-ink"
+          className="mt-3 font-app-bold text-[28px] text-ink"
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}
         >
           {formatCurrency(Math.abs(plan.amount))}
         </Text>
-        <Text className="font-poppins text-[14px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={1.3}>
           {frequency}
         </Text>
 
@@ -150,11 +150,11 @@ export function PlanDetail({
               key={row.label}
               className={`w-full flex-row items-start justify-between gap-4 py-3 ${index > 0 ? 'border-t border-line/60' : ''}`}
             >
-              <Text className="font-poppins text-[14px] text-muted" maxFontSizeMultiplier={1.3}>
+              <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={1.3}>
                 {row.label}
               </Text>
               <Text
-                className="min-w-0 flex-1 text-right font-poppins-medium text-[14px] text-ink"
+                className="min-w-0 flex-1 text-right font-app-medium text-[14px] text-ink"
                 maxFontSizeMultiplier={1.3}
               >
                 {row.value}
@@ -181,7 +181,7 @@ export function PlanDetail({
 
       {!ledger.isLoading && !ledger.isError && charges.length === 0 ? (
         <Text
-          className="mt-6 w-full text-center font-poppins text-[14px] text-muted"
+          className="mt-6 w-full text-center font-app text-[14px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
           No charges for this {noun} in this window.
@@ -222,18 +222,18 @@ function ChargeSection({
             <View className="min-h-14 w-full flex-row items-center justify-between gap-3 px-4 py-3">
               <View className="min-w-0 flex-1">
                 <Text
-                  className="font-poppins-medium text-[15px] text-ink"
+                  className="font-app-medium text-[15px] text-ink"
                   numberOfLines={1}
                   maxFontSizeMultiplier={1.3}
                 >
                   {formatFullDate(new Date(`${entry.date}T00:00:00`))}
                 </Text>
-                <Text className="font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+                <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
                   {title === 'Paid' ? 'Paid' : 'Due'}
                 </Text>
               </View>
               <Text
-                className="font-poppins-semibold text-[15px] text-ink"
+                className="font-app-semibold text-[15px] text-ink"
                 style={{ color: moneyColor(entry.amount) }}
                 maxFontSizeMultiplier={1.3}
               >

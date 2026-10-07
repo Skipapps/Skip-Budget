@@ -46,14 +46,14 @@ export function CategoryPicker({ onSelect, selectedId }: CategoryPickerProps) {
             </View>
 
             <Text
-              className="mt-3 font-poppins-medium text-[14px] leading-[19px] text-ink"
+              className="mt-3 font-app-medium text-[14px] leading-[19px] text-ink"
               numberOfLines={2}
               maxFontSizeMultiplier={1.3}
             >
               {category.label}
             </Text>
             <Text
-              className="mt-1 font-poppins text-[11px] leading-[15px] text-muted"
+              className="mt-1 font-app text-[11px] leading-[15px] text-muted"
               numberOfLines={2}
               maxFontSizeMultiplier={1.2}
             >

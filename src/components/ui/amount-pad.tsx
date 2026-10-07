@@ -50,7 +50,7 @@ export function AmountPad({
             <ChevronLeft size={24} color={colors.ink} strokeWidth={2} />
           </Pressable>
           <Text
-            className="flex-1 pr-11 text-center font-poppins-semibold text-[17px] text-ink"
+            className="flex-1 pr-11 text-center font-app-semibold text-[17px] text-ink"
             numberOfLines={1}
             maxFontSizeMultiplier={1.3}
           >
@@ -61,7 +61,7 @@ export function AmountPad({
         <View className="flex-1 justify-center px-6">
           <AmountFigure value={draft} unit={unit} />
           <Text
-            className="mt-2 w-full text-center font-poppins text-[15px] text-muted"
+            className="mt-2 w-full text-center font-app text-[15px] text-muted"
             maxFontSizeMultiplier={1.2}
           >
             {caption}

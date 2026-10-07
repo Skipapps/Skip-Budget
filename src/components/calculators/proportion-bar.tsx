@@ -23,14 +23,14 @@ export function ProportionBar({ principal, interest }: ProportionBarProps) {
       <View className="mt-3 w-full flex-row items-center justify-between gap-3">
         <View className="flex-row items-center gap-2">
           <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colors.body }} />
-          <Text className="font-poppins text-[12px] text-body" maxFontSizeMultiplier={1.3}>
+          <Text className="font-app text-[12px] text-body" maxFontSizeMultiplier={1.3}>
             Borrowed {formatCurrency(principal, { cents: false })}
           </Text>
         </View>
 
         <View className="flex-row items-center gap-2">
           <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colors.accent }} />
-          <Text className="font-poppins text-[12px] text-body" maxFontSizeMultiplier={1.3}>
+          <Text className="font-app text-[12px] text-body" maxFontSizeMultiplier={1.3}>
             Interest {Math.round(interestShare * 100)}%
           </Text>
         </View>

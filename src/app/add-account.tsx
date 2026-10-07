@@ -378,10 +378,7 @@ function AccountForm({
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
-            <Text
-              className="font-poppins-medium text-[15px] text-danger"
-              maxFontSizeMultiplier={1.4}
-            >
+            <Text className="font-app-medium text-[15px] text-danger" maxFontSizeMultiplier={1.4}>
               {deleteAccount.isPending ? 'Deleting…' : 'Delete account'}
             </Text>
           </Pressable>
@@ -442,14 +439,11 @@ function AccountForm({
           {!editing && hasSalary ? (
             <View className="w-full flex-row items-center gap-4 rounded-[16px] bg-ink/5 px-4 py-4">
               <View className="min-w-0 flex-1">
-                <Text
-                  className="font-poppins-medium text-[15px] text-ink"
-                  maxFontSizeMultiplier={1.3}
-                >
+                <Text className="font-app-medium text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
                   {linkTitle}
                 </Text>
                 <Text
-                  className="mt-1 font-poppins text-[12px] leading-[17px] text-muted"
+                  className="mt-1 font-app text-[12px] leading-[17px] text-muted"
                   maxFontSizeMultiplier={1.3}
                 >
                   {linkCaption}
@@ -477,10 +471,7 @@ function AccountForm({
           ) : null}
 
           {stepError ? (
-            <Text
-              className="w-full font-poppins text-[13px] text-danger"
-              maxFontSizeMultiplier={1.4}
-            >
+            <Text className="w-full font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
               {stepError}
             </Text>
           ) : null}
@@ -495,7 +486,7 @@ function AccountForm({
                 <InlineCalendar value={lastPayday} onChange={setLastPayday} />
                 {nextPayday ? (
                   <Text
-                    className="mt-2 w-full text-center font-poppins text-[13px] text-muted"
+                    className="mt-2 w-full text-center font-app text-[13px] text-muted"
                     maxFontSizeMultiplier={1.4}
                   >
                     Next payday: {formatFullDate(nextPayday)}

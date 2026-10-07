@@ -105,7 +105,7 @@ export function FlowChart({ buckets }: { buckets: FlowBucket[] }) {
           <View key={bucket.key} style={{ width: slotWidth }} className="items-center">
             {slotWidth > 22 ? (
               <Text
-                className="font-poppins text-[11px] text-muted"
+                className="font-app text-[11px] text-muted"
                 numberOfLines={1}
                 allowFontScaling={false}
               >

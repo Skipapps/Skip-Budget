@@ -50,10 +50,7 @@ export function OtpInput({
                 isCursor ? 'border-control' : digit ? 'border-control' : 'border-line',
               )}
             >
-              <Text
-                className="font-poppins-semibold text-[22px] text-ink"
-                maxFontSizeMultiplier={1.3}
-              >
+              <Text className="font-app-semibold text-[22px] text-ink" maxFontSizeMultiplier={1.3}>
                 {digit}
               </Text>
             </View>

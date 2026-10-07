@@ -29,7 +29,7 @@ export function Title({
   return (
     <Text
       className={cn(
-        'font-poppins-bold text-[24px] leading-8 text-ink compact:text-[26px] phone:text-[28px] phone:leading-9',
+        'font-app-bold text-[24px] leading-8 text-ink compact:text-[26px] phone:text-[28px] phone:leading-9',
         align === 'left' ? 'text-left' : 'text-center',
         flush ? undefined : 'mt-2',
         className,
@@ -50,7 +50,7 @@ export function SectionHeading({ children, caption, className }: TextProps & { c
   return (
     <View className={cn('w-full flex-row items-baseline justify-between gap-3', className)}>
       <Text
-        className="shrink font-poppins-semibold text-[17px] text-ink"
+        className="shrink font-app-semibold text-[17px] text-ink"
         numberOfLines={1}
         maxFontSizeMultiplier={1.3}
       >
@@ -58,7 +58,7 @@ export function SectionHeading({ children, caption, className }: TextProps & { c
       </Text>
       {caption ? (
         <Text
-          className="shrink-0 font-poppins text-[13px] text-muted"
+          className="shrink-0 font-app text-[13px] text-muted"
           numberOfLines={1}
           maxFontSizeMultiplier={1.2}
         >
@@ -81,7 +81,7 @@ export function Subtitle({
   return (
     <Text
       className={cn(
-        'font-poppins text-[15px] leading-6 text-body phone:text-base',
+        'font-app text-[15px] leading-6 text-body phone:text-base',
         align === 'left' ? 'text-left' : 'text-center',
         className,
       )}
@@ -96,7 +96,7 @@ export function Body({ children, className }: TextProps) {
   return (
     <Text
       className={cn(
-        'font-poppins text-[14px] leading-5 text-body phone:text-[15px] phone:leading-6',
+        'font-app text-[14px] leading-5 text-body phone:text-[15px] phone:leading-6',
         className,
       )}
       maxFontSizeMultiplier={1.6}
@@ -109,7 +109,7 @@ export function Body({ children, className }: TextProps) {
 export function FieldLabel({ children, className }: TextProps) {
   return (
     <Text
-      className={cn('font-poppins-medium text-[13px] text-body', className)}
+      className={cn('font-app-medium text-[13px] text-body', className)}
       maxFontSizeMultiplier={1.4}
     >
       {children}
@@ -118,5 +118,5 @@ export function FieldLabel({ children, className }: TextProps) {
 }
 
 export function Strong({ children, className }: TextProps) {
-  return <Text className={cn('font-poppins-semibold text-ink', className)}>{children}</Text>;
+  return <Text className={cn('font-app-semibold text-ink', className)}>{children}</Text>;
 }

@@ -156,10 +156,7 @@ export default function SourceDetailScreen() {
           className="h-14 flex-row items-center gap-2 rounded-full bg-control px-5 active:opacity-80"
         >
           <Plus size={20} color={colors.onControl} strokeWidth={2} />
-          <Text
-            className="font-poppins-medium text-[15px] text-on-control"
-            maxFontSizeMultiplier={1.3}
-          >
+          <Text className="font-app-medium text-[15px] text-on-control" maxFontSizeMultiplier={1.3}>
             {isCard ? 'Make a payment' : 'Add money'}
           </Text>
         </Pressable>
@@ -217,7 +214,7 @@ export default function SourceDetailScreen() {
 
       {error ? (
         <Text
-          className="mt-4 w-full text-center font-poppins text-[13px] text-danger"
+          className="mt-4 w-full text-center font-app text-[13px] text-danger"
           maxFontSizeMultiplier={1.4}
         >
           {error}
@@ -245,7 +242,7 @@ export default function SourceDetailScreen() {
               <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
                 <Text
                   allowFontScaling={false}
-                  className="font-poppins-medium text-[11px] text-on-control"
+                  className="font-app-medium text-[11px] text-on-control"
                 >
                   {activeCount}
                 </Text>
@@ -333,9 +330,7 @@ function SummaryLine({ label, value, strong }: { label: string; value: string; s
     <View className="w-full flex-row items-center justify-between py-1.5">
       <Text
         className={
-          strong
-            ? 'font-poppins-medium text-[14px] text-ink'
-            : 'font-poppins text-[14px] text-muted'
+          strong ? 'font-app-medium text-[14px] text-ink' : 'font-app text-[14px] text-muted'
         }
         maxFontSizeMultiplier={1.3}
       >
@@ -343,9 +338,7 @@ function SummaryLine({ label, value, strong }: { label: string; value: string; s
       </Text>
       <Text
         className={
-          strong
-            ? 'font-poppins-semibold text-[16px] text-ink'
-            : 'font-poppins text-[14px] text-body'
+          strong ? 'font-app-semibold text-[16px] text-ink' : 'font-app text-[14px] text-body'
         }
         maxFontSizeMultiplier={1.3}
       >

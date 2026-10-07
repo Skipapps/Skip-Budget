@@ -102,7 +102,7 @@ export default function SetupScreen() {
                   <Check size={16} color={colors.onControl} strokeWidth={2} />
                 ) : (
                   <Text
-                    className="font-poppins-semibold text-[14px] text-ink"
+                    className="font-app-semibold text-[14px] text-ink"
                     maxFontSizeMultiplier={1.2}
                   >
                     {index + 1}
@@ -115,8 +115,8 @@ export default function SetupScreen() {
                   <Text
                     className={
                       step.done
-                        ? 'shrink font-poppins text-[15px] text-muted line-through'
-                        : 'shrink font-poppins-semibold text-[15px] text-ink'
+                        ? 'shrink font-app text-[15px] text-muted line-through'
+                        : 'shrink font-app-semibold text-[15px] text-ink'
                     }
                     numberOfLines={2}
                     maxFontSizeMultiplier={1.3}
@@ -124,10 +124,7 @@ export default function SetupScreen() {
                     {step.title}
                   </Text>
                   {step.optional && !step.done ? (
-                    <Text
-                      className="font-poppins text-[11px] text-muted"
-                      maxFontSizeMultiplier={1.2}
-                    >
+                    <Text className="font-app text-[11px] text-muted" maxFontSizeMultiplier={1.2}>
                       Optional
                     </Text>
                   ) : null}

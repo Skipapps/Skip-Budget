@@ -39,7 +39,7 @@ export function NetworkPicker({ networks, value, onChange }: NetworkPickerProps)
               <Text
                 allowFontScaling={false}
                 className={cn(
-                  'font-poppins-bold text-[13px] italic',
+                  'font-app-bold text-[13px] italic',
                   // Filled with ink, so the mark takes the surface colour (`on-control` pairs with
                   // the accent and vanishes here in dark mode).
                   selected ? 'text-surface' : 'text-ink',
@@ -51,7 +51,7 @@ export function NetworkPicker({ networks, value, onChange }: NetworkPickerProps)
             <Text
               className={cn(
                 'text-[12px]',
-                selected ? 'font-poppins-medium text-ink' : 'font-poppins text-muted',
+                selected ? 'font-app-medium text-ink' : 'font-app text-muted',
               )}
               maxFontSizeMultiplier={1.2}
             >

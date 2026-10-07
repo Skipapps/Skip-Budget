@@ -33,7 +33,7 @@ export function SliderRow({
 }: SliderRowProps) {
   const readout = (
     <Text
-      className="font-poppins-semibold text-[18px] text-ink"
+      className="font-app-semibold text-[18px] text-ink"
       numberOfLines={1}
       maxFontSizeMultiplier={1.2}
     >
@@ -44,7 +44,7 @@ export function SliderRow({
   return (
     <View className="w-full">
       <View className="w-full flex-row items-center justify-between gap-3">
-        <Text className="font-poppins-medium text-[13px] text-body" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app-medium text-[13px] text-body" maxFontSizeMultiplier={1.3}>
           {label}
         </Text>
 
@@ -67,10 +67,10 @@ export function SliderRow({
 
       {minLabel || maxLabel ? (
         <View className="w-full flex-row items-center justify-between">
-          <Text allowFontScaling={false} className="font-poppins text-[11px] text-muted">
+          <Text allowFontScaling={false} className="font-app text-[11px] text-muted">
             {minLabel}
           </Text>
-          <Text allowFontScaling={false} className="font-poppins text-[11px] text-muted">
+          <Text allowFontScaling={false} className="font-app text-[11px] text-muted">
             {maxLabel}
           </Text>
         </View>

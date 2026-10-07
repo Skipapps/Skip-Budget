@@ -93,7 +93,7 @@ export default function LoginScreen() {
 
         <View className="mt-5 w-full flex-row flex-wrap items-center justify-center">
           <Text
-            className="font-poppins text-[12px] leading-[18px] text-muted"
+            className="font-app text-[12px] leading-[18px] text-muted"
             maxFontSizeMultiplier={1.3}
           >
             By continuing you agree to our{' '}
@@ -104,7 +104,7 @@ export default function LoginScreen() {
             onPress={() => router.push('/terms')}
           />
           <Text
-            className="font-poppins text-[12px] leading-[18px] text-muted"
+            className="font-app text-[12px] leading-[18px] text-muted"
             maxFontSizeMultiplier={1.3}
           >
             {' '}

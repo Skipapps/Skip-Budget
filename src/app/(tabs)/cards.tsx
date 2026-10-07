@@ -50,7 +50,7 @@ const PER_MONTH = { weekly: 52 / 12, biweekly: 26 / 12, semimonthly: 2, monthly:
 function ListNote({ text }: { text: string }) {
   return (
     <View className="w-full items-center rounded-[16px] border border-line bg-card p-5">
-      <Text className="text-center font-poppins text-[14px] text-muted" maxFontSizeMultiplier={1.4}>
+      <Text className="text-center font-app text-[14px] text-muted" maxFontSizeMultiplier={1.4}>
         {text}
       </Text>
     </View>

@@ -62,7 +62,7 @@ export function QuickActions({ onPress }: QuickActionsProps) {
           {/* One line, shrunk to fit when Dynamic Type outgrows the card: "Subscription" is one
               word, so a two-line version would break it mid-word. */}
           <Text
-            className="text-center font-poppins-medium text-[12px] text-ink"
+            className="text-center font-app-medium text-[12px] text-ink"
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.75}

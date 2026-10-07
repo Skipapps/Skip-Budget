@@ -33,23 +33,24 @@ export type AmountFigureBand = {
  * Figure size comes from the glyph count, not `adjustsFontSizeToFit`: on iOS that measures against the
  * first layout pass, so a remount with an amount already entered shrank to the floor and never grew back.
  *
- * Bands use measured Poppins Bold advances (widest digit "4" = 0.677em) so the widest string in each
- * still fits an iPhone SE (327pt inside the Screen's px-6). 14 glyphs is everything the keypad can
- * produce ($999,999,999.99); the last band is only for saved figures longer than that, shown in full
- * because an ellipsised money figure is a wrong one.
+ * Bands use measured advances of the app font's bold (widest digit "4" = 0.689em) so the widest
+ * string in each still fits an iPhone SE (327pt inside the Screen's px-6). 14 glyphs is everything
+ * the keypad can produce ($999,999,999.99); the last band is only for saved figures longer than
+ * that, shown in full because an ellipsised money figure is a wrong one.
  */
 const BANDS: (AmountFigureBand & { maxGlyphs: number })[] = [
-  { maxGlyphs: 7, size: 64, lineHeight: 76, affixSize: 28, affixTop: 12 },
-  { maxGlyphs: 10, size: 48, lineHeight: 58, affixSize: 21, affixTop: 9.5 },
-  { maxGlyphs: 14, size: 36, lineHeight: 44, affixSize: 16, affixTop: 7 },
-  { maxGlyphs: Infinity, size: 28, lineHeight: 34, affixSize: 12, affixTop: 5.5 },
+  { maxGlyphs: 7, size: 64, lineHeight: 76, affixSize: 28, affixTop: 9.5 },
+  { maxGlyphs: 10, size: 48, lineHeight: 58, affixSize: 21, affixTop: 7 },
+  { maxGlyphs: 14, size: 36, lineHeight: 44, affixSize: 16, affixTop: 5.5 },
+  { maxGlyphs: Infinity, size: 28, lineHeight: 34, affixSize: 12, affixTop: 4.5 },
 ];
 
 /**
  * The band a display string lands in.
  *
- * `affixTop` = 0.345 x (size - affixSize): Poppins puts a digit's top 0.345em below its line top, and
- * RN applies no baseline shift because none of these line heights is taller than the font's own.
+ * `affixTop` = 0.268 x (size - affixSize), to the half point: the app font's cap line sits 0.268em
+ * below its line top (ascender 0.968em less cap height 0.700em), and RN applies no baseline shift
+ * because none of these line heights is taller than the font's own (1.219em).
  */
 export function amountFigureBand(display: string): AmountFigureBand {
   const band = BANDS.find((candidate) => display.length <= candidate.maxGlyphs) ?? BANDS[0];
@@ -85,7 +86,7 @@ export function AmountFigure({ value, unit = 'currency', className }: AmountFigu
         <Text
           allowFontScaling={false}
           style={{ fontSize: band.affixSize, marginTop: band.affixTop }}
-          className={cn('font-poppins-bold', empty ? 'text-muted' : 'text-body')}
+          className={cn('font-app-bold', empty ? 'text-muted' : 'text-body')}
         >
           $
         </Text>
@@ -95,7 +96,7 @@ export function AmountFigure({ value, unit = 'currency', className }: AmountFigu
         allowFontScaling={false}
         numberOfLines={1}
         style={{ fontSize: band.size, lineHeight: band.lineHeight }}
-        className={cn('font-poppins-bold', empty ? 'text-muted' : 'text-ink')}
+        className={cn('font-app-bold', empty ? 'text-muted' : 'text-ink')}
       >
         {display}
       </Text>
@@ -104,7 +105,7 @@ export function AmountFigure({ value, unit = 'currency', className }: AmountFigu
         <Text
           allowFontScaling={false}
           style={{ fontSize: band.affixSize, marginTop: band.affixTop }}
-          className={cn('font-poppins-bold', empty ? 'text-muted' : 'text-body')}
+          className={cn('font-app-bold', empty ? 'text-muted' : 'text-body')}
         >
           %
         </Text>

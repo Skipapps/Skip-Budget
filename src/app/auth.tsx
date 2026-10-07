@@ -72,7 +72,7 @@ export default function AuthScreen() {
 
         {error ? (
           <Text
-            className="w-full text-center font-poppins text-[13px] text-danger"
+            className="w-full text-center font-app text-[13px] text-danger"
             maxFontSizeMultiplier={1.4}
           >
             {error}

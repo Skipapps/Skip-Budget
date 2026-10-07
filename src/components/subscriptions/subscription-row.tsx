@@ -54,14 +54,14 @@ export function SubscriptionRow({
 
       <View className="min-w-0 flex-1">
         <Text
-          className="font-poppins-medium text-[15px] text-ink"
+          className="font-app-medium text-[15px] text-ink"
           numberOfLines={1}
           maxFontSizeMultiplier={1.4}
         >
           {name}
         </Text>
         <Text
-          className="mt-0.5 font-poppins text-[12px] text-muted"
+          className="mt-0.5 font-app text-[12px] text-muted"
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
@@ -72,13 +72,13 @@ export function SubscriptionRow({
 
       <View className="items-end">
         <Text
-          className="font-poppins-semibold text-[15px] text-ink"
+          className="font-app-semibold text-[15px] text-ink"
           style={{ color: moneyColor(-Math.abs(amount)) }}
           maxFontSizeMultiplier={1.4}
         >
           {formatCurrency(amount)}
         </Text>
-        <Text className="mt-0.5 font-poppins text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text className="mt-0.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
           {renewsOn ? formatFullDate(new Date(`${renewsOn}T00:00:00`)) : 'No renewal date'}
         </Text>
       </View>

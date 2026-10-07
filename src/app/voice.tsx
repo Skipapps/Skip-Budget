@@ -443,7 +443,7 @@ function VoiceScreenInner() {
         <Text
           accessibilityElementsHidden
           importantForAccessibility="no"
-          className="font-poppins text-[14px] text-muted"
+          className="font-app text-[14px] text-muted"
           maxFontSizeMultiplier={1.3}
         >
           {caption}
@@ -534,7 +534,7 @@ function VoiceScreenInner() {
 function LiveWords({ text }: { text: string }) {
   return (
     <Text
-      className="w-full text-center font-poppins-medium text-[24px] leading-8 text-ink"
+      className="w-full text-center font-app-medium text-[24px] leading-8 text-ink"
       maxFontSizeMultiplier={1.3}
     >
       {latestWords(text)}
@@ -551,7 +551,7 @@ function Placeholder() {
     <Text
       accessibilityElementsHidden
       importantForAccessibility="no"
-      className="w-full text-center font-poppins-medium text-[24px] leading-8 text-ink/20"
+      className="w-full text-center font-app-medium text-[24px] leading-8 text-ink/20"
       maxFontSizeMultiplier={1.3}
     >
       Listening…
@@ -563,7 +563,7 @@ function Placeholder() {
 function StatusLine({ text }: { text: string }) {
   return (
     <Text
-      className="w-full text-center font-poppins text-[16px] leading-6 text-body"
+      className="w-full text-center font-app text-[16px] leading-6 text-body"
       maxFontSizeMultiplier={1.4}
     >
       {text}

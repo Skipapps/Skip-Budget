@@ -28,7 +28,7 @@ export const VoiceHints = memo(function VoiceHints({ hidden }: { hidden: boolean
         return (
           <Text
             key={said}
-            className="text-center font-poppins text-[15px] leading-6 text-ink/40"
+            className="text-center font-app text-[15px] leading-6 text-ink/40"
             maxFontSizeMultiplier={1.3}
           >
             {said}

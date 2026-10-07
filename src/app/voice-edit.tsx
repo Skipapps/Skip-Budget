@@ -163,7 +163,7 @@ function EditShell({
       <View className="w-full gap-2">
         {failed ? (
           <Text
-            className="w-full text-center font-poppins text-[13px] text-danger"
+            className="w-full text-center font-app text-[13px] text-danger"
             maxFontSizeMultiplier={1.4}
           >
             {FAILURE_MESSAGE}
@@ -188,7 +188,7 @@ function EditShell({
       <Text
         ref={questionRef}
         accessibilityRole="header"
-        className="mt-6 w-full text-center font-poppins text-[20px] text-muted"
+        className="mt-6 w-full text-center font-app text-[20px] text-muted"
         numberOfLines={2}
         maxFontSizeMultiplier={1.3}
       >

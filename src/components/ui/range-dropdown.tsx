@@ -27,7 +27,7 @@ export function RangeDropdown({ value, onChange }: RangeDropdownProps) {
         hitSlop={{ top: 4, bottom: 4 }}
         className="min-h-10 flex-row items-center gap-1.5 rounded-full bg-ink/5 pl-4 pr-3 active:bg-ink/10"
       >
-        <Text className="font-poppins-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
+        <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
           {current.label}
         </Text>
         <ChevronDown size={16} color={colors.muted} strokeWidth={2} />
@@ -62,8 +62,8 @@ export function RangeDropdown({ value, onChange }: RangeDropdownProps) {
                     <Text
                       className={
                         selected
-                          ? 'font-poppins-medium text-[16px] text-ink'
-                          : 'font-poppins text-[16px] text-body'
+                          ? 'font-app-medium text-[16px] text-ink'
+                          : 'font-app text-[16px] text-body'
                       }
                       maxFontSizeMultiplier={1.3}
                     >

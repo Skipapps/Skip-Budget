@@ -73,7 +73,7 @@ export function AmountKeypad({ onKey }: AmountKeypadProps) {
               {key === 'delete' ? (
                 <Delete size={24} color={colors.ink} strokeWidth={1.8} />
               ) : (
-                <Text allowFontScaling={false} className="font-poppins text-[26px] text-ink">
+                <Text allowFontScaling={false} className="font-app text-[26px] text-ink">
                   {key}
                 </Text>
               )}

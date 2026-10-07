@@ -57,7 +57,7 @@ export function BalanceSummary({
       >
         <View className="w-full flex-row items-start justify-between gap-3">
           <Text
-            className="font-poppins-medium text-[15px] text-on-control/85"
+            className="font-app-medium text-[15px] text-on-control/85"
             maxFontSizeMultiplier={1.3}
           >
             Left this month
@@ -65,7 +65,7 @@ export function BalanceSummary({
 
           <View className="rounded-full bg-on-control/15 px-3 py-1.5">
             <Text
-              className="font-poppins-medium text-[12px] text-on-control"
+              className="font-app-medium text-[12px] text-on-control"
               allowFontScaling={false}
               numberOfLines={1}
             >
@@ -78,7 +78,7 @@ export function BalanceSummary({
             month. */}
         {error ? (
           <Text
-            className="mt-3 text-center font-poppins-bold text-[40px] text-on-control"
+            className="mt-3 text-center font-app-bold text-[40px] text-on-control"
             maxFontSizeMultiplier={1.2}
           >
             —
@@ -97,14 +97,14 @@ export function BalanceSummary({
             value={leftThisMonth}
             lineHeight={Math.round(fontSize * 1.3)}
             fontSize={fontSize}
-            textClassName="font-poppins-bold text-on-control"
+            textClassName="font-app-bold text-on-control"
           />
         )}
       </View>
 
       {error ? (
         <Text
-          className="mt-4 font-poppins text-[12px] leading-[17px] text-on-control/85"
+          className="mt-4 font-app text-[12px] leading-[17px] text-on-control/85"
           maxFontSizeMultiplier={1.3}
         >
           {FAILURE_MESSAGE}
@@ -125,7 +125,7 @@ export function BalanceSummary({
             </View>
           </View>
           <Text
-            className="mt-2 font-poppins text-[12px] text-on-control/85"
+            className="mt-2 font-app text-[12px] text-on-control/85"
             maxFontSizeMultiplier={1.3}
           >
             {Math.round(spentShare * 100)}% of the income is spent
@@ -174,7 +174,7 @@ function Stat({ label, amount, icon: Icon, loading, error }: StatProps) {
           <Icon size={14} color={colors.onControl} strokeWidth={1.8} />
         </View>
         <Text
-          className="shrink font-poppins-medium text-[12px] text-on-control/85"
+          className="shrink font-app-medium text-[12px] text-on-control/85"
           numberOfLines={1}
           maxFontSizeMultiplier={1.2}
         >
@@ -191,7 +191,7 @@ function Stat({ label, amount, icon: Icon, loading, error }: StatProps) {
         </View>
       ) : (
         <Text
-          className="mt-1 text-center font-poppins-semibold text-[17px] text-on-control"
+          className="mt-1 text-center font-app-semibold text-[17px] text-on-control"
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}

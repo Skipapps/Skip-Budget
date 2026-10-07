@@ -28,12 +28,12 @@ export function LegalDocument({ title, updated, summary, sections }: LegalDocume
         {title}
       </Title>
 
-      <Text className="mt-2 w-full font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+      <Text className="mt-2 w-full font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
         Last updated {updated}
       </Text>
 
       <Text
-        className="mt-5 w-full font-poppins text-[15px] leading-[24px] text-body"
+        className="mt-5 w-full font-app text-[15px] leading-[24px] text-body"
         maxFontSizeMultiplier={1.4}
       >
         {summary}
@@ -41,10 +41,7 @@ export function LegalDocument({ title, updated, summary, sections }: LegalDocume
 
       {sections.map((section, index) => (
         <View key={section.heading} className="mt-8 w-full">
-          <Text
-            className="w-full font-poppins-bold text-[17px] text-ink"
-            maxFontSizeMultiplier={1.3}
-          >
+          <Text className="w-full font-app-bold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
             {index + 1}. {section.heading}
           </Text>
 
@@ -55,13 +52,13 @@ export function LegalDocument({ title, updated, summary, sections }: LegalDocume
                   {block.items.map((item) => (
                     <View key={item} className="w-full flex-row gap-2.5">
                       <Text
-                        className="font-poppins text-[15px] leading-[23px] text-muted"
+                        className="font-app text-[15px] leading-[23px] text-muted"
                         maxFontSizeMultiplier={1.4}
                       >
                         •
                       </Text>
                       <Text
-                        className="flex-1 font-poppins text-[15px] leading-[23px] text-body"
+                        className="flex-1 font-app text-[15px] leading-[23px] text-body"
                         maxFontSizeMultiplier={1.4}
                       >
                         {item}
@@ -79,7 +76,7 @@ export function LegalDocument({ title, updated, summary, sections }: LegalDocume
                   className="mt-3 w-full rounded-[12px] bg-ink/[0.04] px-4 py-3"
                 >
                   <Text
-                    className="font-poppins text-[14px] leading-[21px] text-body"
+                    className="font-app text-[14px] leading-[21px] text-body"
                     maxFontSizeMultiplier={1.4}
                   >
                     {block.text}
@@ -91,7 +88,7 @@ export function LegalDocument({ title, updated, summary, sections }: LegalDocume
             return (
               <Text
                 key={blockIndex}
-                className="mt-3 w-full font-poppins text-[15px] leading-[23px] text-body"
+                className="mt-3 w-full font-app text-[15px] leading-[23px] text-body"
                 maxFontSizeMultiplier={1.4}
               >
                 {block.text}

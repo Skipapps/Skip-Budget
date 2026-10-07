@@ -179,11 +179,11 @@ function LoanCalculatorScreenInner() {
   return (
     <Screen title="Loan calculator" showBack>
       <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
-        <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
           Monthly payment
         </Text>
         <Text
-          className="mt-1 font-poppins-bold text-[40px] text-ink"
+          className="mt-1 font-app-bold text-[40px] text-ink"
           numberOfLines={1}
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.2}
@@ -191,7 +191,7 @@ function LoanCalculatorScreenInner() {
           {formatCurrency(contract.payment)}
         </Text>
         <Text
-          className="mt-1 text-center font-poppins text-[13px] text-muted"
+          className="mt-1 text-center font-app text-[13px] text-muted"
           maxFontSizeMultiplier={1.3}
         >
           {schedule.length} payments · last on {formatFullDate(lastPayment)}
@@ -199,7 +199,7 @@ function LoanCalculatorScreenInner() {
 
         {extraMonthly > 0 ? (
           <Text
-            className="mt-2 text-center font-poppins text-[12px] leading-[17px] text-muted"
+            className="mt-2 text-center font-app text-[12px] leading-[17px] text-muted"
             maxFontSizeMultiplier={1.3}
           >
             Plus {formatCurrency(extraMonthly)} extra —{' '}
@@ -210,7 +210,7 @@ function LoanCalculatorScreenInner() {
 
         {oddOpening ? (
           <Text
-            className="mt-2 text-center font-poppins text-[12px] leading-[17px] text-muted"
+            className="mt-2 text-center font-app text-[12px] leading-[17px] text-muted"
             maxFontSizeMultiplier={1.3}
           >
             {basis === 'monthly'
@@ -328,7 +328,7 @@ function LoanCalculatorScreenInner() {
         <FieldLabel className="mb-3">How interest is charged</FieldLabel>
         <ChoiceChips options={BASIS_CHOICES} value={basis} onChange={setBasis} />
         <Text
-          className="mt-3 font-poppins text-[12px] leading-[17px] text-muted"
+          className="mt-3 font-app text-[12px] leading-[17px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
           {BASIS_NOTES[basis]}
@@ -351,7 +351,7 @@ function LoanCalculatorScreenInner() {
 
         {aprDiffers ? (
           <Text
-            className="mt-4 font-poppins text-[12px] leading-[17px] text-muted"
+            className="mt-4 font-app text-[12px] leading-[17px] text-muted"
             maxFontSizeMultiplier={1.4}
           >
             The APR is what the credit costs once the fees and the length of the first period are
@@ -363,7 +363,7 @@ function LoanCalculatorScreenInner() {
 
       {overpaying && (comparison.interestSaved > 0 || comparison.monthsSaved > 0) ? (
         <View className="mt-3 w-full gap-3 rounded-[16px] border border-line bg-card p-5">
-          <Text className="font-poppins-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+          <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
             If you overpay
           </Text>
           <SummaryLine
@@ -375,7 +375,7 @@ function LoanCalculatorScreenInner() {
             <SummaryLine label="Paid off early by" value={formatTerm(comparison.monthsSaved)} />
           ) : null}
           <Text
-            className="font-poppins text-[12px] leading-[17px] text-muted"
+            className="font-app text-[12px] leading-[17px] text-muted"
             maxFontSizeMultiplier={1.4}
           >
             Clear on {formatFullDate(lastPayment)} instead of {formatFullDate(contractLastPayment)},
@@ -544,7 +544,7 @@ function SummaryLine({
     <View className="w-full flex-row items-center justify-between gap-3">
       <Text
         className={
-          strong ? 'font-poppins-medium text-[15px] text-ink' : 'font-poppins text-[14px] text-body'
+          strong ? 'font-app-medium text-[15px] text-ink' : 'font-app text-[14px] text-body'
         }
         maxFontSizeMultiplier={1.3}
       >
@@ -553,12 +553,12 @@ function SummaryLine({
       <Text
         className={
           strong
-            ? 'font-poppins-bold text-[17px] text-ink'
+            ? 'font-app-bold text-[17px] text-ink'
             : accent
-              ? 'font-poppins-semibold text-[15px] text-money-out'
+              ? 'font-app-semibold text-[15px] text-money-out'
               : positive
-                ? 'font-poppins-semibold text-[15px] text-money-in'
-                : 'font-poppins-semibold text-[15px] text-ink'
+                ? 'font-app-semibold text-[15px] text-money-in'
+                : 'font-app-semibold text-[15px] text-ink'
         }
         maxFontSizeMultiplier={1.3}
       >

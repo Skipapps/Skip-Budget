@@ -71,7 +71,7 @@ export function FilterSheet({
             <X size={22} color={colors.ink} strokeWidth={2} />
           </Pressable>
           <Text
-            className="flex-1 pr-11 text-center font-poppins-semibold text-[18px] text-ink"
+            className="flex-1 pr-11 text-center font-app-semibold text-[18px] text-ink"
             maxFontSizeMultiplier={1.2}
           >
             Filter
@@ -96,7 +96,7 @@ export function FilterSheet({
                 onPress={() => setDraft((current) => ({ ...current, date: null }))}
                 className="mt-2 self-start rounded-full px-1 py-1 active:opacity-60"
               >
-                <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+                <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
                   Clear date
                 </Text>
               </Pressable>
@@ -134,7 +134,7 @@ export function FilterSheet({
             onPress={() => setDraft(EMPTY_FILTERS)}
             className="min-h-16 flex-1 items-center justify-center rounded-full border border-control active:bg-ink/5"
           >
-            <Text className="font-poppins-medium text-[17px] text-ink" maxFontSizeMultiplier={1.4}>
+            <Text className="font-app-medium text-[17px] text-ink" maxFontSizeMultiplier={1.4}>
               Reset
             </Text>
           </Pressable>

@@ -13,7 +13,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 describe('calculatorFigureBand', () => {
   it('keeps a short figure at the pad size it has today', () => {
-    expect(calculatorFigureBand('0')).toMatchObject({ size: 48, affixSize: 24, affixTop: 8 });
+    expect(calculatorFigureBand('0')).toMatchObject({ size: 48, affixSize: 24, affixTop: 6.5 });
     expect(calculatorFigureBand('444,444').size).toBe(48);
   });
 
@@ -30,8 +30,10 @@ describe('calculatorFigureBand', () => {
     for (const display of ['0', '4,444.44', '999,999,999', '4,444,444,444.44']) {
       const band = calculatorFigureBand(display);
       expect(band.affixSize).toBeLessThan(band.size);
-      // Cap-aligned: 0.345 x (size - affixSize) in Poppins, to the half point.
-      expect(Math.abs(band.affixTop - 0.345 * (band.size - band.affixSize))).toBeLessThan(0.6);
+      // Cap-aligned: 0.268 x (size - affixSize) in the app font, to the half point.
+      expect(Math.abs(band.affixTop - 0.268 * (band.size - band.affixSize))).toBeLessThanOrEqual(
+        0.25,
+      );
     }
   });
 });

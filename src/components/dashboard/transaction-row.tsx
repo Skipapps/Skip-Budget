@@ -63,7 +63,7 @@ export function TransactionRow({
 
       <View className="min-w-0 flex-1">
         <Text
-          className="font-poppins-medium text-[15px] text-ink"
+          className="font-app-medium text-[15px] text-ink"
           numberOfLines={1}
           maxFontSizeMultiplier={1.4}
         >
@@ -71,7 +71,7 @@ export function TransactionRow({
         </Text>
         {kindLabel ? (
           <Text
-            className="mt-0.5 font-poppins text-[12px] text-muted"
+            className="mt-0.5 font-app text-[12px] text-muted"
             numberOfLines={1}
             maxFontSizeMultiplier={1.3}
           >
@@ -81,7 +81,7 @@ export function TransactionRow({
       </View>
 
       <Text
-        className="font-poppins-semibold text-[15px] text-ink"
+        className="font-app-semibold text-[15px] text-ink"
         style={{ color: moneyColor(amount) }}
         maxFontSizeMultiplier={1.4}
       >

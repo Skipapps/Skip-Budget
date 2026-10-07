@@ -81,7 +81,7 @@ export function AmountTile({
 
         <View className="mt-2.5 w-full items-center">
           <Text
-            className="text-center font-poppins-medium text-[13px] leading-[18px] text-body"
+            className="text-center font-app-medium text-[13px] leading-[18px] text-body"
             numberOfLines={1}
             maxFontSizeMultiplier={1.3}
           >
@@ -90,7 +90,7 @@ export function AmountTile({
           {/* A tool tile has no figure; "Open" keeps the row height so tiles stay aligned. */}
           <Text
             className={cn(
-              'mt-1 text-center font-poppins-semibold text-[16px]',
+              'mt-1 text-center font-app-semibold text-[16px]',
               amount === undefined ? 'text-muted' : 'text-ink',
             )}
             numberOfLines={1}

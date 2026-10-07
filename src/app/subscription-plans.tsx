@@ -115,7 +115,7 @@ export default function SubscriptionPlansScreen() {
                 <View className="absolute -right-1.5 -top-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1">
                   <Text
                     allowFontScaling={false}
-                    className="font-poppins-medium text-[11px] text-on-control"
+                    className="font-app-medium text-[11px] text-on-control"
                   >
                     {activeCount}
                   </Text>
@@ -125,7 +125,7 @@ export default function SubscriptionPlansScreen() {
           </View>
 
           <View className="mt-5 w-full flex-row items-center justify-between">
-            <Text className="font-poppins text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+            <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
               {isLoading
                 ? 'Loading'
                 : narrowed
@@ -133,12 +133,9 @@ export default function SubscriptionPlansScreen() {
                   : `${subscriptions.length} ${subscriptions.length === 1 ? 'subscription' : 'subscriptions'}`}
             </Text>
             {isLoading ? null : (
-              <Text
-                className="font-poppins-semibold text-[15px] text-ink"
-                maxFontSizeMultiplier={1.3}
-              >
+              <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
                 {formatCurrency(monthlyTotal)}
-                <Text className="font-poppins text-[13px] text-muted"> / mo</Text>
+                <Text className="font-app text-[13px] text-muted"> / mo</Text>
               </Text>
             )}
           </View>

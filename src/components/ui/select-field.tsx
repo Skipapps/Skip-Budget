@@ -51,7 +51,7 @@ export function SelectField({
         )}
       >
         <Text
-          className={cn('flex-1 py-4 font-poppins text-[16px]', value ? 'text-ink' : 'text-muted')}
+          className={cn('flex-1 py-4 font-app text-[16px]', value ? 'text-ink' : 'text-muted')}
           numberOfLines={1}
           maxFontSizeMultiplier={1.5}
         >

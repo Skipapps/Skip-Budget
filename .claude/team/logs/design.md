@@ -1132,3 +1132,9 @@ seen.
 
 **Open questions (Founder):** 1) free accounts see the mic with no sticker; 2) approve the privacy
 one-liners and the explainer copy; 3) save lands on Home rather than the item's list.
+
+---
+
+## 2026-10-06 — Priya (Design lead) — large-text rule
+
+Spec written to `.claude/team/design/large-text.md`, read-only on `logo-service`, no source touched. It sets one `TEXT_CAP` ceiling per role, allows no ellipsis and no single-label shrinking, and adds a shared `FitGroup` size: floored at the design size and 11pt, then the layout changes. Founder questions: Quick add as 2×2 everywhere, keep ceilings at 1.6x or below, honour Bold Text.

@@ -39,7 +39,7 @@ export function ChoiceChips<T extends string>({ options, value, onChange }: Choi
             <Text
               className={cn(
                 'text-[14px]',
-                selected ? 'font-poppins-medium text-on-control' : 'font-poppins text-body',
+                selected ? 'font-app-medium text-on-control' : 'font-app text-body',
               )}
               maxFontSizeMultiplier={1.2}
             >

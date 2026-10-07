@@ -274,7 +274,7 @@ export default function SettingsScreen() {
               className="mt-3 min-h-10 items-center justify-center self-end rounded-full bg-control px-4 active:bg-control-pressed"
             >
               <Text
-                className="font-poppins-medium text-[14px] text-on-control"
+                className="font-app-medium text-[14px] text-on-control"
                 maxFontSizeMultiplier={1.2}
               >
                 {updateProfile.isPending ? 'Saving…' : 'Save'}

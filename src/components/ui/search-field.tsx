@@ -26,7 +26,7 @@ export function SearchField({ value, onChangeText, placeholder, className }: Sea
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.muted}
-        className="flex-1 py-3 font-poppins text-[15px] text-ink"
+        className="flex-1 py-3 font-app text-[15px] text-ink"
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"

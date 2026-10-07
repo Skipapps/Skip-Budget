@@ -149,7 +149,7 @@ function SaveLoanScreenInner() {
         ) : null}
 
         {error ? (
-          <Text className="font-poppins text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
+          <Text className="font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
             {error}
           </Text>
         ) : null}
@@ -165,14 +165,12 @@ function SaveLoanScreenInner() {
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <View className="w-full flex-row items-center justify-between gap-3 py-1.5">
-      <Text className="font-poppins text-[14px] text-muted" maxFontSizeMultiplier={1.3}>
+      <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={1.3}>
         {label}
       </Text>
       <Text
         className={
-          strong
-            ? 'font-poppins-semibold text-[15px] text-ink'
-            : 'font-poppins text-[14px] text-body'
+          strong ? 'font-app-semibold text-[15px] text-ink' : 'font-app text-[14px] text-body'
         }
         maxFontSizeMultiplier={1.3}
       >

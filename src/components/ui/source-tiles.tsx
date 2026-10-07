@@ -44,7 +44,7 @@ export function SourceTiles({ sources, value, onChange }: SourceTilesProps) {
             <Text
               className={cn(
                 'shrink text-[14px]',
-                selected ? 'font-poppins-medium text-on-control' : 'font-poppins text-body',
+                selected ? 'font-app-medium text-on-control' : 'font-app text-body',
               )}
               numberOfLines={1}
               maxFontSizeMultiplier={1.2}
