@@ -54,11 +54,17 @@ describe('the message catalogue', () => {
   });
 
   it('never defines one key in two areas', () => {
-    const defined = Object.values(MESSAGE_AREAS).reduce(
+    const defined = Object.values(MESSAGE_AREAS).reduce<number>(
       (total, area) => total + Object.keys(area).length,
       0,
     );
     expect(Object.keys(MESSAGES).length).toBe(defined);
+  });
+
+  it('starts every key with the name of the area that owns it', () => {
+    for (const [area, messages] of Object.entries(MESSAGE_AREAS)) {
+      for (const key of Object.keys(messages)) expect(key.startsWith(`${area}.`)).toBe(true);
+    }
   });
 
   it('keeps every key as area.name, lower-case segments', () => {

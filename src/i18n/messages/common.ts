@@ -1,0 +1,35 @@
+import { defineMessages } from '@/i18n/translate';
+
+/** Words that appear on many screens. Reuse a key here when the English is exactly the same. */
+export const commonMessages = defineMessages({
+  'common.cancel': { en: 'Cancel', es: 'Cancelar', fr: 'Annuler' },
+  'common.save': { en: 'Save', es: 'Guardar', fr: 'Enregistrer' },
+  'common.done': { en: 'Done', es: 'Listo', fr: 'Terminé' },
+  'common.back': { en: 'Back', es: 'Atrás', fr: 'Retour' },
+  'common.next': { en: 'Next', es: 'Siguiente', fr: 'Suivant' },
+  'common.continue': { en: 'Continue', es: 'Continuar', fr: 'Continuer' },
+  'common.delete': { en: 'Delete', es: 'Eliminar', fr: 'Supprimer' },
+  'common.edit': { en: 'Edit', es: 'Editar', fr: 'Modifier' },
+  'common.add': { en: 'Add', es: 'Agregar', fr: 'Ajouter' },
+  'common.close': { en: 'Close', es: 'Cerrar', fr: 'Fermer' },
+  'common.ok': { en: 'OK', es: 'Aceptar', fr: 'OK' },
+  'common.yes': { en: 'Yes', es: 'Sí', fr: 'Oui' },
+  'common.no': { en: 'No', es: 'No', fr: 'Non' },
+  'common.tryAgain': { en: 'Try again', es: 'Intentar de nuevo', fr: 'Réessayer' },
+  'common.search': { en: 'Search', es: 'Buscar', fr: 'Rechercher' },
+  'common.loading': { en: 'Loading…', es: 'Cargando…', fr: 'Chargement…' },
+  'common.none': { en: 'None', es: 'Ninguno', fr: 'Aucun' },
+  'common.change': { en: 'Change', es: 'Cambiar', fr: 'Changer' },
+  'common.confirm': { en: 'Confirm', es: 'Confirmar', fr: 'Confirmer' },
+  'common.remove': { en: 'Remove', es: 'Quitar', fr: 'Retirer' },
+  'common.notNow': { en: 'Not now', es: 'Ahora no', fr: 'Pas maintenant' },
+  'common.learnMore': { en: 'Learn more', es: 'Más información', fr: 'En savoir plus' },
+  'common.optional': { en: 'Optional', es: 'Opcional', fr: 'Facultatif' },
+  'common.perMonth': { en: 'per month', es: 'al mes', fr: 'par mois' },
+  'common.perYear': { en: 'per year', es: 'al año', fr: 'par an' },
+  'common.failure': {
+    en: 'Something went wrong. Please try again.',
+    es: 'Algo salió mal. Inténtalo de nuevo.',
+    fr: 'Une erreur est survenue. Réessaie.',
+  },
+});
