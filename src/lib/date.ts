@@ -1,3 +1,6 @@
+import { clockText, monthShort, weekdayShort } from '@/i18n/calendar';
+import { t } from '@/i18n';
+
 /** Date labels without Intl, which Hermes ships inconsistently across platforms. */
 export const MONTHS_SHORT = [
   'Jan',
@@ -21,7 +24,7 @@ const pad = (value: number) => String(value).padStart(2, '0');
 /** "Mon" / "04.05" for the day stepper. */
 export function formatDayLabel(date: Date): { weekday: string; date: string } {
   return {
-    weekday: WEEKDAYS_SHORT[date.getDay()],
+    weekday: weekdayShort(date.getDay()),
     date: `${pad(date.getDate())}.${pad(date.getMonth() + 1)}`,
   };
 }
@@ -46,14 +49,47 @@ export function getFirstWeekday(year: number, month: number): number {
 
 /** "4 May 2026" — for read-only date fields. */
 export function formatFullDate(date: Date): string {
-  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`;
+  return `${date.getDate()} ${monthShort(date.getMonth())} ${date.getFullYear()}`;
 }
 
+/** Labels are read when drawn, never at import, so they follow the language on screen. */
 export const PAY_FREQUENCIES = [
-  { value: 'weekly', label: 'Weekly', caption: 'Each week' },
-  { value: 'biweekly', label: 'Every 2 weeks', caption: 'Every 2 weeks' },
-  { value: 'semimonthly', label: 'Twice a month', caption: 'Twice a month' },
-  { value: 'monthly', label: 'Monthly', caption: 'Each month' },
+  {
+    value: 'weekly',
+    get label() {
+      return t('dates.weekly');
+    },
+    get caption() {
+      return t('dates.weeklyCaption');
+    },
+  },
+  {
+    value: 'biweekly',
+    get label() {
+      return t('dates.biweekly');
+    },
+    get caption() {
+      return t('dates.biweeklyCaption');
+    },
+  },
+  {
+    value: 'semimonthly',
+    get label() {
+      return t('dates.semimonthly');
+    },
+    get caption() {
+      return t('dates.semimonthlyCaption');
+    },
+  },
+  {
+    value: 'monthly',
+    get label() {
+      return t('dates.monthly');
+    },
+    get caption() {
+      return t('dates.monthlyCaption');
+    },
+  },
 ] as const;
 
 export type PayFrequency = (typeof PAY_FREQUENCIES)[number]['value'];
@@ -153,15 +189,15 @@ export function paydaysInRange(
 
 /** "Today" / "Yesterday" / "Tomorrow", otherwise the full date. */
 export function formatRelativeDay(iso: string, today: string): string {
-  if (!iso) return 'No date yet';
-  if (iso === today) return 'Today';
+  if (!iso) return t('dates.noDate');
+  if (iso === today) return t('dates.today');
 
   const date = new Date(`${iso}T00:00:00`);
   const reference = new Date(`${today}T00:00:00`);
   const days = Math.round((date.getTime() - reference.getTime()) / 86_400_000);
 
-  if (days === -1) return 'Yesterday';
-  if (days === 1) return 'Tomorrow';
+  if (days === -1) return t('dates.yesterday');
+  if (days === 1) return t('dates.tomorrow');
   return formatFullDate(date);
 }
 
@@ -179,12 +215,12 @@ export function formatDateRange(from: Date, to: Date): string {
   const sameMonth = sameYear && from.getMonth() === to.getMonth();
 
   if (sameMonth) {
-    return `${from.getDate()} – ${to.getDate()} ${MONTHS_SHORT[to.getMonth()]} ${to.getFullYear()}`;
+    return `${from.getDate()} – ${to.getDate()} ${monthShort(to.getMonth())} ${to.getFullYear()}`;
   }
   if (sameYear) {
     return (
-      `${from.getDate()} ${MONTHS_SHORT[from.getMonth()]} – ` +
-      `${to.getDate()} ${MONTHS_SHORT[to.getMonth()]} ${to.getFullYear()}`
+      `${from.getDate()} ${monthShort(from.getMonth())} – ` +
+      `${to.getDate()} ${monthShort(to.getMonth())} ${to.getFullYear()}`
     );
   }
   return `${formatFullDate(from)} – ${formatFullDate(to)}`;
@@ -210,10 +246,7 @@ export function toClockValue(hour: number, minute: number): string {
   return `${pad(hour)}:${pad(minute)}`;
 }
 
-/** "9:00 AM" — how a time is read out loud. */
+/** "9:00 AM", "9:00 a. m.", "9 h 00" — how a time is read out loud. */
 export function formatClock(hour: number, minute: number): string {
-  const period = hour < 12 ? 'AM' : 'PM';
-  // 0 and 12 both show as 12: midnight and midday.
-  const shown = hour % 12 === 0 ? 12 : hour % 12;
-  return `${shown}:${pad(minute)} ${period}`;
+  return clockText(hour, minute);
 }

@@ -1,4 +1,6 @@
-import { MONTHS_SHORT, WEEKDAYS_SHORT, toIsoDate } from '@/lib/date';
+import { monthShort, weekdayShort } from '@/i18n/calendar';
+import { t } from '@/i18n';
+import { toIsoDate } from '@/lib/date';
 import type { DateRange } from '@/lib/range';
 
 /**
@@ -7,10 +9,30 @@ import type { DateRange } from '@/lib/range';
  */
 
 export const PERIODS = [
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' },
-  { value: 'year', label: 'Year' },
-  { value: 'all', label: 'All' },
+  {
+    value: 'week',
+    get label() {
+      return t('dates.week');
+    },
+  },
+  {
+    value: 'month',
+    get label() {
+      return t('dates.month');
+    },
+  },
+  {
+    value: 'year',
+    get label() {
+      return t('dates.year');
+    },
+  },
+  {
+    value: 'all',
+    get label() {
+      return t('dates.all');
+    },
+  },
 ] as const;
 
 export type PeriodKey = (typeof PERIODS)[number]['value'];
@@ -75,14 +97,14 @@ export function periodLabel(key: PeriodKey, anchor: Date): string {
   const range = periodRange(key, anchor);
   if (key === 'all') return `${range.from.slice(0, 4)} – ${range.to.slice(0, 4)}`;
   if (key === 'year') return String(anchor.getFullYear());
-  if (key === 'month') return `${MONTHS_SHORT[anchor.getMonth()]} ${anchor.getFullYear()}`;
+  if (key === 'month') return `${monthShort(anchor.getMonth())} ${anchor.getFullYear()}`;
 
   const [, , fromDay] = range.from.split('-').map(Number);
   const [, toMonth, toDay] = range.to.split('-').map(Number);
   const fromMonth = Number(range.from.split('-')[1]);
   return fromMonth === toMonth
-    ? `${fromDay} – ${toDay} ${MONTHS_SHORT[toMonth - 1]}`
-    : `${fromDay} ${MONTHS_SHORT[fromMonth - 1]} – ${toDay} ${MONTHS_SHORT[toMonth - 1]}`;
+    ? `${fromDay} – ${toDay} ${monthShort(toMonth - 1)}`
+    : `${fromDay} ${monthShort(fromMonth - 1)} – ${toDay} ${monthShort(toMonth - 1)}`;
 }
 
 /** The divisions a period is read in: a week as days, a month as weeks, a year as months, All as years. */
@@ -96,7 +118,7 @@ export function periodBuckets(key: PeriodKey, anchor: Date): Bucket[] {
       const iso = toIsoDate(day);
       return {
         key: iso,
-        label: `${day.getDate()} ${WEEKDAYS_SHORT[day.getDay()]}`,
+        label: `${day.getDate()} ${weekdayShort(day.getDay())}`,
         from: iso,
         to: iso,
       };
@@ -132,7 +154,7 @@ export function periodBuckets(key: PeriodKey, anchor: Date): Bucket[] {
       const from = toIsoDate(new Date(anchor.getFullYear(), month, 1));
       return {
         key: from,
-        label: MONTHS_SHORT[month],
+        label: monthShort(month),
         from,
         to: toIsoDate(new Date(anchor.getFullYear(), month + 1, 0)),
       };

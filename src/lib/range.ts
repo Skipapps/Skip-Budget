@@ -1,13 +1,43 @@
+import { t } from '@/i18n';
+
 /** The windows the dashboard and the transactions page are read through. Pure: the anchor is an argument. */
 export const RANGES = [
-  { value: 'today', label: 'Today' },
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' },
-  { value: 'year', label: 'Year' },
+  {
+    value: 'today',
+    get label() {
+      return t('dates.today');
+    },
+  },
+  {
+    value: 'week',
+    get label() {
+      return t('dates.week');
+    },
+  },
+  {
+    value: 'month',
+    get label() {
+      return t('dates.month');
+    },
+  },
+  {
+    value: 'year',
+    get label() {
+      return t('dates.year');
+    },
+  },
 ] as const;
 
 /** The same windows plus "All", which is history: it ends today, as a future charge is not a transaction yet. */
-export const LEDGER_RANGES = [...RANGES, { value: 'all', label: 'All' }] as const;
+export const LEDGER_RANGES = [
+  ...RANGES,
+  {
+    value: 'all',
+    get label() {
+      return t('dates.all');
+    },
+  },
+] as const;
 
 export type RangeKey = 'today' | 'week' | 'month' | 'year' | 'all';
 

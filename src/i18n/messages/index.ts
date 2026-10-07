@@ -1,7 +1,9 @@
+import { dateMessages } from '@/i18n/messages/dates';
 import { localeMessages } from '@/i18n/messages/locale';
 
 /** One file per area, each with all three languages side by side. */
 export const MESSAGE_AREAS = {
+  dates: dateMessages,
   locale: localeMessages,
 };
 
@@ -10,6 +12,7 @@ export const MESSAGE_AREAS = {
  * areas would be silently overwritten here; the messages test counts the areas to catch it.
  */
 export const MESSAGES = {
+  ...MESSAGE_AREAS.dates,
   ...MESSAGE_AREAS.locale,
 };
 
