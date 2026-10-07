@@ -66,9 +66,9 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
       return t('pro.scan.tagline');
     },
     benefits: [
+      benefit('pro.scan.unlimited.title', 'pro.scan.unlimited.detail'),
       benefit('pro.scan.private.title', 'pro.scan.private.detail'),
       benefit('pro.scan.handled.title', 'pro.scan.handled.detail'),
-      benefit('pro.scan.card.title', 'pro.scan.card.detail'),
     ],
   },
   voice: {

@@ -199,6 +199,8 @@ let mockSources = [
 
 let mockReceipt: { data: unknown; isError: boolean; isFetched: boolean };
 jest.mock('@/api/queries', () => ({
+  // This month's receipts, which the free scan and upload allowances count.
+  useReceipts: () => ({ data: [], isFetched: true, isError: false }),
   useReceipt: () => ({ ...mockReceipt, refetch: jest.fn() }),
   usePaymentSources: () => ({ sources: mockSources }),
 }));

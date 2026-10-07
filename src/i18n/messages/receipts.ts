@@ -95,6 +95,21 @@ export const receiptsMessages = defineMessages({
     es: '{hint}. Parte de Skip Pro.',
     fr: '{hint}. Fait partie de Skip Pro.',
   },
+  'receipts.scan.allowance': {
+    en: 'Free this month: {scans} and {uploads} left',
+    es: 'Gratis este mes: quedan {scans} y {uploads}',
+    fr: 'Gratuit ce mois-ci : il reste {scans} et {uploads}',
+  },
+  'receipts.scan.scansCount': {
+    en: { one: '{count} scan', other: '{count} scans' },
+    es: { one: '{count} escaneo', other: '{count} escaneos' },
+    fr: { one: '{count} numérisation', other: '{count} numérisations' },
+  },
+  'receipts.scan.uploadsCount': {
+    en: { one: '{count} upload', other: '{count} uploads' },
+    es: { one: '{count} subida', other: '{count} subidas' },
+    fr: { one: '{count} import', other: '{count} imports' },
+  },
   'receipts.scan.reading': {
     en: 'Reading the receipt…',
     es: 'Leyendo el recibo…',

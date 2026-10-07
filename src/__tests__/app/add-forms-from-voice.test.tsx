@@ -165,6 +165,8 @@ jest.mock('@/api/queries', () => {
   const read = () => ({ data: mockRow, isError: false, isFetched: true, refetch: jest.fn() });
   return {
     useReceipt: read,
+    // This month's receipts, which the free scan and upload allowances count.
+    useReceipts: () => ({ data: [], isFetched: true, isError: false }),
     useBill: read,
     useSubscription: read,
     useLoanForBill: () => ({ data: null }),

@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
+import { useCaptureAllowance } from '@/api/capture-allowance';
 import { usePaymentSources, useReceipts } from '@/api/queries';
-import { usePro } from '@/api/pro';
 import { useRefreshAll } from '@/api/refresh';
 import { draftToParams, useReceiptScan } from '@/api/scan';
 import {
@@ -46,16 +46,17 @@ export default function ReceiptsScreen() {
   const { sources } = usePaymentSources();
 
   const { scan, scanning, available: canScan } = useReceiptScan();
-  const { pro, ready } = usePro();
+  const allowance = useCaptureAllowance();
   const { refresh, refreshing } = useRefreshAll();
 
   /** A scan lands on the pre-filled form, never filed directly, so a misread total gets checked. */
   const handleScan = async () => {
-    // Until Pro is known a tap does nothing, so someone who paid is never sent to the explainer.
-    if (!ready) return;
+    // Until the allowance is known a tap does nothing, so nobody with scans left (or Pro) is ever
+    // sent to the explainer.
+    if (!allowance.ready) return;
     setScanError(null);
-    // Scanning is Pro; typing a receipt stays free.
-    if (!pro) {
+    // Free scans 15 receipts a month; typing one stays free and uncounted.
+    if (!allowance.scan.allowed) {
       router.push({ pathname: '/pro-feature', params: { id: 'scan' } });
       return;
     }

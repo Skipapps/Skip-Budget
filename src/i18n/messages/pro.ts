@@ -108,19 +108,29 @@ export const proMessages = defineMessages({
   },
 
   'pro.scan.title': {
-    en: 'Point, tap, filed',
-    es: 'Apunta, toca y listo',
-    fr: 'Vise, touche, c’est classé',
+    en: 'Every receipt, read for you',
+    es: 'Cada recibo, leído por ti',
+    fr: 'Chaque reçu, lu pour toi',
   },
   'pro.scan.tagline': {
-    en: 'The camera finds the receipt, reads it, and fills the form. You just check it.',
-    es: 'La cámara encuentra el recibo, lo lee y llena el formulario. Tú solo lo revisas.',
-    fr: 'L’appareil photo trouve le reçu, le lit et remplit le formulaire. Tu n’as qu’à vérifier.',
+    en: 'Free reads 15 receipts a month with the camera and 15 from photos or files. Skip Pro reads every one.',
+    es: 'El plan Gratis lee 15 recibos al mes con la cámara y 15 desde fotos o archivos. Skip Pro los lee todos.',
+    fr: 'Le forfait Gratuit lit 15 reçus par mois avec l’appareil photo et 15 depuis des photos ou des fichiers. Skip Pro les lit tous.',
+  },
+  'pro.scan.unlimited.title': {
+    en: 'Scan and upload without counting',
+    es: 'Escanea y sube sin contar',
+    fr: 'Numérise et importe sans compter',
+  },
+  'pro.scan.unlimited.detail': {
+    en: 'Paper receipts, photos and PDFs: a whole month of them in one sitting if you like.',
+    es: 'Recibos de papel, fotos y PDF: un mes entero de una sola vez, si quieres.',
+    fr: 'Reçus papier, photos et PDF : un mois entier d’un coup, si tu veux.',
   },
   'pro.scan.private.title': {
-    en: 'Read on your phone, never uploaded',
-    es: 'Se lee en tu teléfono, nunca se sube',
-    fr: 'Lu sur ton téléphone, jamais téléversé',
+    en: 'Read on your phone, never sent anywhere',
+    es: 'Se lee en tu teléfono, nunca se envía a ningún sitio',
+    fr: 'Lu sur ton téléphone, jamais envoyé ailleurs',
   },
   'pro.scan.private.detail': {
     en: 'The photo is thrown away after reading — only the store, date and total are kept, on your account.',
@@ -136,16 +146,6 @@ export const proMessages = defineMessages({
     en: 'Skip straightens the page before reading it, which is the difference between a 3 and an 8.',
     es: 'Skip endereza la página antes de leerla, y esa es la diferencia entre un 3 y un 8.',
     fr: 'Skip redresse la page avant de la lire, ce qui fait la différence entre un 3 et un 8.',
-  },
-  'pro.scan.card.title': {
-    en: 'The credit card comes pre-picked',
-    es: 'La tarjeta de crédito ya viene elegida',
-    fr: 'La carte de crédit est déjà choisie',
-  },
-  'pro.scan.card.detail': {
-    en: 'When the last four digits match a credit card you track, it is already selected to save.',
-    es: 'Si los últimos cuatro dígitos coinciden con una tarjeta de crédito que registras, ya viene seleccionada para guardar.',
-    fr: 'Quand les quatre derniers chiffres correspondent à une carte de crédit que tu suis, elle est déjà sélectionnée pour l’enregistrement.',
   },
 
   'pro.voice.title': { en: 'Just say it', es: 'Solo dilo', fr: 'Dis-le, tout simplement' },

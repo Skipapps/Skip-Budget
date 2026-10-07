@@ -104,7 +104,13 @@ let mockReceipt: { data: unknown; isError: boolean; isFetched: boolean } = {
   isError: false,
   isFetched: false,
 };
+// This month's receipts, which the free scan and upload allowances count.
+let mockReceiptsList: { data: { source: string; created_at: string }[]; isFetched: boolean } = {
+  data: [],
+  isFetched: true,
+};
 jest.mock('@/api/queries', () => ({
+  useReceipts: () => mockReceiptsList,
   useReceipt: () => ({ ...mockReceipt, refetch: jest.fn() }),
   usePaymentSources: () => ({
     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
@@ -193,6 +199,7 @@ beforeEach(() => {
   resetLocaleForTests();
   mockParams = {};
   mockPro = { pro: true, ready: true };
+  mockReceiptsList = { data: [], isFetched: true };
   mockScanner.capture = true;
   mockScanner.recognition = true;
   mockReceipt = { data: null, isError: false, isFetched: false };
@@ -275,20 +282,51 @@ describe('Add receipt in Spanish', () => {
     expect(screen.queryByText('Archivado en', { exact: false })).toBeNull();
   });
 
-  it('offers Scan and Upload as Pro, and asks the amount', async () => {
+  it('says what a free account has left this month, and asks the amount', async () => {
     setLanguage('es');
     mockPro = { pro: false, ready: true };
+    mockReceiptsList = {
+      data: Array.from({ length: 14 }, () => ({
+        source: 'scan',
+        created_at: '2026-10-02T15:00:00.000Z',
+      })),
+      isFetched: true,
+    };
     const screen = await render(<AddReceiptScreen />);
 
     expect(screen.getByText('¿Cuánto gastaste?')).toBeTruthy();
     expect(screen.getByText('Continuar')).toBeTruthy();
+    expect(screen.getByText('Gratis este mes: quedan 1 escaneo y 15 subidas')).toBeTruthy();
+    expect(screen.getByLabelText('Escanear').props.accessibilityHint).toBe(
+      'Apunta la cámara a un recibo de papel',
+    );
+    expectNoRawText(screen.toJSON());
+  });
+
+  it('offers Scan and Upload as Pro once the month’s free ones are used, in French too', async () => {
+    setLanguage('es');
+    mockPro = { pro: false, ready: true };
+    mockReceiptsList = {
+      data: ['scan', 'upload'].flatMap((source) =>
+        Array.from({ length: 15 }, () => ({ source, created_at: '2026-10-02T15:00:00.000Z' })),
+      ),
+      isFetched: true,
+    };
+    const screen = await render(<AddReceiptScreen />);
+
     expect(screen.getByLabelText('Escanear').props.accessibilityHint).toBe(
       'Apunta la cámara a un recibo de papel. Parte de Skip Pro.',
     );
     expect(screen.getByLabelText('Subir').props.accessibilityHint).toBe(
       'Sube una foto o un PDF de un recibo. Parte de Skip Pro.',
     );
-    expectNoRawText(screen.toJSON());
+    expect(screen.getByText('Gratis este mes: quedan 0 escaneos y 0 subidas')).toBeTruthy();
+
+    setLanguage('fr');
+    await screen.rerender(<AddReceiptScreen />);
+    expect(
+      screen.getByText('Gratuit ce mois-ci\u00a0: il reste 0 numérisation et 0 import'),
+    ).toBeTruthy();
   });
 
   it('reads every page a line opens in Spanish', async () => {

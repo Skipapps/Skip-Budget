@@ -8,9 +8,9 @@ import { FAILURE_MESSAGE } from '@/lib/failure';
  * A scanned receipt opens on the final page, a report of what was read above the amount and Save,
  * on both ways in: a scan from the receipts list (route params) and Scan / Upload on the form
  * itself. Whatever the reading missed is a gap on that page (the amount, the store) rather than a
- * different page; a reading of nothing leaves the person on the amount page. Scanning is Pro: a free
- * account is shown the explainer before the camera opens, and a save the database refuses for Pro
- * goes to the explainer rather than the failure line.
+ * different page; a reading of nothing leaves the person on the amount page. Free reads 15 receipts a
+ * month by camera and 15 by upload: past either, the explainer opens before the camera or picker
+ * does, and a save the database refuses for Pro goes to the explainer rather than the failure line.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -140,7 +140,17 @@ jest.mock('@/api/logos', () => ({
   useLogoMatch: () => ({ data: null, isLoading: false, isFetching: false }),
 }));
 
+// This month's receipts, which the free allowance counts.
+let mockReceipts: {
+  data: { source: string; created_at: string | null }[];
+  isFetched: boolean;
+  isError: boolean;
+} = { data: [], isFetched: true, isError: false };
+const savedThisMonth = (source: string, count: number) =>
+  Array.from({ length: count }, () => ({ source, created_at: '2026-10-02T15:00:00.000Z' }));
+
 jest.mock('@/api/queries', () => ({
+  useReceipts: () => mockReceipts,
   useReceipt: () => ({ data: null, isError: false, isFetched: false, refetch: jest.fn() }),
   usePaymentSources: () => ({
     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
@@ -241,6 +251,7 @@ beforeEach(() => {
   mockParsed = {};
   mockScanner.available = true;
   mockPro = { pro: true, ready: true };
+  mockReceipts = { data: [], isFetched: true, isError: false };
   mockCreate.mockResolvedValue({ id: 'receipt-new' });
 });
 
@@ -588,23 +599,106 @@ describe('Scan and Upload on the form', () => {
   });
 });
 
-describe('scanning is Pro', () => {
-  it.each(['Scan', 'Upload'])(
-    'a free account tapping %s is shown the explainer before anything opens',
-    async (label) => {
-      mockPro = { pro: false, ready: true };
-      const screen = await render(<AddReceiptScreen />);
+describe('the free allowance', () => {
+  it('lets a free account with scans left open the camera, and says what is left', async () => {
+    mockPro = { pro: false, ready: true };
+    mockReceipts = {
+      data: [...savedThisMonth('scan', 12), ...savedThisMonth('manual', 30)],
+      isFetched: true,
+      isError: false,
+    };
+    const screen = await render(<AddReceiptScreen />);
 
-      await press(screen, label);
+    expect(screen.getByText('Free this month: 3 scans and 15 uploads left')).toBeTruthy();
+    await scanOnForm(screen, READ);
 
-      expect(router.push).toHaveBeenCalledWith({
-        pathname: '/pro-feature',
-        params: { id: 'scan' },
-      });
-      expect(mockCapture).not.toHaveBeenCalled();
-      expect(mockAsk).not.toHaveBeenCalled();
-    },
-  );
+    expect(mockCapture).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+    onFinalPage(screen);
+  });
+
+  it('lets a free account with uploads left open the picker', async () => {
+    mockPro = { pro: false, ready: true };
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Upload');
+
+    expect(mockAsk).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('words a single scan left in the singular', async () => {
+    mockPro = { pro: false, ready: true };
+    mockReceipts = {
+      data: [...savedThisMonth('scan', 14), ...savedThisMonth('upload', 14)],
+      isFetched: true,
+      isError: false,
+    };
+    const screen = await render(<AddReceiptScreen />);
+    expect(screen.getByText('Free this month: 1 scan and 1 upload left')).toBeTruthy();
+  });
+
+  it('shows the explainer at the 16th scan, before the camera opens, and keeps uploads open', async () => {
+    mockPro = { pro: false, ready: true };
+    mockReceipts = { data: savedThisMonth('scan', 15), isFetched: true, isError: false };
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(screen.getByText('Free this month: 0 scans and 15 uploads left')).toBeTruthy();
+    expect(screen.getByLabelText('Scan')).toHaveProp(
+      'accessibilityHint',
+      'Point the camera at a paper receipt. Part of Skip Pro.',
+    );
+    await press(screen, 'Scan');
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/pro-feature', params: { id: 'scan' } });
+    expect(mockCapture).not.toHaveBeenCalled();
+
+    jest.mocked(router.push).mockClear();
+    await press(screen, 'Upload');
+    expect(router.push).not.toHaveBeenCalled();
+    expect(mockAsk).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the explainer at the 16th upload, before the picker opens', async () => {
+    mockPro = { pro: false, ready: true };
+    mockReceipts = { data: savedThisMonth('upload', 15), isFetched: true, isError: false };
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Upload');
+
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/pro-feature', params: { id: 'scan' } });
+    expect(mockAsk).not.toHaveBeenCalled();
+  });
+
+  it('counts only this month: last month’s 15 scans leave this month’s open', async () => {
+    mockPro = { pro: false, ready: true };
+    mockReceipts = {
+      data: Array.from({ length: 15 }, () => ({
+        source: 'scan',
+        created_at: '2026-09-20T15:00:00.000Z',
+      })),
+      isFetched: true,
+      isError: false,
+    };
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(screen.getByText('Free this month: 15 scans and 15 uploads left')).toBeTruthy();
+    await scanOnForm(screen, READ);
+    expect(mockCapture).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no count and no limit on Pro', async () => {
+    mockReceipts = { data: savedThisMonth('scan', 200), isFetched: true, isError: false };
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(screen.queryByText(/Free this month/)).toBeNull();
+    expect(screen.getByLabelText('Scan')).toHaveProp(
+      'accessibilityHint',
+      'Point the camera at a paper receipt',
+    );
+    await scanOnForm(screen, READ);
+    expect(mockCapture).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+  });
 
   it.each(['Scan', 'Upload'])(
     '%s is dimmed until Pro is known, so a payer never sees the explainer',
@@ -620,6 +714,27 @@ describe('scanning is Pro', () => {
       expect(mockAsk).not.toHaveBeenCalled();
     },
   );
+
+  it.each(['Scan', 'Upload'])(
+    '%s is dimmed on free until the month’s receipts are counted',
+    async (label) => {
+      mockPro = { pro: false, ready: true };
+      mockReceipts = { data: [], isFetched: false, isError: false };
+      const screen = await render(<AddReceiptScreen />);
+
+      expect(screen.getByLabelText(label)).toBeDisabled();
+      expect(screen.queryByText(/Free this month/)).toBeNull();
+    },
+  );
+
+  it('does not block when the receipts could not be read: the database still holds the line', async () => {
+    mockPro = { pro: false, ready: true };
+    mockReceipts = { data: [], isFetched: true, isError: true };
+    const screen = await render(<AddReceiptScreen />);
+
+    await scanOnForm(screen, READ);
+    expect(mockCapture).toHaveBeenCalledTimes(1);
+  });
 
   it('typing a receipt stays free', async () => {
     mockPro = { pro: false, ready: true };
@@ -637,7 +752,7 @@ describe('scanning is Pro', () => {
   });
 
   it.each([
-    ['a scan', ROUTE, 'scan', 'Scanning receipts is part of Skip Pro.'],
+    ['a scan', ROUTE, 'scan', 'Scanning more than 15 receipts a month is part of Skip Pro.'],
     [
       'a voice hand-off',
       { ...ROUTE, scannedVia: 'voice', from: 'voice' },

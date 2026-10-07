@@ -30,7 +30,7 @@ describe('PRO_FEATURES', () => {
     setLanguage('es');
     expect(PRO_FEATURES.loans.title).toBe('Conoce tu préstamo al centavo');
     expect(PRO_FEATURES.scan.tagline).toBe(
-      'La cámara encuentra el recibo, lo lee y llena el formulario. Tú solo lo revisas.',
+      'El plan Gratis lee 15 recibos al mes con la cámara y 15 desde fotos o archivos. Skip Pro los lee todos.',
     );
     expect(PRO_FEATURES.insights.benefits[0].title).toBe('Cómo estás, sin rodeos');
   });

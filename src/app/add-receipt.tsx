@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { guessCategory, matchBrand, useBrandDirectory, useSpendCategories } from '@/api/brands';
+import { useCaptureAllowance } from '@/api/capture-allowance';
 import { usePro } from '@/api/pro';
 import { buildReceiptValues } from '@/api/entry-values';
 import { receiptParseOptions } from '@/api/scan';
@@ -329,7 +330,8 @@ function ReceiptForm({
   const deleteReceipt = useDeleteReceipt();
   const confirm = useConfirm();
   const ask = useDialog();
-  const { pro, ready } = usePro();
+  const { pro } = usePro();
+  const allowance = useCaptureAllowance();
 
   // A hand edit retires the scan report: telling someone to check an amount they just corrected is
   // worse than silence. It retires a failed save's line too, which was about the page as it was.
@@ -403,12 +405,13 @@ function ReceiptForm({
   };
 
   const handleScan = async () => {
-    // Until Pro is known a tap does nothing, so someone who paid is never sent to the explainer.
-    if (!ready) return;
+    // Until the allowance is known a tap does nothing, so nobody with scans left (or Pro) is ever
+    // sent to the explainer.
+    if (!allowance.ready) return;
     setError(null);
     setScanResult(null);
 
-    if (!pro) {
+    if (!allowance.scan.allowed) {
       router.push({ pathname: '/pro-feature', params: { id: 'scan' } });
       return;
     }
@@ -486,9 +489,9 @@ function ReceiptForm({
 
   /** Photos and files are separate pickers on iOS, so ask which one. */
   const handleUpload = async () => {
-    if (!ready) return;
+    if (!allowance.ready) return;
     setError(null);
-    if (!pro) {
+    if (!allowance.upload.allowed) {
       router.push({ pathname: '/pro-feature', params: { id: 'scan' } });
       return;
     }
@@ -693,18 +696,33 @@ function ReceiptForm({
                   label={t('receipts.scan.scan')}
                   hint={t('receipts.scan.scanHint')}
                   onPress={handleScan}
-                  disabled={reading || !ready}
-                  proBadge={ready && !pro}
+                  disabled={reading || !allowance.ready}
+                  proBadge={allowance.ready && !allowance.scan.allowed}
                 />
                 <CaptureButton
                   icon={ImageUp}
                   label={t('receipts.scan.upload')}
                   hint={t('receipts.scan.uploadHint')}
                   onPress={handleUpload}
-                  disabled={reading || !ready}
-                  proBadge={ready && !pro}
+                  disabled={reading || !allowance.ready}
+                  proBadge={allowance.ready && !allowance.upload.allowed}
                 />
               </View>
+            ) : null}
+
+            {isRecognitionAvailable() &&
+            allowance.ready &&
+            allowance.scan.left !== null &&
+            allowance.upload.left !== null ? (
+              <Text
+                className="w-full text-center font-app text-[12px] text-muted"
+                maxFontSizeMultiplier={TEXT_CAP.row}
+              >
+                {t('receipts.scan.allowance', {
+                  scans: t('receipts.scan.scansCount', { count: allowance.scan.left }),
+                  uploads: t('receipts.scan.uploadsCount', { count: allowance.upload.left }),
+                })}
+              </Text>
             ) : null}
 
             {reading ? (

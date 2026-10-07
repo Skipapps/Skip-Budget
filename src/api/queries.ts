@@ -429,6 +429,8 @@ export type ReceiptRow = {
   note: string | null;
   source: CaptureSource;
   image_path: string | null;
+  /** When it was saved, which is what the free scan and upload allowances count by. */
+  created_at?: string | null;
   brands: { domain: string | null } | null;
   /** The owner's logo choice; read the logo through logoDomainOf, never these directly. */
   logo_domain?: string | null;
@@ -441,7 +443,7 @@ export function useReceipts() {
       supabase
         .from('receipts')
         .select(
-          `id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path${logo}, brands(domain)`,
+          `id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path, created_at${logo}, brands(domain)`,
         )
         .order('purchased_on', { ascending: false })
         .order('created_at', { ascending: false }),

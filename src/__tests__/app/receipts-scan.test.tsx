@@ -4,9 +4,10 @@ import { router } from 'expo-router';
 import ReceiptsScreen from '@/app/receipts';
 
 /**
- * Scan on the receipts list is Pro. Until the app knows, a tap does nothing, so someone who paid
- * and taps right after launch is never shown the explainer; once known, a free account sees it and
- * a paying one goes to the camera and on to the filled-in form.
+ * Scan on the receipts list: free reads 15 receipts a month by camera. Until the app knows, a tap
+ * does nothing, so nobody with scans left is shown the explainer; once known, a free account with
+ * scans left and a paying one go to the camera and on to the filled-in form, and a free account
+ * past the 15th sees the explainer.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -37,14 +38,29 @@ jest.mock('@/api/scan', () => ({
   draftToParams: () => ({ scannedStore: 'Deli', scannedAmount: '9.50' }),
 }));
 
+let mockReceipts: { source: string; created_at: string; purchased_on: string }[] = [];
+const scansThisMonth = (count: number) =>
+  Array.from({ length: count }, () => ({
+    source: 'scan',
+    created_at: new Date().toISOString(),
+    purchased_on: '2000-01-01',
+  }));
+
 jest.mock('@/api/queries', () => ({
-  useReceipts: () => ({ data: [], isLoading: false, isError: false, refetch: jest.fn() }),
+  useReceipts: () => ({
+    data: mockReceipts,
+    isLoading: false,
+    isFetched: true,
+    isError: false,
+    refetch: jest.fn(),
+  }),
   usePaymentSources: () => ({ sources: [] }),
 }));
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockPro = { pro: true, ready: true };
+  mockReceipts = [];
 });
 
 it('does nothing on a tap before Pro is known', async () => {
@@ -57,14 +73,29 @@ it('does nothing on a tap before Pro is known', async () => {
   expect(mockScan).not.toHaveBeenCalled();
 });
 
-it('shows a free account the explainer, without opening the camera', async () => {
+it('shows a free account past its 15th scan the explainer, without opening the camera', async () => {
   mockPro = { pro: false, ready: true };
+  mockReceipts = scansThisMonth(15);
   const screen = await render(<ReceiptsScreen />);
 
   await fireEvent.press(screen.getByLabelText('Scan a receipt'));
 
   expect(router.push).toHaveBeenCalledWith({ pathname: '/pro-feature', params: { id: 'scan' } });
   expect(mockScan).not.toHaveBeenCalled();
+});
+
+it('scans for a free account with scans left', async () => {
+  mockPro = { pro: false, ready: true };
+  mockReceipts = scansThisMonth(14);
+  mockScan.mockResolvedValueOnce({ store: null, amount: 9.5, read: ['amount'] });
+  const screen = await render(<ReceiptsScreen />);
+
+  await fireEvent.press(screen.getByLabelText('Scan a receipt'));
+
+  await waitFor(() => expect(mockScan).toHaveBeenCalledTimes(1));
+  expect(router.push).not.toHaveBeenCalledWith(
+    expect.objectContaining({ pathname: '/pro-feature' }),
+  );
 });
 
 it('scans for a paying account and opens the filled-in form', async () => {
