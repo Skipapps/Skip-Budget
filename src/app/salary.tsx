@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { CalculatorPad } from '@/components/ui/calculator-pad';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { DatePicker } from '@/components/ui/date-picker';
+import { FitFigure } from '@/components/ui/fit-group';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { usePro } from '@/api/pro';
 import { Screen } from '@/components/ui/screen';
@@ -38,6 +39,7 @@ import { useColors } from '@/providers/theme-provider';
 import { failureMessage, failureText } from '@/lib/failure';
 import { OVERTIME_RATES, estimateHourlyPay, hourlyProblem, type HourlyPay } from '@/lib/hourly-pay';
 import { useArtwork } from '@/theme/artwork';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 /** Normalised to monthly so sources on different cycles can be summed. */
 const PER_MONTH: Record<PayFrequency, number> = {
@@ -342,24 +344,30 @@ function SalaryEditor({
   return (
     <Screen title={t('salary.title')} showBack avoidKeyboard>
       <View className="mt-3 w-full items-center">
-        <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text
+          className="text-center font-app text-[13px] text-muted"
+          maxFontSizeMultiplier={TEXT_CAP.control}
+        >
           {t('salary.totalPerMonth')}
         </Text>
-        <Text
-          className="mt-0.5 font-app-semibold text-[24px] text-ink"
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          maxFontSizeMultiplier={1.2}
+        <FitFigure
+          id="monthly-total"
+          size={24}
+          className="text-center font-app-semibold text-ink"
+          boxClassName="mt-0.5"
         >
           {formatCurrency(monthlyTotal)}
-        </Text>
+        </FitFigure>
       </View>
 
       <View className="mt-6 w-full gap-4">
         {sources.map((source, index) => (
           <View key={source.id} className="w-full rounded-[16px] border border-line bg-card p-4">
-            <View className="mb-3 w-full flex-row items-center justify-between">
-              <Text className="font-app-medium text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+            <View className="mb-3 w-full flex-row items-center justify-between gap-3">
+              <Text
+                className="min-w-0 flex-1 font-app-medium text-[15px] text-ink"
+                maxFontSizeMultiplier={TEXT_CAP.heading}
+              >
                 {t('salary.sourceNumber', { number: index + 1 })}
               </Text>
 
@@ -401,7 +409,10 @@ function SalaryEditor({
             </View>
 
             {collapsed[source.id] ? (
-              <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+              <Text
+                className="font-app text-[13px] text-muted"
+                maxFontSizeMultiplier={TEXT_CAP.row}
+              >
                 {[
                   source.name.trim() || t('salary.unnamed'),
                   paycheckOf(source) ? formatCurrency(paycheckOf(source)) : null,
@@ -529,7 +540,10 @@ function SalaryEditor({
                 />
 
                 {source.lastPayday ? (
-                  <Text className="-mt-3 ml-4 font-app text-[13px] text-muted">
+                  <Text
+                    className="-mt-3 ml-4 font-app text-[13px] text-muted"
+                    maxFontSizeMultiplier={TEXT_CAP.reading}
+                  >
                     {t('salary.nextPayday', {
                       date: formatFullDate(
                         getNextPayday(asDate(source.lastPayday)!, source.frequency),
@@ -560,7 +574,10 @@ function SalaryEditor({
         className="mt-4 min-h-14 w-full flex-row items-center justify-center gap-2 rounded-full bg-ink/5 active:bg-ink/10"
       >
         <Plus size={18} color={colors.ink} strokeWidth={1.8} />
-        <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
+        <Text
+          className="shrink text-center font-app-medium text-[14px] text-ink"
+          maxFontSizeMultiplier={TEXT_CAP.row}
+        >
           {t('salary.addSource')}
         </Text>
       </Pressable>
@@ -569,7 +586,7 @@ function SalaryEditor({
         {error ? (
           <Text
             className="mb-3 w-full text-center font-app text-[13px] text-danger"
-            maxFontSizeMultiplier={1.4}
+            maxFontSizeMultiplier={TEXT_CAP.reading}
           >
             {error}
           </Text>
@@ -636,7 +653,7 @@ function SalaryEditor({
 
 function HoursUnit() {
   return (
-    <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={1.2}>
+    <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={TEXT_CAP.row}>
       {t('salary.hoursUnit')}
     </Text>
   );
@@ -650,7 +667,7 @@ function HourlyEstimateCard({ source }: { source: SalarySource }) {
   if (problem) {
     return (
       <View className="w-full rounded-[16px] bg-accent/10 px-4 py-3.5">
-        <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+        <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={TEXT_CAP.reading}>
           {problem}
         </Text>
       </View>
@@ -669,18 +686,21 @@ function HourlyEstimateCard({ source }: { source: SalarySource }) {
       })}
       className="w-full rounded-[16px] bg-accent/10 px-4 py-3.5"
     >
-      <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+      <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={TEXT_CAP.control}>
         {t('salary.eachPaycheck')}
       </Text>
-      <Text
-        className="mt-0.5 font-app-semibold text-[22px] text-ink"
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        maxFontSizeMultiplier={1.2}
+      <FitFigure
+        id="paycheck"
+        size={22}
+        className="font-app-semibold text-ink"
+        boxClassName="mt-0.5"
       >
         {formatCurrency(estimate.grossPerPaycheck)}
-      </Text>
-      <Text className="mt-1 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+      </FitFigure>
+      <Text
+        className="mt-1 font-app text-[13px] text-muted"
+        maxFontSizeMultiplier={TEXT_CAP.reading}
+      >
         {t('salary.aboutPerMonth', { amount: formatCurrency(perMonth) })}
       </Text>
     </View>

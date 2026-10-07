@@ -97,13 +97,14 @@ export function BrandLogo({ name, domain, size = 40, className, fallback }: Bran
       }}
     >
       {showFallback ? (
+        // Stands in for a logo image, so it keeps the circle's size as the image would; the name
+        // itself is written, and read out, beside it.
         <Text
           className="font-app font-semibold"
           style={{
             fontSize: size * 0.36,
             color: isLightColor(background) ? '#161616' : '#FFFFFF',
           }}
-          maxFontSizeMultiplier={1}
           allowFontScaling={false}
         >
           {monogram(name)}

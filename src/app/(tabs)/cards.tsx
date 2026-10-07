@@ -7,6 +7,7 @@ import { AccountCard } from '@/components/cards/account-card';
 import { PaymentCard } from '@/components/cards/payment-card';
 import { ActionPill } from '@/components/ui/action-pill';
 import { AmountTile } from '@/components/ui/amount-tile';
+import { FitGroup, useFitGroup } from '@/components/ui/fit-group';
 import { PageState } from '@/components/ui/page-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Screen } from '@/components/ui/screen';
@@ -25,6 +26,7 @@ import { useToday } from '@/lib/use-today';
 import { moneyBuckets } from '@/data/money-mock';
 import { t, type MessageKey } from '@/i18n';
 import { failureText } from '@/lib/failure';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type SectionHeaderProps = {
   title: string;
@@ -57,7 +59,10 @@ const BUCKET_LABELS: Record<string, MessageKey> = {
 function ListNote({ text }: { text: string }) {
   return (
     <View className="w-full items-center rounded-[16px] border border-line bg-card p-5">
-      <Text className="text-center font-app text-[14px] text-muted" maxFontSizeMultiplier={1.4}>
+      <Text
+        className="text-center font-app text-[14px] text-muted"
+        maxFontSizeMultiplier={TEXT_CAP.reading}
+      >
         {text}
       </Text>
     </View>
@@ -77,6 +82,10 @@ export default function CardsScreen() {
   const { balances, isError: balancesError, refetch: refetchBalances } = useSourceBalances(today);
   const { refresh, refreshing } = useRefreshAll();
   const { pro } = usePro();
+  // The tiles' labels share one size and their figures another; the pair stacks if either cannot.
+  const tileLabels = useFitGroup({ mode: 'shrink' });
+  const tileFigures = useFitGroup({ mode: 'shrink' });
+  const tilesStacked = !tileLabels.fits || !tileFigures.fits;
 
   const monthlySalary = (salary.data ?? []).reduce(
     (sum, source) => sum + source.amount * PER_MONTH[source.frequency],
@@ -217,24 +226,34 @@ export default function CardsScreen() {
       </View>
 
       {/* Tiles flex, not a fixed width, so they stay side by side on a narrow phone. */}
-      <View className="mt-5 w-full flex-row gap-3 pb-8">
-        {moneyBuckets.map((bucket) => (
-          <View key={bucket.id} className="flex-1">
-            <AmountTile
-              label={BUCKET_LABELS[bucket.id] ? t(BUCKET_LABELS[bucket.id]) : bucket.label}
-              amount={moneyAmounts[bucket.id] ?? 0}
-              artwork={artwork[bucket.artwork]}
-              onPress={
-                bucket.id === 'salary'
-                  ? () => router.push('/salary')
-                  : bucket.id === 'savings'
-                    ? () => router.push('/savings')
-                    : undefined
-              }
-            />
-          </View>
-        ))}
-      </View>
+      <FitGroup group={tileLabels} className="mt-5 w-full pb-8" testID="money-tile-labels">
+        <FitGroup
+          group={tileFigures}
+          className={tilesStacked ? 'w-full gap-3' : 'w-full flex-row gap-3'}
+          testID="money-tile-figures"
+        >
+          {moneyBuckets.map((bucket) => (
+            <View key={bucket.id} className={tilesStacked ? 'w-full' : 'min-w-0 flex-1'}>
+              <AmountTile
+                id={bucket.id}
+                label={BUCKET_LABELS[bucket.id] ? t(BUCKET_LABELS[bucket.id]) : bucket.label}
+                amount={moneyAmounts[bucket.id] ?? 0}
+                artwork={artwork[bucket.artwork]}
+                labels={tileLabels}
+                figures={tileFigures}
+                stacked={tilesStacked}
+                onPress={
+                  bucket.id === 'salary'
+                    ? () => router.push('/salary')
+                    : bucket.id === 'savings'
+                      ? () => router.push('/savings')
+                      : undefined
+                }
+              />
+            </View>
+          ))}
+        </FitGroup>
+      </FitGroup>
     </Screen>
   );
 }

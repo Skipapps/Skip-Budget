@@ -206,6 +206,35 @@ describe("An account's page in French", () => {
     expectNoLeftovers(screen);
   });
 
+  it('lets the money button and the summary grow at large text, nothing cut', async () => {
+    const screen = await render(<SourceDetailScreen />);
+
+    // The button's height is a minimum, so a label on two lines still fits inside it.
+    const button = screen.getByLabelText('Ajouter un dépôt');
+    expect(String(button.props.className)).toContain('min-h-14');
+    expect(String(button.props.className)).not.toMatch(/(^|\s)h-14(\s|$)/);
+    const words = screen.getByText('Ajouter de l’argent');
+    expect(String(words.props.className)).toContain('shrink');
+    expect(words.props.maxFontSizeMultiplier).toBe(1.4);
+
+    // Once one label cannot sit beside its figure, every figure in the card goes under its label.
+    const layout = async (testID: string, width: number) =>
+      fireEvent(screen.getByTestId(testID, { includeHiddenElements: true }), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width, height: 20 } },
+      });
+    const lines = ['start', 'charged', 'paid', 'now'];
+    for (const id of lines) {
+      await layout(`fit-slot-${id}-label`, 160);
+      await layout(`fit-copy-${id}-label`, id === 'charged' ? 170 : 70);
+    }
+    await layout('source-sums', 295);
+    for (const id of lines) {
+      const row = screen.getByTestId(`fit-slot-${id}-label`).parent;
+      expect([id, String(row?.props.className).includes('flex-row')]).toEqual([id, false]);
+    }
+    expect(screen.getByText(`636,50${NBSP}$`)).toBeTruthy();
+  });
+
   it('offers the account kinds on the filter page in French', async () => {
     const screen = await render(<SourceDetailScreen />);
 

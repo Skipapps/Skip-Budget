@@ -1,7 +1,8 @@
 import { createElement } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { BrandLogo } from '@/components/brands/brand-logo';
+import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
 import { getBillIcon, type Bill } from '@/data/bills-mock';
 import { GLYPH_STROKE } from '@/data/glyphs';
 import { t, type MessageKey } from '@/i18n';
@@ -57,9 +58,15 @@ export function billCategoryHint(id: string, fallback = ''): string {
   return keys ? t(keys.hint) : fallback;
 }
 
+/**
+ * One bill in a list. The name wraps between words; a word too wide to sit beside the amount and
+ * date puts them under the name instead.
+ */
 export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
   const colors = useColors();
   const moneyColor = useMoneyColor();
+  const words = useFitGroup({ mode: 'switch' });
+  const stacked = !words.fits;
   // createElement, not JSX: a capitalised local for a looked-up component trips the lint rule.
   const icon = createElement(getBillIcon(bill), {
     size: 20,
@@ -69,55 +76,84 @@ export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
   const recurrence = recurrenceLabel(bill.recurrence);
   const domain = bill.domain;
 
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t('bills.row.a11y', {
-        name: bill.name,
-        amount: formatCurrency(bill.amount),
-        recurrence,
-        source: sourceLabel,
-      })}
-      onPress={onPress}
-      className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
+  const amount = (
+    <FitText
+      id="amount"
+      hug
+      role="row"
+      size={15}
+      className="font-app-semibold text-ink"
+      style={{ color: moneyColor(bill.amount) }}
+      slotClassName={stacked ? 'mt-0.5' : undefined}
     >
-      {domain ? (
-        <BrandLogo name={bill.name} domain={domain} size={40} />
-      ) : (
-        <View className="h-10 w-10 items-center justify-center rounded-[12px] bg-ink/5">
-          {icon}
+      {formatCurrency(bill.amount)}
+    </FitText>
+  );
+  const due = (
+    <FitText
+      id="date"
+      hug
+      role="row"
+      size={12}
+      className="font-app text-muted"
+      slotClassName="mt-0.5"
+    >
+      {formatFullDate(new Date(`${bill.dueDate}T00:00:00`))}
+    </FitText>
+  );
+
+  return (
+    <FitGroup group={words} className="w-full">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('bills.row.a11y', {
+          name: bill.name,
+          amount: formatCurrency(bill.amount),
+          recurrence,
+          source: sourceLabel,
+        })}
+        onPress={onPress}
+        className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
+      >
+        {domain ? (
+          <BrandLogo name={bill.name} domain={domain} size={40} />
+        ) : (
+          <View className="h-10 w-10 items-center justify-center rounded-[12px] bg-ink/5">
+            {icon}
+          </View>
+        )}
+
+        {/* Stacked, the amount follows the name and the date follows the details. */}
+        <View className="min-w-0 flex-1 items-start">
+          <FitText
+            id="name"
+            role="row"
+            size={15}
+            className="font-app-medium text-ink"
+            slotClassName="w-full"
+          >
+            {bill.name}
+          </FitText>
+          {stacked ? amount : null}
+          <FitText
+            id="detail"
+            role="row"
+            size={12}
+            className="font-app text-muted"
+            slotClassName="mt-0.5 w-full"
+          >
+            {sourceLabel ? `${recurrence} · ${sourceLabel}` : recurrence}
+          </FitText>
+          {stacked ? due : null}
         </View>
-      )}
 
-      <View className="min-w-0 flex-1">
-        <Text
-          className="font-app-medium text-[15px] text-ink"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.4}
-        >
-          {bill.name}
-        </Text>
-        <Text
-          className="mt-0.5 font-app text-[12px] text-muted"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.3}
-        >
-          {sourceLabel ? `${recurrence} · ${sourceLabel}` : recurrence}
-        </Text>
-      </View>
-
-      <View className="items-end">
-        <Text
-          className="font-app-semibold text-[15px] text-ink"
-          style={{ color: moneyColor(bill.amount) }}
-          maxFontSizeMultiplier={1.4}
-        >
-          {formatCurrency(bill.amount)}
-        </Text>
-        <Text className="mt-0.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-          {formatFullDate(new Date(`${bill.dueDate}T00:00:00`))}
-        </Text>
-      </View>
-    </Pressable>
+        {stacked ? null : (
+          <View className="shrink-0 items-end">
+            {amount}
+            {due}
+          </View>
+        )}
+      </Pressable>
+    </FitGroup>
   );
 }

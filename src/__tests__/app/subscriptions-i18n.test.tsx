@@ -1,4 +1,5 @@
 import { fireEvent, getDefaultNormalizer, render } from '@testing-library/react-native';
+import { Dimensions } from 'react-native';
 import type { ReactTestRendererJSON } from 'react-test-renderer';
 
 import SubscriptionPlansScreen from '@/app/subscription-plans';
@@ -261,6 +262,26 @@ describe('Subscriptions charged', () => {
       ),
     ).toBeTruthy();
     expectNoRawText(screen.toJSON());
+  });
+
+  it('keeps the total whole at large text, wrapping a renewal rather than cutting it', async () => {
+    setLanguage('fr');
+    const window = { width: 375, height: 812, scale: 3, fontScale: 1.3 };
+    Dimensions.set({ window, screen: window });
+    const screen = await render(<SubscriptionsScreen />);
+
+    const total = `-1${NBSP}215,99${NBSP}$`;
+    const figure = screen.getByText(total);
+    expect(figure.props.numberOfLines).toBeUndefined();
+    expect(figure.props.adjustsFontSizeToFit).toBeUndefined();
+    expect(figure.props.maxFontSizeMultiplier).toBe(1.2);
+    expect(
+      screen.getByTestId('fit-copy-total', { includeHiddenElements: true }).props.children,
+    ).toBe(total);
+    // Each renewal row draws its name and amount whole as well.
+    for (const node of screen.getAllByText(`-15,99${NBSP}$`)) {
+      expect(node.props.numberOfLines).toBeUndefined();
+    }
   });
 });
 

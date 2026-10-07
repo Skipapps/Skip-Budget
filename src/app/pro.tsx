@@ -21,6 +21,7 @@ import { proMonthlyLabel, proYearlyLabel, usdText } from '@/lib/wall';
 import { router } from 'expo-router';
 import { useColors } from '@/providers/theme-provider';
 import { failureMessage, failureText } from '@/lib/failure';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 const FEATURES: { icon: LucideIcon; title: MessageKey; hint: MessageKey }[] = [
   { icon: CreditCard, title: 'pro.page.cards.title', hint: 'pro.page.cards.hint' },
@@ -285,10 +286,11 @@ function PriceCard({
       }
     >
       {badge ? (
+        // Its words are not in the card's spoken label, so they follow the text size like any other.
         <View className="absolute -top-2.5 right-3 rounded-full bg-accent px-2.5 py-0.5">
           <Text
-            allowFontScaling={false}
             className="font-app-bold text-[9px] tracking-wide text-on-control"
+            maxFontSizeMultiplier={TEXT_CAP.control}
           >
             {badge}
           </Text>

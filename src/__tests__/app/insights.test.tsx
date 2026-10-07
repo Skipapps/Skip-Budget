@@ -133,6 +133,15 @@ const redFigures = (nodes: { props: { style?: unknown; children?: unknown } }[])
     )
     .map((node) => node.props.children);
 
+type Node = { parent: Node | null; props: { testID?: string } };
+
+/** A text's own box: its parent, past the slot and group boxes that large text draws around it. */
+function boxOf(node: Node): Node | null {
+  let box = node.parent;
+  while (box && String(box.props.testID ?? '').startsWith('fit-')) box = box.parent;
+  return box;
+}
+
 /** The three newest of the six, oldest of those three first. */
 const EXPECTED = ['June 2026', 'July 2026', 'August 2026'];
 
@@ -171,10 +180,10 @@ describe('Insights — where you stand', () => {
 
     const { getByText } = await render(<InsightsScreen />);
 
-    // A figure is pinned to its own label by sharing a parent with it, so a total cannot pass by
+    // A figure is pinned to its own label by sharing a box with it, so a total cannot pass by
     // turning up somewhere else on the page.
     const beside = (label: string, figure: string) =>
-      expect(getByText(figure).parent).toBe(getByText(label).parent);
+      expect(boxOf(getByText(figure))).toBe(boxOf(getByText(label)));
 
     beside('Saved, less what you owe', '$2,065.37');
     beside('Put aside', '$3,300.00');
@@ -195,7 +204,7 @@ describe('Insights — where you stand', () => {
     const dust = await render(<InsightsScreen />);
 
     const label = dust.getByText('Saved, less what you owe');
-    expect(dust.getAllByText('$0.00').some((node) => node.parent === label.parent)).toBe(true);
+    expect(dust.getAllByText('$0.00').some((node) => boxOf(node) === boxOf(label))).toBe(true);
     // The card debt is the only red figure; finding it proves the colour can be seen here, so the
     // headline missing from the list is a real answer.
     expect(redFigures(dust.getAllByText(/\$/))).toEqual(['$0.30']);
@@ -278,5 +287,91 @@ describe('Insights — where you spend most', () => {
     expect(drawn.Target).toMatchObject({ domain: null, hidden: false });
     expect(drawn.Calm).toMatchObject({ domain: 'calm.com', hidden: false });
     expect(drawn.Spotify).toMatchObject({ domain: 'spotify.com', hidden: false });
+  });
+});
+
+describe('Insights — at large text sizes', () => {
+  type Screen = Awaited<ReturnType<typeof render>>;
+
+  const layout = async (screen: Screen, testID: string, width: number) =>
+    fireEvent(screen.getByTestId(testID, { includeHiddenElements: true }), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width, height: 20 } },
+    });
+
+  /** Each row's label beside its figure, then the card: `wide` names the row whose word is too wide. */
+  async function layOutCard(screen: Screen, card: string, ids: string[], wide?: string) {
+    for (const id of ids) {
+      await layout(screen, `fit-slot-${id}-label`, 150);
+      await layout(screen, `fit-copy-${id}-label`, id === wide ? 170 : 80);
+    }
+    await layout(screen, card, 290);
+  }
+
+  type Shown = { props: { children?: unknown; [prop: string]: unknown } };
+  const shownIn = (screen: Screen, slot: string) =>
+    screen.getByTestId(slot).children[0] as unknown as Shown;
+
+  const beside = (screen: Screen, id: string) =>
+    String(screen.getByTestId(`fit-slot-${id}-label`).parent?.props.className).includes('flex-row');
+
+  beforeEach(() => {
+    mockCards = [{ id: 'card-a', holder: 'Chase Sapphire', last4: '1004', balance: 1234.56 }];
+    mockEntries = [
+      {
+        id: 'e1',
+        label: 'Ticketmaster Entertainment',
+        amount: -1234.5,
+        date: '2026-10-01',
+        kind: 'receipt',
+        sourceId: 'card-a',
+        categoryId: 'fun',
+      },
+      {
+        id: 'e2',
+        label: 'Bakery',
+        amount: -6,
+        date: '2026-10-02',
+        kind: 'receipt',
+        sourceId: 'card-a',
+        categoryId: 'food',
+      },
+    ];
+  });
+
+  it('prints each headline figure whole, with its cents, never shrunk on its own by iOS', async () => {
+    const screen = await render(<InsightsScreen />);
+    for (const id of ['worth', 'out']) {
+      // The figure drawn in its slot, ahead of the hidden copy that measures it.
+      const node = shownIn(screen, `fit-slot-${id}`);
+      expect(node.props.children).toMatch(/\.\d{2}$/);
+      expect(node.props.numberOfLines).toBeUndefined();
+      expect(node.props.adjustsFontSizeToFit).toBeUndefined();
+      expect(node.props.maxFontSizeMultiplier).toBe(1.2);
+    }
+  });
+
+  it('moves both Where you stand figures under their labels once one label cannot fit', async () => {
+    const screen = await render(<InsightsScreen />);
+    await layOutCard(screen, 'insights-stand', ['aside', 'owed'], undefined);
+    expect([beside(screen, 'aside'), beside(screen, 'owed')]).toEqual([true, true]);
+
+    await layOutCard(screen, 'insights-stand', ['aside', 'owed'], 'owed');
+    expect([beside(screen, 'aside'), beside(screen, 'owed')]).toEqual([false, false]);
+    // Still pinned to its own label, and still to the cent.
+    const row = screen.getByTestId('fit-slot-owed-label').parent;
+    expect(screen.getByTestId('fit-slot-owed-value').parent).toBe(row);
+    expect(shownIn(screen, 'fit-slot-owed-value').props.children).toBe('$1,234.56');
+  });
+
+  it('wraps a long store name and moves every figure in that card under its name together', async () => {
+    const screen = await render(<InsightsScreen />);
+    const name = screen.getByText('Ticketmaster Entertainment');
+    expect(name.props.numberOfLines).toBeUndefined();
+    expect(name.props.maxFontSizeMultiplier).toBe(1.4);
+
+    await layOutCard(screen, 'insights-merchants', ['merchant-0', 'merchant-1'], 'merchant-0');
+    expect([beside(screen, 'merchant-0'), beside(screen, 'merchant-1')]).toEqual([false, false]);
+    // The other cards are groups of their own and keep their layout.
+    expect(beside(screen, 'category-0')).toBe(true);
   });
 });

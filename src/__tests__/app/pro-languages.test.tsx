@@ -121,6 +121,13 @@ describe('the Pro page in English', () => {
     expect(screen.getByText('$1.67 a month, billed once a year')).toBeTruthy();
     expect(screen.getByText('2 MONTHS FREE')).toBeTruthy();
   });
+
+  it('lets the offer sticker follow the text size, since the card does not say it aloud', async () => {
+    const screen = await render(<ProScreen />);
+    const sticker = screen.getByText('2 MONTHS FREE');
+    expect(sticker.props.allowFontScaling).toBeUndefined();
+    expect(sticker.props.maxFontSizeMultiplier).toBe(1.3);
+  });
 });
 
 describe('the Pro page in Spanish', () => {

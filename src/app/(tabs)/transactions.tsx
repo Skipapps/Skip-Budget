@@ -40,6 +40,7 @@ import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
 import { failureText } from '@/lib/failure';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 export default function TransactionsScreen() {
   const artwork = useArtwork();
@@ -164,9 +165,8 @@ export default function TransactionsScreen() {
         </Pressable>
 
         <Text
-          className="flex-1 text-center font-app-semibold text-[15px] text-ink"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.3}
+          className="min-w-0 flex-1 text-center font-app-semibold text-[15px] text-ink"
+          maxFontSizeMultiplier={TEXT_CAP.control}
         >
           {periodLabel(periodKey, anchor)}
         </Text>
@@ -262,18 +262,18 @@ export default function TransactionsScreen() {
               {group.from === group.to ? (
                 <DateGroupHeader date={group.from} today={today} total={group.total} />
               ) : (
-                <View className="w-full flex-row items-center justify-between gap-3 bg-surface pb-1.5 pt-4">
+                // As DateGroupHeader: the total moves under the name when both do not fit.
+                <View className="w-full flex-row flex-wrap items-center justify-between gap-x-3 bg-surface pb-1.5 pt-4">
                   <Text
-                    className="font-app-medium text-[13px] uppercase tracking-wide text-muted"
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={1.3}
+                    className="shrink font-app-medium text-[13px] uppercase tracking-wide text-muted"
+                    maxFontSizeMultiplier={TEXT_CAP.heading}
                   >
                     {group.label}
                   </Text>
                   <Text
                     className="font-app text-[13px] text-muted"
                     style={{ color: moneyColor(group.total) }}
-                    maxFontSizeMultiplier={1.3}
+                    maxFontSizeMultiplier={TEXT_CAP.heading}
                   >
                     {formatCurrency(group.total)}
                   </Text>

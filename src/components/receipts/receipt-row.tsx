@@ -1,6 +1,7 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { BrandMark } from '@/components/brands/brand-mark';
+import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
 import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
@@ -20,6 +21,10 @@ type ReceiptRowProps = {
   onPress?: () => void;
 };
 
+/**
+ * One receipt in a list. The store's name wraps between words; a word too wide to sit beside the
+ * amount and date puts them under the name instead.
+ */
 export function ReceiptRow({
   merchant,
   amount,
@@ -30,54 +35,85 @@ export function ReceiptRow({
   onPress,
 }: ReceiptRowProps) {
   const moneyColor = useMoneyColor();
+  const words = useFitGroup({ mode: 'switch' });
+  const stacked = !words.fits;
   const spent = -Math.abs(amount);
   const figure = formatCurrency(spent);
 
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={
-        sourceLabel
-          ? t('receipts.row.paidWith', { merchant, amount: figure, source: sourceLabel })
-          : `${merchant}, ${figure}`
-      }
-      accessibilityHint={t('receipts.row.hint')}
-      onPress={onPress}
-      className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
+  const shownAmount = (
+    <FitText
+      id="amount"
+      hug
+      role="row"
+      size={15}
+      className="font-app-semibold text-ink"
+      style={{ color: moneyColor(spent) }}
+      slotClassName={stacked ? 'mt-0.5' : undefined}
     >
-      <BrandMark name={merchant} domain={domain} hidden={logoHidden} size={40} />
+      {figure}
+    </FitText>
+  );
+  const shownDate = (
+    <FitText
+      id="date"
+      hug
+      role="row"
+      size={12}
+      className="font-app text-muted"
+      slotClassName="mt-0.5"
+    >
+      {formatFullDate(new Date(`${date}T00:00:00`))}
+    </FitText>
+  );
 
-      <View className="min-w-0 flex-1">
-        <Text
-          className="font-app-medium text-[15px] text-ink"
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.4}
-        >
-          {merchant}
-        </Text>
-        {sourceLabel ? (
-          <Text
-            className="mt-0.5 font-app text-[12px] text-muted"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.3}
+  return (
+    <FitGroup group={words} className="w-full">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          sourceLabel
+            ? t('receipts.row.paidWith', { merchant, amount: figure, source: sourceLabel })
+            : `${merchant}, ${figure}`
+        }
+        accessibilityHint={t('receipts.row.hint')}
+        onPress={onPress}
+        className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
+      >
+        <BrandMark name={merchant} domain={domain} hidden={logoHidden} size={40} />
+
+        {/* Stacked, the amount follows the name and the date follows the card it was paid with. */}
+        <View className="min-w-0 flex-1 items-start">
+          <FitText
+            id="name"
+            role="row"
+            size={15}
+            className="font-app-medium text-ink"
+            slotClassName="w-full"
           >
-            {sourceLabel}
-          </Text>
-        ) : null}
-      </View>
+            {merchant}
+          </FitText>
+          {stacked ? shownAmount : null}
+          {sourceLabel ? (
+            <FitText
+              id="detail"
+              role="row"
+              size={12}
+              className="font-app text-muted"
+              slotClassName="mt-0.5 w-full"
+            >
+              {sourceLabel}
+            </FitText>
+          ) : null}
+          {stacked ? shownDate : null}
+        </View>
 
-      <View className="items-end">
-        <Text
-          className="font-app-semibold text-[15px] text-ink"
-          style={{ color: moneyColor(spent) }}
-          maxFontSizeMultiplier={1.4}
-        >
-          {figure}
-        </Text>
-        <Text className="mt-0.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-          {formatFullDate(new Date(`${date}T00:00:00`))}
-        </Text>
-      </View>
-    </Pressable>
+        {stacked ? null : (
+          <View className="shrink-0 items-end">
+            {shownAmount}
+            {shownDate}
+          </View>
+        )}
+      </Pressable>
+    </FitGroup>
   );
 }

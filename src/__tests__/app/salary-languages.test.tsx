@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Dimensions } from 'react-native';
 
 import SalaryScreen from '@/app/salary';
 import type { CurrencyCode, Language } from '@/i18n/config';
@@ -227,6 +228,34 @@ it('names the source in a French hourly problem, with the no-break space before 
     ),
   ).toBeTruthy();
   expect(mockUpdate).not.toHaveBeenCalled();
+});
+
+it('keeps every figure whole at large text and lets every line grow', async () => {
+  const window = { width: 375, height: 812, scale: 3, fontScale: 1.4 };
+  Dimensions.set({ window, screen: window });
+  mockDetails = { rows: [hourlyRow], hourlyAvailable: true };
+  await showIn('fr', 'CAD');
+
+  // The month's total and the paycheck estimate: each a figure of its own, measured and drawn as
+  // one piece, with its cents.
+  for (const id of ['monthly-total', 'paycheck']) {
+    const copy = screen.getByTestId(`fit-copy-${id}`, { includeHiddenElements: true });
+    const figure = copy.props.children as string;
+    expect(figure).toMatch(/^[\d\u00a0]+,\d{2}\u00a0\$$/);
+    const node = screen.getByText(figure, RAW);
+    expect(node.props.numberOfLines).toBeUndefined();
+    expect(node.props.adjustsFontSizeToFit).toBeUndefined();
+    expect(node.props.maxFontSizeMultiplier).toBe(1.2);
+  }
+  expect(screen.getByText(`1${NBSP}900,00${NBSP}$`, RAW)).toBeTruthy();
+
+  // The next payday line had no ceiling at all; it is a field hint now.
+  expect(screen.getByText(/^Prochain jour de paie/, RAW).props.maxFontSizeMultiplier).toBe(1.6);
+  // The source's name wraps beside its buttons, the add button's words inside it.
+  expect(String(screen.getByText('Source 1', RAW).props.className)).toContain('flex-1');
+  expect(String(screen.getByText('Ajouter une source de salaire', RAW).props.className)).toContain(
+    'shrink',
+  );
 });
 
 it('says the one failure line in the language on screen', async () => {

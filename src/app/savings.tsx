@@ -1,5 +1,6 @@
 import { savedFor, useMonthlySavings, type MonthlySavingRow } from '@/api/queries';
 import { useRefreshAll } from '@/api/refresh';
+import { FitFigure, FitRows, FitText, useGroupFits } from '@/components/ui/fit-group';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -15,6 +16,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { useColors } from '@/providers/theme-provider';
 import { failureText } from '@/lib/failure';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 /** "August 2026", "Agosto de 2026": it starts its line, so it takes a capital in every language. */
 function monthName(month: string): string {
@@ -72,26 +74,31 @@ export default function SavingsScreen() {
       {months.length > 0 ? (
         <>
           <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
-            <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+            <Text
+              className="text-center font-app text-[13px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.control}
+            >
               {t('savings.list.savedSoFar')}
             </Text>
-            <Text
-              className="mt-1 font-app-bold text-[38px] text-ink"
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              maxFontSizeMultiplier={1.2}
+            <FitFigure
+              id="saved-total"
+              size={38}
+              className="text-center font-app-bold text-ink"
+              boxClassName="mt-1"
             >
               {formatCurrency(total)}
-            </Text>
+            </FitFigure>
             <Text
               className="mt-1 text-center font-app text-[13px] text-muted"
-              maxFontSizeMultiplier={1.3}
+              maxFontSizeMultiplier={TEXT_CAP.reading}
             >
               {t('savings.list.across', { count: kept })}
             </Text>
           </View>
 
-          <View className="mb-10 mt-8 w-full">
+          {/* One column of amounts: once one month's name cannot sit beside its amount, every
+              month puts its amount under its name. */}
+          <FitRows className="mb-10 mt-8 w-full" testID="saving-months">
             {rows.map((month) => (
               <MonthRow
                 key={month.month}
@@ -99,7 +106,7 @@ export default function SavingsScreen() {
                 onPress={() => router.push(`/savings-month?month=${month.month}`)}
               />
             ))}
-          </View>
+          </FitRows>
         </>
       ) : null}
     </Screen>
@@ -108,6 +115,7 @@ export default function SavingsScreen() {
 
 function MonthRow({ row, onPress }: { row: MonthlySavingRow; onPress: () => void }) {
   const colors = useColors();
+  const stacked = !useGroupFits();
 
   const computed = Number(row.saved);
   const corrected = row.adjusted_saved !== null;
@@ -147,32 +155,42 @@ function MonthRow({ row, onPress }: { row: MonthlySavingRow; onPress: () => void
       className="w-full flex-row items-center gap-3 border-b border-line py-4 active:bg-ink/5"
     >
       <View className="min-w-0 flex-1">
-        <View className="w-full flex-row items-baseline justify-between gap-3">
-          <Text
-            className="min-w-0 flex-1 font-app-medium text-[15px] text-ink"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.3}
+        <View
+          className={
+            stacked ? 'w-full items-start' : 'w-full flex-row items-baseline justify-between gap-3'
+          }
+        >
+          <FitText
+            id={`${row.month}-name`}
+            role="row"
+            size={15}
+            className="font-app-medium text-ink"
+            slotClassName={stacked ? 'w-full' : 'min-w-0 flex-1'}
           >
             {name}
-          </Text>
-          <Text
+          </FitText>
+          <FitText
+            id={`${row.month}-amount`}
+            hug
+            role="row"
+            size={excluded ? 14 : 15}
             // Money colours, never the accent: the sign must read at a glance.
             className={
               excluded
-                ? 'font-app text-[14px] text-muted line-through'
+                ? 'font-app text-muted line-through'
                 : over
-                  ? 'font-app-semibold text-[15px] text-money-out'
-                  : 'font-app-semibold text-[15px] text-money-in'
+                  ? 'font-app-semibold text-money-out'
+                  : 'font-app-semibold text-money-in'
             }
-            maxFontSizeMultiplier={1.4}
+            slotClassName={stacked ? 'mt-0.5' : 'shrink-0'}
           >
             {over ? `\u2212${formatCurrency(Math.abs(shown))}` : formatCurrency(shown)}
-          </Text>
+          </FitText>
         </View>
 
         <Text
           className="mt-1.5 font-app text-[12px] leading-[18px] text-muted"
-          maxFontSizeMultiplier={1.4}
+          maxFontSizeMultiplier={TEXT_CAP.row}
         >
           {explain}
         </Text>

@@ -1,4 +1,5 @@
 import { fireEvent, getDefaultNormalizer, render } from '@testing-library/react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 import type { ReactTestRendererJSON } from 'react-test-renderer';
 
 import BillPlansScreen from '@/app/bill-plans';
@@ -269,6 +270,36 @@ describe('Monthly bills', () => {
     expect(none.getByText('Pas encore de factures')).toBeTruthy();
     expect(none.getByText('Ajouter une facture')).toBeTruthy();
     expectNoRawText(none.toJSON());
+  });
+
+  it('keeps the total whole at large text, in French too, and shrinks it alone if it must', async () => {
+    setLanguage('fr');
+    const window = { width: 375, height: 812, scale: 3, fontScale: 1.3 };
+    Dimensions.set({ window, screen: window });
+    const screen = await render(<BillsScreen />);
+
+    const total = `-2${NBSP}230,50${NBSP}$`;
+    const figure = screen.getByText(total);
+    expect(figure.props.numberOfLines).toBeUndefined();
+    expect(figure.props.adjustsFontSizeToFit).toBeUndefined();
+    expect(figure.props.maxFontSizeMultiplier).toBe(1.2);
+    // Measured as one piece: its no-break spaces are not places to wrap.
+    const copy = screen.getByTestId('fit-copy-total', { includeHiddenElements: true });
+    expect(copy.props.children).toBe(total);
+
+    for (const [testID, width] of [
+      ['fit-slot-total', 150],
+      ['fit-copy-total', 200],
+      ['fit-figure-total', 150],
+    ] as const) {
+      await fireEvent(screen.getByTestId(testID, { includeHiddenElements: true }), 'layout', {
+        nativeEvent: { layout: { x: 0, y: 0, width, height: 30 } },
+      });
+    }
+    expect(StyleSheet.flatten(screen.getByText(total).props.style).fontSize).toBeCloseTo(
+      26 * 0.74,
+      5,
+    );
   });
 });
 

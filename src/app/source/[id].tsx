@@ -15,6 +15,7 @@ import {
   type LedgerFilters,
 } from '@/components/transactions/filter-sheet';
 import { AmountPad } from '@/components/ui/amount-pad';
+import { FitRows, FitText, useGroupFits } from '@/components/ui/fit-group';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
@@ -28,6 +29,7 @@ import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
 import { failureMessage, failureText } from '@/lib/failure';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 const KIND_KEYS: Record<string, MessageKey> = {
   receipt: 'accounts.source.kind.receipt',
@@ -175,10 +177,13 @@ export default function SourceDetailScreen() {
             isCard ? t('accounts.source.makePayment') : t('accounts.source.addDeposit')
           }
           onPress={() => setPadOpen(true)}
-          className="h-14 flex-row items-center gap-2 rounded-full bg-control px-5 active:opacity-80"
+          className="min-h-14 flex-row items-center gap-2 rounded-full bg-control px-5 py-3 active:opacity-80"
         >
           <Plus size={20} color={colors.onControl} strokeWidth={2} />
-          <Text className="font-app-medium text-[15px] text-on-control" maxFontSizeMultiplier={1.3}>
+          <Text
+            className="shrink font-app-medium text-[15px] text-on-control"
+            maxFontSizeMultiplier={TEXT_CAP.row}
+          >
             {isCard ? t('accounts.source.makePayment') : t('accounts.source.addMoney')}
           </Text>
         </Pressable>
@@ -212,8 +217,12 @@ export default function SourceDetailScreen() {
         )}
       </View>
 
-      <View className="mt-6 w-full rounded-[16px] border border-line px-4 py-3">
+      <FitRows
+        className="mt-6 w-full rounded-[16px] border border-line px-4 py-3"
+        testID="source-sums"
+      >
         <SummaryLine
+          id="start"
           label={
             source.balance_as_of
               ? t('accounts.source.balanceOn', {
@@ -224,25 +233,28 @@ export default function SourceDetailScreen() {
           value={formatCurrency(source.balance)}
         />
         <SummaryLine
+          id="charged"
           label={isCard ? t('accounts.source.chargedSince') : t('accounts.source.spentSince')}
           value={formatCurrency(-ledger.charged)}
         />
         <SummaryLine
+          id="paid"
           label={isCard ? t('accounts.source.payments') : t('accounts.source.moneyIn')}
           value={formatCurrency(ledger.paid)}
         />
         <View className="my-2 h-px w-full bg-line" />
         <SummaryLine
+          id="now"
           label={isCard ? t('accounts.source.owedNow') : t('accounts.source.balanceNow')}
           value={formatCurrency(ledger.balance)}
           strong
         />
-      </View>
+      </FitRows>
 
       {error ? (
         <Text
           className="mt-4 w-full text-center font-app text-[13px] text-danger"
-          maxFontSizeMultiplier={1.4}
+          maxFontSizeMultiplier={TEXT_CAP.reading}
         >
           {error}
         </Text>
@@ -354,25 +366,50 @@ export default function SourceDetailScreen() {
   );
 }
 
-function SummaryLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+/**
+ * A label and its figure. Every line in the card keeps its figure beside its label, or every line
+ * puts it underneath.
+ */
+function SummaryLine({
+  id,
+  label,
+  value,
+  strong,
+}: {
+  /** Names the fit slots; unique in its card. */
+  id: string;
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  const stacked = !useGroupFits();
   return (
-    <View className="w-full flex-row items-center justify-between py-1.5">
-      <Text
-        className={
-          strong ? 'font-app-medium text-[14px] text-ink' : 'font-app text-[14px] text-muted'
-        }
-        maxFontSizeMultiplier={1.3}
+    <View
+      className={
+        stacked
+          ? 'w-full items-start py-1.5'
+          : 'w-full flex-row items-center justify-between gap-3 py-1.5'
+      }
+    >
+      <FitText
+        id={`${id}-label`}
+        role="row"
+        size={14}
+        className={strong ? 'font-app-medium text-ink' : 'font-app text-muted'}
+        slotClassName={stacked ? 'w-full' : 'min-w-0 flex-1'}
       >
         {label}
-      </Text>
-      <Text
-        className={
-          strong ? 'font-app-semibold text-[16px] text-ink' : 'font-app text-[14px] text-body'
-        }
-        maxFontSizeMultiplier={1.3}
+      </FitText>
+      <FitText
+        id={`${id}-value`}
+        hug
+        role="row"
+        size={strong ? 16 : 14}
+        className={strong ? 'font-app-semibold text-ink' : 'font-app text-body'}
+        slotClassName={stacked ? 'mt-0.5' : 'shrink-0'}
       >
         {value}
-      </Text>
+      </FitText>
     </View>
   );
 }

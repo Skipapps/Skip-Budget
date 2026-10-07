@@ -12,6 +12,7 @@ import { cn } from '@/lib/cn';
 import { selectionLogo } from '@/lib/logo-columns';
 import { logoHints } from '@/lib/logo-lookup';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 export type BrandSelection = {
   /** Null for a store the catalog does not know. */
@@ -134,9 +135,8 @@ export function BrandField({
         <View className="min-h-14 w-full flex-row items-center rounded-[10px] border border-line px-4">
           <BrandLogo name={value.name} domain={selectionLogo(value)} size={32} />
           <Text
-            className="ml-3 flex-1 py-4 font-app text-[16px] text-ink"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.5}
+            className="ml-3 min-w-0 flex-1 py-4 font-app text-[16px] text-ink"
+            maxFontSizeMultiplier={TEXT_CAP.row}
           >
             {value.name}
           </Text>
@@ -192,7 +192,7 @@ export function BrandField({
           autoCorrect={false}
           returnKeyType="search"
           className="flex-1 py-4 font-app text-[16px] text-ink"
-          maxFontSizeMultiplier={1.5}
+          maxFontSizeMultiplier={TEXT_CAP.row}
         />
         {searching && isFetching ? <ActivityIndicator size="small" color={colors.muted} /> : null}
       </View>
@@ -212,9 +212,8 @@ export function BrandField({
             >
               <BrandLogo name={brand.name} domain={brand.domain} size={32} />
               <Text
-                className="ml-3 flex-1 font-app text-[15px] text-ink"
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.4}
+                className="ml-3 min-w-0 flex-1 font-app text-[15px] text-ink"
+                maxFontSizeMultiplier={TEXT_CAP.row}
               >
                 {brand.name}
               </Text>
@@ -235,9 +234,8 @@ export function BrandField({
                 <Plus size={16} color={colors.muted} strokeWidth={2} />
               </View>
               <Text
-                className="ml-3 flex-1 font-app text-[15px] text-body"
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.4}
+                className="ml-3 min-w-0 flex-1 font-app text-[15px] text-body"
+                maxFontSizeMultiplier={TEXT_CAP.row}
               >
                 {t('settings.store.add', { name: typed })}
               </Text>
@@ -247,7 +245,10 @@ export function BrandField({
       ) : null}
 
       {error ? (
-        <Text className="ml-5 mt-1.5 font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
+        <Text
+          className="ml-5 mt-1.5 font-app text-[13px] text-danger"
+          maxFontSizeMultiplier={TEXT_CAP.reading}
+        >
           {error}
         </Text>
       ) : null}

@@ -157,3 +157,75 @@ it('opens Change logo for this bill from its logo', async () => {
     params: { kind: 'bill', id: 'b1', name: 'Housing' },
   });
 });
+
+describe('at large text sizes', () => {
+  type Screen = Awaited<ReturnType<typeof render>>;
+
+  const layout = async (screen: Screen, testID: string, width: number) =>
+    fireEvent(screen.getByTestId(testID, { includeHiddenElements: true }), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width, height: 20 } },
+    });
+
+  /** Next due, Paid from, Category, Started: each label's room and widest word, then the card. */
+  async function layOutDetails(screen: Screen, widestLabelWord: number) {
+    for (let index = 0; index < 4; index += 1) {
+      await layout(screen, `fit-slot-detail-${index}-label`, 90);
+      await layout(screen, `fit-copy-detail-${index}-label`, index === 1 ? widestLabelWord : 50);
+      await layout(screen, `fit-slot-detail-${index}-value`, 180);
+      await layout(screen, `fit-copy-detail-${index}-value`, 80);
+    }
+    await layout(screen, 'plan-details', 290);
+  }
+
+  const rowOf = (screen: Screen, testID: string) =>
+    String(screen.getByTestId(testID).parent?.props.className);
+
+  it('prints the amount whole, with its cents, and never shrinks it on its own', async () => {
+    const screen = await render(<BillDetailScreen />);
+    const figure = screen.getByText('$1,030.00');
+    expect(figure.props.numberOfLines).toBeUndefined();
+    expect(figure.props.adjustsFontSizeToFit).toBeUndefined();
+    expect(figure.props.maxFontSizeMultiplier).toBe(1.2);
+  });
+
+  it('keeps each detail beside its label while every word fits', async () => {
+    const screen = await render(<BillDetailScreen />);
+    await layOutDetails(screen, 60);
+    for (let index = 0; index < 4; index += 1) {
+      expect(rowOf(screen, `fit-slot-detail-${index}-label`)).toContain('flex-row');
+    }
+    expect(screen.getByText('Chase Checking ••7730').props.className).toContain('text-right');
+  });
+
+  it('puts every detail under its label once one label word cannot fit', async () => {
+    const screen = await render(<BillDetailScreen />);
+    await layOutDetails(screen, 95);
+    for (let index = 0; index < 4; index += 1) {
+      expect(rowOf(screen, `fit-slot-detail-${index}-label`)).not.toContain('flex-row');
+    }
+    // Under its label, a value starts where the label does.
+    expect(screen.getByText('Chase Checking ••7730').props.className).not.toContain('text-right');
+  });
+
+  it('puts every charge in a card under its date once one date cannot fit beside its amount', async () => {
+    const screen = await render(<BillDetailScreen />);
+    const paid = ['2026-09-01', '2026-10-01'].map((date) => `bill-b1@${date}`);
+    for (const id of paid) {
+      await layout(screen, `fit-slot-${id}-date`, 120);
+      await layout(screen, `fit-copy-${id}-date`, id.endsWith('09-01') ? 130 : 60);
+      await layout(screen, `fit-slot-${id}-amount`, 95);
+    }
+    await layout(screen, 'charges-paid', 327);
+
+    for (const id of paid) {
+      const date = screen.getByTestId(`fit-slot-${id}-date`);
+      expect(screen.getByTestId(`fit-slot-${id}-amount`).parent).toBe(date.parent);
+    }
+    // The upcoming card is its own group and keeps its amounts beside their dates.
+    const upcoming = 'bill-b1@2026-11-01';
+    expect(screen.getByTestId(`fit-slot-${upcoming}-amount`).parent).not.toBe(
+      screen.getByTestId(`fit-slot-${upcoming}-date`).parent,
+    );
+    expect(screen.getAllByText('-$1,030.00').length).toBeGreaterThan(0);
+  });
+});

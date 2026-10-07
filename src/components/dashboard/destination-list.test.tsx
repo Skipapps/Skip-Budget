@@ -135,7 +135,7 @@ async function layOut(screen: Screen, room: number, scale = 1) {
     const key = id as keyof typeof WIDEST_WORD;
     await layout(screen, `fit-slot-${id}-label`, room);
     await layout(screen, `fit-copy-${id}-label`, WIDEST_WORD[key] * scale);
-    await layout(screen, `fit-copy-${id}-amount`, FIGURE[key] * scale);
+    await layout(screen, `fit-slot-${id}-amount`, FIGURE[key] * scale);
   }
   await layout(screen, 'where-it-goes', 380);
 }
