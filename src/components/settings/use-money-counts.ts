@@ -5,8 +5,24 @@ import {
   useSalarySources,
   useSubscriptions,
 } from '@/api/queries';
+import { t } from '@/i18n';
 
-export const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+/** Each counted thing's message holds its own one/other wording; this only hands it the count. */
+const COUNTED = {
+  card: 'settings.count.cards',
+  bankAccount: 'settings.count.bankAccounts',
+  bill: 'settings.count.bills',
+  recurringBill: 'settings.count.recurringBills',
+  subscription: 'settings.count.subscriptions',
+  receipt: 'settings.count.receipts',
+  recordedCharge: 'settings.count.recordedCharges',
+  salarySource: 'settings.count.salarySources',
+} as const;
+
+export type Counted = keyof typeof COUNTED;
+
+/** "2 bank accounts" in the language on screen. */
+export const plural = (count: number, thing: Counted) => t(COUNTED[thing], { count });
 
 /**
  * One read for the counts Your money shows and the tally Delete account lists, so the two pages

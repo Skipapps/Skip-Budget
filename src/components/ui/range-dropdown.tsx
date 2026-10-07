@@ -2,6 +2,7 @@ import { Check, ChevronDown } from 'lucide-react-native';
 import { useState } from 'react';
 import { Modal, Pressable, Text } from 'react-native';
 
+import { t } from '@/i18n';
 import { LEDGER_RANGES, type RangeKey } from '@/lib/range';
 import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
@@ -21,7 +22,7 @@ export function RangeDropdown({ value, onChange }: RangeDropdownProps) {
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Showing ${current.label}. Change the window.`}
+        accessibilityLabel={t('ui.range.showing', { range: current.label })}
         onPress={() => setOpen(true)}
         // The pill is 40pt tall by design; the touch target is the 44pt floor.
         hitSlop={{ top: 4, bottom: 4 }}
@@ -36,7 +37,7 @@ export function RangeDropdown({ value, onChange }: RangeDropdownProps) {
       {open ? (
         <Modal visible transparent animationType="fade" onRequestClose={() => setOpen(false)}>
           <Pressable
-            accessibilityLabel="Dismiss"
+            accessibilityLabel={t('ui.dismiss')}
             onPress={() => setOpen(false)}
             className="flex-1 items-center justify-center bg-black/40 px-8"
           >

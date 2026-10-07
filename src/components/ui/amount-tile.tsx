@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { SvgProps } from 'react-native-svg';
 
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { formatCurrency } from '@/lib/format';
 
@@ -97,7 +98,7 @@ export function AmountTile({
             adjustsFontSizeToFit
             maxFontSizeMultiplier={1.3}
           >
-            {amount === undefined ? 'Open' : formatCurrency(amount)}
+            {amount === undefined ? t('loan.amountTile.open') : formatCurrency(amount)}
           </Text>
         </View>
       </Animated.View>

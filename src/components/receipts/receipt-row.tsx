@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { BrandMark } from '@/components/brands/brand-mark';
+import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { useMoneyColor } from '@/providers/theme-provider';
@@ -30,12 +31,17 @@ export function ReceiptRow({
 }: ReceiptRowProps) {
   const moneyColor = useMoneyColor();
   const spent = -Math.abs(amount);
+  const figure = formatCurrency(spent);
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${merchant}, ${formatCurrency(spent)}${sourceLabel ? `, paid with ${sourceLabel}` : ''}`}
-      accessibilityHint="Opens this receipt"
+      accessibilityLabel={
+        sourceLabel
+          ? t('receipts.row.paidWith', { merchant, amount: figure, source: sourceLabel })
+          : `${merchant}, ${figure}`
+      }
+      accessibilityHint={t('receipts.row.hint')}
       onPress={onPress}
       className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
     >
@@ -66,7 +72,7 @@ export function ReceiptRow({
           style={{ color: moneyColor(spent) }}
           maxFontSizeMultiplier={1.4}
         >
-          {formatCurrency(spent)}
+          {figure}
         </Text>
         <Text className="mt-0.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
           {formatFullDate(new Date(`${date}T00:00:00`))}

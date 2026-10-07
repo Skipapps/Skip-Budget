@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { LOGO_COPY } from '@/components/brands/logo-choices';
+import { t } from '@/i18n';
 import { withTap } from '@/lib/press';
 import { useColors } from '@/providers/theme-provider';
 
@@ -30,7 +31,7 @@ export function ChangeLogoButton({ kind, id, name, children }: ChangeLogoButtonP
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={LOGO_COPY.changeLogo}
-      accessibilityHint={`Choose the logo shown for ${name}`}
+      accessibilityHint={t('settings.logo.chooseFor', { name })}
       onPress={withTap(() => openChangeLogo(kind, id, name))}
       hitSlop={6}
       className="active:opacity-60"

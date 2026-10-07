@@ -10,7 +10,7 @@ import {
   type BillFilters,
 } from '@/components/bills/bill-filter-sheet';
 import { useArtwork } from '@/theme/artwork';
-import { BillRow } from '@/components/bills/bill-row';
+import { BillRow, billCategoryLabel } from '@/components/bills/bill-row';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { PageState } from '@/components/ui/page-state';
@@ -19,13 +19,14 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { usePaymentSources, useBills } from '@/api/queries';
 import { getBillCategory } from '@/data/bills-mock';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
+import { t } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 
 export default function BillPlansScreen() {
   const artwork = useArtwork();
@@ -68,7 +69,11 @@ export default function BillPlansScreen() {
 
   const visible = useMemo(() => {
     return bills.filter((bill) => {
-      const category = getBillCategory(bill.categoryId)?.label ?? '';
+      // The name read on screen is the one searched for.
+      const category = billCategoryLabel(
+        bill.categoryId,
+        getBillCategory(bill.categoryId)?.label ?? '',
+      );
       if (!matchesSearch(`${bill.name} ${category}`, queryText)) return false;
       if (filters.categoryIds.length > 0 && !filters.categoryIds.includes(bill.categoryId)) {
         return false;
@@ -100,20 +105,28 @@ export default function BillPlansScreen() {
 
   return (
     <Screen
-      title="Your bills"
+      title={t('bills.plans.title')}
       showBack
       avoidKeyboard
-      headerActions={[{ icon: Plus, label: 'Add bill', onPress: () => router.push('/add-bill') }]}
+      headerActions={[
+        { icon: Plus, label: t('bills.addBill'), onPress: () => router.push('/add-bill') },
+      ]}
     >
       {showEmpty || query.isError ? null : (
         <>
           <View className="mt-5 w-full flex-row items-center gap-3">
-            <SearchField value={queryText} onChangeText={setQuery} placeholder="Search bills" />
+            <SearchField
+              value={queryText}
+              onChangeText={setQuery}
+              placeholder={t('bills.plans.search')}
+            />
 
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={
-                activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter bills'
+                activeCount > 0
+                  ? t('bills.plans.filtersActive', { count: activeCount })
+                  : t('bills.filter.title')
               }
               onPress={() => setFilterOpen(true)}
               className="h-11 w-11 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
@@ -135,10 +148,10 @@ export default function BillPlansScreen() {
           <View className="mt-5 w-full flex-row items-center justify-between">
             <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
               {query.isPending
-                ? 'Loading'
+                ? t('bills.plans.loading')
                 : narrowed
-                  ? `${visible.length} of ${bills.length} bills`
-                  : `${bills.length} ${bills.length === 1 ? 'bill' : 'bills'}`}
+                  ? t('bills.plans.countOf', { shown: visible.length, count: bills.length })
+                  : t('bills.plans.count', { count: bills.length })}
             </Text>
             <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
               {formatCurrency(total)}
@@ -154,8 +167,8 @@ export default function BillPlansScreen() {
       {query.isError ? (
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={() => query.refetch()}
         />
       ) : null}
@@ -163,9 +176,9 @@ export default function BillPlansScreen() {
       {showEmpty ? (
         <PageState
           art={artwork.emptyBills}
-          title="No bills yet"
-          message="Add the ones that repeat — rent, power, phone — and Skip will keep track of what is due."
-          actionLabel="Add a bill"
+          title={t('bills.noBillsYet')}
+          message={t('bills.plans.emptyMessage')}
+          actionLabel={t('bills.addABill')}
           onAction={() => router.push('/add-bill')}
         />
       ) : null}
@@ -173,9 +186,9 @@ export default function BillPlansScreen() {
       {showNoMatches ? (
         <PageState
           art={artwork.noResults}
-          title="Nothing matches"
-          message="No bill fits that search and those filters. Try a different name or clear what you have set."
-          actionLabel="Clear filters"
+          title={t('bills.plans.noMatchTitle')}
+          message={t('bills.plans.noMatchMessage')}
+          actionLabel={t('bills.plans.clearFilters')}
           onAction={() => {
             setQuery('');
             setFilters(EMPTY_BILL_FILTERS);

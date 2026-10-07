@@ -224,4 +224,5 @@ export const apiMessages = defineMessages({
     es: 'Cuando tu salario llegue aquí',
     fr: 'Quand ta paie arrive ici',
   },
+  'api.ledger.income': { en: 'Income', es: 'Ingresos', fr: 'Revenus' },
 });

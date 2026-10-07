@@ -6,36 +6,78 @@ import { useLogoMatch, type LogoHints, type LogoMatch } from '@/api/logos';
 import { BrandLogo } from '@/components/brands/brand-logo';
 import { TextField } from '@/components/ui/text-field';
 import { TextLink } from '@/components/ui/text-link';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 import { websiteHost } from '@/lib/logo-lookup';
 import { withTap } from '@/lib/press';
 import { useColors } from '@/providers/theme-provider';
 
-/** Every word the logo choices say, in one place so the add-store card and Change logo match. */
+/**
+ * Every word the logo choices say, in one place so the add-store card and Change logo match. Read
+ * when drawn, so each follows the language on screen.
+ */
 export const LOGO_COPY = {
-  looksLike: 'Looks like',
-  yes: 'Yes, that’s it',
-  notThis: 'Not this one',
-  website: 'Use the website instead',
-  letters: 'No logo, use letters',
-  icon: 'No logo, use the icon',
-  addWebsite: 'Add a website',
-  changeLogo: 'Change logo',
-  looking: 'Looking for a logo…',
-  whichOne: 'Which one is it?',
-  noOthers: 'Nothing else came up.',
-  websiteLabel: 'Website',
+  get yes() {
+    return t('settings.logo.yes');
+  },
+  get notThis() {
+    return t('settings.logo.notThis');
+  },
+  get website() {
+    return t('settings.logo.website');
+  },
+  get letters() {
+    return t('settings.logo.letters');
+  },
+  get icon() {
+    return t('settings.logo.icon');
+  },
+  get addWebsite() {
+    return t('settings.logo.addWebsite');
+  },
+  get changeLogo() {
+    return t('settings.logo.change');
+  },
+  get looking() {
+    return t('settings.logo.looking');
+  },
+  get whichOne() {
+    return t('settings.logo.whichOne');
+  },
+  get noOthers() {
+    return t('settings.logo.noOthers');
+  },
+  get websiteLabel() {
+    return t('settings.logo.websiteLabel');
+  },
+  /** An address, not a word: the same in every language. */
   websitePlaceholder: 'example.com',
-  find: 'Find',
-  findingWebsite: 'Looking…',
-  noLogoForWebsite: 'No logo found for that website.',
-  report: 'Report this logo',
-  reporting: 'Sending…',
-  reported: 'Thanks. We’ll check this logo.',
-  save: 'Save logo',
-  saving: 'Saving…',
-} as const;
+  get find() {
+    return t('settings.logo.find');
+  },
+  get findingWebsite() {
+    return t('settings.logo.finding');
+  },
+  get noLogoForWebsite() {
+    return t('settings.logo.noLogoForWebsite');
+  },
+  get report() {
+    return t('settings.logo.report');
+  },
+  get reporting() {
+    return t('settings.logo.reporting');
+  },
+  get reported() {
+    return t('settings.logo.reported');
+  },
+  get save() {
+    return t('settings.logo.save');
+  },
+  get saving() {
+    return t('settings.saving');
+  },
+};
 
 /** What a logo choice writes on a row. */
 export type LogoChoice = { logoDomain: string | null; logoHidden: boolean };
@@ -162,14 +204,24 @@ export function ChoiceCard({ children, className }: { children: ReactNode; class
   );
 }
 
+const NAME = '{name}';
+
 /** "Looks like **Planet Fitness**" over its website, with the logo. */
 export function MatchHeader({ name, domain }: { name: string; domain: string }) {
+  // Split around the name rather than glued after it, so the bold name lands where the language
+  // puts it.
+  const sentence = t('settings.logo.looksLike');
+  const at = sentence.indexOf(NAME);
+  const before = at < 0 ? sentence : sentence.slice(0, at);
+  const after = at < 0 ? '' : sentence.slice(at + NAME.length);
   return (
     <View className="w-full flex-row items-center gap-3 py-3">
       <BrandLogo name={name} domain={domain} size={44} className="border border-line" />
       <View className="min-w-0 flex-1">
         <Text className="font-app text-[15px] text-ink" maxFontSizeMultiplier={1.4}>
-          {LOGO_COPY.looksLike} <Text className="font-app-semibold">{name}</Text>
+          {before}
+          <Text className="font-app-semibold">{name}</Text>
+          {after || null}
         </Text>
         <Text
           className="font-app text-[13px] text-muted"
@@ -226,7 +278,7 @@ export function WebsiteFinder({ hints, onPick, selectedDomain }: WebsiteFinderPr
         trailing={
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Find the logo for this website"
+            accessibilityLabel={t('settings.logo.findLabel')}
             onPress={withTap(find)}
             hitSlop={8}
             className="-mr-2 min-h-11 justify-center px-2 active:opacity-60"
@@ -246,7 +298,7 @@ export function WebsiteFinder({ hints, onPick, selectedDomain }: WebsiteFinderPr
 
       {answered && lookup.data === null ? (
         <Text className="mt-2 font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
-          {FAILURE_MESSAGE}
+          {failureText()}
         </Text>
       ) : null}
 

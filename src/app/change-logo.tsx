@@ -25,7 +25,8 @@ import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { TextLink } from '@/components/ui/text-link';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { t } from '@/i18n';
+import { failureMessage, failureText } from '@/lib/failure';
 import { success, warn } from '@/lib/haptics';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { logoHints } from '@/lib/logo-lookup';
@@ -72,8 +73,8 @@ export default function ChangeLogoScreen() {
       <Screen title={LOGO_COPY.changeLogo} showBack>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Go back"
+          title={failureText()}
+          actionLabel={t('settings.logo.goBack')}
           onAction={() => router.back()}
         />
       </Screen>
@@ -85,12 +86,12 @@ export default function ChangeLogoScreen() {
       <Screen title={LOGO_COPY.changeLogo} showBack>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={() => {
             void query.refetch();
           }}
-          secondaryLabel="Go back"
+          secondaryLabel={t('settings.logo.goBack')}
           onSecondary={() => router.back()}
         />
       </Screen>
@@ -111,8 +112,8 @@ export default function ChangeLogoScreen() {
       <Screen title={LOGO_COPY.changeLogo} showBack>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Go back"
+          title={failureText()}
+          actionLabel={t('settings.logo.goBack')}
           onAction={() => router.back()}
         />
       </Screen>
@@ -242,7 +243,7 @@ function LogoChooser({ kind, id, row }: { kind: LogoKind; id: string; row: LogoR
           className="mt-0.5 text-center font-app text-[13px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
-          {pickedDomain ?? 'No logo'}
+          {pickedDomain ?? t('settings.logo.none')}
         </Text>
       </View>
 
@@ -334,14 +335,14 @@ function LogoChooser({ kind, id, row }: { kind: LogoKind; id: string; row: LogoR
                   className="pt-3 text-center font-app text-[13px] text-danger"
                   maxFontSizeMultiplier={1.4}
                 >
-                  {FAILURE_MESSAGE}
+                  {failureText()}
                 </Text>
               ) : null}
               <TextLink
                 label={LOGO_COPY.report}
                 variant="subtle"
                 onPress={() => void sendReport()}
-                accessibilityHint="Tells Skip this logo is wrong, so it can be fixed for everyone"
+                accessibilityHint={t('settings.logo.reportHint')}
               />
             </>
           )}

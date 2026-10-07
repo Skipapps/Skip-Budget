@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 
 import type { LedgerTotals } from '@/api/queries';
+import { t } from '@/i18n';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
@@ -27,7 +28,7 @@ export function LedgerSummary({ totals }: { totals: LedgerTotals }) {
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
-          {short ? 'Short by' : 'Left over'}
+          {t(short ? 'transactions.summary.shortBy' : 'transactions.summary.leftOver')}
         </Text>
 
         <View className="shrink-0 rounded-full bg-ink/5 px-3 py-1.5">
@@ -37,8 +38,8 @@ export function LedgerSummary({ totals }: { totals: LedgerTotals }) {
             allowFontScaling={false}
           >
             {totals.count === 0
-              ? 'Nothing yet'
-              : `${totals.count} ${totals.count === 1 ? 'transaction' : 'transactions'}`}
+              ? t('transactions.summary.nothingYet')
+              : t('transactions.summary.count', { count: totals.count })}
           </Text>
         </View>
       </View>
@@ -61,9 +62,9 @@ export function LedgerSummary({ totals }: { totals: LedgerTotals }) {
       )}
 
       <View className="mt-4 w-full flex-row gap-3">
-        <Stat label="Income" icon={ArrowDownLeft} amount={totals.in} />
+        <Stat label={t('transactions.summary.income')} icon={ArrowDownLeft} amount={totals.in} />
         {/* Stored as a magnitude; shown as money going out. */}
-        <Stat label="Expenses" icon={ArrowUpRight} amount={-totals.out} />
+        <Stat label={t('transactions.summary.expenses')} icon={ArrowUpRight} amount={-totals.out} />
       </View>
     </View>
   );

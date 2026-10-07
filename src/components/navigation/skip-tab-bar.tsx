@@ -13,6 +13,7 @@ import {
   tabLayout,
 } from '@/components/navigation/tab-layout';
 import { VoiceFab } from '@/components/voice/voice-fab';
+import { useLocale } from '@/i18n';
 import { withTap } from '@/lib/press';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
@@ -45,6 +46,8 @@ const TAB_ICONS: Record<string, LucideIcon> = {
  * lets touches through to whatever is behind it.
  */
 export function SkipTabBar({ state, descriptors, navigation }: SkipTabBarProps) {
+  // The bar and the Voice button live outside every screen's remount boundary.
+  useLocale();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();

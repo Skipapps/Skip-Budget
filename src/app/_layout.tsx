@@ -13,6 +13,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useRegisterPush } from '@/api/push';
 import { AppLockGate } from '@/components/app-lock-gate';
 import { LaunchSplash } from '@/components/launch-splash';
+import { useLocale } from '@/i18n';
+import { LocaleProvider, rootScreenLayout } from '@/i18n/locale-provider';
 import { DialogProvider } from '@/providers/dialog-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { useConfigurePurchases } from '@/api/pro';
@@ -41,8 +43,10 @@ function RootLayout() {
       {/* Outermost: it paints the surface everything else sits on. */}
       <ThemeProvider>
         <PreferencesProvider>
-          {/* A font error counts as loaded, so a missing font cannot strand users. */}
-          <AppShell fontsReady={fontsLoaded || Boolean(fontError)} />
+          <LocaleProvider>
+            {/* A font error counts as loaded, so a missing font cannot strand users. */}
+            <AppShell fontsReady={fontsLoaded || Boolean(fontError)} />
+          </LocaleProvider>
         </PreferencesProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
@@ -50,12 +54,14 @@ function RootLayout() {
 }
 
 /**
- * Held back until fonts and the stored theme mode are both read, so someone who chose dark does not
- * open on a white flash. Then LaunchSplash takes over from the native splash (it is what hides it).
+ * Held back until fonts, the stored theme mode and the stored language are all read, so someone who
+ * chose dark does not open on a white flash, nor someone who chose French on English. Then
+ * LaunchSplash takes over from the native splash (it is what hides it).
  */
 function AppShell({ fontsReady }: { fontsReady: boolean }) {
   const { ready, scheme } = useTheme();
-  const settled = fontsReady && ready;
+  const { ready: localeReady } = useLocale();
+  const settled = fontsReady && ready && localeReady;
 
   if (!settled) return null;
 
@@ -107,6 +113,7 @@ function RootNavigator() {
   return (
     <Stack
       key={`fontscale-${fontScale}`}
+      screenLayout={rootScreenLayout}
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',

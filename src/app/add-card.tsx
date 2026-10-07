@@ -27,8 +27,9 @@ import { useConfirm } from '@/providers/dialog-provider';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { NETWORKS } from '@/data/cards-mock';
+import { t } from '@/i18n';
 import { success, warn } from '@/lib/haptics';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { failureMessage, failureText } from '@/lib/failure';
 import { toIsoDate } from '@/lib/date';
 import { useArtwork } from '@/theme/artwork';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
@@ -69,12 +70,12 @@ function AddCardScreenInner() {
         <Screen showBack>
           <PageState
             art={artwork.error}
-            title={FAILURE_MESSAGE}
-            actionLabel="Try again"
+            title={failureText()}
+            actionLabel={t('common.tryAgain')}
             onAction={() => {
               void card.refetch();
             }}
-            secondaryLabel="Go back"
+            secondaryLabel={t('cards.form.goBack')}
             onSecondary={() => router.back()}
           />
         </Screen>
@@ -84,12 +85,12 @@ function AddCardScreenInner() {
     if (!card.isFetched) {
       return (
         <StepFlow
-          title="Edit credit card"
-          closePrompt="Cancel editing this credit card?"
+          title={t('cards.add.editTitle')}
+          closePrompt={t('cards.add.closeEditing')}
           steps={3}
           current={0}
           onBack={() => router.back()}
-          primaryLabel="Continue"
+          primaryLabel={t('common.continue')}
           primaryDisabled
           onPrimary={() => {}}
         >
@@ -105,8 +106,8 @@ function AddCardScreenInner() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Go back"
+          title={failureText()}
+          actionLabel={t('cards.form.goBack')}
           onAction={() => router.back()}
         />
       </Screen>
@@ -164,10 +165,9 @@ function CardForm({
   const handleDelete = async () => {
     if (!id) return;
     const ok = await confirm({
-      title: 'Delete this credit card?',
-      message:
-        'Receipts, bills and subscriptions paid with it are kept, but stop showing this credit card.',
-      confirmLabel: 'Delete',
+      title: t('cards.add.deleteTitle'),
+      message: t('cards.add.deleteMessage'),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -189,7 +189,7 @@ function CardForm({
   const handleSave = async () => {
     setError(null);
     if (!name.trim()) {
-      fail('Give the credit card a name so you can tell it apart.', 1);
+      fail(t('cards.add.nameMissing'), 1);
       return;
     }
 
@@ -200,15 +200,10 @@ function CardForm({
 
       if (absorbed.length > 0) {
         const ok = await confirm({
-          title: 'This balance becomes the starting point',
-          message:
-            `A new balance is taken as today's figure, so the ` +
-            `${absorbed.length === 1 ? 'transaction' : `${absorbed.length} transactions`} ` +
-            `already on this credit card ${absorbed.length === 1 ? 'is' : 'are'} counted as part of ` +
-            `it and will stop showing here. Nothing is deleted — they stay in your ` +
-            `transactions, and on the bills and receipts they came from.`,
-          confirmLabel: 'Update the balance',
-          cancelLabel: 'Leave it as it was',
+          title: t('cards.add.newBalanceTitle'),
+          message: t('cards.add.newBalanceMessage', { count: absorbed.length }),
+          confirmLabel: t('cards.add.updateBalance'),
+          cancelLabel: t('cards.add.keepBalance'),
         });
         if (!ok) return;
       }
@@ -256,18 +251,24 @@ function CardForm({
 
   const question =
     step === 0
-      ? 'What is the credit card balance right now?'
+      ? t('cards.add.balanceQuestion')
       : step === 2
-        ? 'When is the bill due?'
+        ? t('cards.add.dueQuestion')
         : undefined;
   const primaryLabel =
-    step < 2 ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save credit card';
+    step < 2
+      ? t('common.continue')
+      : busy
+        ? t('cards.form.saving')
+        : editing
+          ? t('cards.form.saveChanges')
+          : t('cards.add.saveCard');
   const stepError = error && error.step === step ? error.message : null;
 
   return (
     <StepFlow
-      title={editing ? 'Edit credit card' : 'Add a credit card'}
-      closePrompt={editing ? 'Cancel editing this credit card?' : 'Cancel adding this credit card?'}
+      title={editing ? t('cards.add.editTitle') : t('cards.add.addTitle')}
+      closePrompt={editing ? t('cards.add.closeEditing') : t('cards.add.closeAdding')}
       steps={3}
       current={step}
       onBack={() => {
@@ -292,13 +293,13 @@ function CardForm({
         editing ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Delete this credit card"
+            accessibilityLabel={t('cards.add.deleteLabel')}
             onPress={handleDelete}
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
             <Text className="font-app-medium text-[15px] text-danger" maxFontSizeMultiplier={1.4}>
-              {deleteCard.isPending ? 'Deleting…' : 'Delete card'}
+              {deleteCard.isPending ? t('cards.form.deleting') : t('cards.add.deleteCard')}
             </Text>
           </Pressable>
         ) : null
@@ -317,16 +318,16 @@ function CardForm({
               network,
               color,
             }}
-            placeholderHolder="Name of the credit card"
+            placeholderHolder={t('cards.add.name')}
           />
 
           <View className="w-full">
-            <FieldLabel className="mb-3">Select Network provider</FieldLabel>
+            <FieldLabel className="mb-3">{t('cards.add.network')}</FieldLabel>
             <NetworkPicker networks={NETWORKS} value={network} onChange={setNetwork} />
           </View>
 
           <TextField
-            label="Name of the credit card"
+            label={t('cards.add.name')}
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
@@ -334,12 +335,12 @@ function CardForm({
           />
 
           <View className="w-full">
-            <FieldLabel className="mb-3">Card colour</FieldLabel>
+            <FieldLabel className="mb-3">{t('cards.form.cardColour')}</FieldLabel>
             <ColorPicker value={color} onChange={setColor} />
           </View>
 
           <TextField
-            label="Last 4 digits"
+            label={t('cards.form.last4')}
             value={last4}
             onChangeText={(text) => setLast4(text.replace(/\D/g, '').slice(0, 4))}
             keyboardType="number-pad"
@@ -364,9 +365,7 @@ function CardForm({
             onChange={setReminderDraft}
             time={remindAt}
             onTimeChange={setTimeDraft}
-            unavailable={
-              dueDate ? null : 'Set a bill due date above and Skip can remind you before it.'
-            }
+            unavailable={dueDate ? null : t('cards.add.reminderNeedsDate')}
           />
         </View>
       ) : null}

@@ -15,6 +15,7 @@ import { usePastCharges } from '@/api/past-charges';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { ScheduleCard } from '@/components/calculators/schedule-card';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
+import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
 import { CategoryPicker } from '@/components/bills/category-picker';
 import { IconPicker } from '@/components/bills/icon-picker';
 import { AmountStep } from '@/components/flow/amount-step';
@@ -39,9 +40,10 @@ import {
   type BillCategory,
   type Recurrence,
 } from '@/data/bills-mock';
+import { t } from '@/i18n';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { success, warn } from '@/lib/haptics';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { failureMessage, failureText } from '@/lib/failure';
 import { logoColumns } from '@/lib/logo-columns';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { amortise, termsFromStored } from '@/lib/loan';
@@ -54,30 +56,39 @@ import {
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 
-const CATEGORY_OPTIONS = BILL_CATEGORIES.map((category) => ({
-  value: category.id,
-  label: category.label,
-}));
-
 /** The open-ended schedules, plus one that runs only between two dates. */
 const PERIOD = 'period';
-const RECURRENCE_CHOICES = [...RECURRENCES, { value: PERIOD, label: 'Specific period' }] as const;
 
 type RecurrenceChoice = Recurrence | typeof PERIOD;
 
-/** Placeholder per category, naming real companies so people know what counts. */
-const ISSUER_HINT: Record<string, string> = {
-  housing: 'Letting agent or management company',
-  energy: 'AEP, Duke Energy, National Grid',
-  water: 'Your water company',
-  internet: 'Xfinity, Spectrum, Verizon',
-  mobile: 'T-Mobile, AT&T, Verizon',
-  insurance: 'Geico, State Farm, Progressive',
-  loans: 'Chase, Discover, SoFi',
-  transport: 'Transit, tolls or parking',
-  family: 'Nursery, school or clinic',
-  other: 'Search for a company',
-};
+/**
+ * Placeholder per category, naming real companies so people know what counts. Company names are
+ * the same in every language, so only the hints with words go through messages.
+ */
+function issuerHint(categoryId: string): string {
+  switch (categoryId) {
+    case 'housing':
+      return t('bills.add.issuer.housing');
+    case 'energy':
+      return 'AEP, Duke Energy, National Grid';
+    case 'water':
+      return t('bills.add.issuer.water');
+    case 'internet':
+      return 'Xfinity, Spectrum, Verizon';
+    case 'mobile':
+      return 'T-Mobile, AT&T, Verizon';
+    case 'insurance':
+      return 'Geico, State Farm, Progressive';
+    case 'loans':
+      return 'Chase, Discover, SoFi';
+    case 'transport':
+      return t('bills.add.issuer.transport');
+    case 'family':
+      return t('bills.add.issuer.family');
+    default:
+      return t('bills.add.issuer.other');
+  }
+}
 
 /** The category chooser is its own screen before the dots: it pre-fills the name, so runs first. */
 type Step = 'category' | 'amount' | 'details' | 'when';
@@ -105,12 +116,12 @@ export default function AddBillScreen() {
         <Screen showBack>
           <PageState
             art={artwork.error}
-            title={FAILURE_MESSAGE}
-            actionLabel="Try again"
+            title={failureText()}
+            actionLabel={t('common.tryAgain')}
             onAction={() => {
               void bill.refetch();
             }}
-            secondaryLabel="Go back"
+            secondaryLabel={t('bills.goBack')}
             onSecondary={() => router.back()}
           />
         </Screen>
@@ -121,12 +132,12 @@ export default function AddBillScreen() {
     if (!bill.isFetched) {
       return (
         <StepFlow
-          title="Edit bill"
-          closePrompt="Cancel editing this bill?"
+          title={t('bills.add.titleEdit')}
+          closePrompt={t('bills.add.closeEdit')}
           steps={3}
           current={0}
           onBack={() => router.back()}
-          primaryLabel="Continue"
+          primaryLabel={t('common.continue')}
           primaryDisabled
           onPrimary={() => {}}
         >
@@ -145,8 +156,8 @@ export default function AddBillScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Go back"
+          title={failureText()}
+          actionLabel={t('bills.goBack')}
           onAction={() => router.back()}
         />
       </Screen>
@@ -167,12 +178,24 @@ export default function AddBillScreen() {
   );
 }
 
-/** The name a pre-filled bill opens with: the one typed, the company, else the category. */
+/**
+ * What a new bill is pre-named after: its category in the language on screen. Once in the Name
+ * field it is the person's own text, so a saved bill keeps it whatever the language later becomes.
+ */
+function categoryName(categoryId: string | null | undefined): string {
+  const data = BILL_CATEGORIES.find((option) => option.id === categoryId);
+  return billCategoryLabel(categoryId, data?.label ?? '');
+}
+
+/** The name a pre-filled bill opens with: the one typed, the company, else the category's. */
 function prefillName(prefill: BillPrefill | null): string {
   if (!prefill) return '';
   if (prefill.name) return prefill.name;
-  const label = BILL_CATEGORIES.find((option) => option.id === prefill.categoryId)?.label ?? '';
-  return defaultBillName(prefill.categoryId ?? '', label, prefill.issuer);
+  return defaultBillName(
+    prefill.categoryId ?? '',
+    categoryName(prefill.categoryId),
+    prefill.issuer,
+  );
 }
 
 function BillForm({
@@ -244,7 +267,8 @@ function BillForm({
   // Only a self-named bill needs its own icon; the rest inherit the category's.
   const isCustom = categoryId === 'other';
 
-  const categoryLabel = BILL_CATEGORIES.find((option) => option.id === categoryId)?.label ?? '';
+  // Exactly what pre-fills the name, so a name still equal to it was never typed.
+  const categoryLabel = categoryName(categoryId);
 
   // Picking a company names the bill unless it has a real name: the default category label (named
   // by the app, not the person) counts as unnamed; anything typed is left alone.
@@ -271,7 +295,7 @@ function BillForm({
     // (the company's, or typed on the voice review page): "Comcast" must not become "Internet".
     const current = name.trim();
     const real = Boolean(current) && (current === issuer?.name || current === prefill?.name);
-    if (!real) setName(category.id === 'other' ? '' : category.label);
+    if (!real) setName(category.id === 'other' ? '' : categoryName(category.id));
     setStep('amount');
   };
 
@@ -291,9 +315,9 @@ function BillForm({
   const handleDelete = async () => {
     if (!id) return;
     const ok = await confirm({
-      title: 'Delete this bill?',
-      message: 'This cannot be undone.',
-      confirmLabel: 'Delete',
+      title: t('bills.add.deleteTitle'),
+      message: t('bills.add.deleteMessage'),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -382,7 +406,7 @@ function BillForm({
       if (!pastCharges.ready) {
         pastCharges.retry();
         warn();
-        setError({ message: FAILURE_MESSAGE, step: 'when' });
+        setError({ message: failureText(), step: 'when' });
         return;
       }
 
@@ -412,13 +436,13 @@ function BillForm({
       <Screen
         header={
           <FlowHeader
-            title="Add a bill"
+            title={t('bills.addABill')}
             onBack={() => router.back()}
-            closePrompt="Cancel adding this bill?"
+            closePrompt={t('bills.add.closeNew')}
           />
         }
       >
-        <Title className="mt-2">What is this bill for?</Title>
+        <Title className="mt-2">{t('bills.add.categoryQuestion')}</Title>
 
         <View className="mt-6 w-full pb-10">
           <CategoryPicker onSelect={handleSelectCategory} selectedId={categoryId} />
@@ -435,22 +459,37 @@ function BillForm({
 
   const question =
     step === 'amount'
-      ? 'How much is the bill?'
+      ? t('bills.add.amountQuestion')
       : step === 'when'
         ? hasPeriod
-          ? 'When does it start?'
-          : 'When is it due?'
+          ? t('bills.add.startQuestion')
+          : t('bills.add.dueQuestion')
         : undefined;
 
   const primaryLabel =
-    step !== 'when' ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save bill';
+    step !== 'when'
+      ? t('common.continue')
+      : busy
+        ? t('bills.add.saving')
+        : editing
+          ? t('bills.add.saveChanges')
+          : t('bills.add.saveBill');
+
+  const categoryOptions = BILL_CATEGORIES.map((category) => ({
+    value: category.id,
+    label: billCategoryLabel(category.id, category.label),
+  }));
+  const recurrenceChoices: { value: RecurrenceChoice; label: string }[] = [
+    ...RECURRENCES.map((option) => ({ value: option.value, label: recurrenceLabel(option.value) })),
+    { value: PERIOD, label: t('bills.add.specificPeriod') },
+  ];
 
   const stepError = error && error.step === step ? error.message : null;
 
   return (
     <StepFlow
-      title={editing ? 'Edit bill' : 'Add a bill'}
-      closePrompt={editing ? 'Cancel editing this bill?' : 'Cancel adding this bill?'}
+      title={editing ? t('bills.add.titleEdit') : t('bills.addABill')}
+      closePrompt={editing ? t('bills.add.closeEdit') : t('bills.add.closeNew')}
       steps={3}
       current={dot}
       onBack={() => {
@@ -469,7 +508,7 @@ function BillForm({
           <View className="w-full flex-row justify-center">
             <ActionPill
               icon={Calculator}
-              label="Calculator"
+              label={t('bills.add.calculator')}
               onPress={() => setCalculatorOpen(true)}
             />
           </View>
@@ -496,13 +535,13 @@ function BillForm({
         editing ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Delete this bill"
+            accessibilityLabel={t('bills.add.deleteA11y')}
             onPress={handleDelete}
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
             <Text className="font-app-medium text-[15px] text-danger" maxFontSizeMultiplier={1.4}>
-              {deleteBill.isPending ? 'Deleting…' : 'Delete bill'}
+              {deleteBill.isPending ? t('bills.add.deleting') : t('bills.add.deleteBill')}
             </Text>
           </Pressable>
         ) : null
@@ -513,16 +552,16 @@ function BillForm({
       {step === 'details' ? (
         <View className="w-full gap-5">
           <BrandField
-            label="Company"
+            label={t('bills.field.company')}
             value={issuer}
             onChange={handleIssuer}
-            placeholder={ISSUER_HINT[categoryId] ?? ISSUER_HINT.other}
+            placeholder={issuerHint(categoryId)}
             category={categoryId}
             noLogo="icon"
           />
 
           <TextField
-            label="Name"
+            label={t('bills.field.name')}
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
@@ -532,22 +571,22 @@ function BillForm({
           {/* The icon only shows when there is no logo, so offering it beside one does nothing. */}
           {isCustom && !issuer ? (
             <View className="w-full">
-              <FieldLabel className="mb-2">Icon</FieldLabel>
+              <FieldLabel className="mb-2">{t('bills.field.icon')}</FieldLabel>
               <IconPicker value={iconId} onChange={setIconId} />
             </View>
           ) : null}
 
           <View className="w-full">
-            <FieldLabel className="mb-2">Category</FieldLabel>
+            <FieldLabel className="mb-2">{t('bills.field.category')}</FieldLabel>
             <ChoiceChips
-              options={CATEGORY_OPTIONS}
+              options={categoryOptions}
               value={categoryId}
               onChange={(next) => setCategoryId(next)}
             />
           </View>
 
           <View className="w-full">
-            <FieldLabel className="mb-2">Paid with</FieldLabel>
+            <FieldLabel className="mb-2">{t('bills.field.paidWith')}</FieldLabel>
             <SourceTiles sources={sources} value={sourceId} onChange={setSourceId} />
           </View>
 
@@ -567,7 +606,7 @@ function BillForm({
                     funded: loan.funded_on ?? '',
                     basis: loan.day_count_basis,
                     payment: String(loan.monthly_payment),
-                    name: name || 'Payment schedule',
+                    name: name || t('bills.add.paymentSchedule'),
                   },
                 })
               }
@@ -575,11 +614,11 @@ function BillForm({
           ) : null}
 
           <TextField
-            label="Note"
+            label={t('bills.field.note')}
             optional
             value={note}
             onChangeText={setNote}
-            placeholder="Anything worth remembering"
+            placeholder={t('bills.add.notePlaceholder')}
             multiline
             maxLength={200}
             autoCapitalize="sentences"
@@ -605,9 +644,9 @@ function BillForm({
           />
 
           <View className="w-full">
-            <FieldLabel className="mb-2">Recurring</FieldLabel>
+            <FieldLabel className="mb-2">{t('bills.field.recurring')}</FieldLabel>
             <ChoiceChips
-              options={RECURRENCE_CHOICES}
+              options={recurrenceChoices}
               value={recurrence}
               onChange={handleRecurrenceChange}
             />
@@ -617,22 +656,22 @@ function BillForm({
           {hasPeriod ? (
             <View className="w-full">
               <SelectField
-                label="To"
+                label={t('bills.field.to')}
                 variant="pill"
                 value={endDate ? formatFullDate(endDate) : ''}
-                placeholder="Ongoing — no end date"
+                placeholder={t('bills.add.noEndDate')}
                 icon={Calendar}
                 onPress={() => setDatePicker('end')}
               />
               {endDate ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Clear end date"
+                  accessibilityLabel={t('bills.add.clearEndA11y')}
                   onPress={() => setEndDate(null)}
                   className="mt-1.5 self-start rounded-full px-1 py-1 active:opacity-60"
                 >
                   <Text className="ml-4 font-app text-[13px] text-muted">
-                    Clear — make it ongoing
+                    {t('bills.add.clearEnd')}
                   </Text>
                 </Pressable>
               ) : null}
@@ -663,7 +702,7 @@ function BillForm({
               // A period that finishes before it begins is refused, not quietly kept. Compared as
               // ISO days: exact, no clock.
               setDatePicker(null);
-              fail('The end date cannot be before the start date.', 'when');
+              fail(t('api.entry.endBeforeStart'), 'when');
               return;
             } else {
               setError(null);
@@ -676,7 +715,7 @@ function BillForm({
 
       {calculatorOpen ? (
         <CalculatorPad
-          title="Calculator"
+          title={t('bills.add.calculator')}
           value={amount}
           onCancel={() => setCalculatorOpen(false)}
           onConfirm={(next) => {

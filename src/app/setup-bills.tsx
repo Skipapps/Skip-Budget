@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useBills, usePaymentSources } from '@/api/queries';
 import { BillRow } from '@/components/bills/bill-row';
 import { SetupCollection } from '@/components/setup/setup-collection';
+import { t } from '@/i18n';
 import { logoDomainOf } from '@/lib/logo-domain';
 
 /** The bills step of the setup walk-in: add as many as there are, then Done. */
@@ -35,10 +36,11 @@ export default function SetupBillsScreen() {
 
   return (
     <SetupCollection
-      title="Add your bills"
-      subtitle="Rent, phone, internet — add every bill that comes back, one at a time."
-      emptyText="Your bills show up here as you add them."
-      noun="bill"
+      title={t('onboarding.bills.title')}
+      subtitle={t('onboarding.bills.subtitle')}
+      emptyText={t('onboarding.bills.empty')}
+      addLabel={t('onboarding.bills.add')}
+      addAnotherLabel={t('onboarding.bills.addAnother')}
       addHref="/add-bill"
       count={bills.length}
       isPending={query.isPending}

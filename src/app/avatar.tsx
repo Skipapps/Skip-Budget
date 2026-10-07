@@ -5,6 +5,7 @@ import { Image, Pressable, Text, View } from 'react-native';
 import { useUpdateProfile } from '@/api/mutations';
 import { useProfile } from '@/api/queries';
 import { Screen } from '@/components/ui/screen';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { success, tap } from '@/lib/haptics';
 import { useColors } from '@/providers/theme-provider';
@@ -35,25 +36,25 @@ export default function AvatarScreen() {
   };
 
   return (
-    <Screen title="Profile picture" showBack>
+    <Screen title={t('onboarding.avatar.title')} showBack>
       <View className="mt-4 w-full items-center">
         <Cell
           selected={chosen === null}
           onPress={() => choose(null)}
-          accessibilityLabel="No profile picture"
-          label="No profile"
+          accessibilityLabel={t('onboarding.avatar.noneLabel')}
+          label={t('onboarding.avatar.none')}
         >
           <UserRound size={30} color={colors.muted} strokeWidth={1.6} />
         </Cell>
       </View>
 
       <View className="mt-2 w-full flex-row flex-wrap">
-        {AVATARS.map((avatar) => (
+        {AVATARS.map((avatar, index) => (
           <Cell
             key={avatar.id}
             selected={chosen === avatar.id}
             onPress={() => choose(avatar.id)}
-            accessibilityLabel={avatar.label}
+            accessibilityLabel={t('onboarding.avatar.number', { number: index + 1 })}
           >
             <Image
               source={avatar.source}

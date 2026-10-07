@@ -12,6 +12,9 @@ jest.mock('react-native-keyboard-controller', () =>
 
 jest.mock('expo-router', () => ({ router: { push: jest.fn(), back: jest.fn() } }));
 
+// The Pro answer quotes the store's prices; with no answer from the store it uses the fallback.
+jest.mock('@/api/pro', () => ({ useProPrices: () => ({ data: undefined }) }));
+
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', body: '#333333', line: '#DDDDDD' }),
 }));

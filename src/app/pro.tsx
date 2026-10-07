@@ -16,34 +16,28 @@ import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
 import { Title } from '@/components/ui/typography';
-import { PRO_MONTHLY_LABEL, PRO_YEARLY_LABEL } from '@/lib/wall';
+import { t, type MessageKey } from '@/i18n';
+import { formatMoney } from '@/i18n/number';
+import { getLocaleSnapshot } from '@/i18n/store';
+import { proMonthlyLabel, proYearlyLabel } from '@/lib/wall';
 import { router } from 'expo-router';
 import { useColors } from '@/providers/theme-provider';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { failureMessage, failureText } from '@/lib/failure';
 
-const FEATURES: { icon: LucideIcon; title: string; hint: string }[] = [
-  {
-    icon: CreditCard,
-    title: 'Unlimited credit cards, accounts & incomes',
-    hint: 'Track every credit card and account you actually have',
-  },
-  {
-    icon: Camera,
-    title: 'Unlimited receipt scanning',
-    hint: 'Point, tap, filed — read on your phone, never uploaded',
-  },
-  {
-    icon: Calculator,
-    title: 'Loan calculator, to the cent',
-    hint: 'Daily interest, the way your bank actually charges',
-  },
-  { icon: ChartColumn, title: 'Insights', hint: 'Your whole money picture on one page' },
-  {
-    icon: Sparkles,
-    title: 'Early features, first-in-line support',
-    hint: 'Get the new things first, and your questions answered first',
-  },
+const FEATURES: { icon: LucideIcon; title: MessageKey; hint: MessageKey }[] = [
+  { icon: CreditCard, title: 'pro.page.cards.title', hint: 'pro.page.cards.hint' },
+  { icon: Camera, title: 'pro.page.scan.title', hint: 'pro.page.scan.hint' },
+  { icon: Calculator, title: 'pro.page.loans.title', hint: 'pro.page.loans.hint' },
+  { icon: ChartColumn, title: 'pro.page.insights.title', hint: 'pro.page.insights.hint' },
+  { icon: Sparkles, title: 'pro.page.early.title', hint: 'pro.page.early.hint' },
 ];
+
+/**
+ * The yearly price over twelve months ($19.99 / 12), for when the store has not answered. In
+ * dollars whatever the app shows, like the fallback prices in wall.ts: Apple prices each
+ * storefront itself, so no other currency's figure would be a real price.
+ */
+const PRO_YEARLY_PER_MONTH_USD = 1.67;
 
 /**
  * The Pro page. With no store key configured it still renders and says purchases are opening soon,
@@ -63,14 +57,24 @@ export default function ProScreen() {
 
   // No billing in this build says so; a store that is unreachable or returns no plans is a failure.
   const storeNote = !purchasesAvailable()
-    ? 'Purchases are not open in this version yet. Everything on this page is coming shortly.'
+    ? t('pro.page.notOpen')
     : !canBuy && prices.isFetched
-      ? FAILURE_MESSAGE
+      ? failureText()
       : null;
 
   const devNote = prices.error ? (prices.error as Error).message : (prices.data?.debug ?? null);
-  const yearlyPrice = prices.data?.yearly?.product.priceString ?? PRO_YEARLY_LABEL;
-  const monthlyPrice = prices.data?.monthly?.product.priceString ?? PRO_MONTHLY_LABEL;
+  // The store's own prices when it has answered; the dollar fallbacks until then.
+  const yearly = prices.data?.yearly?.product;
+  const monthly = prices.data?.monthly?.product;
+  const yearlyPrice = yearly
+    ? t('pro.price.yearly', { price: yearly.priceString })
+    : proYearlyLabel();
+  const monthlyPrice = monthly
+    ? t('pro.price.monthly', { price: monthly.priceString })
+    : proMonthlyLabel();
+  const yearlyPerMonth =
+    yearly?.pricePerMonthString ??
+    formatMoney(PRO_YEARLY_PER_MONTH_USD, getLocaleSnapshot().language, 'USD');
   const trial = prices.data?.trialText ?? null;
 
   const handleContinue = async () => {
@@ -93,7 +97,7 @@ export default function ProScreen() {
     setBusy(true);
     try {
       const restored = await restore();
-      setMessage(restored ? 'Welcome back — Pro is active.' : 'No past purchase to restore.');
+      setMessage(t(restored ? 'pro.page.restored' : 'pro.page.nothingToRestore'));
     } catch (thrown) {
       setMessage(failureMessage(thrown));
     } finally {
@@ -109,19 +113,18 @@ export default function ProScreen() {
             <Crown size={28} color={colors.onControl} strokeWidth={2} />
           </View>
           <Title flush className="mt-5">
-            You have Skip Pro
+            {t('pro.page.haveTitle')}
           </Title>
           <Text
             className="mt-3 max-w-[300px] text-center font-app text-[14px] leading-[21px] text-muted"
             maxFontSizeMultiplier={1.4}
           >
-            Everything is unlocked. Billing is handled by Apple — renewals, changes and cancellation
-            all live in your App Store subscriptions.
+            {t('pro.page.haveDetail')}
           </Text>
         </View>
         <View className="mb-8 mt-auto w-full gap-3 pt-10">
           <Button
-            label="Manage in the App Store"
+            label={t('pro.page.manage')}
             variant="outline"
             onPress={() => Linking.openURL('https://apps.apple.com/account/subscriptions')}
           />
@@ -133,7 +136,7 @@ export default function ProScreen() {
   return (
     <Screen title="Skip Pro" showBack>
       <Text className="mt-2 w-full font-app text-[14px] text-muted" maxFontSizeMultiplier={1.4}>
-        Everything Skip can do, for less than a coffee a month.
+        {t('pro.page.tagline')}
       </Text>
 
       <View className="mt-6 w-full gap-2.5">
@@ -150,13 +153,13 @@ export default function ProScreen() {
                 className="font-app-semibold text-[13.5px] text-ink"
                 maxFontSizeMultiplier={1.3}
               >
-                {feature.title}
+                {t(feature.title)}
               </Text>
               <Text
                 className="mt-0.5 font-app text-[11.5px] leading-[16px] text-muted"
                 maxFontSizeMultiplier={1.3}
               >
-                {feature.hint}
+                {t(feature.hint)}
               </Text>
             </View>
             <Check size={18} color={colors.accentInk} strokeWidth={2} />
@@ -168,17 +171,21 @@ export default function ProScreen() {
         <PriceCard
           selected={plan === 'yearly'}
           onPress={() => setPlan('yearly')}
-          name="Yearly"
-          price={`${yearlyPrice}/yr`}
-          hint={trial ? `${trial}, then billed once a year` : '$1.67 a month, billed once a year'}
-          badge="2 MONTHS FREE"
+          name={t('pro.plan.yearly')}
+          price={yearlyPrice}
+          hint={
+            trial
+              ? t('pro.plan.yearlyTrial', { trial })
+              : t('pro.plan.yearlyHint', { perMonth: yearlyPerMonth })
+          }
+          badge={t('pro.plan.badge')}
         />
         <PriceCard
           selected={plan === 'monthly'}
           onPress={() => setPlan('monthly')}
-          name="Monthly"
-          price={`${monthlyPrice}/mo`}
-          hint={trial ? `${trial}, then monthly` : 'Cancel any time in your Apple subscriptions'}
+          name={t('pro.plan.monthly')}
+          price={monthlyPrice}
+          hint={trial ? t('pro.plan.monthlyTrial', { trial }) : t('pro.plan.monthlyHint')}
         />
       </View>
 
@@ -214,14 +221,14 @@ export default function ProScreen() {
         <Button
           label={
             busy
-              ? 'One moment…'
+              ? t('pro.page.oneMoment')
               : canBuy
                 ? trial
-                  ? `Start ${trial}`
-                  : 'Continue'
+                  ? t('pro.page.startTrial', { trial })
+                  : t('common.continue')
                 : prices.isFetching
-                  ? 'Checking the store…'
-                  : 'Check again'
+                  ? t('pro.page.checking')
+                  : t('pro.page.checkAgain')
           }
           onPress={canBuy ? handleContinue : () => void prices.refetch()}
           disabled={busy || prices.isFetching}
@@ -229,15 +236,15 @@ export default function ProScreen() {
         {/* Text links, not pills, so they do not read as a second thing to buy. Restore must stay
             easy to find (App Store). */}
         <View className="w-full flex-row flex-wrap items-center justify-center gap-5">
-          <TextLink label="Restore purchases" variant="subtle" onPress={handleRestore} />
+          <TextLink label={t('pro.page.restore')} variant="subtle" onPress={handleRestore} />
           <TextLink
-            label="Terms"
+            label={t('pro.page.terms')}
             variant="subtle"
             underline
             onPress={() => router.push('/terms')}
           />
           <TextLink
-            label="Privacy"
+            label={t('pro.page.privacy')}
             variant="subtle"
             underline
             onPress={() => router.push('/privacy')}
@@ -247,8 +254,7 @@ export default function ProScreen() {
           className="mt-1 w-full text-center font-app text-[10.5px] leading-[15px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
-          Billed by Apple. Renews automatically until cancelled in your App Store subscriptions.
-          Cancel any time — everything you made stays yours.
+          {t('pro.page.billing')}
         </Text>
       </View>
     </Screen>

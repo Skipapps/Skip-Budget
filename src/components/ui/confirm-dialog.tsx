@@ -1,5 +1,6 @@
 import { Modal, Pressable, Text, View } from 'react-native';
 
+import { t, useLocale } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { shadows } from '@/theme/shadows';
 
@@ -34,10 +35,13 @@ export function ConfirmDialog({
   title,
   message,
   actions = [],
-  cancelLabel = 'Cancel',
+  cancelLabel: givenCancelLabel,
   onResolve,
 }: ConfirmDialogProps) {
-  const choices = actions.length > 0 ? actions : [{ id: 'ok', label: 'OK' }];
+  // The dialog host sits at the root, outside every screen's remount, so this follows the language itself.
+  useLocale();
+  const cancelLabel = givenCancelLabel === undefined ? t('common.cancel') : givenCancelLabel;
+  const choices = actions.length > 0 ? actions : [{ id: 'ok', label: t('common.ok') }];
   const showCancel = cancelLabel !== null && actions.length > 0;
   // Side by side only while every label fits half the card; longer ones end in "…" on a small phone.
   const labels = [...choices.map((choice) => choice.label), cancelLabel ?? ''];
@@ -47,7 +51,7 @@ export function ConfirmDialog({
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => onResolve(null)}>
       <Pressable
-        accessibilityLabel="Dismiss"
+        accessibilityLabel={t('ui.dismiss')}
         onPress={() => onResolve(null)}
         className="flex-1 items-center justify-center bg-black/40 px-8"
       >

@@ -1,23 +1,7 @@
 import { clockText, monthShort, weekdayShort } from '@/i18n/calendar';
 import { t } from '@/i18n';
 
-/** Date labels without Intl, which Hermes ships inconsistently across platforms. */
-export const MONTHS_SHORT = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
-export const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+// Date labels without Intl, which Hermes ships inconsistently across platforms.
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
@@ -34,8 +18,6 @@ export function addDays(date: Date, days: number): Date {
   next.setDate(next.getDate() + days);
   return next;
 }
-
-export const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
 
 /** Days in a month — day 0 of the next month is the last day of this one. */
 export function getDaysInMonth(year: number, month: number): number {

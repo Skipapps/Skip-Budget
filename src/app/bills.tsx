@@ -11,12 +11,13 @@ import { PageState } from '@/components/ui/page-state';
 import { RangeDropdown } from '@/components/ui/range-dropdown';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
+import { t } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { groupByDate } from '@/lib/group';
 import { rangeFor, type RangeKey } from '@/lib/range';
 import { useMoneyColor } from '@/providers/theme-provider';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 
 /**
  * What the bills have cost over a window: it lists the times a bill landed (a monthly bill is one
@@ -56,16 +57,18 @@ export default function BillsScreen() {
 
   return (
     <Screen
-      title="Monthly bills"
+      title={t('bills.charged.title')}
       showBack
       onRefresh={refetch}
-      headerActions={[{ icon: Plus, label: 'Add bill', onPress: () => router.push('/add-bill') }]}
+      headerActions={[
+        { icon: Plus, label: t('bills.addBill'), onPress: () => router.push('/add-bill') },
+      ]}
     >
       <View className="mt-3 w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
         <View className="w-full flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1">
             <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-              Bills charged
+              {t('bills.charged.label')}
             </Text>
             <Text
               // text-ink underneath: a zero total gets no money colour, and an unstyled figure is
@@ -84,8 +87,8 @@ export default function BillsScreen() {
 
         <Text className="mt-2 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.2}>
           {charges.length === 0
-            ? 'Nothing in this window'
-            : `${charges.length} ${charges.length === 1 ? 'charge' : 'charges'}`}
+            ? t('bills.charged.nothing')
+            : t('bills.charged.count', { count: charges.length })}
         </Text>
       </View>
 
@@ -94,8 +97,8 @@ export default function BillsScreen() {
       {isError ? (
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={refetch}
         />
       ) : null}
@@ -103,13 +106,11 @@ export default function BillsScreen() {
       {!isLoading && !isError && charges.length === 0 ? (
         <PageState
           art={artwork.emptyBills}
-          title={planCount === 0 ? 'No bills yet' : 'Nothing in this window'}
+          title={planCount === 0 ? t('bills.noBillsYet') : t('bills.charged.nothing')}
           message={
-            planCount === 0
-              ? 'Add the ones that repeat — rent, power, phone — and each time one lands it shows up here.'
-              : 'Your bills have not landed in this stretch of time. Try a wider window.'
+            planCount === 0 ? t('bills.charged.emptyMessage') : t('bills.charged.windowMessage')
           }
-          actionLabel={planCount === 0 ? 'Add a bill' : undefined}
+          actionLabel={planCount === 0 ? t('bills.addABill') : undefined}
           onAction={planCount === 0 ? () => router.push('/add-bill') : undefined}
         />
       ) : null}
@@ -125,7 +126,7 @@ export default function BillsScreen() {
                   <TransactionRow
                     label={entry.label}
                     amount={entry.amount}
-                    kindLabel={sourceLabels.get(entry.sourceId) ?? 'No payment method'}
+                    kindLabel={sourceLabels.get(entry.sourceId) ?? t('bills.noPaymentMethod')}
                     kind="bill"
                     domain={entry.domain}
                     categoryId={entry.categoryId}

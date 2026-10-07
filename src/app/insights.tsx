@@ -25,6 +25,9 @@ import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { SectionHeading } from '@/components/ui/typography';
 import { BILL_CATEGORIES } from '@/data/bills-mock';
+import { t, type MessageKey } from '@/i18n';
+import { monthLong } from '@/i18n/calendar';
+import { MESSAGES } from '@/i18n/messages';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { sortByDateAscending } from '@/lib/group';
@@ -32,7 +35,7 @@ import { toCents } from '@/lib/money';
 import { PERIODS, periodBuckets, periodRange, type PeriodKey } from '@/lib/period';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 
 const PER_MONTH: Record<string, number> = {
   weekly: 52 / 12,
@@ -40,6 +43,36 @@ const PER_MONTH: Record<string, number> = {
   semimonthly: 2,
   monthly: 1,
 };
+
+const PERIOD_TOTAL: Record<PeriodKey, MessageKey> = {
+  week: 'insights.out.thisWeek',
+  month: 'insights.out.thisMonth',
+  year: 'insights.out.thisYear',
+  all: 'insights.out.allTime',
+};
+
+/**
+ * A category's name by its stored id. An id the app has no words for (added to the database
+ * later) keeps the label it was stored with.
+ */
+function categoryName(
+  prefix: 'receipts.category' | 'insights.billCategory',
+  id: string,
+  stored: string,
+): string {
+  const key = `${prefix}.${id}`;
+  return key in MESSAGES ? t(key as MessageKey) : stored;
+}
+
+/** "June 2026", "Junio de 2026": a row label, so it takes a capital in every language. */
+function monthName(month: string): string {
+  const date = new Date(`${month}T00:00:00`);
+  const name = t('savings.monthYear', {
+    month: monthLong(date.getMonth()),
+    year: date.getFullYear(),
+  });
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
 
 /**
  * All the figures side by side. It reads rather than computes: every number comes from the same
@@ -142,8 +175,12 @@ function InsightsScreenInner() {
 
   const categoryLabel = useMemo(() => {
     const labels = new Map<string, string>();
-    for (const category of BILL_CATEGORIES) labels.set(category.id, category.label);
-    for (const category of spendCategories) labels.set(category.id, category.label);
+    for (const category of BILL_CATEGORIES) {
+      labels.set(category.id, categoryName('insights.billCategory', category.id, category.label));
+    }
+    for (const category of spendCategories) {
+      labels.set(category.id, categoryName('receipts.category', category.id, category.label));
+    }
     return labels;
   }, [spendCategories]);
 
@@ -155,7 +192,11 @@ function InsightsScreenInner() {
       totalsByCategory.set(key, (totalsByCategory.get(key) ?? 0) + Math.abs(entry.amount));
     }
     return [...totalsByCategory.entries()]
-      .map(([id, amount]) => ({ id, label: categoryLabel.get(id) ?? 'Other', amount }))
+      .map(([id, amount]) => ({
+        id,
+        label: categoryLabel.get(id) ?? t('receipts.category.other'),
+        amount,
+      }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 6);
   }, [entries, categoryLabel]);
@@ -223,11 +264,11 @@ function InsightsScreenInner() {
 
   if (isError) {
     return (
-      <Screen title="Insights" showBack onRefresh={refresh} refreshing={refreshing}>
+      <Screen title={t('insights.title')} showBack onRefresh={refresh} refreshing={refreshing}>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={retry}
         />
       </Screen>
@@ -235,11 +276,11 @@ function InsightsScreenInner() {
   }
 
   return (
-    <Screen title="Insights" showBack onRefresh={refresh} refreshing={refreshing}>
-      <Heading>Where you stand</Heading>
+    <Screen title={t('insights.title')} showBack onRefresh={refresh} refreshing={refreshing}>
+      <Heading>{t('insights.stand.heading')}</Heading>
       <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
         <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-          Saved, less what you owe
+          {t('insights.stand.worth')}
         </Text>
         <Text
           className="mt-1 font-app-bold text-[34px] text-ink"
@@ -252,16 +293,16 @@ function InsightsScreenInner() {
         </Text>
 
         <View className="mt-4 w-full gap-2.5">
-          <StandRow label="Put aside" value={savedTotal} />
-          <StandRow label="Owed on credit cards" value={-owedOnCards} />
+          <StandRow label={t('insights.stand.putAside')} value={savedTotal} />
+          <StandRow label={t('insights.stand.owedOnCards')} value={-owedOnCards} />
         </View>
       </View>
 
-      <Heading>What comes in</Heading>
+      <Heading>{t('insights.in.heading')}</Heading>
       {monthlyIncome > 0 ? (
         <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
           <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-            Every month
+            {t('insights.in.everyMonth')}
           </Text>
           <Text
             className="mt-1 font-app-bold text-[28px] text-ink"
@@ -272,20 +313,19 @@ function InsightsScreenInner() {
             {formatCurrency(monthlyIncome)}
           </Text>
           <Text className="mt-1 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-            from {(salary.data ?? []).length}{' '}
-            {(salary.data ?? []).length === 1 ? 'source' : 'sources'}
+            {t('insights.in.sources', { count: (salary.data ?? []).length })}
           </Text>
         </View>
       ) : (
         <Prompt
-          title="Skip does not know what you earn yet"
-          message="Adding your pay is what turns this page from a record of what you spent into a picture of what you can afford."
-          actionLabel="Set up payday"
+          title={t('insights.in.emptyTitle')}
+          message={t('insights.in.emptyMessage')}
+          actionLabel={t('insights.in.setUp')}
           onPress={() => router.push('/salary')}
         />
       )}
 
-      <Heading>What goes out</Heading>
+      <Heading>{t('insights.out.heading')}</Heading>
       <ChoiceChips
         options={PERIODS.map((period) => ({ value: period.value, label: period.label }))}
         value={periodKey}
@@ -298,7 +338,7 @@ function InsightsScreenInner() {
         <>
           <View className="mt-4 w-full rounded-[16px] border border-line bg-card px-5 py-5">
             <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-              {periodKey === 'all' ? 'All time' : `This ${periodKey}`}
+              {t(PERIOD_TOTAL[periodKey])}
             </Text>
             <Text
               className="mt-1 font-app-bold text-[30px] text-ink"
@@ -314,15 +354,23 @@ function InsightsScreenInner() {
           </View>
 
           <View className="mt-3 w-full rounded-[16px] border border-line bg-card px-5 py-4">
-            <StandRow label="Shop receipts" value={-(byKind.get('receipt') ?? 0)} plain />
+            <StandRow
+              label={t('insights.out.receipts')}
+              value={-(byKind.get('receipt') ?? 0)}
+              plain
+            />
             <View className="h-2" />
-            <StandRow label="Bills" value={-(byKind.get('bill') ?? 0)} plain />
+            <StandRow label={t('insights.out.bills')} value={-(byKind.get('bill') ?? 0)} plain />
             <View className="h-2" />
-            <StandRow label="Subscriptions" value={-(byKind.get('subscription') ?? 0)} plain />
+            <StandRow
+              label={t('insights.out.subscriptions')}
+              value={-(byKind.get('subscription') ?? 0)}
+              plain
+            />
             <View className="my-3 h-px w-full bg-line" />
             <View className="w-full flex-row items-center justify-between gap-3">
               <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
-                Recorded in this period
+                {t('insights.out.recorded')}
               </Text>
               <Text className="font-app-bold text-[16px] text-ink" maxFontSizeMultiplier={1.3}>
                 {formatCurrency(totals.out)}
@@ -334,7 +382,7 @@ function InsightsScreenInner() {
 
       {categories.length > 0 ? (
         <>
-          <Heading>Where it goes</Heading>
+          <Heading>{t('insights.goes.heading')}</Heading>
           <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
             {categories.map((category, index) => (
               <View
@@ -375,7 +423,7 @@ function InsightsScreenInner() {
 
       {merchants.length > 0 ? (
         <>
-          <Heading>Where you spend most</Heading>
+          <Heading>{t('insights.most.heading')}</Heading>
           <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
             {merchants.map((merchant, index) => (
               <View
@@ -427,7 +475,7 @@ function InsightsScreenInner() {
                     className="mt-1 font-app text-[12px] text-muted"
                     maxFontSizeMultiplier={1.3}
                   >
-                    {merchant.visits} {merchant.visits === 1 ? 'time' : 'times'}
+                    {t('insights.most.times', { count: merchant.visits })}
                   </Text>
                 </View>
               </View>
@@ -436,46 +484,39 @@ function InsightsScreenInner() {
         </>
       ) : null}
 
-      <Heading>What you keep</Heading>
+      <Heading>{t('insights.keep.heading')}</Heading>
       {recentMonths.length > 0 ? (
         <View className="w-full rounded-[16px] border border-line bg-card px-5 py-4">
           {recentMonths.map((month, index) => (
             <View key={month.month} className={index > 0 ? 'mt-3' : undefined}>
-              <StandRow
-                label={new Date(`${month.month}T00:00:00`).toLocaleDateString(undefined, {
-                  month: 'long',
-                  year: 'numeric',
-                })}
-                value={savedFor(month)}
-                plain
-              />
+              <StandRow label={monthName(month.month)} value={savedFor(month)} plain />
             </View>
           ))}
           <View className="my-3 h-px w-full bg-line" />
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="See every month"
+            accessibilityLabel={t('insights.keep.seeEvery')}
             onPress={() => router.push('/savings')}
             className="min-h-11 w-full flex-row items-center justify-between active:opacity-70"
           >
             <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.3}>
-              Every month
+              {t('insights.keep.everyMonth')}
             </Text>
             <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
           </Pressable>
         </View>
       ) : (
         <Prompt
-          title="No finished months yet"
-          message="When a month ends, whatever is left of it is added to your savings and shows up here."
-          actionLabel="See savings"
+          title={t('insights.keep.emptyTitle')}
+          message={t('insights.keep.emptyMessage')}
+          actionLabel={t('insights.keep.seeSavings')}
           onPress={() => router.push('/savings')}
         />
       )}
 
       {(cards.data ?? []).length > 0 ? (
         <>
-          <Heading>What you owe</Heading>
+          <Heading>{t('insights.owe.heading')}</Heading>
           <View className="w-full rounded-[16px] border border-line bg-card px-5 py-4">
             {(cards.data ?? []).map((card, index) => (
               <View key={card.id} className={index > 0 ? 'mt-3' : undefined}>
@@ -492,11 +533,11 @@ function InsightsScreenInner() {
 
       {monthlySubs > 0 ? (
         <>
-          <Heading>Coming up</Heading>
+          <Heading>{t('insights.coming.heading')}</Heading>
           <Row
-            label="Subscriptions"
-            value={`${formatCurrency(monthlySubs)}/mo`}
-            hint={`${formatCurrency(monthlySubs * 12)} over a year`}
+            label={t('insights.out.subscriptions')}
+            value={t('insights.coming.perMonth', { amount: formatCurrency(monthlySubs) })}
+            hint={t('insights.coming.overYear', { amount: formatCurrency(monthlySubs * 12) })}
             onPress={() => router.push('/subscriptions')}
           />
         </>

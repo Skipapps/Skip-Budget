@@ -17,13 +17,14 @@ import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
+import { t } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 
 /** Normalised to a month so a yearly plan does not look cheap beside a monthly one. */
 const PER_MONTH: Record<string, number> = {
@@ -90,22 +91,32 @@ export default function SubscriptionPlansScreen() {
 
   return (
     <Screen
-      title="Your subscriptions"
+      title={t('subscriptions.plans.title')}
       showBack
       avoidKeyboard
       headerActions={[
-        { icon: Plus, label: 'Add subscription', onPress: () => router.push('/add-subscription') },
+        {
+          icon: Plus,
+          label: t('subscriptions.addSubscription'),
+          onPress: () => router.push('/add-subscription'),
+        },
       ]}
     >
       {showEmpty || isError ? null : (
         <>
           <View className="mt-5 w-full flex-row items-center gap-3">
-            <SearchField value={query} onChangeText={setQuery} placeholder="Search subscriptions" />
+            <SearchField
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t('subscriptions.plans.search')}
+            />
 
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={
-                activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter subscriptions'
+                activeCount > 0
+                  ? t('subscriptions.plans.filtersActive', { count: activeCount })
+                  : t('subscriptions.filter.title')
               }
               onPress={() => setFilterOpen(true)}
               className="h-11 w-11 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
@@ -127,15 +138,20 @@ export default function SubscriptionPlansScreen() {
           <View className="mt-5 w-full flex-row items-center justify-between">
             <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
               {isLoading
-                ? 'Loading'
+                ? t('subscriptions.plans.loading')
                 : narrowed
-                  ? `${visible.length} of ${subscriptions.length} subscriptions`
-                  : `${subscriptions.length} ${subscriptions.length === 1 ? 'subscription' : 'subscriptions'}`}
+                  ? t('subscriptions.plans.countOf', {
+                      shown: visible.length,
+                      count: subscriptions.length,
+                    })
+                  : t('subscriptions.plans.count', { count: subscriptions.length })}
             </Text>
             {isLoading ? null : (
               <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
                 {formatCurrency(monthlyTotal)}
-                <Text className="font-app text-[13px] text-muted"> / mo</Text>
+                <Text className="font-app text-[13px] text-muted">
+                  {` ${t('subscriptions.plans.perMonth')}`}
+                </Text>
               </Text>
             )}
           </View>
@@ -149,8 +165,8 @@ export default function SubscriptionPlansScreen() {
       {isError ? (
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={() => refetch()}
         />
       ) : null}
@@ -158,9 +174,9 @@ export default function SubscriptionPlansScreen() {
       {showEmpty ? (
         <PageState
           art={artwork.emptySubscriptions}
-          title="No subscriptions yet"
-          message="Add the ones you pay for and Skip will show what they cost you each month."
-          actionLabel="Add a subscription"
+          title={t('subscriptions.noSubscriptionsYet')}
+          message={t('subscriptions.plans.emptyMessage')}
+          actionLabel={t('subscriptions.addASubscription')}
           onAction={() => router.push('/add-subscription')}
         />
       ) : null}
@@ -168,9 +184,9 @@ export default function SubscriptionPlansScreen() {
       {showNoMatches ? (
         <PageState
           art={artwork.noResults}
-          title="Nothing matches"
-          message="No subscription fits that search and those filters. Try a different name or clear what you have set."
-          actionLabel="Clear filters"
+          title={t('subscriptions.plans.noMatchTitle')}
+          message={t('subscriptions.plans.noMatchMessage')}
+          actionLabel={t('subscriptions.plans.clearFilters')}
           onAction={() => {
             setQuery('');
             setFilters(EMPTY_SUBSCRIPTION_FILTERS);

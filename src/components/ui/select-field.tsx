@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { FieldLabel } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
 
@@ -41,7 +42,7 @@ export function SelectField({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}. ${value || placeholder || 'Not set'}`}
+        accessibilityLabel={`${label}. ${value || placeholder || t('ui.select.notSet')}`}
         onPress={onPress}
         className={cn(
           'min-h-14 w-full flex-row items-center justify-between px-5',

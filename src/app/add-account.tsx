@@ -52,16 +52,28 @@ import {
   type PayFrequency,
 } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
+import { t } from '@/i18n';
 import { success, warn } from '@/lib/haptics';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { failureMessage, failureText } from '@/lib/failure';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
 
-const TYPE_OPTIONS = ACCOUNT_TYPES.map((type) => ({ value: type, label: type }));
+/** The value stays the stored "Checking"/"Savings"; the label is read when the chips draw. */
+const TYPE_OPTIONS = ACCOUNT_TYPES.map((type) => ({
+  value: type,
+  get label() {
+    return t(type === 'Savings' ? 'accounts.type.savings' : 'accounts.type.checking');
+  },
+}));
 
 /** "Acme", "Acme and Side gig", "Acme, Side gig and Rent". */
 function joinNames(names: string[]): string {
   if (names.length <= 1) return names[0] ?? '';
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  const last = names[names.length - 1];
+  const params = { list: names.slice(0, -1).join(', '), last };
+  // An "i" sound ("IBM", "Hilton", not "Hielo") takes the Spanish "e" for "and".
+  return /^h?i(?![aeiouáéíóú])/i.test(last)
+    ? t('accounts.link.namesBeforeI', params)
+    : t('accounts.link.names', params);
 }
 
 /** "monthly", "every 2 weeks" — reads on after an amount. */
@@ -106,12 +118,12 @@ function AddAccountScreenInner() {
         <Screen showBack>
           <PageState
             art={artwork.error}
-            title={FAILURE_MESSAGE}
-            actionLabel="Try again"
+            title={failureText()}
+            actionLabel={t('common.tryAgain')}
             onAction={() => {
               void account.refetch();
             }}
-            secondaryLabel="Go back"
+            secondaryLabel={t('cards.form.goBack')}
             onSecondary={() => router.back()}
           />
         </Screen>
@@ -121,12 +133,12 @@ function AddAccountScreenInner() {
     if (!account.isFetched) {
       return (
         <StepFlow
-          title="Edit account"
-          closePrompt="Cancel editing this account?"
+          title={t('accounts.add.editTitle')}
+          closePrompt={t('accounts.add.closeEditing')}
           steps={3}
           current={0}
           onBack={() => router.back()}
-          primaryLabel="Continue"
+          primaryLabel={t('common.continue')}
           primaryDisabled
           onPrimary={() => {}}
         >
@@ -142,8 +154,8 @@ function AddAccountScreenInner() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Go back"
+          title={failureText()}
+          actionLabel={t('cards.form.goBack')}
           onAction={() => router.back()}
         />
       </Screen>
@@ -196,10 +208,9 @@ function AccountForm({
   const handleDelete = async () => {
     if (!id) return;
     const ok = await confirm({
-      title: 'Delete this account?',
-      message:
-        'Receipts, bills and subscriptions paid from it are kept, but stop showing this account.',
-      confirmLabel: 'Delete',
+      title: t('accounts.add.deleteTitle'),
+      message: t('accounts.add.deleteMessage'),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -224,13 +235,15 @@ function AccountForm({
   const payLinked = !editing && hasSalary && linkPay;
   const salaryNames = joinNames(salaries.map((source) => source.name.trim()).filter(Boolean));
   const linkTitle = salaryNames
-    ? `${salaryNames} ${salaries.length === 1 ? 'lands' : 'land'} here`
-    : 'My pay lands here';
+    ? t('accounts.link.lands', { names: salaryNames, count: salaries.length })
+    : t('accounts.link.myPay');
   const onlySalary = salaries.length === 1 ? salaries[0] : null;
   const linkCaption = onlySalary
-    ? `${formatCurrency(Number(onlySalary.amount))} ${frequencyLabel(onlySalary.frequency)}` +
-      (onlySalary.last_payday ? ' · payday already set' : '')
-    : 'Their paydays are already set';
+    ? t(onlySalary.last_payday ? 'accounts.link.payWithPayday' : 'accounts.link.pay', {
+        amount: formatCurrency(Number(onlySalary.amount)),
+        frequency: frequencyLabel(onlySalary.frequency),
+      })
+    : t('accounts.link.paydaysSet');
   // Income and payday belong to pay, not the account: asked only when adding, where they make a
   // salary source. An edit never saved them.
   const askPay = !editing && !payLinked;
@@ -261,7 +274,7 @@ function AccountForm({
   const handleSave = async () => {
     setError(null);
     if (!bankName.trim()) {
-      fail('Enter the bank name.', 1);
+      fail(t('accounts.add.bankNameMissing'), 1);
       return;
     }
 
@@ -269,7 +282,7 @@ function AccountForm({
       const values = {
         bank_name: bankName.trim(),
         nickname: nickname.trim() || null,
-        // The picker shows "Checking"; the column is a lowercase enum.
+        // The picker's value is "Checking"; the column is a lowercase enum.
         account_type: accountType.toLowerCase() as 'checking' | 'savings',
         last4: last4.length === 4 ? last4 : null,
         color,
@@ -335,20 +348,26 @@ function AccountForm({
 
   const question =
     step === 0
-      ? 'What is in the account today?'
+      ? t('accounts.add.balanceQuestion')
       : step === 2
         ? askPay
-          ? 'When was the last pay day?'
-          : 'Want a nudge when pay lands?'
+          ? t('accounts.add.lastPaydayQuestion')
+          : t('accounts.add.reminderQuestion')
         : undefined;
   const primaryLabel =
-    step < 2 ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save account';
+    step < 2
+      ? t('common.continue')
+      : busy
+        ? t('cards.form.saving')
+        : editing
+          ? t('cards.form.saveChanges')
+          : t('accounts.add.saveAccount');
   const stepError = error && error.step === step ? error.message : null;
 
   return (
     <StepFlow
-      title={editing ? 'Edit account' : 'Add an account'}
-      closePrompt={editing ? 'Cancel editing this account?' : 'Cancel adding this account?'}
+      title={editing ? t('accounts.add.editTitle') : t('accounts.add.addTitle')}
+      closePrompt={editing ? t('accounts.add.closeEditing') : t('accounts.add.closeAdding')}
       steps={3}
       current={step}
       onBack={() => {
@@ -373,13 +392,13 @@ function AccountForm({
         editing ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Delete this account"
+            accessibilityLabel={t('accounts.add.deleteLabel')}
             onPress={handleDelete}
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
             <Text className="font-app-medium text-[15px] text-danger" maxFontSizeMultiplier={1.4}>
-              {deleteAccount.isPending ? 'Deleting…' : 'Delete account'}
+              {deleteAccount.isPending ? t('cards.form.deleting') : t('accounts.add.deleteAccount')}
             </Text>
           </Pressable>
         ) : null
@@ -399,11 +418,11 @@ function AccountForm({
               last4,
               color,
             }}
-            placeholderName="Bank name"
+            placeholderName={t('accounts.add.bankName')}
           />
 
           <TextField
-            label="Bank name"
+            label={t('accounts.add.bankName')}
             value={bankName}
             onChangeText={setBankName}
             autoCapitalize="words"
@@ -411,12 +430,12 @@ function AccountForm({
           />
 
           <View className="w-full">
-            <FieldLabel className="mb-2">Account type</FieldLabel>
+            <FieldLabel className="mb-2">{t('accounts.add.accountType')}</FieldLabel>
             <ChoiceChips options={TYPE_OPTIONS} value={accountType} onChange={setAccountType} />
           </View>
 
           <TextField
-            label="Name of the account"
+            label={t('accounts.add.accountName')}
             value={nickname}
             onChangeText={setNickname}
             autoCapitalize="words"
@@ -424,12 +443,12 @@ function AccountForm({
           />
 
           <View className="w-full">
-            <FieldLabel className="mb-3">Card colour</FieldLabel>
+            <FieldLabel className="mb-3">{t('cards.form.cardColour')}</FieldLabel>
             <ColorPicker value={color} onChange={setColor} />
           </View>
 
           <TextField
-            label="Last 4 digits"
+            label={t('cards.form.last4')}
             value={last4}
             onChangeText={(text) => setLast4(text.replace(/\D/g, '').slice(0, 4))}
             keyboardType="number-pad"
@@ -459,14 +478,14 @@ function AccountForm({
 
           {askPay ? (
             <SelectField
-              label="Expected income"
+              label={t('accounts.add.expectedIncome')}
               variant="pill"
               value={income ? formatCurrency(Number(income)) : ''}
-              placeholder="Enter an amount"
+              placeholder={t('accounts.add.enterAmount')}
               icon={Calculator}
               onPress={() => setIncomePadOpen(true)}
               onIconPress={() => setCalculatorOpen(true)}
-              iconAccessibilityLabel="Open calculator"
+              iconAccessibilityLabel={t('accounts.add.openCalculator')}
             />
           ) : null}
 
@@ -489,13 +508,13 @@ function AccountForm({
                     className="mt-2 w-full text-center font-app text-[13px] text-muted"
                     maxFontSizeMultiplier={1.4}
                   >
-                    Next payday: {formatFullDate(nextPayday)}
+                    {t('accounts.add.nextPayday', { date: formatFullDate(nextPayday) })}
                   </Text>
                 ) : null}
               </View>
 
               <View className="w-full">
-                <FieldLabel className="mb-2">How often are you paid?</FieldLabel>
+                <FieldLabel className="mb-2">{t('accounts.add.payFrequency')}</FieldLabel>
                 <ChoiceChips
                   options={PAY_FREQUENCIES}
                   value={payFrequency}
@@ -513,12 +532,12 @@ function AccountForm({
             onTimeChange={setTimeDraft}
             unavailable={
               payLookupPending
-                ? 'Checking what is paid into this account…'
+                ? t('accounts.add.checkingPay')
                 : payLookupFailed
-                  ? FAILURE_MESSAGE
+                  ? failureText()
                   : payLandsHere
                     ? null
-                    : 'Add the income paid into this account and Skip can tell you when it lands.'
+                    : t('accounts.add.reminderNeedsPay')
             }
             onRetry={payLookupFailed ? () => void salaryAccounts.refetch() : undefined}
           />
@@ -527,7 +546,7 @@ function AccountForm({
 
       {calculatorOpen ? (
         <CalculatorPad
-          title="Calculator"
+          title={t('accounts.add.calculator')}
           value={income}
           onCancel={() => setCalculatorOpen(false)}
           onConfirm={(next) => {
@@ -539,10 +558,10 @@ function AccountForm({
 
       {incomePadOpen ? (
         <AmountPad
-          title="Expected income"
+          title={t('accounts.add.expectedIncome')}
           // The pay frequency is asked on the next step, so a cycle named here would state a choice
           // nobody has made.
-          caption="Each pay period"
+          caption={t('accounts.add.eachPayPeriod')}
           value={income}
           onCancel={() => setIncomePadOpen(false)}
           onConfirm={(next) => {

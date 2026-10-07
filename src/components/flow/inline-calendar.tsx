@@ -3,36 +3,12 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { ActionPill } from '@/components/ui/action-pill';
+import { monthLong, monthsShort, weekdayInitials, weekdayLong } from '@/i18n/calendar';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
-import { MONTHS_SHORT, WEEKDAY_INITIALS, getDaysInMonth, getFirstWeekday } from '@/lib/date';
+import { getDaysInMonth, getFirstWeekday } from '@/lib/date';
 import { selection } from '@/lib/haptics';
 import { useColors } from '@/providers/theme-provider';
-
-/** Spoken names for the header and screen reader; never stored (`src/lib/date.ts` owns saved and printed dates). */
-const MONTHS_FULL = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-] as const;
-
-const WEEKDAYS_FULL = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-] as const;
 
 function isSameDay(a: Date, b: Date): boolean {
   return (
@@ -75,7 +51,7 @@ export function DayGrid({
 
   return (
     <View role="grid" className="w-full flex-row flex-wrap">
-      {WEEKDAY_INITIALS.map((initial, index) => (
+      {weekdayInitials().map((initial, index) => (
         <View key={`${initial}-${index}`} className="w-[14.28%] items-center py-1">
           <Text allowFontScaling={false} className="font-app-medium text-[11px] text-muted">
             {initial}
@@ -93,14 +69,19 @@ export function DayGrid({
         const selected = dayNumber === selectedDay;
         const isToday = today ? isSameDay(date, today) : false;
         const blocked = minDate ? startOfDay(date) < startOfDay(minDate) : false;
-        const spoken = `${WEEKDAYS_FULL[date.getDay()]} ${dayNumber} ${MONTHS_FULL[month]} ${year}`;
+        const spoken = t('ui.calendar.day', {
+          weekday: weekdayLong(date.getDay()),
+          day: dayNumber,
+          month: monthLong(month),
+          year,
+        });
 
         return (
           <View key={dayNumber} className="w-[14.28%] items-center py-0.5">
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ selected, disabled: blocked }}
-              accessibilityLabel={isToday ? `Today, ${spoken}` : spoken}
+              accessibilityLabel={isToday ? t('ui.calendar.today', { date: spoken }) : spoken}
               disabled={blocked}
               onPress={() => {
                 selection();
@@ -179,7 +160,7 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
       <View className="w-full flex-row items-center justify-between">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Previous month"
+          accessibilityLabel={t('ui.calendar.previousMonth')}
           onPress={() => step(-1)}
           className="h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
         >
@@ -188,7 +169,7 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${MONTHS_FULL[month]} ${year}. Choose a different month.`}
+          accessibilityLabel={t('ui.calendar.pickMonth', { month: monthLong(month), year })}
           onPress={() => setPickingMonth((open) => !open)}
           className="min-h-11 shrink flex-row items-center justify-center rounded-full px-4 active:bg-ink/5"
         >
@@ -197,13 +178,13 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
             numberOfLines={1}
             maxFontSizeMultiplier={1.3}
           >
-            {MONTHS_FULL[month]} {year}
+            {t('ui.calendar.monthYear', { month: monthLong(month), year })}
           </Text>
         </Pressable>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Next month"
+          accessibilityLabel={t('ui.calendar.nextMonth')}
           onPress={() => step(1)}
           className="h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
         >
@@ -216,7 +197,7 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
           <View className="w-full flex-row items-center justify-between">
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Previous year"
+              accessibilityLabel={t('ui.calendar.previousYear')}
               onPress={() => {
                 selection();
                 setYear((current) => current - 1);
@@ -230,7 +211,7 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Next year"
+              accessibilityLabel={t('ui.calendar.nextYear')}
               onPress={() => {
                 selection();
                 setYear((current) => current + 1);
@@ -242,14 +223,14 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
           </View>
 
           <View className="mt-1 w-full flex-row flex-wrap">
-            {MONTHS_SHORT.map((label, index) => {
+            {monthsShort().map((label, index) => {
               const selected = index === month;
               return (
                 <View key={label} className="w-1/4 items-center py-1.5">
                   <Pressable
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
-                    accessibilityLabel={MONTHS_FULL[index]}
+                    accessibilityLabel={monthLong(index)}
                     onPress={() => {
                       selection();
                       setMonth(index);
@@ -293,7 +274,7 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
         <View className="mt-4 w-full flex-row justify-end">
           <ActionPill
             icon={CalendarDays}
-            label="Today"
+            label={t('dates.today')}
             onPress={() => {
               const now = new Date();
               setMonth(now.getMonth());

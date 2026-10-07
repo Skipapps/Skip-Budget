@@ -2,11 +2,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Check, Lock } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
+import { useProPrices } from '@/api/pro';
 import { PRO_FEATURES } from '@/data/pro-features';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { Subtitle, Title } from '@/components/ui/typography';
-import { PRO_MONTHLY_LABEL, PRO_YEARLY_LABEL } from '@/lib/wall';
+import { t } from '@/i18n';
+import { proMonthlyLabel, proYearlyLabel } from '@/lib/wall';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 
@@ -15,9 +17,18 @@ export default function ProFeatureScreen() {
   const colors = useColors();
   const artwork = useArtwork();
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const prices = useProPrices();
 
   const feature = PRO_FEATURES[id ?? ''] ?? PRO_FEATURES.unlimited;
   const Art = artwork[feature.artwork];
+
+  // The store's own prices when it has answered; the dollar fallbacks until then.
+  const monthlyStore = prices.data?.monthly?.product.priceString;
+  const yearlyStore = prices.data?.yearly?.product.priceString;
+  const monthly = monthlyStore
+    ? t('pro.price.monthly', { price: monthlyStore })
+    : proMonthlyLabel();
+  const yearly = yearlyStore ? t('pro.price.yearly', { price: yearlyStore }) : proYearlyLabel();
 
   return (
     <Screen title="Skip Pro" showBack>
@@ -55,24 +66,24 @@ export default function ProFeatureScreen() {
         <Lock size={18} color={colors.muted} strokeWidth={1.8} />
         <View className="min-w-0 flex-1">
           <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.3}>
-            Part of Skip Pro
+            {t('pro.feature.partOf')}
           </Text>
           <Text className="mt-0.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-            With everything else Pro unlocks
+            {t('pro.feature.withEverything')}
           </Text>
         </View>
       </View>
 
       <View className="mb-8 mt-auto w-full gap-2 pt-8">
-        <Button label={`See Skip Pro — ${PRO_MONTHLY_LABEL}`} onPress={() => router.push('/pro')} />
+        <Button label={t('pro.feature.see', { monthly })} onPress={() => router.push('/pro')} />
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Not now"
+          accessibilityLabel={t('common.notNow')}
           onPress={() => router.back()}
           className="min-h-11 w-full items-center justify-center rounded-full active:bg-ink/5"
         >
           <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-            or {PRO_YEARLY_LABEL} · Not now
+            {t('pro.feature.orYearly', { yearly })}
           </Text>
         </Pressable>
       </View>

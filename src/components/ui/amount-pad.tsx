@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AmountFigure } from '@/components/flow/amount-figure';
 import { AmountKeypad, applyAmountKey } from '@/components/flow/amount-keypad';
 import { Button } from '@/components/ui/button';
+import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
 
 type AmountPadProps = {
@@ -42,7 +43,7 @@ export function AmountPad({
         <View className="flex-row items-center px-4 py-2">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Back"
+            accessibilityLabel={t('common.back')}
             hitSlop={8}
             onPress={onCancel}
             className="h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
@@ -51,7 +52,6 @@ export function AmountPad({
           </Pressable>
           <Text
             className="flex-1 pr-11 text-center font-app-semibold text-[17px] text-ink"
-            numberOfLines={1}
             maxFontSizeMultiplier={1.3}
           >
             {title}
@@ -73,7 +73,7 @@ export function AmountPad({
         </View>
 
         <View className="px-6 pt-5">
-          <Button label="Done" onPress={() => onConfirm(draft)} />
+          <Button label={t('common.done')} onPress={() => onConfirm(draft)} />
         </View>
       </View>
     </Modal>

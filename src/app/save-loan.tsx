@@ -5,15 +5,17 @@ import { Text, View } from 'react-native';
 import { useSaveLoan } from '@/api/mutations';
 import { usePaymentSources } from '@/api/queries';
 import { IconPicker } from '@/components/bills/icon-picker';
+import { loanRateText, loanTermText } from '@/components/calculators/schedule-card';
 import { Button } from '@/components/ui/button';
 import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Subtitle } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { amortise, formatTerm, type AccrualBasis } from '@/lib/loan';
+import { amortise, type AccrualBasis } from '@/lib/loan';
 import { failureMessage } from '@/lib/failure';
 
 /** Only the app's own conventions get through a hand-edited link. */
@@ -76,11 +78,11 @@ function SaveLoanScreenInner() {
     setError(null);
 
     if (!name.trim()) {
-      setError('Give the loan a name so you can spot it in your bills.');
+      setError(t('loan.save.needName'));
       return;
     }
     if (termMonths < 1 || principal <= 0) {
-      setError('That loan does not have a payment to save.');
+      setError(t('loan.save.noPayment'));
       return;
     }
     const chosen = sources.find((source) => source.id === sourceId);
@@ -109,41 +111,48 @@ function SaveLoanScreenInner() {
   };
 
   return (
-    <Screen title="Add to monthly bills" showBack avoidKeyboard>
-      <Subtitle className="mt-3">
-        This becomes a monthly bill under Loans, so it counts against what you have left.
-      </Subtitle>
+    <Screen title={t('loan.save.title')} showBack avoidKeyboard>
+      <Subtitle className="mt-3">{t('loan.save.subtitle')}</Subtitle>
 
       <View className="mt-6 w-full rounded-[16px] border border-line bg-card px-4 py-3">
-        <Row label="Monthly payment" value={formatCurrency(loan.payment)} strong />
-        <Row label="Borrowed" value={formatCurrency(principal)} />
-        <Row label="Rate" value={`${annualRate}% a year`} />
-        <Row label="Term" value={`${formatTerm(termMonths)} · ${termMonths} payments`} />
+        <Row label={t('loan.monthlyPayment')} value={formatCurrency(loan.payment)} strong />
+        <Row label={t('loan.borrowed')} value={formatCurrency(principal)} />
         <Row
-          label="First payment"
+          label={t('loan.save.rate')}
+          value={t('loan.save.ratePerYear', { rate: loanRateText(annualRate) })}
+        />
+        <Row
+          label={t('loan.termLabel')}
+          value={t('loan.save.termPayments', {
+            term: loanTermText(termMonths),
+            count: termMonths,
+          })}
+        />
+        <Row
+          label={t('loan.firstPayment')}
           value={firstPaymentOn ? formatFullDate(new Date(`${firstPaymentOn}T00:00:00`)) : '—'}
         />
-        <Row label="Interest over the term" value={formatCurrency(loan.totalInterest)} />
+        <Row label={t('loan.save.interestOverTerm')} value={formatCurrency(loan.totalInterest)} />
       </View>
 
       <View className="mt-8 w-full gap-6">
         <TextField
-          label="Name"
+          label={t('loan.save.name')}
           value={name}
           onChangeText={setName}
-          placeholder="Car loan, student loan…"
+          placeholder={t('loan.save.namePlaceholder')}
           autoCapitalize="sentences"
           returnKeyType="done"
         />
 
         <View className="w-full">
-          <FieldLabel className="mb-3">Icon</FieldLabel>
+          <FieldLabel className="mb-3">{t('loan.save.icon')}</FieldLabel>
           <IconPicker value={iconId} onChange={setIconId} />
         </View>
 
         {sources.length > 0 ? (
           <View className="w-full">
-            <FieldLabel className="mb-3">Paid from</FieldLabel>
+            <FieldLabel className="mb-3">{t('loan.save.paidFrom')}</FieldLabel>
             <SourceTiles sources={sources} value={sourceId} onChange={setSourceId} />
           </View>
         ) : null}
@@ -156,7 +165,10 @@ function SaveLoanScreenInner() {
       </View>
 
       <View className="mt-auto w-full pt-10">
-        <Button label={saveLoan.isPending ? 'Saving…' : 'Add to bills'} onPress={handleSave} />
+        <Button
+          label={saveLoan.isPending ? t('loan.save.saving') : t('loan.save.addToBills')}
+          onPress={handleSave}
+        />
       </View>
     </Screen>
   );

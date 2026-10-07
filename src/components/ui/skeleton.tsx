@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 
 /** A block that breathes while data loads. A skeleton, not a spinner, so the page does not jump when rows land. */
@@ -52,7 +53,7 @@ export function SkeletonRow() {
 /** A list's worth of placeholders. Five reads as "a list" without filling a tablet. */
 export function SkeletonList({ rows = 5 }: { rows?: number }) {
   return (
-    <View className="w-full" accessibilityLabel="Loading">
+    <View className="w-full" accessibilityLabel={t('ui.skeleton.loading')}>
       {Array.from({ length: rows }, (_, index) => (
         <SkeletonRow key={index} />
       ))}

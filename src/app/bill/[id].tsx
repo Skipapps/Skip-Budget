@@ -3,9 +3,10 @@ import { useLocalSearchParams } from 'expo-router';
 import { useBills, usePaymentSources } from '@/api/queries';
 import { BillMark } from '@/components/bills/bill-mark';
 import { ChangeLogoButton } from '@/components/brands/change-logo-button';
-import { RECURRENCE_LABELS } from '@/components/bills/bill-row';
+import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
 import { PlanDetail, type PlanDetailRow } from '@/components/plans/plan-detail';
 import { BILL_CATEGORIES } from '@/data/bills-mock';
+import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { logoDomainOf } from '@/lib/logo-domain';
 
@@ -23,17 +24,26 @@ export default function BillDetailScreen() {
   if (bill) {
     const source = sources.find((option) => option.id === (bill.card_id ?? bill.bank_account_id));
     details.push({
-      label: 'Next due',
-      value: bill.next_due_on ? asDate(bill.next_due_on) : 'Nothing due',
+      label: t('bills.detail.nextDue'),
+      value: bill.next_due_on ? asDate(bill.next_due_on) : t('bills.detail.nothingDue'),
     });
-    details.push({ label: 'Paid from', value: source?.label ?? 'No payment method' });
     details.push({
-      label: 'Category',
-      value: BILL_CATEGORIES.find((category) => category.id === bill.category_id)?.label ?? 'Other',
+      label: t('bills.detail.paidFrom'),
+      value: source?.label ?? t('bills.noPaymentMethod'),
     });
-    if (bill.starts_on) details.push({ label: 'Started', value: asDate(bill.starts_on) });
-    if (bill.ends_on) details.push({ label: 'Ends', value: asDate(bill.ends_on) });
-    if (bill.note?.trim()) details.push({ label: 'Note', value: bill.note.trim() });
+    details.push({
+      label: t('bills.field.category'),
+      value: billCategoryLabel(
+        bill.category_id,
+        BILL_CATEGORIES.find((category) => category.id === bill.category_id)?.label ??
+          t('bills.detail.otherCategory'),
+      ),
+    });
+    if (bill.starts_on) {
+      details.push({ label: t('bills.detail.started'), value: asDate(bill.starts_on) });
+    }
+    if (bill.ends_on) details.push({ label: t('bills.detail.ends'), value: asDate(bill.ends_on) });
+    if (bill.note?.trim()) details.push({ label: t('bills.field.note'), value: bill.note.trim() });
   }
 
   return (
@@ -57,7 +67,7 @@ export default function BillDetailScreen() {
           </ChangeLogoButton>
         ) : null
       }
-      frequency={bill ? (RECURRENCE_LABELS[bill.recurrence] ?? bill.recurrence) : ''}
+      frequency={bill ? recurrenceLabel(bill.recurrence) : ''}
       details={details}
       editHref={`/add-bill?id=${id}`}
     />

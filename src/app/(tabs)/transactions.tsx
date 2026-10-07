@@ -7,6 +7,7 @@ import {
   EMPTY_FILTERS,
   FilterSheet,
   countActiveFilters,
+  ledgerKindLabel,
   type LedgerFilters,
 } from '@/components/transactions/filter-sheet';
 import { useArtwork } from '@/theme/artwork';
@@ -21,7 +22,7 @@ import { PageState } from '@/components/ui/page-state';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { LedgerSummary } from '@/components/transactions/ledger-summary';
-import { TRANSACTION_KINDS } from '@/data/transactions-mock';
+import { t } from '@/i18n';
 import {
   PERIODS,
   isEarliestPeriod,
@@ -38,11 +39,7 @@ import { useToday } from '@/lib/use-today';
 import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
-import { FAILURE_MESSAGE } from '@/lib/failure';
-
-const KIND_LABELS = Object.fromEntries(
-  TRANSACTION_KINDS.map((kind) => [kind.value, kind.label]),
-) as Record<string, string>;
+import { failureText } from '@/lib/failure';
 
 export default function TransactionsScreen() {
   const artwork = useArtwork();
@@ -131,7 +128,12 @@ export default function TransactionsScreen() {
   );
 
   return (
-    <Screen title="Transactions" avoidKeyboard onRefresh={refresh} refreshing={refreshing}>
+    <Screen
+      title={t('transactions.title')}
+      avoidKeyboard
+      onRefresh={refresh}
+      refreshing={refreshing}
+    >
       <View className="mt-5 w-full">
         <ChoiceChips
           options={PERIODS}
@@ -147,7 +149,7 @@ export default function TransactionsScreen() {
       <View className="mt-4 w-full flex-row items-center justify-between rounded-[16px] border border-line bg-card px-2 py-2">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Earlier"
+          accessibilityLabel={t('transactions.earlier')}
           accessibilityState={{ disabled: atEarliest }}
           disabled={atEarliest}
           onPress={() => setAnchor((current) => stepPeriod(periodKey, current, -1))}
@@ -171,7 +173,7 @@ export default function TransactionsScreen() {
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Later"
+          accessibilityLabel={t('transactions.later')}
           accessibilityState={{ disabled: atLatest }}
           disabled={atLatest}
           onPress={() => setAnchor((current) => stepPeriod(periodKey, current, 1))}
@@ -193,12 +195,14 @@ export default function TransactionsScreen() {
       ) : null}
 
       <View className="mt-5 w-full flex-row items-center gap-3">
-        <SearchField value={query} onChangeText={setQuery} placeholder="Search transactions" />
+        <SearchField value={query} onChangeText={setQuery} placeholder={t('transactions.search')} />
 
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
-            activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter transactions'
+            activeCount > 0
+              ? t('transactions.filtersActive', { count: activeCount })
+              : t('transactions.filterButton')
           }
           onPress={() => setFilterOpen(true)}
           className="h-11 w-11 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
@@ -222,8 +226,8 @@ export default function TransactionsScreen() {
       {isError ? (
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={refetch}
         />
       ) : null}
@@ -231,9 +235,9 @@ export default function TransactionsScreen() {
       {!isLoading && !isError && ledger.length === 0 ? (
         <PageState
           art={artwork.emptyWallet}
-          title="Nothing here yet"
-          message="Receipts, bills and subscriptions all show up here together once you add a few."
-          actionLabel="Add a receipt"
+          title={t('transactions.emptyTitle')}
+          message={t('transactions.emptyMessage')}
+          actionLabel={t('transactions.addReceipt')}
           onAction={() => router.push('/add-receipt')}
         />
       ) : null}
@@ -241,9 +245,9 @@ export default function TransactionsScreen() {
       {!isLoading && !isError && ledger.length > 0 && groups.length === 0 ? (
         <PageState
           art={artwork.noResults}
-          title="Nothing matches"
-          message="No transaction fits that search and those filters."
-          actionLabel="Clear filters"
+          title={t('transactions.noMatchTitle')}
+          message={t('transactions.noMatchMessage')}
+          actionLabel={t('transactions.clearFilters')}
           onAction={() => {
             setQuery('');
             setFilters(EMPTY_FILTERS);
@@ -281,7 +285,7 @@ export default function TransactionsScreen() {
                   key={entry.id}
                   entry={entry}
                   sourceLabel={sourceLabels.get(entry.sourceId) ?? ''}
-                  kindLabel={KIND_LABELS[entry.kind] ?? entry.kind}
+                  kindLabel={ledgerKindLabel(entry.kind)}
                   onPress={openEntry(entry)}
                 />
               ))}

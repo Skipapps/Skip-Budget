@@ -226,4 +226,152 @@ export const proMessages = defineMessages({
     es: 'Si Pro vence, todo lo que creaste sigue funcionando tal como está; solo no podrás agregar más allá del límite gratis hasta que vuelvas.',
     fr: 'Si Pro prend fin, tout ce que tu as créé continue de fonctionner tel quel — tu ne peux simplement pas dépasser la limite gratuite avant ton retour.',
   },
+
+  'pro.feature.partOf': {
+    en: 'Part of Skip Pro',
+    es: 'Parte de Skip Pro',
+    fr: 'Inclus dans Skip Pro',
+  },
+  'pro.feature.withEverything': {
+    en: 'With everything else Pro unlocks',
+    es: 'Junto con todo lo demás que desbloquea Pro',
+    fr: 'Avec tout ce que Pro débloque d’autre',
+  },
+  'pro.feature.see': {
+    en: 'See Skip Pro — {monthly}',
+    es: 'Ver Skip Pro: {monthly}',
+    fr: 'Voir Skip Pro — {monthly}',
+  },
+  'pro.feature.orYearly': {
+    en: 'or {yearly} · Not now',
+    es: 'o {yearly} · Ahora no',
+    fr: 'ou {yearly} · Pas maintenant',
+  },
+
+  'pro.page.tagline': {
+    en: 'Everything Skip can do, for less than a coffee a month.',
+    es: 'Todo lo que Skip puede hacer, por menos de lo que cuesta un café al mes.',
+    fr: 'Tout ce que Skip peut faire, pour moins qu’un café par mois.',
+  },
+  'pro.page.cards.title': {
+    en: 'Unlimited credit cards, accounts & incomes',
+    es: 'Tarjetas de crédito, cuentas e ingresos ilimitados',
+    fr: 'Cartes de crédit, comptes et revenus illimités',
+  },
+  'pro.page.cards.hint': {
+    en: 'Track every credit card and account you actually have',
+    es: 'Lleva el control de cada tarjeta de crédito y cuenta que de verdad tienes',
+    fr: 'Suis chaque carte de crédit et chaque compte que tu as vraiment',
+  },
+  'pro.page.scan.title': {
+    en: 'Unlimited receipt scanning',
+    es: 'Escaneo de recibos ilimitado',
+    fr: 'Numérisation de reçus illimitée',
+  },
+  'pro.page.scan.hint': {
+    en: 'Point, tap, filed — read on your phone, never uploaded',
+    es: 'Apunta, toca y listo: se lee en tu teléfono, nunca se sube',
+    fr: 'Vise, touche, c’est classé — lu sur ton téléphone, jamais téléversé',
+  },
+  'pro.page.loans.title': {
+    en: 'Loan calculator, to the cent',
+    es: 'Calculadora de préstamos, al centavo',
+    fr: 'Calculateur de prêt, au cent près',
+  },
+  'pro.page.loans.hint': {
+    en: 'Daily interest, the way your bank actually charges',
+    es: 'Intereses diarios, como de verdad cobra tu banco',
+    fr: 'Intérêts quotidiens, comme ta banque les facture vraiment',
+  },
+  'pro.page.insights.title': { en: 'Insights', es: 'Análisis', fr: 'Aperçu' },
+  'pro.page.insights.hint': {
+    en: 'Your whole money picture on one page',
+    es: 'Todo tu dinero en una sola página',
+    fr: 'Tout ton argent sur une seule page',
+  },
+  'pro.page.early.title': {
+    en: 'Early features, first-in-line support',
+    es: 'Funciones anticipadas y soporte prioritario',
+    fr: 'Nouveautés en avant-première et soutien prioritaire',
+  },
+  'pro.page.early.hint': {
+    en: 'Get the new things first, and your questions answered first',
+    es: 'Recibe lo nuevo antes que nadie, y respuestas a tus preguntas primero',
+    fr: 'Reçois les nouveautés en premier, et des réponses à tes questions en priorité',
+  },
+
+  'pro.page.notOpen': {
+    en: 'Purchases are not open in this version yet. Everything on this page is coming shortly.',
+    es: 'Las compras aún no están disponibles en esta versión. Todo lo de esta página llegará pronto.',
+    fr: 'Les achats ne sont pas encore ouverts dans cette version. Tout ce qui est sur cette page arrive bientôt.',
+  },
+  'pro.page.restored': {
+    en: 'Welcome back — Pro is active.',
+    es: 'Qué gusto verte de nuevo: Pro está activo.',
+    fr: 'Bon retour — Pro est actif.',
+  },
+  'pro.page.nothingToRestore': {
+    en: 'No past purchase to restore.',
+    es: 'No hay compras anteriores que restaurar.',
+    fr: 'Aucun achat antérieur à restaurer.',
+  },
+  'pro.page.haveTitle': { en: 'You have Skip Pro', es: 'Tienes Skip Pro', fr: 'Tu as Skip Pro' },
+  'pro.page.haveDetail': {
+    en: 'Everything is unlocked. Billing is handled by Apple — renewals, changes and cancellation all live in your App Store subscriptions.',
+    es: 'Todo está desbloqueado. Apple se encarga del cobro: las renovaciones, los cambios y la cancelación están en tus suscripciones del App Store.',
+    fr: 'Tout est déverrouillé. La facturation est gérée par Apple — renouvellements, changements et annulation se trouvent dans tes abonnements de l’App Store.',
+  },
+  'pro.page.manage': {
+    en: 'Manage in the App Store',
+    es: 'Administrar en el App Store',
+    fr: 'Gérer dans l’App Store',
+  },
+  'pro.page.oneMoment': { en: 'One moment…', es: 'Un momento…', fr: 'Un instant…' },
+  'pro.page.startTrial': { en: 'Start {trial}', es: 'Prueba {trial}', fr: 'Essaie {trial}' },
+  'pro.page.checking': {
+    en: 'Checking the store…',
+    es: 'Consultando el App Store…',
+    fr: 'Connexion à l’App Store…',
+  },
+  'pro.page.checkAgain': {
+    en: 'Check again',
+    es: 'Volver a consultar',
+    fr: 'Vérifier à nouveau',
+  },
+  'pro.page.restore': {
+    en: 'Restore purchases',
+    es: 'Restaurar compras',
+    fr: 'Restaurer les achats',
+  },
+  'pro.page.terms': { en: 'Terms', es: 'Términos', fr: 'Conditions' },
+  'pro.page.privacy': { en: 'Privacy', es: 'Privacidad', fr: 'Confidentialité' },
+  'pro.page.billing': {
+    en: 'Billed by Apple. Renews automatically until cancelled in your App Store subscriptions. Cancel any time — everything you made stays yours.',
+    es: 'Cobrado por Apple. Se renueva automáticamente hasta que lo canceles en tus suscripciones del App Store. Cancela cuando quieras: todo lo que creaste sigue siendo tuyo.',
+    fr: 'Facturé par Apple. Renouvellement automatique jusqu’à l’annulation dans tes abonnements de l’App Store. Annule quand tu veux — tout ce que tu as créé reste à toi.',
+  },
+
+  'pro.plan.yearly': { en: 'Yearly', es: 'Anual', fr: 'Annuel' },
+  'pro.plan.monthly': { en: 'Monthly', es: 'Mensual', fr: 'Mensuel' },
+  'pro.plan.badge': { en: '2 MONTHS FREE', es: '2 MESES GRATIS', fr: '2 MOIS GRATUITS' },
+  'pro.plan.yearlyHint': {
+    en: '{perMonth} a month, billed once a year',
+    es: '{perMonth} al mes, cobrado una vez al año',
+    fr: '{perMonth} par mois, facturé une fois par an',
+  },
+  'pro.plan.yearlyTrial': {
+    en: '{trial}, then billed once a year',
+    es: '{trial}, luego se cobra una vez al año',
+    fr: '{trial}, puis facturé une fois par an',
+  },
+  'pro.plan.monthlyHint': {
+    en: 'Cancel any time in your Apple subscriptions',
+    es: 'Cancela cuando quieras en tus suscripciones de Apple',
+    fr: 'Annule quand tu veux dans tes abonnements Apple',
+  },
+  'pro.plan.monthlyTrial': {
+    en: '{trial}, then monthly',
+    es: '{trial}, luego cada mes',
+    fr: '{trial}, puis chaque mois',
+  },
 });

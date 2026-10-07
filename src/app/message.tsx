@@ -6,49 +6,41 @@ import { Text, View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { Strong, Subtitle } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
 
 export default function MessageScreen() {
   return (
     <Screen
-      title="Why Skip is different"
+      title={t('support.why.title')}
       showBack
-      footer={<Button label="Let's go" onPress={() => router.push('/auth')} />}
+      footer={<Button label={t('support.why.go')} onPress={() => router.push('/auth')} />}
     >
-      <Subtitle className="mt-3 w-full">
-        Built for people who want to truly understand their money — not automate it and forget it.
-      </Subtitle>
+      <Subtitle className="mt-3 w-full">{t('support.why.intro')}</Subtitle>
 
       <View className="mt-8 w-full gap-3">
         <Pillar
           icon={Eye}
-          title="Awareness"
-          line="Recording your spending helps you notice where your money goes."
+          title={t('support.why.awareness')}
+          line={t('support.why.awarenessLine')}
         />
-        <Pillar
-          icon={Lock}
-          title="Privacy"
-          line="No bank logins, no imports. Your records stay yours."
-        />
+        <Pillar icon={Lock} title={t('support.why.privacy')} line={t('support.why.privacyLine')} />
         <Pillar
           icon={SlidersHorizontal}
-          title="Control"
-          line="You decide what counts — not an algorithm."
+          title={t('support.why.control')}
+          line={t('support.why.controlLine')}
         />
       </View>
 
       <View className="mt-6 w-full rounded-[16px] bg-accent/10 px-5 py-4">
-        <QuoteLine>
-          “People once recorded every penny in a ledger. Skip brings that same financial awareness
-          into modern life — without the paperwork.”
-        </QuoteLine>
+        <QuoteLine>{t('support.why.quote')}</QuoteLine>
       </View>
 
       <Text
         className="mt-6 w-full text-center font-app text-[14px] leading-5 text-body"
         maxFontSizeMultiplier={1.4}
       >
-        Know where your money goes. <Strong>Decide where it goes next.</Strong>
+        {t('support.why.know')} <Strong>{t('support.why.decide')}</Strong>
       </Text>
     </Screen>
   );

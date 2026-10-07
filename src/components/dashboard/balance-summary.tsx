@@ -5,11 +5,12 @@ import { Text, View } from 'react-native';
 import { FitGroup, FitText, useFitGroup, type FitGroupHandle } from '@/components/ui/fit-group';
 import { RollingNumber } from '@/components/ui/rolling-number';
 import { Skeleton } from '@/components/ui/skeleton';
+import { percent, t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { daysLeftInMonth } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { useColors } from '@/providers/theme-provider';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 import { TEXT_CAP } from '@/theme/text-scale';
 
 type BalanceSummaryProps = {
@@ -42,7 +43,8 @@ export function BalanceSummary({
   const stacked = !labels.fits || !figures.fits;
   const today = new Date();
   const daysLeft = daysLeftInMonth(today);
-  const daysLabel = daysLeft === 0 ? 'Last day' : `${daysLeft} days left`;
+  const daysLabel =
+    daysLeft === 0 ? t('home.balance.lastDay') : t('home.balance.daysLeft', { count: daysLeft });
 
   // Wheels cannot shrink to fit, so the size is chosen from the figure's length: a seven-figure
   // balance gets smaller type rather than running off the card.
@@ -51,6 +53,8 @@ export function BalanceSummary({
 
   // Share of this month's income already committed; null until income is known, so no bar shows.
   const spentShare = error || payday <= 0 ? null : Math.min(Math.max(expenses / payday, 0), 1);
+  const spentPercent = spentShare === null ? 0 : Math.round(spentShare * 100);
+  const spentLabel = t('home.balance.spent', { percent: percent(spentPercent, 0) });
 
   return (
     <View className="w-full overflow-hidden rounded-[24px] bg-control p-5">
@@ -58,8 +62,8 @@ export function BalanceSummary({
         accessible
         accessibilityLabel={
           error
-            ? `Left this month, unavailable, ${daysLabel}`
-            : `Left this month, ${formatCurrency(leftThisMonth)}, ${daysLabel}`
+            ? t('home.balance.summaryUnavailable', { days: daysLabel })
+            : t('home.balance.summary', { amount: formatCurrency(leftThisMonth), days: daysLabel })
         }
       >
         <View className="w-full flex-row items-start justify-between gap-3">
@@ -67,7 +71,7 @@ export function BalanceSummary({
             className="shrink font-app-medium text-[15px] text-on-control/85"
             maxFontSizeMultiplier={TEXT_CAP.control}
           >
-            Left this month
+            {t('home.balance.left')}
           </Text>
 
           <View className="shrink-0 rounded-full bg-on-control/15 px-3 py-1.5">
@@ -113,15 +117,15 @@ export function BalanceSummary({
           className="mt-4 font-app text-[12px] leading-[17px] text-on-control/85"
           maxFontSizeMultiplier={TEXT_CAP.reading}
         >
-          {FAILURE_MESSAGE}
+          {failureText()}
         </Text>
       ) : spentShare === null ? null : (
         <View
           className="mt-5 w-full"
           accessible
           accessibilityRole="progressbar"
-          accessibilityLabel={`${Math.round(spentShare * 100)}% of the income is spent`}
-          accessibilityValue={{ min: 0, max: 100, now: Math.round(spentShare * 100) }}
+          accessibilityLabel={spentLabel}
+          accessibilityValue={{ min: 0, max: 100, now: spentPercent }}
         >
           <View className="h-2 w-full overflow-hidden rounded-full bg-on-control/15">
             <View className="h-full flex-row">
@@ -134,7 +138,7 @@ export function BalanceSummary({
             className="mt-2 font-app text-[12px] text-on-control/85"
             maxFontSizeMultiplier={TEXT_CAP.reading}
           >
-            {Math.round(spentShare * 100)}% of the income is spent
+            {spentLabel}
           </Text>
         </View>
       )}
@@ -146,7 +150,8 @@ export function BalanceSummary({
           testID="stat-figures"
         >
           <Stat
-            label="Income"
+            id="Income"
+            label={t('home.balance.income')}
             amount={payday}
             icon={ArrowDownLeft}
             loading={loading}
@@ -157,7 +162,8 @@ export function BalanceSummary({
           />
           {/* Stored as a positive magnitude; shown as money going out. */}
           <Stat
-            label="Expenses"
+            id="Expenses"
+            label={t('home.balance.expenses')}
             amount={-expenses}
             icon={ArrowUpRight}
             loading={loading}
@@ -173,6 +179,8 @@ export function BalanceSummary({
 }
 
 type StatProps = {
+  /** Names the fit slots; the same in every language, unlike the label. */
+  id: string;
   label: string;
   amount: number;
   icon: LucideIcon;
@@ -186,7 +194,17 @@ type StatProps = {
 /** The icon beside the label: 14pt and the 6pt gap after it. */
 const ICON_ROOM = 20;
 
-function Stat({ label, amount, icon: Icon, loading, error, labels, figures, stacked }: StatProps) {
+function Stat({
+  id,
+  label,
+  amount,
+  icon: Icon,
+  loading,
+  error,
+  labels,
+  figures,
+  stacked,
+}: StatProps) {
   const colors = useColors();
 
   return (
@@ -197,14 +215,16 @@ function Stat({ label, amount, icon: Icon, loading, error, labels, figures, stac
       )}
       accessible
       accessibilityLabel={
-        error || loading
-          ? `${label}, ${error ? 'unavailable' : 'loading'}`
-          : `${label}, ${formatCurrency(amount)}`
+        error
+          ? t('home.balance.statUnavailable', { label })
+          : loading
+            ? t('home.balance.statLoading', { label })
+            : `${label}, ${formatCurrency(amount)}`
       }
     >
       <FitText
         group={labels}
-        id={`${label}-label`}
+        id={`${id}-label`}
         role="control"
         size={12}
         className="text-center font-app-medium text-on-control/85"
@@ -229,7 +249,7 @@ function Stat({ label, amount, icon: Icon, loading, error, labels, figures, stac
       ) : (
         <FitText
           group={figures}
-          id={`${label}-figure`}
+          id={`${id}-figure`}
           role="figure"
           size={17}
           className="text-center font-app-semibold text-on-control"

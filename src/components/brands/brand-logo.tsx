@@ -3,6 +3,7 @@ import { useSyncExternalStore, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { logoImageUrl } from '@/api/logos';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { isLightColor } from '@/lib/color';
 import { CARD_COLORS } from '@/theme/card-colors';
@@ -119,7 +120,7 @@ export function BrandLogo({ name, domain, size = 40, className, fallback }: Bran
           onError={() => {
             if (url) rememberFailure(url);
           }}
-          accessibilityLabel={`${name} logo`}
+          accessibilityLabel={t('settings.logo.imageOf', { name })}
         />
       )}
     </View>

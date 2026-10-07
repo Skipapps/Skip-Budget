@@ -20,6 +20,7 @@ import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
+import { t } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
 import { logoDomainOf } from '@/lib/logo-domain';
@@ -28,7 +29,7 @@ import { rangeFor, type RangeKey } from '@/lib/range';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { failureMessage, failureText } from '@/lib/failure';
 
 export default function ReceiptsScreen() {
   const artwork = useArtwork();
@@ -107,7 +108,7 @@ export default function ReceiptsScreen() {
 
   return (
     <Screen
-      title="Receipts"
+      title={t('receipts.list.title')}
       showBack
       avoidKeyboard
       onRefresh={refresh}
@@ -117,13 +118,13 @@ export default function ReceiptsScreen() {
           ? [
               {
                 icon: ScanLine,
-                label: scanning ? 'Reading the receipt' : 'Scan a receipt',
+                label: scanning ? t('receipts.list.reading') : t('receipts.list.scan'),
                 onPress: handleScan,
                 busy: scanning,
               },
             ]
           : []),
-        { icon: Plus, label: 'Add a receipt', onPress: () => router.push('/add-receipt') },
+        { icon: Plus, label: t('receipts.list.add'), onPress: () => router.push('/add-receipt') },
       ]}
     >
       {scanError ? (
@@ -135,12 +136,18 @@ export default function ReceiptsScreen() {
       {showEmpty || isError ? null : (
         <>
           <View className="mt-5 w-full flex-row items-center gap-3">
-            <SearchField value={query} onChangeText={setQuery} placeholder="Search receipts" />
+            <SearchField
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t('receipts.list.search')}
+            />
 
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={
-                activeCount > 0 ? `Filters, ${activeCount} active` : 'Filter receipts'
+                activeCount > 0
+                  ? t('receipts.list.filtersActive', { count: activeCount })
+                  : t('receipts.filter.title')
               }
               onPress={() => setFilterOpen(true)}
               className="h-11 w-11 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
@@ -164,8 +171,8 @@ export default function ReceiptsScreen() {
               <RangeDropdown value={rangeKey} onChange={setRangeKey} />
               <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
                 {isLoading
-                  ? 'Loading'
-                  : `${visible.length} ${visible.length === 1 ? 'receipt' : 'receipts'}`}
+                  ? t('receipts.list.loading')
+                  : t('receipts.list.count', { count: visible.length })}
               </Text>
             </View>
             <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
@@ -180,8 +187,8 @@ export default function ReceiptsScreen() {
       {isError ? (
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={() => refetch()}
         />
       ) : null}
@@ -190,9 +197,9 @@ export default function ReceiptsScreen() {
         // Adding, not scanning: the first receipt should never begin with a paywall.
         <PageState
           art={artwork.emptyReceipts}
-          title="No receipts yet"
-          message="Add what you spend day to day and it shows up here."
-          actionLabel="Add a receipt"
+          title={t('receipts.list.emptyTitle')}
+          message={t('receipts.list.emptyMessage')}
+          actionLabel={t('receipts.list.add')}
           onAction={() => router.push('/add-receipt')}
         />
       ) : null}
@@ -200,9 +207,9 @@ export default function ReceiptsScreen() {
       {showNoMatches ? (
         <PageState
           art={artwork.noResults}
-          title="Nothing matches"
-          message="No receipt fits that search and those filters. Try a different store or clear what you have set."
-          actionLabel="Clear filters"
+          title={t('receipts.list.noMatchTitle')}
+          message={t('receipts.list.noMatchMessage')}
+          actionLabel={t('receipts.list.clearFilters')}
           onAction={() => {
             setQuery('');
             setFilters(EMPTY_RECEIPT_FILTERS);

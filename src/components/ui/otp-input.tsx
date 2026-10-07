@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 
 type OtpInputProps = {
@@ -71,7 +72,7 @@ export function OtpInput({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         style={[StyleSheet.absoluteFill, { opacity: 0 }]}
-        accessibilityLabel={`${length} digit verification code`}
+        accessibilityLabel={t('ui.otp.label', { length })}
       />
     </View>
   );

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { Subtitle } from '@/components/ui/typography';
+import { t } from '@/i18n';
 
 export default function ResetPasswordScreen() {
   const [password, setPassword] = useState('');
@@ -21,11 +22,11 @@ export default function ResetPasswordScreen() {
     setError(null);
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError(t('api.auth.shortPassword'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Those passwords do not match.');
+      setError(t('auth.passwordsDiffer'));
       return;
     }
 
@@ -41,12 +42,12 @@ export default function ResetPasswordScreen() {
   };
 
   return (
-    <Screen title="Set a new password" showBack avoidKeyboard>
-      <Subtitle className="mt-3">Choose a password you have not used before.</Subtitle>
+    <Screen title={t('auth.reset.title')} showBack avoidKeyboard>
+      <Subtitle className="mt-3">{t('auth.reset.subtitle')}</Subtitle>
 
       <View className="mt-8 w-full gap-5">
         <TextField
-          label="New password"
+          label={t('auth.reset.newPassword')}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -56,7 +57,7 @@ export default function ResetPasswordScreen() {
           returnKeyType="next"
         />
         <TextField
-          label="Confirm new password"
+          label={t('auth.reset.confirm')}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
@@ -69,7 +70,10 @@ export default function ResetPasswordScreen() {
       </View>
 
       <View className="mt-auto w-full pt-10">
-        <Button label={busy ? 'Saving…' : 'Continue'} onPress={handleContinue} />
+        <Button
+          label={busy ? t('auth.reset.saving') : t('common.continue')}
+          onPress={handleContinue}
+        />
       </View>
     </Screen>
   );

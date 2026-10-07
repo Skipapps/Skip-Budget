@@ -7,6 +7,7 @@ import { BrandLogo } from '@/components/brands/brand-logo';
 import { LOGO_COPY, LogoConfirm, type NoLogo } from '@/components/brands/logo-choices';
 import { TextLink } from '@/components/ui/text-link';
 import { FieldLabel } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { selectionLogo } from '@/lib/logo-columns';
 import { logoHints } from '@/lib/logo-lookup';
@@ -69,7 +70,7 @@ export function BrandField({
   label,
   value,
   onChange,
-  placeholder = 'Search for a store',
+  placeholder = t('settings.store.search'),
   error,
   className,
   initialQuery = '',
@@ -141,7 +142,7 @@ export function BrandField({
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Change store, currently ${value.name}`}
+            accessibilityLabel={t('settings.store.change', { name: value.name })}
             hitSlop={10}
             onPress={clear}
             className="-mr-1 h-10 w-10 items-center justify-center rounded-[8px] active:bg-ink/10"
@@ -223,7 +224,7 @@ export function BrandField({
           {alreadyListed ? null : (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Add ${typed} as a new store`}
+              accessibilityLabel={t('settings.store.addAs', { name: typed })}
               onPress={addCustom}
               className={cn(
                 'min-h-14 flex-row items-center px-4 py-3 active:bg-ink/5',
@@ -238,7 +239,7 @@ export function BrandField({
                 numberOfLines={1}
                 maxFontSizeMultiplier={1.4}
               >
-                Add &ldquo;{typed}&rdquo;
+                {t('settings.store.add', { name: typed })}
               </Text>
             </Pressable>
           )}

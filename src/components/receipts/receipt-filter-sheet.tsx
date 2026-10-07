@@ -8,6 +8,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { SelectField } from '@/components/ui/select-field';
 import { FieldLabel } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { useColors } from '@/providers/theme-provider';
 
@@ -51,7 +52,7 @@ export function ReceiptFilterSheet({
         <View className="flex-row items-center px-4 py-2">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close filters"
+            accessibilityLabel={t('receipts.filter.close')}
             hitSlop={8}
             onPress={onCancel}
             className="h-11 w-11 items-center justify-center rounded-full active:bg-ink/5"
@@ -62,16 +63,16 @@ export function ReceiptFilterSheet({
             className="flex-1 pr-11 text-center font-app-semibold text-[18px] text-ink"
             maxFontSizeMultiplier={1.2}
           >
-            Filter receipts
+            {t('receipts.filter.title')}
           </Text>
         </View>
 
         <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}>
           <View className="mt-4 w-full">
             <SelectField
-              label="Date"
+              label={t('receipts.filter.date')}
               value={draft.date ? formatFullDate(new Date(`${draft.date}T00:00:00`)) : ''}
-              placeholder="Any date"
+              placeholder={t('receipts.filter.anyDate')}
               icon={Calendar}
               onPress={() => setDatePickerOpen(true)}
             />
@@ -82,19 +83,19 @@ export function ReceiptFilterSheet({
                 className="mt-2 self-start rounded-full px-1 py-1 active:opacity-60"
               >
                 <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-                  Clear date
+                  {t('receipts.filter.clearDate')}
                 </Text>
               </Pressable>
             ) : null}
           </View>
 
           <View className="mt-6 w-full">
-            <FieldLabel className="mb-2">Paid with</FieldLabel>
+            <FieldLabel className="mb-2">{t('receipts.field.paidWith')}</FieldLabel>
             <MultiChoiceChips
               options={sourceOptions}
               values={draft.sourceIds}
               onChange={(sourceIds) => setDraft((current) => ({ ...current, sourceIds }))}
-              emptyHint="Showing every credit card and account."
+              emptyHint={t('receipts.filter.everySource')}
             />
           </View>
         </ScrollView>
@@ -106,11 +107,11 @@ export function ReceiptFilterSheet({
             className="min-h-16 flex-1 items-center justify-center rounded-full border border-control active:bg-ink/5"
           >
             <Text className="font-app-medium text-[17px] text-ink" maxFontSizeMultiplier={1.4}>
-              Reset
+              {t('receipts.filter.reset')}
             </Text>
           </Pressable>
           <View className="flex-[2]">
-            <Button label="Apply" onPress={() => onApply(draft)} />
+            <Button label={t('receipts.filter.apply')} onPress={() => onApply(draft)} />
           </View>
         </View>
 

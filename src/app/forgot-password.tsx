@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { Subtitle } from '@/components/ui/typography';
+import { t } from '@/i18n';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -19,7 +20,7 @@ export default function ForgotPasswordScreen() {
     setError(null);
 
     if (!email.trim()) {
-      setError('Enter the email on your account.');
+      setError(t('auth.forgot.missing'));
       return;
     }
 
@@ -38,14 +39,12 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <Screen title="Forgot password?" showBack avoidKeyboard>
-      <Subtitle className="mt-3">
-        Enter your email and we will send you a 6-digit verification code.
-      </Subtitle>
+    <Screen title={t('auth.forgot.title')} showBack avoidKeyboard>
+      <Subtitle className="mt-3">{t('auth.forgot.subtitle')}</Subtitle>
 
       <View className="mt-8 w-full">
         <TextField
-          label="Email"
+          label={t('auth.email')}
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -59,7 +58,10 @@ export default function ForgotPasswordScreen() {
       </View>
 
       <View className="mt-auto w-full pt-10">
-        <Button label={busy ? 'Sending…' : 'Continue'} onPress={handleContinue} />
+        <Button
+          label={busy ? t('auth.forgot.sending') : t('common.continue')}
+          onPress={handleContinue}
+        />
       </View>
     </Screen>
   );

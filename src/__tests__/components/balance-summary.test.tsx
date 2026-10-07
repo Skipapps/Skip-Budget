@@ -55,7 +55,7 @@ describe('BalanceSummary at large text sizes', () => {
 
   it('lets the days-left pill follow the text size, whole', async () => {
     const screen = await render(<Summary />);
-    const pill = screen.getByText(/days left|Last day/);
+    const pill = screen.getByText(/days? left|Last day/);
     expect(pill.props.allowFontScaling).toBeUndefined();
     expect(pill.props.numberOfLines).toBeUndefined();
     expect(pill.props.maxFontSizeMultiplier).toBe(1.3);

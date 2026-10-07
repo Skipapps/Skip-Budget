@@ -10,8 +10,9 @@ import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { SectionHeading } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { formatFullDate, toIsoDate } from '@/lib/date';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
 import { rangeFor } from '@/lib/range';
 import { useMoneyColor } from '@/providers/theme-provider';
@@ -25,8 +26,18 @@ type Window = 'month' | 'year';
  * end.
  */
 const WINDOWS = [
-  { value: 'month', label: 'Month' },
-  { value: 'year', label: 'Year' },
+  {
+    value: 'month',
+    get label() {
+      return t('dates.month');
+    },
+  },
+  {
+    value: 'year',
+    get label() {
+      return t('dates.year');
+    },
+  },
 ] as const;
 
 export type PlanDetailRow = { label: string; value: string };
@@ -41,7 +52,7 @@ type PlanDetailProps = {
   onRetry: () => void;
   /** The bill's icon or the subscription's logo. */
   mark: ReactNode;
-  /** "Monthly", "Every 3 months", "Cancelled". */
+  /** "Monthly", "Every 3 months", "Cancelled", already in the language on screen. */
   frequency: string;
   details: PlanDetailRow[];
   editHref: string;
@@ -95,8 +106,6 @@ export function PlanDetail({
     if (gone) goBack();
   }, [gone]);
 
-  const noun = kind === 'bill' ? 'bill' : 'subscription';
-
   if (isLoading || gone) {
     return (
       <Screen showBack>
@@ -110,8 +119,8 @@ export function PlanDetail({
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={onRetry}
         />
       </Screen>
@@ -127,7 +136,11 @@ export function PlanDetail({
         ledger.refetch();
       }}
       headerActions={[
-        { icon: Pencil, label: `Edit ${plan.name}`, onPress: () => router.push(editHref as never) },
+        {
+          icon: Pencil,
+          label: t('bills.planDetail.edit', { name: plan.name }),
+          onPress: () => router.push(editHref as never),
+        },
       ]}
     >
       <View className="mt-3 w-full items-center rounded-[16px] border border-line bg-card px-5 pb-2 pt-5">
@@ -173,8 +186,8 @@ export function PlanDetail({
       {ledger.isError ? (
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={ledger.refetch}
         />
       ) : null}
@@ -184,14 +197,18 @@ export function PlanDetail({
           className="mt-6 w-full text-center font-app text-[14px] text-muted"
           maxFontSizeMultiplier={1.4}
         >
-          No charges for this {noun} in this window.
+          {t(
+            kind === 'bill'
+              ? 'bills.planDetail.noChargesBill'
+              : 'bills.planDetail.noChargesSubscription',
+          )}
         </Text>
       ) : null}
 
       {!ledger.isLoading && !ledger.isError ? (
         <View className="w-full pb-10">
-          <ChargeSection title="Paid" entries={paid} moneyColor={moneyColor} />
-          <ChargeSection title="Upcoming" entries={upcoming} moneyColor={moneyColor} />
+          <ChargeSection when="paid" entries={paid} moneyColor={moneyColor} />
+          <ChargeSection when="upcoming" entries={upcoming} moneyColor={moneyColor} />
         </View>
       ) : null}
     </Screen>
@@ -199,11 +216,11 @@ export function PlanDetail({
 }
 
 function ChargeSection({
-  title,
+  when,
   entries,
   moneyColor,
 }: {
-  title: 'Upcoming' | 'Paid';
+  when: 'paid' | 'upcoming';
   entries: LedgerEntry[];
   moneyColor: (amount: number) => string;
 }) {
@@ -213,7 +230,7 @@ function ChargeSection({
   return (
     <View className="mt-6 w-full">
       <SectionHeading caption={`${entries.length} · ${formatCurrency(Math.abs(total))}`}>
-        {title}
+        {t(when === 'paid' ? 'bills.planDetail.paid' : 'bills.planDetail.upcoming')}
       </SectionHeading>
       <View className="mt-2 w-full overflow-hidden rounded-[16px] border border-line bg-card">
         {entries.map((entry, index) => (
@@ -229,7 +246,7 @@ function ChargeSection({
                   {formatFullDate(new Date(`${entry.date}T00:00:00`))}
                 </Text>
                 <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-                  {title === 'Paid' ? 'Paid' : 'Due'}
+                  {t(when === 'paid' ? 'bills.planDetail.paidRow' : 'bills.planDetail.due')}
                 </Text>
               </View>
               <Text

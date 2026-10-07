@@ -4,13 +4,14 @@ import { Pressable, Text, View } from 'react-native';
 
 import { Screen } from '@/components/ui/screen';
 import { Subtitle } from '@/components/ui/typography';
+import { t, type MessageKey } from '@/i18n';
 import { useArtwork, type ArtworkName } from '@/theme/artwork';
 import { useColors } from '@/providers/theme-provider';
 
 type Stop = {
   artwork: ArtworkName;
-  title: string;
-  detail: string;
+  title: MessageKey;
+  detail: MessageKey;
   href: string;
 };
 
@@ -18,37 +19,32 @@ type Stop = {
 const STOPS: Stop[] = [
   {
     artwork: 'tileSalary',
-    title: 'Track without linking a bank',
-    detail:
-      'No credentials, no aggregator. You tell Skip what happens and it does the arithmetic — your bank never knows Skip exists.',
+    title: 'onboarding.stop.bank.title',
+    detail: 'onboarding.tour.bank.detail',
     href: '/salary',
   },
   {
     artwork: 'tileReceipts',
-    title: 'Scan receipts in a tap',
-    detail:
-      'Point the camera at a receipt and it is read on your phone — store, date, total, ready to check and save. The photo never leaves the device.',
+    title: 'onboarding.stop.receipts.title',
+    detail: 'onboarding.tour.receipts.detail',
     href: '/receipts',
   },
   {
     artwork: 'tileLoanRepayment',
-    title: 'Loans, to the cent',
-    detail:
-      'Interest charged by the day, the way lenders actually bill — so Skip’s payoff matches your statement exactly.',
+    title: 'onboarding.stop.loans.title',
+    detail: 'onboarding.tour.loans.detail',
     href: '/loan-calculator',
   },
   {
     artwork: 'tileSavings',
-    title: 'Savings that explain themselves',
-    detail:
-      'When a month ends, whatever was left of it is added here — with the arithmetic shown, and corrections when Skip missed something.',
+    title: 'onboarding.stop.savings.title',
+    detail: 'onboarding.tour.savings.detail',
     href: '/savings',
   },
   {
     artwork: 'tileMonthlyBills',
-    title: 'Reminded before things land',
-    detail:
-      'Bills, renewals and payday, announced before they happen instead of discovered afterwards.',
+    title: 'onboarding.stop.reminders.title',
+    detail: 'onboarding.tour.reminders.detail',
     href: '/reminders',
   },
 ];
@@ -58,20 +54,19 @@ export default function TourScreen() {
   const colors = useColors();
 
   return (
-    <Screen title="What Skip can do" showBack>
-      <Subtitle className="mt-3 w-full text-left">
-        Five things, each a tap away. No setup order to follow — start wherever your money bothers
-        you most.
-      </Subtitle>
+    <Screen title={t('onboarding.canDo.title')} showBack>
+      <Subtitle className="mt-3 w-full text-left">{t('onboarding.tour.subtitle')}</Subtitle>
 
       <View className="mb-10 mt-7 w-full gap-3">
         {STOPS.map((stop) => {
           const Art = artwork[stop.artwork];
+          const title = t(stop.title);
+          const detail = t(stop.detail);
           return (
             <Pressable
-              key={stop.title}
+              key={stop.href}
               accessibilityRole="button"
-              accessibilityLabel={`${stop.title}. ${stop.detail}`}
+              accessibilityLabel={`${title}. ${detail}`}
               onPress={() => router.push(stop.href as never)}
               className="w-full flex-row items-center gap-4 rounded-[16px] border border-line bg-card p-4 active:bg-ink/5"
             >
@@ -83,13 +78,13 @@ export default function TourScreen() {
                   className="font-app-semibold text-[15px] text-ink"
                   maxFontSizeMultiplier={1.3}
                 >
-                  {stop.title}
+                  {title}
                 </Text>
                 <Text
                   className="mt-1 font-app text-[12px] leading-[18px] text-muted"
                   maxFontSizeMultiplier={1.4}
                 >
-                  {stop.detail}
+                  {detail}
                 </Text>
               </View>
               <ChevronRight size={18} color={colors.muted} strokeWidth={2} />

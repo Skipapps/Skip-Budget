@@ -24,6 +24,7 @@ import {
 import { useBankAccounts, useSalaryDetails } from '@/api/queries';
 import { PageState } from '@/components/ui/page-state';
 import { type SalarySource } from '@/data/salary-mock';
+import { t } from '@/i18n';
 import {
   PAY_FREQUENCIES,
   formatFullDate,
@@ -34,7 +35,7 @@ import {
 import { formatCurrency } from '@/lib/format';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { failureMessage, failureText } from '@/lib/failure';
 import { OVERTIME_RATES, estimateHourlyPay, hourlyProblem, type HourlyPay } from '@/lib/hourly-pay';
 import { useArtwork } from '@/theme/artwork';
 
@@ -46,14 +47,35 @@ const PER_MONTH: Record<PayFrequency, number> = {
   monthly: 1,
 };
 
+/** Labels are read when drawn, never at import, so they follow the language on screen. */
 const PAY_TYPES = [
-  { value: 'fixed', label: 'Fixed pay' },
-  { value: 'hourly', label: 'Hourly' },
+  {
+    value: 'fixed',
+    get label() {
+      return t('salary.payType.fixed');
+    },
+  },
+  {
+    value: 'hourly',
+    get label() {
+      return t('salary.payType.hourly');
+    },
+  },
 ] as const;
 
 const OVERTIME_CHOICES = [
-  { value: 'none', label: 'None' },
-  { value: 'yes', label: 'Yes' },
+  {
+    value: 'none',
+    get label() {
+      return t('salary.overtime.none');
+    },
+  },
+  {
+    value: 'yes',
+    get label() {
+      return t('common.yes');
+    },
+  },
 ] as const;
 
 /** Hours as typed. A comma is a decimal point to half the world. */
@@ -127,7 +149,7 @@ export default function SalaryScreen() {
 
   if (details.isPending) {
     return (
-      <Screen title="Salary" showBack>
+      <Screen title={t('salary.title')} showBack>
         <View className="mt-16 w-full items-center">
           <ActivityIndicator size="small" color={colors.muted} />
         </View>
@@ -138,11 +160,11 @@ export default function SalaryScreen() {
   // Never an empty editor on failure: Save from there would delete every source.
   if (details.isError) {
     return (
-      <Screen title="Salary" showBack>
+      <Screen title={t('salary.title')} showBack>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Try again"
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
           onAction={() => void details.refetch()}
         />
       </Screen>
@@ -252,12 +274,10 @@ function SalaryEditor({
     const name = source?.name.trim();
 
     const ok = await confirm({
-      title: name ? `Remove ${name}?` : 'Remove this source?',
-      message:
-        'Its paydays stop being counted as money coming in, on the dashboard and ' +
-        'everywhere else. Nothing you have spent changes.',
-      confirmLabel: 'Remove',
-      cancelLabel: 'Keep it',
+      title: name ? t('salary.remove.title', { name }) : t('salary.remove.titleUnnamed'),
+      message: t('salary.remove.message'),
+      confirmLabel: t('common.remove'),
+      cancelLabel: t('salary.remove.keep'),
       destructive: true,
     });
     if (!ok) return;
@@ -274,20 +294,20 @@ function SalaryEditor({
       (source) => source.name.trim() && (source.payType === 'hourly' || source.amount > 0),
     );
     if (sources.length > 0 && named.length === 0) {
-      setError('Give each source a name and its pay.');
+      setError(t('salary.needNameAndPay'));
       return;
     }
     for (const source of named) {
       if (source.payType !== 'hourly') continue;
       const problem = hourlyProblem(hourlyOf(source));
       if (problem) {
-        setError(`${source.name.trim()}: ${problem}`);
+        setError(t('salary.sourceProblem', { name: source.name.trim(), problem }));
         return;
       }
     }
     // Paydays are counted forward from the last one; without it the income never lands anywhere.
     if (named.some((source) => !source.lastPayday)) {
-      setError('Pick the last payday for each source, so Skip can work out the next ones.');
+      setError(t('salary.needLastPayday'));
       return;
     }
 
@@ -320,10 +340,10 @@ function SalaryEditor({
   };
 
   return (
-    <Screen title="Salary" showBack avoidKeyboard>
+    <Screen title={t('salary.title')} showBack avoidKeyboard>
       <View className="mt-3 w-full items-center">
         <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-          Total per month
+          {t('salary.totalPerMonth')}
         </Text>
         <Text
           className="mt-0.5 font-app-semibold text-[24px] text-ink"
@@ -340,13 +360,13 @@ function SalaryEditor({
           <View key={source.id} className="w-full rounded-[16px] border border-line bg-card p-4">
             <View className="mb-3 w-full flex-row items-center justify-between">
               <Text className="font-app-medium text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
-                Source {index + 1}
+                {t('salary.sourceNumber', { number: index + 1 })}
               </Text>
 
               <View className="flex-row items-center gap-1">
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Remove source ${index + 1}`}
+                  accessibilityLabel={t('salary.removeSource', { number: index + 1 })}
                   hitSlop={8}
                   onPress={() => void removeSource(source.id)}
                   className="h-9 w-9 items-center justify-center rounded-full active:bg-ink/5"
@@ -358,8 +378,8 @@ function SalaryEditor({
                   accessibilityRole="button"
                   accessibilityLabel={
                     collapsed[source.id]
-                      ? `Expand source ${index + 1}`
-                      : `Collapse source ${index + 1}`
+                      ? t('salary.expandSource', { number: index + 1 })
+                      : t('salary.collapseSource', { number: index + 1 })
                   }
                   accessibilityState={{ expanded: !collapsed[source.id] }}
                   hitSlop={8}
@@ -383,9 +403,9 @@ function SalaryEditor({
             {collapsed[source.id] ? (
               <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
                 {[
-                  source.name.trim() || 'Unnamed',
+                  source.name.trim() || t('salary.unnamed'),
                   paycheckOf(source) ? formatCurrency(paycheckOf(source)) : null,
-                  source.payType === 'hourly' ? 'Hourly' : null,
+                  source.payType === 'hourly' ? t('salary.payType.hourly') : null,
                 ]
                   .filter(Boolean)
                   .join(' · ')}
@@ -393,7 +413,7 @@ function SalaryEditor({
             ) : (
               <View className="w-full gap-5">
                 <TextField
-                  label="Name"
+                  label={t('salary.name')}
                   value={source.name}
                   onChangeText={(text) => update(source.id, { name: text })}
                   autoCapitalize="words"
@@ -402,7 +422,7 @@ function SalaryEditor({
 
                 {hourlyAvailable ? (
                   <View className="w-full">
-                    <FieldLabel className="mb-2">How you are paid</FieldLabel>
+                    <FieldLabel className="mb-2">{t('salary.howPaid')}</FieldLabel>
                     <ChoiceChips
                       options={PAY_TYPES}
                       value={source.payType ?? 'fixed'}
@@ -414,11 +434,13 @@ function SalaryEditor({
                 {source.payType === 'hourly' ? (
                   <>
                     <SelectField
-                      label="Hourly rate"
+                      label={t('salary.hourlyRate')}
                       value={
-                        source.hourlyRate ? `${formatCurrency(source.hourlyRate)} an hour` : ''
+                        source.hourlyRate
+                          ? t('salary.perHour', { amount: formatCurrency(source.hourlyRate) })
+                          : ''
                       }
-                      placeholder="What you earn per hour"
+                      placeholder={t('salary.hourlyRatePlaceholder')}
                       icon={Calculator}
                       variant="pill"
                       onPress={() =>
@@ -427,7 +449,7 @@ function SalaryEditor({
                     />
 
                     <TextField
-                      label="Hours a week"
+                      label={t('salary.hoursAWeek')}
                       value={source.hoursPerWeek ?? ''}
                       onChangeText={(text) => update(source.id, { hoursPerWeek: text })}
                       placeholder="40"
@@ -437,7 +459,7 @@ function SalaryEditor({
                     />
 
                     <View className="w-full">
-                      <FieldLabel className="mb-2">Overtime</FieldLabel>
+                      <FieldLabel className="mb-2">{t('salary.overtime')}</FieldLabel>
                       <ChoiceChips
                         options={OVERTIME_CHOICES}
                         value={source.overtime ? 'yes' : 'none'}
@@ -448,7 +470,7 @@ function SalaryEditor({
                     {source.overtime ? (
                       <>
                         <TextField
-                          label="Overtime hours a week"
+                          label={t('salary.overtimeHours')}
                           value={source.overtimeHours ?? ''}
                           onChangeText={(text) => update(source.id, { overtimeHours: text })}
                           placeholder="5"
@@ -457,7 +479,7 @@ function SalaryEditor({
                           trailing={<HoursUnit />}
                         />
                         <View className="w-full">
-                          <FieldLabel className="mb-2">Overtime pays</FieldLabel>
+                          <FieldLabel className="mb-2">{t('salary.overtimePays')}</FieldLabel>
                           <ChoiceChips
                             options={OVERTIME_RATES}
                             value={String(source.overtimeMultiplier ?? 1.5) as '1.5' | '2'}
@@ -471,9 +493,9 @@ function SalaryEditor({
                   </>
                 ) : (
                   <SelectField
-                    label="Amount"
+                    label={t('salary.amount')}
                     value={source.amount ? formatCurrency(source.amount) : ''}
-                    placeholder="Enter an amount"
+                    placeholder={t('salary.enterAmount')}
                     icon={Calculator}
                     variant="pill"
                     onPress={() =>
@@ -482,12 +504,12 @@ function SalaryEditor({
                     onIconPress={() =>
                       setPadTarget({ sourceId: source.id, mode: 'calculator', field: 'amount' })
                     }
-                    iconAccessibilityLabel="Open calculator"
+                    iconAccessibilityLabel={t('salary.openCalculator')}
                   />
                 )}
 
                 <View className="w-full">
-                  <FieldLabel className="mb-2">How often</FieldLabel>
+                  <FieldLabel className="mb-2">{t('salary.howOften')}</FieldLabel>
                   <ChoiceChips
                     options={PAY_FREQUENCIES}
                     value={source.frequency}
@@ -498,9 +520,9 @@ function SalaryEditor({
                 {source.payType === 'hourly' ? <HourlyEstimateCard source={source} /> : null}
 
                 <SelectField
-                  label="Last payday"
+                  label={t('salary.lastPayday')}
                   value={source.lastPayday ? formatFullDate(asDate(source.lastPayday)!) : ''}
-                  placeholder="Pick the most recent one"
+                  placeholder={t('salary.lastPaydayPlaceholder')}
                   icon={Calendar}
                   variant="pill"
                   onPress={() => setDateTarget(source.id)}
@@ -508,18 +530,21 @@ function SalaryEditor({
 
                 {source.lastPayday ? (
                   <Text className="-mt-3 ml-4 font-app text-[13px] text-muted">
-                    Next payday{' '}
-                    {formatFullDate(getNextPayday(asDate(source.lastPayday)!, source.frequency))}
+                    {t('salary.nextPayday', {
+                      date: formatFullDate(
+                        getNextPayday(asDate(source.lastPayday)!, source.frequency),
+                      ),
+                    })}
                   </Text>
                 ) : null}
 
                 <View className="w-full">
-                  <FieldLabel className="mb-2">Paid into</FieldLabel>
+                  <FieldLabel className="mb-2">{t('salary.paidInto')}</FieldLabel>
                   <MultiChoiceChips
                     options={accountOptions}
                     values={source.accountIds}
                     onChange={(accountIds) => update(source.id, { accountIds })}
-                    emptyHint="Link at least one account so Skip knows where this lands."
+                    emptyHint={t('salary.linkAccountHint')}
                   />
                 </View>
               </View>
@@ -530,13 +555,13 @@ function SalaryEditor({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Add salary source"
+        accessibilityLabel={t('salary.addSource')}
         onPress={addSource}
         className="mt-4 min-h-14 w-full flex-row items-center justify-center gap-2 rounded-full bg-ink/5 active:bg-ink/10"
       >
         <Plus size={18} color={colors.ink} strokeWidth={1.8} />
         <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
-          Add salary source
+          {t('salary.addSource')}
         </Text>
       </Pressable>
 
@@ -549,7 +574,10 @@ function SalaryEditor({
             {error}
           </Text>
         ) : null}
-        <Button label={createSource.isPending ? 'Saving…' : 'Save'} onPress={handleSave} />
+        <Button
+          label={createSource.isPending ? t('salary.saving') : t('common.save')}
+          onPress={handleSave}
+        />
       </View>
 
       {dateTarget ? (
@@ -565,8 +593,8 @@ function SalaryEditor({
 
       {padTarget && activeSource && padTarget.field === 'rate' ? (
         <AmountPad
-          title="Hourly rate"
-          caption="Per hour, before tax"
+          title={t('salary.hourlyRate')}
+          caption={t('salary.ratePadCaption')}
           value={activeSource.hourlyRate ? String(activeSource.hourlyRate) : ''}
           onCancel={() => setPadTarget(null)}
           onConfirm={(next) => {
@@ -579,7 +607,6 @@ function SalaryEditor({
       {padTarget && activeSource && padTarget.field === 'amount' ? (
         padTarget.mode === 'calculator' ? (
           <CalculatorPad
-            title="Calculator"
             value={activeSource.amount ? String(activeSource.amount) : ''}
             onCancel={() => setPadTarget(null)}
             onConfirm={(next) => {
@@ -589,10 +616,10 @@ function SalaryEditor({
           />
         ) : (
           <AmountPad
-            title="Salary amount"
+            title={t('salary.amountPadTitle')}
             caption={
               PAY_FREQUENCIES.find((option) => option.value === activeSource.frequency)?.caption ??
-              'Each pay period'
+              t('salary.eachPayPeriod')
             }
             value={activeSource.amount ? String(activeSource.amount) : ''}
             onCancel={() => setPadTarget(null)}
@@ -610,7 +637,7 @@ function SalaryEditor({
 function HoursUnit() {
   return (
     <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={1.2}>
-      hrs
+      {t('salary.hoursUnit')}
     </Text>
   );
 }
@@ -636,13 +663,14 @@ function HourlyEstimateCard({ source }: { source: SalarySource }) {
   return (
     <View
       accessible
-      accessibilityLabel={`Each paycheck about ${formatCurrency(
-        estimate.grossPerPaycheck,
-      )} before tax. About ${formatCurrency(perMonth)} a month.`}
+      accessibilityLabel={t('salary.estimateA11y', {
+        paycheck: formatCurrency(estimate.grossPerPaycheck),
+        perMonth: formatCurrency(perMonth),
+      })}
       className="w-full rounded-[16px] bg-accent/10 px-4 py-3.5"
     >
       <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-        Each paycheck, before tax
+        {t('salary.eachPaycheck')}
       </Text>
       <Text
         className="mt-0.5 font-app-semibold text-[22px] text-ink"
@@ -653,7 +681,7 @@ function HourlyEstimateCard({ source }: { source: SalarySource }) {
         {formatCurrency(estimate.grossPerPaycheck)}
       </Text>
       <Text className="mt-1 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
-        About {formatCurrency(perMonth)} a month
+        {t('salary.aboutPerMonth', { amount: formatCurrency(perMonth) })}
       </Text>
     </View>
   );

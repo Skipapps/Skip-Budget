@@ -22,19 +22,34 @@ import { useLedger, useProfile, type LedgerEntry } from '@/api/queries';
 import { useCharges } from '@/api/charges';
 import { useHasUnreadNews } from '@/api/news';
 import { useKeepSchedulesCurrent, useRefreshAll } from '@/api/refresh';
-import { spendingCategories } from '@/data/dashboard-mock';
+import { spendingCategories, type SpendingCategory } from '@/data/dashboard-mock';
+import { t, type MessageKey } from '@/i18n';
 import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
 import { groupByDate } from '@/lib/group';
 import { rangeFor } from '@/lib/range';
 import { addDays, formatDateRange, formatDayLabel, toIsoDate } from '@/lib/date';
 import { useToday } from '@/lib/use-today';
-import { FAILURE_MESSAGE } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 import { TEXT_CAP } from '@/theme/text-scale';
 
-const KIND_LABELS: Record<string, string> = {
-  receipt: 'Receipt',
-  bill: 'Bill',
-  subscription: 'Subscription',
+/** What each kind of row says under its name; kinds missing here say nothing. */
+const KIND_LABELS: Record<string, MessageKey> = {
+  receipt: 'home.kind.receipt',
+  bill: 'home.kind.bill',
+  subscription: 'home.kind.subscription',
+};
+
+/** The tile ids are stored values; only what the rows show is looked up by them. */
+const DESTINATION_LABELS: Record<string, MessageKey> = {
+  'monthly-bills': 'home.destination.monthlyBills',
+  receipts: 'home.destination.receipts',
+  subscriptions: 'home.destination.subscriptions',
+  'loan-calculator': 'home.tool.loanCalculator',
+};
+
+const worded = (tile: SpendingCategory): SpendingCategory => {
+  const key = DESTINATION_LABELS[tile.id];
+  return key ? { ...tile, label: t(key) } : tile;
 };
 
 const DESTINATION_ROUTES: Record<string, Href> = {
@@ -143,7 +158,7 @@ export default function HomeScreen() {
     <Screen onRefresh={refresh} refreshing={refreshing}>
       <View className="mt-2 w-full">
         <DashboardHeader
-          name={profile.data?.display_name ?? 'Welcome'}
+          name={profile.data?.display_name ?? t('home.welcome')}
           avatarId={profile.data?.avatar_id}
           onAvatarPress={() => router.push('/avatar')}
           onNotificationsPress={() => router.push('/notifications')}
@@ -162,7 +177,7 @@ export default function HomeScreen() {
       </View>
 
       <View className="mt-6 w-full">
-        <SectionHeading>Quick add</SectionHeading>
+        <SectionHeading>{t('home.quickAdd')}</SectionHeading>
       </View>
       <View className="mt-3 w-full">
         <QuickActions onPress={(href) => router.push(href)} />
@@ -172,12 +187,12 @@ export default function HomeScreen() {
       <GettingStartedCard />
 
       <View className="mt-8 w-full">
-        <SectionHeading caption="This month">Where it goes</SectionHeading>
+        <SectionHeading caption={t('home.thisMonth')}>{t('home.whereItGoes')}</SectionHeading>
       </View>
 
       <View className="mt-3 w-full">
         <DestinationList
-          items={TILES}
+          items={TILES.map(worded)}
           amounts={tileAmounts}
           pro={pro}
           loading={month.isLoading}
@@ -191,7 +206,7 @@ export default function HomeScreen() {
       </View>
 
       <View className="mt-8 w-full">
-        <SectionHeading caption="Included with Pro">Go further</SectionHeading>
+        <SectionHeading caption={t('home.includedWithPro')}>{t('home.goFurther')}</SectionHeading>
       </View>
       <View className="mt-3 w-full">
         <ToolCards pro={pro} onPress={(href) => router.push(href)} />
@@ -212,10 +227,10 @@ export default function HomeScreen() {
       </View>
 
       <Section
-        title="Recent"
+        title={t('home.recent')}
         range={formatDateRange(recentFrom, selectedDate)}
         entries={recent.entries}
-        empty="Nothing in this week."
+        empty={t('home.recent.empty')}
         loading={recent.isLoading}
         error={recent.isError}
         onRetry={refresh}
@@ -227,10 +242,10 @@ export default function HomeScreen() {
 
       <View className="w-full pb-24">
         <Section
-          title="Coming up"
+          title={t('home.comingUp')}
           range={formatDateRange(addDays(selectedDate, 1), addDays(selectedDate, 7))}
           entries={upcoming.entries}
-          empty="Nothing due in the week ahead."
+          empty={t('home.comingUp.empty')}
           loading={upcoming.isLoading}
           error={upcoming.isError}
           onRetry={refresh}
@@ -295,9 +310,9 @@ function Section({
             className="w-full text-center font-app text-[14px] text-muted"
             maxFontSizeMultiplier={TEXT_CAP.reading}
           >
-            {FAILURE_MESSAGE}
+            {failureText()}
           </Text>
-          <TextLink label="Try again" variant="subtle" onPress={onRetry} />
+          <TextLink label={t('common.tryAgain')} variant="subtle" onPress={onRetry} />
         </View>
       ) : loading ? (
         <View className="mt-1 w-full">
@@ -321,7 +336,7 @@ function Section({
                   <TransactionRow
                     label={entry.label}
                     amount={entry.amount}
-                    kindLabel={KIND_LABELS[entry.kind]}
+                    kindLabel={KIND_LABELS[entry.kind] ? t(KIND_LABELS[entry.kind]) : undefined}
                     domain={entry.domain}
                     logoHidden={entry.logoHidden}
                     kind={entry.kind}

@@ -59,9 +59,22 @@ export function LocaleBoundary({ children }: { children: ReactNode }) {
 
 /**
  * For a navigator's `screenLayout`. React Navigation calls it as a plain function, so the hook
- * lives in LocaleBoundary, not here. The tab navigator is skipped by the caller: keying it would
- * send the person back to the first tab.
+ * lives in LocaleBoundary, not here.
  */
 export function localeScreenLayout({ children }: { children: ReactElement }): ReactElement {
   return <LocaleBoundary>{children}</LocaleBoundary>;
+}
+
+/**
+ * The root stack's layout. The tab navigator is left alone: keying it would send the person back
+ * to the first tab, and it remounts its own screens through localeScreenLayout instead.
+ */
+export function rootScreenLayout({
+  route,
+  children,
+}: {
+  route: { name: string };
+  children: ReactElement;
+}): ReactElement {
+  return route.name === '(tabs)' ? children : localeScreenLayout({ children });
 }

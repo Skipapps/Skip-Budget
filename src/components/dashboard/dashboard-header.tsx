@@ -2,6 +2,7 @@ import { Bell } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { ProfileAvatar } from '@/components/ui/profile-avatar';
+import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
 
@@ -28,7 +29,7 @@ export function DashboardHeader({
       <View className="flex-1 flex-row items-center gap-3">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={avatarId ? 'Change your profile picture' : 'Add a profile picture'}
+          accessibilityLabel={t(avatarId ? 'home.header.changePicture' : 'home.header.addPicture')}
           onPress={onAvatarPress}
           className="rounded-full active:opacity-70"
         >
@@ -44,7 +45,9 @@ export function DashboardHeader({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={unread ? 'Notifications, new' : 'Notifications'}
+        accessibilityLabel={t(
+          unread ? 'home.header.notificationsNew' : 'home.header.notifications',
+        )}
         onPress={onNotificationsPress}
         className="h-11 w-11 items-center justify-center rounded-[12px] active:bg-ink/5"
       >

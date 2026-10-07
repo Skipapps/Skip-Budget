@@ -8,6 +8,7 @@ import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { TextLink } from '@/components/ui/text-link';
 import { Subtitle } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { resetTo } from '@/lib/nav';
 
 export default function SignUpScreen() {
@@ -23,15 +24,15 @@ export default function SignUpScreen() {
     setError(null);
 
     if (!email.trim() || !password) {
-      setError('Enter an email and password.');
+      setError(t('auth.signup.missing'));
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError(t('api.auth.shortPassword'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Those passwords do not match.');
+      setError(t('auth.passwordsDiffer'));
       return;
     }
 
@@ -54,12 +55,12 @@ export default function SignUpScreen() {
   };
 
   return (
-    <Screen title="Create your account" showBack avoidKeyboard>
-      <Subtitle className="mt-3">Use your email and a password you will remember.</Subtitle>
+    <Screen title={t('auth.signup.title')} showBack avoidKeyboard>
+      <Subtitle className="mt-3">{t('auth.signup.subtitle')}</Subtitle>
 
       <View className="mt-8 w-full gap-5">
         <TextField
-          label="Email"
+          label={t('auth.email')}
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -70,7 +71,7 @@ export default function SignUpScreen() {
           returnKeyType="next"
         />
         <TextField
-          label="Password"
+          label={t('auth.password')}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -80,7 +81,7 @@ export default function SignUpScreen() {
           returnKeyType="next"
         />
         <TextField
-          label="Confirm password"
+          label={t('auth.signup.confirm')}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
@@ -93,8 +94,11 @@ export default function SignUpScreen() {
       </View>
 
       <View className="mt-auto w-full gap-2 pt-10">
-        <Button label={busy ? 'Creating…' : 'Create account'} onPress={handleCreateAccount} />
-        <TextLink label="I already have an account" onPress={() => router.push('/login')} />
+        <Button
+          label={busy ? t('auth.signup.creating') : t('auth.signup.button')}
+          onPress={handleCreateAccount}
+        />
+        <TextLink label={t('auth.haveAccount')} onPress={() => router.push('/login')} />
       </View>
     </Screen>
   );

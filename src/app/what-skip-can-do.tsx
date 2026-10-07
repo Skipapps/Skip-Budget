@@ -3,34 +3,35 @@ import { Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
+import { t, type MessageKey } from '@/i18n';
 import { useArtwork, type ArtworkName } from '@/theme/artwork';
 
 /** The tour's cards in a line each. Nothing navigates: there is no account yet. */
-const CAN_DO: { artwork: ArtworkName; title: string; detail: string }[] = [
+const CAN_DO: { artwork: ArtworkName; title: MessageKey; detail: MessageKey }[] = [
   {
     artwork: 'tileSalary',
-    title: 'Track without linking a bank',
-    detail: 'You tell Skip what happens. Your bank never knows Skip exists.',
+    title: 'onboarding.stop.bank.title',
+    detail: 'onboarding.canDo.bank.detail',
   },
   {
     artwork: 'tileReceipts',
-    title: 'Scan receipts in a tap',
-    detail: 'Read on your phone — the photo never leaves it.',
+    title: 'onboarding.stop.receipts.title',
+    detail: 'onboarding.canDo.receipts.detail',
   },
   {
     artwork: 'tileLoanRepayment',
-    title: 'Loans, to the cent',
-    detail: 'Daily interest, so the payoff matches your statement.',
+    title: 'onboarding.stop.loans.title',
+    detail: 'onboarding.canDo.loans.detail',
   },
   {
     artwork: 'tileSavings',
-    title: 'Savings that explain themselves',
-    detail: 'Whatever a month leaves over lands here, arithmetic shown.',
+    title: 'onboarding.stop.savings.title',
+    detail: 'onboarding.canDo.savings.detail',
   },
   {
     artwork: 'tileMonthlyBills',
-    title: 'Reminded before things land',
-    detail: 'Bills, renewals and payday, announced ahead.',
+    title: 'onboarding.stop.reminders.title',
+    detail: 'onboarding.canDo.reminders.detail',
   },
 ];
 
@@ -39,9 +40,9 @@ export default function WhatSkipCanDoScreen() {
 
   return (
     <Screen
-      title="What Skip can do"
+      title={t('onboarding.canDo.title')}
       showBack
-      footer={<Button label="Continue" onPress={() => router.push('/message')} />}
+      footer={<Button label={t('common.continue')} onPress={() => router.push('/message')} />}
     >
       <View className="mt-7 w-full gap-3">
         {CAN_DO.map((item) => {
@@ -59,13 +60,13 @@ export default function WhatSkipCanDoScreen() {
                   className="font-app-semibold text-[15px] text-ink"
                   maxFontSizeMultiplier={1.3}
                 >
-                  {item.title}
+                  {t(item.title)}
                 </Text>
                 <Text
                   className="mt-1 font-app text-[12px] leading-[18px] text-muted"
                   maxFontSizeMultiplier={1.4}
                 >
-                  {item.detail}
+                  {t(item.detail)}
                 </Text>
               </View>
             </View>

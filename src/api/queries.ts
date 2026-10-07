@@ -12,6 +12,7 @@ import {
   type RecordedCharge,
   type SourceKind,
 } from '@/lib/card-ledger';
+import { t } from '@/i18n';
 import { withTimeout } from '@/lib/deadline';
 import { paydaysInRange } from '@/lib/date';
 import type { AccrualBasis } from '@/lib/loan';
@@ -1015,7 +1016,7 @@ export function useLedger(range: DateRange | undefined, today: string) {
       for (const date of dates) {
         entries.push({
           id: `income-${row.id}@${date}`,
-          label: row.name || 'Income',
+          label: row.name || t('api.ledger.income'),
           amount: Math.abs(row.amount),
           date,
           kind: 'income',

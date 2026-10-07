@@ -1,16 +1,23 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { BrandMark } from '@/components/brands/brand-mark';
+import { t, type MessageKey } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { useMoneyColor } from '@/providers/theme-provider';
 
-export const CYCLE_LABELS: Record<string, string> = {
-  weekly: 'Weekly',
-  monthly: 'Monthly',
-  quarterly: 'Quarterly',
-  yearly: 'Yearly',
-};
+const CYCLE_KEYS = new Map<string, MessageKey>([
+  ['weekly', 'dates.weekly'],
+  ['monthly', 'dates.monthly'],
+  ['quarterly', 'subscriptions.cycle.quarterly'],
+  ['yearly', 'subscriptions.cycle.yearly'],
+]);
+
+/** A billing cycle as read; the stored value only picks the line. */
+export function cycleLabel(cycle: string): string {
+  const key = CYCLE_KEYS.get(cycle);
+  return key ? t(key) : cycle;
+}
 
 type SubscriptionRowProps = {
   name: string;
@@ -39,13 +46,22 @@ export function SubscriptionRow({
   onPress,
 }: SubscriptionRowProps) {
   const moneyColor = useMoneyColor();
-  const cycleLabel = CYCLE_LABELS[cycle] ?? cycle;
+  const shownCycle = cycleLabel(cycle);
+  const spoken = {
+    name,
+    amount: formatCurrency(amount),
+    cycle: shownCycle,
+    source: sourceLabel,
+  };
+  const accessibilityLabel = sourceLabel
+    ? t(active ? 'subscriptions.row.a11ySource' : 'subscriptions.row.a11ySourceCancelled', spoken)
+    : t(active ? 'subscriptions.row.a11y' : 'subscriptions.row.a11yCancelled', spoken);
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${name}, ${formatCurrency(amount)} ${cycleLabel}${sourceLabel ? `, charged to ${sourceLabel}` : ''}${active ? '' : ', cancelled'}`}
-      accessibilityHint="Opens this subscription"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={t('subscriptions.row.hint')}
       onPress={onPress}
       className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
       style={active ? undefined : { opacity: 0.5 }}
@@ -65,7 +81,7 @@ export function SubscriptionRow({
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
-          {active ? cycleLabel : 'Cancelled'}
+          {active ? shownCycle : t('subscriptions.cancelled')}
           {sourceLabel ? ` · ${sourceLabel}` : ''}
         </Text>
       </View>
@@ -79,7 +95,9 @@ export function SubscriptionRow({
           {formatCurrency(amount)}
         </Text>
         <Text className="mt-0.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-          {renewsOn ? formatFullDate(new Date(`${renewsOn}T00:00:00`)) : 'No renewal date'}
+          {renewsOn
+            ? formatFullDate(new Date(`${renewsOn}T00:00:00`))
+            : t('subscriptions.row.noRenewalDate')}
         </Text>
       </View>
     </Pressable>

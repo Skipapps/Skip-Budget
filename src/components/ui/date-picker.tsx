@@ -3,8 +3,10 @@ import { useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 
 import { DayGrid } from '@/components/flow/inline-calendar';
+import { monthShort, monthsShort } from '@/i18n/calendar';
+import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
-import { MONTHS_SHORT, getDaysInMonth } from '@/lib/date';
+import { formatFullDate, getDaysInMonth } from '@/lib/date';
 import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
 
@@ -52,7 +54,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable
-        accessibilityLabel="Close date picker"
+        accessibilityLabel={t('ui.datePicker.close')}
         onPress={onCancel}
         className="flex-1 items-center justify-center bg-black/40 px-8"
       >
@@ -63,7 +65,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
         >
           <View className="bg-control px-5 py-4">
             <Text className="font-app text-[13px] text-on-control/85" maxFontSizeMultiplier={1.2}>
-              {safeDay} {MONTHS_SHORT[month]} {year}
+              {formatFullDate(draft)}
             </Text>
 
             <View className="mt-1 flex-row items-center justify-between">
@@ -77,7 +79,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
               <View className="flex-row items-center">
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Next year"
+                  accessibilityLabel={t('ui.calendar.nextYear')}
                   onPress={() => setYear((current) => current + 1)}
                   className="h-11 w-11 items-center justify-center rounded-[12px] active:bg-on-control/10"
                 >
@@ -85,7 +87,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Previous year"
+                  accessibilityLabel={t('ui.calendar.previousYear')}
                   onPress={() => setYear((current) => current - 1)}
                   className="h-11 w-11 items-center justify-center rounded-[12px] active:bg-on-control/10"
                 >
@@ -97,7 +99,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
 
           {step === 'month' ? (
             <View className="flex-row flex-wrap px-3 py-4">
-              {MONTHS_SHORT.map((label, index) => {
+              {monthsShort().map((label, index) => {
                 const selected = index === month;
                 // Dead only when the whole month is below the floor.
                 const blocked = minDate
@@ -139,13 +141,13 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
             <View className="px-3 pb-2 pt-3">
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Back to months"
+                accessibilityLabel={t('ui.datePicker.backToMonths')}
                 onPress={() => setStep('month')}
                 className="mb-2 flex-row items-center gap-1 self-start rounded-[12px] px-2 py-1.5 active:bg-ink/5"
               >
                 <ChevronLeft size={16} color={colors.muted} strokeWidth={2} />
                 <Text className="font-app-medium text-[14px] text-body" maxFontSizeMultiplier={1.2}>
-                  {MONTHS_SHORT[month]} {year}
+                  {t('ui.calendar.monthYearShort', { month: monthShort(month), year })}
                 </Text>
               </Pressable>
 
@@ -167,7 +169,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
               onPress={onCancel}
               className="min-h-11 justify-center rounded-full px-5 active:bg-ink/5"
             >
-              <Text className="font-app-medium text-[15px] text-body">Cancel</Text>
+              <Text className="font-app-medium text-[15px] text-body">{t('common.cancel')}</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -182,7 +184,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
               )}
             >
               <Text className="font-app-semibold text-[15px] text-on-control">
-                {step === 'month' ? 'Next' : 'OK'}
+                {step === 'month' ? t('common.next') : t('common.ok')}
               </Text>
             </Pressable>
           </View>

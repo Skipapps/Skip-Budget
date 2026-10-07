@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
 import { Title } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
 
 /** Where a step opens from the walk-in, when that is not its everyday screen. */
@@ -48,10 +49,10 @@ export default function SetupScreen() {
   const allDone = steps.every((step) => step.done);
 
   const primary = allDone
-    ? { label: 'All set — open Skip', act: () => resetTo('/home') }
+    ? { label: t('onboarding.setup.allSet'), act: () => resetTo('/home') }
     : requiredDone
-      ? { label: 'Add a receipt', act: () => openStep(receipt) }
-      : { label: 'Continue', act: () => openStep(next!) };
+      ? { label: t('onboarding.setup.addReceipt'), act: () => openStep(receipt) }
+      : { label: t('common.continue'), act: () => openStep(next!) };
 
   return (
     <Screen
@@ -60,7 +61,7 @@ export default function SetupScreen() {
           <Button label={primary.label} onPress={primary.act} />
           {!allDone ? (
             <TextLink
-              label={requiredDone ? 'Skip the receipt — open Skip' : 'Set up later'}
+              label={t(requiredDone ? 'onboarding.setup.skipReceipt' : 'onboarding.setup.later')}
               variant="subtle"
               onPress={() => resetTo('/home')}
             />
@@ -68,7 +69,7 @@ export default function SetupScreen() {
         </View>
       }
     >
-      <Title>Let’s set up Skip</Title>
+      <Title>{t('onboarding.setup.title')}</Title>
 
       <View className="mt-7 w-full gap-3">
         {steps.map((step, index) => {
@@ -80,7 +81,7 @@ export default function SetupScreen() {
               accessibilityState={{ disabled: step.done }}
               accessibilityLabel={
                 step.done
-                  ? `Step ${index + 1}, ${step.title}. Done.`
+                  ? t('onboarding.setup.stepDone', { number: index + 1, title: step.title })
                   : `${step.title}. ${step.detail}`
               }
               disabled={step.done}
@@ -125,7 +126,7 @@ export default function SetupScreen() {
                   </Text>
                   {step.optional && !step.done ? (
                     <Text className="font-app text-[11px] text-muted" maxFontSizeMultiplier={1.2}>
-                      Optional
+                      {t('common.optional')}
                     </Text>
                   ) : null}
                 </View>

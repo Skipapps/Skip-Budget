@@ -28,3 +28,21 @@ whether to also fold "learned voice corrections stay on the phone" into the exis
 haptics/app-lock bullet (I kept it inside the new voice section instead, flagged as a judgment
 call). Whoever owns App Store Connect should confirm the capture_source/Usage Data point against
 the live listing, not this draft.
+
+---
+
+## 2026-10-07 — Mia — wave 2 legal and FAQ translation (done, in the i18n worktree)
+
+**Outcome:** Privacy policy, terms of service, common questions and the shared legal-document
+component now read through the message system; Spanish (Mexico) and French (Canada) written
+clause for clause beside the English, which is unchanged.
+
+**What changed:** `src/app/privacy.tsx`, `terms.tsx`, `faq.tsx`, `src/components/ui/legal-document.tsx`,
+`src/i18n/messages/legal.ts` and `faq.ts`, five new test files, one mock line in `faq.test.tsx`.
+A courtesy-translation notice sits on top of the translated policy and terms. Detail in
+`.claude/team/logs/wave2/legal-faq.md`.
+
+**Open questions:** a lawyer must review the Spanish and French and four clauses that depend on
+local consumer law (English-prevails notice, warranty disclaimer, liability carve-out, changing
+the terms by notice). The English Terms "Money" section says Skip has no in-app purchases or
+subscriptions, which Skip Pro contradicts; the privacy policy does not name RevenueCat.

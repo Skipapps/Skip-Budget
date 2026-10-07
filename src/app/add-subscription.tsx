@@ -20,6 +20,7 @@ import { usePastCharges } from '@/api/past-charges';
 import { usePaymentSources, useSubscription } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { AmountStep } from '@/components/flow/amount-step';
+import { cycleLabel } from '@/components/subscriptions/subscription-row';
 import { InlineCalendar } from '@/components/flow/inline-calendar';
 import { StepFlow } from '@/components/flow/step-flow';
 import { PageState } from '@/components/ui/page-state';
@@ -31,9 +32,10 @@ import { ReminderField } from '@/components/ui/reminder-field';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
+import { t, type MessageKey } from '@/i18n';
 import { planFloor } from '@/lib/card-ledger';
 import { success, warn } from '@/lib/haptics';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { failureMessage, failureText } from '@/lib/failure';
 import { logoColumns } from '@/lib/logo-columns';
 import { logoDomainOf, type LogoFields } from '@/lib/logo-domain';
 import {
@@ -45,14 +47,43 @@ import {
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 
-const CYCLES = [
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'yearly', label: 'Yearly' },
-] as const;
+const CYCLES = ['weekly', 'monthly', 'quarterly', 'yearly'] as const;
 
-type Cycle = (typeof CYCLES)[number]['value'];
+type Cycle = (typeof CYCLES)[number];
+
+const SPEND_CATEGORY_KEYS = new Map<string, MessageKey>([
+  ['groceries', 'subscriptions.spendCategory.groceries'],
+  ['dining', 'subscriptions.spendCategory.dining'],
+  ['fuel', 'subscriptions.spendCategory.fuel'],
+  ['pharmacy', 'subscriptions.spendCategory.pharmacy'],
+  ['shopping', 'subscriptions.spendCategory.shopping'],
+  ['clothing', 'subscriptions.spendCategory.clothing'],
+  ['electronics', 'subscriptions.spendCategory.electronics'],
+  ['home', 'subscriptions.spendCategory.home'],
+  ['beauty', 'subscriptions.spendCategory.beauty'],
+  ['pets', 'subscriptions.spendCategory.pets'],
+  ['entertainment', 'subscriptions.spendCategory.entertainment'],
+  ['software', 'subscriptions.spendCategory.software'],
+  ['fitness', 'subscriptions.spendCategory.fitness'],
+  ['news', 'subscriptions.spendCategory.news'],
+  ['meals', 'subscriptions.spendCategory.meals'],
+  ['memberships', 'subscriptions.spendCategory.memberships'],
+  ['transport', 'subscriptions.spendCategory.transport'],
+  ['utilities', 'subscriptions.spendCategory.utilities'],
+  ['telecom', 'subscriptions.spendCategory.telecom'],
+  ['insurance', 'subscriptions.spendCategory.insurance'],
+  ['finance', 'subscriptions.spendCategory.finance'],
+  ['other', 'subscriptions.spendCategory.other'],
+]);
+
+/**
+ * A spending category as read. The database holds an English label beside each id; the id picks
+ * the line, and that label only covers an id this build does not know.
+ */
+function spendCategoryLabel(id: string, stored: string): string {
+  const key = SPEND_CATEGORY_KEYS.get(id);
+  return key ? t(key) : stored;
+}
 
 type Initial = {
   service: BrandSelection | null;
@@ -108,12 +139,12 @@ export default function AddSubscriptionScreen() {
         <Screen showBack>
           <PageState
             art={artwork.error}
-            title={FAILURE_MESSAGE}
-            actionLabel="Try again"
+            title={failureText()}
+            actionLabel={t('common.tryAgain')}
             onAction={() => {
               void subscription.refetch();
             }}
-            secondaryLabel="Go back"
+            secondaryLabel={t('subscriptions.goBack')}
             onSecondary={() => router.back()}
           />
         </Screen>
@@ -123,12 +154,12 @@ export default function AddSubscriptionScreen() {
     if (!subscription.isFetched) {
       return (
         <StepFlow
-          title="Edit subscription"
-          closePrompt="Cancel editing this subscription?"
+          title={t('subscriptions.add.titleEdit')}
+          closePrompt={t('subscriptions.add.closeEdit')}
           steps={3}
           current={0}
           onBack={() => router.back()}
-          primaryLabel="Continue"
+          primaryLabel={t('common.continue')}
           primaryDisabled
           onPrimary={() => {}}
         >
@@ -145,8 +176,8 @@ export default function AddSubscriptionScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Go back"
+          title={failureText()}
+          actionLabel={t('subscriptions.goBack')}
           onAction={() => router.back()}
         />
       </Screen>
@@ -223,8 +254,13 @@ function SubscriptionForm({
   const deleteSubscription = useDeleteSubscription();
   const confirm = useConfirm();
 
+  const category = service
+    ? categories.find((option) => option.id === service.categoryId)
+    : undefined;
   const categoryLabel = service
-    ? (categories.find((category) => category.id === service.categoryId)?.label ?? 'Other')
+    ? category
+      ? spendCategoryLabel(category.id, category.label)
+      : t('subscriptions.spendCategory.other')
     : null;
 
   const savedReminder = useReminderChoice('subscription', id);
@@ -284,7 +320,7 @@ function SubscriptionForm({
       if (!pastCharges.ready) {
         pastCharges.retry();
         warn();
-        setError({ message: FAILURE_MESSAGE, step: 2 });
+        setError({ message: failureText(), step: 2 });
         return;
       }
 
@@ -314,9 +350,9 @@ function SubscriptionForm({
   const handleDelete = async () => {
     if (!id) return;
     const ok = await confirm({
-      title: 'Delete this subscription?',
-      message: 'This cannot be undone.',
-      confirmLabel: 'Delete',
+      title: t('subscriptions.add.deleteTitle'),
+      message: t('subscriptions.add.deleteMessage'),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -339,17 +375,26 @@ function SubscriptionForm({
   const stepValid = step === 0 ? amountReady : step === 1 ? Boolean(service) : !busy;
 
   const question =
-    step === 0 ? 'How much does it cost?' : step === 2 ? 'When does it renew?' : undefined;
+    step === 0
+      ? t('subscriptions.add.amountQuestion')
+      : step === 2
+        ? t('subscriptions.add.renewQuestion')
+        : undefined;
   const primaryLabel =
-    step < 2 ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save subscription';
+    step < 2
+      ? t('common.continue')
+      : busy
+        ? t('subscriptions.add.saving')
+        : editing
+          ? t('subscriptions.add.saveChanges')
+          : t('subscriptions.add.saveSubscription');
+  const cycleOptions = CYCLES.map((value) => ({ value, label: cycleLabel(value) }));
   const stepError = error && error.step === step ? error.message : null;
 
   return (
     <StepFlow
-      title={editing ? 'Edit subscription' : 'Add a subscription'}
-      closePrompt={
-        editing ? 'Cancel editing this subscription?' : 'Cancel adding this subscription?'
-      }
+      title={editing ? t('subscriptions.add.titleEdit') : t('subscriptions.addASubscription')}
+      closePrompt={editing ? t('subscriptions.add.closeEdit') : t('subscriptions.add.closeNew')}
       steps={3}
       current={step}
       onBack={() => {
@@ -374,13 +419,15 @@ function SubscriptionForm({
         editing ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Delete this subscription"
+            accessibilityLabel={t('subscriptions.add.deleteA11y')}
             onPress={handleDelete}
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
             <Text className="font-app-medium text-[15px] text-danger" maxFontSizeMultiplier={1.4}>
-              {deleteSubscription.isPending ? 'Deleting…' : 'Delete subscription'}
+              {deleteSubscription.isPending
+                ? t('subscriptions.add.deleting')
+                : t('subscriptions.add.deleteSubscription')}
             </Text>
           </Pressable>
         ) : null
@@ -391,25 +438,25 @@ function SubscriptionForm({
       {step === 1 ? (
         <View className="w-full gap-6">
           <BrandField
-            label="Service"
+            label={t('subscriptions.field.service')}
             value={service}
             onChange={setService}
-            placeholder="Search for a service"
+            placeholder={t('subscriptions.add.servicePlaceholder')}
           />
 
           {sources.length > 0 ? (
             <View className="w-full">
-              <FieldLabel className="mb-3">Charged to</FieldLabel>
+              <FieldLabel className="mb-3">{t('subscriptions.field.chargedTo')}</FieldLabel>
               <SourceTiles sources={sources} value={sourceId} onChange={setSourceId} />
             </View>
           ) : null}
 
           <TextField
-            label="Note"
+            label={t('subscriptions.field.note')}
             optional
             value={note}
             onChangeText={setNote}
-            placeholder="Which plan, for example"
+            placeholder={t('subscriptions.add.notePlaceholder')}
             multiline
             maxLength={200}
             autoCapitalize="sentences"
@@ -418,11 +465,11 @@ function SubscriptionForm({
           {/* Cancelling keeps the history; only offered on something that already exists. */}
           {editing ? (
             <View className="w-full">
-              <FieldLabel className="mb-2">Status</FieldLabel>
+              <FieldLabel className="mb-2">{t('subscriptions.field.status')}</FieldLabel>
               <ChoiceChips
                 options={[
-                  { value: 'active', label: 'Active' },
-                  { value: 'cancelled', label: 'Cancelled' },
+                  { value: 'active', label: t('subscriptions.active') },
+                  { value: 'cancelled', label: t('subscriptions.cancelled') },
                 ]}
                 value={active ? 'active' : 'cancelled'}
                 onChange={(next) => setActive(next === 'active')}
@@ -432,7 +479,7 @@ function SubscriptionForm({
 
           {categoryLabel ? (
             <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-              Filed under {categoryLabel}
+              {t('subscriptions.add.filedUnder', { category: categoryLabel })}
             </Text>
           ) : null}
 
@@ -450,8 +497,8 @@ function SubscriptionForm({
           <InlineCalendar value={renewsOn} onChange={setRenewsOn} />
 
           <View className="w-full">
-            <FieldLabel className="mb-2">Billing cycle</FieldLabel>
-            <ChoiceChips options={CYCLES} value={cycle} onChange={setCycle} />
+            <FieldLabel className="mb-2">{t('subscriptions.field.billingCycle')}</FieldLabel>
+            <ChoiceChips options={cycleOptions} value={cycle} onChange={setCycle} />
           </View>
 
           <ReminderField

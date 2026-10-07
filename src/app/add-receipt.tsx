@@ -36,9 +36,11 @@ import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { GlyphWell, ReviewRow } from '@/components/voice/review-row';
+import { t, type MessageKey } from '@/i18n';
+import { MESSAGES } from '@/i18n/messages';
 import { success, warn } from '@/lib/haptics';
 import { withTap } from '@/lib/press';
-import { FAILURE_MESSAGE, failureMessage } from '@/lib/failure';
+import { failureMessage, failureText } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
 import { logoColumns, selectionLogo } from '@/lib/logo-columns';
 import { logoDomainOf, type LogoFields } from '@/lib/logo-domain';
@@ -66,18 +68,28 @@ type ScanField = 'store' | 'date' | 'amount' | 'card';
 
 type ScanResult = { read: ScanField[]; missed: ScanField[] };
 
-const FIELD_WORDS: Record<ScanField, string> = {
-  store: 'store',
-  date: 'date',
-  amount: 'amount',
-  card: 'card',
+const FIELD_WORDS: Record<ScanField, MessageKey> = {
+  store: 'receipts.scan.field.store',
+  date: 'receipts.scan.field.date',
+  amount: 'receipts.scan.field.amount',
+  card: 'receipts.scan.field.card',
 };
 
 /** "store, date and amount": no Oxford comma, because it is read aloud. */
 function listWords(fields: ScanField[]): string {
-  const words = fields.map((field) => FIELD_WORDS[field]);
+  const words = fields.map((field) => t(FIELD_WORDS[field]));
   if (words.length <= 1) return words[0] ?? '';
-  return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
+  return t('receipts.scan.and', {
+    first: words.slice(0, -1).join(', '),
+    last: words[words.length - 1],
+  });
+}
+
+/** A shop category's name by its stored id; an id the app has no words for keeps its stored label. */
+function categoryName(id: string, stored: string | undefined): string {
+  const key = `receipts.category.${id}`;
+  if (key in MESSAGES) return t(key as MessageKey);
+  return stored ?? t('receipts.category.other');
 }
 
 /**
@@ -177,12 +189,12 @@ export default function AddReceiptScreen() {
         <Screen showBack>
           <PageState
             art={artwork.error}
-            title={FAILURE_MESSAGE}
-            actionLabel="Try again"
+            title={failureText()}
+            actionLabel={t('common.tryAgain')}
             onAction={() => {
               void receipt.refetch();
             }}
-            secondaryLabel="Go back"
+            secondaryLabel={t('receipts.add.goBack')}
             onSecondary={() => router.back()}
           />
         </Screen>
@@ -193,12 +205,12 @@ export default function AddReceiptScreen() {
     if (!receipt.isFetched) {
       return (
         <StepFlow
-          title="Edit receipt"
-          closePrompt="Cancel editing this receipt?"
+          title={t('receipts.add.titleEdit')}
+          closePrompt={t('receipts.add.closeEdit')}
           steps={3}
           current={0}
           onBack={() => router.back()}
-          primaryLabel="Continue"
+          primaryLabel={t('common.continue')}
           primaryDisabled
           onPrimary={() => {}}
         >
@@ -217,8 +229,8 @@ export default function AddReceiptScreen() {
       <Screen showBack>
         <PageState
           art={artwork.error}
-          title={FAILURE_MESSAGE}
-          actionLabel="Go back"
+          title={failureText()}
+          actionLabel={t('receipts.add.goBack')}
           onAction={() => router.back()}
         />
       </Screen>
@@ -321,7 +333,10 @@ function ReceiptForm({
     };
 
   const categoryLabel = store
-    ? (categories.find((category) => category.id === store.categoryId)?.label ?? 'Other')
+    ? categoryName(
+        store.categoryId,
+        categories.find((category) => category.id === store.categoryId)?.label,
+      )
     : null;
 
   /** Turns recognised text into filled fields, leaving anything unsure alone. */
@@ -398,9 +413,8 @@ function ReceiptForm({
     // Scanning needs real hardware; say so rather than leave a button that silently does nothing.
     if (!isCaptureAvailable() && !isScanningAvailable()) {
       await ask({
-        title: 'Scanning needs a camera',
-        message:
-          'The Simulator has none, so scanning is unavailable here. Upload reads a photo or a PDF and works everywhere.',
+        title: t('receipts.scan.noCameraTitle'),
+        message: t('receipts.scan.noCameraMessage'),
         cancelLabel: null,
       });
       return;
@@ -442,7 +456,7 @@ function ReceiptForm({
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       setError({
-        message: 'Allow photo access in Settings to read a receipt from your library.',
+        message: t('receipts.scan.photoAccess'),
         step: 0,
       });
       return;
@@ -471,10 +485,10 @@ function ReceiptForm({
       return;
     }
     const where = await ask({
-      title: 'Where is the receipt?',
+      title: t('receipts.scan.whereTitle'),
       actions: [
-        { id: 'photos', label: 'Photo library' },
-        { id: 'files', label: 'Files' },
+        { id: 'photos', label: t('receipts.scan.photoLibrary') },
+        { id: 'files', label: t('receipts.scan.files') },
       ],
     });
 
@@ -538,9 +552,9 @@ function ReceiptForm({
   const handleDelete = async () => {
     if (!id) return;
     const ok = await confirm({
-      title: 'Delete this receipt?',
-      message: 'This cannot be undone.',
-      confirmLabel: 'Delete',
+      title: t('receipts.add.deleteTitle'),
+      message: t('receipts.add.deleteMessage'),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -559,9 +573,16 @@ function ReceiptForm({
   const amountReady = Number.isFinite(total) && total > 0;
   const stepValid = step === 0 ? amountReady : step === 1 ? Boolean(store) : !busy;
 
-  const question = step === 0 ? 'How much did you spend?' : step === 2 ? 'When was it?' : undefined;
+  const question =
+    step === 0 ? t('receipts.add.askAmount') : step === 2 ? t('receipts.add.askDate') : undefined;
   const primaryLabel =
-    step < 2 ? 'Continue' : busy ? 'Saving…' : editing ? 'Save changes' : 'Save receipt';
+    step < 2
+      ? t('common.continue')
+      : busy
+        ? t('receipts.add.saving')
+        : editing
+          ? t('receipts.add.saveChanges')
+          : t('receipts.add.saveReceipt');
   const stepError = error && error.step === step ? error.message : null;
   // A new scanned receipt shows what was read above the date, so the last step is a review.
   const reviewing =
@@ -570,8 +591,8 @@ function ReceiptForm({
 
   return (
     <StepFlow
-      title={editing ? 'Edit receipt' : 'Add a receipt'}
-      closePrompt={editing ? 'Cancel editing this receipt?' : 'Cancel adding this receipt?'}
+      title={editing ? t('receipts.add.titleEdit') : t('receipts.add.titleNew')}
+      closePrompt={editing ? t('receipts.add.closeEdit') : t('receipts.add.closeNew')}
       steps={3}
       current={step}
       onBack={() => {
@@ -588,16 +609,16 @@ function ReceiptForm({
               <View className="w-full flex-row gap-3">
                 <CaptureButton
                   icon={ScanLine}
-                  label="Scan"
-                  hint="Point the camera at a paper receipt"
+                  label={t('receipts.scan.scan')}
+                  hint={t('receipts.scan.scanHint')}
                   onPress={handleScan}
                   disabled={reading || !ready}
                   proBadge={ready && !pro}
                 />
                 <CaptureButton
                   icon={ImageUp}
-                  label="Upload"
-                  hint="Upload a photo or PDF of a receipt"
+                  label={t('receipts.scan.upload')}
+                  hint={t('receipts.scan.uploadHint')}
                   onPress={handleUpload}
                   disabled={reading || !ready}
                   proBadge={ready && !pro}
@@ -609,7 +630,7 @@ function ReceiptForm({
               <View className="mt-2 w-full flex-row items-center justify-center gap-2">
                 <ActivityIndicator size="small" color={colors.muted} />
                 <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-                  Reading the receipt…
+                  {t('receipts.scan.reading')}
                 </Text>
               </View>
             ) : null}
@@ -618,11 +639,11 @@ function ReceiptForm({
               <View className="mt-2 w-full rounded-[16px] bg-ink/5 px-4 py-3">
                 {scanResult.read.length > 0 ? (
                   <Text className="font-app text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
-                    Read the {listWords(scanResult.read)}.
+                    {t('receipts.scan.read', { fields: listWords(scanResult.read) })}
                   </Text>
                 ) : (
                   <Text className="font-app text-[13px] text-ink" maxFontSizeMultiplier={1.4}>
-                    {FAILURE_MESSAGE}
+                    {failureText()}
                   </Text>
                 )}
                 {scanResult.missed.length > 0 ? (
@@ -630,7 +651,7 @@ function ReceiptForm({
                     className="mt-1 font-app text-[13px] text-muted"
                     maxFontSizeMultiplier={1.4}
                   >
-                    Check the {listWords(scanResult.missed)} below — it will save either way.
+                    {t('receipts.scan.check', { fields: listWords(scanResult.missed) })}
                   </Text>
                 ) : null}
               </View>
@@ -639,7 +660,7 @@ function ReceiptForm({
             {reviewing ? (
               <View className="mt-2 w-full overflow-hidden rounded-[16px] border border-line bg-card py-1">
                 <ReviewRow
-                  label="Amount"
+                  label={t('receipts.field.amount')}
                   value={amountReady ? formatCurrency(total) : null}
                   required
                   leading={<GlyphWell icon={Banknote} />}
@@ -647,7 +668,7 @@ function ReceiptForm({
                 />
                 <View className="ml-[52px] h-px bg-line/60" />
                 <ReviewRow
-                  label="Store"
+                  label={t('receipts.field.store')}
                   value={store?.name ?? null}
                   required
                   leading={
@@ -664,7 +685,7 @@ function ReceiptForm({
                 />
                 <View className="ml-[52px] h-px bg-line/60" />
                 <ReviewRow
-                  label="Paid with"
+                  label={t('receipts.field.paidWith')}
                   value={sourceLabel}
                   required={false}
                   leading={<GlyphWell icon={CreditCard} />}
@@ -691,13 +712,15 @@ function ReceiptForm({
         editing ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Delete this receipt"
+            accessibilityLabel={t('receipts.add.deleteLabel')}
             onPress={handleDelete}
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
             <Text className="font-app-medium text-[15px] text-danger" maxFontSizeMultiplier={1.4}>
-              {deleteReceipt.isPending ? 'Deleting…' : 'Delete receipt'}
+              {deleteReceipt.isPending
+                ? t('receipts.add.deleting')
+                : t('receipts.add.deleteReceipt')}
             </Text>
           </Pressable>
         ) : null
@@ -708,7 +731,7 @@ function ReceiptForm({
       {step === 1 ? (
         <View className="w-full gap-6">
           <BrandField
-            label="Store"
+            label={t('receipts.field.store')}
             value={store}
             onChange={edited(setStore)}
             onChangeLogo={
@@ -720,17 +743,17 @@ function ReceiptForm({
 
           {sources.length > 0 ? (
             <View className="w-full">
-              <FieldLabel className="mb-3">Paid with</FieldLabel>
+              <FieldLabel className="mb-3">{t('receipts.field.paidWith')}</FieldLabel>
               <SourceTiles sources={sources} value={sourceId} onChange={edited(setSourceId)} />
             </View>
           ) : null}
 
           <TextField
-            label="Note"
+            label={t('receipts.field.note')}
             optional
             value={note}
             onChangeText={setNote}
-            placeholder="Anything worth remembering"
+            placeholder={t('receipts.add.notePlaceholder')}
             multiline
             maxLength={200}
             autoCapitalize="sentences"
@@ -738,7 +761,7 @@ function ReceiptForm({
 
           {categoryLabel ? (
             <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-              Filed under {categoryLabel}
+              {t('receipts.add.filedUnder', { category: categoryLabel })}
             </Text>
           ) : null}
 
@@ -779,7 +802,7 @@ function CaptureButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityHint={proBadge ? `${hint}. Part of Skip Pro.` : hint}
+      accessibilityHint={proBadge ? t('receipts.scan.proHint', { hint }) : hint}
       accessibilityState={{ disabled }}
       onPress={withTap(onPress)}
       disabled={disabled}

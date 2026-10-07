@@ -78,7 +78,11 @@ jest.mock('@/api/auth', () => ({
 
 jest.mock('@/lib/nav', () => ({ resetTo: jest.fn() }));
 
-jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: false }) }));
+// No store answer: the price line falls back to the US dollar labels.
+jest.mock('@/api/pro', () => ({
+  usePro: () => ({ pro: false }),
+  useProPrices: () => ({ data: undefined }),
+}));
 
 jest.mock('@/lib/pro-bypass', () => ({
   useProOverride: () => 'off',
@@ -231,7 +235,7 @@ describe('Settings, the main page', () => {
 });
 
 describe('Settings, Preferences', () => {
-  it('shows exactly its four items, each with its small line and control', async () => {
+  it('shows exactly its six items, each with its small line and control', async () => {
     const screen = await render(<PreferencesScreen />);
 
     expect(textsOf(screen)).toEqual([
@@ -241,6 +245,21 @@ describe('Settings, Preferences', () => {
       'Light',
       'Dark',
       'System',
+      'Language',
+      'English',
+      'Same as my phone',
+      'English',
+      'Español',
+      'Français',
+      'Currency',
+      'US dollar · $1,234.56',
+      'Same as my phone',
+      'US dollar (USD $)',
+      'Pound sterling (GBP £)',
+      'Canadian dollar (CAD $)',
+      'Mexican peso (MXN $)',
+      'Australian dollar (AUD $)',
+      'This changes how amounts are shown. It does not convert them.',
       'Haptics',
       'A tap when you press something',
       'App lock',

@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { affixGap, displayAmount } from '@/components/flow/amount-figure';
 import { Button } from '@/components/ui/button';
+import { currencyMark, numberMarks, t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { roundMoney } from '@/lib/money';
 import { useColors } from '@/providers/theme-provider';
@@ -18,6 +20,7 @@ type CalculatorPadProps = {
 type Operator = '+' | '-' | '*' | '/';
 
 type Key = {
+  /** What a digit key appends. The dot key's face is the language's decimal mark; this stays '.'. */
   label: string;
   action: 'digit' | 'dot' | 'operator' | 'equals' | 'clear' | 'delete';
   operator?: Operator;
@@ -57,19 +60,12 @@ const ROWS: Key[][] = [
 
 const SYMBOLS: Record<Operator, string> = { '+': '+', '-': '−', '*': '×', '/': '÷' };
 
-function group(raw: string): string {
-  if (raw === '') return '0';
-  const [whole, fraction] = raw.split('.');
-  const grouped = (whole || '0').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return fraction === undefined ? grouped : `${grouped}.${fraction}`;
-}
-
 /**
  * Figure size comes from the glyph count, not `adjustsFontSizeToFit` (same iOS first-layout-pass bug
  * and fix as `amountFigureBand` in components/flow/amount-figure): the pad opens over a field that
  * already has a value. Sizes use measured advances of the app font's bold so each band fits an
  * iPhone SE (327pt inside the pad's px-6). `affixTop` = 0.268 x (size - affixSize), to the half
- * point, levels the "$" cap with the digits.
+ * point, levels the currency mark's cap with the digits.
  *
  * There is no digit cap here, so the last band is a floor: past about 18 digits the figure ellipsises.
  */
@@ -87,16 +83,14 @@ export function calculatorFigureBand(display: string) {
 
 /**
  * Four-function calculator for amount fields. A running accumulator, not an expression parser, like a
- * pocket calculator; every intermediate result is rounded to cents.
+ * pocket calculator; every intermediate result is rounded to cents. Operands and results stay ASCII
+ * strings with a "." in every language; only the figure and the dot key are drawn in its marks.
  */
-export function CalculatorPad({
-  title = 'Calculator',
-  value,
-  onCancel,
-  onConfirm,
-}: CalculatorPadProps) {
+export function CalculatorPad({ title, value, onCancel, onConfirm }: CalculatorPadProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const mark = currencyMark();
+  const { decimal } = numberMarks();
 
   const [current, setCurrent] = useState(value);
   const [accumulator, setAccumulator] = useState<number | null>(null);
@@ -167,7 +161,7 @@ export function CalculatorPad({
     const result = applyPending(operand);
 
     if (result === null) {
-      setError('Cannot divide by zero');
+      setError(t('loan.calcPad.divideByZero'));
       setCurrent('');
       setAccumulator(null);
       setPending(null);
@@ -192,8 +186,22 @@ export function CalculatorPad({
 
   const shown = current === '' ? (accumulator !== null ? String(accumulator) : '') : current;
   const isEmpty = shown === '' || Number(shown) === 0;
-  const shownFigure = group(shown);
+  const shownFigure = displayAmount(shown);
   const figure = calculatorFigureBand(shownFigure);
+
+  const currencyAffix = (gap: number) => (
+    <Text
+      allowFontScaling={false}
+      style={{
+        fontSize: figure.affixSize,
+        marginTop: figure.affixTop,
+        ...(gap ? { marginLeft: gap } : null),
+      }}
+      className={cn('font-app-bold', isEmpty ? 'text-muted' : 'text-body')}
+    >
+      {mark.symbol}
+    </Text>
+  );
 
   const handleDone = () => {
     // Settle any half-finished operation so Done never discards a pending sum.
@@ -211,7 +219,7 @@ export function CalculatorPad({
         <View className="flex-row items-center px-4 py-2">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Back"
+            accessibilityLabel={t('common.back')}
             hitSlop={8}
             onPress={onCancel}
             className="h-11 w-11 items-center justify-center rounded-[12px] active:bg-ink/5"
@@ -222,7 +230,7 @@ export function CalculatorPad({
             className="flex-1 pr-11 text-center font-app-semibold text-[18px] text-ink"
             maxFontSizeMultiplier={1.2}
           >
-            {title}
+            {title ?? t('loan.calcPad.title')}
           </Text>
         </View>
 
@@ -234,18 +242,12 @@ export function CalculatorPad({
           >
             {error ??
               (pending && accumulator !== null
-                ? `${group(String(accumulator))} ${SYMBOLS[pending]}`
+                ? `${displayAmount(String(accumulator))} ${SYMBOLS[pending]}`
                 : ' ')}
           </Text>
 
           <View className="mt-1 flex-row items-start">
-            <Text
-              allowFontScaling={false}
-              style={{ fontSize: figure.affixSize, marginTop: figure.affixTop }}
-              className={cn('font-app-bold', isEmpty ? 'text-muted' : 'text-body')}
-            >
-              $
-            </Text>
+            {mark.after ? null : currencyAffix(0)}
             <Text
               allowFontScaling={false}
               style={{ fontSize: figure.size }}
@@ -254,6 +256,7 @@ export function CalculatorPad({
             >
               {shownFigure}
             </Text>
+            {mark.after ? currencyAffix(affixGap(figure.affixSize, true)) : null}
           </View>
         </View>
 
@@ -269,7 +272,13 @@ export function CalculatorPad({
                   <View key={key.label} style={{ flex: key.span ?? 1 }} className="p-1.5">
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={key.action === 'delete' ? 'Delete' : key.label}
+                      accessibilityLabel={
+                        key.action === 'delete'
+                          ? t('common.delete')
+                          : key.action === 'dot'
+                            ? decimal
+                            : key.label
+                      }
                       onPress={() => press(key)}
                       className={cn(
                         'h-[64px] items-center justify-center rounded-[12px] border',
@@ -292,7 +301,7 @@ export function CalculatorPad({
                             isEquals || isActiveOperator ? 'text-on-control' : 'text-ink',
                           )}
                         >
-                          {key.label}
+                          {key.action === 'dot' ? decimal : key.label}
                         </Text>
                       )}
                     </Pressable>
@@ -304,7 +313,7 @@ export function CalculatorPad({
         </View>
 
         <View className="px-5 pt-3">
-          <Button label="Done" onPress={handleDone} />
+          <Button label={t('common.done')} onPress={handleDone} />
         </View>
       </View>
     </Modal>

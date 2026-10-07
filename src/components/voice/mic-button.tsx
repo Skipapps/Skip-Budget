@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { t } from '@/i18n';
 import { contrast } from '@/lib/tone';
 import { useTheme } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
@@ -88,7 +89,7 @@ export function MicButton({
       <Animated.View style={buttonStyle}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Record"
+          accessibilityLabel={t('voice.mic.label')}
           accessibilityHint={accessibilityHint}
           accessibilityState={{ selected: held }}
           hitSlop={8}

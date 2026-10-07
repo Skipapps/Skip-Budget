@@ -3,34 +3,32 @@ import { Fragment } from 'react';
 import { Text, View } from 'react-native';
 
 import { ProportionBar } from '@/components/calculators/proportion-bar';
+import { loanRateText, loanTermText } from '@/components/calculators/schedule-card';
 import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { Subtitle } from '@/components/ui/typography';
+import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import {
-  amortise,
-  formatTerm,
-  scheduleByYear,
-  type AccrualBasis,
-  type ScheduleRow,
-} from '@/lib/loan';
+import { amortise, scheduleByYear, type AccrualBasis, type ScheduleRow } from '@/lib/loan';
 
 /** Only the app's own conventions get through a hand-edited link. */
 const BASES: readonly AccrualBasis[] = ['actual/365', 'actual/360', '30/360', 'monthly'];
 const parseBasis = (value: string | undefined): AccrualBasis =>
   BASES.find((basis) => basis === value) ?? 'actual/365';
 
-const BASIS_FOOTNOTES: Record<AccrualBasis, string> = {
-  'actual/365':
-    'Interest accrues daily on what is still owed, so a 31-day month costs more than a 28-day one.',
-  'actual/360':
-    'Interest accrues daily on what is still owed, over a 360-day year, so a full year costs a little more than the quoted rate.',
-  '30/360':
-    'Every month is counted as 30 days and every year as 360, so every period costs the same.',
-  monthly:
-    'Interest is charged in monthly rests — one twelfth of the annual rate on what is still owed — so February costs the same as March. Any odd days before the first payment are charged on top, by the day.',
-};
+function basisFootnote(basis: AccrualBasis): string {
+  switch (basis) {
+    case 'actual/365':
+      return t('loan.basisFootnote.actual365');
+    case 'actual/360':
+      return t('loan.basisFootnote.actual360');
+    case '30/360':
+      return t('loan.basisFootnote.thirty360');
+    case 'monthly':
+      return t('loan.basisFootnote.monthly');
+  }
+}
 
 /** Every payment and where it goes, grouped by year (a thirty-year loan is 360 rows). */
 export default function LoanScheduleScreen() {
@@ -84,12 +82,17 @@ function LoanScheduleScreenInner() {
   });
   const rows = loan.rows;
   const years = scheduleByYear(rows);
+  const footnote = basisFootnote(basis);
+  const overpaid = extraMonthly > 0 || lumpAmount > 0;
 
   return (
-    <Screen title={params.name || 'Payment schedule'} showBack>
+    <Screen title={params.name || t('loan.schedule.title')} showBack>
       <Subtitle className="mt-3">
-        {formatCurrency(loan.payment)} a month for {formatTerm(rows.length)}, at {annualRate}%.{' '}
-        {BASIS_FOOTNOTES[basis]}
+        {`${t('loan.schedule.summary', {
+          payment: formatCurrency(loan.payment),
+          term: loanTermText(rows.length),
+          rate: loanRateText(annualRate),
+        })} ${footnote}`}
       </Subtitle>
 
       <View className="mt-6 w-full rounded-[16px] border border-line bg-card px-4 py-4">
@@ -103,7 +106,10 @@ function LoanScheduleScreenInner() {
               {year.year}
             </Text>
             <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-              {formatCurrency(year.interest)} interest · {formatCurrency(year.principal)} off
+              {t('loan.schedule.yearSplit', {
+                interest: formatCurrency(year.interest),
+                principal: formatCurrency(year.principal),
+              })}
             </Text>
           </View>
 
@@ -119,22 +125,35 @@ function LoanScheduleScreenInner() {
         className="mb-10 mt-8 w-full text-center font-app text-[12px] leading-[18px] text-muted"
         maxFontSizeMultiplier={1.4}
       >
-        {BASIS_FOOTNOTES[basis]} Assumes every payment lands on time and the rate never moves —
-        paying late costs the extra days.
-        {extraMonthly > 0 || lumpAmount > 0
-          ? ' The overpayments you set are already in these rows, which is why the schedule ends early.'
-          : ' Paying extra against the balance shortens the term.'}
+        {`${footnote} ${t('loan.schedule.assumes')} ${t(
+          overpaid ? 'loan.schedule.overpaidNote' : 'loan.schedule.payExtraNote',
+        )}`}
       </Text>
     </Screen>
   );
 }
 
 function PaymentRow({ row }: { row: ScheduleRow }) {
+  const date = formatFullDate(new Date(`${row.date}T00:00:00`));
+  const figures = {
+    number: row.number,
+    date,
+    count: row.days,
+    payment: formatCurrency(row.payment),
+    interest: formatCurrency(row.interest),
+    principal: formatCurrency(row.principal),
+    balance: formatCurrency(row.balance),
+  };
+
   return (
     <View
       className="w-full py-3"
       accessible
-      accessibilityLabel={`Payment ${row.number}, ${formatFullDate(new Date(`${row.date}T00:00:00`))}, covering ${row.days} days. ${formatCurrency(row.payment)}: ${formatCurrency(row.interest)} interest, ${formatCurrency(row.principal)} off the balance${row.extra > 0 ? `, including ${formatCurrency(row.extra)} paid extra` : ''}. ${formatCurrency(row.balance)} left.`}
+      accessibilityLabel={
+        row.extra > 0
+          ? t('loan.schedule.rowA11yExtra', { ...figures, extra: formatCurrency(row.extra) })
+          : t('loan.schedule.rowA11y', figures)
+      }
     >
       <View className="w-full flex-row items-baseline justify-between gap-3">
         <Text
@@ -142,7 +161,7 @@ function PaymentRow({ row }: { row: ScheduleRow }) {
           numberOfLines={1}
           maxFontSizeMultiplier={1.3}
         >
-          {row.number}. {formatFullDate(new Date(`${row.date}T00:00:00`))}
+          {row.number}. {date}
         </Text>
         <Text className="font-app-semibold text-[14px] text-ink" maxFontSizeMultiplier={1.3}>
           {formatCurrency(row.payment)}
@@ -156,11 +175,20 @@ function PaymentRow({ row }: { row: ScheduleRow }) {
 
       <View className="mt-1.5 w-full flex-row items-center justify-between gap-3">
         <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-          {formatCurrency(row.principal)} off · {formatCurrency(row.interest)} interest
-          {row.extra > 0 ? ` · ${formatCurrency(row.extra)} extra` : ` · ${row.days}d`}
+          {row.extra > 0
+            ? t('loan.schedule.rowSplitExtra', {
+                principal: figures.principal,
+                interest: figures.interest,
+                extra: formatCurrency(row.extra),
+              })
+            : t('loan.schedule.rowSplitDays', {
+                principal: figures.principal,
+                interest: figures.interest,
+                days: row.days,
+              })}
         </Text>
         <Text className="font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-          {formatCurrency(row.balance)} left
+          {t('loan.schedule.left', { amount: figures.balance })}
         </Text>
       </View>
     </View>

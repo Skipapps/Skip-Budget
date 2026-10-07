@@ -11,6 +11,7 @@ import {
 import type { ReactNode } from 'react';
 
 import { ConfirmDialog, type DialogRequest } from '@/components/ui/confirm-dialog';
+import { t } from '@/i18n';
 
 /** Resolves to the chosen action's id, or null when the user backed out. */
 type Ask = (request: DialogRequest) => Promise<string | null>;
@@ -85,7 +86,7 @@ export function useConfirm() {
       const choice = await ask({
         title: options.title,
         message: options.message,
-        cancelLabel: options.cancelLabel ?? 'Cancel',
+        cancelLabel: options.cancelLabel ?? t('common.cancel'),
         actions: [{ id: 'confirm', label: options.confirmLabel, destructive: options.destructive }],
       });
       return choice === 'confirm';

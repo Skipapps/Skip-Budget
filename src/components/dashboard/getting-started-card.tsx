@@ -4,6 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { SectionHeading } from '@/components/ui/typography';
 import { useGettingStarted } from '@/api/onboarding';
+import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
 
@@ -21,17 +22,17 @@ export function GettingStartedCard() {
     <View className="mt-6 w-full rounded-[16px] border border-line bg-card p-5">
       <View className="w-full flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">
-          <SectionHeading>Getting started</SectionHeading>
+          <SectionHeading>{t('onboarding.gettingStarted.title')}</SectionHeading>
           <Text
             className="mt-0.5 font-app text-[12px] text-muted"
             maxFontSizeMultiplier={TEXT_CAP.heading}
           >
-            {doneCount} of {steps.length} done
+            {t('onboarding.gettingStarted.progress', { done: doneCount, total: steps.length })}
           </Text>
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Hide the getting started card"
+          accessibilityLabel={t('onboarding.gettingStarted.hide')}
           onPress={dismiss}
           hitSlop={8}
           className="h-9 w-9 items-center justify-center rounded-full active:bg-ink/5"
@@ -54,7 +55,11 @@ export function GettingStartedCard() {
               key={step.id}
               accessibilityRole="button"
               accessibilityState={{ disabled: step.done }}
-              accessibilityLabel={step.done ? `${step.title}. Done.` : step.title}
+              accessibilityLabel={
+                step.done
+                  ? t('onboarding.gettingStarted.stepDone', { title: step.title })
+                  : step.title
+              }
               // Not drawn (titles only) but still said, so VoiceOver keeps the why behind each
               // step.
               accessibilityHint={step.done ? undefined : step.detail}
@@ -89,7 +94,7 @@ export function GettingStartedCard() {
                       className="shrink-0 font-app text-[11px] text-muted"
                       maxFontSizeMultiplier={TEXT_CAP.row}
                     >
-                      Optional
+                      {t('common.optional')}
                     </Text>
                   ) : null}
                 </View>
