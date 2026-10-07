@@ -1,0 +1,1891 @@
+{
+  "source": "supabase/migrations/20260930100001_brands_samsung.sql",
+  "note": "Rows of the newest brand sync migration, in useBrandDirectory order (rank, highest first). Regenerate when a brand migration lands.",
+  "brands": [
+    {
+      "name": "Amazon",
+      "aliases": [
+        "amzn",
+        "amazon.ca",
+        "amazon music unlimited",
+        "amazon music",
+        "amazon prime",
+        "prime",
+        "kindle unlimited",
+        "kindle",
+        "amazon prime video",
+        "prime video"
+      ],
+      "domain": "amazon.com"
+    },
+    {
+      "name": "Walmart",
+      "aliases": ["wal mart", "wm supercenter", "walmart+", "walmart plus", "walmart pharmacy"],
+      "domain": "walmart.com"
+    },
+    {
+      "name": "T-Mobile",
+      "aliases": ["tmobile", "t mobile"],
+      "domain": "t-mobile.com"
+    },
+    {
+      "name": "Verizon",
+      "aliases": ["verizon wireless"],
+      "domain": "verizon.com"
+    },
+    {
+      "name": "AT&T",
+      "aliases": ["at&t", "atandt"],
+      "domain": "att.com"
+    },
+    {
+      "name": "Netflix",
+      "aliases": [],
+      "domain": "netflix.com"
+    },
+    {
+      "name": "Spotify",
+      "aliases": [],
+      "domain": "spotify.com"
+    },
+    {
+      "name": "Costco",
+      "aliases": ["costco membership", "costco pharmacy"],
+      "domain": "costco.com"
+    },
+    {
+      "name": "McDonald's",
+      "aliases": ["mcdonalds", "mc donalds", "mcd"],
+      "domain": "mcdonalds.com"
+    },
+    {
+      "name": "Starbucks",
+      "aliases": [],
+      "domain": "starbucks.com"
+    },
+    {
+      "name": "Target",
+      "aliases": [],
+      "domain": "target.com"
+    },
+    {
+      "name": "Tim Hortons",
+      "aliases": ["tims", "tim horton"],
+      "domain": "timhortons.com"
+    },
+    {
+      "name": "Xfinity",
+      "aliases": ["comcast"],
+      "domain": "xfinity.com"
+    },
+    {
+      "name": "GEICO",
+      "aliases": [],
+      "domain": "geico.com"
+    },
+    {
+      "name": "State Farm",
+      "aliases": [],
+      "domain": "statefarm.com"
+    },
+    {
+      "name": "Chase",
+      "aliases": ["jpmorgan chase"],
+      "domain": "chase.com"
+    },
+    {
+      "name": "Bank of America",
+      "aliases": ["bofa"],
+      "domain": "bankofamerica.com"
+    },
+    {
+      "name": "The Home Depot",
+      "aliases": ["home depot"],
+      "domain": "homedepot.com"
+    },
+    {
+      "name": "AEP",
+      "aliases": ["american electric power", "aep ohio", "aep texas"],
+      "domain": "aep.com"
+    },
+    {
+      "name": "Duke Energy",
+      "aliases": ["duke"],
+      "domain": "duke-energy.com"
+    },
+    {
+      "name": "Spectrum",
+      "aliases": ["charter"],
+      "domain": "spectrum.com"
+    },
+    {
+      "name": "Progressive",
+      "aliases": [],
+      "domain": "progressive.com"
+    },
+    {
+      "name": "Wells Fargo",
+      "aliases": [],
+      "domain": "wellsfargo.com"
+    },
+    {
+      "name": "Capital One",
+      "aliases": [],
+      "domain": "capitalone.com"
+    },
+    {
+      "name": "American Express",
+      "aliases": ["amex"],
+      "domain": "americanexpress.com"
+    },
+    {
+      "name": "Disney+",
+      "aliases": ["disney plus", "disney"],
+      "domain": "disneyplus.com"
+    },
+    {
+      "name": "Kroger",
+      "aliases": ["kroger pharmacy"],
+      "domain": "kroger.com"
+    },
+    {
+      "name": "Loblaws",
+      "aliases": [],
+      "domain": "loblaws.ca"
+    },
+    {
+      "name": "No Frills",
+      "aliases": ["nofrills"],
+      "domain": "nofrills.ca"
+    },
+    {
+      "name": "CVS",
+      "aliases": ["cvs pharmacy"],
+      "domain": "cvs.com"
+    },
+    {
+      "name": "Walgreens",
+      "aliases": [],
+      "domain": "walgreens.com"
+    },
+    {
+      "name": "Shoppers Drug Mart",
+      "aliases": ["shoppers"],
+      "domain": "shoppersdrugmart.ca"
+    },
+    {
+      "name": "Lowe's",
+      "aliases": ["lowes"],
+      "domain": "lowes.com"
+    },
+    {
+      "name": "Best Buy",
+      "aliases": ["bestbuy"],
+      "domain": "bestbuy.com"
+    },
+    {
+      "name": "Apple",
+      "aliases": [
+        "apple store",
+        "apple",
+        "apple tv+",
+        "apple tv plus",
+        "apple music",
+        "apple podcasts",
+        "apple arcade",
+        "icloud+",
+        "icloud",
+        "apple fitness+",
+        "apple fitness plus",
+        "apple news+",
+        "apple news plus"
+      ],
+      "domain": "apple.com"
+    },
+    {
+      "name": "Shell",
+      "aliases": [],
+      "domain": "shell.com"
+    },
+    {
+      "name": "Chick-fil-A",
+      "aliases": ["chick fil a", "chickfila"],
+      "domain": "chick-fil-a.com"
+    },
+    {
+      "name": "PG&E",
+      "aliases": ["pacific gas and electric", "pacific gas"],
+      "domain": "pge.com"
+    },
+    {
+      "name": "Allstate",
+      "aliases": [],
+      "domain": "allstate.com"
+    },
+    {
+      "name": "Discover",
+      "aliases": [],
+      "domain": "discover.com"
+    },
+    {
+      "name": "Citi",
+      "aliases": ["citibank"],
+      "domain": "citi.com"
+    },
+    {
+      "name": "Hulu",
+      "aliases": [],
+      "domain": "hulu.com"
+    },
+    {
+      "name": "HBO Max",
+      "aliases": ["max", "hbo"],
+      "domain": "hbomax.com"
+    },
+    {
+      "name": "YouTube",
+      "aliases": ["youtube premium", "youtube tv", "youtube music"],
+      "domain": "youtube.com"
+    },
+    {
+      "name": "ChatGPT",
+      "aliases": ["openai"],
+      "domain": "openai.com"
+    },
+    {
+      "name": "Canadian Tire",
+      "aliases": ["canadian tire gas", "ct gas"],
+      "domain": "canadiantire.ca"
+    },
+    {
+      "name": "Publix",
+      "aliases": ["publix pharmacy"],
+      "domain": "publix.com"
+    },
+    {
+      "name": "Aldi",
+      "aliases": [],
+      "domain": "aldi.us"
+    },
+    {
+      "name": "Trader Joe's",
+      "aliases": ["trader joes"],
+      "domain": "traderjoes.com"
+    },
+    {
+      "name": "Whole Foods Market",
+      "aliases": ["whole foods"],
+      "domain": "wholefoodsmarket.com"
+    },
+    {
+      "name": "Real Canadian Superstore",
+      "aliases": ["superstore"],
+      "domain": "realcanadiansuperstore.ca"
+    },
+    {
+      "name": "Sobeys",
+      "aliases": [],
+      "domain": "sobeys.com"
+    },
+    {
+      "name": "Nike",
+      "aliases": [],
+      "domain": "nike.com"
+    },
+    {
+      "name": "7-Eleven",
+      "aliases": ["7 eleven", "seven eleven"],
+      "domain": "7-eleven.com"
+    },
+    {
+      "name": "Subway",
+      "aliases": [],
+      "domain": "subway.com"
+    },
+    {
+      "name": "Dunkin'",
+      "aliases": ["dunkin", "dunkin donuts"],
+      "domain": "dunkindonuts.com"
+    },
+    {
+      "name": "Taco Bell",
+      "aliases": [],
+      "domain": "tacobell.com"
+    },
+    {
+      "name": "Wendy's",
+      "aliases": ["wendys"],
+      "domain": "wendys.com"
+    },
+    {
+      "name": "Burger King",
+      "aliases": ["bk"],
+      "domain": "bk.com"
+    },
+    {
+      "name": "Chipotle",
+      "aliases": [],
+      "domain": "chipotle.com"
+    },
+    {
+      "name": "Dominion Energy",
+      "aliases": ["dominion"],
+      "domain": "dominionenergy.com"
+    },
+    {
+      "name": "Xcel Energy",
+      "aliases": ["xcel"],
+      "domain": "xcelenergy.com"
+    },
+    {
+      "name": "Con Edison",
+      "aliases": ["coned", "consolidated edison"],
+      "domain": "coned.com"
+    },
+    {
+      "name": "USAA",
+      "aliases": [],
+      "domain": "usaa.com"
+    },
+    {
+      "name": "Xbox",
+      "aliases": ["xbox game pass", "game pass", "xbox"],
+      "domain": "xbox.com"
+    },
+    {
+      "name": "PlayStation",
+      "aliases": ["playstation plus", "ps plus", "playstation"],
+      "domain": "playstation.com"
+    },
+    {
+      "name": "Google",
+      "aliases": ["google one", "google play pass"],
+      "domain": "one.google.com"
+    },
+    {
+      "name": "Microsoft",
+      "aliases": ["microsoft 365", "office 365", "office"],
+      "domain": "microsoft.com"
+    },
+    {
+      "name": "Planet Fitness",
+      "aliases": [],
+      "domain": "planetfitness.com"
+    },
+    {
+      "name": "The New York Times",
+      "aliases": ["nyt", "new york times"],
+      "domain": "nytimes.com"
+    },
+    {
+      "name": "Dollarama",
+      "aliases": [],
+      "domain": "dollarama.com"
+    },
+    {
+      "name": "Safeway",
+      "aliases": ["safeway canada"],
+      "domain": "safeway.com"
+    },
+    {
+      "name": "Metro",
+      "aliases": [],
+      "domain": "metro.ca"
+    },
+    {
+      "name": "IKEA",
+      "aliases": [],
+      "domain": "ikea.com"
+    },
+    {
+      "name": "Samsung",
+      "aliases": ["samsung electronics", "galaxy", "samsung galaxy"],
+      "domain": "samsung.com"
+    },
+    {
+      "name": "Sephora",
+      "aliases": [],
+      "domain": "sephora.com"
+    },
+    {
+      "name": "Circle K",
+      "aliases": [],
+      "domain": "circlek.com"
+    },
+    {
+      "name": "Exxon",
+      "aliases": [],
+      "domain": "exxon.com"
+    },
+    {
+      "name": "Chevron",
+      "aliases": [],
+      "domain": "chevron.com"
+    },
+    {
+      "name": "Petro-Canada",
+      "aliases": ["petro canada"],
+      "domain": "petro-canada.ca"
+    },
+    {
+      "name": "Esso",
+      "aliases": [],
+      "domain": "esso.ca"
+    },
+    {
+      "name": "Domino's",
+      "aliases": ["dominos"],
+      "domain": "dominos.com"
+    },
+    {
+      "name": "KFC",
+      "aliases": ["kentucky fried chicken"],
+      "domain": "kfc.com"
+    },
+    {
+      "name": "National Grid",
+      "aliases": [],
+      "domain": "nationalgrid.com"
+    },
+    {
+      "name": "Florida Power & Light",
+      "aliases": ["fpl", "florida power and light"],
+      "domain": "fpl.com"
+    },
+    {
+      "name": "Southern California Edison",
+      "aliases": ["sce", "socal edison"],
+      "domain": "sce.com"
+    },
+    {
+      "name": "Cox",
+      "aliases": ["cox communications"],
+      "domain": "cox.com"
+    },
+    {
+      "name": "Liberty Mutual",
+      "aliases": [],
+      "domain": "libertymutual.com"
+    },
+    {
+      "name": "Peacock",
+      "aliases": [],
+      "domain": "peacocktv.com"
+    },
+    {
+      "name": "Paramount+",
+      "aliases": ["paramount plus"],
+      "domain": "paramountplus.com"
+    },
+    {
+      "name": "Audible",
+      "aliases": [],
+      "domain": "audible.com"
+    },
+    {
+      "name": "Nintendo",
+      "aliases": ["nintendo switch online", "nintendo"],
+      "domain": "nintendo.com"
+    },
+    {
+      "name": "Adobe",
+      "aliases": ["adobe creative cloud", "adobe"],
+      "domain": "adobe.com"
+    },
+    {
+      "name": "Claude",
+      "aliases": ["anthropic"],
+      "domain": "claude.ai"
+    },
+    {
+      "name": "HelloFresh",
+      "aliases": ["hello fresh"],
+      "domain": "hellofresh.com"
+    },
+    {
+      "name": "Dollar General",
+      "aliases": [],
+      "domain": "dollargeneral.com"
+    },
+    {
+      "name": "Albertsons",
+      "aliases": [],
+      "domain": "albertsons.com"
+    },
+    {
+      "name": "H-E-B",
+      "aliases": ["heb"],
+      "domain": "heb.com"
+    },
+    {
+      "name": "FreshCo",
+      "aliases": ["fresh co"],
+      "domain": "freshco.com"
+    },
+    {
+      "name": "Macy's",
+      "aliases": ["macys"],
+      "domain": "macys.com"
+    },
+    {
+      "name": "Old Navy",
+      "aliases": [],
+      "domain": "oldnavy.com"
+    },
+    {
+      "name": "H&M",
+      "aliases": ["h and m", "hm"],
+      "domain": "hm.com"
+    },
+    {
+      "name": "Zara",
+      "aliases": [],
+      "domain": "zara.com"
+    },
+    {
+      "name": "TJ Maxx",
+      "aliases": ["tjmaxx"],
+      "domain": "tjmaxx.com"
+    },
+    {
+      "name": "Winners",
+      "aliases": [],
+      "domain": "winners.ca"
+    },
+    {
+      "name": "Lululemon",
+      "aliases": ["lulu"],
+      "domain": "lululemon.com"
+    },
+    {
+      "name": "Adidas",
+      "aliases": [],
+      "domain": "adidas.com"
+    },
+    {
+      "name": "Ulta Beauty",
+      "aliases": ["ulta"],
+      "domain": "ulta.com"
+    },
+    {
+      "name": "PetSmart",
+      "aliases": ["pet smart"],
+      "domain": "petsmart.com"
+    },
+    {
+      "name": "Mobil",
+      "aliases": ["exxonmobil"],
+      "domain": "mobil.com"
+    },
+    {
+      "name": "BP",
+      "aliases": [],
+      "domain": "bp.com"
+    },
+    {
+      "name": "Pizza Hut",
+      "aliases": [],
+      "domain": "pizzahut.com"
+    },
+    {
+      "name": "Popeyes",
+      "aliases": [],
+      "domain": "popeyes.com"
+    },
+    {
+      "name": "FirstEnergy",
+      "aliases": ["first energy"],
+      "domain": "firstenergycorp.com"
+    },
+    {
+      "name": "Entergy",
+      "aliases": [],
+      "domain": "entergy.com"
+    },
+    {
+      "name": "DTE Energy",
+      "aliases": ["dte"],
+      "domain": "dteenergy.com"
+    },
+    {
+      "name": "Georgia Power",
+      "aliases": [],
+      "domain": "georgiapower.com"
+    },
+    {
+      "name": "PSE&G",
+      "aliases": ["pseg", "public service enterprise"],
+      "domain": "pseg.com"
+    },
+    {
+      "name": "Eversource",
+      "aliases": [],
+      "domain": "eversource.com"
+    },
+    {
+      "name": "ComEd",
+      "aliases": ["commonwealth edison"],
+      "domain": "comed.com"
+    },
+    {
+      "name": "Nationwide",
+      "aliases": [],
+      "domain": "nationwide.com"
+    },
+    {
+      "name": "Farmers Insurance",
+      "aliases": ["farmers"],
+      "domain": "farmers.com"
+    },
+    {
+      "name": "Canva",
+      "aliases": ["canva pro", "canva"],
+      "domain": "canva.com"
+    },
+    {
+      "name": "Sam's Club",
+      "aliases": ["sams club"],
+      "domain": "samsclub.com"
+    },
+    {
+      "name": "Uber",
+      "aliases": ["uber one", "uber"],
+      "domain": "uber.com"
+    },
+    {
+      "name": "DoorDash",
+      "aliases": ["doordash dashpass", "dashpass", "doordash"],
+      "domain": "doordash.com"
+    },
+    {
+      "name": "Peloton",
+      "aliases": [],
+      "domain": "onepeloton.com"
+    },
+    {
+      "name": "The Wall Street Journal",
+      "aliases": ["wsj"],
+      "domain": "wsj.com"
+    },
+    {
+      "name": "AAA",
+      "aliases": ["triple a"],
+      "domain": "aaa.com"
+    },
+    {
+      "name": "eBay",
+      "aliases": [],
+      "domain": "ebay.com"
+    },
+    {
+      "name": "Dollar Tree",
+      "aliases": [],
+      "domain": "dollartree.com"
+    },
+    {
+      "name": "Meijer",
+      "aliases": [],
+      "domain": "meijer.com"
+    },
+    {
+      "name": "Wegmans",
+      "aliases": [],
+      "domain": "wegmans.com"
+    },
+    {
+      "name": "Food Basics",
+      "aliases": [],
+      "domain": "foodbasics.ca"
+    },
+    {
+      "name": "Save-On-Foods",
+      "aliases": ["save on foods"],
+      "domain": "saveonfoods.com"
+    },
+    {
+      "name": "Rexall",
+      "aliases": [],
+      "domain": "rexall.ca"
+    },
+    {
+      "name": "RONA",
+      "aliases": [],
+      "domain": "rona.ca"
+    },
+    {
+      "name": "Kohl's",
+      "aliases": ["kohls"],
+      "domain": "kohls.com"
+    },
+    {
+      "name": "Marshalls",
+      "aliases": [],
+      "domain": "marshalls.com"
+    },
+    {
+      "name": "Ross",
+      "aliases": ["ross dress for less"],
+      "domain": "rossstores.com"
+    },
+    {
+      "name": "Staples",
+      "aliases": [],
+      "domain": "staples.com"
+    },
+    {
+      "name": "Petco",
+      "aliases": ["petco vital care", "vital care"],
+      "domain": "petco.com"
+    },
+    {
+      "name": "Chewy",
+      "aliases": [],
+      "domain": "chewy.com"
+    },
+    {
+      "name": "Panera Bread",
+      "aliases": ["panera"],
+      "domain": "panerabread.com"
+    },
+    {
+      "name": "A&W",
+      "aliases": ["a and w"],
+      "domain": "aw.com"
+    },
+    {
+      "name": "Ameren",
+      "aliases": [],
+      "domain": "ameren.com"
+    },
+    {
+      "name": "CenterPoint Energy",
+      "aliases": ["centerpoint"],
+      "domain": "centerpointenergy.com"
+    },
+    {
+      "name": "Consumers Energy",
+      "aliases": [],
+      "domain": "consumersenergy.com"
+    },
+    {
+      "name": "Waste Management",
+      "aliases": ["wm"],
+      "domain": "wm.com"
+    },
+    {
+      "name": "Mint Mobile",
+      "aliases": ["mint"],
+      "domain": "mintmobile.com"
+    },
+    {
+      "name": "Cricket Wireless",
+      "aliases": ["cricket"],
+      "domain": "cricketwireless.com"
+    },
+    {
+      "name": "Optimum",
+      "aliases": ["altice"],
+      "domain": "optimum.com"
+    },
+    {
+      "name": "Frontier",
+      "aliases": ["frontier communications"],
+      "domain": "frontier.com"
+    },
+    {
+      "name": "CenturyLink",
+      "aliases": ["lumen"],
+      "domain": "centurylink.com"
+    },
+    {
+      "name": "Travelers",
+      "aliases": [],
+      "domain": "travelers.com"
+    },
+    {
+      "name": "Ally",
+      "aliases": ["ally bank"],
+      "domain": "ally.com"
+    },
+    {
+      "name": "SoFi",
+      "aliases": [],
+      "domain": "sofi.com"
+    },
+    {
+      "name": "ESPN+",
+      "aliases": ["espn plus"],
+      "domain": "espn.com"
+    },
+    {
+      "name": "Crave",
+      "aliases": [],
+      "domain": "crave.ca"
+    },
+    {
+      "name": "SiriusXM",
+      "aliases": ["sirius"],
+      "domain": "siriusxm.com"
+    },
+    {
+      "name": "Dropbox",
+      "aliases": [],
+      "domain": "dropbox.com"
+    },
+    {
+      "name": "Zoom",
+      "aliases": [],
+      "domain": "zoom.us"
+    },
+    {
+      "name": "Instacart",
+      "aliases": ["instacart+", "instacart"],
+      "domain": "instacart.com"
+    },
+    {
+      "name": "LA Fitness",
+      "aliases": [],
+      "domain": "lafitness.com"
+    },
+    {
+      "name": "Anytime Fitness",
+      "aliases": [],
+      "domain": "anytimefitness.com"
+    },
+    {
+      "name": "GoodLife Fitness",
+      "aliases": ["goodlife"],
+      "domain": "goodlifefitness.com"
+    },
+    {
+      "name": "The Washington Post",
+      "aliases": ["wapo"],
+      "domain": "washingtonpost.com"
+    },
+    {
+      "name": "Duolingo",
+      "aliases": [],
+      "domain": "duolingo.com"
+    },
+    {
+      "name": "Tinder",
+      "aliases": [],
+      "domain": "tinder.com"
+    },
+    {
+      "name": "CAA",
+      "aliases": [],
+      "domain": "caa.ca"
+    },
+    {
+      "name": "Etsy",
+      "aliases": [],
+      "domain": "etsy.com"
+    },
+    {
+      "name": "Temu",
+      "aliases": [],
+      "domain": "temu.com"
+    },
+    {
+      "name": "SHEIN",
+      "aliases": [],
+      "domain": "shein.com"
+    },
+    {
+      "name": "Food Lion",
+      "aliases": [],
+      "domain": "foodlion.com"
+    },
+    {
+      "name": "Stop & Shop",
+      "aliases": ["stop and shop"],
+      "domain": "stopandshop.com"
+    },
+    {
+      "name": "ShopRite",
+      "aliases": ["shop rite"],
+      "domain": "shoprite.com"
+    },
+    {
+      "name": "IGA",
+      "aliases": [],
+      "domain": "iga.net"
+    },
+    {
+      "name": "Jean Coutu",
+      "aliases": [],
+      "domain": "jeancoutu.com"
+    },
+    {
+      "name": "Ace Hardware",
+      "aliases": ["ace"],
+      "domain": "acehardware.com"
+    },
+    {
+      "name": "Menards",
+      "aliases": [],
+      "domain": "menards.com"
+    },
+    {
+      "name": "Home Hardware",
+      "aliases": [],
+      "domain": "homehardware.ca"
+    },
+    {
+      "name": "Wayfair",
+      "aliases": [],
+      "domain": "wayfair.com"
+    },
+    {
+      "name": "Nordstrom",
+      "aliases": [],
+      "domain": "nordstrom.com"
+    },
+    {
+      "name": "Gap",
+      "aliases": [],
+      "domain": "gap.com"
+    },
+    {
+      "name": "Uniqlo",
+      "aliases": [],
+      "domain": "uniqlo.com"
+    },
+    {
+      "name": "Aritzia",
+      "aliases": [],
+      "domain": "aritzia.com"
+    },
+    {
+      "name": "Bath & Body Works",
+      "aliases": ["bath and body works"],
+      "domain": "bathandbodyworks.com"
+    },
+    {
+      "name": "Wawa",
+      "aliases": [],
+      "domain": "wawa.com"
+    },
+    {
+      "name": "APS",
+      "aliases": ["arizona public service"],
+      "domain": "aps.com"
+    },
+    {
+      "name": "PECO",
+      "aliases": [],
+      "domain": "peco.com"
+    },
+    {
+      "name": "BGE",
+      "aliases": ["baltimore gas and electric"],
+      "domain": "bge.com"
+    },
+    {
+      "name": "Pepco",
+      "aliases": [],
+      "domain": "pepco.com"
+    },
+    {
+      "name": "American Water",
+      "aliases": [],
+      "domain": "amwater.com"
+    },
+    {
+      "name": "Republic Services",
+      "aliases": ["republic"],
+      "domain": "republicservices.com"
+    },
+    {
+      "name": "Boost Mobile",
+      "aliases": ["boost"],
+      "domain": "boostmobile.com"
+    },
+    {
+      "name": "Metro by T-Mobile",
+      "aliases": ["metro pcs", "metropcs"],
+      "domain": "metrobyt-mobile.com"
+    },
+    {
+      "name": "Starlink",
+      "aliases": [],
+      "domain": "starlink.com"
+    },
+    {
+      "name": "American Family",
+      "aliases": ["amfam"],
+      "domain": "amfam.com"
+    },
+    {
+      "name": "Synchrony",
+      "aliases": ["synchrony bank"],
+      "domain": "synchrony.com"
+    },
+    {
+      "name": "Navient",
+      "aliases": [],
+      "domain": "navient.com"
+    },
+    {
+      "name": "Nelnet",
+      "aliases": [],
+      "domain": "nelnet.com"
+    },
+    {
+      "name": "Sling TV",
+      "aliases": [],
+      "domain": "sling.com"
+    },
+    {
+      "name": "Crunchyroll",
+      "aliases": [],
+      "domain": "crunchyroll.com"
+    },
+    {
+      "name": "Roblox",
+      "aliases": ["roblox premium", "roblox"],
+      "domain": "roblox.com"
+    },
+    {
+      "name": "Discord",
+      "aliases": ["discord nitro", "discord"],
+      "domain": "discord.com"
+    },
+    {
+      "name": "Notion",
+      "aliases": [],
+      "domain": "notion.so"
+    },
+    {
+      "name": "GitHub",
+      "aliases": [],
+      "domain": "github.com"
+    },
+    {
+      "name": "1Password",
+      "aliases": ["one password"],
+      "domain": "1password.com"
+    },
+    {
+      "name": "NordVPN",
+      "aliases": ["nord"],
+      "domain": "nordvpn.com"
+    },
+    {
+      "name": "YMCA",
+      "aliases": [],
+      "domain": "ymca.net"
+    },
+    {
+      "name": "Calm",
+      "aliases": [],
+      "domain": "calm.com"
+    },
+    {
+      "name": "Headspace",
+      "aliases": [],
+      "domain": "headspace.com"
+    },
+    {
+      "name": "LinkedIn",
+      "aliases": ["linkedin premium", "linkedin"],
+      "domain": "linkedin.com"
+    },
+    {
+      "name": "Bumble",
+      "aliases": [],
+      "domain": "bumble.com"
+    },
+    {
+      "name": "Hinge",
+      "aliases": [],
+      "domain": "hinge.co"
+    },
+    {
+      "name": "Snapchat",
+      "aliases": ["snapchat+", "snapchat"],
+      "domain": "snapchat.com"
+    },
+    {
+      "name": "Ring",
+      "aliases": ["ring protect", "ring"],
+      "domain": "ring.com"
+    },
+    {
+      "name": "Giant Tiger",
+      "aliases": [],
+      "domain": "gianttiger.com"
+    },
+    {
+      "name": "Giant Food",
+      "aliases": [],
+      "domain": "giantfood.com"
+    },
+    {
+      "name": "Giant Eagle",
+      "aliases": [],
+      "domain": "gianteagle.com"
+    },
+    {
+      "name": "Sprouts Farmers Market",
+      "aliases": ["sprouts"],
+      "domain": "sprouts.com"
+    },
+    {
+      "name": "Hy-Vee",
+      "aliases": ["hyvee"],
+      "domain": "hy-vee.com"
+    },
+    {
+      "name": "Harris Teeter",
+      "aliases": [],
+      "domain": "harristeeter.com"
+    },
+    {
+      "name": "Ralphs",
+      "aliases": [],
+      "domain": "ralphs.com"
+    },
+    {
+      "name": "Fred Meyer",
+      "aliases": [],
+      "domain": "fredmeyer.com"
+    },
+    {
+      "name": "Your Independent Grocer",
+      "aliases": ["independent"],
+      "domain": "yourindependentgrocer.ca"
+    },
+    {
+      "name": "Zehrs",
+      "aliases": [],
+      "domain": "zehrs.ca"
+    },
+    {
+      "name": "Provigo",
+      "aliases": [],
+      "domain": "provigo.ca"
+    },
+    {
+      "name": "Maxi",
+      "aliases": [],
+      "domain": "maxi.ca"
+    },
+    {
+      "name": "T&T Supermarket",
+      "aliases": ["t and t"],
+      "domain": "tntsupermarket.com"
+    },
+    {
+      "name": "Farm Boy",
+      "aliases": [],
+      "domain": "farmboy.ca"
+    },
+    {
+      "name": "Super C",
+      "aliases": [],
+      "domain": "superc.ca"
+    },
+    {
+      "name": "London Drugs",
+      "aliases": [],
+      "domain": "londondrugs.com"
+    },
+    {
+      "name": "Harbor Freight",
+      "aliases": [],
+      "domain": "harborfreight.com"
+    },
+    {
+      "name": "Tractor Supply",
+      "aliases": [],
+      "domain": "tractorsupply.com"
+    },
+    {
+      "name": "HomeSense",
+      "aliases": ["home sense"],
+      "domain": "homesense.com"
+    },
+    {
+      "name": "Burlington",
+      "aliases": [],
+      "domain": "burlington.com"
+    },
+    {
+      "name": "Foot Locker",
+      "aliases": [],
+      "domain": "footlocker.com"
+    },
+    {
+      "name": "Levi's",
+      "aliases": ["levis"],
+      "domain": "levi.com"
+    },
+    {
+      "name": "GameStop",
+      "aliases": ["game stop"],
+      "domain": "gamestop.com"
+    },
+    {
+      "name": "Pet Valu",
+      "aliases": ["petvalu"],
+      "domain": "petvalu.ca"
+    },
+    {
+      "name": "Sunoco",
+      "aliases": [],
+      "domain": "sunoco.com"
+    },
+    {
+      "name": "Speedway",
+      "aliases": [],
+      "domain": "speedway.com"
+    },
+    {
+      "name": "Sheetz",
+      "aliases": [],
+      "domain": "sheetz.com"
+    },
+    {
+      "name": "QuikTrip",
+      "aliases": ["qt"],
+      "domain": "quiktrip.com"
+    },
+    {
+      "name": "Irving",
+      "aliases": ["irving oil"],
+      "domain": "irvingoil.com"
+    },
+    {
+      "name": "Alliant Energy",
+      "aliases": ["alliant"],
+      "domain": "alliantenergy.com"
+    },
+    {
+      "name": "Salt River Project",
+      "aliases": ["srp"],
+      "domain": "srpnet.com"
+    },
+    {
+      "name": "NV Energy",
+      "aliases": [],
+      "domain": "nvenergy.com"
+    },
+    {
+      "name": "Puget Sound Energy",
+      "aliases": ["puget sound"],
+      "domain": "pse.com"
+    },
+    {
+      "name": "Google Fi",
+      "aliases": [],
+      "domain": "fi.google.com"
+    },
+    {
+      "name": "MOHELA",
+      "aliases": [],
+      "domain": "mohela.com"
+    },
+    {
+      "name": "Aidvantage",
+      "aliases": [],
+      "domain": "aidvantage.com"
+    },
+    {
+      "name": "Fubo",
+      "aliases": ["fubotv"],
+      "domain": "fubo.tv"
+    },
+    {
+      "name": "STARZ",
+      "aliases": [],
+      "domain": "starz.com"
+    },
+    {
+      "name": "Discovery+",
+      "aliases": ["discovery plus"],
+      "domain": "discoveryplus.com"
+    },
+    {
+      "name": "EA",
+      "aliases": ["ea play"],
+      "domain": "ea.com"
+    },
+    {
+      "name": "Grammarly",
+      "aliases": [],
+      "domain": "grammarly.com"
+    },
+    {
+      "name": "ExpressVPN",
+      "aliases": ["express vpn"],
+      "domain": "expressvpn.com"
+    },
+    {
+      "name": "Orangetheory",
+      "aliases": ["orange theory"],
+      "domain": "orangetheory.com"
+    },
+    {
+      "name": "Strava",
+      "aliases": [],
+      "domain": "strava.com"
+    },
+    {
+      "name": "MyFitnessPal",
+      "aliases": ["myfitnesspal premium", "myfitnesspal"],
+      "domain": "myfitnesspal.com"
+    },
+    {
+      "name": "The Globe and Mail",
+      "aliases": ["globe and mail"],
+      "domain": "theglobeandmail.com"
+    },
+    {
+      "name": "Factor",
+      "aliases": ["factor 75"],
+      "domain": "factor75.com"
+    },
+    {
+      "name": "Home Chef",
+      "aliases": [],
+      "domain": "homechef.com"
+    },
+    {
+      "name": "Reddit",
+      "aliases": ["reddit premium", "reddit"],
+      "domain": "reddit.com"
+    },
+    {
+      "name": "X",
+      "aliases": ["x premium", "twitter blue", "twitter"],
+      "domain": "x.com"
+    },
+    {
+      "name": "Nest",
+      "aliases": ["nest aware", "nest"],
+      "domain": "nest.com"
+    },
+    {
+      "name": "ADT",
+      "aliases": [],
+      "domain": "adt.com"
+    },
+    {
+      "name": "Five Below",
+      "aliases": [],
+      "domain": "fivebelow.com"
+    },
+    {
+      "name": "WinCo Foods",
+      "aliases": ["winco"],
+      "domain": "wincofoods.com"
+    },
+    {
+      "name": "Jewel-Osco",
+      "aliases": ["jewel osco"],
+      "domain": "jewelosco.com"
+    },
+    {
+      "name": "Vons",
+      "aliases": [],
+      "domain": "vons.com"
+    },
+    {
+      "name": "Fortinos",
+      "aliases": [],
+      "domain": "fortinos.ca"
+    },
+    {
+      "name": "Foodland",
+      "aliases": [],
+      "domain": "foodland.ca"
+    },
+    {
+      "name": "Longo's",
+      "aliases": ["longos"],
+      "domain": "longos.com"
+    },
+    {
+      "name": "JCPenney",
+      "aliases": ["jc penney"],
+      "domain": "jcpenney.com"
+    },
+    {
+      "name": "Banana Republic",
+      "aliases": [],
+      "domain": "bananarepublic.com"
+    },
+    {
+      "name": "Micro Center",
+      "aliases": [],
+      "domain": "microcenter.com"
+    },
+    {
+      "name": "Lush",
+      "aliases": [],
+      "domain": "lush.com"
+    },
+    {
+      "name": "MAC Cosmetics",
+      "aliases": ["mac"],
+      "domain": "maccosmetics.com"
+    },
+    {
+      "name": "Casey's",
+      "aliases": ["caseys"],
+      "domain": "caseys.com"
+    },
+    {
+      "name": "Visible",
+      "aliases": [],
+      "domain": "visible.com"
+    },
+    {
+      "name": "UScellular",
+      "aliases": ["us cellular"],
+      "domain": "uscellular.com"
+    },
+    {
+      "name": "Straight Talk",
+      "aliases": [],
+      "domain": "straighttalk.com"
+    },
+    {
+      "name": "Google Fiber",
+      "aliases": [],
+      "domain": "fiber.google.com"
+    },
+    {
+      "name": "Lemonade",
+      "aliases": [],
+      "domain": "lemonade.com"
+    },
+    {
+      "name": "AMC+",
+      "aliases": ["amc plus"],
+      "domain": "amcplus.com"
+    },
+    {
+      "name": "DAZN",
+      "aliases": [],
+      "domain": "dazn.com"
+    },
+    {
+      "name": "CBC Gem",
+      "aliases": ["cbc gem premium", "cbc gem"],
+      "domain": "gem.cbc.ca"
+    },
+    {
+      "name": "STACKTV",
+      "aliases": ["stack tv"],
+      "domain": "stacktv.ca"
+    },
+    {
+      "name": "TSN+",
+      "aliases": ["tsn plus"],
+      "domain": "tsn.ca"
+    },
+    {
+      "name": "Sportsnet+",
+      "aliases": ["sportsnet plus"],
+      "domain": "sportsnet.ca"
+    },
+    {
+      "name": "Pandora",
+      "aliases": [],
+      "domain": "pandora.com"
+    },
+    {
+      "name": "Fortnite",
+      "aliases": ["fortnite crew", "fortnite"],
+      "domain": "fortnite.com"
+    },
+    {
+      "name": "Proton",
+      "aliases": ["protonmail"],
+      "domain": "proton.me"
+    },
+    {
+      "name": "Norton",
+      "aliases": [],
+      "domain": "norton.com"
+    },
+    {
+      "name": "McAfee",
+      "aliases": [],
+      "domain": "mcafee.com"
+    },
+    {
+      "name": "Grubhub",
+      "aliases": ["grubhub+", "grubhub"],
+      "domain": "grubhub.com"
+    },
+    {
+      "name": "Crunch Fitness",
+      "aliases": ["crunch"],
+      "domain": "crunch.com"
+    },
+    {
+      "name": "Equinox",
+      "aliases": [],
+      "domain": "equinox.com"
+    },
+    {
+      "name": "Fit4Less",
+      "aliases": ["fit 4 less"],
+      "domain": "fit4less.ca"
+    },
+    {
+      "name": "Fitbit",
+      "aliases": ["fitbit premium", "fitbit"],
+      "domain": "fitbit.com"
+    },
+    {
+      "name": "ClassPass",
+      "aliases": ["class pass"],
+      "domain": "classpass.com"
+    },
+    {
+      "name": "Noom",
+      "aliases": [],
+      "domain": "noom.com"
+    },
+    {
+      "name": "USA Today",
+      "aliases": [],
+      "domain": "usatoday.com"
+    },
+    {
+      "name": "The Athletic",
+      "aliases": ["athletic"],
+      "domain": "theathletic.com"
+    },
+    {
+      "name": "Toronto Star",
+      "aliases": [],
+      "domain": "thestar.com"
+    },
+    {
+      "name": "National Post",
+      "aliases": [],
+      "domain": "nationalpost.com"
+    },
+    {
+      "name": "Substack",
+      "aliases": [],
+      "domain": "substack.com"
+    },
+    {
+      "name": "Coursera",
+      "aliases": ["coursera plus", "coursera"],
+      "domain": "coursera.org"
+    },
+    {
+      "name": "MasterClass",
+      "aliases": ["master class"],
+      "domain": "masterclass.com"
+    },
+    {
+      "name": "EveryPlate",
+      "aliases": ["every plate"],
+      "domain": "everyplate.com"
+    },
+    {
+      "name": "Blue Apron",
+      "aliases": [],
+      "domain": "blueapron.com"
+    },
+    {
+      "name": "Chef's Plate",
+      "aliases": ["chefs plate"],
+      "domain": "chefsplate.com"
+    },
+    {
+      "name": "Goodfood",
+      "aliases": ["good food"],
+      "domain": "makegoodfood.ca"
+    },
+    {
+      "name": "OnStar",
+      "aliases": ["on star"],
+      "domain": "onstar.com"
+    },
+    {
+      "name": "Tesla",
+      "aliases": ["tesla premium connectivity", "tesla"],
+      "domain": "tesla.com"
+    },
+    {
+      "name": "SimpliSafe",
+      "aliases": ["simpli safe"],
+      "domain": "simplisafe.com"
+    },
+    {
+      "name": "BarkBox",
+      "aliases": ["bark box"],
+      "domain": "barkbox.com"
+    },
+    {
+      "name": "AliExpress",
+      "aliases": ["ali express"],
+      "domain": "aliexpress.com"
+    },
+    {
+      "name": "Smith's",
+      "aliases": ["smiths"],
+      "domain": "smithsfoodanddrug.com"
+    },
+    {
+      "name": "Mariano's",
+      "aliases": ["marianos"],
+      "domain": "marianos.com"
+    },
+    {
+      "name": "Atlantic Superstore",
+      "aliases": [],
+      "domain": "atlanticsuperstore.ca"
+    },
+    {
+      "name": "Thrifty Foods",
+      "aliases": [],
+      "domain": "thriftyfoods.com"
+    },
+    {
+      "name": "Co-op",
+      "aliases": ["coop"],
+      "domain": "crs.coop"
+    },
+    {
+      "name": "Pharmasave",
+      "aliases": [],
+      "domain": "pharmasave.com"
+    },
+    {
+      "name": "Bed Bath & Beyond",
+      "aliases": ["bed bath and beyond"],
+      "domain": "bedbathandbeyond.com"
+    },
+    {
+      "name": "Canada Computers",
+      "aliases": [],
+      "domain": "canadacomputers.com"
+    },
+    {
+      "name": "Sally Beauty",
+      "aliases": [],
+      "domain": "sallybeauty.com"
+    },
+    {
+      "name": "Astound Broadband",
+      "aliases": ["rcn", "wave"],
+      "domain": "astound.com"
+    },
+    {
+      "name": "WOW!",
+      "aliases": ["wide open west"],
+      "domain": "wowway.com"
+    },
+    {
+      "name": "Windstream",
+      "aliases": ["kinetic"],
+      "domain": "windstream.com"
+    },
+    {
+      "name": "Root",
+      "aliases": ["root insurance"],
+      "domain": "joinroot.com"
+    },
+    {
+      "name": "Philo",
+      "aliases": [],
+      "domain": "philo.com"
+    },
+    {
+      "name": "BritBox",
+      "aliases": [],
+      "domain": "britbox.com"
+    },
+    {
+      "name": "Tidal",
+      "aliases": [],
+      "domain": "tidal.com"
+    },
+    {
+      "name": "iHeartRadio",
+      "aliases": ["iheart"],
+      "domain": "iheart.com"
+    },
+    {
+      "name": "Ubisoft",
+      "aliases": ["ubisoft+", "ubisoft plus"],
+      "domain": "ubisoft.com"
+    },
+    {
+      "name": "NVIDIA GeForce NOW",
+      "aliases": ["geforce now"],
+      "domain": "nvidia.com"
+    },
+    {
+      "name": "Surfshark",
+      "aliases": [],
+      "domain": "surfshark.com"
+    },
+    {
+      "name": "DocuSign",
+      "aliases": [],
+      "domain": "docusign.com"
+    },
+    {
+      "name": "Shipt",
+      "aliases": [],
+      "domain": "shipt.com"
+    },
+    {
+      "name": "PC Express",
+      "aliases": ["pc express pass", "pc express"],
+      "domain": "pcexpress.ca"
+    },
+    {
+      "name": "F45",
+      "aliases": ["f45 training"],
+      "domain": "f45training.com"
+    },
+    {
+      "name": "Medium",
+      "aliases": [],
+      "domain": "medium.com"
+    },
+    {
+      "name": "Chegg",
+      "aliases": [],
+      "domain": "chegg.com"
+    },
+    {
+      "name": "Green Chef",
+      "aliases": [],
+      "domain": "greenchef.com"
+    },
+    {
+      "name": "Hungryroot",
+      "aliases": [],
+      "domain": "hungryroot.com"
+    },
+    {
+      "name": "Match",
+      "aliases": [],
+      "domain": "match.com"
+    },
+    {
+      "name": "Arlo",
+      "aliases": ["arlo secure", "arlo"],
+      "domain": "arlo.com"
+    },
+    {
+      "name": "QFC",
+      "aliases": [],
+      "domain": "qfc.com"
+    },
+    {
+      "name": "Calgary Co-op",
+      "aliases": ["calgary coop"],
+      "domain": "calgarycoop.com"
+    },
+    {
+      "name": "Memory Express",
+      "aliases": [],
+      "domain": "memoryexpress.com"
+    },
+    {
+      "name": "Ren's Pets",
+      "aliases": ["rens pets"],
+      "domain": "renspets.com"
+    },
+    {
+      "name": "SoundCloud",
+      "aliases": ["soundcloud go+", "soundcloud"],
+      "domain": "soundcloud.com"
+    },
+    {
+      "name": "Evernote",
+      "aliases": [],
+      "domain": "evernote.com"
+    },
+    {
+      "name": "Dashlane",
+      "aliases": [],
+      "domain": "dashlane.com"
+    },
+    {
+      "name": "Malwarebytes",
+      "aliases": [],
+      "domain": "malwarebytes.com"
+    },
+    {
+      "name": "Financial Post",
+      "aliases": [],
+      "domain": "financialpost.com"
+    },
+    {
+      "name": "CookUnity",
+      "aliases": ["cook unity"],
+      "domain": "cookunity.com"
+    },
+    {
+      "name": "Fresh Prep",
+      "aliases": [],
+      "domain": "freshprep.ca"
+    },
+    {
+      "name": "eHarmony",
+      "aliases": ["e harmony"],
+      "domain": "eharmony.com"
+    },
+    {
+      "name": "Piggly Wiggly",
+      "aliases": [],
+      "domain": "pigglywiggly.com"
+    },
+    {
+      "name": "PriceSmart Foods",
+      "aliases": [],
+      "domain": "pricesmartfoods.ca"
+    },
+    {
+      "name": "Global Pet Foods",
+      "aliases": [],
+      "domain": "globalpetfoods.com"
+    },
+    {
+      "name": "illico+",
+      "aliases": ["illico"],
+      "domain": "illico.tv"
+    },
+    {
+      "name": "Hayu",
+      "aliases": [],
+      "domain": "hayu.com"
+    },
+    {
+      "name": "Everand",
+      "aliases": ["scribd"],
+      "domain": "everand.com"
+    },
+    {
+      "name": "Urban Fare",
+      "aliases": [],
+      "domain": "urbanfare.com"
+    },
+    {
+      "name": "Pocket Casts",
+      "aliases": ["pocket casts plus", "pocket casts"],
+      "domain": "pocketcasts.com"
+    },
+    {
+      "name": "NorthMart",
+      "aliases": ["north mart"],
+      "domain": "northmart.ca"
+    }
+  ]
+}

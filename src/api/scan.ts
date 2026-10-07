@@ -24,11 +24,6 @@ export type ScanDraft = {
   sourceId: string | null;
   /** Which fields were actually read, for telling someone what to check. */
   read: ('store' | 'date' | 'amount' | 'card')[];
-  /**
-   * Whether this can be filed without asking anything: needs a store and an amount. Deliberately
-   * strict, since a confident wrong total is worse than one extra screen.
-   */
-  complete: boolean;
 };
 
 /**
@@ -45,8 +40,8 @@ export function receiptParseOptions(directory: readonly BrandRow[]): ParseOption
 }
 
 /**
- * Camera to draft receipt, in one call. Shared by the receipts list (a complete scan is filed in
- * place) and the add form (it fills the fields).
+ * Camera to draft receipt, in one call. The receipts list opens the add form pre-filled with it,
+ * so every scan is checked before it is filed.
  */
 export function useReceiptScan() {
   const [scanning, setScanning] = useState(false);
@@ -107,7 +102,6 @@ export function useReceiptScan() {
         date: day ?? new Date(),
         sourceId: matchedSource?.id ?? null,
         read,
-        complete: Boolean(store) && amount !== null && amount > 0,
       };
     } finally {
       setScanning(false);

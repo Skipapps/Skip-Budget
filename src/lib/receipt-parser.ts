@@ -112,7 +112,11 @@ type Page = {
   body: number;
   /** Plain text has no geometry: size and position say nothing. */
   flat: boolean;
+  /** Shows £ or VAT, so British postcodes are looked for. */
+  uk: boolean;
 };
+
+const BRITISH = /£|\bvat\b|\bgbp\b/;
 
 /** Prices: what sits in a receipt's right-hand column. */
 const PRICE_CELL = /^[-$£€]?\s?\d{1,6}[.,]\d{2}\b/;
@@ -249,14 +253,28 @@ function makeRow(cells: Cell[]): Row {
  * Reading order: cells sorted by their vertical centre and gathered into rows by how closely the
  * centres agree. Two cells that overlap sideways are stacked lines, never one row.
  */
-function pageFromLines(lines: readonly ParsedLine[]): Page {
+/**
+ * No receipt line is anywhere near this long; a runaway reading (a 50,000-digit line) would
+ * otherwise cost seconds in the figure scans.
+ */
+const MAX_LINE = 300;
+const MAX_LINES = 2000;
+
+/** Text from outside, which may be missing or not a string at all. */
+function clip(value: unknown): string {
+  return typeof value === 'string' ? value.slice(0, MAX_LINE) : '';
+}
+
+function pageFromLines(lines: readonly ParsedLine[] | undefined | null): Page {
   const raw: Cell[] = [];
-  for (const line of lines) {
-    const text = latin(line.text ?? '').trim();
+  for (const line of (Array.isArray(lines) ? lines : []).slice(0, MAX_LINES)) {
+    if (!line || typeof line !== 'object') continue;
+    const text = latin(clip(line.text)).trim();
     const box = [line.x, line.y, line.width, line.height];
     if (!text || !box.every(Number.isFinite)) continue;
-    const alts = (line.candidates ?? [])
-      .map((candidate) => latin(candidate).trim())
+    const candidates: unknown[] = Array.isArray(line.candidates) ? line.candidates : [];
+    const alts = candidates
+      .map((candidate) => latin(clip(candidate)).trim())
       .filter((candidate) => candidate && candidate !== text);
     raw.push({
       text,
@@ -306,13 +324,15 @@ function pageFromLines(lines: readonly ParsedLine[]): Page {
     right: rows.length ? Math.max(...rows.map((row) => row.right)) : 1,
     body: median((sized.length ? sized : cells).map((cell) => cell.h)),
     flat: false,
+    uk: rows.some((row) => BRITISH.test(row.folded)),
   };
 }
 
-function pageFromText(text: string): Page {
+function pageFromText(text: string | undefined | null): Page {
   const rows: Row[] = [];
-  text.split('\n').forEach((line, index) => {
-    const trimmed = latin(line).trim();
+  const lines = (typeof text === 'string' ? text : '').split('\n').slice(0, MAX_LINES);
+  lines.forEach((line, index) => {
+    const trimmed = latin(clip(line)).trim();
     if (!trimmed) return;
     const cell: Cell = { text: trimmed, alts: [], x: 0, y: index, w: 1, h: 0.5 };
     rows.push(makeRow([cell]));
@@ -325,6 +345,7 @@ function pageFromText(text: string): Page {
     right: 1,
     body: 0.5,
     flat: true,
+    uk: rows.some((row) => BRITISH.test(row.folded)),
   };
 }
 
@@ -336,7 +357,12 @@ function pageFromText(text: string): Page {
  * Integer cents built from the printed digits; the dollars are only formed at the very end. A weak
  * reading is glued to letters; `stuck` means the letters are a whole total label ("A PAGAR260.79").
  */
-type Reading = { cents: number; weak: boolean; stuck?: boolean };
+type Reading = { cents: number; weak: boolean; stuck?: boolean; negative?: boolean };
+
+/** "-24.99", "-$24.99", "$-24.99" or "24.99-": a credit (refund, discount), never a charge. */
+function negativeAt(text: string, start: number, end: number): boolean {
+  return /-[ $£€]{0,2}$/.test(text.slice(Math.max(0, start - 3), start)) || text[end] === '-';
+}
 
 const STUCK_LABEL = /(total|totals|pagar|payer|pay|due|du|amount|importe|montant|solde|balance)$/;
 const stuckTo = (text: string, index: number) =>
@@ -412,7 +438,8 @@ function readCell(text: string, bare: boolean, dollarBefore = false): Reading[] 
     const cents = centsOf(whole, match[2]);
     if (cents >= MAX_CENTS) continue;
     const glued = context === 'glued';
-    dotted.push({ cents, weak: glued, stuck: glued && stuckTo(text, match.index) });
+    const negative = negativeAt(text, match.index, match.index + match[0].length);
+    dotted.push({ cents, weak: glued, stuck: glued && stuckTo(text, match.index), negative });
   }
   if (dotted.length) return dotted;
 
@@ -433,7 +460,8 @@ function readCell(text: string, bare: boolean, dollarBefore = false): Reading[] 
     const cents = centsOf(match[1], match[2]);
     if (cents >= MAX_CENTS) continue;
     const glued = context === 'glued';
-    found.push({ cents, weak: glued, stuck: glued && stuckTo(text, match.index) });
+    const negative = negativeAt(text, match.index, end);
+    found.push({ cents, weak: glued, stuck: glued && stuckTo(text, match.index), negative });
   }
   return found;
 }
@@ -465,7 +493,7 @@ function repaired(text: string): number[] {
 
 /** Rows that carry money but never the charge, whatever else they say. */
 const SKIP =
-  /\b(agree|accepte|acepto|sugg\w*|sugerid\w*|savings?|saved|economies|ahorr\w*|points?|puntos|item count|items? sold|total items|\d+ items?|articles|articulos|qty|quantity|cantidad|cash ?back|rate|taux|tasa|balance remaining|previous|anterior|available|avail|disponible|ledger|eligible|elegible|admissible)\b/;
+  /\b(agree|accepte|acepto|sugg\w*|sugerid\w*|savings?|saved|economies|ahorr\w*|points?|puntos|item count|items? sold|total items|\d+ items?|articles|articulos|qty|quantity|cantidad|cash ?back|rate|taux|tasa|previous|anterior|available|avail|disponible|ledger|eligible|elegible|admissible|guide|(?:card|gift card|new|remaining|account|points|rewards|loyalty|stored value) bal\w*|bal\w* (?:remaining|left|restant)|nouveau solde|solde restant|saldo (?:restante|disponible))\b/;
 const SUBTOTAL = /\bsub[ -]*total\b|\bsous[ -]*total\b|\btotal partiel\b|\bavant taxes?\b|^sub\b/;
 const TOTAL_INCLUDING = /^(grand )?total\b.*\b(inc|incl|including|includes|inclus|incluido)\b/;
 const TAX =
@@ -483,6 +511,8 @@ const CASH = /\b(cash|comptant|especes|efectivo|tendered|recibido)\b/;
 const WITHDRAWAL = /\b(withdrawal|retrait|retiro|disposicion)\b/;
 /** The account an Australian or Canadian debit card drew on: its line carries the charge. */
 const ACCOUNT = /\b(cheque|chq)\b/;
+/** "PAYMENT 20.00" with no card named: money handed over, which the change line comes back from. */
+const PAYMENT = /\b(payment|paiement|pago)\b/;
 const TOTAL =
   /\b(total|totals|grand total|balance|due|amount|saleamount|montant|solde|a payer|to pay|paid|importe|a pagar|monto|purchase|achat)\b/;
 const TENDER =
@@ -500,13 +530,21 @@ const RATE = /\d+(?:[.,]\d+)? ?%/g;
 
 /** A row's words with its figures, rates and currency marks taken out, from folded text. */
 function labelOf(folded: string): string {
-  return folded
-    .replace(RATE, ' ')
-    .replace(DOT_FIGURE, ' ')
-    .replace(COMMA_FIGURE, ' ')
-    .replace(/[$£€:]|\.{2,}|[•·]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    folded
+      .replace(RATE, ' ')
+      .replace(DOT_FIGURE, ' ')
+      .replace(COMMA_FIGURE, ' ')
+      .replace(/[$£€:]|\.{2,}|[•·]+/g, ' ')
+      // A digit inside a word of letters is a misread letter: "T0TAL" is TOTAL, "CA5H" is CASH.
+      .replace(/\b[a-z0-9]*[a-z][a-z0-9]*\b/g, (word) =>
+        /[a-z].*[a-z]/.test(word)
+          ? word.replace(/0/g, 'o').replace(/5/g, 's').replace(/1/g, 'l')
+          : word,
+      )
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 function isFrenchMoneyLabel(label: string): boolean {
@@ -547,6 +585,7 @@ function kindOf(label: string): Kind {
   if (CASH.test(label)) return 'cash';
   if (TOTAL.test(label)) return 'total';
   if (TENDER.test(label)) return 'tender';
+  if (PAYMENT.test(label)) return 'cash';
   return 'none';
 }
 
@@ -654,11 +693,23 @@ function readTotal(page: Page): number | undefined {
   }
 
   const strong = (row: MoneyRow) => row.readings.filter((reading) => !reading.weak);
-  // A zero is never the charge ("BALANCE DUE 0.00" once the card has paid).
+  // A zero is never the charge ("BALANCE DUE 0.00" once the card has paid), nor a credit; a
+  // discount is printed as a credit and counts by its size.
   const last = (row: MoneyRow) => {
-    const found = strong(row).filter((reading) => reading.cents > 0);
+    const found = strong(row).filter(
+      (reading) => reading.cents > 0 && (!reading.negative || row.kind === 'discount'),
+    );
     return found.length ? found[found.length - 1].cents : undefined;
   };
+
+  // A refund slip prints its total as a credit: filing it as a purchase would be wrong.
+  const refund = money.some(
+    (row) =>
+      row.kind === 'total' &&
+      strong(row).some((reading) => reading.negative) &&
+      !strong(row).some((reading) => !reading.negative && reading.cents > 0),
+  );
+  if (refund) return undefined;
 
   let chosen = -1;
   for (let i = 0; i < money.length; i++) {
@@ -676,7 +727,9 @@ function readTotal(page: Page): number | undefined {
   let unreadable = false;
   for (let i = chosen + 1; chosen >= 0 && i < money.length; i++) {
     const { folded, text } = rows[i];
-    if (money[i].kind === 'tip' && TIP_ONLY.test(folded) && !/\bincl/.test(folded)) {
+    // A suggested tip ("TIP 18% = 7.78", "TIP GUIDE") is advice, not money added.
+    const suggestion = /%|\bguide\b|\bsugg/.test(folded);
+    if (money[i].kind === 'tip' && TIP_ONLY.test(folded) && !/\bincl/.test(folded) && !suggestion) {
       tipLine = true;
       tipAfter += last(money[i]) ?? 0;
     } else if (
@@ -805,13 +858,21 @@ function readTotal(page: Page): number | undefined {
     if (stuck.length) return stuck[stuck.length - 1].cents / 100;
   }
 
-  // Nothing labelled at all: the largest amount, which on a receipt is usually the total.
-  let largest = 0;
+  // Nothing labelled at all: the largest amount, but only when a second row prints the same figure
+  // (an item total repeated on a card or summary line); a lone largest figure is as often the cash
+  // handed over or a misread as it is the total.
+  const seen = new Map<number, number>();
   for (const row of money) {
     if (row.kind === 'cash' || row.kind === 'change' || row.kind === 'skip') continue;
-    for (const reading of strong(row)) largest = Math.max(largest, reading.cents);
+    const figures = new Set(
+      strong(row)
+        .filter((r) => !r.negative)
+        .map((r) => r.cents),
+    );
+    for (const cents of figures) seen.set(cents, (seen.get(cents) ?? 0) + 1);
   }
-  return largest > 0 ? largest / 100 : undefined;
+  const repeated = [...seen].filter(([cents, rowsWith]) => cents > 0 && rowsWith >= 2);
+  return repeated.length ? Math.max(...repeated.map(([cents]) => cents)) / 100 : undefined;
 }
 
 // =============================================================================================
@@ -848,7 +909,7 @@ const NUMERIC = /(^|[^\d/.-])(\d{1,2})([/.-])(\d{1,2})\3(\d{4}|\d{2})(?![\d/.-]\
 const TIME = /\b\d{1,2}[:h] ?\d{2}\b|\b(am|pm)\b/;
 const DATE_LABEL = /\b(date|fecha|dated)\b/;
 const NOT_PURCHASE =
-  /\b(return\w*|retour\w*|devoluci\w*|exp|expir\w*|vence|vencimiento|valid\w*|best before|use by|until|hasta|due date)\b/;
+  /\b(return\w*|retour\w*|devoluci\w*|exchang\w*|exp|expir\w*|vence|vencimiento|valid\w*|before|use by|until|thru|through|hasta|due date|dob|birth\w*|naissance|nacimiento)\b/;
 
 type DateHit = {
   /** One reading, or two for "07/10/2026" with both numbers 12 or below. */
@@ -898,49 +959,56 @@ function datesOnRow(folded: string): DateHit[] {
   return hits;
 }
 
+/** Day first, month first, or contradicting itself. */
+type Order = 'day' | 'month' | 'conflict';
+
+const US_STATES =
+  'AL|AK|AZ|AR|CA|CO|CT|DE|DC|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|PR|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY';
+const US_ADDRESS = new RegExp(`\\b(${US_STATES}),? \\d{5}(?:-\\d{4})?\\b`);
+/** Printed only where dates are written day first: the UK, Australia, Mexico, Quebec. */
+const STRONG_DAY_FIRST =
+  /£|\bgbp\b|\bvat\b|\btax ?invoice\b|\babn\b|\beftpos\b|\baud\b|\bgst incl|\b(nsw|vic|qld|tas|act|wa|sa|nt) \d{4}\b|\br\.? ?f\.? ?c\b|\bc\.? ?p\.? ?\d{5}\b|\bmxn\b|\btps\b|\btvq\b|\(qc\)/;
+const STRONG_MONTH_FIRST = /\bsales tax\b|\busd\b/;
+/** Spanish and French words: printed by US and Canadian shops too, so they only lean. */
+const WEAK_DAY_FIRST =
+  /\biva\b|\bfecha\b|\btotal a pagar\b|\bgracias\b|\bsous-? ?total\b|\bmontant\b|\ba payer\b|\bpourboire\b|\bmonnaie\b|\bmerci\b/;
+
 /**
- * Whether the receipt itself says how it writes dates. Inference order for a numeric date whose
- * day and month are both 12 or below:
- *   1. the receipt: "£", VAT (UK), ABN, EFTPOS, GST included, a state and postcode (Australia),
- *      IVA, RFC, FECHA, C.P. (Mexico), TPS, TVQ or French wording (Quebec) all mean day first;
- *      a US state and ZIP, or sales tax, mean month first; English Canada (GST/HST/PST) prints both,
- *      so it does not decide;
+ * How a numeric date whose day and month are both 12 or below is read. Inference order:
+ *   1. what the receipt prints that only one side of the world prints: "£", VAT, ABN, EFTPOS, an
+ *      Australian state and postcode, RFC, C.P., MXN, TPS, TVQ, "(QC)" mean day first; a US state
+ *      and ZIP, sales tax or USD mean month first; both at once is a contradiction, and the date is
+ *      left blank;
  *   2. the phone's region (`options.dayFirst`);
- *   3. the reading that is not in the future and is closest to today.
- * A date printed year first is never ambiguous.
+ *   3. Spanish or French wording (FECHA, GRACIAS, MERCI, SOUS-TOTAL...), which leans day first;
+ *   4. nothing: English Canada prints both orders, so the reading that is not in the future and is
+ *      nearest today.
+ * A reading after today is dropped. When the side chosen in 1-3 reads as a future day, the date
+ * is left blank rather than flipped: the other reading would be a guess. A date printed year first,
+ * or with a day above 12, is never ambiguous.
  */
-function receiptDayFirst(rows: Row[]): boolean | undefined {
+function dateOrder(rows: Row[], options: ParseOptions): Order | undefined {
   const all = rows.map((row) => row.folded).join('\n');
   const raw = rows.map((row) => row.text).join('\n');
-  if (
-    /£|\bgbp\b/.test(all) ||
-    /\bvat\b/.test(all) ||
-    /\btax ?invoice\b|\babn\b|\beftpos\b|\baud\b|\bgst incl|\b(nsw|vic|qld|tas|act|wa|sa|nt) \d{4}\b/.test(
-      all,
-    ) ||
-    /\biva\b|\br\.? ?f\.? ?c\b|\bfecha\b|\bc\.? ?p\.? ?\d{5}\b|\bmxn\b|\btotal a pagar\b|\bgracias\b/.test(
-      all,
-    ) ||
-    /\btps\b|\btvq\b|\(qc\)|\bsous-? ?total\b|\bmontant\b|\ba payer\b|\bpourboire\b|\bmonnaie\b|\bmerci\b/.test(
-      all,
-    )
-  ) {
-    return true;
-  }
-  if (/\b[A-Z]{2},? \d{5}(?:-\d{4})?\b/.test(raw) || /\bsales tax\b|\busd\b/.test(all))
-    return false;
-  return undefined;
+  const day = STRONG_DAY_FIRST.test(all);
+  const month = US_ADDRESS.test(raw) || STRONG_MONTH_FIRST.test(all);
+  if (day && month) return 'conflict';
+  if (day || month) return day ? 'day' : 'month';
+  if (options.dayFirst !== undefined) return options.dayFirst ? 'day' : 'month';
+  return WEAK_DAY_FIRST.test(all) ? 'day' : undefined;
 }
 
 function readDate(page: Page, options: ParseOptions): string | undefined {
   const today = options.today ?? new Date();
+  const now = localIso(today);
+  // A shop in a later time zone can print tomorrow's date, but only an unambiguous one counts.
   const limit = localIso(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1));
-  const usable = (value: string | undefined) =>
-    value !== undefined && value >= '2000-01-01' && value <= limit ? value : undefined;
+  const usable = (value: string | undefined, last = limit) =>
+    value !== undefined && value >= '2000-01-01' && value <= last ? value : undefined;
 
-  let order: boolean | undefined | null = null;
-  const dayFirst = () => {
-    if (order === null) order = receiptDayFirst(page.rows) ?? options.dayFirst;
+  let order: Order | undefined | null = null;
+  const resolve = () => {
+    if (order === null) order = dateOrder(page.rows, options);
     return order;
   };
 
@@ -951,14 +1019,12 @@ function readDate(page: Page, options: ParseOptions): string | undefined {
       if (hit.only !== undefined) {
         value = usable(hit.only);
       } else {
-        const df = usable(hit.dayFirst);
-        const mf = usable(hit.monthFirst);
-        const preferred = dayFirst();
-        if (preferred === true) value = df ?? mf;
-        else if (preferred === false) value = mf ?? df;
-        // Neither the receipt nor the phone says: the later reading, as a receipt is scanned soon
-        // after it is printed and both are already past.
-        else value = df && mf ? (df > mf ? df : mf) : (df ?? mf);
+        const df = usable(hit.dayFirst, now);
+        const mf = usable(hit.monthFirst, now);
+        const side = resolve();
+        if (side === 'day') value = df;
+        else if (side === 'month') value = mf;
+        else if (side === undefined) value = df && mf ? (df > mf ? df : mf) : (df ?? mf);
       }
       if (value === undefined) continue;
       if (!best || hit.score > best.score) best = { value, score: hit.score };
@@ -975,7 +1041,8 @@ function readDate(page: Page, options: ParseOptions): string | undefined {
  * The last four digits of the card used. Masked forms only: a bare four-digit run is never
  * accepted, as receipts are full of them (store numbers, times, totals).
  */
-export function parseLast4(text: string): string | undefined {
+export function parseLast4(input: string): string | undefined {
+  const text = typeof input === 'string' ? input : '';
   const masked = text.match(/(?:[*x#•]{2,}\s*|ending\s+(?:in\s+)?|acct\s*#?\s*)(\d{4})\b/i);
   if (masked) return masked[1];
 
@@ -995,15 +1062,18 @@ const STREET =
   /\b(street|st|road|rd|avenue|ave|av|boulevard|blvd|boul|bd|drive|dr|lane|ln|way|highway|hwy|parkway|pkwy|place|pl|court|ct|crescent|cres|terrace|tce|parade|pde|square|sq|close|grove|row|plaza|suite|ste|unit|floor|rue|chemin|ch|rang|route|rte|montee|cote|calle|avenida|calzada|calz|carretera|carr|colonia|col|privada|prol|prolongacion|paseo|periferico|circuito|andador|esquina|esq|local|piso|mall|centre|center|market place|retail park)\b/;
 const STREET_FIRST =
   /^(av|ave|avenida|calle|calzada|calz|blvd|boul|boulevard|bd|rue|chemin|ch|carretera|paseo|prol|privada|col|colonia)\b/;
+// Postcodes allow for letters read in place of digits, but a match needs one real digit:
+// otherwise "PHO BAR" or "TAQUERIA EL SOL" reads as one.
 const POSTAL = [
   /\b[a-z]{2}\.? \d{5}(?:-\d{4})?\b/, // US state and ZIP
   /\b[a-z][0-9oil][a-z] ?[0-9oil][a-z][0-9oil]\b/, // Canada A1A 1A1
-  /\b[a-z]{1,2}[0-9oil][a-z0-9]? [0-9oilbszg][a-z]{2}\b/, // UK postcode
   /\b(nsw|vic|qld|tas|act|wa|sa|nt) \d{4}\b/, // Australia state and postcode
   /\bc\.? ?p\.? ?\d{5}\b/, // Mexico C.P.
   /\((qc|quebec|on|ontario|bc|ab|mb|sk|ns|nb|nl|pe)\)/, // "Montréal (Québec)"
   /\b(ab|bc|mb|nb|nl|ns|nt|nu|on|pe|qc|sk|yt) [a-z0-9]{3} ?[a-z0-9]{3}$/, // a misread postal code
 ];
+/** Only looked for on a British receipt (one showing £ or VAT): the shape is too common. */
+const UK_POSTCODE = /\b[a-z]{1,2}[0-9oil][a-z0-9]? [0-9oilbszg][a-z]{2}\b/;
 /** "Guadalajara, Jal.", "Monterrey, N.L.", "Toluca. Edo. Mex.", "Ciudad de Mexico, CDMX". */
 const CITY_AND_STATE = /, ?([a-z]{1,4}\.? ?){1,3}$|\. ?([a-z]{1,4}\. ?){1,3}$/;
 const PHONE_WORD = /\b(tel|telephone|telefono|ph|phone|fax|tlf|whatsapp)\b/;
@@ -1042,22 +1112,24 @@ function isJunk(text: string, letters: number): boolean {
   return strokes >= compact.length * 0.7;
 }
 
-function isAddress(folded: string): boolean {
-  if (POSTAL.some((pattern) => pattern.test(folded))) return true;
+function isAddress(folded: string, uk: boolean): boolean {
+  const postcode = (pattern: RegExp) => /\d/.test(folded.match(pattern)?.[0] ?? '');
+  if (POSTAL.some(postcode) || (uk && postcode(UK_POSTCODE))) return true;
   if (CITY_AND_STATE.test(folded) && /[a-z]{3}/.test(folded)) return true;
   const hasDigit = /\d/.test(folded);
   if (hasDigit && STREET.test(folded)) return true;
-  if (STREET_FIRST.test(folded)) return true;
+  // "BOULEVARD BURGER", "RUE LA LA": a street word starts a shop's name too; an address has a number.
+  if (hasDigit && STREET_FIRST.test(folded)) return true;
   // "1701 W Broadway": a house number and words.
   return /^\d{1,5}[a-z]?,? [a-z]/.test(folded) && folded.split(' ').length >= 3;
 }
 
 /** Why a header row cannot be the shop's name, if it cannot. */
-function excluded(text: string, folded: string): string | undefined {
+function excluded(text: string, folded: string, uk = false): string | undefined {
   const letters = (folded.match(/[a-z]/g) ?? []).length;
   if (isJunk(text, letters)) return 'junk';
   if (text.length > 48) return 'long';
-  if (isAddress(folded)) return 'address';
+  if (isAddress(folded, uk)) return 'address';
   if (PHONE_WORD.test(folded) || PHONE.test(folded)) return 'phone';
   if (WEB.test(folded)) return 'web';
   if (DATE_OR_TIME.test(folded)) return 'date';
@@ -1154,7 +1226,7 @@ function headerCandidates(page: Page): Candidate[] {
   let eligible = 0;
   const judge = (raw: string) => {
     const text = withoutStoreNumber(withoutGreeting(raw));
-    return { text, why: text ? excluded(text, fold(text)) : 'empty' };
+    return { text, why: text ? excluded(text, fold(text), page.uk) : 'empty' };
   };
 
   for (let index = 0; index < rows.length && index < 14; index++) {
@@ -1280,7 +1352,7 @@ function nameClues(page: Page): Clue[] {
     if (next && NAMED_WRAPPED.test(folded) && /( (at|from|in|chez|en|de|a|au)|:)$/.test(folded)) {
       const name = cleanName(next.text);
       const nextFolded = fold(name);
-      const why = excluded(name, nextFolded);
+      const why = excluded(name, nextFolded, page.uk);
       if (!NOT_A_SHOP.test(nextFolded) && (!why || why === 'paperwork' || why === 'money label')) {
         clues.push({ name, kind: 'thanks' });
       }
@@ -1355,40 +1427,45 @@ function spaced(text: string): string {
 }
 
 /**
- * The catalogue's name for a printed one, if any. Case, accent, punctuation and space blind; a
- * short name (BP, IGA, M&S) must match the whole line, a longer one may sit inside it as whole
- * words ("WALMART SUPERCENTER"). The longest matching name wins, so a line naming "Shoppers Drug
- * Mart" is not taken for a shorter brand inside it.
+ * The catalogue's name for a printed one, if any; case, accent, punctuation and space blind. A
+ * brand's own name may be the whole line or, from six letters, whole words inside it ("WALMART
+ * SUPERCENTER"); a shorter one inside a longer line is too often another business ("CRAVE
+ * BURGERS" is not the streaming service). An alias or web domain must be the whole line: aliases
+ * name products as often as shops ("office" for Microsoft 365 would take OFFICE DEPOT). The
+ * longest match wins, so "Shoppers Drug Mart" is not taken for a shorter brand inside it. One
+ * misread letter is forgiven only against a brand name of seven letters or more.
  */
 function matchHint(text: string, brands: readonly BrandHint[]): string | undefined {
   const flat = squash(text);
   const words = spaced(text);
-  if (!flat) return undefined;
+  // A single character (a signature "X", a stray letter) never names a shop.
+  if (flat.length < 2) return undefined;
   let found: { name: string; length: number } | undefined;
+  const take = (name: string, length: number) => {
+    if (!found || length > found.length) found = { name, length };
+  };
   for (const brand of brands) {
-    const names = [brand.name, ...(brand.aliases ?? [])];
+    const key = squash(brand.name);
+    if (
+      key.length >= 2 &&
+      (key === flat || (key.length >= 6 && words.includes(spaced(brand.name))))
+    ) {
+      take(brand.name, key.length);
+    }
+    if ((brand.aliases ?? []).some((alias) => squash(alias) === flat))
+      take(brand.name, flat.length);
     const domain = brand.domain
-      ? brand.domain
-          .toLowerCase()
-          .replace(/^www\./, '')
-          .split('.')[0]
-      : '';
-    for (const name of names) {
-      const key = squash(name);
-      if (!key) continue;
-      const hit = key.length <= 4 ? flat === key : flat === key || words.includes(spaced(name));
-      if (hit && (!found || key.length > found.length))
-        found = { name: brand.name, length: key.length };
-    }
-    if (domain && squash(domain) === flat && (!found || flat.length > found.length)) {
-      found = { name: brand.name, length: flat.length };
-    }
+      ?.toLowerCase()
+      .replace(/^www\./, '')
+      .split('.')[0];
+    if (domain && squash(domain) === flat) take(brand.name, flat.length);
   }
   if (found || flat.length < 7) return found?.name;
   // One letter misread in a long name ("OFFICE DEPOI"): close enough when the whole line is it.
-  return brands.find((brand) =>
-    [brand.name, ...(brand.aliases ?? [])].some((name) => withinOneEdit(flat, squash(name))),
-  )?.name;
+  return brands.find((brand) => {
+    const key = squash(brand.name);
+    return key.length >= 7 && withinOneEdit(flat, key);
+  })?.name;
 }
 
 function withinOneEdit(a: string, b: string): boolean {
@@ -1410,19 +1487,22 @@ function readMerchant(page: Page, options: ParseOptions): string | undefined {
 
   const brands = options.brands;
   if (brands?.length) {
-    // The header, then the clues; the header's lesser rows only when the header itself is weak,
-    // so a product line cannot outrank a printed name the catalogue does not know.
+    // The header first. Footer clues and the header's lesser rows only when the header itself is
+    // weak: a printed name the catalogue does not know must not give way to a delivery platform's
+    // web address ("JOE'S DINER" with "www.doordash.com/joes") or a product line.
     const lines = [
       ...(header ? [header] : []),
       // Vision's other readings of the name, for the letter it may have got wrong.
       ...(best ? page.rows[best.index].cells.flatMap((cell) => cell.alts).map(cleanName) : []),
-      ...clues.map((clue) => clue.name),
       ...(strong
         ? []
-        : candidates
-            .filter((candidate) => !candidate.fragment)
-            .slice(1, 6)
-            .map((candidate) => cleanName(candidate.text))),
+        : [
+            ...clues.map((clue) => clue.name),
+            ...candidates
+              .filter((candidate) => !candidate.fragment)
+              .slice(1, 6)
+              .map((candidate) => cleanName(candidate.text)),
+          ]),
     ];
     for (const line of lines) {
       const hit = matchHint(line, brands);

@@ -1459,3 +1459,27 @@ parallel (a receipt that parses in under 1 ms): it now takes the best of three r
 **Things to know:** Drew's `receipt-parser.accuracy.test.ts` already filters `hold-` fixtures and runs its holdout floors as soon as the
 files exist. The parser in the tree at about 11:00 scored merchant 96.0 (training) / 96.0 (holdout) / 76.3 (hard), flat. Not verified on
 a device; handwriting and glare are drawn, not photographed.
+
+## 2026-10-07 — Theo (Tester) — harness follow-ups from the review (M5 and four more)
+
+**Outcome:** Done, uncommitted. Only my harness, fixture and corpus files changed; parser, native module and `ocr-batch.swift` untouched.
+
+1. **Baseline write is opt-in.** `accuracy.test.ts` writes nothing by default; `RECEIPT_BASELINE_OUT=<file>` or `RECEIPT_BASELINE_WRITE=1` (over
+   `baseline.json`) asks for it. `src/__tests__/fixtures/receipts/baseline.json` is now the FROZEN baseline of the original parser (c7a607c) with an
+   `_about` header, and the only copy: `scripts/receipt-corpus/baseline-v0.json` is deleted (and its `.prettierignore` line). Checked: a full default
+   run leaves its md5 unchanged.
+2. **`today` pinned** to 2026-10-07: `{ today }` passed to the parser and `Date` held there (jest fake timers on Date only, `performance` real), so the
+   original parser, which has no option, is pinned too.
+3. **Parse limit 250 ms** best of three, with the reason in the code (a few ms normally, tens of ms of noise on a busy machine, seconds for a quadratic
+   pattern).
+4. **`next` pass added to the fixtures and the test** (`PASSES = raw, flat, next`; `build-fixtures.py` reads `<id>.next.json` and `.next-timing.json`,
+   `meta.next`). `fixed` dropped from the stored fixtures after grepping: only my harness and `build-fixtures.py` read it, the parser's accuracy test reads
+   raw and flat. Net size 8.94 MB -> 9.09 MB (`next` takes what `fixed` freed). All 531 fixtures' raw, flat and ground truth are byte-identical.
+5. **Two hand-written adversarial receipts** (`adv-card-app`, `adv-gift-card`) in `fixtures/receipts/adversarial/`, written from a one-line description (the
+   reviewer's text was not available to me). They fail on the original parser and pass on the tree's, so nothing is marked known-failing; marks run as
+   `it.failing`.
+
+**Things to know:** the first version of the two fixtures passed even the original parser, so they proved nothing; I made them discriminating before
+keeping them. I first named them `hard-adv-*`, which Drew's `hard-` filter would have counted in his hard numbers; they live in a subfolder now. Drew's
+`receipt-parser.accuracy.test.ts` fails its hard-set total floor (82%) on the parser as it stands (77.5%) and one rule test fails: both are his work in
+progress (his file was being edited as I measured), not the fixtures. Drew and Dilip: the stored `fixed` pass is gone and fixtures now carry `next`.

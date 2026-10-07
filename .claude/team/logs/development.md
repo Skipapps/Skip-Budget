@@ -4151,3 +4151,69 @@ tile whose label wraps more ends taller than its neighbour. Give the Pressable a
 A single-word figure below the 11pt floor would break mid-character (only at an extreme width and amount).
 
 **2026-10-07 — Dana — follow-up to Dmitri's review of cbe48d8:** side-by-side money tiles now grow to their row's height (Pressable and surface `grow`), and a lone figure that would need to go under 11pt scrolls sideways at 11pt instead of breaking between digits (`FitText scrollWhenTooWide`, used by `FitFigure`); tsc 0, jest 184/184 suites, 2638 tests, prettier and ESLint `--no-cache` clean; pinned by the stretch-chain test in cards-large-text (Jest has no layout engine) and the 11pt test in fit-group.
+
+---
+
+## 2026-10-07 — Drew (Developer, money maths) — receipt parser: fixes from Dmitri's review of 29068c7
+
+**Outcome:** Done in `SkipBudget-scan` (branch `receipt-scanning`), not committed. The review's wrong answers are fixed and each
+has a unit test using the reviewer's exact input. As shipped (`next` pass, real catalogue, phone region), the confident wrong
+answers fell on training (stores 11 -> 6, totals 4 -> 2) and stayed level on held-out; merchant accuracy with the catalogue rose
+(training 95.6 -> 97.1). Hard-set totals fell 86.3 -> 76.3 because the largest-amount guess now needs a repeat (CEO's decision);
+those are blanks, and wrong totals fell 9 -> 6. M3 (`src/api/brands.ts`) skipped on the Founder's instruction. tsc 0, eslint 0 (cache
+cleared), prettier clean; parser 79 + 193 + 4, Theo's bench 58; full jest 135/135 suites, 2407/2407.
+
+**Behaviour changed on purpose:** card/gift/new/remaining/rewards/loyalty/stored-value balances, "balance left/restant", "nouveau
+solde", "solde restant", "saldo restante/disponible" are never the total; a tip row with %, "guide" or "sugg" is never added;
+"PAYMENT" without a card named is money handed over; "T0TAL"/"CA5H" read as words; a total printed as a credit (refund) gives a
+blank total; with nothing labelled, the largest figure only when a second row prints it. Dates: strong evidence (£, VAT, ABN,
+EFTPOS, AU postcode, RFC, C.P., MXN, TPS, TVQ, (QC) / US state + ZIP, sales tax, USD) decides; then the phone; then Spanish or
+French words; strong evidence both ways, or the chosen reading lying after today, leaves an ambiguous date blank (no flip); an
+ambiguous pair never reads as tomorrow; DOB, birth, exchange, thru/through and "before" lines are never the purchase date.
+Merchant: postcodes need a real digit, the UK shape only on a page with £ or VAT, a street word at the start needs a number (PHO BAR,
+TAQUERIA EL SOL, BOULEVARD BURGER are names again). Catalogue: aliases and domains match only a whole line; a brand name inside a
+longer line only from 6 letters; one-letter tolerance only against brand names of 7+ letters; no 1-character brand; footer clues
+only under a weak header. Lines capped at 300 characters (a 50,000-digit line was 14.9 s, now about 9 ms) and 2000 lines;
+missing text or candidates are tolerated. `ScanDraft.complete` (read by nothing) removed. Tests changed with reasons: 4 pinned
+largest-amount tests (M1), 2 French "$" tests and 1 positioned "$" test now put the figure on a card line or a repeated row so they
+still test the "$" rule; UK postcode test moved to a British receipt; "flip to the other reading" test now expects blank (B5).
+New: `src/lib/__fixtures__/brand-catalogue.json` (372 rows of the newest brand sync migration, directory order) and the floors test
+rewritten for the shipping combination with ceilings on wrong answers.
+
+**Not done:** the add-receipt upload fallback to `recognizeText` "only on a build lacking recognizeReceipt": the module returns `[]`
+for both that and "no text found", so the call site cannot tell them apart without a change in `modules/receipt-scanner` (Dilip's).
+
+---
+
+## 2026-10-07 — Dilip (Developer, native and platform) — review fixes B1, M6 and minors on 29068c7
+
+**Outcome:** Done in `SkipBudget-scan`, nothing committed, no xcodebuild, no `ios/`. Swift parses; typechecks against
+the iOS 26.5 SDK (stub ExpoModulesCore) with 0 diagnostics in Swift 5 mode at iOS 16.4 and 15.1; Swift 6 mode shows the
+same 2 errors / 24 warnings as HEAD, all in the untouched camera controller. A Mac Catalyst build of the real module
+(UIKit, stub Expo) reproduces the bench port line for line. tsc 0, eslint clean, prettier clean, full jest 135/135
+suites, 2408 tests; baseline.json untouched.
+
+**B1 (screenshots cropped to a card):** a file that records no exposure (no EXIF ExposureTime/FNumber: screenshots,
+downloads, scans) whose found page is square to the frame (every edge within 0.6 degrees; cards and scans 0.06-0.45,
+photographed receipts never under 0.74) is read whole first, and cropped only when no more than 24 legible characters
+lie outside the page (app chrome 14-16; shop and date above an item card 60+). Camera captures and in-app camera:
+unchanged. Dmitri's prototype (1.5x character test for every non-camera file) fixed his card but kept the crop on
+large cards (whole/card ratio 1.32-1.34): s4/s7 lost store and date, s5 read total 18.00 for 93.63. Result: s1/s2/s3
+22 lines, Blue Bottle Coffee / 23.45 / 2026-10-03 (committed and working parser); s4-s7 all right.
+Bench before/after (committed parser, Theo's harness, his build-fixtures into scratch): training, holdout, hard: 0
+outcome flips on next, raw/flat identical; same with Drew's working parser. Second passes: training 6 to 22, holdout
+2 to 13, hard 6 to 6 (the 27 square scans and app receipts, +0.3-0.6 s each); photos unchanged.
+
+**M6 (big JPEG decode):** past 25 MP the decode is halved or quartered (ImageIO decodes a JPEG at reduced size only for
+half or less). Catalyst peak RSS / wall: 48 MP JPEG 501 MB / 2.9 s to 315 MB / 1.9 s; 80 MP 740 MB / 2.7 s to 404 MB /
+1.7 s; 12 and 24 MP JPEG and all HEIC unchanged (314 / 448 MB, 165-171 MB). 48 MP small-in-frame receipts read at
+12 MP: 96.7 / 98.3 / 98.3 / 93.3 vs 25 MP 93.3 / 95.0 / 100.0 / 90.0 and full 95.0 / 91.7 / 98.3 / 86.7 (lines 2779 /
+2807 / 2773).
+
+**Minors:** transparent PNG put on white (0 to 28 lines). Temp JPEG no longer written by the camera or the document
+scanner (50-170 ms and a 0.7-2.3 MB file per scan, read by nothing in src); `imageUri` stays in the result as null.
+New `hasLayoutRecognition()` in modules/receipt-scanner/index.ts (+ test) for the add-receipt fallback.
+
+**Not verified:** a device; whether real photos picked from Photos keep ExposureTime (iPhone files do; a photo whose
+EXIF was stripped takes the non-camera branch, which only differs for square pages); 12 and 24 MP JPEG uploads still
+peak at 314 / 448 MB on the Mac (the shipping camera path peaks at 408 MB on a 12 MP shot there).

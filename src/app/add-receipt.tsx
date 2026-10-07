@@ -58,6 +58,7 @@ import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import {
   captureReceipt,
+  hasLayoutRecognition,
   isCaptureAvailable,
   isRecognitionAvailable,
   isScanningAvailable,
@@ -446,8 +447,10 @@ function ReceiptForm({
       setReading(true);
       const lines = await recognizeReceipt(uri);
       const options = receiptParseOptions(directory);
+      // The flat text is only for an older native build; an empty list from a current one means
+      // there is no text to find, and reading the file again would find none.
       applyScan(
-        lines.length
+        lines.length || hasLayoutRecognition()
           ? parseReceiptFromLines(lines, options)
           : parseReceipt(await recognizeText(uri), options),
         'upload',

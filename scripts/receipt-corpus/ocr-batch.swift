@@ -14,9 +14,11 @@
 //   <name>.fixed.json   the flattened page read with ["en-US","fr-FR","es-ES"] + automatic language
 //   <name>.timing.json  milliseconds per pass, and what the flattening step did to the page
 //
-// next, the module as it is now (camera and upload paths read a photo the same way):
-//   <name>.next.json         lines from `readPhoto`: upright decode (EXIF applied, pixel cap), the
-//                            guarded flatten, languages en-US/es-ES/fr-FR, reading order
+// next, the module as it is now, reading the file as the upload path would:
+//   <name>.next.json         lines from `readPhoto`: upright decode (EXIF applied, pixel cap, white
+//                            under transparency), the guarded flatten (a square page in a file that
+//                            records no exposure is cropped only when nothing but screen chrome lies
+//                            outside it), languages en-US/es-ES/fr-FR, reading order
 //   <name>.next-timing.json  milliseconds per step, how many Vision passes, which image was kept
 //
 // The functions below are ports of the ones in modules/receipt-scanner/ios/ReceiptScannerModule.swift
@@ -158,7 +160,9 @@ func recognize(
 let maxPixels: CGFloat = 25_000_000
 
 /// Module: `uprightPhoto(at:)`. ImageIO applies the EXIF orientation and the pixel cap in one decode.
-func uprightPhoto(_ source: CGImageSource) -> CGImage? {
+/// `fromCamera`: the file records an exposure. The corpus PNGs carry none, so every corpus image
+/// takes the module's non-camera branch (which differs only for a page square to the frame).
+func uprightPhoto(_ source: CGImageSource) -> (image: CGImage, fromCamera: Bool)? {
   guard CGImageSourceGetCount(source) > 0 else { return nil }
 
   let index = CGImageSourceGetPrimaryImageIndex(source)
@@ -168,20 +172,46 @@ func uprightPhoto(_ source: CGImageSource) -> CGImage? {
         width > 0, height > 0
   else { return nil }
 
-  let pixels = CGFloat(width) * CGFloat(height)
-  let shrink = pixels > maxPixels ? (maxPixels / pixels).squareRoot() : 1
+  var shrink = 1
+  while CGFloat(width) * CGFloat(height) / CGFloat(shrink * shrink) > maxPixels, shrink < 8 {
+    shrink *= 2
+  }
   let options: [CFString: Any] = [
     kCGImageSourceCreateThumbnailFromImageAlways: true,
     kCGImageSourceCreateThumbnailWithTransform: true,
     kCGImageSourceShouldCacheImmediately: true,
-    kCGImageSourceThumbnailMaxPixelSize: max(1, Int(CGFloat(max(width, height)) * shrink)),
+    kCGImageSourceThumbnailMaxPixelSize: max(1, max(width, height) / shrink),
   ]
-  return CGImageSourceCreateThumbnailAtIndex(source, index, options as CFDictionary)
+  guard let decoded = CGImageSourceCreateThumbnailAtIndex(source, index, options as CFDictionary)
+  else { return nil }
+
+  let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any]
+  let fromCamera = exif?[kCGImagePropertyExifExposureTime] != nil
+    || exif?[kCGImagePropertyExifFNumber] != nil
+  let hasAlpha = (properties[kCGImagePropertyHasAlpha] as? Bool) ?? false
+  return (hasAlpha ? onWhite(decoded) : decoded, fromCamera)
 }
 
-/// Module: `minimumPageShare`, `minimumFlatLines`.
+/// Module: `onWhite(_:)` (the module fills with UIColor.white).
+func onWhite(_ image: CGImage) -> CGImage {
+  let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+  guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+        let context = CGContext(
+          data: nil, width: image.width, height: image.height, bitsPerComponent: 8,
+          bytesPerRow: 0, space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+  else { return image }
+
+  context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+  context.fill(bounds)
+  context.draw(image, in: bounds)
+  return context.makeImage() ?? image
+}
+
+/// Module: `minimumPageShare`, `minimumFlatLines`, `squareTolerance`, `chromeCharacters`.
 let minimumPageShare: CGFloat = 0.10
 let minimumFlatLines = 5
+let squareTolerance: CGFloat = 0.6
+let chromeCharacters = 24
 
 struct NextInfo {
   var detectMs = 0.0
@@ -193,23 +223,63 @@ struct NextInfo {
   var quadTopDown: [[Double]] = []
   var flatLines = -1
   var wholeLines = -1
-  /// "whole" (no usable page), "flat", or after a doubtful crop "flat-checked" / "whole-checked".
+  var fromCamera = false
+  /// Largest angle between a page edge and the image's axes, in degrees (-1 without a page).
+  var skewDegrees = -1.0
+  /// Legible characters the whole reading has outside a square page (-1 when not measured).
+  var outsideCharacters = -1
+  /// "whole" (no usable page), "flat", after a doubtful crop "flat-checked" / "whole-checked";
+  /// for a page square to the frame in a file with no exposure, "whole-square" (text around it) or
+  /// "flat-square" / "whole-square-checked" (only screen chrome around it).
   var kept = ""
   var cropWidth = 0
   var cropHeight = 0
 }
 
-/// Module: `read(photo:)`.
-func readPhoto(_ photo: CGImage, info: inout NextInfo) -> [[String: Any]] {
+/// Module: `read(photo:fromCamera:)`.
+func readPhoto(_ photo: CGImage, fromCamera: Bool, info: inout NextInfo) -> [[String: Any]] {
+  info.fromCamera = fromCamera
   var started = DispatchTime.now()
   let outline = pageOutline(in: photo)
   info.detectMs = milliseconds(since: started)
   info.found = outline != nil
   if let outline {
     info.pageShare = Double(area(of: outline))
+    info.skewDegrees = Double(skew(of: outline, in: photo))
     info.quadTopDown = [outline.topLeft, outline.topRight, outline.bottomRight, outline.bottomLeft].map {
       [Double($0.x), 1 - Double($0.y)]
     }
+  }
+
+  if let outline, !fromCamera, skew(of: outline, in: photo) <= squareTolerance {
+    started = DispatchTime.now()
+    let wholeLines = recognizeNext(in: photo)
+    info.recognizeMs = milliseconds(since: started)
+    info.passes = 1
+    info.wholeLines = wholeLines.count
+    info.outsideCharacters = legibleCharacters(in: wholeLines, outside: outline)
+    info.cropWidth = photo.width
+    info.cropHeight = photo.height
+    started = DispatchTime.now()
+    let flat = info.outsideCharacters > chromeCharacters ? nil : flattened(photo, to: outline)
+    info.flattenMs = milliseconds(since: started)
+    guard let flat else {
+      info.kept = "whole-square"
+      return wholeLines
+    }
+    started = DispatchTime.now()
+    let flatLines = recognizeNext(in: flat)
+    info.recognizeMs += milliseconds(since: started)
+    info.passes = 2
+    info.flatLines = flatLines.count
+    if legibleCharacters(in: wholeLines) * 2 > legibleCharacters(in: flatLines) * 3 {
+      info.kept = "whole-square-checked"
+      return wholeLines
+    }
+    info.kept = "flat-square"
+    info.cropWidth = flat.width
+    info.cropHeight = flat.height
+    return flatLines
   }
 
   started = DispatchTime.now()
@@ -272,6 +342,22 @@ func pageOutline(in cgImage: CGImage) -> VNRectangleObservation? {
   return request.results?.first
 }
 
+/// Module: `isSquare(_:in:)`, as the angle it compares with `squareTolerance`.
+func skew(of outline: VNRectangleObservation, in image: CGImage) -> CGFloat {
+  let width = CGFloat(image.width)
+  let height = CGFloat(image.height)
+  let corners = [outline.topLeft, outline.topRight, outline.bottomRight, outline.bottomLeft]
+
+  var worst: CGFloat = 0
+  for (index, start) in corners.enumerated() {
+    let end = corners[(index + 1) % corners.count]
+    let run = abs(end.x - start.x) * width
+    let rise = abs(end.y - start.y) * height
+    worst = max(worst, atan2(min(run, rise), max(run, rise)) * 180 / .pi)
+  }
+  return worst
+}
+
 /// Module: `area(of:)`.
 func area(of outline: VNRectangleObservation) -> CGFloat {
   let corners = [outline.topLeft, outline.topRight, outline.bottomRight, outline.bottomLeft]
@@ -300,6 +386,20 @@ func flattened(_ cgImage: CGImage, to page: VNRectangleObservation) -> CGImage? 
 
   guard let output = filter.outputImage else { return nil }
   return CIContext().createCGImage(output, from: output.extent)
+}
+
+/// Module: `legibleCharacters(in:outside:)`.
+func legibleCharacters(in lines: [[String: Any]], outside outline: VNRectangleObservation) -> Int {
+  let page = CGMutablePath()
+  page.addLines(between: [outline.topLeft, outline.topRight, outline.bottomRight, outline.bottomLeft])
+  page.closeSubpath()
+
+  return legibleCharacters(in: lines.filter { line in
+    guard let x = line["x"] as? CGFloat, let y = line["y"] as? CGFloat,
+          let width = line["width"] as? CGFloat, let height = line["height"] as? CGFloat
+    else { return false }
+    return !page.contains(CGPoint(x: x + width / 2, y: 1 - y - height / 2))
+  })
 }
 
 /// Module: `legibleCharacters(in:)`. The module stores confidence as Float, the bench as Double.
@@ -409,7 +509,7 @@ func processNext(at url: URL, force: Bool) -> [String: Any]? {
 
   let started = DispatchTime.now()
   guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-        let photo = uprightPhoto(source)
+        let (photo, fromCamera) = uprightPhoto(source)
   else {
     FileHandle.standardError.write(Data("cannot read \(url.lastPathComponent)\n".utf8))
     return nil
@@ -417,7 +517,7 @@ func processNext(at url: URL, force: Bool) -> [String: Any]? {
   let loadMs = milliseconds(since: started)
 
   var info = NextInfo()
-  let lines = readPhoto(photo, info: &info)
+  let lines = readPhoto(photo, fromCamera: fromCamera, info: &info)
   let timing: [String: Any] = [
     "width": photo.width,
     "height": photo.height,
@@ -436,6 +536,9 @@ func processNext(at url: URL, force: Bool) -> [String: Any]? {
     "flatLines": info.flatLines,
     "wholeLines": info.wholeLines,
     "kept": info.kept,
+    "fromCamera": info.fromCamera,
+    "skewDegrees": info.skewDegrees,
+    "outsideCharacters": info.outsideCharacters,
     "cropWidth": info.cropWidth,
     "cropHeight": info.cropHeight,
   ]

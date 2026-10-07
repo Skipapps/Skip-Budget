@@ -80,3 +80,30 @@ Changes after the first look (each a failure class seen on the held-out set, fix
 Held-out flat is within five points of training on every metric (all three: 90.1 against 94.3). The
 hard set's main loss is newspaper text behind the receipt read into its rows (stressor `bgtext`): it
 needs the receipt's own region found first, which no rule here does.
+
+## Review fixes (Dmitri's review of 29068c7), measured as shipped
+
+`next` pass (the current native reader), real 372-brand catalogue passed, `dayFirst` from each
+receipt's market, `today` 2026-10-07. Wrong = a confident wrong answer (out of n).
+
+| set | parser | named | abstain | total | date | all three | wrong store / total / date |
+| --- | ------ | ----- | ------- | ----- | ---- | --------- | -------------------------- |
+| training 300 | 29068c7 | 95.6 | 96.3 | 98.0 | 99.0 | 93.3 | 11 / 4 / 1 |
+| training | now | 97.1 | 100 | 97.0 | 99.0 | 94.3 | 6 / 2 / 1 |
+| holdout 151 | 29068c7 | 95.0 | 100 | 96.7 | 100 | 92.1 | 3 / 1 / 0 |
+| holdout | now | 96.4 | 100 | 96.0 | 100 | 92.7 | 3 / 1 / 0 |
+| hard 80 | 29068c7 | 78.4 | 66.7 | 86.3 | 86.3 | 61.3 | 16 / 9 / 3 |
+| hard | now | 78.4 | 66.7 | 76.3 | 86.3 | 56.3 | 16 / 6 / 3 |
+
+The catalogue's own spelling counts as right ("Costco" for COSTCO WHOLESALE, "CVS" for CVS PHARMACY;
+12 receipts, all of them those two). Scored strictly instead, training named is 93.0 now against 91.6
+before. Without the catalogue, now: training 96.7 / wrong 7 stores, so the catalogue is a net gain.
+
+What moved: catalogue aliases only as a whole line, brand name inside a longer line only from 6
+letters, fuzzy only against brand names of 7+ letters, nothing of one character, footer clues only
+under a weak header (wrong stores 11 -> 6); store-card and gift-card balances skipped; tip guides and
+suggestions never added; refunds blank; the largest-amount fallback only when a second row repeats
+the figure (the CEO's call: hard total 86.3 -> 76.3, wrong 9 -> 6, all blanks); the UK postcode shape
+only on a page showing £ or VAT and every postcode needs a real digit (held-out named 95.0 -> 96.4);
+dates decided by strong evidence first, the phone, then Spanish/French words, contradictions and
+future readings of an ambiguous pair left blank (no bench change; fixes US receipts saying GRACIAS).

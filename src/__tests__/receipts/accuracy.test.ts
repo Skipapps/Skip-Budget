@@ -21,19 +21,41 @@ const { parseReceiptFromLines } = parser;
 /**
  * Receipt-scanning bench. Every fixture is one synthetic receipt photograph, its ground truth, and
  * what Apple Vision made of it three ways (see scripts/receipt-corpus/README.md):
- *   raw   the app's Vision request on the untouched photo (the upload path)
- *   flat  after normalised + flattened (the camera path the app ships)
- *   fixed the flattened page read with languages Vision actually has models for
+ *   raw   the first baseline's Vision request on the untouched photo (the old upload path)
+ *   flat  after the old normalised + flattened (the old camera path)
+ *   next  the native module as it is now: upright decode, guarded flatten, en/es/fr, reading order
  *
- * The first describe MEASURES the parser, per set (training, holdout, hard), and writes baseline.json.
- * It never fails on low accuracy: that is the number to beat. The other describes keep the bench honest.
+ * The first describe MEASURES the parser, per set (training, holdout, hard). It never fails on low
+ * accuracy: that is the number to beat. The other describes keep the bench honest. Nothing is
+ * written by default: `src/__tests__/fixtures/receipts/baseline.json` is the FROZEN baseline of the
+ * original parser and `npm test` must leave it alone. To write numbers, ask:
+ *   RECEIPT_BASELINE_OUT=/tmp/numbers.json   write them there
+ *   RECEIPT_BASELINE_WRITE=1                  write them over baseline.json (to refreeze it)
+ * and RECEIPT_RESULTS_OUT=/tmp/each.json dumps every receipt's answer.
  */
 
 const FIXTURE_DIR =
   process.env.RECEIPT_FIXTURES ?? path.join(__dirname, '..', 'fixtures', 'receipts');
-const BASELINE_FILE = process.env.RECEIPT_BASELINE_OUT ?? path.join(FIXTURE_DIR, 'baseline.json');
+const BASELINE_FILE =
+  process.env.RECEIPT_BASELINE_OUT ??
+  (process.env.RECEIPT_BASELINE_WRITE ? path.join(FIXTURE_DIR, 'baseline.json') : undefined);
 
-const PASSES = ['raw', 'flat', 'fixed'] as const;
+/**
+ * The calendar the corpus was drawn on. Which of two readings of 07/10/2026 is in the future
+ * depends on it, so the parser is told it explicitly and Date is held there while it runs (the
+ * original parser has no `today` option and asks the clock).
+ */
+const TODAY = new Date(2026, 9, 7, 12);
+
+/**
+ * A parse takes a few milliseconds here (the slowest receipt of the bench takes under 10). The limit
+ * sits far above that on purpose: a busy machine adds tens of milliseconds of scheduling noise to any
+ * one timing, while the regression this guards against, a quadratic or backtracking pattern on a
+ * 300-line receipt, costs seconds. Each receipt is timed three times and the best counts.
+ */
+const PARSE_LIMIT_MS = 250;
+
+const PASSES = ['raw', 'flat', 'next'] as const;
 type Pass = (typeof PASSES)[number];
 
 type Expected = {
@@ -62,6 +84,8 @@ type Expected = {
   set?: string;
   stress?: string[];
   source?: string;
+  /** Hand-written fixtures only: "field:pass" entries that fail today and must keep failing until fixed. */
+  knownFailing?: string[];
   photo: { paperQuad: number[][]; level: string; canvas: number[]; fill: number };
 };
 
@@ -69,22 +93,36 @@ type Fixture = {
   id: string;
   expected: Expected;
   meta: {
-    ms: { raw: number; flat: number; fixed: number; flatten: number };
+    ms: { raw: number; flat: number; next: number; flatten: number };
     flattened: boolean;
     flattenQuad: number[][];
+    next: {
+      kept: string;
+      passes: number;
+      found: boolean;
+      pageShare: number;
+      loadMs: number;
+      detectMs: number;
+      flattenMs: number;
+      recognizeMs: number;
+    };
   };
   raw: ParsedLine[];
   flat: ParsedLine[];
-  fixed: ParsedLine[];
+  next: ParsedLine[];
 };
 
 function loadFixtures(): Fixture[] {
   if (!fs.existsSync(FIXTURE_DIR)) return [];
-  return fs
-    .readdirSync(FIXTURE_DIR)
-    .filter((name) => name.endsWith('.json') && !name.startsWith('baseline'))
-    .sort()
-    .map((name) => JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, name), 'utf8')) as Fixture);
+  const read = (dir: string) =>
+    fs
+      .readdirSync(dir)
+      .filter((name) => name.endsWith('.json') && !name.startsWith('baseline'))
+      .sort()
+      .map((name) => JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')) as Fixture);
+  // The hand-written receipts sit in their own folder, out of the way of loaders that read the flat one.
+  const hand = path.join(FIXTURE_DIR, 'adversarial');
+  return [...read(FIXTURE_DIR), ...(fs.existsSync(hand) ? read(hand) : [])];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -374,7 +412,7 @@ function evaluate(fixture: Fixture, pass: Pass): Outcome {
   for (let attempt = 0; attempt < 3; attempt++) {
     const started = performance.now();
     try {
-      parsed = parseReceiptFromLines(lines);
+      parsed = parseReceiptFromLines(lines, { today: TODAY });
     } catch {
       crashed = true;
     }
@@ -400,16 +438,40 @@ function evaluate(fixture: Fixture, pass: Pass): Outcome {
 type Evaluated = { fixture: Fixture; outcomes: Record<Pass, Outcome> };
 
 function evaluateAll(fixtures: Fixture[]): Evaluated[] {
-  // One parse first so JIT warm-up is not charged to the first receipt.
-  if (fixtures.length) parseReceiptFromLines(fixtures[0].raw);
-  return fixtures.map((fixture) => ({
-    fixture,
-    outcomes: {
-      raw: evaluate(fixture, 'raw'),
-      flat: evaluate(fixture, 'flat'),
-      fixed: evaluate(fixture, 'fixed'),
-    },
-  }));
+  // Only Date is held still: performance.now() and the timers must keep running for the timing check.
+  jest.useFakeTimers({
+    now: TODAY,
+    doNotFake: [
+      'hrtime',
+      'nextTick',
+      'performance',
+      'queueMicrotask',
+      'requestAnimationFrame',
+      'cancelAnimationFrame',
+      'requestIdleCallback',
+      'cancelIdleCallback',
+      'setImmediate',
+      'clearImmediate',
+      'setInterval',
+      'clearInterval',
+      'setTimeout',
+      'clearTimeout',
+    ],
+  });
+  try {
+    // One parse first so JIT warm-up is not charged to the first receipt.
+    if (fixtures.length) parseReceiptFromLines(fixtures[0].raw, { today: TODAY });
+    return fixtures.map((fixture) => ({
+      fixture,
+      outcomes: {
+        raw: evaluate(fixture, 'raw'),
+        flat: evaluate(fixture, 'flat'),
+        next: evaluate(fixture, 'next'),
+      },
+    }));
+  } finally {
+    jest.useRealTimers();
+  }
 }
 
 type Rate = { correct: number; wrong: number; missed: number; rate: number };
@@ -480,7 +542,7 @@ function summariseAll(items: Evaluated[]): Slice {
   return {
     raw: summarise(items, 'raw'),
     flat: summarise(items, 'flat'),
-    fixed: summarise(items, 'fixed'),
+    next: summarise(items, 'next'),
   };
 }
 
@@ -710,15 +772,36 @@ function distribution(values: number[]) {
   };
 }
 
+/** What the native `readPhoto` did: which image it kept, how often it needed a second Vision pass. */
+function nextPassSummary(items: Evaluated[]) {
+  const kept: Record<string, number> = {};
+  for (const { fixture } of items) {
+    kept[fixture.meta.next.kept] = (kept[fixture.meta.next.kept] ?? 0) + 1;
+  }
+  const step = (pick: (n: Fixture['meta']['next']) => number) =>
+    distribution(items.map((i) => pick(i.fixture.meta.next)));
+  return {
+    kept,
+    twoVisionPasses: items.filter((i) => i.fixture.meta.next.passes === 2).length,
+    pageFound: items.filter((i) => i.fixture.meta.next.found).length,
+    stepsMs: {
+      decode: step((n) => n.loadMs),
+      findPage: step((n) => n.detectMs),
+      flatten: step((n) => n.flattenMs),
+      recognize: step((n) => n.recognizeMs),
+    },
+  };
+}
+
 function buildBaseline(items: Evaluated[]) {
   const named = items.filter((i) => i.fixture.expected.merchant !== null);
   const nulls = items.filter((i) => i.fixture.expected.merchant === null);
   return {
     receipts: items.length,
     passes: {
-      raw: 'Vision as the app calls it, photo untouched (upload path)',
-      flat: 'after normalised + flattened (camera path, what ships)',
-      fixed: 'flat page, languages en-US/fr-FR/es-ES, automatic detection',
+      raw: "the first baseline's Vision request on the untouched photo (the old upload path)",
+      flat: 'after the old normalised + flattened (the old camera path)',
+      next: 'the native module as it is now: upright decode, guarded flatten, en/es/fr, reading order',
     },
     overall: summariseAll(items),
     merchantNamed: summariseAll(named),
@@ -727,20 +810,21 @@ function buildBaseline(items: Evaluated[]) {
     merchantFailureModes: {
       raw: failureModes(items, 'raw'),
       flat: failureModes(items, 'flat'),
-      fixed: failureModes(items, 'fixed'),
+      next: failureModes(items, 'next'),
     },
     funnel: {
       raw: funnel(items, 'raw'),
       flat: funnel(items, 'flat'),
-      fixed: funnel(items, 'fixed'),
+      next: funnel(items, 'next'),
     },
     flatten: flattenAnalysis(items),
     ocrMs: {
       raw: distribution(items.map((i) => i.fixture.meta.ms.raw)),
       flat: distribution(items.map((i) => i.fixture.meta.ms.flat)),
-      fixed: distribution(items.map((i) => i.fixture.meta.ms.fixed)),
+      next: distribution(items.map((i) => i.fixture.meta.ms.next)),
       flattenStep: distribution(items.map((i) => i.fixture.meta.ms.flatten)),
     },
+    nextPass: nextPassSummary(items),
     parseMs: distribution(items.flatMap((i) => PASSES.map((p) => i.outcomes[p].ms))),
   };
 }
@@ -753,7 +837,7 @@ const pct = (value: number) => `${(value * 100).toFixed(1)}`.padStart(5);
 
 function table(baseline: ReturnType<typeof buildBaseline>, title: string): string {
   const head = (title: string) =>
-    `${title.padEnd(34)} ${'n'.padStart(4)} | merchant raw/flat/fixed | total raw/flat/fixed | date raw/flat/fixed`;
+    `${title.padEnd(34)} ${'n'.padStart(4)} | merchant raw/flat/next | total raw/flat/next | date raw/flat/next`;
   const row = (name: string, n: number, slice: Slice) =>
     `${name.padEnd(34)} ${String(n).padStart(4)} | ${PASSES.map((p) => pct(slice[p].merchant.rate)).join(' ')} | ${PASSES.map((p) => pct(slice[p].total.rate)).join(' ')} | ${PASSES.map((p) => pct(slice[p].date.rate)).join(' ')}`;
   const out = [
@@ -787,7 +871,7 @@ function table(baseline: ReturnType<typeof buildBaseline>, title: string): strin
   const ms = baseline.ocrMs;
   out.push(
     '',
-    `OCR ms per image (mean/median/p95): raw ${ms.raw.mean}/${ms.raw.median}/${ms.raw.p95}, flat ${ms.flat.mean}/${ms.flat.median}/${ms.flat.p95} (of which flatten ${ms.flattenStep.mean}), fixed ${ms.fixed.mean}/${ms.fixed.median}/${ms.fixed.p95}; parser ${baseline.parseMs.mean} ms mean, ${baseline.parseMs.max} ms max`,
+    `OCR ms per image (mean/median/p95): raw ${ms.raw.mean}/${ms.raw.median}/${ms.raw.p95}, flat ${ms.flat.mean}/${ms.flat.median}/${ms.flat.p95} (of which flatten ${ms.flattenStep.mean}), next ${ms.next.mean}/${ms.next.median}/${ms.next.p95}; parser ${baseline.parseMs.mean} ms mean, ${baseline.parseMs.max} ms max`,
     '',
   );
   return out.join('\n');
@@ -796,10 +880,14 @@ function table(baseline: ReturnType<typeof buildBaseline>, title: string): strin
 // ---------------------------------------------------------------------------------------------
 
 const SETS = ['training', 'holdout', 'hard'] as const;
-type SetName = (typeof SETS)[number];
+type SetName = (typeof SETS)[number] | 'adversarial';
 
-/** training: the first 300. holdout: other layouts, brands, fonts and seed. hard: photographs under stress. */
+/**
+ * training: the first 300. holdout: other layouts, brands, fonts and seed. hard: photographs under
+ * stress. adversarial: a few hand-written receipts, one per case a review found (not measured).
+ */
 function setOf(fixture: Fixture): SetName {
+  if (fixture.id.startsWith('adv-')) return 'adversarial';
   if (fixture.id.startsWith('hold-')) return 'holdout';
   if (fixture.id.startsWith('hard-')) return 'hard';
   return 'training';
@@ -826,7 +914,7 @@ function setSummary(baseline: ReturnType<typeof buildBaseline>) {
 function comparison(summaries: Record<string, ReturnType<typeof setSummary>>): string {
   const lines = [
     '',
-    'THE THREE SETS: percent correct (raw/flat/fixed)    n | merchant            | total               | date                | all three (flat)',
+    'THE THREE SETS: percent correct (raw/flat/next)     n | merchant            | total               | date                | all three (flat)',
   ];
   for (const [name, x] of Object.entries(summaries)) {
     const cell = (r: Record<string, number>) => PASSES.map((p) => pct(r[p])).join(' ');
@@ -851,14 +939,24 @@ describe('receipt scanning baseline (measures; never fails on accuracy)', () => 
       Object.entries(baselines).map(([name, baseline]) => [name, setSummary(baseline!)]),
     );
     process.stdout.write(comparison(summaries));
-    // The training numbers stay where they always were; the other sets sit beside them.
-    const file = {
-      ...baselines.training,
-      ...(baselines.holdout ? { holdout: baselines.holdout } : {}),
-      ...(baselines.hard ? { hard: baselines.hard } : {}),
-      sets: summaries,
-    };
-    fs.writeFileSync(BASELINE_FILE, `${JSON.stringify(file, null, 2)}\n`);
+    // The training numbers stay at the top level; the other sets sit beside them.
+    if (BASELINE_FILE) {
+      const about =
+        process.env.RECEIPT_BASELINE_ABOUT ??
+        `Written by src/__tests__/receipts/accuracy.test.ts with ${
+          process.env.RECEIPT_PARSER
+            ? `the parser at ${process.env.RECEIPT_PARSER}`
+            : 'the parser in the tree (src/lib/receipt-parser.ts)'
+        }, today pinned to 2026-10-07, on the fixtures in src/__tests__/fixtures/receipts.`;
+      const file = {
+        _about: about,
+        ...baselines.training,
+        ...(baselines.holdout ? { holdout: baselines.holdout } : {}),
+        ...(baselines.hard ? { hard: baselines.hard } : {}),
+        sets: summaries,
+      };
+      fs.writeFileSync(BASELINE_FILE, `${JSON.stringify(file, null, 2)}\n`);
+    }
     // Per-receipt answers, for digging into a number: RECEIPT_RESULTS_OUT=/tmp/results.json
     if (process.env.RECEIPT_RESULTS_OUT) {
       const perReceipt = results().map(({ fixture, outcomes }) => ({
@@ -880,7 +978,9 @@ describe('receipt scanning baseline (measures; never fails on accuracy)', () => 
       }));
       fs.writeFileSync(process.env.RECEIPT_RESULTS_OUT, JSON.stringify(perReceipt));
     }
-    expect(Object.values(baselines).reduce((n, b) => n + b!.receipts, 0)).toBe(fixtures.length);
+    expect(Object.values(baselines).reduce((n, b) => n + b!.receipts, 0)).toBe(
+      fixtures.filter((f) => setOf(f) !== 'adversarial').length,
+    );
   });
 });
 
@@ -1053,14 +1153,14 @@ function harness(name: SetName, rules: Rules) {
       expect(upper / checked).toBeGreaterThan(0.9);
     });
 
-    it('parses every receipt in every pass without throwing, each in under 50 ms', () => {
+    it(`parses every receipt in every pass without throwing, each in under ${PARSE_LIMIT_MS} ms`, () => {
       const all = resultsFor(name);
       const crashed = all.flatMap((e) =>
         PASSES.filter((p) => e.outcomes[p].crashed).map((p) => `${e.fixture.id}/${p}`),
       );
       expect(crashed).toEqual([]);
       const slow = all.flatMap((e) =>
-        PASSES.filter((p) => e.outcomes[p].ms >= 50).map(
+        PASSES.filter((p) => e.outcomes[p].ms >= PARSE_LIMIT_MS).map(
           (p) => `${e.fixture.id}/${p}: ${e.outcomes[p].ms.toFixed(1)} ms`,
         ),
       );
@@ -1149,6 +1249,75 @@ describe('the three sets are kept apart', () => {
     expect(new Set(digital.map((f) => f.expected.country)).size).toBe(5);
     expect(new Set(digital.map((f) => f.expected.language)).size).toBe(3);
   });
+});
+
+/**
+ * Hand-written receipts, one per case a review found (scripts/receipt-corpus/adversarial-fixtures.py; fixtures/receipts/adversarial/).
+ * Unlike the measured sets these are assertions: the parser must read every field on every pass.
+ * A field that fails today carries a "field:pass" mark in its fixture's knownFailing; those run as
+ * `it.failing`, which passes while the field is wrong and fails the day it is fixed, so the mark
+ * has to be removed with the fix. They do not apply to another parser version (RECEIPT_PARSER).
+ */
+describe('adversarial receipts: hand-written lines for the cases a review found', () => {
+  const items = bySet('adversarial');
+  const other = process.env.RECEIPT_PARSER ? it.skip : it;
+
+  it('has the card-bordered app screenshot and the gift-card receipt', () => {
+    expect(items.map((f) => f.id).sort()).toEqual(['adv-card-app', 'adv-gift-card']);
+  });
+
+  it('is well formed: lines in the module’s shape, a plausible total and date, real marks', () => {
+    const problems: string[] = [];
+    for (const fixture of items) {
+      const { expected, id } = fixture;
+      if (!(expected.totalCents > 0) || Math.round(expected.total * 100) !== expected.totalCents)
+        problems.push(`${id}: total`);
+      if (expected.date < '2026-01-01' || expected.date > '2026-10-06')
+        problems.push(`${id}: date`);
+      for (const pass of PASSES) {
+        if (!fixture[pass].length) problems.push(`${id}/${pass}: no lines`);
+        for (const line of fixture[pass]) {
+          const finite = (['x', 'y', 'width', 'height'] as const).every((k) =>
+            Number.isFinite(line[k]),
+          );
+          if (typeof line.text !== 'string' || !finite || line.y < 0 || line.y > 1)
+            problems.push(`${id}/${pass}: ${line.text}`);
+        }
+      }
+      for (const mark of expected.knownFailing ?? []) {
+        const [field, pass] = mark.split(':');
+        if (
+          !['merchant', 'total', 'date'].includes(field) ||
+          !(PASSES as readonly string[]).includes(pass)
+        )
+          problems.push(`${id}: mark ${mark}`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  for (const fixture of items) {
+    for (const pass of PASSES) {
+      for (const field of ['merchant', 'total', 'date'] as const) {
+        const mark = `${field}:${pass}`;
+        const known = fixture.expected.knownFailing?.includes(mark) ?? false;
+        const run = process.env.RECEIPT_PARSER ? other : known ? it.failing : it;
+        run(`${fixture.id} ${mark}${known ? ' (known failing until fixed)' : ''}`, () => {
+          const { parsed } = results().find((r) => r.fixture.id === fixture.id)!.outcomes[pass];
+          const { expected } = fixture;
+          if (field === 'merchant') {
+            const read =
+              parsed.merchant !== undefined && sameMerchant(parsed.merchant, expected.merchant!);
+            expect(read ? expected.merchant : parsed.merchant).toBe(expected.merchant);
+          } else if (field === 'total') {
+            expect(parsed.total).toBe(expected.total);
+          } else {
+            expect(parsed.date).toBe(expected.date);
+          }
+        });
+      }
+    }
+  }
 });
 
 describe('receipt bench harness: scoring', () => {

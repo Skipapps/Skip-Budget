@@ -72,7 +72,9 @@ const mockScanner = { available: true };
 const mockCapture = jest.fn();
 const mockRecognize = jest.fn();
 const mockRecognizeText = jest.fn();
+let mockHasLayout = true;
 jest.mock('../../../modules/receipt-scanner', () => ({
+  hasLayoutRecognition: () => mockHasLayout,
   captureReceipt: () => mockCapture(),
   isCaptureAvailable: () => mockScanner.available,
   isRecognitionAvailable: () => mockScanner.available,
@@ -200,6 +202,7 @@ const SAVED_SCAN = {
 };
 
 beforeEach(() => {
+  mockHasLayout = true;
   jest.clearAllMocks();
   for (const key of Object.keys(mockProps)) delete mockProps[key];
   mockParams = {};
@@ -304,7 +307,8 @@ describe('Scan and Upload on the form', () => {
     expect(mockCreate).toHaveBeenCalledWith({ ...SAVED_SCAN, source: 'scan' });
   });
 
-  it('Upload opens on the last step too, and saves it as an upload', async () => {
+  it('Upload reads flat text only on a native build without layout recognition', async () => {
+    mockHasLayout = false;
     mockAsk.mockResolvedValueOnce('photos');
     mockLibrary.mockResolvedValueOnce({ canceled: false, assets: [{ uri: 'file://receipt.jpg' }] });
     mockRecognize.mockResolvedValueOnce([]);
@@ -318,6 +322,20 @@ describe('Scan and Upload on the form', () => {
     await fireEvent.press(screen.getByText('Save receipt'));
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate).toHaveBeenCalledWith({ ...SAVED_SCAN, source: 'upload' });
+    expect(mockRecognizeText).toHaveBeenCalledTimes(1);
+  });
+
+  it('Upload does not read a file twice when a current build finds no text', async () => {
+    mockAsk.mockResolvedValueOnce('photos');
+    mockLibrary.mockResolvedValueOnce({ canceled: false, assets: [{ uri: 'file://blank.jpg' }] });
+    mockRecognize.mockResolvedValueOnce([]);
+    mockParsed = {};
+    const screen = await render(<AddReceiptScreen />);
+
+    await fireEvent.press(screen.getByLabelText('Upload'));
+
+    await waitFor(() => expect(mockRecognize).toHaveBeenCalledTimes(1));
+    expect(mockRecognizeText).not.toHaveBeenCalled();
   });
 
   it('stays on the amount when no total was read', async () => {

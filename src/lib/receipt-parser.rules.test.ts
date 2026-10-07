@@ -6,6 +6,7 @@ import {
   type BrandHint,
   type ParsedLine,
 } from '@/lib/receipt-parser';
+import catalogue from '@/lib/__fixtures__/brand-catalogue.json';
 
 /**
  * One rule per test, on the smallest receipt that shows it. Lines are shaped the way Vision returns
@@ -147,7 +148,7 @@ describe('merchant: the printed name', () => {
     ['US city, state and ZIP', 'Raleigh, NC 27658'],
     ['Canadian postal code', 'Edmonton AB T8H 8N8'],
     ['Quebec city', 'Montréal (Québec) H3T 1X8'],
-    ['UK postcode', 'LEEDS LS1 8LQ'],
+    // A UK postcode only on a British receipt: see "still reads a British postcode" below.
     ['Australian state and postcode', 'HOBART TAS 7000'],
   ])('never takes an address line (%s)', (_kind, address) => {
     expect(read([address, ...ITEMS]).merchant).toBeUndefined();
@@ -423,9 +424,56 @@ describe('dates', () => {
     expect(parseDate('GST/HST 191379215 RT0001\n11/09/26', { today: TODAY })).toBe('2026-09-11');
   });
 
-  it('falls back to the other reading when the preferred one is in the future', () => {
-    // Read month first that is 3 November, still to come; 11 March is the date.
-    expect(parseDate('11/03/2026', { today: TODAY, dayFirst: false })).toBe('2026-03-11');
+  // Was 2026-03-11: the other reading was taken when the preferred one lay in the future. A
+  // reading the region says is still to come is a misread or the wrong region, and flipping to
+  // the other one is a guess, so the date stays blank.
+  it('leaves an ambiguous date blank when the preferred reading is in the future', () => {
+    expect(parseDate('11/03/2026', { today: TODAY, dayFirst: false })).toBeUndefined();
+  });
+
+  it('never reads an ambiguous date as tomorrow, but allows an unambiguous one', () => {
+    // CAD user, no region words: 8 October would be tomorrow; 10 August is the date.
+    expect(parseDate('08/10/2026 14:22', { today: TODAY })).toBe('2026-08-10');
+    // USD user: 8 October read month first is tomorrow and is dropped, with no flip to 10 August.
+    expect(parseDate('Albany, NY 12209\n10/08/2026 14:22', { today: TODAY })).toBeUndefined();
+    expect(parseDate('10/08/2026 14:22', { today: TODAY, dayFirst: false })).toBeUndefined();
+    // A shop a time zone ahead prints tomorrow's date; with the day above 12 it is unambiguous.
+    expect(parseDate('2026-10-08', { today: TODAY })).toBe('2026-10-08');
+    expect(parseDate('13/10/2026', { today: new Date(2026, 9, 12, 23) })).toBe('2026-10-13');
+  });
+
+  it('decides the order from strong evidence before a Spanish or French word', () => {
+    const taqueria =
+      'TAQUERIA EL SOL\n123 Main St\nLos Angeles, CA 90012\n10/06/2026 12:30 PM\nTACOS 12.00\nSALES TAX 1.14\nTOTAL 13.14\nGRACIAS!';
+    expect(parseDate(taqueria, { today: TODAY })).toBe('2026-10-06');
+    expect(parseDate(taqueria, { today: TODAY, dayFirst: false })).toBe('2026-10-06');
+    const houston =
+      'SUPERMERCADO LA FAMILIA\n500 Main St\nHouston, TX 77002\nFECHA/DATE: 09/08/2026 11:05';
+    expect(parseDate(houston, { today: TODAY })).toBe('2026-09-08');
+    expect(parseDate(houston, { today: TODAY, dayFirst: false })).toBe('2026-09-08');
+    // The phone outranks a lone word; the word decides only when nothing else does.
+    expect(parseDate('GRACIAS\n03/04/2026', { today: TODAY, dayFirst: false })).toBe('2026-03-04');
+    expect(parseDate('GRACIAS\n03/04/2026', { today: TODAY })).toBe('2026-04-03');
+  });
+
+  it('leaves an ambiguous date blank when the receipt contradicts itself', () => {
+    expect(
+      parseDate('VAT No. GB 043 0902 61\nAlbany, NY 12209\n03/04/2026', { today: TODAY }),
+    ).toBeUndefined();
+    // An unambiguous date is still read.
+    expect(
+      parseDate('VAT No. GB 043 0902 61\nAlbany, NY 12209\n23/04/2026', { today: TODAY }),
+    ).toBe('2026-04-23');
+  });
+
+  it('never takes a birth date or an exchange deadline for the purchase date', () => {
+    const pharmacy =
+      'SPRING PHARMACY\n77 Oak Ave\nAustin, TX 78701\nPATIENT: SMITH, AVA\nDOB 05/12/2019\nRX 4471023 AMOXICILLIN 12.00\nTOTAL 12.00\n09/01/2026';
+    expect(parseDate(pharmacy, { today: TODAY, dayFirst: false })).toBe('2026-09-01');
+    const gap =
+      'GAP\n1 Mall Rd\nParamus, NJ 07652\nEXCHANGES THRU 09/30/2026\nJEANS 59.99\nTOTAL 59.99\n09/01/2026';
+    expect(parseDate(gap, { today: TODAY, dayFirst: false })).toBe('2026-09-01');
+    expect(parseDate('DATE OF BIRTH 2019-05-12\nRETURN BEFORE 2026-11-01')).toBeUndefined();
   });
 
   it('refuses a future date and one before 2000', () => {
@@ -657,6 +705,229 @@ describe('whole receipts in each market', () => {
       total: 3.2,
       date: '2026-08-14',
     });
+  });
+});
+
+/** The app's real brand catalogue (372 brands), as the scan screens pass it. */
+const CATALOGUE: BrandHint[] = catalogue.brands;
+
+// Each of these gave a confident wrong answer in review; the inputs are the reviewer's own.
+describe('review: totals that must not be wrong', () => {
+  it('never takes a store-card or gift-card balance for the total', () => {
+    const starbucks: Row[] = [
+      { text: 'STARBUCKS', size: 2 },
+      '1912 Pike Pl',
+      'Seattle, WA 98101',
+      '10/06/2026 8:14 AM',
+      ['GRANDE LATTE', '5.45'],
+      ['TOTAL', '5.45'],
+      ['SBUX CARD', '5.45'],
+      ['NEW BALANCE', '14.55'],
+    ];
+    expect(read(starbucks).total).toBe(5.45);
+    const costa: Row[] = [
+      { text: 'COSTA COFFEE', size: 2 },
+      '12 High St',
+      '01/10/2026 08:14',
+      ['FLAT WHITE', '3.20'],
+      ['TOTAL', '3.20'],
+      ['GIFT CARD', '3.20'],
+      ['REMAINING BALANCE', '16.80'],
+    ];
+    expect(read(costa, { dayFirst: true }).total).toBe(3.2);
+  });
+
+  it.each([
+    'CARD BALANCE',
+    'GIFT CARD BALANCE',
+    'NEW BALANCE',
+    'REWARDS BALANCE',
+    'LOYALTY BALANCE',
+    'STORED VALUE BALANCE',
+    'BALANCE LEFT',
+    'NOUVEAU SOLDE',
+    'SOLDE RESTANT',
+    'SALDO RESTANTE',
+    'SALDO DISPONIBLE',
+    'AVAILABLE BALANCE',
+  ])('never reads "%s" as the total', (label) => {
+    expect(parseTotal(`TOTAL 5.45\nVISA 5.45\n${label} 14.55`)).toBe(5.45);
+  });
+
+  const DINER: Row[] = [
+    { text: "JOE'S DINER", size: 2 },
+    '42 Elm St',
+    'Albany, NY 12209',
+    '10/06/2026 7:41 PM',
+    ['CHEESEBURGER', '14.00'],
+    ['FRIES', '6.00'],
+    ['SHAKE', '20.00'],
+    ['SUBTOTAL', '40.00'],
+    ['TAX', '3.20'],
+    ['TOTAL', '43.20'],
+  ];
+
+  it('never adds a printed tip suggestion to the total', () => {
+    const guide: Row[] = [
+      ...DINER,
+      'TIP GUIDE 18%: $7.78',
+      ['TIP', '________'],
+      ['TOTAL', '________'],
+      'X____________ Signature',
+    ];
+    expect(read(guide, { dayFirst: false }).total).toBe(43.2);
+    const suggestions: Row[] = [
+      ...DINER,
+      ['Tip 18% =', '7.78'],
+      ['Tip 20% =', '8.64'],
+      ['TIP', '________'],
+      ['TOTAL', '________'],
+      'Signature',
+    ];
+    expect(read(suggestions, { dayFirst: false }).total).toBe(43.2);
+  });
+
+  it('works the total out from subtotal and tax when payment minus change agrees', () => {
+    const rows: Row[] = [
+      { text: 'CORNER MARKET', size: 2 },
+      '9 Bay St',
+      'Toronto ON M5J 2N8',
+      ['MILK 2L', '4.29'],
+      ['BREAD', '2.91'],
+      ['SUBTOTAL', '7.20'],
+      ['HST', '0.58'],
+      ['PAYMENT', '20.00'],
+      ['CHANGE DUE', '12.22'],
+    ];
+    expect(read(rows).total).toBe(7.78);
+  });
+
+  it('reads "T0TAL" and "CA5H" as the words they are, and never takes the cash handed over', () => {
+    const rows: Row[] = [
+      { text: 'CORNER MARKET', size: 2 },
+      ['MILK 2L', '4.29'],
+      ['BREAD', '3.49'],
+      ['T0TAL', '7.78'],
+      ['CA5H', '20.00'],
+      ['CHANGE', '12.22'],
+    ];
+    expect(read(rows).total).toBe(7.78);
+    // Without the words, a lone largest figure is not taken.
+    expect(parseTotal('MILK 4.29\nBREAD 3.49\n7.78\n20.00')).toBeUndefined();
+  });
+
+  it('leaves a refund slip blank rather than filing it as a purchase', () => {
+    const rows: Row[] = [
+      { text: 'BEST BUY', size: 2 },
+      'REFUND',
+      ['HDMI CABLE', '-24.99'],
+      ['TOTAL', '-24.99'],
+      ['VISA REFUND', '-24.99'],
+    ];
+    expect(read(rows).total).toBeUndefined();
+    expect(parseTotal('TOTAL 24.99-')).toBeUndefined();
+    expect(parseTotal('TOTAL -$24.99')).toBeUndefined();
+    // A discount printed as a credit still counts in the sum.
+    expect(parseTotal('SUBTOTAL 10.00\nCOUPON -1.00\nTAX 0.90\nTOTAL 9.90\nVISA 9.90')).toBe(9.9);
+  });
+});
+
+describe('review: shop names that must not be lost or replaced', () => {
+  it.each([
+    'TAQUERIA EL SOL',
+    'CASA DEL SOL',
+    'PHO BAR',
+    'OLIO BAR',
+    'KOI SPA',
+    'LIL BBQ',
+    'BOULEVARD BURGER',
+    'RUE LA LA',
+    'COL. ROMA TACOS',
+  ])('reads "%s" as a name, not an address', (name) => {
+    const rows: Row[] = [{ text: name, size: 2 }, '42 Elm St', 'Albany, NY 12209', ...ITEMS];
+    expect(read(rows).merchant).toBe(name);
+  });
+
+  // The postcode shape alone ("PHO BAR" reads as one with O for 0) is looked for only on a receipt
+  // showing £ or VAT, which every British receipt prints.
+  it('still reads a British postcode on a British receipt', () => {
+    const rows: Row[] = ['LEEDS LS1 8LQ', 'VAT No. GB 043 0902 61', ...ITEMS];
+    expect(read(rows).merchant).toBeUndefined();
+  });
+
+  it('never lets a catalogue alias rename a printed shop', () => {
+    // "office" is an alias of Microsoft 365, "x premium" of X.
+    const office: Row[] = [{ text: 'OFFICE DEPOT', size: 2 }, '42 Elm St', ...ITEMS];
+    expect(read(office, { brands: CATALOGUE }).merchant).toBe('OFFICE DEPOT');
+    const premium: Row[] = [{ text: 'PREMIUM', size: 2 }, '42 Elm St', ...ITEMS];
+    expect(read(premium, { brands: CATALOGUE }).merchant).toBe('PREMIUM');
+    // An alias that is the whole line still counts.
+    const cvs: Row[] = [{ text: 'CVS PHARMACY', size: 2 }, '42 Elm St', ...ITEMS];
+    expect(read(cvs, { brands: CATALOGUE }).merchant).toBe('CVS');
+  });
+
+  it('never matches a single letter, a short brand inside a longer name, or a misread alias', () => {
+    const signature: Row[] = ['1094 Lake Blvd', 'Seattle, WA 98185', ...ITEMS, 'X'];
+    expect(read(signature, { brands: CATALOGUE }).merchant).toBeUndefined();
+    const crave: Row[] = [{ text: 'CRAVE BURGERS', size: 2 }, '18 King St W', ...ITEMS];
+    expect(read(crave, { brands: CATALOGUE }).merchant).toBe('CRAVE BURGERS');
+    // One letter off an alias ("dashpass") is not the brand; one off a long brand name is.
+    const brands: BrandHint[] = [
+      { name: 'DoorDash', aliases: ['dashpass'] },
+      { name: 'Walgreens' },
+    ];
+    expect(read([{ text: 'DASHPAS', size: 2 }, ...ITEMS], { brands }).merchant).toBe('DASHPAS');
+    expect(read([{ text: 'WALGREEMS', size: 2 }, ...ITEMS], { brands }).merchant).toBe('Walgreens');
+  });
+
+  it('keeps a strong printed name over a delivery platform in the footer', () => {
+    const joes: Row[] = [
+      { text: "JOE'S DINER", size: 2 },
+      '42 Elm St',
+      'Albany, NY 12209',
+      '10/06/2026 7:41 PM',
+      ['CHEESEBURGER', '14.00'],
+      ['TOTAL', '14.00'],
+      'Order online: www.doordash.com/joes',
+    ];
+    expect(read(joes, { brands: CATALOGUE, dayFirst: false }).merchant).toBe("JOE'S DINER");
+    const pho: Row[] = [
+      { text: 'PHO SAIGON', size: 2 },
+      '42 Elm St',
+      'Albany, NY 12209',
+      ['PHO', '14.00'],
+      ['TOTAL', '14.00'],
+      'Thank you for your order from Uber Eats',
+    ];
+    expect(read(pho, { brands: CATALOGUE, dayFirst: false }).merchant).toBe('PHO SAIGON');
+  });
+
+  it('still names a logo-only receipt from its footer through the catalogue', () => {
+    const rows: Row[] = ['1563 River Rd', 'Fredericton NB E2B 4G4', ...ITEMS, 'www.walmart.com'];
+    expect(read(rows, { brands: CATALOGUE }).merchant).toBe('Walmart');
+  });
+});
+
+describe('review: input that must not hang or crash', () => {
+  it('reads a runaway 50,000-character line quickly and safely', () => {
+    const started = performance.now();
+    expect(parseTotal(`TOTAL ${'9'.repeat(50000)}.99`)).toBeUndefined();
+    const lines: ParsedLine[] = [
+      { text: `${'1'.repeat(50000)}.00`, x: 0, y: 0, width: 1, height: 0.01 },
+    ];
+    expect(parseReceiptFromLines(lines).total).toBeUndefined();
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
+  it('survives missing text and missing candidates', () => {
+    const empty = { merchant: undefined, total: undefined, date: undefined, last4: undefined };
+    expect(parseReceipt(undefined as unknown as string)).toEqual(empty);
+    expect(parseReceiptFromLines(undefined as unknown as ParsedLine[])).toEqual(empty);
+    const odd = [
+      { text: 'TOTAL 5.00', candidates: [undefined], x: 0, y: 0, width: 1, height: 0.01 },
+      null,
+    ] as unknown as ParsedLine[];
+    expect(parseReceiptFromLines(odd).total).toBe(5);
   });
 });
 
