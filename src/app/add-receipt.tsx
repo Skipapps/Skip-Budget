@@ -15,6 +15,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { guessCategory, matchBrand, useBrandDirectory, useSpendCategories } from '@/api/brands';
 import { usePro } from '@/api/pro';
 import { buildReceiptValues } from '@/api/entry-values';
+import { receiptParseOptions } from '@/api/scan';
 import {
   useCreateReceipt,
   useDeleteReceipt,
@@ -411,8 +412,11 @@ function ReceiptForm({
       const result = await captureReceipt();
       // Prefer the positioned reading; a build without it still returns text.
       if (result) {
+        const options = receiptParseOptions(directory);
         applyScan(
-          result.lines?.length ? parseReceiptFromLines(result.lines) : parseReceipt(result.text),
+          result.lines?.length
+            ? parseReceiptFromLines(result.lines, options)
+            : parseReceipt(result.text, options),
           'scan',
         );
       }
@@ -427,8 +431,11 @@ function ReceiptForm({
     try {
       setReading(true);
       const lines = await recognizeReceipt(uri);
+      const options = receiptParseOptions(directory);
       applyScan(
-        lines.length ? parseReceiptFromLines(lines) : parseReceipt(await recognizeText(uri)),
+        lines.length
+          ? parseReceiptFromLines(lines, options)
+          : parseReceipt(await recognizeText(uri), options),
         'upload',
       );
     } catch (thrown) {

@@ -156,8 +156,9 @@ describe('parseReceipt', () => {
   });
 
   it('reads a coffee shop receipt', () => {
+    // The store number is not part of the shop's name ("#4021" made it match no catalogue brand).
     expect(parseReceipt(TIM_HORTONS)).toEqual({
-      merchant: 'TIM HORTONS #4021',
+      merchant: 'TIM HORTONS',
       total: 7.2,
       date: '2026-08-26',
       last4: '4417',
@@ -506,8 +507,10 @@ describe('English receipts read exactly as before', () => {
     ).toBeUndefined();
   });
 
-  it('keeps the largest dot amount when nothing is labelled', () => {
-    expect(parseTotal(HARDWARE.replace('TOTAL 10.82\n', ''))).toBe(20);
+  it('works the total out when nothing is labelled, rather than taking the cash handed over', () => {
+    // Was 20 (the CASH line, the largest figure). Subtotal plus tax and cash minus change both
+    // come to 10.82, the amount actually charged.
+    expect(parseTotal(HARDWARE.replace('TOTAL 10.82\n', ''))).toBe(10.82);
   });
 
   it('reads a line with a dot amount only by its dot amounts', () => {

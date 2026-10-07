@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreImage
 import ExpoModulesCore
+import ImageIO
 import PDFKit
 import UIKit
 import Vision
@@ -80,11 +81,13 @@ public class ReceiptScannerModule: Module {
     /// text: an empty result is an answer.
     AsyncFunction("recognizeText") { (uri: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
-        guard let image = Self.loadImage(from: uri) else {
-          promise.reject("ERR_UNREADABLE", "Could not open that file as an image or PDF.")
-          return
+        autoreleasepool {
+          guard let lines = Self.recognizeFile(at: uri) else {
+            promise.reject("ERR_UNREADABLE", "Could not open that file as an image or PDF.")
+            return
+          }
+          promise.resolve(Self.joinedText(lines))
         }
-        promise.resolve(Self.recognizeText(in: image))
       }
     }
 
@@ -93,11 +96,13 @@ public class ReceiptScannerModule: Module {
     /// name by its size and the total by its row.
     AsyncFunction("recognizeReceipt") { (uri: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
-        guard let image = Self.loadImage(from: uri) else {
-          promise.reject("ERR_UNREADABLE", "Could not open that file as an image or PDF.")
-          return
+        autoreleasepool {
+          guard let lines = Self.recognizeFile(at: uri) else {
+            promise.reject("ERR_UNREADABLE", "Could not open that file as an image or PDF.")
+            return
+          }
+          promise.resolve(lines)
         }
-        promise.resolve(Self.recognize(in: image))
       }
     }
   }
@@ -107,29 +112,88 @@ public class ReceiptScannerModule: Module {
 
   // MARK: - Loading
 
-  /// Accepts photos, screenshots and PDFs (rendered at 2x so small print survives recognition).
-  private static func loadImage(from uri: String) -> UIImage? {
+  private enum LoadedFile {
+    case photo(UIImage)
+    case document(UIImage)
+  }
+
+  /// Most pixels one decoded page may hold. A 48 MP photo or a poster-sized PDF page would take
+  /// 200 MB or more as a bitmap; this keeps a 24 MP photo whole and is twice what the camera reads.
+  private static let maxPixels: CGFloat = 25_000_000
+
+  /// Nil only when the file cannot be opened; a page without text is an empty list. A picked photo
+  /// is straightened like a camera shot, a PDF page is already flat.
+  private static func recognizeFile(at uri: String) -> [[String: Any]]? {
+    switch loadImage(from: uri) {
+    case .photo(let image)?:
+      return read(photo: image).lines
+    case .document(let image)?:
+      return recognize(in: image)
+    case nil:
+      return nil
+    }
+  }
+
+  /// Accepts photos, screenshots and PDFs.
+  private static func loadImage(from uri: String) -> LoadedFile? {
     let url = uri.hasPrefix("file://") ? URL(string: uri) : URL(fileURLWithPath: uri)
     guard let url else { return nil }
 
     if url.pathExtension.lowercased() == "pdf" {
-      guard let document = PDFDocument(url: url), let page = document.page(at: 0) else {
-        return nil
-      }
-      let bounds = page.bounds(for: .mediaBox)
-      let scale: CGFloat = 2
-      let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
-      return UIGraphicsImageRenderer(size: size).image { context in
-        UIColor.white.set()
-        context.fill(CGRect(origin: .zero, size: size))
-        context.cgContext.translateBy(x: 0, y: size.height)
-        context.cgContext.scaleBy(x: scale, y: -scale)
-        page.draw(with: .mediaBox, to: context.cgContext)
-      }
+      return renderedFirstPage(of: url).map { .document($0) }
     }
+    return uprightPhoto(at: url).map { .photo($0) }
+  }
 
-    guard let data = try? Data(contentsOf: url) else { return nil }
-    return UIImage(data: data)
+  /// A portrait iPhone photo is stored sideways with an EXIF rotation flag, and Vision is told `.up`
+  /// throughout this file, so the flag is applied while decoding (as `normalised` does for the
+  /// camera). The same decode downsamples anything past `maxPixels`.
+  private static func uprightPhoto(at url: URL) -> UIImage? {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+          CGImageSourceGetCount(source) > 0
+    else { return nil }
+
+    let index = CGImageSourceGetPrimaryImageIndex(source)
+    guard let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any],
+          let width = properties[kCGImagePropertyPixelWidth] as? Int,
+          let height = properties[kCGImagePropertyPixelHeight] as? Int,
+          width > 0, height > 0
+    else { return nil }
+
+    let pixels = CGFloat(width) * CGFloat(height)
+    let shrink = pixels > maxPixels ? (maxPixels / pixels).squareRoot() : 1
+    let options: [CFString: Any] = [
+      kCGImageSourceCreateThumbnailFromImageAlways: true,
+      kCGImageSourceCreateThumbnailWithTransform: true,
+      kCGImageSourceShouldCacheImmediately: true,
+      kCGImageSourceThumbnailMaxPixelSize: max(1, Int(CGFloat(max(width, height)) * shrink)),
+    ]
+    guard let decoded = CGImageSourceCreateThumbnailAtIndex(source, index, options as CFDictionary)
+    else { return nil }
+    return UIImage(cgImage: decoded)
+  }
+
+  /// The first page at twice its size, so small print survives recognition; a page too big for
+  /// that is drawn smaller rather than allowed past `maxPixels`.
+  private static func renderedFirstPage(of url: URL) -> UIImage? {
+    guard let document = PDFDocument(url: url), let page = document.page(at: 0) else { return nil }
+    let bounds = page.bounds(for: .mediaBox)
+    guard bounds.width.isFinite, bounds.height.isFinite, bounds.width >= 1, bounds.height >= 1
+    else { return nil }
+
+    let format = UIGraphicsImageRendererFormat.default()
+    // Text gains nothing from wide colour, and the extended range doubles the bytes per pixel.
+    format.preferredRange = .standard
+    let pixelsAtScaleOne = bounds.width * bounds.height * format.scale * format.scale
+    let scale = min(2, (maxPixels / pixelsAtScaleOne).squareRoot())
+    let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
+    return UIGraphicsImageRenderer(size: size, format: format).image { context in
+      UIColor.white.set()
+      context.fill(CGRect(origin: .zero, size: size))
+      context.cgContext.translateBy(x: 0, y: size.height)
+      context.cgContext.scaleBy(x: scale, y: -scale)
+      page.draw(with: .mediaBox, to: context.cgContext)
+    }
   }
 
   /// Redraws an image so its pixels sit the way its orientation claims. The camera returns a
@@ -139,20 +203,51 @@ public class ReceiptScannerModule: Module {
     guard image.imageOrientation != .up else { return image }
     let format = UIGraphicsImageRendererFormat.default()
     format.scale = image.scale
+    format.preferredRange = .standard
     return UIGraphicsImageRenderer(size: image.size, format: format).image { _ in
       image.draw(in: CGRect(origin: .zero, size: image.size))
     }
   }
 
-  /// Flattens the receipt out of the photograph: skew turns a 3 into an 8, so Vision finds the page
-  /// corners and Core Image warps them back to a rectangle (as the system scanner does).
+  // MARK: - Flattening
+
+  /// A found page covering less of the photo than this is checked against the whole photo. Real
+  /// receipts in the bench cover 6 to 82 percent of a photo, so no share can reject a crop on its
+  /// own; the wrong finds (a logo box or barcode inside a scan that is all receipt) cover 1 to 10.
+  private static let minimumPageShare: CGFloat = 0.10
+
+  /// Fewer lines than this from the flattened page means the crop probably missed the text.
+  private static let minimumFlatLines = 5
+
+  /// Reads a photographed receipt, upright. Flattening first (skew turns a 3 into an 8, so Vision
+  /// finds the page corners and Core Image warps them back to a rectangle, as the system scanner
+  /// does) is what makes photos read well; a doubtful crop (small, or almost no text on it) also
+  /// gets the whole photo read, so a wrong crop cannot cost the receipt. The typical photo is read
+  /// once.
   ///
-  /// Vision and CIImage both measure up from the bottom left, so the corners need no flipping here.
-  ///
-  /// Returns the original whenever no page is found: a photo that is already mostly receipt reads
-  /// fine, and a confident wrong crop loses the total.
-  fileprivate static func flattened(_ image: UIImage) -> UIImage {
-    guard let cgImage = image.cgImage else { return image }
+  /// `page` is the image the lines came from, for saving.
+  fileprivate static func read(photo: UIImage) -> (lines: [[String: Any]], page: UIImage) {
+    guard let outline = pageOutline(in: photo),
+          let flat = flattened(photo, to: outline)
+    else {
+      return (recognize(in: photo), photo)
+    }
+
+    let flatLines = recognize(in: flat)
+    if area(of: outline) >= minimumPageShare, flatLines.count >= minimumFlatLines {
+      return (flatLines, flat)
+    }
+
+    let wholeLines = recognize(in: photo)
+    // The flattened page keeps rows straighter, so the whole photo has to read clearly more to win.
+    // A crop on the wrong thing leaves a hundred times fewer characters; a true one about as many.
+    let whole = legibleCharacters(in: wholeLines)
+    let flatCount = legibleCharacters(in: flatLines)
+    return whole * 2 > flatCount * 3 ? (wholeLines, photo) : (flatLines, flat)
+  }
+
+  private static func pageOutline(in image: UIImage) -> VNRectangleObservation? {
+    guard let cgImage = image.cgImage else { return nil }
 
     let request = VNDetectRectanglesRequest()
     // Receipts are tall and narrow, and a long one is narrower still.
@@ -166,9 +261,24 @@ public class ReceiptScannerModule: Module {
     request.quadratureTolerance = 35
 
     let handler = VNImageRequestHandler(cgImage: cgImage, orientation: .up, options: [:])
-    guard (try? handler.perform([request])) != nil,
-          let page = request.results?.first
-    else { return image }
+    guard (try? handler.perform([request])) != nil else { return nil }
+    return request.results?.first
+  }
+
+  /// Share of the image inside the outline (shoelace formula on the normalised corners).
+  private static func area(of outline: VNRectangleObservation) -> CGFloat {
+    let corners = [outline.topLeft, outline.topRight, outline.bottomRight, outline.bottomLeft]
+    var twice: CGFloat = 0
+    for (index, point) in corners.enumerated() {
+      let next = corners[(index + 1) % corners.count]
+      twice += point.x * next.y - next.x * point.y
+    }
+    return abs(twice) / 2
+  }
+
+  /// Vision and CIImage both measure up from the bottom left, so the corners need no flipping here.
+  private static func flattened(_ image: UIImage, to page: VNRectangleObservation) -> UIImage? {
+    guard let cgImage = image.cgImage else { return nil }
 
     let source = CIImage(cgImage: cgImage)
     let size = source.extent.size
@@ -176,7 +286,7 @@ public class ReceiptScannerModule: Module {
       CIVector(x: point.x * size.width, y: point.y * size.height)
     }
 
-    guard let filter = CIFilter(name: "CIPerspectiveCorrection") else { return image }
+    guard let filter = CIFilter(name: "CIPerspectiveCorrection") else { return nil }
     filter.setValue(source, forKey: kCIInputImageKey)
     filter.setValue(corner(page.topLeft), forKey: "inputTopLeft")
     filter.setValue(corner(page.topRight), forKey: "inputTopRight")
@@ -185,9 +295,20 @@ public class ReceiptScannerModule: Module {
 
     guard let output = filter.outputImage,
           let rendered = CIContext().createCGImage(output, from: output.extent)
-    else { return image }
+    else { return nil }
 
     return UIImage(cgImage: rendered)
+  }
+
+  /// Letters and digits Vision was reasonably sure of: the measure for "which reading got more".
+  private static func legibleCharacters(in lines: [[String: Any]]) -> Int {
+    lines.reduce(0) { total, line in
+      guard let text = line["text"] as? String,
+            let confidence = line["confidence"] as? Float,
+            confidence >= 0.3
+      else { return total }
+      return total + text.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.count
+    }
   }
 
   // MARK: - Recognition
@@ -197,8 +318,17 @@ public class ReceiptScannerModule: Module {
   /// own arithmetic.
   private static let candidateCount = 3
 
-  /// Every recognised line, with where it sits and how tall it was printed. Vision's normalised
-  /// boxes have their origin at the bottom left; they are flipped here so y grows downward.
+  private struct Line {
+    let text: String
+    let candidates: [String]
+    let confidence: Float
+    /// Normalised, origin at the top left.
+    let box: CGRect
+  }
+
+  /// Every recognised line, with where it sits and how tall it was printed, in reading order.
+  /// Vision's normalised boxes have their origin at the bottom left; they are flipped here so y
+  /// grows downward.
   fileprivate static func recognize(in image: UIImage) -> [[String: Any]] {
     guard let cgImage = image.cgImage else { return [] }
 
@@ -211,7 +341,8 @@ public class ReceiptScannerModule: Module {
     // names on two passes.
     request.usesLanguageCorrection = false
 
-    request.recognitionLanguages = ["en-US", "en-CA", "fr-CA"]
+    // Only tags Vision has models for: a regional one such as en-CA is accepted and ignored.
+    request.recognitionLanguages = ["en-US", "es-ES", "fr-FR"]
     // Fine print (the tax line, the card footer) is small but load-bearing.
     request.minimumTextHeight = 0.008
 
@@ -226,25 +357,57 @@ public class ReceiptScannerModule: Module {
       return []
     }
 
-    return (request.results ?? []).compactMap { observation in
+    let lines: [Line] = (request.results ?? []).compactMap { observation in
       let candidates = observation.topCandidates(candidateCount)
       guard let best = candidates.first else { return nil }
 
       let box = observation.boundingBox
-      return [
-        "text": best.string,
-        "candidates": candidates.map { $0.string },
-        "confidence": best.confidence,
-        "x": box.origin.x,
-        "y": 1 - box.origin.y - box.size.height,
-        "width": box.size.width,
-        "height": box.size.height,
+      guard box.origin.x.isFinite, box.origin.y.isFinite,
+            box.size.width.isFinite, box.size.height.isFinite
+      else { return nil }
+
+      return Line(
+        text: best.string,
+        candidates: candidates.map { $0.string },
+        confidence: best.confidence,
+        box: CGRect(
+          x: box.origin.x, y: 1 - box.origin.y - box.size.height,
+          width: box.size.width, height: box.size.height))
+    }
+
+    return inReadingOrder(lines).map { line in
+      [
+        "text": line.text,
+        "candidates": line.candidates,
+        "confidence": line.confidence,
+        "x": line.box.minX,
+        "y": line.box.minY,
+        "width": line.box.width,
+        "height": line.box.height,
       ]
     }
   }
 
-  fileprivate static func recognizeText(in image: UIImage) -> String {
-    recognize(in: image)
+  /// Vision returns lines in its own order, often a column at a time; readers expect top to bottom
+  /// and, within a row, left to right. Two lines share a row when their centres are closer than
+  /// half the shorter one's height, so a label and its amount a pixel apart stay together.
+  private static func inReadingOrder(_ lines: [Line]) -> [Line] {
+    let downThePage = lines.sorted { ($0.box.midY, $0.box.minX) < ($1.box.midY, $1.box.minX) }
+
+    var rows: [[Line]] = []
+    for line in downThePage {
+      if let first = rows.last?.first,
+         abs(line.box.midY - first.box.midY) <= min(line.box.height, first.box.height) / 2 {
+        rows[rows.count - 1].append(line)
+      } else {
+        rows.append([line])
+      }
+    }
+    return rows.flatMap { row in row.sorted { $0.box.minX < $1.box.minX } }
+  }
+
+  fileprivate static func joinedText(_ lines: [[String: Any]]) -> String {
+    lines
       .compactMap { $0["text"] as? String }
       .joined(separator: "\n")
   }
@@ -611,12 +774,12 @@ extension ReceiptCameraViewController: AVCapturePhotoCaptureDelegate {
 
     // Straightening and recognition are slow enough to freeze the preview still on screen.
     DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-      let page = ReceiptScannerModule.flattened(ReceiptScannerModule.normalised(image))
-      let lines = ReceiptScannerModule.recognize(in: page)
-      let text = lines.compactMap { $0["text"] as? String }.joined(separator: "\n")
+      let reading = ReceiptScannerModule.read(photo: ReceiptScannerModule.normalised(image))
+      let lines = reading.lines
+      let text = ReceiptScannerModule.joinedText(lines)
 
       var savedPath: String?
-      if let jpeg = page.jpegData(compressionQuality: 0.8) {
+      if let jpeg = reading.page.jpegData(compressionQuality: 0.8) {
         let url = FileManager.default.temporaryDirectory
           .appendingPathComponent("receipt-\(UUID().uuidString).jpg")
         if (try? jpeg.write(to: url)) != nil { savedPath = url.absoluteString }

@@ -76,6 +76,62 @@ describe('receipt-scanner on an older native build', () => {
     await expect(scanner.recognizeReceipt('file:///receipt.jpg')).resolves.toEqual([]);
   });
 
+  it('hands the native lines and text on untouched, in the order native returns them', async () => {
+    // Native sorts into reading order; the wrapper must not reorder or reshape.
+    const lines = [
+      {
+        text: 'TOTAL',
+        candidates: ['TOTAL'],
+        confidence: 0.9,
+        x: 0.1,
+        y: 0.5,
+        width: 0.2,
+        height: 0.02,
+      },
+      {
+        text: '12.99',
+        candidates: ['12.99'],
+        confidence: 0.8,
+        x: 0.7,
+        y: 0.501,
+        width: 0.1,
+        height: 0.02,
+      },
+    ];
+    mockRequireOptionalNativeModule.mockReset();
+    mockRequireOptionalNativeModule.mockReturnValue({
+      isScanningAvailable: () => true,
+      scanDocument: jest.fn(),
+      recognizeText: jest.fn().mockResolvedValue('TOTAL\n12.99'),
+      recognizeReceipt: jest.fn().mockResolvedValue(lines),
+    });
+
+    const scanner = loadScanner();
+    await expect(scanner.recognizeReceipt('file:///receipt.heic')).resolves.toBe(lines);
+    await expect(scanner.recognizeText('file:///receipt.heic')).resolves.toBe('TOTAL\n12.99');
+  });
+
+  it('passes an unreadable file through as the native rejection, code intact', async () => {
+    const unreadable = Object.assign(new Error('Could not open that file as an image or PDF.'), {
+      code: 'ERR_UNREADABLE',
+    });
+    mockRequireOptionalNativeModule.mockReset();
+    mockRequireOptionalNativeModule.mockReturnValue({
+      isScanningAvailable: () => true,
+      scanDocument: jest.fn(),
+      recognizeText: jest.fn().mockRejectedValue(unreadable),
+      recognizeReceipt: jest.fn().mockRejectedValue(unreadable),
+    });
+
+    const scanner = loadScanner();
+    await expect(scanner.recognizeReceipt('file:///broken.jpg')).rejects.toMatchObject({
+      code: 'ERR_UNREADABLE',
+    });
+    await expect(scanner.recognizeText('file:///broken.jpg')).rejects.toMatchObject({
+      code: 'ERR_UNREADABLE',
+    });
+  });
+
   it('survives a native isScanningAvailable that throws', async () => {
     mockRequireOptionalNativeModule.mockReset();
     mockRequireOptionalNativeModule.mockReturnValue({

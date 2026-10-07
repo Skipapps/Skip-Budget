@@ -5,6 +5,9 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
  *
  * Coordinates are normalised to 0–1 with the origin at the TOP left, so y grows the way a receipt
  * is read. Height is the printed size of the line, which tells the shop's name from its address.
+ *
+ * Lists of lines come in reading order: top to bottom, and left to right within a row (a label and
+ * its amount count as one row when their centres are within half a line height).
  */
 export type TextLine = {
   text: string;
@@ -82,14 +85,20 @@ export async function captureReceipt(): Promise<ScanResult | null> {
   return native.captureReceipt();
 }
 
+/**
+ * The text of a photo or of a PDF's first page, one line per row in reading order. A photo is read
+ * as the camera reads one: turned upright from its EXIF orientation and flattened when the receipt
+ * can be found in it. Resolves "" for a file without text; rejects (`ERR_UNREADABLE`) only when the
+ * file cannot be opened as an image or PDF.
+ */
 export async function recognizeText(uri: string): Promise<string> {
   if (!native) throw new Error('Scanning needs a newer build of the app.');
   return native.recognizeText(uri);
 }
 
 /**
- * Recognition that keeps the layout. An empty list (older native build) means "fall back to the
- * flat text", not a failure.
+ * Recognition that keeps the layout, read the same way as `recognizeText`. An empty list means
+ * "no text was found" or, on an older native build, "fall back to the flat text"; never a failure.
  */
 export async function recognizeReceipt(uri: string): Promise<TextLine[]> {
   if (!native) throw new Error('Scanning needs a newer build of the app.');

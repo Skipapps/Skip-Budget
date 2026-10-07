@@ -1,10 +1,11 @@
 import { useState } from 'react';
 
-import { guessCategory, matchBrand, useBrandDirectory } from '@/api/brands';
+import { guessCategory, matchBrand, useBrandDirectory, type BrandRow } from '@/api/brands';
 import { usePaymentSources } from '@/api/queries';
 import type { BrandSelection } from '@/components/brands/brand-field';
+import { getLocaleSnapshot } from '@/i18n/store';
 import { toIsoDate } from '@/lib/date';
-import { parseReceipt, parseReceiptFromLines } from '@/lib/receipt-parser';
+import { parseReceipt, parseReceiptFromLines, type ParseOptions } from '@/lib/receipt-parser';
 import { readDayParam } from '@/lib/voice-draft';
 import {
   captureReceipt,
@@ -31,6 +32,19 @@ export type ScanDraft = {
 };
 
 /**
+ * What the parser is told about this person: the shops the catalogue knows, and how their region
+ * writes dates, for a receipt that does not say. English Canada prints both orders, so CAD does not
+ * decide.
+ */
+export function receiptParseOptions(directory: readonly BrandRow[]): ParseOptions {
+  const { currency } = getLocaleSnapshot();
+  return {
+    brands: directory,
+    dayFirst: currency === 'USD' ? false : currency === 'CAD' ? undefined : true,
+  };
+}
+
+/**
  * Camera to draft receipt, in one call. Shared by the receipts list (a complete scan is filed in
  * place) and the add form (it fills the fields).
  */
@@ -49,9 +63,10 @@ export function useReceiptScan() {
 
       // Prefer the positioned reading: a receipt is a two-column document, and flat text loses
       // which figure belongs to which label.
+      const options = receiptParseOptions(directory);
       const parsed = result.lines?.length
-        ? parseReceiptFromLines(result.lines)
-        : parseReceipt(result.text);
+        ? parseReceiptFromLines(result.lines, options)
+        : parseReceipt(result.text, options);
 
       const read: ScanDraft['read'] = [];
       let store: BrandSelection | null = null;

@@ -1388,3 +1388,74 @@ screenshot of the tab bar taken, nothing reproduced or ruled out.
 shut down (it was shut down when I started); 0 simulators booted. Content size was never changed (it read `large`). Live tree:
 branch `almost-done-all-pages`, no source file touched, status clean before this log entry; the worktree is untouched at
 `9e18275` on `logo-service`. Scratch log: the scratchpad's `metro-8091.log`.
+
+## 2026-10-07 — Theo (Tester) — receipt-scanning test bench and baseline (branch receipt-scanning, worktree SkipBudget-scan)
+
+**Outcome:** Done. A measurable bench for receipt scanning now exists and the baseline is recorded. Nothing in
+`src/lib/receipt-parser.ts`, `src/api/scan.ts` or the native module was touched. Nothing committed.
+
+**Baseline before touching anything (`npm run check`):** typecheck pass; lint FAIL with 8 errors + 11 warnings that were
+already there (`react-hooks/refs` in `src/app/add-account.tsx:83` and `add-card.tsx:46,49`); format:check pass; jest 132 suites /
+2150 tests pass. After: typecheck clean, lint identical (none mine), prettier clean, jest 133 suites / 2167 tests pass.
+
+**What was added**
+- `scripts/receipt-corpus/`: `generate.py` (+ `catalog.py`, `content.py`, `frames.py`, `render.py`, `photo.py`): 300 seeded receipt
+  photos (US 60, Canada 30 en + 30 fr, UK 60, Mexico 60, Australia 60; 20 hand-built frames x 8 kinds x data), 12 MP, 40 percent
+  stored sideways with EXIF 6; `ocr-batch.swift` (raw / flat / fixed passes, a port of `normalised` + `flattened`, timings);
+  `build-fixtures.py`; `README.md` (commands + labelling rules); `.gitignore` for `out/` (3.3 GB of images).
+- `src/__tests__/fixtures/receipts/`: 300 compact fixtures + `baseline.json` (5.8 MB).
+- `src/__tests__/receipts/accuracy.test.ts`: describe 1 measures the current parser and never fails on accuracy; describe 2
+  (16 tests incl. scoring rules) asserts the harness works.
+- `.prettierignore` (two lines) so `format:check` ignores the generated fixtures and `out/`.
+- `.claude/team/dev/receipt-scanning-baseline.md`: the report.
+
+**Headline (flat = camera path):** merchant 59.3%, total 89.3%, date 62.3% (raw/upload path 42.7 / 73.3 / 63.3; fixed languages
+no better). Vision read the printed name in 94.9% of receipts and the parser picked it 68.3% of those times: the parser, not
+OCR, loses the merchant. Dates: numeric day-first ambiguous 0 of 67. Upload path never resolves EXIF orientation (merchant 28% on
+sideways photos vs 63% on the camera path). Flattening is net positive. OCR per pass at 12 MP (Intel Mac, busy): raw 1.41 s,
+flat 1.09 s (flatten 0.16), fixed 1.15 s mean.
+
+**Things I got wrong first and fixed (so the next person does not repeat them)**
+- First corpus was 1800 px wide: glyphs 1.7x too small for a real 12 MP shot, timings meaningless. Regenerated at 3024 px.
+- `concurrentPerform` ignored `--jobs`, so my first timings ran images in parallel. Serial now.
+- The Mexican "facturar" footer printed the brand's web address on "name printed nowhere" receipts, and a legal-entity line
+  often does not contain the brand ("LOBLAW COMPANIES LIMITED"). Fixed, and generation now fails if a "no name" receipt prints
+  the name or a named-elsewhere receipt does not.
+- 3-decimal rounding changed the parser's merchant on 38 of 900 receipt-passes versus full precision (it compares box heights
+  within 15 percent of ~0.01). y/height now keep 5 decimals, x/width 3: identical to full precision.
+- Two harness assertions were wrong, not the data (Vision boxes can overhang the frame; names must match ignoring spaces).
+
+**Not verified:** anything on a physical iPhone; whether the image picker's file keeps the EXIF flag (the upload-path finding
+depends on it); the Founder's "about zero" is not reproduced on synthetic receipts (59% merchant on the camera path).
+Probed in a throwaway iOS 26.5 simulator device (deleted): `en-CA`/`fr-CA` in `recognitionLanguages` is accepted silently.
+
+## 2026-10-07 — Theo (Tester) — holdout and hard sets added to the receipt bench
+
+**Outcome:** Done, uncommitted. Two new sets beside the 300 (training, byte-identical to before): `holdout` (151, `hold-*`) and `hard`
+(80, `hard-*`), same fixture format, same three passes. Report: addendum in `.claude/team/dev/receipt-scanning-baseline.md`.
+Did not edit `receipt-parser.ts`, `scan.ts`, the native module or `ocr-batch.swift` (Drew and Dilip own them); Vision was run with a
+frozen copy of the compiled `ocr-batch` (`out/ocr-batch-v0`).
+
+**Numbers, original parser (commit c7a607c), raw / flat / fixed:** training merchant 42.7 / 59.3 / 59.0, total 73.3 / 89.3 / 89.3,
+date 63.3 / 62.3 / 62.3; holdout 51.7 / 70.9 / 70.9, 73.5 / 78.1 / 78.1, 71.5 / 70.2 / 70.2; hard 28.7 / 53.8 / 53.8, 50.0 / 75.0 / 75.0,
+55.0 / 53.8 / 53.8. Frozen in `scripts/receipt-corpus/baseline-v0.json`.
+
+**What was added:** `generate_sets.py` with `holdout_catalog.py`, `holdout_frames.py` (13 layout families, 12 frames per market, 13 in
+Canada, about 20 new brands per market, new fonts and column widths), `digital.py` (email, app, PDF; 26 receipts, 5 markets, 3
+languages), `hardphoto.py` (10 stressors, EXIF 6 and 8); additive changes to `render.py` (variable fonts, per-cell fonts and tilt,
+framed total rows, a scribble, row spans); `ocr-min-text-height.swift` and `compare-min-text-height.py`; `accuracy.test.ts` now reports
+training / holdout / hard separately (38 tests), accepts `RECEIPT_PARSER=<file in the repo tree>` to measure another parser version,
+and writes `holdout`, `hard` and `sets` beside the unchanged training keys in `baseline.json`. 3.3 MB of new fixtures.
+
+**minimumTextHeight 0.008:** no loss. Lines per photo are the same at 0.008, 0.003 and 0.001 (26.2 against 26.4 on the 16 small-in-frame
+hard photos, raw; 31.9 for all three, flat); Vision returns boxes as small as 0.0029 under a 0.008 setting. Small receipts lose lines
+to pixel size in the raw pass (7 to 9 lines against 22 to 23 flattened), not to the setting.
+
+**Mistakes of mine the harness caught:** McDonald's was a holdout brand but is in the training set (Australia); a department-store
+receipt netted to a negative total; tips computed 100 times too large on digital and taxi slips; a pharmacy decoy total larger than the
+receipt total; baseline files read as fixtures. The "each parse under 50 ms" check failed once at 147 ms under a whole suite running in
+parallel (a receipt that parses in under 1 ms): it now takes the best of three runs per receipt.
+
+**Things to know:** Drew's `receipt-parser.accuracy.test.ts` already filters `hold-` fixtures and runs its holdout floors as soon as the
+files exist. The parser in the tree at about 11:00 scored merchant 96.0 (training) / 96.0 (holdout) / 76.3 (hard), flat. Not verified on
+a device; handwriting and glare are drawn, not photographed.

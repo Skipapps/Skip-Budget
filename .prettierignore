@@ -15,3 +15,9 @@ TEAM.md
 
 # Design kit: generated SVG/HTML and one-line-per-component specs, not shipped code.
 design/
+
+# Receipt-scanning bench: the fixtures are generated, one compact line each on purpose (the corpus
+# is a few MB), and out/ holds the images and raw Vision output they are built from.
+src/__tests__/fixtures/receipts/
+scripts/receipt-corpus/out/
+scripts/receipt-corpus/baseline-v0.json

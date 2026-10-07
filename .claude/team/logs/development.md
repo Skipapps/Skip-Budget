@@ -3983,3 +3983,66 @@ total. Mutation: 11/12 guards caught by a test; the 12th (no digit after the cen
 one space before a 3-digit comma figure reads as thousands ("2 123,45 $" → 2123.45). A line with a dot figure and
 a comma one (e.g. "TVQ 9.975 % 2,97 $") reads only the dot figure. `parseDate` reads 06/10/2026 US-first and has
 no French month names.
+
+---
+
+## 2026-10-07 — Drew (Developer, money maths) — receipt parser: store, total and date across five markets
+
+**Outcome:** Done in the `SkipBudget-scan` worktree (branch `receipt-scanning`), nothing committed. Camera path (`flat`) on
+the 300 training receipts: merchant 64.8 -> 95.6 % named and 3.7 -> 100 % abstain on no-name receipts, total 89.3 -> 97.0,
+date 62.3 -> 97.0, all three 33.3 -> 94.3. Held-out set (151, other shops/layouts/fonts/seed): 95.7 / 100 / 96.0 / 96.0 /
+90.1, within five points of training. Hard set (80, stressed photos): 77.0 / 66.7 / 86.3 / 86.3 / 58.8. tsc 0; eslint 0
+(cache cleared) and prettier clean on my 6 files; parser suites 79 + 157 + 6, receipt bench 38; full jest 135/135 suites,
+2353/2353.
+
+**Changed:** `src/lib/receipt-parser.ts` rewritten as one engine for both entry points (rows by reading order; sideways
+photos turned upright; tilt levelled by price/label slope votes; scored header with address/phone/web/date/till/tax-id/
+paperwork exclusions in en/fr/es and five postal systems; split names joined; clues from thanks / "receipt from" /
+legal-entity / web lines; brand hints with accent/case/space-blind matching, exact for names of 4 letters or fewer;
+dates per row only, en/fr/es months, region inference then `dayFirst` then nearest-past; totals as integer cents with
+leading-zero/digit-run/mask/ceiling rejection, French "$" before or as its own cell, tips, and the receipt's arithmetic
+(subtotal + taxes + tips + fees - discounts, cash - change, card line) to choose between readings). New
+`ParseOptions { brands?, today?, dayFirst? }` on parseReceipt / parseReceiptFromLines (and the single-field exports).
+`src/api/scan.ts`: `receiptParseOptions(directory)` (brand directory + dayFirst from the chosen currency: USD false,
+CAD undecided, GBP/MXN/AUD true), used by `useReceiptScan` and both parse calls in `src/app/add-receipt.tsx`.
+Tests: `receipt-parser.rules.test.ts` (157, one rule each), `receipt-parser.accuracy.test.ts` (floors on all three sets,
+`today` pinned). Two pinned expectations changed with reasons in the test: `TIM HORTONS #4021` -> `TIM HORTONS` (store
+number stripped), HARDWARE without TOTAL 20 -> 10.82 (cash handed over is not the charge; two sums agree on 10.82).
+Per-step table in `.claude/team/logs/scan-parser.md`.
+
+**Not verified / caveats:** held-out numbers after my first look are no longer blind (first look and every later rule
+are logged); parse time is 2-5 ms in Node/Jest for 225-line receipts on a quiet machine, not measured on a phone
+(Hermes); the hard set's main loss is newspaper text behind the receipt; G500-style names (one letter + digits) are
+excluded on purpose because order numbers ("H187") look the same.
+
+---
+
+## 2026-10-07 — Dilip (Developer, native and platform) — receipt reader (Apple Vision) hardened, camera and upload
+
+**Outcome:** Done in the `SkipBudget-scan` worktree (branch `receipt-scanning`), nothing committed, no xcodebuild, no
+`ios/` touched. Swift parses and typechecks against the iOS 26.5 SDK with a stub ExpoModulesCore (arm64 iOS 16.4 and
+15.1, x86_64 simulator; Swift 5 mode as the pod builds: 0 errors, 0 warnings; Swift 6 mode shows only the camera
+controller's existing diagnostics). tsc 0, eslint clean (cache cleared), prettier clean, module tests 7/7.
+
+**Changed:** `modules/receipt-scanner/ios/ReceiptScannerModule.swift`, `modules/receipt-scanner/index.ts` (docs only),
+`index.test.ts` (+2 tests), `scripts/receipt-corpus/ocr-batch.swift` (new `next` pass, `--passes legacy,next`; raw /
+flat / fixed untouched), its README section. `next.json` + `next-timing.json` written beside the images in
+`out/images`, `out/hard`, `out/holdout`; fixtures not rebuilt.
+- Upload path: photos decoded upright with ImageIO (EXIF applied, capped at 25 MP) and read like a camera shot; PDFs keep
+  their 2x render (capped at 25 MP, standard colour range).
+- One `read(photo:)` for camera and upload: flatten when a page is found; a doubtful crop (page under 10% of the frame
+  or fewer than 5 lines) also gets the whole photo read, whole kept only with >1.5x the legible characters.
+- Languages `en-US, es-ES, fr-FR`; auto-detect and language correction stay off; minimumTextHeight stays 0.008.
+- Lines returned in reading order (rows by centre within half a line height, then left to right).
+
+**Measured (300 training receipts, parser frozen at HEAD; merchant / total / date / all three):** raw 42.7 / 73.3 /
+63.3 / 18.7, flat 59.3 / 89.3 / 62.3 / 33.3, next 60.3 / 90.7 / 64.0 / 33.7. Clean scans: total 75.0 to 84.1, date 61.4
+to 72.7 (6 bad crops now fall back). Photos: next = flat within 1-2 receipts (decode-layout noise in Vision, not a
+rule). Holdout 151: flat 70.9 / 76.8 / 70.2 / 39.7, next 72.2 / 76.8 / 71.5 / 41.1. Theo's hard 80: next = flat within
+one receipt. Language list: byte-identical text on all 300; auto-detect -1 merchant; language correction rewrote 231
+digit lines ("GST (10%)" to "GST (108)"). minimumTextHeight 0 / 0.004: no gain on small receipts, 0 is -2 merchants on
+training. Cap 12-48 MP on 48 MP small-receipt shots: non-monotonic, within 3 of 60. Second Vision pass on 6/300,
+6/80, 2/151. Time: read without decode 1027 ms vs legacy flat 1095 (interleaved, 40 images, Intel Mac).
+
+**Not verified:** anything on a device (HEIC decode, memory, Vision model on iOS), PDFs (no PDF corpus), the camera
+path's own decode (UIImage + `normalised`, unchanged) against the bench's ImageIO decode.
