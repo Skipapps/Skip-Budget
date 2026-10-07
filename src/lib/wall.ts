@@ -13,9 +13,10 @@ import { getLocaleSnapshot } from '@/i18n/store';
 export const WALL = {
   loanCalculator: 'pro',
   insights: 'pro',
-  receiptScan: 'pro',
   /** Adding a receipt, bill or subscription by speaking it. */
   voice: 'pro',
+  /** Free draws a store's initials where Pro draws its logo. */
+  brandLogos: 'pro',
 } as const;
 
 export type WalledFeature = keyof typeof WALL;
@@ -25,7 +26,18 @@ export const FREE_LIMITS = {
   cards: 1,
   bankAccounts: 1,
   incomeSources: 1,
+  /** Receipts read by the camera, per calendar month. */
+  scansPerMonth: 15,
+  /** Receipts read from a photo or a file, per calendar month, counted apart from scans. */
+  uploadsPerMonth: 15,
 } as const;
+
+/**
+ * How far back each plan sees its own history. Only the view is shortened: older entries stay
+ * stored, keep counting in every balance, and come back the day the account has Pro again.
+ */
+export const FREE_HISTORY_DAYS = 90;
+export const PRO_HISTORY_YEARS = 7;
 
 /** English only, frozen at import; proMonthlyLabel() and proYearlyLabel() follow the language. */
 export const PRO_MONTHLY_LABEL = '$1.99/mo';

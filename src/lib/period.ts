@@ -2,6 +2,7 @@ import { monthShort, weekdayShort } from '@/i18n/calendar';
 import { t } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
 import type { DateRange } from '@/lib/range';
+import { PRO_HISTORY_YEARS } from '@/lib/wall';
 
 /**
  * Windows you step through, with fixed edges everybody agrees on (week Sunday to Saturday, calendar
@@ -38,7 +39,7 @@ export const PERIODS = [
 export type PeriodKey = (typeof PERIODS)[number]['value'];
 
 /** How far back the app keeps anything. Stepping stops here. */
-export const HISTORY_YEARS = 7;
+export const HISTORY_YEARS = PRO_HISTORY_YEARS;
 
 /** One division inside a period: a day, a week, or a month. */
 export type Bucket = {
