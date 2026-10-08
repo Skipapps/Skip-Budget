@@ -28,10 +28,7 @@ export default function WelcomeScreen() {
     <Screen
       footer={
         <View className="w-full items-center gap-2">
-          <Button
-            label={t('onboarding.welcome.start')}
-            onPress={() => router.push('/what-skip-can-do')}
-          />
+          <Button label={t('onboarding.welcome.start')} onPress={() => router.push('/message')} />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${haveAccount} ${logIn}`}

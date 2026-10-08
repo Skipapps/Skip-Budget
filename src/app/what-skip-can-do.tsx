@@ -43,18 +43,13 @@ export default function WhatSkipCanDoScreen() {
 
   return (
     <Screen
+      title={t('onboarding.canDo.title')}
       showBack
-      footer={<Button label={t('common.continue')} onPress={() => router.push('/message')} />}
+      // The last page before the account.
+      footer={<Button label={t('common.continue')} onPress={() => router.push('/auth')} />}
     >
       <Text
-        accessibilityRole="header"
-        className="mt-4 w-full font-app-bold text-[28px] leading-[34px] text-ink"
-        maxFontSizeMultiplier={TEXT_CAP.heading}
-      >
-        {t('onboarding.canDo.title')}
-      </Text>
-      <Text
-        className="mt-2 w-full font-app text-[15px] leading-[21px] text-muted"
+        className="mt-3 w-full text-center font-app text-[15px] leading-[21px] text-muted"
         maxFontSizeMultiplier={TEXT_CAP.reading}
       >
         {t('onboarding.canDo.subtitle')}

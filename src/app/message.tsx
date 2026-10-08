@@ -9,7 +9,7 @@ import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
 
-/** Why Skip: the last page before the account. */
+/** Why Skip: the first page after the welcome, before what Skip can do. */
 export default function MessageScreen() {
   return (
     <Screen
@@ -24,7 +24,7 @@ export default function MessageScreen() {
             {'\n'}
             <Text className="font-app-semibold text-ink">{t('support.why.decide')}</Text>
           </Text>
-          <Button label={t('support.why.go')} onPress={() => router.push('/auth')} />
+          <Button label={t('support.why.go')} onPress={() => router.push('/what-skip-can-do')} />
         </View>
       }
     >

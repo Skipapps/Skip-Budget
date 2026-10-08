@@ -1,4 +1,5 @@
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
+import { router } from 'expo-router';
 
 import MessageScreen from '@/app/message';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
@@ -89,4 +90,12 @@ it('reads in French', async () => {
     expect(screen.getByText(line)).toBeTruthy();
   }
   expectAllWorded(screen);
+});
+
+it('goes on to what Skip can do, the page after it', async () => {
+  const screen = await render(<MessageScreen />);
+
+  await fireEvent.press(screen.getByText("Let's go"));
+
+  expect(router.push).toHaveBeenCalledWith('/what-skip-can-do');
 });

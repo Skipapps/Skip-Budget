@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/react-native';
+import { router } from 'expo-router';
 
 import AccountOfferScreen from '@/app/account-offer';
 import AvatarScreen from '@/app/avatar';
@@ -165,6 +166,10 @@ describe('onboarding in Spanish', () => {
     expect(screen.getByText('Comenzar')).toBeTruthy();
     expect(screen.getByLabelText('¿Ya tienes una cuenta? Inicia sesión')).toBeTruthy();
     expectNoRawText(screen);
+
+    // Welcome, then why Skip, then what it can do, then the account.
+    await fireEvent.press(screen.getByText('Comenzar'));
+    expect(router.push).toHaveBeenCalledWith('/message');
   });
 
   it('lists what Skip can do, short', async () => {
