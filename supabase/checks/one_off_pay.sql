@@ -100,6 +100,27 @@ select pg_temp.check((select monthly_income from public.v_monthly_income
                        where user_id = '00000000-0000-0000-0000-0000000000f1') = 3000,
   'the standing monthly income leaves one-off pays out');
 
+-- ---------------------------------------------------------------- an exact half cent rounds up, as in the app
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000f3', 'h@test.local');
+insert into public.profiles (id) values ('00000000-0000-0000-0000-0000000000f3') on conflict (id) do nothing;
+insert into public.entitlements (user_id, pro, expires_at) values ('00000000-0000-0000-0000-0000000000f3', true, null);
+insert into public.salary_sources (user_id, name, amount, frequency, last_payday) values
+  ('00000000-0000-0000-0000-0000000000f3', 'A', 0.17, 'weekly', '2026-06-05'),
+  ('00000000-0000-0000-0000-0000000000f3', 'B', 5723.39, 'biweekly', '2026-06-05');
+select pg_temp.check(public.income_for_month('00000000-0000-0000-0000-0000000000f3', '2026-08-01') = 12401.42,
+  '0.17 weekly and 5,723.39 every two weeks are exactly 12,401.415 a month: 12,401.42');
+select pg_temp.check((select monthly_income from public.v_monthly_income
+                       where user_id = '00000000-0000-0000-0000-0000000000f3') = 12401.42,
+  'and the standing monthly income agrees');
+delete from public.salary_sources where user_id = '00000000-0000-0000-0000-0000000000f3';
+insert into public.salary_sources (user_id, name, amount, frequency, last_payday) values
+  ('00000000-0000-0000-0000-0000000000f3', 'A', 2693.80, 'weekly', '2026-06-05'),
+  ('00000000-0000-0000-0000-0000000000f3', 'B', 2022.31, 'biweekly', '2026-06-05'),
+  ('00000000-0000-0000-0000-0000000000f3', 'S', 518.11, 'once', '2026-08-03'),
+  ('00000000-0000-0000-0000-0000000000f3', 'S', 514.10, 'once', '2026-08-21');
+select pg_temp.check(public.income_for_month('00000000-0000-0000-0000-0000000000f3', '2026-08-01') = 17087.02,
+  'two schedules and two one-off pays making exactly 17,087.015: 17,087.02');
+
 -- ---------------------------------------------------------------- the savings record
 update public.profiles set created_at = '2026-06-01' where id = '00000000-0000-0000-0000-0000000000f1';
 -- The rebuilt record starts at the first month with spending, so June has a purchase too.

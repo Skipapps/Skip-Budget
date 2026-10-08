@@ -17,6 +17,7 @@ const COUNTED = {
   receipt: 'settings.count.receipts',
   recordedCharge: 'settings.count.recordedCharges',
   salarySource: 'settings.count.salarySources',
+  oneOffPay: 'settings.count.oneOffPays',
 } as const;
 
 export type Counted = keyof typeof COUNTED;
@@ -40,7 +41,8 @@ export function useMoneyCounts() {
     subscriptions: subscriptions.data?.length ?? 0,
     cards: cards.data?.length ?? 0,
     accounts: accounts.data?.length ?? 0,
-    // Incomes, not pays: a one-off pay is money in on one day, not a source.
+    // Incomes, not pays: a one-off pay is money in on one day, not a source, and is counted apart.
     salarySources: (salary.data ?? []).filter((source) => source.frequency !== 'once').length,
+    oneOffPays: (salary.data ?? []).filter((source) => source.frequency === 'once').length,
   };
 }

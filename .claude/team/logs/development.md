@@ -4295,3 +4295,30 @@ changes source on edit). Remaining: (1) period-labelled sub-figures still sum on
 "Paid" caption, receipt detail store-history caption, Activity bucket that straddles the floor); (2) entitlement query
 inherits retry 1, so a hung network holds every free gate ~17 s (offline fails fast); (3) LogoConfirm still looks up
 while the plan is unknown; (4) `hidden` ignores income; nits on `until` trust, isHalf default, inline Stack.Screen options.
+
+## 2026-10-08 — Dmitri (Development Lead) — review of 6a914ce (one-off pay, "Just this time")
+
+**Outcome:** FIX-FIRST on two small items. Read-only; no source touched. pay/date/salary-one-off jest 34/34;
+supabase/checks/one_off_pay.sql ALL CHECKS PASSED; lapsed-Pro path exercised as `authenticated` on the local DB
+(rolled back); 7,000-case fuzz of `incomeForMonth` vs `public.income_for_month` vs exact rational arithmetic.
+
+- **Fix 1 (money):** server rounds a half cent down when 2+ weekly/biweekly schedules sum to exactly x.xx5,
+  because each `monthly_from_salary` term is a separately rounded numeric division. App matches exact maths in
+  every case; SQL was 1 cent low in 23 of 7,000 (about 1 in 300 two-schedule users). Fixture: weekly 0.17 +
+  biweekly 5,723.39 -> exact 12,401.415 -> app 12,401.42, server 12,401.41. Fix: sum amount x pays-per-year and
+  divide by 12 once in income_for_month (and v_monthly_income); add the fixture to the checks.
+- **Fix 2 (Pro rule):** salary.tsx changeFrequency gates on the frequency on screen, not the saved one. A
+  lapsed Pro with 2+ schedules who taps "Just this time" on a saved schedule cannot tap back (sent to
+  /pro-feature). If they Save, the DB refuses the reverse change and the schedule's income goes from every past
+  month's savings record (local: Aug 6,766.67 -> 2,000.00). Gate only rows saved as one-off or new.
+- **Founder question:** earlier one-off pays cannot be corrected or deleted: hidden from the editor, and the
+  Activity row links to /salary where they are not shown (breaks ledgerHref's "never route somewhere
+  approximate").
+- **Low:** Save order can refuse a legal swap on free; 168 h/week cap applies to a one-off's hours worked;
+  link-all-salaries links one-offs to a new account; Settings "Payday: Not set up" and the delete tally ignore
+  one-off pays; next_payday still has no pinned search_path. Ops: apply 100001 and 100002 as separate
+  transactions, and make them live before the build.
+- **Verified OK:** savedIds holds shown rows only (hidden one-offs never deleted, month-rollover remount safe);
+  local yyyy-mm month logic matches server ranges; next_payday/getNextPayday/paydaysInRange for 'once';
+  privileges on income_for_month and the trigger; enum split recorded by the CLI; lapsed-Pro edits and one-off
+  adds pass the trigger.

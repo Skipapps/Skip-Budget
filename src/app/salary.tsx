@@ -153,10 +153,12 @@ export default function SalaryScreen() {
   const details = useSalaryDetails();
   const { today } = useToday();
   const rows = details.data?.rows ?? [];
-  // Every pay as it comes would grow this page without end: earlier months' one-off pays stay
-  // saved, counted and in Activity, but out of the editor, which never deletes what it does not show.
+  // Every pay as it comes would grow this page without end: earlier months' one-off pays wait
+  // behind one row until asked for, and the editor never deletes what it does not show.
   const saved = rows.filter((row) => !earlierOneOff(row.frequency, row.last_payday, today));
-  const earlier = rows.length - saved.length;
+  const earlier = rows
+    .filter((row) => earlierOneOff(row.frequency, row.last_payday, today))
+    .sort((a, b) => (b.last_payday ?? '').localeCompare(a.last_payday ?? ''));
 
   if (details.isPending) {
     return (
@@ -182,7 +184,7 @@ export default function SalaryScreen() {
     );
   }
 
-  const initial: SalarySource[] = saved.map((row) => ({
+  const toSource = (row: (typeof rows)[number]): SalarySource => ({
     id: row.id,
     name: row.name,
     amount: row.amount,
@@ -196,13 +198,13 @@ export default function SalaryScreen() {
     overtime: row.overtime_hours_per_week > 0,
     overtimeHours: row.overtime_hours_per_week > 0 ? String(row.overtime_hours_per_week) : '',
     overtimeMultiplier: row.overtime_multiplier || 1.5,
-  }));
+  });
 
   return (
     <SalaryEditor
       key={saved.map((row) => row.id).join('|') || 'empty'}
-      initial={initial}
-      earlierOneOffs={earlier}
+      initial={saved.map(toSource)}
+      earlier={earlier.map(toSource)}
       hourlyAvailable={details.data?.hourlyAvailable ?? false}
     />
   );
@@ -210,12 +212,12 @@ export default function SalaryScreen() {
 
 function SalaryEditor({
   initial,
-  earlierOneOffs,
+  earlier,
   hourlyAvailable,
 }: {
   initial: SalarySource[];
-  /** One-off pays from earlier months, saved but not shown here. */
-  earlierOneOffs: number;
+  /** One-off pays from earlier months, newest first: saved, and shown only when asked for. */
+  earlier: SalarySource[];
   /** False until the database has the hourly columns; fixed pay only until then. */
   hourlyAvailable: boolean;
 }) {
@@ -229,6 +231,22 @@ function SalaryEditor({
   const nextId = useRef(initial.length + 1);
   // Ids in the database: anything else on screen is new, and any missing from screen was removed.
   const savedIds = useRef(new Set(initial.map((source) => source.id)));
+  // Each pay as the database holds it, for what a change of frequency really is.
+  const savedPays = useRef(new Map(initial.map((source) => [source.id, source])));
+  const [earlierShown, setEarlierShown] = useState(false);
+
+  const showEarlier = () => {
+    for (const source of earlier) {
+      savedIds.current.add(source.id);
+      savedPays.current.set(source.id, source);
+    }
+    setCollapsed((current) => ({
+      ...current,
+      ...Object.fromEntries(earlier.map((source) => [source.id, true])),
+    }));
+    setSources((current) => [...current, ...earlier]);
+    setEarlierShown(true);
+  };
 
   const { data: accounts = [] } = useBankAccounts();
   const accountOptions = accounts.map((account) => ({
@@ -289,14 +307,27 @@ function SalaryEditor({
   const addOneOff = () => setSources((current) => [...current, blankSource('once')]);
 
   const changeFrequency = (source: SalarySource, frequency: PayFrequency) => {
-    if (source.frequency === 'once' && frequency !== 'once' && scheduleNeedsPro(source.id)) {
+    const held = savedPays.current.get(source.id);
+    // Only a pay that is not a schedule in the database becomes a new income; taking a saved
+    // schedule back from "Just this time" is an edit, which any plan may make.
+    const newSchedule =
+      source.frequency === 'once' && frequency !== 'once' && (held?.frequency ?? 'once') === 'once';
+    if (newSchedule && scheduleNeedsPro(source.id)) {
       router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } });
       return;
     }
-    update(source.id, {
-      frequency,
-      lastPayday: frequency === 'once' && !source.lastPayday ? today : source.lastPayday,
-    });
+    let lastPayday = source.lastPayday;
+    // A pay just this time is usually the one that landed today; back on its schedule, a saved pay
+    // gets its own last payday again.
+    if (frequency === 'once' && source.frequency !== 'once') lastPayday = today;
+    else if (
+      frequency !== 'once' &&
+      source.frequency === 'once' &&
+      held &&
+      held.frequency !== 'once'
+    )
+      lastPayday = held.lastPayday;
+    update(source.id, { frequency, lastPayday });
   };
 
   // Removing a source drops its income from every projection, so it asks first. The row is deleted
@@ -332,6 +363,11 @@ function SalaryEditor({
       setError(t('salary.needNameAndPay'));
       return;
     }
+    // A saved pay left without a name would be dropped, and so deleted, on Save: ask for it instead.
+    if (sources.some((source) => savedIds.current.has(source.id) && !named.includes(source))) {
+      setError(t('salary.needNameAndPay'));
+      return;
+    }
     for (const source of named) {
       if (source.payType !== 'hourly') continue;
       const problem = hourlyProblem(hourlyOf(source));
@@ -359,7 +395,12 @@ function SalaryEditor({
         if (!stillPresent.has(id)) await deleteSource.mutateAsync(id);
       }
 
-      for (const source of named) {
+      // One-off pays first: a schedule turned one-off frees the free plan's slot before a one-off
+      // turned schedule takes it, and the database checks each write as it lands.
+      const ordered = [...named].sort(
+        (a, b) => Number(a.frequency !== 'once') - Number(b.frequency !== 'once'),
+      );
+      for (const source of ordered) {
         const values: SalaryValues = {
           name: source.name.trim(),
           amount: paycheckOf(source),
@@ -466,7 +507,8 @@ function SalaryEditor({
                 maxFontSizeMultiplier={TEXT_CAP.row}
               >
                 {[
-                  source.name.trim() || t('salary.unnamed'),
+                  // A one-off pay's card already says what it is.
+                  source.name.trim() || (source.frequency === 'once' ? null : t('salary.unnamed')),
                   paycheckOf(source) ? formatCurrency(paycheckOf(source)) : null,
                   source.payType === 'hourly' ? t('salary.payType.hourly') : null,
                   source.frequency === 'once' && source.lastPayday
@@ -636,6 +678,24 @@ function SalaryEditor({
         ))}
       </View>
 
+      {earlier.length > 0 && !earlierShown ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('salary.earlierOneOffs', { count: earlier.length })}
+          accessibilityHint={t('salary.earlierHint')}
+          onPress={showEarlier}
+          className="mt-4 min-h-14 w-full flex-row items-center justify-between gap-3 rounded-[16px] border border-line bg-card px-4 active:bg-ink/5"
+        >
+          <Text
+            className="min-w-0 flex-1 font-app-medium text-[14px] text-ink"
+            maxFontSizeMultiplier={TEXT_CAP.row}
+          >
+            {t('salary.earlierOneOffs', { count: earlier.length })}
+          </Text>
+          <ChevronDown size={18} color={colors.muted} strokeWidth={2} />
+        </Pressable>
+      ) : null}
+
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('salary.addSource')}
@@ -665,15 +725,6 @@ function SalaryEditor({
           {t('salary.addOneOff')}
         </Text>
       </Pressable>
-
-      {earlierOneOffs > 0 ? (
-        <Text
-          className="mt-4 w-full text-center font-app text-[13px] text-muted"
-          maxFontSizeMultiplier={TEXT_CAP.reading}
-        >
-          {t('salary.earlierOneOffs', { count: earlierOneOffs })}
-        </Text>
-      ) : null}
 
       <View className="mt-auto w-full pt-10">
         {error ? (

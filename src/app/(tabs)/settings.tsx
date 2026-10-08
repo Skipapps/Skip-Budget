@@ -120,6 +120,7 @@ export default function SettingsScreen() {
       [receipts.data?.length ?? 0, 'receipt'],
       [charges.data?.length ?? 0, 'recordedCharge'],
       [counts.salarySources, 'salarySource'],
+      [counts.oneOffPays, 'oneOffPay'],
     ];
 
     const held = tally.filter(([count]) => count > 0).map(([count, thing]) => plural(count, thing));

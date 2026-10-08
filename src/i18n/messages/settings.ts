@@ -152,6 +152,11 @@ export const settingsMessages = defineMessages({
     es: { one: '{count} fuente de ingresos', other: '{count} fuentes de ingresos' },
     fr: { one: '{count} source de revenus', other: '{count} sources de revenus' },
   },
+  'settings.count.oneOffPays': {
+    en: { one: '{count} one-off pay', other: '{count} one-off pays' },
+    es: { one: '{count} pago único', other: '{count} pagos únicos' },
+    fr: { one: '{count} paie unique', other: '{count} paies uniques' },
+  },
 
   'settings.yourMoney.bills': { en: 'Bills', es: 'Facturas', fr: 'Factures' },
   'settings.yourMoney.noBills': { en: 'None yet', es: 'Ninguna aún', fr: 'Aucune pour l’instant' },

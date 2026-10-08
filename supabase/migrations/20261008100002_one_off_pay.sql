@@ -28,6 +28,8 @@ $$;
 
 -- ----------------------------------------------------------------------------
 -- 2. A month's income: every schedule normalised to a month, plus the one-off pays that landed in it.
+--    The year's pay is summed first and divided once: dividing each schedule separately leaves the
+--    total a hair under an exact half cent, and the month would round down where the app rounds up.
 -- ----------------------------------------------------------------------------
 create or replace function public.income_for_month(p_user uuid, p_month date)
 returns numeric
@@ -36,9 +38,15 @@ stable
 set search_path = ''
 as $$
   select round(
-           coalesce((select sum(public.monthly_from_salary(s.amount, s.frequency))
+           coalesce((select sum(s.amount * case s.frequency
+                                              when 'weekly'      then 52
+                                              when 'biweekly'    then 26
+                                              when 'semimonthly' then 24
+                                              when 'monthly'     then 12
+                                              else 0
+                                            end)
                        from public.salary_sources s
-                      where s.user_id = p_user), 0)
+                      where s.user_id = p_user), 0) / 12.0
          + coalesce((select sum(s.amount)
                        from public.salary_sources s
                       where s.user_id = p_user
@@ -50,6 +58,19 @@ $$;
 
 -- It takes any user id: only the server's own functions may ask.
 revoke all on function public.income_for_month(uuid, date) from public, anon, authenticated;
+
+-- The standing monthly income, summed the same way.
+create or replace view public.v_monthly_income as
+  select user_id,
+         round(coalesce(sum(amount * case frequency
+                                       when 'weekly'      then 52
+                                       when 'biweekly'    then 26
+                                       when 'semimonthly' then 24
+                                       when 'monthly'     then 12
+                                       else 0
+                                     end), 0) / 12.0, 2) as monthly_income
+    from public.salary_sources
+   group by user_id;
 
 -- ----------------------------------------------------------------------------
 -- 3. The savings record counts each month's own one-off pays.
@@ -167,6 +188,7 @@ create or replace function public.next_payday(p_last date, p_frequency public.pa
 returns date
 language plpgsql
 immutable
+set search_path = ''
 as $$
 declare
   d date := p_last;

@@ -43,7 +43,9 @@ export default function YourMoneyScreen() {
         subtitle={
           counts.salarySources > 0
             ? plural(counts.salarySources, 'salarySource')
-            : t('settings.yourMoney.notSetUp')
+            : counts.oneOffPays > 0
+              ? plural(counts.oneOffPays, 'oneOffPay')
+              : t('settings.yourMoney.notSetUp')
         }
         onPress={() => router.push('/salary')}
         last

@@ -41,3 +41,26 @@ it('earns only one-off pays when there is no schedule', () => {
   ).toBe(120);
   expect(incomeForMonth([], '2026-10-08')).toBe(0);
 });
+
+it('rounds an exact half cent up, the same as the server', () => {
+  expect(
+    incomeForMonth(
+      [
+        { amount: 0.17, frequency: 'weekly', payday: '2026-06-05' },
+        { amount: 5723.39, frequency: 'biweekly', payday: '2026-06-05' },
+      ],
+      '2026-08-01',
+    ),
+  ).toBe(12401.42);
+  expect(
+    incomeForMonth(
+      [
+        { amount: 2693.8, frequency: 'weekly', payday: '2026-06-05' },
+        { amount: 2022.31, frequency: 'biweekly', payday: '2026-06-05' },
+        { amount: 518.11, frequency: 'once', payday: '2026-08-03' },
+        { amount: 514.1, frequency: 'once', payday: '2026-08-21' },
+      ],
+      '2026-08-01',
+    ),
+  ).toBe(17087.02);
+});

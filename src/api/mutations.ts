@@ -411,7 +411,11 @@ export function useLinkAccountToSalaries() {
 
   return useMutation({
     mutationFn: async (bankAccountId: string) => {
-      const { data: sources, error } = await supabase.from('salary_sources').select('id');
+      // The pay schedules the switch named: a one-off pay has landed somewhere already.
+      const { data: sources, error } = await supabase
+        .from('salary_sources')
+        .select('id')
+        .neq('frequency', 'once');
       if (error) throw error;
 
       const rows = (sources ?? []).map((source: { id: string }) => ({

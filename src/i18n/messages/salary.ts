@@ -141,18 +141,14 @@ export const salaryMessages = defineMessages({
   },
   'salary.oneOffNumber': { en: 'One-off pay', es: 'Pago único', fr: 'Paie unique' },
   'salary.earlierOneOffs': {
-    en: {
-      one: '{count} one-off pay from earlier months is kept in Activity.',
-      other: '{count} one-off pays from earlier months are kept in Activity.',
-    },
-    es: {
-      one: '{count} pago único de meses anteriores está en Actividad.',
-      other: '{count} pagos únicos de meses anteriores están en Actividad.',
-    },
-    fr: {
-      one: '{count} paie unique des mois précédents est gardée dans Activité.',
-      other: '{count} paies uniques des mois précédents sont gardées dans Activité.',
-    },
+    en: { one: '{count} earlier one-off pay', other: '{count} earlier one-off pays' },
+    es: { one: '{count} pago único anterior', other: '{count} pagos únicos anteriores' },
+    fr: { one: '{count} paie unique antérieure', other: '{count} paies uniques antérieures' },
+  },
+  'salary.earlierHint': {
+    en: 'Shows them, to change or remove',
+    es: 'Los muestra para cambiarlos o quitarlos',
+    fr: 'Les affiche pour les modifier ou les retirer',
   },
   'salary.nextPayday': {
     en: 'Next payday {date}',
