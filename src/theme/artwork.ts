@@ -4,7 +4,6 @@ import type { SvgProps } from 'react-native-svg';
 
 import { useTheme } from '@/providers/theme-provider';
 
-import DarkInsights from '@/assets/illustrations/dark/insights.svg';
 import DarkStateEmptyBills from '@/assets/illustrations/dark/state-empty-bills.svg';
 import DarkStateEmptyReceipts from '@/assets/illustrations/dark/state-empty-receipts.svg';
 import DarkStateEmptySubscriptions from '@/assets/illustrations/dark/state-empty-subscriptions.svg';
@@ -13,7 +12,6 @@ import DarkStateError from '@/assets/illustrations/dark/state-error.svg';
 import DarkStateNoResults from '@/assets/illustrations/dark/state-no-results.svg';
 import DarkWelcomeHero from '@/assets/illustrations/dark/welcome-hero.svg';
 
-import Insights from '@/assets/illustrations/insights.svg';
 import LoanSchedule from '@/assets/illustrations/loan-schedule.svg';
 import LoginHero from '@/assets/illustrations/login-hero.svg';
 import StateEmptyBills from '@/assets/illustrations/state-empty-bills.svg';
@@ -31,7 +29,6 @@ import WelcomeHero from '@/assets/illustrations/welcome-hero.svg';
 type Pair = { light: FC<SvgProps>; dark: FC<SvgProps> };
 
 const ARTWORK = {
-  insights: { light: Insights, dark: DarkInsights },
   // One drawing for both modes: it sits on transparency and its palette reads on light and dark.
   loginHero: { light: LoginHero, dark: LoginHero },
   welcomeHero: { light: WelcomeHero, dark: DarkWelcomeHero },
