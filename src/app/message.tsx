@@ -24,7 +24,7 @@ export default function MessageScreen() {
             {'\n'}
             <Text className="font-app-semibold text-ink">{t('support.why.decide')}</Text>
           </Text>
-          <Button label={t('support.why.go')} onPress={() => router.push('/what-skip-can-do')} />
+          <Button label={t('common.continue')} onPress={() => router.push('/what-skip-can-do')} />
         </View>
       }
     >

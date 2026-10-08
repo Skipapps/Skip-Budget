@@ -33,6 +33,8 @@ export const onboardingMessages = defineMessages({
     es: 'Lo que Skip puede hacer',
     fr: 'Ce que Skip peut faire',
   },
+  // The last page before the account.
+  'onboarding.canDo.go': { en: "Let's go", es: '¡Vamos!', fr: 'C’est parti !' },
   'onboarding.canDo.subtitle': {
     en: 'Simple money tracking, built for privacy.',
     es: 'Llevar tu dinero, sencillo y privado.',

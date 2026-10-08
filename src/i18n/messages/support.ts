@@ -106,7 +106,6 @@ export const supportMessages = defineMessages({
     es: 'No solo lo automatices.',
     fr: 'Ne te contente pas de l’automatiser.',
   },
-  'support.why.go': { en: "Let's go", es: '¡Vamos!', fr: 'C’est parti !' },
   'support.why.awareness': { en: 'Awareness', es: 'Conciencia', fr: 'Conscience' },
   'support.why.awarenessLine': {
     en: 'Every dollar, accounted for.',

@@ -47,7 +47,7 @@ it('reads as designed in English', async () => {
     'You decide, not an algorithm.',
     'People once tracked every penny in a ledger. Skip brings that habit into modern life, without the paperwork.',
     'Know where your money goes. Decide where it goes next.',
-    "Let's go",
+    'Continue',
   ]) {
     expect(screen.getByText(line)).toBeTruthy();
   }
@@ -66,7 +66,7 @@ it('reads in Spanish', async () => {
     'Control',
     'Decides tú, no un algoritmo.',
     'Sabe a dónde va tu dinero. Decide a dónde irá después.',
-    '¡Vamos!',
+    'Continuar',
   ]) {
     expect(screen.getByText(line)).toBeTruthy();
   }
@@ -85,7 +85,7 @@ it('reads in French', async () => {
     'Contrôle',
     'Aucun identifiant bancaire. Jamais.',
     'Sache où va ton argent. Décide où il ira ensuite.',
-    'C’est parti !',
+    'Continuer',
   ]) {
     expect(screen.getByText(line)).toBeTruthy();
   }
@@ -95,7 +95,7 @@ it('reads in French', async () => {
 it('goes on to what Skip can do, the page after it', async () => {
   const screen = await render(<MessageScreen />);
 
-  await fireEvent.press(screen.getByText("Let's go"));
+  await fireEvent.press(screen.getByText('Continue'));
 
   expect(router.push).toHaveBeenCalledWith('/what-skip-can-do');
 });

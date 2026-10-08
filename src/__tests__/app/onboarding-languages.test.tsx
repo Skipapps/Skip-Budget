@@ -178,7 +178,7 @@ describe('onboarding in Spanish', () => {
     expect(screen.getByText('Llevar tu dinero, sencillo y privado.')).toBeTruthy();
     expect(screen.getByText('Préstamos exactos')).toBeTruthy();
     expect(screen.getByText('Interés diario, igual que tu banco.')).toBeTruthy();
-    expect(screen.getByText('Continuar')).toBeTruthy();
+    expect(screen.getByText('¡Vamos!')).toBeTruthy();
     expectNoRawText(screen);
   });
 
@@ -275,7 +275,7 @@ describe('onboarding in French', () => {
     expect(screen.getByText('Ce que Skip peut faire')).toBeTruthy();
     expect(screen.getByText('Des prêts suivis au plus juste')).toBeTruthy();
     expect(screen.getByText('Intérêts quotidiens, comme ta banque.')).toBeTruthy();
-    expect(screen.getByText('Continuer')).toBeTruthy();
+    expect(screen.getByText('C’est parti !')).toBeTruthy();
     expectNoRawText(screen);
   });
 

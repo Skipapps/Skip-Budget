@@ -52,7 +52,7 @@ describe('What Skip can do', () => {
   it('names itself in the top bar, and goes on to the account, the last page before it', async () => {
     const screen = await render(<WhatSkipCanDoScreen />);
 
-    await fireEvent.press(screen.getByText('Continue'));
+    await fireEvent.press(screen.getByText("Let's go"));
 
     expect(router.push).toHaveBeenCalledWith('/auth');
   });

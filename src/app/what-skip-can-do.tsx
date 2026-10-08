@@ -46,7 +46,7 @@ export default function WhatSkipCanDoScreen() {
       title={t('onboarding.canDo.title')}
       showBack
       // The last page before the account.
-      footer={<Button label={t('common.continue')} onPress={() => router.push('/auth')} />}
+      footer={<Button label={t('onboarding.canDo.go')} onPress={() => router.push('/auth')} />}
     >
       <Text
         className="mt-3 w-full text-center font-app text-[15px] leading-[21px] text-muted"
