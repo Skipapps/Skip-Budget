@@ -6,7 +6,6 @@ import HelloScreen from '@/app/hello';
 import SetupScreen from '@/app/setup';
 import SetupBillsScreen from '@/app/setup-bills';
 import SetupSubscriptionsScreen from '@/app/setup-subscriptions';
-import TourScreen from '@/app/tour';
 import WelcomeScreen from '@/app/welcome';
 import WhatSkipCanDoScreen from '@/app/what-skip-can-do';
 import type { SetupStep } from '@/api/onboarding';
@@ -53,6 +52,7 @@ jest.mock('@/providers/theme-provider', () => ({
     accentInk: '#905479',
   }),
   useMoneyColor: () => () => '#000000',
+  useTheme: () => ({ scheme: 'light' }),
 }));
 
 jest.mock('@/providers/session-provider', () => ({
@@ -156,47 +156,24 @@ afterAll(() => resetLocaleForTests());
 describe('onboarding in Spanish', () => {
   beforeEach(() => setLanguage('es'));
 
-  it('welcomes, with each bold phrase inside its own sentence', async () => {
+  it('welcomes with the promise, and the way back in for an account', async () => {
     const screen = await render(<WelcomeScreen />);
-    expect(screen.getByText('Tu dinero, tu privacidad.')).toBeTruthy();
+    expect(screen.getByText('Tu dinero,\ntu privacidad.')).toBeTruthy();
     expect(
-      screen.getByText(
-        'Lleva el control de tus gastos, facturas, suscripciones y saldos de tarjetas, todo en un solo lugar.',
-      ),
-    ).toBeTruthy();
-    expect(screen.getByText('todo en un solo lugar')).toBeTruthy();
-    expect(
-      screen.getByText(
-        'Nunca te pedimos los datos de tu banco. Tú decides qué sabe Skip, y nada más.',
-      ),
+      screen.getByText('Lleva tus gastos, facturas y tarjetas.\nSin acceso a tu banco, nunca.'),
     ).toBeTruthy();
     expect(screen.getByText('Comenzar')).toBeTruthy();
-    expect(screen.getByText('Ya tengo una cuenta')).toBeTruthy();
+    expect(screen.getByLabelText('¿Ya tienes una cuenta? Inicia sesión')).toBeTruthy();
     expectNoRawText(screen);
   });
 
   it('lists what Skip can do, short', async () => {
     const screen = await render(<WhatSkipCanDoScreen />);
     expect(screen.getByText('Lo que Skip puede hacer')).toBeTruthy();
-    expect(screen.getByText('Préstamos, al centavo')).toBeTruthy();
-    expect(
-      screen.getByText(
-        'Intereses diarios, para que el saldo a liquidar coincida con tu estado de cuenta.',
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText('Llevar tu dinero, sencillo y privado.')).toBeTruthy();
+    expect(screen.getByText('Préstamos exactos')).toBeTruthy();
+    expect(screen.getByText('Interés diario, igual que tu banco.')).toBeTruthy();
     expect(screen.getByText('Continuar')).toBeTruthy();
-    expectNoRawText(screen);
-  });
-
-  it('tours the five stops, read out whole', async () => {
-    const screen = await render(<TourScreen />);
-    expect(screen.getByText(/^Cinco cosas, cada una a un toque\./)).toBeTruthy();
-    expect(screen.getByText('Ahorros que se explican solos')).toBeTruthy();
-    expect(
-      screen.getByLabelText(
-        'Escanea recibos con un toque. Apunta la cámara a un recibo y se lee en tu teléfono: tienda, fecha y total, listos para revisar y guardar. La foto nunca sale del dispositivo.',
-      ),
-    ).toBeTruthy();
     expectNoRawText(screen);
   });
 
@@ -277,30 +254,23 @@ describe('onboarding in Spanish', () => {
 describe('onboarding in French', () => {
   beforeEach(() => setLanguage('fr'));
 
-  it('welcomes, with each bold phrase inside its own sentence', async () => {
+  it('welcomes with the promise', async () => {
     const screen = await render(<WelcomeScreen />);
-    expect(screen.getByText('Ton argent, ta vie privée.')).toBeTruthy();
+    expect(screen.getByText('Ton argent,\nta vie privée.')).toBeTruthy();
     expect(
-      screen.getByText(
-        'Suis tes dépenses, factures, abonnements et soldes de cartes — tout au même endroit.',
-      ),
+      screen.getByText('Suis tes dépenses, factures et cartes.\nJamais d’identifiants bancaires.'),
     ).toBeTruthy();
     expect(screen.getByText('Commencer')).toBeTruthy();
+    expect(screen.getByLabelText('Tu as déjà un compte ? Connecte-toi')).toBeTruthy();
     expectNoRawText(screen);
   });
 
   it('lists what Skip can do, short', async () => {
     const screen = await render(<WhatSkipCanDoScreen />);
     expect(screen.getByText('Ce que Skip peut faire')).toBeTruthy();
-    expect(screen.getByText('Les prêts, au cent près')).toBeTruthy();
+    expect(screen.getByText('Des prêts suivis au plus juste')).toBeTruthy();
+    expect(screen.getByText('Intérêts quotidiens, comme ta banque.')).toBeTruthy();
     expect(screen.getByText('Continuer')).toBeTruthy();
-    expectNoRawText(screen);
-  });
-
-  it('tours the five stops', async () => {
-    const screen = await render(<TourScreen />);
-    expect(screen.getByText(/^Cinq choses, chacune à une touche de distance\./)).toBeTruthy();
-    expect(screen.getByText('Une épargne qui s’explique d’elle-même')).toBeTruthy();
     expectNoRawText(screen);
   });
 

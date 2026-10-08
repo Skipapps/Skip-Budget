@@ -384,7 +384,7 @@ describe('Settings, About', () => {
 });
 
 describe('Settings, Support', () => {
-  it('shows exactly its five items, each with its small line', async () => {
+  it('shows exactly its four items, each with its small line', async () => {
     const screen = await render(<SupportScreen />);
 
     expect(textsOf(screen)).toEqual([
@@ -393,8 +393,6 @@ describe('Settings, Support', () => {
       'Put the setup steps back on Home',
       'Common questions',
       'Short answers, no waiting',
-      'What Skip can do',
-      'The five things, each a tap away',
       'Email support',
       'Something is wrong or unclear',
       'Share an idea',
@@ -417,21 +415,21 @@ describe('Settings, Support', () => {
   it('opens each help page, and has no coffee link of its own', async () => {
     const screen = await render(<SupportScreen />);
 
-    for (const name of [
-      /^Common questions/,
-      /^What Skip can do/,
-      /^Email support/,
-      /^Share an idea/,
-    ]) {
+    for (const name of [/^Common questions/, /^Email support/, /^Share an idea/]) {
       await fireEvent.press(screen.getByRole('button', { name }));
     }
 
     expect(jest.mocked(router.push).mock.calls.map(([href]) => href)).toEqual([
       '/faq',
-      '/tour',
       '/contact?topic=support',
       '/contact?topic=idea',
     ]);
     expect(openBrowserAsync).not.toHaveBeenCalled();
+  });
+
+  it('no longer offers the What Skip can do tour', async () => {
+    const screen = await render(<SupportScreen />);
+
+    expect(screen.queryByText('What Skip can do')).toBeNull();
   });
 });

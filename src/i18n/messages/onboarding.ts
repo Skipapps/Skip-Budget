@@ -9,121 +9,85 @@ export const onboardingMessages = defineMessages({
     fr: 'Passer pour l’instant',
   },
 
+  // Broken after the comma, as the design sets it.
   'onboarding.welcome.title': {
-    en: 'Your money, your privacy.',
-    es: 'Tu dinero, tu privacidad.',
-    fr: 'Ton argent, ta vie privée.',
+    en: 'Your money,\nyour privacy.',
+    es: 'Tu dinero,\ntu privacidad.',
+    fr: 'Ton argent,\nta vie privée.',
   },
-  // {place} and {noLogin} are drawn in bold, so the screen splits each sentence around them.
-  'onboarding.welcome.track': {
-    en: 'Track spending, bills, subscriptions and card balances — {place}.',
-    es: 'Lleva el control de tus gastos, facturas, suscripciones y saldos de tarjetas, {place}.',
-    fr: 'Suis tes dépenses, factures, abonnements et soldes de cartes — {place}.',
-  },
-  'onboarding.welcome.trackPlace': {
-    en: 'all in one place',
-    es: 'todo en un solo lugar',
-    fr: 'tout au même endroit',
-  },
-  'onboarding.welcome.privacy': {
-    en: '{noLogin} You decide what Skip knows, and nothing else.',
-    es: '{noLogin} Tú decides qué sabe Skip, y nada más.',
-    fr: '{noLogin} Tu décides de ce que Skip sait, et rien d’autre.',
-  },
-  'onboarding.welcome.noLogin': {
-    en: 'No bank login, ever.',
-    es: 'Nunca te pedimos los datos de tu banco.',
-    fr: 'Jamais d’identifiants bancaires.',
+  'onboarding.welcome.subtitle': {
+    en: 'Track spending, bills and cards.\nNo bank login, ever.',
+    es: 'Lleva tus gastos, facturas y tarjetas.\nSin acceso a tu banco, nunca.',
+    fr: 'Suis tes dépenses, factures et cartes.\nJamais d’identifiants bancaires.',
   },
   'onboarding.welcome.start': { en: 'Get started', es: 'Comenzar', fr: 'Commencer' },
+  'onboarding.welcome.haveAccount': {
+    en: 'Already have an account?',
+    es: '¿Ya tienes una cuenta?',
+    fr: 'Tu as déjà un compte ?',
+  },
+  'onboarding.welcome.logIn': { en: 'Log in', es: 'Inicia sesión', fr: 'Connecte-toi' },
 
   'onboarding.canDo.title': {
     en: 'What Skip can do',
     es: 'Lo que Skip puede hacer',
     fr: 'Ce que Skip peut faire',
   },
-  'onboarding.tour.subtitle': {
-    en: 'Five things, each a tap away. No setup order to follow — start wherever your money bothers you most.',
-    es: 'Cinco cosas, cada una a un toque. No hay un orden que seguir: empieza por lo que más te preocupe de tu dinero.',
-    fr: 'Cinq choses, chacune à une touche de distance. Aucun ordre à suivre — commence par ce qui te préoccupe le plus côté argent.',
+  'onboarding.canDo.subtitle': {
+    en: 'Simple money tracking, built for privacy.',
+    es: 'Llevar tu dinero, sencillo y privado.',
+    fr: 'Suivre ton argent, simplement et en privé.',
   },
 
-  'onboarding.stop.bank.title': {
-    en: 'Track without linking a bank',
-    es: 'Lleva tus cuentas sin conectar tu banco',
-    fr: 'Suis ton argent sans lier ta banque',
+  'onboarding.canDo.bank.title': {
+    en: 'No bank connection needed',
+    es: 'Sin conectar tu banco',
+    fr: 'Aucune connexion bancaire',
   },
-  'onboarding.stop.receipts.title': {
-    en: 'Scan receipts in a tap',
-    es: 'Escanea recibos con un toque',
-    fr: 'Numérise tes reçus en une touche',
-  },
-  'onboarding.stop.loans.title': {
-    en: 'Loans, to the cent',
-    es: 'Préstamos, al centavo',
-    fr: 'Les prêts, au cent près',
-  },
-  'onboarding.stop.savings.title': {
-    en: 'Savings that explain themselves',
-    es: 'Ahorros que se explican solos',
-    fr: 'Une épargne qui s’explique d’elle-même',
-  },
-  'onboarding.stop.reminders.title': {
-    en: 'Reminded before things land',
-    es: 'Recordatorios antes de cada cargo',
-    fr: 'Des rappels avant que ça tombe',
-  },
-
-  'onboarding.tour.bank.detail': {
-    en: 'No credentials, no aggregator. You tell Skip what happens and it does the arithmetic — your bank never knows Skip exists.',
-    es: 'Sin contraseñas ni agregadores. Tú le dices a Skip lo que pasa y Skip hace las cuentas: tu banco nunca sabe que Skip existe.',
-    fr: 'Pas d’identifiants, pas d’agrégateur. Tu dis à Skip ce qui se passe et il fait les calculs — ta banque ne sait jamais que Skip existe.',
-  },
-  'onboarding.tour.receipts.detail': {
-    en: 'Point the camera at a receipt and it is read on your phone — store, date, total, ready to check and save. The photo never leaves the device.',
-    es: 'Apunta la cámara a un recibo y se lee en tu teléfono: tienda, fecha y total, listos para revisar y guardar. La foto nunca sale del dispositivo.',
-    fr: 'Pointe l’appareil photo vers un reçu et il est lu sur ton téléphone — magasin, date, total, prêts à vérifier et à enregistrer. La photo ne quitte jamais l’appareil.',
-  },
-  'onboarding.tour.loans.detail': {
-    en: 'Interest charged by the day, the way lenders actually bill — so Skip’s payoff matches your statement exactly.',
-    es: 'Intereses calculados por día, como cobran de verdad los bancos, para que el saldo a liquidar de Skip coincida exactamente con tu estado de cuenta.',
-    fr: 'Des intérêts calculés au jour près, comme les prêteurs facturent vraiment — le solde à rembourser de Skip correspond donc exactement à ton relevé.',
-  },
-  'onboarding.tour.savings.detail': {
-    en: 'When a month ends, whatever was left of it is added here — with the arithmetic shown, and corrections when Skip missed something.',
-    es: 'Cuando termina un mes, lo que sobró se suma aquí, con las cuentas a la vista y correcciones cuando a Skip se le pasó algo.',
-    fr: 'À la fin d’un mois, ce qui en reste s’ajoute ici — avec les calculs bien visibles, et des corrections quand Skip a manqué quelque chose.',
-  },
-  'onboarding.tour.reminders.detail': {
-    en: 'Bills, renewals and payday, announced before they happen instead of discovered afterwards.',
-    es: 'Facturas, renovaciones y día de pago, avisados antes de que pasen y no descubiertos después.',
-    fr: 'Factures, renouvellements et jour de paie, annoncés avant plutôt que découverts après coup.',
-  },
-
   'onboarding.canDo.bank.detail': {
-    en: 'You tell Skip what happens. Your bank never knows Skip exists.',
-    es: 'Tú le dices a Skip lo que pasa. Tu banco nunca sabe que Skip existe.',
-    fr: 'Tu dis à Skip ce qui se passe. Ta banque ne sait jamais que Skip existe.',
+    en: 'Your bank details always stay private.',
+    es: 'Los datos de tu banco siempre son privados.',
+    fr: 'Tes données bancaires restent toujours privées.',
+  },
+  'onboarding.canDo.receipts.title': {
+    en: 'Scan receipts instantly',
+    es: 'Escanea recibos al instante',
+    fr: 'Numérise tes reçus en un instant',
   },
   'onboarding.canDo.receipts.detail': {
-    en: 'Read on your phone — the photo never leaves it.',
-    es: 'Se lee en tu teléfono: la foto nunca sale de ahí.',
-    fr: 'Lu sur ton téléphone — la photo n’en sort jamais.',
+    en: 'Read on your phone, never uploaded.',
+    es: 'Se leen en tu teléfono, nunca se suben.',
+    fr: 'Lus sur ton téléphone, jamais envoyés.',
+  },
+  'onboarding.canDo.loans.title': {
+    en: 'Accurate loan tracking',
+    es: 'Préstamos exactos',
+    fr: 'Des prêts suivis au plus juste',
   },
   'onboarding.canDo.loans.detail': {
-    en: 'Daily interest, so the payoff matches your statement.',
-    es: 'Intereses diarios, para que el saldo a liquidar coincida con tu estado de cuenta.',
-    fr: 'Intérêts quotidiens : le solde à rembourser correspond à ton relevé.',
+    en: 'Daily interest, just like your bank.',
+    es: 'Interés diario, igual que tu banco.',
+    fr: 'Intérêts quotidiens, comme ta banque.',
+  },
+  'onboarding.canDo.savings.title': {
+    en: 'Clear, automatic savings',
+    es: 'Ahorro claro y automático',
+    fr: 'Une épargne claire et automatique',
   },
   'onboarding.canDo.savings.detail': {
-    en: 'Whatever a month leaves over lands here, arithmetic shown.',
-    es: 'Lo que sobra cada mes llega aquí, con las cuentas a la vista.',
-    fr: 'Ce qui reste de chaque mois arrive ici, calculs à l’appui.',
+    en: 'Leftovers saved, with the math shown.',
+    es: 'Lo que sobra se ahorra, con las cuentas a la vista.',
+    fr: 'Le reste est épargné, calculs à l’appui.',
+  },
+  'onboarding.canDo.reminders.title': {
+    en: 'Reminders before it’s due',
+    es: 'Avisos antes de cada pago',
+    fr: 'Des rappels avant l’échéance',
   },
   'onboarding.canDo.reminders.detail': {
-    en: 'Bills, renewals and payday, announced ahead.',
-    es: 'Facturas, renovaciones y día de pago, avisados con tiempo.',
-    fr: 'Factures, renouvellements et jour de paie, annoncés d’avance.',
+    en: 'Bills, renewals and payday, ahead of time.',
+    es: 'Facturas, renovaciones y día de pago, con tiempo.',
+    fr: 'Factures, renouvellements et jour de paie, à l’avance.',
   },
 
   'onboarding.accountOffer.title': {

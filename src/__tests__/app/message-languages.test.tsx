@@ -3,7 +3,7 @@ import { render } from '@testing-library/react-native';
 import MessageScreen from '@/app/message';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
-/** "Why Skip is different", the page before sign-up, in each language. */
+/** "Why Skip", the page before sign-up, in each language. */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('react-native-keyboard-controller', () =>
@@ -34,17 +34,23 @@ beforeEach(() => {
   resetLocaleForTests();
 });
 
-it('keeps the English as it was', async () => {
+it('reads as designed in English', async () => {
   const screen = await render(<MessageScreen />);
 
-  expect(screen.getByText('Why Skip is different')).toBeTruthy();
-  expect(
-    screen.getByText(
-      '“People once recorded every penny in a ledger. Skip brings that same financial awareness into modern life — without the paperwork.”',
-    ),
-  ).toBeTruthy();
-  expect(screen.getByText('Know where your money goes. Decide where it goes next.')).toBeTruthy();
-  expect(screen.getByText("Let's go")).toBeTruthy();
+  for (const line of [
+    'Why Skip',
+    'Understand your money. Don’t just automate it.',
+    'Awareness',
+    'Every dollar, accounted for.',
+    'No bank logins. Ever.',
+    'You decide, not an algorithm.',
+    'People once tracked every penny in a ledger. Skip brings that habit into modern life, without the paperwork.',
+    'Know where your money goes. Decide where it goes next.',
+    "Let's go",
+  ]) {
+    expect(screen.getByText(line)).toBeTruthy();
+  }
+  expectAllWorded(screen);
 });
 
 it('reads in Spanish', async () => {
@@ -52,12 +58,12 @@ it('reads in Spanish', async () => {
   const screen = await render(<MessageScreen />);
 
   for (const line of [
-    'Por qué Skip es diferente',
-    'Hecho para quienes quieren entender de verdad su dinero, no automatizarlo y olvidarse de él.',
+    'Por qué Skip',
+    'Entiende tu dinero. No solo lo automatices.',
     'Conciencia',
     'Privacidad',
     'Control',
-    'Tú decides qué cuenta, no un algoritmo.',
+    'Decides tú, no un algoritmo.',
     'Sabe a dónde va tu dinero. Decide a dónde irá después.',
     '¡Vamos!',
   ]) {
@@ -66,22 +72,21 @@ it('reads in Spanish', async () => {
   expectAllWorded(screen);
 });
 
-it('reads in French, with its own quotation marks', async () => {
+it('reads in French', async () => {
   setLanguage('fr');
   const screen = await render(<MessageScreen />);
 
   for (const line of [
-    'Pourquoi Skip est différent',
+    'Pourquoi Skip',
+    'Comprends ton argent. Ne te contente pas de l’automatiser.',
     'Conscience',
     'Confidentialité',
     'Contrôle',
-    'Pas de connexion bancaire, pas d’importation. Tes données restent à toi.',
+    'Aucun identifiant bancaire. Jamais.',
     'Sache où va ton argent. Décide où il ira ensuite.',
-    'C’est parti !',
+    'C’est parti !',
   ]) {
     expect(screen.getByText(line)).toBeTruthy();
   }
-  // The matcher's normalizer turns the no-break spaces inside « » into plain ones.
-  expect(screen.getByText(/^«\sAutrefois.*paperasse\.\s»$/)).toBeTruthy();
   expectAllWorded(screen);
 });

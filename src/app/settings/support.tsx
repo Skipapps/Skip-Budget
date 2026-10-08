@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { CircleHelp, Compass, Lightbulb, ListChecks, Mail } from 'lucide-react-native';
+import { CircleHelp, Lightbulb, ListChecks, Mail } from 'lucide-react-native';
 
 import { useUpdateProfile } from '@/api/mutations';
 import { SettingsPage } from '@/components/settings/settings-page';
@@ -27,12 +27,6 @@ export default function SupportScreen() {
         title={t('support.faq')}
         subtitle={t('support.faqDetail')}
         onPress={() => router.push('/faq')}
-      />
-      <SettingsRow
-        icon={Compass}
-        title={t('support.tour')}
-        subtitle={t('support.tourDetail')}
-        onPress={() => router.push('/tour')}
       />
       <SettingsRow
         icon={Mail}

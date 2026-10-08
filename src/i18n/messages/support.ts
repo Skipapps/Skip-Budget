@@ -21,16 +21,6 @@ export const supportMessages = defineMessages({
     es: 'Respuestas cortas, sin esperar',
     fr: 'Des réponses courtes, sans attendre',
   },
-  'support.tour': {
-    en: 'What Skip can do',
-    es: 'Lo que Skip puede hacer',
-    fr: 'Ce que Skip peut faire',
-  },
-  'support.tourDetail': {
-    en: 'The five things, each a tap away',
-    es: 'Las cinco cosas, cada una a un toque',
-    fr: 'Les cinq choses, chacune à une touche de distance',
-  },
   'support.email': {
     en: 'Email support',
     es: 'Escribir a soporte',
@@ -105,39 +95,40 @@ export const supportMessages = defineMessages({
   'support.contact.sending': { en: 'Sending…', es: 'Enviando…', fr: 'Envoi…' },
   'support.contact.send': { en: 'Send', es: 'Enviar', fr: 'Envoyer' },
 
-  'support.why.title': {
-    en: 'Why Skip is different',
-    es: 'Por qué Skip es diferente',
-    fr: 'Pourquoi Skip est différent',
+  'support.why.eyebrow': { en: 'Why Skip', es: 'Por qué Skip', fr: 'Pourquoi Skip' },
+  'support.why.headline': {
+    en: 'Understand your money.',
+    es: 'Entiende tu dinero.',
+    fr: 'Comprends ton argent.',
   },
-  'support.why.go': { en: "Let's go", es: '¡Vamos!', fr: 'C’est parti !' },
-  'support.why.intro': {
-    en: 'Built for people who want to truly understand their money — not automate it and forget it.',
-    es: 'Hecho para quienes quieren entender de verdad su dinero, no automatizarlo y olvidarse de él.',
-    fr: 'Conçu pour les gens qui veulent vraiment comprendre leur argent — pas l’automatiser et l’oublier.',
+  'support.why.headlineAccent': {
+    en: 'Don’t just automate it.',
+    es: 'No solo lo automatices.',
+    fr: 'Ne te contente pas de l’automatiser.',
   },
+  'support.why.go': { en: "Let's go", es: '¡Vamos!', fr: 'C’est parti !' },
   'support.why.awareness': { en: 'Awareness', es: 'Conciencia', fr: 'Conscience' },
   'support.why.awarenessLine': {
-    en: 'Recording your spending helps you notice where your money goes.',
-    es: 'Registrar tus gastos te ayuda a notar a dónde va tu dinero.',
-    fr: 'Noter tes dépenses t’aide à voir où va ton argent.',
+    en: 'Every dollar, accounted for.',
+    es: 'Cada centavo, bien contado.',
+    fr: 'Chaque centime, bien compté.',
   },
   'support.why.privacy': { en: 'Privacy', es: 'Privacidad', fr: 'Confidentialité' },
   'support.why.privacyLine': {
-    en: 'No bank logins, no imports. Your records stay yours.',
-    es: 'Sin accesos bancarios ni importaciones. Tus registros son solo tuyos.',
-    fr: 'Pas de connexion bancaire, pas d’importation. Tes données restent à toi.',
+    en: 'No bank logins. Ever.',
+    es: 'Sin accesos a tu banco. Nunca.',
+    fr: 'Aucun identifiant bancaire. Jamais.',
   },
   'support.why.control': { en: 'Control', es: 'Control', fr: 'Contrôle' },
   'support.why.controlLine': {
-    en: 'You decide what counts — not an algorithm.',
-    es: 'Tú decides qué cuenta, no un algoritmo.',
-    fr: 'C’est toi qui décides ce qui compte — pas un algorithme.',
+    en: 'You decide, not an algorithm.',
+    es: 'Decides tú, no un algoritmo.',
+    fr: 'C’est toi qui décides, pas un algorithme.',
   },
   'support.why.quote': {
-    en: '“People once recorded every penny in a ledger. Skip brings that same financial awareness into modern life — without the paperwork.”',
-    es: '“Antes la gente anotaba cada centavo en un libro de cuentas. Skip trae esa misma conciencia financiera a la vida moderna, sin el papeleo.”',
-    fr: '« Autrefois, on notait chaque sou dans un grand livre. Skip apporte cette même conscience financière à la vie moderne — sans la paperasse. »',
+    en: 'People once tracked every penny in a ledger. Skip brings that habit into modern life, without the paperwork.',
+    es: 'Antes la gente anotaba cada centavo en un libro de cuentas. Skip trae ese hábito a la vida moderna, sin el papeleo.',
+    fr: 'Autrefois, on notait chaque sou dans un grand livre. Skip ramène cette habitude dans la vie moderne, sans la paperasse.',
   },
   'support.why.know': {
     en: 'Know where your money goes.',

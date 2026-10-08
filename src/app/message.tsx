@@ -5,43 +5,81 @@ import { Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
-import { Strong, Subtitle } from '@/components/ui/typography';
 import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
+/** Why Skip: the last page before the account. */
 export default function MessageScreen() {
   return (
     <Screen
-      title={t('support.why.title')}
       showBack
-      footer={<Button label={t('support.why.go')} onPress={() => router.push('/auth')} />}
+      footer={
+        <View className="w-full gap-5">
+          <Text
+            className="w-full text-center font-app text-[14px] leading-[21px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.reading}
+          >
+            {t('support.why.know')}
+            {'\n'}
+            <Text className="font-app-semibold text-ink">{t('support.why.decide')}</Text>
+          </Text>
+          <Button label={t('support.why.go')} onPress={() => router.push('/auth')} />
+        </View>
+      }
     >
-      <Subtitle className="mt-3 w-full">{t('support.why.intro')}</Subtitle>
+      <View className="w-full flex-1 items-center justify-center py-6">
+        <Text
+          className="font-app-semibold text-[12px] uppercase tracking-[2px] text-accent-ink"
+          maxFontSizeMultiplier={TEXT_CAP.control}
+        >
+          {t('support.why.eyebrow')}
+        </Text>
+        <Text
+          accessibilityRole="header"
+          className="mt-4 w-full text-center font-app-bold text-[28px] leading-[34px] text-ink"
+          maxFontSizeMultiplier={TEXT_CAP.heading}
+        >
+          {t('support.why.headline')}
+          {'\n'}
+          <Text className="text-accent-ink">{t('support.why.headlineAccent')}</Text>
+        </Text>
 
-      <View className="mt-8 w-full gap-3">
-        <Pillar
-          icon={Eye}
-          title={t('support.why.awareness')}
-          line={t('support.why.awarenessLine')}
-        />
-        <Pillar icon={Lock} title={t('support.why.privacy')} line={t('support.why.privacyLine')} />
-        <Pillar
-          icon={SlidersHorizontal}
-          title={t('support.why.control')}
-          line={t('support.why.controlLine')}
-        />
+        <View className="mt-9 w-full flex-row">
+          <Pillar
+            icon={Eye}
+            title={t('support.why.awareness')}
+            line={t('support.why.awarenessLine')}
+          />
+          <View className="w-px self-stretch bg-line" />
+          <Pillar
+            icon={Lock}
+            title={t('support.why.privacy')}
+            line={t('support.why.privacyLine')}
+          />
+          <View className="w-px self-stretch bg-line" />
+          <Pillar
+            icon={SlidersHorizontal}
+            title={t('support.why.control')}
+            line={t('support.why.controlLine')}
+          />
+        </View>
+
+        <Text
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+          className="mt-10 font-app-bold text-[44px] leading-[44px] text-accent-ink opacity-50"
+          maxFontSizeMultiplier={TEXT_CAP.figure}
+        >
+          “
+        </Text>
+        <Text
+          className="w-full text-center font-app text-[16px] leading-[25px] text-ink"
+          maxFontSizeMultiplier={TEXT_CAP.reading}
+        >
+          {t('support.why.quote')}
+        </Text>
       </View>
-
-      <View className="mt-6 w-full rounded-[16px] bg-accent/10 px-5 py-4">
-        <QuoteLine>{t('support.why.quote')}</QuoteLine>
-      </View>
-
-      <Text
-        className="mt-6 w-full text-center font-app text-[14px] leading-5 text-body"
-        maxFontSizeMultiplier={1.4}
-      >
-        {t('support.why.know')} <Strong>{t('support.why.decide')}</Strong>
-      </Text>
     </Screen>
   );
 }
@@ -49,34 +87,20 @@ export default function MessageScreen() {
 function Pillar({ icon: Icon, title, line }: { icon: LucideIcon; title: string; line: string }) {
   const colors = useColors();
   return (
-    <View className="w-full flex-row items-start gap-3 rounded-[16px] bg-ink/[0.035] px-4 py-3.5">
-      <View className="h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10">
-        <Icon size={19} color={colors.accentInk} strokeWidth={1.8} />
-      </View>
-      <View className="min-w-0 flex-1">
-        <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
-          {title}
-        </Text>
-        <Text
-          className="mt-0.5 font-app text-[13px] leading-[19px] text-body"
-          maxFontSizeMultiplier={1.4}
-        >
-          {line}
-        </Text>
-      </View>
+    <View className="min-w-0 flex-1 items-center px-2">
+      <Icon size={24} color={colors.accentInk} strokeWidth={1.6} />
+      <Text
+        className="mt-3 text-center font-app-semibold text-[15px] text-ink"
+        maxFontSizeMultiplier={TEXT_CAP.control}
+      >
+        {title}
+      </Text>
+      <Text
+        className="mt-1 text-center font-app text-[12px] leading-[17px] text-muted"
+        maxFontSizeMultiplier={TEXT_CAP.reading}
+      >
+        {line}
+      </Text>
     </View>
-  );
-}
-
-function QuoteLine({ children }: { children: React.ReactNode }) {
-  const colors = useColors();
-  return (
-    <Text
-      className="font-app text-[14px] italic leading-[22px]"
-      style={{ color: colors.accentInk }}
-      maxFontSizeMultiplier={1.4}
-    >
-      {children}
-    </Text>
   );
 }
