@@ -1,6 +1,6 @@
 import { ChevronLeft } from 'lucide-react-native';
 import { useState } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AmountFigure } from '@/components/flow/amount-figure';
@@ -8,6 +8,7 @@ import { AmountKeypad, applyAmountKey } from '@/components/flow/amount-keypad';
 import { Button } from '@/components/ui/button';
 import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type AmountPadProps = {
   title: string;
@@ -21,6 +22,9 @@ type AmountPadProps = {
 /**
  * Full-screen amount entry with its own keypad, for the secondary amounts (a share, expected income,
  * a rate) where a modal is the right weight. Same figure and keys as step 1.
+ *
+ * The figure and keys scroll above a pinned Done: at large text a wrapped caption on a small phone
+ * would otherwise push the keys into the button.
  */
 export function AmountPad({
   title,
@@ -52,25 +56,32 @@ export function AmountPad({
           </Pressable>
           <Text
             className="flex-1 pr-11 text-center font-app-semibold text-[17px] text-ink"
-            maxFontSizeMultiplier={1.3}
+            maxFontSizeMultiplier={TEXT_CAP.heading}
           >
             {title}
           </Text>
         </View>
 
-        <View className="flex-1 justify-center px-6">
-          <AmountFigure value={draft} unit={unit} />
-          <Text
-            className="mt-2 w-full text-center font-app text-[15px] text-muted"
-            maxFontSizeMultiplier={1.2}
-          >
-            {caption}
-          </Text>
-        </View>
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ flexGrow: 1 }}
+          alwaysBounceVertical={false}
+          showsVerticalScrollIndicator={false}
+        >
+          <View className="flex-1 justify-center px-6 py-4">
+            <AmountFigure value={draft} unit={unit} />
+            <Text
+              className="mt-2 w-full text-center font-app text-[15px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
+            >
+              {caption}
+            </Text>
+          </View>
 
-        <View className="px-6">
-          <AmountKeypad onKey={(key) => setDraft((current) => applyAmountKey(current, key))} />
-        </View>
+          <View className="px-6">
+            <AmountKeypad onKey={(key) => setDraft((current) => applyAmountKey(current, key))} />
+          </View>
+        </ScrollView>
 
         <View className="px-6 pt-5">
           <Button label={t('common.done')} onPress={() => onConfirm(draft)} />

@@ -15,6 +15,7 @@ import { FieldLabel } from '@/components/ui/typography';
 import { t } from '@/i18n';
 import { formatClock, parseClock } from '@/lib/date';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type ReminderFieldProps = {
   kind: ReminderKind;
@@ -50,7 +51,10 @@ export function ReminderField({
   return (
     <View className="w-full">
       <FieldLabel className="mb-1">{t('ui.reminder.label')}</FieldLabel>
-      <Text className="mb-2.5 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+      <Text
+        className="mb-2.5 font-app text-[13px] text-muted"
+        maxFontSizeMultiplier={TEXT_CAP.reading}
+      >
         {unavailable ?? REMINDER_CAPTION[kind]}
       </Text>
 
@@ -74,10 +78,13 @@ export function ReminderField({
               onPress={() => setPickerOpen(true)}
               // The pill is 40pt tall by design; the target is the 44pt floor.
               hitSlop={{ top: 4, bottom: 4 }}
-              className="mt-3 min-h-10 flex-row items-center gap-2 self-start rounded-full bg-ink/5 px-4 active:bg-ink/10"
+              className="mt-3 min-h-10 max-w-full flex-row items-center gap-2 self-start rounded-full bg-ink/5 px-4 py-2 active:bg-ink/10"
             >
               <Clock size={18} color={colors.body} strokeWidth={1.8} />
-              <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
+              <Text
+                className="shrink font-app-medium text-[14px] text-ink"
+                maxFontSizeMultiplier={TEXT_CAP.control}
+              >
                 {t('ui.reminder.at', { time: clockLabel, count: clock.hour % 12 || 12 })}
               </Text>
             </Pressable>

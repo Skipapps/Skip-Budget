@@ -422,7 +422,27 @@ function SalaryEditor({
   };
 
   return (
-    <Screen title={t('salary.title')} showBack avoidKeyboard>
+    <Screen
+      title={t('salary.title')}
+      showBack
+      avoidKeyboard
+      footer={
+        <View className="w-full">
+          {error ? (
+            <Text
+              className="mb-3 w-full text-center font-app text-[13px] text-danger"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
+            >
+              {error}
+            </Text>
+          ) : null}
+          <Button
+            label={createSource.isPending ? t('salary.saving') : t('common.save')}
+            onPress={handleSave}
+          />
+        </View>
+      }
+    >
       <View className="mt-3 w-full items-center">
         <Text
           className="text-center font-app text-[13px] text-muted"
@@ -715,7 +735,7 @@ function SalaryEditor({
         accessibilityRole="button"
         accessibilityLabel={t('salary.addOneOff')}
         onPress={addOneOff}
-        className="mt-3 min-h-14 w-full flex-row items-center justify-center gap-2 rounded-full border border-line active:bg-ink/5"
+        className="mb-4 mt-3 min-h-14 w-full flex-row items-center justify-center gap-2 rounded-full border border-line active:bg-ink/5"
       >
         <Plus size={18} color={colors.ink} strokeWidth={1.8} />
         <Text
@@ -725,21 +745,6 @@ function SalaryEditor({
           {t('salary.addOneOff')}
         </Text>
       </Pressable>
-
-      <View className="mt-auto w-full pt-10">
-        {error ? (
-          <Text
-            className="mb-3 w-full text-center font-app text-[13px] text-danger"
-            maxFontSizeMultiplier={TEXT_CAP.reading}
-          >
-            {error}
-          </Text>
-        ) : null}
-        <Button
-          label={createSource.isPending ? t('salary.saving') : t('common.save')}
-          onPress={handleSave}
-        />
-      </View>
 
       {dateTarget ? (
         <DatePicker

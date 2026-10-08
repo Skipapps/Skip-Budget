@@ -338,6 +338,11 @@ type FitTextProps = {
    */
   hug?: boolean;
   /**
+   * Measured as one line rather than by its widest word: the slot has to hold all of it. For labels
+   * whose owner would rather change layout than let them wrap, such as a pair of buttons.
+   */
+  whole?: boolean;
+  /**
    * A lone figure that would have to go under the floor scrolls sideways at the floor size, so a
    * figure with no space in it is never broken between its digits.
    */
@@ -364,6 +369,7 @@ export function FitText({
   after,
   reserve = 0,
   hug = false,
+  whole = false,
   scrollWhenTooWide = false,
   accessibilityRole,
   textRef,
@@ -393,7 +399,7 @@ export function FitText({
     });
   }, [register, id, children, size, lineHeight, role, family, reserve, hug]);
 
-  const words = children.trim().split(BREAKABLE_SPACE).join('\n');
+  const words = whole ? children : children.trim().split(BREAKABLE_SPACE).join('\n');
 
   const shown = (
     <Text

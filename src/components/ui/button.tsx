@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { FitText } from '@/components/ui/fit-group';
 import { withTap } from '@/lib/press';
 import { cn } from '@/lib/cn';
 import { TEXT_CAP } from '@/theme/text-scale';
@@ -16,6 +17,11 @@ type ButtonProps = {
   accessibilityHint?: string;
   /** Refuses the press and dims the pill, for work in flight: a second tap on "Send" is a second email. */
   disabled?: boolean;
+  /**
+   * Joins the surrounding FitGroup with the label measured on one line, so the owner of a pair can
+   * stack it rather than let the label wrap. Unique within the group.
+   */
+  fitId?: string;
 };
 
 const container: Record<ButtonVariant, string> = {
@@ -37,6 +43,7 @@ export function Button({
   className,
   accessibilityHint,
   disabled = false,
+  fitId,
 }: ButtonProps) {
   return (
     <Pressable
@@ -54,13 +61,26 @@ export function Button({
       )}
     >
       {icon ? <View className="mr-3 shrink-0">{icon}</View> : null}
-      {/* Wraps between words and the pill grows, rather than shrinking one label away from the rest. */}
-      <Text
-        className={cn('shrink text-center font-app-medium text-[17px]', label[variant])}
-        maxFontSizeMultiplier={TEXT_CAP.row}
-      >
-        {labelText}
-      </Text>
+      {fitId ? (
+        <FitText
+          id={fitId}
+          whole
+          role="row"
+          size={17}
+          className={cn('text-center font-app-medium', label[variant])}
+          slotClassName="min-w-0 flex-1"
+        >
+          {labelText}
+        </FitText>
+      ) : (
+        // Wraps between words and the pill grows, rather than shrinking one label away from the rest.
+        <Text
+          className={cn('shrink text-center font-app-medium text-[17px]', label[variant])}
+          maxFontSizeMultiplier={TEXT_CAP.row}
+        >
+          {labelText}
+        </Text>
+      )}
     </Pressable>
   );
 }

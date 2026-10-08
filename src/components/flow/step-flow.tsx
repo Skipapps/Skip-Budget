@@ -12,6 +12,7 @@ import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type StepFlowProps = {
   title: string;
@@ -125,8 +126,7 @@ export function StepFlow({
             'w-full text-center font-app text-[20px] text-muted',
             headerSlot ? 'mt-8' : 'mt-6',
           )}
-          numberOfLines={2}
-          maxFontSizeMultiplier={1.3}
+          maxFontSizeMultiplier={TEXT_CAP.heading}
         >
           {question}
         </Text>
@@ -138,7 +138,7 @@ export function StepFlow({
         {error ? (
           <Text
             className="w-full text-center font-app text-[13px] text-danger"
-            maxFontSizeMultiplier={1.4}
+            maxFontSizeMultiplier={TEXT_CAP.reading}
           >
             {error}
           </Text>

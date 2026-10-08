@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn';
 import { getDaysInMonth, getFirstWeekday } from '@/lib/date';
 import { selection } from '@/lib/haptics';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 function isSameDay(a: Date, b: Date): boolean {
   return (
@@ -174,9 +175,8 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
           className="min-h-11 shrink flex-row items-center justify-center rounded-full px-4 active:bg-ink/5"
         >
           <Text
-            className="font-app-semibold text-[17px] text-ink"
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.3}
+            className="shrink text-center font-app-semibold text-[17px] text-ink"
+            maxFontSizeMultiplier={TEXT_CAP.heading}
           >
             {t('ui.calendar.monthYear', { month: monthLong(month), year })}
           </Text>
@@ -206,7 +206,10 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
             >
               <ChevronLeft size={22} color={colors.ink} strokeWidth={2} />
             </Pressable>
-            <Text className="font-app-semibold text-[17px] text-ink" maxFontSizeMultiplier={1.3}>
+            <Text
+              className="font-app-semibold text-[17px] text-ink"
+              maxFontSizeMultiplier={TEXT_CAP.heading}
+            >
               {year}
             </Text>
             <Pressable
@@ -241,12 +244,15 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
                       selected ? 'bg-control' : 'active:bg-ink/5',
                     )}
                   >
+                    {/* No fit group: the widest short month, French "mars" when chosen
+                        (SemiBold), is 51pt at the control ceiling, inside the narrowest pill's
+                        52pt. */}
                     <Text
                       className={cn(
                         'text-[15px]',
                         selected ? 'font-app-semibold text-on-control' : 'font-app text-ink',
                       )}
-                      maxFontSizeMultiplier={1.2}
+                      maxFontSizeMultiplier={TEXT_CAP.control}
                     >
                       {label}
                     </Text>

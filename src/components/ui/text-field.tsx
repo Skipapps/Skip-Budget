@@ -6,6 +6,7 @@ import { FieldLabel } from '@/components/ui/typography';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type TextFieldProps = {
   label: string;
@@ -54,10 +55,11 @@ export function TextField({
 
   return (
     <View className={cn('w-full', className)}>
-      <View className="mb-2 flex-row items-baseline">
-        <FieldLabel>{label}</FieldLabel>
+      {/* "(optional)" moves under a label that leaves it no room, so neither is cut. */}
+      <View className="mb-2 flex-row flex-wrap items-baseline gap-x-1.5">
+        <FieldLabel className="shrink">{label}</FieldLabel>
         {optional ? (
-          <Text className="ml-1.5 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+          <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={TEXT_CAP.row}>
             {t('ui.field.optional')}
           </Text>
         ) : null}
@@ -81,7 +83,7 @@ export function TextField({
           multiline={multiline}
           textAlignVertical={multiline ? 'top' : 'center'}
           className={cn('flex-1 py-4 font-app text-[16px] text-ink', multiline && 'min-h-20')}
-          maxFontSizeMultiplier={1.5}
+          maxFontSizeMultiplier={TEXT_CAP.row}
           {...inputProps}
           // After the spread, and calling through: a caller's onBlur would otherwise replace the one
           // that clears the focus ring, leaving the field looking focused.
@@ -107,7 +109,10 @@ export function TextField({
       </View>
 
       {error ? (
-        <Text className="ml-5 mt-1.5 font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
+        <Text
+          className="ml-5 mt-1.5 font-app text-[13px] text-danger"
+          maxFontSizeMultiplier={TEXT_CAP.reading}
+        >
           {error}
         </Text>
       ) : null}

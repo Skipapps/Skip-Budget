@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { cn } from '@/lib/cn';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type NetworkPickerProps = {
   networks: readonly string[];
@@ -48,12 +49,13 @@ export function NetworkPicker({ networks, value, onChange }: NetworkPickerProps)
                 {MARKS[network] ?? network}
               </Text>
             </View>
+            {/* The tile is as wide as its name, so a name is never squeezed; the row wraps instead. */}
             <Text
               className={cn(
-                'text-[12px]',
+                'text-center text-[12px]',
                 selected ? 'font-app-medium text-ink' : 'font-app text-muted',
               )}
-              maxFontSizeMultiplier={1.2}
+              maxFontSizeMultiplier={TEXT_CAP.control}
             >
               {network}
             </Text>

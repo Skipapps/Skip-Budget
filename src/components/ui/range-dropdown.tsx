@@ -6,6 +6,7 @@ import { t } from '@/i18n';
 import { LEDGER_RANGES, type RangeKey } from '@/lib/range';
 import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type RangeDropdownProps = {
   value: RangeKey;
@@ -26,9 +27,12 @@ export function RangeDropdown({ value, onChange }: RangeDropdownProps) {
         onPress={() => setOpen(true)}
         // The pill is 40pt tall by design; the touch target is the 44pt floor.
         hitSlop={{ top: 4, bottom: 4 }}
-        className="min-h-10 flex-row items-center gap-1.5 rounded-full bg-ink/5 pl-4 pr-3 active:bg-ink/10"
+        className="min-h-10 max-w-full flex-row items-center gap-1.5 rounded-full bg-ink/5 py-2 pl-4 pr-3 active:bg-ink/10"
       >
-        <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.2}>
+        <Text
+          className="shrink font-app-medium text-[14px] text-ink"
+          maxFontSizeMultiplier={TEXT_CAP.control}
+        >
           {current.label}
         </Text>
         <ChevronDown size={16} color={colors.muted} strokeWidth={2} />
@@ -58,15 +62,15 @@ export function RangeDropdown({ value, onChange }: RangeDropdownProps) {
                       onChange(range.value);
                       setOpen(false);
                     }}
-                    className="w-full flex-row items-center justify-between gap-3 px-5 py-3.5 active:bg-ink/5"
+                    className="min-h-12 w-full flex-row items-center justify-between gap-3 px-5 py-3.5 active:bg-ink/5"
                   >
                     <Text
                       className={
                         selected
-                          ? 'font-app-medium text-[16px] text-ink'
-                          : 'font-app text-[16px] text-body'
+                          ? 'shrink font-app-medium text-[16px] text-ink'
+                          : 'shrink font-app text-[16px] text-body'
                       }
-                      maxFontSizeMultiplier={1.3}
+                      maxFontSizeMultiplier={TEXT_CAP.row}
                     >
                       {range.label}
                     </Text>

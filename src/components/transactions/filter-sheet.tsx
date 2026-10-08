@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
+import { FilterActions } from '@/components/ui/filter-actions';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { SelectField } from '@/components/ui/select-field';
 import { FieldLabel } from '@/components/ui/typography';
@@ -12,6 +12,7 @@ import { TRANSACTION_KINDS, type TransactionKind } from '@/data/transaction-kind
 import { t, type MessageKey } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 export type LedgerFilters = {
   /** ISO yyyy-mm-dd, or null for any date. */
@@ -87,7 +88,7 @@ export function FilterSheet({
           </Pressable>
           <Text
             className="flex-1 pr-11 text-center font-app-semibold text-[18px] text-ink"
-            maxFontSizeMultiplier={1.2}
+            maxFontSizeMultiplier={TEXT_CAP.heading}
           >
             {t('transactions.filter.title')}
           </Text>
@@ -109,9 +110,14 @@ export function FilterSheet({
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setDraft((current) => ({ ...current, date: null }))}
+                // 24pt tall by design; the target is the 44pt floor.
+                hitSlop={10}
                 className="mt-2 self-start rounded-full px-1 py-1 active:opacity-60"
               >
-                <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
+                <Text
+                  className="font-app text-[13px] text-muted"
+                  maxFontSizeMultiplier={TEXT_CAP.row}
+                >
                   {t('transactions.filter.clearDate')}
                 </Text>
               </Pressable>
@@ -143,19 +149,13 @@ export function FilterSheet({
           </View>
         </ScrollView>
 
-        <View className="w-full flex-row gap-3 px-5 pt-2">
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setDraft(EMPTY_FILTERS)}
-            className="min-h-16 flex-1 items-center justify-center rounded-full border border-control active:bg-ink/5"
-          >
-            <Text className="font-app-medium text-[17px] text-ink" maxFontSizeMultiplier={1.4}>
-              {t('transactions.filter.reset')}
-            </Text>
-          </Pressable>
-          <View className="flex-[2]">
-            <Button label={t('transactions.filter.apply')} onPress={() => onApply(draft)} />
-          </View>
+        <View className="w-full px-5 pt-2">
+          <FilterActions
+            resetLabel={t('transactions.filter.reset')}
+            applyLabel={t('transactions.filter.apply')}
+            onReset={() => setDraft(EMPTY_FILTERS)}
+            onApply={() => onApply(draft)}
+          />
         </View>
 
         {datePickerOpen ? (

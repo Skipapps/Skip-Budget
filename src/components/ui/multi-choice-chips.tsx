@@ -4,6 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { selection } from '@/lib/haptics';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type ChoiceOption<T extends string> = {
   value: T;
@@ -18,6 +19,7 @@ type MultiChoiceChipsProps<T extends string> = {
   emptyHint?: string;
 };
 
+/** Pick-any chips that wrap onto more lines, never cut, like ChoiceChips. */
 export function MultiChoiceChips<T extends string>({
   options,
   values,
@@ -44,17 +46,17 @@ export function MultiChoiceChips<T extends string>({
               hitSlop={{ top: 4, bottom: 4 }}
               onPress={() => toggle(option.value)}
               className={cn(
-                'min-h-10 flex-row items-center gap-1.5 rounded-full px-4',
+                'min-h-10 max-w-full flex-row items-center gap-1.5 rounded-full px-4 py-2',
                 selected ? 'bg-control' : 'bg-ink/5 active:bg-ink/10',
               )}
             >
               {selected ? <Check size={16} color={colors.onControl} strokeWidth={1.8} /> : null}
               <Text
                 className={cn(
-                  'text-[14px]',
+                  'shrink text-[14px]',
                   selected ? 'font-app-medium text-on-control' : 'font-app text-body',
                 )}
-                maxFontSizeMultiplier={1.2}
+                maxFontSizeMultiplier={TEXT_CAP.control}
               >
                 {option.label}
               </Text>
@@ -64,7 +66,10 @@ export function MultiChoiceChips<T extends string>({
       </View>
 
       {values.length === 0 && emptyHint ? (
-        <Text className="mt-2 font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
+        <Text
+          className="mt-2 font-app text-[13px] text-muted"
+          maxFontSizeMultiplier={TEXT_CAP.reading}
+        >
           {emptyHint}
         </Text>
       ) : null}

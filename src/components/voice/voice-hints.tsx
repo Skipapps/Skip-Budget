@@ -39,10 +39,12 @@ export const VoiceHints = memo(function VoiceHints({ hidden }: { hidden: boolean
       {VOICE_EXAMPLES.map((example) => {
         const said = sentenceText(example.parts);
         return (
+          // The note's ceiling, not reading's: these sit in the pinned footer above the mic, and
+          // three sentences at reading's would leave little of the page to scroll.
           <Text
             key={said}
             className="text-center font-app text-[15px] leading-6 text-ink/40"
-            maxFontSizeMultiplier={1.3}
+            maxFontSizeMultiplier={TEXT_CAP.heading}
           >
             {said}
           </Text>

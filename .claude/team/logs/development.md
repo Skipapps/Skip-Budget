@@ -4322,3 +4322,94 @@ supabase/checks/one_off_pay.sql ALL CHECKS PASSED; lapsed-Pro path exercised as 
   local yyyy-mm month logic matches server ranges; next_payday/getNextPayday/paydaysInRange for 'once';
   privileges on income_for_month and the trigger; enum split recorded by the CLI; lapsed-Pro edits and one-off
   adds pass the trigger.
+
+---
+
+## 2026-10-08 — Dana (Developer, UI and navigation) — large text, phase 2b-1 finished: tests in three languages, gates
+
+**Outcome:** Done on `almost-done-all-pages` (048ca72), uncommitted, on top of the 2b-1 work the CEO carried over. No
+bug in component behaviour found; two comments corrected. tsc 0; `rm -rf .expo/cache/eslint && npx expo lint` 0 errors
+(1 known warning, setup.test.tsx); `npx prettier --check .` clean; full `jest --ci` 212/212 suites, 4031 tests (was
+206 / 3726: 6 new suites, 1 extended, +305 tests). No device or simulator run.
+
+- **Conflict check (CEO's merge):** salary.tsx footer holds the error line above Save; "Add another source" (mt-4) and
+  "Add a one-off" (mb-4 mt-3) end the scroll; loan-calculator Save in the footer, schedule card last with mb-4;
+  category-picker import path fine; guard ADOPTED list matches (review-row gone, entry-review already clean). All OK.
+- **New suites** (widths summed from the Montserrat TTFs' advance widths, by a scratch script, no kerning):
+  `filter-actions-large-text` (56): all four filter pages x en/es/fr x 1/1.4/3.1x at 375pt. Activity stacks at 1.4x in
+  es/fr only ("Borrar todo" 139pt, "Tout effacer" 145pt vs 105pt), Apply first; holds stacked; returns beside when the
+  text size drops; label measured whole; both buttons press. `category-picker-large-text` (19): two-up/one-column and
+  one shared size per group, en/es/fr at 375/320pt: at 375pt 1.3x English names shrink together to 0.9
+  ("Transportation"), es/fr unshrunk; at 320pt English goes one column while es/fr stay two-up (es hints 0.79,
+  "estacionamiento"). `settings-row-large-text` (16): real About page in 3 languages (version stays beside), value
+  moves under the title per language's widest word (fr at 120pt, es at 100pt), holds, switch rows never move.
+  `app/loan-calculator-large-text` (12): Save outside the scroll and saves; sliders beside in all three (French
+  "25 000 $" pill counted); all rows stack together and hold through a keypad change to 900,000; readouts unbroken
+  (no-break spaces). `app/salary-large-text` (6): Save and the "why not" line in the footer, Add a one-off last in
+  the scroll. `shared-controls-large-text` (180): all 33 adopted components and the 4 sheets x en/es/fr at 1.4x: no
+  line limit/shrink/ellipsis, every ceiling a TEXT_CAP value, role spot checks, no fixed height around growing text,
+  no raw key or {param}, and nothing left in English on es/fr screens beyond listed names, figures and shared words.
+- **Extended:** `ui-dialogs-language` (+16): ConfirmDialog pair x en/es/fr x 1/1.2/1.4/3.1x (fr stacks from 1.2x,
+  es from 1.4x, en never); AppLockGate in es and fr, live language change while locked.
+- **Mutations** (each restored byte-for-byte): one-line cut on chips, hard-coded "Unlock", numeric ceiling, OTP back
+  to h-14, Reset not measured whole, dialog back to the 12-character guess, grid ignoring the label group, labels
+  never shrinking, sliders/settings value never stacking, Save back in the scroll (salary, loan): every one fails.
+- **Fixed:** date-picker and inline-calendar comments said the widest short month is French "sept." at 49pt; it is
+  "mars" when chosen, 50.6pt (still inside the 56pt circle and the 52pt pill). Comment only.
+- **Translations:** none missing; every 2b-1 line comes from t() (catalogue enforces en/es/fr at compile time).
+  Same-word lines allowed after checking: fr "Minute", "Date", "Version", "OK"; "Internet" in es/fr; voice hints
+  stay English by design.
+- **Not verified / notes:** no device. Font widths are advance sums, so French Activity Reset at default size fits
+  its third by about 1pt and could stack on a phone; stacked is the safe side. Side-by-side Reset has no horizontal
+  padding (as before 2b-1), so a near-full label runs close to the pill's ends: for Tia's walk. SettingsRow switches
+  per row, not per section (only About › Version has a value). "Worker failed to exit" appears in the full run
+  without the new suites too (pre-existing, e.g. salary-languages' Sentry timer); the new suites mock Sentry.
+- **2026-10-08 — Dana — Dmitri's two test fixes (SHIP review):** shared-controls' same-word allowlists are now per language (names and figures in both; "Date", "Version", "Minute", "OK" French only; "7.50%" Spanish only), and the VoiceHints note must be translated in es/fr while the English examples stay allowed; mutations (English "Date", "Minute", "Version", note hard-coded or left English in es) now fail and passed under the old lists; filter-actions padding left for the Founder; tsc 0, lint 0 errors, prettier clean, jest 212/212 suites, 4033 tests.
+
+---
+
+## 2026-10-08 — Dmitri (Development Lead) — review of large text phase 2b-1 (uncommitted on 048ca72)
+
+**Outcome:** SHIP. No blocking issues. One es/fr layout risk is worth fixing before Tia's walk; it is a design call (Priya), and the layout it comes from was already there before 2b-1. Edited nothing but this log.
+
+**Gates (on the working tree as handed over):** tsc 0. `rm -rf .expo/cache/eslint && npx expo lint`: 0 errors, 1 known warning (setup.test.tsx). Prettier clean. Full `jest --ci`: 212/212 suites, 4031/4031. The "worker failed to exit" warning was already there before 2b-1: the six new suites run on their own without it.
+
+**Verified:**
+- Carry-over matches Dana's paused work in logo-service. I compared patch lines, not files. The only differences are prettier reflow, her two comment fixes, and the salary conflict.
+- Salary: Save and the error line are in Screen's footer. "Add another source" keeps mt-4, and "Add a one-off" (mb-4 mt-3) ends the scroll. salary-one-off.test.tsx (add a one-off, the earlier one-offs row, saving and deleting) passes with Save in the footer.
+- Guard: 32 files removed from ALLOWED and 33 added to ADOPTED (the 32 plus filter-actions.tsx). review-row was dropped because the file is gone. Its replacement, entry-review.tsx, has no line limits and uses only TEXT_CAP.
+- Nothing is cut. In the 2b-1 files, allowFontScaling={false} is left only on spec-listed text (slider tick labels, the network mark, calendar initials and days). The remaining h-* boxes hold icons or bars, not text. TEXT_CAP roles match the spec table, with one exception (VoiceHints, below). Accessibility labels are intact; FilterActions' Reset gained a translated label.
+- Font widths: I checked Dana's widths with my own reader of the Montserrat TTFs. They are exact advance sums: "Tout effacer" 103.55, "Borrar todo" 99.53, "Supprimer" 82.29, "Transportation" 105.35, "mars" SemiBold 38.92 (50.6 at 1.3x), "p. m." 34.47, "confidentialité" 110.53.
+- French money is formatted by hand in src/i18n/number.ts with a literal no-break space, so the phone draws what the tests check.
+- First frame inside a Modal: RN 0.86.2 ModalHostViewState() takes ModalHostViewScreenSize() synchronously, so the dialog and the filter pages measure correctly on their first layout.
+- Mutations, run in a scratch copy with the real tree untouched; every one was caught:
+  - Reset measured by its widest word: 2 failures (es, fr).
+  - SettingsRow never stacking: 4.
+  - The dialog back on the 12-character guess: 6.
+  - "Reset" left in English on screen: 14.
+
+**Non-blocking:**
+1. `src/components/ui/filter-actions.tsx:28-29`: when the buttons sit side by side, Reset has no horizontal padding, so its fit is judged against the full width of a rounded pill. On a 375pt phone at default text, French Activity's "Tout effacer" fits its third by about 1pt and sits about 1pt from the border, touching the curve at cap height. Spanish "Borrar todo" has about 3pt. The text is whole, not cut.
+   - Suggested fix: 'min-w-0 flex-1 px-2'. In the test, set ROOM.beside.reset to 89.67 and expect Activity es/fr 'stacked' at 1x. Jest injects slot widths, so the test cannot see padding by itself.
+   - Effect: es/fr Activity stacks on phones up to about 393pt. Nothing else changes ("Effacer" at 1.4x is 84.9pt, under 88.67).
+2. `src/components/voice/voice-hints.tsx:42-47`: the example sentences take TEXT_CAP.heading. The 1.3 value is deliberate (they sit in the pinned footer), but the role label is wrong: the spec puts sentences under `reading`. Priya should sign off on it. Also, the shared-controls test allows every VoiceHints line (`same: /./`), so the translated "English only" note on es/fr is not asserted.
+3. The shared-controls same-word allowlists (Date, Version, Minute) apply to both es and fr. Those words are French only, so a Spanish leak of "Date" or "Version" would pass. Make the lists per language.
+4. Small changes outside the brief, all harmless:
+   - hitSlop 10 on the clear-date link (two filter pages);
+   - min-h-11 on DatePicker's "back to months";
+   - the dialog's Cancel link changed from Medium to SemiBold. The comment explains why: the measured width must not change between layouts.
+5. SettingsRow measures every row, including switch and chevron rows that have no second layout. That is wasted layout work on Settings. It could skip the FitGroup when there is no value.
+
+**Ruling on SettingsRow per row vs per section:** leave it for later and do not change it in this commit. Today the result is identical: About › Version is the only row with a value, and About is a single card with no SettingsSection. A section-level group would pull switch and chevron rows into a decision they cannot act on.
+- Trigger: the first time a card gets a second row with a value. Then wrap the card in FitRows and have SettingsRow read useGroupFits() (the SliderRow pattern). Decide the stacked order then too: today it is title, value, subtitle.
+- Record it in large-text.md as a known deviation.
+
+**Device only (Tia):**
+- The French Activity filter pair at 375pt and default text (item 1).
+- No visible jump from side by side to stacked when the dialog or a filter page opens in fr at 1.2x or larger.
+- AmountPad keys inside the new ScrollView: fast taps at default text, and scrolling at AX3 on an SE with Done in view.
+- Salary with the keyboard up: the field scrolls clear of the keyboard with the footer present.
+- Dragging the loan amount slider in fr at AX3: the rows stack at most once and then stay.
+- "mars" selected in the date circles at AX3.
+- The longest dialog (delete account) in fr at AX3 on an SE fits on screen; the card does not scroll.
+- All widths are advance sums without kerning, so real labels run slightly narrower.

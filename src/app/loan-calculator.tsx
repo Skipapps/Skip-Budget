@@ -174,7 +174,11 @@ export default function LoanCalculatorScreen() {
   };
 
   return (
-    <Screen title={t('loan.calculator.title')} showBack>
+    <Screen
+      title={t('loan.calculator.title')}
+      showBack
+      footer={<Button label={t('common.save')} onPress={handleSave} />}
+    >
       <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
         <Text
           className="text-center font-app text-[13px] text-muted"
@@ -232,8 +236,9 @@ export default function LoanCalculatorScreen() {
 
       <SectionHeading className="mb-4 mt-8">{t('loan.calculator.theLoan')}</SectionHeading>
 
-      <View className="w-full gap-6">
+      <FitRows className="w-full gap-6" testID="loan-sliders">
         <SliderRow
+          id="amount"
           label={t('loan.amount')}
           display={formatCurrency(amount, { cents: false })}
           value={amount}
@@ -248,6 +253,7 @@ export default function LoanCalculatorScreen() {
         />
 
         <SliderRow
+          id="rate"
           label={t('loan.interestRate')}
           display={percent(rate, 2)}
           value={rate}
@@ -261,6 +267,7 @@ export default function LoanCalculatorScreen() {
         />
 
         <SliderRow
+          id="term"
           label={t('loan.termLabel')}
           display={loanTermText(months)}
           value={months}
@@ -271,7 +278,7 @@ export default function LoanCalculatorScreen() {
           minLabel={loanTermText(6)}
           maxLabel={loanTermText(480)}
         />
-      </View>
+      </FitRows>
 
       <SectionHeading className="mb-4 mt-8">{t('loan.calculator.dates')}</SectionHeading>
 
@@ -422,7 +429,7 @@ export default function LoanCalculatorScreen() {
         </FitRows>
       ) : null}
 
-      <View className="mt-3 w-full">
+      <View className="mb-4 mt-3 w-full">
         <ScheduleCard
           rows={schedule}
           onPress={() =>
@@ -442,10 +449,6 @@ export default function LoanCalculatorScreen() {
             })
           }
         />
-      </View>
-
-      <View className="mt-auto w-full pb-8 pt-8">
-        <Button label={t('common.save')} onPress={handleSave} />
       </View>
 
       {padOpen ? (

@@ -4,6 +4,7 @@ import { Pressable, TextInput, View } from 'react-native';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type SearchFieldProps = {
   value: string;
@@ -31,7 +32,7 @@ export function SearchField({ value, onChangeText, placeholder, className }: Sea
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
-        maxFontSizeMultiplier={1.4}
+        maxFontSizeMultiplier={TEXT_CAP.row}
       />
       {value ? (
         <Pressable

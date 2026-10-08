@@ -9,6 +9,7 @@ import { parseClock, toClockValue } from '@/lib/date';
 import { tap } from '@/lib/haptics';
 import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type TimePickerProps = {
   /** "HH:MM" the picker opens on. */
@@ -139,7 +140,10 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
           style={shadows.floating}
           className="w-full max-w-[340px] overflow-hidden rounded-[16px] bg-card px-5 pb-4 pt-5"
         >
-          <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={1.2}>
+          <Text
+            className="font-app text-[14px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.heading}
+          >
             {t('ui.timePicker.title')}
           </Text>
 
@@ -151,7 +155,10 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
               onPress={() => setMode('hour')}
               accessibilityLabel={t('ui.timePicker.hour', { hour: hour12 })}
             />
-            <Text className="font-app-bold text-[34px] text-ink" maxFontSizeMultiplier={1.2}>
+            <Text
+              className="font-app-bold text-[34px] text-ink"
+              maxFontSizeMultiplier={TEXT_CAP.figure}
+            >
               :
             </Text>
             <Field
@@ -208,12 +215,13 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
                     }}
                     className="items-center justify-center"
                   >
+                    {/* Two digits: at most 28pt at the control ceiling, in a 44pt marker. */}
                     <Text
                       className={cn(
                         'font-app text-[16px]',
                         mark.selected ? 'text-on-control' : 'text-body',
                       )}
-                      maxFontSizeMultiplier={1.1}
+                      maxFontSizeMultiplier={TEXT_CAP.control}
                     >
                       {mark.label}
                     </Text>
@@ -223,14 +231,18 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
             </View>
           </View>
 
-          <View className="mt-5 w-full flex-row items-center justify-end gap-2">
+          {/* OK wraps under Cancel when the two do not fit on one line, rather than either being cut. */}
+          <View className="mt-5 w-full flex-row flex-wrap items-center justify-end gap-2">
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('common.cancel')}
               onPress={onCancel}
-              className="min-h-11 justify-center rounded-full px-5 active:bg-ink/5"
+              className="min-h-11 max-w-full justify-center rounded-full px-5 active:bg-ink/5"
             >
-              <Text className="font-app-medium text-[15px] text-body" maxFontSizeMultiplier={1.2}>
+              <Text
+                className="text-center font-app-medium text-[15px] text-body"
+                maxFontSizeMultiplier={TEXT_CAP.row}
+              >
                 {t('common.cancel')}
               </Text>
             </Pressable>
@@ -242,11 +254,11 @@ export function TimePicker({ value, onCancel, onConfirm }: TimePickerProps) {
                 tap();
                 onConfirm(toClockValue(hour, minute));
               }}
-              className="min-h-11 justify-center rounded-full bg-control px-5 active:bg-control-pressed"
+              className="min-h-11 max-w-full justify-center rounded-full bg-control px-5 active:bg-control-pressed"
             >
               <Text
-                className="font-app-semibold text-[15px] text-on-control"
-                maxFontSizeMultiplier={1.2}
+                className="text-center font-app-semibold text-[15px] text-on-control"
+                maxFontSizeMultiplier={TEXT_CAP.row}
               >
                 {t('common.ok')}
               </Text>
@@ -279,7 +291,7 @@ function Field({ label, active, onPress, accessibilityLabel }: FieldProps) {
     >
       <Text
         className={cn('font-app-bold text-[38px]', active ? 'text-on-control' : 'text-ink')}
-        maxFontSizeMultiplier={1.2}
+        maxFontSizeMultiplier={TEXT_CAP.figure}
       >
         {label}
       </Text>

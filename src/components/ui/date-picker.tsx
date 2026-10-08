@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn';
 import { formatFullDate, getDaysInMonth } from '@/lib/date';
 import { useColors } from '@/providers/theme-provider';
 import { shadows } from '@/theme/shadows';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type DatePickerProps = {
   /** Date the picker opens on. */
@@ -64,14 +65,17 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
           className="w-full max-w-[340px] overflow-hidden rounded-[16px] bg-card"
         >
           <View className="bg-control px-5 py-4">
-            <Text className="font-app text-[13px] text-on-control/85" maxFontSizeMultiplier={1.2}>
+            <Text
+              className="font-app text-[13px] text-on-control/85"
+              maxFontSizeMultiplier={TEXT_CAP.row}
+            >
               {formatFullDate(draft)}
             </Text>
 
             <View className="mt-1 flex-row items-center justify-between">
               <Text
                 className="font-app-bold text-[30px] text-on-control"
-                maxFontSizeMultiplier={1.2}
+                maxFontSizeMultiplier={TEXT_CAP.figure}
               >
                 {year}
               </Text>
@@ -119,6 +123,8 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
                         blocked ? null : selected ? 'bg-control' : 'active:bg-ink/5',
                       )}
                     >
+                      {/* No fit group: the widest short month, French "mars" when chosen
+                          (SemiBold), is 51pt at the control ceiling, inside the 56pt circle. */}
                       <Text
                         className={cn(
                           'text-[15px]',
@@ -128,7 +134,7 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
                               ? 'font-app-semibold text-on-control'
                               : 'font-app text-ink',
                         )}
-                        maxFontSizeMultiplier={1.2}
+                        maxFontSizeMultiplier={TEXT_CAP.control}
                       >
                         {label}
                       </Text>
@@ -143,10 +149,13 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
                 accessibilityRole="button"
                 accessibilityLabel={t('ui.datePicker.backToMonths')}
                 onPress={() => setStep('month')}
-                className="mb-2 flex-row items-center gap-1 self-start rounded-[12px] px-2 py-1.5 active:bg-ink/5"
+                className="mb-2 min-h-11 max-w-full flex-row items-center gap-1 self-start rounded-[12px] px-2 py-1.5 active:bg-ink/5"
               >
                 <ChevronLeft size={16} color={colors.muted} strokeWidth={2} />
-                <Text className="font-app-medium text-[14px] text-body" maxFontSizeMultiplier={1.2}>
+                <Text
+                  className="shrink font-app-medium text-[14px] text-body"
+                  maxFontSizeMultiplier={TEXT_CAP.row}
+                >
                   {t('ui.calendar.monthYearShort', { month: monthShort(month), year })}
                 </Text>
               </Pressable>
@@ -163,13 +172,19 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
             </View>
           )}
 
-          <View className="flex-row justify-end gap-1 px-3 pb-3 pt-1">
+          {/* OK wraps under Cancel when the two do not fit on one line, rather than either being cut. */}
+          <View className="flex-row flex-wrap justify-end gap-1 px-3 pb-3 pt-1">
             <Pressable
               accessibilityRole="button"
               onPress={onCancel}
-              className="min-h-11 justify-center rounded-full px-5 active:bg-ink/5"
+              className="min-h-11 max-w-full justify-center rounded-full px-5 active:bg-ink/5"
             >
-              <Text className="font-app-medium text-[15px] text-body">{t('common.cancel')}</Text>
+              <Text
+                className="text-center font-app-medium text-[15px] text-body"
+                maxFontSizeMultiplier={TEXT_CAP.row}
+              >
+                {t('common.cancel')}
+              </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -177,13 +192,16 @@ export function DatePicker({ value, minDate = null, onCancel, onConfirm }: DateP
               disabled={step === 'day' && belowFloor}
               onPress={() => (step === 'month' ? setStep('day') : onConfirm(draft))}
               className={cn(
-                'min-h-11 justify-center rounded-full px-5',
+                'min-h-11 max-w-full justify-center rounded-full px-5',
                 step === 'day' && belowFloor
                   ? 'bg-control/40'
                   : 'bg-control active:bg-control-pressed',
               )}
             >
-              <Text className="font-app-semibold text-[15px] text-on-control">
+              <Text
+                className="text-center font-app-semibold text-[15px] text-on-control"
+                maxFontSizeMultiplier={TEXT_CAP.row}
+              >
                 {step === 'month' ? t('common.next') : t('common.ok')}
               </Text>
             </Pressable>

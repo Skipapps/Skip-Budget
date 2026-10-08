@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Illustration } from '@/components/ui/illustration';
 import { TextLink } from '@/components/ui/text-link';
 import { cn } from '@/lib/cn';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type PageStateProps = {
   art: FC<SvgProps>;
@@ -42,7 +43,7 @@ export function PageState({
 
       <Text
         className="mt-7 text-center font-app-semibold text-[19px] leading-6 text-ink"
-        maxFontSizeMultiplier={1.4}
+        maxFontSizeMultiplier={TEXT_CAP.heading}
       >
         {title}
       </Text>
@@ -50,7 +51,7 @@ export function PageState({
       {message ? (
         <Text
           className="mt-2.5 max-w-[320px] text-center font-app text-[14px] leading-5 text-muted"
-          maxFontSizeMultiplier={1.4}
+          maxFontSizeMultiplier={TEXT_CAP.reading}
         >
           {message}
         </Text>

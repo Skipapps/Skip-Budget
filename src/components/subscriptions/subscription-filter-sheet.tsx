@@ -3,13 +3,14 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ui/button';
+import { FilterActions } from '@/components/ui/filter-actions';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { FieldLabel } from '@/components/ui/typography';
 import { cycleLabel } from '@/components/subscriptions/subscription-row';
 import { BILLING_CYCLES } from '@/data/billing-cycles';
 import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 export type SubscriptionFilters = {
   cycles: string[];
@@ -63,7 +64,7 @@ export function SubscriptionFilterSheet({
           </Pressable>
           <Text
             className="flex-1 pr-11 text-center font-app-semibold text-[18px] text-ink"
-            maxFontSizeMultiplier={1.2}
+            maxFontSizeMultiplier={TEXT_CAP.heading}
           >
             {t('subscriptions.filter.title')}
           </Text>
@@ -91,19 +92,13 @@ export function SubscriptionFilterSheet({
           </View>
         </ScrollView>
 
-        <View className="w-full flex-row gap-3 px-5 pt-2">
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setDraft(EMPTY_SUBSCRIPTION_FILTERS)}
-            className="min-h-16 flex-1 items-center justify-center rounded-full border border-control active:bg-ink/5"
-          >
-            <Text className="font-app-medium text-[17px] text-ink">
-              {t('subscriptions.filter.reset')}
-            </Text>
-          </Pressable>
-          <View className="flex-[2]">
-            <Button label={t('subscriptions.filter.apply')} onPress={() => onApply(draft)} />
-          </View>
+        <View className="w-full px-5 pt-2">
+          <FilterActions
+            resetLabel={t('subscriptions.filter.reset')}
+            applyLabel={t('subscriptions.filter.apply')}
+            onReset={() => setDraft(EMPTY_SUBSCRIPTION_FILTERS)}
+            onApply={() => onApply(draft)}
+          />
         </View>
       </View>
     </Modal>

@@ -6,6 +6,7 @@ import { useArtwork } from '@/theme/artwork';
 import { formatCurrency } from '@/lib/format';
 import type { AmortisationRow } from '@/lib/loan';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 /**
  * A loan term in the language on screen: "5 yrs 3 mo", "5 años 3 meses", "5 ans 3 mois". The
@@ -63,12 +64,15 @@ export function ScheduleCard({ rows, onPress }: ScheduleCardProps) {
       </View>
 
       <View className="min-w-0 flex-1">
-        <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+        <Text
+          className="font-app-semibold text-[15px] text-ink"
+          maxFontSizeMultiplier={TEXT_CAP.row}
+        >
           {t('loan.scheduleCard.title')}
         </Text>
         <Text
           className="mt-1 font-app text-[12px] leading-[17px] text-muted"
-          maxFontSizeMultiplier={1.3}
+          maxFontSizeMultiplier={TEXT_CAP.row}
         >
           {t('loan.scheduleCard.summary', {
             share: percent(Math.round(interestShare * 100), 0),

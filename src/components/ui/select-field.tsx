@@ -5,6 +5,7 @@ import { FieldLabel } from '@/components/ui/typography';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type SelectFieldProps = {
   label: string;
@@ -45,16 +46,16 @@ export function SelectField({
         accessibilityLabel={`${label}. ${value || placeholder || t('ui.select.notSet')}`}
         onPress={onPress}
         className={cn(
-          'min-h-14 w-full flex-row items-center justify-between px-5',
+          'min-h-14 w-full flex-row items-center justify-between gap-3 px-5',
           pill
             ? 'rounded-full bg-ink/5 active:bg-ink/10'
             : 'rounded-[12px] border border-line active:bg-ink/5',
         )}
       >
+        {/* Wraps and the field grows, so a long value or a translated placeholder is never cut. */}
         <Text
           className={cn('flex-1 py-4 font-app text-[16px]', value ? 'text-ink' : 'text-muted')}
-          numberOfLines={1}
-          maxFontSizeMultiplier={1.5}
+          maxFontSizeMultiplier={TEXT_CAP.row}
         >
           {value || placeholder}
         </Text>

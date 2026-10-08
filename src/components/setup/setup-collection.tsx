@@ -11,6 +11,7 @@ import { Subtitle, Title } from '@/components/ui/typography';
 import { t } from '@/i18n';
 import { failureText } from '@/lib/failure';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type SetupCollectionProps = {
   title: string;
@@ -84,7 +85,7 @@ export function SetupCollection({
           <View className="w-full items-center gap-1">
             <Text
               className="text-center font-app text-[14px] text-muted"
-              maxFontSizeMultiplier={1.4}
+              maxFontSizeMultiplier={TEXT_CAP.reading}
             >
               {failureText()}
             </Text>
@@ -98,7 +99,7 @@ export function SetupCollection({
           <View className="w-full items-center rounded-[16px] border border-dashed border-line px-6 py-8">
             <Text
               className="text-center font-app text-[14px] leading-5 text-muted"
-              maxFontSizeMultiplier={1.4}
+              maxFontSizeMultiplier={TEXT_CAP.reading}
             >
               {emptyText}
             </Text>

@@ -1,9 +1,14 @@
 import { Pressable, Text, View } from 'react-native';
 
+import { FitText, useGroupFits } from '@/components/ui/fit-group';
 import { Slider } from '@/components/ui/slider';
 import { t } from '@/i18n';
+import { cn } from '@/lib/cn';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type SliderRowProps = {
+  /** Names the label's fit slot; unique among the rows that share a FitRows. */
+  id?: string;
   label: string;
   /** Already formatted for display in the language on screen: currency, percent, a term. */
   display: string;
@@ -19,7 +24,16 @@ type SliderRowProps = {
   maxLabel?: string;
 };
 
+/**
+ * A label, its value and a slider. The label wraps beside the value; put the rows in one FitRows and,
+ * once a word of any label cannot sit beside its value, every row puts its value under its label.
+ *
+ * The value is not a member of the group, so dragging does not judge the layout again on every step:
+ * a wider value narrows the label's slot, and that alone can move the rows to the stacked layout,
+ * where they then stay rather than jump back under the finger.
+ */
 export function SliderRow({
+  id = 'slider',
   label,
   display,
   value,
@@ -32,11 +46,11 @@ export function SliderRow({
   minLabel,
   maxLabel,
 }: SliderRowProps) {
+  const stacked = !useGroupFits();
   const readout = (
     <Text
       className="font-app-semibold text-[18px] text-ink"
-      numberOfLines={1}
-      maxFontSizeMultiplier={1.2}
+      maxFontSizeMultiplier={TEXT_CAP.figure}
     >
       {display}
     </Text>
@@ -44,10 +58,21 @@ export function SliderRow({
 
   return (
     <View className="w-full">
-      <View className="w-full flex-row items-center justify-between gap-3">
-        <Text className="font-app-medium text-[13px] text-body" maxFontSizeMultiplier={1.3}>
+      <View
+        className={cn(
+          'w-full',
+          stacked ? 'items-start gap-1.5' : 'flex-row items-center justify-between gap-3',
+        )}
+      >
+        <FitText
+          id={`${id}-label`}
+          role="row"
+          size={13}
+          className="font-app-medium text-body"
+          slotClassName={stacked ? 'w-full' : 'min-w-0 flex-1'}
+        >
           {label}
-        </Text>
+        </FitText>
 
         {onValuePress ? (
           <Pressable
@@ -55,12 +80,12 @@ export function SliderRow({
             accessibilityLabel={t('loan.sliderRow.edit', { label, value: display })}
             onPress={onValuePress}
             hitSlop={8}
-            className="min-h-10 justify-center rounded-full bg-ink/5 px-4 active:bg-ink/10"
+            className="min-h-10 max-w-full shrink-0 justify-center rounded-full bg-ink/5 px-4 py-1.5 active:bg-ink/10"
           >
             {readout}
           </Pressable>
         ) : (
-          readout
+          <View className="max-w-full shrink-0">{readout}</View>
         )}
       </View>
 

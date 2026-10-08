@@ -3,6 +3,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type OtpInputProps = {
   value: string;
@@ -47,11 +48,14 @@ export function OtpInput({
             <View
               key={index}
               className={cn(
-                'h-14 flex-1 items-center justify-center rounded-[12px] border',
+                'min-h-14 flex-1 items-center justify-center rounded-[12px] border',
                 isCursor ? 'border-control' : digit ? 'border-control' : 'border-line',
               )}
             >
-              <Text className="font-app-semibold text-[22px] text-ink" maxFontSizeMultiplier={1.3}>
+              <Text
+                className="font-app-semibold text-[22px] text-ink"
+                maxFontSizeMultiplier={TEXT_CAP.control}
+              >
                 {digit}
               </Text>
             </View>

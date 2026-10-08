@@ -2,6 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { selection } from '@/lib/haptics';
 import { cn } from '@/lib/cn';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 type ChoiceOption<T extends string> = {
   value: T;
@@ -14,7 +15,10 @@ type ChoiceChipsProps<T extends string> = {
   onChange: (value: T) => void;
 };
 
-/** Pick-one chips that wrap. 40pt tall plus 4pt of vertical hitSlop clears the 44pt target floor. */
+/**
+ * Pick-one chips that wrap onto more lines, never cut; a label wider than the row wraps inside its
+ * chip. 40pt tall plus 4pt of vertical hitSlop clears the 44pt target floor.
+ */
 export function ChoiceChips<T extends string>({ options, value, onChange }: ChoiceChipsProps<T>) {
   return (
     <View accessibilityRole="radiogroup" className="w-full flex-row flex-wrap gap-2">
@@ -32,16 +36,16 @@ export function ChoiceChips<T extends string>({ options, value, onChange }: Choi
               onChange(option.value);
             }}
             className={cn(
-              'min-h-10 items-center justify-center rounded-full px-4',
+              'min-h-10 max-w-full items-center justify-center rounded-full px-4 py-2',
               selected ? 'bg-control' : 'bg-ink/5 active:bg-ink/10',
             )}
           >
             <Text
               className={cn(
-                'text-[14px]',
+                'text-center text-[14px]',
                 selected ? 'font-app-medium text-on-control' : 'font-app text-body',
               )}
-              maxFontSizeMultiplier={1.2}
+              maxFontSizeMultiplier={TEXT_CAP.control}
             >
               {option.label}
             </Text>

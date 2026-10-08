@@ -6,6 +6,7 @@ import { t, useLocale } from '@/i18n';
 import { authenticate } from '@/lib/app-lock';
 import { usePreferences } from '@/providers/preferences-provider';
 import { useColors } from '@/providers/theme-provider';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 /**
  * Face ID between the app and whoever holds the phone: locks on a cold start and on every return
@@ -79,12 +80,15 @@ export function AppLockGate({ children }: { children: ReactNode }) {
       </View>
 
       <View className="items-center gap-2">
-        <Text className="font-app-bold text-[22px] text-ink" maxFontSizeMultiplier={1.3}>
+        <Text
+          className="text-center font-app-bold text-[22px] text-ink"
+          maxFontSizeMultiplier={TEXT_CAP.heading}
+        >
           {t('nav.locked.title')}
         </Text>
         <Text
           className="text-center font-app text-[14px] leading-[21px] text-muted"
-          maxFontSizeMultiplier={1.4}
+          maxFontSizeMultiplier={TEXT_CAP.reading}
         >
           {t('nav.locked.body')}
         </Text>
@@ -95,9 +99,12 @@ export function AppLockGate({ children }: { children: ReactNode }) {
         accessibilityLabel={t('nav.locked.unlockLabel')}
         disabled={checking}
         onPress={() => void prompt()}
-        className="rounded-full bg-control px-7 py-3.5 active:bg-control-pressed"
+        className="max-w-full rounded-full bg-control px-7 py-3.5 active:bg-control-pressed"
       >
-        <Text className="font-app-medium text-[15px] text-on-control" maxFontSizeMultiplier={1.2}>
+        <Text
+          className="text-center font-app-medium text-[15px] text-on-control"
+          maxFontSizeMultiplier={TEXT_CAP.row}
+        >
           {checking ? t('nav.locked.waiting') : t('nav.locked.unlock')}
         </Text>
       </Pressable>
