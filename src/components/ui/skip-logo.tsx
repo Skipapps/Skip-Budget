@@ -17,7 +17,7 @@ const ARROW_NEAR = 'M1212 410 L1612 320 L1397 535 Z';
 const ARROW_FAR = 'M1397 535 L1612 320 L1520 718 Z';
 
 /** The Skip mark alone: ring and arrow, sized as a square. */
-export function SkipMark({ size = 32 }: { size?: number }) {
+function SkipMark({ size = 32 }: { size?: number }) {
   const colors = useColors();
   const { scheme } = useTheme();
   const arrow = scheme === 'dark' ? colors.accentInk : colors.accent;

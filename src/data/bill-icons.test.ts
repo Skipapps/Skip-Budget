@@ -10,7 +10,7 @@ import {
   Wifi,
 } from 'lucide-react-native';
 
-import { BILL_CATEGORIES, getBillIcon } from '@/data/bills-mock';
+import { BILL_CATEGORIES, getBillIcon } from '@/data/bill-categories';
 import { FALLBACK_GLYPH, GLYPHS } from '@/data/glyphs';
 
 // Lucide ships untransformed ESM; each icon stands in as its own name.

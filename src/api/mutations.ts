@@ -199,7 +199,7 @@ export const useDeleteBankAccount = () => useRemove('bank_accounts');
  * left out unless the person chose something: a database without these columns refuses any write
  * that names them.
  */
-export type LogoValues = {
+type LogoValues = {
   /** A bare host name ("netflix.com"); the database refuses anything else. */
   logo_domain?: string | null;
   /** True draws letters instead of any logo. */

@@ -591,7 +591,7 @@ export function useBankAccount(id: string | undefined) {
   });
 }
 
-export type PaymentRow = {
+type PaymentRow = {
   id: string;
   card_id: string | null;
   bank_account_id: string | null;
@@ -600,7 +600,7 @@ export type PaymentRow = {
   note: string | null;
 };
 
-export function usePayments() {
+function usePayments() {
   return useOwnerQuery<PaymentRow[]>('payments', async () => {
     const { data, error } = await supabase
       .from('payments')

@@ -12,12 +12,12 @@ import { APP_FONTS } from '@/theme/fonts';
  */
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const tailwind = require('../../../tailwind.config.js') as {
+const tailwind = require('../../tailwind.config.js') as {
   theme: { extend: { fontFamily: Record<string, string[]> } };
 };
 const FAMILIES = tailwind.theme.extend.fontFamily;
 
-const SRC = path.join(__dirname, '..', '..');
+const SRC = path.join(__dirname, '..');
 
 /** Tailwind's own font utilities: weights, generic families and numeric variants, not ours. */
 const BUILT_IN =

@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { View } from 'react-native';
 
 import { BrandLogo } from '@/components/brands/brand-logo';
-import { getBillIcon } from '@/data/bills-mock';
+import { getBillIcon } from '@/data/bill-categories';
 import { GLYPH_STROKE } from '@/data/glyphs';
 import { useColors } from '@/providers/theme-provider';
 

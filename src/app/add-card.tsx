@@ -1,6 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import {
@@ -26,7 +26,7 @@ import { usePro } from '@/api/pro';
 import { useConfirm } from '@/providers/dialog-provider';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
-import { NETWORKS } from '@/data/cards-mock';
+import { NETWORKS } from '@/data/cards';
 import { t } from '@/i18n';
 import { success, warn } from '@/lib/haptics';
 import { failureMessage, failureText } from '@/lib/failure';
@@ -43,11 +43,13 @@ export default function AddCardScreen() {
   const { pro, ready } = usePro();
   const existing = useCards();
 
-  const walled = useRef<boolean | null>(null);
-  if (walled.current === null && (id || (ready && !existing.isPending))) {
-    walled.current = !id && !pro && (existing.data?.length ?? 0) >= 1;
+  const [walled, setWalled] = useState<boolean | null>(null);
+  let decided = walled;
+  if (decided === null && (id || (ready && !existing.isPending))) {
+    decided = !id && !pro && (existing.data?.length ?? 0) >= 1;
+    setWalled(decided);
   }
-  if (walled.current) {
+  if (decided) {
     return <Redirect href={{ pathname: '/pro-feature', params: { id: 'unlimited' } }} />;
   }
   return <AddCardScreenInner />;

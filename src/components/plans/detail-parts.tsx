@@ -60,15 +60,7 @@ export function DetailCard({ mark, amount, subtitle, rows }: DetailCardProps) {
  * A fact about the plan. Side by side, the label keeps its own width and the value wraps in the rest;
  * once a word of either cannot fit, every row in the card puts its value under its label.
  */
-export function DetailRow({
-  id,
-  row,
-  divider,
-}: {
-  id: string;
-  row: PlanDetailRow;
-  divider: boolean;
-}) {
+function DetailRow({ id, row, divider }: { id: string; row: PlanDetailRow; divider: boolean }) {
   const stacked = !useGroupFits();
   return (
     <View
@@ -101,7 +93,7 @@ export function DetailRow({
 }
 
 /** One dated amount; a ledger entry is one, and so is a receipt. */
-export type ChargeLine = { id: string; date: string; amount: number };
+type ChargeLine = { id: string; date: string; amount: number };
 
 type ChargeSectionProps = {
   title: string;

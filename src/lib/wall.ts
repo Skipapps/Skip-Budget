@@ -2,23 +2,9 @@ import { t } from '@/i18n';
 import { formatMoney, NBSP } from '@/i18n/number';
 import { getLocaleSnapshot } from '@/i18n/store';
 
-/**
- * The wall between Free and Pro, in one place: every gate reads this map, so moving a feature
- * between tiers is a one-line change here.
- *
- * The wall gates verbs, never nouns: Pro is about what an account can *start*, not what it owns.
- * Everything already created stays fully usable on any tier; only creation is counted, winding
- * down (paying off, closing) is always free, and the tools below are all a lapse switches off.
- */
-export const WALL = {
-  insights: 'pro',
-  /** Adding a receipt, bill or subscription by speaking it. */
-  voice: 'pro',
-  /** Free draws a store's initials where Pro draws its logo. */
-  brandLogos: 'pro',
-} as const;
-
-export type WalledFeature = keyof typeof WALL;
+// The wall between Free and Pro gates verbs, never nouns: Pro is about what an account can *start*,
+// not what it owns. Everything already created stays fully usable on any tier; only creation is
+// counted, and winding down (paying off, closing) is always free.
 
 /** What the free plan keeps of each countable thing. */
 export const FREE_LIMITS = {

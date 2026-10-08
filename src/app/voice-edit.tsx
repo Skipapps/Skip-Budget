@@ -16,7 +16,7 @@ import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { TextLink } from '@/components/ui/text-link';
 import { StaleDraft } from '@/components/voice/stale-draft';
-import { BILL_CATEGORIES, type BillCategory } from '@/data/bills-mock';
+import { BILL_CATEGORIES, type BillCategory } from '@/data/bill-categories';
 import { t, type MessageKey } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
 import { failureText } from '@/lib/failure';

@@ -1,18 +1,11 @@
 import { CURRENCY_SYMBOL } from '@/i18n/config';
 import { MESSAGES, type MessageKey } from '@/i18n/messages';
-import {
-  formatCompactMoney,
-  formatMoney,
-  formatNumber,
-  formatPercent,
-  numberStyle,
-} from '@/i18n/number';
+import { formatCompactMoney, formatMoney, formatPercent, numberStyle } from '@/i18n/number';
 import { getLocaleSnapshot } from '@/i18n/store';
 import { translate, type MessageParams } from '@/i18n/translate';
 
 export type { MessageKey } from '@/i18n/messages';
 export type { MessageParams } from '@/i18n/translate';
-export { defineMessages } from '@/i18n/translate';
 export { useLocale } from '@/i18n/store';
 
 /**
@@ -35,10 +28,6 @@ export function compactMoney(amount: number): string {
 
 export function percent(value: number, decimals?: number): string {
   return formatPercent(value, getLocaleSnapshot().language, decimals);
-}
-
-export function plainNumber(value: number, maxDecimals?: number): string {
-  return formatNumber(value, getLocaleSnapshot().language, maxDecimals);
 }
 
 /** The mark and which side of the figure it sits on, for screens that draw the mark apart from the digits. */

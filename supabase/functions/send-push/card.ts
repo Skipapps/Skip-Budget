@@ -9,10 +9,9 @@
 // The phone reads this from `userInfo.body` (see TapPayload in index.ts) in
 // targets/notification-service and targets/notification-content; src/api/push.ts routes the tap.
 
-export type CardKind =
-  'bill' | 'subscription' | 'card' | 'account' | 'charge' | 'group' | 'receipts';
+type CardKind = 'bill' | 'subscription' | 'card' | 'account' | 'charge' | 'group' | 'receipts';
 
-export type PushCard = {
+type PushCard = {
   kind: CardKind;
   title: string;
   /** Formatted, e.g. "$15.49". Absent when there is no single figure. */
@@ -47,7 +46,7 @@ export type PushCard = {
  * else, so a payload can never send somebody to an arbitrary screen. `id` is required by the
  * per-item routes.
  */
-export type TapRoute =
+type TapRoute =
   '/add-receipt' | '/bill' | '/subscription' | '/source' | '/splits' | '/transactions';
 
 export type TapPayload = { route: TapRoute; id?: string; card?: PushCard };

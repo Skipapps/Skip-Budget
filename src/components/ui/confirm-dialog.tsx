@@ -4,7 +4,7 @@ import { t, useLocale } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { shadows } from '@/theme/shadows';
 
-export type DialogAction = {
+type DialogAction = {
   id: string;
   label: string;
   /** Paints the action red. Reserved for things that cannot be undone. */

@@ -1,4 +1,4 @@
-import { BILL_CATEGORIES } from '@/data/bills-mock';
+import { BILL_CATEGORIES } from '@/data/bill-categories';
 
 import { BILL_CATEGORY_IDS, categoryFromBrand } from './bill-category';
 

@@ -1,7 +1,7 @@
 import type { ViewStyle } from 'react-native';
 
 import { CardFace } from '@/components/cards/card-face';
-import type { BankAccount } from '@/data/accounts-mock';
+import type { BankAccount } from '@/data/accounts';
 import { t } from '@/i18n';
 import { toCents } from '@/lib/money';
 

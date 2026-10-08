@@ -2,7 +2,7 @@ import { act, fireEvent, render } from '@testing-library/react-native';
 import { Dimensions } from 'react-native';
 
 import { DestinationList } from '@/components/dashboard/destination-list';
-import type { SpendingCategory } from '@/data/dashboard-mock';
+import type { SpendingCategory } from '@/data/spending-categories';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 // jest.mock is hoisted above the imports, so each factory uses `require` rather than closing over

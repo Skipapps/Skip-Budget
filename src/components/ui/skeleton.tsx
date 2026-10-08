@@ -34,7 +34,7 @@ export function Skeleton({ className, style }: { className?: string; style?: obj
 }
 
 /** Placeholder shaped like a receipt or subscription row. */
-export function SkeletonRow() {
+function SkeletonRow() {
   return (
     <View className="w-full flex-row items-center gap-3 py-3.5">
       <Skeleton className="h-11 w-11 rounded-full" />

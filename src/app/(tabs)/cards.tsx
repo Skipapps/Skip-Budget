@@ -24,7 +24,7 @@ import { usePro } from '@/api/pro';
 import { useRefreshAll } from '@/api/refresh';
 import { incomeForMonth } from '@/lib/pay';
 import { useToday } from '@/lib/use-today';
-import { moneyBuckets } from '@/data/money-mock';
+import { moneyBuckets } from '@/data/money-buckets';
 import { t, type MessageKey } from '@/i18n';
 import { failureText } from '@/lib/failure';
 import { TEXT_CAP } from '@/theme/text-scale';

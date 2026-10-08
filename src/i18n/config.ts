@@ -4,8 +4,7 @@ export type Language = (typeof LANGUAGES)[number];
 export const CURRENCIES = ['USD', 'GBP', 'CAD', 'MXN', 'AUD'] as const;
 export type CurrencyCode = (typeof CURRENCIES)[number];
 
-export const COUNTRIES = ['US', 'GB', 'CA', 'MX', 'AU'] as const;
-export type Country = (typeof COUNTRIES)[number];
+type Country = 'US' | 'GB' | 'CA' | 'MX' | 'AU';
 
 export const DEFAULT_LANGUAGE: Language = 'en';
 export const DEFAULT_CURRENCY: CurrencyCode = 'USD';
@@ -15,14 +14,6 @@ export const LANGUAGE_NATIVE_NAMES: Record<Language, string> = {
   en: 'English',
   es: 'Español',
   fr: 'Français',
-};
-
-export const CURRENCY_COUNTRY: Record<CurrencyCode, Country> = {
-  USD: 'US',
-  GBP: 'GB',
-  CAD: 'CA',
-  MXN: 'MX',
-  AUD: 'AU',
 };
 
 /**

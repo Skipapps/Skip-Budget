@@ -2,7 +2,7 @@ import type { PayFrequency } from '@/lib/date';
 import { roundMoney } from '@/lib/money';
 
 /** Each schedule as a share of a month, so pays on different cycles add up; one-off pays are no schedule. */
-export const PER_MONTH: Record<PayFrequency, number> = {
+const PER_MONTH: Record<PayFrequency, number> = {
   weekly: 52 / 12,
   biweekly: 26 / 12,
   semimonthly: 2,

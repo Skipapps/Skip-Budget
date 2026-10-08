@@ -23,7 +23,7 @@ import { useCharges } from '@/api/charges';
 import { useHistoryFloor } from '@/api/history';
 import { useHasUnreadNews } from '@/api/news';
 import { useKeepSchedulesCurrent, useRefreshAll } from '@/api/refresh';
-import { spendingCategories, type SpendingCategory } from '@/data/dashboard-mock';
+import { spendingCategories, type SpendingCategory } from '@/data/spending-categories';
 import { t, type MessageKey } from '@/i18n';
 import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
 import { groupByDate } from '@/lib/group';

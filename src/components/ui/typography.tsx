@@ -97,20 +97,6 @@ export function Subtitle({
   );
 }
 
-export function Body({ children, className }: TextProps) {
-  return (
-    <Text
-      className={cn(
-        'font-app text-[14px] leading-5 text-body phone:text-[15px] phone:leading-6',
-        className,
-      )}
-      maxFontSizeMultiplier={TEXT_CAP.reading}
-    >
-      {children}
-    </Text>
-  );
-}
-
 export function FieldLabel({ children, className }: TextProps) {
   return (
     <Text

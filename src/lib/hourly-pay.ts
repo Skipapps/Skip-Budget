@@ -7,7 +7,7 @@ import { roundMoney } from '@/lib/money';
  * (52 weeks over 24 or 12 paychecks), matching the monthly total fixed sources give for the same
  * yearly pay.
  */
-export const WEEKS_PER_PAYCHECK: Record<PayFrequency, number> = {
+const WEEKS_PER_PAYCHECK: Record<PayFrequency, number> = {
   weekly: 1,
   biweekly: 2,
   semimonthly: 52 / 24,
@@ -56,7 +56,7 @@ export type HourlyEstimate = {
 };
 
 /** The most hours a week holds. Anything above is a typo, not a job. */
-export const HOURS_IN_A_WEEK = 168;
+const HOURS_IN_A_WEEK = 168;
 
 /** Why the hourly inputs cannot be turned into pay yet (worded for the form), or null when they can. */
 export function hourlyProblem(pay: HourlyPay): string | null {

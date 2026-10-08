@@ -1,6 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Calculator, Trash2 } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { AccountCard } from '@/components/cards/account-card';
@@ -43,7 +43,7 @@ import {
 } from '@/api/reminders';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
-import { ACCOUNT_TYPES, type AccountType } from '@/data/accounts-mock';
+import { ACCOUNT_TYPES, type AccountType } from '@/data/accounts';
 import {
   PAY_FREQUENCIES,
   PAY_SCHEDULES,
@@ -92,11 +92,13 @@ export default function AddAccountScreen() {
   const { pro, ready } = usePro();
   const existing = useBankAccounts();
 
-  const walled = useRef<boolean | null>(null);
-  if (walled.current === null && (id || (ready && !existing.isPending))) {
-    walled.current = !id && !pro && (existing.data?.length ?? 0) >= 1;
+  const [walled, setWalled] = useState<boolean | null>(null);
+  let decided = walled;
+  if (decided === null && (id || (ready && !existing.isPending))) {
+    decided = !id && !pro && (existing.data?.length ?? 0) >= 1;
+    setWalled(decided);
   }
-  if (walled.current) {
+  if (decided) {
     return <Redirect href={{ pathname: '/pro-feature', params: { id: 'unlimited' } }} />;
   }
   return <AddAccountScreenInner />;

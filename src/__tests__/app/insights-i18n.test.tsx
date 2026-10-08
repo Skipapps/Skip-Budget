@@ -20,7 +20,9 @@ jest.mock('@/components/brands/brand-mark', () => ({ BrandMark: () => null }));
 jest.mock('@/components/bills/bill-mark', () => ({ BillMark: () => null }));
 jest.mock('@/components/pro/pro-gate', () => ({ useProGate: () => null }));
 // The real list imports SVGs that jest cannot resolve; the stored id and label are what matter.
-jest.mock('@/data/bills-mock', () => ({ BILL_CATEGORIES: [{ id: 'housing', label: 'Housing' }] }));
+jest.mock('@/data/bill-categories', () => ({
+  BILL_CATEGORIES: [{ id: 'housing', label: 'Housing' }],
+}));
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', line: '#DDDDDD', moneyOut: '#B85040' }),
   useMoneyColor: () => () => '#000000',

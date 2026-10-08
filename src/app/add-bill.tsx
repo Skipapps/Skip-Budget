@@ -58,7 +58,7 @@ import {
   RECURRENCES,
   type BillCategory,
   type Recurrence,
-} from '@/data/bills-mock';
+} from '@/data/bill-categories';
 import { t } from '@/i18n';
 import { formatEntryDay } from '@/lib/entry-day';
 import { reminderSummary } from '@/lib/entry-reminder';

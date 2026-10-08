@@ -17,7 +17,7 @@ import { PageState } from '@/components/ui/page-state';
 import { SkeletonList } from '@/components/ui/skeleton';
 
 import { usePaymentSources, useBills } from '@/api/queries';
-import { getBillCategory } from '@/data/bills-mock';
+import { getBillCategory } from '@/data/bill-categories';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { t } from '@/i18n';
 import { toIsoDate } from '@/lib/date';

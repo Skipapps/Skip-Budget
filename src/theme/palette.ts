@@ -4,7 +4,7 @@ import { contrast } from '@/lib/tone';
  * The one accent. White type on it clears 5.6:1, so buttons and the tab bar carry white in both
  * modes.
  */
-export const ACCENT = { value: '#905479', on: '#FFFFFF' } as const;
+const ACCENT = { value: '#905479', on: '#FFFFFF' } as const;
 
 export type ModeKey = 'light' | 'dark' | 'system';
 
@@ -24,7 +24,7 @@ function toHex(r: number, g: number, b: number): string {
 }
 
 /** Blends towards another colour. `amount` is 0 (unchanged) to 1 (fully it). */
-export function mix(hex: string, towards: string, amount: number): string {
+function mix(hex: string, towards: string, amount: number): string {
   const [r1, g1, b1] = toRgb(hex);
   const [r2, g2, b2] = toRgb(towards);
   return toHex(r1 + (r2 - r1) * amount, g1 + (g2 - g1) * amount, b1 + (b2 - b1) * amount);
@@ -34,7 +34,7 @@ export function mix(hex: string, towards: string, amount: number): string {
  * The accent pushed away from `background` until it clears `target` contrast, so one swatch serves
  * as a button fill and as a label (plain, it is only 3.1:1 on near-black).
  */
-export function readable(hex: string, background: string, target = 4.5): string {
+function readable(hex: string, background: string, target = 4.5): string {
   if (contrast(hex, background) >= target) return hex;
 
   // Away from the background: darker on a light page, lighter on a dark one.
@@ -126,7 +126,7 @@ export function buildTokens(scheme: Scheme): Tokens {
 }
 
 /** `#RRGGBB` as the "R G B" channel list a CSS variable wants. */
-export function channels(hex: string): string {
+function channels(hex: string): string {
   return toRgb(hex).join(' ');
 }
 

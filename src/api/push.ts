@@ -29,7 +29,7 @@ Notifications.setNotificationHandler({
  * Whether notifications are allowed right now, without asking. Works on a simulator too (permission
  * is local to the device); only the push token needs a real phone (see registerDevice).
  */
-export async function remindersAllowed(): Promise<boolean> {
+async function remindersAllowed(): Promise<boolean> {
   if (Platform.OS !== 'ios') return false;
   const existing = await Notifications.getPermissionsAsync();
   return (
@@ -192,13 +192,13 @@ export function useRegisterPush(): void {
 }
 
 /** The category every Skip notification carries; see send-push/index.ts. */
-export const NOTIFICATION_CATEGORY = 'skip.item';
+const NOTIFICATION_CATEGORY = 'skip.item';
 
 /** The "View …" button's identifier, routed like a plain tap. */
-export const VIEW_ACTION = 'view';
+const VIEW_ACTION = 'view';
 
 /** "Remind me in 1 hour", handled by the content extension on the phone. */
-export const SNOOZE_ACTION = 'snooze';
+const SNOOZE_ACTION = 'snooze';
 
 function registerCategories(): Promise<unknown> {
   return Notifications.setNotificationCategoryAsync(NOTIFICATION_CATEGORY, [

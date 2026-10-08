@@ -39,7 +39,7 @@ function overdue(rows: Rollable[], today: string) {
  * swallowed: this runs in the background behind a pull-to-refresh, and a bill that could not be
  * advanced is a cosmetic problem.
  */
-export async function rollSchedulesForward(today: string): Promise<number> {
+async function rollSchedulesForward(today: string): Promise<number> {
   let moved = 0;
 
   try {

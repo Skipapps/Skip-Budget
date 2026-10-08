@@ -3,7 +3,7 @@
  * so the voice review page saves through the same rules: each builder is the form's own Save minus
  * the writing, with the checks in the same order and the same words.
  *
- * Pure on purpose: no hooks, no Supabase, and nothing from `@/data/bills-mock` (it pulls lucide
+ * Pure on purpose: no hooks, no Supabase, and nothing from `@/data/bill-categories` (it pulls lucide
  * icons into Jest). The caller hands in what it already read: the payment sources, and for an edit
  * the last charge on record and where the plan counts from. A new item passes
  * `lastChargedOn: null, countsFrom: null`, which makes both floors no-ops.
@@ -25,8 +25,8 @@ export type SourceRef = { id: string; kind: 'card' | 'account' };
 export type Built<T, F extends string> =
   { ok: true; values: T } | { ok: false; field: F; message: string };
 
-export type BillRecurrence = BillValues['recurrence'];
-export type SubscriptionCycle = SubscriptionValues['cycle'];
+type BillRecurrence = BillValues['recurrence'];
+type SubscriptionCycle = SubscriptionValues['cycle'];
 
 const refuse = <F extends string>(field: F, message: string) =>
   ({ ok: false, field, message }) as const;

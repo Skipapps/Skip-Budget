@@ -34,7 +34,7 @@ jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
 
-jest.mock('@/data/money-mock', () => ({
+jest.mock('@/data/money-buckets', () => ({
   moneyBuckets: [
     { id: 'salary', label: 'Salary', artwork: 'tileSalary' },
     { id: 'savings', label: 'Savings', artwork: 'tileSavings' },

@@ -100,7 +100,6 @@ export const weekdayLong = (day: number): string => WEEKDAYS_LONG[current()][day
 
 /** All twelve, for a month grid. */
 export const monthsShort = (): readonly string[] => MONTHS_SHORT[current()];
-export const monthsLong = (): readonly string[] => MONTHS_LONG[current()];
 export const weekdayInitials = (): readonly string[] => WEEKDAY_INITIALS[current()];
 
 /**

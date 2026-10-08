@@ -32,7 +32,7 @@ import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { SectionHeading } from '@/components/ui/typography';
-import { BILL_CATEGORIES } from '@/data/bills-mock';
+import { BILL_CATEGORIES } from '@/data/bill-categories';
 import { t, type MessageKey } from '@/i18n';
 import { monthLong } from '@/i18n/calendar';
 import { MESSAGES } from '@/i18n/messages';

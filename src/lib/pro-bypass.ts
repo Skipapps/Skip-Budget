@@ -24,7 +24,7 @@ import { useSyncExternalStore } from 'react';
 
 export type ProOverride = 'off' | 'pro' | 'free';
 
-export const PRO_BYPASS_KEY = 'skip.dev.proBypass';
+const PRO_BYPASS_KEY = 'skip.dev.proBypass';
 
 /** The stored position once read back. Meaningless unless `__DEV__`. */
 let stored: ProOverride = 'off';

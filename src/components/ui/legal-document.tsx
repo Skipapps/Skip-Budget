@@ -5,7 +5,7 @@ import { Title } from '@/components/ui/typography';
 import { t, useLocale } from '@/i18n';
 import { TEXT_CAP } from '@/theme/text-scale';
 
-export type Block =
+type Block =
   | { kind: 'text'; text: string }
   | { kind: 'bullets'; items: string[] }
   | { kind: 'note'; text: string };

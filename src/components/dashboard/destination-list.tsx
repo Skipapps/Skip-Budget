@@ -13,7 +13,7 @@ import { Pressable, Text, View } from 'react-native';
 import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TextLink } from '@/components/ui/text-link';
-import type { SpendingCategory } from '@/data/dashboard-mock';
+import type { SpendingCategory } from '@/data/spending-categories';
 import { t } from '@/i18n';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';

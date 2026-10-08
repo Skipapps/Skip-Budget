@@ -25,7 +25,7 @@ import { addDays, getDaysInMonth, toIsoDate } from '@/lib/date';
 import type { Token } from './clean';
 import { readGroup, TENS } from './numbers';
 
-export const MONTHS: Record<string, number> = {
+const MONTHS: Record<string, number> = {
   january: 1,
   jan: 1,
   february: 2,

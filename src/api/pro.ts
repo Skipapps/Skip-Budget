@@ -295,7 +295,7 @@ export function useProPrices() {
 }
 
 /** The RevenueCat offering that holds the one-time offer's product. */
-export const EXIT_OFFERING = 'exit_offer';
+const EXIT_OFFERING = 'exit_offer';
 
 export type OfferPrices = {
   /** The one-time yearly plan; null when the store has no such offering, and then no offer shows. */

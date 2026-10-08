@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { FieldLabel } from '@/components/ui/typography';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
-import { BILL_CATEGORIES, RECURRENCES } from '@/data/bills-mock';
+import { BILL_CATEGORIES, RECURRENCES } from '@/data/bill-categories';
 import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
 

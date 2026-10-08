@@ -15,7 +15,7 @@ import type { Href } from 'expo-router';
  */
 
 /** Mirrors `LedgerEntry['kind']`. */
-export type LedgerLinkKind = 'bill' | 'receipt' | 'subscription' | 'income';
+type LedgerLinkKind = 'bill' | 'receipt' | 'subscription' | 'income';
 
 export type LedgerLinkEntry = { id: string; kind: LedgerLinkKind };
 

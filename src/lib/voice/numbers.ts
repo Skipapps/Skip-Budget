@@ -24,7 +24,7 @@ export const UNITS: Record<string, number> = {
   nine: 9,
 };
 
-export const TEENS: Record<string, number> = {
+const TEENS: Record<string, number> = {
   ten: 10,
   eleven: 11,
   twelve: 12,

@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { billCategoryHint, billCategoryLabel } from '@/components/bills/bill-row';
-import { BILL_CATEGORIES, type BillCategory } from '@/data/bills-mock';
+import { BILL_CATEGORIES, type BillCategory } from '@/data/bill-categories';
 import { GLYPH_STROKE } from '@/data/glyphs';
 import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';

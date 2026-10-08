@@ -27,7 +27,7 @@ export const TRIGGER_WORDS = new Set([
   'hold',
 ]);
 
-export const STOPWORDS = new Set([
+const STOPWORDS = new Set([
   'a',
   'an',
   'the',

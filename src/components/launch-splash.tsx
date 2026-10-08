@@ -17,7 +17,7 @@ import splashVideo from '../../assets/videos/skip-splash.mp4';
  * The video's own background, edge to edge in every frame. The native splash (app.json) and the
  * space around the video use the same colour, so the hand-over and the letterboxing are invisible.
  */
-export const SPLASH_BACKDROP = '#F5F3F1';
+const SPLASH_BACKDROP = '#F5F3F1';
 
 /** The video runs 1.8s; this is how long it is given to finish before the app takes over anyway. */
 const STALL_MS = 4000;

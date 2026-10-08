@@ -20,7 +20,7 @@
 import { addMonths, daysBetween } from '@/lib/loan';
 import { roundMoney, sumMoney, toCents } from '@/lib/money';
 
-export type AprPayment = {
+type AprPayment = {
   on: Date;
   amount: number;
 };

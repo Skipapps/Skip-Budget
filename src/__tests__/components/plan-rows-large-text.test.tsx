@@ -5,7 +5,7 @@ import { Dimensions } from 'react-native';
 import { BillRow } from '@/components/bills/bill-row';
 import { ReceiptRow } from '@/components/receipts/receipt-row';
 import { SubscriptionRow } from '@/components/subscriptions/subscription-row';
-import type { Bill } from '@/data/bills-mock';
+import type { Bill } from '@/data/bill-categories';
 import { resetLocaleForTests } from '@/i18n/store';
 
 /**
@@ -20,7 +20,7 @@ jest.mock('@/providers/theme-provider', () => ({
 }));
 jest.mock('@/components/brands/brand-mark', () => ({ BrandMark: () => null }));
 jest.mock('@/components/brands/brand-logo', () => ({ BrandLogo: () => null }));
-jest.mock('@/data/bills-mock', () => ({ getBillIcon: () => () => null }));
+jest.mock('@/data/bill-categories', () => ({ getBillIcon: () => () => null }));
 
 type Screen = Awaited<ReturnType<typeof render>>;
 

@@ -44,7 +44,7 @@ const CONFIDENCES: readonly VoiceDraft['confidence'][] = ['high', 'medium', 'low
 const MERCHANT_SOURCES: readonly VoiceMerchantSource[] = ['learned', 'catalog', 'fuzzy', 'heard'];
 
 /** The keypad's ceiling: nine whole digits and two decimals. */
-export const MAX_VOICE_AMOUNT = 999_999_999.99;
+const MAX_VOICE_AMOUNT = 999_999_999.99;
 
 const MAX_NAME = 200;
 /** The note field's own limit, as the forms' note page types it. */
@@ -54,7 +54,7 @@ const MAX_TRANSCRIPT = 2000;
 const isString = (value: unknown): value is string => typeof value === 'string';
 
 /** Dollars that are positive, within the keypad's range and exact to the cent. */
-export function isVoiceAmount(value: unknown): value is number {
+function isVoiceAmount(value: unknown): value is number {
   return (
     typeof value === 'number' &&
     Number.isFinite(value) &&
@@ -68,7 +68,7 @@ export function isVoiceAmount(value: unknown): value is number {
  * A real calendar day as yyyy-mm-dd: the shape, and a round trip through the
  * calendar so 2026-02-30 and 2026-13-01 are refused.
  */
-export function isIsoDay(value: unknown): value is string {
+function isIsoDay(value: unknown): value is string {
   if (!isString(value) || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [year, month, day] = value.split('-').map(Number);
   if (year < 1900 || year > 2999) return false;
@@ -233,7 +233,7 @@ export type VoiceEntry = {
   note: string | null;
 };
 
-export type VoiceEntryField = keyof VoiceEntry;
+type VoiceEntryField = keyof VoiceEntry;
 
 /** The working copy a fresh draft opens with. An ambiguous amount is left unpicked. */
 export function entryFromDraft(draft: VoiceDraft): VoiceEntry {
@@ -470,7 +470,7 @@ export function clearVoiceDraft(): void {
   publish();
 }
 
-export function subscribeVoiceDraft(listener: () => void): () => void {
+function subscribeVoiceDraft(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);

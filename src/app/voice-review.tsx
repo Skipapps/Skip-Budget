@@ -39,7 +39,7 @@ import { ChoiceChips } from '@/components/ui/choice-chips';
 import { TextLink } from '@/components/ui/text-link';
 import { FieldLabel } from '@/components/ui/typography';
 import { StaleDraft } from '@/components/voice/stale-draft';
-import { BILL_CATEGORIES, RECURRENCES } from '@/data/bills-mock';
+import { BILL_CATEGORIES, RECURRENCES } from '@/data/bill-categories';
 import { t, type MessageKey } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
 import { formatEntryDay } from '@/lib/entry-day';

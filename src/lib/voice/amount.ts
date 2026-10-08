@@ -316,7 +316,7 @@ export type AmountResult = {
 };
 
 /** Pre-selected reading of an unsettled pair: hundreds for a bill, dollars-and-cents otherwise. */
-export function likelierReading(readings: readonly number[], kind: VoiceKind): number {
+function likelierReading(readings: readonly number[], kind: VoiceKind): number {
   return kind === 'bill' ? Math.max(...readings) : Math.min(...readings);
 }
 

@@ -13,7 +13,7 @@ import { forgetLogoFailure } from '@/lib/logo-failures';
  * and is not a secret, but it is still never logged.
  */
 
-export type LogoCandidate = { domain: string; name: string; confidence: number };
+type LogoCandidate = { domain: string; name: string; confidence: number };
 
 export type LogoMatch = {
   /** False when the service is not confident: show letters, not a guess. */

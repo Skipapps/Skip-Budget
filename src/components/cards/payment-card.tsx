@@ -1,7 +1,7 @@
 import type { ViewStyle } from 'react-native';
 
 import { CardFace } from '@/components/cards/card-face';
-import type { PaymentCard as PaymentCardModel } from '@/data/cards-mock';
+import type { PaymentCard as PaymentCardModel } from '@/data/cards';
 import { t } from '@/i18n';
 import { toCents } from '@/lib/money';
 

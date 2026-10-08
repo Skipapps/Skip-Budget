@@ -1,6 +1,6 @@
 /**
  * Which bill category, for bills only. The ids are copied from BILL_CATEGORIES in
- * src/data/bills-mock.ts rather than imported (that module pulls in lucide icons); the test fails
+ * src/data/bill-categories.ts rather than imported (that module pulls in lucide icons); the test fails
  * if the two lists differ.
  *
  * Order of evidence:

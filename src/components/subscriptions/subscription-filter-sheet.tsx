@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { FieldLabel } from '@/components/ui/typography';
 import { cycleLabel } from '@/components/subscriptions/subscription-row';
-import { BILLING_CYCLES } from '@/data/subscriptions-mock';
+import { BILLING_CYCLES } from '@/data/billing-cycles';
 import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
 

@@ -8,7 +8,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { SelectField } from '@/components/ui/select-field';
 import { FieldLabel } from '@/components/ui/typography';
-import { TRANSACTION_KINDS, type TransactionKind } from '@/data/transactions-mock';
+import { TRANSACTION_KINDS, type TransactionKind } from '@/data/transaction-kinds';
 import { t, type MessageKey } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { useColors } from '@/providers/theme-provider';

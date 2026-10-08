@@ -171,13 +171,13 @@ export type LoanTerms = {
 };
 
 /** A one-off overpayment: an amount, and the day it lands. */
-export type LumpSum = {
+type LumpSum = {
   on: Date;
   amount: number;
 };
 
 /** Money paid on top of the contract payment, all against principal. It shortens the term, not the payment. */
-export type Prepayment = {
+type Prepayment = {
   /** Added to every scheduled payment. */
   monthly?: number;
   /** One-off amounts on given dates. */

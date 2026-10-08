@@ -21,7 +21,7 @@ export type Charge = {
 };
 
 /** What a bill needs to draw its icon, since it has no brand to look up. */
-export type BillMarkFields = {
+type BillMarkFields = {
   categoryId?: string | null;
   iconId?: string | null;
 };

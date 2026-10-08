@@ -36,7 +36,7 @@ const COLUMN: Record<Kind, 'bill_id' | 'subscription_id'> = {
  * re-record: the scheduler pushes a notice for every charge it newly writes, and a correction must
  * not arrive as a fresh batch.
  */
-export function useRewritePastCharges() {
+function useRewritePastCharges() {
   const client = useQueryClient();
 
   return useMutation({

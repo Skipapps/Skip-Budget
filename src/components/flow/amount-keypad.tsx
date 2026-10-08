@@ -6,20 +6,7 @@ import { selection } from '@/lib/haptics';
 import { useColors } from '@/providers/theme-provider';
 
 /** Key identities, not faces: '.' is the decimal key in every language and is drawn with its mark. */
-export const AMOUNT_KEYS = [
-  '1',
-  '2',
-  '3',
-  '4',
-  '5',
-  '6',
-  '7',
-  '8',
-  '9',
-  '.',
-  '0',
-  'delete',
-] as const;
+const AMOUNT_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'delete'] as const;
 
 export type AmountKey = (typeof AMOUNT_KEYS)[number];
 

@@ -6,7 +6,7 @@
  */
 import { toCents } from '@/lib/money';
 
-export type NumberLiteral = {
+type NumberLiteral = {
   /** The figure as written, before a "k" suffix. */
   value: number;
   /** Cents the digits say, after a "k" suffix. Rounded only if `exact` is false. */

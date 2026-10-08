@@ -1,6 +1,6 @@
 import { Pressable, View } from 'react-native';
 
-import { BILL_ICON_CHOICES } from '@/data/bills-mock';
+import { BILL_ICON_CHOICES } from '@/data/bill-categories';
 import { GLYPH_STROKE } from '@/data/glyphs';
 import { t, type MessageKey } from '@/i18n';
 import { cn } from '@/lib/cn';

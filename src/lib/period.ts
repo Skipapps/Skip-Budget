@@ -39,7 +39,7 @@ export const PERIODS = [
 export type PeriodKey = (typeof PERIODS)[number]['value'];
 
 /** How far back the app keeps anything. Stepping stops here. */
-export const HISTORY_YEARS = PRO_HISTORY_YEARS;
+const HISTORY_YEARS = PRO_HISTORY_YEARS;
 
 /** One division inside a period: a day, a week, or a month. */
 export type Bucket = {

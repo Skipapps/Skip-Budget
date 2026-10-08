@@ -24,7 +24,7 @@ import {
 } from '@/api/mutations';
 import { useBankAccounts, useSalaryDetails } from '@/api/queries';
 import { PageState } from '@/components/ui/page-state';
-import { type SalarySource } from '@/data/salary-mock';
+import { type SalarySource } from '@/data/salary';
 import { t } from '@/i18n';
 import {
   PAY_FREQUENCIES,

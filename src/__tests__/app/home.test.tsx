@@ -44,7 +44,7 @@ jest.mock('@/components/ui/skeleton', () => ({ SkeletonList: () => null }));
 jest.mock('@/components/brands/brand-mark', () => ({ BrandMark: () => null }));
 jest.mock('@/components/bills/bill-mark', () => ({ BillMark: () => null }));
 // Artwork imports SVGs, which Jest has no transformer for.
-jest.mock('@/data/dashboard-mock', () => ({ spendingCategories: [] }));
+jest.mock('@/data/spending-categories', () => ({ spendingCategories: [] }));
 
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', line: '#DDDDDD', surface: '#FFFFFF' }),

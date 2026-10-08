@@ -12,7 +12,7 @@ import { contrast } from '@/lib/tone';
 import { useTheme } from '@/providers/theme-provider';
 
 /** As tall as the tab bar's pill beside it, so the two sit on one line. */
-export const VOICE_FAB_SIZE = ROW_HEIGHT;
+const VOICE_FAB_SIZE = ROW_HEIGHT;
 
 /**
  * The round Voice button at the end of the tab bar: the fastest way to put something in, from any

@@ -74,7 +74,7 @@ export function PageHeader({
   );
 }
 
-export function HeaderAction({
+function HeaderAction({
   icon: Icon,
   label,
   onPress,

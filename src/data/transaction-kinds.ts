@@ -6,15 +6,3 @@ export const TRANSACTION_KINDS = [
 ] as const;
 
 export type TransactionKind = (typeof TRANSACTION_KINDS)[number]['value'];
-
-export type LedgerEntry = {
-  id: string;
-  label: string;
-  /** Negative is money out. */
-  amount: number;
-  /** ISO yyyy-mm-dd so entries sort and group without parsing. */
-  date: string;
-  kind: TransactionKind;
-  /** Id of the card or bank account it was paid from. */
-  sourceId: string;
-};

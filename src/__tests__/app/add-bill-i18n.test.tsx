@@ -3,7 +3,7 @@ import type { ReactTestRendererJSON } from 'react-test-renderer';
 
 import AddBillScreen from '@/app/add-bill';
 import { billCategoryLabel } from '@/components/bills/bill-row';
-import { BILL_CATEGORIES } from '@/data/bills-mock';
+import { BILL_CATEGORIES } from '@/data/bill-categories';
 import { LOGO_COPY } from '@/components/brands/logo-choices';
 import { t } from '@/i18n';
 import type { Language } from '@/i18n/config';

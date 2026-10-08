@@ -1,6 +1,6 @@
 /**
  * How often, for bills and subscriptions. Only the four cycles the forms offer (RECURRENCES in
- * src/data/bills-mock.ts, CYCLES in add-subscription.tsx) come back as a cycle. Rhythms the app
+ * src/data/bill-categories.ts, CYCLES in add-subscription.tsx) come back as a cycle. Rhythms the app
  * cannot store (every two weeks, twice a month) are still recognised, so their numbers are not read
  * as an amount, but the cycle stays null for the person to pick.
  *

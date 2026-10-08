@@ -306,7 +306,7 @@ function titleCase(words: string[]): string {
   return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
-export type MerchantSource = VoiceMerchantSource;
+type MerchantSource = VoiceMerchantSource;
 
 export type MerchantSpan = {
   start: number;

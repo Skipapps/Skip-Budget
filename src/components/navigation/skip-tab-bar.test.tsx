@@ -25,7 +25,7 @@ jest.mock('@/providers/theme-provider', () => ({
 jest.mock('@/lib/press', () => ({ withTap: (handler?: () => void) => handler }));
 
 // Its own test covers it (voice-fab.test.tsx); here it only has to take up room.
-jest.mock('@/components/voice/voice-fab', () => ({ VoiceFab: () => null, VOICE_FAB_SIZE: 64 }));
+jest.mock('@/components/voice/voice-fab', () => ({ VoiceFab: () => null }));
 
 const routes = [
   { key: 'home-1', name: 'home' },

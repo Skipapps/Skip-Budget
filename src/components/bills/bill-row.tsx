@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { BrandLogo } from '@/components/brands/brand-logo';
 import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
-import { getBillIcon, type Bill } from '@/data/bills-mock';
+import { getBillIcon, type Bill } from '@/data/bill-categories';
 import { GLYPH_STROKE } from '@/data/glyphs';
 import { t, type MessageKey } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
