@@ -443,6 +443,73 @@ export const proMessages = defineMessages({
     es: '{feature}: Gratis, {free}. Pro, {pro}.',
     fr: '{feature} : Gratuit, {free}. Pro, {pro}.',
   },
+  'pro.offer.badge': { en: 'ONE-TIME OFFER', es: 'OFERTA ÚNICA', fr: 'OFFRE UNIQUE' },
+  'pro.offer.title': {
+    en: 'Skip Pro, half price',
+    es: 'Skip Pro a mitad de precio',
+    fr: 'Skip Pro à moitié prix',
+  },
+  'pro.offer.year': { en: 'year', es: 'año', fr: 'an' },
+  'pro.offer.wasPrice': {
+    en: 'Was {price}',
+    es: 'Antes {price}',
+    fr: 'Avant {price}',
+  },
+  'pro.offer.perMonth': {
+    en: 'That’s just {price} a month.',
+    es: 'Solo {price} al mes.',
+    fr: 'Soit seulement {price} par mois.',
+  },
+  'pro.offer.min': { en: 'min', es: 'min', fr: 'min' },
+  'pro.offer.sec': { en: 'sec', es: 'seg', fr: 's' },
+  'pro.offer.timeLeft': {
+    en: '{minutes} min {seconds} s left',
+    es: 'Quedan {minutes} min {seconds} s',
+    fr: 'Il reste {minutes} min {seconds} s',
+  },
+  'pro.offer.endsWhen': {
+    en: 'This offer ends when the timer runs out.',
+    es: 'Esta oferta termina cuando se acabe el tiempo.',
+    fr: 'Cette offre prend fin à la fin du compte à rebours.',
+  },
+  'pro.offer.ended': {
+    en: 'This offer has ended.',
+    es: 'Esta oferta ha terminado.',
+    fr: 'Cette offre est terminée.',
+  },
+  'pro.offer.endedButton': { en: 'Offer ended', es: 'Oferta terminada', fr: 'Offre terminée' },
+  'pro.offer.includes': {
+    en: 'Everything in Pro, including',
+    es: 'Todo lo de Pro, incluido',
+    fr: 'Tout Pro, y compris',
+  },
+  'pro.offer.scans': {
+    en: 'Unlimited receipt scans',
+    es: 'Escaneos de recibos ilimitados',
+    fr: 'Numérisations de reçus illimitées',
+  },
+  'pro.offer.voice': {
+    en: 'Unlimited Voice entry',
+    es: 'Entrada por voz ilimitada',
+    fr: 'Saisie vocale illimitée',
+  },
+  'pro.offer.history': {
+    en: { one: '{count} year of money history', other: '{count} years of money history' },
+    es: { one: '{count} año de historial', other: '{count} años de historial' },
+    fr: { one: '{count} an d’historique', other: '{count} ans d’historique' },
+  },
+  'pro.offer.insights': {
+    en: 'Insights and brand logos',
+    es: 'Análisis y logos de marcas',
+    fr: 'Aperçu et logos des marques',
+  },
+  'pro.offer.once': {
+    en: 'If you close this, you won’t see this offer again.',
+    es: 'Si cierras esto, no volverás a ver esta oferta.',
+    fr: 'Si tu fermes cette page, tu ne reverras plus cette offre.',
+  },
+  'pro.offer.noThanks': { en: 'No thanks', es: 'No, gracias', fr: 'Non merci' },
+  'pro.offer.close': { en: 'Close', es: 'Cerrar', fr: 'Fermer' },
   'pro.plan.popular': { en: 'Most Popular', es: 'Más popular', fr: 'Le plus choisi' },
   'pro.plan.billedMonthly': {
     en: 'Billed monthly',

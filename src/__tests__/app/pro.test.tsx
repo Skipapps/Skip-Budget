@@ -16,7 +16,23 @@ jest.mock('lucide-react-native', () => {
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
 );
-jest.mock('expo-router', () => ({ router: { push: jest.fn(), back: jest.fn() } }));
+let mockScreenOptions: { gestureEnabled?: boolean } = {};
+jest.mock('expo-router', () => ({
+  router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
+  Stack: {
+    Screen: ({ options }: { options: { gestureEnabled?: boolean } }) => {
+      mockScreenOptions = options;
+      return null;
+    },
+  },
+}));
+
+// The one-time offer: whether leaving would open it, and the server's once-only claim.
+let mockOfferArmed = false;
+const mockClaim = jest.fn(async () => true);
+jest.mock('@/api/pro-offer', () => ({
+  useExitOffer: () => ({ armed: mockOfferArmed, claim: mockClaim }),
+}));
 // The real SDK starts a cleanup interval on import that keeps Jest from exiting.
 jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
 jest.mock('@/providers/theme-provider', () => ({
@@ -69,6 +85,8 @@ beforeEach(() => {
   mockPro = false;
   mockOpen = false;
   mockTrials = { monthly: null, yearly: null };
+  mockOfferArmed = false;
+  mockScreenOptions = {};
 });
 
 const ROWS = [
@@ -210,4 +228,67 @@ it('tells someone who already has Pro, with a way to manage it', async () => {
   const screen = await render(<ProScreen />);
   expect(screen.getByText('You have Skip Pro')).toBeTruthy();
   expect(screen.queryByText('What you get')).toBeNull();
+});
+
+describe('leaving without buying', () => {
+  it('opens the one-time offer in this page’s place, the first time, with the swipe held', async () => {
+    mockOfferArmed = true;
+    const screen = await render(<ProScreen />);
+    expect(mockScreenOptions.gestureEnabled).toBe(false);
+
+    await fireEvent.press(screen.getByLabelText('Go back'));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/pro-offer'));
+    expect(mockClaim).toHaveBeenCalledTimes(1);
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('just goes back once the offer has been seen, with the swipe open', async () => {
+    const screen = await render(<ProScreen />);
+    expect(mockScreenOptions.gestureEnabled).toBe(true);
+
+    await fireEvent.press(screen.getByLabelText('Go back'));
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(mockClaim).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('goes back when another phone claimed it first, or the claim fails', async () => {
+    mockOfferArmed = true;
+    mockClaim.mockResolvedValueOnce(false);
+    const screen = await render(<ProScreen />);
+    await fireEvent.press(screen.getByLabelText('Go back'));
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(router.replace).not.toHaveBeenCalled();
+
+    mockClaim.mockRejectedValueOnce(new Error('offline'));
+    await fireEvent.press(screen.getByLabelText('Go back'));
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(2));
+  });
+
+  it('claims once however many times the chevron is tapped', async () => {
+    mockOfferArmed = true;
+    let release: (value: boolean) => void = () => {};
+    mockClaim.mockImplementationOnce(() => new Promise<boolean>((resolve) => (release = resolve)));
+    const screen = await render(<ProScreen />);
+
+    await fireEvent.press(screen.getByLabelText('Go back'));
+    await fireEvent.press(screen.getByLabelText('Go back'));
+    release(true);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledTimes(1));
+    expect(mockClaim).toHaveBeenCalledTimes(1);
+  });
+
+  it('never offers it after a purchase: buying steps back directly', async () => {
+    mockOfferArmed = true;
+    mockOpen = true;
+    mockPurchase.mockResolvedValueOnce('done');
+    const screen = await render(<ProScreen />);
+
+    await fireEvent.press(screen.getByLabelText('Get Pro for $19.99/year'));
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockClaim).not.toHaveBeenCalled();
+  });
 });

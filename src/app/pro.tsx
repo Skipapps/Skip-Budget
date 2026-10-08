@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import {
   ChartColumn,
   Check,
@@ -14,7 +14,7 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 
 import {
@@ -24,6 +24,8 @@ import {
   useProPrices,
   usePurchasePro,
 } from '@/api/pro';
+import { useExitOffer } from '@/api/pro-offer';
+import { goBack } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
@@ -98,6 +100,27 @@ export default function ProScreen() {
   const [plan, setPlan] = useState<Plan>('yearly');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  // Leaving without buying opens the one-time offer, the first time only. While it is armed the
+  // edge swipe is off, so the chevron is the one way out and the offer cannot be skipped by
+  // gesture; once seen, the page goes back as any other.
+  const offer = useExitOffer();
+  const leaving = useRef(false);
+  const screenOptions = useMemo(() => ({ gestureEnabled: !offer.armed }), [offer.armed]);
+  const leave = async () => {
+    if (leaving.current) return;
+    leaving.current = true;
+    try {
+      if (offer.armed && (await offer.claim())) {
+        router.replace('/pro-offer');
+        return;
+      }
+    } catch {
+      // A failed claim is not a reason to keep anyone on this page.
+    }
+    leaving.current = false;
+    goBack();
+  };
 
   const pack = plan === 'yearly' ? prices.data?.yearly : prices.data?.monthly;
   const canBuy = purchasesAvailable() && Boolean(pack);
@@ -204,6 +227,7 @@ export default function ProScreen() {
     <Screen
       title={t('pro.page.title')}
       showBack
+      onBack={() => void leave()}
       footer={
         <View className="w-full gap-2">
           <Button
@@ -239,6 +263,8 @@ export default function ProScreen() {
         </View>
       }
     >
+      <Stack.Screen options={screenOptions} />
+
       <Text
         className="mt-1 w-full text-center font-app text-[15px] text-muted"
         maxFontSizeMultiplier={TEXT_CAP.reading}

@@ -20,6 +20,7 @@ import { Pressable, Text, View } from 'react-native';
 import { deleteAccount, signOut } from '@/api/auth';
 import { resetTo } from '@/lib/nav';
 import { usePro, useProPrices } from '@/api/pro';
+import { resetExitOfferForDev } from '@/api/pro-offer';
 import { t } from '@/i18n';
 import { proMonthlyLabel, proYearlyLabel } from '@/lib/wall';
 import { setProOverride, useProOverride } from '@/lib/pro-bypass';
@@ -82,6 +83,7 @@ export default function SettingsScreen() {
   const { pro } = usePro();
   const prices = useProPrices();
   const proOverride = useProOverride();
+  const [offerReset, setOfferReset] = useState<string | null>(null);
   const updateProfile = useUpdateProfile();
 
   const receipts = useReceipts();
@@ -201,6 +203,19 @@ export default function SettingsScreen() {
             toggle={{
               value: proOverride === 'free',
               onChange: (on) => setProOverride(on ? 'free' : 'off'),
+            }}
+          />
+          {/* The offer is once per account on the server, so trying it again needs the flag cleared. */}
+          <SettingsRow
+            icon={FlaskConical}
+            title="Show the one-time offer again"
+            subtitle={offerReset ?? 'Leave the Pro page without buying to see it'}
+            onPress={() => {
+              void resetExitOfferForDev().then((done) =>
+                setOfferReset(
+                  done ? 'Done — it opens next time you leave the Pro page' : 'Could not reset',
+                ),
+              );
             }}
             last
           />

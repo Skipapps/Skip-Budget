@@ -280,6 +280,36 @@ export function useProPrices() {
   });
 }
 
+/** The RevenueCat offering that holds the one-time offer's product. */
+export const EXIT_OFFERING = 'exit_offer';
+
+export type OfferPrices = {
+  /** The one-time yearly plan; null when the store has no such offering, and then no offer shows. */
+  offer: PurchasesPackage | null;
+  /** The ordinary yearly plan, drawn struck through beside it. */
+  regular: PurchasesPackage | null;
+};
+
+/** The one-time offer's plan and the ordinary yearly one, straight from the store. */
+export function useOfferPrices() {
+  const userId = useUserId();
+  return useQuery({
+    queryKey: ['pro-offer-prices', userId],
+    enabled: purchasesAvailable() && Boolean(userId),
+    queryFn: async (): Promise<OfferPrices> => {
+      if (!(await ensureConfigured(userId!))) {
+        throw new Error(lastConfigureError ?? 'could not start, with no reason given.');
+      }
+      const offerings = await Purchases.getOfferings();
+      const exit = offerings.all[EXIT_OFFERING];
+      return {
+        offer: exit?.annual ?? exit?.availablePackages[0] ?? null,
+        regular: offerings.current?.annual ?? null,
+      };
+    },
+  });
+}
+
 export function usePurchasePro() {
   const client = useQueryClient();
   const userId = useUserId();

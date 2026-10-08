@@ -16,8 +16,12 @@ jest.mock('react-native-keyboard-controller', () =>
 );
 
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), back: jest.fn() },
+  router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
   useLocalSearchParams: () => ({ id: 'history' }),
+  Stack: { Screen: () => null },
+}));
+jest.mock('@/api/pro-offer', () => ({
+  useExitOffer: () => ({ armed: false, claim: jest.fn(async () => false) }),
 }));
 
 // The real SDK starts a cleanup interval on import that keeps Jest from exiting.

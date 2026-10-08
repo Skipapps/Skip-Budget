@@ -19,6 +19,8 @@ type ScreenProps = {
   scrollable?: boolean;
   /** Shows a back chevron pinned above the content. Off on entry screens. */
   showBack?: boolean;
+  /** What the back chevron does instead of popping the stack. */
+  onBack?: () => void;
   /**
    * The page's name, centred on the back chevron's line. Pages give it here, not as a heading in
    * their content, so every page's top row is the same height.
@@ -53,6 +55,7 @@ export function Screen({
   className,
   scrollable = true,
   showBack = false,
+  onBack,
   title,
   headerActions,
   header,
@@ -92,7 +95,7 @@ export function Screen({
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={['top', 'bottom']}>
-      {header || title || showBack ? (
+      {header || title || showBack || headerActions?.length ? (
         // Outside the scroll view so it stays put while content scrolls under it.
         <View className="w-full items-center">
           <View className="w-full max-w-[520px] px-6 pt-1">
@@ -100,7 +103,7 @@ export function Screen({
             {header ?? (
               <PageHeader
                 title={title}
-                left={showBack ? <BackButton /> : null}
+                left={showBack ? <BackButton onPress={onBack} /> : null}
                 actions={headerActions}
               />
             )}

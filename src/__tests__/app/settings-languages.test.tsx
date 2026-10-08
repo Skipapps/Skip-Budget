@@ -52,6 +52,7 @@ jest.mock('@/lib/nav', () => ({ resetTo: jest.fn() }));
 
 let mockPro = false;
 let mockPrices: { data?: unknown } = {};
+jest.mock('@/api/pro-offer', () => ({ resetExitOfferForDev: jest.fn(async () => true) }));
 jest.mock('@/api/pro', () => ({
   usePro: () => ({ pro: mockPro }),
   useProPrices: () => mockPrices,

@@ -38,6 +38,9 @@ export const FREE_LIMITS = {
 export const FREE_HISTORY_DAYS = 90;
 export const PRO_HISTORY_YEARS = 7;
 
+/** How long the one-time offer stands once shown. It really ends then: nothing brings it back. */
+export const PRO_OFFER_MS = 10 * 60 * 1000;
+
 /** English only, frozen at import; proMonthlyLabel() and proYearlyLabel() follow the language. */
 export const PRO_MONTHLY_LABEL = '$1.99/mo';
 export const PRO_YEARLY_LABEL = '$19.99/yr';

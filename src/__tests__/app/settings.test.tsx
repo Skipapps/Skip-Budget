@@ -79,6 +79,7 @@ jest.mock('@/api/auth', () => ({
 jest.mock('@/lib/nav', () => ({ resetTo: jest.fn() }));
 
 // No store answer: the price line falls back to the US dollar labels.
+jest.mock('@/api/pro-offer', () => ({ resetExitOfferForDev: jest.fn(async () => true) }));
 jest.mock('@/api/pro', () => ({
   usePro: () => ({ pro: false }),
   useProPrices: () => ({ data: undefined }),
@@ -140,6 +141,8 @@ describe('Settings, the main page', () => {
 
     expect(buttonLabels(screen)).toEqual([
       'Skip Pro. Unlimited everything, $1.99/mo or $19.99/yr',
+      // Development builds only, under Developer.
+      'Show the one-time offer again. Leave the Pro page without buying to see it',
       'Profile picture. Pick one to show on your dashboard',
       ...PAGES.map((page) => page.title),
       COFFEE,
