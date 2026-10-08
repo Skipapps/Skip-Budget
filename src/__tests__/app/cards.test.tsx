@@ -97,7 +97,7 @@ jest.mock('@/api/queries', () => ({
   }) => (month.excluded_at ? 0 : Number(month.adjusted_saved ?? month.saved)),
   useCards: () => ({ data: mockCards, isPending: false, isError: false }),
   useBankAccounts: () => ({ data: mockAccounts, isPending: false, isError: false }),
-  useSalarySources: () => ({ data: [], isPending: false, isError: false }),
+  useSalarySources: () => ({ data: mockSalary, isPending: false, isError: false }),
   useMonthlySavings: () => ({ data: mockSavings, isPending: false, isError: false }),
   useSourceBalances: () => ({
     balances: new Map<string, number>(),
@@ -106,9 +106,11 @@ jest.mock('@/api/queries', () => ({
   }),
 }));
 
+let mockSalary: unknown[] = [];
 jest.mock('@/lib/use-today', () => ({ useToday: () => ({ today: '2026-09-12' }) }));
 
 beforeEach(() => {
+  mockSalary = [];
   mockBalancesFailed = false;
   mockSavings = [];
   mockRefetchBalances.mockClear();
@@ -150,6 +152,39 @@ describe('Cards — the Savings tile', () => {
     expect(getByText('Savings: 260')).toBeTruthy();
     expect(queryByText('Savings: 1783.46')).toBeNull();
     expect(queryByText('Savings: 500')).toBeNull();
+  });
+});
+
+/** This month's money in: the schedules, plus one-off pays dated this month and no other. */
+describe('Cards — the Salary tile', () => {
+  const schedule = {
+    id: 's1',
+    name: 'Acme',
+    amount: 1880,
+    frequency: 'semimonthly',
+    last_payday: '2026-08-31',
+  };
+  const oneOff = (payday: string, amount: number) => ({
+    id: `o-${payday}`,
+    name: '',
+    amount,
+    frequency: 'once',
+    last_payday: payday,
+  });
+
+  it('adds this month’s one-off pays to the schedules', async () => {
+    mockSalary = [schedule, oneOff('2026-09-05', 400), oneOff('2026-08-20', 999)];
+    const { getByText } = await render(<CardsScreen />);
+
+    // 2 × $1,880 twice a month, plus September's $400.
+    expect(getByText('Salary: 4160')).toBeTruthy();
+  });
+
+  it('shows only one-off pays when there is no schedule', async () => {
+    mockSalary = [oneOff('2026-09-01', 250.5), oneOff('2026-09-10', 100)];
+    const { getByText } = await render(<CardsScreen />);
+
+    expect(getByText('Salary: 350.5')).toBeTruthy();
   });
 });
 

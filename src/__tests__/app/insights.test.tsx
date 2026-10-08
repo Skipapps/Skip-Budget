@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, within } from '@testing-library/react-native';
 import { StyleSheet, type StyleProp, type TextStyle } from 'react-native';
 
 import InsightsScreen from '@/app/insights';
@@ -85,6 +85,8 @@ const mockRefetch = Object.fromEntries(SOURCES.map((source) => [source, jest.fn(
   jest.Mock
 >;
 
+let mockSalary: unknown[] = [];
+
 const mockAnswer = (source: Source, data: unknown) => ({
   data,
   isError: mockFailing === source,
@@ -105,7 +107,7 @@ jest.mock('@/api/queries', () => ({
     refetch: mockRefetch.ledger,
   }),
   useCards: () => mockAnswer('cards', mockCards),
-  useSalarySources: () => mockAnswer('salary', []),
+  useSalarySources: () => mockAnswer('salary', mockSalary),
   useMonthlySavings: () => mockAnswer('savings', mockSavings),
   useSubscriptions: () => mockAnswer('subscriptions', []),
   useSourceBalances: () => ({
@@ -116,6 +118,7 @@ jest.mock('@/api/queries', () => ({
 }));
 
 beforeEach(() => {
+  mockSalary = [];
   mockSavings = [...mockMonths];
   mockCards = [];
   mockBalances = new Map();
@@ -373,5 +376,57 @@ describe('Insights — at large text sizes', () => {
     expect([beside(screen, 'merchant-0'), beside(screen, 'merchant-1')]).toEqual([false, false]);
     // The other cards are groups of their own and keep their layout.
     expect(beside(screen, 'category-0')).toBe(true);
+  });
+});
+
+describe('Insights — money in', () => {
+  // This month and an earlier one, from the real clock the page itself reads.
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const thisMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+  const earlier = `${now.getFullYear() - 1}-${pad(now.getMonth() + 1)}-01`;
+  const schedule = {
+    id: 's1',
+    name: 'Acme',
+    amount: 3000,
+    frequency: 'monthly',
+    last_payday: earlier,
+  };
+  const oneOff = (payday: string, amount: number) => ({
+    id: `o-${payday}-${amount}`,
+    name: '',
+    amount,
+    frequency: 'once',
+    last_payday: payday,
+  });
+
+  it('counts the schedules every month and says what one-off pays added this month', async () => {
+    mockSalary = [schedule, oneOff(thisMonth, 400), oneOff(earlier, 999)];
+    const screen = await render(<InsightsScreen />);
+    const card = within(screen.getByTestId('insights-income'));
+
+    expect(card.getByText('Every month')).toBeTruthy();
+    expect(card.getByText('$3,000.00')).toBeTruthy();
+    expect(card.getByText('from 1 source')).toBeTruthy();
+    expect(card.getByText('+ $400.00 paid once this month')).toBeTruthy();
+  });
+
+  it('shows this month’s one-off pays when there is no schedule', async () => {
+    mockSalary = [oneOff(thisMonth, 400), oneOff(thisMonth, 120.5)];
+    const screen = await render(<InsightsScreen />);
+    const card = within(screen.getByTestId('insights-income'));
+
+    expect(card.getByText('This month')).toBeTruthy();
+    expect(card.getByText('$520.50')).toBeTruthy();
+    expect(card.getByText('from 2 one-off pays')).toBeTruthy();
+    expect(card.queryByText('Every month')).toBeNull();
+  });
+
+  it('never counts an earlier month’s one-off pay as this month’s income', async () => {
+    mockSalary = [oneOff(earlier, 400)];
+    const screen = await render(<InsightsScreen />);
+
+    expect(screen.queryByTestId('insights-income')).toBeNull();
+    expect(screen.queryByText('$400.00')).toBeNull();
   });
 });

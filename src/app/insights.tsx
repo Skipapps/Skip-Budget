@@ -40,18 +40,12 @@ import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { sortByDateAscending } from '@/lib/group';
 import { toCents } from '@/lib/money';
+import { oneOffsInMonth, scheduledPerMonth } from '@/lib/pay';
 import { PERIODS, periodBuckets, periodRange, type PeriodKey } from '@/lib/period';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { failureText } from '@/lib/failure';
 import { TEXT_CAP } from '@/theme/text-scale';
-
-const PER_MONTH: Record<string, number> = {
-  weekly: 52 / 12,
-  biweekly: 26 / 12,
-  semimonthly: 2,
-  monthly: 1,
-};
 
 const PERIOD_TOTAL: Record<PeriodKey, MessageKey> = {
   week: 'insights.out.thisWeek',
@@ -153,10 +147,16 @@ function InsightsScreenInner() {
 
   const worth = savedTotal - owedOnCards;
 
-  const monthlyIncome = (salary.data ?? []).reduce(
-    (sum, source) => sum + source.amount * (PER_MONTH[source.frequency] ?? 1),
-    0,
-  );
+  const pays = (salary.data ?? []).map((source) => ({
+    amount: source.amount,
+    frequency: source.frequency,
+    payday: source.last_payday,
+  }));
+  // The schedules every month; one-off pays only in the month they landed.
+  const monthlyIncome = scheduledPerMonth(pays);
+  const schedules = pays.filter((pay) => pay.frequency !== 'once').length;
+  const onceThisMonth = oneOffsInMonth(pays, today);
+  const onceTotal = onceThisMonth.reduce((sum, pay) => sum + pay.amount, 0);
 
   const buckets = useMemo(() => periodBuckets(periodKey, anchor), [periodKey, anchor]);
 
@@ -308,23 +308,36 @@ function InsightsScreenInner() {
       </View>
 
       <Heading>{t('insights.in.heading')}</Heading>
-      {monthlyIncome > 0 ? (
-        <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
+      {monthlyIncome > 0 || onceTotal > 0 ? (
+        <View
+          testID="insights-income"
+          className="w-full rounded-[16px] border border-line bg-card px-5 py-5"
+        >
           <Text
             className="font-app text-[13px] text-muted"
             maxFontSizeMultiplier={TEXT_CAP.control}
           >
-            {t('insights.in.everyMonth')}
+            {monthlyIncome > 0 ? t('insights.in.everyMonth') : t('insights.in.thisMonth')}
           </Text>
           <FitFigure id="income" size={28} className="font-app-bold text-ink" boxClassName="mt-1">
-            {formatCurrency(monthlyIncome)}
+            {formatCurrency(monthlyIncome > 0 ? monthlyIncome : onceTotal)}
           </FitFigure>
           <Text
             className="mt-1 font-app text-[12px] text-muted"
             maxFontSizeMultiplier={TEXT_CAP.reading}
           >
-            {t('insights.in.sources', { count: (salary.data ?? []).length })}
+            {monthlyIncome > 0
+              ? t('insights.in.sources', { count: schedules })
+              : t('insights.in.paidOnce', { count: onceThisMonth.length })}
           </Text>
+          {monthlyIncome > 0 && onceTotal > 0 ? (
+            <Text
+              className="mt-1 font-app text-[12px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
+            >
+              {t('insights.in.onceThisMonth', { amount: formatCurrency(onceTotal) })}
+            </Text>
+          ) : null}
         </View>
       ) : (
         <Prompt

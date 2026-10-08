@@ -40,6 +40,7 @@ export function useMoneyCounts() {
     subscriptions: subscriptions.data?.length ?? 0,
     cards: cards.data?.length ?? 0,
     accounts: accounts.data?.length ?? 0,
-    salarySources: salary.data?.length ?? 0,
+    // Incomes, not pays: a one-off pay is money in on one day, not a source.
+    salarySources: (salary.data ?? []).filter((source) => source.frequency !== 'once').length,
   };
 }

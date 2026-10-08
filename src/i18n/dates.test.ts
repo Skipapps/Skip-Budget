@@ -66,6 +66,7 @@ describe('dates follow the language on screen', () => {
       'Every 2 weeks',
       'Twice a month',
       'Monthly',
+      'Just this time',
     ]);
     expect(RANGES.map((option) => option.label)).toEqual(['Today', 'Week', 'Month', 'Year']);
 
@@ -75,6 +76,7 @@ describe('dates follow the language on screen', () => {
       'Toutes les 2 semaines',
       'Deux fois par mois',
       'Chaque mois',
+      'Juste cette fois',
     ]);
     expect(LEDGER_RANGES.map((option) => option.label)).toEqual([
       'Aujourd’hui',
@@ -89,6 +91,7 @@ describe('dates follow the language on screen', () => {
       'biweekly',
       'semimonthly',
       'monthly',
+      'once',
     ]);
   });
 

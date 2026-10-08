@@ -22,6 +22,7 @@ import {
 } from '@/api/queries';
 import { usePro } from '@/api/pro';
 import { useRefreshAll } from '@/api/refresh';
+import { incomeForMonth } from '@/lib/pay';
 import { useToday } from '@/lib/use-today';
 import { moneyBuckets } from '@/data/money-mock';
 import { t, type MessageKey } from '@/i18n';
@@ -47,7 +48,6 @@ function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
 }
 
 /** Salary sources arrive on different cycles; normalise before summing. */
-const PER_MONTH = { weekly: 52 / 12, biweekly: 26 / 12, semimonthly: 2, monthly: 1 } as const;
 
 /** The tiles' words by bucket id; the bucket list itself holds only the English. */
 const BUCKET_LABELS: Record<string, MessageKey> = {
@@ -87,9 +87,14 @@ export default function CardsScreen() {
   const tileFigures = useFitGroup({ mode: 'shrink' });
   const tilesStacked = !tileLabels.fits || !tileFigures.fits;
 
-  const monthlySalary = (salary.data ?? []).reduce(
-    (sum, source) => sum + source.amount * PER_MONTH[source.frequency],
-    0,
+  // This month's money in: the schedules plus any one-off pays dated this month.
+  const monthlySalary = incomeForMonth(
+    (salary.data ?? []).map((source) => ({
+      amount: source.amount,
+      frequency: source.frequency,
+      payday: source.last_payday,
+    })),
+    today,
   );
   // Finished months added up; an overspent month takes from it. `savedFor` is the same figure the
   // Savings screen shows (a corrected month counts its correction, a left-out month nothing).

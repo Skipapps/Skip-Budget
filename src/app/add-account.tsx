@@ -46,6 +46,7 @@ import { useArtwork } from '@/theme/artwork';
 import { ACCOUNT_TYPES, type AccountType } from '@/data/accounts-mock';
 import {
   PAY_FREQUENCIES,
+  PAY_SCHEDULES,
   formatFullDate,
   getNextPayday,
   toIsoDate,
@@ -229,7 +230,8 @@ function AccountForm({
   // Pay already set up (the walk-in's first step) turns the question into "does it land in this
   // account": a switch, on by default from setup. Linked pay brings its own payday and cycle;
   // switched off, income, payday and cycle are asked for pay of this account's own.
-  const salaries = salarySources.data ?? [];
+  // Schedules only: a one-off pay has landed already and is no account's "my pay".
+  const salaries = (salarySources.data ?? []).filter((source) => source.frequency !== 'once');
   const hasSalary = salaries.length > 0;
   const [linkPay, setLinkPay] = useState(origin === 'setup');
   const payLinked = !editing && hasSalary && linkPay;
@@ -516,7 +518,7 @@ function AccountForm({
               <View className="w-full">
                 <FieldLabel className="mb-2">{t('accounts.add.payFrequency')}</FieldLabel>
                 <ChoiceChips
-                  options={PAY_FREQUENCIES}
+                  options={PAY_SCHEDULES}
                   value={payFrequency}
                   onChange={setPayFrequency}
                 />

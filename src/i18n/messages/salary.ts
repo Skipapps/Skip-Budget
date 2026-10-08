@@ -102,6 +102,58 @@ export const salaryMessages = defineMessages({
     es: 'Elige el más reciente',
     fr: 'Choisis le plus récent',
   },
+  'salary.paidOn': { en: 'Paid on', es: 'Pagado el', fr: 'Payé le' },
+  'salary.paidOnPlaceholder': {
+    en: 'Pick the day it was paid',
+    es: 'Elige el día en que se pagó',
+    fr: 'Choisis le jour où elle a été payée',
+  },
+  'salary.needPaidOn': {
+    en: 'Pick the day each one-off pay was paid.',
+    es: 'Elige el día en que se pagó cada pago único.',
+    fr: 'Choisis le jour de chaque paie unique.',
+  },
+  'salary.hoursWorked': { en: 'Hours worked', es: 'Horas trabajadas', fr: 'Heures travaillées' },
+  'salary.overtimeWorked': {
+    en: 'Overtime hours worked',
+    es: 'Horas extra trabajadas',
+    fr: 'Heures supplémentaires travaillées',
+  },
+  'salary.thisPay': {
+    en: 'This pay, before tax',
+    es: 'Este pago, antes de impuestos',
+    fr: 'Cette paie, avant impôts',
+  },
+  'salary.countsThisMonth': {
+    en: 'Counts once, in the month it was paid',
+    es: 'Cuenta una vez, en el mes en que se pagó',
+    fr: 'Compte une fois, le mois où elle a été payée',
+  },
+  'salary.oneOffThisMonth': {
+    en: '+ {amount} paid once this month',
+    es: '+ {amount} pagado una vez este mes',
+    fr: '+ {amount} payé une fois ce mois-ci',
+  },
+  'salary.addOneOff': {
+    en: 'Add a one-off pay',
+    es: 'Agregar un pago único',
+    fr: 'Ajouter une paie unique',
+  },
+  'salary.oneOffNumber': { en: 'One-off pay', es: 'Pago único', fr: 'Paie unique' },
+  'salary.earlierOneOffs': {
+    en: {
+      one: '{count} one-off pay from earlier months is kept in Activity.',
+      other: '{count} one-off pays from earlier months are kept in Activity.',
+    },
+    es: {
+      one: '{count} pago único de meses anteriores está en Actividad.',
+      other: '{count} pagos únicos de meses anteriores están en Actividad.',
+    },
+    fr: {
+      one: '{count} paie unique des mois précédents est gardée dans Activité.',
+      other: '{count} paies uniques des mois précédents sont gardées dans Activité.',
+    },
+  },
   'salary.nextPayday': {
     en: 'Next payday {date}',
     es: 'Próximo día de pago: {date}',

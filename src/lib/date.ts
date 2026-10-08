@@ -72,9 +72,22 @@ export const PAY_FREQUENCIES = [
       return t('dates.monthlyCaption');
     },
   },
+  {
+    // Not a schedule: one pay on one day, for work that pays differently each time.
+    value: 'once',
+    get label() {
+      return t('dates.once');
+    },
+    get caption() {
+      return t('dates.onceCaption');
+    },
+  },
 ] as const;
 
 export type PayFrequency = (typeof PAY_FREQUENCIES)[number]['value'];
+
+/** The cycles a pay can repeat on: every choice but a one-off pay, for pages that set up a schedule. */
+export const PAY_SCHEDULES = PAY_FREQUENCIES.filter((option) => option.value !== 'once');
 
 function advanceOneCycle(date: Date, frequency: PayFrequency): Date {
   const year = date.getFullYear();
@@ -98,6 +111,9 @@ function advanceOneCycle(date: Date, frequency: PayFrequency): Date {
       const nextMonthDays = getDaysInMonth(year, month + 1);
       return new Date(year, month + 1, Math.min(day, nextMonthDays));
     }
+    case 'once':
+      // No cycle: a one-off pay is its own day, which the callers below return before walking.
+      return date;
   }
 }
 
@@ -106,6 +122,8 @@ function advanceOneCycle(date: Date, frequency: PayFrequency): Date {
  * still produces a future date.
  */
 export function getNextPayday(lastPayday: Date, frequency: PayFrequency): Date {
+  // A one-off pay's only payday is its own.
+  if (frequency === 'once') return lastPayday;
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -136,6 +154,11 @@ export function paydaysInRange(
   from: string,
   to: string,
 ): string[] {
+  if (frequency === 'once') {
+    const day = toIsoDate(lastPayday);
+    return day >= from && day <= to ? [day] : [];
+  }
+
   const found: string[] = [];
   let cursor = new Date(lastPayday);
 

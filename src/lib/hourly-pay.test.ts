@@ -28,6 +28,14 @@ describe('estimateHourlyPay', () => {
     ).toBe(1000);
   });
 
+  it('pays a one-off pay for exactly the hours given, overtime included', () => {
+    // 12 × $20 + 3 × $30 = $330, once.
+    expect(
+      estimateHourlyPay({ ...base, hoursPerWeek: 12, overtimeHoursPerWeek: 3, frequency: 'once' })
+        .grossPerPaycheck,
+    ).toBe(330);
+  });
+
   it('covers two weeks on a fortnightly paycheck', () => {
     expect(estimateHourlyPay({ ...base, frequency: 'biweekly' }).grossPerPaycheck).toBe(1600);
   });

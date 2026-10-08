@@ -34,20 +34,14 @@ import {
   type PayFrequency,
 } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
+import { oneOffsInMonth, scheduledPerMonth, type PayLine } from '@/lib/pay';
+import { useToday } from '@/lib/use-today';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
 import { failureMessage, failureText } from '@/lib/failure';
 import { OVERTIME_RATES, estimateHourlyPay, hourlyProblem, type HourlyPay } from '@/lib/hourly-pay';
 import { useArtwork } from '@/theme/artwork';
 import { TEXT_CAP } from '@/theme/text-scale';
-
-/** Normalised to monthly so sources on different cycles can be summed. */
-const PER_MONTH: Record<PayFrequency, number> = {
-  weekly: 52 / 12,
-  biweekly: 26 / 12,
-  semimonthly: 2,
-  monthly: 1,
-};
 
 /** Labels are read when drawn, never at import, so they follow the language on screen. */
 const PAY_TYPES = [
@@ -105,6 +99,16 @@ function paycheckOf(source: SalarySource): number {
   return hourlyProblem(pay) ? 0 : estimateHourlyPay(pay).takeHomePerPaycheck;
 }
 
+/** The source as the shared income maths reads it. */
+function payLineOf(source: SalarySource): PayLine {
+  return { amount: paycheckOf(source), frequency: source.frequency, payday: source.lastPayday };
+}
+
+/** A one-off pay that landed before this month: kept, and shown in Activity, not in the editor. */
+function earlierOneOff(frequency: PayFrequency, payday: string | null, today: string): boolean {
+  return frequency === 'once' && Boolean(payday) && payday!.slice(0, 7) < today.slice(0, 7);
+}
+
 /** The hourly columns as saved: emptied out for a fixed source. */
 function hourlyValues(source: SalarySource): Partial<SalaryValues> {
   if (source.payType !== 'hourly') {
@@ -147,7 +151,12 @@ export default function SalaryScreen() {
   const colors = useColors();
   const artwork = useArtwork();
   const details = useSalaryDetails();
-  const saved = details.data?.rows ?? [];
+  const { today } = useToday();
+  const rows = details.data?.rows ?? [];
+  // Every pay as it comes would grow this page without end: earlier months' one-off pays stay
+  // saved, counted and in Activity, but out of the editor, which never deletes what it does not show.
+  const saved = rows.filter((row) => !earlierOneOff(row.frequency, row.last_payday, today));
+  const earlier = rows.length - saved.length;
 
   if (details.isPending) {
     return (
@@ -193,6 +202,7 @@ export default function SalaryScreen() {
     <SalaryEditor
       key={saved.map((row) => row.id).join('|') || 'empty'}
       initial={initial}
+      earlierOneOffs={earlier}
       hourlyAvailable={details.data?.hourlyAvailable ?? false}
     />
   );
@@ -200,9 +210,12 @@ export default function SalaryScreen() {
 
 function SalaryEditor({
   initial,
+  earlierOneOffs,
   hourlyAvailable,
 }: {
   initial: SalarySource[];
+  /** One-off pays from earlier months, saved but not shown here. */
+  earlierOneOffs: number;
   /** False until the database has the hourly columns; fixed pay only until then. */
   hourlyAvailable: boolean;
 }) {
@@ -231,10 +244,10 @@ function SalaryEditor({
   const confirm = useConfirm();
   const setAccounts = useSetSalaryAccounts();
 
-  const monthlyTotal = sources.reduce(
-    (sum, source) => sum + paycheckOf(source) * PER_MONTH[source.frequency],
-    0,
-  );
+  const { today } = useToday();
+  const pays = sources.map(payLineOf);
+  const monthlyTotal = scheduledPerMonth(pays);
+  const onceThisMonth = oneOffsInMonth(pays, today).reduce((sum, pay) => sum + pay.amount, 0);
 
   const update = (id: string, patch: Partial<SalarySource>) => {
     setSources((current) =>
@@ -244,29 +257,46 @@ function SalaryEditor({
 
   const { pro } = usePro();
 
+  const blankSource = (frequency: PayFrequency): SalarySource => ({
+    id: `salary-${nextId.current++}`,
+    name: '',
+    amount: 0,
+    frequency,
+    // A one-off pay is usually logged the day it lands.
+    lastPayday: frequency === 'once' ? today : null,
+    accountIds: [],
+    payType: 'fixed',
+    hourlyRate: 0,
+    hoursPerWeek: '',
+    overtime: false,
+    overtimeHours: '',
+    overtimeMultiplier: 1.5,
+  });
+
+  // One income schedule is free; a second is Pro. The database refuses it too, so this says why.
+  const scheduleNeedsPro = (exceptId?: string) =>
+    !pro && sources.some((source) => source.frequency !== 'once' && source.id !== exceptId);
+
   const addSource = () => {
-    // One income is free; the second is Pro. The database refuses it too, so this just says why.
-    if (!pro && sources.length >= 1) {
+    if (scheduleNeedsPro()) {
       router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } });
       return;
     }
-    setSources((current) => [
-      ...current,
-      {
-        id: `salary-${nextId.current++}`,
-        name: '',
-        amount: 0,
-        frequency: 'monthly',
-        lastPayday: null,
-        accountIds: [],
-        payType: 'fixed',
-        hourlyRate: 0,
-        hoursPerWeek: '',
-        overtime: false,
-        overtimeHours: '',
-        overtimeMultiplier: 1.5,
-      },
-    ]);
+    setSources((current) => [...current, blankSource('monthly')]);
+  };
+
+  // A one-off pay is a record of money in, not another income: free on every plan.
+  const addOneOff = () => setSources((current) => [...current, blankSource('once')]);
+
+  const changeFrequency = (source: SalarySource, frequency: PayFrequency) => {
+    if (source.frequency === 'once' && frequency !== 'once' && scheduleNeedsPro(source.id)) {
+      router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } });
+      return;
+    }
+    update(source.id, {
+      frequency,
+      lastPayday: frequency === 'once' && !source.lastPayday ? today : source.lastPayday,
+    });
   };
 
   // Removing a source drops its income from every projection, so it asks first. The row is deleted
@@ -292,8 +322,11 @@ function SalaryEditor({
   const handleSave = async () => {
     setError(null);
     // Hourly sources count once named: their pay is checked below, with a reason.
+    // A one-off pay needs no name of its own: it shows as income on its day.
     const named = sources.filter(
-      (source) => source.name.trim() && (source.payType === 'hourly' || source.amount > 0),
+      (source) =>
+        (source.name.trim() || source.frequency === 'once') &&
+        (source.payType === 'hourly' || source.amount > 0),
     );
     if (sources.length > 0 && named.length === 0) {
       setError(t('salary.needNameAndPay'));
@@ -303,13 +336,19 @@ function SalaryEditor({
       if (source.payType !== 'hourly') continue;
       const problem = hourlyProblem(hourlyOf(source));
       if (problem) {
-        setError(t('salary.sourceProblem', { name: source.name.trim(), problem }));
+        setError(
+          t('salary.sourceProblem', {
+            name: source.name.trim() || t('salary.oneOffNumber'),
+            problem,
+          }),
+        );
         return;
       }
     }
     // Paydays are counted forward from the last one; without it the income never lands anywhere.
-    if (named.some((source) => !source.lastPayday)) {
-      setError(t('salary.needLastPayday'));
+    const undated = named.find((source) => !source.lastPayday);
+    if (undated) {
+      setError(undated.frequency === 'once' ? t('salary.needPaidOn') : t('salary.needLastPayday'));
       return;
     }
 
@@ -358,6 +397,14 @@ function SalaryEditor({
         >
           {formatCurrency(monthlyTotal)}
         </FitFigure>
+        {onceThisMonth > 0 ? (
+          <Text
+            className="mt-1 text-center font-app text-[13px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.reading}
+          >
+            {t('salary.oneOffThisMonth', { amount: formatCurrency(onceThisMonth) })}
+          </Text>
+        ) : null}
       </View>
 
       <View className="mt-6 w-full gap-4">
@@ -368,7 +415,12 @@ function SalaryEditor({
                 className="min-w-0 flex-1 font-app-medium text-[15px] text-ink"
                 maxFontSizeMultiplier={TEXT_CAP.heading}
               >
-                {t('salary.sourceNumber', { number: index + 1 })}
+                {source.frequency === 'once'
+                  ? t('salary.oneOffNumber')
+                  : t('salary.sourceNumber', {
+                      number: sources.slice(0, index + 1).filter((s) => s.frequency !== 'once')
+                        .length,
+                    })}
               </Text>
 
               <View className="flex-row items-center gap-1">
@@ -417,6 +469,9 @@ function SalaryEditor({
                   source.name.trim() || t('salary.unnamed'),
                   paycheckOf(source) ? formatCurrency(paycheckOf(source)) : null,
                   source.payType === 'hourly' ? t('salary.payType.hourly') : null,
+                  source.frequency === 'once' && source.lastPayday
+                    ? formatFullDate(asDate(source.lastPayday)!)
+                    : null,
                 ]
                   .filter(Boolean)
                   .join(' · ')}
@@ -460,7 +515,11 @@ function SalaryEditor({
                     />
 
                     <TextField
-                      label={t('salary.hoursAWeek')}
+                      label={
+                        source.frequency === 'once'
+                          ? t('salary.hoursWorked')
+                          : t('salary.hoursAWeek')
+                      }
                       value={source.hoursPerWeek ?? ''}
                       onChangeText={(text) => update(source.id, { hoursPerWeek: text })}
                       placeholder="40"
@@ -481,7 +540,11 @@ function SalaryEditor({
                     {source.overtime ? (
                       <>
                         <TextField
-                          label={t('salary.overtimeHours')}
+                          label={
+                            source.frequency === 'once'
+                              ? t('salary.overtimeWorked')
+                              : t('salary.overtimeHours')
+                          }
                           value={source.overtimeHours ?? ''}
                           onChangeText={(text) => update(source.id, { overtimeHours: text })}
                           placeholder="5"
@@ -524,16 +587,20 @@ function SalaryEditor({
                   <ChoiceChips
                     options={PAY_FREQUENCIES}
                     value={source.frequency}
-                    onChange={(frequency) => update(source.id, { frequency })}
+                    onChange={(frequency) => changeFrequency(source, frequency)}
                   />
                 </View>
 
                 {source.payType === 'hourly' ? <HourlyEstimateCard source={source} /> : null}
 
                 <SelectField
-                  label={t('salary.lastPayday')}
+                  label={source.frequency === 'once' ? t('salary.paidOn') : t('salary.lastPayday')}
                   value={source.lastPayday ? formatFullDate(asDate(source.lastPayday)!) : ''}
-                  placeholder={t('salary.lastPaydayPlaceholder')}
+                  placeholder={
+                    source.frequency === 'once'
+                      ? t('salary.paidOnPlaceholder')
+                      : t('salary.lastPaydayPlaceholder')
+                  }
                   icon={Calendar}
                   variant="pill"
                   onPress={() => setDateTarget(source.id)}
@@ -544,11 +611,13 @@ function SalaryEditor({
                     className="-mt-3 ml-4 font-app text-[13px] text-muted"
                     maxFontSizeMultiplier={TEXT_CAP.reading}
                   >
-                    {t('salary.nextPayday', {
-                      date: formatFullDate(
-                        getNextPayday(asDate(source.lastPayday)!, source.frequency),
-                      ),
-                    })}
+                    {source.frequency === 'once'
+                      ? t('salary.countsThisMonth')
+                      : t('salary.nextPayday', {
+                          date: formatFullDate(
+                            getNextPayday(asDate(source.lastPayday)!, source.frequency),
+                          ),
+                        })}
                   </Text>
                 ) : null}
 
@@ -581,6 +650,30 @@ function SalaryEditor({
           {t('salary.addSource')}
         </Text>
       </Pressable>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('salary.addOneOff')}
+        onPress={addOneOff}
+        className="mt-3 min-h-14 w-full flex-row items-center justify-center gap-2 rounded-full border border-line active:bg-ink/5"
+      >
+        <Plus size={18} color={colors.ink} strokeWidth={1.8} />
+        <Text
+          className="shrink text-center font-app-medium text-[14px] text-ink"
+          maxFontSizeMultiplier={TEXT_CAP.row}
+        >
+          {t('salary.addOneOff')}
+        </Text>
+      </Pressable>
+
+      {earlierOneOffs > 0 ? (
+        <Text
+          className="mt-4 w-full text-center font-app text-[13px] text-muted"
+          maxFontSizeMultiplier={TEXT_CAP.reading}
+        >
+          {t('salary.earlierOneOffs', { count: earlierOneOffs })}
+        </Text>
+      ) : null}
 
       <View className="mt-auto w-full pt-10">
         {error ? (
@@ -675,19 +768,26 @@ function HourlyEstimateCard({ source }: { source: SalarySource }) {
   }
 
   const estimate = estimateHourlyPay(pay);
-  const perMonth = estimate.grossPerPaycheck * PER_MONTH[source.frequency];
+  const once = source.frequency === 'once';
+  const perMonth = scheduledPerMonth([
+    { amount: estimate.grossPerPaycheck, frequency: source.frequency, payday: null },
+  ]);
 
   return (
     <View
       accessible
-      accessibilityLabel={t('salary.estimateA11y', {
-        paycheck: formatCurrency(estimate.grossPerPaycheck),
-        perMonth: formatCurrency(perMonth),
-      })}
+      accessibilityLabel={
+        once
+          ? `${t('salary.thisPay')}: ${formatCurrency(estimate.grossPerPaycheck)}. ${t('salary.countsThisMonth')}`
+          : t('salary.estimateA11y', {
+              paycheck: formatCurrency(estimate.grossPerPaycheck),
+              perMonth: formatCurrency(perMonth),
+            })
+      }
       className="w-full rounded-[16px] bg-accent/10 px-4 py-3.5"
     >
       <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={TEXT_CAP.control}>
-        {t('salary.eachPaycheck')}
+        {once ? t('salary.thisPay') : t('salary.eachPaycheck')}
       </Text>
       <FitFigure
         id="paycheck"
@@ -701,7 +801,9 @@ function HourlyEstimateCard({ source }: { source: SalarySource }) {
         className="mt-1 font-app text-[13px] text-muted"
         maxFontSizeMultiplier={TEXT_CAP.reading}
       >
-        {t('salary.aboutPerMonth', { amount: formatCurrency(perMonth) })}
+        {once
+          ? t('salary.countsThisMonth')
+          : t('salary.aboutPerMonth', { amount: formatCurrency(perMonth) })}
       </Text>
     </View>
   );

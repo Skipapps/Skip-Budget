@@ -100,7 +100,7 @@ let mockRows: Record<string, number | undefined> = {};
 // A declaration, so it is defined when the hoisted factories below run.
 function mockRead(table: string) {
   const count = mockRows[table];
-  return { data: count === undefined ? undefined : Array.from({ length: count }) };
+  return { data: count === undefined ? undefined : Array.from({ length: count }, () => ({})) };
 }
 jest.mock('@/api/queries', () => ({
   useProfile: () => ({ data: { display_name: 'Sam', avatar_id: null } }),

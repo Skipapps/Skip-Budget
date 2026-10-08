@@ -5,6 +5,7 @@ import {
   getDaysInMonth,
   getNextPayday,
   parseClock,
+  paydaysInRange,
   toClockValue,
   toIsoDate,
 } from '@/lib/date';
@@ -108,5 +109,25 @@ describe('clock times', () => {
     expect(formatClock(12, 0)).toBe('12:00 PM');
     expect(formatClock(13, 30)).toBe('1:30 PM');
     expect(formatClock(9, 5)).toBe('9:05 AM');
+  });
+});
+
+describe('a pay just this time', () => {
+  it('has its own day as its only payday', () => {
+    expect(getNextPayday(on(2026, 8, 14), 'once')).toEqual(on(2026, 8, 14));
+  });
+
+  it('lands once, on its day, when the window holds it', () => {
+    expect(paydaysInRange(on(2026, 8, 14), 'once', '2026-08-01', '2026-08-31')).toEqual([
+      '2026-08-14',
+    ]);
+    expect(paydaysInRange(on(2026, 8, 14), 'once', '2026-08-14', '2026-08-14')).toEqual([
+      '2026-08-14',
+    ]);
+  });
+
+  it('lands nowhere outside it, however long the window', () => {
+    expect(paydaysInRange(on(2026, 8, 14), 'once', '2026-09-01', '2027-09-01')).toEqual([]);
+    expect(paydaysInRange(on(2026, 8, 14), 'once', '2025-01-01', '2026-08-13')).toEqual([]);
   });
 });

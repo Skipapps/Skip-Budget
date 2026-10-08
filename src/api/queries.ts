@@ -15,7 +15,7 @@ import {
 import { t } from '@/i18n';
 import { historyFloor, NOTHING_HIDDEN, type HiddenHistory } from '@/lib/allowance';
 import { withTimeout } from '@/lib/deadline';
-import { paydaysInRange } from '@/lib/date';
+import { paydaysInRange, type PayFrequency } from '@/lib/date';
 import type { AccrualBasis } from '@/lib/loan';
 import { logoDomainOf } from '@/lib/logo-domain';
 import type { DateRange } from '@/lib/range';
@@ -80,7 +80,7 @@ export type SalarySourceRow = {
   id: string;
   name: string;
   amount: number;
-  frequency: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+  frequency: PayFrequency;
   last_payday: string | null;
 };
 

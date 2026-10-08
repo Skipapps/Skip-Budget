@@ -18,6 +18,17 @@ export const insightsMessages = defineMessages({
 
   'insights.in.heading': { en: 'What comes in', es: 'Lo que entra', fr: 'Ce qui entre' },
   'insights.in.everyMonth': { en: 'Every month', es: 'Cada mes', fr: 'Chaque mois' },
+  'insights.in.thisMonth': { en: 'This month', es: 'Este mes', fr: 'Ce mois-ci' },
+  'insights.in.onceThisMonth': {
+    en: '+ {amount} paid once this month',
+    es: '+ {amount} pagado una vez este mes',
+    fr: '+ {amount} payé une fois ce mois-ci',
+  },
+  'insights.in.paidOnce': {
+    en: { one: 'from {count} one-off pay', other: 'from {count} one-off pays' },
+    es: { one: 'de {count} pago único', other: 'de {count} pagos únicos' },
+    fr: { one: 'de {count} paie unique', other: 'de {count} paies uniques' },
+  },
   'insights.in.sources': {
     en: { one: 'from {count} source', other: 'from {count} sources' },
     es: { one: 'de {count} fuente', other: 'de {count} fuentes' },

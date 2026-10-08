@@ -12,6 +12,8 @@ export const WEEKS_PER_PAYCHECK: Record<PayFrequency, number> = {
   biweekly: 2,
   semimonthly: 52 / 24,
   monthly: 52 / 12,
+  // A one-off pay covers exactly the hours given for it.
+  once: 1,
 };
 
 /** Labels are read when drawn, never at import, so they follow the language on screen. */

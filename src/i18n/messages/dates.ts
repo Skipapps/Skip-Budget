@@ -21,6 +21,8 @@ export const dateMessages = defineMessages({
   },
   'dates.monthly': { en: 'Monthly', es: 'Mensual', fr: 'Chaque mois' },
   'dates.monthlyCaption': { en: 'Each month', es: 'Cada mes', fr: 'Chaque mois' },
+  'dates.once': { en: 'Just this time', es: 'Solo esta vez', fr: 'Juste cette fois' },
+  'dates.onceCaption': { en: 'This pay only', es: 'Solo este pago', fr: 'Cette paie seulement' },
   'dates.week': { en: 'Week', es: 'Semana', fr: 'Semaine' },
   'dates.month': { en: 'Month', es: 'Mes', fr: 'Mois' },
   'dates.year': { en: 'Year', es: 'Año', fr: 'Année' },

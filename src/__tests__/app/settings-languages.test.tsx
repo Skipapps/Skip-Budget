@@ -65,7 +65,7 @@ jest.mock('@/api/mutations', () => ({
 let mockRows: Record<string, number | undefined> = {};
 function mockRead(table: string) {
   const count = mockRows[table];
-  return { data: count === undefined ? undefined : Array.from({ length: count }) };
+  return { data: count === undefined ? undefined : Array.from({ length: count }, () => ({})) };
 }
 jest.mock('@/api/queries', () => ({
   useProfile: () => ({ data: { display_name: 'Sam', avatar_id: null } }),

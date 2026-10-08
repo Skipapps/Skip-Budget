@@ -3,6 +3,7 @@ import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/r
 import type { AccrualBasis } from '@/lib/loan';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
+import type { PayFrequency } from '@/lib/date';
 
 /**
  * Every write in the app. Inserts send user_id explicitly: the with-check policy compares the row
@@ -229,7 +230,7 @@ export type SalaryValues = {
   name: string;
   /** What lands each payday. Worked out from the hourly fields when hourly. */
   amount: number;
-  frequency: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+  frequency: PayFrequency;
   last_payday: string | null;
   /** Only sent once the database has the hourly columns. */
   pay_type?: 'fixed' | 'hourly';
