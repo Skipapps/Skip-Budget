@@ -1,5 +1,11 @@
-import { type ReactNode } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  RefreshControl,
+  ScrollView,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -44,6 +50,12 @@ type ScreenProps = {
   /** Enables pull-to-refresh. Omit on screens with nothing to re-fetch. */
   onRefresh?: () => void;
   refreshing?: boolean;
+  /**
+   * Where the page was scrolled to, kept by the caller: a page swapped out for another and drawn
+   * again (a form's one-field pages) opens where it was left instead of at the top. `keep` is told
+   * the place when the page goes.
+   */
+  scrollPlace?: { y: number; keep: (y: number) => void };
 };
 
 /**
@@ -64,8 +76,20 @@ export function Screen({
   footer,
   onRefresh,
   refreshing = false,
+  scrollPlace,
 }: ScreenProps) {
   const colors = useColors();
+  // Either scroll view (plain or keyboard-aware) can scroll to an offset, which is all this needs.
+  const scrollRef = useRef<Pick<ScrollView, 'scrollTo'> | null>(null);
+  // Read once: handed back on every render, a moving offset would yank the page mid-scroll.
+  const [startOffset] = useState(() => ({ x: 0, y: scrollPlace?.y ?? 0 }));
+  const returned = useRef(false);
+  const lastY = useRef(startOffset.y);
+  const keep = scrollPlace?.keep;
+  useEffect(() => {
+    if (!keep) return;
+    return () => keep(lastY.current);
+  }, [keep]);
   const column = (
     <View className={cn('w-full max-w-[520px] flex-1 px-6', className)}>{children}</View>
   );
@@ -80,6 +104,25 @@ export function Screen({
       // Muted from the live theme: a fixed grey disappears on the dark surface.
       <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.muted} />
     ) : undefined,
+    ...(scrollPlace
+      ? {
+          ref: (node: Pick<ScrollView, 'scrollTo'> | null) => {
+            scrollRef.current = node;
+          },
+          contentOffset: startOffset,
+          scrollEventThrottle: 32,
+          onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            lastY.current = event.nativeEvent.contentOffset.y;
+          },
+          // The starting offset can land before the content is tall enough to hold it; go back
+          // once the content has its height.
+          onContentSizeChange: () => {
+            if (returned.current || startOffset.y <= 0) return;
+            returned.current = true;
+            scrollRef.current?.scrollTo({ y: startOffset.y, animated: false });
+          },
+        }
+      : {}),
   };
 
   // Plain padding-based avoidance cannot clear fields low on the page; this scrolls the focused input clear.

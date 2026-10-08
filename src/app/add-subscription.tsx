@@ -274,6 +274,8 @@ function SubscriptionForm({
   // Pages over one piece of state, never routes, so Back keeps everything filled in. The final
   // page is `review`; each line of it opens a page for that one thing and returns here.
   const [view, setView] = useState<Page>(initialView);
+  // Outlives the review page while a row's own page is open, so coming back lands where it was.
+  const [reviewY, setReviewY] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const { todayDate } = useToday();
 
@@ -641,6 +643,7 @@ function SubscriptionForm({
 
   return (
     <EntryReview
+      scrollPlace={{ y: reviewY, keep: setReviewY }}
       title={title}
       closePrompt={closePrompt}
       root={isRoot}

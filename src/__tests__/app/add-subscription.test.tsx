@@ -1149,3 +1149,29 @@ describe('Add subscription — deleting a saved subscription', () => {
     log.mockRestore();
   });
 });
+
+describe('Add subscription — the final page keeps its place', () => {
+  // The page's scroll view, found by the memory it was handed rather than by layout.
+  const scroller = (screen: Screen) =>
+    screen.container.queryAll((node) => node.props.scrollEventThrottle === 32)[0];
+  const scrollTo = (screen: Screen, y: number) =>
+    fireEvent.scroll(scroller(screen), { nativeEvent: { contentOffset: { x: 0, y } } });
+
+  it('comes back from a line’s page where it was left, not at the top', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await fillAmount(screen);
+    expect(scroller(screen).props.contentOffset).toEqual({ x: 0, y: 0 });
+
+    await scrollTo(screen, 380);
+    await press(screen, 'Note, not set, optional');
+    expect(screen.queryByText('You can edit this later.')).toBeNull();
+    await press(screen, 'Back');
+    onFinalPage(screen);
+    expect(scroller(screen).props.contentOffset).toEqual({ x: 0, y: 380 });
+
+    await scrollTo(screen, 120);
+    await pressButton(screen, 'Amount, $15.99');
+    await press(screen, 'Back');
+    expect(scroller(screen).props.contentOffset).toEqual({ x: 0, y: 120 });
+  });
+});

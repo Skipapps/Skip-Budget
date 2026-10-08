@@ -93,6 +93,11 @@ type EntryReviewProps = {
   hint?: string | null;
   /** Under the Save button: Delete, when editing. */
   footerSlot?: ReactNode;
+  /**
+   * Kept by the form, which outlives this page while a row's own page is open: coming back lands
+   * where the person was, not at the top.
+   */
+  scrollPlace?: { y: number; keep: (y: number) => void };
 };
 
 /**
@@ -120,6 +125,7 @@ export function EntryReview({
   error,
   hint,
   footerSlot,
+  scrollPlace,
 }: EntryReviewProps) {
   const titleRef = useRef<ComponentRef<typeof Text>>(null);
   useEffect(() => {
@@ -180,6 +186,7 @@ export function EntryReview({
     <Screen
       // A row can be a box to type in; the page scrolls it clear of the keyboard.
       avoidKeyboard={rows.some((row) => 'field' in row)}
+      scrollPlace={scrollPlace}
       header={
         <View className="w-full pb-2">
           <FlowHeader

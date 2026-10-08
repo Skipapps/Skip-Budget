@@ -1689,3 +1689,42 @@ describe('Add bill — deleting a saved bill', () => {
     log.mockRestore();
   });
 });
+
+describe('Add bill — the final page keeps its place', () => {
+  beforeEach(() => editing(POWER));
+
+  // The page's scroll view, found by the memory it was handed rather than by layout.
+  const scroller = (screen: Screen) =>
+    screen.container.queryAll((node) => node.props.scrollEventThrottle === 32)[0];
+  const scrollTo = (screen: Screen, y: number) =>
+    fireEvent.scroll(scroller(screen), { nativeEvent: { contentOffset: { x: 0, y } } });
+
+  it('comes back from a line’s page where it was left, not at the top', async () => {
+    const screen = await render(<AddBillScreen />);
+    expect(scroller(screen).props.contentOffset).toEqual({ x: 0, y: 0 });
+
+    await scrollTo(screen, 420);
+    await press(screen, 'Due on, Sun Sep 20');
+    expect(screen.queryByText('You can edit this later.')).toBeNull();
+    await press(screen, 'Back');
+
+    onFinalPage(screen);
+    expect(scroller(screen).props.contentOffset).toEqual({ x: 0, y: 420 });
+  });
+
+  it('keeps its place after a Done too, and through more than one line', async () => {
+    const screen = await render(<AddBillScreen />);
+
+    await scrollTo(screen, 260);
+    await press(screen, 'Due on, Sun Sep 20');
+    await press(screen, 'Previous month');
+    await press(screen, 'Saturday 15 August 2026');
+    await press(screen, 'Done');
+    expect(scroller(screen).props.contentOffset).toEqual({ x: 0, y: 260 });
+
+    await scrollTo(screen, 510);
+    await pressButton(screen, 'Amount, $84.20');
+    await press(screen, 'Back');
+    expect(scroller(screen).props.contentOffset).toEqual({ x: 0, y: 510 });
+  });
+});
