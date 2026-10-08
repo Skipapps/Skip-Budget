@@ -1,91 +1,104 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Check, Lock } from 'lucide-react-native';
+import { Lock } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { useProPrices } from '@/api/pro';
 import { PRO_FEATURES } from '@/data/pro-features';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
-import { Subtitle, Title } from '@/components/ui/typography';
 import { t } from '@/i18n';
-import { proMonthlyLabel, proYearlyLabel } from '@/lib/wall';
+import { proMonthlyLabel } from '@/lib/wall';
 import { useColors } from '@/providers/theme-provider';
-import { useArtwork } from '@/theme/artwork';
+import { TEXT_CAP } from '@/theme/text-scale';
 
-/** What a locked feature says for itself: its benefits first, the price last. */
+/**
+ * What a locked feature says for itself, one glance: its icon, an example, a heading, one line and
+ * three points, with the price last. The comparison and the purchase live on the Pro page.
+ */
 export default function ProFeatureScreen() {
   const colors = useColors();
-  const artwork = useArtwork();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const prices = useProPrices();
 
   const feature = PRO_FEATURES[id ?? ''] ?? PRO_FEATURES.unlimited;
-  const Art = artwork[feature.artwork];
+  const Icon = feature.icon;
 
-  // The store's own prices when it has answered; the dollar fallbacks until then.
+  // The store's own price when it has answered; the dollar fallback until then.
   const monthlyStore = prices.data?.monthly?.product.priceString;
-  const yearlyStore = prices.data?.yearly?.product.priceString;
   const monthly = monthlyStore
     ? t('pro.price.monthly', { price: monthlyStore })
     : proMonthlyLabel();
-  const yearly = yearlyStore ? t('pro.price.yearly', { price: yearlyStore }) : proYearlyLabel();
 
   return (
-    <Screen title="Skip Pro" showBack>
-      <View className="mt-4 w-full items-center py-4">
-        <View className="h-[130px] w-[130px]">
-          <Art width="100%" height="100%" />
-        </View>
-      </View>
-
-      <Title align="left">{feature.title}</Title>
-      <Subtitle className="mt-2 w-full text-left">{feature.tagline}</Subtitle>
-
-      <View className="mt-6 w-full gap-4">
-        {feature.benefits.map((benefit) => (
-          <View key={benefit.title} className="w-full flex-row gap-3">
-            <View className="mt-0.5 h-6 w-6 items-center justify-center rounded-full bg-accent">
-              <Check size={14} color={colors.onControl} strokeWidth={2} />
-            </View>
-            <View className="min-w-0 flex-1">
-              <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
-                {benefit.title}
-              </Text>
-              <Text
-                className="mt-0.5 font-app text-[13px] leading-[19px] text-muted"
-                maxFontSizeMultiplier={1.4}
-              >
-                {benefit.detail}
-              </Text>
-            </View>
+    <Screen
+      title="Skip Pro"
+      showBack
+      footer={
+        <View className="w-full items-center gap-3">
+          <View className="flex-row items-center gap-1.5">
+            <Lock size={13} color={colors.muted} strokeWidth={1.8} />
+            <Text
+              className="font-app text-[12px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.control}
+            >
+              {t('pro.feature.included')}
+            </Text>
           </View>
-        ))}
-      </View>
+          <Button label={t('pro.feature.get', { monthly })} onPress={() => router.push('/pro')} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.notNow')}
+            onPress={() => router.back()}
+            className="min-h-11 w-full items-center justify-center rounded-full active:bg-ink/5"
+          >
+            <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={TEXT_CAP.row}>
+              {t('common.notNow')}
+            </Text>
+          </Pressable>
+        </View>
+      }
+    >
+      <View className="w-full flex-1 items-center justify-center py-6">
+        <View className="h-[104px] w-[104px] items-center justify-center rounded-full bg-accent">
+          <Icon size={44} color={colors.onControl} strokeWidth={1.7} />
+        </View>
 
-      <View className="mt-6 w-full flex-row items-center gap-3 rounded-[16px] border border-line bg-card px-4 py-3.5">
-        <Lock size={18} color={colors.muted} strokeWidth={1.8} />
-        <View className="min-w-0 flex-1">
-          <Text className="font-app-medium text-[14px] text-ink" maxFontSizeMultiplier={1.3}>
-            {t('pro.feature.partOf')}
-          </Text>
-          <Text className="mt-0.5 font-app text-[12px] text-muted" maxFontSizeMultiplier={1.3}>
-            {t('pro.feature.withEverything')}
+        <View className="mt-6 max-w-full rounded-full border border-line bg-card px-4 py-2.5">
+          <Text
+            className="text-center font-app text-[13px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.control}
+          >
+            {feature.example}
           </Text>
         </View>
-      </View>
 
-      <View className="mb-8 mt-auto w-full gap-2 pt-8">
-        <Button label={t('pro.feature.see', { monthly })} onPress={() => router.push('/pro')} />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('common.notNow')}
-          onPress={() => router.back()}
-          className="min-h-11 w-full items-center justify-center rounded-full active:bg-ink/5"
+        <Text
+          accessibilityRole="header"
+          className="mt-8 text-center font-app-bold text-[28px] leading-9 text-ink"
+          maxFontSizeMultiplier={TEXT_CAP.heading}
         >
-          <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.4}>
-            {t('pro.feature.orYearly', { yearly })}
-          </Text>
-        </Pressable>
+          {feature.title}
+        </Text>
+        <Text
+          className="mt-2 text-center font-app text-[15px] leading-6 text-muted"
+          maxFontSizeMultiplier={TEXT_CAP.reading}
+        >
+          {feature.subtitle}
+        </Text>
+
+        <View className="mt-9 w-full gap-5 px-2">
+          {feature.points.map(({ icon: PointIcon, text }) => (
+            <View key={text} className="w-full flex-row items-center gap-4">
+              <PointIcon size={22} color={colors.accentInk} strokeWidth={1.7} />
+              <Text
+                className="min-w-0 flex-1 font-app text-[15px] text-ink"
+                maxFontSizeMultiplier={TEXT_CAP.row}
+              >
+                {text}
+              </Text>
+            </View>
+          ))}
+        </View>
       </View>
     </Screen>
   );

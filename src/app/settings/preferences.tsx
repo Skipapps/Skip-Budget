@@ -1,26 +1,17 @@
 import { router } from 'expo-router';
-import { Bell, Coins, Languages, ScanFace, SunMoon, Vibrate } from 'lucide-react-native';
-import { Text } from 'react-native';
+import { Bell, Languages, ScanFace, SunMoon, Vibrate } from 'lucide-react-native';
 
 import { SettingsPage } from '@/components/settings/settings-page';
 import { SettingsRow } from '@/components/settings/settings-row';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { t, useLocale } from '@/i18n';
-import {
-  CURRENCIES,
-  CURRENCY_SYMBOL,
-  LANGUAGE_NATIVE_NAMES,
-  LANGUAGES,
-  type Language,
-} from '@/i18n/config';
-import { setCurrency, setLanguage } from '@/i18n/store';
+import { LANGUAGE_NATIVE_NAMES, LANGUAGES, type Language } from '@/i18n/config';
+import { setLanguage } from '@/i18n/store';
 import { authenticate, lockCapability, unavailableMessage } from '@/lib/app-lock';
-import { formatCurrency } from '@/lib/format';
 import { useDialog } from '@/providers/dialog-provider';
 import { usePreferences } from '@/providers/preferences-provider';
 import { useTheme } from '@/providers/theme-provider';
 import type { ModeKey } from '@/theme/palette';
-import { TEXT_CAP } from '@/theme/text-scale';
 
 const AUTOMATIC = 'automatic';
 
@@ -30,7 +21,7 @@ export default function PreferencesScreen() {
   const ask = useDialog();
   const { mode, setMode } = useTheme();
   const { haptics, setHaptics, appLock, setAppLock } = usePreferences();
-  const { language, currency, chosenLanguage } = useLocale();
+  const { language, chosenLanguage } = useLocale();
 
   const modeOptions = MODE_VALUES.map((value) => ({
     value,
@@ -46,10 +37,6 @@ export default function PreferencesScreen() {
     { value: AUTOMATIC, label: t('locale.automatic') },
     ...LANGUAGES.map((value) => ({ value, label: LANGUAGE_NATIVE_NAMES[value] })),
   ];
-  const currencyOptions = CURRENCIES.map((value) => ({
-    value,
-    label: `${t(`locale.currency.${value}`)} (${value} ${CURRENCY_SYMBOL[value]})`,
-  }));
 
   /**
    * Turning the lock on must pass a scan first, or a broken lock could shut someone out of their
@@ -95,19 +82,6 @@ export default function PreferencesScreen() {
           value={chosenLanguage ?? AUTOMATIC}
           onChange={(value) => setLanguage(value === AUTOMATIC ? null : (value as Language))}
         />
-      </SettingsRow>
-      <SettingsRow
-        icon={Coins}
-        title={t('locale.currency.title')}
-        subtitle={`${t(`locale.currency.${currency}`)} · ${formatCurrency(1234.56)}`}
-      >
-        <ChoiceChips options={currencyOptions} value={currency} onChange={setCurrency} />
-        <Text
-          className="mt-2.5 font-app text-[12px] text-muted"
-          maxFontSizeMultiplier={TEXT_CAP.row}
-        >
-          {t('locale.currency.note')}
-        </Text>
       </SettingsRow>
       <SettingsRow
         icon={Vibrate}

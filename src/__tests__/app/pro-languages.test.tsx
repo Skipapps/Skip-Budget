@@ -197,11 +197,11 @@ describe('the Pro page in Spanish', () => {
 
   it('explains a locked feature, the price last', async () => {
     const screen = await render(<ProFeatureScreen />);
-    expect(screen.getByText('Siete años de tu dinero')).toBeTruthy();
-    expect(screen.getByText('Parte de Skip Pro')).toBeTruthy();
-    expect(screen.getByText('Junto con todo lo demás que desbloquea Pro')).toBeTruthy();
-    expect(screen.getByText('Ver Skip Pro: $1.99/mes')).toBeTruthy();
-    expect(screen.getByText('o $19.99/año · Ahora no')).toBeTruthy();
+    expect(screen.getByText('Mira más atrás')).toBeTruthy();
+    expect(screen.getByText('Lo anterior se guarda, no se pierde.')).toBeTruthy();
+    expect(screen.getByText('Hasta 7 años de historial')).toBeTruthy();
+    expect(screen.getByText('Incluido con Skip Pro')).toBeTruthy();
+    expect(screen.getByText('Obtener Skip Pro — $1.99/mes')).toBeTruthy();
     expect(screen.getByLabelText('Ahora no')).toBeTruthy();
     expectNoRawText(screen);
   });
@@ -240,10 +240,11 @@ describe('the Pro page in French', () => {
     mockStore = 'open';
     mockPrices = { monthly: '2,49 $', yearly: '24,99 $', perMonth: '2,08 $' };
     const screen = await render(<ProFeatureScreen />);
-    expect(screen.getByText('Sept ans de ton argent')).toBeTruthy();
-    expect(screen.getByText('Inclus dans Skip Pro')).toBeTruthy();
-    expect(screen.getByText('Voir Skip Pro — 2,49 $/mois')).toBeTruthy();
-    expect(screen.getByText('ou 24,99 $/an · Pas maintenant')).toBeTruthy();
+    expect(screen.getByText('Remonte plus loin')).toBeTruthy();
+    expect(screen.getByText('L’ancien est conservé, pas perdu.')).toBeTruthy();
+    expect(screen.getByText('Inclus avec Skip Pro')).toBeTruthy();
+    expect(screen.getByText('Obtenir Skip Pro — 2,49 $/mois')).toBeTruthy();
+    expect(screen.getByLabelText('Pas maintenant')).toBeTruthy();
     expectNoRawText(screen);
   });
 });

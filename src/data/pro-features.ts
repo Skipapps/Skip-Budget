@@ -1,119 +1,85 @@
+import {
+  ArchiveRestore,
+  ArrowDownUp,
+  BadgeCheck,
+  Banknote,
+  Bell,
+  CalendarCheck,
+  CalendarRange,
+  ChartNoAxesColumn,
+  CircleCheck,
+  CreditCard,
+  History,
+  Infinity as InfinityIcon,
+  LockOpen,
+  Mic,
+  ReceiptText,
+  Replace,
+  ScanLine,
+  Scale,
+  ShieldCheck,
+  Sparkles,
+  Store,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react-native';
+
 import { t, type MessageKey } from '@/i18n';
-import type { ArtworkName } from '@/theme/artwork';
 
 export type ProFeature = {
   id: string;
-  artwork: ArtworkName;
+  /** The big mark in the accent circle. */
+  icon: LucideIcon;
+  /** One example under it, as the person would see or say it. */
+  example: string;
   title: string;
-  tagline: string;
-  benefits: { title: string; detail: string }[];
+  /** One line under the title. */
+  subtitle: string;
+  /** Three lines, each a single line of words with its own icon. */
+  points: { icon: LucideIcon; text: string }[];
 };
 
 /** Read when drawn, never at import, so the words follow the language on screen. */
-function benefit(title: MessageKey, detail: MessageKey): ProFeature['benefits'][number] {
+function point(icon: LucideIcon, text: MessageKey): ProFeature['points'][number] {
   return {
-    get title() {
-      return t(title);
-    },
-    get detail() {
-      return t(detail);
+    icon,
+    get text() {
+      return t(text);
     },
   };
 }
 
+function feature(
+  id: string,
+  icon: LucideIcon,
+  points: [LucideIcon, LucideIcon, LucideIcon],
+): ProFeature {
+  const key = (part: string) => `pro.${id}.${part}` as MessageKey;
+  return {
+    id,
+    icon,
+    get example() {
+      return t(key('example'));
+    },
+    get title() {
+      return t(key('title'));
+    },
+    get subtitle() {
+      return t(key('subtitle'));
+    },
+    points: [point(points[0], key('a')), point(points[1], key('b')), point(points[2], key('c'))],
+  };
+}
+
 /**
- * The explainer behind each locked door. Each page argues for its feature in its own terms, never
- * "this is locked".
+ * What each locked door says for itself: one example, a heading, a line, three points. Each page
+ * argues for its feature in its own terms, never "this is locked".
  */
 export const PRO_FEATURES: Record<string, ProFeature> = {
-  insights: {
-    id: 'insights',
-    artwork: 'insights',
-    get title() {
-      return t('pro.insights.title');
-    },
-    get tagline() {
-      return t('pro.insights.tagline');
-    },
-    benefits: [
-      benefit('pro.insights.stand.title', 'pro.insights.stand.detail'),
-      benefit('pro.insights.goes.title', 'pro.insights.goes.detail'),
-      benefit('pro.insights.months.title', 'pro.insights.months.detail'),
-    ],
-  },
-  scan: {
-    id: 'scan',
-    artwork: 'tileReceipts',
-    get title() {
-      return t('pro.scan.title');
-    },
-    get tagline() {
-      return t('pro.scan.tagline');
-    },
-    benefits: [
-      benefit('pro.scan.unlimited.title', 'pro.scan.unlimited.detail'),
-      benefit('pro.scan.private.title', 'pro.scan.private.detail'),
-      benefit('pro.scan.handled.title', 'pro.scan.handled.detail'),
-    ],
-  },
-  voice: {
-    id: 'voice',
-    artwork: 'welcomeTrack',
-    get title() {
-      return t('pro.voice.title');
-    },
-    get tagline() {
-      return t('pro.voice.tagline');
-    },
-    benefits: [
-      benefit('pro.voice.kinds.title', 'pro.voice.kinds.detail'),
-      benefit('pro.voice.check.title', 'pro.voice.check.detail'),
-      benefit('pro.voice.private.title', 'pro.voice.private.detail'),
-    ],
-  },
-  history: {
-    id: 'history',
-    artwork: 'tileSavings',
-    get title() {
-      return t('pro.history.title');
-    },
-    get tagline() {
-      return t('pro.history.tagline');
-    },
-    benefits: [
-      benefit('pro.history.kept.title', 'pro.history.kept.detail'),
-      benefit('pro.history.years.title', 'pro.history.years.detail'),
-      benefit('pro.history.balances.title', 'pro.history.balances.detail'),
-    ],
-  },
-  logos: {
-    id: 'logos',
-    artwork: 'tileSubscriptions',
-    get title() {
-      return t('pro.logos.title');
-    },
-    get tagline() {
-      return t('pro.logos.tagline');
-    },
-    benefits: [
-      benefit('pro.logos.glance.title', 'pro.logos.glance.detail'),
-      benefit('pro.logos.brands.title', 'pro.logos.brands.detail'),
-      benefit('pro.logos.yours.title', 'pro.logos.yours.detail'),
-    ],
-  },
-  unlimited: {
-    id: 'unlimited',
-    artwork: 'emptyWallet',
-    get title() {
-      return t('pro.unlimited.title');
-    },
-    get tagline() {
-      return t('pro.unlimited.tagline');
-    },
-    benefits: [
-      benefit('pro.unlimited.all.title', 'pro.unlimited.all.detail'),
-      benefit('pro.unlimited.income.title', 'pro.unlimited.income.detail'),
-      benefit('pro.unlimited.kept.title', 'pro.unlimited.kept.detail'),
-    ],
-  },
+  insights: feature('insights', ChartNoAxesColumn, [Wallet, ArrowDownUp, CalendarCheck]),
+  scan: feature('scan', ScanLine, [InfinityIcon, Sparkles, ShieldCheck]),
+  voice: feature('voice', Mic, [ReceiptText, CircleCheck, ShieldCheck]),
+  history: feature('history', History, [CalendarRange, ArchiveRestore, Scale]),
+  logos: feature('logos', Store, [BadgeCheck, Replace, Bell]),
+  unlimited: feature('unlimited', CreditCard, [InfinityIcon, Banknote, LockOpen]),
 };

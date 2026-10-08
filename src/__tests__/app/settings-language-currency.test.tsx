@@ -8,8 +8,9 @@ import { PreferencesProvider } from '@/providers/preferences-provider';
 import { ThemeProvider } from '@/providers/theme-provider';
 
 /**
- * Language and currency in Preferences: a choice is applied at once, written to the phone,
- * and "Same as my phone" hands the decision back to the phone.
+ * Language in Preferences: a choice is applied at once, written to the phone, and "Same as my
+ * phone" hands the decision back to the phone. There is no currency choice: the currency is the one
+ * the phone implied at first launch, pinned, and never offered.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -72,25 +73,23 @@ beforeEach(() => {
 const chip = (view: View, name: string | RegExp) => view.getAllByRole('radio', { name });
 
 describe('a Spanish phone set to Mexico', () => {
-  it('opens in Spanish and pesos, the language following the phone', async () => {
+  it('opens in Spanish, the language following the phone, and offers no currency', async () => {
     const view = await open();
 
     await waitFor(() => expect(getLocaleSnapshot().ready).toBe(true));
     expect(view.getByText('Preferencias')).toBeTruthy();
     expect(view.getByText('Idioma')).toBeTruthy();
-    expect(view.getByText('Moneda')).toBeTruthy();
     // The row's caption and its chip.
     expect(view.getAllByText('Español')).toHaveLength(2);
-    expect(view.getByText('Peso mexicano · $1,234.56')).toBeTruthy();
 
     const automatic = chip(view, 'Igual que mi teléfono');
     expect(automatic).toHaveLength(1);
     expect(automatic[0].props.accessibilityState).toMatchObject({ selected: true });
 
-    // The currency has no automatic chip: it is pinned to what the phone implied at first launch.
-    expect(chip(view, /Peso mexicano/)[0].props.accessibilityState).toMatchObject({
-      selected: true,
-    });
+    // Nothing to choose, but amounts still read in what the phone implied at first launch.
+    expect(view.queryByText('Moneda')).toBeNull();
+    expect(view.queryAllByRole('radio', { name: /Peso mexicano|\(MXN /i })).toHaveLength(0);
+    expect(getLocaleSnapshot().currency).toBe('MXN');
     await waitFor(() => expect(mockStore.get(CURRENCY_KEY)).toBe('MXN'));
     expect(mockStore.has(LANGUAGE_KEY)).toBe(false);
   });
@@ -124,39 +123,29 @@ describe('choosing a language', () => {
   });
 });
 
-describe('choosing a currency', () => {
-  it('shows an English page in British pounds without changing the language', async () => {
+describe('the currency', () => {
+  it('is never offered, in English or French', async () => {
     const view = await open();
     await waitFor(() => expect(getLocaleSnapshot().ready).toBe(true));
+
     await fireEvent.press(chip(view, 'English')[0]);
-    await waitFor(() => expect(view.getByText('Currency')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Preferences')).toBeTruthy());
+    expect(view.queryByText('Currency')).toBeNull();
+    expect(view.queryByText(/does not convert them/)).toBeNull();
+    expect(view.queryAllByRole('radio', { name: /\((USD|GBP|CAD|MXN|AUD) /i })).toHaveLength(0);
 
-    await fireEvent.press(chip(view, /Pound sterling/)[0]);
-
-    await waitFor(() => expect(view.getByText('Pound sterling · £1,234.56')).toBeTruthy());
-    expect(mockStore.get(CURRENCY_KEY)).toBe('GBP');
-    expect(
-      view.getByText('This changes how amounts are shown. It does not convert them.'),
-    ).toBeTruthy();
-  });
-
-  it('writes a French figure with the mark after it', async () => {
-    const view = await open();
-    await waitFor(() => expect(getLocaleSnapshot().ready).toBe(true));
     await fireEvent.press(chip(view, 'Français')[0]);
-    await waitFor(() => expect(view.getByText('Devise')).toBeTruthy());
-
-    await fireEvent.press(chip(view, /Dollar canadien/)[0]);
-
-    await waitFor(() => expect(view.getByText('Dollar canadien · 1 234,56 $')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Préférences')).toBeTruthy());
+    expect(view.queryByText('Devise')).toBeNull();
   });
 
-  it('offers all five currencies', async () => {
+  it('follows a British phone into pounds without being asked', async () => {
+    resetLocaleForTests([{ languageCode: 'en', regionCode: 'GB', languageRegionCode: 'GB' }]);
     const view = await open();
-    await waitFor(() => expect(getLocaleSnapshot().ready).toBe(true));
 
-    for (const code of ['USD', 'GBP', 'CAD', 'MXN', 'AUD']) {
-      expect(chip(view, new RegExp(`\\(${code} `))).toHaveLength(1);
-    }
+    await waitFor(() => expect(getLocaleSnapshot().ready).toBe(true));
+    expect(getLocaleSnapshot().currency).toBe('GBP');
+    await waitFor(() => expect(mockStore.get(CURRENCY_KEY)).toBe('GBP'));
+    expect(view.queryByText('Currency')).toBeNull();
   });
 });

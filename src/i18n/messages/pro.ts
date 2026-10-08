@@ -20,168 +20,199 @@ export const proMessages = defineMessages({
     fr: { one: '{count} an', other: '{count} ans' },
   },
 
-  'pro.insights.title': {
-    en: 'Your whole money picture, one page',
-    es: 'Todo tu dinero, en una sola página',
-    fr: 'Tout ton argent, sur une seule page',
+  // What a free person sees at a locked door: an icon, one example, a heading, one line and three
+  // points, each one line. The examples are the same in every language (dictation is English).
+  'pro.feature.included': {
+    en: 'Included with Skip Pro',
+    es: 'Incluido con Skip Pro',
+    fr: 'Inclus avec Skip Pro',
   },
-  'pro.insights.tagline': {
-    en: 'Where you stand, what comes in, where it goes, what you keep.',
-    es: 'Cómo estás, lo que entra, a dónde se va y lo que te queda.',
-    fr: 'Où tu en es, ce qui entre, où ça va, ce que tu gardes.',
+  'pro.feature.get': {
+    en: 'Get Skip Pro — {monthly}',
+    es: 'Obtener Skip Pro — {monthly}',
+    fr: 'Obtenir Skip Pro — {monthly}',
   },
-  'pro.insights.stand.title': {
-    en: 'Where you stand, honestly',
-    es: 'Cómo estás, sin rodeos',
-    fr: 'Où tu en es, honnêtement',
+  'pro.voice.example': {
+    en: '“$12.50 at Starbucks today”',
+    es: '“$12.50 at Starbucks today”',
+    fr: '“$12.50 at Starbucks today”',
   },
-  'pro.insights.stand.detail': {
-    en: 'Savings, less what you owe on credit cards — one figure that means something.',
-    es: 'Tus ahorros menos lo que debes en tarjetas de crédito: una cifra que sí dice algo.',
-    fr: 'Ton épargne, moins ce que tu dois sur tes cartes de crédit — un seul chiffre qui veut dire quelque chose.',
+  'pro.voice.title': {
+    en: 'Just say it',
+    es: 'Solo dilo',
+    fr: 'Dis-le simplement',
   },
-  'pro.insights.goes.title': {
-    en: 'Where it actually goes',
-    es: 'A dónde se va de verdad',
-    fr: 'Où va vraiment ton argent',
+  'pro.voice.subtitle': {
+    en: 'Speak it. Skip writes it down.',
+    es: 'Dilo y Skip lo anota.',
+    fr: 'Dis-le, Skip le note.',
   },
-  'pro.insights.goes.detail': {
-    en: 'By category and by shop, with the chart that shows which weeks did the damage.',
-    es: 'Por categoría y por tienda, con la gráfica que muestra qué semanas hicieron el daño.',
-    fr: 'Par catégorie et par magasin, avec le graphique qui montre quelles semaines ont fait des dégâts.',
+  'pro.voice.a': {
+    en: 'Log receipts, bills and subscriptions',
+    es: 'Recibos, facturas y suscripciones',
+    fr: 'Reçus, factures et abonnements',
   },
-  'pro.insights.months.title': {
-    en: 'What each month left behind',
-    es: 'Lo que dejó cada mes',
-    fr: 'Ce que chaque mois a laissé',
+  'pro.voice.b': {
+    en: 'You review it before it saves',
+    es: 'Lo revisas antes de guardar',
+    fr: 'Tu vérifies avant d’enregistrer',
   },
-  'pro.insights.months.detail': {
-    en: 'Finished months, added up — the difference between feeling careful and being right.',
-    es: 'Los meses terminados, sumados: la diferencia entre creer que te cuidas y saberlo.',
-    fr: 'Les mois terminés, additionnés — la différence entre croire que tu fais attention et le savoir.',
+  'pro.voice.c': {
+    en: 'Your voice is never stored',
+    es: 'Tu voz nunca se guarda',
+    fr: 'Ta voix n’est jamais gardée',
   },
-
+  'pro.scan.example': {
+    en: 'Starbucks · $12.50 · Today',
+    es: 'Starbucks · $12.50 · Hoy',
+    fr: 'Starbucks · $12.50 · Aujourd’hui',
+  },
   'pro.scan.title': {
-    en: 'Every receipt, read for you',
-    es: 'Cada recibo, leído para ti',
-    fr: 'Chaque reçu, lu pour toi',
+    en: 'Scan every receipt',
+    es: 'Escanea cada recibo',
+    fr: 'Scanne chaque reçu',
   },
-  'pro.scan.tagline': {
-    en: 'Free reads 15 receipts a month with the camera and 15 from photos or files. Skip Pro reads every one.',
-    es: 'El plan Gratis lee 15 recibos al mes con la cámara y 15 desde fotos o archivos. Skip Pro los lee todos.',
-    fr: 'Le forfait Gratuit lit 15 reçus par mois avec l’appareil photo et 15 depuis des photos ou des fichiers. Skip Pro les lit tous.',
+  'pro.scan.subtitle': {
+    en: 'Snap it. Skip reads it for you.',
+    es: 'Haz la foto. Skip la lee.',
+    fr: 'Prends la photo. Skip la lit.',
   },
-  'pro.scan.unlimited.title': {
-    en: 'Scan and upload without counting',
-    es: 'Escanea y sube sin contar',
-    fr: 'Numérise et importe sans compter',
+  'pro.scan.a': {
+    en: 'Unlimited scans and uploads',
+    es: 'Escaneos y subidas sin límite',
+    fr: 'Scans et imports illimités',
   },
-  'pro.scan.unlimited.detail': {
-    en: 'Paper receipts, photos and PDFs: a whole month of them in one sitting if you like.',
-    es: 'Recibos de papel, fotos y PDF: un mes entero de una sola vez, si quieres.',
-    fr: 'Reçus papier, photos et PDF : un mois entier d’un coup, si tu veux.',
+  'pro.scan.b': {
+    en: 'Handles glare and thermal print',
+    es: 'Maneja reflejos y papel térmico',
+    fr: 'Gère reflets et papier thermique',
   },
-  'pro.scan.private.title': {
-    en: 'Read on your phone, never sent anywhere',
-    es: 'Se lee en tu teléfono, nunca se envía a ningún sitio',
-    fr: 'Lu sur ton téléphone, jamais envoyé ailleurs',
+  'pro.scan.c': {
+    en: 'Photos are never kept',
+    es: 'Las fotos nunca se guardan',
+    fr: 'Les photos ne sont jamais gardées',
   },
-  'pro.scan.private.detail': {
-    en: 'The photo is thrown away after reading — only the store, date and total are kept, on your account.',
-    es: 'La foto se descarta después de leerla: solo se guardan la tienda, la fecha y el total, en tu cuenta.',
-    fr: 'La photo est supprimée après la lecture — seuls le magasin, la date et le total sont conservés, dans ton compte.',
+  'pro.insights.example': {
+    en: 'Left this month · $1,240',
+    es: 'Te queda este mes · $1,240',
+    fr: 'Reste ce mois-ci · $1,240',
   },
-  'pro.scan.handled.title': {
-    en: 'Skew, glare, thermal print — handled',
-    es: 'Torcido, con reflejos o en papel térmico: no hay problema',
-    fr: 'De travers, avec reflets, sur papier thermique — réglé',
+  'pro.insights.title': {
+    en: 'Money on one page',
+    es: 'Todo en una página',
+    fr: 'Tout sur une page',
   },
-  'pro.scan.handled.detail': {
-    en: 'Skip straightens the page before reading it, which is the difference between a 3 and an 8.',
-    es: 'Skip endereza la página antes de leerla, y esa es la diferencia entre un 3 y un 8.',
-    fr: 'Skip redresse la page avant de la lire, ce qui fait la différence entre un 3 et un 8.',
+  'pro.insights.subtitle': {
+    en: 'See what comes in and goes out.',
+    es: 'Mira lo que entra y lo que sale.',
+    fr: 'Vois ce qui entre et ce qui sort.',
   },
-
-  'pro.logos.title': {
-    en: 'Every store, its own logo',
-    es: 'Cada tienda, con su logo',
-    fr: 'Chaque magasin, avec son logo',
+  'pro.insights.a': {
+    en: 'Where you stand right now',
+    es: 'Cómo estás ahora mismo',
+    fr: 'Où tu en es maintenant',
   },
-  'pro.logos.tagline': {
-    en: 'Free shows each store’s initials. Skip Pro shows the real logo, from thousands of brands.',
-    es: 'El plan Gratis muestra las iniciales de cada tienda. Skip Pro muestra el logo real, entre miles de marcas.',
-    fr: 'Le forfait Gratuit affiche les initiales de chaque magasin. Skip Pro affiche le vrai logo, parmi des milliers de marques.',
+  'pro.insights.b': {
+    en: 'Where your money goes',
+    es: 'A dónde va tu dinero',
+    fr: 'Où va ton argent',
   },
-  'pro.logos.glance.title': {
-    en: 'Spot it at a glance',
-    es: 'Lo reconoces de un vistazo',
-    fr: 'Repéré d’un coup d’œil',
+  'pro.insights.c': {
+    en: 'Finished months, added up',
+    es: 'Los meses cerrados, sumados',
+    fr: 'Les mois terminés, additionnés',
   },
-  'pro.logos.glance.detail': {
-    en: 'A list of logos reads faster than a list of names, on every page.',
-    es: 'Una lista de logos se lee más rápido que una lista de nombres, en cada página.',
-    fr: 'Une liste de logos se lit plus vite qu’une liste de noms, sur chaque page.',
-  },
-  'pro.logos.brands.title': {
-    en: 'Thousands of brands',
-    es: 'Miles de marcas',
-    fr: 'Des milliers de marques',
-  },
-  'pro.logos.brands.detail': {
-    en: 'Shops, services and billers are matched by name as you add them.',
-    es: 'Tiendas, servicios y facturadores se reconocen por su nombre al agregarlos.',
-    fr: 'Magasins, services et factureurs sont reconnus par leur nom quand tu les ajoutes.',
-  },
-  'pro.logos.yours.title': {
-    en: 'Yours to change',
-    es: 'Tú decides',
-    fr: 'C’est toi qui choisis',
-  },
-  'pro.logos.yours.detail': {
-    en: 'Pick another logo, or keep the initials, for anything you have added.',
-    es: 'Elige otro logo, o quédate con las iniciales, en cualquier cosa que hayas agregado.',
-    fr: 'Choisis un autre logo, ou garde les initiales, pour tout ce que tu as ajouté.',
+  'pro.history.example': {
+    en: 'From 90 days to 7 years',
+    es: 'De 90 días a 7 años',
+    fr: 'De 90 jours à 7 ans',
   },
   'pro.history.title': {
-    en: 'Seven years of your money',
-    es: 'Siete años de tu dinero',
-    fr: 'Sept ans de ton argent',
+    en: 'See further back',
+    es: 'Mira más atrás',
+    fr: 'Remonte plus loin',
   },
-  'pro.history.tagline': {
-    en: 'Free shows your last 90 days. Everything older is kept, and Skip Pro shows it all, up to seven years back.',
-    es: 'El plan Gratis muestra tus últimos 90 días. Todo lo anterior se guarda, y Skip Pro te lo muestra todo, hasta siete años atrás.',
-    fr: 'Le forfait Gratuit affiche tes 90 derniers jours. Tout ce qui est plus ancien est conservé, et Skip Pro te montre tout, jusqu’à sept ans en arrière.',
+  'pro.history.subtitle': {
+    en: 'Older entries are kept, not lost.',
+    es: 'Lo anterior se guarda, no se pierde.',
+    fr: 'L’ancien est conservé, pas perdu.',
   },
-  'pro.history.kept.title': {
-    en: 'Nothing is deleted',
-    es: 'No se borra nada',
-    fr: 'Rien n’est supprimé',
+  'pro.history.a': {
+    en: 'Up to 7 years of history',
+    es: 'Hasta 7 años de historial',
+    fr: 'Jusqu’à 7 ans d’historique',
   },
-  'pro.history.kept.detail': {
-    en: 'Entries older than 90 days stay on your account and come back the moment you have Pro.',
-    es: 'Los movimientos de hace más de 90 días siguen en tu cuenta y vuelven en cuanto tengas Pro.',
-    fr: 'Les opérations de plus de 90 jours restent sur ton compte et reviennent dès que tu as Pro.',
+  'pro.history.b': {
+    en: 'Nothing is ever deleted',
+    es: 'Nada se borra nunca',
+    fr: 'Rien n’est jamais supprimé',
   },
-  'pro.history.years.title': {
-    en: 'Every year, side by side',
-    es: 'Cada año, uno junto al otro',
-    fr: 'Chaque année, côte à côte',
-  },
-  'pro.history.years.detail': {
-    en: 'Step back through weeks, months and years of spending and income.',
-    es: 'Recorre semanas, meses y años de gastos e ingresos.',
-    fr: 'Remonte les semaines, les mois et les années de dépenses et de revenus.',
-  },
-  'pro.history.balances.title': {
+  'pro.history.c': {
     en: 'Balances always add up',
     es: 'Los saldos siempre cuadran',
     fr: 'Les soldes tombent toujours juste',
   },
-  'pro.history.balances.detail': {
-    en: 'Card and account balances count every entry, whichever plan you are on.',
-    es: 'Los saldos de tarjetas y cuentas cuentan cada movimiento, tengas el plan que tengas.',
-    fr: 'Les soldes des cartes et des comptes comptent chaque opération, quel que soit ton forfait.',
+  'pro.logos.example': {
+    en: 'Netflix · Spotify · Uber',
+    es: 'Netflix · Spotify · Uber',
+    fr: 'Netflix · Spotify · Uber',
   },
+  'pro.logos.title': {
+    en: 'Every store, its logo',
+    es: 'Cada tienda, su logo',
+    fr: 'Un logo par magasin',
+  },
+  'pro.logos.subtitle': {
+    en: 'Spot your spending at a glance.',
+    es: 'Reconoce tus gastos de un vistazo.',
+    fr: 'Repère tes dépenses d’un coup d’œil.',
+  },
+  'pro.logos.a': {
+    en: 'Real logos, not just initials',
+    es: 'Logos reales, no solo iniciales',
+    fr: 'Vrais logos, pas que des initiales',
+  },
+  'pro.logos.b': {
+    en: 'Pick the right logo for any store',
+    es: 'Elige el logo de cualquier tienda',
+    fr: 'Choisis le logo de chaque magasin',
+  },
+  'pro.logos.c': {
+    en: 'Logos in lists and reminders',
+    es: 'Logos en listas y recordatorios',
+    fr: 'Logos dans les listes et rappels',
+  },
+  'pro.unlimited.example': {
+    en: 'Visa ••4242 · Chase ••1180',
+    es: 'Visa ••4242 · Chase ••1180',
+    fr: 'Visa ••4242 · Chase ••1180',
+  },
+  'pro.unlimited.title': {
+    en: 'Add them all',
+    es: 'Añádelos todos',
+    fr: 'Ajoute-les tous',
+  },
+  'pro.unlimited.subtitle': {
+    en: 'Free keeps one card and one account.',
+    es: 'Gratis incluye una tarjeta y una cuenta.',
+    fr: 'Gratuit : une carte et un compte.',
+  },
+  'pro.unlimited.a': {
+    en: 'Unlimited cards and accounts',
+    es: 'Tarjetas y cuentas sin límite',
+    fr: 'Cartes et comptes illimités',
+  },
+  'pro.unlimited.b': {
+    en: 'Every income counted',
+    es: 'Todos tus ingresos, contados',
+    fr: 'Tous tes revenus, comptés',
+  },
+  'pro.unlimited.c': {
+    en: 'Nothing locked if Pro ends',
+    es: 'Nada se bloquea si Pro termina',
+    fr: 'Rien n’est bloqué si Pro finit',
+  },
+
   'pro.history.notice.title': {
     en: 'Older history is saved',
     es: 'Tu historial anterior está guardado',
@@ -192,105 +223,7 @@ export const proMessages = defineMessages({
     es: 'Gratis muestra los últimos 90 días. Skip Pro muestra hasta 7 años.',
     fr: 'Gratuit affiche les 90 derniers jours. Skip Pro affiche jusqu’à 7 ans.',
   },
-  'pro.voice.title': { en: 'Just say it', es: 'Solo dilo', fr: 'Dis-le, tout simplement' },
-  'pro.voice.tagline': {
-    en: 'Say what you spent or what’s due. Skip fills it in, and you check it before it’s saved.',
-    es: 'Di lo que gastaste o lo que vence. Skip lo llena y tú lo revisas antes de guardarlo.',
-    fr: 'Dis ce que tu as dépensé ou ce qui est à payer. Skip le remplit, et tu vérifies avant l’enregistrement.',
-  },
-  'pro.voice.kinds.title': {
-    en: 'Receipts, bills and subscriptions',
-    es: 'Recibos, facturas y suscripciones',
-    fr: 'Reçus, factures et abonnements',
-  },
   // The examples stay in English in every language: dictation only understands English.
-  'pro.voice.kinds.detail': {
-    en: '“$12.50 at Starbucks today.” “Rent $1,800, due on the 1st.” “Netflix $15.99 every month.” One sentence each.',
-    es: '“$12.50 at Starbucks today.” “Rent $1,800, due on the 1st.” “Netflix $15.99 every month.” Una frase para cada uno, dicha en inglés.',
-    fr: '« $12.50 at Starbucks today. » « Rent $1,800, due on the 1st. » « Netflix $15.99 every month. » Une phrase pour chacun, dite en anglais.',
-  },
-  'pro.voice.check.title': {
-    en: 'Nothing saves until you say so',
-    es: 'Nada se guarda hasta que tú lo digas',
-    fr: 'Rien n’est enregistré sans ton accord',
-  },
-  'pro.voice.check.detail': {
-    en: 'Skip shows exactly what it heard. Fix anything it missed, then tap Save. Nothing is filed without you.',
-    es: 'Skip muestra exactamente lo que escuchó. Corrige lo que se le haya pasado y toca Guardar. Nada se guarda sin ti.',
-    fr: 'Skip affiche exactement ce qu’il a entendu. Corrige ce qui manque, puis touche Enregistrer. Rien n’est classé sans toi.',
-  },
-  'pro.voice.private.title': {
-    en: 'Skip never keeps your voice',
-    es: 'Skip nunca guarda tu voz',
-    fr: 'Skip ne garde jamais ta voix',
-  },
-  'pro.voice.private.detail': {
-    en: 'Your iPhone turns what you say into text, on the phone when it can, or with Apple’s speech service when it can’t.',
-    es: 'Tu iPhone convierte lo que dices en texto, en el propio teléfono cuando puede, o con el servicio de voz de Apple cuando no.',
-    fr: 'Ton iPhone transforme ce que tu dis en texte, sur le téléphone quand il le peut, sinon avec le service vocal d’Apple.',
-  },
-
-  'pro.unlimited.title': {
-    en: 'All your credit cards. All your accounts.',
-    es: 'Todas tus tarjetas de crédito. Todas tus cuentas.',
-    fr: 'Toutes tes cartes de crédit. Tous tes comptes.',
-  },
-  'pro.unlimited.tagline': {
-    en: 'Free keeps one of each. Real wallets are bigger than that.',
-    es: 'El plan Gratis incluye una de cada cosa. Las carteras de verdad tienen más.',
-    fr: 'Le forfait Gratuit en garde un de chaque. Les vrais portefeuilles sont plus garnis.',
-  },
-  'pro.unlimited.all.title': {
-    en: 'Every credit card and account you actually have',
-    es: 'Cada tarjeta de crédito y cuenta que de verdad tienes',
-    fr: 'Chaque carte de crédit et chaque compte que tu as vraiment',
-  },
-  'pro.unlimited.all.detail': {
-    en: 'Track them all, with live balances and their own ledgers.',
-    es: 'Lleva el control de todas, con saldos al día y sus propios movimientos.',
-    fr: 'Suis-les tous, avec leurs soldes à jour et leur propre historique.',
-  },
-  'pro.unlimited.income.title': {
-    en: 'Every income, counted',
-    es: 'Todos tus ingresos, contados',
-    fr: 'Tous tes revenus, comptés',
-  },
-  'pro.unlimited.income.detail': {
-    en: 'Salary, side work, the second job — Left this month gets the whole truth.',
-    es: 'Salario, trabajos extra, el segundo empleo: “Te queda este mes” conoce toda la verdad.',
-    fr: 'Salaire, petits boulots, deuxième emploi — « Reste ce mois-ci » connaît toute la vérité.',
-  },
-  'pro.unlimited.kept.title': {
-    en: 'Nothing ever locked or deleted',
-    es: 'Nada se bloquea ni se borra',
-    fr: 'Rien n’est jamais verrouillé ni supprimé',
-  },
-  'pro.unlimited.kept.detail': {
-    en: 'If Pro lapses, everything you made keeps working exactly as it is — you just cannot add past the free allowance until you are back.',
-    es: 'Si Pro vence, todo lo que creaste sigue funcionando tal como está; solo no podrás agregar más allá del límite gratis hasta que vuelvas.',
-    fr: 'Si Pro prend fin, tout ce que tu as créé continue de fonctionner tel quel — tu ne peux simplement pas dépasser la limite gratuite avant ton retour.',
-  },
-
-  'pro.feature.partOf': {
-    en: 'Part of Skip Pro',
-    es: 'Parte de Skip Pro',
-    fr: 'Inclus dans Skip Pro',
-  },
-  'pro.feature.withEverything': {
-    en: 'With everything else Pro unlocks',
-    es: 'Junto con todo lo demás que desbloquea Pro',
-    fr: 'Avec tout ce que Pro débloque d’autre',
-  },
-  'pro.feature.see': {
-    en: 'See Skip Pro — {monthly}',
-    es: 'Ver Skip Pro: {monthly}',
-    fr: 'Voir Skip Pro — {monthly}',
-  },
-  'pro.feature.orYearly': {
-    en: 'or {yearly} · Not now',
-    es: 'o {yearly} · Ahora no',
-    fr: 'ou {yearly} · Pas maintenant',
-  },
 
   'pro.page.notOpen': {
     en: 'Purchases are not open in this version yet. Everything on this page is coming shortly.',
