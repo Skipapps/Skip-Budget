@@ -2,6 +2,7 @@ import { act, fireEvent, render } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
 import { BrandLogo, FAILED_LOGO_RETRY_MS } from '@/components/brands/brand-logo';
+import { resetLogoShapesForTests } from '@/lib/logo-shape';
 import { publishProStatus, resetProStatusForTests } from '@/lib/pro-status';
 
 /**
@@ -32,6 +33,7 @@ beforeAll(() => {
 // Logos are Pro; these pages are drawn for a paying account.
 afterEach(() => resetProStatusForTests());
 beforeEach(() => {
+  resetLogoShapesForTests();
   publishProStatus({ pro: true, ready: true });
   // A failure is forgotten on a timer, so the clock is the test's to move.
   jest.useFakeTimers();
@@ -215,5 +217,58 @@ describe('on the free plan', () => {
 
     await act(async () => publishProStatus({ pro: true, ready: true }));
     expect(screen.getByTestId('logo')).toBeTruthy();
+  });
+});
+
+describe('the logo inside its circle', () => {
+  type Box = { width: number; height: number };
+  const box = (screen: Screen) => (screen.getByTestId('logo').props as { style: Box }).style;
+  const load = (screen: Screen, width: number, height: number) =>
+    act(async () => {
+      (screen.getByTestId('logo').props as { onLoad: (e: unknown) => void }).onLoad({
+        cacheType: 'none',
+        source: { url: '', width, height, mediaType: null },
+      });
+    });
+
+  it('keeps a square icon filling the circle', async () => {
+    const screen = await render(<BrandLogo name="Netflix" domain="netflix.com" size={40} />);
+    await load(screen, 512, 512);
+    expect(box(screen)).toEqual({ width: 40, height: 40 });
+  });
+
+  it('draws a wide wordmark whole, its corners inside the circle', async () => {
+    const screen = await render(<BrandLogo name="Elon" domain="elonmanagement.com" size={40} />);
+    expect(box(screen)).toEqual({ width: 40, height: 40 });
+
+    await load(screen, 1131, 486);
+    const { width, height } = box(screen);
+    expect(width / height).toBeCloseTo(1131 / 486, 0);
+    expect(Math.hypot(width / 2, height / 2)).toBeLessThan(20);
+    expect(width).toBeGreaterThan(30);
+  });
+
+  it('draws a tall logo whole too', async () => {
+    const screen = await render(<BrandLogo name="Blo" domain="blo.com" size={60} />);
+    await load(screen, 316, 430);
+    const { width, height } = box(screen);
+    expect(height).toBeGreaterThan(width);
+    expect(Math.hypot(width / 2, height / 2)).toBeLessThan(30);
+  });
+
+  it('remembers the shape, so the next row draws it right first time', async () => {
+    const first = await render(<BrandLogo name="Elon" domain="elonmanagement.com" size={40} />);
+    await load(first, 1000, 250);
+    const drawn = box(first);
+
+    const next = await render(<BrandLogo name="Elon" domain="elonmanagement.com" size={40} />);
+    expect(box(next)).toEqual(drawn);
+  });
+
+  it("does not lend one store's shape to another in a recycled row", async () => {
+    const screen = await render(<BrandLogo name="Elon" domain="elonmanagement.com" size={40} />);
+    await load(screen, 1000, 250);
+    await screen.rerender(<BrandLogo name="Netflix" domain="netflix.com" size={40} />);
+    expect(box(screen)).toEqual({ width: 40, height: 40 });
   });
 });

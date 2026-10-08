@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
-import { useSyncExternalStore, type ReactNode } from 'react';
+import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { logoImageUrl } from '@/api/logos';
 import { logoFailedLately, rememberLogoFailure, subscribeLogoFailures } from '@/lib/logo-failures';
+import { logoAspect, logoBox, rememberLogoAspect } from '@/lib/logo-shape';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { monogramOf } from '@/lib/monogram';
@@ -36,6 +37,9 @@ export function BrandLogo({ name, domain, size = 40, className, fallback }: Bran
   const waiting = Boolean(logo) && !ready;
   // Keyed by URL, not a flag on the row, so a recycled row showing another brand recovers at once.
   const failed = useSyncExternalStore(subscribeLogoFailures, () => logoFailedLately(url));
+  // Learnt when the image loads; tied to its URL so a recycled row never borrows another's shape.
+  const [shape, setShape] = useState<{ url: string; aspect: number } | null>(null);
+  const aspect = (shape?.url === url ? shape.aspect : undefined) ?? logoAspect(url);
 
   const showFallback = !url || failed;
   const mark = monogramOf(name);
@@ -76,12 +80,17 @@ export function BrandLogo({ name, domain, size = 40, className, fallback }: Bran
       ) : (
         <Image
           source={{ uri: url }}
-          style={{ width: size, height: size }}
+          style={logoBox(size, aspect)}
           contentFit="contain"
           // A logo seldom changes, so the disk cache spares the service a request on every
           // render and keeps logos showing offline.
           cachePolicy="memory-disk"
           transition={120}
+          onLoad={(event) => {
+            if (!url) return;
+            const loaded = rememberLogoAspect(url, event.source.width, event.source.height);
+            if (loaded !== undefined && loaded !== aspect) setShape({ url, aspect: loaded });
+          }}
           onError={() => {
             if (url) rememberLogoFailure(url);
           }}
