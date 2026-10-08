@@ -105,7 +105,6 @@ describe('the dashboard cards in Spanish', () => {
       <DestinationList
         items={ROWS}
         amounts={{ 'monthly-bills': -120 }}
-        pro
         loading
         onPress={() => {}}
       />,
@@ -116,13 +115,13 @@ describe('the dashboard cards in Spanish', () => {
     expectNoRawText(screen);
   });
 
-  it('names Insights and the loan calculator without the Pro note once paid', async () => {
+  it('names Insights without the Pro note once paid, and the loan calculator always', async () => {
     const banner = await render(<InsightBanner pro onPress={() => {}} />);
     expect(
       banner.getByLabelText('Análisis. Descubre la historia detrás de tus gastos.'),
     ).toBeTruthy();
 
-    const tools = await render(<ToolCards pro onPress={() => {}} />);
+    const tools = await render(<ToolCards onPress={() => {}} />);
     expect(tools.getByLabelText('Calculadora de préstamos. Abre la herramienta.')).toBeTruthy();
     expectNoRawText(tools);
   });
@@ -173,7 +172,6 @@ describe('the dashboard cards in French', () => {
       <DestinationList
         items={[{ id: 'receipts', label: 'Reçus' }]}
         amounts={{ receipts: -45.5 }}
-        pro
         error
         onRetry={() => {}}
         onPress={() => {}}
@@ -185,15 +183,16 @@ describe('the dashboard cards in French', () => {
     expectNoRawText(screen);
   });
 
-  it('marks the locked tools for someone without Pro', async () => {
+  it('marks Insights as Pro for someone without it, and leaves the loan calculator open', async () => {
     const banner = await render(<InsightBanner pro={false} onPress={() => {}} />);
     expect(
       banner.getByLabelText('Aperçu. Fonction Pro. Découvre l’histoire derrière tes dépenses.'),
     ).toBeTruthy();
     expect(banner.getByText('Découvre l’histoire derrière tes dépenses')).toBeTruthy();
 
-    const tools = await render(<ToolCards pro={false} onPress={() => {}} />);
-    expect(tools.getByLabelText('Calculateur de prêt. Fonction Pro. Ouvre l’outil.')).toBeTruthy();
+    const tools = await render(<ToolCards onPress={() => {}} />);
+    expect(tools.getByLabelText('Calculateur de prêt. Ouvre l’outil.')).toBeTruthy();
+    expect(tools.queryAllByText('PRO', { includeHiddenElements: true })).toHaveLength(0);
   });
 
   it('labels the four Quick add tiles', async () => {

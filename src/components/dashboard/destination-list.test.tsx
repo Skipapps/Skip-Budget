@@ -48,7 +48,7 @@ describe('DestinationList', () => {
     const reordered = [...CATEGORIES].reverse();
 
     const { getAllByRole } = await render(
-      <DestinationList items={reordered} amounts={AMOUNTS} pro onPress={() => {}} />,
+      <DestinationList items={reordered} amounts={AMOUNTS} onPress={() => {}} />,
     );
 
     const rowLabels = getAllByRole('button').map((row) => row.props.accessibilityLabel as string);
@@ -60,24 +60,17 @@ describe('DestinationList', () => {
     });
   });
 
-  it('shows a PRO pill on the loan calculator only when the account is not pro', async () => {
-    // The PRO badge is hidden from the accessibility tree (the row's label already says "Pro
-    // feature"), so the query has to include hidden elements.
-    const notPro = await render(
-      <DestinationList items={CATEGORIES} amounts={AMOUNTS} pro={false} onPress={() => {}} />,
+  it('opens the loan calculator for everyone: it is free, with no PRO pill', async () => {
+    const screen = await render(
+      <DestinationList items={CATEGORIES} amounts={AMOUNTS} onPress={() => {}} />,
     );
-    expect(notPro.getAllByText('PRO', { includeHiddenElements: true })).toHaveLength(1);
-    expect(notPro.getByLabelText('Loan calculator. Pro feature. Opens the tool.')).toBeTruthy();
-
-    const isPro = await render(
-      <DestinationList items={CATEGORIES} amounts={AMOUNTS} pro onPress={() => {}} />,
-    );
-    expect(isPro.queryAllByText('PRO', { includeHiddenElements: true })).toHaveLength(0);
+    expect(screen.queryAllByText('PRO', { includeHiddenElements: true })).toHaveLength(0);
+    expect(screen.getByLabelText('Loan calculator. Opens the tool.')).toBeTruthy();
   });
 
   it('shows a skeleton in place of each amount while loading', async () => {
     const { getByLabelText, getAllByTestId, queryByText } = await render(
-      <DestinationList items={CATEGORIES} amounts={AMOUNTS} pro loading onPress={() => {}} />,
+      <DestinationList items={CATEGORIES} amounts={AMOUNTS} loading onPress={() => {}} />,
     );
 
     expect(getAllByTestId('skeleton')).toHaveLength(3);
@@ -93,7 +86,6 @@ describe('DestinationList', () => {
       <DestinationList
         items={CATEGORIES}
         amounts={AMOUNTS}
-        pro
         error
         onRetry={onRetry}
         onPress={() => {}}
@@ -157,7 +149,7 @@ describe('DestinationList at large text sizes', () => {
 
   it('lets labels wrap and prints every amount whole, with its cents', async () => {
     const screen = await render(
-      <DestinationList items={HOME} amounts={AMOUNTS} pro onPress={() => {}} />,
+      <DestinationList items={HOME} amounts={AMOUNTS} onPress={() => {}} />,
     );
 
     for (const { label } of HOME) {
@@ -175,7 +167,7 @@ describe('DestinationList at large text sizes', () => {
 
   it('keeps each amount beside its label while every word fits', async () => {
     const screen = await render(
-      <DestinationList items={HOME} amounts={AMOUNTS} pro onPress={() => {}} />,
+      <DestinationList items={HOME} amounts={AMOUNTS} onPress={() => {}} />,
     );
     await layOut(screen, 150);
     for (const { id } of HOME) expect(isStacked(screen, id)).toBe(false);
@@ -185,7 +177,7 @@ describe('DestinationList at large text sizes', () => {
     // 428pt at 1.4x leaves about 137pt beside the amount; "Subscriptions" needs 145.6pt. The other
     // two labels fit, and stack anyway: the card switches as one.
     const screen = await render(
-      <DestinationList items={HOME} amounts={AMOUNTS} pro onPress={() => {}} />,
+      <DestinationList items={HOME} amounts={AMOUNTS} onPress={() => {}} />,
     );
     await layOut(screen, 137);
 
@@ -196,7 +188,7 @@ describe('DestinationList at large text sizes', () => {
 
   it('goes back beside the labels when a smaller text size makes the words fit', async () => {
     const screen = await render(
-      <DestinationList items={HOME} amounts={AMOUNTS} pro onPress={() => {}} />,
+      <DestinationList items={HOME} amounts={AMOUNTS} onPress={() => {}} />,
     );
     await layOut(screen, 137);
     expect(isStacked(screen, 'subscriptions')).toBe(true);

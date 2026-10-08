@@ -11,7 +11,6 @@ import { getLocaleSnapshot } from '@/i18n/store';
  * down (paying off, closing) is always free, and the tools below are all a lapse switches off.
  */
 export const WALL = {
-  loanCalculator: 'pro',
   insights: 'pro',
   /** Adding a receipt, bill or subscription by speaking it. */
   voice: 'pro',

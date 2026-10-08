@@ -46,7 +46,6 @@ jest.mock('@/api/pro', () => ({
 const FEATURES = [
   'Unlimited credit cards, accounts & incomes',
   'Unlimited receipt scanning',
-  'Loan calculator, to the cent',
   'Insights',
   'Early features, first-in-line support',
 ];

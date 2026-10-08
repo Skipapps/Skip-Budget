@@ -1,8 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import LoanCalculatorScreen from '@/app/loan-calculator';
 import type { CurrencyCode, Language } from '@/i18n/config';
 import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
+import { publishProStatus, resetProStatusForTests } from '@/lib/pro-status';
 
 /**
  * The loan calculator in Spanish and French. Words and the writing of figures follow the language;
@@ -19,7 +20,6 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
-jest.mock('@/components/pro/pro-gate', () => ({ useProGate: () => null }));
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
@@ -278,5 +278,15 @@ describe('in every language and currency', () => {
     const sent = mockPush.mock.calls.map(([route]) => route);
     expect(sent).toHaveLength(LOCALES.length);
     for (const route of sent.slice(1)) expect(route).toEqual(sent[0]);
+  });
+});
+
+describe('on the free plan', () => {
+  afterEach(() => resetProStatusForTests());
+
+  it('opens the calculator itself: it is free, never the Pro explainer', async () => {
+    await act(async () => publishProStatus({ pro: false, ready: true }));
+    await render(<LoanCalculatorScreen />);
+    expect(screen.getByText('Monthly payment', RAW)).toBeTruthy();
   });
 });

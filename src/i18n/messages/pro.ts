@@ -25,47 +25,6 @@ export const proMessages = defineMessages({
     fr: { one: '{count} an gratuit', other: '{count} ans gratuits' },
   },
 
-  'pro.loans.title': {
-    en: 'Know a loan to the cent',
-    es: 'Conoce tu préstamo al centavo',
-    fr: 'Connais ton prêt au cent près',
-  },
-  'pro.loans.tagline': {
-    en: 'Most calculators guess with a twelfth of a year. Lenders charge by the day — and so does Skip.',
-    es: 'La mayoría de las calculadoras adivinan con un doceavo de año. Los bancos cobran por día, y Skip también.',
-    fr: 'La plupart des calculatrices devinent avec un douzième d’année. Les prêteurs comptent au jour près — et Skip aussi.',
-  },
-  'pro.loans.exact.title': {
-    en: 'Matches your bank’s statement exactly',
-    es: 'Coincide exactamente con el estado de cuenta de tu banco',
-    fr: 'Correspond exactement au relevé de ta banque',
-  },
-  'pro.loans.exact.detail': {
-    en: 'Payoff, next payment, accrued interest — the same figures your lender shows, to the cent.',
-    es: 'Saldo para liquidar, próximo pago, intereses acumulados: las mismas cifras que muestra tu banco, al centavo.',
-    fr: 'Solde à rembourser, prochain paiement, intérêts courus — les mêmes chiffres que ton prêteur, au cent près.',
-  },
-  'pro.loans.schedule.title': {
-    en: 'Every payment, mapped out',
-    es: 'Cada pago, desglosado',
-    fr: 'Chaque paiement, détaillé',
-  },
-  'pro.loans.schedule.detail': {
-    en: 'See how much of each month is interest, and what paying extra actually saves.',
-    es: 'Ve cuánto de cada mes es interés y cuánto ahorras de verdad al pagar de más.',
-    fr: 'Vois quelle part de chaque mois va aux intérêts, et ce que payer plus te fait vraiment économiser.',
-  },
-  'pro.loans.bill.title': {
-    en: 'Filed as a bill, reminded on time',
-    es: 'Guardado como factura, con recordatorio a tiempo',
-    fr: 'Classé comme facture, avec un rappel à temps',
-  },
-  'pro.loans.bill.detail': {
-    en: 'Save a loan once and its payment joins your bills, reminders and dashboard.',
-    es: 'Guarda un préstamo una vez y su pago se suma a tus facturas, tus recordatorios y tu panel.',
-    fr: 'Enregistre un prêt une fois et son paiement rejoint tes factures, tes rappels et ton tableau de bord.',
-  },
-
   'pro.insights.title': {
     en: 'Your whole money picture, one page',
     es: 'Todo tu dinero, en una sola página',
@@ -362,16 +321,6 @@ export const proMessages = defineMessages({
     en: 'Point, tap, filed — read on your phone, never uploaded',
     es: 'Apunta, toca y listo: se lee en tu teléfono, nunca se sube',
     fr: 'Vise, touche, c’est classé — lu sur ton téléphone, jamais téléversé',
-  },
-  'pro.page.loans.title': {
-    en: 'Loan calculator, to the cent',
-    es: 'Calculadora de préstamos, al centavo',
-    fr: 'Calculateur de prêt, au cent près',
-  },
-  'pro.page.loans.hint': {
-    en: 'Daily interest, the way your bank actually charges',
-    es: 'Intereses diarios, como de verdad cobra tu banco',
-    fr: 'Intérêts quotidiens, comme ta banque les facture vraiment',
   },
   'pro.page.insights.title': { en: 'Insights', es: 'Análisis', fr: 'Aperçu' },
   'pro.page.insights.hint': {

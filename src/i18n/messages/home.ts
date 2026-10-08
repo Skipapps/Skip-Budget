@@ -138,11 +138,6 @@ export const homeMessages = defineMessages({
     es: '{label}. Abre la herramienta.',
     fr: '{label}. Ouvre l’outil.',
   },
-  'home.tool.opensLocked': {
-    en: '{label}. Pro feature. Opens the tool.',
-    es: '{label}. Función Pro. Abre la herramienta.',
-    fr: '{label}. Fonction Pro. Ouvre l’outil.',
-  },
 
   'home.insights.title': { en: 'Insights', es: 'Análisis', fr: 'Aperçu' },
   'home.insights.detail': {

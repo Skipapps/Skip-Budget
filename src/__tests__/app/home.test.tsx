@@ -255,7 +255,7 @@ describe('Home — Go further', () => {
     expect(tools).toHaveLength(1);
 
     const [loan] = tools;
-    expect(loan.props.accessibilityLabel).toBe('Loan Calculator. Pro feature. Opens the tool.');
+    expect(loan.props.accessibilityLabel).toBe('Loan Calculator. Opens the tool.');
     // The only child of its row and flex-1, so it fills the width instead of half of it.
     expect(loan.props.className).toContain('flex-1');
     expect(loan.parent?.props.className).toContain('flex-row');

@@ -11,7 +11,6 @@ import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { FitFigure, FitRows, FitText, useGroupFits } from '@/components/ui/fit-group';
-import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm } from '@/providers/dialog-provider';
 import { SelectField } from '@/components/ui/select-field';
@@ -58,14 +57,6 @@ function basisNote(basis: AccrualBasis): string {
 }
 
 export default function LoanCalculatorScreen() {
-  // Wrapper, not inline: an early return above the screen's own hooks would change the hook count
-  // when the entitlement answer lands.
-  const gate = useProGate('loans');
-  if (gate) return gate;
-  return <LoanCalculatorScreenInner />;
-}
-
-function LoanCalculatorScreenInner() {
   const confirm = useConfirm();
 
   const [amount, setAmount] = useState(25_000);

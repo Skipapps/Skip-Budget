@@ -38,7 +38,6 @@ type DestinationListProps = {
   items: SpendingCategory[];
   /** Signed month totals by id. Absent means the row opens a tool, not a figure. */
   amounts: Record<string, number | undefined>;
-  pro: boolean;
   loading?: boolean;
   error?: boolean;
   onPress: (id: string) => void;
@@ -54,7 +53,6 @@ type DestinationListProps = {
 export function DestinationList({
   items,
   amounts,
-  pro,
   loading = false,
   error = false,
   onPress,
@@ -76,9 +74,6 @@ export function DestinationList({
           const Icon = DESTINATION_ICONS[category.id] ?? DESTINATION_FALLBACK_ICON;
           const amount = amounts[category.id];
           const isMoneyRow = amount !== undefined;
-          // Locked features keep their row: a hidden feature sells nothing, and the destination
-          // screen still does the refusing.
-          const locked = !pro && category.id === 'loan-calculator';
 
           const label = isMoneyRow
             ? loading
@@ -89,7 +84,7 @@ export function DestinationList({
                     label: category.label,
                     amount: formatCurrency(amount),
                   })
-            : t(locked ? 'home.tool.opensLocked' : 'home.tool.opens', { label: category.label });
+            : t('home.tool.opens', { label: category.label });
 
           const name = (
             <FitText
@@ -128,20 +123,6 @@ export function DestinationList({
             </FitText>
           );
 
-          // Inline rather than pinned to the corner, so at large type the badge pushes the label
-          // along.
-          const badge = locked ? (
-            <View
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-              className="shrink-0 rounded-full bg-accent px-2 py-0.5"
-            >
-              <Text allowFontScaling={false} className="font-app-bold text-[9px] text-on-control">
-                PRO
-              </Text>
-            </View>
-          ) : null;
-
           const chevron = <ChevronRight size={18} color={colors.muted} strokeWidth={2} />;
 
           return (
@@ -168,8 +149,6 @@ export function DestinationList({
                 ) : (
                   name
                 )}
-
-                {badge}
 
                 {stacked ? (
                   <View className="shrink-0">{chevron}</View>

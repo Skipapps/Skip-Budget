@@ -193,7 +193,6 @@ export default function HomeScreen() {
         <DestinationList
           items={TILES.map(worded)}
           amounts={tileAmounts}
-          pro={pro}
           loading={month.isLoading}
           error={month.isError}
           onRetry={refresh}
@@ -208,7 +207,7 @@ export default function HomeScreen() {
         <SectionHeading caption={t('home.includedWithPro')}>{t('home.goFurther')}</SectionHeading>
       </View>
       <View className="mt-3 w-full">
-        <ToolCards pro={pro} onPress={(href) => router.push(href)} />
+        <ToolCards onPress={(href) => router.push(href)} />
       </View>
       <View className="mt-4 w-full">
         <InsightBanner pro={pro} onPress={() => router.push('/insights')} />

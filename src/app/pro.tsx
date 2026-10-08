@@ -1,6 +1,5 @@
 import {
   Camera,
-  Calculator,
   ChartColumn,
   Check,
   CreditCard,
@@ -26,7 +25,6 @@ import { TEXT_CAP } from '@/theme/text-scale';
 const FEATURES: { icon: LucideIcon; title: MessageKey; hint: MessageKey }[] = [
   { icon: CreditCard, title: 'pro.page.cards.title', hint: 'pro.page.cards.hint' },
   { icon: Camera, title: 'pro.page.scan.title', hint: 'pro.page.scan.hint' },
-  { icon: Calculator, title: 'pro.page.loans.title', hint: 'pro.page.loans.hint' },
   { icon: ChartColumn, title: 'pro.page.insights.title', hint: 'pro.page.insights.hint' },
   { icon: Sparkles, title: 'pro.page.early.title', hint: 'pro.page.early.hint' },
 ];

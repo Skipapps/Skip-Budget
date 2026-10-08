@@ -1,7 +1,7 @@
 import type { Href } from 'expo-router';
 import { ChevronRight, Landmark } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
 import { t, type MessageKey } from '@/i18n';
@@ -27,7 +27,6 @@ const TOOLS: Tool[] = [
 ];
 
 type ToolCardsProps = {
-  pro: boolean;
   onPress: (href: Href) => void;
 };
 
@@ -35,12 +34,10 @@ type ToolCardsProps = {
 const CHEVRON_ROOM = 18;
 
 /**
- * A raised card: shadow and no border (an outline would flatten the lift).
- * A locked tool keeps its card with a PRO badge, since a hidden feature sells nothing and the
- * destination screen still does the refusing. Side by side, the tool names share one size; cards
- * that cannot hold it stack.
+ * A raised card: shadow and no border (an outline would flatten the lift). Side by side, the tool
+ * names share one size; cards that cannot hold it stack.
  */
-export function ToolCards({ pro, onPress }: ToolCardsProps) {
+export function ToolCards({ onPress }: ToolCardsProps) {
   const colors = useColors();
   const names = useFitGroup({ mode: 'shrink' });
 
@@ -50,9 +47,7 @@ export function ToolCards({ pro, onPress }: ToolCardsProps) {
         <Pressable
           key={tool.id}
           accessibilityRole="button"
-          accessibilityLabel={t(pro ? 'home.tool.opens' : 'home.tool.opensLocked', {
-            label: t(tool.label),
-          })}
+          accessibilityLabel={t('home.tool.opens', { label: t(tool.label) })}
           onPress={() => onPress(tool.href)}
           style={shadows.raised}
           className={cn(
@@ -60,18 +55,6 @@ export function ToolCards({ pro, onPress }: ToolCardsProps) {
             names.fits ? 'min-w-0 flex-1' : 'w-full',
           )}
         >
-          {pro ? null : (
-            <View
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-              className="absolute right-3 top-3 rounded-full bg-accent px-2 py-0.5"
-            >
-              <Text allowFontScaling={false} className="font-app-bold text-[9px] text-on-control">
-                PRO
-              </Text>
-            </View>
-          )}
-
           {/* The same accent circle as the "Where it goes" rows above. */}
           <View className="h-[44px] w-[44px] items-center justify-center rounded-full bg-accent/10">
             <tool.icon size={20} color={colors.accentInk} strokeWidth={1.8} />

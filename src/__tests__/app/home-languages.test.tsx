@@ -187,9 +187,7 @@ describe('Home in Spanish', () => {
 
     expect(screen.getByText('Ve más allá')).toBeTruthy();
     expect(screen.getByText('Incluido con Pro')).toBeTruthy();
-    expect(
-      screen.getByLabelText('Calculadora de préstamos. Función Pro. Abre la herramienta.'),
-    ).toBeTruthy();
+    expect(screen.getByLabelText('Calculadora de préstamos. Abre la herramienta.')).toBeTruthy();
     expect(
       screen.getByLabelText('Análisis. Función Pro. Descubre la historia detrás de tus gastos.'),
     ).toBeTruthy();
@@ -258,7 +256,7 @@ describe('Home in French', () => {
     ).toBeTruthy();
     expect(screen.getByText('Va plus loin')).toBeTruthy();
     expect(screen.getByText('Inclus avec Pro')).toBeTruthy();
-    expect(screen.getByLabelText('Calculateur de prêt. Fonction Pro. Ouvre l’outil.')).toBeTruthy();
+    expect(screen.getByLabelText('Calculateur de prêt. Ouvre l’outil.')).toBeTruthy();
     expect(screen.getByText('Aperçu')).toBeTruthy();
     expect(screen.getByLabelText('jeu. 10.09. Choisir une date')).toBeTruthy();
     expect(screen.getByText('Récents')).toBeTruthy();

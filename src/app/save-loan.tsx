@@ -7,7 +7,6 @@ import { usePaymentSources } from '@/api/queries';
 import { IconPicker } from '@/components/bills/icon-picker';
 import { loanRateText, loanTermText } from '@/components/calculators/schedule-card';
 import { Button } from '@/components/ui/button';
-import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
@@ -28,14 +27,6 @@ const parseBasis = (value: string | undefined): AccrualBasis =>
  * params, so a hand-edited link cannot save one that disagrees with its principal, rate and term.
  */
 export default function SaveLoanScreen() {
-  // Wrapper, not inline: an early return above the screen's own hooks would change the hook count
-  // when the entitlement answer lands.
-  const gate = useProGate('loans');
-  if (gate) return gate;
-  return <SaveLoanScreenInner />;
-}
-
-function SaveLoanScreenInner() {
   const params = useLocalSearchParams<{
     amount?: string;
     rate?: string;

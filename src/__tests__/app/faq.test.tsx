@@ -53,7 +53,9 @@ describe('Common questions', () => {
 
     expect(screen.queryAllByText(/split|friend|\bgroup/i)).toEqual([]);
     // The answers that did name them now end without them.
-    expect(screen.getByText(/the loan calculator, Insights, early access/)).toBeTruthy();
+    expect(
+      screen.getByText(/Voice entry, Insights, brand logos, seven years of history/),
+    ).toBeTruthy();
     expect(screen.getByText(/the bills, receipts and cards on your account/)).toBeTruthy();
     expect(screen.getByText(/there is no grace copy kept\.$/)).toBeTruthy();
   });

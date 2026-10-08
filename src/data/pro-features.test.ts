@@ -15,10 +15,9 @@ const allText = () =>
 
 describe('PRO_FEATURES', () => {
   it('keeps its English words and ids', () => {
-    expect(PRO_FEATURES.loans.title).toBe('Know a loan to the cent');
+    expect(PRO_FEATURES.history.title).toBe('Seven years of your money');
     expect(PRO_FEATURES.unlimited.benefits[2].title).toBe('Nothing ever locked or deleted');
     expect(Object.values(PRO_FEATURES).map((feature) => feature.id)).toEqual([
-      'loans',
       'insights',
       'scan',
       'voice',
@@ -30,7 +29,7 @@ describe('PRO_FEATURES', () => {
 
   it('reads in Spanish', () => {
     setLanguage('es');
-    expect(PRO_FEATURES.loans.title).toBe('Conoce tu préstamo al centavo');
+    expect(PRO_FEATURES.history.title).toBe('Siete años de tu dinero');
     expect(PRO_FEATURES.scan.tagline).toBe(
       'El plan Gratis lee 15 recibos al mes con la cámara y 15 desde fotos o archivos. Skip Pro los lee todos.',
     );

@@ -26,21 +26,6 @@ function benefit(title: MessageKey, detail: MessageKey): ProFeature['benefits'][
  * "this is locked".
  */
 export const PRO_FEATURES: Record<string, ProFeature> = {
-  loans: {
-    id: 'loans',
-    artwork: 'tileLoanRepayment',
-    get title() {
-      return t('pro.loans.title');
-    },
-    get tagline() {
-      return t('pro.loans.tagline');
-    },
-    benefits: [
-      benefit('pro.loans.exact.title', 'pro.loans.exact.detail'),
-      benefit('pro.loans.schedule.title', 'pro.loans.schedule.detail'),
-      benefit('pro.loans.bill.title', 'pro.loans.bill.detail'),
-    ],
-  },
   insights: {
     id: 'insights',
     artwork: 'insights',

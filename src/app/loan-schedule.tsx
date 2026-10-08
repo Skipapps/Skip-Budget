@@ -4,7 +4,6 @@ import { Text, View } from 'react-native';
 
 import { ProportionBar } from '@/components/calculators/proportion-bar';
 import { loanRateText, loanTermText } from '@/components/calculators/schedule-card';
-import { useProGate } from '@/components/pro/pro-gate';
 import { Screen } from '@/components/ui/screen';
 import { Subtitle } from '@/components/ui/typography';
 import { t } from '@/i18n';
@@ -32,14 +31,6 @@ function basisFootnote(basis: AccrualBasis): string {
 
 /** Every payment and where it goes, grouped by year (a thirty-year loan is 360 rows). */
 export default function LoanScheduleScreen() {
-  // Wrapper, not inline: an early return above the screen's own hooks would change the hook count
-  // when the entitlement answer lands.
-  const gate = useProGate('loans');
-  if (gate) return gate;
-  return <LoanScheduleScreenInner />;
-}
-
-function LoanScheduleScreenInner() {
   const params = useLocalSearchParams<{
     amount?: string;
     rate?: string;

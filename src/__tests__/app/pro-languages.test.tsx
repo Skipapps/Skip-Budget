@@ -17,7 +17,7 @@ jest.mock('react-native-keyboard-controller', () =>
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn() },
-  useLocalSearchParams: () => ({ id: 'loans' }),
+  useLocalSearchParams: () => ({ id: 'history' }),
 }));
 
 // The real SDK starts a cleanup interval on import that keeps Jest from exiting.
@@ -139,7 +139,6 @@ describe('the Pro page in Spanish', () => {
       screen.getByText('Todo lo que Skip puede hacer, por menos de lo que cuesta un café al mes.'),
     ).toBeTruthy();
     expect(screen.getByText('Tarjetas de crédito, cuentas e ingresos ilimitados')).toBeTruthy();
-    expect(screen.getByText('Calculadora de préstamos, al centavo')).toBeTruthy();
     expect(screen.getByText('Anual')).toBeTruthy();
     expect(screen.getByText('$19.99/año')).toBeTruthy();
     expect(screen.getByText('$1.67 al mes, cobrado una vez al año')).toBeTruthy();
@@ -184,7 +183,7 @@ describe('the Pro page in Spanish', () => {
 
   it('explains a locked feature, the price last', async () => {
     const screen = await render(<ProFeatureScreen />);
-    expect(screen.getByText('Conoce tu préstamo al centavo')).toBeTruthy();
+    expect(screen.getByText('Siete años de tu dinero')).toBeTruthy();
     expect(screen.getByText('Parte de Skip Pro')).toBeTruthy();
     expect(screen.getByText('Junto con todo lo demás que desbloquea Pro')).toBeTruthy();
     expect(screen.getByText('Ver Skip Pro: $1.99/mes')).toBeTruthy();
@@ -226,7 +225,7 @@ describe('the Pro page in French', () => {
     mockStore = 'open';
     mockPrices = { monthly: '2,49 $', yearly: '24,99 $', perMonth: '2,08 $' };
     const screen = await render(<ProFeatureScreen />);
-    expect(screen.getByText('Connais ton prêt au cent près')).toBeTruthy();
+    expect(screen.getByText('Sept ans de ton argent')).toBeTruthy();
     expect(screen.getByText('Inclus dans Skip Pro')).toBeTruthy();
     expect(screen.getByText('Voir Skip Pro — 2,49 $/mois')).toBeTruthy();
     expect(screen.getByText('ou 24,99 $/an · Pas maintenant')).toBeTruthy();
