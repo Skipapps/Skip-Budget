@@ -63,6 +63,8 @@ const mockBills = {
 };
 
 const mockLedger = jest.fn();
+// Charges the window holds but a free list leaves out (older than 90 days).
+let mockOlder: string[] = [];
 jest.mock('@/api/queries', () => ({
   useBills: () => mockBills,
   usePaymentSources: () => ({ sources: [{ id: 'acc1', label: 'Chase Checking ••7730' }] }),
@@ -77,15 +79,17 @@ jest.mock('@/api/queries', () => ({
       sourceId: 'acc1',
       planId,
     });
+    const listed = [
+      entry('2026-09-01'),
+      entry('2026-10-01'),
+      entry('2026-11-01'),
+      entry('2026-12-01'),
+      // Another bill's charge, which must not appear on this page.
+      entry('2026-10-05', 'b2'),
+    ];
     return {
-      entries: [
-        entry('2026-09-01'),
-        entry('2026-10-01'),
-        entry('2026-11-01'),
-        entry('2026-12-01'),
-        // Another bill's charge, which must not appear on this page.
-        entry('2026-10-05', 'b2'),
-      ],
+      entries: listed,
+      allEntries: [...mockOlder.map((date) => entry(date)), ...listed],
       isLoading: false,
       isError: false,
       refetch: jest.fn(),
@@ -120,6 +124,16 @@ it('shows the bill, then its paid and upcoming charges as one timeline', async (
     '1 Nov 2026',
     '1 Dec 2026',
   ]);
+});
+
+it('counts the whole year in the Paid heading when a free list stops at 90 days', async () => {
+  mockOlder = ['2026-05-01'];
+  const screen = await render(<BillDetailScreen />);
+
+  // Two paid rows are listed; the heading still counts May's.
+  expect(screen.getByText('3 · $3,090.00')).toBeTruthy();
+  expect(screen.queryByText('May 1, 2026')).toBeNull();
+  mockOlder = [];
 });
 
 it('opens the edit flow from the pencil', async () => {

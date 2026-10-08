@@ -130,6 +130,9 @@ export function useProSource(): ProStatus {
   const server = useQuery({
     queryKey: ['entitlement', userId],
     enabled: Boolean(userId),
+    // One attempt: until it answers, a free account's gates wait. A purchase and every return to the
+    // app read it again anyway.
+    retry: false,
     queryFn: async (): Promise<boolean> => {
       // A ceiling on the wait: until this answers (or fails), a "no" from the SDK alone does not
       // count as known, so a hung request would hold every gate.

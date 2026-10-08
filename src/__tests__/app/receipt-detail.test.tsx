@@ -1,8 +1,9 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import ReceiptDetailScreen from '@/app/receipt/[id]';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
+import { publishProStatus, resetProStatusForTests } from '@/lib/pro-status';
 
 /**
  * One receipt's own page, in the bill page's style: what was bought and how it was paid, then every
@@ -269,5 +270,22 @@ describe('a receipt’s page in Spanish and French', () => {
     expect(screen.getByText('Reçus de Starbucks')).toBeTruthy();
     expect(screen.getByLabelText('Modifier Starbucks')).toBeTruthy();
     expect(screen.getByLabelText('Tout')).toBeTruthy();
+  });
+});
+
+describe('on the free plan', () => {
+  afterEach(() => resetProStatusForTests());
+
+  it('lists the store’s last 90 days, with the heading still counting all of them', async () => {
+    await act(async () => publishProStatus({ pro: false, ready: true }));
+    const screen = await render(<ReceiptDetailScreen />);
+
+    expect(screen.getByText('4 · $33.75')).toBeTruthy();
+    expect(listed(screen)).toEqual(['2 Oct 2026', '1 Oct 2026', '20 Sep 2026']);
+    expect(
+      screen.getByLabelText(
+        'Older history is saved. Free shows the last 90 days. Skip Pro shows up to 7 years.',
+      ),
+    ).toBeTruthy();
   });
 });

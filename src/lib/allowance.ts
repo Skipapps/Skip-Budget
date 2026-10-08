@@ -92,6 +92,8 @@ export type HiddenHistory = {
   receipts: boolean;
   /** planKey of every bill or subscription with a charge from before the window. */
   plans: ReadonlySet<string>;
+  /** Paydays from before the window. */
+  income?: boolean;
 };
 
 export const NOTHING_HIDDEN: HiddenHistory = { receipts: false, plans: new Set() };
@@ -109,5 +111,5 @@ export function hidOlder(
   if (kind === 'receipt') return hidden.receipts;
   if (kind && planId) return hidden.plans.has(planKey(kind, planId));
   if (kind) return [...hidden.plans].some((key) => key.startsWith(`${kind}-`));
-  return hidden.receipts || hidden.plans.size > 0;
+  return hidden.receipts || hidden.plans.size > 0 || Boolean(hidden.income);
 }

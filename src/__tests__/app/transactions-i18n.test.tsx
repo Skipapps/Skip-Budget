@@ -55,6 +55,7 @@ let mockFailed = false;
 jest.mock('@/api/queries', () => ({
   useLedger: () => ({
     entries: mockEntries,
+    allEntries: mockEntries,
     totals: { in: 2000, out: 1036.5, net: 963.5, count: mockEntries.length },
     isLoading: false,
     isError: mockFailed,

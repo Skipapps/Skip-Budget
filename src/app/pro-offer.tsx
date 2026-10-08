@@ -38,9 +38,13 @@ function readDeadline(until: string | undefined): number | null {
   return at <= Date.now() + PRO_OFFER_MS + 5_000 ? at : null;
 }
 
-/** Whether the store prices really are about half, before the page says "half price". */
+/**
+ * Whether the page may say "half price": the store's two prices really are about half, or the store
+ * has said nothing and the dollar figures (exactly half) are drawn.
+ */
 function isHalf(offer: number | undefined, regular: number | undefined): boolean {
-  if (!offer || !regular) return true;
+  if (!offer) return true;
+  if (!regular) return false;
   return Math.abs(offer / regular - 0.5) <= 0.05;
 }
 

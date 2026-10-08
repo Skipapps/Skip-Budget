@@ -112,6 +112,11 @@ type ChargeSectionProps = {
   testID: string;
   /** What a row opens; undefined leaves the row a plain line. */
   onPress?: (entry: ChargeLine) => (() => void) | undefined;
+  /**
+   * The heading's count and total when the rows are fewer than the window (a free account's list
+   * stops at 90 days): the figure stays the whole window's.
+   */
+  whole?: ChargeLine[];
 };
 
 /** A headed card of dated amounts, with their count and total beside the heading. */
@@ -122,13 +127,14 @@ export function ChargeSection({
   moneyColor,
   testID,
   onPress,
+  whole = entries,
 }: ChargeSectionProps) {
   if (entries.length === 0) return null;
-  const total = entries.reduce((sum, entry) => sum + entry.amount, 0);
+  const total = whole.reduce((sum, entry) => sum + entry.amount, 0);
 
   return (
     <View className="mt-6 w-full">
-      <SectionHeading caption={`${entries.length} · ${formatCurrency(Math.abs(total))}`}>
+      <SectionHeading caption={`${whole.length} · ${formatCurrency(Math.abs(total))}`}>
         {title}
       </SectionHeading>
       <FitRows

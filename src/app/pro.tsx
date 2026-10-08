@@ -88,6 +88,8 @@ const PRO_YEARLY_PER_MONTH_USD = 1.67;
 
 type Plan = 'yearly' | 'monthly';
 
+const SWIPE_BACK = { gestureEnabled: true };
+
 /**
  * The Pro page: Free against Pro, the two plans, and one button. With no store key configured it
  * still renders and says purchases are opening soon, so a missing billing SDK never crashes it.
@@ -204,7 +206,7 @@ export default function ProScreen() {
     return (
       <Screen title="Skip Pro" showBack>
         {/* A restore made here turns this page Pro while the offer was armed: the swipe comes back. */}
-        <Stack.Screen options={{ gestureEnabled: true }} />
+        <Stack.Screen options={SWIPE_BACK} />
         <View className="mt-8 w-full items-center">
           <View className="h-16 w-16 items-center justify-center rounded-full bg-accent">
             <Crown size={28} color={colors.onControl} strokeWidth={2} />

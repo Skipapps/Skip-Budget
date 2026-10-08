@@ -148,6 +148,13 @@ describe('hidOlder', () => {
     expect(hidOlder(undefined, 'receipt')).toBe(false);
   });
 
+  it('counts older paydays as history left out', () => {
+    const paydays = { receipts: false, plans: new Set<string>(), income: true };
+    expect(hidOlder(paydays)).toBe(true);
+    expect(hidOlder(paydays, 'receipt')).toBe(false);
+    expect(hidOlder(paydays, 'bill')).toBe(false);
+  });
+
   it('does not mistake one kind for another', () => {
     const billsOnly = { receipts: false, plans: new Set(['bill-b1']) };
     expect(hidOlder(billsOnly, 'subscription')).toBe(false);

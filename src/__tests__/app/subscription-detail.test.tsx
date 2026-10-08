@@ -45,7 +45,13 @@ jest.mock('@/api/queries', () => ({
     refetch: jest.fn(),
   }),
   usePaymentSources: () => ({ sources: [] }),
-  useLedger: () => ({ entries: [], isLoading: false, isError: false, refetch: jest.fn() }),
+  useLedger: () => ({
+    entries: [],
+    allEntries: [],
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
 }));
 
 const CALM = {

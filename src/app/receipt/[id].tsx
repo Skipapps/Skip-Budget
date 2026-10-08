@@ -78,8 +78,8 @@ export default function ReceiptDetailScreen() {
   const today = toIsoDate(new Date());
   // Free lists 90 days back, Pro seven years; older receipts from the store stay stored.
   const { floor, free } = useHistoryFloor();
-  const { history, hiddenOlder } = useMemo(() => {
-    if (!receipt || !receipts.data) return { history: [], hiddenOlder: false };
+  const { history, inWindow, hiddenOlder } = useMemo(() => {
+    if (!receipt || !receipts.data) return { history: [], inWindow: [], hiddenOlder: false };
     const fromStore = receiptsFromStore(receipts.data, receipt);
     const range = windowKey === 'all' ? null : rangeFor(windowKey, new Date(`${today}T00:00:00`));
     const inWindow = fromStore.filter(
@@ -87,6 +87,7 @@ export default function ReceiptDetailScreen() {
     );
     return {
       history: inWindow.filter((row) => row.purchased_on >= floor),
+      inWindow,
       hiddenOlder: free && inWindow.some((row) => row.purchased_on < floor),
     };
   }, [receipt, receipts.data, windowKey, today, floor, free]);
@@ -139,11 +140,14 @@ export default function ReceiptDetailScreen() {
     details.push({ label: t('receipts.field.note'), value: receipt.note.trim() });
   }
 
-  const lines = history.map((row) => ({
+  const asLine = (row: ReceiptRow) => ({
     id: row.id,
     date: row.purchased_on,
     amount: -Math.abs(row.amount),
-  }));
+  });
+  const lines = history.map(asLine);
+  // The heading counts the whole window, as Pro sees it; a free list stops at 90 days.
+  const wholeLines = inWindow.map(asLine);
   const rowById = new Map(history.map((row) => [row.id, row]));
 
   return (
@@ -193,6 +197,7 @@ export default function ReceiptDetailScreen() {
           <ChargeSection
             title={t('receipts.detail.history', { store: receipt.merchant })}
             entries={lines}
+            whole={wholeLines}
             status={(entry) => {
               const row = rowById.get(entry.id);
               const paid = (row && sourceLabel(row)) ?? t('receipts.detail.noPaymentMethod');

@@ -99,6 +99,14 @@ export function PlanDetail({
   // One timeline, oldest at the top: Paid, then Upcoming, so today falls where the two lists meet.
   const byDate = (a: LedgerEntry, b: LedgerEntry) => a.date.localeCompare(b.date);
   const paid = useMemo(() => charges.filter((c) => c.date <= today).sort(byDate), [charges, today]);
+  // The Paid heading counts the whole window, as Pro sees it; a free list stops at 90 days.
+  const paidInWindow = useMemo(
+    () =>
+      ledger.allEntries.filter(
+        (entry) => entry.kind === kind && entry.planId === id && entry.date <= today,
+      ),
+    [ledger.allEntries, kind, id, today],
+  );
   const upcoming = useMemo(
     () => charges.filter((c) => c.date > today).sort(byDate),
     [charges, today],
@@ -192,6 +200,7 @@ export function PlanDetail({
           <ChargeSection
             title={t('bills.planDetail.paid')}
             entries={paid}
+            whole={paidInWindow}
             status={() => t('bills.planDetail.paidRow')}
             moneyColor={moneyColor}
             testID="charges-paid"

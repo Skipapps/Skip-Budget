@@ -92,6 +92,7 @@ let mockLedgerEntries: typeof mockEntries | typeof routingEntries = mockEntries;
 jest.mock('@/api/queries', () => ({
   useLedger: () => ({
     entries: mockLedgerEntries,
+    allEntries: mockLedgerEntries,
     totals: { in: 0, out: 20, net: -20 },
     isLoading: false,
     isError: false,

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import {
@@ -72,7 +72,15 @@ export default function TransactionsScreen() {
     return { from: period.from, to: period.to > today ? today : period.to };
   }, [periodKey, anchor, today]);
 
-  const { entries: ledger, totals, hidden, isLoading, isError, refetch } = useLedger(range, today);
+  const {
+    entries: ledger,
+    allEntries,
+    totals,
+    hidden,
+    isLoading,
+    isError,
+    refetch,
+  } = useLedger(range, today);
   const hiddenOlder = hidOlder(hidden);
   const { refresh, refreshing } = useRefreshAll();
   const { sources } = usePaymentSources();
@@ -102,15 +110,19 @@ export default function TransactionsScreen() {
 
   const buckets = useMemo(() => periodBuckets(periodKey, anchor), [periodKey, anchor]);
 
-  const matching = useMemo(() => {
-    return ledger.filter((entry) => {
+  const keeps = useCallback(
+    (entry: LedgerEntry) => {
       if (!matchesSearch(entry.label, query)) return false;
       if (filters.date && entry.date !== filters.date) return false;
       if (filters.sourceIds.length > 0 && !filters.sourceIds.includes(entry.sourceId)) return false;
       if (filters.kinds.length > 0 && !filters.kinds.includes(entry.kind)) return false;
       return true;
-    });
-  }, [ledger, query, filters]);
+    },
+    [query, filters],
+  );
+  const matching = useMemo(() => ledger.filter(keeps), [ledger, keeps]);
+  // A group's total is the whole group's, as Pro sees it, even where a free list starts mid-group.
+  const matchingAll = useMemo(() => allEntries.filter(keeps), [allEntries, keeps]);
 
   // Newest first, empty buckets dropped. `periodBuckets` is oldest-first, so buckets are reversed
   // and rows within a bucket sorted descending; same-day rows tiebreak on id.
@@ -126,12 +138,14 @@ export default function TransactionsScreen() {
           return {
             ...bucket,
             entries,
-            total: entries.reduce((sum, entry) => sum + entry.amount, 0),
+            total: matchingAll
+              .filter((entry) => entry.date >= bucket.from && entry.date <= bucket.to)
+              .reduce((sum, entry) => sum + entry.amount, 0),
           };
         })
         .filter((bucket) => bucket.entries.length > 0)
         .reverse(),
-    [buckets, matching],
+    [buckets, matching, matchingAll],
   );
 
   return (

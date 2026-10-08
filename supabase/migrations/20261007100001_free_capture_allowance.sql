@@ -72,11 +72,12 @@ $$;
 
 -- How a receipt arrived and when it was saved are facts about its creation:
 -- an edit keeps both. Otherwise an edit could move this month's scans into
--- last month, or relabel a typed receipt, and free the allowance.
+-- last month, or relabel a typed receipt, and free the allowance. Every
+-- update is held to this, a data fix included: a migration that must change
+-- either column disables receipts_keep_origin around its update.
 create or replace function public.keep_receipt_origin()
 returns trigger
 language plpgsql
-security definer
 set search_path = public
 as $$
 begin

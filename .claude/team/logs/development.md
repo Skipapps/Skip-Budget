@@ -4285,3 +4285,13 @@ logos explainer. A refused capture recounts the month. Migration: receipts_keep_
 update; count repeats the partial-index predicate (26 local checks, fresh `db reset` clean). Week trials read in days.
 Free window is exactly 90 days. Open for the Founder: logos in rich pushes (send-push deploy); keeping a refused scan
 as a typed receipt.
+
+**2026-10-07 — Dmitri — re-review of a388394 (fixes from the review):** FIX-FIRST on one small item, then
+ship to the phone (migration live first). Read-only; tsc 0, full jest 203/203 (3633), ESLint `--no-cache` and prettier
+clean on the commit's files. Verified fixed: Savings total, whole-window headings (Activity, Bills, Subscriptions,
+Receipts), 3 s claim ceiling, ready waits on a lone SDK "no", offer `until`/Restore/renews/half-price, grey logo circle,
+free remembers stores, recount after refusal, 90-day floor, week trials in days, receipts_keep_origin (no app path
+changes source on edit). Remaining: (1) period-labelled sub-figures still sum only listed rows on free (plan-detail
+"Paid" caption, receipt detail store-history caption, Activity bucket that straddles the floor); (2) entitlement query
+inherits retry 1, so a hung network holds every free gate ~17 s (offline fails fast); (3) LogoConfirm still looks up
+while the plan is unknown; (4) `hidden` ignores income; nits on `until` trust, isHalf default, inline Stack.Screen options.

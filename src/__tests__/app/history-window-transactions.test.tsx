@@ -36,9 +36,16 @@ const TODAY = '2026-09-10';
 
 let mockEntries: { id: string; label: string; amount: number; date: string }[] = [];
 let mockHidden: HiddenHistory = NOTHING_HIDDEN;
+// Rows the window holds but a free list leaves out.
+let mockOlder: { id: string; label: string; amount: number; date: string }[] = [];
 jest.mock('@/api/queries', () => ({
   useLedger: () => ({
     entries: mockEntries.map((row) => ({ ...row, kind: 'receipt', sourceId: 's1' })),
+    allEntries: [...mockOlder, ...mockEntries].map((row) => ({
+      ...row,
+      kind: 'receipt',
+      sourceId: 's1',
+    })),
     totals: { in: 0, out: 0, net: 0 },
     hidden: mockHidden,
     isLoading: false,
@@ -57,6 +64,7 @@ beforeEach(() => {
   resetProStatusForTests();
   mockEntries = [{ id: 'receipt-1', label: 'Bakery', amount: -6, date: TODAY }];
   mockHidden = NOTHING_HIDDEN;
+  mockOlder = [];
 });
 
 type Screen = Awaited<ReturnType<typeof render>>;
@@ -126,4 +134,17 @@ describe('the notice', () => {
     const screen = await render(<TransactionsScreen />);
     expect(screen.queryByLabelText(NOTICE)).toBeNull();
   });
+});
+
+it('totals the whole month in a group the free list starts partway through', async () => {
+  await act(async () => publishProStatus({ pro: false, ready: true }));
+  mockEntries = [{ id: 'receipt-jun20', label: 'Bakery', amount: -6, date: '2026-06-20' }];
+  mockOlder = [{ id: 'receipt-jun05', label: 'Chemist', amount: -4, date: '2026-06-05' }];
+  mockHidden = { receipts: true, plans: new Set() };
+  const screen = await render(<TransactionsScreen />);
+  await fireEvent.press(screen.getByText('Year'));
+
+  expect(screen.getByText('Bakery')).toBeTruthy();
+  expect(screen.queryByText('Chemist')).toBeNull();
+  expect(screen.getByText('-$10.00')).toBeTruthy();
 });

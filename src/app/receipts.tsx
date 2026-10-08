@@ -23,6 +23,7 @@ import { SearchField } from '@/components/ui/search-field';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { t } from '@/i18n';
+import { historyFloor } from '@/lib/allowance';
 import { toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
 import { logoDomainOf } from '@/lib/logo-domain';
@@ -47,6 +48,8 @@ export default function ReceiptsScreen() {
   const { data: receipts = [], isLoading, isError, refetch } = useReceipts();
   // Free lists 90 days back, Pro seven years. Older receipts stay stored and say so.
   const { floor, free } = useHistoryFloor();
+  // Seven years back is as far as the app keeps anything, on any plan.
+  const kept = useMemo(() => historyFloor(true, new Date()), []);
   const { sources } = usePaymentSources();
 
   const { scan, scanning, available: canScan } = useReceiptScan();
@@ -88,6 +91,7 @@ export default function ReceiptsScreen() {
   const matching = useMemo(() => {
     return receipts.filter((receipt) => {
       if (receipt.purchased_on < range.from || receipt.purchased_on > range.to) return false;
+      if (receipt.purchased_on < kept) return false;
       if (!matchesSearch(receipt.merchant, query)) return false;
       if (filters.date && receipt.purchased_on !== filters.date) return false;
       if (filters.sourceIds.length > 0) {
@@ -96,7 +100,7 @@ export default function ReceiptsScreen() {
       }
       return true;
     });
-  }, [receipts, query, filters, range]);
+  }, [receipts, query, filters, range, kept]);
 
   const visible = useMemo(
     () => matching.filter((receipt) => receipt.purchased_on >= floor),

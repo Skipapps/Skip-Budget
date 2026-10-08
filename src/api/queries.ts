@@ -1053,15 +1053,15 @@ export function useLedger(range: DateRange | undefined, today: string) {
   const hidden = useMemo<HiddenHistory>(() => {
     if (!free) return NOTHING_HIDDEN;
     let receiptsHidden = false;
+    let incomeHidden = false;
     const plans = new Set<string>();
     for (const entry of allEntries) {
       if (entry.date >= floor) continue;
       if (entry.kind === 'receipt') receiptsHidden = true;
-      else if ((entry.kind === 'bill' || entry.kind === 'subscription') && entry.planId) {
-        plans.add(planKey(entry.kind, entry.planId));
-      }
+      else if (entry.kind === 'income') incomeHidden = true;
+      else if (entry.planId) plans.add(planKey(entry.kind, entry.planId));
     }
-    return { receipts: receiptsHidden, plans };
+    return { receipts: receiptsHidden, plans, income: incomeHidden };
   }, [free, allEntries, floor]);
 
   // A figure for the whole window asked for, as Pro sees it: "charged this year" is the year's.

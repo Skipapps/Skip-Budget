@@ -63,7 +63,7 @@ Then: App Store Connect (14-day intro offer, $9.99 offer product), RevenueCat (a
 
 - [x] 1 b2a6dcd  - [x] 2 30b8eef  - [x] 3 a81f380 (migration NOT live)  - [x] 4 e2ccf21
 - [x] 5 8d985ae  - [x] 6 ce7ec3c  - [x] 7 8d5176e  - [x] 8 577c666  - [x] 9 b02eefa
-- [ ] 10 lapse pass + Dmitri review (in progress)
+- [x] 10 lapse pass + Dmitri review (FIX-FIRST → fixed in a388394 + follow-up; re-review SHIP-TO-PHONE after its one item)
 
 Device checklist: `.claude/team/dev/pro-free-test-checklist.md`.
 RevenueCat offering id the app reads: `exit_offer` (its yearly/annual package is the $9.99 plan).
