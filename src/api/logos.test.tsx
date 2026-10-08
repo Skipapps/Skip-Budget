@@ -107,6 +107,8 @@ describe('resolveLogo', () => {
       ],
       // This answer says nothing of how it was found.
       kind: null,
+      pending: false,
+      hasLogo: true,
     });
   });
 
@@ -149,6 +151,28 @@ describe('resolveLogo', () => {
       margin: 0.02,
       candidates: [{ domain: 'calm.com', name: 'Calm', confidence: 0.41 }],
       kind: null,
+      pending: false,
+      hasLogo: false,
+    });
+  });
+
+  it('says when the service is still finding the logo', async () => {
+    answer = () =>
+      json({
+        matched: true,
+        name: 'elonmanagement.com',
+        domain: 'elonmanagement.com',
+        confidence: 1,
+        margin: 1,
+        logo: null,
+        candidates: [],
+        match: 'domain',
+        pending: true,
+      });
+    await expect(resolveLogo('elonmanagement.com', {})).resolves.toMatchObject({
+      matched: true,
+      pending: true,
+      hasLogo: false,
     });
   });
 
@@ -242,6 +266,8 @@ describe('resolveLogo', () => {
         { domain: 'max.com', name: 'Max', confidence: 0 },
       ],
       kind: null,
+      pending: false,
+      hasLogo: false,
     });
   });
 
@@ -259,6 +285,8 @@ describe('resolveLogo', () => {
           { domain: 'planet.com', name: 'Planet Labs', confidence: 0.67 },
         ],
         kind: 'alias',
+        pending: false,
+        hasLogo: true,
       });
     });
 

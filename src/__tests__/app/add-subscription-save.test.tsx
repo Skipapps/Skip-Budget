@@ -1283,6 +1283,7 @@ describe('Add subscription — the logo', () => {
     expect(mockRemember).toHaveBeenCalledTimes(1);
     expect(mockRemember).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Linear', logoDomain: 'linear.app', logoHidden: false }),
+      { teach: false },
     );
   });
 

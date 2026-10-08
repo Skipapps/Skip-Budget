@@ -211,15 +211,19 @@ export function BrandField({
             hints={logoHints(category ?? value.categoryId)}
             noLogo={noLogo}
             decided={logoChosen(value)}
-            onChoose={(choice) => {
+            onChoose={(choice, how) => {
               const answered = { ...value, ...choice };
               onChange(answered);
-              void remember({
-                name: answered.name,
-                categoryId: answered.categoryId,
-                logoDomain: choice.logoDomain,
-                logoHidden: choice.logoHidden,
-              });
+              void remember(
+                {
+                  name: answered.name,
+                  categoryId: answered.categoryId,
+                  logoDomain: choice.logoDomain,
+                  logoHidden: choice.logoHidden,
+                },
+                // Only a person's own choice teaches the service; a sure match it already knows.
+                { teach: how === 'chosen' },
+              );
             }}
           />
         ) : onChangeLogo && !free ? (

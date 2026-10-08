@@ -583,14 +583,17 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
             hints={logoHints(kind === 'bill' ? entry.billCategoryId : merchant.categoryId)}
             noLogo={kind === 'bill' ? 'icon' : 'letters'}
             decided={logoChosen(merchant)}
-            onChoose={(choice) => {
+            onChoose={(choice, how) => {
               updateVoiceEntry(id, { merchant: { ...merchant, ...choice } });
-              void remember({
-                name: merchant.name,
-                categoryId: merchant.categoryId,
-                logoDomain: choice.logoDomain,
-                logoHidden: choice.logoHidden,
-              });
+              void remember(
+                {
+                  name: merchant.name,
+                  categoryId: merchant.categoryId,
+                  logoDomain: choice.logoDomain,
+                  logoHidden: choice.logoHidden,
+                },
+                { teach: how === 'chosen' },
+              );
             }}
           />
         ) : undefined

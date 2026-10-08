@@ -330,7 +330,8 @@ type LogoConfirmProps = {
   name: string;
   hints: LogoHints;
   noLogo: NoLogo;
-  onChoose: (choice: LogoChoice) => void;
+  /** `chosen` when the person answered; `automatic` when a sure match was applied for them. */
+  onChoose: (choice: LogoChoice, how: 'chosen' | 'automatic') => void;
   /** Already answered elsewhere (an earlier page): opens on "Change logo" instead of asking again. */
   decided?: boolean;
 };
@@ -361,7 +362,7 @@ export function LogoConfirm({ name, hints, noLogo, onChoose, decided = false }: 
   const sureDomain = auto && step === 'ask' && isSureMatch(match.data) ? match.data.domain : null;
 
   const choose = (choice: LogoChoice) => {
-    onChoose(choice);
+    onChoose(choice, 'chosen');
     setStep('done');
   };
 
@@ -373,7 +374,7 @@ export function LogoConfirm({ name, hints, noLogo, onChoose, decided = false }: 
   useEffect(() => {
     if (!sureDomain || applied.current) return;
     applied.current = true;
-    onChooseRef.current({ logoDomain: sureDomain, logoHidden: false });
+    onChooseRef.current({ logoDomain: sureDomain, logoHidden: false }, 'automatic');
     setStep('done');
   }, [sureDomain]);
 

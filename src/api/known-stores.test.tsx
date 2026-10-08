@@ -18,6 +18,8 @@ import {
  * storage read as nothing, and no failure anywhere thrown at a caller.
  */
 
+const mockTeach = jest.fn(async (_input: unknown) => true);
+jest.mock('@/api/logos', () => ({ teachLogo: (input: unknown) => mockTeach(input) }));
 jest.mock('@react-native-async-storage/async-storage', () => {
   const storage = jest.requireActual(
     '@react-native-async-storage/async-storage/jest/async-storage-mock',
@@ -248,7 +250,7 @@ describe('readKnownStores', () => {
     ]);
   });
 
-  it('drops an entry that holds no answer: no logo chosen and not letters', async () => {
+  it('keeps a store with no logo answer, so it is still listed first (free is never asked)', async () => {
     await put([
       store('Answered'),
       store('Neither', { logoDomain: null, logoHidden: false }),
@@ -256,10 +258,15 @@ describe('readKnownStores', () => {
       store('Letters', { logoDomain: null, logoHidden: true }),
     ]);
 
-    expect((await readKnownStores('user-1')).map((entry) => entry.name)).toEqual([
+    const read = await readKnownStores('user-1');
+    expect(read.map((entry) => entry.name)).toEqual([
       'Answered',
+      'Neither',
+      'Empty domain',
       'Letters',
     ]);
+    // An empty website is no website.
+    expect(read[2].logoDomain).toBeNull();
   });
 
   it('keeps only the first 100 of a longer list', async () => {
@@ -390,15 +397,52 @@ describe('useRememberStore', () => {
     expect(list.some((entry) => entry.name === 'Shop 99')).toBe(false);
   });
 
-  it('writes nothing for a store with no answer', async () => {
+  it('writes nothing for a store with no name', async () => {
     const { result } = await renderHook(() => useRememberStore());
 
-    await act(() => result.current(store('Vercel', { logoDomain: null, logoHidden: false })));
-    await act(() => result.current(store('Vercel', { logoDomain: '', logoHidden: false })));
     await act(() => result.current(store('   ', { logoDomain: 'x.com' })));
 
     expect(AsyncStorage.setItem).not.toHaveBeenCalled();
     expect(await stored()).toBeNull();
+  });
+
+  it('remembers a store with no logo answer, without losing an answer given before', async () => {
+    const { result } = await renderHook(() => useRememberStore());
+
+    await act(() => result.current(store('Planet Fitness', { logoDomain: 'planetfitness.com' })));
+    await act(() =>
+      result.current(store('Planet Fitness', { logoDomain: null, logoHidden: false })),
+    );
+    await act(() => result.current(store('Corner Deli', { logoDomain: null, logoHidden: false })));
+
+    const read = await readKnownStores('user-1');
+    expect(read.map((entry) => [entry.name, entry.logoDomain])).toEqual([
+      ['Corner Deli', null],
+      ['Planet Fitness', 'planetfitness.com'],
+    ]);
+  });
+
+  it('teaches the service only a website the person chose', async () => {
+    const { result } = await renderHook(() => useRememberStore());
+
+    await act(() =>
+      result.current(store('Elon Management', { logoDomain: 'elonmanagement.com' }), {
+        teach: true,
+      }),
+    );
+    await act(() => result.current(store('Sure Thing', { logoDomain: 'surething.com' })));
+    await act(() =>
+      result.current(store('Letters Shop', { logoDomain: null, logoHidden: true }), {
+        teach: true,
+      }),
+    );
+
+    expect(mockTeach).toHaveBeenCalledTimes(1);
+    expect(mockTeach).toHaveBeenCalledWith({
+      query: 'Elon Management',
+      domain: 'elonmanagement.com',
+      userId: 'user-1',
+    });
   });
 
   it('writes nothing with nobody signed in', async () => {

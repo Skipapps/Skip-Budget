@@ -1096,6 +1096,7 @@ describe('Add bill — the logo', () => {
         logoDomain: 'metrohydro.example',
         logoHidden: false,
       }),
+      { teach: false },
     );
   });
 

@@ -962,12 +962,15 @@ describe('Add receipt — the logo', () => {
       logo_hidden: false,
     });
     expect(mockRemember).toHaveBeenCalledTimes(1);
-    expect(mockRemember).toHaveBeenCalledWith({
-      name: 'Blue Bottle Coffee',
-      categoryId: 'dining',
-      logoDomain: 'bluebottlecoffee.com',
-      logoHidden: false,
-    });
+    expect(mockRemember).toHaveBeenCalledWith(
+      {
+        name: 'Blue Bottle Coffee',
+        categoryId: 'dining',
+        logoDomain: 'bluebottlecoffee.com',
+        logoHidden: false,
+      },
+      { teach: false },
+    );
   });
 
   it('still asks when the service only half knows the name', async () => {

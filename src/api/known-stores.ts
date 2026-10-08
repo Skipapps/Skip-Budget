@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { teachLogo } from '@/api/logos';
 import { useUserId } from '@/providers/session-provider';
 
 /**
@@ -49,9 +50,8 @@ function readStore(value: unknown): KnownStore | null {
   if (typeof name !== 'string' || !name.trim() || typeof categoryId !== 'string') return null;
   if (logoDomain !== null && typeof logoDomain !== 'string') return null;
   if (typeof logoHidden !== 'boolean') return null;
-  // An entry that holds no answer is not worth remembering.
-  if (!logoDomain && !logoHidden) return null;
-  return { name, categoryId, logoDomain, logoHidden };
+  // An entry with no logo answer still lists the store first (free accounts are never asked).
+  return { name, categoryId, logoDomain: logoDomain || null, logoHidden };
 }
 
 /** Everything remembered for `userId`, newest first. Anything unreadable is nothing. */
@@ -76,10 +76,19 @@ export async function readKnownStores(userId: string): Promise<KnownStore[]> {
   }
 }
 
-/** `stores` with `next` first, replacing any earlier answer for the same name. */
+/**
+ * `stores` with `next` first, replacing any earlier entry for the same name. An entry without a logo
+ * answer keeps the answer given before, so adding a store again on free never loses its logo.
+ */
 export function rememberIn(stores: readonly KnownStore[], next: KnownStore): KnownStore[] {
   const key = storeKey(next.name);
-  return [next, ...stores.filter((store) => storeKey(store.name) !== key)].slice(0, CAP);
+  const earlier = stores.find((store) => storeKey(store.name) === key);
+  const answered = next.logoDomain !== null || next.logoHidden;
+  const kept =
+    !answered && earlier
+      ? { ...next, logoDomain: earlier.logoDomain, logoHidden: earlier.logoHidden }
+      : next;
+  return [kept, ...stores.filter((store) => storeKey(store.name) !== key)].slice(0, CAP);
 }
 
 /** Remembered stores that a typed name could be, best first: starts with it, then contains it. */
@@ -124,15 +133,22 @@ export function useKnownStores(): KnownStore[] {
 let queue: Promise<void> = Promise.resolve();
 
 /**
- * Remembers the logo answer for a store. Best-effort: never rejects, and writes nothing for a store
- * with no answer (no logo chosen and not letters).
+ * Remembers a store and its logo answer. With `teach`, a website the person chose for it is also
+ * sent to the logo service, so the next person who adds the same store is offered it (and three
+ * people agreeing makes it certain for everyone). Best-effort: never rejects.
  */
-export function useRememberStore(): (store: KnownStore) => Promise<void> {
+export function useRememberStore(): (
+  store: KnownStore,
+  options?: { teach?: boolean },
+) => Promise<void> {
   const userId = useUserId();
 
   return useCallback(
-    (store: KnownStore) => {
+    (store: KnownStore, options?: { teach?: boolean }) => {
       if (!userId || !readStore(store)) return Promise.resolve();
+      if (options?.teach && store.logoDomain && !store.logoHidden) {
+        void teachLogo({ query: store.name, domain: store.logoDomain, userId });
+      }
       const write = async () => {
         const area = storage();
         if (!area) return;

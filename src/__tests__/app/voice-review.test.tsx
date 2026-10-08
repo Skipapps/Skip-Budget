@@ -842,12 +842,15 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
       await press(screen, LOGO_COPY.yes);
 
       expect(mockRemember).toHaveBeenCalledTimes(1);
-      expect(mockRemember).toHaveBeenCalledWith({
-        name: 'Rainbow Shops',
-        categoryId: 'shopping',
-        logoDomain: 'rainbowshops.com',
-        logoHidden: false,
-      });
+      expect(mockRemember).toHaveBeenCalledWith(
+        {
+          name: 'Rainbow Shops',
+          categoryId: 'shopping',
+          logoDomain: 'rainbowshops.com',
+          logoHidden: false,
+        },
+        { teach: true },
+      );
     });
 
     it('remembers letters when the person asks for none', async () => {
@@ -858,12 +861,15 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
       await press(screen, LOGO_COPY.letters);
 
       expect(mockRemember).toHaveBeenCalledTimes(1);
-      expect(mockRemember).toHaveBeenCalledWith({
-        name: 'Rainbow Shops',
-        categoryId: 'shopping',
-        logoDomain: null,
-        logoHidden: true,
-      });
+      expect(mockRemember).toHaveBeenCalledWith(
+        {
+          name: 'Rainbow Shops',
+          categoryId: 'shopping',
+          logoDomain: null,
+          logoHidden: true,
+        },
+        { teach: true },
+      );
     });
 
     it('remembers a bill’s company the same way', async () => {
@@ -887,12 +893,15 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
 
       await press(screen, LOGO_COPY.yes);
 
-      expect(mockRemember).toHaveBeenCalledWith({
-        name: 'Local Power',
-        categoryId: 'utilities',
-        logoDomain: 'localpower.com',
-        logoHidden: false,
-      });
+      expect(mockRemember).toHaveBeenCalledWith(
+        {
+          name: 'Local Power',
+          categoryId: 'utilities',
+          logoDomain: 'localpower.com',
+          logoHidden: false,
+        },
+        { teach: true },
+      );
     });
 
     it('remembers nothing until the person answers, and saving is not an answer', async () => {
@@ -947,12 +956,15 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
         }),
       );
       expect(mockRemember).toHaveBeenCalledTimes(1);
-      expect(mockRemember).toHaveBeenCalledWith({
-        name: 'Rainbow Shops',
-        categoryId: 'shopping',
-        logoDomain: 'rainbowshops.com',
-        logoHidden: false,
-      });
+      expect(mockRemember).toHaveBeenCalledWith(
+        {
+          name: 'Rainbow Shops',
+          categoryId: 'shopping',
+          logoDomain: 'rainbowshops.com',
+          logoHidden: false,
+        },
+        { teach: false },
+      );
     });
 
     it('still asks for a close spelling', async () => {

@@ -3,6 +3,7 @@ import { useSyncExternalStore, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { logoImageUrl } from '@/api/logos';
+import { logoFailedLately, rememberLogoFailure, subscribeLogoFailures } from '@/lib/logo-failures';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { monogramOf } from '@/lib/monogram';
@@ -19,39 +20,7 @@ type BrandLogoProps = {
   fallback?: ReactNode;
 };
 
-/** How long a logo that would not load is drawn as letters before it is asked for again. */
-export const FAILED_LOGO_RETRY_MS = 10 * 60 * 1000;
-
-/**
- * Logo URLs that failed in the last FAILED_LOGO_RETRY_MS. A website with no logo answers 404 every
- * time, so without this every row showing it would ask again on every mount. Forgotten after the
- * wait rather than kept for the session, because a phone that was briefly offline fails the same
- * way and must get its logos back. Rows read it as a store, so a row on screen redraws (and asks
- * again) when a failure is forgotten, not only rows mounted later.
- */
-const failedLately = new Set<string>();
-const listeners = new Set<() => void>();
-
-function notify() {
-  for (const listener of listeners) listener();
-}
-
-function rememberFailure(url: string) {
-  if (failedLately.has(url)) return;
-  failedLately.add(url);
-  notify();
-  setTimeout(() => {
-    failedLately.delete(url);
-    notify();
-  }, FAILED_LOGO_RETRY_MS);
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
+export { FAILED_LOGO_RETRY_MS } from '@/lib/logo-failures';
 
 /**
  * A brand's logo, or a coloured monogram. The fallback is not an error state: plenty of websites
@@ -66,7 +35,7 @@ export function BrandLogo({ name, domain, size = 40, className, fallback }: Bran
   // other's version flash, and nothing is fetched for an account that may be free.
   const waiting = Boolean(logo) && !ready;
   // Keyed by URL, not a flag on the row, so a recycled row showing another brand recovers at once.
-  const failed = useSyncExternalStore(subscribe, () => (url ? failedLately.has(url) : false));
+  const failed = useSyncExternalStore(subscribeLogoFailures, () => logoFailedLately(url));
 
   const showFallback = !url || failed;
   const mark = monogramOf(name);
@@ -114,7 +83,7 @@ export function BrandLogo({ name, domain, size = 40, className, fallback }: Bran
           cachePolicy="memory-disk"
           transition={120}
           onError={() => {
-            if (url) rememberFailure(url);
+            if (url) rememberLogoFailure(url);
           }}
           accessibilityLabel={t('settings.logo.imageOf', { name })}
         />

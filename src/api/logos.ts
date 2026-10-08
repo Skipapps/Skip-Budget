@@ -2,6 +2,8 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { getLocales } from 'expo-localization';
 import { useMemo } from 'react';
 
+import { forgetLogoFailure } from '@/lib/logo-failures';
+
 /**
  * Skip Logos, our own name-to-logo service. `resolve` finds the brand behind a typed name;
  * `report` flags a wrong logo for a human to fix for everyone; images are plain public URLs.
@@ -24,8 +26,12 @@ export type LogoMatch = {
   margin: number;
   /** The next-best brands, for "Not this one?". */
   candidates: LogoCandidate[];
-  /** How it was found: "alias" and "domain" are exact, "fuzzy" is a close spelling. */
+  /** How it was found: "alias" and "domain" are exact, "fuzzy" is a close spelling, "guess" is a likely website. */
   kind?: string | null;
+  /** The service is still finding the logo: asking again shortly may bring it. */
+  pending?: boolean;
+  /** The service holds a logo for the match. */
+  hasLogo?: boolean;
 };
 
 export type LogoHints = { country?: string; category?: string };
@@ -33,6 +39,10 @@ export type LogoHints = { country?: string; category?: string };
 /** A lookup can make the service fetch other sites, so give it time, but not forever. */
 const RESOLVE_TIMEOUT_MS = 10_000;
 const REPORT_TIMEOUT_MS = 10_000;
+const LEARN_TIMEOUT_MS = 8_000;
+/** While the service is still finding a logo, the page asks again this often, this many times. */
+const PENDING_RECHECK_MS = 5_000;
+const PENDING_RECHECKS = 6;
 
 const MAX_CANDIDATES = 8;
 
@@ -125,6 +135,8 @@ function readLogoMatch(raw: unknown): LogoMatch | null {
     margin: unit(raw.margin),
     candidates,
     kind: typeof raw.match === 'string' ? raw.match.trim().slice(0, 20) || null : null,
+    pending: raw.pending === true,
+    hasLogo: isRecord(raw.logo),
   };
 }
 
@@ -193,19 +205,82 @@ export function useLogoMatch(query: string, hints: LogoHints): UseQueryResult<Lo
   const country = hints.country?.trim() || device || null;
   const category = hints.category?.trim() || null;
 
-  return useQuery({
+  return useQuery<LogoMatch | null>({
     queryKey: ['logo-match', needle.toLowerCase(), country, category],
     // One character matches nothing useful and would still cost the service a lookup.
     enabled: needle.length >= 2,
     staleTime: (cached) => (cached.state.data == null ? 0 : RESOLVED_FOR),
     retry: false,
-    queryFn: ({ signal }) =>
-      resolveLogo(
+    // A logo still being found is asked about again while the page is open, so it appears without
+    // leaving it; a handful of times, then the row's own retry takes over.
+    refetchInterval: (cached) => {
+      const data = cached.state.data;
+      return data?.pending && !data.hasLogo && cached.state.dataUpdateCount < PENDING_RECHECKS
+        ? PENDING_RECHECK_MS
+        : false;
+    },
+    queryFn: async ({ signal }) => {
+      const match = await resolveLogo(
         needle,
         { country: country ?? undefined, category: category ?? undefined },
         signal,
-      ),
+      );
+      // Found now: rows drawing letters after an earlier miss load it at once.
+      if (match?.hasLogo && match.domain) forgetLogoFailure(logoImageUrl(match.domain));
+      return match;
+    },
   });
+}
+
+/**
+ * Tells the service which website a store's name belongs to, after the person chose it. The next
+ * person who adds the same store is offered it, and three different people agreeing makes it
+ * certain for everyone. `voter` is a one-way fingerprint of the account, so a person counts once
+ * and is never identified. True when the service took it; never throws.
+ */
+export async function teachLogo(input: {
+  query: string;
+  domain: string;
+  userId: string;
+  country?: string;
+}): Promise<boolean> {
+  const base = apiBase();
+  const domain = cleanDomain(input.domain);
+  const query = input.query.trim().slice(0, 80);
+  if (!base || !domain || query.length < 2 || !input.userId) return false;
+  const voter = await logoVoter(input.userId);
+  if (!voter) return false;
+  const taken = await fetchWithin(
+    `${base}/v1/learn`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json',
+        ...appKeyHeader(),
+      },
+      body: JSON.stringify({ query, domain, country: input.country ?? deviceCountry(), voter }),
+    },
+    LEARN_TIMEOUT_MS,
+    (response) => response.ok,
+  );
+  return taken === true;
+}
+
+/** SHA-256 of the account id under a fixed label: the same person always, nobody recognisable. */
+async function logoVoter(userId: string): Promise<string | null> {
+  try {
+    // Required here: the native module is only needed when someone teaches, and tests have none.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Crypto = require('expo-crypto') as typeof import('expo-crypto');
+    const hex = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      `skip-logos-voter:${userId}`,
+    );
+    return /^[0-9a-f]{64}$/i.test(hex) ? hex.toLowerCase() : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -574,12 +574,15 @@ describe('what is remembered for next time', () => {
     await fireEvent.press(screen.getByLabelText('Yes, that’s it'));
 
     expect(mockRemember).toHaveBeenCalledTimes(1);
-    expect(mockRemember).toHaveBeenCalledWith({
-      name: 'Planet Fitness',
-      categoryId: 'fitness',
-      logoDomain: 'planetfitness.com',
-      logoHidden: false,
-    });
+    expect(mockRemember).toHaveBeenCalledWith(
+      {
+        name: 'Planet Fitness',
+        categoryId: 'fitness',
+        logoDomain: 'planetfitness.com',
+        logoHidden: false,
+      },
+      { teach: true },
+    );
   });
 
   it('remembers letters as the answer', async () => {
@@ -589,12 +592,15 @@ describe('what is remembered for next time', () => {
     await fireEvent.press(screen.getByLabelText('No logo, use letters'));
 
     expect(mockRemember).toHaveBeenCalledTimes(1);
-    expect(mockRemember).toHaveBeenCalledWith({
-      name: 'Planet Fitness',
-      categoryId: 'fitness',
-      logoDomain: null,
-      logoHidden: true,
-    });
+    expect(mockRemember).toHaveBeenCalledWith(
+      {
+        name: 'Planet Fitness',
+        categoryId: 'fitness',
+        logoDomain: null,
+        logoHidden: true,
+      },
+      { teach: true },
+    );
   });
 
   it('remembers the other brand the person picked', async () => {
@@ -606,12 +612,15 @@ describe('what is remembered for next time', () => {
     await fireEvent.press(screen.getByLabelText('Planet Labs, planet.com'));
 
     expect(mockRemember).toHaveBeenCalledTimes(1);
-    expect(mockRemember).toHaveBeenCalledWith({
-      name: 'Planet Fitness',
-      categoryId: 'fitness',
-      logoDomain: 'planet.com',
-      logoHidden: false,
-    });
+    expect(mockRemember).toHaveBeenCalledWith(
+      {
+        name: 'Planet Fitness',
+        categoryId: 'fitness',
+        logoDomain: 'planet.com',
+        logoHidden: false,
+      },
+      { teach: true },
+    );
   });
 
   it('remembers the website the person gave', async () => {
@@ -627,6 +636,7 @@ describe('what is remembered for next time', () => {
     expect(mockRemember).toHaveBeenCalledTimes(1);
     expect(mockRemember).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Planet Fitness', logoDomain: 'planetfitness.com' }),
+      { teach: true },
     );
   });
 
@@ -636,12 +646,15 @@ describe('what is remembered for next time', () => {
     await screen.rerender(<Harness />);
 
     expect(mockRemember).toHaveBeenCalledTimes(1);
-    expect(mockRemember).toHaveBeenCalledWith({
-      name: 'Vercel',
-      categoryId: 'other',
-      logoDomain: 'vercel.com',
-      logoHidden: false,
-    });
+    expect(mockRemember).toHaveBeenCalledWith(
+      {
+        name: 'Vercel',
+        categoryId: 'other',
+        logoDomain: 'vercel.com',
+        logoHidden: false,
+      },
+      { teach: false },
+    );
   });
 
   it('remembers the new answer when the person changes it', async () => {
@@ -653,12 +666,15 @@ describe('what is remembered for next time', () => {
     await fireEvent.press(screen.getByLabelText('No logo, use letters'));
 
     expect(mockRemember).toHaveBeenCalledTimes(1);
-    expect(mockRemember).toHaveBeenCalledWith({
-      name: 'Vercel',
-      categoryId: 'other',
-      logoDomain: null,
-      logoHidden: true,
-    });
+    expect(mockRemember).toHaveBeenCalledWith(
+      {
+        name: 'Vercel',
+        categoryId: 'other',
+        logoDomain: null,
+        logoHidden: true,
+      },
+      { teach: true },
+    );
   });
 
   it('remembers nothing until there is an answer', async () => {
@@ -705,6 +721,7 @@ describe('what is remembered for next time', () => {
 
     expect(mockRemember).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Planet Fitness', logoDomain: 'planetfitness.com' }),
+      { teach: true },
     );
   });
 });
@@ -830,6 +847,7 @@ describe('stores this person added before', () => {
     expect(lastValue()).toMatchObject({ logoDomain: 'planetfitness.com' });
     expect(mockRemember).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Planet Fitness', logoDomain: 'planetfitness.com' }),
+      { teach: true },
     );
   });
 
