@@ -5,9 +5,8 @@ import { Text, View } from 'react-native';
 import { logoImageUrl } from '@/api/logos';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
-import { isLightColor } from '@/lib/color';
+import { monogramOf } from '@/lib/monogram';
 import { useProStatus } from '@/lib/pro-status';
-import { CARD_COLORS } from '@/theme/card-colors';
 
 type BrandLogoProps = {
   /** Shown in the fallback tile, so it is required even when a logo exists. */
@@ -55,26 +54,6 @@ function subscribe(listener: () => void) {
 }
 
 /**
- * Fallback tile colour. Deterministic per name, so a brand looks the same everywhere; hashing the
- * name rather than cycling an index means adding brands never reshuffles the ones on screen.
- */
-function monogramColor(name: string): string {
-  let hash = 0;
-  for (let index = 0; index < name.length; index += 1) {
-    hash = (hash * 31 + name.charCodeAt(index)) % 100000;
-  }
-  return CARD_COLORS[hash % CARD_COLORS.length].value;
-}
-
-/** First letter of the first two words: "Trader Joe's" reads better as TJ than T. */
-function monogram(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return '?';
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return (words[0][0] + words[1][0]).toUpperCase();
-}
-
-/**
  * A brand's logo, or a coloured monogram. The fallback is not an error state: plenty of websites
  * have no logo, and the service answers those with a 404.
  */
@@ -90,7 +69,7 @@ export function BrandLogo({ name, domain, size = 40, className, fallback }: Bran
   const failed = useSyncExternalStore(subscribe, () => (url ? failedLately.has(url) : false));
 
   const showFallback = !url || failed;
-  const background = monogramColor(name || '?');
+  const mark = monogramOf(name);
 
   if (waiting) {
     return (
@@ -109,7 +88,7 @@ export function BrandLogo({ name, domain, size = 40, className, fallback }: Bran
       style={{
         width: size,
         height: size,
-        backgroundColor: showFallback ? background : '#FFFFFF',
+        backgroundColor: showFallback ? mark.background : '#FFFFFF',
       }}
     >
       {showFallback ? (
@@ -119,11 +98,11 @@ export function BrandLogo({ name, domain, size = 40, className, fallback }: Bran
           className="font-app font-semibold"
           style={{
             fontSize: size * 0.36,
-            color: isLightColor(background) ? '#161616' : '#FFFFFF',
+            color: mark.ink,
           }}
           allowFontScaling={false}
         >
-          {monogram(name)}
+          {mark.letters}
         </Text>
       ) : (
         <Image

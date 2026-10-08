@@ -103,7 +103,7 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
     // userInfo.body), so the payload moves up a level for the app to route the copy's tap.
     copy.userInfo = (original.userInfo["body"] as? [AnyHashable: Any]) ?? original.userInfo
 
-    let art = model.logo ?? model.card.map { SkipArt.glyphTile($0.fallbackGlyph) }
+    let art = model.logo ?? model.card.map { SkipArt.fallbackArt(for: $0) }
     if let art, let attachment = SkipArt.attachment(art, name: "art") {
       copy.attachments = [attachment]
     }
@@ -196,7 +196,7 @@ struct CardView: View {
   }
 }
 
-/// The logo in a circle, or the category's glyph when there is no brand.
+/// The logo in a circle; without one, the store's initials or the category's glyph.
 private struct Mark: View {
   let card: SkipCard
   let logo: UIImage?
@@ -208,6 +208,13 @@ private struct Mark: View {
           .resizable()
           .scaledToFill()
           .background(Color.white)
+      } else if let letters = card.letters, let background = card.lettersColor, let ink = card.lettersInk {
+        ZStack {
+          Color(background)
+          Text(letters)
+            .font(.system(size: 23, weight: .semibold))
+            .foregroundColor(Color(ink))
+        }
       } else {
         ZStack {
           Color(UIColor.tertiarySystemFill)

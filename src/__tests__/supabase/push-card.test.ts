@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { logoDomainOf as appLogoDomainOf } from '@/lib/logo-domain';
+import { monogramOf } from '@/lib/monogram';
 
 import {
   billGlyph,
@@ -9,6 +10,7 @@ import {
   digestPayload,
   logoDomainOf,
   logoUrl,
+  monogram,
   money,
   noticePayload,
   receiptsPayload,
@@ -73,6 +75,7 @@ describe('reminders', () => {
   it('shows a subscription with its logo, amount, renewal and card', () => {
     const payload = reminderPayload(
       {
+        pro: true,
         kind: 'subscription',
         title: 'Netflix',
         body: 'Renews tomorrow · $15.49',
@@ -103,6 +106,7 @@ describe('reminders', () => {
   it('gives a bill with no brand its category icon instead of a logo', () => {
     const payload = reminderPayload(
       {
+        pro: true,
         kind: 'bill',
         title: 'Housing',
         body: 'Due tomorrow · $1,500.00',
@@ -125,6 +129,7 @@ describe('reminders', () => {
   it('shows payday with its own icon and the account it lands in', () => {
     const payload = reminderPayload(
       {
+        pro: true,
         kind: 'account',
         title: 'Payday',
         body: 'Your pay lands today',
@@ -146,7 +151,14 @@ describe('reminders', () => {
 
   it('shows a card payment with the card icon', () => {
     const payload = reminderPayload(
-      { kind: 'card', title: 'Sam', body: 'Payment due tomorrow', targetId: 'card-1', self: AMEX },
+      {
+        pro: true,
+        kind: 'card',
+        title: 'Sam',
+        body: 'Payment due tomorrow',
+        targetId: 'card-1',
+        self: AMEX,
+      },
       BASE,
     );
 
@@ -159,6 +171,7 @@ describe('everything else', () => {
   it('announces a charge with its logo and the day it went out', () => {
     const payload = chargePayload(
       {
+        pro: true,
         label: 'Housing',
         amount: 1500,
         chargedOn: '2026-10-01',
@@ -272,6 +285,7 @@ describe('thumbnails from the logo service', () => {
   it('puts the CDN logo on a subscription reminder, glyph still sent', () => {
     const payload = reminderPayload(
       {
+        pro: true,
         kind: 'subscription',
         title: 'Hulu',
         body: 'Renews tomorrow · $17.99',
@@ -289,6 +303,7 @@ describe('thumbnails from the logo service', () => {
   it('leaves a bill reminder on its icon when its owner chose letters', () => {
     const payload = reminderPayload(
       {
+        pro: true,
         kind: 'bill',
         title: 'Electric',
         body: 'Due tomorrow · $80.00',
@@ -308,6 +323,7 @@ describe('thumbnails from the logo service', () => {
   it('puts the CDN logo on a charge from a custom store', () => {
     const payload = chargePayload(
       {
+        pro: true,
         label: 'Planet Fitness',
         amount: 24.99,
         chargedOn: '2026-10-01',
@@ -323,10 +339,139 @@ describe('thumbnails from the logo service', () => {
 
   it('keeps a charge on the bucket logo without the setting', () => {
     const payload = chargePayload(
-      { label: 'Netflix', amount: 15.49, chargedOn: '2026-10-01', subscriptionId: 's', ...NETFLIX },
+      {
+        pro: true,
+        label: 'Netflix',
+        amount: 15.49,
+        chargedOn: '2026-10-01',
+        subscriptionId: 's',
+        ...NETFLIX,
+      },
       BASE,
     );
     expect(payload.card?.logo).toBe(BUCKET_NETFLIX);
+  });
+});
+
+describe('free accounts: logos are Pro', () => {
+  const CDN = 'https://logos.skipapps.net/logos';
+  const NETFLIX: LogoSource = { brandDomain: 'netflix.com', logoPath: 'v1/netflix.png' };
+
+  it('sends a subscription reminder with the store’s letters, never its logo', () => {
+    const payload = reminderPayload(
+      {
+        pro: false,
+        kind: 'subscription',
+        title: 'Netflix',
+        body: 'Renews tomorrow · $15.49',
+        targetId: 'sub-1',
+        ...NETFLIX,
+        categoryId: 'entertainment',
+      },
+      BASE,
+      CDN,
+    );
+    const app = monogramOf('Netflix');
+    expect(payload.card?.logo).toBeUndefined();
+    expect(payload.card).toMatchObject({
+      letters: 'NE',
+      lettersColor: app.background,
+      lettersInk: app.ink,
+    });
+  });
+
+  it('sends a bill reminder with its icon and no letters, as the app draws a bill', () => {
+    const payload = reminderPayload(
+      {
+        pro: false,
+        kind: 'bill',
+        title: 'Electric',
+        body: 'Due tomorrow · $80.00',
+        targetId: 'bill-2',
+        brandDomain: 'aep.com',
+        logoPath: 'v1/aep.png',
+        categoryId: 'energy',
+      },
+      BASE,
+      CDN,
+    );
+    expect(payload.card?.logo).toBeUndefined();
+    expect(payload.card?.letters).toBeUndefined();
+    expect(payload.card?.glyph).toBe('energy');
+  });
+
+  it('sends a subscription charge with letters and a bill charge with its icon', () => {
+    const subscription = chargePayload(
+      {
+        pro: false,
+        label: 'Planet Fitness',
+        amount: 24.99,
+        chargedOn: '2026-10-01',
+        subscriptionId: 'sub-3',
+        logoDomain: 'planetfitness.com',
+        glyph: 'fitness',
+      },
+      BASE,
+      CDN,
+    );
+    expect(subscription.card?.logo).toBeUndefined();
+    expect(subscription.card?.letters).toBe('PF');
+
+    const bill = chargePayload(
+      {
+        pro: false,
+        label: 'Housing',
+        amount: 1500,
+        chargedOn: '2026-10-01',
+        billId: 'bill-1',
+        glyph: 'housing',
+      },
+      BASE,
+      CDN,
+    );
+    expect(bill.card?.logo).toBeUndefined();
+    expect(bill.card?.letters).toBeUndefined();
+  });
+
+  it('still sends Pro the logo, with letters for when it will not load', () => {
+    const payload = reminderPayload(
+      {
+        pro: true,
+        kind: 'subscription',
+        title: 'Netflix',
+        body: 'Renews tomorrow · $15.49',
+        targetId: 'sub-1',
+        ...NETFLIX,
+      },
+      BASE,
+      CDN,
+    );
+    expect(payload.card).toMatchObject({ logo: `${CDN}/netflix.com`, letters: 'NE' });
+  });
+
+  it.each([
+    'Netflix',
+    "Trader Joe's",
+    'Planet Fitness',
+    '  spaced   name ',
+    'X',
+    '',
+    'Café Olé',
+    'AT&T Wireless',
+    '7-Eleven',
+    'Hulu + Live TV',
+  ])('draws %p exactly as the app does', (name) => {
+    expect(monogram(name)).toEqual(monogramOf(name));
+  });
+
+  it('agrees with the app on every colour of the palette, ink included', () => {
+    const seen = new Set<string>();
+    for (let index = 0; index < 500 && seen.size < 8; index += 1) {
+      const name = `Store ${index}`;
+      expect(monogram(name)).toEqual(monogramOf(name));
+      seen.add(monogram(name).background);
+    }
+    expect(seen.size).toBe(8);
   });
 });
 

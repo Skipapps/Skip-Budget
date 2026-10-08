@@ -29,6 +29,15 @@ export type PushCard = {
   logo?: string;
   /** A category or kind id the phone draws as an icon when there is no logo or it will not load. */
   glyph?: string;
+  /**
+   * A store's initials and their colours, drawn in place of the glyph when there is no logo or it
+   * will not load, as the app draws them. Only for a subscription: a bill wears its icon.
+   */
+  letters?: string;
+  /** "#RRGGBB" behind the letters. */
+  lettersColor?: string;
+  /** "#RRGGBB" of the letters. */
+  lettersInk?: string;
   /** Title of the action that opens this in the app. */
   view: string;
 };
@@ -100,6 +109,47 @@ export function thumbnailUrl(
   return logoUrl(supabaseUrl, source.logoPath);
 }
 
+/**
+ * The app's card colours (src/theme/card-colors.ts) in the same order, each with the ink the app
+ * puts on it (isLightColor in src/lib/color.ts). The order is part of the hash below.
+ */
+const MONOGRAM_COLOURS: { background: string; ink: string }[] = [
+  { background: '#FA8F6F', ink: '#161616' },
+  { background: '#161616', ink: '#FFFFFF' },
+  { background: '#FFFFFF', ink: '#161616' },
+  { background: '#C7E756', ink: '#161616' },
+  { background: '#7BC4F5', ink: '#161616' },
+  { background: '#8B7BF5', ink: '#161616' },
+  { background: '#E9CF9B', ink: '#161616' },
+  { background: '#2E6E5B', ink: '#FFFFFF' },
+];
+
+/**
+ * A store's initials on its colour. Must stay the app's monogramOf (src/lib/monogram.ts), which
+ * the push-card test checks name by name.
+ */
+export function monogram(name: string): { letters: string; background: string; ink: string } {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const letters =
+    words.length === 0
+      ? '?'
+      : words.length === 1
+        ? words[0].slice(0, 2).toUpperCase()
+        : (words[0][0] + words[1][0]).toUpperCase();
+  const keyed = name || '?';
+  let hash = 0;
+  for (let index = 0; index < keyed.length; index += 1) {
+    hash = (hash * 31 + keyed.charCodeAt(index)) % 100000;
+  }
+  return { letters, ...MONOGRAM_COLOURS[hash % MONOGRAM_COLOURS.length] };
+}
+
+/** The card fields that draw a store's initials. */
+function lettersFor(name: string): Pick<PushCard, 'letters' | 'lettersColor' | 'lettersInk'> {
+  const mark = monogram(name);
+  return { letters: mark.letters, lettersColor: mark.background, lettersInk: mark.ink };
+}
+
 /** A reminder body is "<when> · <amount>" or just "<when>" (reminders_due writes it that way). */
 export function splitBody(body: string): { when: string; amount?: string } {
   const at = body.lastIndexOf(' · ');
@@ -141,6 +191,8 @@ type ReminderInput = {
   payer?: SourceRow | null;
   /** The card itself, for a card-payment reminder. */
   self?: SourceRow | null;
+  /** Whether the account has Skip Pro: logos are Pro, so free gets letters or the icon. */
+  pro: boolean;
 } & LogoSource;
 
 export function reminderPayload(
@@ -149,7 +201,7 @@ export function reminderPayload(
   logoCdnUrl?: string | null,
 ): TapPayload {
   const { when, amount } = splitBody(input.body);
-  const logo = thumbnailUrl(input, supabaseUrl, logoCdnUrl);
+  const logo = input.pro ? thumbnailUrl(input, supabaseUrl, logoCdnUrl) : undefined;
   const id = input.targetId ?? undefined;
 
   switch (input.kind) {
@@ -166,6 +218,7 @@ export function reminderPayload(
           source: sourceName(input.payer),
           logo,
           glyph: input.categoryId || 'entertainment',
+          ...lettersFor(input.title),
           view: 'View subscription',
         },
       };
@@ -225,6 +278,8 @@ type ChargeInput = {
   subscriptionId?: string | null;
   glyph?: string | null;
   payer?: SourceRow | null;
+  /** Whether the account has Skip Pro: logos are Pro, so free gets letters or the icon. */
+  pro: boolean;
 } & LogoSource;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -240,7 +295,7 @@ export function chargePayload(
   supabaseUrl: string,
   logoCdnUrl?: string | null,
 ): TapPayload {
-  const logo = thumbnailUrl(input, supabaseUrl, logoCdnUrl);
+  const logo = input.pro ? thumbnailUrl(input, supabaseUrl, logoCdnUrl) : undefined;
   const route: TapRoute = input.subscriptionId
     ? '/subscription'
     : input.billId
@@ -258,6 +313,7 @@ export function chargePayload(
       source: sourceName(input.payer),
       logo,
       glyph: input.glyph || 'other',
+      ...(input.subscriptionId ? lettersFor(input.label) : {}),
       view: input.subscriptionId
         ? 'View subscription'
         : input.billId

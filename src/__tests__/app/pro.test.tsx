@@ -241,9 +241,10 @@ describe('leaving without buying', () => {
     const screen = await render(<ProScreen />);
     expect(mockScreenOptions.gestureEnabled).toBe(false);
 
+    // Read before the tap: the claim can settle inside it.
+    const before = Date.now();
     await fireEvent.press(screen.getByLabelText('Go back'));
 
-    const before = Date.now();
     await waitFor(() => expect(router.replace).toHaveBeenCalledTimes(1));
     // The ten minutes start at the claim and travel with the page.
     const [{ pathname, params }] = jest.mocked(router.replace).mock.calls[0] as unknown as [

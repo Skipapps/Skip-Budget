@@ -17,6 +17,10 @@ struct SkipCard {
   let source: String?
   let logo: URL?
   let glyph: String?
+  /// A store's initials and their colours, drawn in place of the glyph as the app draws them.
+  let letters: String?
+  let lettersColor: UIColor?
+  let lettersInk: UIColor?
   let view: String
 
   init?(userInfo: [AnyHashable: Any]) {
@@ -33,6 +37,9 @@ struct SkipCard {
     source = raw["source"] as? String
     logo = (raw["logo"] as? String).flatMap(URL.init(string:))
     glyph = raw["glyph"] as? String
+    letters = raw["letters"] as? String
+    lettersColor = (raw["lettersColor"] as? String).flatMap(SkipArt.color(hex:))
+    lettersInk = (raw["lettersInk"] as? String).flatMap(SkipArt.color(hex:))
     view = raw["view"] as? String ?? "Open Skip"
   }
 
@@ -47,6 +54,9 @@ struct SkipCard {
     source = nil
     logo = nil
     glyph = nil
+    letters = nil
+    lettersColor = nil
+    lettersInk = nil
     view = "Open Skip"
   }
 
@@ -135,6 +145,46 @@ enum SkipArt {
     }
   }
 
+  /// "#RRGGBB" as a colour; nil for anything else.
+  static func color(hex: String) -> UIColor? {
+    let digits = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+    guard digits.count == 6, let value = UInt32(digits, radix: 16) else { return nil }
+    return UIColor(
+      red: CGFloat((value >> 16) & 0xFF) / 255,
+      green: CGFloat((value >> 8) & 0xFF) / 255,
+      blue: CGFloat(value & 0xFF) / 255,
+      alpha: 1
+    )
+  }
+
+  /// A square thumbnail tile with a store's initials on its colour, as the app's monogram.
+  static func lettersTile(_ letters: String, background: UIColor, ink: UIColor, side: CGFloat = 300) -> UIImage {
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    format.opaque = true
+    return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { context in
+      background.setFill()
+      context.fill(CGRect(x: 0, y: 0, width: side, height: side))
+      let text = NSAttributedString(
+        string: letters,
+        attributes: [
+          .font: UIFont.systemFont(ofSize: side * 0.36, weight: .semibold),
+          .foregroundColor: ink,
+        ]
+      )
+      let size = text.size()
+      text.draw(at: CGPoint(x: (side - size.width) / 2, y: (side - size.height) / 2))
+    }
+  }
+
+  /// What stands in for a logo: the store's initials when the card has them, else the glyph.
+  static func fallbackArt(for card: SkipCard) -> UIImage {
+    if let letters = card.letters, let background = card.lettersColor, let ink = card.lettersInk {
+      return lettersTile(letters, background: background, ink: ink)
+    }
+    return glyphTile(card.fallbackGlyph)
+  }
+
   /// A brand logo from the brand-logos bucket. Nil on any failure: no network,
   /// a slow answer, anything that is not an image.
   static func fetchLogo(_ url: URL, timeout: TimeInterval, completion: @escaping (UIImage?) -> Void) {
@@ -146,9 +196,9 @@ enum SkipArt {
   }
 
   static func art(for card: SkipCard, timeout: TimeInterval, completion: @escaping (UIImage) -> Void) {
-    guard let url = card.logo else { return completion(glyphTile(card.fallbackGlyph)) }
+    guard let url = card.logo else { return completion(fallbackArt(for: card)) }
     fetchLogo(url, timeout: timeout) { image in
-      completion(image ?? glyphTile(card.fallbackGlyph))
+      completion(image ?? fallbackArt(for: card))
     }
   }
 

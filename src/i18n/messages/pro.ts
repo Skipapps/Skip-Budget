@@ -63,7 +63,7 @@ export const proMessages = defineMessages({
 
   'pro.scan.title': {
     en: 'Every receipt, read for you',
-    es: 'Cada recibo, leído por ti',
+    es: 'Cada recibo, leído para ti',
     fr: 'Chaque reçu, lu pour toi',
   },
   'pro.scan.tagline': {
@@ -365,12 +365,12 @@ export const proMessages = defineMessages({
   'pro.page.getYearly': {
     en: 'Get Pro for {price}/year',
     es: 'Obtén Pro por {price} al año',
-    fr: 'Prends Pro pour {price} par an',
+    fr: 'Passe à Pro pour {price} par an',
   },
   'pro.page.getMonthly': {
     en: 'Get Pro for {price}/month',
     es: 'Obtén Pro por {price} al mes',
-    fr: 'Prends Pro pour {price} par mois',
+    fr: 'Passe à Pro pour {price} par mois',
   },
   'pro.page.billedYearly': {
     en: 'Billed once a year. Cancel anytime.',
@@ -485,7 +485,7 @@ export const proMessages = defineMessages({
   'pro.offer.endedButton': { en: 'Offer ended', es: 'Oferta terminada', fr: 'Offre terminée' },
   'pro.offer.includes': {
     en: 'Everything in Pro, including',
-    es: 'Todo lo de Pro, incluido',
+    es: 'Todo Pro, incluyendo',
     fr: 'Tout Pro, y compris',
   },
   'pro.offer.scans': {

@@ -378,6 +378,23 @@ describe('the report on the final page', () => {
     expect(screen.getByRole('button', { name: 'Amount, $16.00' })).toBeTruthy();
   });
 
+  it('still saves as a scan however much is corrected by hand: a scan counts once it is saved', async () => {
+    mockParams = ROUTE;
+    const screen = await render(<AddReceiptScreen />);
+
+    await pressButton(screen, 'Amount, $15.99');
+    for (let i = 0; i < 5; i += 1) await press(screen, 'Delete last digit');
+    await typeAmount(screen, '42');
+    await press(screen, 'Done');
+    await press(screen, "Change store, currently Trader Joe's");
+    await searchStore(screen, 'Deli');
+    await press(screen, 'Add Deli as a new store');
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ source: 'scan', amount: 42 });
+  });
+
   it('stays when a page is left with Back', async () => {
     mockParams = ROUTE;
     const screen = await render(<AddReceiptScreen />);
