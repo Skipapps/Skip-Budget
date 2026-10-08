@@ -4,12 +4,14 @@ import { Text, View } from 'react-native';
 
 import { resendOtp, signInWithEmail } from '@/api/auth';
 import { resetTo } from '@/lib/nav';
+import { SocialSignIn } from '@/components/auth/social-sign-in';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { TextLink } from '@/components/ui/text-link';
 import { Subtitle } from '@/components/ui/typography';
 import { t } from '@/i18n';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -95,6 +97,16 @@ export default function LoginScreen() {
 
       <View className="mt-auto w-full pt-10">
         <Button label={busy ? t('auth.signingIn') : t('auth.login.title')} onPress={handleLogin} />
+
+        <View className="my-5 w-full flex-row items-center gap-3">
+          <View className="h-px flex-1 bg-line" />
+          <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={TEXT_CAP.row}>
+            {t('auth.login.or')}
+          </Text>
+          <View className="h-px flex-1 bg-line" />
+        </View>
+
+        <SocialSignIn />
 
         <View className="mt-5 w-full flex-row flex-wrap items-center justify-center">
           <Text

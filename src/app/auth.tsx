@@ -1,53 +1,17 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
-import { signInWithApple, signInWithGoogle } from '@/api/oauth';
-import { AppleIcon } from '@/components/icons/apple-icon';
-import { GoogleIcon } from '@/components/icons/google-icon';
-import { Button } from '@/components/ui/button';
+import { SocialSignIn } from '@/components/auth/social-sign-in';
 import { Illustration } from '@/components/ui/illustration';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
 import { Subtitle } from '@/components/ui/typography';
 import { t } from '@/i18n';
-import { resetTo } from '@/lib/nav';
 
-/**
- * Apple and Google sign-in, and the door to email sign-up.
- *
- * Providers return a session but no name (`display_name` is only written on email signup), so they
- * land on `/hello`, which asks for a name only when the profile has none, rather than on `/home`.
- */
+/** Apple and Google sign-in, and the door to email sign-up. */
 export default function AuthScreen() {
   const artwork = useArtwork();
-  const [busy, setBusy] = useState<'google' | 'apple' | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const run = async (
-    provider: 'google' | 'apple',
-    start: () => Promise<{ error: string | null; cancelled?: boolean }>,
-  ) => {
-    if (busy) return;
-    setError(null);
-    setBusy(provider);
-    const { error: authError, cancelled } = await start();
-    setBusy(null);
-
-    if (cancelled) return;
-    if (authError) {
-      setError(authError);
-      return;
-    }
-    // resetTo, not replace: signing in is a one-way door, and replace leaves the welcome pages
-    // underneath for the edge swipe to walk back into.
-    resetTo('/hello');
-  };
-
-  const handleGoogle = () => run('google', signInWithGoogle);
-  const handleApple = () => run('apple', signInWithApple);
-  const handleEmail = () => router.push('/signup');
 
   return (
     <Screen title={t('auth.start.title')} showBack>
@@ -56,27 +20,8 @@ export default function AuthScreen() {
       <Subtitle className="mt-3">{t('auth.start.subtitle')}</Subtitle>
 
       <View className="mt-auto w-full gap-4 pt-10">
-        <Button
-          label={busy === 'google' ? t('auth.start.openingGoogle') : t('auth.start.google')}
-          variant="outline"
-          icon={<GoogleIcon size={22} />}
-          onPress={handleGoogle}
-        />
-        <Button
-          label={busy === 'apple' ? t('auth.signingIn') : t('auth.start.apple')}
-          icon={<AppleIcon size={22} />}
-          onPress={handleApple}
-        />
-        <TextLink label={t('auth.start.email')} onPress={handleEmail} />
-
-        {error ? (
-          <Text
-            className="w-full text-center font-app text-[13px] text-danger"
-            maxFontSizeMultiplier={1.4}
-          >
-            {error}
-          </Text>
-        ) : null}
+        <SocialSignIn />
+        <TextLink label={t('auth.start.email')} onPress={() => router.push('/signup')} />
       </View>
     </Screen>
   );

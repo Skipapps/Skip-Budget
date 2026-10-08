@@ -2,6 +2,7 @@ import { fireEvent, render } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import AuthScreen from '@/app/auth';
+import LoginScreen from '@/app/login';
 import SignupScreen from '@/app/signup';
 import { resetTo } from '@/lib/nav';
 
@@ -33,13 +34,16 @@ jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', line: '#DDDDDD', surface: '#FFFFFF' }),
 }));
 
+const mockApple = jest.fn(async () => ({ error: null as string | null, cancelled: false }));
 jest.mock('@/api/oauth', () => ({
   signInWithGoogle: async () => ({ error: null }),
-  signInWithApple: async () => ({ error: null }),
+  signInWithApple: () => mockApple(),
 }));
 
 jest.mock('@/api/auth', () => ({
   signUpWithEmail: async () => ({ error: null, signedIn: true }),
+  signInWithEmail: async () => ({ error: null }),
+  resendOtp: async () => ({ error: null }),
 }));
 
 beforeEach(() => {
@@ -49,7 +53,7 @@ beforeEach(() => {
 it('lands a Google sign-in on the name page with nothing behind it', async () => {
   const screen = await render(<AuthScreen />);
 
-  await fireEvent.press(screen.getByText('Continue with google'));
+  await fireEvent.press(screen.getByText('Continue with Google'));
 
   expect(resetTo).toHaveBeenCalledWith('/hello');
   expect(router.replace).not.toHaveBeenCalled();
@@ -66,4 +70,32 @@ it('lands an email sign-up on the name page with nothing behind it', async () =>
 
   expect(resetTo).toHaveBeenCalledWith('/hello');
   expect(router.replace).not.toHaveBeenCalled();
+});
+
+it('offers Google and Apple on the log-in page too, landing them the same way', async () => {
+  const screen = await render(<LoginScreen />);
+
+  expect(screen.getByText('or')).toBeTruthy();
+  await fireEvent.press(screen.getByText('Continue with Google'));
+  expect(resetTo).toHaveBeenCalledWith('/hello');
+
+  await fireEvent.press(screen.getByText('Continue with Apple'));
+  expect(resetTo).toHaveBeenCalledTimes(2);
+  expect(router.replace).not.toHaveBeenCalled();
+});
+
+it('stays on the log-in page when the Apple sheet is dismissed, and says why when it fails', async () => {
+  const screen = await render(<LoginScreen />);
+
+  mockApple.mockResolvedValueOnce({ error: null, cancelled: true });
+  await fireEvent.press(screen.getByText('Continue with Apple'));
+  expect(resetTo).not.toHaveBeenCalled();
+
+  mockApple.mockResolvedValueOnce({
+    error: 'No Apple ID is signed in on this phone.',
+    cancelled: false,
+  });
+  await fireEvent.press(screen.getByText('Continue with Apple'));
+  expect(resetTo).not.toHaveBeenCalled();
+  expect(screen.getByText('No Apple ID is signed in on this phone.')).toBeTruthy();
 });

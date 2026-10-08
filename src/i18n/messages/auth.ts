@@ -31,7 +31,7 @@ export const authMessages = defineMessages({
     fr: 'Ouverture de Google…',
   },
   'auth.start.google': {
-    en: 'Continue with google',
+    en: 'Continue with Google',
     es: 'Continuar con Google',
     fr: 'Continuer avec Google',
   },
@@ -47,6 +47,8 @@ export const authMessages = defineMessages({
   },
 
   'auth.login.title': { en: 'Log in', es: 'Iniciar sesión', fr: 'Se connecter' },
+  // Between the email log-in and the Google and Apple buttons.
+  'auth.login.or': { en: 'or', es: 'o', fr: 'ou' },
   'auth.login.subtitle': {
     en: 'Welcome back. Pick up where you left off.',
     es: 'Qué gusto verte de nuevo. Sigue donde te quedaste.',

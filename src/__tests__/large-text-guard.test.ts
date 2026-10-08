@@ -18,7 +18,6 @@ const ALLOWED: Record<string, Counts> = {
   'app/add-account.tsx': [5, 0, 0],
   'app/add-card.tsx': [2, 0, 0],
   'app/add-receipt.tsx': [2, 0, 0],
-  'app/auth.tsx': [1, 0, 0],
   'app/avatar.tsx': [1, 1, 0],
   'app/bill-plans.tsx': [2, 0, 0],
   'app/change-logo.tsx': [7, 0, 0],
