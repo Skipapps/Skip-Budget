@@ -1,5 +1,3 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
 # dependencies
 node_modules/
 
@@ -9,17 +7,23 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# generated native folders (continuous native generation)
+/ios
+/android
 .kotlin/
+
+# signing material
 *.orig.*
 *.jks
 *.p8
 *.p12
 *.key
+*.pem
 *.mobileprovision
 
-# Supabase CLI link state
+# Supabase CLI local state: the project link and the local-branch marker
 supabase/.temp/
+supabase/.branches/
 
 # Metro
 .metro-health-check*
@@ -31,7 +35,6 @@ yarn-error.*
 
 # macOS
 .DS_Store
-*.pem
 
 # local env files
 .env*.local
@@ -39,17 +42,6 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-example
-
-# generated native folders
-/ios
-/android
-
-# local env
-.env.local
-.env*.local
-
 # Team artefacts that must not be committed (real balances in screenshots; third-party prototype)
 .claude/team/testing/screenshots/
 .claude/team/design/reference/chatgpt-prototype/
-coverage/

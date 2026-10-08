@@ -25,15 +25,19 @@ npm run check        # all four, in order
 
 ## Layout
 
-| Path                 | What lives there                                                       |
-| -------------------- | ---------------------------------------------------------------------- |
-| `src/app`            | Screens, one file per route (expo-router). No test files here.         |
-| `src/__tests__`      | Screen tests. Unit tests sit next to the code they cover.              |
-| `src/api`            | Supabase queries and mutations (TanStack Query).                       |
-| `src/lib`            | Pure logic: loan maths, voice parsing, formatting.                     |
-| `src/components`     | Shared UI, grouped by feature.                                         |
-| `src/theme`          | Palette, colours, artwork and avatar registries.                       |
-| `assets`             | Illustrations, avatars, app icons and the launch video.                |
-| `supabase`           | Migrations and edge functions (Deno, excluded from the app typecheck). |
-| `modules`, `targets` | Native receipt scanner and the notification extensions.                |
-| `design`             | Wireframe and hi-fi generator used by the design team.                 |
+| Path                 | What lives there                                                                   |
+| -------------------- | ---------------------------------------------------------------------------------- |
+| `src/app`            | Screens, one file per route (expo-router). No test files here.                     |
+| `src/components`     | Shared UI, grouped by feature.                                                     |
+| `src/api`            | Supabase queries and mutations (TanStack Query).                                   |
+| `src/lib`            | Pure logic: loan maths, receipt and voice parsing, dates, formatting.              |
+| `src/data`           | Static catalogues: bill categories, card networks, glyphs, Pro features.           |
+| `src/i18n`           | Languages, currencies and every on-screen string (`messages/`).                    |
+| `src/providers`      | App-wide React providers: session, data, realtime, theme, preferences, dialogs.    |
+| `src/theme`          | Palette, colours, fonts, artwork and avatar registries.                            |
+| `src/__tests__`      | Screen tests and cross-screen suites. Unit tests sit next to the code they cover.  |
+| `assets`             | Illustrations, avatars, app icons and the launch video.                            |
+| `supabase`           | Migrations, edge functions (Deno, excluded from the app typecheck), seeds, checks. |
+| `modules`, `targets` | Native receipt scanner and the notification extensions.                            |
+| `plugins`            | Expo config plugin for code signing.                                               |
+| `scripts`            | One-off tools: Apple client secret, brand seed, receipt test corpus.               |
