@@ -149,8 +149,9 @@ let mockReceipts: {
 const savedThisMonth = (source: string, count: number) =>
   Array.from({ length: count }, () => ({ source, created_at: '2026-10-02T15:00:00.000Z' }));
 
+const mockRecount = jest.fn();
 jest.mock('@/api/queries', () => ({
-  useReceipts: () => mockReceipts,
+  useReceipts: () => ({ ...mockReceipts, refetch: mockRecount }),
   useReceipt: () => ({ data: null, isError: false, isFetched: false, refetch: jest.fn() }),
   usePaymentSources: () => ({
     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
@@ -772,6 +773,8 @@ describe('the free allowance', () => {
       await waitFor(() =>
         expect(router.push).toHaveBeenCalledWith({ pathname: '/pro-feature', params: { id } }),
       );
+      // A refused scan recounts the month; a voice refusal has nothing to recount.
+      expect(mockRecount).toHaveBeenCalledTimes(id === 'scan' ? 1 : 0);
       expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
       expect(router.back).not.toHaveBeenCalled();
       expect(router.dismissTo).not.toHaveBeenCalled();

@@ -164,6 +164,11 @@ describe('the button', () => {
 
     expect(screen.getByLabelText('Try Pro free for 14 days')).toBeTruthy();
     expect(screen.getByText('Then $19.99/year. Cancel anytime.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Billed by Apple. Renews automatically until you cancel in your App Store subscriptions.',
+      ),
+    ).toBeTruthy();
   });
 
   it('follows the plan chosen: a plan with no trial is bought at its price', async () => {
@@ -238,7 +243,16 @@ describe('leaving without buying', () => {
 
     await fireEvent.press(screen.getByLabelText('Go back'));
 
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/pro-offer'));
+    const before = Date.now();
+    await waitFor(() => expect(router.replace).toHaveBeenCalledTimes(1));
+    // The ten minutes start at the claim and travel with the page.
+    const [{ pathname, params }] = jest.mocked(router.replace).mock.calls[0] as unknown as [
+      { pathname: string; params: { until: string } },
+    ];
+    expect(pathname).toBe('/pro-offer');
+    const until = Number(params.until);
+    expect(until).toBeGreaterThanOrEqual(before + 10 * 60 * 1000);
+    expect(until).toBeLessThanOrEqual(Date.now() + 10 * 60 * 1000);
     expect(mockClaim).toHaveBeenCalledTimes(1);
     expect(router.back).not.toHaveBeenCalled();
   });

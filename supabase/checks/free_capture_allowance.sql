@@ -88,6 +88,20 @@ update public.receipts set merchant = 'Scan 1 edited' where merchant = 'Scan 1';
 select pg_temp.check((select count(*) = 1 from public.receipts where merchant = 'Scan 1 edited'),
   'a counted receipt stays editable at the limit');
 
+-- An edit cannot free the allowance: backdating or relabelling is ignored.
+update public.receipts set created_at = '2020-01-01', source = 'manual' where merchant like 'Scan %';
+select pg_temp.check(
+  (select count(*) = 15 from public.receipts
+    where source = 'scan' and created_at > now() - interval '1 minute'),
+  'an edit keeps how a receipt arrived and when it was saved');
+select pg_temp.expect_refusal(
+  $q$insert into public.receipts (user_id, merchant, amount, source)
+     values ('00000000-0000-0000-0000-00000000000a', 'Scan after edit', 1, 'scan')$q$,
+  'Scanning more than 15');
+update public.receipts set source = 'scan' where merchant = 'Typed 1';
+select pg_temp.check((select source = 'manual' from public.receipts where merchant = 'Typed 1'),
+  'a typed receipt cannot be relabelled as a scan');
+
 select pg_temp.check(public.claim_pro_offer(), 'the offer is claimed the first time');
 select pg_temp.check(not public.claim_pro_offer(), 'and never again');
 reset role;

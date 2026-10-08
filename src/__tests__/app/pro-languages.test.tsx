@@ -55,7 +55,7 @@ jest.mock('@/api/pro', () => {
   const { t } = jest.requireActual('@/i18n');
   return {
     usePro: () => ({ pro: mockPro, ready: true }),
-    trialPeriodLabel: ({ count }: { count: number }) => t('pro.period.week', { count }),
+    trialPeriodLabel: ({ count }: { count: number }) => t('pro.period.day', { count: count * 7 }),
     purchasesAvailable: () => mockStore === 'open',
     usePurchasePro: () => ({ purchase: jest.fn(), restore: async () => false }),
     useProPrices: () =>
@@ -174,7 +174,7 @@ describe('the Pro page in Spanish', () => {
   it('offers the store’s trial at the store’s prices once it answers', async () => {
     mockStore = 'open';
     const screen = await render(<ProScreen />);
-    expect(screen.getByText('Prueba Pro gratis durante 1 semana')).toBeTruthy();
+    expect(screen.getByText('Prueba Pro gratis durante 7 días')).toBeTruthy();
     expect(screen.getByText('Después, $19.99 al año. Cancela cuando quieras.')).toBeTruthy();
     expect(screen.getByLabelText('Anual, $19.99/año. $1.67/mes')).toBeTruthy();
 
@@ -231,7 +231,7 @@ describe('the Pro page in French', () => {
     expect(screen.getByText('24,99 $/an')).toBeTruthy();
     expect(screen.getByText('2,49 $/mois')).toBeTruthy();
     expect(screen.getByText('2,08 $/mois')).toBeTruthy();
-    expect(screen.getByText('Essaie Pro gratuitement pendant 1 semaine')).toBeTruthy();
+    expect(screen.getByText('Essaie Pro gratuitement pendant 7 jours')).toBeTruthy();
     expect(screen.getByText('Ensuite 24,99 $ par an. Annule quand tu veux.')).toBeTruthy();
     expectNoRawText(screen);
   });

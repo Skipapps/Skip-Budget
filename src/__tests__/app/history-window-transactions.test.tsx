@@ -31,7 +31,7 @@ jest.mock('@/api/refresh', () => ({
 jest.mock('expo-router', () => ({ router: { push: jest.fn(), back: jest.fn() } }));
 jest.mock('@/api/charges', () => ({ useCharges: () => ({ data: [] }) }));
 
-// Thursday 10 September 2026: the free window starts on 12 June.
+// Thursday 10 September 2026: the free window starts on 13 June.
 const TODAY = '2026-09-10';
 
 let mockEntries: { id: string; label: string; amount: number; date: string }[] = [];

@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ChartColumn, History, Info, Mic, ScanLine, X, type LucideIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { AppState, Text, View } from 'react-native';
@@ -29,6 +29,22 @@ const INCLUDED: { icon: LucideIcon; label: () => string }[] = [
 const twoDigits = (value: number) => String(value).padStart(2, '0');
 
 /**
+ * The deadline the Pro page set when it claimed the offer. None, or one further off than an offer
+ * lasts, means this was not opened by a claim (a typed link, say), and the page closes.
+ */
+function readDeadline(until: string | undefined): number | null {
+  const at = Number(until);
+  if (!until || !Number.isFinite(at)) return null;
+  return at <= Date.now() + PRO_OFFER_MS + 5_000 ? at : null;
+}
+
+/** Whether the store prices really are about half, before the page says "half price". */
+function isHalf(offer: number | undefined, regular: number | undefined): boolean {
+  if (!offer || !regular) return true;
+  return Math.abs(offer / regular - 0.5) <= 0.05;
+}
+
+/**
  * Skip Pro at half price, once: opened in place of the Pro page the first time a free account
  * leaves it without buying (the claim is made before this opens, so closing it, by X, "No thanks"
  * or a swipe, is final). The timer runs on the clock, not on renders, so time away from the app
@@ -37,15 +53,22 @@ const twoDigits = (value: number) => String(value).padStart(2, '0');
 export default function ProOfferScreen() {
   const colors = useColors();
   const prices = useOfferPrices();
-  const { purchase } = usePurchasePro();
+  const { purchase, restore } = usePurchasePro();
+  const { until } = useLocalSearchParams<{ until?: string }>();
 
-  const [endsAt] = useState(() => Date.now() + PRO_OFFER_MS);
+  // Read once: a remount (the text size changing, say) keeps the same deadline.
+  const [deadline] = useState(() => readDeadline(until));
+  const endsAt = deadline ?? 0;
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const left = Math.max(0, endsAt - now);
   const ended = left === 0;
+
+  useEffect(() => {
+    if (deadline === null) goBack();
+  }, [deadline]);
 
   useEffect(() => {
     if (ended) return;
@@ -66,10 +89,30 @@ export default function ProOfferScreen() {
   const product = pack?.product;
   const price = product?.priceString ?? usdText(OFFER_YEARLY_USD);
   const perMonth = product?.pricePerMonthString ?? usdText(OFFER_PER_MONTH_USD);
-  const regular = prices.data?.regular?.product.priceString ?? usdText(REGULAR_YEARLY_USD);
+  const regularProduct = prices.data?.regular?.product;
+  // The dollar figure stands in only while the store has said nothing: beside a store price in
+  // another currency it would be a price nobody is charged.
+  const regular = regularProduct?.priceString ?? (product ? null : usdText(REGULAR_YEARLY_USD));
+  const title = isHalf(product?.price, regularProduct?.price)
+    ? t('pro.offer.title')
+    : t('pro.offer.titleSpecial');
 
   const minutes = Math.floor(left / 60000);
   const seconds = Math.floor((left % 60000) / 1000);
+
+  const handleRestore = async () => {
+    setMessage(null);
+    setBusy(true);
+    try {
+      const restored = await restore();
+      if (restored) goBack();
+      else setMessage(t('pro.page.nothingToRestore'));
+    } catch (thrown) {
+      setMessage(failureMessage(thrown));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleBuy = async () => {
     if (!pack || ended) return;
@@ -94,6 +137,8 @@ export default function ProOfferScreen() {
         : prices.isFetching
           ? t('pro.page.checking')
           : t('pro.page.checkAgain');
+
+  if (deadline === null) return null;
 
   return (
     <Screen
@@ -141,17 +186,19 @@ export default function ProOfferScreen() {
           className="mt-4 text-center font-app-bold text-[28px] text-ink"
           maxFontSizeMultiplier={TEXT_CAP.heading}
         >
-          {t('pro.offer.title')}
+          {title}
         </Text>
 
         <View className="mt-3 flex-row flex-wrap items-baseline justify-center gap-x-2">
-          <Text
-            accessibilityLabel={t('pro.offer.wasPrice', { price: regular })}
-            className="font-app text-[20px] text-muted line-through"
-            maxFontSizeMultiplier={TEXT_CAP.figure}
-          >
-            {regular}
-          </Text>
+          {regular ? (
+            <Text
+              accessibilityLabel={t('pro.offer.wasPrice', { price: regular })}
+              className="font-app text-[20px] text-muted line-through"
+              maxFontSizeMultiplier={TEXT_CAP.figure}
+            >
+              {regular}
+            </Text>
+          ) : null}
           <Text
             className="font-app-bold text-[56px] text-ink"
             maxFontSizeMultiplier={TEXT_CAP.figure}
@@ -231,8 +278,9 @@ export default function ProOfferScreen() {
         </Text>
       ) : null}
 
-      {/* A purchase screen keeps Terms and Privacy within reach (App Review 3.1.2). */}
-      <View className="mb-2 mt-4 w-full flex-row items-center justify-center gap-x-5">
+      {/* A purchase screen keeps Restore, Terms and Privacy within reach (App Review 3.1.2). */}
+      <View className="mt-4 w-full flex-row flex-wrap items-center justify-center gap-x-5">
+        <TextLink label={t('pro.page.restore')} variant="subtle" onPress={handleRestore} />
         <TextLink
           label={t('pro.page.terms')}
           variant="subtle"
@@ -246,6 +294,12 @@ export default function ProOfferScreen() {
           onPress={() => router.push('/privacy')}
         />
       </View>
+      <Text
+        className="mb-2 mt-3 w-full text-center font-app text-[10.5px] leading-[15px] text-muted"
+        maxFontSizeMultiplier={TEXT_CAP.reading}
+      >
+        {t('pro.page.renews')}
+      </Text>
     </Screen>
   );
 }

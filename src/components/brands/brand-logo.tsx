@@ -6,7 +6,7 @@ import { logoImageUrl } from '@/api/logos';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { isLightColor } from '@/lib/color';
-import { useKnownFree } from '@/lib/pro-status';
+import { useProStatus } from '@/lib/pro-status';
 import { CARD_COLORS } from '@/theme/card-colors';
 
 type BrandLogoProps = {
@@ -80,13 +80,26 @@ function monogram(name: string): string {
  */
 export function BrandLogo({ name, domain, size = 40, className, fallback }: BrandLogoProps) {
   // Logos are Pro: free draws the store's initials (or the given fallback, e.g. a bill's glyph).
-  const free = useKnownFree();
-  const url = free ? null : logoImageUrl(domain);
+  const { pro, ready } = useProStatus();
+  const logo = logoImageUrl(domain);
+  const url = ready && pro ? logo : null;
+  // A logo to draw and no plan yet: a quiet circle, so neither a payer nor a free account sees the
+  // other's version flash, and nothing is fetched for an account that may be free.
+  const waiting = Boolean(logo) && !ready;
   // Keyed by URL, not a flag on the row, so a recycled row showing another brand recovers at once.
   const failed = useSyncExternalStore(subscribe, () => (url ? failedLately.has(url) : false));
 
   const showFallback = !url || failed;
   const background = monogramColor(name || '?');
+
+  if (waiting) {
+    return (
+      <View
+        className={cn('overflow-hidden rounded-full bg-ink/10', className)}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
 
   if (showFallback && fallback) return fallback;
 

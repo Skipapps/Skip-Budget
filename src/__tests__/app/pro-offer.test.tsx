@@ -13,26 +13,32 @@ jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }))
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
 );
+// The deadline the Pro page set when it claimed the offer.
+let mockUntil: string | undefined;
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
+  useLocalSearchParams: () => ({ until: mockUntil }),
 }));
 jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', accentInk: '#905479' }),
 }));
 
-const offerPack = { product: { priceString: '$9.99', pricePerMonthString: '$0.83' } };
-const regularPack = { product: { priceString: '$19.99' } };
+const offerPack = { product: { priceString: '$9.99', pricePerMonthString: '$0.83', price: 9.99 } };
+let mockRegular: { product: { priceString: string; price: number } } | null = {
+  product: { priceString: '$19.99', price: 19.99 },
+};
 let mockOpen = true;
+const mockRestore = jest.fn();
 const mockPurchase = jest.fn();
 
 jest.mock('@/api/pro', () => ({
   purchasesAvailable: () => mockOpen,
-  usePurchasePro: () => ({ purchase: mockPurchase, restore: jest.fn() }),
+  usePurchasePro: () => ({ purchase: mockPurchase, restore: mockRestore }),
   useOfferPrices: () =>
     mockOpen
       ? {
-          data: { offer: offerPack, regular: regularPack },
+          data: { offer: offerPack, regular: mockRegular },
           isFetching: false,
           refetch: jest.fn(),
         }
@@ -43,6 +49,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.useFakeTimers();
   jest.setSystemTime(new Date('2026-10-07T09:00:00'));
+  mockUntil = String(Date.now() + 10 * 60 * 1000);
+  mockRegular = { product: { priceString: '$19.99', price: 19.99 } };
   mockOpen = true;
   resetLocaleForTests();
 });
@@ -141,4 +149,67 @@ it('reads in Spanish', async () => {
   expect(screen.getByLabelText('Quedan 10 min 0 s')).toBeTruthy();
   expect(screen.getByText('Si cierras esto, no volverás a ver esta oferta.')).toBeTruthy();
   expect(screen.getByLabelText('No, gracias')).toBeTruthy();
+});
+
+describe('opened only by a claim', () => {
+  it('closes at once, drawing nothing, without a deadline (a typed link)', async () => {
+    mockUntil = undefined;
+    const screen = await render(<ProOfferScreen />);
+    expect(screen.queryByText('Skip Pro, half price')).toBeNull();
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes for a deadline further off than an offer lasts', async () => {
+    mockUntil = String(Date.now() + 60 * 60 * 1000);
+    await render(<ProOfferScreen />);
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the same deadline across a remount, so the ten minutes never start again', async () => {
+    const screen = await render(<ProOfferScreen key="first" />);
+    await pass(61_000);
+
+    // A new instance, as when the navigator remounts for a change of text size.
+    await screen.rerender(<ProOfferScreen key="second" />);
+    expect(screen.getByLabelText('8 min 59 s left')).toBeTruthy();
+  });
+});
+
+describe('what App Review looks for', () => {
+  it('offers Restore, and closes when a purchase comes back', async () => {
+    mockRestore.mockResolvedValueOnce(true);
+    const screen = await render(<ProOfferScreen />);
+    await fireEvent.press(screen.getByLabelText('Restore purchase'));
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+  });
+
+  it('says when there is nothing to restore', async () => {
+    mockRestore.mockResolvedValueOnce(false);
+    const screen = await render(<ProOfferScreen />);
+    await fireEvent.press(screen.getByLabelText('Restore purchase'));
+    expect(await screen.findByText('No past purchase to restore.')).toBeTruthy();
+  });
+
+  it('says it renews automatically', async () => {
+    const screen = await render(<ProOfferScreen />);
+    expect(
+      screen.getByText(
+        'Billed by Apple. Renews automatically until you cancel in your App Store subscriptions.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('does not call it half price when the store’s prices are not', async () => {
+    mockRegular = { product: { priceString: '$24.99', price: 24.99 } };
+    const screen = await render(<ProOfferScreen />);
+    expect(screen.queryByText('Skip Pro, half price')).toBeNull();
+    expect(screen.getByText('Skip Pro, a one-time price')).toBeTruthy();
+  });
+
+  it('draws no struck price rather than a dollar guess beside a store price', async () => {
+    mockRegular = null;
+    const screen = await render(<ProOfferScreen />);
+    expect(screen.getByText('$9.99')).toBeTruthy();
+    expect(screen.queryByLabelText(/^Was /)).toBeNull();
+  });
 });

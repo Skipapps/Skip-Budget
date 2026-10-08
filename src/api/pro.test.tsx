@@ -58,6 +58,8 @@ afterAll(() => resetLocaleForTests());
 describe('trialPeriodLabel', () => {
   it('words the period in English, including a unit it does not know', () => {
     expect(trialPeriodLabel({ count: 14, unit: 'DAY' })).toBe('14 days');
+    // App Store Connect's "2 weeks" is the design's "14 days".
+    expect(trialPeriodLabel({ count: 2, unit: 'WEEK' })).toBe('14 days');
     expect(trialPeriodLabel({ count: 1, unit: 'MONTH' })).toBe('1 month');
     expect(trialPeriodLabel({ count: 3, unit: 'FORTNIGHT' })).toBe('3 fortnights');
   });
@@ -68,7 +70,7 @@ describe('trialPeriodLabel', () => {
     expect(trialPeriodLabel({ count: 1, unit: 'YEAR' })).toBe('1 año');
 
     setLanguage('fr');
-    expect(trialPeriodLabel({ count: 1, unit: 'WEEK' })).toBe('1 semaine');
+    expect(trialPeriodLabel({ count: 1, unit: 'WEEK' })).toBe('7 jours');
     expect(trialPeriodLabel({ count: 14, unit: 'DAY' })).toBe('14 jours');
   });
 });

@@ -110,6 +110,8 @@ jest.mock('@/api/queries', () => ({
   }),
   useLedger: () => ({
     entries: mockEntries,
+    // On Pro the whole window and the list are the same rows.
+    allEntries: mockEntries,
     isLoading: false,
     isError: false,
     refetch: jest.fn(),

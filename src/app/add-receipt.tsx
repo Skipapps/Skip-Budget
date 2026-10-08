@@ -549,6 +549,8 @@ function ReceiptForm({
       // adds, pushed so Back returns to the filled-in form. For someone the app thinks has Pro it is
       // a disagreement between the two, so it is reported like any failure.
       if (refusedForPro(thrown) && !pro) {
+        // Another phone, or a month already turned where the account lives: the count catches up.
+        if (captureSource === 'scan' || captureSource === 'upload') allowance.recount();
         router.push({
           pathname: '/pro-feature',
           params: { id: captureSource === 'voice' ? 'voice' : 'scan' },

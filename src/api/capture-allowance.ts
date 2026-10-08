@@ -12,6 +12,8 @@ export function useCaptureAllowance(): {
   upload: CaptureAllowance;
   /** Safe to decide on: Pro is known and, on free, the receipts have been counted. */
   ready: boolean;
+  /** Counts again, for when the database refused a receipt this phone thought had room. */
+  recount: () => void;
 } {
   const { pro, ready: proReady } = usePro();
   const receipts = useReceipts();
@@ -25,5 +27,6 @@ export function useCaptureAllowance(): {
     scan: captureAllowance(rows, 'scan', pro, todayDate),
     upload: captureAllowance(rows, 'upload', pro, todayDate),
     ready: proReady && counted,
+    recount: () => void receipts.refetch(),
   };
 }

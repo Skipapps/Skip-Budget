@@ -4255,3 +4255,33 @@ for nothing heard; the receipt store is searched for in place after a focus, no 
 (company box and Name mark). `voice-review` pins the blocker as Save's accessibility hint with no failure line. `jest voice
 add-forms-from-voice large-text` 23/23 suites, 717 tests; tsc 0; ESLint and prettier clean. Suspected copy bug: BrandField's
 clear button says "Change store, currently …" on a subscription's Service and a bill's Company too.
+
+---
+
+## 2026-10-07 — Dmitri (Development Lead) — adversarial review of the Pro/Free upgrade (b2a6dcd..b02eefa + uncommitted caption removal)
+
+**Outcome:** FIX-FIRST. Read-only review; no code touched. tsc 0; touched suites 34/34 (475 tests); full jest 202/202
+(3617); ESLint `--no-cache` and prettier clean on the 72 changed files. SQL, device and RevenueCat sandbox not run.
+
+**Fix before the phone build:** (1) Savings "Saved so far" and "across N months" sum only the free window
+(src/app/savings.tsx:46-51) while the Cards tab Savings tile sums every month ((tabs)/cards.tsx:96): two savings
+totals, and a lapse shrinks one. (2) Pro page exit: `claim_pro_offer` has no deadline while the edge swipe is off, so a
+stalled network leaves the chevron dead (pro.tsx:110-123). (3) `ready` turns true on the SDK's "no" alone
+(api/pro.ts:181), so a payer whose Pro is only on the server row can flash initials, cut lists and paywalls.
+**Founder ruling needed:** period totals labelled Year/All (Activity, Bills, Subscriptions, Receipts) are 90-day sums on
+free. **Also open:** free still gets brand logos in rich pushes (send-push/card.ts:84-100); free no longer remembers added
+stores (brand-field.tsx:200-210); offer timer anchored on mount and deep-linkable; offer page lacks Restore; DB wall
+is insert-only; migration must be live before the build; Fake Free never exercises the DB wall.
+
+## 2026-10-07 — CEO — Dmitri's FIX-FIRST findings resolved
+
+Savings total counts every month (list cut only). Period headings (Activity, Bills, Subscriptions, Receipts) sum the
+whole window as Pro sees it; rows stop at 90 days (useLedger exposes `allEntries`; Founder can flip this). Offer claim
+has a 3 s ceiling; a lone SDK "no" now waits for the entitlements row (8 s ceiling). Offer deadline travels as `until`
+(remount-safe, typed links close), Restore + "renews automatically" line on both purchase pages, "half price" only when
+the store's prices are about half, no dollar guess beside a store price, Stack.Screen also on the Pro view. Logos: a
+grey circle while the plan is unknown (no fetch, no flash); free remembers added stores; the pencil goes straight to the
+logos explainer. A refused capture recounts the month. Migration: receipts_keep_origin freezes source/created_at on
+update; count repeats the partial-index predicate (26 local checks, fresh `db reset` clean). Week trials read in days.
+Free window is exactly 90 days. Open for the Founder: logos in rich pushes (send-push deploy); keeping a refused scan
+as a typed receipt.

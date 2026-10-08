@@ -37,7 +37,7 @@ jest.mock('@/lib/supabase', () => {
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'user-1' }));
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
 
-// 7 October 2026: the free window starts on 9 July.
+// 7 October 2026: the free window starts on 10 July.
 const TODAY = '2026-10-07';
 const THIS_YEAR = { from: '2026-01-01', to: TODAY };
 
@@ -130,11 +130,11 @@ describe('the ledger’s window', () => {
     const { result } = await renderHook(() => useLedger(THIS_YEAR, TODAY), { wrapper });
     await waitFor(() => expect(result.current.entries.length).toBeGreaterThan(0));
 
-    expect(result.current.entries.every((entry) => entry.date >= '2026-07-09')).toBe(true);
+    expect(result.current.entries.every((entry) => entry.date >= '2026-07-10')).toBe(true);
     expect(result.current.entries.map((entry) => entry.id)).toContain('receipt-new');
-    // The totals are what is listed: October's receipt and September's recorded charge, not May's
-    // $300 or June's charge.
-    expect(result.current.totals.out).toBe(20 + 60);
+    // The totals are the year's, as Pro sees them: a figure labelled with a period sums all of it.
+    expect(result.current.totals.out).toBe(20 + 300 + 60 + 60);
+    expect(result.current.allEntries.map((entry) => entry.date)).toContain('2026-05-15');
 
     const { hidden } = result.current;
     expect(hidOlder(hidden)).toBe(true);

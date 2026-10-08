@@ -11,7 +11,8 @@
 --
 -- Same function, same trigger (receipts_scan_is_pro, BEFORE INSERT only), so
 -- a receipt already on the books stays editable on any plan: the wall gates
--- verbs, not nouns (20260928100001). Every refusal says "part of Skip Pro",
+-- verbs, not nouns (20260928100001); an edit cannot change how a receipt
+-- arrived or when (receipts_keep_origin, below). Every refusal says "part of Skip Pro",
 -- which is how the app tells the wall from a failure (src/lib/pro-refusal.ts).
 --
 -- Order: this goes live before the app build that lets free accounts scan.
@@ -48,10 +49,12 @@ begin
   -- Two saves at once must not both take the last place.
   perform pg_advisory_xact_lock(hashtextextended('capture-allowance:' || new.user_id::text, 0));
 
+  -- The source list repeats the partial index's own predicate, so the index is always usable.
   select count(*) into v_used
     from public.receipts
    where user_id = new.user_id
      and source = new.source
+     and source in ('scan', 'upload')
      and created_at >= v_start;
 
   if v_used >= 15 then
@@ -66,6 +69,27 @@ begin
   return new;
 end;
 $$;
+
+-- How a receipt arrived and when it was saved are facts about its creation:
+-- an edit keeps both. Otherwise an edit could move this month's scans into
+-- last month, or relabel a typed receipt, and free the allowance.
+create or replace function public.keep_receipt_origin()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.source := old.source;
+  new.created_at := old.created_at;
+  return new;
+end;
+$$;
+
+drop trigger if exists receipts_keep_origin on public.receipts;
+create trigger receipts_keep_origin
+  before update on public.receipts
+  for each row execute function public.keep_receipt_origin();
 
 -- The count above runs on every free scan and upload; this keeps it to the
 -- month's own rows however long the account's history grows.

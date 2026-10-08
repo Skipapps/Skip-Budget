@@ -35,7 +35,7 @@ export default function SubscriptionsScreen() {
   const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
 
   const plans = useSubscriptions();
-  const { entries, hidden, isLoading, isError, refetch } = useLedger(range, today);
+  const { entries, allEntries, hidden, isLoading, isError, refetch } = useLedger(range, today);
   // Free lists 90 days back: say the older charges are kept rather than look like none.
   const hiddenOlder = hidOlder(hidden, 'subscription');
   const { sources } = usePaymentSources();
@@ -49,7 +49,12 @@ export default function SubscriptionsScreen() {
     () => entries.filter((entry) => entry.kind === 'subscription'),
     [entries],
   );
-  const total = charges.reduce((sum, entry) => sum + entry.amount, 0);
+  // The heading sums the whole window, as Pro sees it; only the list stops at the plan's window.
+  const inWindow = useMemo(
+    () => allEntries.filter((entry) => entry.kind === 'subscription'),
+    [allEntries],
+  );
+  const total = inWindow.reduce((sum, entry) => sum + entry.amount, 0);
 
   // Oldest day first, today last.
   const groups = useMemo(
@@ -102,9 +107,9 @@ export default function SubscriptionsScreen() {
           className="mt-2 font-app text-[12px] text-muted"
           maxFontSizeMultiplier={TEXT_CAP.reading}
         >
-          {charges.length === 0
+          {inWindow.length === 0
             ? t('subscriptions.renewals.nothing')
-            : t('subscriptions.renewals.count', { count: charges.length })}
+            : t('subscriptions.renewals.count', { count: inWindow.length })}
         </Text>
       </View>
 

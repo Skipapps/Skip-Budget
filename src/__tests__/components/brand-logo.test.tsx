@@ -29,7 +29,10 @@ beforeAll(() => {
   for (const name of ENV) saved[name] = process.env[name];
 });
 
+// Logos are Pro; these pages are drawn for a paying account.
+afterEach(() => resetProStatusForTests());
 beforeEach(() => {
+  publishProStatus({ pro: true, ready: true });
   // A failure is forgotten on a timer, so the clock is the test's to move.
   jest.useFakeTimers();
   process.env.EXPO_PUBLIC_LOGO_API_URL = API;
@@ -184,13 +187,21 @@ describe('on the free plan', () => {
     expect(mockImage).not.toHaveBeenCalled();
   });
 
-  it('draws the logo on Pro, and while the plan is still unknown', async () => {
+  it('draws a quiet circle while the plan is unknown, fetching nothing, and the logo on Pro', async () => {
+    resetProStatusForTests();
     const unknown = await render(<BrandLogo name="Netflix" domain="netflix.com" />);
-    expect(source(unknown)).toBe(`${API}/v1/logo/netflix.com`);
+    expect(unknown.queryByTestId('logo')).toBeNull();
+    expect(unknown.queryByText('NE')).toBeNull();
+    expect(mockImage).not.toHaveBeenCalled();
 
     await act(async () => publishProStatus({ pro: true, ready: true }));
-    const paid = await render(<BrandLogo name="Netflix" domain="netflix.com" />);
-    expect(source(paid)).toBe(`${API}/v1/logo/netflix.com`);
+    expect(source(unknown)).toBe(`${API}/v1/logo/netflix.com`);
+  });
+
+  it('draws initials at once for a store with no logo, whatever the plan', async () => {
+    resetProStatusForTests();
+    const screen = await render(<BrandLogo name="Corner Deli" />);
+    expect(screen.getByText('CD')).toBeTruthy();
   });
 
   it('turns to initials on a lapse and back to the logo on a return, without a remount', async () => {

@@ -186,7 +186,8 @@ describe('Home in Spanish', () => {
     const screen = await render(<HomeScreen />);
 
     expect(screen.getByText('Ve más allá')).toBeTruthy();
-    expect(screen.getByText('Incluido con Pro')).toBeTruthy();
+    // The loan calculator is free, so the section no longer says it comes with Pro.
+    expect(screen.queryByText('Incluido con Pro')).toBeNull();
     expect(screen.getByLabelText('Calculadora de préstamos. Abre la herramienta.')).toBeTruthy();
     expect(
       screen.getByLabelText('Análisis. Función Pro. Descubre la historia detrás de tus gastos.'),
@@ -255,7 +256,7 @@ describe('Home in French', () => {
       screen.getByLabelText(`Factures mensuelles, -1${NBSP}030,00${NBSP}$, ce mois-ci`),
     ).toBeTruthy();
     expect(screen.getByText('Va plus loin')).toBeTruthy();
-    expect(screen.getByText('Inclus avec Pro')).toBeTruthy();
+    expect(screen.queryByText('Inclus avec Pro')).toBeNull();
     expect(screen.getByLabelText('Calculateur de prêt. Ouvre l’outil.')).toBeTruthy();
     expect(screen.getByText('Aperçu')).toBeTruthy();
     expect(screen.getByLabelText('jeu. 10.09. Choisir une date')).toBeTruthy();

@@ -83,10 +83,11 @@ export default function ReceiptsScreen() {
     [sources],
   );
 
-  const visible = useMemo(() => {
+  // Everything the window, search and filters match, as Pro sees it: the heading counts and sums
+  // these. Only the list stops at the plan's window.
+  const matching = useMemo(() => {
     return receipts.filter((receipt) => {
       if (receipt.purchased_on < range.from || receipt.purchased_on > range.to) return false;
-      if (receipt.purchased_on < floor) return false;
       if (!matchesSearch(receipt.merchant, query)) return false;
       if (filters.date && receipt.purchased_on !== filters.date) return false;
       if (filters.sourceIds.length > 0) {
@@ -95,21 +96,15 @@ export default function ReceiptsScreen() {
       }
       return true;
     });
-  }, [receipts, query, filters, range, floor]);
+  }, [receipts, query, filters, range]);
 
-  const hiddenOlder = useMemo(
-    () =>
-      free &&
-      receipts.some(
-        (receipt) =>
-          receipt.purchased_on < floor &&
-          receipt.purchased_on >= range.from &&
-          receipt.purchased_on <= range.to,
-      ),
-    [free, receipts, floor, range],
+  const visible = useMemo(
+    () => matching.filter((receipt) => receipt.purchased_on >= floor),
+    [matching, floor],
   );
+  const hiddenOlder = free && visible.length < matching.length;
 
-  const total = visible.reduce((sum, receipt) => sum - Math.abs(receipt.amount), 0);
+  const total = matching.reduce((sum, receipt) => sum - Math.abs(receipt.amount), 0);
 
   // Oldest day first, today last: the page opens at the bottom, on the latest shop.
   const groups = useMemo(
@@ -191,7 +186,7 @@ export default function ReceiptsScreen() {
               <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={1.3}>
                 {isLoading
                   ? t('receipts.list.loading')
-                  : t('receipts.list.count', { count: visible.length })}
+                  : t('receipts.list.count', { count: matching.length })}
               </Text>
             </View>
             <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>

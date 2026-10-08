@@ -204,7 +204,7 @@ export default function HomeScreen() {
       </View>
 
       <View className="mt-8 w-full">
-        <SectionHeading caption={t('home.includedWithPro')}>{t('home.goFurther')}</SectionHeading>
+        <SectionHeading>{t('home.goFurther')}</SectionHeading>
       </View>
       <View className="mt-3 w-full">
         <ToolCards onPress={(href) => router.push(href)} />

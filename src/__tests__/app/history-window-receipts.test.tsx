@@ -35,11 +35,11 @@ jest.mock('@/api/scan', () => ({
   draftToParams: () => ({}),
 }));
 
-// 12 September 2026: the free window starts on 14 June.
+// 12 September 2026: the free window starts on 15 June.
 const TODAY = '2026-09-12';
 let mockReceipts = [
   { id: 'r-sep', merchant: 'Bakery', amount: 6, purchased_on: '2026-09-10' },
-  { id: 'r-jun', merchant: 'Chemist', amount: 5, purchased_on: '2026-06-14' },
+  { id: 'r-jun', merchant: 'Chemist', amount: 5, purchased_on: '2026-06-15' },
   { id: 'r-may', merchant: 'Hardware', amount: 3, purchased_on: '2026-05-02' },
 ].map((row) => ({ ...row, card_id: null, bank_account_id: null, brands: null }));
 const ALL = mockReceipts;
@@ -80,6 +80,9 @@ it('shows a free year from the window’s first day, and says May is kept', asyn
   expect(screen.getByText('Bakery')).toBeTruthy();
   expect(screen.getByText('Chemist')).toBeTruthy();
   expect(screen.queryByText('Hardware')).toBeNull();
+  // The heading is the year's, as on Pro: May's receipt counts though it is not listed.
+  expect(screen.getByText('3 receipts')).toBeTruthy();
+  expect(screen.getByText('-$14.00')).toBeTruthy();
 
   await fireEvent.press(screen.getByLabelText(NOTICE));
   expect(router.push).toHaveBeenCalledWith({ pathname: '/pro-feature', params: { id: 'history' } });

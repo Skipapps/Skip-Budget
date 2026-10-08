@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react-native';
 
 import { BrandMark } from '@/components/brands/brand-mark';
+import { publishProStatus, resetProStatusForTests } from '@/lib/pro-status';
 
 /**
  * A list row's logo: the row's own website when it has one, else a catalog brand found by the
@@ -33,7 +34,10 @@ const API = 'https://logos.test';
 const savedApi = process.env.EXPO_PUBLIC_LOGO_API_URL;
 const savedCdn = process.env.EXPO_PUBLIC_LOGO_CDN_URL;
 
+// Logos are Pro; these pages are drawn for a paying account.
+afterEach(() => resetProStatusForTests());
 beforeEach(() => {
+  publishProStatus({ pro: true, ready: true });
   process.env.EXPO_PUBLIC_LOGO_API_URL = API;
   process.env.EXPO_PUBLIC_LOGO_CDN_URL = '';
 });

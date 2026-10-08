@@ -6,13 +6,22 @@ import { Pressable, View } from 'react-native';
 import { LOGO_COPY } from '@/components/brands/logo-choices';
 import { t } from '@/i18n';
 import { withTap } from '@/lib/press';
+import { proStatus } from '@/lib/pro-status';
 import { useColors } from '@/providers/theme-provider';
 
 /** The rows that carry their own logo choice. */
 export type LogoKind = 'receipt' | 'subscription' | 'bill';
 
-/** Change logo for one saved row: a normal pushed page, so Back returns to where it opened. */
+/**
+ * Change logo for one saved row: a normal pushed page, so Back returns to where it opened. Logos
+ * are Pro, so a free account is shown what Pro adds instead.
+ */
 export function openChangeLogo(kind: LogoKind, id: string, name: string) {
+  const { pro, ready } = proStatus();
+  if (ready && !pro) {
+    router.push({ pathname: '/pro-feature', params: { id: 'logos' } });
+    return;
+  }
   router.push({ pathname: '/change-logo', params: { kind, id, name } });
 }
 

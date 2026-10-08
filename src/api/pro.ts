@@ -7,6 +7,7 @@ import Purchases, {
 } from 'react-native-purchases';
 
 import { t } from '@/i18n';
+import { withTimeout } from '@/lib/deadline';
 import { useProOverride } from '@/lib/pro-bypass';
 import { publishProStatus, useProStatus, type ProStatus } from '@/lib/pro-status';
 import { supabase } from '@/lib/supabase';
@@ -24,6 +25,9 @@ import { useUserId } from '@/providers/session-provider';
  */
 
 const RC_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '';
+
+/** How long the server's copy may take before it counts as unanswered (and free is assumed). */
+const ENTITLEMENT_TIMEOUT_MS = 8_000;
 
 let configuredFor: string | null = null;
 let configuring: Promise<boolean> | null = null;
@@ -127,10 +131,13 @@ export function useProSource(): ProStatus {
     queryKey: ['entitlement', userId],
     enabled: Boolean(userId),
     queryFn: async (): Promise<boolean> => {
-      const { data, error } = await supabase
-        .from('entitlements')
-        .select('pro, expires_at')
-        .maybeSingle();
+      // A ceiling on the wait: until this answers (or fails), a "no" from the SDK alone does not
+      // count as known, so a hung request would hold every gate.
+      const { data, error } = await withTimeout(
+        Promise.resolve(supabase.from('entitlements').select('pro, expires_at').maybeSingle()),
+        ENTITLEMENT_TIMEOUT_MS,
+        'Could not check Skip Pro.',
+      );
       if (error) throw error;
       if (!data?.pro) return false;
       return !data.expires_at || new Date(data.expires_at).getTime() > Date.now();
@@ -176,9 +183,10 @@ export function useProSource(): ProStatus {
     // An override outranks both, in whichever direction it points.
     pro:
       override === 'free' ? false : override === 'pro' || sdkPro === true || server.data === true,
-    // Ready means "safe to show a gate": the server or the SDK has answered, so a payer never sees
-    // a paywall flash. An override is ready by definition: it has no request to wait on.
-    ready: override !== 'off' || server.isFetched || sdkPro !== null,
+    // Ready means "safe to show a gate": a yes from either source, or the server's answer. A no
+    // from the SDK alone waits for the row, which knows a grant or a purchase made elsewhere, so a
+    // payer never sees the free version flash. An override is ready by definition.
+    ready: override !== 'off' || sdkPro === true || server.isFetched,
   };
 }
 
@@ -199,13 +207,16 @@ export type TrialPeriod = { count: number; unit: string };
 
 const PERIOD_KEYS = {
   DAY: 'pro.period.day',
-  WEEK: 'pro.period.week',
   MONTH: 'pro.period.month',
   YEAR: 'pro.period.year',
 } as const;
 
-/** "14 days" in the language on screen. */
+/**
+ * "14 days" in the language on screen. Weeks are told in days: App Store Connect offers "2 weeks",
+ * and the page promises "14 days".
+ */
 export function trialPeriodLabel({ count, unit }: TrialPeriod): string {
+  if (unit.toUpperCase() === 'WEEK') return t('pro.period.day', { count: count * 7 });
   const key = PERIOD_KEYS[unit.toUpperCase() as keyof typeof PERIOD_KEYS];
   if (key) return t(key, { count });
   return `${count} ${unit.toLowerCase()}${count === 1 ? '' : 's'}`;

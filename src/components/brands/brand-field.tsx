@@ -18,6 +18,7 @@ import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { logoChosen, selectionLogo } from '@/lib/logo-columns';
 import { logoHints } from '@/lib/logo-lookup';
+import { useKnownFree } from '@/lib/pro-status';
 import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
 
@@ -103,6 +104,8 @@ export function BrandField({
   const { data: results = [], isFetching } = useBrandSearch(debounced);
   const knownStores = useKnownStores();
   const remember = useRememberStore();
+  // Free has no logos, so nothing about one is asked: the store itself is still remembered.
+  const free = useKnownFree();
 
   const typed = query.trim();
   const searching = focused && typed.length >= 2;
@@ -149,7 +152,7 @@ export function BrandField({
   };
 
   const addCustom = () => {
-    onChange({
+    const added = {
       brandId: null,
       name: typed,
       domain: null,
@@ -157,8 +160,19 @@ export function BrandField({
       categoryId: guessCategory(typed),
       logoDomain: null,
       logoHidden: false,
-    });
+    };
+    onChange(added);
     setConfirming(true);
+    // On Pro the logo answer remembers it; free is asked nothing, so it is remembered here, with no
+    // logo chosen, to be listed first next time.
+    if (free && suggestLogos) {
+      void remember({
+        name: added.name,
+        categoryId: added.categoryId,
+        logoDomain: null,
+        logoHidden: false,
+      });
+    }
   };
 
   const clear = () => {
@@ -208,7 +222,7 @@ export function BrandField({
               });
             }}
           />
-        ) : onChangeLogo ? (
+        ) : onChangeLogo && !free ? (
           <TextLink
             label={LOGO_COPY.changeLogo}
             variant="subtle"

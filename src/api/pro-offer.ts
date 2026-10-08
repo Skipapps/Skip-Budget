@@ -2,8 +2,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { useOfferPrices, usePro } from '@/api/pro';
+import { withTimeout } from '@/lib/deadline';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
+
+/**
+ * How long leaving the Pro page waits for the claim. The edge swipe is off while the offer is armed,
+ * so a stalled claim must not hold the only way out.
+ */
+const CLAIM_TIMEOUT_MS = 3_000;
 
 /**
  * The one-time offer: shown the first time a free account leaves the Pro page without buying, and
@@ -37,9 +44,19 @@ export function useExitOffer(): {
   });
 
   const claim = useCallback(async (): Promise<boolean> => {
-    const { data, error } = await supabase.rpc('claim_pro_offer');
-    client.setQueryData(['pro-offer-seen', userId], true);
-    return !error && data === true;
+    try {
+      const { data, error } = await withTimeout(
+        Promise.resolve(supabase.rpc('claim_pro_offer')),
+        CLAIM_TIMEOUT_MS,
+        'The offer could not be checked.',
+      );
+      if (error) return false;
+      // Either answer means the row is now marked: this call showed it, or another phone did.
+      client.setQueryData(['pro-offer-seen', userId], true);
+      return data === true;
+    } catch {
+      return false;
+    }
   }, [client, userId]);
 
   // Anything unknown (a failed read, a database without the column, a store without the offer)

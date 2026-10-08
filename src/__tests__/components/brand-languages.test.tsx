@@ -8,6 +8,7 @@ import { BrandField, type BrandSelection } from '@/components/brands/brand-field
 import { BrandLogo } from '@/components/brands/brand-logo';
 import { ChangeLogoButton } from '@/components/brands/change-logo-button';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
+import { publishProStatus, resetProStatusForTests } from '@/lib/pro-status';
 
 /**
  * The store field, the add-store logo check, a logo's spoken name and the Change logo button, in
@@ -94,7 +95,10 @@ const lastValue = () => onValue.mock.calls[onValue.mock.calls.length - 1][0] as 
 
 const savedApi = process.env.EXPO_PUBLIC_LOGO_API_URL;
 
+// Logos are Pro; these pages are drawn for a paying account.
+afterEach(() => resetProStatusForTests());
 beforeEach(() => {
+  publishProStatus({ pro: true, ready: true });
   jest.useFakeTimers();
   jest.clearAllMocks();
   resetLocaleForTests();
@@ -189,5 +193,18 @@ describe('the Change logo button', () => {
       pathname: '/change-logo',
       params: { kind: 'subscription', id: 's1', name: 'Calm' },
     });
+  });
+});
+
+describe('the logo pencil on the free plan', () => {
+  it('opens what Pro adds, not the Change logo page', async () => {
+    await act(async () => publishProStatus({ pro: false, ready: true }));
+    const screen = await render(
+      <ChangeLogoButton kind="receipt" id="r1" name="Deli">
+        <View />
+      </ChangeLogoButton>,
+    );
+    await fireEvent.press(screen.getByLabelText('Change logo'));
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/pro-feature', params: { id: 'logos' } });
   });
 });

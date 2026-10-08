@@ -47,8 +47,9 @@ export default function SavingsScreen() {
   const hiddenOlder = free && months.length < allMonths.length;
 
   // `savedFor` takes the corrected figure where there is one and nothing from a month left out.
-  const total = months.reduce((sum, month) => sum + savedFor(month), 0);
-  const kept = months.filter((month) => savedFor(month) > 0).length;
+  // Every month counts, as on the Cards tab: only the list below stops at the plan's window.
+  const total = allMonths.reduce((sum, month) => sum + savedFor(month), 0);
+  const kept = allMonths.filter((month) => savedFor(month) > 0).length;
 
   // Oldest month at the top. The query returns newest-first, so the display order is set here.
   const rows = sortByDateAscending(
@@ -72,11 +73,7 @@ export default function SavingsScreen() {
         />
       ) : null}
 
-      {!isLoading && !isError && months.length === 0 && hiddenOlder ? (
-        <HistoryNotice className="mt-6" />
-      ) : null}
-
-      {!isLoading && !isError && months.length === 0 && !hiddenOlder ? (
+      {!isLoading && !isError && allMonths.length === 0 ? (
         <PageState
           art={artwork.tileSavings}
           title={t('savings.list.emptyTitle')}
@@ -84,7 +81,7 @@ export default function SavingsScreen() {
         />
       ) : null}
 
-      {months.length > 0 ? (
+      {allMonths.length > 0 ? (
         <>
           <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
             <Text

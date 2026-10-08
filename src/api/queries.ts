@@ -896,16 +896,17 @@ export function useLedger(range: DateRange | undefined, today: string) {
   const charges = useCharges();
   const free = useKnownFree();
 
-  // Nothing is listed from before the plan's window: 90 days back on free, seven years on Pro.
-  // Only the listing is cut; balances walk the whole history elsewhere (ledgerForSource), and the
-  // rows themselves stay stored. No range means the whole window.
+  // The window is walked as far back as the app keeps anything (seven years), on every plan, so a
+  // figure that sums it is the same on free and Pro. Only what is listed stops at the plan's
+  // window: 90 days back on free. No range means the whole window.
+  const kept = useMemo(() => historyFloor(true, new Date(`${today}T00:00:00`)), [today]);
   const floor = useMemo(() => historyFloor(!free, new Date(`${today}T00:00:00`)), [free, today]);
   const asked = range?.from ?? null;
-  const from = asked && asked > floor ? asked : floor;
+  const from = asked && asked > kept ? asked : kept;
   const to = range?.to ?? '9999-12-31';
   // Projecting every bill and payday across the window is real work (a year range walks each
   // schedule dozens of times), so it is held to once per change of the data or the window.
-  const entries = useMemo<LedgerEntry[]>(() => {
+  const allEntries = useMemo<LedgerEntry[]>(() => {
     // A window wholly before the floor shows nothing; no schedule is walked backwards for it.
     if (from > to) return [];
     const inRange = (date: string) => date <= to && date >= from;
@@ -1043,30 +1044,42 @@ export function useLedger(range: DateRange | undefined, today: string) {
     return entries;
   }, [receipts.data, subscriptions.data, bills.data, salary.data, charges.data, from, to, today]);
 
-  // What the window cut off that happened, so a free account is told it is kept, not gone.
-  // Receipts and recorded charges are what happened; projections are not history.
-  const hidden = useMemo<HiddenHistory>(() => {
-    if (!free || (asked !== null && asked >= floor)) return NOTHING_HIDDEN;
-    const older = (date: string) => date < floor && date <= to && (asked === null || date >= asked);
-    const plans = new Set<string>();
-    for (const row of charges.data ?? []) {
-      if (older(row.charged_on)) plans.add(chargePlanKey(row));
-    }
-    return { receipts: (receipts.data ?? []).some((row) => older(row.purchased_on)), plans };
-  }, [free, asked, floor, to, receipts.data, charges.data]);
+  const entries = useMemo(
+    () => (free ? allEntries.filter((entry) => entry.date >= floor) : allEntries),
+    [free, allEntries, floor],
+  );
 
+  // What the list left out, so a free account is told it is kept, not gone.
+  const hidden = useMemo<HiddenHistory>(() => {
+    if (!free) return NOTHING_HIDDEN;
+    let receiptsHidden = false;
+    const plans = new Set<string>();
+    for (const entry of allEntries) {
+      if (entry.date >= floor) continue;
+      if (entry.kind === 'receipt') receiptsHidden = true;
+      else if ((entry.kind === 'bill' || entry.kind === 'subscription') && entry.planId) {
+        plans.add(planKey(entry.kind, entry.planId));
+      }
+    }
+    return { receipts: receiptsHidden, plans };
+  }, [free, allEntries, floor]);
+
+  // A figure for the whole window asked for, as Pro sees it: "charged this year" is the year's.
   const totals = useMemo<LedgerTotals>(
     () => ({
-      out: entries.filter((e) => e.amount < 0).reduce((sum, e) => sum + Math.abs(e.amount), 0),
-      in: entries.filter((e) => e.amount > 0).reduce((sum, e) => sum + e.amount, 0),
-      net: entries.reduce((sum, e) => sum + e.amount, 0),
-      count: entries.length,
+      out: allEntries.filter((e) => e.amount < 0).reduce((sum, e) => sum + Math.abs(e.amount), 0),
+      in: allEntries.filter((e) => e.amount > 0).reduce((sum, e) => sum + e.amount, 0),
+      net: allEntries.reduce((sum, e) => sum + e.amount, 0),
+      count: allEntries.length,
     }),
-    [entries],
+    [allEntries],
   );
 
   return {
+    /** What is listed: from the plan's window on. */
     entries,
+    /** The whole window asked for, for figures that sum it. Never list these. */
+    allEntries,
     totals,
     hidden,
     isLoading:

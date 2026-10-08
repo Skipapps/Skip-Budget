@@ -9,6 +9,8 @@ import { resetProStatusForTests } from '@/lib/pro-status';
 let mockUserId: string | null = 'user-1';
 let mockOverride: 'off' | 'pro' | 'free' = 'off';
 let mockServerRow: { pro: boolean; expires_at: string | null } | null = null;
+// When set, the server's answer waits until the test lets it through.
+let mockServerGate: Promise<void> | null = null;
 let mockSdkActive: Record<string, string[]> = {};
 const mockListeners = new Set<(info: unknown) => void>();
 
@@ -36,7 +38,10 @@ jest.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
       select: () => ({
-        maybeSingle: async () => ({ data: mockServerRow, error: null }),
+        maybeSingle: async () => {
+          if (mockServerGate) await mockServerGate;
+          return { data: mockServerRow, error: null };
+        },
       }),
     }),
   },
@@ -55,6 +60,7 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 beforeEach(() => {
+  mockServerGate = null;
   mockUserId = 'user-1';
   mockOverride = 'off';
   mockServerRow = null;
@@ -88,5 +94,26 @@ describe('with a store key', () => {
       }
     });
     expect(result.current.pro).toBe(true);
+  });
+
+  it('does not take a lone no from the SDK as known: the server row may hold a grant', async () => {
+    let open: () => void = () => {};
+    mockServerGate = new Promise<void>((resolve) => (open = resolve));
+    mockServerRow = { pro: true, expires_at: null };
+    const { result } = await renderHook(() => mod.useProSource(), { wrapper });
+
+    // The SDK has said no; the row has not answered.
+    await waitFor(() => expect(mockListeners.size).toBe(1));
+    expect(result.current).toEqual({ pro: false, ready: false });
+
+    await act(async () => open());
+    await waitFor(() => expect(result.current).toEqual({ pro: true, ready: true }));
+  });
+
+  it('takes a yes from the SDK at once, before the row', async () => {
+    mockServerGate = new Promise<void>(() => {});
+    mockSdkActive = { 'user-1': ['pro'] };
+    const { result } = await renderHook(() => mod.useProSource(), { wrapper });
+    await waitFor(() => expect(result.current).toEqual({ pro: true, ready: true }));
   });
 });

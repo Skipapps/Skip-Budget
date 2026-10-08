@@ -35,6 +35,7 @@ import { failureMessage, failureText } from '@/lib/failure';
 import {
   FREE_HISTORY_DAYS,
   PRO_HISTORY_YEARS,
+  PRO_OFFER_MS,
   proMonthlyAmount,
   proMonthlyLabel,
   proYearlyAmount,
@@ -112,7 +113,11 @@ export default function ProScreen() {
     leaving.current = true;
     try {
       if (offer.armed && (await offer.claim())) {
-        router.replace('/pro-offer');
+        // The deadline travels with the page, so a remount cannot start the ten minutes again.
+        router.replace({
+          pathname: '/pro-offer',
+          params: { until: String(Date.now() + PRO_OFFER_MS) },
+        });
         return;
       }
     } catch {
@@ -174,7 +179,7 @@ export default function ProScreen() {
     setBusy(true);
     try {
       const result = await purchase(pack);
-      if (result === 'done') router.back();
+      if (result === 'done') goBack();
     } catch (thrown) {
       setMessage(failureMessage(thrown));
     } finally {
@@ -198,6 +203,8 @@ export default function ProScreen() {
   if (pro) {
     return (
       <Screen title="Skip Pro" showBack>
+        {/* A restore made here turns this page Pro while the offer was armed: the swipe comes back. */}
+        <Stack.Screen options={{ gestureEnabled: true }} />
         <View className="mt-8 w-full items-center">
           <View className="h-16 w-16 items-center justify-center rounded-full bg-accent">
             <Crown size={28} color={colors.onControl} strokeWidth={2} />
@@ -310,6 +317,13 @@ export default function ProScreen() {
           {storeNote}
         </Text>
       ) : null}
+
+      <Text
+        className="mt-6 w-full text-center font-app text-[10.5px] leading-[15px] text-muted"
+        maxFontSizeMultiplier={TEXT_CAP.reading}
+      >
+        {t('pro.page.renews')}
+      </Text>
 
       {__DEV__ && devNote ? (
         <Text

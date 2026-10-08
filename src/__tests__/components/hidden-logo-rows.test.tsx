@@ -3,6 +3,7 @@ import { render } from '@testing-library/react-native';
 import type { LedgerEntry } from '@/api/queries';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { LedgerRow } from '@/components/transactions/ledger-row';
+import { publishProStatus, resetProStatusForTests } from '@/lib/pro-status';
 
 /**
  * The lists built from the ledger (Home, Transactions, Subscriptions, a card's page) draw a row with
@@ -39,7 +40,10 @@ const API = 'https://logos.test';
 const savedApi = process.env.EXPO_PUBLIC_LOGO_API_URL;
 const savedCdn = process.env.EXPO_PUBLIC_LOGO_CDN_URL;
 
+// Logos are Pro; these pages are drawn for a paying account.
+afterEach(() => resetProStatusForTests());
 beforeEach(() => {
+  publishProStatus({ pro: true, ready: true });
   process.env.EXPO_PUBLIC_LOGO_API_URL = API;
   process.env.EXPO_PUBLIC_LOGO_CDN_URL = '';
 });

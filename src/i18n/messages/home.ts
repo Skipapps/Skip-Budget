@@ -123,11 +123,6 @@ export const homeMessages = defineMessages({
   'home.destination.open': { en: 'Open', es: 'Abrir', fr: 'Ouvrir' },
 
   'home.goFurther': { en: 'Go further', es: 'Ve más allá', fr: 'Va plus loin' },
-  'home.includedWithPro': {
-    en: 'Included with Pro',
-    es: 'Incluido con Pro',
-    fr: 'Inclus avec Pro',
-  },
   'home.tool.loanCalculator': {
     en: 'Loan Calculator',
     es: 'Calculadora de préstamos',

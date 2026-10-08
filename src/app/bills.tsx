@@ -36,7 +36,7 @@ export default function BillsScreen() {
   const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
 
   const plans = useBills();
-  const { entries, hidden, isLoading, isError, refetch } = useLedger(range, today);
+  const { entries, allEntries, hidden, isLoading, isError, refetch } = useLedger(range, today);
   // Free lists 90 days back: say the older charges are kept rather than look like none.
   const hiddenOlder = hidOlder(hidden, 'bill');
   const { sources } = usePaymentSources();
@@ -47,7 +47,9 @@ export default function BillsScreen() {
   );
 
   const charges = useMemo(() => entries.filter((entry) => entry.kind === 'bill'), [entries]);
-  const total = charges.reduce((sum, entry) => sum + entry.amount, 0);
+  // The heading sums the whole window, as Pro sees it; only the list stops at the plan's window.
+  const inWindow = useMemo(() => allEntries.filter((entry) => entry.kind === 'bill'), [allEntries]);
+  const total = inWindow.reduce((sum, entry) => sum + entry.amount, 0);
 
   // Oldest day first, today last; stated rather than relying on groupByDate's default.
   const groups = useMemo(
@@ -98,9 +100,9 @@ export default function BillsScreen() {
           className="mt-2 font-app text-[12px] text-muted"
           maxFontSizeMultiplier={TEXT_CAP.reading}
         >
-          {charges.length === 0
+          {inWindow.length === 0
             ? t('bills.charged.nothing')
-            : t('bills.charged.count', { count: charges.length })}
+            : t('bills.charged.count', { count: inWindow.length })}
         </Text>
       </View>
 

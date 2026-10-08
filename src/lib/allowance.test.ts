@@ -107,9 +107,9 @@ describe('captureAllowance', () => {
 });
 
 describe('historyFloor', () => {
-  it('is 90 days back on free', () => {
-    expect(historyFloor(false, today)).toBe('2026-07-09');
-    expect(historyFloor(false, new Date(2026, 2, 1))).toBe('2025-12-01');
+  it('is the 90 days ending today on free', () => {
+    expect(historyFloor(false, today)).toBe('2026-07-10');
+    expect(historyFloor(false, new Date(2026, 2, 1))).toBe('2025-12-02');
   });
 
   it('is seven years back on Pro', () => {
@@ -117,14 +117,14 @@ describe('historyFloor', () => {
   });
 
   it('crosses a leap day without drifting', () => {
-    expect(historyFloor(false, new Date(2028, 4, 29))).toBe('2028-02-29');
+    expect(historyFloor(false, new Date(2028, 4, 28))).toBe('2028-02-29');
     expect(historyFloor(true, new Date(2027, 1, 28))).toBe('2020-02-28');
   });
 
   it('shows the floor day itself and everything after it', () => {
     const floor = historyFloor(false, today);
-    expect(isWithinHistory('2026-07-09', floor)).toBe(true);
-    expect(isWithinHistory('2026-07-08', floor)).toBe(false);
+    expect(isWithinHistory('2026-07-10', floor)).toBe(true);
+    expect(isWithinHistory('2026-07-09', floor)).toBe(false);
     expect(isWithinHistory('2026-10-07', floor)).toBe(true);
   });
 });

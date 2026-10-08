@@ -9,11 +9,6 @@ export const proMessages = defineMessages({
     es: { one: '{count} día', other: '{count} días' },
     fr: { one: '{count} jour', other: '{count} jours' },
   },
-  'pro.period.week': {
-    en: { one: '{count} week', other: '{count} weeks' },
-    es: { one: '{count} semana', other: '{count} semanas' },
-    fr: { one: '{count} semaine', other: '{count} semaines' },
-  },
   'pro.period.month': {
     en: { one: '{count} month', other: '{count} months' },
     es: { one: '{count} mes', other: '{count} meses' },
@@ -387,6 +382,11 @@ export const proMessages = defineMessages({
     es: 'Se cobra cada mes. Cancela cuando quieras.',
     fr: 'Facturé chaque mois. Annule quand tu veux.',
   },
+  'pro.page.renews': {
+    en: 'Billed by Apple. Renews automatically until you cancel in your App Store subscriptions.',
+    es: 'Lo cobra Apple. Se renueva automáticamente hasta que lo canceles en tus suscripciones del App Store.',
+    fr: 'Facturé par Apple. Se renouvelle automatiquement jusqu’à ce que tu l’annules dans tes abonnements de l’App Store.',
+  },
   'pro.compare.what': { en: 'What you get', es: 'Lo que obtienes', fr: 'Ce que tu obtiens' },
   'pro.compare.free': { en: 'Free', es: 'Gratis', fr: 'Gratuit' },
   'pro.compare.pro': { en: 'Pro', es: 'Pro', fr: 'Pro' },
@@ -448,6 +448,11 @@ export const proMessages = defineMessages({
     en: 'Skip Pro, half price',
     es: 'Skip Pro a mitad de precio',
     fr: 'Skip Pro à moitié prix',
+  },
+  'pro.offer.titleSpecial': {
+    en: 'Skip Pro, a one-time price',
+    es: 'Skip Pro a un precio único',
+    fr: 'Skip Pro à un prix unique',
   },
   'pro.offer.year': { en: 'year', es: 'año', fr: 'an' },
   'pro.offer.wasPrice': {

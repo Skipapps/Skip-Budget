@@ -933,6 +933,28 @@ describe('on the free plan, where logos are Pro', () => {
     expect(lastValue()).toMatchObject({ name: 'Planet Fitness', logoDomain: null });
   });
 
+  it('still remembers the store, with no logo chosen, to list it first next time', async () => {
+    const screen = await render(<Harness />);
+    await addStore(screen, 'Planet Fitness');
+
+    expect(mockRemember).toHaveBeenCalledWith({
+      name: 'Planet Fitness',
+      categoryId: 'fitness',
+      logoDomain: null,
+      logoHidden: false,
+    });
+  });
+
+  it('offers no Change logo on a saved store', async () => {
+    const screen = await render(
+      <Harness
+        value={{ brandId: null, name: 'Planet Fitness', domain: null, categoryId: 'fitness' }}
+        onChangeLogo={jest.fn()}
+      />,
+    );
+    expect(screen.queryByLabelText('Change logo')).toBeNull();
+  });
+
   it('does not apply even a sure match', async () => {
     const screen = await render(<Harness />);
     await addStore(screen, 'Vercel');

@@ -59,6 +59,11 @@ shown the first time a free person closes the Pro page without buying, never aga
 Then: App Store Connect (14-day intro offer, $9.99 offer product), RevenueCat (attach product,
 `exit_offer` offering, verify webhook writes entitlements), Release build for the Founder's phone.
 
-## Status
+## Status (2026-10-07)
 
-- [ ] 1  - [ ] 2  - [ ] 3  - [ ] 4  - [ ] 5  - [ ] 6  - [ ] 7  - [ ] 8  - [ ] 9  - [ ] 10
+- [x] 1 b2a6dcd  - [x] 2 30b8eef  - [x] 3 a81f380 (migration NOT live)  - [x] 4 e2ccf21
+- [x] 5 8d985ae  - [x] 6 ce7ec3c  - [x] 7 8d5176e  - [x] 8 577c666  - [x] 9 b02eefa
+- [ ] 10 lapse pass + Dmitri review (in progress)
+
+Device checklist: `.claude/team/dev/pro-free-test-checklist.md`.
+RevenueCat offering id the app reads: `exit_offer` (its yearly/annual package is the $9.99 plan).

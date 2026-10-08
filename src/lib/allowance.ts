@@ -68,8 +68,8 @@ export function captureAllowance(
 }
 
 /**
- * The earliest day each plan sees, as yyyy-mm-dd: seven years back on Pro, 90 days back on free.
- * Only for what is listed; balances always walk the whole history.
+ * The earliest day each plan sees, as yyyy-mm-dd: seven years back on Pro, and on free the 90 days
+ * ending today (today is the 90th). Only for what is listed; balances always walk the whole history.
  */
 export function historyFloor(pro: boolean, today: Date): string {
   const year = today.getFullYear();
@@ -78,7 +78,7 @@ export function historyFloor(pro: boolean, today: Date): string {
   return toIsoDate(
     pro
       ? new Date(year - PRO_HISTORY_YEARS, month, day)
-      : new Date(year, month, day - FREE_HISTORY_DAYS),
+      : new Date(year, month, day - (FREE_HISTORY_DAYS - 1)),
   );
 }
 
