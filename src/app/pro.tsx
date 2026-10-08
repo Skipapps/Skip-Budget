@@ -1,33 +1,80 @@
+import { router } from 'expo-router';
 import {
-  Camera,
   ChartColumn,
   Check,
   CreditCard,
   Crown,
+  FileUp,
+  Headphones,
+  History,
+  Mic,
+  ScanLine,
   Sparkles,
+  Store,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 
-import { usePro, useProPrices, usePurchasePro, purchasesAvailable } from '@/api/pro';
+import {
+  purchasesAvailable,
+  trialPeriodLabel,
+  usePro,
+  useProPrices,
+  usePurchasePro,
+} from '@/api/pro';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { TextLink } from '@/components/ui/text-link';
 import { Title } from '@/components/ui/typography';
 import { t, type MessageKey } from '@/i18n';
-import { proMonthlyLabel, proYearlyLabel, usdText } from '@/lib/wall';
-import { router } from 'expo-router';
-import { useColors } from '@/providers/theme-provider';
 import { failureMessage, failureText } from '@/lib/failure';
+import {
+  FREE_HISTORY_DAYS,
+  PRO_HISTORY_YEARS,
+  proMonthlyAmount,
+  proMonthlyLabel,
+  proYearlyAmount,
+  proYearlyLabel,
+  usdText,
+} from '@/lib/wall';
+import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
 
-const FEATURES: { icon: LucideIcon; title: MessageKey; hint: MessageKey }[] = [
-  { icon: CreditCard, title: 'pro.page.cards.title', hint: 'pro.page.cards.hint' },
-  { icon: Camera, title: 'pro.page.scan.title', hint: 'pro.page.scan.hint' },
-  { icon: ChartColumn, title: 'pro.page.insights.title', hint: 'pro.page.insights.hint' },
-  { icon: Sparkles, title: 'pro.page.early.title', hint: 'pro.page.early.hint' },
+/** What one side of the table says: a tick, a dash, or a few words. */
+type Cell = 'yes' | 'no' | (() => string);
+
+type Row = { icon: LucideIcon; label: MessageKey; free: Cell; pro: Cell };
+
+const limited = () => t('pro.compare.limited');
+const unlimited = () => t('pro.compare.unlimited');
+
+/** Free against Pro, in the order the design gives them. The words follow the language on screen. */
+const ROWS: Row[] = [
+  { icon: Wallet, label: 'pro.compare.track', free: 'yes', pro: 'yes' },
+  { icon: FileUp, label: 'pro.compare.upload', free: limited, pro: 'yes' },
+  { icon: ScanLine, label: 'pro.compare.scan', free: limited, pro: unlimited },
+  { icon: CreditCard, label: 'pro.compare.cards', free: limited, pro: unlimited },
+  {
+    icon: History,
+    label: 'pro.compare.history',
+    free: () => t('pro.compare.days', { count: FREE_HISTORY_DAYS }),
+    pro: () => t('pro.compare.years', { count: PRO_HISTORY_YEARS }),
+  },
+  { icon: Mic, label: 'pro.compare.voice', free: 'no', pro: 'yes' },
+  { icon: ChartColumn, label: 'pro.compare.insights', free: 'no', pro: 'yes' },
+  { icon: Store, label: 'pro.compare.logos', free: 'no', pro: 'yes' },
+  { icon: Sparkles, label: 'pro.compare.early', free: 'no', pro: 'yes' },
+  { icon: Headphones, label: 'pro.compare.support', free: 'no', pro: 'yes' },
 ];
+
+/** How a cell is read aloud. */
+function spoken(cell: Cell): string {
+  if (cell === 'yes') return t('pro.compare.included');
+  if (cell === 'no') return t('pro.compare.notIncluded');
+  return cell();
+}
 
 /**
  * The yearly price over twelve months ($19.99 / 12), for when the store has not answered. In
@@ -36,9 +83,11 @@ const FEATURES: { icon: LucideIcon; title: MessageKey; hint: MessageKey }[] = [
  */
 const PRO_YEARLY_PER_MONTH_USD = 1.67;
 
+type Plan = 'yearly' | 'monthly';
+
 /**
- * The Pro page. With no store key configured it still renders and says purchases are opening soon,
- * so a missing billing SDK never crashes it.
+ * The Pro page: Free against Pro, the two plans, and one button. With no store key configured it
+ * still renders and says purchases are opening soon, so a missing billing SDK never crashes it.
  */
 export default function ProScreen() {
   const colors = useColors();
@@ -46,11 +95,13 @@ export default function ProScreen() {
   const prices = useProPrices();
   const { purchase, restore } = usePurchasePro();
 
-  const [plan, setPlan] = useState<'yearly' | 'monthly'>('yearly');
+  const [plan, setPlan] = useState<Plan>('yearly');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const canBuy = purchasesAvailable() && Boolean(prices.data?.yearly || prices.data?.monthly);
+  const pack = plan === 'yearly' ? prices.data?.yearly : prices.data?.monthly;
+  const canBuy = purchasesAvailable() && Boolean(pack);
+  const trial = prices.data?.trials[plan] ?? null;
 
   // No billing in this build says so; a store that is unreachable or returns no plans is a failure.
   const storeNote = !purchasesAvailable()
@@ -58,8 +109,8 @@ export default function ProScreen() {
     : !canBuy && prices.isFetched
       ? failureText()
       : null;
-
   const devNote = prices.error ? (prices.error as Error).message : (prices.data?.debug ?? null);
+
   // The store's own prices when it has answered; the dollar fallbacks until then.
   const yearly = prices.data?.yearly?.product;
   const monthly = prices.data?.monthly?.product;
@@ -69,11 +120,32 @@ export default function ProScreen() {
   const monthlyPrice = monthly
     ? t('pro.price.monthly', { price: monthly.priceString })
     : proMonthlyLabel();
-  const yearlyPerMonth = yearly?.pricePerMonthString ?? usdText(PRO_YEARLY_PER_MONTH_USD);
-  const trial = prices.data?.trialText ?? null;
+  const yearlyPerMonth = t('pro.price.monthly', {
+    price: yearly?.pricePerMonthString ?? usdText(PRO_YEARLY_PER_MONTH_USD),
+  });
+  const price =
+    plan === 'yearly'
+      ? (yearly?.priceString ?? proYearlyAmount())
+      : (monthly?.priceString ?? proMonthlyAmount());
+
+  const cta = busy
+    ? t('pro.page.oneMoment')
+    : canBuy
+      ? trial
+        ? t('pro.page.tryFree', { period: trialPeriodLabel(trial) })
+        : t(plan === 'yearly' ? 'pro.page.getYearly' : 'pro.page.getMonthly', { price })
+      : prices.isFetching
+        ? t('pro.page.checking')
+        : t('pro.page.checkAgain');
+
+  // What happens after the button, in the plan's own terms; nothing until the store has answered.
+  const terms = !canBuy
+    ? null
+    : trial
+      ? t(plan === 'yearly' ? 'pro.page.thenYearly' : 'pro.page.thenMonthly', { price })
+      : t(plan === 'yearly' ? 'pro.page.billedYearly' : 'pro.page.billedMonthly');
 
   const handleContinue = async () => {
-    const pack = plan === 'yearly' ? prices.data?.yearly : prices.data?.monthly;
     if (!pack) return;
     setMessage(null);
     setBusy(true);
@@ -112,7 +184,7 @@ export default function ProScreen() {
           </Title>
           <Text
             className="mt-3 max-w-[300px] text-center font-app text-[14px] leading-[21px] text-muted"
-            maxFontSizeMultiplier={1.4}
+            maxFontSizeMultiplier={TEXT_CAP.row}
           >
             {t('pro.page.haveDetail')}
           </Text>
@@ -129,65 +201,75 @@ export default function ProScreen() {
   }
 
   return (
-    <Screen title="Skip Pro" showBack>
-      <Text className="mt-2 w-full font-app text-[14px] text-muted" maxFontSizeMultiplier={1.4}>
-        {t('pro.page.tagline')}
+    <Screen
+      title={t('pro.page.title')}
+      showBack
+      footer={
+        <View className="w-full gap-2">
+          <Button
+            label={cta}
+            onPress={canBuy ? handleContinue : () => void prices.refetch()}
+            disabled={busy || prices.isFetching}
+          />
+          {terms ? (
+            <Text
+              className="w-full text-center font-app text-[12px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.row}
+            >
+              {terms}
+            </Text>
+          ) : null}
+          {/* Text links, not pills, so they do not read as a second thing to buy. Restore, Terms
+              and Privacy must stay easy to find (App Review 3.1.2). */}
+          <View className="w-full flex-row flex-wrap items-center justify-center gap-x-5">
+            <TextLink label={t('pro.page.restore')} variant="subtle" onPress={handleRestore} />
+            <TextLink
+              label={t('pro.page.terms')}
+              variant="subtle"
+              underline
+              onPress={() => router.push('/terms')}
+            />
+            <TextLink
+              label={t('pro.page.privacy')}
+              variant="subtle"
+              underline
+              onPress={() => router.push('/privacy')}
+            />
+          </View>
+        </View>
+      }
+    >
+      <Text
+        className="mt-1 w-full text-center font-app text-[15px] text-muted"
+        maxFontSizeMultiplier={TEXT_CAP.reading}
+      >
+        {t('pro.page.coffee')}
       </Text>
 
-      <View className="mt-6 w-full gap-2.5">
-        {FEATURES.map((feature) => (
-          <View
-            key={feature.title}
-            className="w-full flex-row items-center gap-3 rounded-[16px] border border-line bg-card px-4 py-3"
-          >
-            <View className="h-10 w-10 items-center justify-center rounded-[12px] bg-ink/5">
-              <feature.icon size={20} color={colors.body} strokeWidth={1.8} />
-            </View>
-            <View className="min-w-0 flex-1">
-              <Text
-                className="font-app-semibold text-[13.5px] text-ink"
-                maxFontSizeMultiplier={1.3}
-              >
-                {t(feature.title)}
-              </Text>
-              <Text
-                className="mt-0.5 font-app text-[11.5px] leading-[16px] text-muted"
-                maxFontSizeMultiplier={1.3}
-              >
-                {t(feature.hint)}
-              </Text>
-            </View>
-            <Check size={18} color={colors.accentInk} strokeWidth={2} />
-          </View>
-        ))}
-      </View>
+      <CompareTable />
 
-      <View className="mt-6 w-full gap-2.5">
-        <PriceCard
+      <View className="mt-6 w-full flex-row gap-3">
+        <PlanCard
           selected={plan === 'yearly'}
           onPress={() => setPlan('yearly')}
           name={t('pro.plan.yearly')}
           price={yearlyPrice}
-          hint={
-            trial
-              ? t('pro.plan.yearlyTrial', { trial })
-              : t('pro.plan.yearlyHint', { perMonth: yearlyPerMonth })
-          }
-          badge={t('pro.plan.badge')}
+          detail={yearlyPerMonth}
+          badge={t('pro.plan.popular')}
         />
-        <PriceCard
+        <PlanCard
           selected={plan === 'monthly'}
           onPress={() => setPlan('monthly')}
           name={t('pro.plan.monthly')}
           price={monthlyPrice}
-          hint={trial ? t('pro.plan.monthlyTrial', { trial }) : t('pro.plan.monthlyHint')}
+          detail={t('pro.plan.billedMonthly')}
         />
       </View>
 
       {message ? (
         <Text
           className="mt-4 w-full text-center font-app text-[13px] text-ink"
-          maxFontSizeMultiplier={1.4}
+          maxFontSizeMultiplier={TEXT_CAP.reading}
         >
           {message}
         </Text>
@@ -197,7 +279,7 @@ export default function ProScreen() {
       {storeNote ? (
         <Text
           className="mt-4 w-full text-center font-app text-[12px] leading-[17px] text-muted"
-          maxFontSizeMultiplier={1.4}
+          maxFontSizeMultiplier={TEXT_CAP.reading}
         >
           {storeNote}
         </Text>
@@ -206,104 +288,177 @@ export default function ProScreen() {
       {__DEV__ && devNote ? (
         <Text
           className="mt-2 w-full text-center font-app text-[10px] leading-[14px] text-muted"
-          maxFontSizeMultiplier={1.2}
+          maxFontSizeMultiplier={TEXT_CAP.control}
         >
           {devNote}
         </Text>
       ) : null}
-
-      <View className="mb-6 mt-6 w-full gap-2">
-        <Button
-          label={
-            busy
-              ? t('pro.page.oneMoment')
-              : canBuy
-                ? trial
-                  ? t('pro.page.startTrial', { trial })
-                  : t('common.continue')
-                : prices.isFetching
-                  ? t('pro.page.checking')
-                  : t('pro.page.checkAgain')
-          }
-          onPress={canBuy ? handleContinue : () => void prices.refetch()}
-          disabled={busy || prices.isFetching}
-        />
-        {/* Text links, not pills, so they do not read as a second thing to buy. Restore must stay
-            easy to find (App Store). */}
-        <View className="w-full flex-row flex-wrap items-center justify-center gap-5">
-          <TextLink label={t('pro.page.restore')} variant="subtle" onPress={handleRestore} />
-          <TextLink
-            label={t('pro.page.terms')}
-            variant="subtle"
-            underline
-            onPress={() => router.push('/terms')}
-          />
-          <TextLink
-            label={t('pro.page.privacy')}
-            variant="subtle"
-            underline
-            onPress={() => router.push('/privacy')}
-          />
-        </View>
-        <Text
-          className="mt-1 w-full text-center font-app text-[10.5px] leading-[15px] text-muted"
-          maxFontSizeMultiplier={1.4}
-        >
-          {t('pro.page.billing')}
-        </Text>
-      </View>
     </Screen>
   );
 }
 
-function PriceCard({
+/** The free and Pro columns: wide enough for "Unlimited" and its translations at their cap. */
+const COLUMN = 'w-[76px] items-center';
+
+function CompareTable() {
+  return (
+    <View className="mt-5 w-full">
+      <View className="w-full flex-row items-center border-b border-line pb-2">
+        <Text
+          className="min-w-0 flex-1 font-app text-[13px] text-muted"
+          maxFontSizeMultiplier={TEXT_CAP.control}
+        >
+          {t('pro.compare.what')}
+        </Text>
+        <View className={COLUMN}>
+          <Text
+            className="font-app-medium text-[14px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.control}
+          >
+            {t('pro.compare.free')}
+          </Text>
+        </View>
+        <View className={COLUMN}>
+          <Text
+            className="font-app-semibold text-[14px] text-accent-ink"
+            maxFontSizeMultiplier={TEXT_CAP.control}
+          >
+            {t('pro.compare.pro')}
+          </Text>
+        </View>
+      </View>
+
+      {ROWS.map((row) => (
+        <CompareRow key={row.label} row={row} />
+      ))}
+    </View>
+  );
+}
+
+function CompareRow({ row }: { row: Row }) {
+  const colors = useColors();
+  const label = t(row.label);
+  return (
+    // One stop for VoiceOver, read as a sentence, rather than five fragments.
+    <View
+      accessible
+      accessibilityLabel={t('pro.compare.row', {
+        feature: label,
+        free: spoken(row.free),
+        pro: spoken(row.pro),
+      })}
+      className="min-h-[44px] w-full flex-row items-center gap-3 border-b border-line py-2"
+    >
+      <row.icon size={18} color={colors.accentInk} strokeWidth={1.8} />
+      <Text
+        className="min-w-0 flex-1 font-app text-[15px] text-ink"
+        maxFontSizeMultiplier={TEXT_CAP.row}
+      >
+        {label}
+      </Text>
+      <View className={COLUMN}>
+        <CellMark cell={row.free} side="free" />
+      </View>
+      <View className={COLUMN}>
+        <CellMark cell={row.pro} side="pro" />
+      </View>
+    </View>
+  );
+}
+
+function CellMark({ cell, side }: { cell: Cell; side: 'free' | 'pro' }) {
+  const colors = useColors();
+  if (cell === 'yes') {
+    return (
+      <Check size={18} color={side === 'pro' ? colors.accentInk : colors.muted} strokeWidth={2} />
+    );
+  }
+  if (cell === 'no') {
+    return (
+      <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={TEXT_CAP.control}>
+        —
+      </Text>
+    );
+  }
+  return (
+    <Text
+      className={
+        side === 'pro'
+          ? 'text-center font-app-semibold text-[13px] text-accent-ink'
+          : 'text-center font-app text-[13px] text-muted'
+      }
+      maxFontSizeMultiplier={TEXT_CAP.control}
+    >
+      {cell()}
+    </Text>
+  );
+}
+
+function PlanCard({
   selected,
   onPress,
   name,
   price,
-  hint,
+  detail,
   badge,
 }: {
   selected: boolean;
   onPress: () => void;
   name: string;
   price: string;
-  hint: string;
+  detail: string;
   badge?: string;
 }) {
+  const colors = useColors();
   return (
     <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${name}, ${price}. ${hint}`}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={`${name}, ${price}. ${detail}`}
       onPress={onPress}
       className={
         selected
-          ? 'w-full rounded-[16px] border-2 border-control bg-card px-4 py-3.5'
-          : 'w-full rounded-[16px] border border-line bg-card px-4 py-3.5 active:bg-ink/5'
+          ? 'min-w-0 flex-1 rounded-[16px] border-[1.5px] border-accent bg-card px-4 pb-4 pt-5'
+          : 'min-w-0 flex-1 rounded-[16px] border border-line bg-card px-4 pb-4 pt-5 active:bg-ink/5'
       }
     >
       {badge ? (
         // Its words are not in the card's spoken label, so they follow the text size like any other.
-        <View className="absolute -top-2.5 right-3 rounded-full bg-accent px-2.5 py-0.5">
+        <View className="absolute -top-2.5 left-3 rounded-full bg-accent px-2.5 py-0.5">
           <Text
-            className="font-app-bold text-[9px] tracking-wide text-on-control"
+            className="font-app-semibold text-[10px] text-on-control"
             maxFontSizeMultiplier={TEXT_CAP.control}
           >
             {badge}
           </Text>
         </View>
       ) : null}
-      <View className="w-full flex-row items-baseline justify-between gap-3">
-        <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
+      <View className="w-full flex-row items-center justify-between gap-2">
+        <Text
+          className="min-w-0 shrink font-app-medium text-[14px] text-ink"
+          maxFontSizeMultiplier={TEXT_CAP.control}
+        >
           {name}
         </Text>
-        <Text className="font-app-bold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
-          {price}
-        </Text>
+        {selected ? (
+          <View className="h-6 w-6 items-center justify-center rounded-full bg-accent">
+            <Check size={14} color={colors.onControl} strokeWidth={2.4} />
+          </View>
+        ) : (
+          <View className="h-6 w-6 rounded-full border-[1.5px] border-line" />
+        )}
       </View>
-      <Text className="mt-0.5 font-app text-[11.5px] text-muted" maxFontSizeMultiplier={1.3}>
-        {hint}
+      <Text
+        className="mt-1.5 font-app-bold text-[22px] text-ink"
+        maxFontSizeMultiplier={TEXT_CAP.control}
+      >
+        {price}
+      </Text>
+      <Text
+        className="mt-0.5 font-app text-[12.5px] text-muted"
+        maxFontSizeMultiplier={TEXT_CAP.control}
+      >
+        {detail}
       </Text>
     </Pressable>
   );

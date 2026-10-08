@@ -51,6 +51,7 @@ jest.mock('@/api/pro', () => {
   const { t } = jest.requireActual('@/i18n');
   return {
     usePro: () => ({ pro: mockPro, ready: true }),
+    trialPeriodLabel: ({ count }: { count: number }) => t('pro.period.week', { count }),
     purchasesAvailable: () => mockStore === 'open',
     usePurchasePro: () => ({ purchase: jest.fn(), restore: async () => false }),
     useProPrices: () =>
@@ -64,7 +65,7 @@ jest.mock('@/api/pro', () => {
                   pricePerMonthString: mockPrices.perMonth,
                 },
               },
-              trialText: t('pro.trial.week', { count: 1 }),
+              trials: { yearly: { count: 1, unit: 'WEEK' }, monthly: null },
               debug: '',
             },
             error: null,
@@ -118,13 +119,13 @@ describe('the Pro page in English', () => {
     const screen = await render(<ProScreen />);
     expect(screen.getByText('$19.99/yr')).toBeTruthy();
     expect(screen.getByText('$1.99/mo')).toBeTruthy();
-    expect(screen.getByText('$1.67 a month, billed once a year')).toBeTruthy();
-    expect(screen.getByText('2 MONTHS FREE')).toBeTruthy();
+    expect(screen.getByText('$1.67/mo')).toBeTruthy();
+    expect(screen.getByText('Most Popular')).toBeTruthy();
   });
 
-  it('lets the offer sticker follow the text size, since the card does not say it aloud', async () => {
+  it('lets the Most Popular sticker follow the text size, since the card does not say it aloud', async () => {
     const screen = await render(<ProScreen />);
-    const sticker = screen.getByText('2 MONTHS FREE');
+    const sticker = screen.getByText('Most Popular');
     expect(sticker.props.allowFontScaling).toBeUndefined();
     expect(sticker.props.maxFontSizeMultiplier).toBe(1.3);
   });
@@ -133,26 +134,34 @@ describe('the Pro page in English', () => {
 describe('the Pro page in Spanish', () => {
   beforeEach(() => setLanguage('es'));
 
-  it('sells the features at the dollar fallbacks while the store is closed', async () => {
+  it('compares the plans at the dollar fallbacks while the store is closed', async () => {
     const screen = await render(<ProScreen />);
+    expect(screen.getByText('Consigue más con Skip Pro')).toBeTruthy();
+    expect(screen.getByText('Menos que un café al mes.')).toBeTruthy();
+    expect(screen.getByText('Lo que obtienes')).toBeTruthy();
     expect(
-      screen.getByText('Todo lo que Skip puede hacer, por menos de lo que cuesta un café al mes.'),
+      screen.getByLabelText('Escanea recibos: Gratis, Limitado. Pro, Ilimitado.'),
     ).toBeTruthy();
-    expect(screen.getByText('Tarjetas de crédito, cuentas e ingresos ilimitados')).toBeTruthy();
+    expect(
+      screen.getByLabelText('Historial de dinero: Gratis, 90 días. Pro, 7 años.'),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText('Entrada por voz: Gratis, no incluido. Pro, incluido.'),
+    ).toBeTruthy();
     expect(screen.getByText('Anual')).toBeTruthy();
     expect(screen.getByText('$19.99/año')).toBeTruthy();
-    expect(screen.getByText('$1.67 al mes, cobrado una vez al año')).toBeTruthy();
-    expect(screen.getByText('2 MESES GRATIS')).toBeTruthy();
+    expect(screen.getByText('$1.67/mes')).toBeTruthy();
+    expect(screen.getByText('Más popular')).toBeTruthy();
     expect(screen.getByText('Mensual')).toBeTruthy();
     expect(screen.getByText('$1.99/mes')).toBeTruthy();
-    expect(screen.getByText('Cancela cuando quieras en tus suscripciones de Apple')).toBeTruthy();
+    expect(screen.getByText('Cobro mensual')).toBeTruthy();
     expect(
       screen.getByText(
         'Las compras aún no están disponibles en esta versión. Todo lo de esta página llegará pronto.',
       ),
     ).toBeTruthy();
     expect(screen.getByText('Volver a consultar')).toBeTruthy();
-    expect(screen.getByText('Restaurar compras')).toBeTruthy();
+    expect(screen.getByText('Restaurar compra')).toBeTruthy();
     expect(screen.getByText('Términos')).toBeTruthy();
     expect(screen.getByText('Privacidad')).toBeTruthy();
     expectNoRawText(screen);
@@ -161,14 +170,15 @@ describe('the Pro page in Spanish', () => {
   it('offers the store’s trial at the store’s prices once it answers', async () => {
     mockStore = 'open';
     const screen = await render(<ProScreen />);
-    expect(screen.getByText('Prueba 1 semana gratis')).toBeTruthy();
-    expect(screen.getByText('1 semana gratis, luego se cobra una vez al año')).toBeTruthy();
-    expect(screen.getByText('1 semana gratis, luego cada mes')).toBeTruthy();
-    expect(
-      screen.getByLabelText('Anual, $19.99/año. 1 semana gratis, luego se cobra una vez al año'),
-    ).toBeTruthy();
+    expect(screen.getByText('Prueba Pro gratis durante 1 semana')).toBeTruthy();
+    expect(screen.getByText('Después, $19.99 al año. Cancela cuando quieras.')).toBeTruthy();
+    expect(screen.getByLabelText('Anual, $19.99/año. $1.67/mes')).toBeTruthy();
 
-    await fireEvent.press(screen.getByText('Restaurar compras'));
+    await fireEvent.press(screen.getByLabelText('Mensual, $1.99/mes. Cobro mensual'));
+    expect(screen.getByText('Obtén Pro por $1.99 al mes')).toBeTruthy();
+    expect(screen.getByText('Se cobra cada mes. Cancela cuando quieras.')).toBeTruthy();
+
+    await fireEvent.press(screen.getByText('Restaurar compra'));
     expect(await screen.findByText('No hay compras anteriores que restaurar.')).toBeTruthy();
     expectNoRawText(screen);
   });
@@ -198,15 +208,15 @@ describe('the Pro page in French', () => {
 
   it('writes the dollar fallbacks the French way', async () => {
     const screen = await render(<ProScreen />);
-    expect(
-      screen.getByText('Tout ce que Skip peut faire, pour moins qu’un café par mois.'),
-    ).toBeTruthy();
+    expect(screen.getByText('Va plus loin avec Skip Pro')).toBeTruthy();
+    expect(screen.getByText('Moins qu’un café par mois.')).toBeTruthy();
+    expect(screen.getByLabelText('Historique : Gratuit, 90 jours. Pro, 7 ans.')).toBeTruthy();
     expect(screen.getByText('Annuel')).toBeTruthy();
     expect(screen.getByText(`19,99${NBSP}$/an`)).toBeTruthy();
-    expect(screen.getByText(`1,67${NBSP}$ par mois, facturé une fois par an`)).toBeTruthy();
-    expect(screen.getByText('2 MOIS GRATUITS')).toBeTruthy();
+    expect(screen.getByText(`1,67${NBSP}$/mois`)).toBeTruthy();
+    expect(screen.getByText('Le plus choisi')).toBeTruthy();
     expect(screen.getByText(`1,99${NBSP}$/mois`)).toBeTruthy();
-    expect(screen.getByText('Restaurer les achats')).toBeTruthy();
+    expect(screen.getByText('Restaurer l’achat')).toBeTruthy();
     expectNoRawText(screen);
   });
 
@@ -216,8 +226,9 @@ describe('the Pro page in French', () => {
     const screen = await render(<ProScreen />);
     expect(screen.getByText('24,99 $/an')).toBeTruthy();
     expect(screen.getByText('2,49 $/mois')).toBeTruthy();
-    expect(screen.getByText('Essaie 1 semaine gratuite')).toBeTruthy();
-    expect(screen.getByText('1 semaine gratuite, puis chaque mois')).toBeTruthy();
+    expect(screen.getByText('2,08 $/mois')).toBeTruthy();
+    expect(screen.getByText('Essaie Pro gratuitement pendant 1 semaine')).toBeTruthy();
+    expect(screen.getByText('Ensuite 24,99 $ par an. Annule quand tu veux.')).toBeTruthy();
     expectNoRawText(screen);
   });
 

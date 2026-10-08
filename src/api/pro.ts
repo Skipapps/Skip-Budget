@@ -185,8 +185,11 @@ export function useProSource(): ProStatus {
 export type ProPrices = {
   monthly: PurchasesPackage | null;
   yearly: PurchasesPackage | null;
-  /** "7 days free" when Apple has an intro offer configured; null otherwise. */
-  trialText: string | null;
+  /**
+   * The free introductory period each plan offers this person: null when the plan has none or they
+   * have used theirs. Only a confirmed yes counts, so nobody is promised a trial Apple will not give.
+   */
+  trials: { monthly: TrialPeriod | null; yearly: TrialPeriod | null };
   /** Why the store came back the way it did — shown while debugging billing. */
   debug: string;
 };
@@ -194,20 +197,28 @@ export type ProPrices = {
 /** A free introductory period as the store describes it: a number of DAY, WEEK, MONTH or YEAR. */
 export type TrialPeriod = { count: number; unit: string };
 
-type StorePrices = Omit<ProPrices, 'trialText'> & { trial: TrialPeriod | null };
-
-const TRIAL_KEYS = {
-  DAY: 'pro.trial.day',
-  WEEK: 'pro.trial.week',
-  MONTH: 'pro.trial.month',
-  YEAR: 'pro.trial.year',
+const PERIOD_KEYS = {
+  DAY: 'pro.period.day',
+  WEEK: 'pro.period.week',
+  MONTH: 'pro.period.month',
+  YEAR: 'pro.period.year',
 } as const;
 
-/** "7 days free" in the language on screen. */
-export function trialLabel({ count, unit }: TrialPeriod): string {
-  const key = TRIAL_KEYS[unit.toUpperCase() as keyof typeof TRIAL_KEYS];
+/** "14 days" in the language on screen. */
+export function trialPeriodLabel({ count, unit }: TrialPeriod): string {
+  const key = PERIOD_KEYS[unit.toUpperCase() as keyof typeof PERIOD_KEYS];
   if (key) return t(key, { count });
-  return `${count} ${unit.toLowerCase()}${count === 1 ? '' : 's'} free`;
+  return `${count} ${unit.toLowerCase()}${count === 1 ? '' : 's'}`;
+}
+
+/** The plan's free intro period, when it has one and this person may still take it. */
+function trialFor(
+  pack: PurchasesPackage | null,
+  eligible: ReadonlySet<string>,
+): TrialPeriod | null {
+  const intro = pack?.product.introPrice;
+  if (!pack || !intro || intro.price !== 0 || !eligible.has(pack.product.identifier)) return null;
+  return { count: intro.periodNumberOfUnits, unit: intro.periodUnit };
 }
 
 /** The live prices, straight from the store — never hardcoded when buyable. */
@@ -216,12 +227,7 @@ export function useProPrices() {
   return useQuery({
     queryKey: ['pro-prices', userId],
     enabled: purchasesAvailable() && Boolean(userId),
-    // Worded on read, not on fetch, so a cached answer still follows a change of language.
-    select: ({ trial, ...prices }: StorePrices): ProPrices => ({
-      ...prices,
-      trialText: trial ? trialLabel(trial) : null,
-    }),
-    queryFn: async (): Promise<StorePrices> => {
+    queryFn: async (): Promise<ProPrices> => {
       if (!(await ensureConfigured(userId!))) {
         throw new Error(
           lastConfigureError
@@ -249,13 +255,27 @@ export function useProPrices() {
         }
       }
 
-      const intro = yearly?.product.introPrice ?? monthly?.product.introPrice;
-      const trial =
-        intro && intro.price === 0
-          ? { count: intro.periodNumberOfUnits, unit: intro.periodUnit }
-          : null;
+      // A trial is offered once per subscription group. Unknown (or a failed check) shows the
+      // ordinary price, as RevenueCat advises: a trial promised and then refused at the sheet is
+      // worse than one discovered there.
+      const eligible = new Set<string>();
+      const ids = [monthly, yearly].flatMap((pack) => (pack ? [pack.product.identifier] : []));
+      if (ids.length > 0) {
+        try {
+          const answer = await Purchases.checkTrialOrIntroductoryPriceEligibility(ids);
+          const yes = Purchases.INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE;
+          for (const id of ids) if (answer[id]?.status === yes) eligible.add(id);
+        } catch (thrown) {
+          debug += ` trialErr=${(thrown as Error).message}`;
+        }
+      }
 
-      return { monthly, yearly, trial, debug };
+      return {
+        monthly,
+        yearly,
+        trials: { monthly: trialFor(monthly, eligible), yearly: trialFor(yearly, eligible) },
+        debug,
+      };
     },
   });
 }

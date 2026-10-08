@@ -4,25 +4,25 @@ export const proMessages = defineMessages({
   'pro.price.monthly': { en: '{price}/mo', es: '{price}/mes', fr: '{price}/mois' },
   'pro.price.yearly': { en: '{price}/yr', es: '{price}/año', fr: '{price}/an' },
 
-  'pro.trial.day': {
-    en: { one: '{count} day free', other: '{count} days free' },
-    es: { one: '{count} día gratis', other: '{count} días gratis' },
-    fr: { one: '{count} jour gratuit', other: '{count} jours gratuits' },
+  'pro.period.day': {
+    en: { one: '{count} day', other: '{count} days' },
+    es: { one: '{count} día', other: '{count} días' },
+    fr: { one: '{count} jour', other: '{count} jours' },
   },
-  'pro.trial.week': {
-    en: { one: '{count} week free', other: '{count} weeks free' },
-    es: { one: '{count} semana gratis', other: '{count} semanas gratis' },
-    fr: { one: '{count} semaine gratuite', other: '{count} semaines gratuites' },
+  'pro.period.week': {
+    en: { one: '{count} week', other: '{count} weeks' },
+    es: { one: '{count} semana', other: '{count} semanas' },
+    fr: { one: '{count} semaine', other: '{count} semaines' },
   },
-  'pro.trial.month': {
-    en: { one: '{count} month free', other: '{count} months free' },
-    es: { one: '{count} mes gratis', other: '{count} meses gratis' },
-    fr: { one: '{count} mois gratuit', other: '{count} mois gratuits' },
+  'pro.period.month': {
+    en: { one: '{count} month', other: '{count} months' },
+    es: { one: '{count} mes', other: '{count} meses' },
+    fr: { one: '{count} mois', other: '{count} mois' },
   },
-  'pro.trial.year': {
-    en: { one: '{count} year free', other: '{count} years free' },
-    es: { one: '{count} año gratis', other: '{count} años gratis' },
-    fr: { one: '{count} an gratuit', other: '{count} ans gratuits' },
+  'pro.period.year': {
+    en: { one: '{count} year', other: '{count} years' },
+    es: { one: '{count} año', other: '{count} años' },
+    fr: { one: '{count} an', other: '{count} ans' },
   },
 
   'pro.insights.title': {
@@ -297,48 +297,6 @@ export const proMessages = defineMessages({
     fr: 'ou {yearly} · Pas maintenant',
   },
 
-  'pro.page.tagline': {
-    en: 'Everything Skip can do, for less than a coffee a month.',
-    es: 'Todo lo que Skip puede hacer, por menos de lo que cuesta un café al mes.',
-    fr: 'Tout ce que Skip peut faire, pour moins qu’un café par mois.',
-  },
-  'pro.page.cards.title': {
-    en: 'Unlimited credit cards, accounts & incomes',
-    es: 'Tarjetas de crédito, cuentas e ingresos ilimitados',
-    fr: 'Cartes de crédit, comptes et revenus illimités',
-  },
-  'pro.page.cards.hint': {
-    en: 'Track every credit card and account you actually have',
-    es: 'Lleva el control de cada tarjeta de crédito y cuenta que de verdad tienes',
-    fr: 'Suis chaque carte de crédit et chaque compte que tu as vraiment',
-  },
-  'pro.page.scan.title': {
-    en: 'Unlimited receipt scanning',
-    es: 'Escaneo de recibos ilimitado',
-    fr: 'Numérisation de reçus illimitée',
-  },
-  'pro.page.scan.hint': {
-    en: 'Point, tap, filed — read on your phone, never uploaded',
-    es: 'Apunta, toca y listo: se lee en tu teléfono, nunca se sube',
-    fr: 'Vise, touche, c’est classé — lu sur ton téléphone, jamais téléversé',
-  },
-  'pro.page.insights.title': { en: 'Insights', es: 'Análisis', fr: 'Aperçu' },
-  'pro.page.insights.hint': {
-    en: 'Your whole money picture on one page',
-    es: 'Todo tu dinero en una sola página',
-    fr: 'Tout ton argent sur une seule page',
-  },
-  'pro.page.early.title': {
-    en: 'Early features, first-in-line support',
-    es: 'Funciones anticipadas y soporte prioritario',
-    fr: 'Nouveautés en avant-première et soutien prioritaire',
-  },
-  'pro.page.early.hint': {
-    en: 'Get the new things first, and your questions answered first',
-    es: 'Recibe lo nuevo antes que nadie, y respuestas a tus preguntas primero',
-    fr: 'Reçois les nouveautés en premier, et des réponses à tes questions en priorité',
-  },
-
   'pro.page.notOpen': {
     en: 'Purchases are not open in this version yet. Everything on this page is coming shortly.',
     es: 'Las compras aún no están disponibles en esta versión. Todo lo de esta página llegará pronto.',
@@ -366,7 +324,6 @@ export const proMessages = defineMessages({
     fr: 'Gérer dans l’App Store',
   },
   'pro.page.oneMoment': { en: 'One moment…', es: 'Un momento…', fr: 'Un instant…' },
-  'pro.page.startTrial': { en: 'Start {trial}', es: 'Prueba {trial}', fr: 'Essaie {trial}' },
   'pro.page.checking': {
     en: 'Checking the store…',
     es: 'Consultando el App Store…',
@@ -378,39 +335,120 @@ export const proMessages = defineMessages({
     fr: 'Vérifier à nouveau',
   },
   'pro.page.restore': {
-    en: 'Restore purchases',
-    es: 'Restaurar compras',
-    fr: 'Restaurer les achats',
+    en: 'Restore purchase',
+    es: 'Restaurar compra',
+    fr: 'Restaurer l’achat',
   },
   'pro.page.terms': { en: 'Terms', es: 'Términos', fr: 'Conditions' },
   'pro.page.privacy': { en: 'Privacy', es: 'Privacidad', fr: 'Confidentialité' },
-  'pro.page.billing': {
-    en: 'Billed by Apple. Renews automatically until cancelled in your App Store subscriptions. Cancel any time — everything you made stays yours.',
-    es: 'Cobrado por Apple. Se renueva automáticamente hasta que lo canceles en tus suscripciones del App Store. Cancela cuando quieras: todo lo que creaste sigue siendo tuyo.',
-    fr: 'Facturé par Apple. Renouvellement automatique jusqu’à l’annulation dans tes abonnements de l’App Store. Annule quand tu veux — tout ce que tu as créé reste à toi.',
-  },
 
+  'pro.page.title': {
+    en: 'Get more with Skip Pro',
+    es: 'Consigue más con Skip Pro',
+    fr: 'Va plus loin avec Skip Pro',
+  },
+  'pro.page.coffee': {
+    en: 'Less than a coffee a month.',
+    es: 'Menos que un café al mes.',
+    fr: 'Moins qu’un café par mois.',
+  },
+  'pro.page.tryFree': {
+    en: 'Try Pro free for {period}',
+    es: 'Prueba Pro gratis durante {period}',
+    fr: 'Essaie Pro gratuitement pendant {period}',
+  },
+  'pro.page.thenYearly': {
+    en: 'Then {price}/year. Cancel anytime.',
+    es: 'Después, {price} al año. Cancela cuando quieras.',
+    fr: 'Ensuite {price} par an. Annule quand tu veux.',
+  },
+  'pro.page.thenMonthly': {
+    en: 'Then {price}/month. Cancel anytime.',
+    es: 'Después, {price} al mes. Cancela cuando quieras.',
+    fr: 'Ensuite {price} par mois. Annule quand tu veux.',
+  },
+  'pro.page.getYearly': {
+    en: 'Get Pro for {price}/year',
+    es: 'Obtén Pro por {price} al año',
+    fr: 'Prends Pro pour {price} par an',
+  },
+  'pro.page.getMonthly': {
+    en: 'Get Pro for {price}/month',
+    es: 'Obtén Pro por {price} al mes',
+    fr: 'Prends Pro pour {price} par mois',
+  },
+  'pro.page.billedYearly': {
+    en: 'Billed once a year. Cancel anytime.',
+    es: 'Se cobra una vez al año. Cancela cuando quieras.',
+    fr: 'Facturé une fois par an. Annule quand tu veux.',
+  },
+  'pro.page.billedMonthly': {
+    en: 'Billed every month. Cancel anytime.',
+    es: 'Se cobra cada mes. Cancela cuando quieras.',
+    fr: 'Facturé chaque mois. Annule quand tu veux.',
+  },
+  'pro.compare.what': { en: 'What you get', es: 'Lo que obtienes', fr: 'Ce que tu obtiens' },
+  'pro.compare.free': { en: 'Free', es: 'Gratis', fr: 'Gratuit' },
+  'pro.compare.pro': { en: 'Pro', es: 'Pro', fr: 'Pro' },
+  'pro.compare.track': {
+    en: 'Track spending & bills',
+    es: 'Gastos y facturas',
+    fr: 'Dépenses et factures',
+  },
+  'pro.compare.upload': {
+    en: 'Upload any bill',
+    es: 'Sube cualquier factura',
+    fr: 'Importe tes factures',
+  },
+  'pro.compare.scan': { en: 'Scan receipts', es: 'Escanea recibos', fr: 'Numérise tes reçus' },
+  'pro.compare.cards': {
+    en: 'Cards & accounts',
+    es: 'Tarjetas y cuentas',
+    fr: 'Cartes et comptes',
+  },
+  'pro.compare.history': {
+    en: 'Money history',
+    es: 'Historial de dinero',
+    fr: 'Historique',
+  },
+  'pro.compare.voice': { en: 'Voice entry', es: 'Entrada por voz', fr: 'Saisie vocale' },
+  'pro.compare.insights': { en: 'Insights', es: 'Análisis', fr: 'Aperçu' },
+  'pro.compare.logos': { en: 'Brand logos', es: 'Logos de marcas', fr: 'Logos des marques' },
+  'pro.compare.early': {
+    en: 'New features first',
+    es: 'Novedades primero',
+    fr: 'Nouveautés en avant-première',
+  },
+  'pro.compare.support': {
+    en: 'Priority support',
+    es: 'Soporte prioritario',
+    fr: 'Assistance prioritaire',
+  },
+  'pro.compare.limited': { en: 'Limited', es: 'Limitado', fr: 'Limité' },
+  'pro.compare.unlimited': { en: 'Unlimited', es: 'Ilimitado', fr: 'Illimité' },
+  'pro.compare.days': {
+    en: { one: '{count} day', other: '{count} days' },
+    es: { one: '{count} día', other: '{count} días' },
+    fr: { one: '{count} jour', other: '{count} jours' },
+  },
+  'pro.compare.years': {
+    en: { one: '{count} year', other: '{count} years' },
+    es: { one: '{count} año', other: '{count} años' },
+    fr: { one: '{count} an', other: '{count} ans' },
+  },
+  'pro.compare.included': { en: 'included', es: 'incluido', fr: 'inclus' },
+  'pro.compare.notIncluded': { en: 'not included', es: 'no incluido', fr: 'non inclus' },
+  'pro.compare.row': {
+    en: '{feature}: Free, {free}. Pro, {pro}.',
+    es: '{feature}: Gratis, {free}. Pro, {pro}.',
+    fr: '{feature} : Gratuit, {free}. Pro, {pro}.',
+  },
+  'pro.plan.popular': { en: 'Most Popular', es: 'Más popular', fr: 'Le plus choisi' },
+  'pro.plan.billedMonthly': {
+    en: 'Billed monthly',
+    es: 'Cobro mensual',
+    fr: 'Facturé chaque mois',
+  },
   'pro.plan.yearly': { en: 'Yearly', es: 'Anual', fr: 'Annuel' },
   'pro.plan.monthly': { en: 'Monthly', es: 'Mensual', fr: 'Mensuel' },
-  'pro.plan.badge': { en: '2 MONTHS FREE', es: '2 MESES GRATIS', fr: '2 MOIS GRATUITS' },
-  'pro.plan.yearlyHint': {
-    en: '{perMonth} a month, billed once a year',
-    es: '{perMonth} al mes, cobrado una vez al año',
-    fr: '{perMonth} par mois, facturé une fois par an',
-  },
-  'pro.plan.yearlyTrial': {
-    en: '{trial}, then billed once a year',
-    es: '{trial}, luego se cobra una vez al año',
-    fr: '{trial}, puis facturé une fois par an',
-  },
-  'pro.plan.monthlyHint': {
-    en: 'Cancel any time in your Apple subscriptions',
-    es: 'Cancela cuando quieras en tus suscripciones de Apple',
-    fr: 'Annule quand tu veux dans tes abonnements Apple',
-  },
-  'pro.plan.monthlyTrial': {
-    en: '{trial}, then monthly',
-    es: '{trial}, luego cada mes',
-    fr: '{trial}, puis chaque mois',
-  },
 });
