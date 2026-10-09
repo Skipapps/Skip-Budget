@@ -10,6 +10,8 @@ import SalaryScreen from '@/app/salary';
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
+// The real SDK starts a cleanup interval that holds Jest open.
+jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
 
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
@@ -30,6 +32,22 @@ jest.mock('@/providers/theme-provider', () => ({
 }));
 
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => jest.fn(async () => true) }));
+
+// Pay that has already landed is written down before a save changes anything; none of that is under
+// test in this file, so the sweep finds nothing and an edit to a salary that has paid is not asked.
+jest.mock('@/api/pay', () => ({
+  recordDuePay: jest.fn(async () => 0),
+  usePastPay: () => ({
+    choose: jest.fn(async () => 'upcoming'),
+    apply: jest.fn(async () => {}),
+    saving: false,
+  }),
+}));
+jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'user-1' }));
+jest.mock('@tanstack/react-query', () => ({
+  ...jest.requireActual('@tanstack/react-query'),
+  useQueryClient: () => ({ invalidateQueries: jest.fn() }),
+}));
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
 
 const mockCreate = jest.fn(async () => ({ id: 'new' }));

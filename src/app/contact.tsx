@@ -10,6 +10,7 @@ import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, Subtitle, Title } from '@/components/ui/typography';
 import { success, warn } from '@/lib/haptics';
+import { useToast } from '@/providers/toast-context';
 import { useUserEmail } from '@/providers/session-provider';
 import { useColors } from '@/providers/theme-provider';
 import { failureMessage } from '@/lib/failure';
@@ -42,6 +43,7 @@ export default function ContactScreen() {
   const email = useUserEmail();
   const profile = useProfile();
   const send = useSendMessage();
+  const toast = useToast();
 
   const [name, setName] = useState(profile.data?.display_name ?? '');
   const [message, setMessage] = useState('');
@@ -59,6 +61,7 @@ export default function ContactScreen() {
     try {
       await send.mutateAsync({ topic, name: name.trim(), message: message.trim() });
       success();
+      toast('toast.message.sent');
       setSent(true);
     } catch (thrown) {
       warn();

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { recordDueCharges } from '@/api/charges';
+import { recordDuePay } from '@/api/pay';
 import { nextOccurrenceFrom } from '@/lib/card-ledger';
 import { settleWithin } from '@/lib/deadline';
 import { toIsoDate } from '@/lib/date';
@@ -108,6 +109,9 @@ async function sweep(client: ReturnType<typeof useQueryClient>, userId: string):
 
   const recorded = await recordDueCharges(userId, today);
   if (recorded > 0) client.invalidateQueries({ queryKey: ['charges'] });
+
+  const paid = await recordDuePay(userId, today);
+  if (paid > 0) client.invalidateQueries({ queryKey: ['pay_received'] });
 
   const moved = await rollSchedulesForward(today);
   if (moved === 0) return;

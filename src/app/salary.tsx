@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Calculator, Calendar, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
@@ -9,7 +10,6 @@ import { CalculatorPad } from '@/components/ui/calculator-pad';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { DatePicker } from '@/components/ui/date-picker';
 import { FitFigure } from '@/components/ui/fit-group';
-import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { usePro } from '@/api/pro';
 import { Screen } from '@/components/ui/screen';
 import { SelectField } from '@/components/ui/select-field';
@@ -22,6 +22,7 @@ import {
   useUpdateSalarySource,
   type SalaryValues,
 } from '@/api/mutations';
+import { recordDuePay, usePastPay, type CarriedPay } from '@/api/pay';
 import { useBankAccounts, useSalaryDetails } from '@/api/queries';
 import { PageState } from '@/components/ui/page-state';
 import { type SalarySource } from '@/data/salary';
@@ -34,9 +35,12 @@ import {
   type PayFrequency,
 } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { oneOffsInMonth, scheduledPerMonth, type PayLine } from '@/lib/pay';
+import { landingAccount, oneOffsInMonth, scheduledPerMonth, type PayLine } from '@/lib/pay';
+import { toCents } from '@/lib/money';
 import { useToday } from '@/lib/use-today';
 import { useConfirm } from '@/providers/dialog-provider';
+import { useToast } from '@/providers/toast-context';
+import { useUserId } from '@/providers/session-provider';
 import { useColors } from '@/providers/theme-provider';
 import { failureMessage, failureText } from '@/lib/failure';
 import { OVERTIME_RATES, estimateHourlyPay, hourlyProblem, type HourlyPay } from '@/lib/hourly-pay';
@@ -261,6 +265,10 @@ function SalaryEditor({
   const deleteSource = useDeleteSalarySource();
   const confirm = useConfirm();
   const setAccounts = useSetSalaryAccounts();
+  const pastPay = usePastPay();
+  const toast = useToast();
+  const client = useQueryClient();
+  const userId = useUserId();
 
   const { today } = useToday();
   const pays = sources.map(payLineOf);
@@ -389,6 +397,37 @@ function SalaryEditor({
     }
 
     try {
+      // Pay that has already come due is written down as it was, before any change below can
+      // reprice it, and before a removed salary takes its unwritten paydays with it.
+      if (userId && (await recordDuePay(userId, today)) > 0) {
+        client.invalidateQueries({ queryKey: ['pay_received'] });
+      }
+
+      // A changed name, amount or account reaches pay already received only if the person says so.
+      const accountOrder = accounts.map((account) => account.id);
+      const carried = (source: SalarySource): CarriedPay => ({
+        label: source.name.trim(),
+        amount: paycheckOf(source),
+        bank_account_id: landingAccount(source.accountIds, accountOrder),
+      });
+      const carryBack = new Map<string, CarriedPay>();
+      for (const source of named) {
+        const before = savedPays.current.get(source.id);
+        if (!before || !savedIds.current.has(source.id)) continue;
+        const was = carried(before);
+        const now = carried(source);
+        if (
+          was.label === now.label &&
+          toCents(was.amount) === toCents(now.amount) &&
+          was.bank_account_id === now.bank_account_id
+        ) {
+          continue;
+        }
+        const scope = await pastPay.choose(source.id, now.label || t('salary.oneOffNumber'));
+        if (scope === null) return;
+        if (scope === 'all') carryBack.set(source.id, now);
+      }
+
       // Deletes first, so a delete plus a re-add of the same name cannot collide.
       const stillPresent = new Set(named.map((source) => source.id));
       for (const id of savedIds.current) {
@@ -415,6 +454,9 @@ function SalaryEditor({
         await setAccounts.mutateAsync({ salaryId: id, accountIds: source.accountIds });
       }
 
+      for (const [id, values] of carryBack) await pastPay.apply(id, values);
+
+      toast('toast.pay.saved');
       router.back();
     } catch (thrown) {
       setError(failureMessage(thrown));
@@ -685,12 +727,28 @@ function SalaryEditor({
 
                 <View className="w-full">
                   <FieldLabel className="mb-2">{t('salary.paidInto')}</FieldLabel>
-                  <MultiChoiceChips
-                    options={accountOptions}
-                    values={source.accountIds}
-                    onChange={(accountIds) => update(source.id, { accountIds })}
-                    emptyHint={t('salary.linkAccountHint')}
+                  {/* One account: pay lands in it on each payday, so it cannot land in two. A
+                      salary saved with several shows the one its pay lands in, the first of them. */}
+                  <ChoiceChips
+                    options={[...accountOptions, { value: '', label: t('salary.noAccount') }]}
+                    value={
+                      accountOptions.find((option) => source.accountIds.includes(option.value))
+                        ?.value ?? ''
+                    }
+                    onChange={(accountId) =>
+                      update(source.id, { accountIds: accountId ? [accountId] : [] })
+                    }
                   />
+                  {accountOptions.some((option) =>
+                    source.accountIds.includes(option.value),
+                  ) ? null : (
+                    <Text
+                      className="mt-2 font-app text-[13px] text-muted"
+                      maxFontSizeMultiplier={TEXT_CAP.reading}
+                    >
+                      {t('salary.linkAccountHint')}
+                    </Text>
+                  )}
                 </View>
               </View>
             )}

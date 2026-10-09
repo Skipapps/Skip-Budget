@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { useCharges, type ChargeRow } from '@/api/charges';
+import { usePayReceived } from '@/api/pay';
 import type { CaptureSource } from '@/api/mutations';
 import {
-  buildLedger,
   chargePlanKey,
   planKey,
   planOccurrences,
@@ -15,7 +15,9 @@ import {
 import { t } from '@/i18n';
 import { historyFloor, NOTHING_HIDDEN, type HiddenHistory } from '@/lib/allowance';
 import { withTimeout } from '@/lib/deadline';
+import { moneyBook, type BookSpend } from '@/lib/money-book';
 import { paydaysInRange, type PayFrequency } from '@/lib/date';
+import { landingAccount, payProjectionStart } from '@/lib/pay';
 import type { AccrualBasis } from '@/lib/loan';
 import { logoDomainOf } from '@/lib/logo-domain';
 import type { DateRange } from '@/lib/range';
@@ -304,51 +306,6 @@ export function useSalaryDetails() {
   });
 }
 
-export type MonthlySavingRow = {
-  /** yyyy-mm-01 — the month is the identity of the row. */
-  month: string;
-  income: number;
-  spent: number;
-  /** What the app worked out. Negative on a month that was overspent. */
-  saved: number;
-  /** What the person says it really left. Null means use the computed figure. */
-  adjusted_saved: number | null;
-  note: string | null;
-  /** Set when the month is kept out of the total. */
-  excluded_at: string | null;
-};
-
-/** What a month contributes: the correction if there is one, else the maths. */
-export function savedFor(month: MonthlySavingRow): number {
-  if (month.excluded_at) return 0;
-  return Number(month.adjusted_saved ?? month.saved);
-}
-
-/**
- * What each finished month left behind. Closes anything outstanding first, so a month that ended
- * while the phone was shut shows up on opening rather than when the monthly job next runs
- * (idempotent, and cheap when there is nothing to close).
- */
-export function useMonthlySavings() {
-  const userId = useUserId();
-  return useQuery({
-    queryKey: ['monthly-savings', userId],
-    enabled: Boolean(userId),
-    queryFn: async (): Promise<MonthlySavingRow[]> => {
-      // Failure here is not fatal: the rows already closed are still worth
-      // showing, and the job will catch up whatever this missed.
-      await supabase.rpc('close_my_savings');
-
-      const { data, error } = await supabase
-        .from('monthly_savings')
-        .select('month, income, spent, saved, adjusted_saved, note, excluded_at')
-        .order('month', { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as MonthlySavingRow[];
-    },
-  });
-}
-
 /**
  * Accounts that a salary source pays into. An account has no date of its own, so "remind me when
  * pay lands" only means something for one something is paid into; the reminders page uses this to
@@ -383,6 +340,18 @@ export type PaymentSourceRow = {
   kind: 'card' | 'account';
 };
 
+/** "Visa ••4821": the network alone when no digits were given, never a dangling "••". */
+export function cardLabel(card: Pick<CardRow, 'network' | 'last4'>): string {
+  return card.last4 ? `${card.network} ••${card.last4}` : card.network;
+}
+
+export function accountLabel(
+  account: Pick<BankAccountRow, 'nickname' | 'bank_name' | 'last4'>,
+): string {
+  const name = account.nickname || account.bank_name;
+  return account.last4 ? `${name} ••${account.last4}` : name;
+}
+
 export function usePaymentSources() {
   const cards = useCards();
   const accounts = useBankAccounts();
@@ -397,16 +366,13 @@ export function usePaymentSources() {
   const sources: PaymentSourceRow[] = [
     ...usableCards.map((card) => ({
       id: card.id,
-      // Digits are optional, so the network alone must still read as a label, not a dangling "••".
-      label: card.last4 ? `${card.network} ••${card.last4}` : card.network,
+      label: cardLabel(card),
       color: card.color,
       kind: 'card' as const,
     })),
     ...usableAccounts.map((account) => ({
       id: account.id,
-      label: account.last4
-        ? `${account.nickname || account.bank_name} ••${account.last4}`
-        : account.nickname || account.bank_name,
+      label: accountLabel(account),
       color: account.color,
       kind: 'account' as const,
     })),
@@ -595,19 +561,24 @@ type PaymentRow = {
   id: string;
   card_id: string | null;
   bank_account_id: string | null;
+  /** The account the money came out of; null for money from outside. */
+  from_bank_account_id?: string | null;
   amount: number;
   paid_on: string;
   note: string | null;
 };
 
+const PAYMENT_COLUMNS = 'id, card_id, bank_account_id, amount, paid_on, note';
+
 function usePayments() {
   return useOwnerQuery<PaymentRow[]>('payments', async () => {
-    const { data, error } = await supabase
-      .from('payments')
-      .select('id, card_id, bank_account_id, amount, paid_on, note')
-      .order('paid_on', { ascending: false });
-    if (error) throw error;
-    return data ?? [];
+    const read = (columns: string) =>
+      supabase.from('payments').select(columns).order('paid_on', { ascending: false });
+    const full = await read(`${PAYMENT_COLUMNS}, from_bank_account_id`);
+    // 42703: a database not yet given the column. Every payment then reads as money from outside.
+    const result = full.error?.code === '42703' ? await read(PAYMENT_COLUMNS) : full;
+    if (result.error) throw result.error;
+    return (result.data ?? []) as unknown as PaymentRow[];
   });
 }
 
@@ -632,230 +603,12 @@ function readCharges(rows: ChargeRow[]): { rows: RecordedCharge[]; plans: Set<st
   };
 }
 
-type LedgerSources = {
-  receipts: ReceiptRow[];
-  bills: BillRow[];
-  subscriptions: SubscriptionRow[];
-  payments: PaymentRow[];
-  charges: ReturnType<typeof readCharges>;
-};
-
-/**
- * One source's ledger, built from lists that were already fetched. Shared so the cards list and the
- * card detail screen run the same arithmetic and a receipt moves the balance on both.
- */
-function ledgerForSource(
-  source: CardRow | BankAccountRow,
-  kind: SourceKind,
-  data: LedgerSources,
-  today: string,
-) {
-  const mine = <T extends { card_id: string | null; bank_account_id: string | null }>(rows: T[]) =>
-    rows.filter((row) => (row.card_id ?? row.bank_account_id) === source.id);
-
-  return buildLedger({
-    kind,
-    statedBalance: source.balance,
-    balanceAsOf: source.balance_as_of ?? null,
-    today,
-    charges: mine(data.receipts).map((row) => ({
-      id: `receipt-${row.id}`,
-      label: row.merchant,
-      amount: row.amount,
-      date: row.purchased_on,
-      kind: 'receipt' as const,
-      domain: logoDomainOf(row),
-      logoHidden: Boolean(row.logo_hidden),
-    })),
-    // Filtered on the charge's own source, not the plan's: a bill moved to another card keeps last
-    // March on the card that actually paid it.
-    recorded: data.charges.rows.filter((row) => (row.cardId ?? row.accountId) === source.id),
-    recordedPlans: data.charges.plans,
-    recurring: [
-      ...mine(data.bills)
-        .filter((row) => row.next_due_on)
-        .map((row) => ({
-          id: planKey('bill', row.id),
-          label: row.name,
-          amount: row.amount,
-          nextDate: row.next_due_on!,
-          recurrence: row.recurrence,
-          kind: 'bill' as const,
-          startsOn: row.starts_on,
-          createdAt: row.created_at,
-          endsOn: row.ends_on,
-          cardId: row.card_id,
-          accountId: row.bank_account_id,
-          domain: logoDomainOf(row),
-          logoHidden: Boolean(row.logo_hidden),
-          categoryId: row.category_id,
-          iconId: row.icon_id,
-        })),
-      ...mine(data.subscriptions)
-        .filter((row) => row.active && row.next_renewal_on)
-        .map((row) => ({
-          id: planKey('subscription', row.id),
-          label: row.name,
-          amount: row.amount,
-          nextDate: row.next_renewal_on!,
-          recurrence: row.cycle,
-          kind: 'subscription' as const,
-          startsOn: row.started_on,
-          createdAt: row.created_at,
-          cardId: row.card_id,
-          accountId: row.bank_account_id,
-          domain: logoDomainOf(row),
-          logoHidden: Boolean(row.logo_hidden),
-        })),
-    ],
-    payments: mine(data.payments).map((row) => ({
-      id: `payment-${row.id}`,
-      amount: row.amount,
-      date: row.paid_on,
-      note: row.note,
-    })),
-  });
-}
-
-export function useSourceLedger(sourceId: string | undefined, today: string) {
-  const cards = useCards();
-  const accounts = useBankAccounts();
-  const receipts = useReceipts();
-  const bills = useBills();
-  const subscriptions = useSubscriptions();
-  const payments = usePayments();
-  const charges = useCharges();
-
-  const card = (cards.data ?? []).find((row) => row.id === sourceId);
-  const account = (accounts.data ?? []).find((row) => row.id === sourceId);
-  const source = card ?? account;
-  const kind: SourceKind = card ? 'card' : 'account';
-
-  // Walking a source's whole history is not scroll-cheap and this screen re-renders as it scrolls,
-  // so it is held to once per change of the lists behind it.
-  const ledger = useMemo(
-    () =>
-      source
-        ? ledgerForSource(
-            source,
-            kind,
-            {
-              receipts: receipts.data ?? [],
-              bills: bills.data ?? [],
-              subscriptions: subscriptions.data ?? [],
-              payments: payments.data ?? [],
-              charges: readCharges(charges.data ?? []),
-            },
-            today,
-          )
-        : null,
-    [
-      source,
-      kind,
-      receipts.data,
-      bills.data,
-      subscriptions.data,
-      payments.data,
-      charges.data,
-      today,
-    ],
-  );
-
-  return {
-    source,
-    kind,
-    card,
-    account,
-    ledger,
-    isLoading:
-      cards.isLoading ||
-      accounts.isLoading ||
-      receipts.isLoading ||
-      bills.isLoading ||
-      subscriptions.isLoading ||
-      payments.isLoading ||
-      charges.isLoading,
-    // Every list the ledger is built from, not just the three that name the source: a failed read
-    // leaves rows out of a running balance that still renders as complete.
-    isError: anyError([cards, accounts, receipts, bills, subscriptions, payments, charges]),
-    // Retries the whole set rather than the one query that failed.
-    refetch: () => {
-      cards.refetch();
-      accounts.refetch();
-      receipts.refetch();
-      bills.refetch();
-      subscriptions.refetch();
-      payments.refetch();
-      charges.refetch();
-    },
-  };
-}
-
-/** Live balances for every card and account, keyed by id, from lists already in the cache. */
-export function useSourceBalances(today: string) {
-  const cards = useCards();
-  const accounts = useBankAccounts();
-  const receipts = useReceipts();
-  const bills = useBills();
-  const subscriptions = useSubscriptions();
-  const payments = usePayments();
-  const charges = useCharges();
-
-  // Walks every source's whole history, so it is done once per change of the lists, not per render
-  // (the cards screen re-renders on scroll).
-  const balances = useMemo(() => {
-    const data: LedgerSources = {
-      receipts: receipts.data ?? [],
-      bills: bills.data ?? [],
-      subscriptions: subscriptions.data ?? [],
-      payments: payments.data ?? [],
-      charges: readCharges(charges.data ?? []),
-    };
-
-    const next = new Map<string, number>();
-    for (const card of cards.data ?? []) {
-      next.set(card.id, ledgerForSource(card, 'card', data, today).balance);
-    }
-    for (const account of accounts.data ?? []) {
-      next.set(account.id, ledgerForSource(account, 'account', data, today).balance);
-    }
-    return next;
-  }, [
-    cards.data,
-    accounts.data,
-    receipts.data,
-    bills.data,
-    subscriptions.data,
-    payments.data,
-    charges.data,
-    today,
-  ]);
-
-  return {
-    balances,
-    /**
-     * A balance is only as good as the lists it was walked from. Consumers read `balances.get(id)
-     * ?? card.balance`, so a failed read would present the typed opening figure as the live
-     * balance.
-     */
-    isError: anyError([cards, accounts, receipts, bills, subscriptions, payments, charges]),
-    refetch: () => {
-      cards.refetch();
-      accounts.refetch();
-      receipts.refetch();
-      bills.refetch();
-      subscriptions.refetch();
-      payments.refetch();
-      charges.refetch();
-    },
-  };
-}
-
 /**
  * Everything that moved money inside a window, as one timeline. Receipts are history. Bills and
  * subscriptions store only their NEXT date, so they are projected across the window in both
  * directions, which is what makes "upcoming" possible without a job writing rows ahead of time;
- * salary is projected from its last payday and lands as money in.
+ * pay is read off the record where it landed, and worked out from the schedule after the last
+ * recorded payday, in the account it is paid into.
  *
  * Card payments are deliberately absent: paying a card moves money between two things you own, so
  * counting it beside the charge it settles would double the spending. It belongs on the card.
@@ -892,8 +645,10 @@ export function useLedger(range: DateRange | undefined, today: string) {
   const receipts = useReceipts();
   const subscriptions = useSubscriptions();
   const bills = useBills();
-  const salary = useSalarySources();
+  const salary = useSalaryDetails();
   const charges = useCharges();
+  const pay = usePayReceived();
+  const accounts = useBankAccounts();
   const free = useKnownFree();
 
   // The window is walked as far back as the app keeps anything (seven years), on every plan, so a
@@ -1014,25 +769,44 @@ export function useLedger(range: DateRange | undefined, today: string) {
       );
     }
 
-    for (const row of salary.data ?? []) {
-      if (!row.last_payday) continue;
-      // The floor bills get, in the only form income has: one payday is what the user told us
-      // happened, and walking backwards over years would invent a career in a long window.
-      const start = from > row.last_payday ? from : row.last_payday;
-      const dates = paydaysInRange(
+    // Pay on the record, as it landed: its own amount and the account it went into.
+    const lastRecorded = new Map<string, string>();
+    for (const row of pay.data ?? []) {
+      const id = row.salary_source_id;
+      if (id && (!lastRecorded.has(id) || row.paid_on > lastRecorded.get(id)!)) {
+        lastRecorded.set(id, row.paid_on);
+      }
+      if (!inRange(row.paid_on)) continue;
+      entries.push({
+        id: `pay-${row.id}`,
+        label: row.label || t('api.ledger.income'),
+        amount: Math.abs(row.amount),
+        date: row.paid_on,
+        kind: 'income',
+        sourceId: row.bank_account_id ?? '',
+      });
+    }
+
+    // What the record does not hold yet is worked out from the schedule, from the day after its
+    // last recorded pay: a payday not written down yet, and every one still to come.
+    const accountOrder = (accounts.data ?? []).map((account) => account.id);
+    for (const row of salary.data?.rows ?? []) {
+      const projected = payProjectionStart(row.last_payday, lastRecorded.get(row.id) ?? null);
+      if (!projected || !row.last_payday) continue;
+      const into = landingAccount(row.account_ids, accountOrder) ?? '';
+      for (const date of paydaysInRange(
         new Date(`${row.last_payday}T00:00:00`),
         row.frequency,
-        start,
+        from > projected ? from : projected,
         to,
-      );
-      for (const date of dates) {
+      )) {
         entries.push({
           id: `income-${row.id}@${date}`,
           label: row.name || t('api.ledger.income'),
           amount: Math.abs(row.amount),
           date,
           kind: 'income',
-          sourceId: '',
+          sourceId: into,
         });
       }
     }
@@ -1042,7 +816,18 @@ export function useLedger(range: DateRange | undefined, today: string) {
     );
 
     return entries;
-  }, [receipts.data, subscriptions.data, bills.data, salary.data, charges.data, from, to, today]);
+  }, [
+    receipts.data,
+    subscriptions.data,
+    bills.data,
+    salary.data,
+    charges.data,
+    pay.data,
+    accounts.data,
+    from,
+    to,
+    today,
+  ]);
 
   const entries = useMemo(
     () => (free ? allEntries.filter((entry) => entry.date >= floor) : allEntries),
@@ -1087,18 +872,199 @@ export function useLedger(range: DateRange | undefined, today: string) {
       subscriptions.isLoading ||
       bills.isLoading ||
       salary.isLoading ||
-      charges.isLoading,
+      charges.isLoading ||
+      pay.isLoading ||
+      accounts.isLoading,
     // Salary and charges count: missing income makes a net figure wrong, and a failed charges read
     // substitutes the projected plan amount for the recorded one with nothing to say it is a guess.
-    isError: anyError([receipts, subscriptions, bills, salary, charges]),
+    // Recorded pay and the accounts it lands in count for the same reason.
+    isError: anyError([receipts, subscriptions, bills, salary, charges, pay, accounts]),
     refetch: () => {
       receipts.refetch();
       subscriptions.refetch();
       bills.refetch();
       salary.refetch();
       charges.refetch();
+      pay.refetch();
+      accounts.refetch();
     },
   };
+}
+
+/**
+ * Every card's and account's running balance and Home's Current balance, from one book (see
+ * `moneyBook`). Everything that has happened is in it: receipts and bill and subscription charges,
+ * pay on its paydays, and payments, which move money between the person's own accounts and cards.
+ */
+function useMoneyBook(today: string) {
+  const range = useMemo(() => ({ from: '0000-01-01', to: today }), [today]);
+  const ledger = useLedger(range, today);
+  const cards = useCards();
+  const accounts = useBankAccounts();
+  const payments = usePayments();
+  const subscriptions = useSubscriptions();
+  const bills = useBills();
+  const charges = useCharges();
+
+  const book = useMemo(() => {
+    const spending: BookSpend[] = [];
+    for (const entry of ledger.allEntries) {
+      if (entry.amount >= 0 || entry.kind === 'income') continue;
+      spending.push({
+        id: entry.id,
+        label: entry.label,
+        date: entry.date,
+        amount: entry.amount,
+        kind: entry.kind,
+        sourceId: entry.sourceId,
+        domain: entry.domain,
+        logoHidden: entry.logoHidden,
+        categoryId: entry.categoryId,
+        iconId: entry.iconId,
+      });
+    }
+
+    // The ledger walks only plans that are still running. What a cancelled subscription or a
+    // finished bill was charged still went out, so it stays spent.
+    const running = new Set<string>();
+    const plans = new Map<
+      string,
+      { domain: string | null; logoHidden: boolean } & Partial<BillRow>
+    >();
+    for (const row of subscriptions.data ?? []) {
+      const key = planKey('subscription', row.id);
+      if (row.active && row.next_renewal_on) running.add(key);
+      plans.set(key, { domain: logoDomainOf(row), logoHidden: Boolean(row.logo_hidden) });
+    }
+    for (const row of bills.data ?? []) {
+      const key = planKey('bill', row.id);
+      if (row.next_due_on) running.add(key);
+      plans.set(key, { ...row, domain: logoDomainOf(row), logoHidden: Boolean(row.logo_hidden) });
+    }
+    for (const charge of readCharges(charges.data ?? []).rows) {
+      if (running.has(charge.planId)) continue;
+      const plan = plans.get(charge.planId);
+      spending.push({
+        id: charge.id,
+        label: charge.label,
+        date: charge.date,
+        amount: charge.amount,
+        kind: charge.planId.startsWith('bill') ? 'bill' : 'subscription',
+        sourceId: charge.cardId ?? charge.accountId ?? '',
+        domain: plan?.domain ?? null,
+        logoHidden: plan?.logoHidden ?? false,
+        categoryId: plan?.category_id ?? null,
+        iconId: plan?.icon_id ?? null,
+      });
+    }
+
+    return moneyBook({
+      today,
+      sources: [
+        ...(accounts.data ?? []).map((row) => ({
+          id: row.id,
+          kind: 'account' as const,
+          name: accountLabel(row),
+          balance: Number(row.balance),
+          asOf: row.balance_as_of ?? null,
+        })),
+        ...(cards.data ?? []).map((row) => ({
+          id: row.id,
+          kind: 'card' as const,
+          name: cardLabel(row),
+          balance: Number(row.balance),
+          asOf: row.balance_as_of ?? null,
+        })),
+      ],
+      spending,
+      payments: (payments.data ?? []).map((row) => ({
+        id: row.id,
+        amount: Number(row.amount),
+        date: row.paid_on,
+        note: row.note,
+        toId: row.card_id ?? row.bank_account_id ?? '',
+        fromAccountId: row.from_bank_account_id ?? null,
+      })),
+      income: ledger.allEntries
+        .filter((entry) => entry.kind === 'income' && entry.amount > 0)
+        .map((entry) => ({
+          id: entry.id,
+          label: entry.label,
+          date: entry.date,
+          amount: entry.amount,
+          accountId: entry.sourceId || null,
+        })),
+    });
+  }, [
+    ledger.allEntries,
+    subscriptions.data,
+    bills.data,
+    charges.data,
+    accounts.data,
+    cards.data,
+    payments.data,
+    today,
+  ]);
+
+  const parts = [ledger, cards, accounts, payments, subscriptions, bills, charges];
+  return {
+    book,
+    cards,
+    accounts,
+    isLoading: parts.some((part) => part.isLoading),
+    // Every part is a term in some balance, so a missing one would show a wrong figure as a real one.
+    isError: parts.some((part) => part.isError),
+    refetch: () => {
+      for (const part of parts) void part.refetch();
+    },
+  };
+}
+
+/** One card's or account's running balance and the entries behind it. */
+export function useSourceLedger(sourceId: string | undefined, today: string) {
+  const { book, cards, accounts, isLoading, isError, refetch } = useMoneyBook(today);
+
+  const card = (cards.data ?? []).find((row) => row.id === sourceId);
+  const account = (accounts.data ?? []).find((row) => row.id === sourceId);
+  const source = card ?? account;
+  const kind: SourceKind = card ? 'card' : 'account';
+
+  return {
+    source,
+    kind,
+    card,
+    account,
+    ledger: source ? (book.sources.get(source.id) ?? null) : null,
+    isLoading,
+    isError,
+    refetch,
+  };
+}
+
+/** Live balances for every card and account, keyed by id. */
+export function useSourceBalances(today: string) {
+  const { book, isError, refetch } = useMoneyBook(today);
+  const balances = useMemo(() => {
+    const next = new Map<string, number>();
+    for (const [id, ledger] of book.sources) next.set(id, ledger.balance);
+    return next;
+  }, [book]);
+
+  return {
+    balances,
+    /**
+     * Consumers read `balances.get(id) ?? card.balance`, so a failed read would present the typed
+     * opening figure as the live balance.
+     */
+    isError,
+    refetch,
+  };
+}
+
+/** Home's "Current balance": the person's accounts less what their cards owe, rolled on to today. */
+export function useCurrentBalance(today: string) {
+  const { book, isLoading, isError, refetch } = useMoneyBook(today);
+  return { ...book.current, isLoading, isError, refetch };
 }
 
 export type LoanRow = {

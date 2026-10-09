@@ -54,7 +54,6 @@ jest.mock('@/api/refresh', () => ({
 jest.mock('@/lib/use-today', () => ({ useToday: () => ({ today: '2026-09-12' }) }));
 
 jest.mock('@/api/queries', () => ({
-  savedFor: (month: { saved: number }) => Number(month.saved),
   useCards: () => ({
     data: [
       {
@@ -89,11 +88,6 @@ jest.mock('@/api/queries', () => ({
     isPending: false,
     isError: false,
   }),
-  useMonthlySavings: () => ({
-    data: [{ month: '2026-08-01', saved: 260 }],
-    isPending: false,
-    isError: false,
-  }),
   useSourceBalances: () => ({ balances: new Map(), isError: false, refetch: jest.fn() }),
 }));
 
@@ -108,9 +102,9 @@ async function layout(screen: Screen, testID: string, width: number) {
 const sizeOf = (screen: Screen, text: string) =>
   StyleSheet.flatten(screen.getByText(text).props.style).fontSize as number;
 
-/** Montserrat at 13pt x 1.3 (labels) and SemiBold at 16pt x 1.2 (figures). */
+/** Montserrat at 13pt x 1.3 (labels) and SemiBold at 16pt x 1.2 (figures; Savings says "Open"). */
 const LABELS = { salary: 59.6, savings: 65.2 };
-const FIGURES = { salary: 112.4, savings: 77.9 };
+const FIGURES = { salary: 112.4, savings: 44.5 };
 
 /** One layout pass with `room` points for each tile's text, then the two group boxes. */
 async function layOutTiles(screen: Screen, room: number) {
@@ -157,14 +151,14 @@ beforeEach(() => {
 });
 
 describe('Cards — money tiles at large text sizes', () => {
-  it('prints the labels and figures whole, the figures with their cents', async () => {
+  it('prints the labels and figures whole, the Salary figure with its cents', async () => {
     const screen = await render(<CardsScreen />);
     for (const label of ['Salary', 'Savings']) {
       const node = screen.getByText(label);
       expect(node.props.numberOfLines).toBeUndefined();
       expect(node.props.maxFontSizeMultiplier).toBe(1.3);
     }
-    for (const figure of ['$12,345.67', '$260.00']) {
+    for (const figure of ['$12,345.67', 'Open']) {
       const node = screen.getByText(figure);
       expect(node.props.numberOfLines).toBeUndefined();
       expect(node.props.adjustsFontSizeToFit).toBeUndefined();
@@ -188,7 +182,7 @@ describe('Cards — money tiles at large text sizes', () => {
     expect(String(row.props.className)).toContain('flex-row');
     expect(String(row.props.className)).not.toMatch(/(^|\s)items-/);
 
-    for (const label of ['Salary, $12,345.67', 'Savings, $260.00']) {
+    for (const label of ['Salary, $12,345.67', 'Savings']) {
       const tile = screen.getByLabelText(label);
       const cell = tile.parent;
       const surface = tile.children[0] as unknown as { props: { className?: string } };
@@ -205,7 +199,7 @@ describe('Cards — money tiles at large text sizes', () => {
     // 100pt each: "$12,345.67" needs 112.4pt, so both go to 99 / 112.4 = 0.88.
     await layOutTiles(screen, 100);
 
-    expect(sizeOf(screen, '$260.00')).toBe(sizeOf(screen, '$12,345.67'));
+    expect(sizeOf(screen, 'Open')).toBe(sizeOf(screen, '$12,345.67'));
     expect(sizeOf(screen, '$12,345.67')).toBeCloseTo(16 * 0.88, 5);
     expect(sizeOf(screen, 'Salary')).toBe(sizeOf(screen, 'Savings'));
     expect(tilesStacked(screen)).toBe(false);

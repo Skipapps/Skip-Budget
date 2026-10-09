@@ -29,7 +29,6 @@ const ALLOWED: Record<string, Counts> = {
   'app/receipts.tsx': [3, 0, 0],
   'app/reminders.tsx': [13, 3, 0],
   'app/save-loan.tsx': [3, 0, 0],
-  'app/savings-month.tsx': [6, 0, 0],
   'app/setup.tsx': [3, 0, 0],
   'app/subscription-plans.tsx': [2, 0, 0],
   'app/verify-otp.tsx': [1, 0, 0],

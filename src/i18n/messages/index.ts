@@ -23,6 +23,7 @@ import { salaryMessages } from '@/i18n/messages/salary';
 import { savingsMessages } from '@/i18n/messages/savings';
 import { settingsMessages } from '@/i18n/messages/settings';
 import { subscriptionsMessages } from '@/i18n/messages/subscriptions';
+import { toastMessages } from '@/i18n/messages/toast';
 import { supportMessages } from '@/i18n/messages/support';
 import { transactionsMessages } from '@/i18n/messages/transactions';
 import { uiMessages } from '@/i18n/messages/ui';
@@ -55,6 +56,7 @@ export const MESSAGE_AREAS = {
   savings: savingsMessages,
   settings: settingsMessages,
   subscriptions: subscriptionsMessages,
+  toast: toastMessages,
   support: supportMessages,
   transactions: transactionsMessages,
   ui: uiMessages,
@@ -91,6 +93,7 @@ export const MESSAGES = {
   ...MESSAGE_AREAS.savings,
   ...MESSAGE_AREAS.settings,
   ...MESSAGE_AREAS.subscriptions,
+  ...MESSAGE_AREAS.toast,
   ...MESSAGE_AREAS.support,
   ...MESSAGE_AREAS.transactions,
   ...MESSAGE_AREAS.ui,

@@ -159,6 +159,66 @@ export const accountsMessages = defineMessages({
     fr: 'Abonnement',
   },
   'accounts.source.kind.payment': { en: 'Payment', es: 'Pago', fr: 'Paiement' },
+  'accounts.source.kind.income': { en: 'Pay', es: 'Sueldo', fr: 'Paie' },
+  // A move's other side, when it is one of the person's own cards or accounts.
+  'accounts.source.fromSource': { en: 'From {name}', es: 'Desde {name}', fr: 'Depuis {name}' },
+  'accounts.source.toSource': { en: 'To {name}', es: 'A {name}', fr: 'Vers {name}' },
+  'accounts.source.moneyOut': { en: 'Money out', es: 'Dinero que salió', fr: 'Argent sorti' },
+
+  'accounts.pay.closeCard': {
+    en: 'Cancel this payment?',
+    es: '¿Cancelar este pago?',
+    fr: 'Annuler ce paiement ?',
+  },
+  'accounts.pay.closeAccount': {
+    en: 'Cancel adding this money?',
+    es: '¿Dejar de agregar este dinero?',
+    fr: 'Annuler l’ajout de cet argent ?',
+  },
+  'accounts.pay.howMuchCard': {
+    en: 'How much did you pay?',
+    es: '¿Cuánto pagaste?',
+    fr: 'Combien as-tu payé ?',
+  },
+  'accounts.pay.howMuchAccount': {
+    en: 'How much came in?',
+    es: '¿Cuánto entró?',
+    fr: 'Combien est entré ?',
+  },
+  'accounts.pay.fromCard': {
+    en: 'Which account did you pay from?',
+    es: '¿Desde qué cuenta pagaste?',
+    fr: 'Depuis quel compte as-tu payé ?',
+  },
+  'accounts.pay.fromAccount': {
+    en: 'Where did it come from?',
+    es: '¿De dónde vino?',
+    fr: 'D’où vient cet argent ?',
+  },
+  'accounts.pay.fromCardHint': {
+    en: 'The payment comes out of that account and off what the card owes.',
+    es: 'El pago sale de esa cuenta y se descuenta de lo que debe la tarjeta.',
+    fr: 'Le paiement sort de ce compte et réduit ce que doit la carte.',
+  },
+  'accounts.pay.fromAccountHint': {
+    en: 'Money from another of your accounts comes out of that one. New money, like a gift or a refund, adds to your balance.',
+    es: 'Si viene de otra de tus cuentas, sale de esa. El dinero nuevo, como un regalo o un reembolso, suma a tu saldo.',
+    fr: 'S’il vient d’un autre de tes comptes, il en sort. L’argent nouveau, comme un cadeau ou un remboursement, s’ajoute à ton solde.',
+  },
+  'accounts.pay.somewhereElse': { en: 'Somewhere else', es: 'En otro lugar', fr: 'Ailleurs' },
+  'accounts.pay.newMoney': { en: 'New money', es: 'Dinero nuevo', fr: 'Nouvel argent' },
+  'accounts.pay.pickFrom': {
+    en: 'Choose where the money came from.',
+    es: 'Elige de dónde vino el dinero.',
+    fr: 'Choisis d’où vient l’argent.',
+  },
+  'accounts.pay.saveCard': {
+    en: 'Save payment',
+    es: 'Guardar pago',
+    fr: 'Enregistrer le paiement',
+  },
+  'accounts.pay.saveAccount': { en: 'Add money', es: 'Agregar dinero', fr: 'Ajouter l’argent' },
+  'accounts.pay.saving': { en: 'Saving…', es: 'Guardando…', fr: 'Enregistrement…' },
   'accounts.source.removePaymentTitle': {
     en: 'Remove payment?',
     es: '¿Quitar este pago?',
@@ -173,6 +233,11 @@ export const accountsMessages = defineMessages({
     en: 'The balance goes back up by that amount.',
     es: 'El saldo vuelve a subir en esa cantidad.',
     fr: 'Le solde remonte de ce montant.',
+  },
+  'accounts.source.removeMessageDown': {
+    en: 'The balance goes down by that amount.',
+    es: 'El saldo baja en esa cantidad.',
+    fr: 'Le solde baisse de ce montant.',
   },
   'accounts.source.editLabel': { en: 'Edit {name}', es: 'Editar {name}', fr: 'Modifier {name}' },
   'accounts.source.makePayment': {
@@ -201,13 +266,9 @@ export const accountsMessages = defineMessages({
     es: 'Cargos desde entonces',
     fr: 'Débité depuis',
   },
-  'accounts.source.spentSince': {
-    en: 'Spent since',
-    es: 'Gastos desde entonces',
-    fr: 'Dépensé depuis',
-  },
   'accounts.source.payments': { en: 'Payments', es: 'Pagos', fr: 'Paiements' },
   'accounts.source.moneyIn': { en: 'Money in', es: 'Dinero recibido', fr: 'Argent reçu' },
+  'accounts.source.moneySent': { en: 'Money sent', es: 'Dinero enviado', fr: 'Argent envoyé' },
   'accounts.source.owedNow': { en: 'Owed now', es: 'Adeudo actual', fr: 'Montant dû actuel' },
   'accounts.source.balanceNow': { en: 'Balance now', es: 'Saldo actual', fr: 'Solde actuel' },
   'accounts.source.emptyTitle': {

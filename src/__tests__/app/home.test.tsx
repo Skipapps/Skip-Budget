@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import HomeScreen from '@/app/(tabs)/home';
@@ -6,7 +6,8 @@ import HomeScreen from '@/app/(tabs)/home';
 /**
  * Where a row in Recent or Coming up goes when pressed. Rows are ledger *occurrences*, so each must
  * resolve back to the record behind it: the receipt, the bill or subscription that charged, the
- * salary screen for a payday.
+ * salary screen for a payday. Also what feeds the headline card and Where it goes, which read
+ * different data.
  *
  * One mount, every row pressed in turn: the screen is expensive to mount and a test per row made
  * the file order-dependent.
@@ -22,8 +23,24 @@ jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn() },
 }));
 
-jest.mock('@/components/dashboard/balance-summary', () => ({ BalanceSummary: () => null }));
-jest.mock('@/components/dashboard/destination-list', () => ({ DestinationList: () => null }));
+// The real SDK starts a cleanup interval on import that keeps Jest from exiting.
+jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
+
+// The two cards are read by the props they are given.
+const mockCard = jest.fn();
+const mockDestinations = jest.fn();
+jest.mock('@/components/dashboard/balance-summary', () => ({
+  BalanceSummary: (props: unknown) => {
+    mockCard(props);
+    return null;
+  },
+}));
+jest.mock('@/components/dashboard/destination-list', () => ({
+  DestinationList: (props: unknown) => {
+    mockDestinations(props);
+    return null;
+  },
+}));
 jest.mock('@/components/dashboard/dashboard-header', () => ({ DashboardHeader: () => null }));
 jest.mock('@/components/dashboard/getting-started-card', () => ({
   GettingStartedCard: () => null,
@@ -124,9 +141,21 @@ const mockUpcoming = [
   },
 ];
 
+let mockLedgerState = { isLoading: false, isError: false };
+
 const mockLedger = jest.fn((range: { from: string; to: string } | undefined) => ({
   entries: range && range.from > '2026-09-10' ? mockUpcoming : mockRecent,
+  // The month's own in and out, kept apart from the balance's so a card fed from the wrong one shows.
   totals: { in: 2000, out: 2147, net: -147, count: 7 },
+  ...mockLedgerState,
+  refetch: jest.fn(),
+}));
+
+/** Rolls on from the typed balances and never resets, so nothing here equals the month's totals. */
+const CURRENT = { balance: 2700, income: 2000, expenses: 100 };
+
+const mockBalance = jest.fn((_today: string) => ({
+  ...CURRENT,
   isLoading: false,
   isError: false,
   refetch: jest.fn(),
@@ -134,15 +163,24 @@ const mockLedger = jest.fn((range: { from: string; to: string } | undefined) => 
 
 jest.mock('@/api/queries', () => ({
   useProfile: () => ({ data: { display_name: 'Sam' } }),
-  // Called for the month behind the card, then the chosen day, then the rest of the month; the
+  // Called for the month behind Where it goes, then the chosen day, then the rest of the month; the
   // month gets the same rows.
   useLedger: (range: { from: string; to: string } | undefined) => mockLedger(range),
+  useCurrentBalance: (today: string) => mockBalance(today),
 }));
 
 jest.useFakeTimers().setSystemTime(new Date(`${TODAY}T09:00:00`));
 
+const settled = () => ({ ...CURRENT, isLoading: false, isError: false, refetch: jest.fn() });
+
 beforeEach(() => {
+  jest.setSystemTime(new Date(`${TODAY}T09:00:00`));
   jest.mocked(router.push).mockClear();
+  mockCard.mockClear();
+  mockDestinations.mockClear();
+  mockBalance.mockClear();
+  mockBalance.mockImplementation(settled);
+  mockLedgerState = { isLoading: false, isError: false };
 });
 
 describe('Home — where a transaction row opens', () => {
@@ -211,7 +249,7 @@ describe('Home — what sits under the day selector', () => {
     await render(<HomeScreen />);
 
     const ranges = mockLedger.mock.calls.map(([range]) => range);
-    // The month behind the balance card.
+    // The month behind Where it goes.
     expect(ranges).toContainEqual({ from: '2026-09-01', to: '2026-09-30' });
     // Recent: today, and nothing before it.
     expect(ranges).toContainEqual({ from: TODAY, to: TODAY });
@@ -242,6 +280,96 @@ describe('Home — what sits under the day selector', () => {
     // The captions used to read "4 – 10 Sep 2026" and "11 – 17 Sep 2026"; a day's own header, like
     // "9 Sep 2026", is not a range.
     expect(queryByText(/\d – \d/)).toBeNull();
+  });
+});
+
+describe('Home — the headline card', () => {
+  const card = () => mockCard.mock.lastCall?.[0];
+  const destinations = () => mockDestinations.mock.lastCall?.[0];
+
+  it('is fed from the current balance for today, not from the month', async () => {
+    await render(<HomeScreen />);
+
+    expect(mockBalance).toHaveBeenCalledWith(TODAY);
+    // The month's totals are $2,000 in and $2,147 out; none of that reaches the card.
+    expect(card()).toEqual({
+      balance: 2700,
+      income: 2000,
+      expenses: 100,
+      loading: false,
+      error: false,
+    });
+  });
+
+  it('is handed no days-left or month figure', async () => {
+    await render(<HomeScreen />);
+
+    expect(Object.keys(card()).sort()).toEqual([
+      'balance',
+      'error',
+      'expenses',
+      'income',
+      'loading',
+    ]);
+  });
+
+  it('shows the card loading while the balance is, and the month is not what it waits for', async () => {
+    mockBalance.mockImplementation(() => ({ ...settled(), isLoading: true }));
+    await render(<HomeScreen />);
+
+    expect(card()).toMatchObject({ loading: true, error: false });
+    expect(destinations()).toMatchObject({ loading: false, error: false });
+  });
+
+  it('shows the card as failed when the balance is, and Where it goes is not', async () => {
+    mockBalance.mockImplementation(() => ({ ...settled(), isError: true }));
+    await render(<HomeScreen />);
+
+    expect(card()).toMatchObject({ loading: false, error: true });
+    expect(destinations()).toMatchObject({ loading: false, error: false });
+  });
+
+  it('leaves the card alone when only the month fails', async () => {
+    mockLedgerState = { isLoading: false, isError: true };
+    await render(<HomeScreen />);
+
+    expect(card()).toMatchObject({ balance: 2700, loading: false, error: false });
+    expect(destinations()).toMatchObject({ loading: false, error: true });
+  });
+
+  it('leaves the card alone while only the month is loading', async () => {
+    mockLedgerState = { isLoading: true, isError: false };
+    await render(<HomeScreen />);
+
+    expect(card()).toMatchObject({ loading: false, error: false });
+    expect(destinations()).toMatchObject({ loading: true, error: false });
+  });
+
+  it('asks for the balance as of the new day once midnight passes', async () => {
+    await render(<HomeScreen />);
+    expect(mockBalance).not.toHaveBeenCalledWith('2026-09-11');
+
+    jest.setSystemTime(new Date('2026-09-11T00:01:00'));
+    await act(async () => {
+      jest.advanceTimersByTime(60_000);
+    });
+
+    expect(mockBalance).toHaveBeenLastCalledWith('2026-09-11');
+  });
+});
+
+describe('Home — Where it goes', () => {
+  it('still adds up the month: bills, receipts and subscriptions of September', async () => {
+    const { getByText } = await render(<HomeScreen />);
+
+    expect(getByText('Where it goes')).toBeTruthy();
+    expect(getByText('This month')).toBeTruthy();
+    // Two bill rows and the unplaceable one (1,030 + 1,030 + 1), the bakery receipt, two Netflix rows.
+    expect(mockDestinations.mock.lastCall?.[0].amounts).toEqual({
+      'monthly-bills': -2061,
+      receipts: -6,
+      subscriptions: -30,
+    });
   });
 });
 

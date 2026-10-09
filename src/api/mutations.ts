@@ -268,39 +268,6 @@ export const useCreateReceipt = () => useCreate<ReceiptValues>('receipts');
 export const useUpdateReceipt = () => useUpdate<Partial<ReceiptValues>>('receipts');
 export const useDeleteReceipt = () => useRemove('receipts');
 
-/**
- * Correcting a month. A null amount clears the correction and puts the month back on the computed
- * figure.
- */
-export function useAdjustSavingsMonth() {
-  const invalidate = useInvalidate();
-  return useMutation({
-    mutationFn: async (values: { month: string; amount: number | null; note: string | null }) => {
-      const { error } = await supabase.rpc('adjust_savings_month', {
-        p_month: values.month,
-        p_amount: values.amount,
-        p_note: values.note,
-      });
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: () => invalidate('monthly-savings'),
-  });
-}
-
-export function useExcludeSavingsMonth() {
-  const invalidate = useInvalidate();
-  return useMutation({
-    mutationFn: async (values: { month: string; excluded: boolean }) => {
-      const { error } = await supabase.rpc('exclude_savings_month', {
-        p_month: values.month,
-        p_excluded: values.excluded,
-      });
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: () => invalidate('monthly-savings'),
-  });
-}
-
 export type SubscriptionValues = {
   brand_id: string | null;
   name: string;
@@ -441,6 +408,8 @@ export function useLinkAccountToSalaries() {
 export type PaymentValues = {
   card_id: string | null;
   bank_account_id: string | null;
+  /** The account the money came out of. Left off for money from outside. */
+  from_bank_account_id?: string;
   amount: number;
   paid_on: string;
   note: string | null;

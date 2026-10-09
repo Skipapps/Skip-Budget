@@ -407,7 +407,11 @@ describe('Settings, Support', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: /^Getting started/ }));
 
-    expect(mockMutate).toHaveBeenCalledWith({ getting_started_dismissed_at: null });
+    // The second argument carries the toast that says it worked.
+    expect(mockMutate).toHaveBeenCalledWith(
+      { getting_started_dismissed_at: null },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
     expect(router.dismissTo).toHaveBeenCalledWith('/home');
     expect(router.push).not.toHaveBeenCalled();
   });

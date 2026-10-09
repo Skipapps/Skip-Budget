@@ -329,16 +329,16 @@ const CASES: Case[] = [
     name: 'TextField',
     draw: () => (
       <TextField
-        label={t('savings.month.reallyLeft')}
+        label={t('cards.add.name')}
         value=""
         onChangeText={noop}
-        placeholder={t('savings.month.reallyLeftPlaceholder')}
+        placeholder={t('support.contact.ideaPlaceholder')}
         optional
         error={failureText()}
       />
     ),
     roles: () => [
-      [t('savings.month.reallyLeft'), 'row'],
+      [t('cards.add.name'), 'row'],
       [t('ui.field.optional'), 'row'],
       [failureText(), 'reading'],
     ],

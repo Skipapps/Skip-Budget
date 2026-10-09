@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/react-native';
+import { router } from 'expo-router';
 
 import CardsScreen from '@/app/(tabs)/cards';
 import { FAILURE_MESSAGE } from '@/lib/failure';
@@ -17,12 +18,22 @@ jest.mock('react-native-keyboard-controller', () =>
 
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 // Reanimated 4 pulls react-native-worklets, which wants a native module; the stand-in just prints
-// what the page handed it.
+// what the page handed it. An omitted amount is how the real tile knows to draw "Open".
 jest.mock('@/components/ui/amount-tile', () => {
-  const { Text } = jest.requireActual('react-native');
+  const { Pressable, Text } = jest.requireActual('react-native');
   return {
-    AmountTile: ({ label, amount }: { label: string; amount?: number }) => (
-      <Text>{`${label}: ${amount}`}</Text>
+    AmountTile: ({
+      label,
+      amount,
+      onPress,
+    }: {
+      label: string;
+      amount?: number;
+      onPress?: () => void;
+    }) => (
+      <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress}>
+        <Text>{`${label}: ${amount === undefined ? 'no figure' : amount}`}</Text>
+      </Pressable>
     ),
   };
 });
@@ -86,19 +97,13 @@ const mockAccounts = [
 
 let mockBalancesFailed = false;
 const mockRefetchBalances = jest.fn();
-let mockSavings: object[] = [];
 
+// The real module cannot load under Jest (pulls in Supabase). It has no savings hook to offer: a
+// page that still reached for one would throw here.
 jest.mock('@/api/queries', () => ({
-  // The Savings page's rule; the real module cannot load under Jest (pulls in Supabase).
-  savedFor: (month: {
-    excluded_at: string | null;
-    adjusted_saved: number | null;
-    saved: number;
-  }) => (month.excluded_at ? 0 : Number(month.adjusted_saved ?? month.saved)),
   useCards: () => ({ data: mockCards, isPending: false, isError: false }),
   useBankAccounts: () => ({ data: mockAccounts, isPending: false, isError: false }),
   useSalarySources: () => ({ data: mockSalary, isPending: false, isError: false }),
-  useMonthlySavings: () => ({ data: mockSavings, isPending: false, isError: false }),
   useSourceBalances: () => ({
     balances: new Map<string, number>(),
     isError: mockBalancesFailed,
@@ -112,46 +117,40 @@ jest.mock('@/lib/use-today', () => ({ useToday: () => ({ today: '2026-09-12' }) 
 beforeEach(() => {
   mockSalary = [];
   mockBalancesFailed = false;
-  mockSavings = [];
   mockRefetchBalances.mockClear();
   mockRefresh.mockClear();
+  jest.mocked(router.push).mockClear();
 });
 
-/**
- * The Savings tile is the Savings page's total (via savedFor), not a sum of the raw `saved` column:
- * a month corrected to $500 or left out must not count at the worked-out figure.
- */
+/** Savings has nothing to total yet: its tile is a door to the page, with no number of its own. */
 describe('Cards — the Savings tile', () => {
-  const august = { month: '2026-08-01', income: 3760, spent: 1976.54, saved: 1783.46 };
-
-  it('counts a corrected month at its correction', async () => {
-    mockSavings = [
-      { ...august, adjusted_saved: 500, note: 'Paid the plumber in cash', excluded_at: null },
-    ];
+  it('is handed no figure, so it draws Open instead of a total', async () => {
     const { getByText, queryByText } = await render(<CardsScreen />);
 
-    expect(getByText('Savings: 500')).toBeTruthy();
-    expect(queryByText('Savings: 1783.46')).toBeNull();
+    expect(getByText('Savings: no figure')).toBeTruthy();
+    expect(queryByText(/^Savings: \d/)).toBeNull();
   });
 
-  it('counts a month that was left out as nothing', async () => {
-    mockSavings = [
-      { ...august, adjusted_saved: 500, note: null, excluded_at: '2026-09-21T15:37:00Z' },
-      {
-        month: '2026-07-01',
-        income: 3760,
-        spent: 3500,
-        saved: 260,
-        adjusted_saved: null,
-        note: null,
-        excluded_at: null,
-      },
+  it('stays without a figure whatever pay is on file', async () => {
+    mockSalary = [
+      { id: 's1', name: 'Acme', amount: 1880, frequency: 'monthly', last_payday: '2026-08-31' },
     ];
     const { getByText, queryByText } = await render(<CardsScreen />);
 
-    expect(getByText('Savings: 260')).toBeTruthy();
-    expect(queryByText('Savings: 1783.46')).toBeNull();
-    expect(queryByText('Savings: 500')).toBeNull();
+    // The Salary tile beside it still reports its figure; $0 would be a figure too.
+    expect(getByText('Salary: 1880')).toBeTruthy();
+    expect(getByText('Savings: no figure')).toBeTruthy();
+    expect(queryByText('Savings: 0')).toBeNull();
+  });
+
+  it('still opens the Savings page, and Salary still opens Salary', async () => {
+    const { getByLabelText } = await render(<CardsScreen />);
+
+    await fireEvent.press(getByLabelText('Savings'));
+    expect(router.push).toHaveBeenLastCalledWith('/savings');
+
+    await fireEvent.press(getByLabelText('Salary'));
+    expect(router.push).toHaveBeenLastCalledWith('/salary');
   });
 });
 

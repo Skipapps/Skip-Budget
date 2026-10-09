@@ -34,6 +34,22 @@ jest.mock('@/providers/theme-provider', () => ({
   useColors: () => new Proxy({}, { get: () => '#000000' }),
 }));
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => jest.fn(async () => true) }));
+
+// Pay that has already landed is written down before a save changes anything; none of that is under
+// test in this file, so the sweep finds nothing and an edit to a salary that has paid is not asked.
+jest.mock('@/api/pay', () => ({
+  recordDuePay: jest.fn(async () => 0),
+  usePastPay: () => ({
+    choose: jest.fn(async () => 'upcoming'),
+    apply: jest.fn(async () => {}),
+    saving: false,
+  }),
+}));
+jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'user-1' }));
+jest.mock('@tanstack/react-query', () => ({
+  ...jest.requireActual('@tanstack/react-query'),
+  useQueryClient: () => ({ invalidateQueries: jest.fn() }),
+}));
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
 
 const mockUpdate = jest.fn(async (_input: { id: string; values: Record<string, unknown> }) => ({}));

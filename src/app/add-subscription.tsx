@@ -37,6 +37,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { FieldLabel } from '@/components/ui/typography';
 import { useConfirm } from '@/providers/dialog-provider';
+import { useToast } from '@/providers/toast-context';
 import { t, type MessageKey } from '@/i18n';
 import { logoColumns } from '@/lib/logo-columns';
 import { useToday } from '@/lib/use-today';
@@ -277,6 +278,7 @@ function SubscriptionForm({
   const pastCharges = usePastCharges('subscription', id);
   const deleteSubscription = useDeleteSubscription();
   const confirm = useConfirm();
+  const toast = useToast();
 
   const savedReminder = useReminderChoice('subscription', id);
   const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
@@ -382,6 +384,7 @@ function SubscriptionForm({
       // After the row exists, because a reminder points at one.
       await applyReminder('subscription', subscriptionId, choiceToLead(reminder), remindAt);
       success();
+      toast(editing ? 'toast.subscription.updated' : 'toast.subscription.added');
       leave();
     } catch (thrown) {
       warn();
@@ -401,6 +404,7 @@ function SubscriptionForm({
 
     try {
       await deleteSubscription.mutateAsync(id);
+      toast('toast.subscription.deleted', 'deleted');
       router.back();
     } catch (thrown) {
       setError(failureMessage(thrown));

@@ -43,6 +43,7 @@ import { cn } from '@/lib/cn';
 import { formatClock, formatFullDate, parseClock } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { tap } from '@/lib/haptics';
+import { useToast } from '@/providers/toast-context';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { failureText } from '@/lib/failure';
@@ -84,6 +85,11 @@ export default function RemindersScreen() {
   const setReminder = useSetReminder();
   const removeReminder = useRemoveReminder();
   const setReceiptReminder = useSetReceiptReminder();
+  const toast = useToast();
+  // Every change here saves at once, so each one says so.
+  const saved = { onSuccess: () => toast('toast.reminder.saved') };
+  const off = { onSuccess: () => toast('toast.reminder.off', 'deleted') };
+  const removed = { onSuccess: () => toast('toast.reminder.deleted', 'deleted') };
 
   const loading =
     bills.isLoading ||
@@ -277,7 +283,7 @@ export default function RemindersScreen() {
                     value={receipts.enabled}
                     onValueChange={(next) => {
                       // No time sent, so toggling keeps the hour already chosen.
-                      setReceiptReminder.mutate({ enabled: next });
+                      setReceiptReminder.mutate({ enabled: next }, next ? saved : off);
                     }}
                     accessibilityLabel={t('reminders.receipts.daily')}
                   />
@@ -315,7 +321,7 @@ export default function RemindersScreen() {
                   onCancel={() => setTimeFor(null)}
                   onConfirm={(next) => {
                     setTimeFor(null);
-                    setReceiptReminder.mutate({ enabled: true, remindAt: next });
+                    setReceiptReminder.mutate({ enabled: true, remindAt: next }, saved);
                   }}
                 />
               ) : null}
@@ -387,12 +393,15 @@ export default function RemindersScreen() {
                           <SwitchControl
                             value={enabled}
                             onValueChange={(next) => {
-                              setReminder.mutate({
-                                kind: item.kind,
-                                targetId: item.id,
-                                enabled: next,
-                                leadDays,
-                              });
+                              setReminder.mutate(
+                                {
+                                  kind: item.kind,
+                                  targetId: item.id,
+                                  enabled: next,
+                                  leadDays,
+                                },
+                                next ? saved : off,
+                              );
                             }}
                             accessibilityLabel={t('reminders.remindAbout', { name: item.label })}
                           />
@@ -417,13 +426,16 @@ export default function RemindersScreen() {
                                 }
                                 onPress={() => {
                                   tap();
-                                  setReminder.mutate({
-                                    kind: item.kind,
-                                    targetId: item.id,
-                                    enabled: true,
-                                    leadDays: option.value,
-                                    remindAt,
-                                  });
+                                  setReminder.mutate(
+                                    {
+                                      kind: item.kind,
+                                      targetId: item.id,
+                                      enabled: true,
+                                      leadDays: option.value,
+                                      remindAt,
+                                    },
+                                    saved,
+                                  );
                                 }}
                                 hitSlop={{ top: 4, bottom: 4 }}
                                 className={cn(
@@ -473,7 +485,10 @@ export default function RemindersScreen() {
                             accessibilityLabel={t('reminders.remove', { name: item.label })}
                             onPress={() => {
                               tap();
-                              removeReminder.mutate({ kind: item.kind, targetId: item.id });
+                              removeReminder.mutate(
+                                { kind: item.kind, targetId: item.id },
+                                removed,
+                              );
                             }}
                             // 32pt box to fit the row; hitSlop brings the target up to 44pt+.
                             hitSlop={8}
@@ -490,13 +505,16 @@ export default function RemindersScreen() {
                           onCancel={() => setTimeFor(null)}
                           onConfirm={(next) => {
                             setTimeFor(null);
-                            setReminder.mutate({
-                              kind: item.kind,
-                              targetId: item.id,
-                              enabled: true,
-                              leadDays,
-                              remindAt: next,
-                            });
+                            setReminder.mutate(
+                              {
+                                kind: item.kind,
+                                targetId: item.id,
+                                enabled: true,
+                                leadDays,
+                                remindAt: next,
+                              },
+                              saved,
+                            );
                           }}
                         />
                       ) : null}

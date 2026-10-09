@@ -22,6 +22,7 @@ import { RealtimeProvider } from '@/providers/realtime-provider';
 import { PreferencesProvider } from '@/providers/preferences-provider';
 import { SessionProvider, useSession } from '@/providers/session-provider';
 import { ThemeProvider, useColors, useTheme } from '@/providers/theme-provider';
+import { ToastProvider } from '@/providers/toast-provider';
 import { APP_FONTS } from '@/theme/fonts';
 
 // Hold the splash until the app font is ready, so no frame renders in the system font and reflows.
@@ -75,17 +76,20 @@ function AppShell({ fontsReady }: { fontsReady: boolean }) {
             <RealtimeProvider>
               {/* Inside the session so a dialog can outlive a screen; outside the navigator so it
                   draws above every route and modal. */}
-              <DialogProvider>
-                {/* Inside the session, so signing out cannot strand somebody behind a lock; above
+              {/* Outside the navigator, so a toast outlives the page that closes as it appears. */}
+              <ToastProvider>
+                <DialogProvider>
+                  {/* Inside the session, so signing out cannot strand somebody behind a lock; above
                   the navigator so no route renders underneath it. */}
-                <AppLockGate>
-                  {/* Before the navigator: its configure call must start ahead of any screen effect
+                  <AppLockGate>
+                    {/* Before the navigator: its configure call must start ahead of any screen effect
                       that talks to the SDK. */}
-                  <PurchasesBridge />
-                  <RootNavigator />
-                </AppLockGate>
-                <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-              </DialogProvider>
+                    <PurchasesBridge />
+                    <RootNavigator />
+                  </AppLockGate>
+                  <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+                </DialogProvider>
+              </ToastProvider>
             </RealtimeProvider>
           </SessionProvider>
         </QueryProvider>

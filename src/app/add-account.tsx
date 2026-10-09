@@ -22,6 +22,7 @@ import {
   useSalarySources,
 } from '@/api/queries';
 import { useConfirm } from '@/providers/dialog-provider';
+import { useToast } from '@/providers/toast-context';
 import { ReminderField } from '@/components/ui/reminder-field';
 import { SelectField } from '@/components/ui/select-field';
 import { SwitchControl } from '@/components/ui/switch-control';
@@ -207,6 +208,7 @@ function AccountForm({
   const updateAccount = useUpdateBankAccount();
   const deleteAccount = useDeleteBankAccount();
   const confirm = useConfirm();
+  const toast = useToast();
 
   const handleDelete = async () => {
     if (!id) return;
@@ -220,6 +222,7 @@ function AccountForm({
 
     try {
       await deleteAccount.mutateAsync(id);
+      toast('toast.account.deleted', 'deleted');
       router.back();
     } catch (thrown) {
       setError({ message: failureMessage(thrown), step });
@@ -291,7 +294,14 @@ function AccountForm({
         last4: last4.length === 4 ? last4 : null,
         color,
         balance: Number(balance) || 0,
-        balance_as_of: balance ? toIsoDate(new Date()) : null,
+        // An edit that leaves the balance alone keeps its day: re-dating it would drop every
+        // charge and pay since.
+        balance_as_of:
+          existing && Number(balance) === Number(existing.balance)
+            ? (existing.balance_as_of ?? null)
+            : balance
+              ? toIsoDate(new Date())
+              : null,
       };
 
       const accountId =
@@ -335,6 +345,7 @@ function AccountForm({
       }
 
       success();
+      toast(editing ? 'toast.account.updated' : 'toast.account.added');
       if (!editing && origin === 'setup') {
         if (router.canGoBack()) router.back();
         else router.replace('/setup');

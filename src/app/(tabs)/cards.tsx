@@ -12,14 +12,7 @@ import { PageState } from '@/components/ui/page-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Screen } from '@/components/ui/screen';
 import { SectionHeading } from '@/components/ui/typography';
-import {
-  savedFor,
-  useBankAccounts,
-  useCards,
-  useSalarySources,
-  useMonthlySavings,
-  useSourceBalances,
-} from '@/api/queries';
+import { useBankAccounts, useCards, useSalarySources, useSourceBalances } from '@/api/queries';
 import { usePro } from '@/api/pro';
 import { useRefreshAll } from '@/api/refresh';
 import { incomeForMonth } from '@/lib/pay';
@@ -78,7 +71,6 @@ export default function CardsScreen() {
   const cards = useCards();
   const accounts = useBankAccounts();
   const salary = useSalarySources();
-  const savings = useMonthlySavings();
   const { balances, isError: balancesError, refetch: refetchBalances } = useSourceBalances(today);
   const { refresh, refreshing } = useRefreshAll();
   const { pro } = usePro();
@@ -96,13 +88,9 @@ export default function CardsScreen() {
     })),
     today,
   );
-  // Finished months added up; an overspent month takes from it. `savedFor` is the same figure the
-  // Savings screen shows (a corrected month counts its correction, a left-out month nothing).
-  const savingsTotal = (savings.data ?? []).reduce((sum, month) => sum + savedFor(month), 0);
-
+  // Savings stands on its own while it is redesigned, so its tile carries no figure.
   const moneyAmounts: Record<string, number> = {
     salary: monthlySalary,
-    savings: savingsTotal,
   };
 
   // A stale balance is worse than none: if any of the seven reads behind `balances` fails, the
@@ -242,7 +230,7 @@ export default function CardsScreen() {
               <AmountTile
                 id={bucket.id}
                 label={BUCKET_LABELS[bucket.id] ? t(BUCKET_LABELS[bucket.id]) : bucket.label}
-                amount={moneyAmounts[bucket.id] ?? 0}
+                amount={moneyAmounts[bucket.id]}
                 artwork={artwork[bucket.artwork]}
                 labels={tileLabels}
                 figures={tileFigures}

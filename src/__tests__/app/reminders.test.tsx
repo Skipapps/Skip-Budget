@@ -140,7 +140,11 @@ describe('Reminders — daily receipts reminder', () => {
 
     expect(mockSetReceiptReminder).toHaveBeenCalledTimes(1);
     // No time sent: turning it on must not overwrite an hour already chosen.
-    expect(mockSetReceiptReminder).toHaveBeenCalledWith({ enabled: true });
+    // The second argument carries the toast that says it worked.
+    expect(mockSetReceiptReminder).toHaveBeenCalledWith(
+      { enabled: true },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 
   it('shows the default 8:00 pm before a time has ever been stored', async () => {

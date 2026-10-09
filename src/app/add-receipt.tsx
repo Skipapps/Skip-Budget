@@ -41,6 +41,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { FieldLabel } from '@/components/ui/typography';
 import { useDialog, useConfirm } from '@/providers/dialog-provider';
+import { useToast } from '@/providers/toast-context';
 import { t, type MessageKey } from '@/i18n';
 import { success, warn } from '@/lib/haptics';
 import { withTap } from '@/lib/press';
@@ -330,6 +331,7 @@ function ReceiptForm({
   const updateReceipt = useUpdateReceipt();
   const deleteReceipt = useDeleteReceipt();
   const confirm = useConfirm();
+  const toast = useToast();
   const ask = useDialog();
   const { pro } = usePro();
   const allowance = useCaptureAllowance();
@@ -571,6 +573,7 @@ function ReceiptForm({
         await createReceipt.mutateAsync(values);
       }
       success();
+      toast(editing ? 'toast.receipt.updated' : 'toast.receipt.added');
       leave();
     } catch (thrown) {
       // The database's Pro wall is an answer for someone the app also thinks is free: show what Pro
@@ -602,6 +605,7 @@ function ReceiptForm({
 
     try {
       await deleteReceipt.mutateAsync(id);
+      toast('toast.receipt.deleted', 'deleted');
       router.back();
     } catch (thrown) {
       setError(failureMessage(thrown));

@@ -157,10 +157,11 @@ export const salaryMessages = defineMessages({
   },
   'salary.paidInto': { en: 'Paid into', es: 'Se deposita en', fr: 'Versée dans' },
   'salary.linkAccountHint': {
-    en: 'Link at least one account so Skip knows where this lands.',
-    es: 'Vincula al menos una cuenta para que Skip sepa a dónde llega.',
-    fr: 'Associe au moins un compte pour que Skip sache où elle arrive.',
+    en: 'Pick the account it lands in, and each payday adds to that account.',
+    es: 'Elige la cuenta donde llega y cada día de pago se sumará a esa cuenta.',
+    fr: 'Choisis le compte où elle arrive, et chaque jour de paie s’y ajoutera.',
   },
+  'salary.noAccount': { en: 'No account', es: 'Ninguna cuenta', fr: 'Aucun compte' },
   'salary.addSource': {
     en: 'Add salary source',
     es: 'Agregar fuente de salario',

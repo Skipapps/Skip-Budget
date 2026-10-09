@@ -3,19 +3,6 @@ import { defineMessages } from '@/i18n/translate';
 export const insightsMessages = defineMessages({
   'insights.title': { en: 'Insights', es: 'Análisis', fr: 'Aperçu' },
 
-  'insights.stand.heading': { en: 'Where you stand', es: 'Tu situación', fr: 'Où tu en es' },
-  'insights.stand.worth': {
-    en: 'Saved, less what you owe',
-    es: 'Lo ahorrado, menos lo que debes',
-    fr: 'Ton épargne, moins ce que tu dois',
-  },
-  'insights.stand.putAside': { en: 'Put aside', es: 'Apartado', fr: 'Mis de côté' },
-  'insights.stand.owedOnCards': {
-    en: 'Owed on credit cards',
-    es: 'Deuda en tarjetas de crédito',
-    fr: 'Dû sur les cartes de crédit',
-  },
-
   'insights.in.heading': { en: 'What comes in', es: 'Lo que entra', fr: 'Ce qui entre' },
   'insights.in.everyMonth': { en: 'Every month', es: 'Cada mes', fr: 'Chaque mois' },
   'insights.in.thisMonth': { en: 'This month', es: 'Este mes', fr: 'Ce mois-ci' },
@@ -83,25 +70,6 @@ export const insightsMessages = defineMessages({
     es: { one: '{count} vez', other: '{count} veces' },
     fr: { one: '{count} fois', other: '{count} fois' },
   },
-
-  'insights.keep.heading': { en: 'What you keep', es: 'Lo que conservas', fr: 'Ce que tu gardes' },
-  'insights.keep.seeEvery': {
-    en: 'See every month',
-    es: 'Ver todos los meses',
-    fr: 'Voir tous les mois',
-  },
-  'insights.keep.everyMonth': { en: 'Every month', es: 'Todos los meses', fr: 'Tous les mois' },
-  'insights.keep.emptyTitle': {
-    en: 'No finished months yet',
-    es: 'Aún no hay meses terminados',
-    fr: 'Aucun mois terminé pour l’instant',
-  },
-  'insights.keep.emptyMessage': {
-    en: 'When a month ends, whatever is left of it is added to your savings and shows up here.',
-    es: 'Cuando termina un mes, lo que sobra se suma a tus ahorros y aparece aquí.',
-    fr: 'À la fin d’un mois, ce qu’il en reste s’ajoute à ton épargne et s’affiche ici.',
-  },
-  'insights.keep.seeSavings': { en: 'See savings', es: 'Ver ahorros', fr: 'Voir l’épargne' },
 
   'insights.owe.heading': { en: 'What you owe', es: 'Lo que debes', fr: 'Ce que tu dois' },
 

@@ -99,6 +99,41 @@ export const apiMessages = defineMessages({
     fr: 'Indique ce que ça coûte.',
   },
 
+  'api.pastPay.title': {
+    en: 'Change past pay too?',
+    es: '¿Cambiar también los pagos anteriores?',
+    fr: 'Modifier aussi les paies passées ?',
+  },
+  'api.pastPay.paid': {
+    en: {
+      one: '{name} has already paid you once. Change that pay as well, or only the pay still to come?',
+      other:
+        '{name} has already paid you {count} times. Change those as well, or only the pay still to come?',
+    },
+    es: {
+      one: '{name} ya te pagó una vez. ¿Cambiar también ese pago o solo los próximos?',
+      other: '{name} ya te pagó {count} veces. ¿Cambiarlos también o solo los próximos?',
+    },
+    fr: {
+      one: '{name} t’a déjà payé une fois. Modifier aussi cette paie, ou seulement celles à venir ?',
+      other: '{name} t’a déjà payé {count} fois. Les modifier aussi, ou seulement celles à venir ?',
+    },
+  },
+  'api.pastPay.maybe': {
+    en: '{name} may already have paid you. Change that pay as well, or only the pay still to come?',
+    es: 'Puede que {name} ya te haya pagado. ¿Cambiar también esos pagos o solo los próximos?',
+    fr: '{name} t’a peut-être déjà payé. Modifier aussi ces paies, ou seulement celles à venir ?',
+  },
+  'api.pastPay.all': {
+    en: 'Past and upcoming',
+    es: 'Anteriores y próximos',
+    fr: 'Passées et à venir',
+  },
+  'api.pastPay.upcoming': {
+    en: 'Upcoming only',
+    es: 'Solo los próximos',
+    fr: 'Seulement celles à venir',
+  },
   'api.pastCharges.title': {
     en: 'Change past charges too?',
     es: '¿Cambiar también los cargos anteriores?',

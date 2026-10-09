@@ -16,6 +16,7 @@ import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { amortise, type AccrualBasis } from '@/lib/loan';
 import { failureMessage } from '@/lib/failure';
+import { useToast } from '@/providers/toast-context';
 
 /** Only the app's own conventions get through a hand-edited link. */
 const BASES: readonly AccrualBasis[] = ['actual/365', 'actual/360', '30/360', 'monthly'];
@@ -64,6 +65,7 @@ export default function SaveLoanScreen() {
 
   const { sources } = usePaymentSources();
   const saveLoan = useSaveLoan();
+  const toast = useToast();
 
   const handleSave = async () => {
     setError(null);
@@ -94,6 +96,7 @@ export default function SaveLoanScreen() {
         cardId: chosen?.kind === 'card' ? chosen.id : null,
         bankAccountId: chosen?.kind === 'account' ? chosen.id : null,
       });
+      toast('toast.loan.saved');
       // Back past the calculator to the bills list.
       router.dismissTo('/bills');
     } catch (thrown) {

@@ -1,15 +1,25 @@
 import { fireEvent, render, within } from '@testing-library/react-native';
-import { StyleSheet, type StyleProp, type TextStyle } from 'react-native';
+import type { ReactTestRendererJSON } from 'react-test-renderer';
 
 import InsightsScreen from '@/app/insights';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
- * "What you keep" shows the three most recent months whatever order the query returns them in: the
- * fixture hands the same six months over in three orders and pins the answer.
+ * Insights holds no Savings figure and no way into Savings. The queries mock below has no savings
+ * read, as the real module has none, so a page that asked for one would crash on an undefined hook.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
+
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({
+  router: {
+    push: (path: string) => mockPush(path),
+    back: jest.fn(),
+    replace: jest.fn(),
+    canGoBack: () => true,
+  },
+}));
 
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
@@ -44,37 +54,10 @@ jest.mock('@/api/refresh', () => ({
   useRefreshAll: () => ({ refresh: () => {}, refreshing: false }),
 }));
 
-/** Six finished months, oldest to newest, with a distinct figure each. */
-const mockMonths = [
-  { month: '2026-03-01', saved: 300 },
-  { month: '2026-04-01', saved: 400 },
-  { month: '2026-05-01', saved: 500 },
-  { month: '2026-06-01', saved: 600 },
-  { month: '2026-07-01', saved: 700 },
-  { month: '2026-08-01', saved: 800 },
-].map((row) => ({
-  ...row,
-  income: 4000,
-  spent: 4000 - row.saved,
-  adjusted_saved: null,
-  note: null,
-  excluded_at: null,
-}));
-
 /** Every read the page waits on before it shows a figure. */
-const SOURCES = [
-  'ledger',
-  'cards',
-  'salary',
-  'savings',
-  'subscriptions',
-  'categories',
-  'balances',
-] as const;
+const SOURCES = ['ledger', 'cards', 'salary', 'subscriptions', 'categories', 'balances'] as const;
 type Source = (typeof SOURCES)[number];
 
-/** Reassigned per case so the same six months arrive in a different order. */
-let mockSavings = [...mockMonths];
 let mockCards: { id: string; holder: string; last4: string; balance: number }[] = [];
 let mockBalances = new Map<string, number>();
 let mockFailing: Source | null = null;
@@ -86,6 +69,7 @@ const mockRefetch = Object.fromEntries(SOURCES.map((source) => [source, jest.fn(
 >;
 
 let mockSalary: unknown[] = [];
+let mockSubscriptions: object[] = [];
 
 const mockAnswer = (source: Source, data: unknown) => ({
   data,
@@ -94,11 +78,6 @@ const mockAnswer = (source: Source, data: unknown) => ({
 });
 
 jest.mock('@/api/queries', () => ({
-  savedFor: (month: {
-    excluded_at: string | null;
-    adjusted_saved: number | null;
-    saved: number;
-  }) => (month.excluded_at ? 0 : Number(month.adjusted_saved ?? month.saved)),
   useLedger: () => ({
     entries: mockEntries,
     totals: { in: 0, out: 0 },
@@ -108,8 +87,7 @@ jest.mock('@/api/queries', () => ({
   }),
   useCards: () => mockAnswer('cards', mockCards),
   useSalarySources: () => mockAnswer('salary', mockSalary),
-  useMonthlySavings: () => mockAnswer('savings', mockSavings),
-  useSubscriptions: () => mockAnswer('subscriptions', []),
+  useSubscriptions: () => mockAnswer('subscriptions', mockSubscriptions),
   useSourceBalances: () => ({
     balances: mockBalances,
     isError: mockFailing === 'balances',
@@ -119,22 +97,15 @@ jest.mock('@/api/queries', () => ({
 
 beforeEach(() => {
   mockSalary = [];
-  mockSavings = [...mockMonths];
+  mockSubscriptions = [];
   mockCards = [];
   mockBalances = new Map();
   mockFailing = null;
   mockEntries = [];
   mockBrandMark.mockClear();
+  mockPush.mockClear();
   for (const refetch of Object.values(mockRefetch)) refetch.mockClear();
 });
-
-/** The figures drawn in the mocked money-out colour, in page order. */
-const redFigures = (nodes: { props: { style?: unknown; children?: unknown } }[]) =>
-  nodes
-    .filter(
-      (node) => StyleSheet.flatten(node.props.style as StyleProp<TextStyle>)?.color === '#B85040',
-    )
-    .map((node) => node.props.children);
 
 type Node = { parent: Node | null; props: { testID?: string } };
 
@@ -145,34 +116,33 @@ function boxOf(node: Node): Node | null {
   return box;
 }
 
-/** The three newest of the six, oldest of those three first. */
-const EXPECTED = ['June 2026', 'July 2026', 'August 2026'];
+type Tree = ReactTestRendererJSON | ReactTestRendererJSON[] | string | null;
 
-describe('Insights — what you keep', () => {
-  it.each([
-    ['newest first, as the query returns them', [...mockMonths].reverse()],
-    ['oldest first, as the savings screen renders them', [...mockMonths]],
-    [
-      'shuffled',
-      [mockMonths[2], mockMonths[5], mockMonths[0], mockMonths[4], mockMonths[1], mockMonths[3]],
-    ],
-  ])('shows the three most recent months when the list arrives %s', async (_label, order) => {
-    mockSavings = order;
+/** Every line a person can see or hear: text, labels, hints and placeholders. */
+function shownText(node: Tree): string[] {
+  if (node === null) return [];
+  if (typeof node === 'string') return [node];
+  if (Array.isArray(node)) return node.flatMap(shownText);
+  const props = node.props ?? {};
+  const spoken = ['accessibilityLabel', 'aria-label', 'accessibilityHint', 'placeholder'].flatMap(
+    (name) => (typeof props[name] === 'string' ? [props[name] as string] : []),
+  );
+  return [...spoken, ...(node.children ?? []).flatMap((child) => shownText(child as Tree))];
+}
 
-    const { getAllByText } = await render(<InsightsScreen />);
-
-    const shown = getAllByText(
-      /^(January|February|March|April|May|June|July|August|September|October|November|December) 2026$/,
-    ).map((node) => node.props.children);
-
-    expect(shown).toEqual(EXPECTED);
-  });
+const spend = (id: string, label: string, over: object = {}) => ({
+  id,
+  label,
+  amount: -10,
+  date: '2026-10-01',
+  kind: 'receipt',
+  sourceId: 'card-1',
+  domain: null,
+  ...over,
 });
 
-describe('Insights — where you stand', () => {
-  it('is savings less credit card debt, to the cent', async () => {
-    // By hand: 300 + 400 + 500 + 600 + 700 + 800 = 3,300.00 put aside; 1,234.56 + 0.07 = 1,234.63
-    // owed; 3,300.00 − 1,234.63 = 2,065.37. A card balance is debt, so owed is positive.
+describe('Insights — what you owe', () => {
+  it('draws each card’s debt to the cent: the walked balance wins, the typed one stands otherwise', async () => {
     mockCards = [
       // The walked balance must win over the figure typed when the card was added.
       { id: 'card-a', holder: 'Chase Sapphire', last4: '1004', balance: 1200 },
@@ -181,57 +151,153 @@ describe('Insights — where you stand', () => {
     ];
     mockBalances = new Map([['card-a', 1234.56]]);
 
-    const { getByText } = await render(<InsightsScreen />);
+    const { getByText, queryByText } = await render(<InsightsScreen />);
 
-    // A figure is pinned to its own label by sharing a box with it, so a total cannot pass by
+    expect(getByText('What you owe')).toBeTruthy();
+    // A figure is pinned to its own label by sharing a box with it, so a debt cannot pass by
     // turning up somewhere else on the page.
     const beside = (label: string, figure: string) =>
       expect(boxOf(getByText(figure))).toBe(boxOf(getByText(label)));
 
-    beside('Saved, less what you owe', '$2,065.37');
-    beside('Put aside', '$3,300.00');
-    beside('Owed on credit cards', '$1,234.63');
     beside('Chase Sapphire 1004', '$1,234.56');
     beside('Amex Gold 2002', '$0.07');
+    expect(queryByText('$1,200.00')).toBeNull();
   });
 
-  it('a net worth that rounds to $0.00 is not drawn as a debt', async () => {
-    // 0.1 + 0.2 is 0.30000000000000004, so 0.30 saved less these two cards is -5.55e-17: $0.00 on
-    // screen, yet below zero to a raw comparison.
-    mockSavings = [{ ...mockMonths[0], saved: 0.3, spent: 3999.7 }];
-    mockCards = [
-      { id: 'card-a', holder: 'Chase Sapphire', last4: '1004', balance: 0.1 },
-      { id: 'card-b', holder: 'Amex Gold', last4: '2002', balance: 0.2 },
+  it('is left out while there is no card', async () => {
+    const { getByText, queryByText, queryByTestId } = await render(<InsightsScreen />);
+
+    // The page drew, so the missing section is not just an empty screen.
+    expect(getByText('What comes in')).toBeTruthy();
+    expect(queryByText('What you owe')).toBeNull();
+    expect(queryByTestId('insights-cards')).toBeNull();
+  });
+});
+
+describe('Insights — Savings is not part of this page', () => {
+  /** What the page used to say in its "Where you stand" section. */
+  const STAND = [
+    'Where you stand',
+    'Saved, less what you owe',
+    'Put aside',
+    'Owed on credit cards',
+  ];
+  /** What the page used to say in its "What you keep" section, empty state included. */
+  const KEEP = [
+    'What you keep',
+    'See every month',
+    'No finished months yet',
+    'When a month ends',
+    'See savings',
+  ];
+  const MONTH_AND_YEAR =
+    /\b(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\b/;
+
+  // Every remaining section has something to draw, so an absence below is not an empty page.
+  function fillThePage() {
+    mockSalary = [
+      { id: 'pay', name: 'Acme', amount: 3000, frequency: 'monthly', last_payday: '2026-01-01' },
     ];
+    mockEntries = [spend('o1', 'Oxxo', { amount: -12.34 }), spend('o2', 'Oxxo', { amount: -5 })];
+    mockCards = [
+      { id: 'card-a', holder: 'Chase Sapphire', last4: '1004', balance: 1200 },
+      { id: 'card-b', holder: 'Amex Gold', last4: '2002', balance: 0.07 },
+    ];
+    mockBalances = new Map([['card-a', 1234.56]]);
+    mockSubscriptions = [{ id: 's1', amount: 15.99, active: true }];
+  }
 
-    const dust = await render(<InsightsScreen />);
+  it('still draws every other section', async () => {
+    fillThePage();
+    const screen = await render(<InsightsScreen />);
 
-    const label = dust.getByText('Saved, less what you owe');
-    expect(dust.getAllByText('$0.00').some((node) => boxOf(node) === boxOf(label))).toBe(true);
-    // The card debt is the only red figure; finding it proves the colour can be seen here, so the
-    // headline missing from the list is a real answer.
-    expect(redFigures(dust.getAllByText(/\$/))).toEqual(['$0.30']);
-    await dust.unmount();
-
-    // One cent more on a card is a real debt, so a rule that never colours the headline fails here.
-    mockCards = [mockCards[0], { ...mockCards[1], balance: 0.21 }];
-    const cent = await render(<InsightsScreen />);
-    expect(redFigures(cent.getAllByText(/\$/))).toEqual(['-$0.01', '$0.31']);
+    for (const heading of [
+      'What comes in',
+      'What goes out',
+      'Where it goes',
+      'Where you spend most',
+      'What you owe',
+      'Coming up',
+    ]) {
+      expect({ heading, drawn: screen.queryByText(heading) !== null }).toEqual({
+        heading,
+        drawn: true,
+      });
+    }
   });
 
+  it('has no Where you stand card, and no total made from the cards', async () => {
+    fillThePage();
+    const screen = await render(<InsightsScreen />);
+
+    expect(
+      shownText(screen.toJSON()).filter((line) => STAND.some((w) => line.includes(w))),
+    ).toEqual([]);
+    expect(screen.queryByTestId('insights-stand')).toBeNull();
+    // 1,234.56 + 0.07: the old "Owed on credit cards" figure. Each card's own debt stays.
+    expect(screen.queryByText('$1,234.63')).toBeNull();
+    expect(screen.getByText('$1,234.56')).toBeTruthy();
+    expect(screen.getByText('$0.07')).toBeTruthy();
+  });
+
+  it('has no What you keep section: no months, no empty state, no links', async () => {
+    fillThePage();
+    const screen = await render(<InsightsScreen />);
+    const lines = shownText(screen.toJSON());
+
+    expect(lines.filter((line) => KEEP.some((words) => line.includes(words)))).toEqual([]);
+    expect(lines.filter((line) => MONTH_AND_YEAR.test(line))).toEqual([]);
+    // The one "Every month" left is the pay card's; the other was the link under What you keep.
+    expect(screen.getAllByText('Every month')).toHaveLength(1);
+    expect(within(screen.getByTestId('insights-income')).getByText('Every month')).toBeTruthy();
+  });
+
+  it('says nothing about savings at all', async () => {
+    fillThePage();
+    const screen = await render(<InsightsScreen />);
+
+    expect(shownText(screen.toJSON()).filter((line) => /savings?/i.test(line))).toEqual([]);
+  });
+
+  it('offers no way into Savings from any button', async () => {
+    fillThePage();
+    // With no pay the page shows its "Set up payday" button as well as the subscriptions row: each
+    // goes to a page of its own, and nothing else may go anywhere.
+    mockSalary = [];
+    const screen = await render(<InsightsScreen />);
+
+    for (const button of screen.getAllByRole('button')) await fireEvent.press(button);
+
+    const pushed = mockPush.mock.calls.map(([path]) => path);
+    expect(pushed).toEqual(expect.arrayContaining(['/salary', '/subscriptions']));
+    expect(pushed.filter((path) => /savings/.test(path))).toEqual([]);
+  });
+});
+
+describe('Insights — the whole page', () => {
   it('says nothing about friends or groups', async () => {
-    const { getByText, queryAllByText, queryAllByLabelText } = await render(<InsightsScreen />);
+    const screen = await render(<InsightsScreen />);
 
-    // The page drew its figures, so the absences below are not just an empty screen.
-    expect(getByText('Saved, less what you owe')).toBeTruthy();
+    // The page drew its sections, so the absences below are not just an empty screen.
+    expect(screen.getByText('What comes in')).toBeTruthy();
 
-    expect(queryAllByText(/friend/i)).toEqual([]);
-    expect(queryAllByText(/\bgroups?\b/i)).toEqual([]);
-    expect(queryAllByText(/shared with others|settled up/i)).toEqual([]);
-    expect(queryAllByLabelText(/friend|\bgroups?\b|settled up/i)).toEqual([]);
+    // Lines of text rather than elements: a failing comparison prints the words, and an element
+    // cannot be printed.
+    const lines = shownText(screen.toJSON());
+    expect(lines.filter((line) => /friend/i.test(line))).toEqual([]);
+    expect(lines.filter((line) => /\bgroups?\b/i.test(line))).toEqual([]);
+    expect(lines.filter((line) => /shared with others|settled up/i.test(line))).toEqual([]);
   });
 
   it('shows the failure page, and asks every source again, when any one source fails', async () => {
+    mockCards = [{ id: 'card-a', holder: 'Chase Sapphire', last4: '1004', balance: 1234.56 }];
+    const DRAWN = ['What comes in', 'What you owe', '$1,234.56'];
+
+    // Without a failure all three are on the page, so their absence below is the failure's doing.
+    const working = await render(<InsightsScreen />);
+    expect(DRAWN.filter((words) => working.queryByText(words) !== null)).toEqual(DRAWN);
+    await working.unmount();
+
     for (const source of SOURCES) {
       mockFailing = source;
       for (const refetch of Object.values(mockRefetch)) refetch.mockClear();
@@ -242,8 +308,8 @@ describe('Insights — where you stand', () => {
       expect({
         source,
         failure: queryByText(FAILURE_MESSAGE) !== null,
-        figures: queryByText('Saved, less what you owe') !== null,
-      }).toEqual({ source, failure: true, figures: false });
+        drawn: DRAWN.filter((words) => queryByText(words) !== null),
+      }).toEqual({ source, failure: true, drawn: [] });
 
       await fireEvent.press(getByText('Try again'));
       expect({
@@ -257,17 +323,6 @@ describe('Insights — where you stand', () => {
 });
 
 describe('Insights — where you spend most', () => {
-  const spend = (id: string, label: string, over: object = {}) => ({
-    id,
-    label,
-    amount: -10,
-    date: '2026-10-01',
-    kind: 'receipt',
-    sourceId: 'card-1',
-    domain: null,
-    ...over,
-  });
-
   it('keeps letters for a store only when every row of it chose letters and none has a logo', async () => {
     mockEntries = [
       spend('n1', 'Netflix', { kind: 'subscription', logoHidden: true }),
@@ -342,8 +397,11 @@ describe('Insights — at large text sizes', () => {
   });
 
   it('prints each headline figure whole, with its cents, never shrunk on its own by iOS', async () => {
+    mockSalary = [
+      { id: 'pay', name: 'Acme', amount: 3456.78, frequency: 'monthly', last_payday: '2026-01-01' },
+    ];
     const screen = await render(<InsightsScreen />);
-    for (const id of ['worth', 'out']) {
+    for (const id of ['income', 'out']) {
       // The figure drawn in its slot, ahead of the hidden copy that measures it.
       const node = shownIn(screen, `fit-slot-${id}`);
       expect(node.props.children).toMatch(/\.\d{2}$/);
@@ -351,19 +409,29 @@ describe('Insights — at large text sizes', () => {
       expect(node.props.adjustsFontSizeToFit).toBeUndefined();
       expect(node.props.maxFontSizeMultiplier).toBe(1.2);
     }
+    expect(shownIn(screen, 'fit-slot-income').props.children).toBe('$3,456.78');
   });
 
-  it('moves both Where you stand figures under their labels once one label cannot fit', async () => {
+  it('moves every What you owe figure under its label once one label cannot fit', async () => {
+    mockCards = [
+      ...mockCards,
+      { id: 'card-b', holder: 'Amex Gold', last4: '2002', balance: 87.65 },
+    ];
     const screen = await render(<InsightsScreen />);
-    await layOutCard(screen, 'insights-stand', ['aside', 'owed'], undefined);
-    expect([beside(screen, 'aside'), beside(screen, 'owed')]).toEqual([true, true]);
+    await layOutCard(screen, 'insights-cards', ['card-a', 'card-b']);
+    expect([beside(screen, 'card-a'), beside(screen, 'card-b')]).toEqual([true, true]);
 
-    await layOutCard(screen, 'insights-stand', ['aside', 'owed'], 'owed');
-    expect([beside(screen, 'aside'), beside(screen, 'owed')]).toEqual([false, false]);
+    await layOutCard(screen, 'insights-cards', ['card-a', 'card-b'], 'card-b');
+    expect([beside(screen, 'card-a'), beside(screen, 'card-b')]).toEqual([false, false]);
     // Still pinned to its own label, and still to the cent.
-    const row = screen.getByTestId('fit-slot-owed-label').parent;
-    expect(screen.getByTestId('fit-slot-owed-value').parent).toBe(row);
-    expect(shownIn(screen, 'fit-slot-owed-value').props.children).toBe('$1,234.56');
+    for (const [id, figure] of [
+      ['card-a', '$1,234.56'],
+      ['card-b', '$87.65'],
+    ]) {
+      const row = screen.getByTestId(`fit-slot-${id}-label`).parent;
+      expect(screen.getByTestId(`fit-slot-${id}-value`).parent).toBe(row);
+      expect(shownIn(screen, `fit-slot-${id}-value`).props.children).toBe(figure);
+    }
   });
 
   it('wraps a long store name and moves every figure in that card under its name together', async () => {

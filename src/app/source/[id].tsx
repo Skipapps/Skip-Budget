@@ -4,7 +4,7 @@ import { Fragment, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
-import { useCreatePayment, useDeletePayment } from '@/api/mutations';
+import { useDeletePayment } from '@/api/mutations';
 import { useHistoryFloor } from '@/api/history';
 import { useSourceLedger } from '@/api/queries';
 import { AccountCard } from '@/components/cards/account-card';
@@ -15,13 +15,13 @@ import {
   countActiveFilters,
   type LedgerFilters,
 } from '@/components/transactions/filter-sheet';
-import { AmountPad } from '@/components/ui/amount-pad';
 import { FitRows, FitText, useGroupFits } from '@/components/ui/fit-group';
 import { HistoryNotice } from '@/components/pro/history-notice';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { useConfirm } from '@/providers/dialog-provider';
+import { useToast } from '@/providers/toast-context';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { SectionHeading } from '@/components/ui/typography';
 import { t, type MessageKey } from '@/i18n';
@@ -30,7 +30,7 @@ import { sortByDateAscending } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
-import { failureMessage, failureText } from '@/lib/failure';
+import { failureText } from '@/lib/failure';
 import { TEXT_CAP } from '@/theme/text-scale';
 
 const KIND_KEYS: Record<string, MessageKey> = {
@@ -38,6 +38,7 @@ const KIND_KEYS: Record<string, MessageKey> = {
   bill: 'accounts.source.kind.bill',
   subscription: 'accounts.source.kind.subscription',
   payment: 'accounts.source.kind.payment',
+  income: 'accounts.source.kind.income',
 };
 
 function kindLabel(kind: string): string {
@@ -47,10 +48,25 @@ function kindLabel(kind: string): string {
 /** The ledger names a payment with no note "Payment" in English; that name is drawn translated. */
 const UNNAMED_PAYMENT = 'Payment';
 
-function entryLabel(entry: { kind: string; label: string }): string {
-  return entry.kind === 'payment' && entry.label === UNNAMED_PAYMENT
-    ? t('accounts.source.kind.payment')
-    : entry.label;
+/** A payment's own note if it has one; else, for a move, the other side it came from or went to. */
+function entryLabel(entry: {
+  kind: string;
+  label: string;
+  amount: number;
+  counterpart?: string | null;
+}): string {
+  if (entry.kind !== 'payment' || entry.label !== UNNAMED_PAYMENT) return entry.label;
+  if (entry.counterpart) {
+    return entry.amount < 0
+      ? t('accounts.source.toSource', { name: entry.counterpart })
+      : t('accounts.source.fromSource', { name: entry.counterpart });
+  }
+  return t('accounts.source.kind.payment');
+}
+
+/** Money sent out of an account is a payment row too, but it is not money in, so it filters apart. */
+function filterKind(entry: { kind: string; amount: number }): string {
+  return entry.kind === 'payment' && entry.amount < 0 ? 'sent' : entry.kind;
 }
 
 export default function SourceDetailScreen() {
@@ -61,12 +77,9 @@ export default function SourceDetailScreen() {
   const today = toIsoDate(new Date());
 
   const { source, kind, card, account, ledger, isLoading, isError } = useSourceLedger(id, today);
-  const createPayment = useCreatePayment();
   const deletePayment = useDeletePayment();
   const confirm = useConfirm();
-
-  const [padOpen, setPadOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   // Above the loading guards so the hook order never changes.
   const { floor, free } = useHistoryFloor();
@@ -100,7 +113,7 @@ export default function SourceDetailScreen() {
   const isCard = kind === 'card';
   const name = isCard ? card!.holder : account!.nickname || account!.bank_name;
 
-  // Oldest day first. `ledgerForSource` sorts newest-first for its balance arithmetic, so the
+  // Oldest day first. The money book sorts newest-first for its balance arithmetic, so the
   // display order is set here. Only the list stops at the plan's window (90 days on free); the
   // balance above walked every entry.
   const entries = sortByDateAscending(
@@ -114,7 +127,7 @@ export default function SourceDetailScreen() {
     (entry) =>
       matchesSearch(entryLabel(entry), query) &&
       (!filters.date || entry.date === filters.date) &&
-      (filters.kinds.length === 0 || filters.kinds.includes(entry.kind)),
+      (filters.kinds.length === 0 || filters.kinds.includes(filterKind(entry))),
   );
   const activeCount = countActiveFilters(filters);
   const narrowed = query.trim().length > 0 || activeCount > 0;
@@ -127,39 +140,33 @@ export default function SourceDetailScreen() {
       value: 'payment',
       label: isCard ? t('accounts.source.payments') : t('accounts.source.moneyIn'),
     },
+    ...(isCard
+      ? []
+      : [
+          { value: 'sent', label: t('accounts.source.moneySent') },
+          { value: 'income', label: t('accounts.source.kind.income') },
+        ]),
   ];
 
-  const handlePay = async (amount: string) => {
-    const value = Number(amount);
-    setPadOpen(false);
-    if (!Number.isFinite(value) || value <= 0) return;
-
-    setError(null);
-    try {
-      await createPayment.mutateAsync({
-        card_id: isCard ? source.id : null,
-        bank_account_id: isCard ? null : source.id,
-        amount: value,
-        paid_on: today,
-        note: null,
-      });
-    } catch (thrown) {
-      setError(failureMessage(thrown));
-    }
-  };
-
   /** Only payments can be removed here; a charge is edited where it lives. */
-  const handleRemovePayment = async (entryId: string, label: string) => {
+  const handleRemovePayment = async (entryId: string, label: string, amount: number) => {
+    // Money that came into an account leaves it again; anything else removed (a card payment, money
+    // sent out of an account) puts the balance back up.
+    const lowers = !isCard && amount > 0;
     const ok = await confirm({
       title:
         label === UNNAMED_PAYMENT
           ? t('accounts.source.removePaymentTitle')
           : t('accounts.source.removeNamedTitle', { label: label.toLowerCase() }),
-      message: t('accounts.source.removeMessage'),
+      message: lowers ? t('accounts.source.removeMessageDown') : t('accounts.source.removeMessage'),
       confirmLabel: t('common.remove'),
       destructive: true,
     });
-    if (ok) deletePayment.mutate(entryId.replace(/^payment-/, ''));
+    // Either side of a move is the same payment row.
+    if (!ok) return;
+    deletePayment.mutate(entryId.replace(/^payment-/, '').replace(/:out$/, ''), {
+      onSuccess: () => toast('toast.payment.deleted', 'deleted'),
+    });
   };
 
   return (
@@ -181,7 +188,7 @@ export default function SourceDetailScreen() {
           accessibilityLabel={
             isCard ? t('accounts.source.makePayment') : t('accounts.source.addDeposit')
           }
-          onPress={() => setPadOpen(true)}
+          onPress={() => router.push({ pathname: '/source-payment', params: { id: source.id } })}
           className="min-h-14 flex-row items-center gap-2 rounded-full bg-control px-5 py-3 active:opacity-80"
         >
           <Plus size={20} color={colors.onControl} strokeWidth={2} />
@@ -239,7 +246,8 @@ export default function SourceDetailScreen() {
         />
         <SummaryLine
           id="charged"
-          label={isCard ? t('accounts.source.chargedSince') : t('accounts.source.spentSince')}
+          // An account's money out is spending and money it sent to a card or another account.
+          label={isCard ? t('accounts.source.chargedSince') : t('accounts.source.moneyOut')}
           value={formatCurrency(-ledger.charged)}
         />
         <SummaryLine
@@ -255,15 +263,6 @@ export default function SourceDetailScreen() {
           strong
         />
       </FitRows>
-
-      {error ? (
-        <Text
-          className="mt-4 w-full text-center font-app text-[13px] text-danger"
-          maxFontSizeMultiplier={TEXT_CAP.reading}
-        >
-          {error}
-        </Text>
-      ) : null}
 
       <View className="mt-8 w-full">
         <SectionHeading>{t('transactions.title')}</SectionHeading>
@@ -339,7 +338,7 @@ export default function SourceDetailScreen() {
                 iconId={entry.iconId}
                 onPress={
                   entry.kind === 'payment'
-                    ? () => handleRemovePayment(entry.id, entry.label)
+                    ? () => handleRemovePayment(entry.id, entry.label, entry.amount)
                     : undefined
                 }
               />
@@ -347,16 +346,6 @@ export default function SourceDetailScreen() {
           ))}
         </View>
       )}
-
-      {padOpen ? (
-        <AmountPad
-          title={isCard ? t('accounts.source.kind.payment') : t('accounts.source.moneyIn')}
-          caption={name}
-          value=""
-          onCancel={() => setPadOpen(false)}
-          onConfirm={handlePay}
-        />
-      ) : null}
 
       {filterOpen ? (
         <FilterSheet

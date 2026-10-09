@@ -5,7 +5,7 @@ import type { SetupStep } from '@/api/onboarding';
 import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
 
 /**
- * Home with its real cards, read in Spanish and in French: the headline figure and its labels,
+ * Home with its real cards, read in Spanish and in French: the current balance and its labels,
  * Quick add, Where it goes, Go further, the day stepper, and the Recent and Coming up rows.
  */
 
@@ -76,7 +76,7 @@ jest.mock('@/api/onboarding', () => ({
   }),
 }));
 
-/** A Thursday in a 30-day month: 20 days left after it. */
+/** A Thursday. */
 const TODAY = '2026-09-10';
 
 const mockEntries = [
@@ -93,6 +93,7 @@ const mockEntries = [
 ].map((row) => ({ ...row, sourceId: 's1' }));
 
 let mockFailed = false;
+let mockBalanceFailed = false;
 
 jest.mock('@/api/queries', () => ({
   // No name yet, so the header stands in with a greeting.
@@ -102,6 +103,16 @@ jest.mock('@/api/queries', () => ({
     totals: { in: 2000, out: 1051, net: 949, count: 4 },
     isLoading: false,
     isError: mockFailed,
+    refetch: jest.fn(),
+  }),
+  // Nothing like the month's $2,000 in and $1,051 out, so a card fed from the month would not match.
+  // A failed read still hands over its figures; the card is the one that must not show them.
+  useCurrentBalance: () => ({
+    balance: 7707.51,
+    income: 4629.64,
+    expenses: 231.95,
+    isLoading: false,
+    isError: mockBalanceFailed,
     refetch: jest.fn(),
   }),
 }));
@@ -142,6 +153,7 @@ const all = { includeHiddenElements: true };
 beforeEach(() => {
   resetLocaleForTests();
   mockFailed = false;
+  mockBalanceFailed = false;
 });
 afterAll(() => resetLocaleForTests());
 
@@ -155,14 +167,16 @@ describe('Home in Spanish', () => {
     expect(screen.getByLabelText('Agregar una foto de perfil')).toBeTruthy();
     expect(screen.getByLabelText('Notificaciones')).toBeTruthy();
 
-    expect(screen.getByText('Te queda este mes')).toBeTruthy();
-    expect(screen.getByText('Quedan 20 días')).toBeTruthy();
-    expect(screen.getByLabelText('Te queda este mes, $949.00, Quedan 20 días')).toBeTruthy();
-    expect(screen.getByText('Ya se gastó el 53% de los ingresos')).toBeTruthy();
+    expect(screen.getByText('Saldo actual')).toBeTruthy();
+    expect(screen.getByLabelText('Saldo actual, $7,707.51')).toBeTruthy();
+    // No days-left pill, in any wording, and the old monthly heading is gone.
+    expect(screen.queryByText(/Quedan? \d+ días?|Último día|Te queda este mes/)).toBeNull();
+    // 231.95 of 4,629.64 is 5 %: the share of the income counted, not the month's 53 %.
+    expect(screen.getByText('Ya se gastó el 5% de los ingresos')).toBeTruthy();
     expect(screen.getAllByText('Ingresos', all)[0]).toBeTruthy();
     expect(screen.getAllByText('Gastos', all)[0]).toBeTruthy();
-    expect(screen.getByLabelText('Ingresos, $2,000.00')).toBeTruthy();
-    expect(screen.getByLabelText('Gastos, -$1,051.00')).toBeTruthy();
+    expect(screen.getByLabelText('Ingresos, $4,629.64')).toBeTruthy();
+    expect(screen.getByLabelText('Gastos, -$231.95')).toBeTruthy();
 
     expect(screen.getByText('Agregar rápido')).toBeTruthy();
     expect(screen.getAllByText('Suscripción', all)[0]).toBeTruthy();
@@ -206,15 +220,37 @@ describe('Home in Spanish', () => {
     expectNoRawText(screen);
   });
 
-  it('says the one failure line, never a guessed figure, when the month will not load', async () => {
+  it('says the one failure line, never a guessed figure, when nothing will load', async () => {
     mockFailed = true;
+    mockBalanceFailed = true;
     const screen = await render(<HomeScreen />);
 
-    expect(screen.getByLabelText('Te queda este mes, no disponible, Quedan 20 días')).toBeTruthy();
+    expect(screen.getByLabelText('Saldo actual, no disponible')).toBeTruthy();
+    expect(screen.queryByLabelText(/7,707/)).toBeNull();
     expect(screen.getByLabelText('Ingresos, no disponible')).toBeTruthy();
     expect(screen.getByLabelText('Facturas mensuales, importe no disponible')).toBeTruthy();
     expect(screen.getAllByText('Algo salió mal. Inténtalo de nuevo.').length).toBeGreaterThan(1);
     expect(screen.getAllByText('Intentar de nuevo').length).toBeGreaterThan(1);
+    expectNoRawText(screen);
+  });
+
+  it('says only the balance is unavailable when only the balance will not load', async () => {
+    mockBalanceFailed = true;
+    const screen = await render(<HomeScreen />);
+
+    expect(screen.getByLabelText('Saldo actual, no disponible')).toBeTruthy();
+    expect(screen.queryByLabelText(/7,707/)).toBeNull();
+    expect(screen.getByLabelText('Facturas mensuales, -$1,030.00, este mes')).toBeTruthy();
+    expect(screen.queryByLabelText('Facturas mensuales, importe no disponible')).toBeNull();
+    expectNoRawText(screen);
+  });
+
+  it('keeps the balance when only the month will not load', async () => {
+    mockFailed = true;
+    const screen = await render(<HomeScreen />);
+
+    expect(screen.getByLabelText('Saldo actual, $7,707.51')).toBeTruthy();
+    expect(screen.getByLabelText('Facturas mensuales, importe no disponible')).toBeTruthy();
     expectNoRawText(screen);
   });
 });
@@ -229,20 +265,30 @@ describe('Home in French', () => {
     const screen = await render(<HomeScreen />);
 
     expect(screen.getByText('Bienvenue')).toBeTruthy();
-    expect(screen.getByText('Reste ce mois-ci')).toBeTruthy();
-    expect(screen.getByText('20 jours restants')).toBeTruthy();
-    expect(
-      screen.getByLabelText(`Reste ce mois-ci, 949,00${NBSP}$, 20 jours restants`),
-    ).toBeTruthy();
-    expect(screen.getByText(`53${NBSP}% des revenus sont dépensés`)).toBeTruthy();
-    expect(screen.getByLabelText(`Revenus, 2${NBSP}000,00${NBSP}$`)).toBeTruthy();
-    expect(screen.getByLabelText(`Dépenses, -1${NBSP}051,00${NBSP}$`)).toBeTruthy();
+    expect(screen.getByText('Solde actuel')).toBeTruthy();
+    expect(screen.getByLabelText(`Solde actuel, 7${NBSP}707,51${NBSP}$`)).toBeTruthy();
+    expect(screen.queryByText(/jours? restants?|Dernier jour|Reste ce mois-ci/)).toBeNull();
+    expect(screen.getByText(`5${NBSP}% des revenus sont dépensés`)).toBeTruthy();
+    expect(screen.getByLabelText(`Revenus, 4${NBSP}629,64${NBSP}$`)).toBeTruthy();
+    expect(screen.getByLabelText(`Dépenses, -231,95${NBSP}$`)).toBeTruthy();
     expect(screen.getByText('Ajout rapide')).toBeTruthy();
     expect(screen.getAllByText('Reçu', all)[0]).toBeTruthy();
     expect(screen.getByLabelText('Ajouter un abonnement')).toBeTruthy();
     expect(screen.getByText('Premiers pas')).toBeTruthy();
     expect(screen.getByText('1 sur 5 terminées')).toBeTruthy();
     expect(screen.getByLabelText('Masquer le guide Premiers pas')).toBeTruthy();
+    expectNoRawText(screen);
+  });
+
+  it('says the balance is unavailable, never a guessed figure, when it will not load', async () => {
+    mockBalanceFailed = true;
+    const screen = await render(<HomeScreen />);
+
+    expect(screen.getByLabelText('Solde actuel, non disponible')).toBeTruthy();
+    expect(screen.queryByLabelText(/7\D?707/)).toBeNull();
+    expect(screen.getByLabelText('Revenus, non disponible')).toBeTruthy();
+    expect(screen.getByLabelText('Dépenses, non disponible')).toBeTruthy();
+    expect(screen.getAllByText('Une erreur est survenue. Réessaie.').length).toBeGreaterThan(0);
     expectNoRawText(screen);
   });
 

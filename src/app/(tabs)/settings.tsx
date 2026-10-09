@@ -32,6 +32,7 @@ import { SettingsSection } from '@/components/settings/settings-section';
 import { plural, useMoneyCounts, type Counted } from '@/components/settings/use-money-counts';
 import { Screen } from '@/components/ui/screen';
 import { useConfirm, useDialog } from '@/providers/dialog-provider';
+import { useToast } from '@/providers/toast-context';
 import { useColors } from '@/providers/theme-provider';
 import { findAvatar } from '@/theme/avatars';
 import { TextField } from '@/components/ui/text-field';
@@ -85,6 +86,7 @@ export default function SettingsScreen() {
   const proOverride = useProOverride();
   const [offerReset, setOfferReset] = useState<string | null>(null);
   const updateProfile = useUpdateProfile();
+  const toast = useToast();
 
   const receipts = useReceipts();
   const charges = useCharges();
@@ -102,7 +104,12 @@ export default function SettingsScreen() {
     updateProfile.mutate(
       { display_name: displayName.trim() || null },
       // Back to the saved value, so the tick means "stored", not "typed".
-      { onSuccess: () => setDraftName(null) },
+      {
+        onSuccess: () => {
+          setDraftName(null);
+          toast('toast.profile.updated');
+        },
+      },
     );
   };
 

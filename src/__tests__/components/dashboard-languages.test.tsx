@@ -7,7 +7,7 @@ import { DestinationList } from '@/components/dashboard/destination-list';
 import { InsightBanner } from '@/components/dashboard/insight-banner';
 import { QuickActions } from '@/components/dashboard/quick-actions';
 import { ToolCards } from '@/components/dashboard/tool-cards';
-import { resetLocaleForTests, setLanguage } from '@/i18n/store';
+import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
 
 /** Home's cards on their own, in the states Home itself rarely shows, in Spanish and French. */
 
@@ -55,37 +55,58 @@ const ROWS = [
   { id: 'loan-calculator', label: 'Calculadora de préstamos' },
 ];
 
+const NBSP = '\u00a0';
+
 beforeEach(() => resetLocaleForTests());
-afterAll(() => {
-  jest.useRealTimers();
-  resetLocaleForTests();
-});
+afterEach(() => jest.useRealTimers());
+afterAll(() => resetLocaleForTests());
+
+/** The last two days of September 2026, when the card used to say "1 day left" and then "Last day". */
+const END_OF_MONTH = ['2026-09-29T09:00:00', '2026-09-30T09:00:00'];
 
 describe('the dashboard cards in English', () => {
-  it('says one day left in the singular', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-09-29T09:00:00'));
-    const screen = await render(<BalanceSummary leftThisMonth={10} payday={0} expenses={0} />);
-    expect(screen.getByText('1 day left')).toBeTruthy();
-    jest.useRealTimers();
+  it.each(END_OF_MONTH)('names the current balance and no days left, on %s', async (now) => {
+    jest.useFakeTimers().setSystemTime(new Date(now));
+    const screen = await render(<BalanceSummary balance={10} income={0} expenses={0} />);
+
+    expect(screen.getByText('Current balance')).toBeTruthy();
+    expect(screen.getByLabelText('Current balance, $10.00')).toBeTruthy();
+    expect(screen.queryByText(/days? left|Last day|Left this month/)).toBeNull();
   });
 });
 
 describe('the dashboard cards in Spanish', () => {
   beforeEach(() => setLanguage('es'));
 
-  it('counts the days left, one of them singular, and the last day by name', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-09-29T09:00:00'));
-    const oneLeft = await render(<BalanceSummary leftThisMonth={10} payday={0} expenses={0} />);
-    expect(oneLeft.getByText('Queda 1 día')).toBeTruthy();
+  it.each(END_OF_MONTH)('names the saldo actual and no days left, on %s', async (now) => {
+    jest.useFakeTimers().setSystemTime(new Date(now));
+    const screen = await render(<BalanceSummary balance={10} income={0} expenses={0} />);
 
-    jest.setSystemTime(new Date('2026-09-30T09:00:00'));
-    const lastDay = await render(
-      <BalanceSummary leftThisMonth={10} payday={0} expenses={0} loading />,
-    );
-    expect(lastDay.getByText('Último día')).toBeTruthy();
-    expect(lastDay.getByLabelText('Gastos, cargando')).toBeTruthy();
-    expectNoRawText(lastDay);
-    jest.useRealTimers();
+    expect(screen.getByText('Saldo actual')).toBeTruthy();
+    expect(screen.getByLabelText('Saldo actual, $10.00')).toBeTruthy();
+    expect(screen.queryByText(/Queda|Quedan|Último día|Te queda este mes/)).toBeNull();
+    expectNoRawText(screen);
+  });
+
+  it('reads the stats as loading, and the share of the income spent', async () => {
+    const loading = await render(<BalanceSummary balance={10} income={0} expenses={0} loading />);
+    expect(loading.getByText('Saldo actual')).toBeTruthy();
+    expect(loading.getByLabelText('Ingresos, cargando')).toBeTruthy();
+    expect(loading.getByLabelText('Gastos, cargando')).toBeTruthy();
+    expectNoRawText(loading);
+
+    const spent = await render(<BalanceSummary balance={750} income={1000} expenses={250} />);
+    expect(spent.getByText('Ya se gastó el 25% de los ingresos')).toBeTruthy();
+    expectNoRawText(spent);
+  });
+
+  it('says the balance is unavailable when a part would not load', async () => {
+    const screen = await render(<BalanceSummary balance={10} income={1000} expenses={0} error />);
+
+    expect(screen.getByLabelText('Saldo actual, no disponible')).toBeTruthy();
+    expect(screen.getByLabelText('Gastos, no disponible')).toBeTruthy();
+    expect(screen.queryByLabelText(/\$10\.00/)).toBeNull();
+    expectNoRawText(screen);
   });
 
   it('reads the header for a picture already chosen and news unread', async () => {
@@ -142,19 +163,35 @@ describe('the dashboard cards in Spanish', () => {
 });
 
 describe('the dashboard cards in French', () => {
-  beforeEach(() => setLanguage('fr'));
+  beforeEach(() => {
+    setLanguage('fr');
+    setCurrency('CAD');
+  });
 
-  it('counts the days left, with French singular for one', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-09-29T09:00:00'));
-    const screen = await render(
-      <BalanceSummary leftThisMonth={10} payday={0} expenses={0} error />,
-    );
-    expect(screen.getByText('1 jour restant')).toBeTruthy();
-    expect(screen.getByLabelText('Reste ce mois-ci, non disponible, 1 jour restant')).toBeTruthy();
+  it.each(END_OF_MONTH)('names the solde actuel and no days left, on %s', async (now) => {
+    jest.useFakeTimers().setSystemTime(new Date(now));
+    const screen = await render(<BalanceSummary balance={10} income={0} expenses={0} />);
+
+    expect(screen.getByText('Solde actuel')).toBeTruthy();
+    expect(screen.getByLabelText(`Solde actuel, 10,00${NBSP}$`)).toBeTruthy();
+    expect(screen.queryByText(/restants?|Dernier jour|Reste ce mois-ci/)).toBeNull();
+    expectNoRawText(screen);
+  });
+
+  it('reads the share of the income spent with a non-breaking space before the sign', async () => {
+    const screen = await render(<BalanceSummary balance={750} income={1000} expenses={250} />);
+    expect(screen.getByText(`25${NBSP}% des revenus sont dépensés`)).toBeTruthy();
+    expectNoRawText(screen);
+  });
+
+  it('says the balance is unavailable, with the one failure line, when a part would not load', async () => {
+    const screen = await render(<BalanceSummary balance={10} income={1000} expenses={0} error />);
+
+    expect(screen.getByLabelText('Solde actuel, non disponible')).toBeTruthy();
     expect(screen.getByLabelText('Revenus, non disponible')).toBeTruthy();
+    expect(screen.getByLabelText('Dépenses, non disponible')).toBeTruthy();
     expect(screen.getByText('Une erreur est survenue. Réessaie.')).toBeTruthy();
     expectNoRawText(screen);
-    jest.useRealTimers();
   });
 
   it('reads the header and the day stepper', async () => {

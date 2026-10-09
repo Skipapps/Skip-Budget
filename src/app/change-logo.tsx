@@ -28,6 +28,7 @@ import { TextLink } from '@/components/ui/text-link';
 import { t } from '@/i18n';
 import { failureMessage, failureText } from '@/lib/failure';
 import { success, warn } from '@/lib/haptics';
+import { useToast } from '@/providers/toast-context';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { logoHints } from '@/lib/logo-lookup';
 import { useArtwork } from '@/theme/artwork';
@@ -136,6 +137,7 @@ function LogoChooser({ kind, id, row }: { kind: LogoKind; id: string; row: LogoR
   const match = useLogoMatch(row.name, hints);
   const found = confidentMatch(match.data);
   const setRowLogo = useSetRowLogo();
+  const toast = useToast();
   const { data: directory = [] } = useBrandDirectory();
 
   // Lists draw a receipt or subscription with no logo of its own by matching its name to the
@@ -174,6 +176,7 @@ function LogoChooser({ kind, id, row }: { kind: LogoKind; id: string; row: LogoR
         logo_hidden: choice.hidden,
       });
       success();
+      toast('toast.logo.updated');
       router.back();
     } catch (thrown) {
       warn();

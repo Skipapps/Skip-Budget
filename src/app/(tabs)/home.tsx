@@ -18,7 +18,7 @@ import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { TextLink } from '@/components/ui/text-link';
 import { SectionHeading } from '@/components/ui/typography';
-import { useLedger, useProfile, type LedgerEntry } from '@/api/queries';
+import { useCurrentBalance, useLedger, useProfile, type LedgerEntry } from '@/api/queries';
 import { useCharges } from '@/api/charges';
 import { useHistoryFloor } from '@/api/history';
 import { useHasUnreadNews } from '@/api/news';
@@ -78,6 +78,8 @@ export default function HomeScreen() {
   // not this month.
   const monthRange = useMemo(() => rangeFor('month', todayDate), [todayDate]);
   const month = useLedger(monthRange, today);
+  // The headline rolls on from the typed balances and never resets; only "Where it goes" is the month.
+  const balance = useCurrentBalance(today);
 
   // One window of real occurrences (bill on its due date, subscription on its renewal, receipt on
   // the day bought, salary on paydays); nothing is averaged into a monthly rate.
@@ -89,10 +91,6 @@ export default function HomeScreen() {
   const monthlyBillsTotal = spentOn('bill');
   const receiptsTotal = spentOn('receipt');
   const subscriptionsTotal = spentOn('subscription');
-
-  // The three tiles add up to expenses exactly: they are the same entries grouped by kind.
-  const expensesThisMonth = month.totals.out;
-  const payday = month.totals.in;
 
   const tileAmounts: Record<string, number | undefined> = {
     'monthly-bills': -monthlyBillsTotal,
@@ -167,11 +165,11 @@ export default function HomeScreen() {
 
       <View className="mt-6 w-full">
         <BalanceSummary
-          leftThisMonth={payday - expensesThisMonth}
-          payday={payday}
-          expenses={expensesThisMonth}
-          loading={month.isLoading}
-          error={month.isError}
+          balance={balance.balance}
+          income={balance.income}
+          expenses={balance.expenses}
+          loading={balance.isLoading}
+          error={balance.isError}
         />
       </View>
 

@@ -49,6 +49,7 @@ import { logoChosen, logoColumns, selectionLogo } from '@/lib/logo-columns';
 import { logoHints } from '@/lib/logo-lookup';
 import { refusedForPro } from '@/lib/pro-refusal';
 import { success, warn } from '@/lib/haptics';
+import { useToast } from '@/providers/toast-context';
 import { useToday } from '@/lib/use-today';
 import { parseVoice, type VoiceCycle, type VoiceDraft, type VoiceKind } from '@/lib/voice';
 import {
@@ -188,6 +189,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   const remember = useRememberStore();
 
   const createReceipt = useCreateReceipt();
+  const toast = useToast();
   const createBill = useCreateBill();
   const createSubscription = useCreateSubscription();
   const { pro } = usePro();
@@ -295,6 +297,13 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
       else await createSubscription.mutateAsync({ ...built.values, ...logo });
 
       success();
+      toast(
+        built.kind === 'receipt'
+          ? 'toast.receipt.added'
+          : built.kind === 'bill'
+            ? 'toast.bill.added'
+            : 'toast.subscription.added',
+      );
       // Taught only now, and only when the person put a different name on what was heard: "spot a
       // fly" saved as Spotify.
       const lesson = lessonFrom(draft, entry, touched);

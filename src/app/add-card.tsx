@@ -24,6 +24,7 @@ import { ReminderField } from '@/components/ui/reminder-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePro } from '@/api/pro';
 import { useConfirm } from '@/providers/dialog-provider';
+import { useToast } from '@/providers/toast-context';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
 import { NETWORKS } from '@/data/cards';
@@ -163,6 +164,7 @@ function CardForm({
   const updateCard = useUpdateCard();
   const deleteCard = useDeleteCard();
   const confirm = useConfirm();
+  const toast = useToast();
 
   const handleDelete = async () => {
     if (!id) return;
@@ -176,6 +178,7 @@ function CardForm({
 
     try {
       await deleteCard.mutateAsync(id);
+      toast('toast.card.deleted', 'deleted');
       router.back();
     } catch (thrown) {
       setError({ message: failureMessage(thrown), step });
@@ -218,8 +221,14 @@ function CardForm({
         last4: last4.length === 4 ? last4 : null,
         color,
         balance: Number(balance) || 0,
-        // Stamped whenever a balance is stated, so charges before today are not counted twice.
-        balance_as_of: balance ? toIsoDate(new Date()) : null,
+        // Stamped when a balance is stated, so charges before today are not counted twice. An edit
+        // that leaves the balance alone keeps its day: re-dating it would drop every charge since.
+        balance_as_of:
+          editing && existing && Number(balance) === existing.balance
+            ? (existing.balance_as_of ?? null)
+            : balance
+              ? toIsoDate(new Date())
+              : null,
         // The bill day is what recurs, not the specific date picked.
         bill_due_day: dueDate ? dueDate.getDate() : null,
       };
@@ -233,6 +242,7 @@ function CardForm({
       await applyReminder('card', cardId, dueDate ? choiceToLead(reminder) : null, remindAt);
 
       success();
+      toast(editing ? 'toast.card.updated' : 'toast.card.added');
       // The setup walk-in continues on the bank-account offer page; a dialog raised mid-navigation
       // never showed.
       if (!editing && origin === 'setup') {

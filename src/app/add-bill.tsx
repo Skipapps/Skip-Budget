@@ -36,6 +36,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { FieldLabel, Title } from '@/components/ui/typography';
 import { useConfirm } from '@/providers/dialog-provider';
+import { useToast } from '@/providers/toast-context';
 import {
   BILL_CATEGORIES,
   RECURRENCES,
@@ -307,6 +308,7 @@ function BillForm({
   const pastCharges = usePastCharges('bill', id);
   const deleteBill = useDeleteBill();
   const confirm = useConfirm();
+  const toast = useToast();
 
   const handleDelete = async () => {
     if (!id) return;
@@ -320,6 +322,7 @@ function BillForm({
 
     try {
       await deleteBill.mutateAsync(id);
+      toast('toast.bill.deleted', 'deleted');
       router.back();
     } catch (thrown) {
       setError(failureMessage(thrown));
@@ -437,6 +440,7 @@ function BillForm({
       await applyReminder('bill', billId, choiceToLead(reminder), remindAt);
 
       success();
+      toast(editing ? 'toast.bill.updated' : 'toast.bill.added');
       leave();
     } catch (thrown) {
       warn();

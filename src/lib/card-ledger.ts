@@ -1,24 +1,11 @@
 /**
- * Works out what a card or bank account is at: a running total from a user-stated balance, with
- * every charge pushing it up and every payment bringing it down. Pure: no clock, no queries.
+ * When bills and subscriptions land, and the shapes a card's or account's running balance is told
+ * in (worked out by `moneyBook`). Pure: no clock, no queries.
  */
 
 export type SourceKind = 'card' | 'account';
 
 export type Recurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'period';
-
-/** A single dated charge against a source. Amount is a positive magnitude. */
-export type Charge = {
-  id: string;
-  label: string;
-  amount: number;
-  /** yyyy-mm-dd */
-  date: string;
-  kind: 'receipt' | 'bill' | 'subscription';
-  domain?: string | null;
-  /** The owner chose letters: no logo, not even one found by name. Display only. */
-  logoHidden?: boolean | null;
-};
 
 /** What a bill needs to draw its icon, since it has no brand to look up. */
 type BillMarkFields = {
@@ -49,21 +36,16 @@ export type RecurringCharge = {
   accountId?: string | null;
 } & BillMarkFields;
 
-export type Payment = {
-  id: string;
-  amount: number;
-  /** yyyy-mm-dd */
-  date: string;
-  note?: string | null;
-};
-
 export type LedgerEntry = {
   id: string;
   label: string;
   date: string;
   /** Signed for display: negative is money out of pocket. */
   amount: number;
-  kind: 'receipt' | 'bill' | 'subscription' | 'payment';
+  /** `income` is pay landing in an account. */
+  kind: 'receipt' | 'bill' | 'subscription' | 'payment' | 'income';
+  /** A payment's other side, when it is one of the person's own: "From Savings", "To Visa". */
+  counterpart?: string | null;
   domain?: string | null;
   /** The owner chose letters: no logo, not even one found by name. Display only. */
   logoHidden?: boolean | null;
@@ -72,9 +54,9 @@ export type LedgerEntry = {
 export type Ledger = {
   /** Newest first. */
   entries: LedgerEntry[];
-  /** Charges that landed inside the window, summed. */
+  /** Everything that went out inside the window, summed. */
   charged: number;
-  /** Payments made inside the window, summed. */
+  /** Everything that came in inside the window, summed. */
   paid: number;
   /** What the source is at now. */
   balance: number;
@@ -287,109 +269,6 @@ export function planOccurrences(input: {
   return found.sort((a, b) =>
     a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date),
   );
-}
-
-/**
- * Turns everything charged to one source into a ledger and a balance.
- *
- * `statedBalance` is what the user typed and `balanceAsOf` is when it was true. Charges before that
- * date are already baked into the figure; with no stated balance every charge counts. Only what has
- * already happened is shown, so once bills are on the record the balance comes from `recorded`.
- */
-export function buildLedger(input: {
-  kind: SourceKind;
-  statedBalance: number;
-  /** yyyy-mm-dd, or null when no balance was ever stated. */
-  balanceAsOf: string | null;
-  charges: Charge[];
-  recurring: RecurringCharge[];
-  payments: Payment[];
-  /** Charges written down against THIS source, whichever plan they came from. */
-  recorded?: readonly RecordedCharge[];
-  /** Every plan with a charge anywhere. Absent means nothing is recorded yet. */
-  recordedPlans?: ReadonlySet<string>;
-  /** yyyy-mm-dd. Nothing dated after it has happened yet. */
-  today: string;
-}): Ledger {
-  const { kind, statedBalance, balanceAsOf, charges, recurring, payments, today } = input;
-  const recorded = input.recorded ?? [];
-  const recordedPlans = input.recordedPlans ?? new Set<string>();
-
-  const inWindow = (date: string) => date <= today && (!balanceAsOf || date >= balanceAsOf);
-
-  const entries: LedgerEntry[] = [];
-
-  for (const charge of charges) {
-    if (!inWindow(charge.date)) continue;
-    entries.push({
-      id: charge.id,
-      label: charge.label,
-      date: charge.date,
-      amount: -Math.abs(charge.amount),
-      kind: charge.kind,
-      domain: charge.domain,
-      logoHidden: charge.logoHidden,
-    });
-  }
-
-  const byPlan = new Map<string, RecordedCharge[]>();
-  for (const charge of recorded) {
-    const rows = byPlan.get(charge.planId);
-    if (rows) rows.push(charge);
-    else byPlan.set(charge.planId, [charge]);
-  }
-
-  for (const item of recurring) {
-    // Recorded where it is recorded, projected only where it is not. The lifetime bounds live in
-    // there too, or a bill added today would back-date itself onto the card.
-    for (const occurrence of planOccurrences({
-      plan: item,
-      charges: byPlan.get(item.id) ?? [],
-      isRecorded: recordedPlans.has(item.id),
-      from: balanceAsOf,
-      to: today,
-      today,
-    })) {
-      entries.push({
-        id: occurrence.id,
-        label: occurrence.label,
-        date: occurrence.date,
-        amount: -Math.abs(occurrence.amount),
-        kind: item.kind,
-        domain: item.domain,
-        logoHidden: item.logoHidden,
-        categoryId: item.categoryId,
-        iconId: item.iconId,
-      });
-    }
-  }
-
-  for (const payment of payments) {
-    if (!inWindow(payment.date)) continue;
-    entries.push({
-      id: payment.id,
-      label: payment.note?.trim() || 'Payment',
-      date: payment.date,
-      amount: Math.abs(payment.amount),
-      kind: 'payment',
-    });
-  }
-
-  entries.sort((a, b) =>
-    a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date),
-  );
-
-  const charged = entries
-    .filter((entry) => entry.kind !== 'payment')
-    .reduce((sum, entry) => sum + Math.abs(entry.amount), 0);
-  const paid = entries
-    .filter((entry) => entry.kind === 'payment')
-    .reduce((sum, entry) => sum + entry.amount, 0);
-
-  // A card balance is debt (spending raises it); an account balance is money held (the opposite).
-  const balance = kind === 'card' ? statedBalance + charged - paid : statedBalance - charged + paid;
-
-  return { entries, charged, paid, balance };
 }
 
 /**

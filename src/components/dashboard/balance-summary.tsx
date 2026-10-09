@@ -7,31 +7,32 @@ import { RollingNumber } from '@/components/ui/rolling-number';
 import { Skeleton } from '@/components/ui/skeleton';
 import { percent, t } from '@/i18n';
 import { cn } from '@/lib/cn';
-import { daysLeftInMonth } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { useColors } from '@/providers/theme-provider';
 import { failureText } from '@/lib/failure';
 import { TEXT_CAP } from '@/theme/text-scale';
 
 type BalanceSummaryProps = {
-  /** Payday minus expenses. Cash flow, not an account balance. */
-  leftThisMonth: number;
-  payday: number;
+  /** The person's accounts less what their cards owe, rolled on to today (see `moneyBook`). */
+  balance: number;
+  /** Every pay counted into the balance. */
+  income: number;
+  /** Every expense counted into the balance, as a positive magnitude. */
   expenses: number;
   loading?: boolean;
-  /** The month could not be fetched. Nothing derived from it may be shown. */
+  /** Something behind the balance could not be fetched. Nothing derived from it may be shown. */
   error?: boolean;
 };
 
 /**
- * The dashboard's headline: what is left and the two figures it came from, in one card. The
+ * The dashboard's headline: the current balance and the money in and out behind it, in one card. The
  * supporting figures use the card's foreground, not the money pair: green and red are tuned for the
  * page, and on a pale accent only the near-black end of the ramp is legible. Their labels and the
  * minus sign carry the direction.
  */
 export function BalanceSummary({
-  leftThisMonth,
-  payday,
+  balance,
+  income,
   expenses,
   loading = false,
   error = false,
@@ -41,18 +42,14 @@ export function BalanceSummary({
   const labels = useFitGroup({ mode: 'shrink' });
   const figures = useFitGroup({ mode: 'shrink' });
   const stacked = !labels.fits || !figures.fits;
-  const today = new Date();
-  const daysLeft = daysLeftInMonth(today);
-  const daysLabel =
-    daysLeft === 0 ? t('home.balance.lastDay') : t('home.balance.daysLeft', { count: daysLeft });
 
   // Wheels cannot shrink to fit, so the size is chosen from the figure's length: a seven-figure
   // balance gets smaller type rather than running off the card.
-  const digits = formatCurrency(leftThisMonth).length;
+  const digits = formatCurrency(balance).length;
   const fontSize = digits > 12 ? 28 : digits > 10 ? 34 : 40;
 
-  // Share of this month's income already committed; null until income is known, so no bar shows.
-  const spentShare = error || payday <= 0 ? null : Math.min(Math.max(expenses / payday, 0), 1);
+  // Share of the income counted that has gone out; null until there is income, so no bar shows.
+  const spentShare = error || income <= 0 ? null : Math.min(Math.max(expenses / income, 0), 1);
   const spentPercent = spentShare === null ? 0 : Math.round(spentShare * 100);
   const spentLabel = t('home.balance.spent', { percent: percent(spentPercent, 0) });
 
@@ -62,30 +59,20 @@ export function BalanceSummary({
         accessible
         accessibilityLabel={
           error
-            ? t('home.balance.summaryUnavailable', { days: daysLabel })
-            : t('home.balance.summary', { amount: formatCurrency(leftThisMonth), days: daysLabel })
+            ? t('home.balance.summaryUnavailable')
+            : loading
+              ? t('home.balance.statLoading', { label: t('home.balance.left') })
+              : t('home.balance.summary', { amount: formatCurrency(balance) })
         }
       >
-        <View className="w-full flex-row items-start justify-between gap-3">
-          <Text
-            className="shrink font-app-medium text-[15px] text-on-control/85"
-            maxFontSizeMultiplier={TEXT_CAP.control}
-          >
-            {t('home.balance.left')}
-          </Text>
+        <Text
+          className="font-app-medium text-[15px] text-on-control/85"
+          maxFontSizeMultiplier={TEXT_CAP.control}
+        >
+          {t('home.balance.left')}
+        </Text>
 
-          <View className="shrink-0 rounded-full bg-on-control/15 px-3 py-1.5">
-            <Text
-              className="font-app-medium text-[12px] text-on-control"
-              maxFontSizeMultiplier={TEXT_CAP.control}
-            >
-              {daysLabel}
-            </Text>
-          </View>
-        </View>
-
-        {/* A failed figure is never guessed at: show nothing rather than a total built from half a
-            month. */}
+        {/* A failed figure is never guessed at: show nothing rather than a total missing a part. */}
         {error ? (
           <Text
             className="mt-3 text-center font-app-bold text-[40px] text-on-control"
@@ -94,7 +81,7 @@ export function BalanceSummary({
             —
           </Text>
         ) : loading ? (
-          // The label and the pill stay put, so nothing jumps when it lands.
+          // The label stays put, so nothing jumps when it lands.
           <View className="mt-3 h-[52px] w-2/3 self-center opacity-20">
             <Skeleton
               className="h-full w-full rounded-[12px]"
@@ -104,7 +91,7 @@ export function BalanceSummary({
         ) : (
           <RollingNumber
             className="mt-3 justify-center"
-            value={leftThisMonth}
+            value={balance}
             lineHeight={Math.round(fontSize * 1.3)}
             fontSize={fontSize}
             textClassName="font-app-bold text-on-control"
@@ -152,7 +139,7 @@ export function BalanceSummary({
           <Stat
             id="Income"
             label={t('home.balance.income')}
-            amount={payday}
+            amount={income}
             icon={ArrowDownLeft}
             loading={loading}
             error={error}

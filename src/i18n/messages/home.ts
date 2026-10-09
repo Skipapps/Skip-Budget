@@ -25,26 +25,16 @@ export const homeMessages = defineMessages({
     fr: 'Notifications, nouvelles',
   },
 
-  'home.balance.left': {
-    en: 'Left this month',
-    es: 'Te queda este mes',
-    fr: 'Reste ce mois-ci',
-  },
-  'home.balance.lastDay': { en: 'Last day', es: 'Último día', fr: 'Dernier jour' },
-  'home.balance.daysLeft': {
-    en: { one: '{count} day left', other: '{count} days left' },
-    es: { one: 'Queda {count} día', other: 'Quedan {count} días' },
-    fr: { one: '{count} jour restant', other: '{count} jours restants' },
-  },
+  'home.balance.left': { en: 'Current balance', es: 'Saldo actual', fr: 'Solde actuel' },
   'home.balance.summary': {
-    en: 'Left this month, {amount}, {days}',
-    es: 'Te queda este mes, {amount}, {days}',
-    fr: 'Reste ce mois-ci, {amount}, {days}',
+    en: 'Current balance, {amount}',
+    es: 'Saldo actual, {amount}',
+    fr: 'Solde actuel, {amount}',
   },
   'home.balance.summaryUnavailable': {
-    en: 'Left this month, unavailable, {days}',
-    es: 'Te queda este mes, no disponible, {days}',
-    fr: 'Reste ce mois-ci, non disponible, {days}',
+    en: 'Current balance, unavailable',
+    es: 'Saldo actual, no disponible',
+    fr: 'Solde actuel, non disponible',
   },
   'home.balance.spent': {
     en: '{percent} of the income is spent',

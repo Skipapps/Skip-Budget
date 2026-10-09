@@ -5,10 +5,8 @@ import { Pressable, Text, View } from 'react-native';
 
 import { useSpendCategories } from '@/api/brands';
 import {
-  savedFor,
   useCards,
   useLedger,
-  useMonthlySavings,
   useSalarySources,
   useSourceBalances,
   useSubscriptions,
@@ -34,12 +32,9 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { SectionHeading } from '@/components/ui/typography';
 import { BILL_CATEGORIES } from '@/data/bill-categories';
 import { t, type MessageKey } from '@/i18n';
-import { monthLong } from '@/i18n/calendar';
 import { MESSAGES } from '@/i18n/messages';
 import { toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { sortByDateAscending } from '@/lib/group';
-import { toCents } from '@/lib/money';
 import { oneOffsInMonth, scheduledPerMonth } from '@/lib/pay';
 import { PERIODS, periodBuckets, periodRange, type PeriodKey } from '@/lib/period';
 import { useColors } from '@/providers/theme-provider';
@@ -67,16 +62,6 @@ function categoryName(
   return key in MESSAGES ? t(key as MessageKey) : stored;
 }
 
-/** "June 2026", "Junio de 2026": a row label, so it takes a capital in every language. */
-function monthName(month: string): string {
-  const date = new Date(`${month}T00:00:00`);
-  const name = t('savings.monthYear', {
-    month: monthLong(date.getMonth()),
-    year: date.getFullYear(),
-  });
-  return name.charAt(0).toUpperCase() + name.slice(1);
-}
-
 /**
  * All the figures side by side. It reads rather than computes: every number comes from the same
  * hooks as the screen that owns it, so this page cannot disagree with them.
@@ -90,7 +75,6 @@ export default function InsightsScreen() {
 }
 
 function InsightsScreenInner() {
-  const colors = useColors();
   const artwork = useArtwork();
 
   const [periodKey, setPeriodKey] = useState<PeriodKey>('month');
@@ -109,7 +93,6 @@ function InsightsScreenInner() {
 
   const cards = useCards();
   const salary = useSalarySources();
-  const savings = useMonthlySavings();
   const subscriptions = useSubscriptions();
   const categoriesQuery = useSpendCategories();
   const spendCategories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data]);
@@ -123,7 +106,6 @@ function InsightsScreenInner() {
     ledger.isError ||
     cards.isError ||
     salary.isError ||
-    savings.isError ||
     subscriptions.isError ||
     categoriesQuery.isError ||
     // A failed balance walk falls back to the figure typed when the card was added.
@@ -133,19 +115,10 @@ function InsightsScreenInner() {
     ledger.refetch();
     cards.refetch();
     salary.refetch();
-    savings.refetch();
     subscriptions.refetch();
     categoriesQuery.refetch();
     refetchBalances();
   };
-
-  const savedTotal = (savings.data ?? []).reduce((sum, month) => sum + savedFor(month), 0);
-  const owedOnCards = (cards.data ?? []).reduce(
-    (sum, card) => sum + Math.abs(balances.get(card.id) ?? card.balance),
-    0,
-  );
-
-  const worth = savedTotal - owedOnCards;
 
   const pays = (salary.data ?? []).map((source) => ({
     amount: source.amount,
@@ -260,17 +233,6 @@ function InsightsScreenInner() {
     .filter((subscription) => subscription.active)
     .reduce((sum, subscription) => sum + subscription.amount, 0);
 
-  /** The three most recent months, oldest first. Sorted by date, not by query order. */
-  const recentMonths = useMemo(
-    () =>
-      sortByDateAscending(
-        savings.data ?? [],
-        (month) => month.month,
-        (month) => month.month,
-      ).slice(-3),
-    [savings.data],
-  );
-
   if (isError) {
     return (
       <Screen title={t('insights.title')} showBack onRefresh={refresh} refreshing={refreshing}>
@@ -286,27 +248,6 @@ function InsightsScreenInner() {
 
   return (
     <Screen title={t('insights.title')} showBack onRefresh={refresh} refreshing={refreshing}>
-      <Heading>{t('insights.stand.heading')}</Heading>
-      <View className="w-full rounded-[16px] border border-line bg-card px-5 py-5">
-        <Text className="font-app text-[13px] text-muted" maxFontSizeMultiplier={TEXT_CAP.control}>
-          {t('insights.stand.worth')}
-        </Text>
-        <FitFigure
-          id="worth"
-          size={34}
-          className="font-app-bold text-ink"
-          style={toCents(worth) < 0 ? { color: colors.moneyOut } : undefined}
-          boxClassName="mt-1"
-        >
-          {formatCurrency(worth)}
-        </FitFigure>
-
-        <FitRows className="mt-4 w-full gap-2.5" testID="insights-stand">
-          <StandRow id="aside" label={t('insights.stand.putAside')} value={savedTotal} />
-          <StandRow id="owed" label={t('insights.stand.owedOnCards')} value={-owedOnCards} />
-        </FitRows>
-      </View>
-
       <Heading>{t('insights.in.heading')}</Heading>
       {monthlyIncome > 0 || onceTotal > 0 ? (
         <View
@@ -467,47 +408,6 @@ function InsightsScreenInner() {
         </>
       ) : null}
 
-      <Heading>{t('insights.keep.heading')}</Heading>
-      {recentMonths.length > 0 ? (
-        <FitRows
-          className="w-full rounded-[16px] border border-line bg-card px-5 py-4"
-          testID="insights-months"
-        >
-          {recentMonths.map((month, index) => (
-            <View key={month.month} className={index > 0 ? 'mt-3' : undefined}>
-              <StandRow
-                id={month.month}
-                label={monthName(month.month)}
-                value={savedFor(month)}
-                plain
-              />
-            </View>
-          ))}
-          <View className="my-3 h-px w-full bg-line" />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('insights.keep.seeEvery')}
-            onPress={() => router.push('/savings')}
-            className="min-h-11 w-full flex-row items-center justify-between gap-3 active:opacity-70"
-          >
-            <Text
-              className="min-w-0 flex-1 font-app-medium text-[14px] text-ink"
-              maxFontSizeMultiplier={TEXT_CAP.row}
-            >
-              {t('insights.keep.everyMonth')}
-            </Text>
-            <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
-          </Pressable>
-        </FitRows>
-      ) : (
-        <Prompt
-          title={t('insights.keep.emptyTitle')}
-          message={t('insights.keep.emptyMessage')}
-          actionLabel={t('insights.keep.seeSavings')}
-          onPress={() => router.push('/savings')}
-        />
-      )}
-
       {(cards.data ?? []).length > 0 ? (
         <>
           <Heading>{t('insights.owe.heading')}</Heading>
@@ -520,7 +420,8 @@ function InsightsScreenInner() {
                 <StandRow
                   id={card.id}
                   label={`${card.holder}${card.last4 ? ` ${card.last4}` : ''}`}
-                  value={-Math.abs(balances.get(card.id) ?? card.balance)}
+                  // A card in credit owes nothing; its credit is not a debt.
+                  value={-Math.max(balances.get(card.id) ?? card.balance, 0)}
                   plain
                 />
               </View>

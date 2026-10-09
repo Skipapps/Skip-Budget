@@ -4,6 +4,8 @@ import { Dimensions, StyleSheet } from 'react-native';
 import { BalanceSummary } from '@/components/dashboard/balance-summary';
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
+// The real SDK starts a cleanup interval on import that keeps Jest from exiting.
+jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
 // Both pull in react-native-reanimated, whose mock needs the native worklets module.
 jest.mock('@/components/ui/rolling-number', () => ({ RollingNumber: () => null }));
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
@@ -44,7 +46,7 @@ const isStacked = (screen: Screen) =>
   !String(screen.getByLabelText('Income, $1,234.56').parent?.props.className).includes('flex-row');
 
 function Summary() {
-  return <BalanceSummary leftThisMonth={-11111.11} payday={1234.56} expenses={12345.67} />;
+  return <BalanceSummary balance={-11111.11} income={1234.56} expenses={12345.67} />;
 }
 
 describe('BalanceSummary at large text sizes', () => {
@@ -53,12 +55,12 @@ describe('BalanceSummary at large text sizes', () => {
     Dimensions.set({ window, screen: window });
   });
 
-  it('lets the days-left pill follow the text size, whole', async () => {
+  it('lets the heading follow the text size, whole', async () => {
     const screen = await render(<Summary />);
-    const pill = screen.getByText(/days? left|Last day/);
-    expect(pill.props.allowFontScaling).toBeUndefined();
-    expect(pill.props.numberOfLines).toBeUndefined();
-    expect(pill.props.maxFontSizeMultiplier).toBe(1.3);
+    const heading = screen.getByText('Current balance');
+    expect(heading.props.allowFontScaling).toBeUndefined();
+    expect(heading.props.numberOfLines).toBeUndefined();
+    expect(heading.props.maxFontSizeMultiplier).toBe(1.3);
   });
 
   it('prints both figures whole, with their cents, and no per-figure shrinking', async () => {
@@ -87,5 +89,96 @@ describe('BalanceSummary at large text sizes', () => {
     // 80pt would need 17pt x 1.2 x 0.69 = 14.1pt, under the 17pt default.
     await layOut(screen, 80);
     expect(isStacked(screen)).toBe(true);
+  });
+});
+
+describe('BalanceSummary’s headline', () => {
+  it('names the current balance and reads it, to the cent, as one line', async () => {
+    const screen = await render(
+      <BalanceSummary balance={7707.51} income={4629.64} expenses={231.95} />,
+    );
+
+    expect(screen.getByText('Current balance')).toBeTruthy();
+    expect(screen.getByLabelText('Current balance, $7,707.51')).toBeTruthy();
+    expect(screen.getByLabelText('Income, $4,629.64')).toBeTruthy();
+    expect(screen.getByLabelText('Expenses, -$231.95')).toBeTruthy();
+  });
+
+  it('reads a balance below zero with its minus sign', async () => {
+    const screen = await render(<Summary />);
+    expect(screen.getByLabelText('Current balance, -$11,111.11')).toBeTruthy();
+  });
+
+  it('reads a balance of nothing as $0.00', async () => {
+    const screen = await render(<BalanceSummary balance={0} income={0} expenses={0} />);
+    expect(screen.getByLabelText('Current balance, $0.00')).toBeTruthy();
+  });
+
+  it('has no days-left pill and no month in its wording', async () => {
+    const screen = await render(<Summary />);
+
+    expect(screen.queryByText(/days? left|Last day/)).toBeNull();
+    expect(screen.queryByText(/this month/i)).toBeNull();
+    expect(screen.queryByLabelText(/left|this month/i)).toBeNull();
+  });
+
+  it('says it is unavailable, and shows no figure or bar, when a part would not load', async () => {
+    const screen = await render(
+      <BalanceSummary balance={7707.51} income={4629.64} expenses={231.95} error />,
+    );
+
+    expect(screen.getByLabelText('Current balance, unavailable')).toBeTruthy();
+    expect(screen.getByLabelText('Income, unavailable')).toBeTruthy();
+    expect(screen.getByLabelText('Expenses, unavailable')).toBeTruthy();
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.queryByLabelText(/7,707|4,629|231/)).toBeNull();
+  });
+
+  it('keeps the heading and says the stats are loading while the figures arrive', async () => {
+    const screen = await render(<BalanceSummary balance={0} income={0} expenses={0} loading />);
+
+    expect(screen.getByText('Current balance')).toBeTruthy();
+    expect(screen.getByLabelText('Income, loading')).toBeTruthy();
+    expect(screen.getByLabelText('Expenses, loading')).toBeTruthy();
+  });
+});
+
+describe('BalanceSummary’s bar', () => {
+  const bar = (screen: Screen) => screen.getByRole('progressbar');
+
+  it('shows the share of the income already spent, expenses over income', async () => {
+    const screen = await render(<BalanceSummary balance={2700} income={2000} expenses={500} />);
+
+    expect(screen.getByText('25% of the income is spent')).toBeTruthy();
+    expect(bar(screen).props.accessibilityLabel).toBe('25% of the income is spent');
+    expect(bar(screen).props.accessibilityValue).toEqual({ min: 0, max: 100, now: 25 });
+  });
+
+  it('rounds the share to a whole percent', async () => {
+    // 231.95 / 4,629.64 is 5.01 %.
+    const screen = await render(
+      <BalanceSummary balance={7707.51} income={4629.64} expenses={231.95} />,
+    );
+    expect(bar(screen).props.accessibilityValue.now).toBe(5);
+  });
+
+  it('stops at 100% when more went out than came in', async () => {
+    const screen = await render(<BalanceSummary balance={-1000} income={2000} expenses={3000} />);
+
+    expect(screen.getByText('100% of the income is spent')).toBeTruthy();
+    expect(bar(screen).props.accessibilityValue).toEqual({ min: 0, max: 100, now: 100 });
+  });
+
+  it('shows 0% when income came in and nothing went out', async () => {
+    const screen = await render(<BalanceSummary balance={3000} income={2000} expenses={0} />);
+    expect(screen.getByText('0% of the income is spent')).toBeTruthy();
+  });
+
+  it('is not drawn while no income has been counted', async () => {
+    const screen = await render(<BalanceSummary balance={900} income={0} expenses={100} />);
+
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.queryByText(/of the income is spent/)).toBeNull();
   });
 });

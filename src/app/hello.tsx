@@ -18,6 +18,7 @@ import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { t } from '@/i18n';
 import { failureText } from '@/lib/failure';
+import { useToast } from '@/providers/toast-context';
 
 /**
  * One question right after signup: what should we call you? The pen opens the avatar picker (the
@@ -28,6 +29,7 @@ export default function HelloScreen() {
   const colors = useColors();
   const profile = useProfile();
   const updateProfile = useUpdateProfile();
+  const toast = useToast();
   const artwork = useArtwork();
 
   const [name, setName] = useState('');
@@ -71,7 +73,12 @@ export default function HelloScreen() {
   const handleContinue = () => {
     const trimmed = name.trim();
     // The picture is already saved by the picker; only the name is left.
-    if (trimmed) updateProfile.mutate({ display_name: trimmed });
+    if (trimmed) {
+      updateProfile.mutate(
+        { display_name: trimmed },
+        { onSuccess: () => toast('toast.name.saved') },
+      );
+    }
     resetTo('/setup');
   };
 

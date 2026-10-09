@@ -1,9 +1,14 @@
 import { fireEvent, render } from '@testing-library/react-native';
+import { router } from 'expo-router';
 
 import CardsScreen from '@/app/(tabs)/cards';
 import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
 
-/** The Cards tab in Spanish and French: headings, empty notes, locked rows, tiles and figures. */
+/**
+ * The Cards tab in Spanish and French: headings, empty notes, locked rows, tiles and figures. The
+ * tiles are the real ones, so the words on the Savings tile (no figure, "Abrir" / "Ouvrir") come
+ * from the tile and the page together.
+ */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
@@ -12,14 +17,17 @@ jest.mock('react-native-keyboard-controller', () =>
 );
 
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
-// Reanimated 4 wants a native worklets module; the stand-in prints the label and the figure.
-jest.mock('@/components/ui/amount-tile', () => {
-  const { Text } = jest.requireActual('react-native');
-  const { formatCurrency } = jest.requireActual('@/lib/format');
+// Reanimated 4 wants a native worklets module; the tile only needs its press animation to be inert.
+jest.mock('react-native-reanimated', () => {
+  const { View } = jest.requireActual('react-native');
   return {
-    AmountTile: ({ label, amount }: { label: string; amount: number }) => (
-      <Text>{`${label}: ${formatCurrency(amount)}`}</Text>
-    ),
+    __esModule: true,
+    default: { View },
+    Easing: { out: () => () => 0, quad: () => 0 },
+    useAnimatedStyle: () => ({}),
+    useReducedMotion: () => false,
+    withSpring: (value: unknown) => value,
+    withTiming: (value: unknown) => value,
   };
 });
 jest.mock('@/components/cards/payment-card', () => ({ PaymentCard: () => null }));
@@ -80,7 +88,6 @@ let mockBalancesFailed = false;
 const mockRefetchBalances = jest.fn();
 
 jest.mock('@/api/queries', () => ({
-  savedFor: (month: { saved: number }) => Number(month.saved),
   useCards: () => ({ data: mockCards, isPending: false, isError: false }),
   useBankAccounts: () => ({ data: mockAccounts, isPending: false, isError: false }),
   // 1,000 a week normalises to 4,333.33 a month.
@@ -89,7 +96,6 @@ jest.mock('@/api/queries', () => ({
     isPending: false,
     isError: false,
   }),
-  useMonthlySavings: () => ({ data: [{ saved: 1234.5 }], isPending: false, isError: false }),
   useSourceBalances: () => ({
     balances: new Map<string, number>(),
     isError: mockBalancesFailed,
@@ -138,6 +144,7 @@ beforeEach(() => {
   mockCards = [card('c1', 'Everyday Visa'), card('c2', 'Travel card')];
   mockAccounts = [account('a1', 'Main'), account('a2', 'Rainy day')];
   mockRefetchBalances.mockClear();
+  jest.mocked(router.push).mockClear();
 });
 afterAll(() => resetLocaleForTests());
 
@@ -152,9 +159,23 @@ describe('Cards tab in Spanish', () => {
     expect(screen.getByText('Cuentas bancarias')).toBeTruthy();
     expect(screen.getByLabelText('Agregar cuenta')).toBeTruthy();
     expect(screen.getByText('Dinero')).toBeTruthy();
-    expect(screen.getByText('Salario: $4,333.33')).toBeTruthy();
-    expect(screen.getByText('Ahorros: $1,234.50')).toBeTruthy();
+    expect(screen.getByLabelText('Salario, $4,333.33')).toBeTruthy();
+    expect(screen.getByText('$4,333.33')).toBeTruthy();
     expectNoLeftovers(screen);
+  });
+
+  it('draws the Savings tile with Abrir where a figure would be, and opens Ahorros', async () => {
+    const screen = await render(<CardsScreen />);
+
+    // Named alone, not "Ahorros, $…": there is no amount to read out.
+    const tile = screen.getByLabelText('Ahorros');
+    expect(screen.getByText('Ahorros')).toBeTruthy();
+    expect(screen.getByText('Abrir')).toBeTruthy();
+    // The Salary figure is the only number on the tab (the faces are drawn empty here).
+    expect(screen.getAllByText(/\d/)).toHaveLength(1);
+
+    await fireEvent.press(tile);
+    expect(router.push).toHaveBeenLastCalledWith('/savings');
   });
 
   it('says which rows open and which are locked on the free plan', async () => {
@@ -212,9 +233,21 @@ describe('Cards tab in French', () => {
     expect(screen.getByText('Comptes bancaires')).toBeTruthy();
     expect(screen.getByLabelText('Ajouter un compte')).toBeTruthy();
     expect(screen.getByText('Argent')).toBeTruthy();
-    expect(screen.getByText(`Salaire: 4${NBSP}333,33${NBSP}$`)).toBeTruthy();
-    expect(screen.getByText(`Épargne: 1${NBSP}234,50${NBSP}$`)).toBeTruthy();
+    expect(screen.getByLabelText(`Salaire, 4${NBSP}333,33${NBSP}$`)).toBeTruthy();
+    expect(screen.getByText(`4${NBSP}333,33${NBSP}$`)).toBeTruthy();
     expectNoLeftovers(screen);
+  });
+
+  it('draws the Savings tile with Ouvrir where a figure would be, and opens Épargne', async () => {
+    const screen = await render(<CardsScreen />);
+
+    const tile = screen.getByLabelText('Épargne');
+    expect(screen.getByText('Épargne')).toBeTruthy();
+    expect(screen.getByText('Ouvrir')).toBeTruthy();
+    expect(screen.getAllByText(/\d/)).toHaveLength(1);
+
+    await fireEvent.press(tile);
+    expect(router.push).toHaveBeenLastCalledWith('/savings');
   });
 
   it('agrees a locked card and a locked account in French', async () => {

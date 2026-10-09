@@ -206,14 +206,6 @@ export function formatRelativeDay(iso: string, today: string): string {
   return formatFullDate(date);
 }
 
-/**
- * Whole days left in the month after today. getDaysInMonth takes a zero-based month, so
- * getMonth() goes straight through; adding one would measure the next month.
- */
-export function daysLeftInMonth(today: Date): number {
-  return getDaysInMonth(today.getFullYear(), today.getMonth()) - today.getDate();
-}
-
 /** Collapses what the two ends share: "22 – 28 Aug 2026", not "22 Aug 2026 – 28 Aug 2026". */
 export function formatDateRange(from: Date, to: Date): string {
   const sameYear = from.getFullYear() === to.getFullYear();

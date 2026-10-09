@@ -8,6 +8,7 @@ import { Screen } from '@/components/ui/screen';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { success, tap } from '@/lib/haptics';
+import { useToast } from '@/providers/toast-context';
 import { useColors } from '@/providers/theme-provider';
 import { AVATARS } from '@/theme/avatars';
 
@@ -19,6 +20,7 @@ export default function AvatarScreen() {
   const colors = useColors();
   const profile = useProfile();
   const updateProfile = useUpdateProfile();
+  const toast = useToast();
 
   const chosen = profile.data?.avatar_id ?? null;
 
@@ -29,6 +31,7 @@ export default function AvatarScreen() {
       {
         onSuccess: () => {
           success();
+          toast('toast.profile.updated');
           router.back();
         },
       },

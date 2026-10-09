@@ -2,13 +2,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 
-import { useLedger, useSalaryAccountIds, useSourceBalances, useSourceLedger } from '@/api/queries';
+import {
+  useCurrentBalance,
+  useLedger,
+  useSalaryAccountIds,
+  useSourceBalances,
+  useSourceLedger,
+} from '@/api/queries';
 
 /**
- * The combined hooks (a running balance, a month's spending, a card's current balance) must report
- * an error when any one input read fails, rather than success with a figure built from the rest.
- * Each underlying table is failed on its own, since a chain that mentions four of seven queries
- * passes a test that only ever fails the first one.
+ * The combined hooks (a running balance, a month's spending, a card's current balance, Home's
+ * Current balance) must report an error when any one input read fails, rather than success with a
+ * figure built from the rest. Each underlying table is failed on its own, since a chain that
+ * mentions four of nine queries passes a test that only ever fails the first one.
  */
 
 const mockFailures = new Set<string>();
@@ -71,8 +77,17 @@ beforeEach(() => {
   for (const table of Object.keys(mockRows)) delete mockRows[table];
 });
 
-const LEDGER_TABLES = ['receipts', 'subscriptions', 'bills', 'salary_sources', 'charges'];
+const LEDGER_TABLES = [
+  'receipts',
+  'subscriptions',
+  'bills',
+  'salary_sources',
+  'charges',
+  'pay_received',
+  'bank_accounts',
+];
 
+/** Every table a card, an account or Home's balance reads. */
 const SOURCE_TABLES = [
   'cards',
   'bank_accounts',
@@ -81,6 +96,8 @@ const SOURCE_TABLES = [
   'subscriptions',
   'payments',
   'charges',
+  'salary_sources',
+  'pay_received',
 ];
 
 describe('useLedger', () => {
@@ -163,6 +180,62 @@ describe('useLedger, on a month with a recorded charge', () => {
   });
 });
 
+describe('useLedger, on a month with recorded pay', () => {
+  const SEPTEMBER = { from: '2026-09-01', to: '2026-09-30' };
+
+  beforeEach(() => {
+    mockRows.salary_sources = [
+      {
+        id: 'salary-1',
+        name: 'Paycheck',
+        amount: 2500,
+        frequency: 'monthly',
+        last_payday: '2026-09-15',
+        salary_source_accounts: [],
+      },
+    ];
+    // Paid at $2,314.82; the salary has since gone up to $2,500.
+    mockRows.pay_received = ['p-aug|2026-08-15', 'p-sep|2026-09-15'].map((row) => {
+      const [id, paid_on] = row.split('|');
+      return {
+        id,
+        salary_source_id: 'salary-1',
+        label: 'Paycheck',
+        amount: 2314.82,
+        paid_on,
+        bank_account_id: null,
+      };
+    });
+  });
+
+  const income = (entries: { id: string; kind: string; amount: number }[]) =>
+    entries.filter((entry) => entry.kind === 'income');
+
+  it('lists the pay that landed inside the window, at the amount it landed with', async () => {
+    const { result } = await renderHook(() => useLedger(SEPTEMBER, TODAY), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // August's pay is outside the window, and the schedule adds nothing on a payday on the record.
+    expect(income(result.current.entries).map((entry) => [entry.id, entry.amount])).toEqual([
+      ['pay-p-sep', 2314.82],
+    ]);
+    expect(result.current.totals.in).toBe(2314.82);
+    expect(result.current.isError).toBe(false);
+  });
+});
+
+describe('useLedger', () => {
+  it('offers a retry that reads every list again', async () => {
+    const { result } = await renderHook(() => useLedger(undefined, TODAY), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    mockReads.length = 0;
+    result.current.refetch();
+
+    await waitFor(() => expect(new Set(mockReads)).toEqual(new Set(LEDGER_TABLES)));
+  });
+});
+
 describe('useSourceLedger', () => {
   it('reports no error when every read succeeds', async () => {
     const { result } = await renderHook(() => useSourceLedger('card-1', TODAY), { wrapper });
@@ -204,6 +277,30 @@ describe('useSourceBalances', () => {
     const { result } = await renderHook(() => useSourceBalances(TODAY), { wrapper });
     await waitFor(() => expect(mockReads.length).toBeGreaterThan(0));
     expect('isSettled' in result.current).toBe(false);
+  });
+});
+
+describe('useCurrentBalance', () => {
+  it('reports no error when every read succeeds', async () => {
+    const { result } = await renderHook(() => useCurrentBalance(TODAY), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.isError).toBe(false);
+  });
+
+  it.each(SOURCE_TABLES)('reports an error when %s fails', async (table) => {
+    mockFailures.add(table);
+    const { result } = await renderHook(() => useCurrentBalance(TODAY), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it('offers a retry that reads every list again', async () => {
+    const { result } = await renderHook(() => useCurrentBalance(TODAY), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    mockReads.length = 0;
+    result.current.refetch();
+
+    await waitFor(() => expect(new Set(mockReads)).toEqual(new Set(SOURCE_TABLES)));
   });
 });
 

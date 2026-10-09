@@ -2,11 +2,13 @@ import { render } from '@testing-library/react-native';
 import type { ReactTestRendererJSON } from 'react-test-renderer';
 
 import InsightsScreen from '@/app/insights';
+import { MESSAGES } from '@/i18n/messages';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
 /**
  * Insights read in Spanish and French: headings, counts, category names mapped from their stored
- * ids, month names and every figure in the language's own writing.
+ * ids and every figure in the language's own writing. None of it mentions Savings: the old
+ * net-worth and recent-months sections are gone in every language.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -34,19 +36,6 @@ jest.mock('@/api/refresh', () => ({
   useRefreshAll: () => ({ refresh: () => {}, refreshing: false }),
 }));
 
-const MONTHS = [
-  { month: '2026-06-01', saved: 1000 },
-  { month: '2026-07-01', saved: 1100 },
-  { month: '2026-08-01', saved: 1200 },
-].map((row) => ({
-  ...row,
-  income: 4000,
-  spent: 4000 - row.saved,
-  adjusted_saved: null,
-  note: null,
-  excluded_at: null,
-}));
-
 const spend = (id: string, label: string, amount: number, over: object = {}) => ({
   id,
   label,
@@ -67,7 +56,6 @@ const mockEntries = [
 
 let mockFailing = false;
 let mockSalary: object[] = [];
-let mockSavings: object[] = [];
 
 const mockAnswer = (data: unknown) => ({ data, isError: false, refetch: jest.fn() });
 
@@ -80,7 +68,6 @@ jest.mock('@/api/brands', () => ({
 }));
 
 jest.mock('@/api/queries', () => ({
-  savedFor: (month: { saved: number }) => Number(month.saved),
   useLedger: () => ({
     entries: mockEntries,
     totals: { in: 0, out: 1230 },
@@ -90,7 +77,6 @@ jest.mock('@/api/queries', () => ({
   }),
   useCards: () => mockAnswer([{ id: 'card-1', holder: 'Banorte', last4: '1004', balance: 300 }]),
   useSalarySources: () => mockAnswer(mockSalary),
-  useMonthlySavings: () => mockAnswer(mockSavings),
   useSubscriptions: () => mockAnswer([{ id: 's1', amount: 15.99, active: true }]),
   useSourceBalances: () => ({ balances: new Map(), isError: false, refetch: jest.fn() }),
 }));
@@ -117,11 +103,59 @@ function expectNoRawText(tree: Node) {
   expect(lines.filter((line) => /\{\w+\}/.test(line))).toEqual([]);
 }
 
+/** What each language's "Where you stand" and "What you keep" said, empty state included. */
+const REMOVED = {
+  es: [
+    'Tu situación',
+    'Lo ahorrado, menos lo que debes',
+    'Apartado',
+    'Deuda en tarjetas de crédito',
+    'Lo que conservas',
+    'Ver todos los meses',
+    'Todos los meses',
+    'Aún no hay meses terminados',
+    'Cuando termina un mes',
+    'Ver ahorros',
+  ],
+  fr: [
+    'Où tu en es',
+    'Ton épargne, moins ce que tu dois',
+    'Mis de côté',
+    'Dû sur les cartes de crédit',
+    'Ce que tu gardes',
+    'Voir tous les mois',
+    'Tous les mois',
+    'Aucun mois terminé pour l’instant',
+    'À la fin d’un mois',
+    'Voir l’épargne',
+  ],
+};
+
+/** Savings in the language's own stem, and a month written the way the old list wrote it. */
+const LEFTOVERS = {
+  es: [
+    /ahorr/i,
+    /\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre) de \d{4}\b/i,
+  ],
+  fr: [
+    /épargn/i,
+    /\b(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre) \d{4}\b/i,
+  ],
+};
+
+/** Every line that carries one of the removed words or a pattern that only Savings produced. */
+function savingsLines(tree: Node, language: 'es' | 'fr'): string[] {
+  return shownText(tree).filter(
+    (line) =>
+      REMOVED[language].some((words) => line.includes(words)) ||
+      LEFTOVERS[language].some((pattern) => pattern.test(line)),
+  );
+}
+
 beforeEach(() => {
   resetLocaleForTests();
   mockFailing = false;
   mockSalary = [{ id: 'pay', amount: 4000, frequency: 'monthly' }];
-  mockSavings = MONTHS;
 });
 afterAll(() => resetLocaleForTests());
 
@@ -131,12 +165,6 @@ describe('Insights in Spanish', () => {
     const screen = await render(<InsightsScreen />);
 
     expect(screen.getByText('Análisis')).toBeTruthy();
-    expect(screen.getByText('Tu situación')).toBeTruthy();
-    expect(screen.getByText('Lo ahorrado, menos lo que debes')).toBeTruthy();
-    // 1,000 + 1,100 + 1,200 put aside, less 300 on the card.
-    expect(screen.getByText('$3,000.00')).toBeTruthy();
-    expect(screen.getByText('Apartado')).toBeTruthy();
-    expect(screen.getByText('Deuda en tarjetas de crédito')).toBeTruthy();
 
     expect(screen.getByText('Lo que entra')).toBeTruthy();
     expect(screen.getByText('Cada mes')).toBeTruthy();
@@ -155,35 +183,27 @@ describe('Insights in Spanish', () => {
     expect(screen.getByText('2 veces')).toBeTruthy();
     expect(screen.getByText('1 vez')).toBeTruthy();
 
-    expect(screen.getByText('Lo que conservas')).toBeTruthy();
-    expect(screen.getAllByText(/de 2026$/).map((node) => node.props.children as string)).toEqual([
-      'Junio de 2026',
-      'Julio de 2026',
-      'Agosto de 2026',
-    ]);
-    expect(screen.getByLabelText('Ver todos los meses')).toBeTruthy();
-    expect(screen.getByText('Todos los meses')).toBeTruthy();
-
     expect(screen.getByText('Lo que debes')).toBeTruthy();
     expect(screen.getByText('Banorte 1004')).toBeTruthy();
+    // The card's own debt stays, with no total made from it beside it.
+    expect(screen.getByText('$300.00')).toBeTruthy();
 
     expect(screen.getByText('Próximos')).toBeTruthy();
     expect(screen.getByText('$15.99/mes')).toBeTruthy();
     expect(screen.getByText('$191.88 al año')).toBeTruthy();
     expectNoRawText(screen.toJSON());
+    expect(savingsLines(screen.toJSON(), 'es')).toEqual([]);
   });
 
-  it('asks for pay and explains savings while there is none', async () => {
+  it('asks for pay while there is none, with nothing about finished months', async () => {
     setLanguage('es');
     mockSalary = [];
-    mockSavings = [];
     const screen = await render(<InsightsScreen />);
 
     expect(screen.getByText('Skip aún no sabe cuánto ganas')).toBeTruthy();
     expect(screen.getByText('Configurar día de pago')).toBeTruthy();
-    expect(screen.getByText('Aún no hay meses terminados')).toBeTruthy();
-    expect(screen.getByText('Ver ahorros')).toBeTruthy();
     expectNoRawText(screen.toJSON());
+    expect(savingsLines(screen.toJSON(), 'es')).toEqual([]);
   });
 });
 
@@ -193,27 +213,37 @@ describe('Insights in French', () => {
     const screen = await render(<InsightsScreen />);
 
     expect(screen.getByText('Aperçu')).toBeTruthy();
-    expect(screen.getByText('Où tu en es')).toBeTruthy();
+    expect(screen.getByText('Ce qui entre')).toBeTruthy();
     // Queries fold a no-break space into a plain one, so the figures are compared as they are.
-    const worth = `3${NBSP}000,00${NBSP}$`;
-    expect(screen.getByText(worth).props.children).toBe(worth);
+    const pay = `4${NBSP}000,00${NBSP}$`;
+    expect(screen.getByText(pay).props.children).toBe(pay);
     expect(screen.getByText('de 1 source')).toBeTruthy();
     expect(screen.getByText('Ce mois-ci')).toBeTruthy();
     expect(screen.getByText('Épicerie')).toBeTruthy();
     expect(screen.getByText('Logement')).toBeTruthy();
     expect(screen.getByText('2 fois')).toBeTruthy();
     expect(screen.getByText('1 fois')).toBeTruthy();
-    expect(screen.getAllByText(/ 2026$/).map((node) => node.props.children as string)).toEqual([
-      'Juin 2026',
-      'Juillet 2026',
-      'Août 2026',
-    ]);
+    expect(screen.getByText('Ce que tu dois')).toBeTruthy();
+    expect(screen.getByText('Banorte 1004')).toBeTruthy();
+    expect(screen.getByText(`300,00${NBSP}$`)).toBeTruthy();
     expect(screen.getByText('À venir')).toBeTruthy();
     const perMonth = `15,99${NBSP}$/mois`;
     expect(screen.getByText(perMonth).props.children).toBe(perMonth);
     const perYear = `191,88${NBSP}$ sur un an`;
     expect(screen.getByText(perYear).props.children).toBe(perYear);
     expectNoRawText(screen.toJSON());
+    expect(savingsLines(screen.toJSON(), 'fr')).toEqual([]);
+  });
+
+  it('asks for pay while there is none, with nothing about finished months', async () => {
+    setLanguage('fr');
+    mockSalary = [];
+    const screen = await render(<InsightsScreen />);
+
+    expect(screen.getByText('Skip ne sait pas encore combien tu gagnes')).toBeTruthy();
+    expect(screen.getByText('Configurer le jour de paie')).toBeTruthy();
+    expectNoRawText(screen.toJSON());
+    expect(savingsLines(screen.toJSON(), 'fr')).toEqual([]);
   });
 
   it('says the one failure line when a source fails', async () => {
@@ -223,6 +253,25 @@ describe('Insights in French', () => {
 
     expect(screen.getByText('Une erreur est survenue. Réessaie.')).toBeTruthy();
     expect(screen.getByText('Réessayer')).toBeTruthy();
-    expect(screen.queryByText('Ton épargne, moins ce que tu dois')).toBeNull();
+    // The page draws these when nothing fails, so their absence is the failure's doing.
+    expect(screen.queryByText('Ce qui entre')).toBeNull();
+    expect(screen.queryByText('Ce que tu dois')).toBeNull();
+  });
+
+  it('draws the sections the failure page replaces when nothing fails', async () => {
+    setLanguage('fr');
+    const screen = await render(<InsightsScreen />);
+
+    expect(screen.getByText('Ce qui entre')).toBeTruthy();
+    expect(screen.getByText('Ce que tu dois')).toBeTruthy();
+    expect(screen.queryByText('Une erreur est survenue. Réessaie.')).toBeNull();
+  });
+});
+
+describe('Insights copy', () => {
+  it('keeps no words for the removed Where you stand and What you keep sections', () => {
+    expect(Object.keys(MESSAGES).filter((key) => /^insights\.(stand|keep)\./.test(key))).toEqual(
+      [],
+    );
   });
 });
