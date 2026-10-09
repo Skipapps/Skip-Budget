@@ -42,6 +42,8 @@ jest.mock('@/providers/theme-provider', () => ({
 }));
 
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: false }) }));
+// Unknown until it answers, so the Spending Habits card carries no PRO pill here.
+jest.mock('@/api/habits', () => ({ useHabits: () => ({ isSuccess: false, data: undefined }) }));
 jest.mock('@/api/news', () => ({ useHasUnreadNews: () => false }));
 jest.mock('@/api/refresh', () => ({
   useRefreshAll: () => ({ refresh: () => {}, refreshing: false }),

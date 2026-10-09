@@ -1138,3 +1138,50 @@ one-liners and the explainer copy; 3) save lands on Home rather than the item's 
 ## 2026-10-06 — Priya (Design lead) — large-text rule
 
 Spec written to `.claude/team/design/large-text.md`, read-only on `logo-service`, no source touched. It sets one `TEXT_CAP` ceiling per role, allows no ellipsis and no single-label shrinking, and adds a shared `FitGroup` size: floored at the design size and 11pt, then the layout changes. Founder questions: Quick add as 2×2 everywhere, keep ceilings at 1.6x or below, honour Bold Text.
+
+---
+
+## 2026-10-09 — Pia (Product Designer) — Spending habits spec
+
+**Outcome:** Done. The spec is `.claude/team/design/spending-habits.md`. It covers:
+- the Home tool card and PRO badge
+- the `/habits` dashboard
+- the 3-step create flow
+- Add my own (name page and icon picker)
+- `/habit/[id]` detail and edit mode with delete
+- habit receipts in every row and on `receipt/[id]`
+- the `habits` explainer
+- final colours, category tints and presets
+
+It was written against the live source (EntryReview, StepFlow, DetailCard, ToolCards, PRO_FEATURES, palette) and the
+CEO brief. No code touched.
+
+**Decisions**
+- **Day row.** It spans the card's full width (44/42pt columns). The hi-fi's indented row gives 36/35pt.
+- **Card figure.** It shows that week's saved amount in green (`ink` at $0). Every figure keeps its cents.
+- **Sub-lines** depend on the shown week:
+  - Bought today
+  - New · tap the days you bought it
+  - N days skipped (in the habit's ink colour)
+  - Bought yesterday
+  - Skipped all week / Bought on N days, for past weeks
+  - Not tracking yet, before the start
+- **Step 1.** Tapping a tile is the answer, so there is no Continue. More and Add my own sit under the grid.
+- **Confirm page.** It is EntryReview plus two small props (`progress`, `reassurance`).
+- **Hero.** Labelled "Spent this week" / "Saved so far", counting active habits only.
+- **Open past circles** use a `muted` ring so tappable days read as tappable.
+- **Colours.**
+  - Caramel, coral and green fills are darkened slightly, so the white check clears 3:1.
+  - The dark tints are redone; the old ones were 1.05:1 against the card.
+  - A new `ink` pair per colour, for coloured text.
+- **13 category tints:** OKLCH, evenly spaced hues, and no two neighbouring sections alike.
+- **Presets:** three subtitles reworded and the More order changed.
+
+**Could not verify:** nothing was rendered. Contrast figures are computed, not seen. FitGroup breakpoints are by
+arithmetic.
+
+**Open questions:**
+1. First-week credit: a habit started Thursday shows Mon–Wed as already saved (Founder).
+2. MXN preset prices ×10.
+3. Lock Store on habit-receipt edit, plus a same-day hint.
+4. "You can change this anytime." vs the house "You can edit this later."

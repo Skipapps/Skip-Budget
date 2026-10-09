@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import type { LedgerEntry } from '@/api/queries';
 import { BillMark } from '@/components/bills/bill-mark';
 import { BrandMark } from '@/components/brands/brand-mark';
+import { HabitIcon } from '@/components/habits/habit-icon';
 import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
 import { cn } from '@/lib/cn';
 import { formatCurrency } from '@/lib/format';
@@ -66,7 +67,9 @@ export function LedgerRow({ entry, sourceLabel, kindLabel, onPress }: LedgerRowP
           onPress ? 'active:opacity-60' : undefined,
         )}
       >
-        {isIncome ? (
+        {entry.habit ? (
+          <HabitIcon iconId={entry.habit.iconId} color={entry.habit.color} size={40} />
+        ) : isIncome ? (
           <View className="h-10 w-10 items-center justify-center rounded-full bg-ink/5">
             <ArrowDownLeft size={18} color={colors.body} strokeWidth={1.8} />
           </View>

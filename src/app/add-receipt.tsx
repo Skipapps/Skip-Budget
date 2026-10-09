@@ -9,10 +9,11 @@ import {
   Trash2,
   type LucideIcon,
 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { guessCategory, matchBrand, useBrandDirectory, useSpendCategories } from '@/api/brands';
+import { useHabit } from '@/api/habits';
 import { useCaptureAllowance } from '@/api/capture-allowance';
 import { usePro } from '@/api/pro';
 import { buildReceiptValues } from '@/api/entry-values';
@@ -35,16 +36,19 @@ import {
 } from '@/components/entry/entry-review';
 import { AmountStep } from '@/components/flow/amount-step';
 import { StepFlow } from '@/components/flow/step-flow';
+import { HabitIcon } from '@/components/habits/habit-icon';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { FieldLabel } from '@/components/ui/typography';
+import type { HabitColor } from '@/data/habit-colors';
 import { useDialog, useConfirm } from '@/providers/dialog-provider';
 import { useToast } from '@/providers/toast-context';
 import { t, type MessageKey } from '@/i18n';
 import { success, warn } from '@/lib/haptics';
 import { withTap } from '@/lib/press';
+import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatEntryDay } from '@/lib/entry-day';
 import { failureMessage, failureText } from '@/lib/failure';
 import { logoColumns } from '@/lib/logo-columns';
@@ -119,6 +123,18 @@ const blank = (): Initial => ({
 });
 
 const ALL_FIELDS = ['store', 'date', 'amount', 'card'] as const;
+
+/** The spending habit a receipt was filed from: its store is the habit, and stays it. */
+type ReceiptHabit = {
+  name: string;
+  iconId: string | null;
+  color: HabitColor | null;
+  /** The habit's creation day, yyyy-mm-dd: no earlier day can be one of its days. Null until read. */
+  savedFrom: string | null;
+};
+
+/** 23505: a habit has one receipt a day, and the day this one moved to already has one. */
+const dayTaken = (thrown: unknown) => (thrown as { code?: unknown } | null)?.code === '23505';
 
 type ScanParams = {
   scannedStore?: string;
@@ -261,19 +277,51 @@ export default function AddReceiptScreen() {
       }
     : scanned.initial;
 
-  return (
-    <ReceiptForm
-      key={existing?.id ?? 'new'}
-      id={id}
-      initial={initial}
-      saved={existing}
-      initialScan={existing ? null : scanned.result}
-      // Anything that arrives with a receipt already filled in (an edit, a scan, a voice hand-off)
-      // opens on the final page; only a blank one starts at the amount.
-      initialView={existing || scanned.result || fromVoice ? 'review' : 'amount'}
-      fromVoice={fromVoice}
-    />
-  );
+  const form: ComponentProps<typeof ReceiptForm> = {
+    id,
+    initial,
+    saved: existing,
+    initialScan: existing ? null : scanned.result,
+    // Anything that arrives with a receipt already filled in (an edit, a scan, a voice hand-off)
+    // opens on the final page; only a blank one starts at the amount.
+    initialView: existing || scanned.result || fromVoice ? 'review' : 'amount',
+    fromVoice,
+  };
+
+  if (existing?.habit_id) {
+    return (
+      <HabitReceiptForm
+        key={existing.id}
+        habitId={existing.habit_id}
+        habit={{
+          name: existing.habit?.name ?? existing.merchant,
+          iconId: existing.habit?.icon_id ?? null,
+          color: existing.habit?.color ?? null,
+          savedFrom: null,
+        }}
+        form={form}
+      />
+    );
+  }
+
+  return <ReceiptForm key={existing?.id ?? 'new'} {...form} />;
+}
+
+/**
+ * A habit's receipt, with its habit's creation day read for the date: the habit's own page counts
+ * from that day, so a receipt moved earlier would be money the habit never shows.
+ */
+function HabitReceiptForm({
+  habitId,
+  habit,
+  form,
+}: {
+  habitId: string;
+  habit: ReceiptHabit;
+  form: ComponentProps<typeof ReceiptForm>;
+}) {
+  const row = useHabit(habitId);
+  return <ReceiptForm {...form} habit={{ ...habit, savedFrom: row.data?.saved_from ?? null }} />;
 }
 
 function ReceiptForm({
@@ -283,11 +331,17 @@ function ReceiptForm({
   initialScan,
   initialView,
   fromVoice = false,
+  habit = null,
 }: {
   id?: string;
   initial: Initial;
   /** The row being edited, for the logo it already has. */
   saved?: LogoFields | null;
+  /**
+   * Filed by tapping a habit's day. Its store cannot change: another name would cut it from its
+   * habit's days.
+   */
+  habit?: ReceiptHabit | null;
   initialScan: ScanResult | null;
   initialView: 'amount' | 'review';
   /** Saved from a voice hand-off: back to Home, never onto the review page again. */
@@ -555,6 +609,17 @@ function ReceiptForm({
       fail(t('receipts.add.missing', { fields: missing.join(', ') }));
       return;
     }
+    // Only a move is refused: a receipt already dated earlier can still be edited where it is.
+    const day = toIsoDate(date);
+    if (habit?.savedFrom && day < habit.savedFrom && day !== toIsoDate(initial.date)) {
+      fail(
+        t('habits.receipt.startedOn', {
+          name: habit.name,
+          date: formatFullDate(new Date(`${habit.savedFrom}T00:00:00`)),
+        }),
+      );
+      return;
+    }
 
     const built = buildReceiptValues(
       { store: chosen, amount, date, sourceId, note, captureSource },
@@ -576,6 +641,10 @@ function ReceiptForm({
       toast(editing ? 'toast.receipt.updated' : 'toast.receipt.added');
       leave();
     } catch (thrown) {
+      if (habit && dayTaken(thrown)) {
+        fail(t('habits.receipt.dayTaken', { name: habit.name }));
+        return;
+      }
       // The database's Pro wall is an answer for someone the app also thinks is free: show what Pro
       // adds, pushed so Back returns to the filled-in form. For someone the app thinks has Pro it is
       // a disagreement between the two, so it is reported like any failure.
@@ -683,6 +752,7 @@ function ReceiptForm({
         title={t('receipts.field.date')}
         question={t('receipts.add.askDate')}
         value={date}
+        minDate={habit?.savedFrom ? new Date(`${habit.savedFrom}T00:00:00`) : null}
         onBack={toReview}
         onDone={(day) => {
           if (day) edited(setDate)(day);
@@ -767,43 +837,52 @@ function ReceiptForm({
     );
   }
 
+  const storeRow: EntryRowSpec = habit
+    ? {
+        key: 'store',
+        label: t('receipts.field.store'),
+        value: habit.name,
+        leading: <HabitIcon iconId={habit.iconId} color={habit.color} size={40} />,
+      }
+    : {
+        key: 'store',
+        field: (
+          <>
+            <BrandField
+              label={t('receipts.field.store')}
+              value={store}
+              onChange={edited(setStore)}
+              placeholder={t('receipts.add.storePlaceholder')}
+              // The box is drawn afresh after another page; what was typed comes back with it.
+              initialQuery={typedStore}
+              onQueryChange={edited(setTypedStore)}
+              // Receipts have no page of their own, so Change logo opens from here. Until another
+              // store is picked, the row's own store is the one shown.
+              onChangeLogo={
+                editing && id && !storeChanged && store
+                  ? () => openChangeLogo('receipt', id, store.name)
+                  : undefined
+              }
+            />
+            {store ? (
+              <Text
+                className="mt-3 w-full font-app text-[13px] text-muted"
+                maxFontSizeMultiplier={TEXT_CAP.reading}
+              >
+                {t('receipts.add.filedUnder', {
+                  category: receiptCategoryName(
+                    store.categoryId,
+                    categories.find((category) => category.id === store.categoryId)?.label,
+                  ),
+                })}
+              </Text>
+            ) : null}
+          </>
+        ),
+      };
+
   const rows: EntryRowSpec[] = [
-    {
-      key: 'store',
-      field: (
-        <>
-          <BrandField
-            label={t('receipts.field.store')}
-            value={store}
-            onChange={edited(setStore)}
-            placeholder={t('receipts.add.storePlaceholder')}
-            // The box is drawn afresh after another page; what was typed comes back with it.
-            initialQuery={typedStore}
-            onQueryChange={edited(setTypedStore)}
-            // Receipts have no page of their own, so Change logo opens from here. Until another
-            // store is picked, the row's own store is the one shown.
-            onChangeLogo={
-              editing && id && !storeChanged && store
-                ? () => openChangeLogo('receipt', id, store.name)
-                : undefined
-            }
-          />
-          {store ? (
-            <Text
-              className="mt-3 w-full font-app text-[13px] text-muted"
-              maxFontSizeMultiplier={TEXT_CAP.reading}
-            >
-              {t('receipts.add.filedUnder', {
-                category: receiptCategoryName(
-                  store.categoryId,
-                  categories.find((category) => category.id === store.categoryId)?.label,
-                ),
-              })}
-            </Text>
-          ) : null}
-        </>
-      ),
-    },
+    storeRow,
     {
       key: 'date',
       label: t('receipts.field.date'),

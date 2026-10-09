@@ -38,8 +38,8 @@ const AFFECTS_DASHBOARD = new Set([
  * was charged to it to null ("on delete set null"), so those caches are stale until re-read.
  */
 const DEPENDENTS: Record<string, string[]> = {
-  cards: ['bills', 'receipts', 'subscriptions', 'payments'],
-  bank_accounts: ['bills', 'receipts', 'subscriptions', 'payments', 'salary_sources'],
+  cards: ['bills', 'receipts', 'subscriptions', 'payments', 'habits'],
+  bank_accounts: ['bills', 'receipts', 'subscriptions', 'payments', 'salary_sources', 'habits'],
 };
 
 function useInvalidate() {
@@ -246,10 +246,11 @@ export const useUpdateSalarySource = () => useUpdate<Partial<SalaryValues>>('sal
 export const useDeleteSalarySource = () => useRemove('salary_sources');
 
 /**
- * How a receipt got into the app. Mirrors the `public.capture_source` enum; everything but 'manual'
- * is a Pro verb, refused on a free account by the server's `enforce_scan_is_pro` trigger.
+ * How a receipt got into the app. Mirrors the `public.capture_source` enum. 'scan', 'upload' and
+ * 'voice' are Pro verbs, limited or refused on a free account by the server's `enforce_scan_is_pro`
+ * trigger; 'habit' is a tapped day on a spending habit, which every plan may file.
  */
-export type CaptureSource = 'manual' | 'scan' | 'upload' | 'voice';
+export type CaptureSource = 'manual' | 'scan' | 'upload' | 'voice' | 'habit';
 
 export type ReceiptValues = {
   brand_id: string | null;

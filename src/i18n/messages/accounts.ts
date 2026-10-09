@@ -271,6 +271,13 @@ export const accountsMessages = defineMessages({
   'accounts.source.moneySent': { en: 'Money sent', es: 'Dinero enviado', fr: 'Argent envoyé' },
   'accounts.source.owedNow': { en: 'Owed now', es: 'Adeudo actual', fr: 'Montant dû actuel' },
   'accounts.source.balanceNow': { en: 'Balance now', es: 'Saldo actual', fr: 'Solde actuel' },
+  // What a row on a card's or account's page opens, read after its label.
+  'accounts.source.billHint': {
+    en: 'Opens this bill',
+    es: 'Abre esta factura',
+    fr: 'Ouvre cette facture',
+  },
+  'accounts.source.payHint': { en: 'Opens your pay', es: 'Abre tu salario', fr: 'Ouvre ta paie' },
   'accounts.source.emptyTitle': {
     en: 'Nothing on this one yet',
     es: 'Aún no hay nada aquí',

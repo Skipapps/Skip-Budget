@@ -41,6 +41,13 @@ export const toastMessages = defineMessages({
     fr: 'Reçu mis à jour',
   },
   'toast.receipt.deleted': { en: 'Receipt deleted', es: 'Recibo eliminado', fr: 'Reçu supprimé' },
+  'toast.habit.added': { en: 'Habit added', es: 'Hábito agregado', fr: 'Habitude ajoutée' },
+  'toast.habit.updated': {
+    en: 'Habit updated',
+    es: 'Hábito actualizado',
+    fr: 'Habitude mise à jour',
+  },
+  'toast.habit.deleted': { en: 'Habit deleted', es: 'Hábito eliminado', fr: 'Habitude supprimée' },
   'toast.pay.saved': { en: 'Pay saved', es: 'Sueldo guardado', fr: 'Paie enregistrée' },
   'toast.loan.saved': { en: 'Loan saved', es: 'Préstamo guardado', fr: 'Prêt enregistré' },
   'toast.payment.added': {

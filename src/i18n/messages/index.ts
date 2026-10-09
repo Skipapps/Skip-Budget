@@ -7,6 +7,8 @@ import { commonMessages } from '@/i18n/messages/common';
 import { dateMessages } from '@/i18n/messages/dates';
 import { entryMessages } from '@/i18n/messages/entry';
 import { faqMessages } from '@/i18n/messages/faq';
+import { habitFlowMessages } from '@/i18n/messages/habit-flow';
+import { habitsMessages } from '@/i18n/messages/habits';
 import { homeMessages } from '@/i18n/messages/home';
 import { insightsMessages } from '@/i18n/messages/insights';
 import { legalMessages } from '@/i18n/messages/legal';
@@ -40,6 +42,8 @@ export const MESSAGE_AREAS = {
   dates: dateMessages,
   entry: entryMessages,
   faq: faqMessages,
+  habitFlow: habitFlowMessages,
+  habits: habitsMessages,
   home: homeMessages,
   insights: insightsMessages,
   legal: legalMessages,
@@ -77,6 +81,8 @@ export const MESSAGES = {
   ...MESSAGE_AREAS.dates,
   ...MESSAGE_AREAS.entry,
   ...MESSAGE_AREAS.faq,
+  ...MESSAGE_AREAS.habitFlow,
+  ...MESSAGE_AREAS.habits,
   ...MESSAGE_AREAS.home,
   ...MESSAGE_AREAS.insights,
   ...MESSAGE_AREAS.legal,

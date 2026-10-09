@@ -21,6 +21,12 @@ const allText = () =>
 /** The examples are the same in every language: dictation is English, and a card is a card. */
 const SAME_EVERYWHERE = new Set(['voice', 'unlimited']);
 
+/**
+ * Approved with a heading and line that wrap to two lines; the page wraps them whole (no line
+ * limit), so only the points are held to one line.
+ */
+const TWO_LINE_HEADINGS = new Set(['habits']);
+
 describe('PRO_FEATURES', () => {
   it('keeps its ids and gives every feature an icon, three points and an icon for each', () => {
     expect(features().map((feature) => feature.id)).toEqual([
@@ -29,6 +35,7 @@ describe('PRO_FEATURES', () => {
       'voice',
       'history',
       'unlimited',
+      'habits',
     ]);
     for (const feature of features()) {
       expect(feature.icon).toBeDefined();
@@ -49,6 +56,15 @@ describe('PRO_FEATURES', () => {
     ]);
     expect(PRO_FEATURES.history.title).toBe('See further back');
     expect(PRO_FEATURES.unlimited.points[2].text).toBe('Nothing locked if Pro ends');
+    const habits = PRO_FEATURES.habits;
+    expect(habits.example).toBe('Coffee · 3 days skipped · $15.00 saved');
+    expect(habits.title).toBe('See what skipping saves');
+    expect(habits.subtitle).toBe('Tap the days you buy it. Skip adds up the days you don’t.');
+    expect(habits.points.map((point) => point.text)).toEqual([
+      'One tap records what you spent',
+      'Every day you skip counts as saved',
+      'Counts in your receipts and balance',
+    ]);
   });
 
   it('reads in Spanish', () => {
@@ -56,6 +72,7 @@ describe('PRO_FEATURES', () => {
     expect(PRO_FEATURES.history.title).toBe('Mira más atrás');
     expect(PRO_FEATURES.scan.subtitle).toBe('Haz la foto. Skip la lee.');
     expect(PRO_FEATURES.insights.points[0].text).toBe('Cómo estás ahora mismo');
+    expect(PRO_FEATURES.habits.points[1].text).toBe('Cada día sin comprar cuenta como ahorro');
   });
 
   it('reads in French', () => {
@@ -63,6 +80,7 @@ describe('PRO_FEATURES', () => {
     expect(PRO_FEATURES.unlimited.title).toBe('Ajoute-les tous');
     expect(PRO_FEATURES.voice.points[2].text).toBe('Ta voix n’est jamais gardée');
     expect(PRO_FEATURES.history.example).toBe('De 90 jours à 7 ans');
+    expect(PRO_FEATURES.habits.example).toBe('Café · 3 jours sans achat · 15,00 $ économisés');
   });
 
   it.each(['en', 'es', 'fr'] as const)(
@@ -71,8 +89,9 @@ describe('PRO_FEATURES', () => {
       setLanguage(language);
       for (const feature of features()) {
         // 28pt heading, 15pt line and 15pt points on a 390pt phone.
-        expect(feature.title.length).toBeLessThanOrEqual(22);
-        expect(feature.subtitle.length).toBeLessThanOrEqual(42);
+        const lines = TWO_LINE_HEADINGS.has(feature.id) ? 2 : 1;
+        expect(feature.title.length).toBeLessThanOrEqual(22 * lines);
+        expect(feature.subtitle.length).toBeLessThanOrEqual(42 * lines);
         feature.points.forEach((point) => expect(point.text.length).toBeLessThanOrEqual(40));
         [
           feature.example,

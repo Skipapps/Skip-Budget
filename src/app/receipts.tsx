@@ -254,6 +254,7 @@ export default function ReceiptsScreen() {
                   date={receipt.purchased_on}
                   domain={logoDomainOf(receipt)}
                   logoHidden={receipt.logo_hidden}
+                  habit={receipt.habit}
                   sourceLabel={
                     sourceLabels.get(receipt.card_id ?? receipt.bank_account_id ?? '') ?? ''
                   }

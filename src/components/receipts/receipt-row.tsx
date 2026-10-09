@@ -1,7 +1,9 @@
 import { Pressable, View } from 'react-native';
 
 import { BrandMark } from '@/components/brands/brand-mark';
+import { HabitIcon } from '@/components/habits/habit-icon';
 import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
+import type { HabitColor } from '@/data/habit-colors';
 import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
@@ -18,6 +20,8 @@ type ReceiptRowProps = {
   domain?: string | null;
   /** The owner chose letters for this receipt. */
   logoHidden?: boolean | null;
+  /** Filed from a spending habit: drawn with the habit's icon, not a logo. */
+  habit?: { icon_id: string; color: HabitColor } | null;
   onPress?: () => void;
 };
 
@@ -32,6 +36,7 @@ export function ReceiptRow({
   sourceLabel,
   domain,
   logoHidden,
+  habit,
   onPress,
 }: ReceiptRowProps) {
   const moneyColor = useMoneyColor();
@@ -79,7 +84,11 @@ export function ReceiptRow({
         onPress={onPress}
         className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"
       >
-        <BrandMark name={merchant} domain={domain} hidden={logoHidden} size={40} />
+        {habit ? (
+          <HabitIcon iconId={habit.icon_id} color={habit.color} size={40} />
+        ) : (
+          <BrandMark name={merchant} domain={domain} hidden={logoHidden} size={40} />
+        )}
 
         {/* Stacked, the amount follows the name and the date follows the card it was paid with. */}
         <View className="min-w-0 flex-1 items-start">

@@ -1,5 +1,6 @@
 import { router, Stack } from 'expo-router';
 import {
+  CalendarCheck,
   ChartColumn,
   Check,
   CreditCard,
@@ -66,6 +67,7 @@ const ROWS: Row[] = [
   },
   { icon: Mic, label: 'pro.compare.voice', free: 'no', pro: 'yes' },
   { icon: ChartColumn, label: 'pro.compare.insights', free: 'no', pro: 'yes' },
+  { icon: CalendarCheck, label: 'pro.compare.habits', free: 'no', pro: 'yes' },
   { icon: Sparkles, label: 'pro.compare.early', free: 'no', pro: 'yes' },
   { icon: Headphones, label: 'pro.compare.support', free: 'no', pro: 'yes' },
 ];

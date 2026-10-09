@@ -5,6 +5,7 @@ import { Text, View } from 'react-native';
 import { BalanceSummary } from '@/components/dashboard/balance-summary';
 import { DestinationList } from '@/components/dashboard/destination-list';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
+import { useHabits } from '@/api/habits';
 import { usePro } from '@/api/pro';
 import { GettingStartedCard } from '@/components/dashboard/getting-started-card';
 import { InsightBanner } from '@/components/dashboard/insight-banner';
@@ -65,7 +66,10 @@ const TOOL_IDS = new Set(['loan-calculator']);
 const TILES = spendingCategories.filter((tile) => !TOOL_IDS.has(tile.id));
 
 export default function HomeScreen() {
-  const { pro } = usePro();
+  const { pro, ready } = usePro();
+  const habits = useHabits();
+  // Hidden until both answers are in, so a lapsed account that has habits never sees it flash.
+  const habitsLocked = ready && !pro && habits.isSuccess && habits.data.length === 0;
   useKeepSchedulesCurrent();
   const { refresh, refreshing } = useRefreshAll();
 
@@ -205,7 +209,7 @@ export default function HomeScreen() {
         <SectionHeading>{t('home.goFurther')}</SectionHeading>
       </View>
       <View className="mt-3 w-full">
-        <ToolCards onPress={(href) => router.push(href)} />
+        <ToolCards onPress={(href) => router.push(href)} habitsLocked={habitsLocked} />
       </View>
       <View className="mt-4 w-full">
         <InsightBanner pro={pro} onPress={() => router.push('/insights')} />
@@ -335,6 +339,7 @@ function Section({
                     kind={entry.kind}
                     categoryId={entry.categoryId}
                     iconId={entry.iconId}
+                    habit={entry.habit}
                     onPress={onEntryPress(entry)}
                   />
                 </Fragment>

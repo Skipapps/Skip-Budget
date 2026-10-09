@@ -243,6 +243,16 @@ export const receiptsMessages = defineMessages({
     es: 'Recibos de {store}',
     fr: 'Reçus de {store}',
   },
+  'receipts.detail.fromHabit': {
+    en: 'From your habit: {name}',
+    es: 'De tu hábito: {name}',
+    fr: 'De ton habitude : {name}',
+  },
+  'receipts.detail.fromDeletedHabit': {
+    en: 'From a deleted habit: {name}',
+    es: 'De un hábito eliminado: {name}',
+    fr: 'D’une habitude supprimée : {name}',
+  },
   'receipts.detail.thisOne': { en: 'This receipt', es: 'Este recibo', fr: 'Ce reçu' },
   'receipts.detail.empty': {
     en: 'No receipts from {store} in this period.',

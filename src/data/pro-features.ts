@@ -11,6 +11,7 @@ import {
   Infinity as InfinityIcon,
   LockOpen,
   Mic,
+  PiggyBank,
   ReceiptText,
   ScanLine,
   Scale,
@@ -77,4 +78,5 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
   voice: feature('voice', Mic, [ReceiptText, CircleCheck, ShieldCheck]),
   history: feature('history', History, [CalendarRange, ArchiveRestore, Scale]),
   unlimited: feature('unlimited', CreditCard, [InfinityIcon, Banknote, LockOpen]),
+  habits: feature('habits', CalendarCheck, [CircleCheck, PiggyBank, ReceiptText]),
 };

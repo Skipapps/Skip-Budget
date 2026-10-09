@@ -28,6 +28,11 @@ type StepFlowProps = {
   current: number;
   /** Step 0 goes back out of the flow; any other step goes back one step. */
   onBack: () => void;
+  /**
+   * The page the flow opened on: the edge swipe and hardware back leave the route only here.
+   * Defaults to step 0; a second page within step 0 (a name, then an icon) passes false.
+   */
+  root?: boolean;
   /** The muted line the step opens with, e.g. "How much did you spend?". */
   question?: string;
   /** Sits between the dots and the question (the receipt scan pills). */
@@ -58,6 +63,7 @@ export function StepFlow({
   steps,
   current,
   onBack,
+  root = current === 0,
   question,
   headerSlot,
   primaryLabel,
@@ -81,9 +87,9 @@ export function StepFlow({
     if (target) AccessibilityInfo.sendAccessibilityEvent(target, 'focus');
   }, [current, question]);
 
-  // Leaving the route throws away everything typed, so past step 0 the edge swipe is off and
-  // hardware back steps back instead, matching the chevron.
-  const screenOptions = useMemo(() => ({ gestureEnabled: current === 0 }), [current]);
+  // Leaving the route throws away everything typed, so past the first page the edge swipe is off
+  // and hardware back steps back instead, matching the chevron.
+  const screenOptions = useMemo(() => ({ gestureEnabled: root }), [root]);
 
   // Read through a ref so an inline `onBack` does not resubscribe the listener on every keystroke.
   const onBackRef = useRef(onBack);
@@ -94,12 +100,12 @@ export function StepFlow({
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-        if (current === 0) return false;
+        if (root) return false;
         onBackRef.current();
         return true;
       });
       return () => subscription.remove();
-    }, [current]),
+    }, [root]),
   );
 
   return (
@@ -213,7 +219,7 @@ export function FlowHeader({
 }
 
 /** Where you are, as one wide pill among dots. Completed and upcoming steps look the same on purpose. */
-function StepIndicator({ steps, current }: { steps: number; current: number }) {
+export function StepIndicator({ steps, current }: { steps: number; current: number }) {
   return (
     <View
       accessibilityRole="progressbar"

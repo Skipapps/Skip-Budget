@@ -3,7 +3,9 @@ import { Pressable, View } from 'react-native';
 
 import { BillMark } from '@/components/bills/bill-mark';
 import { BrandMark } from '@/components/brands/brand-mark';
+import { HabitIcon } from '@/components/habits/habit-icon';
 import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
+import type { HabitMark } from '@/lib/card-ledger';
 import { cn } from '@/lib/cn';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
@@ -21,8 +23,12 @@ type TransactionRowProps = {
   kind?: 'receipt' | 'bill' | 'subscription' | 'payment' | 'income';
   categoryId?: string | null;
   iconId?: string | null;
+  /** A receipt filed from a spending habit draws the habit's icon, not a logo. */
+  habit?: HabitMark | null;
   /** Opens whatever is behind the row. Undefined leaves it inert: no dimming, not a button. */
   onPress?: () => void;
+  /** What VoiceOver adds after the label when the row opens a page: "Opens this receipt". */
+  hint?: string;
 };
 
 /**
@@ -38,7 +44,9 @@ export function TransactionRow({
   kind,
   categoryId,
   iconId,
+  habit,
   onPress,
+  hint,
 }: TransactionRowProps) {
   const colors = useColors();
   const moneyColor = useMoneyColor();
@@ -64,6 +72,7 @@ export function TransactionRow({
       <Pressable
         accessibilityRole={onPress ? 'button' : 'text'}
         accessibilityLabel={`${label}, ${formatCurrency(amount)}${kindLabel ? `, ${kindLabel}` : ''}`}
+        accessibilityHint={onPress ? hint : undefined}
         onPress={onPress}
         disabled={!onPress}
         className={cn(
@@ -71,7 +80,9 @@ export function TransactionRow({
           onPress ? 'active:opacity-60' : undefined,
         )}
       >
-        {kind === 'bill' ? (
+        {habit ? (
+          <HabitIcon iconId={habit.iconId} color={habit.color} size={40} />
+        ) : kind === 'bill' ? (
           <BillMark
             categoryId={categoryId}
             iconId={iconId}

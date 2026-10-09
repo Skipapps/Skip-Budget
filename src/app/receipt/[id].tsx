@@ -1,13 +1,15 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pencil } from 'lucide-react-native';
+import { ChevronRight, Pencil } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
+import { useHabit } from '@/api/habits';
 import { useHistoryFloor } from '@/api/history';
 import { useReceipts, usePaymentSources, type ReceiptRow } from '@/api/queries';
 import { useSpendCategories } from '@/api/brands';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { ChangeLogoButton } from '@/components/brands/change-logo-button';
+import { HabitIcon } from '@/components/habits/habit-icon';
 import { ChargeSection, DetailCard, type PlanDetailRow } from '@/components/plans/detail-parts';
 import { HistoryNotice } from '@/components/pro/history-notice';
 import { goBack } from '@/components/ui/back-button';
@@ -23,7 +25,8 @@ import { logoDomainOf } from '@/lib/logo-domain';
 import { rangeFor } from '@/lib/range';
 import { receiptCategoryName } from '@/lib/receipt-category';
 import { receiptsFromStore } from '@/lib/receipt-store';
-import { useMoneyColor } from '@/providers/theme-provider';
+import { withTap } from '@/lib/press';
+import { useColors, useMoneyColor } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { TEXT_CAP } from '@/theme/text-scale';
 
@@ -74,13 +77,21 @@ export default function ReceiptDetailScreen() {
   const receipt: ReceiptRow | null | undefined = receipts.data
     ? (receipts.data.find((row) => row.id === id) ?? null)
     : undefined;
+  // A habit's receipt links to its habit, or says the habit is gone.
+  const habitId = receipt?.habit_id ?? undefined;
+  const habit = useHabit(habitId);
 
   const today = toIsoDate(new Date());
   // Free lists 90 days back, Pro seven years; older receipts from the store stay stored.
   const { floor, free } = useHistoryFloor();
   const { history, inWindow, hiddenOlder } = useMemo(() => {
     if (!receipt || !receipts.data) return { history: [], inWindow: [], hiddenOlder: false };
-    const fromStore = receiptsFromStore(receipts.data, receipt);
+    // A habit's receipts are its own, whatever another store of the same name has.
+    const fromStore = receipt.habit_id
+      ? receipts.data
+          .filter((row) => row.habit_id === receipt.habit_id)
+          .sort((a, b) => b.purchased_on.localeCompare(a.purchased_on))
+      : receiptsFromStore(receipts.data, receipt);
     const range = windowKey === 'all' ? null : rangeFor(windowKey, new Date(`${today}T00:00:00`));
     const inWindow = fromStore.filter(
       (row) => !range || (row.purchased_on >= range.from && row.purchased_on <= range.to),
@@ -165,19 +176,32 @@ export default function ReceiptDetailScreen() {
     >
       <DetailCard
         mark={
-          <ChangeLogoButton kind="receipt" id={id} name={receipt.merchant}>
-            <BrandMark
-              name={receipt.merchant}
-              domain={logoDomainOf(receipt)}
-              hidden={receipt.logo_hidden}
-              size={52}
-            />
-          </ChangeLogoButton>
+          receipt.habit ? (
+            // A habit's icon is the habit's, chosen there; it has no logo to change.
+            <HabitIcon iconId={receipt.habit.icon_id} color={receipt.habit.color} size={52} />
+          ) : (
+            <ChangeLogoButton kind="receipt" id={id} name={receipt.merchant}>
+              <BrandMark
+                name={receipt.merchant}
+                domain={logoDomainOf(receipt)}
+                hidden={receipt.logo_hidden}
+                size={52}
+              />
+            </ChangeLogoButton>
+          )
         }
         amount={formatCurrency(Math.abs(receipt.amount))}
         subtitle={t('receipts.detail.boughtOn', { date: asDate(receipt.purchased_on) })}
         rows={details}
       />
+
+      {habitId && habit.data ? (
+        <HabitLink
+          habitId={habitId}
+          name={receipt.habit?.name ?? habit.data.name}
+          archived={habit.data.archived_at !== null}
+        />
+      ) : null}
 
       <View className="mt-7 w-full">
         <ChoiceChips options={WINDOWS} value={windowKey} onChange={setWindowKey} />
@@ -215,5 +239,46 @@ export default function ReceiptDetailScreen() {
         </View>
       )}
     </Screen>
+  );
+}
+
+/** Under a habit receipt's card: the way to its habit, or a plain line once the habit is deleted. */
+function HabitLink({
+  habitId,
+  name,
+  archived,
+}: {
+  habitId: string;
+  name: string;
+  archived: boolean;
+}) {
+  const colors = useColors();
+  if (archived) {
+    return (
+      <Text
+        className="mt-3 w-full text-center font-app text-[14px] text-muted"
+        maxFontSizeMultiplier={TEXT_CAP.row}
+      >
+        {t('receipts.detail.fromDeletedHabit', { name })}
+      </Text>
+    );
+  }
+
+  const label = t('receipts.detail.fromHabit', { name });
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={withTap(() => router.push({ pathname: '/habit/[id]', params: { id: habitId } }))}
+      className="mt-3 min-h-11 flex-row items-center justify-center gap-0.5 self-center rounded-full px-3 active:opacity-60"
+    >
+      <Text
+        className="shrink text-center font-app-semibold text-[14px] text-accent-ink"
+        maxFontSizeMultiplier={TEXT_CAP.row}
+      >
+        {label}
+      </Text>
+      <ChevronRight size={16} color={colors.accentInk} strokeWidth={2} />
+    </Pressable>
   );
 }

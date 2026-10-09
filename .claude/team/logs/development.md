@@ -4413,3 +4413,325 @@ bug in component behaviour found; two comments corrected. tsc 0; `rm -rf .expo/c
 - "mars" selected in the date circles at AX3.
 - The longest dialog (delete account) in fr at AX3 on an SE fits on screen; the card does not scroll.
 - All widths are advance sums without kerning, so real labels run slightly narrower.
+
+---
+
+## 2026-10-09 — Drew (Developer, money maths) — spending habits week maths (`src/lib/habit-week.ts`)
+
+**Outcome:** Done, uncommitted. I wrote the pure module and its tests. Only my two files were touched. jest `src/lib/habit-week.test.ts`: 58/58 passed. The same suite also passed 58/58 under 12 timezones (New York, Los Angeles, London, Paris, Sydney, Chatham, Santiago, Sao Paulo, Beirut, Kolkata, Kiritimati, Pago Pago). Prettier and eslint are clean on both files. tsc reports 113 errors, all in `src/data/habit-icons.ts` (another agent's work in progress: habits message keys not registered yet). None are in my files. Per the CEO I ran only my own suite, not the full `npm test`.
+
+- **Files:** `src/lib/habit-week.ts` and `src/lib/habit-week.test.ts`. The tests sit next to the code, like the other 30+ lib tests (there is no `src/__tests__/lib`).
+- **Exports:** `weekStartOf`, `weekDays`, `shiftWeek`, `isCurrentWeek`, `earliestWeek` (null when there are no habits), `dayState`, `tapsForHabit` (an extra: one habit's taps by day, for the circles and the undo), `savedInWeek`, `savedAllTime`, `spentInWeek`, `skipStreak`, `formatWeekRange`. Types: `HabitMaths`, `HabitTap`, `DayState`.
+- **How it works:**
+  - Dates are counted as whole days, using UTC only as a calendar (no DST), so the device timezone never moves a day.
+  - Money is added up in whole cents with `toCents` and converted back once at the end with `fromCents`. Results are in currency units (like `sumMoney`), not cents.
+  - Anything that is not a real `YYYY-MM-DD` date throws a RangeError. That includes timestamps and "2026-02-30".
+- **Semantic edges I decided:**
+  - A tapped day is always 'tapped', even before the start, today or in the future.
+  - 'future' takes priority over 'before'.
+  - Any day of a week stands for that week in every week function.
+  - Saved counts each tapped day once.
+  - Spent counts every distinct receipt, but a receipt listed twice counts once.
+  - savedAllTime ignores taps whose habit is not in the list, and counts a habit listed twice once.
+  - The streak ignores taps made today, in the future, or before the start.
+  - In formatWeekRange, no-break spaces keep each end and the dash together, so the label can only wrap after the dash. es/fr put the day first; the code branches on the current language.
+- **Mutations** (each restored byte-for-byte): 14 tried, all caught. They were: week starting on Sunday, today counted in saved and in the all-time total, float sums for spent and for saved, no receipt dedupe, today counted in the streak, the start ignored by the streak, 'tapped' not checked first, plain spaces, French with the month first, local-time day maths, no date validation, and a habit listed twice counted twice.
+- **Open:**
+  1. Should the hero's "Spent this week" include receipts of archived habits? `spentInWeek(taps, week)` counts every tap passed in; `spentInWeek(taps, week, activeIds)` counts only the active habits.
+  2. "Saved uses the current price" means a price edit restates all past saved figures.
+  3. UI tests must match the no-break spaces in the range label, not plain "Oct 5 – 11".
+  4. Diego: pass `purchased_on` and `started_on` as plain dates; a timestamp throws.
+
+---
+
+## 2026-10-09 — Dana (Developer, UI and navigation) — spending habits: 100 icons, registry, HabitIcon, names in 3 languages
+
+**Outcome:** Done, uncommitted. All 100 Founder icons are app assets with a typed registry, `<HabitIcon>`, and en/es/fr names. Pia's 13 category tints and her 6 dark habit tints are applied. No screens were built (they wait for the Founder). Gates: tsc has 0 errors in my files; the only 3 errors are in Diego's in-progress `src/__tests__/api/habits.test.tsx` and `habit-receipts.test.tsx`. eslint 0 and prettier clean on my files. jest `src/__tests__/habits` 2 suites, 20/20; `src/i18n` 10/10 suites; the no-splits, large-text-guard and no-route-test-files guards pass. No device or simulator run.
+
+- **Assets:** `assets/habit-icons/<category>/<slug>.svg`: 13 folders, 100 files, 370,569 bytes (362 KB; 520 KB on disk). The originals were 411,170 bytes. Every original was already clean: viewBox `0 0 96 96`, and only path, rect, circle, ellipse and g. There is no `<style>`, filter, mask, gradient, `<use>` or CSS class. No icon needed fixing. The copies went through svgo 3.3.5 (already in node_modules) with the transformer's own config, which keeps the viewBox. That saved 9.9%. Quick Look renders at 384px are identical, with at most 3/255 per channel of anti-aliasing. All 100 go through react-native-svg-transformer/expo plus Expo's Babel transformer cleanly. The Desktop originals were not touched.
+- **Registry:** `src/data/habit-icons.ts` exports `HABIT_ICON_CATEGORIES`, `HABIT_ICONS` (flat), `habitIcon(id)`, `FALLBACK_HABIT_ICON` (goals/other, "Other"), `HabitIconDef`, `HabitIconCategory` and `HabitIconCategoryId`. `HabitIconDef.id` is typed `HabitIconId`, the union of the 100 ids, so a preset table with a typo in an icon id fails tsc.
+  - Category order puts spending first: food-dining, transport, shopping, entertainment, health, fitness, wellness, home-bills, family-pets, relationships, learning-growth, finance, goals. Icons in each group are alphabetical. Pia's tints were assigned in this order.
+  - spendCategory follows the brief's map exactly.
+- **Art module:** `src/data/habit-icon-art.ts` was generated. It imports by relative path because Jest's `@/` mapping stops at src/. Jest therefore resolves every file, and a missing drawing fails the suite. It is a separate module so component tests can stand the drawings in.
+- **HabitIcon:** `src/components/habits/habit-icon.tsx`: `<HabitIcon iconId color size={44} />`. The circle uses `habitColor(color).tint[scheme]` (from useTheme) and the SVG is at 60%. An unknown id draws the fallback. It is hidden from accessibility (`accessible={false}`, elements hidden).
+- **i18n:** `src/i18n/messages/habits.ts` has 113 keys: `habits.category.<camelId>` and `habits.icon.<camelGroup>.<camelName>`. It is registered in `messages/index.ts`. No area-count test existed (messages.test counts keys and passes).
+  - English uses the file names. Category headings keep the Founder's Title Case, like the existing category labels.
+  - Spanish is Mexican (Botanas, Refrescos, Renta, Plan de celular). French is Canadian: Magasinage, Stationnement, and meals Déjeuner (breakfast), Dîner au resto (lunch out), Souper au resto (dinner out).
+- **habit-colors.ts:** only the 6 dark tints were changed, to Pia's section 9 values (the brief allows Dana to add dark values).
+- **Tests:** `src/__tests__/habits/habit-icons.test.ts` (14) and `habit-icon.test.tsx` (6).
+  - They check: 13 groups in order, 100 unique ids, every id resolves, and the 10 preset icons.
+  - Labels follow the id, exist in en/es/fr, and no two icons share a name in any language.
+  - Every spendCategory is in the migrations' spend_categories inserts, and the brief's map is pinned.
+  - Files on disk match the ids one to one. Each art entry imports its own file. The SVG rules: viewBox, plain shapes, no CSS.
+  - HabitIcon: light and dark tint, size 44 with art 26, size 56 with art 34, fallback, and hidden from accessibility.
+  - 9 mutations, each restored byte for byte, were all caught: swapped drawings, groceries filed as dining, an unknown spend id, a `<style>` in a file, the light tint in dark mode, a duplicate French name, no fallback, the drawing at full size, and a missing file.
+- **Open:**
+  1. The brief files Finance, Goals, Relationships and Family (except pets) under `other`. The DB also has utilities, telecom, insurance and finance, which fit electricity/water, internet/phone, insurance/health insurance and bank fees/credit card. I followed the brief; this is a CEO/Founder call.
+  2. Pia's section 9 also darkens the caramel, coral and green fills and adds `HabitColorDef.ink`. Neither is applied (the CEO owns the file).
+  3. In dark mode the navy outlines (#39426a) fade on dark tints: bike and cycling wheels, the meditate stones, the workout plates and dental. They are still recognisable. This is for Pia and Tia.
+  4. The preset names on screens should use the same meal words. Suggest adding them to the playbook glossary.
+  5. Pia's `habits.icon.question` shares the `habits.icon.` prefix with the labels. There is no collision.
+
+---
+
+## 2026-10-09 — Diego (Developer, data and backend) — Spending habits: data layer
+
+**Outcome:** Done, uncommitted, not pushed. Migrations are local files only. Both migrations were applied to a scratch copy of the local DB. `supabase/checks/habits.sql` ran there as `authenticated` with RLS on and printed ALL CHECKS PASSED; the copy was then dropped, and the real local DB was never changed. tsc: 0 errors across the whole tree. eslint is clean on my files. New suites: 2 suites, 41 tests. Affected existing suites: 36 suites, 997 tests, all passing.
+
+- **Migrations:**
+  - `20261009100001_capture_source_habit.sql`: the enum value only.
+  - `20261009100002_habits.sql`:
+    - The `habits` table, with checks: name trimmed and non-empty, icon present, colour one of the 6, price > 0, at most one of card or account. The card and account FKs are `on delete set null`.
+    - `started_on` is NOT NULL with no default. The server does not know the person's week, so the phone must send `weekStartOf(today)`.
+    - Owner-only RLS, plus explicit grants to authenticated and service_role. Default privileges no longer reach new tables (see auto_expose_new_tables in config.toml).
+    - updated_at trigger, and a trigger that only the person's own card or account can be named.
+    - Pro INSERT trigger with the message "Tracking spending habits is part of Skip Pro." It is skipped when auth.uid() is null.
+    - New column `receipts.habit_id` (FK, `on delete set null`) with a partial unique index `receipts_habit_once_a_day`, and a check that a receipt can only name the person's own habit.
+    - A rename trigger, AFTER UPDATE OF name: the new name is written to that habit's receipts as `merchant`.
+    - `habits` is added to supabase_realtime.
+  - `enforce_scan_is_pro` passes 'habit', and `keep_receipt_origin` keeps it on edit. Both were checked on the DB.
+- **`src/api/habits.ts`:** `useHabits`, `useHabit`, `useHabitTaps`, `useCreateHabit`, `useUpdateHabit`, `useArchiveHabit`, `useTapHabitDay`, `useUntapHabitDay`, plus the pure helpers `habitTapValues`, `readHabit` and `habitMaths`.
+  - Taps are cached under `['receipts', uid, 'habit-taps']`, so any receipt write refreshes the circles.
+  - Taps are read in pages using the exact count, because PostgREST caps a response at 1,000 rows.
+  - A 23505 on a tap resolves to `{ alreadyTapped: true }` together with the existing receipt's id.
+  - Any read error is thrown, 42P01 included.
+- **Joins:**
+  - `ReceiptRow` gets optional `habit_id` and `habit`.
+  - Receipt reads embed `habit:habits(name, icon_id, color)`. If the habit read fails with PGRST200, or with 42703 naming habit, they read again without it, the same way the logo columns fall back.
+  - `LedgerEntry.habit` (type `HabitMark` in `src/lib/card-ledger.ts`) is set on receipt entries and carried through the money book, so the card activity page gets it too.
+  - `CaptureSource` gains 'habit'. `DEPENDENTS` for cards and accounts gains 'habits'.
+- **Not verified:** the PostgREST embed against a live PostgREST (only mocked), and no device run.
+- **Open:**
+  - The realtime provider line `habits: ['habits']` is left out on purpose. A binding to a table that does not exist may fail the whole channel, so add it only once the migration is live.
+  - The receipt reminder treats a habit tap as "a receipt added today".
+  - `useReceipts` itself is still capped at 1,000 rows, and taps fill that cap faster.
+  - Re-dating a habit receipt onto a day that is already tapped gets 23505, and the edit page shows the generic failure.
+  - zod is not a dependency, so the boundary checks are written by hand.
+- **2026-10-09 — Diego — follow-ups after the Founder's design review:**
+  - `habits.saved_from date not null` added to `20261009100002_habits.sql` (edited in place; it has not been pushed). A new check, `habits_saved_after_start` (saved_from >= started_on), backs it.
+  - `HabitRow`, `HabitValues` (required on create), `readHabit` and the select now carry `saved_from`. `habitMaths(row)` maps it to Drew's `HabitMaths.savedFrom`; the name matches, so tsc reports 0 errors across the tree.
+  - New migration `20261009100003_receipt_reminder_ignores_habits.sql`: `receipt_reminders_due()` is re-created, adding one line (`and r.source <> 'habit'`), checked by diff. Privileges are restated. It goes after the enum file because the SQL body names 'habit'.
+  - `habits` stays out of the realtime provider for now.
+  - `supabase/checks/habits.sql` was updated for saved_from and the reminder, but **not run**: Docker stays off on the CEO's instruction, and there is no Postgres outside Docker. The SQL was reviewed by hand only.
+  - jest: habits 34 tests, habit-receipts 9; with logo-columns, ledger-window and money-book-hooks, 161 of 161 pass. Prettier and eslint are clean on my files.
+- **2026-10-09 — Drew — Saved counts from the creation day (Founder design review, item 6):**
+  - **Change:** `HabitMaths` gains `savedFrom` (the local day the habit was created). savedInWeek, savedAllTime and skipStreak now count from max(startedOn, savedFrom) to yesterday.
+  - **Unchanged:** dayState still uses only startedOn, so Monday up to the creation day stays 'open' and can be back-filled. spentInWeek is unchanged.
+  - **New fixtures (9 tests):** a habit created Thursday saves 0 until Thursday is over. A back-filled Tuesday adds 5.50 to spent but nothing to saved. Thursday to Sunday saves 20, and with a second habit the all-time total is 55. The streak starts on Thursday. Also covered: a creation week that crosses the year end; a creation day before the start (counting begins at the start); a creation day after today (saves 0); and an invalid creation day (throws).
+  - **Results:** jest 67/67, and 67/67 under 7 timezones. 6 new mutations, all caught. tsc exit 0, with no errors in any file. Prettier and eslint are clean on both files.
+  - **Integration:** Diego's `habitMaths(row)` already maps saved_from, and his check constraint (saved_from >= started_on) matches the max.
+
+---
+
+## 2026-10-09 — Dana (Developer, UI and navigation) — spending habits, build B: /habit-new (create + edit), presets, icon picker
+
+**Outcome:** Done, uncommitted. `/habit-new` covers Pick → Price → Confirm, Add my own (name → icon → Price), and edit mode `/habit-new?id=` with Delete. The Confirm preview is build A's real `HabitCard` (interactive={false}). Gates: tsc has 0 errors in my files; the only 4 errors in the tree are in build A's `src/__tests__/habits/habit-card.test.tsx` (TS2339 on `never`, lines 90/183/202/265). Prettier is clean and eslint (cache cleared) is clean on all 16 files I touched. My 5 suites plus the guards (large-text, no-route-test-files, no-splits) and `src/i18n/messages.test.ts`: 9 suites, 81/81. Existing suites for the shells I touched (step-flow, add-receipt, add-receipt-save, add-bill, add-subscription, source-payment, voice-review, ui-fields-language, shared-controls-large-text): 9 suites, 756/756. Mutations: 22 tried and 22 caught, each file restored byte for byte. No device or simulator run.
+
+- **New:**
+  - `src/app/habit-new.tsx`
+  - `src/data/habit-presets.ts`: 10 presets, `presetPrice`, `presetChips`, `habitPreset`, `OWN_HABIT_CHIPS`; MXN is x10.
+  - `src/components/habits/habit-preset-grid.tsx`
+  - `src/components/habits/habit-icon-picker.tsx`: also exports `iconColumns`.
+  - `src/components/habits/habit-color-swatches.tsx`: also exports `habitColorName`.
+  - `src/i18n/messages/habit-flow.ts`: area `habitFlow`, en/es/fr. The catalogue test requires each key to start with its area's name.
+  - Tests: `src/__tests__/app/habit-new.test.tsx` (34), `habit-new-languages.test.tsx` (7), `src/__tests__/habits/habit-presets.test.ts` (7), `habit-icon-picker.test.tsx` (11), `habit-preset-grid.test.tsx` (7).
+- **Edited (all backward compatible):**
+  - `step-flow.tsx`: `StepIndicator` is exported. New optional `root` prop, defaulting to `current === 0`, so Add my own's name and icon pages (step 1, but not the first page) do not let a swipe drop the flow.
+  - `entry-review.tsx`: new `progress` prop, which draws the dots under the header.
+  - `text-field.tsx`: `autoFocus` passes through.
+  - `messages/index.ts`: registers `habitFlow`.
+  - `messages/toast.ts`: `toast.habit.added/updated/deleted`.
+- **Save payload:**
+  - name is trimmed.
+  - `category_id` is the icon's spendCategory. On edit it is sent only when the icon changed, so an icon unknown to this build keeps its category.
+  - The card goes to `card_id` and the account to `bank_account_id`; Skip sets neither.
+  - On edit, an unchanged Paid with keeps the saved columns, so a card a lapsed plan no longer lists is not dropped.
+  - `preset_id` is null for Add my own.
+  - `started_on` = `weekStartOf(today)` and `saved_from` = today.
+  - `sort_order` = lowest active - 1, so the new habit sits on top.
+- **Pro:** a refusal pushes `/pro-feature?id=habits` only when the app also thinks the account is free (the add-receipt rule). If the app thinks the account is Pro, the refusal shows the failure line. Edit and delete are never gated.
+- **Deviations:**
+  1. Step 1 has no "Pick one, or add your own." subtitle, following the approved mock. It is one line to add back.
+  2. On the Price page, Continue (and Done on the Price line's page) sits above the keypad, as in the mock and the brief. add-receipt's amount step has it below.
+  3. Add my own's chips are x10 in pesos too (50/100/200).
+  4. The edit-mode preview shows the habit's real days (`useHabitTaps`).
+  5. The Habit line's page does not autofocus, so the keyboard does not cover its Icon row. The create path's name page does autofocus.
+  6. The swatches share the row width (justify-between) instead of a fixed 12pt gap. 6x40 + 5x12 = 300pt does not fit the 295pt inside a card at 375pt.
+- **Open:**
+  - A lapsed account editing a habit paid with a card it can no longer list sees no pill selected; the saved card is kept.
+  - Spanish and French are my own (playbook glossary words; Canadian déjeuner/dîner/souper matched to the icon names). New words not yet in the glossary: es "Antojos", "Botanas", "energizantes"; fr "Gâteries", "Restos", "Applis".
+- **2026-10-09 — Dana — CEO call, the create path is gated at its start:**
+  - `habit-new.tsx` calls `useProGate('habits')` and applies it only when there is no `id`. A free account redirects to `/pro-feature?id=habits` before Pick. While Pro is unknown nothing is drawn, as `useProGate` does. Edit mode stays open to every plan.
+  - The Save-time refusal handling stays as the backstop. With the gate in front, it is reachable only if the gate lets a free account through.
+  - New tests (habit-new.test, now 39):
+    - free + create → explainer;
+    - unknown → nothing drawn, then Pick;
+    - Pro + create → Pick;
+    - free + edit → edit page;
+    - a lapse partway through → explainer;
+    - the backstop test now opens the gate on purpose.
+  - Two mutations of the gate line (removed; applied to edit too): both caught.
+  - My 5 suites plus the guards and messages.test: 9 suites, 86/86. tsc: the only errors are build A's 4 in `habit-card.test.tsx`. Prettier and eslint clean.
+
+---
+
+## 2026-10-09 — Dana (Developer, UI and navigation), build A — Spending habits: dashboard, card, habit page, receipts, tool card, explainer
+
+**Outcome:** Done, uncommitted. Built the HabitCard (first, contract appended to the brief), `/habits`, `/habit/[id]`, the Home tool card with its PRO pill, the `habits` Pro explainer and compare row, habit icons in every receipt list and on the receipt page, and the read-only Store plus day-taken hint in `/add-receipt`. Gates: tsc 0. ESLint 0 on my 35 files, run with the cache cleared. Prettier is clean. My run: 85 suites, 1677 tests, all pass (my 7 new suites hold 61 tests; the run includes the guards and the affected existing suites). Diego's API suites and build B's habit-new suites: 6 suites, 229 tests, all pass. 30 mutations, each restored byte for byte, were all caught. No device or simulator run.
+
+- **New:** `src/components/habits/{habit-card,day-row,use-habit-days,habits-hero,week-selector}`; `src/app/habits.tsx`; `src/app/habit/[id].tsx`.
+- **Changed:**
+  - `tool-cards.tsx`, `transaction-row.tsx`, `ledger-row.tsx`, `receipt-row.tsx`, `(tabs)/home.tsx`, `source/[id].tsx`, `receipts.tsx`, `receipt/[id].tsx`, `add-receipt.tsx`, `pro.tsx`, `pro-features.ts`.
+  - Messages: `habits.ts`, `home.ts`, `pro.ts`, `receipts.ts`.
+  - `habit-colors.ts`: Pia's section 9 fills and `ink`.
+  - Tests: home, home-languages, receipt-detail, pro and pro-features updated for the second tool card, the tenth compare row and the new hook mocks.
+- **Decisions:**
+  - `busyDays: ReadonlySet<string>`, because several days can be in flight at once.
+  - Optimistic fill: `useHabitDays` keeps its own pending list. A filled day stays drawn until a re-read shows it, and is dropped after a second read that still lacks it. The hooks do not wait for their refetch, so a fill read from `variables` alone would blink empty after each answer.
+  - Card label: "{name}, {status}, {saved} saved, {spent} spent.", plus the hint "Opens the habit.".
+  - Figures: 15pt figure with a 12pt word.
+  - The habit page reuses B's `habitFlow.color.*` keys. Its skipped count is Saved in cents divided by the price in cents, which is exact.
+  - The Pro features test allows the approved habits title and subtitle to wrap to two lines.
+  - Typed routes: I regenerated the git-ignored `.expo/types/router.d.ts` with Expo's own generator. Only the three new routes changed.
+- **Open:**
+  - Day labels do not name the habit, so two cards' open Thursdays read the same to VoiceOver.
+  - Until the migration is live, Home's `useHabits` fails on every mount: no pill is drawn, and the card opens the error page.
+  - "Skipped all week" overstates a habit's partial first week.
+  - The pro-offer highlight list is unchanged.
+  - Device walk for Tia: hero and card figures stacking at AX3, the PRO pill corner, 375pt day columns, dark tints.
+
+---
+
+## 2026-10-09 — Dmitri (Development Lead) — review of the uncommitted Spending habits feature
+
+**Outcome:** APPROVE WITH FIXES. The money wiring is correct. A tap files one receipt: habit price, local day, card first (else the account, else Skip), the habit's category, source 'habit' and habit_id. The hero's Saved counts active habits only and starts at savedFrom. Spent uses the receipts' real amounts. Habit receipts reach the money book once, as plain receipts. `useHabitTaps` feeds only the habit screens, so nothing is counted twice. tsc exit 0; 26 targeted suites / 335 tests pass; eslint is clean on the habit files. Read-only review: no code was edited.
+
+- **MUST:**
+  1. Dana A: the CEO's spend-category call is not applied in `src/data/habit-icons.ts`. Home-bills and finance still file under home/other. Update the test that pins the map.
+  2. Diego: run migrations 1-3 and `supabase/checks/habits.sql` on a scratch DB, and prove the `lacksHabits` fallback against a real PostgREST that lacks habits. This gates the push.
+- **SHOULD:**
+  - Dana A: name the habit in each day's VoiceOver label.
+  - Drew + Dana A: export skipped-day counts and replace "Skipped all week" on a partial first week.
+  - Dana A: make days before the free floor inert.
+  - Dana A: a failed refetch that still has data shows the inline line, not the error page.
+  - Diego: dedupe the paged taps by receipt id.
+- **Rulings:** the hero's Spent counts active habits only, matching the cards. The one-time-offer page is unchanged in this build; it is a Founder call.
+- **Risk:** the migrations must be live before any build or device run against prod. Until then, `/habits` errors and the Home card leads to an error page.
+- **2026-10-09 — Dana — Dmitri's three fixes:**
+  - The Price-body comment now gives only the why: the button sits next to the figure it confirms.
+  - `handleDelete`'s catch now calls `warn()`, like the file's other catches. A new test checks a failed delete shows the failure line with the haptic and stays.
+  - `@/api/push` is mocked in habit-new.test and habit-new-languages.test, and no notifications warning is left in the run.
+  - My suites plus the guards: 9 suites, 87/87. tsc: 0 errors across the tree. Prettier and eslint clean.
+- **2026-10-09 — Drew — skipped-day counts (Dmitri's ruling):** The UI never has to divide money by a price now.
+  - **New exports:** `countsFrom(habit): string` (the later of startedOn and savedFrom); `skippedDaysInWeek(habit, tappedDays, weekStart, today): number`; `skippedDaysAllTime(habit, tappedDays, today): number`. Both counts use the same window as Saved.
+  - **Saved re-expressed:** savedInWeek and savedAllTime are now count x price in cents. All earlier fixtures pass unchanged.
+  - **New tests (6):** a partial first week (0, 1, then 4 days; whole weeks after); back-filled days, today and the future ignored; repeated taps counted once; a year boundary (5, 4, 10, 6); and a sweep over 4 prices checking count x price equals Saved and the weeks add up to all-time.
+  - **Results:** jest 73/73, also 73/73 under Chatham, Santiago and Pago Pago. tsc exit 0. Prettier and eslint are clean. 4 mutations, all caught. Only my two files were touched.
+- **2026-10-09 — Dana (build A) — Dmitri's review fixes:**
+  - (1) The CEO's spend map is in `habit-icons.ts`. Electricity and water bill file under utilities, internet and phone bill under telecom, both insurance icons under insurance, and bank fees and credit card under finance. All four ids are seeded. The test's live parse now checks they exist, and the pinned map includes them.
+  - (2) Every day's VoiceOver label starts with the habit's name, through the new `habits.day.named` key.
+  - (3) A past first week that began mid-week says "{count} days skipped" (`countsFrom`, `skippedDaysInWeek`); it says "Skipped all week" only when the whole week counted. The habit page's tally uses `skippedDaysAllTime`.
+  - (4) HabitCard and DayRow take `floor`. On a free account, days before it are drawn as 'before', read "kept but not shown on Free" (`habits.day.hidden`) and are inert, so no hidden receipt is filed or removed. The habit page passes it too, though its this-week row never reaches the floor.
+  - (5) A failed read shows the error page only when there is nothing to show. A failed refresh keeps the data on screen and adds the shared `FailureLine` with Try again. The habit page now decides it is gone from what was read, so a failed refresh never steps out.
+  - Gates: tsc is clean except for `habit-gaps-api.test.tsx` (not mine, being written). ESLint and prettier are clean on my 38 files. 79 suites, 1648 tests, all pass. 11 new mutations were all caught. Theo's dashboard and home gap suites pass.
+- **2026-10-09 — Diego — the Docker run the Founder approved, and Dmitri's review items:**
+  - **Docker:**
+    - `n8n` and `cloudflared` were stopped (`docker stop` only) about 1s after the daemon answered.
+    - All work ran on a scratch copy, `habits_check`, and a throwaway PostgREST v14.5 container (the live project's version, read from `supabase/.temp/rest-version`) bound to 127.0.0.1. Container, image and scratch DB were all removed afterwards.
+    - Real local DB unchanged: still at 20261008100002, original enum, no `habits` table.
+    - Docker Desktop was stopped with `docker desktop stop`, and no Docker process remains.
+    - Correction: my earlier "quit" via osascript left the Desktop app and back-end running for 3 hours with no VM. The check only tested whether the daemon answered, which is a bad test.
+  - **Real-PostgREST proof:** the app's actual hooks ran through supabase-js against the scratch PostgREST, from a jest test kept in the scratchpad.
+    - Without habits:
+      - The habit embed returns 400 PGRST200 ("Could not find a relationship between 'receipts' and 'habits'…"). The `useReceipts`/`useReceipt` fallback retries without the habit and gets 200.
+      - `habit_id` alone returns 42703.
+      - `/habits` returns 404 PGRST205, not 42P01.
+      - The fallback needed no change.
+    - With habits, all 7 pass:
+      - The embed answers in one request.
+      - `useHabitTaps` reads 2,500 taps in 3 keyset pages (206/200/200), each once, cents exact.
+      - Tap, then tap again: 201, then 409 23505, which resolves as already tapped with the same id. Untap returns 204.
+      - Untap leaves a non-habit receipt alone.
+      - Rename and archive behave as the migration intends.
+      - Pro create is 201; free create is P0001, which `refusedForPro` matches; `saved_from` before `started_on` is 23514.
+  - **Migrations:** 100001, 100002 and 100003 each ran in their own transaction, in order, twice. All six runs exit 0, and the re-runs only skip with NOTICEs.
+  - **Checks:** `supabase/checks/habits.sql` printed ALL CHECKS PASSED (42 checks), including the reminder: a habit tap leaves it due, any other receipt silences it.
+  - **Dmitri's items:**
+    - (2) Taps are now paged by key on (`purchased_on`, `id`), deduplicated by receipt id; the later read wins for a receipt re-dated between pages. 3 tests added.
+    - (4) Each page now has its own 12 s timeout.
+    - (3) The migration comments now say only 100003 names 'habit'.
+  - **Gates:** tsc 0 errors. Prettier and eslint clean on my files. jest: 6 suites, 188 tests pass, no act() warnings in mine.
+  - **Seen for real:** `useReceipts` returned 1,000 of 2,502 receipts (the PostgREST row cap). `pay.ts` `missingTable` checks 42P01, but PostgREST 14.5 answers PGRST205.
+- **2026-10-09 — Dana (build A) — Founder card change (pills):**
+  - HabitCard no longer draws the sub-line; VoiceOver still reads the status in the card's label.
+  - Two pills sit on the right of the header row, next to the name: icon | name (flex-1, wraps) | [saved][spent], centred. Each is the figure (14pt semibold) over its word (11pt), `rounded-[12px] px-2.5 py-1.5`, 6pt apart.
+  - Saved above 0: money-in tint with money-in type. At 0, and Spent always: neutral `bg-ink/5`, ink figure, muted word.
+  - Tints per mode, each 4.5:1 or better: light money 10% (12% would be 4.44:1), dark money 14%, dark neutral 8%.
+  - A switch FitGroup keeps the pills beside the name while every word of the name fits. Otherwise they drop under the name, side by side, and wrap whole only if even that is too narrow.
+  - Weeks before the start have no pills.
+  - Gates: tsc clean (Theo's api gap file aside, as before). ESLint and prettier clean. Habit suites, Theo's gap suites, B's habit-new suites, the guards and Home: 33 suites, 563 tests, all pass. 4 new mutations were all caught. No edits were needed in Theo's or B's tests: they assert the VoiceOver labels, which keep the status.
+- **2026-10-09 — Drew — taps start on the creation day (Founder, after testing):**
+  - **Change:** `dayState` returns 'before' for days earlier than countsFrom (the later of startedOn and savedFrom), so there is no back-fill before creation. Order is unchanged: tapped, future, before, today, open.
+  - **Old taps:** a tap made before this rule still shows as 'tapped' and can be removed.
+  - **Unchanged:** startedOn stays the Monday (week selector, earliestWeek). Saved, Spent and the counts are unchanged.
+  - **Fixtures, habit created Thursday:**
+    - On Thursday: Monday–Wednesday 'before', Thursday 'today'.
+    - On Friday: Thursday 'open', Friday 'today'.
+    - On the following Monday: Thursday–Sunday 'open'.
+    - Next week: Monday and Tuesday open, Wednesday today.
+    - An old Tuesday tap is still 'tapped'.
+    - A sweep over all 7 creation days x 14 days shows a day is open or today exactly when it falls between countsFrom and today.
+    - A creation day after today makes even today 'before'.
+  - **Results:** jest 76/76, also 76/76 under Chatham, Santiago and Pago Pago. tsc exit 0. Prettier and eslint are clean. 4 mutations, all caught.
+  - **For Dana:** `components/habits/day-row.tsx` gets the rule via dayState. I did not run the habit UI suites (habits, habit-card, habit-gaps-*, habit-detail); any test that back-fills a day before saved_from must change.
+- **2026-10-09 — Dana — Founder rule: a habit can be tapped only from the day it is made:**
+  - Confirm's last row now reads "Starts · Today" on create. On edit it reads "Started · {saved_from}", formatted with `formatFullDate`.
+  - New keys `habitFlow.field.started` (Started / Inicio / Début, matching the detail page) and `habitFlow.starts.today` (Today / Hoy / Aujourd’hui). `habitFlow.starts.thisWeek` and `habitFlow.starts.weekOf` are removed.
+  - No other create-flow copy implied back-filling. The price helper "Each day you tap records this amount." stays.
+  - The save payload is unchanged.
+  - The preview test now checks only what the page hands HabitCard (this habit's name and price, nothing to press). Build A's card sentence changed and is A's to pin.
+  - Two mutations of the row (started_on on edit; the label in place of Today): both caught.
+  - 9 suites, 87/87 with the guards. tsc 0 across the tree. Prettier and eslint clean.
+- **2026-10-09 — Dana (build A) — Founder card change 2 (price only) and creation-day rules:**
+  - HabitCard has no pills and no sub-line. The header row is icon | name | the habit's price, 16pt semibold ink. The price is a whole "hug" member of the header's switch group, so it is never cut. It drops under the name when a word of the name cannot sit beside it, and it shows in weeks before the start.
+  - The VoiceOver label is now "{name}, {price} each time, {status}, {saved} saved, {spent} spent." (en/es/fr). The hero is unchanged.
+  - Drew's `dayState` now treats days before `countsFrom` as 'before'. The dashboard and habit page follow it with no code change. A receipt filed before creation still shows filled and can be removed.
+  - `/add-receipt?id=` for a habit receipt: a small wrapper reads the habit (`useHabit`) for `saved_from`, so ordinary receipts never load habit data. The calendar blocks earlier days (`minDate`). Save refuses a move before the creation day with "{name} started on {date}." (`habits.receipt.startedOn`). A receipt already dated earlier still saves where it is.
+  - Theo's `habit-gaps-dashboard`: the price was inserted into its 8 label assertions; nothing else changed. B's preview assertion is a regex and still passes.
+  - Gates: tsc clean (Theo's api gap file aside). ESLint and prettier clean. 66 suites, 1569 tests, all pass. 5 new mutations were all caught.
+- **2026-10-09 — Diego — habit receipts not dated before the habit was made (DB lock, Founder-approved):**
+  - **Migration:** new `20261009100004_habit_receipt_not_before_creation.sql`.
+    - `receipts_habit_not_before_creation` is a BEFORE INSERT OR UPDATE OF purchased_on, habit_id trigger on receipts. It refuses when `habit_id` is set and `purchased_on < habits.saved_from`.
+    - On UPDATE it checks only when `purchased_on` or `habit_id` is distinct from the old value, so edits to amount, note or card, the rename trigger, the card's on-delete-set-null and deletes all pass.
+    - It is invoker, not security definer: like `receipts_own_habit`, it reads only the person's own habits through RLS.
+    - Re-run safe.
+  - **Error contract (verified through PostgREST v14.5):** HTTP 400 with `{"code":"23514","details":"<saved_from yyyy-mm-dd>","hint":null,"message":"A habit receipt cannot be dated before the habit started."}`, the same for a tap and for a re-date. The app matches it with `refusedBeforeHabitStart(thrown)` from `src/api/habits.ts`: code 23514 plus the words "before the habit started". 23514 alone is not enough, because other receipt checks use it too.
+  - **`useTapHabitDay`:** now `retry: false`, so the refusal fails once with no retry, even under an app-wide mutation retry default.
+  - **Scratch run:**
+    - n8n and cloudflared were already stopped, and `docker stop` was a no-op.
+    - 100001 to 100004 each ran in their own transaction, in order, twice: 8 of 8 exit 0.
+    - `supabase/checks/habits.sql`: ALL CHECKS PASSED, 54 checks. The fixtures now use saved_from = started_on, except the new Breakfast cases.
+    - The scratch DB, the PostgREST container and its image were removed. The real local DB is unchanged. Docker Desktop is stopped with no process left.
+  - **Gates:** tsc 0 errors. Prettier and eslint clean. jest: 6 suites, 191 tests pass. habits.test.tsx has 37 tests and habit-receipts 12 cases; my earlier "9" counted `it` blocks, not cases.
+- **2026-10-09 — Dana — Founder's Pick changes (from the Simulator):**
+  - **Tiles:** the radio is gone. The icon sits centred on top, with the name and subtitle centred under it. The chosen tile shows only the `border-2 border-control` outline, with no check mark. VoiceOver still hears a radio with selected/checked.
+  - **More and Add my own:** both are filled plum pills (`bg-control`, `active:bg-control-pressed`, rounded-full) with white words and white ChevronDown/Plus icons. They have equal widths and a 12pt gap.
+  - **Pill size:** the pills are smaller than the page's primary button (15pt SemiBold, px-3.5, min-h-12). That is what lets them sit side by side at default text on a 375pt phone in all three languages: each label has 103.5pt, measured from Montserrat advance widths with a scratch TTF reader.
+  - **Stacking:** labels are measured whole, so the pair stacks when a label cannot fit on one line at its size (at 1.4x in every language). A label is never cut.
+  - **Copy:**
+    - es "Agregar el mío" → "Crear el mío" (93.6pt).
+    - fr "Ajouter le mien" → "Autre chose" (93.3pt). "Le mien" did not agree with the feminine "habitude", and "Créer la mienne" (123pt) does not fit.
+  - **Tests:** new grid tests check no check mark, centred content, filled pills with white words and icons, and side by side in en/es/fr at 375pt but stacked at 1.4x, using the measured widths. Four mutations: outline pill, label not white, wider icon room, tile not centred. The outline pill first got through because `bg-control` matched inside `active:bg-control-pressed`; the class check now compares whole class names, and all four are caught.
+  - 9 suites, 92/92 with the guards. tsc 0. Prettier and eslint clean.
+- **2026-10-09 — Dana (build A) — card and account page: newest first, rows open their pages (Founder reversal):**
+  - `src/app/source/[id].tsx` lists newest first through the new pure `src/lib/ledger-order.ts` `newestFirst`. Within a day, receipts go latest-created first (`created_at` from `useReceipts`, the receipts list's tiebreak). Rows with no creation time follow in the money book's order. The free-plan notice moved to the end of the list.
+  - Rows open through `ledgerHref` + `chargeOwners` (from `useCharges`), as on Home: receipt, bill (projected or charge), subscription, and pay (`/salary`, where Home and Activity send it). They carry the Receipts rows' role and press feedback, plus hints: the existing receipts/subscriptions hints and new `accounts.source.billHint` / `payHint`. TransactionRow gained an optional `hint`. A charge with no known plan stays inert.
+  - Payments keep their press: it opens "Remove payment?". `source-payment.tsx` only creates a payment (it takes the card or account id, has no edit mode), so no page exists for one, and this press is the only way to remove a payment.
+  - Tests: new `src/lib/ledger-order.test.ts` (4) and `src/__tests__/app/source-detail-rows.test.tsx` (7: order, same-day tiebreak, every kind's destination, hints and feedback, inert unknown charge, payment removal kept, search on the new order, account page). Three existing source tests got the two new hook mocks. `source-detail-i18n`'s pay row now opens `/salary` (it pinned "opens nothing").
+  - Gates: tsc clean (Theo's api gap file aside). ESLint and prettier clean. 67 affected suites, 1188 tests, all pass. 5 mutations were all caught.
+- **2026-10-09 — Dana (build A) — Quick add plus badge (Founder option 2):**
+  - Each Quick add icon now sits in a 22×22 box with a 13pt `bg-control` badge (1.5pt `border-card` ring, white `Plus` 9pt, stroke 3) on its top-right corner. The badge is absolute, decorative and hidden from VoiceOver.
+  - The tile's labels, hints, routes and FitGroup are unchanged, and so is the label's room. A trailing plus was measured first: it would have sent Quick add to one column at the default text size on phones up to 402pt.
+  - Test added in `quick-actions.test.tsx` (badge present, decorative, label slot unchanged). Quick add, dashboard-languages, Home, the Home gap suite, the shared-controls large-text suite and the large-text guard: 251 tests, all pass. tsc and ESLint clean.
+
+- 2026-10-09 (CEO): the Quick add plus badge was tried and removed at the Founder's request; quick-actions.tsx and its test are back to HEAD.

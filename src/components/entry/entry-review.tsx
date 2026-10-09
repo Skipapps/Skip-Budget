@@ -12,7 +12,7 @@ import {
 import { AccessibilityInfo, BackHandler, Pressable, Text, View } from 'react-native';
 
 import { AmountFigure } from '@/components/flow/amount-figure';
-import { FlowHeader } from '@/components/flow/step-flow';
+import { FlowHeader, StepIndicator } from '@/components/flow/step-flow';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { GLYPH_STROKE } from '@/data/glyphs';
@@ -74,6 +74,8 @@ type EntryReviewProps = {
    * would throw away what was filled in, and hardware back steps back instead.
    */
   root: boolean;
+  /** The flow's dots, for a final page that is the last step of a stepped flow. */
+  progress?: { steps: number; current: number };
   amountLabel: string;
   /** The draft as typed ("49.11"); empty or zero draws a gap, never $0. */
   amount: string;
@@ -112,6 +114,7 @@ export function EntryReview({
   onClose,
   onBack,
   root,
+  progress,
   amountLabel,
   amount,
   onEditAmount,
@@ -196,6 +199,7 @@ export function EntryReview({
             onClose={onClose}
             titleRef={titleRef}
           />
+          {progress ? <StepIndicator steps={progress.steps} current={progress.current} /> : null}
         </View>
       }
       footer={footer}

@@ -80,7 +80,10 @@ const OLD = {
 
 let mockEntries: object[] = [RECENT, OLD];
 
+// The page also reads receipts (their order within a day) and charges (which plan a charge opens).
+jest.mock('@/api/charges', () => ({ useCharges: () => ({ data: [] }) }));
 jest.mock('@/api/queries', () => ({
+  useReceipts: () => ({ data: [] }),
   useSourceLedger: () => ({
     source: card,
     kind: 'card',

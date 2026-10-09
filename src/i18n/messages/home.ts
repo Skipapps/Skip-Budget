@@ -118,6 +118,16 @@ export const homeMessages = defineMessages({
     es: 'Calculadora de préstamos',
     fr: 'Calculateur de prêt',
   },
+  'home.tool.spendingHabits': {
+    en: 'Spending Habits',
+    es: 'Hábitos de gasto',
+    fr: 'Habitudes de dépense',
+  },
+  'home.tool.habitsLocked': {
+    en: 'Spending Habits. Pro feature. See what skipping saves.',
+    es: 'Hábitos de gasto. Función Pro. Mira lo que ahorras sin comprar.',
+    fr: 'Habitudes de dépense. Fonction Pro. Vois ce que tu économises en t’abstenant.',
+  },
   'home.tool.opens': {
     en: '{label}. Opens the tool.',
     es: '{label}. Abre la herramienta.',

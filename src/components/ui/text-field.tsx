@@ -21,6 +21,7 @@ type TextFieldProps = {
   trailing?: ReactNode;
 } & Pick<
   TextInputProps,
+  | 'autoFocus'
   | 'autoCapitalize'
   | 'autoComplete'
   | 'autoCorrect'

@@ -8,10 +8,12 @@ import {
   chargePlanKey,
   planKey,
   planOccurrences,
+  type HabitMark,
   type PlanOccurrence,
   type RecordedCharge,
   type SourceKind,
 } from '@/lib/card-ledger';
+import { habitColor, type HabitColor } from '@/data/habit-colors';
 import { t } from '@/i18n';
 import { historyFloor, NOTHING_HIDDEN, type HiddenHistory } from '@/lib/allowance';
 import { withTimeout } from '@/lib/deadline';
@@ -115,6 +117,42 @@ async function withLogoColumns<R extends { error: { code?: string } | null }>(
 ): Promise<R> {
   const result = await read(`, ${LOGO_COLUMNS}`);
   return result.error?.code === '42703' ? read('') : result;
+}
+
+/** A receipt's spending habit, embedded so a tapped day draws the habit's icon in every list. */
+const HABIT_COLUMNS = ', habit_id, habit:habits(name, icon_id, color)';
+
+type ReadFailure = { code?: string; message?: string; details?: string } | null;
+
+/**
+ * A database without spending habits yet: PostgREST finds no relationship to embed (PGRST200), or
+ * Postgres no habit_id column (42703). Any other failure, a missing logo column included, is not
+ * this one's to answer.
+ */
+function lacksHabits(error: ReadFailure): boolean {
+  if (error?.code !== 'PGRST200' && error?.code !== '42703') return false;
+  return /habit/.test(`${error.message ?? ''} ${error.details ?? ''}`);
+}
+
+/**
+ * Runs a receipt read with its habit, and again without when the database does not have habits
+ * yet, so every receipt list still loads (no receipt can belong to a habit there anyway).
+ */
+async function withHabitColumns<R extends { error: ReadFailure }>(
+  read: (habitColumns: string) => PromiseLike<R>,
+): Promise<R> {
+  const result = await read(HABIT_COLUMNS);
+  return lacksHabits(result.error) ? read('') : result;
+}
+
+/** The embedded habit as the app draws it; a colour it does not know falls back to the first. */
+function readReceipt(row: ReceiptRow): ReceiptRow {
+  if (!row.habit) return row;
+  return { ...row, habit: { ...row.habit, color: habitColor(row.habit.color).id } };
+}
+
+function habitMark(habit: ReceiptRow['habit']): HabitMark | undefined {
+  return habit ? { iconId: habit.icon_id, color: habitColor(habit.color).id } : undefined;
 }
 
 function useOwnerQuery<T>(key: string, run: () => Promise<T>) {
@@ -403,21 +441,29 @@ export type ReceiptRow = {
   /** The owner's logo choice; read the logo through logoDomainOf, never these directly. */
   logo_domain?: string | null;
   logo_hidden?: boolean | null;
+  /**
+   * The spending habit whose day this receipt fills. Absent, like `habit`, on a database without
+   * habits. An archived habit still answers, so its receipts keep its icon and name.
+   */
+  habit_id?: string | null;
+  habit?: { name: string; icon_id: string; color: HabitColor } | null;
 };
 
 export function useReceipts() {
   return useOwnerQuery<ReceiptRow[]>('receipts', async () => {
     const { data, error } = await withLogoColumns((logo) =>
-      supabase
-        .from('receipts')
-        .select(
-          `id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path, created_at${logo}, brands(domain)`,
-        )
-        .order('purchased_on', { ascending: false })
-        .order('created_at', { ascending: false }),
+      withHabitColumns((habit) =>
+        supabase
+          .from('receipts')
+          .select(
+            `id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path, created_at${logo}${habit}, brands(domain)`,
+          )
+          .order('purchased_on', { ascending: false })
+          .order('created_at', { ascending: false }),
+      ),
     );
     if (error) throw error;
-    return (data ?? []) as unknown as ReceiptRow[];
+    return ((data ?? []) as unknown as ReceiptRow[]).map(readReceipt);
   });
 }
 
@@ -467,16 +513,18 @@ export function useReceipt(id: string | undefined) {
     enabled: Boolean(userId && id),
     queryFn: async (): Promise<ReceiptRow | null> => {
       const { data, error } = await withLogoColumns((logo) =>
-        supabase
-          .from('receipts')
-          .select(
-            `id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path${logo}, brands(domain)`,
-          )
-          .eq('id', id!)
-          .maybeSingle(),
+        withHabitColumns((habit) =>
+          supabase
+            .from('receipts')
+            .select(
+              `id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path${logo}${habit}, brands(domain)`,
+            )
+            .eq('id', id!)
+            .maybeSingle(),
+        ),
       );
       if (error) throw error;
-      return data as unknown as ReceiptRow | null;
+      return data ? readReceipt(data as unknown as ReceiptRow) : null;
     },
   });
 }
@@ -629,6 +677,8 @@ export type LedgerEntry = {
   iconId?: string | null;
   /** The bill or subscription a charge came from, so tapping it can edit that. */
   planId?: string;
+  /** Set only on a receipt filed from a spending habit: drawn with the habit's icon and colour. */
+  habit?: HabitMark;
 };
 
 export type LedgerTotals = {
@@ -678,6 +728,7 @@ export function useLedger(range: DateRange | undefined, today: string) {
 
     for (const row of receipts.data ?? []) {
       if (!inRange(row.purchased_on)) continue;
+      const habit = habitMark(row.habit);
       entries.push({
         id: `receipt-${row.id}`,
         label: row.merchant,
@@ -687,6 +738,7 @@ export function useLedger(range: DateRange | undefined, today: string) {
         sourceId: row.card_id ?? row.bank_account_id ?? '',
         domain: logoDomainOf(row),
         logoHidden: Boolean(row.logo_hidden),
+        ...(habit ? { habit } : {}),
       });
     }
 
@@ -921,6 +973,7 @@ function useMoneyBook(today: string) {
         logoHidden: entry.logoHidden,
         categoryId: entry.categoryId,
         iconId: entry.iconId,
+        ...(entry.habit ? { habit: entry.habit } : {}),
       });
     }
 

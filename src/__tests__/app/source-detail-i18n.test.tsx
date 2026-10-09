@@ -141,7 +141,10 @@ const ACCOUNT_MOVES = [
 let mockKind: 'card' | 'account' = 'card';
 let mockEntries: object[] = ENTRIES;
 
+// The page also reads receipts (their order within a day) and charges (which plan a charge opens).
+jest.mock('@/api/charges', () => ({ useCharges: () => ({ data: [] }) }));
 jest.mock('@/api/queries', () => ({
+  useReceipts: () => ({ data: [] }),
   useSourceLedger: () => ({
     source: mockKind === 'card' ? card : account,
     kind: mockKind,
@@ -259,16 +262,18 @@ describe("An account's page in English", () => {
     expect(screen.queryByText('Charged since')).toBeNull();
   });
 
-  it('shows pay as its own kind of row, named for the pay, that opens nothing', async () => {
+  it('shows pay as its own kind of row, named for the pay, that opens the pay page', async () => {
     const screen = await render(<SourceDetailScreen />, { wrapper: Toasts });
 
     const pay = screen.getByLabelText('Acme, $1,880.00, Pay · 15 Sep 2026');
-    expect(pay.props.accessibilityRole).toBe('text');
+    expect(pay.props.accessibilityRole).toBe('button');
+    expect(pay.props.accessibilityHint).toBe('Opens your pay');
     await fireEvent.press(pay);
 
+    // Where Home and Activity open pay; nothing is offered for removal.
+    expect(router.push).toHaveBeenCalledWith('/salary');
     expect(mockConfirm).not.toHaveBeenCalled();
     expect(mockDeletePayment).not.toHaveBeenCalled();
-    expect(router.push).not.toHaveBeenCalled();
   });
 
   it('says where each payment came from and where it went', async () => {

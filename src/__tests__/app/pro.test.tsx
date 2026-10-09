@@ -97,12 +97,13 @@ const ROWS = [
   'Money history: Free, 90 days. Pro, 7 years.',
   'Voice entry: Free, not included. Pro, included.',
   'Insights: Free, not included. Pro, included.',
+  'Spending habits: Free, not included. Pro, included.',
   'New features first: Free, not included. Pro, included.',
   'Priority support: Free, not included. Pro, included.',
 ];
 
 describe('the table', () => {
-  it('compares Free and Pro in nine rows, each read as one sentence', async () => {
+  it('compares Free and Pro in ten rows, each read as one sentence', async () => {
     const screen = await render(<ProScreen />);
 
     expect(screen.getByText('Get more with Skip Pro')).toBeTruthy();
@@ -123,7 +124,7 @@ describe('the table', () => {
     expect(screen.getAllByText('Unlimited')).toHaveLength(2);
     expect(screen.getByText('90 days')).toBeTruthy();
     expect(screen.getByText('7 years')).toBeTruthy();
-    expect(screen.getAllByText('—')).toHaveLength(4);
+    expect(screen.getAllByText('—')).toHaveLength(5);
   });
 
   it('sells only what this app does', async () => {

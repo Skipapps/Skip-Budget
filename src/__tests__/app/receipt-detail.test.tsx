@@ -96,6 +96,8 @@ jest.mock('@/api/queries', () => ({
     ],
   }),
 }));
+// None of these receipts is a habit's.
+jest.mock('@/api/habits', () => ({ useHabit: () => ({ data: undefined }) }));
 jest.mock('@/api/brands', () => ({
   useSpendCategories: () => ({ data: [{ id: 'dining', label: 'Dining' }] }),
 }));

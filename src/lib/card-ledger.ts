@@ -2,8 +2,12 @@
  * When bills and subscriptions land, and the shapes a card's or account's running balance is told
  * in (worked out by `moneyBook`). Pure: no clock, no queries.
  */
+import type { HabitColor } from '@/data/habit-colors';
 
 export type SourceKind = 'card' | 'account';
+
+/** A receipt filed by tapping a spending habit's day draws that habit's icon on its colour. */
+export type HabitMark = { iconId: string; color: HabitColor };
 
 export type Recurrence = 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'period';
 
@@ -49,6 +53,8 @@ export type LedgerEntry = {
   domain?: string | null;
   /** The owner chose letters: no logo, not even one found by name. Display only. */
   logoHidden?: boolean | null;
+  /** Set only on a receipt filed from a spending habit. */
+  habit?: HabitMark;
 } & BillMarkFields;
 
 export type Ledger = {

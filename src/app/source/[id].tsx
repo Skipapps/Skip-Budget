@@ -1,12 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pencil, Plus, SlidersHorizontal } from 'lucide-react-native';
-import { Fragment, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
+import { useCharges } from '@/api/charges';
 import { useDeletePayment } from '@/api/mutations';
 import { useHistoryFloor } from '@/api/history';
-import { useSourceLedger } from '@/api/queries';
+import { useReceipts, useSourceLedger } from '@/api/queries';
 import { AccountCard } from '@/components/cards/account-card';
 import { PaymentCard } from '@/components/cards/payment-card';
 import {
@@ -26,8 +27,9 @@ import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { SectionHeading } from '@/components/ui/typography';
 import { t, type MessageKey } from '@/i18n';
 import { formatFullDate, toIsoDate } from '@/lib/date';
-import { sortByDateAscending } from '@/lib/group';
 import { formatCurrency } from '@/lib/format';
+import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
+import { newestFirst } from '@/lib/ledger-order';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
 import { failureText } from '@/lib/failure';
@@ -64,6 +66,14 @@ function entryLabel(entry: {
   return t('accounts.source.kind.payment');
 }
 
+/** What VoiceOver adds to a row that opens a page; payments open none. */
+const OPEN_HINTS: Record<string, MessageKey> = {
+  receipt: 'receipts.row.hint',
+  bill: 'accounts.source.billHint',
+  subscription: 'subscriptions.row.hint',
+  income: 'accounts.source.payHint',
+};
+
 /** Money sent out of an account is a payment row too, but it is not money in, so it filters apart. */
 function filterKind(entry: { kind: string; amount: number }): string {
   return entry.kind === 'payment' && entry.amount < 0 ? 'sent' : entry.kind;
@@ -83,6 +93,20 @@ export default function SourceDetailScreen() {
 
   // Above the loading guards so the hook order never changes.
   const { floor, free } = useHistoryFloor();
+  // A charge's row names the charge, not its bill or subscription; this finds the plan to open.
+  const charges = useCharges();
+  const owners = useMemo(() => chargeOwners(charges.data ?? []), [charges.data]);
+  // Within a day, receipts go latest-created first, as on the receipts list.
+  const receipts = useReceipts();
+  const createdAt = useMemo(
+    () =>
+      new Map(
+        (receipts.data ?? []).flatMap((row) =>
+          row.created_at ? [[`receipt-${row.id}`, row.created_at] as const] : [],
+        ),
+      ),
+    [receipts.data],
+  );
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<LedgerFilters>(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -113,13 +137,11 @@ export default function SourceDetailScreen() {
   const isCard = kind === 'card';
   const name = isCard ? card!.holder : account!.nickname || account!.bank_name;
 
-  // Oldest day first. The money book sorts newest-first for its balance arithmetic, so the
-  // display order is set here. Only the list stops at the plan's window (90 days on free); the
-  // balance above walked every entry.
-  const entries = sortByDateAscending(
+  // Only the list stops at the plan's window (90 days on free); the balance above walked every
+  // entry.
+  const entries = newestFirst(
     ledger.entries.filter((entry) => entry.date >= floor),
-    (entry) => entry.date,
-    (entry) => entry.id,
+    createdAt,
   );
   const hiddenOlder = free && ledger.entries.some((entry) => entry.date < floor);
 
@@ -322,28 +344,37 @@ export default function SourceDetailScreen() {
         />
       ) : (
         <View className="mt-1 w-full pb-28">
-          {/* Oldest first, so the list starts where the plan's window does. */}
-          {hiddenOlder ? <HistoryNotice className="mb-2 mt-2" /> : null}
-          {visible.map((entry, index) => (
-            <Fragment key={entry.id}>
-              {index > 0 ? <View className="ml-[52px] h-px bg-line/60" /> : null}
-              <TransactionRow
-                label={entryLabel(entry)}
-                amount={entry.amount}
-                kindLabel={`${kindLabel(entry.kind)} · ${formatFullDate(new Date(`${entry.date}T00:00:00`))}`}
-                domain={entry.domain}
-                logoHidden={entry.logoHidden}
-                kind={entry.kind}
-                categoryId={entry.categoryId}
-                iconId={entry.iconId}
-                onPress={
-                  entry.kind === 'payment'
-                    ? () => handleRemovePayment(entry.id, entry.label, entry.amount)
-                    : undefined
-                }
-              />
-            </Fragment>
-          ))}
+          {visible.map((entry, index) => {
+            // A payment has no page of its own; pressing it offers to remove it, as before.
+            const href =
+              entry.kind === 'payment' ? null : ledgerHref({ ...entry, kind: entry.kind }, owners);
+            return (
+              <Fragment key={entry.id}>
+                {index > 0 ? <View className="ml-[52px] h-px bg-line/60" /> : null}
+                <TransactionRow
+                  label={entryLabel(entry)}
+                  amount={entry.amount}
+                  kindLabel={`${kindLabel(entry.kind)} · ${formatFullDate(new Date(`${entry.date}T00:00:00`))}`}
+                  domain={entry.domain}
+                  logoHidden={entry.logoHidden}
+                  kind={entry.kind}
+                  categoryId={entry.categoryId}
+                  iconId={entry.iconId}
+                  habit={entry.habit}
+                  hint={href && OPEN_HINTS[entry.kind] ? t(OPEN_HINTS[entry.kind]) : undefined}
+                  onPress={
+                    entry.kind === 'payment'
+                      ? () => handleRemovePayment(entry.id, entry.label, entry.amount)
+                      : href
+                        ? () => router.push(href)
+                        : undefined
+                  }
+                />
+              </Fragment>
+            );
+          })}
+          {/* Newest first, so the older rows a free plan keeps out of view would come last. */}
+          {hiddenOlder ? <HistoryNotice className="mt-3" /> : null}
         </View>
       )}
 

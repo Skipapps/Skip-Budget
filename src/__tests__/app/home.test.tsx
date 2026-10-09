@@ -60,6 +60,13 @@ jest.mock('@/components/ui/date-picker', () => ({ DatePicker: () => null }));
 jest.mock('@/components/ui/skeleton', () => ({ SkeletonList: () => null }));
 jest.mock('@/components/brands/brand-mark', () => ({ BrandMark: () => null }));
 jest.mock('@/components/bills/bill-mark', () => ({ BillMark: () => null }));
+const mockHabitIcon = jest.fn();
+jest.mock('@/components/habits/habit-icon', () => ({
+  HabitIcon: (props: object) => {
+    mockHabitIcon(props);
+    return null;
+  },
+}));
 // Artwork imports SVGs, which Jest has no transformer for.
 jest.mock('@/data/spending-categories', () => ({ spendingCategories: [] }));
 
@@ -68,7 +75,14 @@ jest.mock('@/providers/theme-provider', () => ({
   useMoneyColor: () => () => '#000000',
 }));
 
-jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: false }) }));
+let mockProStatus: { pro: boolean; ready?: boolean } = { pro: false };
+jest.mock('@/api/pro', () => ({ usePro: () => mockProStatus }));
+// Unknown until a test says otherwise, so the Spending Habits card carries no PRO pill.
+let mockHabits: { isSuccess: boolean; data: unknown[] | undefined } = {
+  isSuccess: false,
+  data: undefined,
+};
+jest.mock('@/api/habits', () => ({ useHabits: () => mockHabits }));
 jest.mock('@/api/news', () => ({ useHasUnreadNews: () => false }));
 jest.mock('@/api/refresh', () => ({
   useRefreshAll: () => ({ refresh: () => {}, refreshing: false }),
@@ -181,6 +195,8 @@ beforeEach(() => {
   mockBalance.mockClear();
   mockBalance.mockImplementation(settled);
   mockLedgerState = { isLoading: false, isError: false };
+  mockProStatus = { pro: false };
+  mockHabits = { isSuccess: false, data: undefined };
 });
 
 describe('Home — where a transaction row opens', () => {
@@ -374,23 +390,111 @@ describe('Home — Where it goes', () => {
 });
 
 describe('Home — Go further', () => {
-  it('offers one tool, the Loan Calculator, alone across its row', async () => {
+  it('offers two tools side by side: the Loan Calculator, then Spending Habits', async () => {
     const { getAllByRole } = await render(<HomeScreen />);
 
     const tools = getAllByRole('button').filter((node) =>
       String(node.props.accessibilityLabel ?? '').endsWith('Opens the tool.'),
     );
-    expect(tools).toHaveLength(1);
+    expect(tools.map((node) => node.props.accessibilityLabel)).toEqual([
+      'Loan Calculator. Opens the tool.',
+      'Spending Habits. Opens the tool.',
+    ]);
 
-    const [loan] = tools;
-    expect(loan.props.accessibilityLabel).toBe('Loan Calculator. Opens the tool.');
-    // The only child of its row and flex-1, so it fills the width instead of half of it.
+    const [loan, habits] = tools;
+    // Each flex-1 in one row, so they share the width.
     expect(loan.props.className).toContain('flex-1');
+    expect(habits.props.className).toContain('flex-1');
     expect(loan.parent?.props.className).toContain('flex-row');
-    expect(loan.parent?.children).toHaveLength(1);
+    expect(loan.parent?.children).toHaveLength(2);
 
     await fireEvent.press(loan);
-    expect(router.push).toHaveBeenCalledWith('/loan-calculator');
-    expect(router.push).toHaveBeenCalledTimes(1);
+    await fireEvent.press(habits);
+    expect(router.push).toHaveBeenNthCalledWith(1, '/loan-calculator');
+    expect(router.push).toHaveBeenNthCalledWith(2, '/habits');
+    expect(router.push).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Home — the Spending Habits PRO pill', () => {
+  const LOCKED = 'Spending Habits. Pro feature. See what skipping saves.';
+  const OPEN = 'Spending Habits. Opens the tool.';
+
+  const card = async () => {
+    const screen = await render(<HomeScreen />);
+    const pills = screen.queryAllByText('PRO', { includeHiddenElements: true });
+    const locked = screen.queryByLabelText(LOCKED);
+    const open = screen.queryByLabelText(OPEN);
+    return { pills, locked, open, node: (locked ?? open)! };
+  };
+
+  it('marks it for an account known to be free with no habits, and opens the explainer', async () => {
+    mockProStatus = { pro: false, ready: true };
+    mockHabits = { isSuccess: true, data: [] };
+    const { pills, locked, node } = await card();
+
+    expect(locked).toBeTruthy();
+    expect(pills).toHaveLength(1);
+    await fireEvent.press(node);
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/pro-feature',
+      params: { id: 'habits' },
+    });
+  });
+
+  it.each([
+    ['Pro, no habits', { pro: true, ready: true }, { isSuccess: true, data: [] }],
+    [
+      'free, habits still loading',
+      { pro: false, ready: true },
+      { isSuccess: false, data: undefined },
+    ],
+    ['lapsed, with habits', { pro: false, ready: true }, { isSuccess: true, data: [{ id: 'h1' }] }],
+    ['Pro not known yet', { pro: false, ready: false }, { isSuccess: true, data: [] }],
+  ])('leaves it open to the dashboard: %s', async (_, pro, habits) => {
+    mockProStatus = pro;
+    mockHabits = habits;
+    const { pills, locked, open } = await card();
+
+    expect(locked).toBeNull();
+    expect(pills).toHaveLength(0);
+    await fireEvent.press(open!);
+    expect(router.push).toHaveBeenCalledWith('/habits');
+  });
+});
+
+describe('Home — a habit’s receipt in Recent', () => {
+  it('draws the habit’s icon and still opens the receipt', async () => {
+    const original = mockLedger.getMockImplementation()!;
+    mockLedger.mockImplementation((range) => {
+      const read = original(range);
+      if (!range || range.from !== TODAY || range.to !== TODAY) return read;
+      const coffee = {
+        id: 'receipt-h1',
+        label: 'Coffee',
+        amount: -5,
+        date: TODAY,
+        kind: 'receipt' as const,
+        sourceId: 's1',
+        habit: { iconId: 'food-dining/coffee', color: 'caramel' as const },
+      };
+      return { ...read, entries: [coffee] };
+    });
+    try {
+      mockHabitIcon.mockClear();
+      const { getByLabelText } = await render(<HomeScreen />);
+      expect(mockHabitIcon).toHaveBeenCalledWith({
+        iconId: 'food-dining/coffee',
+        color: 'caramel',
+        size: 40,
+      });
+      await fireEvent.press(getByLabelText('Coffee, -$5.00, Receipt'));
+      expect(router.push).toHaveBeenCalledWith({
+        pathname: '/receipt/[id]',
+        params: { id: 'h1' },
+      });
+    } finally {
+      mockLedger.mockImplementation(original);
+    }
   });
 });

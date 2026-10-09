@@ -152,6 +152,36 @@ export const proMessages = defineMessages({
     es: 'Los saldos siempre cuadran',
     fr: 'Les soldes tombent toujours juste',
   },
+  'pro.habits.example': {
+    en: 'Coffee · 3 days skipped · $15.00 saved',
+    es: 'Café · 3 días sin comprar · $15.00 ahorrados',
+    fr: 'Café · 3 jours sans achat · 15,00 $ économisés',
+  },
+  'pro.habits.title': {
+    en: 'See what skipping saves',
+    es: 'Mira lo que ahorras sin comprar',
+    fr: 'Vois ce que tu économises en t’abstenant',
+  },
+  'pro.habits.subtitle': {
+    en: 'Tap the days you buy it. Skip adds up the days you don’t.',
+    es: 'Toca los días que lo compras. Skip suma los días que no.',
+    fr: 'Touche les jours où tu l’achètes. Skip additionne les autres.',
+  },
+  'pro.habits.a': {
+    en: 'One tap records what you spent',
+    es: 'Un toque registra lo que gastaste',
+    fr: 'Un toucher note ce que tu as dépensé',
+  },
+  'pro.habits.b': {
+    en: 'Every day you skip counts as saved',
+    es: 'Cada día sin comprar cuenta como ahorro',
+    fr: 'Chaque jour sans achat est économisé',
+  },
+  'pro.habits.c': {
+    en: 'Counts in your receipts and balance',
+    es: 'Cuenta en tus recibos y tu saldo',
+    fr: 'Compte dans tes reçus et ton solde',
+  },
   'pro.unlimited.example': {
     en: 'Visa ••4242 · Chase ••1180',
     es: 'Visa ••4242 · Chase ••1180',
@@ -315,6 +345,11 @@ export const proMessages = defineMessages({
     fr: 'Historique',
   },
   'pro.compare.voice': { en: 'Voice entry', es: 'Entrada por voz', fr: 'Saisie vocale' },
+  'pro.compare.habits': {
+    en: 'Spending habits',
+    es: 'Hábitos de gasto',
+    fr: 'Habitudes de dépense',
+  },
   'pro.compare.insights': { en: 'Insights', es: 'Análisis', fr: 'Aperçu' },
   'pro.compare.early': {
     en: 'New features first',
