@@ -168,36 +168,30 @@ it('asks for nothing when a row has no website', async () => {
   expect(mockImage).not.toHaveBeenCalled();
 });
 
-describe('on the free plan', () => {
+describe('on every plan', () => {
   afterEach(() => resetProStatusForTests());
 
-  it('draws the initials, and asks the service for nothing', async () => {
+  it('draws the logo on the free plan', async () => {
     await act(async () => publishProStatus({ pro: false, ready: true }));
     const screen = await render(<BrandLogo name="Trader Joe's" domain="traderjoes.com" />);
 
-    expect(screen.getByText('TJ')).toBeTruthy();
-    expect(screen.queryByTestId('logo')).toBeNull();
-    expect(mockImage).not.toHaveBeenCalled();
+    expect(source(screen)).toBe(`${API}/v1/logo/traderjoes.com`);
+    expect(screen.queryByText('TJ')).toBeNull();
   });
 
-  it('draws the caller’s own fallback, like a bill’s glyph', async () => {
+  it('draws the logo over the caller’s own fallback on the free plan', async () => {
     await act(async () => publishProStatus({ pro: false, ready: true }));
     const glyph = <Text>glyph</Text>;
     const screen = await render(<BrandLogo name="Hydro" domain="hydro.com" fallback={glyph} />);
 
-    expect(screen.getByText('glyph')).toBeTruthy();
-    expect(mockImage).not.toHaveBeenCalled();
+    expect(source(screen)).toBe(`${API}/v1/logo/hydro.com`);
+    expect(screen.queryByText('glyph')).toBeNull();
   });
 
-  it('draws a quiet circle while the plan is unknown, fetching nothing, and the logo on Pro', async () => {
+  it('draws the logo at once, before the plan is known', async () => {
     resetProStatusForTests();
-    const unknown = await render(<BrandLogo name="Netflix" domain="netflix.com" />);
-    expect(unknown.queryByTestId('logo')).toBeNull();
-    expect(unknown.queryByText('NE')).toBeNull();
-    expect(mockImage).not.toHaveBeenCalled();
-
-    await act(async () => publishProStatus({ pro: true, ready: true }));
-    expect(source(unknown)).toBe(`${API}/v1/logo/netflix.com`);
+    const screen = await render(<BrandLogo name="Netflix" domain="netflix.com" />);
+    expect(source(screen)).toBe(`${API}/v1/logo/netflix.com`);
   });
 
   it('draws initials at once for a store with no logo, whatever the plan', async () => {
@@ -206,17 +200,14 @@ describe('on the free plan', () => {
     expect(screen.getByText('CD')).toBeTruthy();
   });
 
-  it('turns to initials on a lapse and back to the logo on a return, without a remount', async () => {
+  it('keeps the logo through a lapse and a return', async () => {
     await act(async () => publishProStatus({ pro: true, ready: true }));
     const screen = await render(<BrandLogo name="Netflix" domain="netflix.com" />);
     expect(screen.getByTestId('logo')).toBeTruthy();
 
     await act(async () => publishProStatus({ pro: false, ready: true }));
-    expect(screen.queryByTestId('logo')).toBeNull();
-    expect(screen.getByText('NE')).toBeTruthy();
-
-    await act(async () => publishProStatus({ pro: true, ready: true }));
     expect(screen.getByTestId('logo')).toBeTruthy();
+    expect(screen.queryByText('NE')).toBeNull();
   });
 });
 

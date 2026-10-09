@@ -29,13 +29,12 @@ thinks is free (pro-state-free.sql, or a second test account), not Fake Free.
 - [ ] Home day stepper ← stops at 90 days back; the date picker cannot go earlier.
 - [ ] Fake Pro on → everything back, up to 7 years.
 
-## 3. Logos (Fake Free on)
-- [ ] Every list, detail page and search shows initials (bills show their icon) instead of logos.
-- [ ] Cold start: logo spots show a plain grey circle for a moment, never a logo that turns into initials.
-- [ ] A store added on free is listed first next time you search.
-- [ ] Adding a new store never asks "Looks like …?" and shows no "Change logo".
-- [ ] Tapping the pencil on a receipt/bill/subscription logo opens "Every store, its own logo".
-- [ ] Fake Pro on → logos return at once.
+## 3. Logos (free for everyone since 2026-10-08; check with Fake Free on)
+- [ ] Every list, detail page and search shows brand logos, the same as Pro (bills with no logo show their icon).
+- [ ] Adding a new store asks "Looks like …?" when the service is unsure, and offers "Change logo".
+- [ ] Tapping the pencil on a receipt/bill/subscription logo opens Change logo, not a Pro page.
+- [ ] The Pro page has no "Brand logos" row; the one-time offer says "Insights" only.
+- [ ] A reminder push on a free account shows the logo (once send-push is redeployed).
 
 ## 4. Loan calculator
 - [ ] Home → Loan Calculator card has no PRO badge and opens for free accounts, schedule and Save included.

@@ -228,8 +228,6 @@ type Context = {
     }
   >;
   sources: Map<string, SourceRow>;
-  /** Accounts with Skip Pro right now: only they get logos (is_pro()'s rule). */
-  pro: Set<string>;
   /** user|label|charged_on → the plan and payer behind a recorded charge. */
   charges: Map<
     string,
@@ -242,14 +240,12 @@ type Context = {
   >;
 };
 
-// With no context nobody is known to pay, so a failed read sends letters and icons, never a logo
-// a free account would not see in the app.
+// A failed read sends letters and icons: no plan is known to draw a logo from.
 const EMPTY: Context = {
   reminders: new Map(),
   bills: new Map(),
   subscriptions: new Map(),
   sources: new Map(),
-  pro: new Set(),
   charges: new Map(),
 };
 
@@ -301,7 +297,6 @@ async function loadContext(
   supabase: ReturnType<typeof createClient>,
   reminderIds: string[],
   charges: Charge[],
-  userIds: string[],
 ): Promise<Context> {
   try {
     const ctx: Context = {
@@ -309,27 +304,8 @@ async function loadContext(
       bills: new Map(),
       subscriptions: new Map(),
       sources: new Map(),
-      pro: new Set(),
       charges: new Map(),
     };
-
-    if (userIds.length > 0) {
-      const { data, error } = await supabase
-        .from('entitlements')
-        .select('user_id, pro, expires_at')
-        .in('user_id', userIds);
-      if (error) throw error;
-      const now = Date.now();
-      for (const row of (data ?? []) as {
-        user_id: string;
-        pro: boolean;
-        expires_at: string | null;
-      }[]) {
-        if (row.pro && (!row.expires_at || new Date(row.expires_at).getTime() > now)) {
-          ctx.pro.add(row.user_id);
-        }
-      }
-    }
 
     if (reminderIds.length > 0) {
       const { data, error } = await supabase
@@ -464,7 +440,6 @@ function reminderData(
 ): TapPayload | undefined {
   const target = ctx.reminders.get(row.reminder_id);
   if (!target) return undefined;
-  const pro = ctx.pro.has(row.user_id);
   const payerOf = (plan?: { card_id: string | null; bank_account_id: string | null }) =>
     plan ? ctx.sources.get(plan.card_id ?? plan.bank_account_id ?? '') : undefined;
 
@@ -475,7 +450,6 @@ function reminderData(
         kind: 'subscription',
         title: row.title,
         body: row.body,
-        pro,
         targetId: target.subscription_id,
         ...plan?.logo,
         categoryId: plan?.category_id,
@@ -492,7 +466,6 @@ function reminderData(
         kind: 'bill',
         title: row.title,
         body: row.body,
-        pro,
         targetId: target.bill_id,
         ...plan?.logo,
         categoryId: plan?.category_id,
@@ -509,7 +482,6 @@ function reminderData(
         kind: 'card',
         title: row.title,
         body: row.body,
-        pro,
         targetId: target.card_id,
         self: ctx.sources.get(target.card_id),
       },
@@ -522,7 +494,6 @@ function reminderData(
         kind: 'account',
         title: row.title,
         body: row.body,
-        pro,
         targetId: target.bank_account_id,
         self: ctx.sources.get(target.bank_account_id),
       },
@@ -546,7 +517,6 @@ function chargeData(
     : undefined;
   return chargePayload(
     {
-      pro: ctx.pro.has(charge.user_id),
       label: charge.label,
       amount: Number(charge.amount),
       chargedOn: charge.charged_on,
@@ -656,7 +626,6 @@ Deno.serve(async (request) => {
     supabase,
     rows.map((row) => row.reminder_id),
     charges,
-    [...new Set([...rows.map((row) => row.user_id), ...charges.map((c) => c.user_id)])],
   );
   let sent = 0;
   let announced = 0;

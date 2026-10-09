@@ -934,52 +934,46 @@ describe('stores this person added before', () => {
   });
 });
 
-describe('on the free plan, where logos are Pro', () => {
+describe('on the free plan, logos as on Pro', () => {
   beforeEach(async () => {
     await act(async () => publishProStatus({ pro: false, ready: true }));
   });
   afterEach(() => resetProStatusForTests());
 
-  it('asks nothing, shows no Change logo, and costs the service no lookup', async () => {
+  it('asks about the logo the service found', async () => {
     const screen = await render(<Harness />);
     await addStore(screen, 'Planet Fitness');
 
-    expect(screen.queryByText('Looks like Planet Fitness')).toBeNull();
-    expect(screen.queryByLabelText('Change logo')).toBeNull();
-    expect(screen.queryByLabelText('Add a website')).toBeNull();
-    expect(mockLogoMatch.mock.calls.every(([query]) => query === '')).toBe(true);
-    expect(lastValue()).toMatchObject({ name: 'Planet Fitness', logoDomain: null });
+    expect(screen.getByText('Looks like Planet Fitness')).toBeTruthy();
+    expect(mockLogoMatch).toHaveBeenCalledWith('Planet Fitness', { category: 'fitness' });
   });
 
-  it('still remembers the store, with no logo chosen, to list it first next time', async () => {
+  it('remembers the store only once the logo question is answered', async () => {
     const screen = await render(<Harness />);
     await addStore(screen, 'Planet Fitness');
 
-    expect(mockRemember).toHaveBeenCalledWith({
-      name: 'Planet Fitness',
-      categoryId: 'fitness',
-      logoDomain: null,
-      logoHidden: false,
-    });
+    expect(mockRemember).not.toHaveBeenCalled();
   });
 
-  it('offers no Change logo on a saved store', async () => {
+  it('offers Change logo on a saved store', async () => {
     const screen = await render(
       <Harness
         value={{ brandId: null, name: 'Planet Fitness', domain: null, categoryId: 'fitness' }}
         onChangeLogo={jest.fn()}
       />,
     );
-    expect(screen.queryByLabelText('Change logo')).toBeNull();
+    expect(screen.getByLabelText('Change logo')).toBeTruthy();
   });
 
-  it('does not apply even a sure match', async () => {
+  it('applies a sure match at once', async () => {
     const screen = await render(<Harness />);
     await addStore(screen, 'Vercel');
 
-    // On Pro the same store would be given its logo at once; on free it keeps its initials.
-
-    expect(lastValue()).toMatchObject({ name: 'Vercel', logoDomain: null, logoHidden: false });
-    expect(screen.queryByLabelText('Change logo')).toBeNull();
+    expect(lastValue()).toMatchObject({
+      name: 'Vercel',
+      logoDomain: 'vercel.com',
+      logoHidden: false,
+    });
+    expect(screen.getByLabelText('Change logo')).toBeTruthy();
   });
 });

@@ -8,7 +8,6 @@ import { logoAspect, logoBox, rememberLogoAspect } from '@/lib/logo-shape';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { monogramOf } from '@/lib/monogram';
-import { useProStatus } from '@/lib/pro-status';
 
 type BrandLogoProps = {
   /** Shown in the fallback tile, so it is required even when a logo exists. */
@@ -28,13 +27,7 @@ export { FAILED_LOGO_RETRY_MS } from '@/lib/logo-failures';
  * have no logo, and the service answers those with a 404.
  */
 export function BrandLogo({ name, domain, size = 40, className, fallback }: BrandLogoProps) {
-  // Logos are Pro: free draws the store's initials (or the given fallback, e.g. a bill's glyph).
-  const { pro, ready } = useProStatus();
-  const logo = logoImageUrl(domain);
-  const url = ready && pro ? logo : null;
-  // A logo to draw and no plan yet: a quiet circle, so neither a payer nor a free account sees the
-  // other's version flash, and nothing is fetched for an account that may be free.
-  const waiting = Boolean(logo) && !ready;
+  const url = logoImageUrl(domain);
   // Keyed by URL, not a flag on the row, so a recycled row showing another brand recovers at once.
   const failed = useSyncExternalStore(subscribeLogoFailures, () => logoFailedLately(url));
   // Learnt when the image loads; tied to its URL so a recycled row never borrows another's shape.
@@ -43,15 +36,6 @@ export function BrandLogo({ name, domain, size = 40, className, fallback }: Bran
 
   const showFallback = !url || failed;
   const mark = monogramOf(name);
-
-  if (waiting) {
-    return (
-      <View
-        className={cn('overflow-hidden rounded-full bg-ink/10', className)}
-        style={{ width: size, height: size }}
-      />
-    );
-  }
 
   if (showFallback && fallback) return fallback;
 

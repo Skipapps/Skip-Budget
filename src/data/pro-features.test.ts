@@ -19,7 +19,7 @@ const allText = () =>
   ]);
 
 /** The examples are the same in every language: dictation is English, and a card is a card. */
-const SAME_EVERYWHERE = new Set(['voice', 'logos', 'unlimited']);
+const SAME_EVERYWHERE = new Set(['voice', 'unlimited']);
 
 describe('PRO_FEATURES', () => {
   it('keeps its ids and gives every feature an icon, three points and an icon for each', () => {
@@ -28,7 +28,6 @@ describe('PRO_FEATURES', () => {
       'scan',
       'voice',
       'history',
-      'logos',
       'unlimited',
     ]);
     for (const feature of features()) {

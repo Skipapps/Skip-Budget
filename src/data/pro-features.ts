@@ -1,9 +1,7 @@
 import {
   ArchiveRestore,
   ArrowDownUp,
-  BadgeCheck,
   Banknote,
-  Bell,
   CalendarCheck,
   CalendarRange,
   ChartNoAxesColumn,
@@ -14,12 +12,10 @@ import {
   LockOpen,
   Mic,
   ReceiptText,
-  Replace,
   ScanLine,
   Scale,
   ShieldCheck,
   Sparkles,
-  Store,
   Wallet,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -80,6 +76,5 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
   scan: feature('scan', ScanLine, [InfinityIcon, Sparkles, ShieldCheck]),
   voice: feature('voice', Mic, [ReceiptText, CircleCheck, ShieldCheck]),
   history: feature('history', History, [CalendarRange, ArchiveRestore, Scale]),
-  logos: feature('logos', Store, [BadgeCheck, Replace, Bell]),
   unlimited: feature('unlimited', CreditCard, [InfinityIcon, Banknote, LockOpen]),
 };

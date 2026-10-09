@@ -1,4 +1,4 @@
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
@@ -29,7 +29,6 @@ import { t } from '@/i18n';
 import { failureMessage, failureText } from '@/lib/failure';
 import { success, warn } from '@/lib/haptics';
 import { logoDomainOf } from '@/lib/logo-domain';
-import { useKnownFree } from '@/lib/pro-status';
 import { logoHints } from '@/lib/logo-lookup';
 import { useArtwork } from '@/theme/artwork';
 
@@ -58,14 +57,6 @@ type ReportState = 'idle' | 'sending' | 'sent' | 'failed';
  * this row alone; the shared logo is only ever changed by a person reviewing reports.
  */
 export default function ChangeLogoScreen() {
-  // Logos are Pro: a free account is shown what Pro adds. Decided on the shared answer, so someone
-  // who paid is never bounced while Pro is still being checked.
-  const free = useKnownFree();
-  if (free) return <Redirect href={{ pathname: '/pro-feature', params: { id: 'logos' } }} />;
-  return <ChangeLogoPage />;
-}
-
-function ChangeLogoPage() {
   const params = useLocalSearchParams<{ kind?: string; id?: string; name?: string }>();
   const kind = asKind(params.kind);
   const id = params.id || undefined;

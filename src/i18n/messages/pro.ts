@@ -152,36 +152,6 @@ export const proMessages = defineMessages({
     es: 'Los saldos siempre cuadran',
     fr: 'Les soldes tombent toujours juste',
   },
-  'pro.logos.example': {
-    en: 'Netflix · Spotify · Uber',
-    es: 'Netflix · Spotify · Uber',
-    fr: 'Netflix · Spotify · Uber',
-  },
-  'pro.logos.title': {
-    en: 'Every store, its logo',
-    es: 'Cada tienda, su logo',
-    fr: 'Un logo par magasin',
-  },
-  'pro.logos.subtitle': {
-    en: 'Spot your spending at a glance.',
-    es: 'Reconoce tus gastos de un vistazo.',
-    fr: 'Repère tes dépenses d’un coup d’œil.',
-  },
-  'pro.logos.a': {
-    en: 'Real logos, not just initials',
-    es: 'Logos reales, no solo iniciales',
-    fr: 'Vrais logos, pas que des initiales',
-  },
-  'pro.logos.b': {
-    en: 'Pick the right logo for any store',
-    es: 'Elige el logo de cualquier tienda',
-    fr: 'Choisis le logo de chaque magasin',
-  },
-  'pro.logos.c': {
-    en: 'Logos in lists and reminders',
-    es: 'Logos en listas y recordatorios',
-    fr: 'Logos dans les listes et rappels',
-  },
   'pro.unlimited.example': {
     en: 'Visa ••4242 · Chase ••1180',
     es: 'Visa ••4242 · Chase ••1180',
@@ -346,7 +316,6 @@ export const proMessages = defineMessages({
   },
   'pro.compare.voice': { en: 'Voice entry', es: 'Entrada por voz', fr: 'Saisie vocale' },
   'pro.compare.insights': { en: 'Insights', es: 'Análisis', fr: 'Aperçu' },
-  'pro.compare.logos': { en: 'Brand logos', es: 'Logos de marcas', fr: 'Logos des marques' },
   'pro.compare.early': {
     en: 'New features first',
     es: 'Novedades primero',
@@ -437,9 +406,9 @@ export const proMessages = defineMessages({
     fr: { one: '{count} an d’historique', other: '{count} ans d’historique' },
   },
   'pro.offer.insights': {
-    en: 'Insights and brand logos',
-    es: 'Análisis y logos de marcas',
-    fr: 'Aperçu et logos des marques',
+    en: 'Insights',
+    es: 'Análisis',
+    fr: 'Aperçu',
   },
   'pro.offer.once': {
     en: 'If you close this, you won’t see this offer again.',

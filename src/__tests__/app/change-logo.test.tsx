@@ -437,14 +437,14 @@ describe('when there is no row to change', () => {
   });
 });
 
-describe('on the free plan, where logos are Pro', () => {
+describe('on the free plan', () => {
   afterEach(() => resetProStatusForTests());
 
-  it('shows what Pro adds instead of the page', async () => {
+  it('opens the page, as on Pro', async () => {
     await act(async () => publishProStatus({ pro: false, ready: true }));
     const screen = await render(<ChangeLogoScreen />);
 
-    expect(screen.getByText('redirect:/pro-feature?id=logos')).toBeTruthy();
-    expect(screen.queryByText('Change logo')).toBeNull();
+    expect(screen.queryByText(/^redirect:/)).toBeNull();
+    expect(screen.getAllByText('Change logo').length).toBeGreaterThan(0);
   });
 });

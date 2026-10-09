@@ -50,7 +50,7 @@ function readStore(value: unknown): KnownStore | null {
   if (typeof name !== 'string' || !name.trim() || typeof categoryId !== 'string') return null;
   if (logoDomain !== null && typeof logoDomain !== 'string') return null;
   if (typeof logoHidden !== 'boolean') return null;
-  // An entry with no logo answer still lists the store first (free accounts are never asked).
+  // An entry with no logo answer still lists the store first.
   return { name, categoryId, logoDomain: logoDomain || null, logoHidden };
 }
 
@@ -78,7 +78,7 @@ export async function readKnownStores(userId: string): Promise<KnownStore[]> {
 
 /**
  * `stores` with `next` first, replacing any earlier entry for the same name. An entry without a logo
- * answer keeps the answer given before, so adding a store again on free never loses its logo.
+ * answer keeps the answer given before, so adding a store again never loses its logo.
  */
 export function rememberIn(stores: readonly KnownStore[], next: KnownStore): KnownStore[] {
   const key = storeKey(next.name);

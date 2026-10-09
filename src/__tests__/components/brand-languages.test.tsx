@@ -197,7 +197,7 @@ describe('the Change logo button', () => {
 });
 
 describe('the logo pencil on the free plan', () => {
-  it('opens what Pro adds, not the Change logo page', async () => {
+  it('opens the Change logo page, as on Pro', async () => {
     await act(async () => publishProStatus({ pro: false, ready: true }));
     const screen = await render(
       <ChangeLogoButton kind="receipt" id="r1" name="Deli">
@@ -205,6 +205,9 @@ describe('the logo pencil on the free plan', () => {
       </ChangeLogoButton>,
     );
     await fireEvent.press(screen.getByLabelText('Change logo'));
-    expect(router.push).toHaveBeenCalledWith({ pathname: '/pro-feature', params: { id: 'logos' } });
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/change-logo',
+      params: { kind: 'receipt', id: 'r1', name: 'Deli' },
+    });
   });
 });

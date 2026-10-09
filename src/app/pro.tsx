@@ -10,7 +10,6 @@ import {
   Mic,
   ScanLine,
   Sparkles,
-  Store,
   Wallet,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -67,7 +66,6 @@ const ROWS: Row[] = [
   },
   { icon: Mic, label: 'pro.compare.voice', free: 'no', pro: 'yes' },
   { icon: ChartColumn, label: 'pro.compare.insights', free: 'no', pro: 'yes' },
-  { icon: Store, label: 'pro.compare.logos', free: 'no', pro: 'yes' },
   { icon: Sparkles, label: 'pro.compare.early', free: 'no', pro: 'yes' },
   { icon: Headphones, label: 'pro.compare.support', free: 'no', pro: 'yes' },
 ];

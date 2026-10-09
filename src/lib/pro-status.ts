@@ -3,8 +3,8 @@ import { useSyncExternalStore } from 'react';
 /**
  * The app's one answer to "does this account pay", published by the purchases bridge at the root
  * and read everywhere else. Reading it is a subscription to a plain store, so a list can ask once
- * per row (a logo) without every row opening its own RevenueCat listener and server request, and
- * it needs no provider, so any component can read it.
+ * per row without every row opening its own RevenueCat listener and server request, and it needs
+ * no provider, so any component can read it.
  */
 export type ProStatus = {
   pro: boolean;
@@ -40,8 +40,8 @@ export function useProStatus(): ProStatus {
 }
 
 /**
- * Known to be free. What is drawn (history, logos) changes only on this, so someone who paid never
- * sees the free version flash while Pro is still being checked.
+ * Known to be free. What is drawn (the history kept in view) changes only on this, so someone who
+ * paid never sees the free version flash while Pro is still being checked.
  */
 export function useKnownFree(): boolean {
   const { pro, ready } = useProStatus();

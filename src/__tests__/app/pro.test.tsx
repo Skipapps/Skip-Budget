@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import ProScreen from '@/app/pro';
 
 /**
- * The Pro page as designed: Free against Pro in ten rows, the two plans with yearly chosen, and one
+ * The Pro page as designed: Free against Pro in nine rows, the two plans with yearly chosen, and one
  * button that offers the trial only to someone Apple will give it to. Prices are the store's own
  * once it answers, the dollar fallbacks before.
  */
@@ -97,13 +97,12 @@ const ROWS = [
   'Money history: Free, 90 days. Pro, 7 years.',
   'Voice entry: Free, not included. Pro, included.',
   'Insights: Free, not included. Pro, included.',
-  'Brand logos: Free, not included. Pro, included.',
   'New features first: Free, not included. Pro, included.',
   'Priority support: Free, not included. Pro, included.',
 ];
 
 describe('the table', () => {
-  it('compares Free and Pro in the design’s ten rows, each read as one sentence', async () => {
+  it('compares Free and Pro in nine rows, each read as one sentence', async () => {
     const screen = await render(<ProScreen />);
 
     expect(screen.getByText('Get more with Skip Pro')).toBeTruthy();
@@ -124,12 +123,12 @@ describe('the table', () => {
     expect(screen.getAllByText('Unlimited')).toHaveLength(2);
     expect(screen.getByText('90 days')).toBeTruthy();
     expect(screen.getByText('7 years')).toBeTruthy();
-    expect(screen.getAllByText('—')).toHaveLength(5);
+    expect(screen.getAllByText('—')).toHaveLength(4);
   });
 
   it('sells only what this app does', async () => {
     const screen = await render(<ProScreen />);
-    expect(screen.queryByText(/split|friend|\bgroup|loan/i)).toBeNull();
+    expect(screen.queryByText(/split|friend|\bgroup|loan|logo/i)).toBeNull();
   });
 });
 

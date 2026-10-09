@@ -190,8 +190,6 @@ type ReminderInput = {
   payer?: SourceRow | null;
   /** The card itself, for a card-payment reminder. */
   self?: SourceRow | null;
-  /** Whether the account has Skip Pro: logos are Pro, so free gets letters or the icon. */
-  pro: boolean;
 } & LogoSource;
 
 export function reminderPayload(
@@ -200,7 +198,7 @@ export function reminderPayload(
   logoCdnUrl?: string | null,
 ): TapPayload {
   const { when, amount } = splitBody(input.body);
-  const logo = input.pro ? thumbnailUrl(input, supabaseUrl, logoCdnUrl) : undefined;
+  const logo = thumbnailUrl(input, supabaseUrl, logoCdnUrl);
   const id = input.targetId ?? undefined;
 
   switch (input.kind) {
@@ -277,8 +275,6 @@ type ChargeInput = {
   subscriptionId?: string | null;
   glyph?: string | null;
   payer?: SourceRow | null;
-  /** Whether the account has Skip Pro: logos are Pro, so free gets letters or the icon. */
-  pro: boolean;
 } & LogoSource;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -294,7 +290,7 @@ export function chargePayload(
   supabaseUrl: string,
   logoCdnUrl?: string | null,
 ): TapPayload {
-  const logo = input.pro ? thumbnailUrl(input, supabaseUrl, logoCdnUrl) : undefined;
+  const logo = thumbnailUrl(input, supabaseUrl, logoCdnUrl);
   const route: TapRoute = input.subscriptionId
     ? '/subscription'
     : input.billId
