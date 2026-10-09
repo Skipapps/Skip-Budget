@@ -157,9 +157,15 @@ export const authMessages = defineMessages({
     fr: 'Indique les {digits} chiffres.',
   },
   'auth.otp.resent': {
-    en: 'A new code is on its way.',
-    es: 'Ya va en camino un código nuevo.',
-    fr: 'Un nouveau code est en route.',
+    en: 'New code sent. If you don’t see it soon, please check your spam folder.',
+    es: 'Código nuevo enviado. Si no lo ves pronto, revisa tu carpeta de spam.',
+    fr: 'Nouveau code envoyé. Si tu ne le vois pas bientôt, vérifie ton dossier de courrier indésirable.',
+  },
+  // Shown once the code has had time to arrive: a new sender's mail often lands in spam.
+  'auth.otp.checkSpam': {
+    en: 'No code yet? Please check your spam folder. Emails from new apps sometimes land there.',
+    es: '¿Aún sin código? Revisa tu carpeta de spam. Los correos de apps nuevas a veces llegan ahí.',
+    fr: 'Pas encore de code ? Vérifie ton dossier de courrier indésirable. Les courriels des nouvelles apps y arrivent parfois.',
   },
   'auth.otp.checking': { en: 'Checking…', es: 'Verificando…', fr: 'Vérification…' },
   'auth.otp.resend': { en: 'Resend code', es: 'Reenviar código', fr: 'Renvoyer le code' },

@@ -32,7 +32,7 @@ const ALLOWED: Record<string, Counts> = {
   'app/savings-month.tsx': [6, 0, 0],
   'app/setup.tsx': [3, 0, 0],
   'app/subscription-plans.tsx': [2, 0, 0],
-  'app/verify-otp.tsx': [2, 0, 0],
+  'app/verify-otp.tsx': [1, 0, 0],
   'app/voice.tsx': [4, 0, 0],
   'components/flow/amount-figure.tsx': [0, 1, 0],
   'components/navigation/skip-tab-bar.tsx': [1, 1, 1],

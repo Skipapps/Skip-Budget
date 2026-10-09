@@ -164,7 +164,9 @@ describe('the sign-in pages in Spanish', () => {
     expect(screen.getByText('Ingresa los 6 dígitos.')).toBeTruthy();
 
     await fireEvent.press(screen.getByText('Reenviar código'));
-    expect(screen.getByText('Ya va en camino un código nuevo.')).toBeTruthy();
+    expect(
+      screen.getByText('Código nuevo enviado. Si no lo ves pronto, revisa tu carpeta de spam.'),
+    ).toBeTruthy();
     expectNoRawText(screen);
   });
 });

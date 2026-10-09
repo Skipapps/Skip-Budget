@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { resendOtp, verifyOtp, type OtpPurpose } from '@/api/auth';
@@ -10,8 +10,11 @@ import { TextLink } from '@/components/ui/text-link';
 import { Strong, Subtitle } from '@/components/ui/typography';
 import { t } from '@/i18n';
 import { resetTo } from '@/lib/nav';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 const CODE_LENGTH = 6;
+/** Long enough for a code that is coming to arrive, so the hint only reaches people still waiting. */
+const SPAM_HINT_AFTER_MS = 15_000;
 
 export default function VerifyOtpScreen() {
   const { email, purpose } = useLocalSearchParams<{ email?: string; purpose?: string }>();
@@ -21,6 +24,12 @@ export default function VerifyOtpScreen() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [waited, setWaited] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setWaited(true), SPAM_HINT_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   const submit = async (value: string) => {
     if (busy || !email) return;
@@ -58,6 +67,9 @@ export default function VerifyOtpScreen() {
     setError(resendError);
   };
 
+  // The resend notice already points to spam, so the two never show together.
+  const note = notice ?? (waited ? t('auth.otp.checkSpam') : null);
+
   // The address is drawn in bold, so the sentence is cut around it rather than filled.
   const [beforeEmail, afterEmail] = t('auth.otp.sentTo', { digits: CODE_LENGTH }).split('{email}');
 
@@ -88,12 +100,12 @@ export default function VerifyOtpScreen() {
         </Text>
       ) : null}
 
-      {notice ? (
+      {note ? (
         <Text
-          className="mt-4 w-full text-center font-app text-[13px] text-muted"
-          maxFontSizeMultiplier={1.4}
+          className="mt-4 w-full text-center font-app text-[13px] leading-[19px] text-muted"
+          maxFontSizeMultiplier={TEXT_CAP.reading}
         >
-          {notice}
+          {note}
         </Text>
       ) : null}
 
