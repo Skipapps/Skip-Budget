@@ -22,6 +22,10 @@ jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', onControl: '#FFFFFF' }),
   useMoneyColor: () => () => '#000000',
 }));
+// Jest turns an .svg into a number, not a component; the icons have suites of their own.
+jest.mock('@/theme/home-icons', () => ({
+  useHomeIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 
 type Screen = Awaited<ReturnType<typeof render>>;
 type Json = ReturnType<Screen['toJSON']>;
@@ -144,6 +148,8 @@ describe('the dashboard cards in Spanish', () => {
 
     const tools = await render(<ToolCards onPress={() => {}} />);
     expect(tools.getByLabelText('Calculadora de préstamos. Abre la herramienta.')).toBeTruthy();
+    expect(tools.getByText('Mira el pago mensual')).toBeTruthy();
+    expect(tools.getByText('Mira tus patrones')).toBeTruthy();
     expectNoRawText(tools);
   });
 
@@ -158,6 +164,10 @@ describe('the dashboard cards in Spanish', () => {
     expect(screen.getAllByText('Factura', { includeHiddenElements: true }).length).toBeGreaterThan(
       0,
     );
+    for (const note of ['Foto o a mano', 'Renta, teléfono, luz', 'Netflix, Spotify']) {
+      expect(screen.getByText(note)).toBeTruthy();
+    }
+    expect(screen.getByText('Tu día de pago')).toBeTruthy();
     expectNoRawText(screen);
   });
 });
@@ -229,7 +239,10 @@ describe('the dashboard cards in French', () => {
 
     const tools = await render(<ToolCards onPress={() => {}} />);
     expect(tools.getByLabelText('Calculateur de prêt. Ouvre l’outil.')).toBeTruthy();
+    expect(tools.getByText('Vois la mensualité')).toBeTruthy();
+    expect(tools.getByText('Vois tes tendances')).toBeTruthy();
     expect(tools.queryAllByText('PRO', { includeHiddenElements: true })).toHaveLength(0);
+    expectNoRawText(tools);
   });
 
   it('labels the four Quick add tiles', async () => {
@@ -238,6 +251,9 @@ describe('the dashboard cards in French', () => {
     expect(
       screen.getAllByText('Abonnement', { includeHiddenElements: true }).length,
     ).toBeGreaterThan(0);
+    for (const note of ['Photo ou saisie', 'Loyer, mobile, énergie', 'Ton jour de paie']) {
+      expect(screen.getByText(note)).toBeTruthy();
+    }
     expectNoRawText(screen);
   });
 });

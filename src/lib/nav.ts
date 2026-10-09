@@ -13,3 +13,12 @@ export function resetTo(href: string): void {
   if (router.canDismiss()) router.dismissAll();
   router.replace(href as Parameters<typeof router.replace>[0]);
 }
+
+/**
+ * Leaves a finished add flow for wherever it was opened from (the Cards tab), or for the Cards tab
+ * when nothing is under it. The flow's steps are in the same route, so nothing goes back into them.
+ */
+export function leaveFlow(): void {
+  if (router.canGoBack()) router.back();
+  else router.replace('/cards');
+}

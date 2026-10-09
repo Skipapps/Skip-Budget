@@ -9,7 +9,6 @@ import { CategoryPicker } from '@/components/bills/category-picker';
 import { ProportionBar } from '@/components/calculators/proportion-bar';
 import { ScheduleCard } from '@/components/calculators/schedule-card';
 import { SliderRow } from '@/components/calculators/slider-row';
-import { NetworkPicker } from '@/components/cards/network-picker';
 import { InlineCalendar } from '@/components/flow/inline-calendar';
 import { StepFlow } from '@/components/flow/step-flow';
 import {
@@ -284,16 +283,6 @@ const CASES: Case[] = [
       />
     ),
     roles: () => [[t('ui.timePicker.pm'), 'control']],
-  },
-  {
-    name: 'NetworkPicker',
-    draw: () => (
-      <NetworkPicker networks={['VISA', 'Mastercard', 'Amex']} value="VISA" onChange={noop} />
-    ),
-    // Brand names; the circle's short mark is drawn at one size inside its 64pt circle.
-    fixed: /^(VISA|MC|AMEX|DISC)$/,
-    same: both(/^(VISA|Mastercard|Amex|MC|AMEX)$/),
-    roles: () => [['Mastercard', 'control']],
   },
   {
     name: 'RangeDropdown',

@@ -3,27 +3,34 @@ import { Plus } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
+import { useGradientIcons, type GradientIconName } from '@/theme/gradient-icons';
 import { AccountCard } from '@/components/cards/account-card';
+import {
+  MoneyTile,
+  type MoneyTileGroups,
+  type MoneyTileValue,
+} from '@/components/cards/money-tile';
 import { PaymentCard } from '@/components/cards/payment-card';
 import { ActionPill } from '@/components/ui/action-pill';
-import { AmountTile } from '@/components/ui/amount-tile';
 import { FitGroup, useFitGroup } from '@/components/ui/fit-group';
 import { PageState } from '@/components/ui/page-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Screen } from '@/components/ui/screen';
-import { SectionHeading } from '@/components/ui/typography';
+import { SectionHeading, Title } from '@/components/ui/typography';
+import { useActiveLoans } from '@/api/loans';
 import { useBankAccounts, useCards, useSalarySources, useSourceBalances } from '@/api/queries';
 import { usePro } from '@/api/pro';
 import { useRefreshAll } from '@/api/refresh';
 import { incomeForMonth } from '@/lib/pay';
 import { useToday } from '@/lib/use-today';
-import { moneyBuckets } from '@/data/money-buckets';
-import { t, type MessageKey } from '@/i18n';
+import { t } from '@/i18n';
 import { failureText } from '@/lib/failure';
+import { formatCurrency } from '@/lib/format';
 import { TEXT_CAP } from '@/theme/text-scale';
 
 type SectionHeaderProps = {
   title: string;
+  /** What VoiceOver says for the pill, which only reads "Add". */
   actionLabel: string;
   onAction: () => void;
 };
@@ -35,18 +42,17 @@ function SectionHeader({ title, actionLabel, onAction }: SectionHeaderProps) {
         <SectionHeading>{title}</SectionHeading>
       </View>
 
-      <ActionPill icon={Plus} label={actionLabel} onPress={onAction} className="shrink-0" />
+      <ActionPill
+        icon={Plus}
+        label={t('cards.list.add')}
+        accessibilityLabel={actionLabel}
+        onPress={onAction}
+        tone="card"
+        className="shrink-0"
+      />
     </View>
   );
 }
-
-/** Salary sources arrive on different cycles; normalise before summing. */
-
-/** The tiles' words by bucket id; the bucket list itself holds only the English. */
-const BUCKET_LABELS: Record<string, MessageKey> = {
-  salary: 'cards.list.salary',
-  savings: 'cards.list.savings',
-};
 
 /** Stands in for an empty list only; a failed read is answered by the whole page. */
 function ListNote({ text }: { text: string }) {
@@ -62,8 +68,27 @@ function ListNote({ text }: { text: string }) {
   );
 }
 
+type Tile = {
+  id: string;
+  icon: GradientIconName;
+  label: string;
+  value: MoneyTileValue;
+  note?: string;
+  onPress?: () => void;
+};
+
+/** "Salary, $3,700.00, Monthly": the tile's lines in the order they are drawn. */
+function tileLabel(tile: Tile): string {
+  const value = tile.value.kind === 'loading' ? '' : tile.value.text;
+  if (!value) return tile.label;
+  return tile.note
+    ? t('cards.money.tileLabel', { name: tile.label, value, note: tile.note })
+    : t('cards.money.tileLabelShort', { name: tile.label, value });
+}
+
 export default function CardsScreen() {
   const artwork = useArtwork();
+  const icons = useGradientIcons();
   // State, not `new Date()`: a backgrounded tab does not re-render, so a plain date would stay on
   // yesterday after an overnight resume.
   const { today } = useToday();
@@ -71,13 +96,46 @@ export default function CardsScreen() {
   const cards = useCards();
   const accounts = useBankAccounts();
   const salary = useSalarySources();
-  const { balances, isError: balancesError, refetch: refetchBalances } = useSourceBalances(today);
+  const loans = useActiveLoans(today);
+  const {
+    balances,
+    updated,
+    isError: balancesError,
+    refetch: refetchBalances,
+  } = useSourceBalances(today);
   const { refresh, refreshing } = useRefreshAll();
   const { pro } = usePro();
-  // The tiles' labels share one size and their figures another; the pair stacks if either cannot.
-  const tileLabels = useFitGroup({ mode: 'shrink' });
-  const tileFigures = useFitGroup({ mode: 'shrink' });
-  const tilesStacked = !tileLabels.fits || !tileFigures.fits;
+
+  // Each kind of line on the tiles shares one size across all four; the grid stacks to one tile
+  // per row as soon as any kind cannot fit two to a row.
+  const groups: MoneyTileGroups = {
+    labels: useFitGroup({ mode: 'shrink' }),
+    figures: useFitGroup({ mode: 'shrink' }),
+    pills: useFitGroup({ mode: 'switch' }),
+    notes: useFitGroup({ mode: 'shrink' }),
+  };
+  const tilesStacked =
+    !groups.labels.fits || !groups.figures.fits || !groups.pills.fits || !groups.notes.fits;
+
+  // A stale balance is worse than none: if any of the reads behind `balances` fails, the faces
+  // would fall back to the balance typed when the card was added. A failed salary or loan read
+  // would pass for having none, and offer to add one. After all hooks, so hook order holds.
+  if (balancesError || salary.isError || loans.isError) {
+    return (
+      <Screen onRefresh={refresh} refreshing={refreshing}>
+        <PageState
+          art={artwork.error}
+          title={failureText()}
+          actionLabel={t('common.tryAgain')}
+          onAction={() => {
+            if (balancesError) refetchBalances();
+            if (salary.isError) void salary.refetch();
+            if (loans.isError) loans.refetch();
+          }}
+        />
+      </Screen>
+    );
+  }
 
   // This month's money in: the schedules plus any one-off pays dated this month.
   const monthlySalary = incomeForMonth(
@@ -88,30 +146,74 @@ export default function CardsScreen() {
     })),
     today,
   );
-  // Savings stands on its own while it is redesigned, so its tile carries no figure.
-  const moneyAmounts: Record<string, number> = {
-    salary: monthlySalary,
-  };
+  const hasSalary = (salary.data?.length ?? 0) > 0;
+  const loanList = loans.loans;
 
-  // A stale balance is worse than none: if any of the seven reads behind `balances` fails, the
-  // faces would fall back to the balance typed when the card was added. After all hooks, so hook
-  // order holds.
-  if (balancesError) {
-    return (
-      <Screen onRefresh={refresh} refreshing={refreshing}>
-        <PageState
-          art={artwork.error}
-          title={failureText()}
-          actionLabel={t('common.tryAgain')}
-          onAction={() => refetchBalances()}
-        />
-      </Screen>
-    );
-  }
+  const tiles: Tile[] = [
+    {
+      id: 'salary',
+      icon: 'salary',
+      label: t('cards.list.salary'),
+      value: salary.isPending
+        ? { kind: 'loading' }
+        : hasSalary
+          ? { kind: 'figure', text: formatCurrency(monthlySalary) }
+          : { kind: 'pill', text: t('cards.money.addSalary') },
+      note: salary.isPending ? undefined : hasSalary ? t('dates.monthly') : t('cards.money.addPay'),
+      onPress: () => router.push('/salary'),
+    },
+    {
+      id: 'savings',
+      icon: 'savings',
+      label: t('cards.list.savings'),
+      // Savings stands on its own while it is redesigned, so its tile carries no figure.
+      value: { kind: 'pill', text: t('cards.money.open') },
+      note: t('cards.money.startSaving'),
+      onPress: () => router.push('/savings'),
+    },
+    {
+      id: 'loans',
+      icon: 'loans',
+      label: t('cards.money.loans'),
+      value: loans.isPending
+        ? { kind: 'loading' }
+        : loanList.length > 0
+          ? { kind: 'figure', text: t('cards.money.loansActive', { count: loanList.length }) }
+          : { kind: 'pill', text: t('cards.money.addLoan') },
+      note: loans.isPending
+        ? undefined
+        : loanList.length > 0
+          ? loanList.map((loan) => loan.name).join(' · ')
+          : t('cards.money.trackLoans'),
+      // A loan lives behind its bill, so one loan opens that bill's page. While the loans are still
+      // being read, "none" is not known yet, so the press waits rather than open the calculator.
+      onPress: () => {
+        if (loans.isPending) return;
+        if (loanList.length === 0) router.push('/loan-calculator');
+        else if (loanList.length === 1) router.push(`/bill/${loanList[0].billId}`);
+        else router.push('/bills');
+      },
+    },
+    {
+      id: 'goals',
+      icon: 'goals',
+      label: t('cards.money.goals'),
+      value: { kind: 'soon', text: t('cards.money.comingSoon') },
+    },
+  ];
+  const rows = [tiles.slice(0, 2), tiles.slice(2, 4)];
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <View className="mt-2 w-full">
+      <Title header>{t('nav.cards')}</Title>
+      <Text
+        className="mt-[4px] w-full text-center font-app text-[13px] text-muted"
+        maxFontSizeMultiplier={TEXT_CAP.reading}
+      >
+        {t('cards.list.subtitle')}
+      </Text>
+
+      <View className="mt-[28px] w-full">
         <SectionHeader
           title={t('cards.list.creditCards')}
           actionLabel={t('cards.list.newCard')}
@@ -124,7 +226,7 @@ export default function CardsScreen() {
         />
       </View>
 
-      <View className="mt-5 w-full gap-4">
+      <View className="mt-[12px] w-full gap-[12px]">
         {(cards.data ?? []).map((card, index) => (
           // Wrapped rather than given an onPress: PaymentCard is also used in the add-card preview,
           // where tapping it means nothing.
@@ -155,17 +257,18 @@ export default function CardsScreen() {
                 last4: card.last4 ?? '',
                 network: card.network,
                 color: card.color,
+                creditLimit: card.credit_limit,
               }}
             />
           </Pressable>
         ))}
-        {cards.isPending ? <Skeleton className="h-44 w-full rounded-[16px]" /> : null}
+        {cards.isPending ? <Skeleton className="h-[186px] w-full rounded-[10px]" /> : null}
         {!cards.isPending && (cards.data?.length ?? 0) === 0 ? (
           <ListNote text={t('cards.list.noCards')} />
         ) : null}
       </View>
 
-      <View className="mt-10 w-full">
+      <View className="mt-[28px] w-full">
         <SectionHeader
           title={t('cards.list.bankAccounts')}
           actionLabel={t('cards.list.addAccount')}
@@ -177,7 +280,7 @@ export default function CardsScreen() {
         />
       </View>
 
-      <View className="mt-5 w-full gap-4">
+      <View className="mt-[12px] w-full gap-[12px]">
         {(accounts.data ?? []).map((account, index) => (
           <Pressable
             key={account.id}
@@ -205,46 +308,49 @@ export default function CardsScreen() {
                 last4: account.last4 ?? '',
                 color: account.color,
               }}
+              updatedOn={updated.get(account.id) ?? null}
+              today={today}
             />
           </Pressable>
         ))}
-        {accounts.isPending ? <Skeleton className="h-36 w-full rounded-[16px]" /> : null}
+        {accounts.isPending ? <Skeleton className="h-[186px] w-full rounded-[10px]" /> : null}
         {!accounts.isPending && (accounts.data?.length ?? 0) === 0 ? (
           <ListNote text={t('cards.list.noAccounts')} />
         ) : null}
       </View>
 
-      <View className="mt-10 w-full">
+      <View className="mt-[28px] w-full">
         <SectionHeading>{t('cards.list.money')}</SectionHeading>
       </View>
 
-      {/* Tiles flex, not a fixed width, so they stay side by side on a narrow phone. */}
-      <FitGroup group={tileLabels} className="mt-5 w-full pb-8" testID="money-tile-labels">
-        <FitGroup
-          group={tileFigures}
-          className={tilesStacked ? 'w-full gap-3' : 'w-full flex-row gap-3'}
-          testID="money-tile-figures"
-        >
-          {moneyBuckets.map((bucket) => (
-            <View key={bucket.id} className={tilesStacked ? 'w-full' : 'min-w-0 flex-1'}>
-              <AmountTile
-                id={bucket.id}
-                label={BUCKET_LABELS[bucket.id] ? t(BUCKET_LABELS[bucket.id]) : bucket.label}
-                amount={moneyAmounts[bucket.id]}
-                artwork={artwork[bucket.artwork]}
-                labels={tileLabels}
-                figures={tileFigures}
-                stacked={tilesStacked}
-                onPress={
-                  bucket.id === 'salary'
-                    ? () => router.push('/salary')
-                    : bucket.id === 'savings'
-                      ? () => router.push('/savings')
-                      : undefined
-                }
-              />
-            </View>
-          ))}
+      <FitGroup group={groups.labels} className="mt-[12px] w-full pb-8" testID="money-tile-labels">
+        <FitGroup group={groups.figures} className="w-full" testID="money-tile-figures">
+          <FitGroup group={groups.pills} className="w-full" testID="money-tile-pills">
+            <FitGroup group={groups.notes} className="w-full gap-[12px]" testID="money-tiles">
+              {rows.map((row) => (
+                <View
+                  key={row.map((tile) => tile.id).join('-')}
+                  testID="money-tile-row"
+                  className={tilesStacked ? 'w-full gap-[12px]' : 'w-full flex-row gap-[12px]'}
+                >
+                  {row.map((tile) => (
+                    <View key={tile.id} className={tilesStacked ? 'w-full' : 'min-w-0 flex-1'}>
+                      <MoneyTile
+                        id={tile.id}
+                        icon={icons[tile.icon]}
+                        label={tile.label}
+                        value={tile.value}
+                        note={tile.note}
+                        onPress={tile.onPress}
+                        accessibilityLabel={tileLabel(tile)}
+                        groups={groups}
+                      />
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </FitGroup>
+          </FitGroup>
         </FitGroup>
       </FitGroup>
     </Screen>

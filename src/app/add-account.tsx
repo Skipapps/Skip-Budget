@@ -4,13 +4,15 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { AccountCard } from '@/components/cards/account-card';
-import { AmountPad } from '@/components/ui/amount-pad';
+import { AddedPage } from '@/components/flow/added-page';
 import { AmountStep } from '@/components/flow/amount-step';
 import { InlineCalendar } from '@/components/flow/inline-calendar';
+import { RemindMeCard } from '@/components/flow/remind-me-card';
 import { StepFlow } from '@/components/flow/step-flow';
 import { CalculatorPad } from '@/components/ui/calculator-pad';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { ColorPicker } from '@/components/ui/color-picker';
+import { CurrencyField } from '@/components/ui/currency-field';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,8 +25,6 @@ import {
 } from '@/api/queries';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useToast } from '@/providers/toast-context';
-import { ReminderField } from '@/components/ui/reminder-field';
-import { SelectField } from '@/components/ui/select-field';
 import { SwitchControl } from '@/components/ui/switch-control';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel } from '@/components/ui/typography';
@@ -36,12 +36,7 @@ import {
   useDeleteBankAccount,
   useUpdateBankAccount,
 } from '@/api/mutations';
-import {
-  choiceToLead,
-  useApplyReminder,
-  useReminderChoice,
-  type ReminderChoice,
-} from '@/api/reminders';
+import { useApplyReminder, useReminderChoice } from '@/api/reminders';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { ACCOUNT_TYPES, type AccountType } from '@/data/accounts';
@@ -57,7 +52,12 @@ import { formatCurrency } from '@/lib/format';
 import { t } from '@/i18n';
 import { success, warn } from '@/lib/haptics';
 import { failureMessage, failureText } from '@/lib/failure';
+import { leaveFlow } from '@/lib/nav';
+import { leadCanFire, paydayReminderOn } from '@/lib/payday';
+import { addedMessage, payReminderCaption, reminderRow, type LeadDays } from '@/lib/reminder-words';
+import { draftFromAmount } from '@/lib/typed-amount';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 /** The value stays the stored "Checking"/"Savings"; the label is read when the chips draw. */
 const TYPE_OPTIONS = ACCOUNT_TYPES.map((type) => ({
@@ -84,6 +84,11 @@ function frequencyLabel(frequency: PayFrequency): string {
   return (match?.label ?? frequency).toLowerCase();
 }
 
+/** The day the next pay reminder is sent, as the scheduler sends it; null when it never is. */
+function reminderBefore(lastPayday: Date, frequency: PayFrequency, lead: LeadDays): string | null {
+  return paydayReminderOn(toIsoDate(lastPayday), frequency, lead, toIsoDate(new Date()));
+}
+
 export default function AddAccountScreen() {
   // Deep-link guard: creating past the free allowance opens Pro instead of a form the database
   // would refuse; editing is untouched. Wrapper-shaped so the hook count never changes. Decided
@@ -95,7 +100,9 @@ export default function AddAccountScreen() {
 
   const [walled, setWalled] = useState<boolean | null>(null);
   let decided = walled;
-  if (decided === null && (id || (ready && !existing.isPending))) {
+  // Not while the list is refreshing either: just after a save, "Add another" would count the
+  // list from before it.
+  if (decided === null && (id || (ready && !existing.isPending && !existing.isFetching))) {
     decided = !id && !pro && (existing.data?.length ?? 0) >= 1;
     setWalled(decided);
   }
@@ -197,8 +204,9 @@ function AccountForm({
   const [lastPayday, setLastPayday] = useState<Date | null>(null);
 
   const [step, setStep] = useState(0);
-  const [incomePadOpen, setIncomePadOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
+  /** Set once a new account is saved: the flow gives way to the page that says so. */
+  const [added, setAdded] = useState(false);
 
   const nextPayday = lastPayday ? getNextPayday(lastPayday, payFrequency) : null;
 
@@ -255,11 +263,23 @@ function AccountForm({
   // salary source. An edit never saved them.
   const askPay = !editing && !payLinked;
 
+  // The saved reminder until the person touches it; its time of day is kept as it is.
   const savedReminder = useReminderChoice('account', id);
-  const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
-  const [timeDraft, setTimeDraft] = useState<string | null>(null);
-  const reminder = reminderDraft ?? savedReminder.choice;
-  const remindAt = timeDraft ?? savedReminder.remindAt;
+  const [onDraft, setOnDraft] = useState<boolean | null>(null);
+  const [leadDraft, setLeadDraft] = useState<LeadDays | null>(null);
+  // New ones start on, three days before; an edit opens on what is saved.
+  const reminderOn = onDraft ?? (editing ? savedReminder.choice !== 'off' : true);
+  const chosenLead: LeadDays =
+    leadDraft ?? (savedReminder.choice === 'off' ? 3 : (Number(savedReminder.choice) as LeadDays));
+  // Only leads the scheduler can keep sending for the pay known here: a week before weekly pay is
+  // itself a payday, so that reminder would never go out.
+  const knownFrequencies = askPay
+    ? [payFrequency]
+    : payLinked
+      ? salaries.map((source) => source.frequency)
+      : [];
+  const leadFits = (value: LeadDays) => leadCanFire(value, knownFrequencies);
+  const lead: LeadDays = leadFits(chosenLead) ? chosenLead : 3;
   const applyReminder = useApplyReminder();
 
   const salaryAccounts = useSalaryAccountIds();
@@ -271,6 +291,8 @@ function AccountForm({
   const payLookupPending = Boolean(editing) && salaryAccounts.isLoading;
   const payLookupFailed = Boolean(editing) && salaryAccounts.isError;
   const payLookupUnknown = payLookupPending || payLookupFailed;
+  // Only pay typed here has a known next payday; linked pay is described by its lead alone.
+  const remindOn = askPay && lastPayday ? reminderBefore(lastPayday, payFrequency, lead) : null;
 
   const fail = (message: string, atStep: number) => {
     warn();
@@ -334,22 +356,27 @@ function AccountForm({
 
       // Untouched while the link is unknown: `payLandsHere` is false for an empty set and
       // `applyReminder(…, null)` deletes the row, so a failed or pending read would silently remove
-      // an existing reminder.
-      if (!payLookupUnknown) {
+      // an existing reminder. The same holds for the saved reminder itself.
+      if (!payLookupUnknown && !savedReminder.unknown) {
         await applyReminder(
           'account',
           accountId,
-          payLandsHere ? choiceToLead(reminder) : null,
-          remindAt,
+          payLandsHere && reminderOn ? lead : null,
+          savedReminder.remindAt,
         );
       }
 
       success();
-      toast(editing ? 'toast.account.updated' : 'toast.account.added');
       if (!editing && origin === 'setup') {
+        toast('toast.account.added');
         if (router.canGoBack()) router.back();
         else router.replace('/setup');
-      } else router.back();
+      } else if (editing) {
+        toast('toast.account.updated');
+        router.back();
+      } else {
+        setAdded(true);
+      }
     } catch (thrown) {
       warn();
       setError({ message: failureMessage(thrown), step: 2 });
@@ -357,18 +384,53 @@ function AccountForm({
   };
 
   const busy = createAccount.isPending || updateAccount.isPending;
+  const face = {
+    id: 'preview',
+    bankName,
+    nickname,
+    accountType,
+    balance: Number(balance) || 0,
+    last4,
+    color,
+  };
+
+  if (added) {
+    const reminded = payLandsHere && reminderOn;
+    return (
+      <AddedPage
+        title={t('accounts.added.title')}
+        message={addedMessage('pay', reminded ? lead : null)}
+        face={
+          <AccountCard
+            account={{ ...face, bankName: bankName.trim() }}
+            updatedOn={balance ? toIsoDate(new Date()) : null}
+          />
+        }
+        rows={[
+          {
+            label: t('accounts.added.type'),
+            value: t(
+              accountType === 'Savings' ? 'accounts.type.savings' : 'accounts.type.checking',
+            ),
+          },
+          ...(askPay && nextPayday && Number(income) > 0
+            ? [{ label: t('accounts.added.nextPayday'), value: formatFullDate(nextPayday) }]
+            : []),
+          ...(reminded
+            ? [{ label: t('cards.added.reminder'), value: reminderRow(lead, remindOn) }]
+            : []),
+        ]}
+        onDone={leaveFlow}
+        anotherLabel={t('accounts.added.another')}
+        // A new route rather than a reset form, so the free allowance is checked again.
+        onAnother={() => router.replace('/add-account')}
+      />
+    );
+  }
 
   // Zero is a real balance, so only the bank name blocks.
   const stepValid = step === 1 ? Boolean(bankName.trim()) : !busy;
 
-  const question =
-    step === 0
-      ? t('accounts.add.balanceQuestion')
-      : step === 2
-        ? askPay
-          ? t('accounts.add.lastPaydayQuestion')
-          : t('accounts.add.reminderQuestion')
-        : undefined;
   const primaryLabel =
     step < 2
       ? t('common.continue')
@@ -376,7 +438,7 @@ function AccountForm({
         ? t('cards.form.saving')
         : editing
           ? t('cards.form.saveChanges')
-          : t('accounts.add.saveAccount');
+          : t('accounts.add.addAccount');
   const stepError = error && error.step === step ? error.message : null;
 
   return (
@@ -390,7 +452,7 @@ function AccountForm({
         if (step === 0) router.back();
         else setStep((current) => current - 1);
       }}
-      question={question}
+      question={step === 0 ? t('accounts.add.balanceQuestion') : undefined}
       primaryLabel={primaryLabel}
       primaryDisabled={!stepValid}
       onPrimary={() => {
@@ -422,19 +484,8 @@ function AccountForm({
       {step === 0 ? <AmountStep value={balance} onChange={setBalance} /> : null}
 
       {step === 1 ? (
-        <View className="w-full gap-6">
-          <AccountCard
-            account={{
-              id: 'preview',
-              bankName,
-              nickname,
-              accountType,
-              balance: Number(balance) || 0,
-              last4,
-              color,
-            }}
-            placeholderName={t('accounts.add.bankName')}
-          />
+        <View className="w-full gap-[16px]">
+          <AccountCard account={face} placeholderName={t('accounts.add.bankName')} />
 
           <TextField
             label={t('accounts.add.bankName')}
@@ -442,12 +493,8 @@ function AccountForm({
             onChangeText={setBankName}
             autoCapitalize="words"
             returnKeyType="next"
+            filled
           />
-
-          <View className="w-full">
-            <FieldLabel className="mb-2">{t('accounts.add.accountType')}</FieldLabel>
-            <ChoiceChips options={TYPE_OPTIONS} value={accountType} onChange={setAccountType} />
-          </View>
 
           <TextField
             label={t('accounts.add.accountName')}
@@ -455,11 +502,17 @@ function AccountForm({
             onChangeText={setNickname}
             autoCapitalize="words"
             returnKeyType="done"
+            filled
           />
 
           <View className="w-full">
-            <FieldLabel className="mb-3">{t('cards.form.cardColour')}</FieldLabel>
-            <ColorPicker value={color} onChange={setColor} />
+            <FieldLabel className="mb-2">{t('accounts.add.accountType')}</FieldLabel>
+            <ChoiceChips
+              options={TYPE_OPTIONS}
+              value={accountType}
+              onChange={setAccountType}
+              tone="card"
+            />
           </View>
 
           <TextField
@@ -468,10 +521,16 @@ function AccountForm({
             onChangeText={(text) => setLast4(text.replace(/\D/g, '').slice(0, 4))}
             keyboardType="number-pad"
             returnKeyType="done"
+            filled
           />
 
+          <View className="w-full">
+            <FieldLabel className="mb-1">{t('cards.form.cardColour')}</FieldLabel>
+            <ColorPicker value={color} onChange={setColor} saved={existing?.color} />
+          </View>
+
           {!editing && hasSalary ? (
-            <View className="w-full flex-row items-center gap-4 rounded-[16px] bg-ink/5 px-4 py-4">
+            <View className="w-full flex-row items-center gap-4 rounded-[16px] border border-line bg-card px-4 py-4">
               <View className="min-w-0 flex-1">
                 <Text className="font-app-medium text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
                   {linkTitle}
@@ -492,15 +551,23 @@ function AccountForm({
           ) : null}
 
           {askPay ? (
-            <SelectField
+            <CurrencyField
               label={t('accounts.add.expectedIncome')}
-              variant="pill"
-              value={income ? formatCurrency(Number(income)) : ''}
+              value={income}
+              onChange={setIncome}
               placeholder={t('accounts.add.enterAmount')}
-              icon={Calculator}
-              onPress={() => setIncomePadOpen(true)}
-              onIconPress={() => setCalculatorOpen(true)}
-              iconAccessibilityLabel={t('accounts.add.openCalculator')}
+              filled
+              trailing={
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('accounts.add.openCalculator')}
+                  hitSlop={10}
+                  onPress={() => setCalculatorOpen(true)}
+                  className="-mr-1 h-10 w-10 items-center justify-center rounded-full active:bg-ink/10"
+                >
+                  <Calculator size={20} color={colors.ink} strokeWidth={1.8} />
+                </Pressable>
+              }
             />
           ) : null}
 
@@ -513,10 +580,24 @@ function AccountForm({
       ) : null}
 
       {step === 2 ? (
-        <View className="w-full gap-6">
+        <View className="w-full">
+          <Text
+            accessibilityRole="header"
+            className="w-full font-app-semibold text-[20px] text-ink"
+            maxFontSizeMultiplier={TEXT_CAP.heading}
+          >
+            {askPay ? t('accounts.add.lastPaydayQuestion') : t('accounts.add.reminderQuestion')}
+          </Text>
+
           {askPay ? (
             <>
-              <View className="w-full">
+              <Text
+                className="mt-1.5 w-full font-app text-[13px] text-muted"
+                maxFontSizeMultiplier={TEXT_CAP.reading}
+              >
+                {t('accounts.add.paySubtitle')}
+              </Text>
+              <View className="mt-[16px] w-full">
                 <InlineCalendar value={lastPayday} onChange={setLastPayday} />
                 {nextPayday ? (
                   <Text
@@ -528,34 +609,49 @@ function AccountForm({
                 ) : null}
               </View>
 
-              <View className="w-full">
+              <View className="mt-[16px] w-full">
                 <FieldLabel className="mb-2">{t('accounts.add.payFrequency')}</FieldLabel>
                 <ChoiceChips
                   options={PAY_SCHEDULES}
                   value={payFrequency}
                   onChange={setPayFrequency}
+                  tone="card"
                 />
               </View>
             </>
           ) : null}
 
-          <ReminderField
-            kind="account"
-            value={reminder}
-            onChange={setReminderDraft}
-            time={remindAt}
-            onTimeChange={setTimeDraft}
-            unavailable={
-              payLookupPending
-                ? t('accounts.add.checkingPay')
-                : payLookupFailed
-                  ? failureText()
-                  : payLandsHere
-                    ? null
-                    : t('accounts.add.reminderNeedsPay')
-            }
-            onRetry={payLookupFailed ? () => void salaryAccounts.refetch() : undefined}
-          />
+          <View className="mt-[16px] w-full">
+            <RemindMeCard
+              on={reminderOn}
+              onToggle={setOnDraft}
+              lead={lead}
+              leadFits={leadFits}
+              onLead={setLeadDraft}
+              caption={
+                reminderOn ? payReminderCaption(lead, remindOn) : t('accounts.add.remindOff')
+              }
+              unavailable={
+                payLookupPending
+                  ? t('accounts.add.checkingPay')
+                  : payLookupFailed
+                    ? failureText()
+                    : payLandsHere
+                      ? null
+                      : t('accounts.add.reminderNeedsPay')
+              }
+              onRetry={payLookupFailed ? () => void salaryAccounts.refetch() : undefined}
+            />
+          </View>
+
+          {editing ? null : (
+            <Text
+              className="mt-[18px] w-full font-app text-[12px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
+            >
+              {t('accounts.add.changeLater')}
+            </Text>
+          )}
         </View>
       ) : null}
 
@@ -565,23 +661,8 @@ function AccountForm({
           value={income}
           onCancel={() => setCalculatorOpen(false)}
           onConfirm={(next) => {
-            setIncome(next);
+            setIncome(draftFromAmount(next));
             setCalculatorOpen(false);
-          }}
-        />
-      ) : null}
-
-      {incomePadOpen ? (
-        <AmountPad
-          title={t('accounts.add.expectedIncome')}
-          // The pay frequency is asked on the next step, so a cycle named here would state a choice
-          // nobody has made.
-          caption={t('accounts.add.eachPayPeriod')}
-          value={income}
-          onCancel={() => setIncomePadOpen(false)}
-          onConfirm={(next) => {
-            setIncome(next);
-            setIncomePadOpen(false);
           }}
         />
       ) : null}

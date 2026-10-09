@@ -233,11 +233,16 @@ export function useSetReminder() {
 /**
  * The choice already stored for one thing, for a form to open on. 'off' for anything with no row,
  * which to a person looking at a form is the same as "never asked".
+ *
+ * `unknown` is true while that answer is not known: for something saved, until the reminders read
+ * has succeeded (loading, or failed). Then 'off' is a guess, and a Save that writes it
+ * (`applyReminder(…, null)` deletes the row) removes a reminder the person never touched, so a form
+ * writes the reminder only when it is false. Never true for something new: nothing is stored yet.
  */
 export function useReminderChoice(
   kind: ReminderKind,
   targetId: string | undefined,
-): { choice: ReminderChoice; remindAt: string } {
+): { choice: ReminderChoice; remindAt: string; unknown: boolean } {
   const reminders = useReminders();
 
   const row = (reminders.data ?? []).find(
@@ -247,6 +252,7 @@ export function useReminderChoice(
   return {
     choice: row?.enabled ? leadToChoice(row.lead_days) : 'off',
     remindAt: row?.remind_at?.slice(0, 5) ?? DEFAULT_REMIND_AT,
+    unknown: Boolean(targetId) && !reminders.isSuccess,
   };
 }
 

@@ -19,7 +19,6 @@ jest.mock('react-native-keyboard-controller', () =>
 
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 jest.mock('@/components/cards/payment-card', () => ({ PaymentCard: () => null }));
-jest.mock('@/components/cards/network-picker', () => ({ NetworkPicker: () => null }));
 // Reanimated 4 wants a native worklets module; the swatches are the only animated part of the form.
 jest.mock('@/components/ui/color-picker', () => ({ ColorPicker: () => null }));
 // Reads captions the reminders mock below leaves out; the reminder is not what these tests are about.
@@ -32,6 +31,10 @@ jest.mock('@/providers/theme-provider', () => ({
 
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
+}));
+// Jest turns an .svg into a number, not a component; the icons have a suite of their own.
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
 }));
 
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => async () => true }));
@@ -54,7 +57,10 @@ const mockUseUpdate = jest.fn(() => ({ mutateAsync: mockUpdate, isPending: false
 const mockUseCreate = jest.fn(() => ({ mutateAsync: mockCreate, isPending: false }));
 const mockUseDelete = jest.fn(() => ({ mutateAsync: jest.fn(), isPending: false }));
 
+// Only creditLimitValue is real, and it never touches the client.
+jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/api/mutations', () => ({
+  creditLimitValue: jest.requireActual('@/api/mutations').creditLimitValue,
   useUpdateCard: () => mockUseUpdate(),
   useCreateCard: () => mockUseCreate(),
   useDeleteCard: () => mockUseDelete(),
@@ -203,7 +209,7 @@ describe('Add card — the day the balance is true from', () => {
     await fireEvent.press(view.getByText('Continue'));
     await fireEvent.changeText(view.getAllByDisplayValue('')[0], 'Everyday Visa');
     await fireEvent.press(view.getByText('Continue'));
-    await fireEvent.press(view.getByText('Save credit card'));
+    await fireEvent.press(view.getByText('Add card'));
     return view;
   };
 

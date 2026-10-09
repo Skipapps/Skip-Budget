@@ -5,7 +5,6 @@ import { ProportionBar } from '@/components/calculators/proportion-bar';
 import { ScheduleCard, loanRateText, loanTermText } from '@/components/calculators/schedule-card';
 import { SliderRow } from '@/components/calculators/slider-row';
 import { FlowChart } from '@/components/transactions/flow-chart';
-import { AmountTile } from '@/components/ui/amount-tile';
 import { RollingNumber } from '@/components/ui/rolling-number';
 import { percent, t } from '@/i18n';
 import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
@@ -264,27 +263,6 @@ describe('English loan lines at a count of one', () => {
   ])('%s', (key, params, many, readsAtOne, readsAtMany) => {
     expect(t(key, { ...params, count: 1 })).toBe(readsAtOne);
     expect(t(key, { ...params, count: many })).toBe(readsAtMany);
-  });
-});
-
-describe('AmountTile', () => {
-  const Art = () => null;
-
-  it.each([
-    ['es' as const, 'Abrir'],
-    ['fr' as const, 'Ouvrir'],
-  ])('offers a tool tile in %s', async (language, open) => {
-    setLanguage(language);
-    await render(<AmountTile label="Herramienta" artwork={Art} onPress={() => {}} />);
-    expect(screen.getByText(open, RAW)).toBeTruthy();
-  });
-
-  it('writes a spending figure in French', async () => {
-    setLanguage('fr');
-    setCurrency('CAD');
-    await render(<AmountTile label="Épicerie" amount={1234.5} artwork={Art} />);
-    expect(screen.getByText(`1${NBSP}234,50${NBSP}$`, RAW)).toBeTruthy();
-    expect(screen.getByLabelText(`Épicerie, 1${NBSP}234,50${NBSP}$`, RAW)).toBeTruthy();
   });
 });
 

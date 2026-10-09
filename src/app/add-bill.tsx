@@ -436,8 +436,11 @@ function BillForm({
 
       if (scope === 'all') await pastCharges.apply(carried);
 
-      // After the bill exists, because a reminder points at a row.
-      await applyReminder('bill', billId, choiceToLead(reminder), remindAt);
+      // After the bill exists, because a reminder points at a row. Untouched while the saved one is
+      // unknown: the form's 'off' is then a guess, and writing it deletes the reminder.
+      if (!savedReminder.unknown) {
+        await applyReminder('bill', billId, choiceToLead(reminder), remindAt);
+      }
 
       success();
       toast(editing ? 'toast.bill.updated' : 'toast.bill.added');

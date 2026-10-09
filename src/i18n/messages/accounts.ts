@@ -60,11 +60,6 @@ export const accountsMessages = defineMessages({
     es: '¿Quieres un aviso cuando llegue tu salario?',
     fr: 'Tu veux un rappel quand ta paie arrive ?',
   },
-  'accounts.add.saveAccount': {
-    en: 'Save account',
-    es: 'Guardar cuenta',
-    fr: 'Enregistrer le compte',
-  },
   'accounts.add.bankName': { en: 'Bank name', es: 'Nombre del banco', fr: 'Nom de la banque' },
   'accounts.add.accountType': { en: 'Account type', es: 'Tipo de cuenta', fr: 'Type de compte' },
   'accounts.add.accountName': {
@@ -88,11 +83,6 @@ export const accountsMessages = defineMessages({
     fr: 'Ouvrir la calculatrice',
   },
   'accounts.add.calculator': { en: 'Calculator', es: 'Calculadora', fr: 'Calculatrice' },
-  'accounts.add.eachPayPeriod': {
-    en: 'Each pay period',
-    es: 'Cada periodo de pago',
-    fr: 'Chaque période de paie',
-  },
   'accounts.add.nextPayday': {
     en: 'Next payday: {date}',
     es: 'Próximo día de pago: {date}',
@@ -107,6 +97,103 @@ export const accountsMessages = defineMessages({
     en: 'Checking what is paid into this account…',
     es: 'Revisando lo que se deposita en esta cuenta…',
     fr: 'Vérification de ce qui est versé dans ce compte…',
+  },
+  'accounts.add.paySubtitle': {
+    en: 'Pick the last payday and how often you’re paid.',
+    es: 'Elige el último día de pago y cada cuánto te pagan.',
+    fr: 'Choisis le dernier jour de paie et la fréquence.',
+  },
+  'accounts.add.remindOff': {
+    en: 'Get a nudge before your pay lands',
+    es: 'Recibe un aviso antes de que llegue tu salario',
+    fr: 'Reçois un rappel avant l’arrivée de ta paie',
+  },
+  'accounts.add.remindOnDay': {
+    en: '{date}, the day your pay lands',
+    es: '{date}, el día que llega tu salario',
+    fr: '{date}, le jour où ta paie arrive',
+  },
+  'accounts.add.remindDays': {
+    en: {
+      one: '{date}, 1 day before your pay lands',
+      other: '{date}, {count} days before your pay lands',
+    },
+    es: {
+      one: '{date}, 1 día antes de que llegue tu salario',
+      other: '{date}, {count} días antes de que llegue tu salario',
+    },
+    fr: {
+      one: '{date}, 1 jour avant l’arrivée de ta paie',
+      other: '{date}, {count} jours avant l’arrivée de ta paie',
+    },
+  },
+  'accounts.add.remindWeek': {
+    en: '{date}, 1 week before your pay lands',
+    es: '{date}, 1 semana antes de que llegue tu salario',
+    fr: '{date}, 1 semaine avant l’arrivée de ta paie',
+  },
+  'accounts.add.remindLeadOnDay': {
+    en: 'On the day your pay lands',
+    es: 'El día que llega tu salario',
+    fr: 'Le jour où ta paie arrive',
+  },
+  'accounts.add.remindLeadDays': {
+    en: { one: '1 day before your pay lands', other: '{count} days before your pay lands' },
+    es: {
+      one: '1 día antes de que llegue tu salario',
+      other: '{count} días antes de que llegue tu salario',
+    },
+    fr: {
+      one: '1 jour avant l’arrivée de ta paie',
+      other: '{count} jours avant l’arrivée de ta paie',
+    },
+  },
+  'accounts.add.remindLeadWeek': {
+    en: '1 week before your pay lands',
+    es: '1 semana antes de que llegue tu salario',
+    fr: '1 semaine avant l’arrivée de ta paie',
+  },
+  'accounts.add.changeLater': {
+    en: 'You can change these anytime in account settings.',
+    es: 'Puedes cambiar esto cuando quieras en los ajustes de la cuenta.',
+    fr: 'Tu peux modifier ça quand tu veux dans les réglages du compte.',
+  },
+  'accounts.add.addAccount': { en: 'Add account', es: 'Agregar cuenta', fr: 'Ajouter le compte' },
+  'accounts.added.title': { en: 'Account added', es: 'Cuenta agregada', fr: 'Compte ajouté' },
+  'accounts.added.remindOnDay': {
+    en: 'We’ll remind you on the day your pay lands.',
+    es: 'Te lo recordaremos el día que llegue tu salario.',
+    fr: 'On te le rappellera le jour où ta paie arrive.',
+  },
+  'accounts.added.remindDays': {
+    en: {
+      one: 'We’ll remind you 1 day before your pay lands.',
+      other: 'We’ll remind you {count} days before your pay lands.',
+    },
+    es: {
+      one: 'Te lo recordaremos 1 día antes de que llegue tu salario.',
+      other: 'Te lo recordaremos {count} días antes de que llegue tu salario.',
+    },
+    fr: {
+      one: 'On te le rappellera 1 jour avant l’arrivée de ta paie.',
+      other: 'On te le rappellera {count} jours avant l’arrivée de ta paie.',
+    },
+  },
+  'accounts.added.remindWeek': {
+    en: 'We’ll remind you 1 week before your pay lands.',
+    es: 'Te lo recordaremos 1 semana antes de que llegue tu salario.',
+    fr: 'On te le rappellera 1 semaine avant l’arrivée de ta paie.',
+  },
+  'accounts.added.type': { en: 'Type', es: 'Tipo', fr: 'Type' },
+  'accounts.added.nextPayday': {
+    en: 'Next payday',
+    es: 'Próximo día de pago',
+    fr: 'Prochain jour de paie',
+  },
+  'accounts.added.another': {
+    en: 'Add another account',
+    es: 'Agregar otra cuenta',
+    fr: 'Ajouter un autre compte',
   },
   'accounts.add.reminderNeedsPay': {
     en: 'Add the income paid into this account and Skip can tell you when it lands.',

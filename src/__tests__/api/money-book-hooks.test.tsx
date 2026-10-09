@@ -1514,3 +1514,29 @@ describe('while a read is still out', () => {
     },
   );
 });
+
+/** The Cards tab's "Updated …" line: the later of the typed day and the newest entry that counted. */
+describe('when each card and account was last updated', () => {
+  it('is the newest entry that counted, or the typed day when nothing has happened since', async () => {
+    aWorkedMonth();
+    mockRows.bank_accounts = [
+      account('checking', 1000, '2026-10-01'),
+      account('savings', 500, '2026-10-18', 'Savings', '0099'),
+    ];
+    mockRows.cards = [card('visa', 200, '2026-10-01'), card('amex', 0, null, 'Amex', '1000')];
+    // After today: it counts nowhere, so it updates nothing.
+    mockRows.receipts.push(receipt('later', '2026-10-25', 10, { card_id: 'visa' }));
+
+    const { result } = await mount(TODAY);
+
+    expect(Object.fromEntries(result.current.balances.updated)).toEqual({
+      // The pay on the 15th, after the receipt on the 4th.
+      checking: '2026-10-15',
+      // Typed on the 18th, with nothing since.
+      savings: '2026-10-18',
+      // The receipt on the 3rd.
+      visa: '2026-10-03',
+      // No typed day and nothing on it: no line at all.
+    });
+  });
+});

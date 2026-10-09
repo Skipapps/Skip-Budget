@@ -4,7 +4,7 @@ import { AccountCard } from '@/components/cards/account-card';
 import { PaymentCard } from '@/components/cards/payment-card';
 
 jest.mock('@/providers/theme-provider', () => ({
-  useColors: () => ({ ink: '#111111', line: '#DDDDDD' }),
+  useColors: () => ({ ink: '#111111', line: '#DDDDDD', surface: '#FBF9F7' }),
 }));
 
 /**

@@ -4,27 +4,16 @@ import { Dimensions, StyleSheet, type StyleProp, type ViewStyle } from 'react-na
 import CardsScreen from '@/app/(tabs)/cards';
 
 /**
- * The Cards tab at large text sizes: the two money tiles share one label size and one figure size
- * and grow taller rather than spill out of a square, and the card faces keep their shape at the least
- * while nothing on them is cut.
+ * The Cards tab at large text sizes. The four Money tiles share one size per kind of line (names,
+ * figures, notes) and sit two to a row only while every line fits there whole, pills on one line;
+ * otherwise they stack one per row. The card faces take their content's height, so nothing on
+ * them is cut.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
 );
-jest.mock('react-native-reanimated', () => {
-  const { View } = jest.requireActual('react-native');
-  return {
-    __esModule: true,
-    default: { View },
-    Easing: { out: () => () => 0, quad: () => 0 },
-    useAnimatedStyle: () => ({}),
-    useReducedMotion: () => false,
-    withSpring: (value: unknown) => value,
-    withTiming: (value: unknown) => value,
-  };
-});
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', line: '#DDDDDD', surface: '#FFFFFF' }),
@@ -33,11 +22,9 @@ jest.mock('@/providers/theme-provider', () => ({
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
-jest.mock('@/data/money-buckets', () => ({
-  moneyBuckets: [
-    { id: 'salary', label: 'Salary', artwork: 'tileSalary' },
-    { id: 'savings', label: 'Savings', artwork: 'tileSavings' },
-  ],
+// Jest turns an .svg into a number, not a component; the icons have a suite of their own.
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
 }));
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true }) }));
 jest.mock('expo-router', () => ({
@@ -53,6 +40,7 @@ jest.mock('@/api/refresh', () => ({
 }));
 jest.mock('@/lib/use-today', () => ({ useToday: () => ({ today: '2026-09-12' }) }));
 
+let mockPay = 12345.67;
 jest.mock('@/api/queries', () => ({
   useCards: () => ({
     data: [
@@ -63,6 +51,7 @@ jest.mock('@/api/queries', () => ({
         last4: '4242',
         network: 'VISA',
         color: '#000000',
+        credit_limit: 5000,
       },
     ],
     isPending: false,
@@ -84,11 +73,24 @@ jest.mock('@/api/queries', () => ({
     isError: false,
   }),
   useSalarySources: () => ({
-    data: [{ amount: 12345.67, frequency: 'monthly' }],
+    data: [{ amount: mockPay, frequency: 'monthly' }],
     isPending: false,
     isError: false,
   }),
-  useSourceBalances: () => ({ balances: new Map(), isError: false, refetch: jest.fn() }),
+  useSourceBalances: () => ({
+    balances: new Map(),
+    updated: new Map([['acct-1', '2026-09-12']]),
+    isError: false,
+    refetch: jest.fn(),
+  }),
+}));
+jest.mock('@/api/loans', () => ({
+  useActiveLoans: () => ({
+    loans: [{ billId: 'b1', name: 'Car loan' }],
+    isPending: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
 }));
 
 type Screen = Awaited<ReturnType<typeof render>>;
@@ -102,31 +104,47 @@ async function layout(screen: Screen, testID: string, width: number) {
 const sizeOf = (screen: Screen, text: string) =>
   StyleSheet.flatten(screen.getByText(text).props.style).fontSize as number;
 
-/** Montserrat at 13pt x 1.3 (labels) and SemiBold at 16pt x 1.2 (figures; Savings says "Open"). */
-const LABELS = { salary: 59.6, savings: 65.2 };
-const FIGURES = { salary: 112.4, savings: 44.5 };
+/**
+ * Each line's widest word (a pill: its whole label plus its 24pt of padding) at 1.3x, in Montserrat:
+ * names 14pt, figures 18pt SemiBold (capped at 1.2x), pills 13pt Medium, notes 12pt.
+ */
+const NATURAL: Record<string, number> = {
+  'salary-label': 54.7,
+  'savings-label': 70.3,
+  'loans-label': 54.1,
+  'goals-label': 50,
+  'salary-figure': 111.5,
+  'loans-figure': 77,
+  'savings-pill': 71.6,
+  'goals-pill': 138.5,
+  'salary-note': 64.7,
+  'savings-note': 50.7,
+  'loans-note': 30,
+};
 
-/** One layout pass with `room` points for each tile's text, then the two group boxes. */
-async function layOutTiles(screen: Screen, room: number) {
-  for (const id of ['salary', 'savings'] as const) {
-    await layout(screen, `fit-slot-${id}-label`, room);
-    await layout(screen, `fit-copy-${id}-label`, LABELS[id]);
-    await layout(screen, `fit-slot-${id}-figure`, room);
-    await layout(screen, `fit-copy-${id}-figure`, FIGURES[id]);
+/** One layout pass with `room` points for each tile's text, then the four group boxes. */
+async function layOutTiles(screen: Screen, room: number, natural: Record<string, number> = {}) {
+  for (const [id, width] of Object.entries({ ...NATURAL, ...natural })) {
+    await layout(screen, `fit-slot-${id}`, room);
+    await layout(screen, `fit-copy-${id}`, width);
   }
-  await layout(screen, 'money-tile-labels', 327);
-  await layout(screen, 'money-tile-figures', 327);
+  for (const box of [
+    'money-tile-labels',
+    'money-tile-figures',
+    'money-tile-pills',
+    'money-tiles',
+  ]) {
+    await layout(screen, box, 327);
+  }
 }
 
-/** The tiles' row, found from a tile: side by side it is a row, stacked a column. */
 const tilesStacked = (screen: Screen) =>
-  !String(screen.getByLabelText('Salary, $12,345.67').parent?.parent?.props.className).includes(
-    'flex-row',
-  );
+  screen
+    .getAllByTestId('money-tile-row')
+    .every((row) => !String(row.props.className).includes('flex-row'));
 
 type Json = { props: Record<string, unknown>; children: (Json | string)[] | null };
 
-/** Every drawn view whose props match. */
 function hostsWhere(screen: Screen, match: (props: Record<string, unknown>) => boolean): Json[] {
   const found: Json[] = [];
   const walk = (node: Json | string) => {
@@ -139,54 +157,45 @@ function hostsWhere(screen: Screen, match: (props: Record<string, unknown>) => b
   return found;
 }
 
-const paddingTopIs = (value: string) => (props: Record<string, unknown>) =>
-  StyleSheet.flatten(props.style as StyleProp<ViewStyle>)?.paddingTop === value;
-
-/** The spacer that keeps a tile at least square is drawn only side by side. */
-const squareSpacers = (screen: Screen) => hostsWhere(screen, paddingTopIs('100%')).length;
-
 beforeEach(() => {
+  mockPay = 12345.67;
   const window = { width: 375, height: 812, scale: 3, fontScale: 1.3 };
   Dimensions.set({ window, screen: window });
 });
 
-describe('Cards — money tiles at large text sizes', () => {
-  it('prints the labels and figures whole, the Salary figure with its cents', async () => {
+describe('Cards — Money tiles at large text sizes', () => {
+  it('caps each line at its role and never cuts or shrinks it on its own', async () => {
     const screen = await render(<CardsScreen />);
-    for (const label of ['Salary', 'Savings']) {
-      const node = screen.getByText(label);
-      expect(node.props.numberOfLines).toBeUndefined();
-      expect(node.props.maxFontSizeMultiplier).toBe(1.3);
-    }
-    for (const figure of ['$12,345.67', 'Open']) {
-      const node = screen.getByText(figure);
+    const lines: [string, number][] = [
+      ['Salary', 1.3],
+      ['Goals', 1.3],
+      ['$12,345.67', 1.2],
+      ['1 active', 1.2],
+      ['Open', 1.3],
+      ['Coming soon', 1.3],
+      ['Monthly', 1.3],
+      ['Car loan', 1.3],
+    ];
+    for (const [text, cap] of lines) {
+      const node = screen.getByText(text);
+      expect([text, node.props.maxFontSizeMultiplier]).toEqual([text, cap]);
       expect(node.props.numberOfLines).toBeUndefined();
       expect(node.props.adjustsFontSizeToFit).toBeUndefined();
-      expect(node.props.maxFontSizeMultiplier).toBe(1.2);
     }
-  });
-
-  it('keeps each tile at least square without fixing its height, so it can grow', async () => {
-    const screen = await render(<CardsScreen />);
-    expect(squareSpacers(screen)).toBe(2);
-    expect(hostsWhere(screen, (props) => /aspect-/.test(String(props.className ?? '')))).toEqual(
-      [],
-    );
   });
 
   it('draws side-by-side tiles at one height, the shorter filling the height of the taller', async () => {
-    // Jest has no layout engine, so this pins the chain that makes it so: the row stretches each
-    // cell to its tallest member (no items-* override), and the tile and its surface grow into it.
+    // Jest has no layout engine, so this pins the chain that makes it so: each row stretches its
+    // cells to the tallest (no items-* override), and the tile and its surface grow into it.
     const screen = await render(<CardsScreen />);
-    const row = screen.getByTestId('money-tile-figures');
-    expect(String(row.props.className)).toContain('flex-row');
-    expect(String(row.props.className)).not.toMatch(/(^|\s)items-/);
-
-    for (const label of ['Salary, $12,345.67', 'Savings']) {
-      const tile = screen.getByLabelText(label);
+    for (const row of screen.getAllByTestId('money-tile-row')) {
+      expect(String(row.props.className)).toContain('flex-row');
+      expect(String(row.props.className)).not.toMatch(/(^|\s)items-/);
+    }
+    for (const id of ['salary', 'savings', 'loans', 'goals']) {
+      const tile = screen.getByTestId(`money-tile-${id}`);
       const cell = tile.parent;
       const surface = tile.children[0] as unknown as { props: { className?: string } };
-      expect(cell?.parent).toBe(row);
       expect(String(cell?.props.className)).toMatch(/(^|\s)flex-1(\s|$)/);
       expect(String(cell?.props.className)).not.toMatch(/(^|\s)(self-|items-)/);
       expect(String(tile.props.className)).toMatch(/(^|\s)grow(\s|$)/);
@@ -194,31 +203,51 @@ describe('Cards — money tiles at large text sizes', () => {
     }
   });
 
-  it('shrinks both figures together when the wider one needs it, side by side', async () => {
+  it('keeps two to a row while every line fits, at its full size', async () => {
     const screen = await render(<CardsScreen />);
-    // 100pt each: "$12,345.67" needs 112.4pt, so both go to 99 / 112.4 = 0.88.
-    await layOutTiles(screen, 100);
+    // 140pt each, a 402pt phone: "Coming soon" needs 138.5pt with its padding.
+    await layOutTiles(screen, 140);
 
-    expect(sizeOf(screen, 'Open')).toBe(sizeOf(screen, '$12,345.67'));
-    expect(sizeOf(screen, '$12,345.67')).toBeCloseTo(16 * 0.88, 5);
-    expect(sizeOf(screen, 'Salary')).toBe(sizeOf(screen, 'Savings'));
     expect(tilesStacked(screen)).toBe(false);
+    expect(sizeOf(screen, '$12,345.67')).toBe(18);
+    expect(sizeOf(screen, '1 active')).toBe(18);
+    expect(sizeOf(screen, 'Coming soon')).toBe(13);
+  });
+
+  it('shrinks both figures together when the wider one needs it, side by side', async () => {
+    mockPay = 1234567.89;
+    const screen = await render(<CardsScreen />);
+    // "$1,234,567.89" needs 150pt: both figures go to 139 / 150 = 0.92, still above 18pt.
+    await layOutTiles(screen, 140, { 'salary-figure': 150 });
+
+    expect(tilesStacked(screen)).toBe(false);
+    expect(sizeOf(screen, '$1,234,567.89')).toBeCloseTo(18 * 0.92, 5);
+    expect(sizeOf(screen, '1 active')).toBe(sizeOf(screen, '$1,234,567.89'));
+  });
+
+  it('stacks the tiles rather than break a pill onto two lines', async () => {
+    const screen = await render(<CardsScreen />);
+    // 126.5pt each, a 375pt phone: "Coming soon" no longer fits whole.
+    await layOutTiles(screen, 126.5);
+
+    expect(tilesStacked(screen)).toBe(true);
+    expect(screen.getByText('Coming soon').props.numberOfLines).toBeUndefined();
+    // Nothing shrank to make room.
+    expect(sizeOf(screen, 'Coming soon')).toBe(13);
   });
 
   it('stacks the tiles rather than take the figures under their default size', async () => {
     const screen = await render(<CardsScreen />);
-    // 70pt would need 16pt x 1.2 x 0.61 = 11.7pt, under the 16pt default.
-    await layOutTiles(screen, 70);
+    // Every pill fits here; 119 / 160 = 0.74 would draw the figures at 16pt, under 18.
+    await layOutTiles(screen, 120, { 'salary-figure': 160, 'goals-pill': 100 });
 
     expect(tilesStacked(screen)).toBe(true);
-    // One tile per line has no use for a square.
-    expect(squareSpacers(screen)).toBe(0);
     expect(screen.getByText('$12,345.67')).toBeTruthy();
   });
 });
 
 describe('Cards — card faces at large text sizes', () => {
-  it('wraps the holder name, keeps the shape as a minimum and keeps the logo its size', async () => {
+  it('takes its content’s height, wraps the name and keeps the wordmark its size', async () => {
     const screen = await render(<CardsScreen />);
 
     const holder = screen.getByText('Chase Sapphire Preferred');
@@ -237,8 +266,21 @@ describe('Cards — card faces at large text sizes', () => {
     expect(owed.props.numberOfLines).toBeUndefined();
     expect(owed.props.maxFontSizeMultiplier).toBe(1.2);
 
-    // One for the card, one for the account; nothing on the tab has a fixed aspect ratio.
-    expect(hostsWhere(screen, paddingTopIs('56.18%'))).toHaveLength(2);
+    // The bottom lines wrap and grow like the name.
+    for (const text of ['$1,234 of $5,000 limit', 'Updated today', '•••• 4242', '•••• 1111']) {
+      const node = screen.getByText(text);
+      expect([text, node.props.numberOfLines]).toEqual([text, undefined]);
+      expect(node.props.maxFontSizeMultiplier).toBe(1.3);
+    }
+
+    // No fixed shape anywhere on the tab: no aspect ratio, no ratio spacer.
+    expect(
+      hostsWhere(screen, (props) =>
+        /%$/.test(
+          String(StyleSheet.flatten(props.style as StyleProp<ViewStyle>)?.paddingTop ?? ''),
+        ),
+      ),
+    ).toEqual([]);
     expect(hostsWhere(screen, (props) => /aspect-/.test(String(props.className ?? '')))).toEqual(
       [],
     );

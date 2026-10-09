@@ -32,6 +32,10 @@ jest.mock('@/providers/theme-provider', () => ({
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
+// Jest turns an .svg into a number, not a component; the icons have a suite of their own.
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => async () => true }));
 
@@ -63,7 +67,10 @@ jest.mock('@/api/mutations', () => ({
 }));
 
 const mockApplyReminder = jest.fn();
+// The reminder choices are real; the client behind them is never called.
+jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/api/reminders', () => ({
+  LEAD_OPTIONS: jest.requireActual('@/api/reminders').LEAD_OPTIONS,
   choiceToLead: () => null,
   useApplyReminder: () => mockApplyReminder,
   useReminderChoice: () => ({ choice: 'off', ready: true }),
@@ -290,7 +297,7 @@ describe('Add account — the day the balance is true from', () => {
     await fireEvent.press(view.getByText('Continue'));
     await fireEvent.changeText(view.getAllByDisplayValue('')[0], 'A Bank');
     await fireEvent.press(view.getByText('Continue'));
-    await fireEvent.press(view.getByText('Save account'));
+    await fireEvent.press(view.getByText('Add account'));
     return view;
   };
 

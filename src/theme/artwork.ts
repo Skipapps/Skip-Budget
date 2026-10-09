@@ -20,7 +20,6 @@ import StateEmptySubscriptions from '@/assets/illustrations/state-empty-subscrip
 import StateEmptyWallet from '@/assets/illustrations/state-empty-wallet.svg';
 import StateError from '@/assets/illustrations/state-error.svg';
 import StateNoResults from '@/assets/illustrations/state-no-results.svg';
-import TileSalary from '@/assets/illustrations/tile-salary.svg';
 import TileSavings from '@/assets/illustrations/tile-savings.svg';
 import WelcomeHero from '@/assets/illustrations/welcome-hero.svg';
 
@@ -33,7 +32,6 @@ const ARTWORK = {
   loginHero: { light: LoginHero, dark: LoginHero },
   welcomeHero: { light: WelcomeHero, dark: DarkWelcomeHero },
 
-  tileSalary: { light: TileSalary, dark: TileSalary },
   tileSavings: { light: TileSavings, dark: TileSavings },
 
   emptyBills: { light: StateEmptyBills, dark: DarkStateEmptyBills },

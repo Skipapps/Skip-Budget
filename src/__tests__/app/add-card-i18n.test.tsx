@@ -24,6 +24,10 @@ jest.mock('@/providers/theme-provider', () => ({
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
+// Jest turns an .svg into a number, not a component; the icons have a suite of their own.
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 
 const mockConfirm = jest.fn(async (_options: Record<string, unknown>) => false);
 jest.mock('@/providers/dialog-provider', () => ({
@@ -42,7 +46,10 @@ jest.mock('expo-router', () => ({
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
 
 const mockUpdate = jest.fn();
+// Only creditLimitValue is real, and it never touches the client.
+jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/api/mutations', () => ({
+  creditLimitValue: jest.requireActual('@/api/mutations').creditLimitValue,
   useUpdateCard: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useCreateCard: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useDeleteCard: () => ({ mutateAsync: jest.fn(), isPending: false }),
@@ -127,8 +134,10 @@ describe('Add a credit card in Spanish', () => {
 
     await fireEvent.press(screen.getByText('Continuar'));
 
-    expect(screen.getByText('Elige la red de la tarjeta')).toBeTruthy();
-    expect(screen.getAllByText('Nombre de la tarjeta de crédito').length).toBeGreaterThan(0);
+    expect(screen.getByText('Red')).toBeTruthy();
+    expect(screen.getAllByText('Nombre de la tarjeta').length).toBeGreaterThan(0);
+    expect(screen.getByText('Límite de la tarjeta')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Opcional')).toBeTruthy();
     expect(screen.getByText('Color de la tarjeta')).toBeTruthy();
     expect(screen.getAllByText('Últimos 4 dígitos').length).toBeGreaterThan(0);
     expectNoLeftovers(screen);
@@ -137,10 +146,9 @@ describe('Add a credit card in Spanish', () => {
     await fireEvent.press(screen.getByText('Continuar'));
 
     expect(screen.getByText('¿Cuál es la fecha de vencimiento?')).toBeTruthy();
-    expect(
-      screen.getByText('Elige arriba la fecha de vencimiento y Skip te lo podrá recordar antes.'),
-    ).toBeTruthy();
-    expect(screen.getByText('Guardar tarjeta de crédito')).toBeTruthy();
+    expect(screen.getByText('Elige el día en que vence cada mes.')).toBeTruthy();
+    expect(screen.getByText('Elige un día arriba y Skip te lo podrá recordar antes.')).toBeTruthy();
+    expect(screen.getByText('Agregar tarjeta')).toBeTruthy();
     expectNoLeftovers(screen);
   });
 

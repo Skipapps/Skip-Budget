@@ -19,6 +19,10 @@ type TextFieldProps = {
   optional?: boolean;
   /** Sits in the field's trailing corner: a tick, a unit, a small action. */
   trailing?: ReactNode;
+  /** Sits before the text: a currency mark. */
+  leading?: ReactNode;
+  /** A card-coloured box, for forms whose fields sit on the page as cards. */
+  filled?: boolean;
 } & Pick<
   TextInputProps,
   | 'autoFocus'
@@ -46,6 +50,8 @@ export function TextField({
   secureTextEntry,
   optional,
   trailing,
+  leading,
+  filled = false,
   multiline,
   ...inputProps
 }: TextFieldProps) {
@@ -71,9 +77,11 @@ export function TextField({
           'w-full rounded-[12px] border px-5',
           // A multiline box grows downward, so the input sits at the top rather than centred.
           multiline ? 'min-h-24 py-1' : 'min-h-14 flex-row items-center',
+          filled && 'bg-card',
           error ? 'border-danger' : focused ? 'border-control' : 'border-line',
         )}
       >
+        {leading}
         <TextInput
           value={value}
           onChangeText={onChangeText}

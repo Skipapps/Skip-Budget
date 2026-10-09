@@ -18,7 +18,6 @@ jest.mock('react-native-keyboard-controller', () =>
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 jest.mock('@/components/cards/payment-card', () => ({ PaymentCard: () => null }));
 jest.mock('@/components/cards/account-card', () => ({ AccountCard: () => null }));
-jest.mock('@/components/cards/network-picker', () => ({ NetworkPicker: () => null }));
 // Reanimated 4 wants a native worklets module; the swatches are the only animated part of the form.
 jest.mock('@/components/ui/color-picker', () => ({ ColorPicker: () => null }));
 jest.mock('@/components/flow/amount-step', () => ({ AmountStep: () => null }));
@@ -58,7 +57,10 @@ const mockUseCreateCard = jest.fn(() => ({ mutateAsync: jest.fn(), isPending: fa
 const mockUseCreateAccount = jest.fn(() => ({ mutateAsync: jest.fn(), isPending: false }));
 const idle = () => ({ mutateAsync: jest.fn(), isPending: false });
 
+// Only creditLimitValue is real, and it never touches the client.
+jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/api/mutations', () => ({
+  creditLimitValue: jest.requireActual('@/api/mutations').creditLimitValue,
   useCreateCard: () => mockUseCreateCard(),
   useUpdateCard: idle,
   useDeleteCard: idle,
@@ -76,7 +78,7 @@ jest.mock('@/api/reminders', () => ({
   useReminderChoice: () => ({ choice: 'off', ready: true }),
 }));
 
-let mockOwned: { data: unknown[] | undefined; isPending: boolean };
+let mockOwned: { data: unknown[] | undefined; isPending: boolean; isFetching?: boolean };
 
 jest.mock('@/api/queries', () => ({
   useCard: () => ({ data: null, isError: false, isFetched: false, refetch: jest.fn() }),
@@ -131,6 +133,16 @@ describe.each([
     expect(queryByText(WALL)).toBeNull();
 
     mockOwned = { data: [{ id: 'one' }], isPending: false };
+    await rerender(<Screen />);
+    expect(queryByText(WALL)).toBeTruthy();
+  });
+
+  it('waits for a list still refreshing after a save, rather than count the old one', async () => {
+    mockOwned = { data: [], isPending: false, isFetching: true };
+    const { queryByText, rerender } = await render(<Screen />);
+    expect(queryByText(WALL)).toBeNull();
+
+    mockOwned = { data: [{ id: 'one' }], isPending: false, isFetching: false };
     await rerender(<Screen />);
     expect(queryByText(WALL)).toBeTruthy();
   });

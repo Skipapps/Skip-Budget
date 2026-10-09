@@ -5,7 +5,7 @@ import { PaymentCard } from '@/components/cards/payment-card';
 import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
 
 jest.mock('@/providers/theme-provider', () => ({
-  useColors: () => ({ ink: '#111111', line: '#DDDDDD' }),
+  useColors: () => ({ ink: '#111111', line: '#DDDDDD', surface: '#FBF9F7' }),
 }));
 
 const NBSP = ' ';
@@ -92,8 +92,8 @@ describe('Card faces in Spanish', () => {
     const screen = await render(<PaymentCard card={card(balance)} />);
     expect(screen.getByText(caption)).toBeTruthy();
     expect(screen.getByText(figure)).toBeTruthy();
-    // A network is a brand name: never translated.
-    expect(screen.getByText('Mastercard')).toBeTruthy();
+    // A network is a brand name: drawn as its uppercase wordmark, never translated.
+    expect(screen.getByText('MASTERCARD')).toBeTruthy();
     expectNoLeftovers(screen);
   });
 });
@@ -123,7 +123,7 @@ describe('Card faces in French', () => {
     const screen = await render(<PaymentCard card={card(balance)} />);
     expect(screen.getByText(caption)).toBeTruthy();
     expect(screen.getByText(figure)).toBeTruthy();
-    expect(screen.getByText('Mastercard')).toBeTruthy();
+    expect(screen.getByText('MASTERCARD')).toBeTruthy();
     expectNoLeftovers(screen);
   });
 

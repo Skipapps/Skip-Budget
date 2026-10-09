@@ -7,7 +7,7 @@ import { SelectField } from '@/components/ui/select-field';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { TextField } from '@/components/ui/text-field';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
-import { CARD_COLORS } from '@/theme/card-colors';
+import { FACE_COLORS } from '@/theme/card-colors';
 
 /** The fields' own words follow the language; what they store does not. */
 
@@ -30,7 +30,14 @@ jest.mock('react-native-reanimated', () => {
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
 jest.mock('@/providers/theme-provider', () => ({
-  useColors: () => ({ ink: '#000000', muted: '#777777', line: '#DDDDDD' }),
+  useColors: () => ({
+    ink: '#000000',
+    muted: '#777777',
+    line: '#DDDDDD',
+    surface: '#FBF9F7',
+    control: '#905479',
+  }),
+  useTheme: () => ({ scheme: 'light' }),
 }));
 
 // Two letters at least on each side, so a short abbreviation is not taken for a key.
@@ -156,19 +163,19 @@ describe('ColorPicker', () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     setLanguage('es');
     const onChange = jest.fn();
-    const spanish = await render(<ColorPicker value={CARD_COLORS[0].value} onChange={onChange} />);
-    expect(spanish.getByLabelText('Coral')).toBeTruthy();
-    expect(spanish.getByLabelText('Verde bosque')).toBeTruthy();
+    const spanish = await render(<ColorPicker value={FACE_COLORS[0].value} onChange={onChange} />);
+    expect(spanish.getByLabelText('Azul')).toBeTruthy();
+    expect(spanish.getByLabelText('Verde azulado')).toBeTruthy();
     expectNoRawText(spanish.toJSON() as Json);
 
-    await fireEvent.press(spanish.getByLabelText('Tinta'));
-    expect(onChange).toHaveBeenCalledWith('#161616');
+    await fireEvent.press(spanish.getByLabelText('Negro'));
+    expect(onChange).toHaveBeenCalledWith('#1E1A22');
     await spanish.unmount();
 
     setLanguage('fr');
-    const french = await render(<ColorPicker value={CARD_COLORS[0].value} onChange={() => {}} />);
-    expect(french.getByLabelText('Corail')).toBeTruthy();
-    expect(french.getByLabelText('Vert forêt')).toBeTruthy();
+    const french = await render(<ColorPicker value={FACE_COLORS[0].value} onChange={() => {}} />);
+    expect(french.getByLabelText('Bleu')).toBeTruthy();
+    expect(french.getByLabelText('Sarcelle')).toBeTruthy();
     expectNoRawText(french.toJSON() as Json);
     warn.mockRestore();
   });

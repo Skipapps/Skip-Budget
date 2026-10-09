@@ -30,6 +30,7 @@ import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
 import { newestFirst } from '@/lib/ledger-order';
+import { lastUpdated } from '@/lib/source-updated';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
 import { failureText } from '@/lib/failure';
@@ -234,6 +235,7 @@ export default function SourceDetailScreen() {
               last4: card!.last4 ?? '',
               network: card!.network,
               color: card!.color,
+              creditLimit: card!.credit_limit,
             }}
           />
         ) : (
@@ -247,6 +249,8 @@ export default function SourceDetailScreen() {
               last4: account!.last4 ?? '',
               color: account!.color,
             }}
+            updatedOn={lastUpdated(account!.balance_as_of, ledger, today)}
+            today={today}
           />
         )}
       </View>

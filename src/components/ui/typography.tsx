@@ -26,9 +26,16 @@ export function Title({
   className,
   align = 'center',
   flush = false,
-}: TextProps & { align?: 'center' | 'left'; flush?: boolean }) {
+  header = false,
+}: TextProps & {
+  align?: 'center' | 'left';
+  flush?: boolean;
+  /** Announced as a heading, for a title drawn in the page rather than in the pinned header. */
+  header?: boolean;
+}) {
   return (
     <Text
+      accessibilityRole={header ? 'header' : undefined}
       className={cn(
         'font-app-bold text-[24px] leading-8 text-ink compact:text-[26px] phone:text-[28px] phone:leading-9',
         align === 'left' ? 'text-left' : 'text-center',

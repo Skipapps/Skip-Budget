@@ -1,6 +1,13 @@
 import { defineMessages } from '@/i18n/translate';
 
 export const cardsMessages = defineMessages({
+  'cards.list.subtitle': {
+    en: 'All your money in one place.',
+    es: 'Todo tu dinero en un solo lugar.',
+    fr: 'Tout ton argent au même endroit.',
+  },
+  // The section's "+ Add" pill; VoiceOver hears newCard / addAccount, which say what is added.
+  'cards.list.add': { en: 'Add', es: 'Agregar', fr: 'Ajouter' },
   'cards.list.creditCards': {
     en: 'Credit cards',
     es: 'Tarjetas de crédito',
@@ -52,6 +59,60 @@ export const cardsMessages = defineMessages({
   'cards.face.nothingOwed': { en: 'Nothing owed', es: 'Sin adeudo', fr: 'Rien à payer' },
   'cards.face.available': { en: 'Available', es: 'Disponible', fr: 'Disponible' },
   'cards.face.overdrawn': { en: 'Overdrawn', es: 'Sobregirado', fr: 'À découvert' },
+  'cards.face.limitUsed': {
+    en: '{used} of {limit} limit',
+    es: '{used} de {limit} de límite',
+    fr: '{used} sur {limit} de limite',
+  },
+  'cards.face.updatedToday': {
+    en: 'Updated today',
+    es: 'Actualizado hoy',
+    fr: 'Mis à jour aujourd’hui',
+  },
+  'cards.face.updatedYesterday': {
+    en: 'Updated yesterday',
+    es: 'Actualizado ayer',
+    fr: 'Mis à jour hier',
+  },
+  'cards.face.updatedOn': {
+    en: 'Updated {date}',
+    es: 'Actualizado el {date}',
+    fr: 'Mis à jour le {date}',
+  },
+
+  'cards.money.loans': { en: 'Loans', es: 'Préstamos', fr: 'Prêts' },
+  'cards.money.goals': { en: 'Goals', es: 'Metas', fr: 'Objectifs' },
+  // The tiles' pills sit two to a row, so each is kept short enough to fit on a 375pt phone.
+  'cards.money.addSalary': { en: 'Add salary', es: 'Agregar salario', fr: 'Ajouter ta paie' },
+  'cards.money.addPay': { en: 'Add your pay', es: 'Agrega tu salario', fr: 'Ajoute ta paie' },
+  'cards.money.open': { en: 'Open', es: 'Abrir', fr: 'Ouvrir' },
+  'cards.money.startSaving': {
+    en: 'Start saving',
+    es: 'Empieza a ahorrar',
+    fr: 'Commence à épargner',
+  },
+  'cards.money.addLoan': { en: 'Add a loan', es: 'Agregar uno', fr: 'Ajouter un prêt' },
+  'cards.money.trackLoans': {
+    en: 'Track what you owe',
+    es: 'Sigue lo que debes',
+    fr: 'Suis ce que tu dois',
+  },
+  'cards.money.loansActive': {
+    en: { one: '1 active', other: '{count} active' },
+    es: { one: '1 activo', other: '{count} activos' },
+    fr: { one: '1 actif', other: '{count} actifs' },
+  },
+  'cards.money.comingSoon': { en: 'Coming soon', es: 'Próximamente', fr: 'Bientôt' },
+  'cards.money.tileLabel': {
+    en: '{name}, {value}, {note}',
+    es: '{name}, {value}, {note}',
+    fr: '{name}, {value}, {note}',
+  },
+  'cards.money.tileLabelShort': {
+    en: '{name}, {value}',
+    es: '{name}, {value}',
+    fr: '{name}, {value}',
+  },
 
   'cards.form.goBack': { en: 'Go back', es: 'Regresar', fr: 'Retour' },
   'cards.form.saving': { en: 'Saving…', es: 'Guardando…', fr: 'Enregistrement…' },
@@ -67,6 +128,14 @@ export const cardsMessages = defineMessages({
     fr: 'Couleur de la carte',
   },
   'cards.form.last4': { en: 'Last 4 digits', es: 'Últimos 4 dígitos', fr: '4 derniers chiffres' },
+  'cards.form.cardName': { en: 'Card name', es: 'Nombre de la tarjeta', fr: 'Nom de la carte' },
+  'cards.form.network': { en: 'Network', es: 'Red', fr: 'Réseau' },
+  'cards.form.creditLimit': {
+    en: 'Card limit',
+    es: 'Límite de la tarjeta',
+    fr: 'Limite de la carte',
+  },
+  'cards.form.creditLimitOptional': { en: 'Optional', es: 'Opcional', fr: 'Facultatif' },
 
   'cards.add.editTitle': {
     en: 'Edit credit card',
@@ -151,24 +220,139 @@ export const cardsMessages = defineMessages({
     es: '¿Cuál es la fecha de vencimiento?',
     fr: 'Quelle est la date d’échéance ?',
   },
-  'cards.add.saveCard': {
-    en: 'Save credit card',
-    es: 'Guardar tarjeta de crédito',
-    fr: 'Enregistrer la carte de crédit',
-  },
   'cards.add.name': {
     en: 'Name of the credit card',
     es: 'Nombre de la tarjeta de crédito',
     fr: 'Nom de la carte de crédit',
   },
-  'cards.add.network': {
-    en: 'Select Network provider',
-    es: 'Elige la red de la tarjeta',
-    fr: 'Choisis le réseau de la carte',
+  'cards.add.dueSubtitle': {
+    en: 'Pick the day it’s due each month.',
+    es: 'Elige el día en que vence cada mes.',
+    fr: 'Choisis le jour où elle est à payer chaque mois.',
   },
-  'cards.add.reminderNeedsDate': {
-    en: 'Set a bill due date above and Skip can remind you before it.',
-    es: 'Elige arriba la fecha de vencimiento y Skip te lo podrá recordar antes.',
-    fr: 'Choisis une date d’échéance ci-dessus et Skip pourra te le rappeler avant.',
+  'cards.add.dayLabel': { en: 'Day {day}', es: 'Día {day}', fr: 'Jour {day}' },
+  'cards.add.dayClearHint': {
+    en: 'Tap again to clear the day.',
+    es: 'Tócalo otra vez para quitar el día.',
+    fr: 'Touche encore pour retirer le jour.',
+  },
+  'cards.add.dueEvery': {
+    en: 'Due every month on the {day}',
+    es: 'Vence cada mes el día {day}',
+    fr: 'À payer chaque mois le {day}',
+  },
+  'cards.add.dueEveryLate': {
+    en: 'Due every month on the {day}, or the last day in shorter months',
+    es: 'Vence cada mes el día {day}, o el último día en los meses más cortos',
+    fr: 'À payer chaque mois le {day}, ou le dernier jour des mois plus courts',
+  },
+  'cards.add.nextDue': {
+    en: 'Next due: {date}',
+    es: 'Próximo vencimiento: {date}',
+    fr: 'Prochaine échéance : {date}',
+  },
+  'cards.add.remindMe': { en: 'Remind me', es: 'Recordarme', fr: 'Me le rappeler' },
+  'cards.add.remindOff': {
+    en: 'Get a nudge before it’s due',
+    es: 'Recibe un aviso antes de que venza',
+    fr: 'Reçois un rappel avant l’échéance',
+  },
+  'cards.add.remindOnDay': {
+    en: '{date}, the day it’s due',
+    es: '{date}, el día que vence',
+    fr: '{date}, le jour de l’échéance',
+  },
+  'cards.add.remindDays': {
+    en: { one: '{date}, 1 day before it’s due', other: '{date}, {count} days before it’s due' },
+    es: {
+      one: '{date}, 1 día antes de que venza',
+      other: '{date}, {count} días antes de que venza',
+    },
+    fr: {
+      one: '{date}, 1 jour avant l’échéance',
+      other: '{date}, {count} jours avant l’échéance',
+    },
+  },
+  'cards.add.remindWeek': {
+    en: '{date}, 1 week before it’s due',
+    es: '{date}, 1 semana antes de que venza',
+    fr: '{date}, 1 semaine avant l’échéance',
+  },
+  'cards.add.reminderNeedsDay': {
+    en: 'Pick a day above and Skip can remind you before it.',
+    es: 'Elige un día arriba y Skip te lo podrá recordar antes.',
+    fr: 'Choisis un jour ci-dessus et Skip pourra te le rappeler avant.',
+  },
+  'cards.add.changeLater': {
+    en: 'You can change these anytime in card settings.',
+    es: 'Puedes cambiar esto cuando quieras en los ajustes de la tarjeta.',
+    fr: 'Tu peux modifier ça quand tu veux dans les réglages de la carte.',
+  },
+  'cards.add.addCard': { en: 'Add card', es: 'Agregar tarjeta', fr: 'Ajouter la carte' },
+
+  'cards.added.title': { en: 'Card added', es: 'Tarjeta agregada', fr: 'Carte ajoutée' },
+  'cards.added.remindOnDay': {
+    en: 'We’ll remind you on the day it’s due.',
+    es: 'Te lo recordaremos el día que vence.',
+    fr: 'On te le rappellera le jour de l’échéance.',
+  },
+  'cards.added.remindDays': {
+    en: {
+      one: 'We’ll remind you 1 day before it’s due.',
+      other: 'We’ll remind you {count} days before it’s due.',
+    },
+    es: {
+      one: 'Te lo recordaremos 1 día antes de que venza.',
+      other: 'Te lo recordaremos {count} días antes de que venza.',
+    },
+    fr: {
+      one: 'On te le rappellera 1 jour avant l’échéance.',
+      other: 'On te le rappellera {count} jours avant l’échéance.',
+    },
+  },
+  'cards.added.remindWeek': {
+    en: 'We’ll remind you 1 week before it’s due.',
+    es: 'Te lo recordaremos 1 semana antes de que venza.',
+    fr: 'On te le rappellera 1 semaine avant l’échéance.',
+  },
+  'cards.added.noReminder': {
+    en: 'No reminder set. You can add one anytime.',
+    es: 'Sin recordatorio. Puedes agregar uno cuando quieras.',
+    fr: 'Aucun rappel. Tu peux en ajouter un quand tu veux.',
+  },
+  'cards.added.due': { en: 'Due', es: 'Vence', fr: 'Échéance' },
+  'cards.added.dueValue': {
+    en: '{day} of each month',
+    es: 'El día {day} de cada mes',
+    fr: 'Le {day} de chaque mois',
+  },
+  'cards.added.notSet': { en: 'Not set', es: 'Sin definir', fr: 'Non définie' },
+  'cards.added.nextDue': { en: 'Next due', es: 'Próximo vencimiento', fr: 'Prochaine échéance' },
+  'cards.added.reminder': { en: 'Reminder', es: 'Recordatorio', fr: 'Rappel' },
+  'cards.added.reminderOnDay': {
+    en: '{date} · on the day',
+    es: '{date} · el mismo día',
+    fr: '{date} · le jour même',
+  },
+  'cards.added.reminderDays': {
+    en: { one: '{date} · 1 day before', other: '{date} · {count} days before' },
+    es: { one: '{date} · 1 día antes', other: '{date} · {count} días antes' },
+    fr: { one: '{date} · 1 jour avant', other: '{date} · {count} jours avant' },
+  },
+  'cards.added.reminderWeek': {
+    en: '{date} · 1 week before',
+    es: '{date} · 1 semana antes',
+    fr: '{date} · 1 semaine avant',
+  },
+  'cards.added.reminderOff': { en: 'Off', es: 'Desactivado', fr: 'Désactivé' },
+  'cards.added.another': {
+    en: 'Add another card',
+    es: 'Agregar otra tarjeta',
+    fr: 'Ajouter une autre carte',
+  },
+  'cards.face.limitNotSet': {
+    en: 'Limit not set',
+    es: 'Límite sin definir',
+    fr: 'Limite non définie',
   },
 });

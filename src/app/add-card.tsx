@@ -1,26 +1,25 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { Trash2 } from 'lucide-react-native';
+import { CalendarDays, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import {
-  choiceToLead,
-  useApplyReminder,
-  useReminderChoice,
-  type ReminderChoice,
-} from '@/api/reminders';
-import { useCreateCard, useDeleteCard, useUpdateCard } from '@/api/mutations';
+import { useApplyReminder, useReminderChoice } from '@/api/reminders';
+import { creditLimitValue, useCreateCard, useDeleteCard, useUpdateCard } from '@/api/mutations';
 import { useCard, useSourceLedger, useCards } from '@/api/queries';
 import { useColors } from '@/providers/theme-provider';
-import { NetworkPicker } from '@/components/cards/network-picker';
 import { PaymentCard } from '@/components/cards/payment-card';
+import { AddedPage } from '@/components/flow/added-page';
 import { AmountStep } from '@/components/flow/amount-step';
-import { InlineCalendar } from '@/components/flow/inline-calendar';
+import { DayStrip } from '@/components/flow/day-strip';
+import { FlowSummary } from '@/components/flow/flow-summary';
+import { RemindMeCard } from '@/components/flow/remind-me-card';
+import type { LeadDays } from '@/lib/reminder-words';
 import { StepFlow } from '@/components/flow/step-flow';
+import { ChoiceChips } from '@/components/ui/choice-chips';
 import { ColorPicker } from '@/components/ui/color-picker';
+import { CurrencyField } from '@/components/ui/currency-field';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
-import { ReminderField } from '@/components/ui/reminder-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePro } from '@/api/pro';
 import { useConfirm } from '@/providers/dialog-provider';
@@ -31,9 +30,19 @@ import { NETWORKS } from '@/data/cards';
 import { t } from '@/i18n';
 import { success, warn } from '@/lib/haptics';
 import { failureMessage, failureText } from '@/lib/failure';
-import { toIsoDate } from '@/lib/date';
+import { leaveFlow } from '@/lib/nav';
+import { formatFullDate, toIsoDate } from '@/lib/date';
+import { LATE_DAYS, dayDate, dayOrdinal, nextDueOn, nextReminderOn } from '@/lib/due-day';
+import { addedMessage, billReminderCaption, reminderRow } from '@/lib/reminder-words';
 import { useArtwork } from '@/theme/artwork';
 import { DEFAULT_CARD_COLOR } from '@/theme/card-colors';
+import { TEXT_CAP } from '@/theme/text-scale';
+
+/** The stored network is the value; a wordmark drawn in capitals is only the label. */
+const NETWORK_OPTIONS = NETWORKS.map((network) => ({
+  value: network,
+  label: network === 'Amex' ? 'AMEX' : network,
+}));
 
 export default function AddCardScreen() {
   // Deep-link guard: creating past the free allowance opens Pro instead of a form the database
@@ -46,7 +55,9 @@ export default function AddCardScreen() {
 
   const [walled, setWalled] = useState<boolean | null>(null);
   let decided = walled;
-  if (decided === null && (id || (ready && !existing.isPending))) {
+  // Not while the list is refreshing either: just after a save, "Add another" would count the
+  // list from before it.
+  if (decided === null && (id || (ready && !existing.isPending && !existing.isFetching))) {
     decided = !id && !pro && (existing.data?.length ?? 0) >= 1;
     setWalled(decided);
   }
@@ -138,27 +149,32 @@ function CardForm({
   const [color, setColor] = useState<string>(existing?.color ?? DEFAULT_CARD_COLOR);
 
   const [last4, setLast4] = useState(existing?.last4 ?? '');
-  // Stored as a day of the month; placed in the current month to give the calendar a Date.
-  const [dueDate, setDueDate] = useState<Date | null>(
-    existing?.bill_due_day
-      ? new Date(new Date().getFullYear(), new Date().getMonth(), existing.bill_due_day)
-      : null,
-  );
+  const [dueDay, setDueDay] = useState<number | null>(existing?.bill_due_day ?? null);
   const [balance, setBalance] = useState(existing ? String(existing.balance) : '');
+  // As typed: creditLimitValue turns it into the number saved, or null for none.
+  const [creditLimit, setCreditLimit] = useState(
+    existing?.credit_limit ? String(existing.credit_limit) : '',
+  );
+  const limit = creditLimitValue(creditLimit);
 
   const today = toIsoDate(new Date());
   // So the warning below can say how much history a new balance would absorb.
   const { ledger } = useSourceLedger(editing ? id : undefined, today);
 
+  // The saved reminder until the person touches it; its time of day is kept as it is.
   const savedReminder = useReminderChoice('card', id);
-  const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
-  const [timeDraft, setTimeDraft] = useState<string | null>(null);
-  const reminder = reminderDraft ?? savedReminder.choice;
-  const remindAt = timeDraft ?? savedReminder.remindAt;
+  const [onDraft, setOnDraft] = useState<boolean | null>(null);
+  const [leadDraft, setLeadDraft] = useState<LeadDays | null>(null);
+  // New ones start on, three days before; an edit opens on what is saved.
+  const reminderOn = onDraft ?? (editing ? savedReminder.choice !== 'off' : true);
+  const lead: LeadDays =
+    leadDraft ?? (savedReminder.choice === 'off' ? 3 : (Number(savedReminder.choice) as LeadDays));
   const applyReminder = useApplyReminder();
 
   const [step, setStep] = useState(0);
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
+  /** Set once a new card is saved: the flow gives way to the page that says so. */
+  const [added, setAdded] = useState(false);
 
   const createCard = useCreateCard();
   const updateCard = useUpdateCard();
@@ -229,8 +245,9 @@ function CardForm({
             : balance
               ? toIsoDate(new Date())
               : null,
-        // The bill day is what recurs, not the specific date picked.
-        bill_due_day: dueDate ? dueDate.getDate() : null,
+        bill_due_day: dueDay,
+        // Sent on every save, null when empty, so clearing the field removes the limit.
+        credit_limit: limit,
       };
 
       const cardId =
@@ -238,17 +255,28 @@ function CardForm({
           ? (await updateCard.mutateAsync({ id, values }), id)
           : (await createCard.mutateAsync(values)).id;
 
-      // A card reminder counts back from its payment day, so it needs one.
-      await applyReminder('card', cardId, dueDate ? choiceToLead(reminder) : null, remindAt);
+      // A card reminder counts back from its payment day, so it needs one. Untouched while the saved
+      // one is unknown: the form's 'off' is then a guess, and writing it deletes the reminder.
+      if (!savedReminder.unknown) {
+        await applyReminder(
+          'card',
+          cardId,
+          dueDay && reminderOn ? lead : null,
+          savedReminder.remindAt,
+        );
+      }
 
       success();
-      toast(editing ? 'toast.card.updated' : 'toast.card.added');
       // The setup walk-in continues on the bank-account offer page; a dialog raised mid-navigation
       // never showed.
       if (!editing && origin === 'setup') {
+        toast('toast.card.added');
         router.replace('/account-offer');
-      } else {
+      } else if (editing) {
+        toast('toast.card.updated');
         router.back();
+      } else {
+        setAdded(true);
       }
     } catch (thrown) {
       warn();
@@ -257,16 +285,52 @@ function CardForm({
   };
 
   const busy = createCard.isPending || updateCard.isPending;
+  const nextDue = dueDay ? nextDueOn(dueDay, today) : null;
+  const remindOn = dueDay ? nextReminderOn(dueDay, lead, today) : null;
+  const preview = {
+    id: 'preview',
+    holder: name,
+    balance: Number(balance) || 0,
+    last4,
+    network,
+    color,
+    creditLimit: limit,
+  };
+
+  if (added) {
+    const reminded = Boolean(dueDay && reminderOn);
+    return (
+      <AddedPage
+        title={t('cards.added.title')}
+        message={addedMessage('bill', reminded ? lead : null)}
+        face={<PaymentCard card={{ ...preview, holder: name.trim() }} />}
+        rows={[
+          {
+            label: t('cards.added.due'),
+            value: dueDay
+              ? t('cards.added.dueValue', { day: dayOrdinal(dueDay) })
+              : t('cards.added.notSet'),
+          },
+          ...(nextDue
+            ? [{ label: t('cards.added.nextDue'), value: formatFullDate(dayDate(nextDue)) }]
+            : []),
+          {
+            label: t('cards.added.reminder'),
+            value:
+              reminded && remindOn ? reminderRow(lead, remindOn) : t('cards.added.reminderOff'),
+          },
+        ]}
+        onDone={leaveFlow}
+        anotherLabel={t('cards.added.another')}
+        // A new route rather than a reset form, so the free allowance is checked again.
+        onAnother={() => router.replace('/add-card')}
+      />
+    );
+  }
 
   // Zero is a real balance, so only the name blocks step 1.
   const stepValid = step === 1 ? Boolean(name.trim()) : !busy;
 
-  const question =
-    step === 0
-      ? t('cards.add.balanceQuestion')
-      : step === 2
-        ? t('cards.add.dueQuestion')
-        : undefined;
   const primaryLabel =
     step < 2
       ? t('common.continue')
@@ -274,7 +338,7 @@ function CardForm({
         ? t('cards.form.saving')
         : editing
           ? t('cards.form.saveChanges')
-          : t('cards.add.saveCard');
+          : t('cards.add.addCard');
   const stepError = error && error.step === step ? error.message : null;
 
   return (
@@ -288,7 +352,7 @@ function CardForm({
         if (step === 0) router.back();
         else setStep((current) => current - 1);
       }}
-      question={question}
+      question={step === 0 ? t('cards.add.balanceQuestion') : undefined}
       primaryLabel={primaryLabel}
       primaryDisabled={!stepValid}
       onPrimary={() => {
@@ -320,35 +384,26 @@ function CardForm({
       {step === 0 ? <AmountStep value={balance} onChange={setBalance} /> : null}
 
       {step === 1 ? (
-        <View className="w-full gap-6">
-          <PaymentCard
-            card={{
-              id: 'preview',
-              holder: name,
-              balance: Number(balance) || 0,
-              last4,
-              network,
-              color,
-            }}
-            placeholderHolder={t('cards.add.name')}
-          />
-
-          <View className="w-full">
-            <FieldLabel className="mb-3">{t('cards.add.network')}</FieldLabel>
-            <NetworkPicker networks={NETWORKS} value={network} onChange={setNetwork} />
-          </View>
+        <View className="w-full gap-[16px]">
+          <PaymentCard card={preview} placeholderHolder={t('cards.form.cardName')} preview />
 
           <TextField
-            label={t('cards.add.name')}
+            label={t('cards.form.cardName')}
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
             returnKeyType="done"
+            filled
           />
 
           <View className="w-full">
-            <FieldLabel className="mb-3">{t('cards.form.cardColour')}</FieldLabel>
-            <ColorPicker value={color} onChange={setColor} />
+            <FieldLabel className="mb-2">{t('cards.form.network')}</FieldLabel>
+            <ChoiceChips
+              options={NETWORK_OPTIONS}
+              value={network}
+              onChange={setNetwork}
+              tone="card"
+            />
           </View>
 
           <TextField
@@ -357,7 +412,21 @@ function CardForm({
             onChangeText={(text) => setLast4(text.replace(/\D/g, '').slice(0, 4))}
             keyboardType="number-pad"
             returnKeyType="done"
+            filled
           />
+
+          <CurrencyField
+            label={t('cards.form.creditLimit')}
+            value={creditLimit}
+            onChange={setCreditLimit}
+            placeholder={t('cards.form.creditLimitOptional')}
+            filled
+          />
+
+          <View className="w-full">
+            <FieldLabel className="mb-1">{t('cards.form.cardColour')}</FieldLabel>
+            <ColorPicker value={color} onChange={setColor} saved={existing?.color} />
+          </View>
 
           {stepError ? (
             <Text className="w-full font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
@@ -368,17 +437,60 @@ function CardForm({
       ) : null}
 
       {step === 2 ? (
-        <View className="w-full gap-6">
-          <InlineCalendar value={dueDate} onChange={setDueDate} />
+        <View className="w-full">
+          <Text
+            accessibilityRole="header"
+            className="w-full font-app-semibold text-[20px] text-ink"
+            maxFontSizeMultiplier={TEXT_CAP.heading}
+          >
+            {t('cards.add.dueQuestion')}
+          </Text>
+          <Text
+            className="mt-1.5 w-full font-app text-[13px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.reading}
+          >
+            {t('cards.add.dueSubtitle')}
+          </Text>
 
-          <ReminderField
-            kind="card"
-            value={reminder}
-            onChange={setReminderDraft}
-            time={remindAt}
-            onTimeChange={setTimeDraft}
-            unavailable={dueDate ? null : t('cards.add.reminderNeedsDate')}
-          />
+          <View className="mt-[16px] w-full">
+            <DayStrip value={dueDay} onChange={setDueDay} />
+          </View>
+
+          {dueDay && nextDue ? (
+            <View className="mt-[16px] w-full">
+              <FlowSummary
+                icon={CalendarDays}
+                title={t(dueDay >= LATE_DAYS ? 'cards.add.dueEveryLate' : 'cards.add.dueEvery', {
+                  day: dayOrdinal(dueDay),
+                })}
+                caption={t('cards.add.nextDue', { date: formatFullDate(dayDate(nextDue)) })}
+              />
+            </View>
+          ) : null}
+
+          <View className="mt-[16px] w-full">
+            <RemindMeCard
+              on={reminderOn}
+              onToggle={setOnDraft}
+              lead={lead}
+              onLead={setLeadDraft}
+              caption={
+                reminderOn && remindOn
+                  ? billReminderCaption(lead, remindOn)
+                  : t('cards.add.remindOff')
+              }
+              unavailable={dueDay ? null : t('cards.add.reminderNeedsDay')}
+            />
+          </View>
+
+          {editing ? null : (
+            <Text
+              className="mt-[18px] w-full font-app text-[12px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
+            >
+              {t('cards.add.changeLater')}
+            </Text>
+          )}
         </View>
       ) : null}
     </StepFlow>

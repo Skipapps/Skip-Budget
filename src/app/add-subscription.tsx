@@ -381,8 +381,11 @@ function SubscriptionForm({
 
       if (scope === 'all') await pastCharges.apply(carried);
 
-      // After the row exists, because a reminder points at one.
-      await applyReminder('subscription', subscriptionId, choiceToLead(reminder), remindAt);
+      // After the row exists, because a reminder points at one. Untouched while the saved one is
+      // unknown: the form's 'off' is then a guess, and writing it deletes the reminder.
+      if (!savedReminder.unknown) {
+        await applyReminder('subscription', subscriptionId, choiceToLead(reminder), remindAt);
+      }
       success();
       toast(editing ? 'toast.subscription.updated' : 'toast.subscription.added');
       leave();

@@ -1,5 +1,6 @@
 import { clockText, monthShort, weekdayShort } from '@/i18n/calendar';
 import { t } from '@/i18n';
+import { nextPaydayOn } from '@/lib/payday';
 
 // Date labels without Intl, which Hermes ships inconsistently across platforms.
 
@@ -118,20 +119,15 @@ function advanceOneCycle(date: Date, frequency: PayFrequency): Date {
 }
 
 /**
- * Next payday strictly after today, walking forward from the last one, so a stale last-pay-day
- * still produces a future date.
+ * The next payday on or after today, walking forward from the last one, as the reminder scheduler
+ * counts it (`nextPaydayOn`): pay due today is today's, and monthly pay keeps its own day of the
+ * month after a short month.
  */
 export function getNextPayday(lastPayday: Date, frequency: PayFrequency): Date {
   // A one-off pay's only payday is its own.
   if (frequency === 'once') return lastPayday;
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  let next = advanceOneCycle(lastPayday, frequency);
-  for (let guard = 0; next <= today && guard < 400; guard += 1) {
-    next = advanceOneCycle(next, frequency);
-  }
-  return next;
+  const next = nextPaydayOn(toIsoDate(lastPayday), frequency, toIsoDate(new Date()));
+  return next ? new Date(`${next}T00:00:00`) : lastPayday;
 }
 
 /**

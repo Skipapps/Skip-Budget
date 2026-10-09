@@ -74,14 +74,16 @@ function useCreate<TInput extends Record<string, unknown>>(table: string) {
 }
 
 /**
- * Where a table's single-row read is cached (useReceipt, useSubscription, useBill). The list key
- * does not reach it, so an edit page reopened inside staleTime would show the values from before
- * the save, and could write them back.
+ * Where a table's single-row read is cached (useReceipt, useSubscription, useBill, useCard,
+ * useBankAccount). The list key does not reach it, so an edit page reopened inside staleTime would
+ * show the values from before the save, and could write them back.
  */
 const SINGLE_ROW_KEY: Record<string, string> = {
   receipts: 'receipt',
   subscriptions: 'subscription',
   bills: 'bill',
+  cards: 'card',
+  bank_accounts: 'bank_account',
 };
 
 /**
@@ -141,7 +143,24 @@ export type CardValues = {
   /** When the stated balance was true; charges before it are already in it. */
   balance_as_of: string | null;
   bill_due_day: number | null;
+  /**
+   * Optional credit limit, from `creditLimitValue`. Send it on every save from the card form, null
+   * when the field is empty, so clearing it removes the limit. A database without the column
+   * refuses a save that names it, so the migration goes live first.
+   */
+  credit_limit?: number | null;
 };
+
+/**
+ * The credit limit field as typed ("10000", "2500.50") to the value saved: a number above zero, or
+ * null for an empty field. Zero means no limit too: the database refuses a limit of zero or less,
+ * and a bar against nothing would say nothing. The keypad settles at two decimals, so nothing is
+ * rounded here.
+ */
+export function creditLimitValue(typed: string): number | null {
+  const value = Number(typed.trim());
+  return typed.trim() !== '' && Number.isFinite(value) && value > 0 ? value : null;
+}
 
 export type ProfileValues = {
   display_name?: string | null;

@@ -11,6 +11,10 @@ type ActionPillProps = {
   onPress: () => void;
   icon?: LucideIcon;
   disabled?: boolean;
+  /** `tint` sits on a card or the page; `card` is a raised white pill for section headings. */
+  tone?: 'tint' | 'card';
+  /** What VoiceOver says when the visible word alone ("Add") does not say what is added. */
+  accessibilityLabel?: string;
   className?: string;
 };
 
@@ -20,13 +24,15 @@ export function ActionPill({
   onPress,
   icon: Icon = Plus,
   disabled,
+  tone = 'tint',
+  accessibilityLabel,
   className,
 }: ActionPillProps) {
   const colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled }}
       onPress={withTap(onPress)}
       disabled={disabled}
@@ -34,7 +40,10 @@ export function ActionPill({
       // The pill is 40pt tall by design; the touch target is the 44pt floor.
       hitSlop={{ top: 4, bottom: 4 }}
       className={cn(
-        'min-h-10 max-w-full flex-row items-center gap-1.5 rounded-full bg-ink/5 py-2 pl-3.5 pr-4 active:bg-ink/10',
+        'min-h-10 max-w-full flex-row items-center gap-1.5 rounded-full py-2 pl-3.5 pr-4',
+        tone === 'card'
+          ? 'border border-line bg-card active:bg-ink/5'
+          : 'bg-ink/5 active:bg-ink/10',
         className,
       )}
     >

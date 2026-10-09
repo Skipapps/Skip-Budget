@@ -34,9 +34,26 @@ describe('toIsoDate', () => {
 });
 
 describe('getNextPayday', () => {
-  it('always lands in the future, however stale the last one', () => {
+  afterEach(() => jest.useRealTimers());
+
+  it('lands today or later, however stale the last one', () => {
     const next = getNextPayday(on(2020, 1, 15), 'monthly');
-    expect(next.getTime()).toBeGreaterThan(Date.now());
+    const now = new Date();
+    expect(next.getTime()).toBeGreaterThanOrEqual(
+      on(now.getFullYear(), now.getMonth() + 1, now.getDate()).getTime(),
+    );
+  });
+
+  it('counts a payday that is today, as the reminder scheduler does', () => {
+    jest.useFakeTimers({ now: new Date(2026, 9, 9, 10, 30) });
+    expect(getNextPayday(on(2026, 10, 2), 'weekly')).toEqual(on(2026, 10, 9));
+    expect(getNextPayday(on(2026, 9, 9), 'monthly')).toEqual(on(2026, 10, 9));
+  });
+
+  it('keeps monthly pay on its own day after a short month, as the scheduler does', () => {
+    jest.useFakeTimers({ now: new Date(2026, 2, 5) });
+    // Paid on the 31st: February's is the 28th, and March's the 31st again, not the 28th.
+    expect(getNextPayday(on(2026, 1, 31), 'monthly')).toEqual(on(2026, 3, 31));
   });
 });
 

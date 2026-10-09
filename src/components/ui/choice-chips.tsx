@@ -14,13 +14,21 @@ type ChoiceChipsProps<T extends string> = {
   /** Null lights nothing: a question not answered yet. */
   value: T | null;
   onChange: (value: T) => void;
+  /** `tint` sits on the page; `card` is the white bordered pill of the add-card and add-account forms. */
+  tone?: 'tint' | 'card';
 };
 
 /**
  * Pick-one chips that wrap onto more lines, never cut; a label wider than the row wraps inside its
  * chip. 40pt tall plus 4pt of vertical hitSlop clears the 44pt target floor.
  */
-export function ChoiceChips<T extends string>({ options, value, onChange }: ChoiceChipsProps<T>) {
+export function ChoiceChips<T extends string>({
+  options,
+  value,
+  onChange,
+  tone = 'tint',
+}: ChoiceChipsProps<T>) {
+  const card = tone === 'card';
   return (
     <View accessibilityRole="radiogroup" className="w-full flex-row flex-wrap gap-2">
       {options.map((option) => {
@@ -38,13 +46,22 @@ export function ChoiceChips<T extends string>({ options, value, onChange }: Choi
             }}
             className={cn(
               'min-h-10 max-w-full items-center justify-center rounded-full px-4 py-2',
-              selected ? 'bg-control' : 'bg-ink/5 active:bg-ink/10',
+              // The border stays when chosen, so a chosen pill is exactly as wide as the others.
+              card && 'border',
+              selected
+                ? cn('bg-control', card && 'border-control')
+                : card
+                  ? 'border-line bg-card active:bg-ink/5'
+                  : 'bg-ink/5 active:bg-ink/10',
             )}
           >
             <Text
               className={cn(
-                'text-center text-[14px]',
-                selected ? 'font-app-medium text-on-control' : 'font-app text-body',
+                'text-center',
+                card ? 'font-app-semibold text-[13px]' : 'text-[14px]',
+                selected
+                  ? cn('text-on-control', !card && 'font-app-medium')
+                  : cn(card ? 'text-ink' : 'font-app text-body'),
               )}
               maxFontSizeMultiplier={TEXT_CAP.control}
             >

@@ -23,6 +23,7 @@ import { landingAccount, payProjectionStart } from '@/lib/pay';
 import type { AccrualBasis } from '@/lib/loan';
 import { logoDomainOf } from '@/lib/logo-domain';
 import type { DateRange } from '@/lib/range';
+import { lastUpdated } from '@/lib/source-updated';
 import { useKnownFree } from '@/lib/pro-status';
 import { supabase } from '@/lib/supabase';
 import { usePro } from '@/api/pro';
@@ -45,6 +46,8 @@ export type CardRow = {
   balance_as_of?: string | null;
   /** Day of the month the card's own bill falls due. What a reminder needs. */
   bill_due_day?: number | null;
+  /** The card's credit limit; null when none was given (and on a database without the column). */
+  credit_limit: number | null;
 };
 
 export type BankAccountRow = {
@@ -219,14 +222,37 @@ export function useAnnouncements() {
   });
 }
 
+const CARD_COLUMNS = 'id, holder, network, last4, color, balance, balance_as_of, bill_due_day';
+
+/**
+ * Runs a card read with the credit limit, and again without it when the database does not have the
+ * column yet (42703 naming it). Cards feed every balance and Home's Current balance, so a build
+ * that reaches a database before the migration must still load them, with no limits shown.
+ */
+async function withCreditLimit<R extends { error: ReadFailure }>(
+  read: (columns: string) => PromiseLike<R>,
+): Promise<R> {
+  const result = await read(`${CARD_COLUMNS}, credit_limit`);
+  const lacksLimit =
+    result.error?.code === '42703' && /credit_limit/.test(result.error.message ?? '');
+  return lacksLimit ? read(CARD_COLUMNS) : result;
+}
+
+type RawCard = Omit<CardRow, 'credit_limit'> & { credit_limit?: number | string | null };
+
+/** numeric arrives as a number, or as a string from some clients; absent means not given. */
+function readCard(row: RawCard): CardRow {
+  const limit = row.credit_limit == null ? null : Number(row.credit_limit);
+  return { ...row, credit_limit: limit !== null && Number.isFinite(limit) ? limit : null };
+}
+
 export function useCards() {
   return useOwnerQuery<CardRow[]>('cards', async () => {
-    const { data, error } = await supabase
-      .from('cards')
-      .select('id, holder, network, last4, color, balance, balance_as_of, bill_due_day')
-      .order('created_at', { ascending: true });
+    const { data, error } = await withCreditLimit((columns) =>
+      supabase.from('cards').select(columns).order('created_at', { ascending: true }),
+    );
     if (error) throw error;
-    return data ?? [];
+    return ((data ?? []) as unknown as RawCard[]).map(readCard);
   });
 }
 
@@ -577,13 +603,11 @@ export function useCard(id: string | undefined) {
     queryKey: ['card', id, userId],
     enabled: Boolean(userId && id),
     queryFn: async (): Promise<(CardRow & { bill_due_day: number | null }) | null> => {
-      const { data, error } = await supabase
-        .from('cards')
-        .select('id, holder, network, last4, color, balance, balance_as_of, bill_due_day')
-        .eq('id', id!)
-        .maybeSingle();
+      const { data, error } = await withCreditLimit((columns) =>
+        supabase.from('cards').select(columns).eq('id', id!).maybeSingle(),
+      );
       if (error) throw error;
-      return data as never;
+      return data ? (readCard(data as unknown as RawCard) as never) : null;
     },
   });
 }
@@ -1096,15 +1120,26 @@ export function useSourceLedger(sourceId: string | undefined, today: string) {
 
 /** Live balances for every card and account, keyed by id. */
 export function useSourceBalances(today: string) {
-  const { book, isError, refetch } = useMoneyBook(today);
+  const { book, cards, accounts, isError, refetch } = useMoneyBook(today);
   const balances = useMemo(() => {
     const next = new Map<string, number>();
     for (const [id, ledger] of book.sources) next.set(id, ledger.balance);
     return next;
   }, [book]);
 
+  /** yyyy-mm-dd each card's and account's figure was last true to something real (lastUpdated). */
+  const updated = useMemo(() => {
+    const next = new Map<string, string>();
+    for (const row of [...(accounts.data ?? []), ...(cards.data ?? [])]) {
+      const day = lastUpdated(row.balance_as_of, book.sources.get(row.id), today);
+      if (day) next.set(row.id, day);
+    }
+    return next;
+  }, [book, accounts.data, cards.data, today]);
+
   return {
     balances,
+    updated,
     /**
      * Consumers read `balances.get(id) ?? card.balance`, so a failed read would present the typed
      * opening figure as the live balance.

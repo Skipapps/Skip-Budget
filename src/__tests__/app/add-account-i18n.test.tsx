@@ -44,6 +44,10 @@ jest.mock('@/providers/theme-provider', () => ({
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
+// Jest turns an .svg into a number, not a component; the icons have a suite of their own.
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 
 const mockConfirm = jest.fn(async () => false);
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => mockConfirm }));
@@ -153,7 +157,7 @@ describe('Add an account in Spanish', () => {
     expect(screen.getByText('Color de la tarjeta')).toBeTruthy();
     expect(screen.getAllByText('Últimos 4 dígitos').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Ingresos esperados').length).toBeGreaterThan(0);
-    expect(screen.getByText('Ingresa un importe')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Ingresa un importe')).toBeTruthy();
     expect(screen.getByLabelText('Abrir calculadora')).toBeTruthy();
     expectNoLeftovers(screen);
 
@@ -176,7 +180,7 @@ describe('Add an account in Spanish', () => {
     expectNoLeftovers(screen);
 
     await fireEvent.press(screen.getByText('Semanal'));
-    await fireEvent.press(screen.getByText('Guardar cuenta'));
+    await fireEvent.press(screen.getByText('Agregar cuenta'));
 
     expect(mockCreate).toHaveBeenCalledWith(
       expect.objectContaining({ bank_name: 'Banco Azul', account_type: 'savings' }),

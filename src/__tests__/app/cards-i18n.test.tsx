@@ -5,9 +5,8 @@ import CardsScreen from '@/app/(tabs)/cards';
 import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
 
 /**
- * The Cards tab in Spanish and French: headings, empty notes, locked rows, tiles and figures. The
- * tiles are the real ones, so the words on the Savings tile (no figure, "Abrir" / "Ouvrir") come
- * from the tile and the page together.
+ * The Cards tab in Spanish and French: title, headings, pills, empty notes, locked rows and the four
+ * Money tiles, which are the real ones.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -17,19 +16,6 @@ jest.mock('react-native-keyboard-controller', () =>
 );
 
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
-// Reanimated 4 wants a native worklets module; the tile only needs its press animation to be inert.
-jest.mock('react-native-reanimated', () => {
-  const { View } = jest.requireActual('react-native');
-  return {
-    __esModule: true,
-    default: { View },
-    Easing: { out: () => () => 0, quad: () => 0 },
-    useAnimatedStyle: () => ({}),
-    useReducedMotion: () => false,
-    withSpring: (value: unknown) => value,
-    withTiming: (value: unknown) => value,
-  };
-});
 jest.mock('@/components/cards/payment-card', () => ({ PaymentCard: () => null }));
 jest.mock('@/components/cards/account-card', () => ({ AccountCard: () => null }));
 
@@ -41,12 +27,9 @@ jest.mock('@/providers/theme-provider', () => ({
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
-
-jest.mock('@/data/money-buckets', () => ({
-  moneyBuckets: [
-    { id: 'salary', label: 'Salary', artwork: 'tileSalary' },
-    { id: 'savings', label: 'Savings', artwork: 'tileSavings' },
-  ],
+// Jest turns an .svg into a number, not a component; the icons have a suite of their own.
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
 }));
 
 let mockPro = false;
@@ -90,16 +73,24 @@ const mockRefetchBalances = jest.fn();
 jest.mock('@/api/queries', () => ({
   useCards: () => ({ data: mockCards, isPending: false, isError: false }),
   useBankAccounts: () => ({ data: mockAccounts, isPending: false, isError: false }),
-  // 1,000 a week normalises to 4,333.33 a month.
-  useSalarySources: () => ({
-    data: [{ amount: 1000, frequency: 'weekly' }],
-    isPending: false,
-    isError: false,
-  }),
+  useSalarySources: () => ({ data: mockSalary, isPending: false, isError: false }),
   useSourceBalances: () => ({
     balances: new Map<string, number>(),
+    updated: new Map<string, string>(),
     isError: mockBalancesFailed,
     refetch: mockRefetchBalances,
+  }),
+}));
+
+// 1,000 a week normalises to 4,333.33 a month.
+let mockSalary: object[] = [];
+let mockLoans: { billId: string; name: string }[] = [];
+jest.mock('@/api/loans', () => ({
+  useActiveLoans: () => ({
+    loans: mockLoans,
+    isPending: false,
+    isError: false,
+    refetch: jest.fn(),
   }),
 }));
 
@@ -143,6 +134,8 @@ beforeEach(() => {
   mockBalancesFailed = false;
   mockCards = [card('c1', 'Everyday Visa'), card('c2', 'Travel card')];
   mockAccounts = [account('a1', 'Main'), account('a2', 'Rainy day')];
+  mockLoans = [];
+  mockSalary = [{ amount: 1000, frequency: 'weekly' }];
   mockRefetchBalances.mockClear();
   jest.mocked(router.push).mockClear();
 });
@@ -151,31 +144,44 @@ afterAll(() => resetLocaleForTests());
 describe('Cards tab in Spanish', () => {
   beforeEach(() => setLanguage('es'));
 
-  it('reads its headings, actions, tiles and figures in Spanish', async () => {
+  it('reads its title, headings, pills and tiles in Spanish', async () => {
     const screen = await render(<CardsScreen />);
 
+    expect(screen.getByRole('header', { name: 'Tarjetas' })).toBeTruthy();
+    expect(screen.getByText('Todo tu dinero en un solo lugar.')).toBeTruthy();
     expect(screen.getByText('Tarjetas de crédito')).toBeTruthy();
+    expect(screen.getAllByText('Agregar')).toHaveLength(2);
     expect(screen.getByLabelText('Nueva tarjeta de crédito')).toBeTruthy();
     expect(screen.getByText('Cuentas bancarias')).toBeTruthy();
     expect(screen.getByLabelText('Agregar cuenta')).toBeTruthy();
     expect(screen.getByText('Dinero')).toBeTruthy();
-    expect(screen.getByLabelText('Salario, $4,333.33')).toBeTruthy();
+    expect(screen.getByLabelText('Salario, $4,333.33, Mensual')).toBeTruthy();
     expect(screen.getByText('$4,333.33')).toBeTruthy();
+    expect(screen.getByLabelText('Préstamos, Agregar uno, Sigue lo que debes')).toBeTruthy();
+    expect(screen.getByLabelText('Metas, Próximamente')).toBeTruthy();
     expectNoLeftovers(screen);
   });
 
   it('draws the Savings tile with Abrir where a figure would be, and opens Ahorros', async () => {
     const screen = await render(<CardsScreen />);
 
-    // Named alone, not "Ahorros, $…": there is no amount to read out.
-    const tile = screen.getByLabelText('Ahorros');
-    expect(screen.getByText('Ahorros')).toBeTruthy();
+    const tile = screen.getByLabelText('Ahorros, Abrir, Empieza a ahorrar');
     expect(screen.getByText('Abrir')).toBeTruthy();
     // The Salary figure is the only number on the tab (the faces are drawn empty here).
     expect(screen.getAllByText(/\d/)).toHaveLength(1);
 
     await fireEvent.press(tile);
     expect(router.push).toHaveBeenLastCalledWith('/savings');
+  });
+
+  it('counts the active loans in Spanish', async () => {
+    mockLoans = [
+      { billId: 'b1', name: 'Auto' },
+      { billId: 'b2', name: 'Casa' },
+    ];
+    const screen = await render(<CardsScreen />);
+
+    expect(screen.getByLabelText('Préstamos, 2 activos, Auto · Casa')).toBeTruthy();
   });
 
   it('says which rows open and which are locked on the free plan', async () => {
@@ -225,29 +231,47 @@ describe('Cards tab in French', () => {
     setCurrency('CAD');
   });
 
-  it('reads its headings, tiles and figures in French', async () => {
+  it('reads its title, headings, pills and tiles in French', async () => {
     const screen = await render(<CardsScreen />);
 
+    expect(screen.getByRole('header', { name: 'Cartes' })).toBeTruthy();
+    expect(screen.getByText('Tout ton argent au même endroit.')).toBeTruthy();
     expect(screen.getByText('Cartes de crédit')).toBeTruthy();
+    expect(screen.getAllByText('Ajouter')).toHaveLength(2);
     expect(screen.getByLabelText('Nouvelle carte de crédit')).toBeTruthy();
     expect(screen.getByText('Comptes bancaires')).toBeTruthy();
     expect(screen.getByLabelText('Ajouter un compte')).toBeTruthy();
     expect(screen.getByText('Argent')).toBeTruthy();
-    expect(screen.getByLabelText(`Salaire, 4${NBSP}333,33${NBSP}$`)).toBeTruthy();
+    expect(screen.getByLabelText(`Salaire, 4${NBSP}333,33${NBSP}$, Chaque mois`)).toBeTruthy();
     expect(screen.getByText(`4${NBSP}333,33${NBSP}$`)).toBeTruthy();
+    expect(screen.getByLabelText('Prêts, Ajouter un prêt, Suis ce que tu dois')).toBeTruthy();
+    expect(screen.getByLabelText('Objectifs, Bientôt')).toBeTruthy();
     expectNoLeftovers(screen);
   });
 
   it('draws the Savings tile with Ouvrir where a figure would be, and opens Épargne', async () => {
     const screen = await render(<CardsScreen />);
 
-    const tile = screen.getByLabelText('Épargne');
-    expect(screen.getByText('Épargne')).toBeTruthy();
+    const tile = screen.getByLabelText('Épargne, Ouvrir, Commence à épargner');
     expect(screen.getByText('Ouvrir')).toBeTruthy();
     expect(screen.getAllByText(/\d/)).toHaveLength(1);
 
     await fireEvent.press(tile);
     expect(router.push).toHaveBeenLastCalledWith('/savings');
+  });
+
+  it('counts one active loan in French', async () => {
+    mockLoans = [{ billId: 'b1', name: 'Auto' }];
+    const screen = await render(<CardsScreen />);
+
+    expect(screen.getByLabelText('Prêts, 1 actif, Auto')).toBeTruthy();
+  });
+
+  it('offers to add pay in French when there is none', async () => {
+    mockSalary = [];
+    const screen = await render(<CardsScreen />);
+
+    expect(screen.getByLabelText('Salaire, Ajouter ta paie, Ajoute ta paie')).toBeTruthy();
   });
 
   it('agrees a locked card and a locked account in French', async () => {
