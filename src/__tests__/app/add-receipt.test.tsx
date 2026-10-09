@@ -4,12 +4,14 @@ import { BackHandler } from 'react-native';
 
 import AddReceiptScreen from '@/app/add-receipt';
 import { FAILURE_MESSAGE } from '@/lib/failure';
+import { success, warn } from '@/lib/haptics';
 
 /**
  * The receipt form as a person walks it. A blank receipt opens on the amount page and Continue
- * lands on the one final page; every line of that page opens a page for that one thing and comes
- * back. Real pages throughout (keypad, calendar, store field, card tiles); only the network, the
- * native scanner and the logo images are replaced.
+ * lands on the one final page. Only the amount, the date and the note open a page of their own and
+ * come back; the store and Paid with are answered on the page itself. Save is never greyed out for
+ * a gap: it names what is still unanswered. Real pages throughout (keypad, calendar, store field,
+ * card pills); only the network, the native scanner and the logo images are replaced.
  *
  * Also: when the receipt to edit cannot be read the editor must not fall back to a create (that
  * would file a second copy of a receipt that is still there): failed, gone and still loading are
@@ -219,9 +221,15 @@ async function typeAmount(screen: Screen, digits: string) {
   }
 }
 
+const STORE_PLACEHOLDER = 'Enter the store name';
+
+/** The pills of the final page, in the order they are drawn: the date chips, then Paid with. */
+const WHEN = ['Today', 'Yesterday', 'Pick date'];
+const PAID_WITH = ['VISA ••4821', 'Checking ••0099', 'Skip'];
+
 /** Types into the store box the way a finger does: a tap into it, then the letters. */
 async function searchStore(screen: Screen, text: string) {
-  const input = screen.getByPlaceholderText('Search for a store');
+  const input = screen.getByPlaceholderText(STORE_PLACEHOLDER);
   await fireEvent(input, 'focus');
   await fireEvent.changeText(input, text);
 }
@@ -238,6 +246,27 @@ async function fillAmount(screen: Screen, amount = '49.11') {
   await press(screen, 'Continue');
 }
 
+/** What a new receipt is still asked once it has an amount: the store and how it was paid. */
+async function answerTheRest(screen: Screen, paidWith = 'VISA ••4821') {
+  await chooseStore(screen, 'Whole', 'Whole Foods');
+  await press(screen, paidWith);
+}
+
+/** The line Save puts above its button when answers are missing. */
+const gaps = (fields: string) => `To save this receipt, fill in: ${fields}.`;
+
+/** Every string drawn on the page, top to bottom. */
+function textsInOrder(screen: Screen): string[] {
+  const out: string[] = [];
+  const walk = (node: unknown) => {
+    if (typeof node === 'string') out.push(node);
+    else if (Array.isArray(node)) node.forEach(walk);
+    else if (node && typeof node === 'object') walk((node as { children?: unknown }).children);
+  };
+  walk(screen.toJSON());
+  return out;
+}
+
 const onAmountPage = (screen: Screen) => {
   expect(screen.getByText('How much did you spend?')).toBeTruthy();
   expect(screen.getByLabelText('Continue')).toBeTruthy();
@@ -250,6 +279,13 @@ const onFinalPage = (screen: Screen) => {
 
 const isChecked = (screen: Screen, label: string) =>
   Boolean(screen.getByLabelText(label).props.accessibilityState?.checked);
+
+/** Which of a group's pills are lit. Throws on a pill that is not on the page. */
+const lit = (screen: Screen, labels: string[]) =>
+  labels.filter((label) => isChecked(screen, label));
+
+const radios = (screen: Screen) =>
+  screen.getAllByRole('radio').map((pill) => pill.props.accessibilityLabel);
 
 /** Hardware back as the system plays it: newest listener first, until one takes it. */
 type BackHandlerFn = Parameters<typeof BackHandler.addEventListener>[1];
@@ -275,6 +311,9 @@ beforeEach(() => {
   mockReceipt = { data: null, isError: false, isFetched: false };
   mockConfirm.mockResolvedValue(true);
   mockDelete.mockResolvedValue(undefined);
+  mockCreate.mockResolvedValue({ id: 'receipt-new' });
+  mockUpdate.mockResolvedValue({ id: 'receipt-1' });
+  mockUseCreate.mockImplementation(() => ({ mutateAsync: mockCreate, isPending: false }));
   backHandlers.clear();
   jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, handler) => {
     backHandlers.add(handler);
@@ -337,6 +376,8 @@ describe('Add receipt — an edit whose receipt could not be read', () => {
     expect(screen.getByLabelText('Change store, currently Greengrocer')).toBeTruthy();
     expect(screen.getByText('Filed under Other')).toBeTruthy();
     expect(screen.getByLabelText('Date, Thu Sep 10')).toBeTruthy();
+    // It was saved with no card or account, which is an answer: Skip.
+    expect(lit(screen, PAID_WITH)).toEqual(['Skip']);
     expect(screen.getByLabelText('Save changes')).toBeTruthy();
     expect(screen.queryByText('How much did you spend?')).toBeNull();
     expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
@@ -383,7 +424,7 @@ describe('Add receipt — the amount page', () => {
     expect(screen.getByLabelText('Continue')).toBeDisabled();
   });
 
-  it('Continue lands on the final page with the amount, an empty store box, and Save held back', async () => {
+  it('Continue lands on the final page with the amount, an empty store box, and nothing written', async () => {
     const screen = await render(<AddReceiptScreen />);
 
     await fillAmount(screen, '1030.5');
@@ -391,8 +432,8 @@ describe('Add receipt — the amount page', () => {
     onFinalPage(screen);
     expect(screen.queryByLabelText('Continue')).toBeNull();
     expect(screen.getByRole('button', { name: 'Amount, $1,030.50' })).toBeTruthy();
-    expect(screen.getByPlaceholderText('Search for a store')).toBeTruthy();
-    expect(screen.getByLabelText('Save receipt')).toBeDisabled();
+    expect(screen.getByPlaceholderText(STORE_PLACEHOLDER)).toBeTruthy();
+    expect(screen.getByLabelText('Save receipt')).toBeEnabled();
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
@@ -438,13 +479,21 @@ describe('Add receipt — the final page', () => {
     );
     expect(screen.getByText('Tap to edit')).toBeTruthy();
 
-    // Only the store is required, and it is a box to type in rather than a red error.
-    expect(screen.getByPlaceholderText('Search for a store')).toBeTruthy();
+    // The store is a box to type in and Paid with a set of pills: neither is a red error.
+    expect(screen.getByText('Store')).toBeTruthy();
+    expect(screen.getByPlaceholderText(STORE_PLACEHOLDER)).toBeTruthy();
+    expect(screen.queryByPlaceholderText('Search for a store')).toBeNull();
     expect(screen.queryByText('Tap to add')).toBeNull();
     expect(screen.queryByLabelText(/^Store, /)).toBeNull();
 
     expect(screen.getByLabelText('Date, Today, Wed Oct 7')).toBeTruthy();
-    expect(screen.getByLabelText('Paid with, not set, optional')).toBeTruthy();
+    expect(lit(screen, WHEN)).toEqual(['Today']);
+
+    // Required like the store, so it is not marked Optional and nothing is chosen for the person.
+    expect(screen.getByText('Paid with')).toBeTruthy();
+    expect(lit(screen, PAID_WITH)).toEqual([]);
+    expect(screen.queryByText(/optional/i)).toBeNull();
+
     expect(screen.getByLabelText('Note, not set, optional')).toBeTruthy();
     expect(screen.getByLabelText('Note, not set, optional').props.accessibilityHint).toBe(
       'Opens note to change it.',
@@ -457,31 +506,36 @@ describe('Add receipt — the final page', () => {
     expect(screen.queryByRole('progressbar')).toBeNull();
   });
 
-  it('holds Save back until there is an amount and a store', async () => {
+  it('lays the lines out in order, and opens no page for the store or how it was paid', async () => {
     const screen = await render(<AddReceiptScreen />);
     await fillAmount(screen);
-    expect(screen.getByLabelText('Save receipt')).toBeDisabled();
 
-    await chooseStore(screen, 'Whole', 'Whole Foods');
+    const texts = textsInOrder(screen);
+    const order = ['Amount', 'Store', 'Date', 'Paid with', 'Note'].map((line) =>
+      texts.indexOf(line),
+    );
+    expect(order.every((index) => index >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
 
-    expect(screen.getByLabelText('Change store, currently Whole Foods')).toBeTruthy();
-    expect(screen.getByLabelText('Save receipt')).toBeEnabled();
+    expect(radios(screen)).toEqual([...WHEN, ...PAID_WITH]);
+
+    expect(screen.queryByLabelText(/^Paid with,/)).toBeNull();
+    expect(screen.queryByText('What did you pay with?')).toBeNull();
+    expect(screen.queryByText('Not set')).toBeNull();
   });
 
-  it('draws a missing amount as a gap to fill, never $0, and holds Save back', async () => {
+  it('draws a missing amount as a gap to fill, never $0', async () => {
     mockParams = { scannedStore: 'Corner Deli', scannedRead: 'store' };
     const screen = await render(<AddReceiptScreen />);
 
     expect(screen.getByText('Tap to add the amount')).toBeTruthy();
     expect(screen.getByLabelText('Amount, needed')).toBeTruthy();
     expect(screen.queryByText(/\$0/)).toBeNull();
-    expect(screen.getByLabelText('Save receipt')).toBeDisabled();
 
     await press(screen, 'Amount, needed');
     await typeAmount(screen, '7');
     await press(screen, 'Done');
     expect(screen.getByRole('button', { name: 'Amount, $7.00' })).toBeTruthy();
-    expect(screen.getByLabelText('Save receipt')).toBeEnabled();
   });
 });
 
@@ -531,13 +585,14 @@ describe('Add receipt — the amount line', () => {
 });
 
 describe('Add receipt — the store box', () => {
-  it('is a search box in the card, not a line that opens a page', async () => {
+  it('is a box to type a name in, in the card, not a line that opens a page', async () => {
     const screen = await render(<AddReceiptScreen />);
     await fillAmount(screen);
 
     onFinalPage(screen);
     expect(screen.getByText('Store')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Search for a store')).toBeTruthy();
+    expect(screen.getByPlaceholderText(STORE_PLACEHOLDER)).toBeTruthy();
+    expect(screen.queryByPlaceholderText('Search for a store')).toBeNull();
     expect(screen.queryByLabelText(/^Store, /)).toBeNull();
     expect(screen.queryByText('Where did you buy it?')).toBeNull();
     expect(screen.queryByText('Filed under', { exact: false })).toBeNull();
@@ -555,23 +610,26 @@ describe('Add receipt — the store box', () => {
 
     onFinalPage(screen);
     expect(screen.queryByLabelText('Done')).toBeNull();
-    expect(screen.queryByPlaceholderText('Search for a store')).toBeNull();
+    expect(screen.queryByPlaceholderText(STORE_PLACEHOLDER)).toBeNull();
     expect(screen.getByLabelText('Change store, currently Whole Foods')).toBeTruthy();
     expect(screen.getByText('Filed under Groceries')).toBeTruthy();
     expect(screen.getByTestId('logo-32')).toHaveTextContent('Whole Foods|wholefoods.com');
-    expect(screen.getByLabelText('Save receipt')).toBeEnabled();
   });
 
-  it('its X clears the store: the box comes back, the category line goes, Save is held', async () => {
+  it('its X clears the store: the box comes back and the category line goes, and Save asks for it', async () => {
     const screen = await render(<AddReceiptScreen />);
     await fillAmount(screen);
     await chooseStore(screen, 'Whole', 'Whole Foods');
 
     await press(screen, 'Change store, currently Whole Foods');
 
-    expect(screen.getByPlaceholderText('Search for a store')).toBeTruthy();
+    expect(screen.getByPlaceholderText(STORE_PLACEHOLDER)).toBeTruthy();
     expect(screen.queryByText('Filed under', { exact: false })).toBeNull();
-    expect(screen.getByLabelText('Save receipt')).toBeDisabled();
+    expect(screen.getByLabelText('Save receipt')).toBeEnabled();
+
+    await press(screen, 'Save receipt');
+    expect(screen.getByText(gaps('Store, Paid with'))).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it('adds a store the catalogue does not know, filed by its name, with the logo question inline', async () => {
@@ -587,7 +645,6 @@ describe('Add receipt — the store box', () => {
     // The lookup is unsure, so there is no card, only the quiet way to add a website.
     expect(screen.getByLabelText('Add a website')).toBeTruthy();
     expect(screen.queryByLabelText('Change logo')).toBeNull();
-    expect(screen.getByLabelText('Save receipt')).toBeEnabled();
   });
 
   it('files a store the keywords cannot place under Other', async () => {
@@ -612,6 +669,155 @@ describe('Add receipt — the store box', () => {
     expect(screen.getByLabelText('Change store, currently Apple Store')).toBeTruthy();
     expect(screen.queryByText('Whole Foods')).toBeNull();
     expect(screen.getByText('Filed under Electronics')).toBeTruthy();
+  });
+});
+
+describe('Add receipt — a store typed but not picked', () => {
+  it('is not yet a chosen store: no category line until it is picked or added', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+
+    await searchStore(screen, 'Planet Fitness');
+
+    expect(screen.getByDisplayValue('Planet Fitness')).toBeTruthy();
+    expect(screen.queryByText('Filed under', { exact: false })).toBeNull();
+    expect(screen.queryByLabelText(/^Change store/)).toBeNull();
+  });
+
+  it.each([
+    ['the note', (screen: Screen) => press(screen, 'Note, not set, optional')],
+    ['the amount', (screen: Screen) => pressButton(screen, 'Amount, $49.11')],
+    ['the calendar', (screen: Screen) => press(screen, 'Pick date')],
+  ])('comes back in the box after a visit to %s', async (_page, open) => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+    await searchStore(screen, 'Town Gym');
+
+    await open(screen);
+    expect(screen.queryByPlaceholderText(STORE_PLACEHOLDER)).toBeNull();
+    await press(screen, 'Back');
+
+    onFinalPage(screen);
+    expect(screen.getByDisplayValue('Town Gym')).toBeTruthy();
+    expect(screen.queryByText('Filed under', { exact: false })).toBeNull();
+  });
+
+  it('is the store at Save: custom, with no brand, filed by the keywords in its name', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+
+    await searchStore(screen, '  Town Gym  ');
+    await press(screen, 'Skip');
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate).toHaveBeenCalledWith({
+      brand_id: null,
+      merchant: 'Town Gym',
+      amount: 49.11,
+      purchased_on: '2026-10-07',
+      category_id: 'fitness',
+      card_id: null,
+      bank_account_id: null,
+      note: null,
+      source: 'manual',
+      image_path: null,
+    });
+    expect(success).toHaveBeenCalledTimes(1);
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('is filed under Other when no keyword in it places it', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+
+    await searchStore(screen, 'Zed Zed');
+    await press(screen, 'Skip');
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: null,
+      merchant: 'Zed Zed',
+      category_id: 'other',
+    });
+  });
+
+  it('is still the store at Save after a visit to another page', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+    await searchStore(screen, 'Town Gym');
+
+    await press(screen, 'Note, not set, optional');
+    await press(screen, 'Back');
+    await press(screen, 'Skip');
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ brand_id: null, merchant: 'Town Gym' });
+  });
+
+  it('is not a store when it is only spaces', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+
+    await searchStore(screen, '   ');
+    await press(screen, 'Skip');
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByText(gaps('Store'))).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('gives way to a store that is picked from the list', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+
+    await chooseStore(screen, 'Whole', 'Whole Foods');
+    await press(screen, 'Skip');
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: 'b-wf',
+      merchant: 'Whole Foods',
+      category_id: 'groceries',
+    });
+  });
+
+  it('is forgotten when the picked store it found is let go of', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+    await chooseStore(screen, 'Whole', 'Whole Foods');
+    await press(screen, 'Skip');
+
+    await press(screen, 'Change store, currently Whole Foods');
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByPlaceholderText(STORE_PLACEHOLDER)).toBeTruthy();
+    expect(screen.getByText(gaps('Store'))).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('replaces a saved receipt’s store, once that is let go of', async () => {
+    mockParams = { id: 'receipt-1' };
+    mockReceipt = { data: GREENGROCER, isError: false, isFetched: true };
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Change store, currently Greengrocer');
+    await searchStore(screen, 'Town Gym');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate).toHaveBeenCalledWith({
+      id: 'receipt-1',
+      values: expect.objectContaining({
+        brand_id: null,
+        merchant: 'Town Gym',
+        category_id: 'fitness',
+        amount: 12.4,
+      }),
+    });
   });
 });
 
@@ -671,51 +877,128 @@ describe('Add receipt — the date line', () => {
   });
 });
 
-describe('Add receipt — the paid-with line', () => {
-  it('is not shown when there is no card or account to pick', async () => {
+describe('Add receipt — paid with', () => {
+  it('starts with nothing chosen on a new one, and offers every card and account, then Skip', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+
+    expect(screen.getByText('Paid with')).toBeTruthy();
+    expect(lit(screen, PAID_WITH)).toEqual([]);
+    expect(radios(screen).slice(WHEN.length)).toEqual(PAID_WITH);
+  });
+
+  it('chooses a card where it stands and lets the other go', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+
+    await press(screen, 'VISA ••4821');
+    expect(lit(screen, PAID_WITH)).toEqual(['VISA ••4821']);
+    await press(screen, 'Checking ••0099');
+
+    onFinalPage(screen);
+    expect(lit(screen, PAID_WITH)).toEqual(['Checking ••0099']);
+  });
+
+  it('takes Skip as an answer, which lets the cards go', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+
+    await press(screen, 'VISA ••4821');
+    await press(screen, 'Skip');
+    expect(lit(screen, PAID_WITH)).toEqual(['Skip']);
+
+    await press(screen, 'Checking ••0099');
+    expect(lit(screen, PAID_WITH)).toEqual(['Checking ••0099']);
+  });
+
+  it('cannot be taken back to unanswered: pressing the lit pill again keeps it', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+
+    await press(screen, 'VISA ••4821');
+    await press(screen, 'VISA ••4821');
+    expect(lit(screen, PAID_WITH)).toEqual(['VISA ••4821']);
+
+    await press(screen, 'Skip');
+    await press(screen, 'Skip');
+    expect(lit(screen, PAID_WITH)).toEqual(['Skip']);
+  });
+
+  it('shows just Skip when there is no card or account to pick', async () => {
     mockSources = [];
     const screen = await render(<AddReceiptScreen />);
     await fillAmount(screen);
 
     onFinalPage(screen);
-    expect(screen.queryByLabelText(/^Paid with/)).toBeNull();
-    expect(screen.getByLabelText('Note, not set, optional')).toBeTruthy();
+    expect(screen.getByText('Paid with')).toBeTruthy();
+    expect(screen.queryByLabelText('VISA ••4821')).toBeNull();
+    expect(screen.queryByLabelText('Checking ••0099')).toBeNull();
+    expect(radios(screen)).toEqual([...WHEN, 'Skip']);
+    expect(lit(screen, ['Skip'])).toEqual([]);
+
+    await press(screen, 'Skip');
+    expect(lit(screen, ['Skip'])).toEqual(['Skip']);
   });
 
-  it('Done writes the card to the line; "No card or account" clears it again', async () => {
-    const screen = await render(<AddReceiptScreen />);
-    await fillAmount(screen);
+  it('opens a saved receipt on its card, its account, or Skip when it has neither', async () => {
+    mockParams = { id: 'receipt-1' };
+    mockReceipt = { data: { ...GREENGROCER, card_id: 'card-1' }, isError: false, isFetched: true };
+    const card = await render(<AddReceiptScreen />);
+    expect(lit(card, PAID_WITH)).toEqual(['VISA ••4821']);
+    await card.unmount();
 
-    await press(screen, 'Paid with, not set, optional');
-    expect(screen.getByText('What did you pay with?')).toBeTruthy();
-    expect(screen.queryByLabelText('No card or account')).toBeNull();
-    await press(screen, 'VISA ••4821');
-    expect(isChecked(screen, 'VISA ••4821')).toBe(true);
-    await press(screen, 'Done');
+    mockReceipt = {
+      data: { ...GREENGROCER, bank_account_id: 'acct-1' },
+      isError: false,
+      isFetched: true,
+    };
+    const account = await render(<AddReceiptScreen />);
+    expect(lit(account, PAID_WITH)).toEqual(['Checking ••0099']);
+    await account.unmount();
 
-    onFinalPage(screen);
-    expect(screen.getByLabelText('Paid with, VISA ••4821')).toBeTruthy();
-
-    await press(screen, 'Paid with, VISA ••4821');
-    expect(isChecked(screen, 'VISA ••4821')).toBe(true);
-    await press(screen, 'No card or account');
-    expect(isChecked(screen, 'VISA ••4821')).toBe(false);
-    expect(screen.queryByLabelText('No card or account')).toBeNull();
-    await press(screen, 'Done');
-
-    expect(screen.getByLabelText('Paid with, not set, optional')).toBeTruthy();
+    mockReceipt = { data: GREENGROCER, isError: false, isFetched: true };
+    const neither = await render(<AddReceiptScreen />);
+    expect(lit(neither, PAID_WITH)).toEqual(['Skip']);
   });
 
-  it('Back leaves the card as it was', async () => {
+  it('keeps the answer through a visit to another page', async () => {
     const screen = await render(<AddReceiptScreen />);
     await fillAmount(screen);
-
-    await press(screen, 'Paid with, not set, optional');
     await press(screen, 'Checking ••0099');
+
+    await press(screen, 'Note, not set, optional');
+    await press(screen, 'Back');
+    expect(lit(screen, PAID_WITH)).toEqual(['Checking ••0099']);
+
+    await pressButton(screen, 'Amount, $49.11');
+    await press(screen, 'Back');
+    expect(lit(screen, PAID_WITH)).toEqual(['Checking ••0099']);
+  });
+
+  it('keeps Skip through a visit to another page, as an answer and not as nothing', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+    await press(screen, 'Skip');
+
+    await press(screen, 'Pick date');
     await press(screen, 'Back');
 
-    onFinalPage(screen);
-    expect(screen.getByLabelText('Paid with, not set, optional')).toBeTruthy();
+    expect(lit(screen, PAID_WITH)).toEqual(['Skip']);
+  });
+
+  it.each([
+    ['a card', 'VISA ••4821', { card_id: 'card-1', bank_account_id: null }],
+    ['an account', 'Checking ••0099', { card_id: null, bank_account_id: 'acct-1' }],
+    ['Skip', 'Skip', { card_id: null, bank_account_id: null }],
+  ])('saves %s under its own column', async (_what, pill, columns) => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+
+    await answerTheRest(screen, pill);
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject(columns);
   });
 });
 
@@ -871,6 +1154,249 @@ describe('Add receipt — Back from the final page', () => {
   });
 });
 
+describe('Add receipt — Save with gaps', () => {
+  it('is never greyed out for a missing answer', async () => {
+    const screen = await render(<AddReceiptScreen />);
+
+    await fillAmount(screen);
+
+    expect(screen.getByLabelText('Save receipt')).toBeEnabled();
+  });
+
+  it('names every gap in the order of the page and writes nothing', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByText(gaps('Store, Paid with'))).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(success).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    onFinalPage(screen);
+  });
+
+  it('names all three when nothing at all was brought', async () => {
+    mockParams = { from: 'voice', scannedVia: 'voice' };
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByText(gaps('Amount, Store, Paid with'))).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+  });
+
+  const WHOLE = {
+    from: 'voice',
+    scannedVia: 'voice',
+    scannedStore: 'Corner Deli',
+    scannedAmount: '12.50',
+    scannedSource: 'card-1',
+  };
+  const without = (key: keyof typeof WHOLE) =>
+    Object.fromEntries(Object.entries(WHOLE).filter(([name]) => name !== key));
+
+  it.each([
+    [
+      'Amount',
+      'scannedAmount',
+      async (screen: Screen) => {
+        await pressButton(screen, 'Amount, needed');
+        await typeAmount(screen, '12.5');
+        await press(screen, 'Done');
+      },
+    ],
+    [
+      'Store',
+      'scannedStore',
+      async (screen: Screen) => {
+        await chooseStore(screen, 'Whole', 'Whole Foods');
+      },
+    ],
+    [
+      'Paid with',
+      'scannedSource',
+      async (screen: Screen) => {
+        await press(screen, 'Skip');
+      },
+    ],
+  ] as const)(
+    'names only %s when that is all that is left, and saves once it is given',
+    async (field, omit, give) => {
+      mockParams = without(omit);
+      const screen = await render(<AddReceiptScreen />);
+
+      await press(screen, 'Save receipt');
+      expect(screen.getByText(gaps(field))).toBeTruthy();
+      expect(mockCreate).not.toHaveBeenCalled();
+
+      await give(screen);
+      await press(screen, 'Save receipt');
+
+      await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+      expect(screen.queryByText(/^To save this receipt/)).toBeNull();
+      expect(router.dismissTo).toHaveBeenCalledWith('/home');
+    },
+  );
+
+  const inlineChanges: [string, (screen: Screen) => Promise<unknown>][] = [
+    ['typing in the store box', (screen) => searchStore(screen, 'Gym')],
+    ['picking a store from the list', (screen) => chooseStore(screen, 'Whole', 'Whole Foods')],
+    ['picking a card', (screen) => press(screen, 'VISA ••4821')],
+    ['picking Skip', (screen) => press(screen, 'Skip')],
+    ['a date chip', (screen) => press(screen, 'Yesterday')],
+  ];
+
+  it.each(inlineChanges)(
+    'goes away with %s, however much is still missing',
+    async (_what, change) => {
+      const screen = await render(<AddReceiptScreen />);
+      await fillAmount(screen);
+      await press(screen, 'Save receipt');
+      expect(screen.getByText(/^To save this receipt/)).toBeTruthy();
+
+      await change(screen);
+
+      expect(screen.queryByText(/^To save this receipt/)).toBeNull();
+      expect(mockCreate).not.toHaveBeenCalled();
+    },
+  );
+
+  it('goes away with a pick from a list that was already showing when Save was pressed', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+    await searchStore(screen, 'Whole');
+    expect(await screen.findByLabelText('Whole Foods')).toBeTruthy();
+    await press(screen, 'Save receipt');
+    expect(screen.getByText(gaps('Paid with'))).toBeTruthy();
+
+    await press(screen, 'Whole Foods');
+
+    expect(screen.queryByText(/^To save this receipt/)).toBeNull();
+    expect(screen.getByLabelText('Change store, currently Whole Foods')).toBeTruthy();
+  });
+
+  it('goes away when the picked store is taken off', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+    await chooseStore(screen, 'Whole', 'Whole Foods');
+    await press(screen, 'Save receipt');
+    expect(screen.getByText(gaps('Paid with'))).toBeTruthy();
+
+    await press(screen, 'Change store, currently Whole Foods');
+
+    expect(screen.queryByText(/^To save this receipt/)).toBeNull();
+  });
+
+  it.each([
+    ['the note', (screen: Screen) => press(screen, 'Note, not set, optional')],
+    ['the amount', (screen: Screen) => pressButton(screen, 'Amount, $49.11')],
+    ['the calendar', (screen: Screen) => press(screen, 'Pick date')],
+  ])(
+    'goes away when %s page keeps something, and stays when it is left with Back',
+    async (_page, open) => {
+      const screen = await render(<AddReceiptScreen />);
+      await fillAmount(screen);
+      await press(screen, 'Save receipt');
+
+      await open(screen);
+      await press(screen, 'Back');
+      expect(screen.getByText(/^To save this receipt/)).toBeTruthy();
+
+      await open(screen);
+      await press(screen, 'Done');
+      expect(screen.queryByText(/^To save this receipt/)).toBeNull();
+    },
+  );
+
+  it('does not follow the person back to the amount page', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+    await press(screen, 'Save receipt');
+
+    await press(screen, 'Back');
+
+    onAmountPage(screen);
+    expect(screen.queryByText(/^To save this receipt/)).toBeNull();
+    await press(screen, 'Continue');
+    expect(screen.queryByText(/^To save this receipt/)).toBeNull();
+  });
+
+  it('is said again on the next press, naming only what is still missing', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await fillAmount(screen);
+    await press(screen, 'Save receipt');
+    await press(screen, 'Save receipt');
+    expect(screen.getAllByText(/^To save this receipt/)).toHaveLength(1);
+
+    await searchStore(screen, 'Gym');
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByText(gaps('Paid with'))).toBeTruthy();
+  });
+
+  it('asks again for an amount that is zero on a saved receipt', async () => {
+    mockParams = { id: 'receipt-1' };
+    mockReceipt = { data: { ...GREENGROCER, amount: 0 }, isError: false, isFetched: true };
+    const screen = await render(<AddReceiptScreen />);
+    expect(screen.getByLabelText('Amount, needed')).toBeTruthy();
+
+    await press(screen, 'Save changes');
+
+    expect(screen.getByText(gaps('Amount'))).toBeTruthy();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('asks again for the store of a saved receipt once it is let go of', async () => {
+    mockParams = { id: 'receipt-1' };
+    mockReceipt = { data: GREENGROCER, isError: false, isFetched: true };
+    const screen = await render(<AddReceiptScreen />);
+    await press(screen, 'Change store, currently Greengrocer');
+
+    await press(screen, 'Save changes');
+
+    expect(screen.getByText(gaps('Store'))).toBeTruthy();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('lets a saved receipt save as it stands, with no line', async () => {
+    mockParams = { id: 'receipt-1' };
+    mockReceipt = { data: GREENGROCER, isError: false, isFetched: true };
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate).toHaveBeenCalledWith({
+      id: 'receipt-1',
+      values: expect.objectContaining({
+        brand_id: null,
+        merchant: 'Greengrocer',
+        amount: 12.4,
+        purchased_on: '2026-09-10',
+        card_id: null,
+        bank_account_id: null,
+      }),
+    });
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(screen.queryByText(/^To save this receipt/)).toBeNull();
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('greys Save out only while it is saving', async () => {
+    mockUseCreate.mockImplementation(() => ({ mutateAsync: mockCreate, isPending: true }));
+    const screen = await render(<AddReceiptScreen />);
+
+    await fillAmount(screen);
+
+    expect(screen.getByLabelText('Saving…')).toBeDisabled();
+    expect(screen.queryByLabelText('Save receipt')).toBeNull();
+  });
+});
+
 describe('Add receipt — deleting a saved receipt', () => {
   beforeEach(() => {
     mockParams = { id: 'receipt-1' };
@@ -933,7 +1459,7 @@ describe('Add receipt — the final page keeps its place', () => {
     expect(scroller(screen).props.contentOffset).toEqual({ x: 0, y: 0 });
 
     await scrollTo(screen, 380);
-    await press(screen, 'Paid with, not set, optional');
+    await press(screen, 'Note, not set, optional');
     expect(screen.queryByText('You can edit this later.')).toBeNull();
     await press(screen, 'Back');
     onFinalPage(screen);

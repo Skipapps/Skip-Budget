@@ -62,6 +62,8 @@ type BrandFieldProps = {
   changeLabel?: (name: string) => string;
   /** What the add-unknown row says, when it is not a store. */
   addLabel?: (name: string) => string;
+  /** Each change to what is typed in the box, and '' when it is emptied. */
+  onQueryChange?: (query: string) => void;
 };
 
 /** Keystrokes are cheap; round trips are not. */
@@ -94,6 +96,7 @@ export function BrandField({
   onChangeLogo,
   changeLabel = (name) => t('settings.store.change', { name }),
   addLabel = (name) => t('settings.store.addAs', { name }),
+  onQueryChange,
 }: BrandFieldProps) {
   const colors = useColors();
   const [query, setQuery] = useState(initialQuery);
@@ -178,6 +181,7 @@ export function BrandField({
   const clear = () => {
     onChange(null);
     setQuery('');
+    onQueryChange?.('');
     setConfirming(false);
   };
 
@@ -250,7 +254,10 @@ export function BrandField({
       >
         <TextInput
           value={query}
-          onChangeText={setQuery}
+          onChangeText={(text) => {
+            setQuery(text);
+            onQueryChange?.(text);
+          }}
           placeholder={placeholder}
           placeholderTextColor={colors.muted}
           onFocus={() => setFocused(true)}

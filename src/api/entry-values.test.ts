@@ -2,7 +2,6 @@ import {
   buildBillValues,
   buildReceiptValues,
   buildSubscriptionValues,
-  defaultBillName,
   type BillInput,
   type ReceiptInput,
   type SubscriptionInput,
@@ -334,17 +333,6 @@ describe('buildSubscriptionValues', () => {
       field: 'amount',
       message: 'Enter what it costs.',
     });
-  });
-});
-
-describe('defaultBillName', () => {
-  const COMCAST = { brandId: 'b-cc', name: 'Comcast', domain: 'comcast.com', categoryId: 'x' };
-
-  it('is the company, else the category label, else nothing for Other', () => {
-    expect(defaultBillName('internet', 'Internet', COMCAST)).toBe('Comcast');
-    expect(defaultBillName('internet', 'Internet', null)).toBe('Internet');
-    expect(defaultBillName('other', 'Other bill', null)).toBe('');
-    expect(defaultBillName('other', 'Other bill', COMCAST)).toBe('Comcast');
   });
 });
 

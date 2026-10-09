@@ -9,13 +9,11 @@ import { warn } from '@/lib/haptics';
 import { clearVoiceDraft } from '@/lib/voice-draft';
 
 /**
- * Golden: exactly what the receipt form's Save writes. Pins the object handed to create/update, the
- * words of the checks inside Save, and where each kind of save goes afterwards.
+ * Golden: exactly what the receipt form's Save writes. Pins the object handed to create/update, what
+ * Save refuses and says while the page has gaps, and where each kind of save goes afterwards.
  *
- * The pages are the real ones, walked the way a person walks them (keypad, store search, calendar,
- * card tiles, note); only the network and the logo images are replaced. The one exception is the
- * primary button, a stub that accepts a press even while disabled: the only way to reach the checks
- * inside Save, which the final page normally holds back. It still reports its disabled state.
+ * The pages are the real ones, walked the way a person walks them (keypad, store box, day chips and
+ * calendar, Paid with pills, note); only the network and the logo images are replaced.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -35,30 +33,6 @@ jest.mock('@/lib/voice-draft', () => ({
   ...jest.requireActual('@/lib/voice-draft'),
   clearVoiceDraft: jest.fn(),
 }));
-
-jest.mock('@/components/ui/button', () => {
-  const { Pressable, Text } = jest.requireActual('react-native');
-  return {
-    Button: ({
-      label,
-      onPress,
-      disabled,
-    }: {
-      label: string;
-      onPress: () => void;
-      disabled?: boolean;
-    }) => (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityState={{ disabled: Boolean(disabled) }}
-        onPress={onPress}
-      >
-        <Text>{label}</Text>
-      </Pressable>
-    ),
-  };
-});
 
 // The logo a mark drew, readable as text: "Corner Deli|cornerdeli.com", or "Corner Deli|" for letters.
 jest.mock('@/components/brands/brand-logo', () => {
@@ -198,9 +172,11 @@ let mockSources = [
 ];
 
 let mockReceipt: { data: unknown; isError: boolean; isFetched: boolean };
+// A refused scan counts the month again; this is that read starting over.
+const mockRecount = jest.fn();
 jest.mock('@/api/queries', () => ({
   // This month's receipts, which the free scan and upload allowances count.
-  useReceipts: () => ({ data: [], isFetched: true, isError: false }),
+  useReceipts: () => ({ data: [], isFetched: true, isError: false, refetch: mockRecount }),
   useReceipt: () => ({ ...mockReceipt, refetch: jest.fn() }),
   usePaymentSources: () => ({ sources: mockSources }),
 }));
@@ -253,9 +229,14 @@ async function typeAmount(screen: Screen, digits: string) {
   for (const key of digits) await press(screen, key === '.' ? 'Decimal point' : key);
 }
 
+const STORE_PLACEHOLDER = 'Enter the store name';
+
+/** The button that lets go of the chosen store. */
+const changeStore = (name: string) => `Change store, currently ${name}`;
+
 /** Types into the store box on the final page the way a finger does: a tap into it, then the letters. */
 async function searchStore(screen: Screen, text: string) {
-  const input = screen.getByPlaceholderText('Search for a store');
+  const input = screen.getByPlaceholderText(STORE_PLACEHOLDER);
   await fireEvent(input, 'focus');
   await fireEvent.changeText(input, text);
 }
@@ -286,7 +267,38 @@ async function typedReceipt(screen: Screen, amount: string) {
   await press(screen, 'Continue');
 }
 
+/**
+ * A new Whole Foods receipt at the amount typed, answered all the way through and ready to Save.
+ * `paidWith` is the pill pressed; null leaves the question open on purpose.
+ */
+async function readyReceipt(screen: Screen, amount: string, paidWith: string | null = 'Skip') {
+  await typedReceipt(screen, amount);
+  await chooseStore(screen, 'Whole', 'Whole Foods');
+  if (paidWith !== null) await press(screen, paidWith);
+}
+
+const MISSING = (fields: string) => `To save this receipt, fill in: ${fields}.`;
+const ANY_MISSING = /^To save this receipt, fill in:/;
+
+/** Save was refused: nothing was written, and the form did not close. */
+function expectNothingWritten() {
+  expect(mockCreate).not.toHaveBeenCalled();
+  expect(mockUpdate).not.toHaveBeenCalled();
+  expect(router.back).not.toHaveBeenCalled();
+  expect(router.dismissTo).not.toHaveBeenCalled();
+  expect(clearVoiceDraft).not.toHaveBeenCalled();
+}
+
 const NOTE_PLACEHOLDER = 'Anything worth remembering';
+
+/** Opens the note page on a row with no note, types one and keeps it. */
+async function keepNote(screen: Screen, text: string) {
+  await press(screen, 'Note, not set, optional');
+  await fireEvent.changeText(screen.getByPlaceholderText(NOTE_PLACEHOLDER), text);
+  await press(screen, 'Done');
+}
+
+const PILLS = ['VISA ••4421', 'Checking ••0099', 'Skip'];
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -316,12 +328,8 @@ describe('Add receipt — what a new receipt saves', () => {
 
     await typedReceipt(screen, '1030.5');
     await chooseStore(screen, 'Whole', 'Whole Foods');
-    await press(screen, 'Paid with, not set, optional');
     await press(screen, 'Checking ••0099');
-    await press(screen, 'Done');
-    await press(screen, 'Note, not set, optional');
-    await fireEvent.changeText(screen.getByPlaceholderText(NOTE_PLACEHOLDER), '  Weekly shop  ');
-    await press(screen, 'Done');
+    await keepNote(screen, '  Weekly shop  ');
     await pickDay(screen, 'Monday 28 September 2026', true);
     await press(screen, 'Save receipt');
 
@@ -344,14 +352,13 @@ describe('Add receipt — what a new receipt saves', () => {
     expect(clearVoiceDraft).not.toHaveBeenCalled();
   });
 
-  it('fills the gaps with today, no source and no note', async () => {
+  it('files today and no note when neither was given, and Skip as the source', async () => {
     const screen = await render(<AddReceiptScreen />);
 
     await typedReceipt(screen, '0.10');
     await addStore(screen, 'Corner Deli');
-    await press(screen, 'Note, not set, optional');
-    await fireEvent.changeText(screen.getByPlaceholderText(NOTE_PLACEHOLDER), '   ');
-    await press(screen, 'Done');
+    await press(screen, 'Skip');
+    await keepNote(screen, '   ');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -370,59 +377,16 @@ describe('Add receipt — what a new receipt saves', () => {
     });
   });
 
-  it('files a store the keywords cannot place under Other', async () => {
-    const screen = await render(<AddReceiptScreen />);
-
-    await typedReceipt(screen, '8');
-    await addStore(screen, 'Zed Zed');
-    await press(screen, 'Save receipt');
-
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    expect(mockCreate.mock.calls[0][0]).toMatchObject({
-      brand_id: null,
-      merchant: 'Zed Zed',
-      category_id: 'other',
-    });
-  });
-
-  it('files a card under card_id and a source that is no longer there under neither', async () => {
-    const screen = await render(<AddReceiptScreen />);
-
-    await typedReceipt(screen, '15.99');
-    await chooseStore(screen, 'Whole', 'Whole Foods');
-    await press(screen, 'Paid with, not set, optional');
-    await press(screen, 'VISA ••4421');
-    await press(screen, 'Done');
-    await pickDay(screen, 'Thursday 1 October 2026');
-    await press(screen, 'Save receipt');
-
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    expect(mockCreate.mock.calls[0][0]).toMatchObject({
-      amount: 15.99,
-      purchased_on: '2026-10-01',
-      card_id: 'card-1',
-      bank_account_id: null,
-    });
-
-    // The card is deleted while the form is open: the choice no longer names anything.
-    mockCreate.mockClear();
-    mockSources = mockSources.filter((source) => source.id !== 'card-1');
-    await screen.rerender(<AddReceiptScreen />);
-    expect(screen.getByLabelText('Paid with, not set, optional')).toBeTruthy();
-    await press(screen, 'Save receipt');
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    expect(mockCreate.mock.calls[0][0]).toMatchObject({ card_id: null, bank_account_id: null });
-  });
-
   it.each([
     ['1100', 1100],
     ['15.99', 15.99],
     ['0.10', 0.1],
+    ['0.01', 0.01],
+    ['999.99', 999.99],
     ['1030.5', 1030.5],
   ])('saves a typed %s as exactly %p dollars', async (typed, saved) => {
     const screen = await render(<AddReceiptScreen />);
-    await typedReceipt(screen, typed);
-    await chooseStore(screen, 'Whole', 'Whole Foods');
+    await readyReceipt(screen, typed);
     await press(screen, 'Save receipt');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0].amount).toBe(saved);
@@ -430,8 +394,7 @@ describe('Add receipt — what a new receipt saves', () => {
 
   it('saves the amount as corrected on the amount line, not as first typed', async () => {
     const screen = await render(<AddReceiptScreen />);
-    await typedReceipt(screen, '49.11');
-    await chooseStore(screen, 'Whole', 'Whole Foods');
+    await readyReceipt(screen, '49.11');
 
     await pressButton(screen, 'Amount, $49.11');
     for (let i = 0; i < 5; i += 1) await press(screen, 'Delete last digit');
@@ -445,14 +408,211 @@ describe('Add receipt — what a new receipt saves', () => {
 
   it('saves the day a chip set, in one tap', async () => {
     const screen = await render(<AddReceiptScreen />);
-    await typedReceipt(screen, '12');
-    await chooseStore(screen, 'Whole', 'Whole Foods');
+    await readyReceipt(screen, '12');
 
     await press(screen, 'Yesterday');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0].purchased_on).toBe('2026-10-06');
+  });
+
+  it('comes back to today with the Today chip', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '12');
+
+    await press(screen, 'Yesterday');
+    await press(screen, 'Today');
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0].purchased_on).toBe('2026-10-07');
+  });
+});
+
+describe('Add receipt — what Paid with saves', () => {
+  it.each([
+    ['a card', 'VISA ••4421', { card_id: 'card-1', bank_account_id: null }],
+    ['an account', 'Checking ••0099', { card_id: null, bank_account_id: 'acct-1' }],
+    ['Skip', 'Skip', { card_id: null, bank_account_id: null }],
+  ])('files %s under its own column and the other under none', async (_name, pill, columns) => {
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99', pill);
+
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ amount: 15.99, ...columns });
+  });
+
+  it('keeps only the last pill pressed, never a card and an account together', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99', 'VISA ••4421');
+
+    await press(screen, 'Checking ••0099');
+    expect(screen.getByLabelText('Checking ••0099')).toBeSelected();
+    expect(screen.getByLabelText('VISA ••4421')).not.toBeSelected();
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      card_id: null,
+      bank_account_id: 'acct-1',
+    });
+  });
+
+  it('lets Skip take back a card, and a card take back Skip', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99', 'VISA ••4421');
+
+    await press(screen, 'Skip');
+    expect(screen.getByLabelText('Skip')).toBeSelected();
+    expect(screen.getByLabelText('VISA ••4421')).not.toBeSelected();
+    await press(screen, 'Save receipt');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ card_id: null, bank_account_id: null });
+
+    mockCreate.mockClear();
+    await press(screen, 'VISA ••4421');
+    expect(screen.getByLabelText('Skip')).not.toBeSelected();
+    await press(screen, 'Save receipt');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ card_id: 'card-1', bank_account_id: null });
+  });
+
+  it('files a card deleted while the form is open under neither, and does not hold Save back', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99', 'VISA ••4421');
+
+    mockSources = mockSources.filter((source) => source.id !== 'card-1');
+    await screen.rerender(<AddReceiptScreen />);
+    expect(screen.queryByLabelText('VISA ••4421')).toBeNull();
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ card_id: null, bank_account_id: null });
+  });
+
+  it('offers Skip alone when there is no card or account, and it answers the question', async () => {
+    mockSources = [];
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99', null);
+
+    expect(screen.queryByLabelText('VISA ••4421')).toBeNull();
+    expect(screen.queryByLabelText('Checking ••0099')).toBeNull();
+    expect(screen.getByLabelText('Skip')).not.toBeSelected();
+    await press(screen, 'Skip');
+    expect(screen.getByLabelText('Skip')).toBeSelected();
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ card_id: null, bank_account_id: null });
+  });
+});
+
+describe('Add receipt — the store box', () => {
+  it('saves a catalogue store with its brand, its category and the name picked, not the letters typed', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99');
+
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    const values = mockCreate.mock.calls[0][0];
+    expect(values).toMatchObject({
+      brand_id: 'b-wf',
+      merchant: 'Whole Foods',
+      category_id: 'groceries',
+    });
+    expect(values).not.toHaveProperty('logo_domain');
+    expect(values).not.toHaveProperty('logo_hidden');
+  });
+
+  it('saves a store typed but not picked under its own name, with no brand and a guessed category', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await typedReceipt(screen, '12.5');
+
+    await searchStore(screen, 'Corner Deli');
+    await press(screen, 'Skip');
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    const values = mockCreate.mock.calls[0][0];
+    expect(values).toMatchObject({
+      brand_id: null,
+      merchant: 'Corner Deli',
+      amount: 12.5,
+      category_id: 'dining',
+    });
+    expect(values).not.toHaveProperty('logo_domain');
+    expect(values).not.toHaveProperty('logo_hidden');
+  });
+
+  it('trims what was typed, and files it under Other when no keyword fits', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await typedReceipt(screen, '8');
+
+    await searchStore(screen, '  Zed Zed ');
+    await press(screen, 'Skip');
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: null,
+      merchant: 'Zed Zed',
+      category_id: 'other',
+    });
+  });
+
+  // Only a tap on the result ties a store to the catalogue; the letters alone are a custom store.
+  it('does not turn a name typed in full into the catalogue brand unless it is picked', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await typedReceipt(screen, '8');
+
+    await searchStore(screen, 'Whole Foods');
+    await press(screen, 'Skip');
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: null,
+      merchant: 'Whole Foods',
+      category_id: 'groceries',
+    });
+  });
+
+  it('files a store added from the box’s own row, with a name no keyword fits, under Other', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await typedReceipt(screen, '8');
+    await addStore(screen, 'Zed Zed');
+    await press(screen, 'Skip');
+
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: null,
+      merchant: 'Zed Zed',
+      category_id: 'other',
+    });
+  });
+
+  it('still names the store after a visit to the note page, and saves it', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await typedReceipt(screen, '12.5');
+    await searchStore(screen, 'Corner Deli');
+    await press(screen, 'Skip');
+
+    await keepNote(screen, 'Lunch');
+    expect(screen.getByDisplayValue('Corner Deli')).toBeTruthy();
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: null,
+      merchant: 'Corner Deli',
+      note: 'Lunch',
+    });
   });
 });
 
@@ -471,6 +631,8 @@ describe('Add receipt — a scan that arrives as route params', () => {
     const screen = await render(<AddReceiptScreen />);
 
     expect(screen.getByText('Read the store, amount, date and card.')).toBeTruthy();
+    // The card the scan matched is already lit.
+    expect(screen.getByLabelText('VISA ••4421')).toBeSelected();
 
     // Opens on the final page: only review and save.
     await press(screen, 'Save receipt');
@@ -491,10 +653,11 @@ describe('Add receipt — a scan that arrives as route params', () => {
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to no brand, Other and today for what a scan did not carry', async () => {
+  it('falls back to no brand, Other and today for what a scan did not carry, once Paid with is answered', async () => {
     mockParams = { scannedStore: 'Corner Deli', scannedAmount: '1100' };
     const screen = await render(<AddReceiptScreen />);
 
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -512,6 +675,31 @@ describe('Add receipt — a scan that arrives as route params', () => {
     });
   });
 
+  it('leaves Paid with open when the scan found no card, and saves as a scan once it is answered', async () => {
+    mockParams = {
+      scannedStore: 'Corner Deli',
+      scannedAmount: '12.5',
+      scannedRead: 'store,amount',
+    };
+    const screen = await render(<AddReceiptScreen />);
+    for (const pill of PILLS) expect(screen.getByLabelText(pill)).not.toBeSelected();
+
+    await press(screen, 'Save receipt');
+    expect(screen.getByText(MISSING('Paid with'))).toBeTruthy();
+    expectNothingWritten();
+
+    await press(screen, 'Checking ••0099');
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      amount: 12.5,
+      card_id: null,
+      bank_account_id: 'acct-1',
+      source: 'scan',
+    });
+  });
+
   it('saves the correction made on the final page, still as a scan', async () => {
     mockParams = {
       scannedStore: 'Corner Deli',
@@ -522,6 +710,7 @@ describe('Add receipt — a scan that arrives as route params', () => {
     const screen = await render(<AddReceiptScreen />);
 
     await press(screen, 'Yesterday');
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -551,6 +740,7 @@ describe('Add receipt — a voice hand-off', () => {
 
     // The camera's "Read the…" report is not for something that was spoken.
     expect(screen.queryByText(/^Read the/)).toBeNull();
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
@@ -570,11 +760,38 @@ describe('Add receipt — a voice hand-off', () => {
     expect(router.back).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['a card', 'card-1', 'VISA ••4421', { card_id: 'card-1', bank_account_id: null }],
+    ['an account', 'acct-1', 'Checking ••0099', { card_id: null, bank_account_id: 'acct-1' }],
+  ])('opens with %s it heard lit, and saves it', async (_name, heard, pill, columns) => {
+    mockParams = { ...HEARD, scannedSource: heard };
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(screen.getByLabelText(pill)).toBeSelected();
+    expect(screen.getByLabelText('Skip')).not.toBeSelected();
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ source: 'voice', ...columns });
+  });
+
+  it('leaves Paid with to answer when no card was heard, and keeps what was said until it is saved', async () => {
+    mockParams = HEARD;
+    const screen = await render(<AddReceiptScreen />);
+    for (const pill of PILLS) expect(screen.getByLabelText(pill)).not.toBeSelected();
+
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByText(MISSING('Paid with'))).toBeTruthy();
+    expectNothingWritten();
+  });
+
   it('carries the note typed on the review page into the form and the saved row', async () => {
     mockParams = { ...HEARD, scannedNote: 'Lunch with Sam' };
     const screen = await render(<AddReceiptScreen />);
 
     expect(screen.getByLabelText('Note, Lunch with Sam')).toBeTruthy();
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -592,7 +809,7 @@ describe('Add receipt — a voice hand-off', () => {
     };
     const screen = await render(<AddReceiptScreen />);
 
-    expect(screen.getByLabelText('Change store, currently Planet Fitness')).toBeTruthy();
+    expect(screen.getByLabelText(changeStore('Planet Fitness'))).toBeTruthy();
     expect(screen.getByTestId('logo-32')).toHaveTextContent('Planet Fitness|planetfitness.com');
     expect(screen.queryByLabelText(LOGO_COPY.yes)).toBeNull();
     expect(screen.queryByLabelText(LOGO_COPY.changeLogo)).toBeNull();
@@ -609,6 +826,7 @@ describe('Add receipt — a voice hand-off', () => {
     };
     const screen = await render(<AddReceiptScreen />);
 
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -626,6 +844,7 @@ describe('Add receipt — a voice hand-off', () => {
     mockParams = HEARD;
     const screen = await render(<AddReceiptScreen />);
 
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
@@ -636,13 +855,19 @@ describe('Add receipt — a voice hand-off', () => {
 });
 
 describe('Add receipt — what an edit saves', () => {
-  it('writes the row back as it was, keeping how it was captured', async () => {
+  beforeEach(() => {
     mockParams = { id: 'receipt-1' };
     mockReceipt = { data: EXISTING, isError: false, isFetched: true };
+  });
+
+  it('writes the row back as it was: its account, how it was captured, and no logo columns', async () => {
     const screen = await render(<AddReceiptScreen />);
 
-    // Opens on the final page, already filled in: Save is the first thing to press.
+    // Opens on the final page, already answered: Save is the first thing to press.
     expect(screen.getByLabelText('Save changes')).toBeEnabled();
+    expect(screen.getByLabelText('Checking ••0099')).toBeSelected();
+    expect(screen.getByLabelText('VISA ••4421')).not.toBeSelected();
+    expect(screen.getByLabelText('Skip')).not.toBeSelected();
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
@@ -663,10 +888,49 @@ describe('Add receipt — what an edit saves', () => {
         image_path: null,
       },
     });
+    expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_domain');
+    expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_hidden');
   });
 
-  it('moves the receipt from an account to a card without touching its source', async () => {
-    mockParams = { id: 'receipt-1' };
+  it('keeps a card as its card', async () => {
+    mockReceipt = {
+      data: { ...EXISTING, card_id: 'card-1', bank_account_id: null },
+      isError: false,
+      isFetched: true,
+    };
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(screen.getByLabelText('VISA ••4421')).toBeSelected();
+    expect(screen.getByLabelText('Skip')).not.toBeSelected();
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    const { values } = mockUpdate.mock.calls[0][0];
+    expect(values).toMatchObject({ card_id: 'card-1', bank_account_id: null, source: 'upload' });
+    expect(values).not.toHaveProperty('logo_domain');
+    expect(values).not.toHaveProperty('logo_hidden');
+  });
+
+  it('shows a row with no card or account on Skip and saves it that way', async () => {
+    mockReceipt = {
+      data: { ...EXISTING, bank_account_id: null },
+      isError: false,
+      isFetched: true,
+    };
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(screen.getByLabelText('Skip')).toBeSelected();
+    expect(screen.getByLabelText('Checking ••0099')).not.toBeSelected();
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    const { values } = mockUpdate.mock.calls[0][0];
+    expect(values).toMatchObject({ card_id: null, bank_account_id: null });
+    expect(values).not.toHaveProperty('logo_domain');
+    expect(values).not.toHaveProperty('logo_hidden');
+  });
+
+  it('moves the receipt from an account to a card without touching its source or its logo', async () => {
     mockReceipt = { data: { ...EXISTING, source: 'scan' }, isError: false, isFetched: true };
     const screen = await render(<AddReceiptScreen />);
 
@@ -675,9 +939,7 @@ describe('Add receipt — what an edit saves', () => {
     await typeAmount(screen, '1030.5');
     await press(screen, 'Done');
 
-    await press(screen, 'Paid with, Checking ••0099');
     await press(screen, 'VISA ••4421');
-    await press(screen, 'Done');
 
     await press(screen, 'Note, AppleCare');
     await fireEvent.changeText(screen.getByPlaceholderText(NOTE_PLACEHOLDER), '');
@@ -686,23 +948,22 @@ describe('Add receipt — what an edit saves', () => {
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
-    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+    const { values } = mockUpdate.mock.calls[0][0];
+    expect(values).toMatchObject({
       amount: 1030.5,
       card_id: 'card-1',
       bank_account_id: null,
       note: null,
       source: 'scan',
     });
+    expect(values).not.toHaveProperty('logo_domain');
+    expect(values).not.toHaveProperty('logo_hidden');
   });
 
-  it('clears the card with "No card or account"', async () => {
-    mockParams = { id: 'receipt-1' };
-    mockReceipt = { data: EXISTING, isError: false, isFetched: true };
+  it('takes the account off with Skip', async () => {
     const screen = await render(<AddReceiptScreen />);
 
-    await press(screen, 'Paid with, Checking ••0099');
-    await press(screen, 'No card or account');
-    await press(screen, 'Done');
+    await press(screen, 'Skip');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
@@ -713,8 +974,6 @@ describe('Add receipt — what an edit saves', () => {
   });
 
   it('saves nothing from a page that was left with Back', async () => {
-    mockParams = { id: 'receipt-1' };
-    mockReceipt = { data: EXISTING, isError: false, isFetched: true };
     const screen = await render(<AddReceiptScreen />);
 
     await pressButton(screen, 'Amount, $1,100.00');
@@ -731,62 +990,225 @@ describe('Add receipt — what an edit saves', () => {
   });
 });
 
-describe('Add receipt — the checks inside Save', () => {
-  it('asks for the store before the amount, and says so on the final page', async () => {
-    mockParams = { scannedRead: 'date', scannedDate: '2026-09-28' };
+describe('Add receipt — Save with gaps', () => {
+  // What a hand-off can give the final page, one answer at a time.
+  const GIVEN = {
+    amount: { scannedAmount: '12.5' },
+    store: { scannedStore: 'Corner Deli' },
+    paidWith: { scannedSource: 'card-1' },
+  };
+
+  it('says what is still open, writes nothing, and stays on the page with Save ready', async () => {
     const screen = await render(<AddReceiptScreen />);
-    expect(screen.getByLabelText('Save receipt')).toBeDisabled();
+    await typedReceipt(screen, '15.99');
+    for (const pill of PILLS) expect(screen.getByLabelText(pill)).not.toBeSelected();
 
     await press(screen, 'Save receipt');
 
-    expect(screen.getByText('Pick a store first.')).toBeTruthy();
+    expect(screen.getByText(MISSING('Store, Paid with'))).toBeTruthy();
     expect(screen.getByText('You can edit this later.')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Search for a store')).toBeTruthy();
+    expect(screen.getByPlaceholderText(STORE_PLACEHOLDER)).toBeTruthy();
+    expect(screen.getByLabelText('Save receipt')).toBeEnabled();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(warn).toHaveBeenCalled();
-    expect(mockCreate).not.toHaveBeenCalled();
+    expectNothingWritten();
   });
 
-  it('asks for the amount when the store is there', async () => {
-    mockParams = { scannedStore: 'Corner Deli', scannedRead: 'store' };
+  it.each([
+    ['nothing', 'Amount, Store, Paid with', []],
+    ['only the amount', 'Store, Paid with', ['amount']],
+    ['only the store', 'Amount, Paid with', ['store']],
+    ['only the card', 'Amount, Store', ['paidWith']],
+    ['the amount and the store', 'Paid with', ['amount', 'store']],
+    ['the amount and the card', 'Store', ['amount', 'paidWith']],
+    ['the store and the card', 'Amount', ['store', 'paidWith']],
+  ] as [string, string, (keyof typeof GIVEN)[]][])(
+    'with %s given, the line lists exactly: %s',
+    async (_name, line, given) => {
+      mockParams = {
+        scannedVia: 'voice',
+        from: 'voice',
+        ...Object.assign({}, ...given.map((key) => GIVEN[key])),
+      };
+      const screen = await render(<AddReceiptScreen />);
+      expect(screen.getByLabelText('Save receipt')).toBeEnabled();
+
+      await press(screen, 'Save receipt');
+
+      expect(screen.getByText(MISSING(line))).toBeTruthy();
+      expectNothingWritten();
+    },
+  );
+
+  it('lists the amount alone when it is all that is left, and points at it', async () => {
+    mockParams = { ...GIVEN.store, ...GIVEN.paidWith, scannedRead: 'store,card' };
     const screen = await render(<AddReceiptScreen />);
-    expect(screen.getByLabelText('Save receipt')).toBeDisabled();
 
     await press(screen, 'Save receipt');
 
-    expect(screen.getByText('Enter how much you spent.')).toBeTruthy();
+    expect(screen.getByText(MISSING('Amount'))).toBeTruthy();
     expect(screen.getByLabelText('Amount, needed')).toBeTruthy();
-    expect(mockCreate).not.toHaveBeenCalled();
+    expectNothingWritten();
   });
 
-  it('does not take a zero for an amount', async () => {
-    mockParams = { scannedStore: 'Corner Deli', scannedRead: 'store' };
+  it('lists the store alone when it is all that is left, and shows the box', async () => {
+    mockParams = { ...GIVEN.amount, ...GIVEN.paidWith, scannedRead: 'amount,card' };
     const screen = await render(<AddReceiptScreen />);
 
-    // The keypad page holds Done back at zero; the stub button lets the press through to prove
-    // that Save would still refuse it.
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByText(MISSING('Store'))).toBeTruthy();
+    expect(screen.getByPlaceholderText(STORE_PLACEHOLDER)).toBeTruthy();
+    expectNothingWritten();
+  });
+
+  it('lists Paid with alone when it is all that is left, and Skip is still one of the answers', async () => {
+    mockParams = { ...GIVEN.amount, ...GIVEN.store, scannedRead: 'store,amount' };
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByText(MISSING('Paid with'))).toBeTruthy();
+    for (const pill of PILLS) expect(screen.getByLabelText(pill)).not.toBeSelected();
+    expectNothingWritten();
+
+    await press(screen, 'Skip');
+    await press(screen, 'Save receipt');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not take a zero typed on the amount page, because Done is held back there', async () => {
+    mockParams = { ...GIVEN.store, ...GIVEN.paidWith, scannedRead: 'store,card' };
+    const screen = await render(<AddReceiptScreen />);
+
     await press(screen, 'Amount, needed');
-    expect(screen.getByLabelText('Done')).toHaveProp('accessibilityState', { disabled: true });
     await typeAmount(screen, '0');
-    await press(screen, 'Done');
-    await press(screen, 'Save receipt');
 
-    expect(screen.getByText('Enter how much you spent.')).toBeTruthy();
-    expect(screen.getByLabelText('Amount, needed')).toBeTruthy();
-    expect(mockCreate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Done')).toBeDisabled();
   });
 
+  it('does not take the zero a row was stored with for an amount', async () => {
+    mockParams = { id: 'receipt-1' };
+    mockReceipt = { data: { ...EXISTING, amount: 0 }, isError: false, isFetched: true };
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Save changes');
+
+    expect(screen.getByText(MISSING('Amount'))).toBeTruthy();
+    expect(screen.getByLabelText('Amount, needed')).toBeTruthy();
+    expectNothingWritten();
+  });
+
+  it('counts a store typed but not picked as given', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await typedReceipt(screen, '15.99');
+    await searchStore(screen, 'Corner Deli');
+
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByText(MISSING('Paid with'))).toBeTruthy();
+    expectNothingWritten();
+  });
+
+  it.each([
+    ['typed and then emptied again', ''],
+    ['only spaces', '   '],
+  ])('does not count a store %s', async (_name, text) => {
+    const screen = await render(<AddReceiptScreen />);
+    await typedReceipt(screen, '15.99');
+    await press(screen, 'Skip');
+    await searchStore(screen, 'Corner');
+    await fireEvent.changeText(screen.getByPlaceholderText(STORE_PLACEHOLDER), text);
+
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByText(MISSING('Store'))).toBeTruthy();
+    expectNothingWritten();
+  });
+
+  it('lists the store again once the one picked is let go of', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99');
+
+    await press(screen, changeStore('Whole Foods'));
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByText(MISSING('Store'))).toBeTruthy();
+    expectNothingWritten();
+  });
+
+  it('holds back an edit whose store was let go of, and never lists what it has answered', async () => {
+    mockParams = { id: 'receipt-1' };
+    mockReceipt = { data: EXISTING, isError: false, isFetched: true };
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, changeStore('Apple Store'));
+    await press(screen, 'Save changes');
+
+    expect(screen.getByText(MISSING('Store'))).toBeTruthy();
+    expectNothingWritten();
+  });
+
+  it('drops each field from the line as it is answered, and writes once none is left', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await typedReceipt(screen, '15.99');
+
+    await press(screen, 'Save receipt');
+    expect(screen.getByText(MISSING('Store, Paid with'))).toBeTruthy();
+
+    await chooseStore(screen, 'Whole', 'Whole Foods');
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
+    await press(screen, 'Save receipt');
+    expect(screen.getByText(MISSING('Paid with'))).toBeTruthy();
+    expectNothingWritten();
+
+    await press(screen, 'Skip');
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: 'b-wf',
+      merchant: 'Whole Foods',
+      amount: 15.99,
+      card_id: null,
+      bank_account_id: null,
+    });
+  });
+
+  it('saves a store typed after the line came up, once Paid with is answered', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await typedReceipt(screen, '15.99');
+    await press(screen, 'Save receipt');
+    expect(screen.getByText(MISSING('Store, Paid with'))).toBeTruthy();
+
+    await searchStore(screen, 'Corner Deli');
+    await press(screen, 'VISA ••4421');
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: null,
+      merchant: 'Corner Deli',
+      card_id: 'card-1',
+    });
+  });
+});
+
+describe('Add receipt — a failed or held save', () => {
   it('says the one failure line above Save when the write fails, and stays', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     mockCreate.mockRejectedValue(new Error('network down'));
     const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99');
 
-    await typedReceipt(screen, '15.99');
-    await chooseStore(screen, 'Whole', 'Whole Foods');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
     expect(screen.getAllByText(FAILURE_MESSAGE)).toHaveLength(1);
     expect(screen.getByText('You can edit this later.')).toBeTruthy();
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
     expect(router.back).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalled();
     log.mockRestore();
@@ -796,9 +1218,7 @@ describe('Add receipt — the checks inside Save', () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     mockCreate.mockRejectedValueOnce(new Error('network down'));
     const screen = await render(<AddReceiptScreen />);
-
-    await typedReceipt(screen, '15.99');
-    await chooseStore(screen, 'Whole', 'Whole Foods');
+    await readyReceipt(screen, '15.99');
     await press(screen, 'Save receipt');
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
 
@@ -810,12 +1230,22 @@ describe('Add receipt — the checks inside Save', () => {
     log.mockRestore();
   });
 
-  it('takes a failed save’s line away when the person steps back to the keypad', async () => {
+  it('says Saving… and holds Save while the write is in flight', async () => {
+    mockParams = { scannedStore: 'Corner Deli', scannedAmount: '12' };
+    mockPending = true;
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(screen.getByLabelText('Saving…')).toBeDisabled();
+    expect(screen.queryByLabelText('Save receipt')).toBeNull();
+  });
+
+  // The line belongs under Save. Back on the keypad, it would sit under a question it has nothing
+  // to do with until the next Continue.
+  it('does not carry a failed save’s line back onto the amount page', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     mockCreate.mockRejectedValueOnce(new Error('network down'));
     const screen = await render(<AddReceiptScreen />);
-    await typedReceipt(screen, '15.99');
-    await chooseStore(screen, 'Whole', 'Whole Foods');
+    await readyReceipt(screen, '15.99');
     await press(screen, 'Save receipt');
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
 
@@ -829,31 +1259,188 @@ describe('Add receipt — the checks inside Save', () => {
     log.mockRestore();
   });
 
-  it('takes a failed save’s line away once a page keeps a change', async () => {
-    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
-    mockCreate.mockRejectedValueOnce(new Error('network down'));
+  it('does not carry the line about gaps back onto the amount page either', async () => {
     const screen = await render(<AddReceiptScreen />);
     await typedReceipt(screen, '15.99');
-    await chooseStore(screen, 'Whole', 'Whole Foods');
+    await press(screen, 'Save receipt');
+    expect(screen.getByText(ANY_MISSING)).toBeTruthy();
+
+    await press(screen, 'Back');
+
+    expect(screen.getByText('How much did you spend?')).toBeTruthy();
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
+
+    await press(screen, 'Continue');
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
+  });
+});
+
+describe('Add receipt — a line that came from Save', () => {
+  // The line names what was wrong with the page as it was, so a change made on the page itself is
+  // what takes it away. A pick in a box has no Done to do it, so each control clears it itself.
+  it.each<[string, (screen: Screen) => Promise<unknown>]>([
+    ['a store is picked', (screen) => chooseStore(screen, 'Whole', 'Whole Foods')],
+    ['something is typed in the store box', (screen) => searchStore(screen, 'Gym')],
+    ['a day chip is pressed', (screen) => press(screen, 'Yesterday')],
+    ['a day is picked on the calendar', (screen) => pickDay(screen, 'Thursday 1 October 2026')],
+    ['a card is picked', (screen) => press(screen, 'VISA ••4421')],
+    ['Skip is picked', (screen) => press(screen, 'Skip')],
+    [
+      'the amount is kept on its page',
+      async (screen) => {
+        await pressButton(screen, 'Amount, $15.99');
+        await press(screen, 'Done');
+      },
+    ],
+    ['a note is kept on its page', (screen) => keepNote(screen, 'Weekly shop')],
+  ])('the line about gaps goes when %s', async (_name, change) => {
+    const screen = await render(<AddReceiptScreen />);
+    await typedReceipt(screen, '15.99');
+    await press(screen, 'Save receipt');
+    expect(screen.getByText(ANY_MISSING)).toBeTruthy();
+
+    await change(screen);
+
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
+  });
+
+  it('the line about gaps goes when the store picked is let go of', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99', null);
+    await press(screen, 'Save receipt');
+    expect(screen.getByText(MISSING('Paid with'))).toBeTruthy();
+
+    await press(screen, changeStore('Whole Foods'));
+
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
+  });
+
+  const failedSave = async () => {
+    mockCreate.mockRejectedValueOnce(new Error('network down'));
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99', 'VISA ••4421');
     await press(screen, 'Save receipt');
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    return screen;
+  };
 
-    await press(screen, 'Note, not set, optional');
-    await fireEvent.changeText(screen.getByPlaceholderText(NOTE_PLACEHOLDER), 'Weekly shop');
-    await press(screen, 'Done');
+  it.each<[string, (screen: Screen) => Promise<unknown>]>([
+    ['the store is let go of', (screen) => press(screen, changeStore('Whole Foods'))],
+    ['a day chip is pressed', (screen) => press(screen, 'Yesterday')],
+    ['a day is picked on the calendar', (screen) => pickDay(screen, 'Thursday 1 October 2026')],
+    ['another card is picked', (screen) => press(screen, 'Checking ••0099')],
+    ['Skip is picked', (screen) => press(screen, 'Skip')],
+    [
+      'the amount is kept on its page',
+      async (screen) => {
+        await pressButton(screen, 'Amount, $15.99');
+        await press(screen, 'Done');
+      },
+    ],
+    ['a note is kept on its page', (screen) => keepNote(screen, 'Weekly shop')],
+  ])('the failure line goes when %s', async (_name, change) => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const screen = await failedSave();
 
-    expect(screen.getByLabelText('Note, Weekly shop')).toBeTruthy();
+    await change(screen);
+
     expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect(screen.getByText('You can edit this later.')).toBeTruthy();
     log.mockRestore();
   });
 
-  it('says Saving… and holds Save while the write is in flight', async () => {
-    mockParams = { scannedStore: 'Corner Deli', scannedAmount: '12' };
-    mockPending = true;
+  it.each(['the line about gaps', 'the failure line'])(
+    '%s stays when a page is left with Back, because nothing was kept',
+    async (which) => {
+      const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+      let screen: Screen;
+      if (which === 'the failure line') {
+        screen = await failedSave();
+      } else {
+        screen = await render(<AddReceiptScreen />);
+        await typedReceipt(screen, '15.99');
+        await press(screen, 'Save receipt');
+      }
+
+      await press(screen, 'Note, not set, optional');
+      await press(screen, 'Back');
+
+      if (which === 'the failure line') expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+      else expect(screen.getByText(ANY_MISSING)).toBeTruthy();
+      log.mockRestore();
+    },
+  );
+});
+
+describe('Add receipt — a save the database refuses for Pro', () => {
+  const SCANNED = {
+    scannedStore: 'Corner Deli',
+    scannedAmount: '15.99',
+    scannedSource: 'card-1',
+    scannedRead: 'store,amount,card',
+  };
+
+  it.each([
+    ['a scan', SCANNED, 'scan', 'Scanning more than 15 receipts a month is part of Skip Pro.'],
+    [
+      'a voice hand-off',
+      { ...SCANNED, scannedVia: 'voice', from: 'voice' },
+      'voice',
+      'Adding receipts by voice is part of Skip Pro.',
+    ],
+  ])(
+    'a free account’s save of %s goes to the explainer, not the failure line',
+    async (_name, params, id, message) => {
+      mockPro = { pro: false, ready: true };
+      mockCreate.mockRejectedValueOnce({ code: 'P0001', message });
+      mockParams = params;
+      const screen = await render(<AddReceiptScreen />);
+
+      await press(screen, 'Save receipt');
+
+      await waitFor(() =>
+        expect(router.push).toHaveBeenCalledWith({ pathname: '/pro-feature', params: { id } }),
+      );
+      // A refused scan counts the month again; a voice refusal has nothing to count.
+      expect(mockRecount).toHaveBeenCalledTimes(id === 'scan' ? 1 : 0);
+      expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+      expect(router.back).not.toHaveBeenCalled();
+      expect(router.dismissTo).not.toHaveBeenCalled();
+      expect(clearVoiceDraft).not.toHaveBeenCalled();
+      // Pushed, so Back returns to the filled-in form.
+      expect(screen.getByRole('button', { name: 'Amount, $15.99' })).toBeTruthy();
+      expect(screen.getByLabelText('VISA ••4421')).toBeSelected();
+      expect(screen.getByLabelText('Save receipt')).toBeEnabled();
+    },
+  );
+
+  it('a refusal for someone the app thinks has Pro is a failure: the line is shown and reported', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const refusal = { code: 'P0001', message: 'Scanning receipts is part of Skip Pro.' };
+    mockCreate.mockRejectedValueOnce(refusal);
+    mockParams = SCANNED;
     const screen = await render(<AddReceiptScreen />);
 
-    expect(screen.getByLabelText('Saving…')).toBeDisabled();
-    expect(screen.queryByLabelText('Save receipt')).toBeNull();
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(router.push).not.toHaveBeenCalled();
+    expect(mockRecount).not.toHaveBeenCalled();
+    // failureMessage's report: the Metro log in development, Sentry in a release build.
+    expect(log).toHaveBeenCalledWith('[failure]', refusal);
+    log.mockRestore();
+  });
+
+  it('does not ask a free account about Pro for a receipt typed by hand that saves', async () => {
+    mockPro = { pro: false, ready: true };
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99');
+
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0].source).toBe('manual');
+    expect(router.push).not.toHaveBeenCalled();
   });
 });
 
@@ -887,6 +1474,7 @@ describe('Add receipt — the logo', () => {
     await typedReceipt(screen, '12');
     await addStore(screen, PLANET.name);
     await answer?.(screen);
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     return mockCreate.mock.calls[0][0];
@@ -946,11 +1534,12 @@ describe('Add receipt — the logo', () => {
 
     expect(screen.queryByLabelText(LOGO_COPY.yes)).toBeNull();
     expect(screen.queryByText(/^Looks like/)).toBeNull();
-    expect(screen.getByLabelText('Change store, currently Blue Bottle Coffee')).toBeTruthy();
+    expect(screen.getByLabelText(changeStore('Blue Bottle Coffee'))).toBeTruthy();
     expect(screen.getByTestId('logo-32')).toHaveTextContent(
       'Blue Bottle Coffee|bluebottlecoffee.com',
     );
     expect(screen.getByLabelText(LOGO_COPY.changeLogo)).toBeTruthy();
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -980,6 +1569,7 @@ describe('Add receipt — the logo', () => {
     await addStore(screen, 'Blue Botle Coffee');
 
     expect(screen.getByLabelText(LOGO_COPY.yes)).toBeTruthy();
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('logo_domain');
@@ -1004,6 +1594,7 @@ describe('Add receipt — the logo', () => {
     expect(screen.getByTestId('logo-32')).toHaveTextContent('Blue Bottle Coffee|old.example');
     expect(screen.getByText('Filed under Dining & Takeout')).toBeTruthy();
     expect(mockLogoAnswer).not.toHaveBeenCalledWith('Blue Bottle Coffee');
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -1023,6 +1614,7 @@ describe('Add receipt — the logo', () => {
 
     await searchStore(screen, 'corner');
     await fireEvent.press(screen.getByLabelText('Corner Deli'));
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -1038,6 +1630,7 @@ describe('Add receipt — the logo', () => {
     await typedReceipt(first, '12');
     await addStore(first, 'Planet Fitness');
     await press(first, LOGO_COPY.yes);
+    await press(first, 'Skip');
     await press(first, 'Save receipt');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockRemember).toHaveBeenCalledTimes(1);
@@ -1054,6 +1647,7 @@ describe('Add receipt — the logo', () => {
 
     expect(second.queryByLabelText(LOGO_COPY.yes)).toBeNull();
     expect(second.queryByText(/^Looks like/)).toBeNull();
+    await press(second, 'Skip');
     await press(second, 'Save receipt');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0]).toMatchObject({
@@ -1085,7 +1679,7 @@ describe('Add receipt — the logo', () => {
   it('an edit that picks another store drops the old store’s logo', async () => {
     const screen = await editing();
 
-    await press(screen, 'Change store, currently Corner Deli');
+    await press(screen, changeStore('Corner Deli'));
     // As the field sends a catalog pick.
     await chooseStore(screen, 'Whole', 'Whole Foods');
     await press(screen, 'Save changes');
@@ -1102,7 +1696,7 @@ describe('Add receipt — the logo', () => {
   it('an edit that replaces its store with a new one is asked for that one’s logo', async () => {
     const screen = await editing();
 
-    await press(screen, 'Change store, currently Corner Deli');
+    await press(screen, changeStore('Corner Deli'));
     await addStore(screen, PLANET.name);
     await press(screen, LOGO_COPY.yes);
     await press(screen, 'Save changes');
@@ -1112,6 +1706,39 @@ describe('Add receipt — the logo', () => {
       brand_id: null,
       merchant: 'Planet Fitness',
       logo_domain: 'planetfitness.com',
+      logo_hidden: false,
+    });
+  });
+
+  it('an edit that replaces its store with typed words saves them as a custom store', async () => {
+    const screen = await editing();
+
+    await press(screen, changeStore('Corner Deli'));
+    await searchStore(screen, 'Blue Cafe');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      brand_id: null,
+      merchant: 'Blue Cafe',
+      category_id: 'dining',
+    });
+  });
+
+  // Typing a new store without picking it leaves the logo columns out, and an update writes only the
+  // columns it is given, so the old store's logo stays on the row; a catalogue pick sends
+  // logo_domain null and logo_hidden false for exactly this.
+  it('an edit that replaces its store with typed words drops the old store’s logo', async () => {
+    const screen = await editing();
+
+    await press(screen, changeStore('Corner Deli'));
+    await searchStore(screen, 'Blue Cafe');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      merchant: 'Blue Cafe',
+      logo_domain: null,
       logo_hidden: false,
     });
   });
@@ -1131,10 +1758,10 @@ describe('Add receipt — the logo', () => {
     const screen = await editing();
     expect(screen.getByLabelText(LOGO_COPY.changeLogo)).toBeTruthy();
 
-    await press(screen, 'Change store, currently Corner Deli');
+    await press(screen, changeStore('Corner Deli'));
 
     expect(screen.queryByLabelText(LOGO_COPY.changeLogo)).toBeNull();
-    expect(screen.getByPlaceholderText('Search for a store')).toBeTruthy();
+    expect(screen.getByPlaceholderText(STORE_PLACEHOLDER)).toBeTruthy();
   });
 
   // The link opens Change logo for the saved receipt, so beside a different store it would change
@@ -1142,10 +1769,10 @@ describe('Add receipt — the logo', () => {
   it('stops offering Change logo as soon as another store is picked', async () => {
     const screen = await editing();
 
-    await press(screen, 'Change store, currently Corner Deli');
+    await press(screen, changeStore('Corner Deli'));
     await chooseStore(screen, 'Whole', 'Whole Foods');
 
-    expect(screen.getByLabelText('Change store, currently Whole Foods')).toBeTruthy();
+    expect(screen.getByLabelText(changeStore('Whole Foods'))).toBeTruthy();
     expect(screen.queryByLabelText(LOGO_COPY.changeLogo)).toBeNull();
   });
 
@@ -1157,11 +1784,12 @@ describe('Add receipt — the logo', () => {
     await typeAmount(screen, '5');
     await press(screen, 'Done');
     await press(screen, 'Yesterday');
+    await press(screen, 'VISA ••4421');
     await press(screen, 'Note, AppleCare');
     await press(screen, 'Done');
 
     expect(screen.getByLabelText(LOGO_COPY.changeLogo)).toBeTruthy();
-    expect(screen.getByLabelText('Change store, currently Corner Deli')).toBeTruthy();
+    expect(screen.getByLabelText(changeStore('Corner Deli'))).toBeTruthy();
   });
 
   it('shows a logo chosen on Change logo when it comes back, and still leaves it alone', async () => {
@@ -1185,8 +1813,7 @@ describe('Add receipt — the logo', () => {
 
   it('never offers Change logo on a receipt not yet saved', async () => {
     const screen = await render(<AddReceiptScreen />);
-    await typedReceipt(screen, '12');
-    await chooseStore(screen, 'Whole', 'Whole Foods');
+    await readyReceipt(screen, '12');
 
     expect(screen.queryByLabelText(LOGO_COPY.changeLogo)).toBeNull();
   });

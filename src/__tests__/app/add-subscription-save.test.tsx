@@ -10,15 +10,12 @@ import { clearVoiceDraft } from '@/lib/voice-draft';
 
 /**
  * Golden: exactly what the subscription form's Save writes. Pins the object handed to create/update,
- * the words of the checks inside Save, `started_on` through countFromAfterPick and floorAfterCharges,
- * the order of the past-charges question, the write and the reminder, and where each kind of save
- * goes afterwards.
+ * what Save refuses and says while the page has gaps, `started_on` through countFromAfterPick and
+ * floorAfterCharges, the order of the past-charges question, the write and the reminder, and where
+ * each kind of save goes afterwards.
  *
- * The pages are the real ones, walked the way a person walks them (keypad, service search,
- * calendar, source tiles, reminder chips, note); only the network and the logo images are replaced.
- * The one exception is the primary button, a stub that accepts a press even while disabled: the only
- * way to reach the checks inside Save, which the final page normally holds back. It still reports
- * its disabled state.
+ * The pages are the real ones, walked the way a person walks them (keypad, service box, day box,
+ * source pills, reminder chips, note); only the network and the logo images are replaced.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -37,30 +34,6 @@ jest.mock('@/lib/voice-draft', () => ({
   ...jest.requireActual('@/lib/voice-draft'),
   clearVoiceDraft: jest.fn(),
 }));
-
-jest.mock('@/components/ui/button', () => {
-  const { Pressable, Text } = jest.requireActual('react-native');
-  return {
-    Button: ({
-      label,
-      onPress,
-      disabled,
-    }: {
-      label: string;
-      onPress: () => void;
-      disabled?: boolean;
-    }) => (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityState={{ disabled: Boolean(disabled) }}
-        onPress={onPress}
-      >
-        <Text>{label}</Text>
-      </Pressable>
-    ),
-  };
-});
 
 // The logo a mark drew, readable as text: "Spotify|spotify.com", or "Spotify|" for letters.
 jest.mock('@/components/brands/brand-logo', () => {
@@ -296,14 +269,20 @@ async function addService(screen: Screen, name: string) {
   await fireEvent.press(screen.getByText(`Add “${name}”`));
 }
 
-/** Opens the calendar from `row`, pages `months` (negative is back), picks the day and keeps it. */
-async function pickRenewal(screen: Screen, row: string, months: number, day: string) {
-  await press(screen, row);
+// The day box, as a screen reader reads it: empty, or showing the day picked.
+const NEXT_RENEWAL = 'Next renewal, Select a date';
+const renewalOn = (shown: string) => `Next renewal, ${shown}`;
+
+/**
+ * Opens a day box, pages `months` on from where its calendar opens (negative is back) and picks the
+ * day. The calendar folds away on its own: there is no Done.
+ */
+async function pickDay(screen: Screen, box: string, months: number, day: string) {
+  await press(screen, box);
   for (let i = 0; i < Math.abs(months); i += 1) {
     await press(screen, months < 0 ? 'Previous month' : 'Next month');
   }
   await press(screen, day);
-  await press(screen, 'Done');
 }
 
 /** A subscription typed by hand: the amount, then the final page. */
@@ -312,13 +291,65 @@ async function typedSubscription(screen: Screen, amount: string) {
   await press(screen, 'Continue');
 }
 
-/** A new Netflix at the amount typed, ready to Save. */
+type Answers = {
+  day?: string | null;
+  source?: string | null;
+  reminder?: string | null;
+};
+
+/**
+ * Answers what a new subscription still asks once it has an amount and a service: the renewal day,
+ * how it is charged and whether to remind. A test passes only what it is about; null leaves a
+ * question open on purpose.
+ */
+async function fillIn(screen: Screen, answers: Answers = {}) {
+  const { day, source, reminder } = {
+    day: 'Thursday 15 October 2026',
+    source: 'Skip',
+    reminder: 'No reminder',
+    ...answers,
+  };
+  if (day !== null) await pickDay(screen, NEXT_RENEWAL, 0, day);
+  if (source !== null) await press(screen, source);
+  if (reminder !== null) await press(screen, reminder);
+}
+
+/** A new Netflix at the amount typed, with the service picked and every other question open. */
 async function netflixAt(screen: Screen, amount: string) {
   await typedSubscription(screen, amount);
   await chooseService(screen, 'Net', 'Netflix');
 }
 
+/** A new Netflix at the amount typed, answered all the way through, ready to Save. */
+async function readyNetflix(screen: Screen, amount: string, answers: Answers = {}) {
+  await netflixAt(screen, amount);
+  await fillIn(screen, answers);
+}
+
+const MISSING = (fields: string) => `To save this subscription, fill in: ${fields}.`;
+const ANY_MISSING = /^To save this subscription, fill in:/;
+
+/** Save was refused: the question, the write, the rewrite and the reminder were all left alone. */
+function expectNothingWritten() {
+  expect(mockCreate).not.toHaveBeenCalled();
+  expect(mockUpdate).not.toHaveBeenCalled();
+  expect(mockPast.choose).not.toHaveBeenCalled();
+  expect(mockPast.apply).not.toHaveBeenCalled();
+  expect(mockApplyReminder).not.toHaveBeenCalled();
+  expect(router.back).not.toHaveBeenCalled();
+  expect(router.dismissTo).not.toHaveBeenCalled();
+}
+
 const NOTE_PLACEHOLDER = 'Which plan, for example';
+
+/** Opens the note page on a row with no note, types one and keeps it. */
+async function keepNote(screen: Screen, label: string, text: string) {
+  await press(screen, label);
+  await fireEvent.changeText(screen.getByPlaceholderText(NOTE_PLACEHOLDER), text);
+  await press(screen, 'Done');
+}
+
+const REMINDER_CHIPS = ['No reminder', 'On the day', '1 day', '3 days', '1 week'];
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -349,14 +380,15 @@ beforeEach(() => {
 });
 
 describe('Add subscription — what a new subscription saves', () => {
-  it('saves without a renewal date, counting from nothing', async () => {
+  it('saves what was filled in, counting from the renewal day picked', async () => {
     const screen = await render(<AddSubscriptionScreen />);
 
     await typedSubscription(screen, '15.99');
     await chooseService(screen, 'Net', 'Netflix');
-    await press(screen, 'Charged to, not set, optional');
+    await pickDay(screen, NEXT_RENEWAL, 0, 'Thursday 15 October 2026');
+    expect(screen.getByLabelText(renewalOn('Thu Oct 15'))).toBeTruthy();
     await press(screen, 'VISA ••4421');
-    await press(screen, 'Done');
+    await press(screen, 'No reminder');
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
@@ -366,8 +398,8 @@ describe('Add subscription — what a new subscription saves', () => {
       name: 'Netflix',
       amount: 15.99,
       cycle: 'monthly',
-      next_renewal_on: null,
-      started_on: null,
+      next_renewal_on: '2026-10-15',
+      started_on: '2026-10-15',
       category_id: 'entertainment',
       card_id: 'card-1',
       bank_account_id: null,
@@ -388,13 +420,8 @@ describe('Add subscription — what a new subscription saves', () => {
     await typedSubscription(screen, '1100');
     // A service the keywords cannot place files under Other rather than nowhere.
     await addService(screen, 'Zed Zed');
-    await press(screen, 'Charged to, not set, optional');
-    await press(screen, 'Checking ••0099');
-    await press(screen, 'Done');
-    await press(screen, 'Note, not set, optional');
-    await fireEvent.changeText(screen.getByPlaceholderText(NOTE_PLACEHOLDER), '  Annual plan ');
-    await press(screen, 'Done');
-    await pickRenewal(screen, 'Next renewal, not set, optional', 0, 'Monday 12 October 2026');
+    await fillIn(screen, { day: 'Monday 12 October 2026', source: 'Checking ••0099' });
+    await keepNote(screen, 'Note, not set, optional', '  Annual plan ');
     await press(screen, 'Yearly');
     await press(screen, 'Save subscription');
 
@@ -414,6 +441,22 @@ describe('Add subscription — what a new subscription saves', () => {
     });
   });
 
+  it('counts from a renewal day already past, which the past-charges question is for', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await netflixAt(screen, '15.99');
+
+    await fillIn(screen, { day: null });
+    await pickDay(screen, NEXT_RENEWAL, -1, 'Tuesday 15 September 2026');
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      next_renewal_on: '2026-09-15',
+      started_on: '2026-09-15',
+    });
+    expect(mockPast.choose).toHaveBeenCalledWith('Netflix', false);
+  });
+
   it.each([
     ['1100', 1100],
     ['15.99', 15.99],
@@ -423,7 +466,7 @@ describe('Add subscription — what a new subscription saves', () => {
     ['999999999.99', 999999999.99],
   ])('saves a typed %s as exactly %p dollars', async (typed, saved) => {
     const screen = await render(<AddSubscriptionScreen />);
-    await netflixAt(screen, typed);
+    await readyNetflix(screen, typed);
     await press(screen, 'Save subscription');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0].amount).toBe(saved);
@@ -431,7 +474,7 @@ describe('Add subscription — what a new subscription saves', () => {
 
   it('saves the amount as corrected on the amount line, not as first typed', async () => {
     const screen = await render(<AddSubscriptionScreen />);
-    await netflixAt(screen, '49.11');
+    await readyNetflix(screen, '49.11');
 
     await pressButton(screen, 'Amount, $49.11');
     for (let i = 0; i < 5; i += 1) await press(screen, 'Delete last digit');
@@ -450,7 +493,7 @@ describe('Add subscription — what a new subscription saves', () => {
     ['Yearly', 'yearly'],
   ])('saves the %s chip as the %s cycle, in one tap', async (chip, cycle) => {
     const screen = await render(<AddSubscriptionScreen />);
-    await netflixAt(screen, '9.99');
+    await readyNetflix(screen, '9.99');
 
     await press(screen, 'Quarterly');
     await press(screen, chip);
@@ -460,35 +503,11 @@ describe('Add subscription — what a new subscription saves', () => {
     expect(mockCreate.mock.calls[0][0].cycle).toBe(cycle);
   });
 
-  it('files a card under card_id and a source that is no longer there under neither', async () => {
-    const screen = await render(<AddSubscriptionScreen />);
-    await netflixAt(screen, '15.99');
-    await press(screen, 'Charged to, not set, optional');
-    await press(screen, 'VISA ••4421');
-    await press(screen, 'Done');
-    await press(screen, 'Save subscription');
-
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    expect(mockCreate.mock.calls[0][0]).toMatchObject({
-      amount: 15.99,
-      card_id: 'card-1',
-      bank_account_id: null,
-    });
-
-    // The card is deleted while the form is open: the choice no longer names anything.
-    mockCreate.mockClear();
-    mockSources = mockSources.filter((source) => source.id !== 'card-1');
-    await screen.rerender(<AddSubscriptionScreen />);
-    expect(screen.getByLabelText('Charged to, not set, optional')).toBeTruthy();
-    await press(screen, 'Save subscription');
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    expect(mockCreate.mock.calls[0][0]).toMatchObject({ card_id: null, bank_account_id: null });
-  });
-
   it('files a service whose category was not heard under Other, from the voice review', async () => {
     mockParams = { from: 'voice', prefillName: 'Gym membership', prefillAmount: '24.99' };
     const screen = await render(<AddSubscriptionScreen />);
 
+    await fillIn(screen);
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -501,17 +520,134 @@ describe('Add subscription — what a new subscription saves', () => {
   });
 });
 
+describe('Add subscription — what Charged to saves', () => {
+  it.each([
+    ['a card', 'VISA ••4421', { card_id: 'card-1', bank_account_id: null }],
+    ['an account', 'Checking ••0099', { card_id: null, bank_account_id: 'acct-1' }],
+    ['Skip', 'Skip', { card_id: null, bank_account_id: null }],
+  ])('files %s under its own column and the other under none', async (_name, pill, columns) => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await readyNetflix(screen, '15.99', { source: pill });
+
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ amount: 15.99, ...columns });
+  });
+
+  it('keeps only the last pill pressed, never a card and an account together', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await readyNetflix(screen, '15.99', { source: 'VISA ••4421' });
+
+    await press(screen, 'Checking ••0099');
+    expect(screen.getByLabelText('Checking ••0099')).toBeSelected();
+    expect(screen.getByLabelText('VISA ••4421')).not.toBeSelected();
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      card_id: null,
+      bank_account_id: 'acct-1',
+    });
+  });
+
+  it('files a card deleted while the form is open under neither, and does not hold Save back', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await readyNetflix(screen, '15.99', { source: 'VISA ••4421' });
+
+    mockSources = mockSources.filter((source) => source.id !== 'card-1');
+    await screen.rerender(<AddSubscriptionScreen />);
+    expect(screen.queryByLabelText('VISA ••4421')).toBeNull();
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ card_id: null, bank_account_id: null });
+  });
+
+  it('offers Skip alone when there is no card or account, and it answers the question', async () => {
+    mockSources = [];
+    const screen = await render(<AddSubscriptionScreen />);
+    await netflixAt(screen, '15.99');
+
+    expect(screen.queryByLabelText('VISA ••4421')).toBeNull();
+    await fillIn(screen);
+    expect(screen.getByLabelText('Skip')).toBeSelected();
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ card_id: null, bank_account_id: null });
+  });
+});
+
+describe('Add subscription — the service box', () => {
+  it('saves a catalogue service with its brand, its category and the name picked, not the letters typed', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await readyNetflix(screen, '15.99');
+
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    const values = mockCreate.mock.calls[0][0];
+    expect(values).toMatchObject({
+      brand_id: 'b-nf',
+      name: 'Netflix',
+      category_id: 'entertainment',
+    });
+    expect(values).not.toHaveProperty('logo_domain');
+    expect(values).not.toHaveProperty('logo_hidden');
+  });
+
+  it('saves a service typed but not picked under its own name, with no brand and a guessed category', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await typedSubscription(screen, '12.5');
+
+    await searchService(screen, 'Gym Pass');
+    await fillIn(screen);
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    const values = mockCreate.mock.calls[0][0];
+    expect(values).toMatchObject({
+      brand_id: null,
+      name: 'Gym Pass',
+      amount: 12.5,
+      category_id: 'fitness',
+    });
+    expect(values).not.toHaveProperty('logo_domain');
+    expect(values).not.toHaveProperty('logo_hidden');
+  });
+
+  it('trims what was typed, and files it under Other when no keyword fits', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await typedSubscription(screen, '8');
+
+    await searchService(screen, '  Zed Zed ');
+    await fillIn(screen);
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      brand_id: null,
+      name: 'Zed Zed',
+      category_id: 'other',
+    });
+  });
+});
+
 describe('Add subscription — what an edit saves', () => {
   beforeEach(() => {
     mockParams = { id: 'sub-1' };
     mockSubscription = { data: SPOTIFY, isError: false, isFetched: true };
   });
 
-  it('writes the row back as it was', async () => {
+  it('writes the row back as it was: its account, its reminder and no logo columns', async () => {
     const screen = await render(<AddSubscriptionScreen />);
 
-    // Opens on the final page, already filled in: Save is the first thing to press.
+    // Opens on the final page, already answered: Save is the first thing to press.
     expect(screen.getByLabelText('Save changes')).toBeEnabled();
+    expect(screen.getByLabelText(renewalOn('Sat Oct 10'))).toBeTruthy();
+    expect(screen.getByLabelText('Checking ••0099')).toBeSelected();
+    expect(screen.getByLabelText('No reminder')).toBeSelected();
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
@@ -533,14 +669,55 @@ describe('Add subscription — what an edit saves', () => {
         active: true,
       },
     });
+    expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_domain');
+    expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_hidden');
     expect(mockPast.choose).toHaveBeenCalledWith('Spotify', false);
     expect(mockApplyReminder).toHaveBeenCalledWith('subscription', 'sub-1', null, '09:00');
+  });
+
+  it('keeps a card as its card', async () => {
+    mockSubscription = {
+      data: { ...SPOTIFY, card_id: 'card-1', bank_account_id: null },
+      isError: false,
+      isFetched: true,
+    };
+    const screen = await render(<AddSubscriptionScreen />);
+
+    expect(screen.getByLabelText('VISA ••4421')).toBeSelected();
+    expect(screen.getByLabelText('Skip')).not.toBeSelected();
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      card_id: 'card-1',
+      bank_account_id: null,
+    });
+    expect(mockPast.choose).toHaveBeenCalledWith('Spotify', false);
+  });
+
+  it('shows a row with no card or account on Skip and saves it that way', async () => {
+    mockSubscription = {
+      data: { ...SPOTIFY, bank_account_id: null },
+      isError: false,
+      isFetched: true,
+    };
+    const screen = await render(<AddSubscriptionScreen />);
+
+    expect(screen.getByLabelText('Skip')).toBeSelected();
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      card_id: null,
+      bank_account_id: null,
+    });
+    expect(mockPast.choose).toHaveBeenCalledWith('Spotify', false);
   });
 
   it('moves the start earlier when an earlier renewal is picked', async () => {
     const screen = await render(<AddSubscriptionScreen />);
 
-    await pickRenewal(screen, 'Next renewal, Sat Oct 10', -3, 'Friday 10 July 2026');
+    await pickDay(screen, renewalOn('Sat Oct 10'), -3, 'Friday 10 July 2026');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
@@ -553,7 +730,7 @@ describe('Add subscription — what an edit saves', () => {
   it('never moves the start later when a later renewal is picked', async () => {
     const screen = await render(<AddSubscriptionScreen />);
 
-    await pickRenewal(screen, 'Next renewal, Sat Oct 10', 1, 'Tuesday 10 November 2026');
+    await pickDay(screen, renewalOn('Sat Oct 10'), 1, 'Tuesday 10 November 2026');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
@@ -590,34 +767,25 @@ describe('Add subscription — what an edit saves', () => {
     });
   });
 
-  it('keeps the start it counts from when a row without a renewal date is saved', async () => {
+  it('asks a row with no renewal date for one, then keeps the start it counts from', async () => {
     mockSubscription = {
       data: { ...SPOTIFY, next_renewal_on: null },
       isError: false,
       isFetched: true,
     };
     const screen = await render(<AddSubscriptionScreen />);
-    expect(screen.getByLabelText('Next renewal, not set, optional')).toBeTruthy();
+    expect(screen.getByLabelText(NEXT_RENEWAL)).toBeTruthy();
 
+    await press(screen, 'Save changes');
+    expect(screen.getByText(MISSING('Next renewal'))).toBeTruthy();
+    expectNothingWritten();
+
+    await pickDay(screen, NEXT_RENEWAL, 0, 'Saturday 10 October 2026');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
-      next_renewal_on: null,
-      started_on: '2026-08-10',
-    });
-  });
-
-  it('keeps the start it counts from when the renewal date is cleared on the page', async () => {
-    const screen = await render(<AddSubscriptionScreen />);
-
-    await press(screen, 'Next renewal, Sat Oct 10');
-    await press(screen, 'No renewal date');
-    await press(screen, 'Save changes');
-
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
-    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
-      next_renewal_on: null,
+      next_renewal_on: '2026-10-10',
       started_on: '2026-08-10',
     });
   });
@@ -626,12 +794,8 @@ describe('Add subscription — what an edit saves', () => {
     const screen = await render(<AddSubscriptionScreen />);
 
     await press(screen, 'Cancelled');
-    await press(screen, 'Charged to, Checking ••0099');
     await press(screen, 'VISA ••4421');
-    await press(screen, 'Done');
-    await press(screen, 'Note, Family plan');
-    await fireEvent.changeText(screen.getByPlaceholderText(NOTE_PLACEHOLDER), ' ');
-    await press(screen, 'Done');
+    await keepNote(screen, 'Note, Family plan', ' ');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
@@ -654,12 +818,10 @@ describe('Add subscription — what an edit saves', () => {
     expect(mockUpdate.mock.calls[0][0].values).toMatchObject({ active: true });
   });
 
-  it('clears the account with "No card or account"', async () => {
+  it('takes the account off with Skip', async () => {
     const screen = await render(<AddSubscriptionScreen />);
 
-    await press(screen, 'Charged to, Checking ••0099');
-    await press(screen, 'No card or account');
-    await press(screen, 'Done');
+    await press(screen, 'Skip');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
@@ -679,10 +841,6 @@ describe('Add subscription — what an edit saves', () => {
     await press(screen, 'Note, Family plan');
     await fireEvent.changeText(screen.getByPlaceholderText(NOTE_PLACEHOLDER), 'Something else');
     await press(screen, 'Back');
-    await pickRenewal(screen, 'Next renewal, Sat Oct 10', 1, 'Tuesday 10 November 2026');
-    await press(screen, 'Reminder, not set, optional');
-    await press(screen, '1 week');
-    await press(screen, 'Back');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
@@ -690,9 +848,8 @@ describe('Add subscription — what an edit saves', () => {
       name: 'Spotify',
       amount: 11.99,
       note: 'Family plan',
-      next_renewal_on: '2026-11-10',
+      next_renewal_on: '2026-10-10',
     });
-    expect(mockApplyReminder).toHaveBeenCalledWith('subscription', 'sub-1', null, '09:00');
   });
 
   it('rewrites past renewals with the new figures when asked to', async () => {
@@ -733,16 +890,19 @@ describe('Add subscription — what an edit saves', () => {
   });
 
   // Only what a recorded renewal copies (name, amount, card or account) is a change worth asking
-  // about; moving the date, the cycle, the note or the status changes nothing already recorded.
+  // about; moving the date, the cycle, the reminder, the note or the status changes nothing
+  // already recorded.
   it.each([
     ['the amount', true],
     ['the service', true],
     ['the card', true],
+    ['Skip instead of the account', true],
     ['the cycle', false],
     ['the renewal date', false],
+    ['the reminder', false],
     ['the note', false],
     ['the status', false],
-  ])('asks about past renewals as changed=%s when you edit %s', async (field, changed) => {
+  ])('editing %s asks about past renewals as changed=%s', async (field, changed) => {
     const screen = await render(<AddSubscriptionScreen />);
 
     if (field === 'the amount') {
@@ -753,17 +913,17 @@ describe('Add subscription — what an edit saves', () => {
     } else if (field === 'the service') {
       await swapService(screen, 'Spotify', 'Net', 'Netflix');
     } else if (field === 'the card') {
-      await press(screen, 'Charged to, Checking ••0099');
       await press(screen, 'VISA ••4421');
-      await press(screen, 'Done');
+    } else if (field === 'Skip instead of the account') {
+      await press(screen, 'Skip');
     } else if (field === 'the cycle') {
       await press(screen, 'Yearly');
     } else if (field === 'the renewal date') {
-      await pickRenewal(screen, 'Next renewal, Sat Oct 10', 1, 'Tuesday 10 November 2026');
+      await pickDay(screen, renewalOn('Sat Oct 10'), 1, 'Tuesday 10 November 2026');
+    } else if (field === 'the reminder') {
+      await press(screen, '3 days');
     } else if (field === 'the note') {
-      await press(screen, 'Note, Family plan');
-      await fireEvent.changeText(screen.getByPlaceholderText(NOTE_PLACEHOLDER), 'Duo plan');
-      await press(screen, 'Done');
+      await keepNote(screen, 'Note, Family plan', 'Duo plan');
     } else {
       await press(screen, 'Cancelled');
     }
@@ -779,7 +939,7 @@ describe('Add subscription — the question, the write and the reminder', () => 
   it('asks about past renewals before anything is written, and backing out writes nothing', async () => {
     mockPast.choose.mockResolvedValueOnce(null);
     const screen = await render(<AddSubscriptionScreen />);
-    await netflixAt(screen, '15.99');
+    await readyNetflix(screen, '15.99');
 
     await press(screen, 'Save subscription');
     await waitFor(() => expect(mockPast.choose).toHaveBeenCalledTimes(1));
@@ -790,6 +950,7 @@ describe('Add subscription — the question, the write and the reminder', () => 
     expect(router.back).not.toHaveBeenCalled();
     expect(screen.getByText('You can edit this later.')).toBeTruthy();
     expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
 
     // Still there to save once the answer is given.
     await press(screen, 'Save subscription');
@@ -803,9 +964,7 @@ describe('Add subscription — the question, the write and the reminder', () => 
     mockSubscription = { data: SPOTIFY, isError: false, isFetched: true };
     const screen = await render(<AddSubscriptionScreen />);
 
-    await press(screen, 'Reminder, not set, optional');
     await press(screen, '3 days');
-    await press(screen, 'Done');
     await pressButton(screen, 'Amount, $11.99');
     for (let i = 0; i < 5; i += 1) await press(screen, 'Delete last digit');
     await typeAmount(screen, '12.99');
@@ -820,12 +979,10 @@ describe('Add subscription — the question, the write and the reminder', () => 
     const screen = await render(<AddSubscriptionScreen />);
     await netflixAt(screen, '15.99');
 
-    await press(screen, 'Reminder, not set, optional');
-    await press(screen, '1 week');
+    await fillIn(screen, { reminder: '1 week' });
     await press(screen, 'Sent at 9:00 AM. Change the time.');
     await press(screen, 'PM');
     await press(screen, 'Confirm time');
-    await press(screen, 'Done');
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
@@ -841,15 +998,27 @@ describe('Add subscription — the question, the write and the reminder', () => 
     ['1 week', 7],
   ])('turns the %s chip into %p days ahead', async (chip, lead) => {
     const screen = await render(<AddSubscriptionScreen />);
-    await netflixAt(screen, '15.99');
+    await readyNetflix(screen, '15.99', { reminder: chip });
 
-    await press(screen, 'Reminder, not set, optional');
-    await press(screen, chip);
-    await press(screen, 'Done');
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
     expect(mockApplyReminder).toHaveBeenCalledWith('subscription', 'sub-new', lead, '09:00');
+  });
+
+  it('turns No reminder into no lead at all, with no time to send it at', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await netflixAt(screen, '15.99');
+
+    await fillIn(screen, { reminder: '3 days' });
+    expect(screen.getByLabelText('Sent at 9:00 AM. Change the time.')).toBeTruthy();
+    await press(screen, 'No reminder');
+    expect(screen.getByLabelText('No reminder')).toBeSelected();
+    expect(screen.queryByLabelText('Sent at 9:00 AM. Change the time.')).toBeNull();
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
+    expect(mockApplyReminder).toHaveBeenCalledWith('subscription', 'sub-new', null, '09:00');
   });
 
   it('writes the reminder an edit already has back as it was', async () => {
@@ -858,21 +1027,34 @@ describe('Add subscription — the question, the write and the reminder', () => 
     mockSubscription = { data: SPOTIFY, isError: false, isFetched: true };
     const screen = await render(<AddSubscriptionScreen />);
 
+    expect(screen.getByLabelText('3 days')).toBeSelected();
+    expect(screen.getByLabelText('Sent at 8:30 AM. Change the time.')).toBeTruthy();
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockApplyReminder).toHaveBeenCalledWith('subscription', 'sub-1', 3, '08:30');
   });
 
-  it('switches an edit’s reminder off when Off is chosen', async () => {
+  it('changes the lead of an edit’s reminder and keeps the time it had', async () => {
     mockSavedReminder = { choice: '3', remindAt: '08:30' };
     mockParams = { id: 'sub-1' };
     mockSubscription = { data: SPOTIFY, isError: false, isFetched: true };
     const screen = await render(<AddSubscriptionScreen />);
 
-    await press(screen, 'Reminder, 3 days before · 8:30 AM');
-    await press(screen, 'Off');
-    await press(screen, 'Done');
+    await press(screen, '1 week');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockApplyReminder).toHaveBeenCalledWith('subscription', 'sub-1', 7, '08:30');
+  });
+
+  it('switches an edit’s reminder off when No reminder is chosen', async () => {
+    mockSavedReminder = { choice: '3', remindAt: '08:30' };
+    mockParams = { id: 'sub-1' };
+    mockSubscription = { data: SPOTIFY, isError: false, isFetched: true };
+    const screen = await render(<AddSubscriptionScreen />);
+
+    await press(screen, 'No reminder');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
@@ -882,7 +1064,7 @@ describe('Add subscription — the question, the write and the reminder', () => 
   it('does not write while the past charges have not been read, and says so', async () => {
     mockPast.ready = false;
     const screen = await render(<AddSubscriptionScreen />);
-    await netflixAt(screen, '15.99');
+    await readyNetflix(screen, '15.99');
 
     await press(screen, 'Save subscription');
 
@@ -913,6 +1095,8 @@ describe('Add subscription — a voice hand-off', () => {
     mockParams = HEARD;
     const screen = await render(<AddSubscriptionScreen />);
 
+    // Nobody says whether to remind; it is the one answer a hand-off leaves to the person.
+    await press(screen, 'No reminder');
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
@@ -933,14 +1117,41 @@ describe('Add subscription — a voice hand-off', () => {
     expect(router.back).not.toHaveBeenCalled();
   });
 
+  it('opens with the card and the day it heard lit, and the reminder left to answer', async () => {
+    mockParams = HEARD;
+    const screen = await render(<AddSubscriptionScreen />);
+
+    expect(screen.getByLabelText('VISA ••4421')).toBeSelected();
+    expect(screen.getByLabelText(renewalOn('Mon Oct 12'))).toBeTruthy();
+    for (const chip of REMINDER_CHIPS) expect(screen.getByLabelText(chip)).not.toBeSelected();
+
+    await press(screen, 'Save subscription');
+
+    expect(screen.getByText(MISSING('Reminder'))).toBeTruthy();
+    expectNothingWritten();
+    expect(clearVoiceDraft).not.toHaveBeenCalled();
+  });
+
+  it('asks for the day and the payment too when neither was heard', async () => {
+    mockParams = { from: 'voice', prefillName: 'Netflix', prefillAmount: '15.99' };
+    const screen = await render(<AddSubscriptionScreen />);
+
+    expect(screen.getByLabelText(NEXT_RENEWAL)).toBeTruthy();
+    expect(screen.getByLabelText('Skip')).not.toBeSelected();
+    await press(screen, 'Save subscription');
+
+    expect(screen.getByText(MISSING('Next renewal, Charged to, Reminder'))).toBeTruthy();
+    expectNothingWritten();
+    expect(clearVoiceDraft).not.toHaveBeenCalled();
+  });
+
   it('saves the correction made on the final page along with what was heard', async () => {
     mockParams = HEARD;
     const screen = await render(<AddSubscriptionScreen />);
 
     await press(screen, 'Monthly');
-    await press(screen, 'Charged to, VISA ••4421');
     await press(screen, 'Checking ••0099');
-    await press(screen, 'Done');
+    await press(screen, 'No reminder');
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -966,6 +1177,7 @@ describe('Add subscription — a voice hand-off', () => {
     const screen = await render(<AddSubscriptionScreen />);
 
     expect(screen.getByTestId('logo-32')).toHaveTextContent('Planet Fitness|planetfitness.com');
+    await press(screen, 'No reminder');
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -983,6 +1195,7 @@ describe('Add subscription — a voice hand-off', () => {
     mockParams = HEARD;
     const screen = await render(<AddSubscriptionScreen />);
 
+    await press(screen, 'No reminder');
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
@@ -992,76 +1205,190 @@ describe('Add subscription — a voice hand-off', () => {
   });
 });
 
-describe('Add subscription — the checks inside Save', () => {
-  it('asks for the service first, and says so on the final page', async () => {
-    mockParams = { from: 'voice', prefillAmount: '15.99' };
+describe('Add subscription — Save with gaps', () => {
+  it('says what is still open, writes nothing, and stays on the page with Save ready', async () => {
     const screen = await render(<AddSubscriptionScreen />);
-    expect(screen.getByLabelText('Save subscription')).toBeDisabled();
+    await typedSubscription(screen, '15.99');
 
     await press(screen, 'Save subscription');
 
-    expect(screen.getByText('Pick a service first.')).toBeTruthy();
+    expect(screen.getByText(MISSING('Service, Next renewal, Charged to, Reminder'))).toBeTruthy();
     expect(screen.getByText('You can edit this later.')).toBeTruthy();
     expect(screen.getByPlaceholderText(SERVICE_PLACEHOLDER)).toBeTruthy();
+    expect(screen.getByLabelText('Save subscription')).toBeEnabled();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(warn).toHaveBeenCalled();
-    expect(mockCreate).not.toHaveBeenCalled();
-    expect(mockPast.choose).not.toHaveBeenCalled();
+    expectNothingWritten();
   });
 
-  it('asks for the service before the amount when both are missing', async () => {
+  it('lists every field, in the order of the page, when nothing is filled in', async () => {
+    mockParams = { from: 'voice' };
     const screen = await render(<AddSubscriptionScreen />);
-    // The stub lets Continue through with no amount, to reach a final page with neither.
-    await press(screen, 'Continue');
+    expect(screen.getByLabelText('Save subscription')).toBeEnabled();
 
     await press(screen, 'Save subscription');
 
-    expect(screen.getByText('Pick a service first.')).toBeTruthy();
-    expect(screen.queryByText('Enter what it costs.')).toBeNull();
-    expect(mockCreate).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(MISSING('Amount, Service, Next renewal, Charged to, Reminder')),
+    ).toBeTruthy();
+    expectNothingWritten();
   });
 
-  it('asks for the amount when the service is there', async () => {
-    mockParams = { from: 'voice', prefillName: 'Netflix' };
+  it('lists the amount alone when it is all that is left', async () => {
+    mockParams = {
+      from: 'voice',
+      prefillName: 'Netflix',
+      prefillDate: '2026-10-12',
+      prefillSource: 'card-1',
+    };
     const screen = await render(<AddSubscriptionScreen />);
-    expect(screen.getByLabelText('Save subscription')).toBeDisabled();
+    await press(screen, 'No reminder');
 
     await press(screen, 'Save subscription');
 
-    expect(screen.getByText('Enter what it costs.')).toBeTruthy();
+    expect(screen.getByText(MISSING('Amount'))).toBeTruthy();
     expect(screen.getByLabelText('Amount, needed')).toBeTruthy();
-    expect(mockCreate).not.toHaveBeenCalled();
-    expect(mockPast.choose).not.toHaveBeenCalled();
+    expectNothingWritten();
   });
 
-  it('does not take a zero for an amount', async () => {
-    mockParams = { from: 'voice', prefillName: 'Netflix' };
+  it('does not take the zero a row was stored with for an amount', async () => {
+    mockParams = { id: 'sub-1' };
+    mockSubscription = { data: { ...SPOTIFY, amount: 0 }, isError: false, isFetched: true };
     const screen = await render(<AddSubscriptionScreen />);
 
-    // The keypad page holds Done back at zero; the stub button lets the press through to prove
-    // that Save would still refuse it.
-    await press(screen, 'Amount, needed');
-    expect(screen.getByLabelText('Done')).toHaveProp('accessibilityState', { disabled: true });
+    await press(screen, 'Save changes');
+
+    expect(screen.getByText(MISSING('Amount'))).toBeTruthy();
+    expect(screen.getByLabelText('Amount, needed')).toBeTruthy();
+    expectNothingWritten();
+  });
+
+  it('does not let a typed zero be kept on the amount page', async () => {
+    mockParams = { id: 'sub-1' };
+    mockSubscription = { data: SPOTIFY, isError: false, isFetched: true };
+    const screen = await render(<AddSubscriptionScreen />);
+
+    await pressButton(screen, 'Amount, $11.99');
+    for (let i = 0; i < 5; i += 1) await press(screen, 'Delete last digit');
     await typeAmount(screen, '0');
-    await press(screen, 'Done');
-    await press(screen, 'Save subscription');
 
-    expect(screen.getByText('Enter what it costs.')).toBeTruthy();
-    expect(screen.getByLabelText('Amount, needed')).toBeTruthy();
-    expect(mockCreate).not.toHaveBeenCalled();
-    expect(mockPast.choose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Done')).toBeDisabled();
   });
 
+  it('lists the renewal day alone when it is all that is left: a day is needed to save', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await netflixAt(screen, '15.99');
+    await fillIn(screen, { day: null });
+
+    await press(screen, 'Save subscription');
+
+    expect(screen.getByText(MISSING('Next renewal'))).toBeTruthy();
+    expectNothingWritten();
+  });
+
+  it('counts a service typed but not picked as given', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await typedSubscription(screen, '15.99');
+    await searchService(screen, 'Gym Pass');
+    await fillIn(screen, { day: null });
+
+    await press(screen, 'Save subscription');
+
+    expect(screen.getByText(MISSING('Next renewal'))).toBeTruthy();
+    expectNothingWritten();
+  });
+
+  it.each([
+    ['typed and then emptied again', ''],
+    ['only spaces', '   '],
+  ])('does not count a service %s', async (_name, text) => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await typedSubscription(screen, '15.99');
+    await fillIn(screen);
+    await searchService(screen, 'Gym');
+    await fireEvent.changeText(screen.getByPlaceholderText(SERVICE_PLACEHOLDER), text);
+
+    await press(screen, 'Save subscription');
+
+    expect(screen.getByText(MISSING('Service'))).toBeTruthy();
+    expectNothingWritten();
+  });
+
+  it('lists the service again once the one picked is let go of', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await readyNetflix(screen, '15.99');
+
+    await press(screen, changeService('Netflix'));
+    await press(screen, 'Save subscription');
+
+    expect(screen.getByText(MISSING('Service'))).toBeTruthy();
+    expectNothingWritten();
+  });
+
+  it('holds back an edit whose service was let go of, and never lists what it has answered', async () => {
+    mockParams = { id: 'sub-1' };
+    mockSubscription = { data: SPOTIFY, isError: false, isFetched: true };
+    const screen = await render(<AddSubscriptionScreen />);
+
+    await press(screen, changeService('Spotify'));
+    await press(screen, 'Save changes');
+
+    expect(screen.getByText(MISSING('Service'))).toBeTruthy();
+    expectNothingWritten();
+  });
+
+  it('drops each field from the line as it is answered, and writes once none is left', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await typedSubscription(screen, '15.99');
+
+    await press(screen, 'Save subscription');
+    expect(screen.getByText(MISSING('Service, Next renewal, Charged to, Reminder'))).toBeTruthy();
+
+    await chooseService(screen, 'Net', 'Netflix');
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
+    await press(screen, 'Save subscription');
+    expect(screen.getByText(MISSING('Next renewal, Charged to, Reminder'))).toBeTruthy();
+
+    await pickDay(screen, NEXT_RENEWAL, 0, 'Thursday 15 October 2026');
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
+    await press(screen, 'Save subscription');
+    expect(screen.getByText(MISSING('Charged to, Reminder'))).toBeTruthy();
+
+    await press(screen, 'Skip');
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
+    await press(screen, 'Save subscription');
+    expect(screen.getByText(MISSING('Reminder'))).toBeTruthy();
+    expectNothingWritten();
+
+    await press(screen, 'No reminder');
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      name: 'Netflix',
+      amount: 15.99,
+      next_renewal_on: '2026-10-15',
+      card_id: null,
+      bank_account_id: null,
+    });
+  });
+});
+
+describe('Add subscription — a failed or held save', () => {
   it('says the one failure line above Save when the write fails, and stays', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     mockCreate.mockRejectedValue(new Error('network down'));
     const screen = await render(<AddSubscriptionScreen />);
-    await netflixAt(screen, '15.99');
+    await readyNetflix(screen, '15.99');
 
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
     expect(screen.getAllByText(FAILURE_MESSAGE)).toHaveLength(1);
     expect(screen.getByText('You can edit this later.')).toBeTruthy();
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
     expect(router.back).not.toHaveBeenCalled();
     // The row never existed, so there is nothing for a reminder to point at.
     expect(mockApplyReminder).not.toHaveBeenCalled();
@@ -1073,7 +1400,7 @@ describe('Add subscription — the checks inside Save', () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     mockCreate.mockRejectedValueOnce(new Error('network down'));
     const screen = await render(<AddSubscriptionScreen />);
-    await netflixAt(screen, '15.99');
+    await readyNetflix(screen, '15.99');
     await press(screen, 'Save subscription');
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
 
@@ -1109,7 +1436,7 @@ describe('Add subscription — the checks inside Save', () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     mockCreate.mockRejectedValue(new Error('network down'));
     const screen = await render(<AddSubscriptionScreen />);
-    await netflixAt(screen, '15.99');
+    await readyNetflix(screen, '15.99');
     await press(screen, 'Save subscription');
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
 
@@ -1119,73 +1446,108 @@ describe('Add subscription — the checks inside Save', () => {
     expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
     log.mockRestore();
   });
+
+  it('does not carry the line about gaps back onto the amount page either', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await typedSubscription(screen, '15.99');
+    await press(screen, 'Save subscription');
+    expect(screen.getByText(ANY_MISSING)).toBeTruthy();
+
+    await press(screen, 'Back');
+
+    expect(screen.getByText('How much does it cost?')).toBeTruthy();
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
+  });
 });
 
 describe('Add subscription — a line that came from Save', () => {
-  // The line names what was wrong with the page as it was, so keeping something on a page that
-  // Save sent a person to is what takes it away.
-  it('goes once the amount is given', async () => {
-    mockParams = { from: 'voice', prefillName: 'Netflix' };
+  // The line names what was wrong with the page as it was, so a change made on the page itself is
+  // what takes it away. A pick in a box has no Done to do it, so each control clears it itself.
+  it.each<[string, (screen: Screen) => Promise<unknown>]>([
+    ['a service is picked', (screen) => chooseService(screen, 'Net', 'Netflix')],
+    ['something is typed in the service box', (screen) => searchService(screen, 'Gym')],
+    [
+      'a renewal day is picked',
+      (screen) => pickDay(screen, NEXT_RENEWAL, 0, 'Thursday 15 October 2026'),
+    ],
+    ['a card is picked', (screen) => press(screen, 'VISA ••4421')],
+    ['Skip is picked', (screen) => press(screen, 'Skip')],
+    ['a reminder is picked', (screen) => press(screen, '3 days')],
+    ['the cycle is changed', (screen) => press(screen, 'Yearly')],
+    [
+      'the amount is kept on its page',
+      async (screen) => {
+        await pressButton(screen, 'Amount, $15.99');
+        await press(screen, 'Done');
+      },
+    ],
+    ['a note is kept on its page', (screen) => keepNote(screen, 'Note, not set, optional', 'Duo')],
+  ])('the line about gaps goes when %s', async (_name, change) => {
     const screen = await render(<AddSubscriptionScreen />);
+    await typedSubscription(screen, '15.99');
     await press(screen, 'Save subscription');
-    expect(screen.getByText('Enter what it costs.')).toBeTruthy();
+    expect(screen.getByText(ANY_MISSING)).toBeTruthy();
 
-    await press(screen, 'Amount, needed');
-    await typeAmount(screen, '7');
-    await press(screen, 'Done');
+    await change(screen);
 
-    expect(screen.queryByText('Enter what it costs.')).toBeNull();
-    expect(screen.getByLabelText('Save subscription')).toBeEnabled();
+    expect(screen.queryByText(ANY_MISSING)).toBeNull();
   });
 
-  // A pick in the service box sets the service without going through a page's Done, so it has to
-  // take the line away itself.
-  it('goes once the service is given', async () => {
-    mockParams = { from: 'voice', prefillAmount: '15.99' };
+  const failedSave = async () => {
+    mockCreate.mockRejectedValueOnce(new Error('network down'));
     const screen = await render(<AddSubscriptionScreen />);
+    await readyNetflix(screen, '15.99', { reminder: '1 week' });
     await press(screen, 'Save subscription');
-    expect(screen.getByText('Pick a service first.')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    return screen;
+  };
 
-    await chooseService(screen, 'Net', 'Netflix');
+  it.each<[string, (screen: Screen) => Promise<unknown>]>([
+    ['the service is let go of', (screen) => press(screen, changeService('Netflix'))],
+    [
+      'the renewal day is changed',
+      (screen) => pickDay(screen, renewalOn('Thu Oct 15'), 0, 'Friday 16 October 2026'),
+    ],
+    ['a card is picked', (screen) => press(screen, 'VISA ••4421')],
+    ['Skip is picked', (screen) => press(screen, 'Skip')],
+    ['a reminder is picked', (screen) => press(screen, '3 days')],
+    ['the cycle is changed', (screen) => press(screen, 'Yearly')],
+    [
+      'the amount is kept on its page',
+      async (screen) => {
+        await pressButton(screen, 'Amount, $15.99');
+        await press(screen, 'Done');
+      },
+    ],
+    ['a note is kept on its page', (screen) => keepNote(screen, 'Note, not set, optional', 'Duo')],
+  ])('the failure line goes when %s', async (_name, change) => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const screen = await failedSave();
 
-    expect(screen.getByLabelText('Save subscription')).toBeEnabled();
-    expect(screen.queryByText('Pick a service first.')).toBeNull();
+    await change(screen);
+
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect(screen.getByText('You can edit this later.')).toBeTruthy();
+    log.mockRestore();
   });
 
-  it.each([['the amount'], ['the card'], ['the renewal'], ['the reminder'], ['the note']])(
-    'goes when Done keeps something on %s',
-    async (page) => {
-      const log = jest.spyOn(console, 'log').mockImplementation(() => {});
-      mockCreate.mockRejectedValueOnce(new Error('network down'));
-      const screen = await render(<AddSubscriptionScreen />);
-      await netflixAt(screen, '15.99');
-      await press(screen, 'Save subscription');
-      await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+  // The time sits in the reminder's own field beside the chips, so by the same rule it clears the
+  // line; today it leaves it standing.
+  it('the failure line goes when the reminder time is changed', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const screen = await failedSave();
 
-      const open = {
-        'the amount': 'Amount, $15.99',
-        'the card': 'Charged to, not set, optional',
-        'the renewal': 'Next renewal, not set, optional',
-        'the reminder': 'Reminder, not set, optional',
-        'the note': 'Note, not set, optional',
-      }[page] as string;
-      if (page === 'the amount') await pressButton(screen, open);
-      else await press(screen, open);
-      await press(screen, 'Done');
+    await press(screen, 'Sent at 9:00 AM. Change the time.');
+    await press(screen, 'PM');
+    await press(screen, 'Confirm time');
 
-      expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
-      expect(screen.getByText('You can edit this later.')).toBeTruthy();
-      log.mockRestore();
-    },
-  );
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    log.mockRestore();
+  });
 
   it('stays when a page is left with Back, because nothing was kept', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
-    mockCreate.mockRejectedValueOnce(new Error('network down'));
-    const screen = await render(<AddSubscriptionScreen />);
-    await netflixAt(screen, '15.99');
-    await press(screen, 'Save subscription');
-    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    const screen = await failedSave();
 
     await press(screen, 'Note, not set, optional');
     await press(screen, 'Back');
@@ -1196,11 +1558,7 @@ describe('Add subscription — a line that came from Save', () => {
 
   it('goes when Continue is pressed again on the amount page it was sent back to', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
-    mockCreate.mockRejectedValueOnce(new Error('network down'));
-    const screen = await render(<AddSubscriptionScreen />);
-    await netflixAt(screen, '15.99');
-    await press(screen, 'Save subscription');
-    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    const screen = await failedSave();
 
     await press(screen, 'Back');
     await press(screen, 'Continue');
@@ -1224,6 +1582,7 @@ describe('Add subscription — the logo', () => {
     await typedSubscription(screen, '24.99');
     await addService(screen, PLANET.name);
     await answer?.(screen);
+    await fillIn(screen);
     await press(screen, 'Save subscription');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     return mockCreate.mock.calls[0][0];
@@ -1270,6 +1629,7 @@ describe('Add subscription — the logo', () => {
     expect(screen.getByLabelText(changeService('Linear'))).toBeTruthy();
     expect(screen.getByTestId('logo-32')).toHaveTextContent('Linear|linear.app');
     expect(screen.getByLabelText(LOGO_COPY.changeLogo)).toBeTruthy();
+    await fillIn(screen);
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -1294,6 +1654,7 @@ describe('Add subscription — the logo', () => {
     await addService(screen, 'Lineer');
 
     expect(screen.getByLabelText(LOGO_COPY.yes)).toBeTruthy();
+    await fillIn(screen);
     await press(screen, 'Save subscription');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('logo_domain');
@@ -1313,6 +1674,7 @@ describe('Add subscription — the logo', () => {
     expect(screen.getByLabelText(changeService('Linear'))).toBeTruthy();
     expect(screen.getByTestId('logo-32')).toHaveTextContent('Linear|old.example');
     expect(mockLogoAnswer).not.toHaveBeenCalledWith('Linear');
+    await fillIn(screen);
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -1330,6 +1692,7 @@ describe('Add subscription — the logo', () => {
     await typedSubscription(first, '24.99');
     await addService(first, 'Planet Fitness');
     await press(first, LOGO_COPY.yes);
+    await fillIn(first);
     await press(first, 'Save subscription');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockRemember).toHaveBeenCalledTimes(1);
@@ -1344,6 +1707,7 @@ describe('Add subscription — the logo', () => {
     await fireEvent.press(second.getByLabelText('Planet Fitness'));
 
     expect(second.queryByLabelText(LOGO_COPY.yes)).toBeNull();
+    await fillIn(second);
     await press(second, 'Save subscription');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0]).toMatchObject({

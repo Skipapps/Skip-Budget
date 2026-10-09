@@ -34,6 +34,19 @@ export const receiptsMessages = defineMessages({
     es: '¿Dónde lo compraste?',
     fr: 'Où l’as-tu acheté ?',
   },
+  'receipts.add.storePlaceholder': {
+    en: 'Enter the store name',
+    es: 'Escribe el nombre de la tienda',
+    fr: 'Écris le nom du magasin',
+  },
+  // Paid with: none of the cards or accounts, chosen on purpose.
+  'receipts.add.skipSource': { en: 'Skip', es: 'Omitir', fr: 'Passer' },
+  // {fields} is the boxes still empty, by the names they carry on the page.
+  'receipts.add.missing': {
+    en: 'To save this receipt, fill in: {fields}.',
+    es: 'Para guardar el recibo, completa: {fields}.',
+    fr: 'Pour enregistrer le reçu, remplis : {fields}.',
+  },
   'receipts.add.saving': { en: 'Saving…', es: 'Guardando…', fr: 'Enregistrement…' },
   'receipts.add.saveChanges': {
     en: 'Save changes',
@@ -122,9 +135,9 @@ export const receiptsMessages = defineMessages({
     fr: 'Nous avons lu {fields}.',
   },
   'receipts.scan.check': {
-    en: 'Check the {fields} below — it will save either way.',
-    es: 'Revisa {fields} abajo: se guardará de todos modos.',
-    fr: 'Vérifie {fields} ci-dessous : il sera enregistré quand même.',
+    en: 'Check the {fields} below.',
+    es: 'Revisa {fields} abajo.',
+    fr: 'Vérifie {fields} ci-dessous.',
   },
   'receipts.scan.and': {
     en: '{first} and {last}',

@@ -63,20 +63,28 @@ export const subscriptionsMessages = defineMessages({
     es: '¿Cuánto cuesta?',
     fr: 'Combien ça coûte ?',
   },
-  'subscriptions.add.renewQuestion': {
-    en: 'When does it renew?',
-    es: '¿Cuándo se renueva?',
-    fr: 'Quand se renouvelle-t-il ?',
-  },
   'subscriptions.add.askService': {
     en: 'Which service is it?',
     es: '¿Qué servicio es?',
     fr: 'Quel est le service ?',
   },
-  'subscriptions.add.noRenewal': {
-    en: 'No renewal date',
-    es: 'Sin fecha de renovación',
-    fr: 'Aucune date de renouvellement',
+  'subscriptions.add.pickDay': {
+    en: 'Select a date',
+    es: 'Elige una fecha',
+    fr: 'Choisis une date',
+  },
+  // Charged to: none of the cards or accounts, chosen on purpose.
+  'subscriptions.add.skipSource': { en: 'Skip', es: 'Omitir', fr: 'Passer' },
+  'subscriptions.add.noReminder': {
+    en: 'No reminder',
+    es: 'Sin recordatorio',
+    fr: 'Aucun rappel',
+  },
+  // {fields} is the boxes still empty, by the names they carry on the page.
+  'subscriptions.add.missing': {
+    en: 'To save this subscription, fill in: {fields}.',
+    es: 'Para guardar la suscripción, completa: {fields}.',
+    fr: 'Pour enregistrer l’abonnement, remplis : {fields}.',
   },
   'subscriptions.add.saving': { en: 'Saving…', es: 'Guardando…', fr: 'Enregistrement…' },
   'subscriptions.add.saveChanges': {

@@ -1,13 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import {
-  AlignLeft,
-  Bell,
-  CalendarDays,
-  CircleCheck,
-  CreditCard,
-  RefreshCw,
-  Trash2,
-} from 'lucide-react-native';
+import { AlignLeft, CircleCheck, RefreshCw, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -17,7 +9,7 @@ import {
   useReminderChoice,
   type ReminderChoice,
 } from '@/api/reminders';
-import { useSpendCategories } from '@/api/brands';
+import { guessCategory, useSpendCategories } from '@/api/brands';
 import { buildSubscriptionValues } from '@/api/entry-values';
 import {
   useCreateSubscription,
@@ -27,13 +19,8 @@ import {
 import { usePastCharges } from '@/api/past-charges';
 import { usePaymentSources, useSubscription } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
-import {
-  AmountEditPage,
-  DateEditPage,
-  NoteEditPage,
-  PaidWithEditPage,
-  ReminderEditPage,
-} from '@/components/entry/edit-pages';
+import { DateBox } from '@/components/entry/date-box';
+import { AmountEditPage, NoteEditPage } from '@/components/entry/edit-pages';
 import {
   EntryReview,
   GlyphWell,
@@ -45,12 +32,12 @@ import { cycleLabel } from '@/components/subscriptions/subscription-row';
 import { StepFlow } from '@/components/flow/step-flow';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
+import { ReminderField } from '@/components/ui/reminder-field';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TextLink } from '@/components/ui/text-link';
+import { SourceTiles } from '@/components/ui/source-tiles';
+import { FieldLabel } from '@/components/ui/typography';
 import { useConfirm } from '@/providers/dialog-provider';
 import { t, type MessageKey } from '@/i18n';
-import { formatEntryDay } from '@/lib/entry-day';
-import { reminderSummary } from '@/lib/entry-reminder';
 import { logoColumns } from '@/lib/logo-columns';
 import { useToday } from '@/lib/use-today';
 import { TEXT_CAP } from '@/theme/text-scale';
@@ -105,15 +92,16 @@ function spendCategoryLabel(id: string, stored: string): string {
   return key ? t(key) : stored;
 }
 
-/** The pages of one subscription: the keypad it starts on, the final page, and one per field. */
-type Page = 'amount' | 'review' | 'amountEdit' | 'paidWith' | 'note' | 'renewal' | 'reminder';
+/** The pages of one subscription: the keypad it starts on, the final page, and the note's. */
+type Page = 'amount' | 'review' | 'amountEdit' | 'note';
 
 type Initial = {
   service: BrandSelection | null;
   amount: string;
   cycle: Cycle;
   renewsOn: Date | null;
-  sourceId: string;
+  /** '' is Skip, picked on purpose; null is not answered yet. A saved subscription has answered. */
+  sourceId: string | null;
   note: string;
   active: boolean;
   /** yyyy-mm-dd the app counts renewals from today; null for a new one. */
@@ -125,7 +113,7 @@ const BLANK: Initial = {
   amount: '',
   cycle: 'monthly',
   renewsOn: null,
-  sourceId: '',
+  sourceId: null,
   note: '',
   active: true,
   countsFrom: null,
@@ -140,7 +128,7 @@ function fromPrefill(prefill: SubscriptionPrefill | null): Initial {
     amount: prefill.amount,
     cycle: prefill.cycle ?? BLANK.cycle,
     renewsOn: prefill.renewsOn,
-    sourceId: prefill.sourceId,
+    sourceId: prefill.sourceId || null,
     note: prefill.note,
   };
 }
@@ -264,6 +252,8 @@ function SubscriptionForm({
   const editing = Boolean(id);
 
   const [service, setService] = useState<BrandSelection | null>(initial.service);
+  // Typed but not picked from the list: it names the subscription all the same.
+  const [typedService, setTypedService] = useState('');
   const [amount, setAmount] = useState(initial.amount);
   const [cycle, setCycle] = useState<Cycle>(initial.cycle);
   const [renewsOn, setRenewsOn] = useState<Date | null>(initial.renewsOn);
@@ -291,9 +281,13 @@ function SubscriptionForm({
   const savedReminder = useReminderChoice('subscription', id);
   const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
   const [timeDraft, setTimeDraft] = useState<string | null>(null);
-  const reminder = reminderDraft ?? savedReminder.choice;
+  // A new subscription has no answer until one is picked; "No reminder" is an answer.
+  const reminder: ReminderChoice | null = reminderDraft ?? (editing ? savedReminder.choice : null);
   const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
+
+  const value = Number(amount);
+  const amountReady = Number.isFinite(value) && value > 0;
 
   const fail = (message: string) => {
     warn();
@@ -313,19 +307,45 @@ function SubscriptionForm({
 
   const handleSave = async () => {
     setError(null);
+    const typed = typedService.trim();
+    const chosen: BrandSelection | null =
+      service ??
+      (typed
+        ? // Keyword guess, as the box's own "Add" row files a new service. No logo: one replaced by
+          // typing must not keep the old one's.
+          {
+            brandId: null,
+            name: typed,
+            domain: null,
+            categoryId: guessCategory(typed),
+            logoDomain: null,
+            logoHidden: false,
+          }
+        : null);
+    const missing = [
+      !amountReady && t('receipts.field.amount'),
+      !chosen && t('subscriptions.field.service'),
+      !renewsOn && t('subscriptions.detail.nextRenewal'),
+      sourceId === null && t('subscriptions.field.chargedTo'),
+      reminder === null && t('ui.reminder.label'),
+    ].filter((field): field is string => Boolean(field));
+    if (missing.length > 0 || sourceId === null || reminder === null) {
+      fail(t('subscriptions.add.missing', { fields: missing.join(', ') }));
+      return;
+    }
 
     // Checks and values live in the shared builder, which the voice review page saves through too.
     // started_on counts from the renewal picked: only ever earlier on an edit, never on or before a
     // renewal already recorded.
     const built = buildSubscriptionValues(
-      { service, amount, cycle, renewsOn, sourceId, note, active },
+      { service: chosen, amount, cycle, renewsOn, sourceId, note, active },
       { sources, lastChargedOn: pastCharges.lastChargedOn, countsFrom: initial.countsFrom },
     );
     if (!built.ok) {
       fail(built.message);
       return;
     }
-    const values = { ...built.values, ...logoColumns(service, saved) };
+    const values = { ...built.values, ...logoColumns(chosen, saved) };
 
     try {
       // What a recorded renewal copies from the subscription.
@@ -339,7 +359,7 @@ function SubscriptionForm({
         editing &&
         (carried.label !== (initial.service?.name || 'Subscription') ||
           carried.amount !== Number(initial.amount) ||
-          (carried.card_id ?? carried.bank_account_id ?? '') !== initial.sourceId);
+          (carried.card_id ?? carried.bank_account_id ?? '') !== (initial.sourceId ?? ''));
 
       // Asked before anything is written, so backing out leaves it as it was.
       if (!pastCharges.ready) {
@@ -388,10 +408,6 @@ function SubscriptionForm({
   };
 
   const busy = createSubscription.isPending || updateSubscription.isPending || pastCharges.saving;
-
-  const value = Number(amount);
-  const amountReady = Number.isFinite(value) && value > 0;
-  const sourceLabel = sources.find((source) => source.id === sourceId)?.label ?? null;
   // The page this form opened on. Anywhere else the edge swipe is off, and Back steps back.
   const isRoot = view === initialView;
 
@@ -420,21 +436,6 @@ function SubscriptionForm({
     );
   }
 
-  if (view === 'paidWith') {
-    return (
-      <PaidWithEditPage
-        title={t('subscriptions.field.chargedTo')}
-        sources={sources}
-        value={sourceId}
-        onBack={toReview}
-        onDone={(next) => {
-          setSourceId(next);
-          settle();
-        }}
-      />
-    );
-  }
-
   if (view === 'note') {
     return (
       <NoteEditPage
@@ -445,47 +446,6 @@ function SubscriptionForm({
         onBack={toReview}
         onDone={(next) => {
           setNote(next);
-          settle();
-        }}
-      />
-    );
-  }
-
-  if (view === 'renewal') {
-    return (
-      <DateEditPage
-        title={t('subscriptions.detail.nextRenewal')}
-        question={t('subscriptions.add.renewQuestion')}
-        // Optional: many know the cost but not the renewal date, so nothing is pre-selected.
-        value={renewsOn}
-        footerExtra={(clear) => (
-          <TextLink
-            label={t('subscriptions.add.noRenewal')}
-            variant="subtle"
-            onPress={clear}
-            className="mt-2 self-start"
-          />
-        )}
-        onBack={toReview}
-        onDone={(day) => {
-          setRenewsOn(day);
-          settle();
-        }}
-      />
-    );
-  }
-
-  if (view === 'reminder') {
-    return (
-      <ReminderEditPage
-        title={t('ui.reminder.label')}
-        kind="subscription"
-        value={reminder}
-        time={remindAt}
-        onBack={toReview}
-        onDone={(choice, at) => {
-          setReminderDraft(choice);
-          setTimeDraft(at);
           settle();
         }}
       />
@@ -532,6 +492,12 @@ function SubscriptionForm({
               setError(null);
               setService(next);
             }}
+            // The box is drawn afresh after another page; what was typed comes back with it.
+            initialQuery={typedService}
+            onQueryChange={(typed) => {
+              setError(null);
+              setTypedService(typed);
+            }}
             placeholder={t('subscriptions.add.servicePlaceholder')}
             changeLabel={(name) => t('subscriptions.add.changeService', { name })}
             addLabel={(name) => t('subscriptions.add.addServiceAs', { name })}
@@ -571,30 +537,61 @@ function SubscriptionForm({
     },
     {
       key: 'renewal',
-      label: t('subscriptions.detail.nextRenewal'),
-      value: renewsOn ? formatEntryDay(renewsOn, todayDate) : null,
-      leading: <GlyphWell icon={CalendarDays} />,
-      onPress: () => setView('renewal'),
+      field: (
+        <DateBox
+          label={t('subscriptions.detail.nextRenewal')}
+          value={renewsOn}
+          today={todayDate}
+          placeholder={t('subscriptions.add.pickDay')}
+          onChange={(day) => {
+            setError(null);
+            setRenewsOn(day);
+          }}
+        />
+      ),
     },
-    // Without a card or account there is nothing to choose between, as before.
-    ...(sources.length > 0
-      ? [
-          {
-            key: 'paidWith',
-            label: t('subscriptions.field.chargedTo'),
-            value: sourceLabel,
-            leading: <GlyphWell icon={CreditCard} />,
-            onPress: () => setView('paidWith'),
-          },
-        ]
-      : []),
+    {
+      key: 'paidWith',
+      field: (
+        <View className="w-full">
+          <FieldLabel className="mb-2">{t('subscriptions.field.chargedTo')}</FieldLabel>
+          <SourceTiles
+            sources={sources}
+            value={sourceId ?? ''}
+            onChange={(next) => {
+              setError(null);
+              setSourceId(next);
+            }}
+            skip={{
+              label: t('subscriptions.add.skipSource'),
+              selected: sourceId === '',
+              onPress: () => {
+                setError(null);
+                setSourceId('');
+              },
+            }}
+          />
+        </View>
+      ),
+    },
     {
       key: 'reminder',
-      label: t('ui.reminder.label'),
-      value: reminderSummary(reminder, remindAt),
-      placeholder: t('api.reminders.off'),
-      leading: <GlyphWell icon={Bell} />,
-      onPress: () => setView('reminder'),
+      field: (
+        <ReminderField
+          kind="subscription"
+          value={reminder}
+          onChange={(choice) => {
+            setError(null);
+            setReminderDraft(choice);
+          }}
+          time={remindAt}
+          onTimeChange={(at) => {
+            setError(null);
+            setTimeDraft(at);
+          }}
+          offLabel={t('subscriptions.add.noReminder')}
+        />
+      ),
     },
     {
       key: 'note',
@@ -667,7 +664,8 @@ function SubscriptionForm({
             ? t('subscriptions.add.saveChanges')
             : t('subscriptions.add.saveSubscription')
       }
-      primaryDisabled={!amountReady || !service || busy}
+      // Never greyed out for a gap: Save says what is still missing.
+      primaryDisabled={busy}
       onPrimary={() => void handleSave()}
       error={error}
       footerSlot={

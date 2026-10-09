@@ -9,6 +9,8 @@ type SourceTilesProps = {
   sources: readonly PaymentSource[];
   value: string;
   onChange: (id: string) => void;
+  /** A last pill for none of them, picked on purpose rather than left blank. */
+  skip?: { label: string; selected: boolean; onPress: () => void };
 };
 
 /**
@@ -16,7 +18,7 @@ type SourceTilesProps = {
  * never repainted on selection: the pill fill says "chosen", the swatch says "which one". The pills
  * wrap onto more lines, and a name wider than the row wraps inside its pill rather than being cut.
  */
-export function SourceTiles({ sources, value, onChange }: SourceTilesProps) {
+export function SourceTiles({ sources, value, onChange, skip }: SourceTilesProps) {
   return (
     <View accessibilityRole="radiogroup" className="w-full flex-row flex-wrap gap-2">
       {sources.map((source) => {
@@ -55,6 +57,33 @@ export function SourceTiles({ sources, value, onChange }: SourceTilesProps) {
           </Pressable>
         );
       })}
+
+      {skip ? (
+        <Pressable
+          accessibilityRole="radio"
+          accessibilityState={{ selected: skip.selected, checked: skip.selected }}
+          accessibilityLabel={skip.label}
+          hitSlop={{ top: 4, bottom: 4 }}
+          onPress={() => {
+            selection();
+            skip.onPress();
+          }}
+          className={cn(
+            'min-h-10 max-w-full flex-row items-center rounded-full px-4 py-2',
+            skip.selected ? 'bg-control' : 'bg-ink/5 active:bg-ink/10',
+          )}
+        >
+          <Text
+            className={cn(
+              'shrink text-[14px]',
+              skip.selected ? 'font-app-medium text-on-control' : 'font-app text-body',
+            )}
+            maxFontSizeMultiplier={TEXT_CAP.control}
+          >
+            {skip.label}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

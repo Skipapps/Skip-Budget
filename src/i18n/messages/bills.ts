@@ -71,9 +71,9 @@ export const billsMessages = defineMessages({
     fr: 'Garderie, frais de scolarité, soins médicaux',
   },
   'bills.categoryHint.other': {
-    en: 'Name it and pick an icon',
-    es: 'Ponle nombre y elige un ícono',
-    fr: 'Donne-lui un nom et choisis une icône',
+    en: 'Anything else you pay',
+    es: 'Cualquier otro pago',
+    fr: 'Tout autre paiement',
   },
 
   // The icon picker's choices, spoken by VoiceOver; the id is what is stored.
@@ -112,15 +112,13 @@ export const billsMessages = defineMessages({
   },
   'bills.goBack': { en: 'Go back', es: 'Regresar', fr: 'Revenir' },
 
-  'bills.field.company': { en: 'Company', es: 'Empresa', fr: 'Entreprise' },
   'bills.field.name': { en: 'Name', es: 'Nombre', fr: 'Nom' },
-  'bills.field.icon': { en: 'Icon', es: 'Ícono', fr: 'Icône' },
   'bills.field.category': { en: 'Category', es: 'Categoría', fr: 'Catégorie' },
   'bills.field.paidWith': { en: 'Paid with', es: 'Se paga con', fr: 'Payée avec' },
   'bills.field.note': { en: 'Note', es: 'Nota', fr: 'Note' },
   'bills.field.recurring': { en: 'Recurring', es: 'Se repite', fr: 'Récurrence' },
   'bills.field.to': { en: 'To', es: 'Hasta', fr: 'Jusqu’au' },
-  'bills.field.due': { en: 'Due on', es: 'Fecha de vencimiento', fr: 'Date d’échéance' },
+  'bills.field.paymentOn': { en: 'Payment on', es: 'Fecha de pago', fr: 'Date de paiement' },
   'bills.field.starts': { en: 'Starts on', es: 'Empieza el', fr: 'Commence le' },
 
   'bills.add.titleEdit': { en: 'Edit bill', es: 'Editar factura', fr: 'Modifier la facture' },
@@ -143,16 +141,6 @@ export const billsMessages = defineMessages({
     en: 'How much is the bill?',
     es: '¿De cuánto es la factura?',
     fr: 'De combien est la facture ?',
-  },
-  'bills.add.startQuestion': {
-    en: 'When does it start?',
-    es: '¿Cuándo empieza?',
-    fr: 'Quand commence-t-elle ?',
-  },
-  'bills.add.dueQuestion': {
-    en: 'When is it due?',
-    es: '¿Cuándo vence?',
-    fr: 'Quelle est la date d’échéance ?',
   },
   'bills.add.saving': { en: 'Saving…', es: 'Guardando…', fr: 'Enregistrement…' },
   'bills.add.saveChanges': {
@@ -194,20 +182,25 @@ export const billsMessages = defineMessages({
     es: 'Continúa — sin fecha de fin',
     fr: 'En cours — sans date de fin',
   },
-  'bills.add.changeCompany': {
-    en: 'Change company, currently {name}',
-    es: 'Cambiar empresa, ahora es {name}',
-    fr: 'Changer d’entreprise, actuellement {name}',
+  'bills.add.changeName': {
+    en: 'Change name, currently {name}',
+    es: 'Cambiar nombre, ahora es {name}',
+    fr: 'Changer le nom, actuellement {name}',
   },
-  'bills.add.addCompanyAs': {
-    en: 'Add {name} as a new company',
-    es: 'Agregar {name} como empresa nueva',
-    fr: 'Ajouter {name} comme nouvelle entreprise',
+  'bills.add.useName': {
+    en: 'Use {name} as the name',
+    es: 'Usar {name} como nombre',
+    fr: 'Utiliser {name} comme nom',
   },
-  'bills.add.clearEndA11y': {
-    en: 'Clear end date',
-    es: 'Borrar fecha de fin',
-    fr: 'Effacer la date de fin',
+  'bills.add.pickDay': { en: 'Select a date', es: 'Elige una fecha', fr: 'Choisis une date' },
+  // Paid with: none of the cards or accounts, chosen on purpose.
+  'bills.add.skipSource': { en: 'Skip', es: 'Omitir', fr: 'Passer' },
+  'bills.add.noReminder': { en: 'No reminder', es: 'Sin recordatorio', fr: 'Aucun rappel' },
+  // {fields} is the boxes still empty, by the names they carry on the page.
+  'bills.add.missing': {
+    en: 'To save this bill, fill in: {fields}.',
+    es: 'Para guardar la factura, completa: {fields}.',
+    fr: 'Pour enregistrer la facture, remplis : {fields}.',
   },
   'bills.add.clearEnd': {
     en: 'Clear — make it ongoing',
@@ -221,9 +214,9 @@ export const billsMessages = defineMessages({
   },
   // The company field's placeholder per category. Lists of company names are not messages.
   'bills.add.issuer.housing': {
-    en: 'Letting agent or management company',
-    es: 'Inmobiliaria o administradora',
-    fr: 'Propriétaire ou gestionnaire immobilier',
+    en: 'Rent, mortgage or your landlord',
+    es: 'Renta, hipoteca o tu arrendador',
+    fr: 'Loyer, prêt immobilier ou ton propriétaire',
   },
   'bills.add.issuer.water': {
     en: 'Your water company',
@@ -241,9 +234,9 @@ export const billsMessages = defineMessages({
     fr: 'Garderie, école ou clinique',
   },
   'bills.add.issuer.other': {
-    en: 'Search for a company',
-    es: 'Busca una empresa',
-    fr: 'Cherche une entreprise',
+    en: 'Search or type a name',
+    es: 'Busca o escribe un nombre',
+    fr: 'Cherche ou écris un nom',
   },
 
   'bills.plans.title': { en: 'Your bills', es: 'Tus facturas', fr: 'Tes factures' },

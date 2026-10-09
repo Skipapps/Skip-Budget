@@ -17,11 +17,13 @@ import {
 /**
  * The add forms opened by "More options" on the voice review page. What arrives is the review
  * page's edited copy as route params (`entryToForm`), and it lands on the form's own final page:
- * nothing walks through the steps again. The store, service or company sits on that page in its
- * own search box, already chosen. A receipt is filed as a voice capture with no scan report, a
- * logo chosen on the review page is drawn and saved, and so is a typed note. Saving goes back to
- * Home with `dismissTo`, so nothing can land on the review page again and file the same thing
- * twice; a form opened any other way still goes back.
+ * nothing walks through the steps again. The store, service or a bill's name sits on that page in
+ * its own search box, already chosen. A receipt is filed as a voice capture with no scan report, a
+ * logo chosen on the review page is drawn and saved, and so is a typed note. How it is paid, and
+ * for a bill or subscription whether to remind, are answers the person gives: a hand-off
+ * preselects only the card or account it heard, and Save names what is still missing rather than
+ * guessing. Saving goes back to Home with `dismissTo`, so nothing can land on the
+ * review page again and file the same thing twice; a form opened any other way still goes back.
  *
  * Real pages throughout; only the network, the native scanner and the logo images are replaced.
  */
@@ -31,7 +33,6 @@ jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
 );
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
-jest.mock('@/components/ui/reminder-field', () => ({ ReminderField: () => null }));
 jest.mock('@/components/ui/calculator-pad', () => ({ CalculatorPad: () => null }));
 jest.mock('@/components/calculators/schedule-card', () => ({ ScheduleCard: () => null }));
 jest.mock('@/lib/haptics', () => ({
@@ -119,9 +120,10 @@ jest.mock('@/api/past-charges', () => ({
 }));
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/api/push', () => ({ enableReminders: jest.fn() }));
+const mockApplyReminder = jest.fn();
 jest.mock('@/api/reminders', () => ({
   ...jest.requireActual('@/api/reminders'),
-  useApplyReminder: () => async () => {},
+  useApplyReminder: () => mockApplyReminder,
   useReminderChoice: () => ({ choice: 'off', remindAt: '09:00' }),
 }));
 
@@ -273,10 +275,25 @@ const onFinalPage = (screen: Screen) => {
 const isLit = (screen: Screen, label: string) =>
   Boolean(screen.getByLabelText(label).props.accessibilityState?.selected);
 
+/** The reminder chips of a bill or subscription. A hand-off never lights one: nobody said anything about reminders. */
+const REMINDER_CHIPS = ['No reminder', 'On the day', '1 day', '3 days', '1 week'];
+
+/** Answers the two questions a hand-off cannot: how it is paid, and whether to remind. */
+async function answerRest(screen: Screen, source: string) {
+  await press(screen, source);
+  await press(screen, 'No reminder');
+}
+
+/** Opens the Payment on box, which has no day yet, and picks a day in the calendar under it. */
+async function pickPaymentDay(screen: Screen, day: string) {
+  await press(screen, 'Payment on, Select a date');
+  await press(screen, day);
+}
+
 /** Searches the store field on the final page and taps the catalogue result of that name. */
 async function chooseStore(screen: Screen, name: string) {
   // On the final page the box is not focused until it is tapped, and only then does it search.
-  const input = screen.getByPlaceholderText('Search for a store');
+  const input = screen.getByPlaceholderText('Enter the store name');
   await act(async () => {
     fireEvent(input, 'focus');
     fireEvent.changeText(input, name);
@@ -320,11 +337,14 @@ describe('Add receipt from voice', () => {
     expect(screen.getByLabelText('Change store, currently Starbucks')).toBeTruthy();
     expect(screen.getByText('Starbucks|starbucks.com')).toBeTruthy();
     expect(screen.getByText(/^Filed under /)).toBeTruthy();
-    expect(screen.queryByPlaceholderText('Search for a store')).toBeNull();
+    expect(screen.queryByPlaceholderText('Enter the store name')).toBeNull();
     expect(screen.getByLabelText('Date, Wed Sep 30')).toBeTruthy();
-    expect(screen.getByLabelText('Paid with, VISA ••4421')).toBeTruthy();
+    // The heard card is already chosen in Paid with; the others are not.
+    expect(isLit(screen, 'VISA ••4421')).toBe(true);
+    expect(isLit(screen, 'Checking ••0099')).toBe(false);
+    expect(isLit(screen, 'Skip')).toBe(false);
     expect(screen.queryByText(/^Read the/)).toBeNull();
-    expect(screen.queryByText(/below — it will save either way/)).toBeNull();
+    expect(screen.queryByText(/^Check the .+ below\.$/)).toBeNull();
 
     await press(screen, 'Save receipt');
 
@@ -350,6 +370,7 @@ describe('Add receipt from voice', () => {
     const screen = await render(<AddReceiptScreen />);
 
     expect(screen.getByLabelText('Note, Team lunch')).toBeTruthy();
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -363,6 +384,11 @@ describe('Add receipt from voice', () => {
 
     expect(screen.getByLabelText('Change store, currently Rainbow Shops')).toBeTruthy();
     expect(screen.getByText('Rainbow Shops|rainbowshops.com')).toBeTruthy();
+    // No card or account was heard: nothing is chosen until one is, and Skip is a choice too.
+    for (const source of ['VISA ••4421', 'Checking ••0099', 'Skip']) {
+      expect(isLit(screen, source)).toBe(false);
+    }
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
@@ -372,6 +398,8 @@ describe('Add receipt from voice', () => {
         merchant: 'Rainbow Shops',
         logo_domain: 'rainbowshops.com',
         logo_hidden: false,
+        card_id: null,
+        bank_account_id: null,
       }),
     );
   });
@@ -383,6 +411,7 @@ describe('Add receipt from voice', () => {
 
     expect(screen.getByLabelText('Change store, currently Rainbow Shops')).toBeTruthy();
     expect(screen.getByText('Rainbow Shops|')).toBeTruthy();
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalled());
@@ -395,6 +424,7 @@ describe('Add receipt from voice', () => {
     handOff({ kind: 'receipt', amount: 12.5, merchant: RAINBOW, date: '2026-09-30' });
     const screen = await render(<AddReceiptScreen />);
 
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalled());
@@ -421,12 +451,86 @@ describe('Add receipt from voice', () => {
     onFinalPage(screen);
     expect(screen.getByLabelText('Change store, currently Starbucks')).toBeTruthy();
 
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0]).toMatchObject({
       merchant: 'Starbucks',
       amount: 4.75,
       purchased_on: '2026-09-29',
+      source: 'voice',
+    });
+  });
+
+  it('says what is still missing and saves nothing when Save is pressed with gaps', async () => {
+    const id = handOff({
+      kind: 'receipt',
+      amount: 12.5,
+      merchant: STARBUCKS,
+      date: '2026-09-30',
+    });
+    const screen = await render(<AddReceiptScreen />);
+
+    // Never greyed out for a gap: it answers.
+    await press(screen, 'Save receipt');
+
+    expect(screen.getByText('To save this receipt, fill in: Paid with.')).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+    // Still on the final page, and what was heard is still there to try again.
+    onFinalPage(screen);
+    expect(readVoiceDraft(id)).not.toBeNull();
+
+    // The answer clears the line.
+    await press(screen, 'VISA ••4421');
+    expect(screen.queryByText(/^To save this receipt, fill in/)).toBeNull();
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ merchant: 'Starbucks', card_id: 'card-1', source: 'voice' }),
+    );
+    expect(readVoiceDraft(id)).toBeNull();
+  });
+
+  it('names the amount and the store too when little was heard, and counts a store typed but not picked', async () => {
+    handOff({ kind: 'receipt', date: '2026-09-29' });
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Save receipt');
+    expect(
+      screen.getByText('To save this receipt, fill in: Amount, Store, Paid with.'),
+    ).toBeTruthy();
+
+    // Typing the name is enough: the line goes, and the store is no longer missing.
+    await act(async () => {
+      fireEvent.changeText(screen.getByPlaceholderText('Enter the store name'), 'Corner Deli');
+    });
+    expect(screen.queryByText(/^To save this receipt, fill in/)).toBeNull();
+    await press(screen, 'Save receipt');
+    expect(screen.getByText('To save this receipt, fill in: Amount, Paid with.')).toBeTruthy();
+
+    // The amount's page is left and the typed name is still in the box.
+    await pressButton(screen, 'Amount, needed');
+    await typeAmount(screen, '4.75');
+    await press(screen, 'Done');
+    onFinalPage(screen);
+    expect(screen.getByPlaceholderText('Enter the store name').props.value).toBe('Corner Deli');
+    expect(screen.queryByText(/^To save this receipt, fill in/)).toBeNull();
+
+    await press(screen, 'Skip');
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      merchant: 'Corner Deli',
+      brand_id: null,
+      amount: 4.75,
+      purchased_on: '2026-09-29',
+      card_id: null,
+      bank_account_id: null,
       source: 'voice',
     });
   });
@@ -446,7 +550,10 @@ describe('Add receipt from voice', () => {
     onFinalPage(screen);
     expect(screen.getByRole('button', { name: 'Amount, needed' })).toBeTruthy();
     expect(screen.getByLabelText('Date, Today, Wed Oct 7')).toBeTruthy();
-    expect(screen.getByLabelText('Paid with, not set, optional')).toBeTruthy();
+    // A source that is not an id is no answer: not Skip either.
+    for (const source of ['VISA ••4421', 'Checking ••0099', 'Skip']) {
+      expect(isLit(screen, source)).toBe(false);
+    }
     expect(screen.getByLabelText('Note, not set, optional')).toBeTruthy();
   });
 
@@ -468,6 +575,7 @@ describe('Add receipt from voice', () => {
     await typeAmount(screen, '4.75');
     await press(screen, 'Continue');
     await chooseStore(screen, 'Starbucks');
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
@@ -518,20 +626,26 @@ describe('Add bill from voice', () => {
     expect(screen.queryByText('What is this bill for?')).toBeNull();
     expect(screen.queryByText('How much is the bill?')).toBeNull();
     expect(screen.getByRole('button', { name: 'Amount, $1,030.50' })).toBeTruthy();
-    // The company in its own box, and its logo on the name's mark too.
-    expect(screen.getByText('Company · Optional')).toBeTruthy();
-    expect(screen.getByLabelText('Change company, currently Xfinity')).toBeTruthy();
-    expect(screen.getByLabelText('Name, Xfinity')).toBeTruthy();
-    expect(screen.getAllByText('Xfinity|xfinity.com')).toHaveLength(2);
+    // The company arrives chosen in the Name box, logo and all.
+    expect(screen.getByLabelText('Change name, currently Xfinity')).toBeTruthy();
+    expect(screen.getByText('Xfinity|xfinity.com')).toBeTruthy();
+    expect(screen.queryByPlaceholderText('Xfinity, Spectrum, Verizon')).toBeNull();
     expect(screen.getByLabelText('Category, Internet')).toBeTruthy();
-    expect(screen.getByLabelText('Due on, Thu Oct 15')).toBeTruthy();
+    expect(screen.getByLabelText('Payment on, Thu Oct 15')).toBeTruthy();
     expect(isLit(screen, 'Yearly')).toBe(true);
-    expect(screen.getByLabelText('Paid with, Checking ••0099')).toBeTruthy();
+    // The heard account is already chosen in Paid with; the others are not.
+    expect(isLit(screen, 'Checking ••0099')).toBe(true);
+    expect(isLit(screen, 'VISA ••4421')).toBe(false);
+    expect(isLit(screen, 'Skip')).toBe(false);
+    // Reminder is never heard, so no chip is chosen.
+    for (const chip of REMINDER_CHIPS) expect(isLit(screen, chip)).toBe(false);
 
+    await press(screen, 'No reminder');
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
     expect(router.back).not.toHaveBeenCalled();
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'new-1', null, '09:00');
     expect(mockCreate).toHaveBeenCalledWith({
       name: 'Xfinity',
       amount: 1030.5,
@@ -567,9 +681,13 @@ describe('Add bill from voice', () => {
     });
     const screen = await render(<AddBillScreen />);
 
-    expect(screen.getByLabelText('Change company, currently Local Power')).toBeTruthy();
-    expect(screen.getByLabelText('Name, Local Power')).toBeTruthy();
-    expect(screen.getAllByText('Local Power|localpower.com')).toHaveLength(2);
+    expect(screen.getByLabelText('Change name, currently Local Power')).toBeTruthy();
+    expect(screen.getByText('Local Power|localpower.com')).toBeTruthy();
+    // No account or card was heard: nothing is chosen until one is, and Skip is a choice too.
+    for (const source of ['VISA ••4421', 'Checking ••0099', 'Skip']) {
+      expect(isLit(screen, source)).toBe(false);
+    }
+    await answerRest(screen, 'Skip');
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
@@ -579,6 +697,8 @@ describe('Add bill from voice', () => {
         brand_id: null,
         logo_domain: 'localpower.com',
         logo_hidden: false,
+        card_id: null,
+        bank_account_id: null,
       }),
     );
   });
@@ -587,6 +707,7 @@ describe('Add bill from voice', () => {
     handOff({
       kind: 'bill',
       amount: 1100,
+      billName: 'Flat rent',
       billCategoryId: 'housing',
       date: '2026-11-01',
       note: 'Shared with Sam',
@@ -594,28 +715,80 @@ describe('Add bill from voice', () => {
     const screen = await render(<AddBillScreen />);
 
     expect(screen.getByLabelText('Note, Shared with Sam')).toBeTruthy();
+    await answerRest(screen, 'VISA ••4421');
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ note: 'Shared with Sam' }));
   });
 
-  it('keeps a name typed on the review page', async () => {
-    handOff({ kind: 'bill', billCategoryId: 'housing', billName: 'Flat rent', amount: 1100 });
+  it('puts a name typed on the review page in the Name box, and saves it', async () => {
+    handOff({
+      kind: 'bill',
+      billCategoryId: 'housing',
+      billName: 'Flat rent',
+      amount: 1100,
+      date: '2026-11-01',
+    });
     const screen = await render(<AddBillScreen />);
 
-    expect(screen.getByLabelText('Name, Flat rent')).toBeTruthy();
+    expect(screen.getByLabelText('Change name, currently Flat rent')).toBeTruthy();
+    // No company was heard, so the mark is the letters a name with no logo gets.
+    expect(screen.getByText('Flat rent|')).toBeTruthy();
+    await answerRest(screen, 'Skip');
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Flat rent', brand_id: null }),
+    );
   });
 
-  it('names a bill with no company after its category', async () => {
+  it('shows a name typed over a heard company as the chosen one, with the company behind it', async () => {
+    handOff({
+      kind: 'bill',
+      merchant: XFINITY,
+      billName: 'Home wifi',
+      billCategoryId: 'internet',
+      amount: 80,
+      date: '2026-10-15',
+    });
+    const screen = await render(<AddBillScreen />);
+
+    expect(screen.getByLabelText('Change name, currently Home wifi')).toBeTruthy();
+    expect(screen.queryByLabelText('Change name, currently Xfinity')).toBeNull();
+    expect(screen.getByText('Home wifi|xfinity.com')).toBeTruthy();
+    await answerRest(screen, 'Skip');
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Home wifi', brand_id: 'xfinity' }),
+    );
+  });
+
+  it('leaves the day, the payment and the reminder unanswered when none was heard', async () => {
     handOff({ kind: 'bill', billCategoryId: 'housing', amount: 1100 });
     const screen = await render(<AddBillScreen />);
 
-    expect(screen.getByLabelText('Name, Housing')).toBeTruthy();
-    // No company was heard: its box is empty, ready to search.
-    expect(screen.queryByLabelText(/^Change company, currently/)).toBeNull();
+    onFinalPage(screen);
     // No day was heard: a gap to fill, not a guess.
-    expect(screen.getByLabelText('Due on, needed')).toBeTruthy();
+    expect(screen.getByLabelText('Payment on, Select a date')).toBeTruthy();
+    for (const source of ['VISA ••4421', 'Checking ••0099', 'Skip']) {
+      expect(isLit(screen, source)).toBe(false);
+    }
+    for (const chip of REMINDER_CHIPS) expect(isLit(screen, chip)).toBe(false);
+  });
+
+  // The page names a category-only hand-off after its category ("Housing") through `prefillName`,
+  // while a new bill's Name is meant to start empty unless a name or company was heard. Flip to
+  // `it` when the page stops naming it.
+  it('leaves the Name box empty, ready to search, when only a category was heard', async () => {
+    handOff({ kind: 'bill', billCategoryId: 'housing', amount: 1100 });
+    const screen = await render(<AddBillScreen />);
+
+    expect(screen.queryByLabelText(/^Change name, currently/)).toBeNull();
+    expect(screen.getByPlaceholderText('Rent, mortgage or your landlord').props.value).toBe('');
   });
 
   it('asks for the category on its own page when none was heard, and keeps the company as the name', async () => {
@@ -624,14 +797,62 @@ describe('Add bill from voice', () => {
 
     onFinalPage(screen);
     expect(screen.getByRole('button', { name: 'Amount, $80.00' })).toBeTruthy();
-    expect(screen.getByLabelText('Name, Xfinity')).toBeTruthy();
+    expect(screen.getByLabelText('Change name, currently Xfinity')).toBeTruthy();
 
     await press(screen, 'Category, needed');
     await press(screen, 'Internet. Home broadband and Wi-Fi');
 
     onFinalPage(screen);
     expect(screen.getByLabelText('Category, Internet')).toBeTruthy();
-    expect(screen.getByLabelText('Name, Xfinity')).toBeTruthy();
+    expect(screen.getByLabelText('Change name, currently Xfinity')).toBeTruthy();
+  });
+
+  it('says what is still missing and saves nothing when Save is pressed with gaps', async () => {
+    const id = handOff({
+      kind: 'bill',
+      amount: 80,
+      merchant: XFINITY,
+      billCategoryId: 'internet',
+    });
+    const screen = await render(<AddBillScreen />);
+
+    // Never greyed out for a gap: it answers.
+    await press(screen, 'Save bill');
+
+    expect(
+      screen.getByText('To save this bill, fill in: Payment on, Paid with, Reminder.'),
+    ).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockApplyReminder).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+    // Still on the final page, and what was heard is still there to try again.
+    onFinalPage(screen);
+    expect(readVoiceDraft(id)).not.toBeNull();
+
+    // Each answer clears the line, and the next Save lists only what is left.
+    await answerRest(screen, 'VISA ••4421');
+    expect(screen.queryByText(/^To save this bill, fill in/)).toBeNull();
+    await press(screen, 'Save bill');
+    expect(screen.getByText('To save this bill, fill in: Payment on.')).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+
+    await pickPaymentDay(screen, 'Thursday 15 October 2026');
+    expect(screen.queryByText(/^To save this bill, fill in/)).toBeNull();
+    expect(screen.getByLabelText('Payment on, Thu Oct 15')).toBeTruthy();
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Xfinity',
+        next_due_on: '2026-10-15',
+        card_id: 'card-1',
+        bank_account_id: null,
+      }),
+    );
+    expect(readVoiceDraft(id)).toBeNull();
   });
 });
 
@@ -654,12 +875,19 @@ describe('Add subscription from voice', () => {
     expect(screen.getByText(/^Filed under /)).toBeTruthy();
     expect(screen.getByLabelText('Next renewal, Mon Oct 12')).toBeTruthy();
     expect(isLit(screen, 'Yearly')).toBe(true);
-    expect(screen.getByLabelText('Charged to, VISA ••4421')).toBeTruthy();
+    // The heard card is already chosen in Charged to; the others are not.
+    expect(isLit(screen, 'VISA ••4421')).toBe(true);
+    expect(isLit(screen, 'Checking ••0099')).toBe(false);
+    expect(isLit(screen, 'Skip')).toBe(false);
+    // Reminder is never heard, so no chip is chosen.
+    for (const chip of REMINDER_CHIPS) expect(isLit(screen, chip)).toBe(false);
 
+    await press(screen, 'No reminder');
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
     expect(router.back).not.toHaveBeenCalled();
+    expect(mockApplyReminder).toHaveBeenCalledWith('subscription', 'new-1', null, '09:00');
     expect(mockCreate).toHaveBeenCalledWith({
       brand_id: 'netflix',
       name: 'Netflix',
@@ -689,6 +917,11 @@ describe('Add subscription from voice', () => {
 
     expect(screen.getByLabelText('Change service, currently Local Gym')).toBeTruthy();
     expect(screen.getByText('Local Gym|localgym.com')).toBeTruthy();
+    // No card or account was heard: nothing is chosen until one is, and Skip is a choice too.
+    for (const source of ['VISA ••4421', 'Checking ••0099', 'Skip']) {
+      expect(isLit(screen, source)).toBe(false);
+    }
+    await answerRest(screen, 'Skip');
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
@@ -698,15 +931,24 @@ describe('Add subscription from voice', () => {
         name: 'Local Gym',
         logo_domain: 'localgym.com',
         logo_hidden: false,
+        card_id: null,
+        bank_account_id: null,
       }),
     );
   });
 
   it('arrives with the note typed on the review page, and saves it', async () => {
-    handOff({ kind: 'subscription', amount: 15.99, merchant: NETFLIX, note: 'Family plan' });
+    handOff({
+      kind: 'subscription',
+      amount: 15.99,
+      merchant: NETFLIX,
+      date: '2026-10-12',
+      note: 'Family plan',
+    });
     const screen = await render(<AddSubscriptionScreen />);
 
     expect(screen.getByLabelText('Note, Family plan')).toBeTruthy();
+    await answerRest(screen, 'Checking ••0099');
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -727,14 +969,68 @@ describe('Add subscription from voice', () => {
     // No service came through: its box is empty, ready to search.
     expect(screen.getByPlaceholderText('Search for a service').props.value).toBe('');
     expect(screen.queryByLabelText(/^Change service, currently/)).toBeNull();
-    expect(screen.getByLabelText('Next renewal, not set, optional')).toBeTruthy();
+    // A day that is not a date is a blank box, not a guess.
+    expect(screen.getByLabelText('Next renewal, Select a date')).toBeTruthy();
     expect(isLit(screen, 'Monthly')).toBe(true);
+    for (const source of ['VISA ••4421', 'Checking ••0099', 'Skip']) {
+      expect(isLit(screen, source)).toBe(false);
+    }
+    for (const chip of REMINDER_CHIPS) expect(isLit(screen, chip)).toBe(false);
+  });
+
+  it('says what is still missing and saves nothing when Save is pressed with gaps', async () => {
+    const id = handOff({ kind: 'subscription', amount: 15.99, merchant: NETFLIX });
+    const screen = await render(<AddSubscriptionScreen />);
+
+    // Never greyed out for a gap: it answers.
+    await press(screen, 'Save subscription');
+
+    expect(
+      screen.getByText('To save this subscription, fill in: Next renewal, Charged to, Reminder.'),
+    ).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockApplyReminder).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+    // Still on the final page, and what was heard is still there to try again.
+    onFinalPage(screen);
+    expect(readVoiceDraft(id)).not.toBeNull();
+
+    // Each answer clears the line, and the next Save lists only what is left.
+    await answerRest(screen, 'Skip');
+    expect(screen.queryByText(/^To save this subscription, fill in/)).toBeNull();
+    await press(screen, 'Save subscription');
+    expect(screen.getByText('To save this subscription, fill in: Next renewal.')).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+
+    await press(screen, 'Next renewal, Select a date');
+    await press(screen, 'Monday 12 October 2026');
+    expect(screen.queryByText(/^To save this subscription, fill in/)).toBeNull();
+    expect(screen.getByLabelText('Next renewal, Mon Oct 12')).toBeTruthy();
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Netflix',
+        next_renewal_on: '2026-10-12',
+        card_id: null,
+        bank_account_id: null,
+      }),
+    );
+    expect(readVoiceDraft(id)).toBeNull();
   });
 });
 
 describe('After a voice hand-off', () => {
   it('forgets what was heard once a receipt is saved', async () => {
-    const id = handOff({ kind: 'receipt', amount: 4.75, merchant: STARBUCKS });
+    const id = handOff({
+      kind: 'receipt',
+      amount: 4.75,
+      merchant: STARBUCKS,
+      sourceId: 'card-1',
+    });
     const screen = await render(<AddReceiptScreen />);
     expect(readVoiceDraft(id)).not.toBeNull();
 
@@ -751,9 +1047,11 @@ describe('After a voice hand-off', () => {
       merchant: XFINITY,
       billCategoryId: 'internet',
       date: '2026-10-15',
+      sourceId: 'card-1',
     });
     const screen = await render(<AddBillScreen />);
 
+    await press(screen, 'No reminder');
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
@@ -765,9 +1063,12 @@ describe('After a voice hand-off', () => {
       kind: 'subscription',
       amount: 15.99,
       merchant: { brandId: 'netflix', name: 'Netflix', domain: 'netflix.com', categoryId: 'x' },
+      date: '2026-10-12',
+      sourceId: 'card-1',
     });
     const screen = await render(<AddSubscriptionScreen />);
 
+    await press(screen, 'No reminder');
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
@@ -782,6 +1083,7 @@ describe('After a voice hand-off', () => {
     await typeAmount(screen, '4.75');
     await press(screen, 'Continue');
     await chooseStore(screen, 'Starbucks');
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));

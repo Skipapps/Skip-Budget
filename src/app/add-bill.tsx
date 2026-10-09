@@ -1,14 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import {
-  AlignLeft,
-  Bell,
-  CalendarDays,
-  CreditCard,
-  Calculator,
-  Repeat,
-  Trash2,
-  Tag,
-} from 'lucide-react-native';
+import { AlignLeft, Calculator, Repeat, Trash2, Tag } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -18,24 +9,16 @@ import {
   useReminderChoice,
   type ReminderChoice,
 } from '@/api/reminders';
-import { buildBillValues, defaultBillName } from '@/api/entry-values';
+import { buildBillValues } from '@/api/entry-values';
 import { useCreateBill, useDeleteBill, useUpdateBill } from '@/api/mutations';
 import { usePastCharges } from '@/api/past-charges';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { ScheduleCard } from '@/components/calculators/schedule-card';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
-import { BillMark } from '@/components/bills/bill-mark';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
 import { CategoryPicker } from '@/components/bills/category-picker';
-import { IconPicker } from '@/components/bills/icon-picker';
-import {
-  AmountEditPage,
-  DateEditPage,
-  FieldPage,
-  NoteEditPage,
-  PaidWithEditPage,
-  ReminderEditPage,
-} from '@/components/entry/edit-pages';
+import { DateBox } from '@/components/entry/date-box';
+import { AmountEditPage, FieldPage, NoteEditPage } from '@/components/entry/edit-pages';
 import {
   EntryReview,
   GlyphWell,
@@ -48,9 +31,9 @@ import { ActionPill } from '@/components/ui/action-pill';
 import { CalculatorPad } from '@/components/ui/calculator-pad';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
+import { ReminderField } from '@/components/ui/reminder-field';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TextField } from '@/components/ui/text-field';
-import { TextLink } from '@/components/ui/text-link';
+import { SourceTiles } from '@/components/ui/source-tiles';
 import { FieldLabel, Title } from '@/components/ui/typography';
 import { useConfirm } from '@/providers/dialog-provider';
 import {
@@ -60,13 +43,11 @@ import {
   type Recurrence,
 } from '@/data/bill-categories';
 import { t } from '@/i18n';
-import { formatEntryDay } from '@/lib/entry-day';
-import { reminderSummary } from '@/lib/entry-reminder';
 import { useToday } from '@/lib/use-today';
 import { TEXT_CAP } from '@/theme/text-scale';
 import { success, warn } from '@/lib/haptics';
 import { failureMessage, failureText } from '@/lib/failure';
-import { logoColumns, selectionLogo } from '@/lib/logo-columns';
+import { logoColumns } from '@/lib/logo-columns';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { amortise, termsFromStored } from '@/lib/loan';
 import {
@@ -84,10 +65,10 @@ const PERIOD = 'period';
 type RecurrenceChoice = Recurrence | typeof PERIOD;
 
 /**
- * Placeholder per category, naming real companies so people know what counts. Company names are
- * the same in every language, so only the hints with words go through messages.
+ * The Name box's placeholder per category, naming real companies so people know what counts.
+ * Company names are the same in every language, so only the hints with words go through messages.
  */
-function issuerHint(categoryId: string): string {
+function nameHint(categoryId: string): string {
   switch (categoryId) {
     case 'housing':
       return t('bills.add.issuer.housing');
@@ -113,21 +94,10 @@ function issuerHint(categoryId: string): string {
 }
 
 /**
- * The pages of one bill: the category chooser it starts on (it pre-fills the name, so it runs
- * first), the keypad, the final page, and one per field.
+ * The pages of one bill: the category chooser it starts on, the keypad, the final page, and the
+ * fields too big to set on it.
  */
-type Page =
-  | 'category'
-  | 'amount'
-  | 'review'
-  | 'amountEdit'
-  | 'name'
-  | 'categoryEdit'
-  | 'paidWith'
-  | 'note'
-  | 'due'
-  | 'endDate'
-  | 'reminder';
+type Page = 'category' | 'amount' | 'review' | 'amountEdit' | 'categoryEdit' | 'note';
 
 const asDate = (value?: string | null) => (value ? new Date(`${value}T00:00:00`) : null);
 
@@ -224,15 +194,29 @@ function categoryName(categoryId: string | null | undefined): string {
   return billCategoryLabel(categoryId, data?.label ?? '');
 }
 
-/** The name a pre-filled bill opens with: the one typed, the company, else the category's. */
-function prefillName(prefill: BillPrefill | null): string {
-  if (!prefill) return '';
-  if (prefill.name) return prefill.name;
-  return defaultBillName(
-    prefill.categoryId ?? '',
-    categoryName(prefill.categoryId),
-    prefill.issuer,
-  );
+/**
+ * What the Name box opens with: the company on record, the bill's own name as one typed, or what
+ * the voice review page heard. A saved name carries no logo choice, so saving leaves the row's logo.
+ */
+function startingName(
+  existing: ReturnType<typeof useBill>['data'] | null,
+  prefill: BillPrefill | null,
+): BrandSelection | null {
+  if (existing) {
+    if (!existing.name) return null;
+    return {
+      brandId: existing.brand_id ?? null,
+      name: existing.name,
+      domain: logoDomainOf(existing),
+      categoryId: existing.category_id,
+    };
+  }
+  if (prefill?.issuer) return { ...prefill.issuer, name: prefill.name || prefill.issuer.name };
+  // Only words that were heard or typed: a category alone leaves the name for the person to give.
+  const heard = prefill?.name?.trim();
+  return heard
+    ? { brandId: null, name: heard, domain: null, categoryId: prefill?.categoryId ?? 'other' }
+    : null;
 }
 
 function BillForm({
@@ -262,26 +246,16 @@ function BillForm({
   const [categoryId, setCategoryId] = useState<string>(
     existing?.category_id ?? prefill?.categoryId ?? '',
   );
-  // Optional: many bills (rent, HOA fees, a loan from a relative) have no company behind them.
-  // No logo choice is carried over, so saving the edit leaves the row's own logo alone.
-  const [issuer, setIssuer] = useState<BrandSelection | null>(
-    existing?.brand_id
-      ? {
-          brandId: existing.brand_id,
-          name: existing.name,
-          domain: logoDomainOf(existing),
-          // Bills carry their own category, chosen a step earlier; the brand never answers it.
-          categoryId: existing.category_id,
-        }
-      : existing
-        ? null
-        : (prefill?.issuer ?? null),
+  // The Name box: a company from the list (its brand and logo come with it) or the person's words.
+  const [issuer, setIssuer] = useState<BrandSelection | null>(() =>
+    startingName(existing, prefill),
   );
   const [issuerChanged, setIssuerChanged] = useState(false);
-  // The name a company gave the bill: replacing the company renames it, a name typed since stays.
-  const [companyNamed, setCompanyNamed] = useState<string | null>(null);
-  const [name, setName] = useState(existing?.name ?? prefillName(prefill));
-  const [iconId, setIconId] = useState(existing?.icon_id ?? 'other');
+  // Typed but not picked from the list: it names the bill all the same.
+  const [typedName, setTypedName] = useState('');
+  const name = issuer?.name ?? typedName.trim();
+  // Kept as saved; a new bill wears its category's.
+  const iconId = existing?.icon_id ?? 'other';
   const [amount, setAmount] = useState(
     existing ? String(existing.amount) : (prefill?.amount ?? ''),
   );
@@ -300,17 +274,14 @@ function BillForm({
   const [recurrence, setRecurrence] = useState<RecurrenceChoice>(
     (existing?.recurrence as RecurrenceChoice) ?? prefill?.recurrence ?? 'monthly',
   );
-  const [sourceId, setSourceId] = useState(
-    existing?.card_id ?? existing?.bank_account_id ?? prefill?.sourceId ?? '',
+  // '' is Skip, picked on purpose; null is not answered yet. A saved bill has answered.
+  const [sourceId, setSourceId] = useState<string | null>(
+    existing ? (existing.card_id ?? existing.bank_account_id ?? '') : prefill?.sourceId || null,
   );
   const [note, setNote] = useState(existing?.note ?? prefill?.note ?? '');
 
   const [calculatorOpen, setCalculatorOpen] = useState(false);
 
-  // Only a self-named bill needs its own icon; the rest inherit the category's.
-  const isCustom = categoryId === 'other';
-
-  // Exactly what pre-fills the name, so a name still equal to it was never typed.
   const categoryLabel = categoryName(categoryId);
 
   const hasPeriod = recurrence === PERIOD;
@@ -322,14 +293,7 @@ function BillForm({
     if (next !== PERIOD) setEndDate(null);
   };
 
-  const applyCategory = (category: BillCategory) => {
-    // The name follows the category only while it is empty or still the old category's own default:
-    // what the person typed, or the company's name ("Comcast" must not become "Internet"), stays.
-    const current = name.trim();
-    const unnamed = !current || current === categoryLabel;
-    setCategoryId(category.id);
-    if (unnamed) setName(category.id === 'other' ? '' : categoryName(category.id));
-  };
+  const applyCategory = (category: BillCategory) => setCategoryId(category.id);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -366,9 +330,14 @@ function BillForm({
   const savedReminder = useReminderChoice('bill', id);
   const [reminderDraft, setReminderDraft] = useState<ReminderChoice | null>(null);
   const [timeDraft, setTimeDraft] = useState<string | null>(null);
-  const reminder = reminderDraft ?? savedReminder.choice;
+  // A new bill has no answer until one is picked; "No reminder" is an answer.
+  const reminder: ReminderChoice | null = reminderDraft ?? (editing ? savedReminder.choice : null);
   const remindAt = timeDraft ?? savedReminder.remindAt;
   const applyReminder = useApplyReminder();
+
+  const value = Number(amount);
+  const amountReady = Number.isFinite(value) && value > 0;
+  const dateLabel = hasPeriod ? t('bills.field.starts') : t('bills.field.paymentOn');
 
   const fail = (message: string) => {
     warn();
@@ -388,6 +357,18 @@ function BillForm({
 
   const handleSave = async () => {
     setError(null);
+    const missing = [
+      !amountReady && t('receipts.field.amount'),
+      !name && t('bills.field.name'),
+      !categoryId && t('bills.field.category'),
+      !startDate && dateLabel,
+      sourceId === null && t('bills.field.paidWith'),
+      reminder === null && t('ui.reminder.label'),
+    ].filter((field): field is string => Boolean(field));
+    if (missing.length > 0 || sourceId === null || reminder === null) {
+      fail(t('bills.add.missing', { fields: missing.join(', ') }));
+      return;
+    }
     // Checks, icon rule and starts_on floor live in the shared builder, which the voice review page
     // saves through too.
     const built = buildBillValues(
@@ -464,9 +445,6 @@ function BillForm({
   };
 
   const busy = createBill.isPending || updateBill.isPending || pastCharges.saving;
-  const value = Number(amount);
-  const amountReady = Number.isFinite(value) && value > 0;
-  const sourceLabel = sources.find((source) => source.id === sourceId)?.label ?? null;
   // The page this form opened on. Anywhere else the edge swipe is off, and Back steps back.
   const isRoot = view === initialView;
 
@@ -559,22 +537,6 @@ function BillForm({
     );
   }
 
-  if (view === 'name') {
-    return (
-      <NameEditPage
-        name={name}
-        iconId={iconId}
-        showIcon={isCustom && !issuer}
-        onBack={toReview}
-        onDone={(next) => {
-          setName(next.name);
-          setIconId(next.iconId);
-          settle();
-        }}
-      />
-    );
-  }
-
   if (view === 'categoryEdit') {
     return (
       <FieldPage
@@ -596,21 +558,6 @@ function BillForm({
     );
   }
 
-  if (view === 'paidWith') {
-    return (
-      <PaidWithEditPage
-        title={t('bills.field.paidWith')}
-        sources={sources}
-        value={sourceId}
-        onBack={toReview}
-        onDone={(next) => {
-          setSourceId(next);
-          settle();
-        }}
-      />
-    );
-  }
-
   if (view === 'note') {
     return (
       <NoteEditPage
@@ -627,118 +574,51 @@ function BillForm({
     );
   }
 
-  if (view === 'due') {
-    return (
-      <DateEditPage
-        title={hasPeriod ? t('bills.field.starts') : t('bills.field.due')}
-        question={hasPeriod ? t('bills.add.startQuestion') : t('bills.add.dueQuestion')}
-        value={startDate}
-        onBack={toReview}
-        onDone={(day) => {
-          if (day) {
-            setStartDate(day);
-            // An end before the start is meaningless; drop it.
-            if (endDate && day > endDate) setEndDate(null);
-          }
-          settle();
-        }}
-      />
-    );
-  }
-
-  if (view === 'endDate') {
-    return (
-      <DateEditPage
-        title={t('bills.field.to')}
-        value={endDate}
-        // Days before the start are not offered.
-        minDate={startDate}
-        footerExtra={(clear) => (
-          <TextLink
-            label={t('bills.add.clearEnd')}
-            variant="subtle"
-            onPress={clear}
-            className="mt-2 self-start"
-          />
-        )}
-        onBack={toReview}
-        onDone={(day) => {
-          setEndDate(day);
-          settle();
-        }}
-      />
-    );
-  }
-
-  if (view === 'reminder') {
-    return (
-      <ReminderEditPage
-        title={t('ui.reminder.label')}
-        kind="bill"
-        value={reminder}
-        time={remindAt}
-        onBack={toReview}
-        onDone={(choice, at) => {
-          setReminderDraft(choice);
-          setTimeDraft(at);
-          settle();
-        }}
-      />
-    );
-  }
-
   const recurrenceChoices: { value: RecurrenceChoice; label: string }[] = [
     ...RECURRENCES.map((option) => ({ value: option.value, label: recurrenceLabel(option.value) })),
     { value: PERIOD, label: t('bills.add.specificPeriod') },
   ];
   const chosenCategory = BILL_CATEGORIES.find((option) => option.id === categoryId);
 
-  // Picking a company names the bill unless it already has a real name of its own.
-  const chooseCompany = (next: BrandSelection | null) => {
+  const chooseName = (next: BrandSelection | null) => {
     setError(null);
     if (next !== issuer) setIssuerChanged(true);
-    if (next) {
-      const current = name.trim();
-      if (!current || current === categoryLabel || current === companyNamed) {
-        setName(next.name);
-        setCompanyNamed(next.name);
-      }
-    }
     setIssuer(next);
+  };
+
+  const pickStart = (day: Date) => {
+    setError(null);
+    setStartDate(day);
+    // An end before the start is meaningless; drop it.
+    if (endDate && day > endDate) setEndDate(null);
+  };
+
+  const pickSource = (next: string) => {
+    setError(null);
+    setSourceId(next);
   };
 
   const rows: EntryRowSpec[] = [
     {
-      key: 'company',
+      key: 'name',
       field: (
         <BrandField
-          label={t('entry.row.optional', { label: t('bills.field.company') })}
+          label={t('bills.field.name')}
           value={issuer}
-          onChange={chooseCompany}
-          placeholder={issuerHint(categoryId)}
+          onChange={chooseName}
+          // The box is drawn afresh after another page; what was typed comes back with it.
+          initialQuery={typedName}
+          onQueryChange={(typed) => {
+            setError(null);
+            setTypedName(typed);
+          }}
+          placeholder={nameHint(categoryId)}
           category={categoryId}
           noLogo="icon"
-          changeLabel={(name) => t('bills.add.changeCompany', { name })}
-          addLabel={(name) => t('bills.add.addCompanyAs', { name })}
+          changeLabel={(current) => t('bills.add.changeName', { name: current })}
+          addLabel={(typed) => t('bills.add.useName', { name: typed })}
         />
       ),
-    },
-    {
-      key: 'name',
-      label: t('bills.field.name'),
-      value: name.trim() || null,
-      required: true,
-      // The company's logo when it has one, else the category's icon, as a saved bill draws it.
-      leading: (
-        <BillMark
-          categoryId={categoryId}
-          iconId={iconId}
-          domain={issuer ? selectionLogo(issuer) : null}
-          name={name}
-          size={40}
-        />
-      ),
-      onPress: () => setView('name'),
     },
     {
       key: 'category',
@@ -750,11 +630,15 @@ function BillForm({
     },
     {
       key: 'due',
-      label: hasPeriod ? t('bills.field.starts') : t('bills.field.due'),
-      value: startDate ? formatEntryDay(startDate, todayDate) : null,
-      required: true,
-      leading: <GlyphWell icon={CalendarDays} />,
-      onPress: () => setView('due'),
+      field: (
+        <DateBox
+          label={dateLabel}
+          value={startDate}
+          today={todayDate}
+          placeholder={t('bills.add.pickDay')}
+          onChange={pickStart}
+        />
+      ),
     },
     {
       key: 'recurrence',
@@ -777,33 +661,66 @@ function BillForm({
       ? [
           {
             key: 'end',
-            label: t('bills.field.to'),
-            value: endDate ? formatEntryDay(endDate, todayDate) : null,
-            placeholder: t('bills.add.noEndDate'),
-            leading: <GlyphWell icon={CalendarDays} />,
-            onPress: () => setView('endDate'),
-          },
-        ]
-      : []),
-    // Without a card or account there is nothing to choose between, as before.
-    ...(sources.length > 0
-      ? [
-          {
-            key: 'paidWith',
-            label: t('bills.field.paidWith'),
-            value: sourceLabel,
-            leading: <GlyphWell icon={CreditCard} />,
-            onPress: () => setView('paidWith'),
+            field: (
+              <DateBox
+                label={t('bills.field.to')}
+                value={endDate}
+                today={todayDate}
+                placeholder={t('bills.add.noEndDate')}
+                // Days before the start are not offered.
+                minDate={startDate}
+                onChange={(day) => {
+                  setError(null);
+                  setEndDate(day);
+                }}
+                clear={{
+                  label: t('bills.add.clearEnd'),
+                  onPress: () => {
+                    setError(null);
+                    setEndDate(null);
+                  },
+                }}
+              />
+            ),
           },
         ]
       : []),
     {
+      key: 'paidWith',
+      field: (
+        <View className="w-full">
+          <FieldLabel className="mb-2">{t('bills.field.paidWith')}</FieldLabel>
+          <SourceTiles
+            sources={sources}
+            value={sourceId ?? ''}
+            onChange={pickSource}
+            skip={{
+              label: t('bills.add.skipSource'),
+              selected: sourceId === '',
+              onPress: () => pickSource(''),
+            }}
+          />
+        </View>
+      ),
+    },
+    {
       key: 'reminder',
-      label: t('ui.reminder.label'),
-      value: reminderSummary(reminder, remindAt),
-      placeholder: t('api.reminders.off'),
-      leading: <GlyphWell icon={Bell} />,
-      onPress: () => setView('reminder'),
+      field: (
+        <ReminderField
+          kind="bill"
+          value={reminder}
+          onChange={(choice) => {
+            setError(null);
+            setReminderDraft(choice);
+          }}
+          time={remindAt}
+          onTimeChange={(at) => {
+            setError(null);
+            setTimeDraft(at);
+          }}
+          offLabel={t('bills.add.noReminder')}
+        />
+      ),
     },
     {
       key: 'note',
@@ -865,7 +782,8 @@ function BillForm({
             ? t('bills.add.saveChanges')
             : t('bills.add.saveBill')
       }
-      primaryDisabled={!amountReady || !name.trim() || !categoryId || !startDate || busy}
+      // Never greyed out for a gap: Save says what is still missing.
+      primaryDisabled={busy}
       onPrimary={() => void handleSave()}
       error={error}
       footerSlot={
@@ -887,51 +805,5 @@ function BillForm({
         ) : null
       }
     />
-  );
-}
-
-/** A bill's name and, for a bill with no company, its icon. The company is chosen on the page. */
-function NameEditPage({
-  name,
-  iconId,
-  showIcon,
-  onBack,
-  onDone,
-}: {
-  name: string;
-  iconId: string;
-  /** The icon only shows when there is no logo, so offering it beside one does nothing. */
-  showIcon: boolean;
-  onBack: () => void;
-  onDone: (next: { name: string; iconId: string }) => void;
-}) {
-  const [nameDraft, setNameDraft] = useState(name);
-  const [iconDraft, setIconDraft] = useState(iconId);
-
-  return (
-    <FieldPage
-      title={t('bills.field.name')}
-      onBack={onBack}
-      onDone={() => onDone({ name: nameDraft, iconId: iconDraft })}
-      doneDisabled={!nameDraft.trim()}
-      avoidKeyboard
-    >
-      <View className="mt-2 w-full gap-5">
-        <TextField
-          label={t('bills.field.name')}
-          value={nameDraft}
-          onChangeText={setNameDraft}
-          autoCapitalize="words"
-          returnKeyType="done"
-        />
-
-        {showIcon ? (
-          <View className="w-full">
-            <FieldLabel className="mb-2">{t('bills.field.icon')}</FieldLabel>
-            <IconPicker value={iconDraft} onChange={setIconDraft} />
-          </View>
-        ) : null}
-      </View>
-    </FieldPage>
   );
 }

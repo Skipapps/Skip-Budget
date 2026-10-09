@@ -45,7 +45,7 @@ export const BILL_CATEGORIES: BillCategory[] = [
     hint: 'Childcare, tuition, medical',
     icon: GLYPHS.family,
   },
-  { id: 'other', label: 'Other bill', hint: 'Name it and pick an icon', icon: GLYPHS.other },
+  { id: 'other', label: 'Other bill', hint: 'Anything else you pay', icon: GLYPHS.other },
 ];
 
 /** Extra icons offered when someone builds their own bill. */

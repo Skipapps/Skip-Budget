@@ -11,7 +11,8 @@ type ChoiceOption<T extends string> = {
 
 type ChoiceChipsProps<T extends string> = {
   options: readonly ChoiceOption<T>[];
-  value: T;
+  /** Null lights nothing: a question not answered yet. */
+  value: T | null;
   onChange: (value: T) => void;
 };
 

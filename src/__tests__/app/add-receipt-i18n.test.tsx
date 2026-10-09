@@ -5,9 +5,10 @@ import AddReceiptScreen from '@/app/add-receipt';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
 /**
- * Add receipt read in Spanish and French: the amount page, the final page and every page a line of
- * it opens, what a scan read (a list whose articles change with the language), the dates in each
- * language's own order, and the dialogs it raises.
+ * Add receipt read in Spanish and French: the amount page, the final page (the Store box, the Paid
+ * with pills and Save that names what is missing) and every page a line of it opens, what a scan
+ * read (a list whose articles change with the language), the dates in each language's own order,
+ * and the dialogs it raises.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -81,8 +82,9 @@ jest.mock('expo-router', () => ({
 let mockPro = { pro: true, ready: true };
 jest.mock('@/api/pro', () => ({ usePro: () => mockPro }));
 
+const mockCreate = jest.fn();
 jest.mock('@/api/mutations', () => ({
-  useCreateReceipt: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useCreateReceipt: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateReceipt: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useDeleteReceipt: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
@@ -109,12 +111,11 @@ let mockReceiptsList: { data: { source: string; created_at: string }[]; isFetche
   data: [],
   isFetched: true,
 };
+let mockSources: { id: string; label: string; color: string; kind: string }[] = [];
 jest.mock('@/api/queries', () => ({
   useReceipts: () => mockReceiptsList,
   useReceipt: () => ({ ...mockReceipt, refetch: jest.fn() }),
-  usePaymentSources: () => ({
-    sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
-  }),
+  usePaymentSources: () => ({ sources: mockSources }),
 }));
 
 // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
@@ -139,15 +140,22 @@ jest.useFakeTimers({
 jest.setSystemTime(new Date('2026-10-07T09:00:00'));
 
 const NBSP = '\u00a0';
+const CARD = 'VISA ••4421';
+const CARD_SOURCE = { id: 'card-1', label: CARD, color: '#111111', kind: 'card' };
 
 /** A scan from the receipts list that read the store and the total, not the date or the card. */
 const PARTIAL_SCAN = {
   scannedStore: 'Oxxo',
   scannedCategory: 'groceries',
   scannedAmount: '1234.5',
-  scannedSource: 'card-1',
   scannedRead: 'store,amount',
 };
+
+/** The same scan, which also matched the card by its last four digits. */
+const CARD_SCAN = { ...PARTIAL_SCAN, scannedSource: 'card-1', scannedRead: 'store,amount,card' };
+
+/** A hand-off that carries only a day: no amount, no store, no card. */
+const BARE_SCAN = { scannedRead: 'date', scannedDate: '2026-09-28' };
 
 const SAVED = {
   id: 'receipt-1',
@@ -167,6 +175,14 @@ type Screen = Awaited<ReturnType<typeof render>>;
 type Node = ReactTestRendererJSON | ReactTestRendererJSON[] | string | null;
 
 const press = (screen: Screen, label: string) => fireEvent.press(screen.getByLabelText(label));
+
+/** A pill or chip by its name, and whether it is the lit one. */
+const radio = (screen: Screen, name: string, checked: boolean) =>
+  screen.getByRole('radio', { name, checked });
+
+/** Types into the Store box without picking anything from the list. */
+const typeStore = (screen: Screen, placeholder: string, text: string) =>
+  fireEvent.changeText(screen.getByPlaceholderText(placeholder), text);
 
 /** Every line a person can see or hear: text, labels, hints and placeholders. */
 function shownText(node: Node): string[] {
@@ -194,6 +210,44 @@ function expectNoRawText(tree: Node) {
   expect(lines.filter((line) => /\{\w+\}/.test(line))).toEqual([]);
 }
 
+/**
+ * The line above Save that names what is still empty, as written (queries fold a no-break space
+ * into a plain one, so only the raw text shows French set it). The Save button's label is not it.
+ */
+const lineAboveSave = (screen: Screen) =>
+  shownText(screen.toJSON()).filter((line) =>
+    /^(Para guardar el recibo|Pour enregistrer le reçu)/.test(line),
+  );
+
+/** The words the Spanish and French tests below read, by language. */
+const WORDS = {
+  es: {
+    store: 'Tienda',
+    storePlaceholder: 'Escribe el nombre de la tienda',
+    oldStorePlaceholder: 'Busca una tienda',
+    paidWith: 'Pagado con',
+    skip: 'Omitir',
+    save: 'Guardar recibo',
+    missing: (fields: string) => `Para guardar el recibo, completa: ${fields}.`,
+    // How the Paid with row used to read, before it became pills.
+    optional: 'Opcional',
+    notSet: 'Sin definir',
+  },
+  fr: {
+    store: 'Magasin',
+    storePlaceholder: 'Écris le nom du magasin',
+    oldStorePlaceholder: 'Cherche un magasin',
+    paidWith: 'Payé avec',
+    skip: 'Passer',
+    save: 'Enregistrer le reçu',
+    missing: (fields: string) => `Pour enregistrer le reçu, remplis${NBSP}: ${fields}.`,
+    optional: 'Facultatif',
+    notSet: 'Non défini',
+  },
+} as const;
+
+const LOCALIZED = ['es', 'fr'] as const;
+
 beforeEach(() => {
   jest.clearAllMocks();
   resetLocaleForTests();
@@ -203,6 +257,8 @@ beforeEach(() => {
   mockScanner.capture = true;
   mockScanner.recognition = true;
   mockReceipt = { data: null, isError: false, isFetched: false };
+  mockSources = [CARD_SOURCE];
+  mockCreate.mockResolvedValue({ id: 'receipt-new' });
 });
 afterAll(() => resetLocaleForTests());
 
@@ -214,12 +270,12 @@ describe('Add receipt in Spanish', () => {
 
     expect(screen.getByText('Agregar un recibo')).toBeTruthy();
     expect(screen.getByText('Leímos la tienda y el importe.')).toBeTruthy();
-    expect(
-      screen.getByText('Revisa la fecha y la tarjeta abajo: se guardará de todos modos.'),
-    ).toBeTruthy();
+    expect(screen.getByText('Revisa la fecha y la tarjeta abajo.')).toBeTruthy();
     expect(screen.getByRole('button', { name: /^Importe.*\$1,234\.50/ })).toBeTruthy();
     expect(screen.getByLabelText('Cambiar tienda, ahora es Oxxo')).toBeTruthy();
-    expect(screen.getByLabelText(/^Pagado con.*VISA ••4421/)).toBeTruthy();
+    // The scan did not read the card, so none of the Paid with pills is lit.
+    expect(screen.getByText('Pagado con')).toBeTruthy();
+    expect(radio(screen, CARD, false)).toBeTruthy();
     expect(screen.getByText('Guardar recibo')).toBeTruthy();
     expectNoRawText(screen.toJSON());
   });
@@ -247,10 +303,11 @@ describe('Add receipt in Spanish', () => {
 
   it('words a store and an amount still to add', async () => {
     setLanguage('es');
-    mockParams = { scannedRead: 'date', scannedDate: '2026-09-28' };
+    mockParams = BARE_SCAN;
     const screen = await render(<AddReceiptScreen />);
 
-    expect(screen.getByPlaceholderText('Busca una tienda')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Escribe el nombre de la tienda')).toBeTruthy();
+    expect(screen.queryByPlaceholderText('Busca una tienda')).toBeNull();
     expect(screen.getByLabelText('Importe, obligatorio').props.accessibilityHint).toBe(
       'Hace falta para guardar. Abre «importe» para agregarlo.',
     );
@@ -261,11 +318,11 @@ describe('Add receipt in Spanish', () => {
 
   it('words the store box: the search, its results, the added store and the category line', async () => {
     setLanguage('es');
-    mockParams = { scannedRead: 'date', scannedDate: '2026-09-28' };
+    mockParams = BARE_SCAN;
     const screen = await render(<AddReceiptScreen />);
 
     expect(screen.getByText('Tienda')).toBeTruthy();
-    const input = screen.getByPlaceholderText('Busca una tienda');
+    const input = screen.getByPlaceholderText('Escribe el nombre de la tienda');
     await fireEvent(input, 'focus');
     await fireEvent.changeText(input, 'Oxxo');
     expect(screen.getByText('Agregar “Oxxo”')).toBeTruthy();
@@ -278,7 +335,7 @@ describe('Add receipt in Spanish', () => {
     expectNoRawText(screen.toJSON());
 
     await press(screen, 'Cambiar tienda, ahora es Oxxo');
-    expect(screen.getByPlaceholderText('Busca una tienda')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Escribe el nombre de la tienda')).toBeTruthy();
     expect(screen.queryByText('Archivado en', { exact: false })).toBeNull();
   });
 
@@ -346,12 +403,6 @@ describe('Add receipt in Spanish', () => {
     expectNoRawText(screen.toJSON());
     await press(screen, 'Atrás');
 
-    await press(screen, 'Pagado con, VISA ••4421');
-    expect(screen.getByText('¿Con qué pagaste?')).toBeTruthy();
-    expect(screen.getByLabelText('Sin tarjeta ni cuenta')).toBeTruthy();
-    expectNoRawText(screen.toJSON());
-    await press(screen, 'Atrás');
-
     await press(screen, 'Nota, sin definir, opcional');
     expect(screen.getByPlaceholderText('Algo que valga la pena recordar')).toBeTruthy();
     expectNoRawText(screen.toJSON());
@@ -371,7 +422,9 @@ describe('Add receipt in Spanish', () => {
     expect(screen.getByText('Guardar cambios')).toBeTruthy();
     expect(screen.getByLabelText('Cambiar tienda, ahora es Oxxo')).toBeTruthy();
     expect(screen.getByText('Archivado en Supermercado')).toBeTruthy();
-    expect(screen.getByLabelText('Pagado con, VISA ••4421')).toBeTruthy();
+    // An edit opens on the card it was saved with.
+    expect(radio(screen, CARD, true)).toBeTruthy();
+    expect(radio(screen, 'Omitir', false)).toBeTruthy();
     expect(screen.getByLabelText('Fecha, jue 10 sep')).toBeTruthy();
     expect(screen.getByText('Eliminar recibo')).toBeTruthy();
     expectNoRawText(screen.toJSON());
@@ -400,11 +453,7 @@ describe('Add receipt in French', () => {
 
     expect(screen.getByText('Ajouter un reçu')).toBeTruthy();
     expect(screen.getByText('Nous avons lu le magasin et le montant.')).toBeTruthy();
-    expect(
-      screen.getByText(
-        `Vérifie la date et la carte ci-dessous${NBSP}: il sera enregistré quand même.`,
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText('Vérifie la date et la carte ci-dessous.')).toBeTruthy();
     // Queries fold a no-break space into a plain one, so the label is compared as it is.
     expect(screen.getByRole('button', { name: /^Montant, / }).props.accessibilityLabel).toBe(
       `Montant, 1${NBSP}234,50${NBSP}$`,
@@ -447,12 +496,6 @@ describe('Add receipt in French', () => {
     expectNoRawText(screen.toJSON());
     await press(screen, 'Retour');
 
-    await press(screen, 'Payé avec, VISA ••4421');
-    expect(screen.getByText(`Tu as payé avec quoi${NBSP}?`)).toBeTruthy();
-    expect(screen.getByLabelText('Aucune carte ni aucun compte')).toBeTruthy();
-    expectNoRawText(screen.toJSON());
-    await press(screen, 'Retour');
-
     await press(screen, 'Note, non défini, facultatif');
     expect(screen.getByPlaceholderText('Quelque chose à retenir')).toBeTruthy();
     expectNoRawText(screen.toJSON());
@@ -464,11 +507,11 @@ describe('Add receipt in French', () => {
   // A line must not wrap onto a lone "?" or a lone guillemet.
   it('words the store box: the search, its results, the added store and the category line', async () => {
     setLanguage('fr');
-    mockParams = { scannedRead: 'date', scannedDate: '2026-09-28' };
+    mockParams = BARE_SCAN;
     const screen = await render(<AddReceiptScreen />);
 
     expect(screen.getByText('Magasin')).toBeTruthy();
-    const input = screen.getByPlaceholderText('Cherche un magasin');
+    const input = screen.getByPlaceholderText('Écris le nom du magasin');
     await fireEvent(input, 'focus');
     await fireEvent.changeText(input, 'Oxxo');
     expect(screen.getByText('Ajouter « Oxxo »')).toBeTruthy();
@@ -491,7 +534,6 @@ describe('Add receipt in French', () => {
 
     for (const [open, back] of [
       ['Choisir une date', 'Retour'],
-      ['Payé avec, VISA ••4421', 'Retour'],
       ['Note, non défini, facultatif', 'Retour'],
     ]) {
       await press(screen, open);
@@ -499,8 +541,12 @@ describe('Add receipt in French', () => {
       await press(screen, back);
     }
     // The row hints are only on the final page, for a line that is set and for one still to add.
-    mockParams = { scannedRead: 'date', scannedDate: '2026-09-28' };
+    mockParams = BARE_SCAN;
     const gaps = await render(<AddReceiptScreen />);
+    faults.push(...frenchSpacingFaults(gaps.toJSON()));
+    // And the line Save puts there when something is missing: its colon follows a no-break space.
+    await press(gaps, 'Enregistrer le reçu');
+    expect(lineAboveSave(gaps)).toHaveLength(1);
     faults.push(...frenchSpacingFaults(gaps.toJSON()));
 
     expect(faults).toEqual([]);
@@ -512,9 +558,7 @@ describe('Add receipt in French', () => {
     const screen = await render(<AddReceiptScreen />);
 
     expect(screen.getByText('Nous avons lu le magasin, le montant et la date.')).toBeTruthy();
-    expect(
-      screen.getByText(`Vérifie la carte ci-dessous${NBSP}: il sera enregistré quand même.`),
-    ).toBeTruthy();
+    expect(screen.getByText('Vérifie la carte ci-dessous.')).toBeTruthy();
   });
 
   it('says a phone without a camera cannot scan', async () => {
@@ -567,4 +611,190 @@ describe('Add receipt in French', () => {
     expect(screen.getByText('Revenir')).toBeTruthy();
     expectNoRawText(screen.toJSON());
   });
+});
+
+describe('Paid with in Spanish and French', () => {
+  it.each(LOCALIZED)(
+    'offers the card and Skip as pills, nothing lit until one is pressed, in %s',
+    async (language) => {
+      const words = WORDS[language];
+      setLanguage(language);
+      mockParams = PARTIAL_SCAN;
+      const screen = await render(<AddReceiptScreen />);
+
+      expect(screen.getByText(words.paidWith)).toBeTruthy();
+      for (const pill of [CARD, words.skip]) expect(radio(screen, pill, false)).toBeTruthy();
+
+      await press(screen, words.skip);
+      expect(radio(screen, words.skip, true)).toBeTruthy();
+      expect(radio(screen, CARD, false)).toBeTruthy();
+
+      await press(screen, CARD);
+      expect(radio(screen, CARD, true)).toBeTruthy();
+      expect(radio(screen, words.skip, false)).toBeTruthy();
+      expectNoRawText(screen.toJSON());
+    },
+  );
+
+  it.each(LOCALIZED)(
+    'is a row of pills, not an optional row with a page, in %s',
+    async (language) => {
+      const words = WORDS[language];
+      setLanguage(language);
+      mockParams = PARTIAL_SCAN;
+      const screen = await render(<AddReceiptScreen />);
+
+      expect(screen.queryByLabelText(new RegExp(`^${words.paidWith}, `))).toBeNull();
+      expect(screen.queryByText(`${words.paidWith} · ${words.optional}`)).toBeNull();
+      expect(screen.queryByText(words.notSet)).toBeNull();
+    },
+  );
+
+  it.each(LOCALIZED)(
+    'offers only Skip when there is no card or account, in %s',
+    async (language) => {
+      const words = WORDS[language];
+      setLanguage(language);
+      mockSources = [];
+      mockParams = PARTIAL_SCAN;
+      const screen = await render(<AddReceiptScreen />);
+
+      expect(screen.getByText(words.paidWith)).toBeTruthy();
+      expect(radio(screen, words.skip, false)).toBeTruthy();
+      expect(screen.queryByRole('radio', { name: CARD })).toBeNull();
+    },
+  );
+
+  it.each(LOCALIZED)('lights the card a scan matched, in %s', async (language) => {
+    const words = WORDS[language];
+    setLanguage(language);
+    mockParams = CARD_SCAN;
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(radio(screen, CARD, true)).toBeTruthy();
+    expect(radio(screen, words.skip, false)).toBeTruthy();
+  });
+
+  it.each(LOCALIZED)('opens a saved receipt with no card on Skip, in %s', async (language) => {
+    const words = WORDS[language];
+    setLanguage(language);
+    mockParams = { id: 'receipt-1' };
+    mockReceipt = { data: { ...SAVED, card_id: null }, isError: false, isFetched: true };
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(radio(screen, words.skip, true)).toBeTruthy();
+    expect(radio(screen, CARD, false)).toBeTruthy();
+  });
+});
+
+describe('The Store box in Spanish and French', () => {
+  it.each(LOCALIZED)('asks for the name of the store, not a search, in %s', async (language) => {
+    const words = WORDS[language];
+    setLanguage(language);
+    mockParams = BARE_SCAN;
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(screen.getByText(words.store)).toBeTruthy();
+    expect(screen.getByPlaceholderText(words.storePlaceholder)).toBeTruthy();
+    expect(screen.queryByPlaceholderText(words.oldStorePlaceholder)).toBeNull();
+    expectNoRawText(screen.toJSON());
+  });
+});
+
+describe('Save with gaps in Spanish and French', () => {
+  it.each([
+    ['es', 'Para guardar el recibo, completa: Importe, Tienda, Pagado con.'],
+    ['fr', `Pour enregistrer le reçu, remplis${NBSP}: Montant, Magasin, Payé avec.`],
+  ] as const)(
+    'names every empty box in %s, in the page’s order, and writes nothing',
+    async (language, line) => {
+      setLanguage(language);
+      mockParams = BARE_SCAN;
+      const screen = await render(<AddReceiptScreen />);
+
+      await press(screen, WORDS[language].save);
+
+      expect(lineAboveSave(screen)).toEqual([line]);
+      expect(mockCreate).not.toHaveBeenCalled();
+      expectNoRawText(screen.toJSON());
+    },
+  );
+
+  it.each([
+    ['es', 'Pagado con'],
+    ['fr', 'Payé avec'],
+  ] as const)(
+    'names only Paid with when the scan read the rest, in %s',
+    async (language, field) => {
+      const words = WORDS[language];
+      setLanguage(language);
+      mockParams = PARTIAL_SCAN;
+      const screen = await render(<AddReceiptScreen />);
+
+      await press(screen, words.save);
+
+      expect(lineAboveSave(screen)).toEqual([words.missing(field)]);
+      expect(mockCreate).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['es', 'Tienda, Pagado con', 'Pagado con'],
+    ['fr', 'Magasin, Payé avec', 'Payé avec'],
+  ] as const)(
+    'lists only what is still empty in %s, and the line goes with the next answer',
+    async (language, afterAmount, afterStore) => {
+      const words = WORDS[language];
+      setLanguage(language);
+      mockParams = { scannedAmount: '12.5', scannedRead: 'amount' };
+      const screen = await render(<AddReceiptScreen />);
+
+      await press(screen, words.save);
+      expect(lineAboveSave(screen)).toEqual([words.missing(afterAmount)]);
+
+      // What is typed in the box names the store without being picked from the list.
+      await typeStore(screen, words.storePlaceholder, 'Zed Mart');
+      expect(lineAboveSave(screen)).toEqual([]);
+
+      await press(screen, words.save);
+      expect(lineAboveSave(screen)).toEqual([words.missing(afterStore)]);
+      await press(screen, words.skip);
+      expect(lineAboveSave(screen)).toEqual([]);
+      expect(mockCreate).not.toHaveBeenCalled();
+
+      await press(screen, words.save);
+      await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+      expect(lineAboveSave(screen)).toEqual([]);
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          merchant: 'Zed Mart',
+          brand_id: null,
+          amount: 12.5,
+          card_id: null,
+          bank_account_id: null,
+        }),
+      );
+    },
+  );
+
+  it.each(LOCALIZED)(
+    'goes when a card is pressed, and the receipt saves on it, in %s',
+    async (language) => {
+      const words = WORDS[language];
+      setLanguage(language);
+      mockParams = PARTIAL_SCAN;
+      const screen = await render(<AddReceiptScreen />);
+
+      await press(screen, words.save);
+      expect(lineAboveSave(screen)).toHaveLength(1);
+      await press(screen, CARD);
+      expect(lineAboveSave(screen)).toEqual([]);
+
+      await press(screen, words.save);
+      await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ merchant: 'Oxxo', amount: 1234.5, card_id: 'card-1' }),
+      );
+    },
+  );
 });

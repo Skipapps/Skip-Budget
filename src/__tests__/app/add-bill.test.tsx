@@ -5,14 +5,16 @@ import { BackHandler } from 'react-native';
 import AddBillScreen from '@/app/add-bill';
 import { LOGO_COPY } from '@/components/brands/logo-choices';
 import { FAILURE_MESSAGE } from '@/lib/failure';
+import { success, warn } from '@/lib/haptics';
 
 /**
  * The bill form as a person walks it. A blank bill opens on the category chooser, then the keypad,
- * then the one final page; every line of that page opens a page for that one thing and comes back,
- * Done to keep what was set and Back to leave it as it was. A saved bill, or what the voice review
- * heard, opens straight on the final page. Real pages throughout (grid, keypad, calendar, company
- * search, card tiles, reminder chips) and the real Save button, so a disabled Save really refuses a
- * press; only the network, the calculator pad and the logo images are replaced.
+ * then the one final page. The name, payment day, card and reminder are answered on that page
+ * itself; the amount, category and note open a page for that one thing and come back, Done to keep
+ * what was set and Back to leave it as it was. A saved bill, or what the voice review heard, opens
+ * straight on the final page. Real pages throughout (grid, keypad, calendar, name search, card
+ * pills, reminder chips) and the real Save button; only the network, the calculator pad and the
+ * logo images are replaced.
  *
  * Also: the bill's form only exists when the record does: `id` turns Save into an update, so a
  * failed read must not open a blank "edit" over a real bill.
@@ -135,10 +137,11 @@ jest.mock('@/api/past-charges', () => ({
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/api/push', () => ({ enableReminders: jest.fn() }));
 const mockApplyReminder = jest.fn();
+let mockSavedReminder: { choice: string; remindAt: string };
 jest.mock('@/api/reminders', () => ({
   ...jest.requireActual('@/api/reminders'),
   useApplyReminder: () => mockApplyReminder,
-  useReminderChoice: () => ({ choice: 'off', remindAt: '09:00' }),
+  useReminderChoice: () => mockSavedReminder,
 }));
 
 /*
@@ -149,7 +152,8 @@ const mockUpdate = jest.fn();
 const mockCreate = jest.fn();
 const mockDelete = jest.fn();
 const mockUseUpdateBill = jest.fn(() => ({ mutateAsync: mockUpdate, isPending: false }));
-const mockUseCreateBill = jest.fn(() => ({ mutateAsync: mockCreate, isPending: false }));
+let mockCreating = false;
+const mockUseCreateBill = jest.fn(() => ({ mutateAsync: mockCreate, isPending: mockCreating }));
 let mockDeleting = false;
 const mockUseDeleteBill = jest.fn(() => ({ mutateAsync: mockDelete, isPending: mockDeleting }));
 
@@ -241,11 +245,33 @@ const PERIOD = {
 const TILE = {
   housing: 'Housing. Rent, mortgage, HOA fees',
   energy: 'Electricity & Gas. Power, heating, cooking gas',
+  water: 'Water & Waste. Water, sewer, garbage',
   internet: 'Internet. Home broadband and Wi-Fi',
   mobile: 'Mobile Phone. Phone plans, device payments',
   insurance: 'Insurance. Car, health, home, life',
-  other: 'Other bill. Name it and pick an icon',
+  loans: 'Loans & Credit. Cards, student, auto, personal',
+  transport: 'Transportation. Car, transit, parking, tolls',
+  family: 'Family & Healthcare. Childcare, tuition, medical',
+  other: 'Other bill. Anything else you pay',
 };
+
+/** What the Name box suggests for each category. */
+const HINT: Record<keyof typeof TILE, string> = {
+  housing: 'Rent, mortgage or your landlord',
+  energy: 'AEP, Duke Energy, National Grid',
+  water: 'Your water company',
+  internet: 'Xfinity, Spectrum, Verizon',
+  mobile: 'T-Mobile, AT&T, Verizon',
+  insurance: 'Geico, State Farm, Progressive',
+  loans: 'Chase, Discover, SoFi',
+  transport: 'Transit, tolls or parking',
+  family: 'Nursery, school or clinic',
+  other: 'Search or type a name',
+};
+
+const RECURRING = ['Weekly', 'Monthly', 'Every 3 months', 'Yearly', 'Specific period'];
+const PAID_WITH = ['VISA ••4421', 'Checking ••0099', 'Skip'];
+const REMINDERS = ['No reminder', 'On the day', '1 day', '3 days', '1 week'];
 
 type Screen = Awaited<ReturnType<typeof render>>;
 
@@ -261,23 +287,28 @@ async function typeAmount(screen: Screen, digits: string) {
 
 const isChecked = (screen: Screen, label: string) =>
   Boolean(screen.getByLabelText(label).props.accessibilityState?.checked);
-const isSelected = (screen: Screen, label: string) =>
-  Boolean(screen.getByLabelText(label).props.accessibilityState?.selected);
 
-/** The Name page holds one text box, and an Other bill's is empty until someone names it. */
-const nameInput = (screen: Screen) => screen.getByDisplayValue('');
+/** Which of a group's chips are lit. Throws on a chip that is not on the page. */
+const lit = (screen: Screen, labels: string[]) =>
+  labels.filter((label) => isChecked(screen, label));
 
-/** Types into the company box on the final page the way a finger does: a tap into it, then the letters. */
-async function searchCompany(screen: Screen, placeholder: string, text: string) {
+/** Types into the Name box the way a finger does: a tap into it, then the letters. */
+async function typeName(screen: Screen, placeholder: string, text: string) {
   const input = screen.getByPlaceholderText(placeholder);
   await fireEvent(input, 'focus');
   await fireEvent.changeText(input, text);
 }
 
-/** Picks a company the catalogue knows from the box on the final page. */
-async function chooseCompany(screen: Screen, placeholder: string, text: string) {
-  await searchCompany(screen, placeholder, text);
+/** Picks a name the catalogue knows from the matches listed under the box. */
+async function pickName(screen: Screen, placeholder: string, text: string) {
+  await typeName(screen, placeholder, text);
   await fireEvent.press(await screen.findByLabelText(text));
+}
+
+/** Opens a date box and picks a day from the calendar that unfolds under it. */
+async function pickDay(screen: Screen, box: string, day: string) {
+  await press(screen, box);
+  await press(screen, day);
 }
 
 /** Every string drawn on the page, top to bottom. */
@@ -315,6 +346,17 @@ async function newBill(screen: Screen, tile: string, amount: string) {
   await press(screen, 'Continue');
 }
 
+/** What is still asked of a new bill on its final page: a name, a day, a payer and a reminder. */
+async function answerTheRest(screen: Screen, placeholder: string, name = 'Gym') {
+  await typeName(screen, placeholder, name);
+  await pickDay(screen, 'Payment on, Select a date', 'Friday 9 October 2026');
+  await press(screen, 'VISA ••4421');
+  await press(screen, 'No reminder');
+}
+
+/** The line Save puts above its button when answers are missing. */
+const gaps = (fields: string) => `To save this bill, fill in: ${fields}.`;
+
 /** Hardware back as the system plays it: newest listener first, until one takes it. */
 type BackListener = Parameters<typeof BackHandler.addEventListener>[1];
 const backHandlers = new Set<BackListener>();
@@ -342,7 +384,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockParams = {};
   mockSources = SOURCES;
+  mockCreating = false;
   mockDeleting = false;
+  mockSavedReminder = { choice: 'off', remindAt: '09:00' };
   mockBill = { data: null, isError: false, isFetched: false };
   mockConfirm.mockResolvedValue(true);
   mockCreate.mockResolvedValue({ id: 'bill-new' });
@@ -406,10 +450,11 @@ describe('Add bill — an edit whose bill could not be read', () => {
 
     expect(screen.getByText('Edit bill')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Amount, $84.20' })).toBeTruthy();
-    expect(screen.getByLabelText('Name, Power')).toBeTruthy();
+    expect(screen.getByLabelText('Change name, currently Power')).toBeTruthy();
     expect(screen.getByLabelText('Category, Electricity & Gas')).toBeTruthy();
-    expect(screen.getByLabelText('Due on, Sun Sep 20')).toBeTruthy();
-    expect(screen.getByLabelText('Paid with, VISA ••4421')).toBeTruthy();
+    expect(screen.getByLabelText('Payment on, Sun Sep 20')).toBeTruthy();
+    expect(lit(screen, PAID_WITH)).toEqual(['VISA ••4421']);
+    expect(lit(screen, REMINDERS)).toEqual(['No reminder']);
     expect(screen.getByLabelText('Save changes')).toBeEnabled();
     onFinalPage(screen);
     expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
@@ -492,7 +537,7 @@ describe('Add bill — a new bill, page by page', () => {
     expect(screen.getByRole('button', { name: 'Amount, $1,234.56' })).toBeTruthy();
   });
 
-  it('lands on one final page with the category as the name and the date still to give', async () => {
+  it('lands on one final page with every answer still to give', async () => {
     const screen = await render(<AddBillScreen />);
 
     await newBill(screen, TILE.internet, '80');
@@ -500,19 +545,47 @@ describe('Add bill — a new bill, page by page', () => {
     onFinalPage(screen);
     expect(screen.getByRole('button', { name: 'Amount, $80.00' })).toBeTruthy();
     expect(screen.getByText('Tap to edit')).toBeTruthy();
-    expect(screen.getByLabelText('Name, Internet')).toBeTruthy();
+    // The name starts empty, whatever the category.
+    expect(screen.getByPlaceholderText(HINT.internet)).toBeTruthy();
+    expect(screen.getByDisplayValue('')).toBeTruthy();
     expect(screen.getByLabelText('Category, Internet')).toBeTruthy();
-    expect(screen.getByLabelText('Due on, needed')).toBeTruthy();
-    expect(screen.getByText('Tap to add')).toBeTruthy();
-    expect(screen.getByLabelText('Paid with, not set, optional')).toBeTruthy();
-    expect(screen.getByLabelText('Reminder, not set, optional')).toBeTruthy();
-    expect(screen.getByText('Off')).toBeTruthy();
+    expect(screen.getByLabelText('Payment on, Select a date')).toBeTruthy();
+    expect(lit(screen, RECURRING)).toEqual(['Monthly']);
+    expect(lit(screen, PAID_WITH)).toEqual([]);
+    expect(lit(screen, REMINDERS)).toEqual([]);
+    expect(screen.queryByLabelText(/^Sent at/)).toBeNull();
     expect(screen.getByLabelText('Note, not set, optional')).toBeTruthy();
     expect(screen.getByText('Add a note')).toBeTruthy();
-    expect(screen.getByLabelText('Save bill')).toBeDisabled();
+    expect(screen.queryByText('Tap to add')).toBeNull();
+    expect(screen.getByLabelText('Save bill')).toBeEnabled();
+    expect(screen.queryByText(/^To save this bill/)).toBeNull();
     expect(screen.queryByLabelText('Delete this bill')).toBeNull();
     expect(screen.queryByRole('progressbar')).toBeNull();
     expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('lays the lines out in order, and the choices after the repeat pills', async () => {
+    const screen = await render(<AddBillScreen />);
+
+    await newBill(screen, TILE.internet, '80');
+
+    const texts = textsInOrder(screen);
+    const places = [
+      'Name',
+      'Category',
+      'Payment on',
+      'Recurring',
+      'Paid with',
+      'Reminder',
+      'Note',
+    ].map((label) => texts.indexOf(label));
+    expect(places).not.toContain(-1);
+    expect(places).toEqual([...places].sort((a, b) => a - b));
+    expect(screen.getAllByRole('radio').map((chip) => chip.props.accessibilityLabel)).toEqual([
+      ...RECURRING,
+      ...PAID_WITH,
+      ...REMINDERS,
+    ]);
   });
 
   it('shows the amount to the cent, never padded to a figure nobody typed', async () => {
@@ -523,14 +596,18 @@ describe('Add bill — a new bill, page by page', () => {
     expect(screen.getByRole('button', { name: 'Amount, $1,030.50' })).toBeTruthy();
   });
 
-  it('offers no Paid with line when there is no card or account to choose', async () => {
+  it('offers only Skip in Paid with when there is no card or account to choose', async () => {
     mockSources = [];
     const screen = await render(<AddBillScreen />);
 
     await newBill(screen, TILE.housing, '80');
 
-    expect(screen.queryByText('Paid with')).toBeNull();
-    expect(screen.queryByLabelText(/^Paid with/)).toBeNull();
+    expect(screen.getByText('Paid with')).toBeTruthy();
+    expect(screen.queryByLabelText('VISA ••4421')).toBeNull();
+    expect(screen.queryByLabelText('Checking ••0099')).toBeNull();
+    expect(isChecked(screen, 'Skip')).toBe(false);
+    await press(screen, 'Skip');
+    expect(isChecked(screen, 'Skip')).toBe(true);
   });
 });
 
@@ -680,7 +757,7 @@ describe('Add bill — back and close', () => {
   });
 });
 
-describe('Add bill — each line of the final page opens its page', () => {
+describe('Add bill — the lines that open a page of their own', () => {
   beforeEach(() => editing(POWER));
 
   describe('the amount', () => {
@@ -736,101 +813,6 @@ describe('Add bill — each line of the final page opens its page', () => {
     });
   });
 
-  describe('the name', () => {
-    it('opens the name on a page of its own, without the company, and keeps a new name on Done', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Name, Power');
-
-      expect(screen.getAllByText('Name').length).toBeGreaterThan(0);
-      expect(screen.queryByText(/^Company/)).toBeNull();
-      expect(screen.queryByPlaceholderText('AEP, Duke Energy, National Grid')).toBeNull();
-      expect(screen.queryByText('You can edit this later.')).toBeNull();
-      await fireEvent.changeText(screen.getByDisplayValue('Power'), 'Electric');
-      await press(screen, 'Done');
-
-      onFinalPage(screen);
-      expect(screen.getByLabelText('Name, Electric')).toBeTruthy();
-    });
-
-    it('leaves the name as it was on Back', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Name, Power');
-      await fireEvent.changeText(screen.getByDisplayValue('Power'), 'Electric');
-      await press(screen, 'Back');
-
-      expect(screen.getByLabelText('Name, Power')).toBeTruthy();
-    });
-
-    it('will not keep an empty name', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Name, Power');
-      await fireEvent.changeText(screen.getByDisplayValue('Power'), '');
-      expect(screen.getByLabelText('Done')).toBeDisabled();
-      await fireEvent.changeText(nameInput(screen), '   ');
-      expect(screen.getByLabelText('Done')).toBeDisabled();
-      await fireEvent.changeText(nameInput(screen), 'Gas');
-      expect(screen.getByLabelText('Done')).toBeEnabled();
-    });
-
-    it('offers the icons only to an Other bill with no company', async () => {
-      editing({ ...POWER, category_id: 'other', name: 'Gym', icon_id: 'pets' });
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Name, Gym');
-      expect(screen.getByText('Icon')).toBeTruthy();
-      expect(isSelected(screen, 'Pets')).toBe(true);
-      await press(screen, 'Music');
-      expect(isSelected(screen, 'Music')).toBe(true);
-      await press(screen, 'Done');
-      await press(screen, 'Save changes');
-
-      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
-      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
-        category_id: 'other',
-        icon_id: 'music',
-      });
-    });
-
-    it('does not offer the icons to a bill of any other category', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Name, Power');
-
-      expect(screen.queryByText('Icon')).toBeNull();
-      expect(screen.queryByLabelText('Pets')).toBeNull();
-    });
-
-    it('does not offer the icons beside a company, whose logo would hide them', async () => {
-      editing({
-        ...POWER,
-        category_id: 'other',
-        name: 'Gym',
-        brand_id: 'b-gs',
-        brands: { domain: 'greystar.com' },
-      });
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Name, Gym');
-
-      expect(screen.queryByText('Icon')).toBeNull();
-      expect(screen.queryByLabelText('Pets')).toBeNull();
-    });
-
-    it('draws the company’s logo beside the name, else the category’s icon', async () => {
-      editing({ ...POWER, brand_id: 'b-cc', brands: { domain: 'comcast.com' } });
-      const first = await render(<AddBillScreen />);
-      expect(first.getByTestId('logo-40')).toHaveTextContent('Power|comcast.com');
-      await first.unmount();
-
-      editing(POWER);
-      const second = await render(<AddBillScreen />);
-      expect(second.queryByTestId('logo-40')).toBeNull();
-    });
-  });
-
   describe('the category', () => {
     it('opens the grid, and a tap picks and returns at once, with no Done', async () => {
       const screen = await render(<AddBillScreen />);
@@ -855,135 +837,6 @@ describe('Add bill — each line of the final page opens its page', () => {
 
       onFinalPage(screen);
       expect(screen.getByLabelText('Category, Electricity & Gas')).toBeTruthy();
-    });
-  });
-
-  describe('the due date', () => {
-    it('opens the calendar on the date, and keeps a new day on Done', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Due on, Sun Sep 20');
-
-      expect(screen.getByText('When is it due?')).toBeTruthy();
-      expect(screen.getByLabelText('Sunday 20 September 2026').props.accessibilityState).toEqual(
-        expect.objectContaining({ selected: true }),
-      );
-      await press(screen, 'Next month');
-      await press(screen, 'Friday 9 October 2026');
-      await press(screen, 'Done');
-
-      onFinalPage(screen);
-      expect(screen.getByLabelText('Due on, Fri Oct 9')).toBeTruthy();
-    });
-
-    it('names the page Due on, and sets today with the Today pill', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Due on, Sun Sep 20');
-      expect(screen.getByText('Due on')).toBeTruthy();
-      await press(screen, 'Today');
-      await press(screen, 'Done');
-
-      expect(screen.getByLabelText('Due on, Today, Wed Oct 7')).toBeTruthy();
-    });
-
-    it('leaves the date as it was on Back', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Due on, Sun Sep 20');
-      await press(screen, 'Previous month');
-      await press(screen, 'Saturday 15 August 2026');
-      await press(screen, 'Back');
-
-      expect(screen.getByLabelText('Due on, Sun Sep 20')).toBeTruthy();
-    });
-
-    it('says Today for a bill due today', async () => {
-      editing({ ...POWER, next_due_on: '2026-10-07' });
-      const screen = await render(<AddBillScreen />);
-
-      expect(screen.getByLabelText('Due on, Today, Wed Oct 7')).toBeTruthy();
-    });
-  });
-
-  describe('paid with', () => {
-    it('opens the cards and accounts, and keeps the pick on Done', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Paid with, VISA ••4421');
-
-      expect(isChecked(screen, 'VISA ••4421')).toBe(true);
-      expect(isChecked(screen, 'Checking ••0099')).toBe(false);
-      await press(screen, 'Checking ••0099');
-      await press(screen, 'Done');
-
-      onFinalPage(screen);
-      expect(screen.getByLabelText('Paid with, Checking ••0099')).toBeTruthy();
-    });
-
-    it('leaves the choice as it was on Back', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Paid with, VISA ••4421');
-      await press(screen, 'Checking ••0099');
-      await press(screen, 'Back');
-
-      expect(screen.getByLabelText('Paid with, VISA ••4421')).toBeTruthy();
-    });
-
-    it('lets the choice go with No card or account, offered only while one is chosen', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Paid with, VISA ••4421');
-      await press(screen, 'No card or account');
-      expect(screen.queryByLabelText('No card or account')).toBeNull();
-      expect(isChecked(screen, 'VISA ••4421')).toBe(false);
-      await press(screen, 'Done');
-
-      expect(screen.getByLabelText('Paid with, not set, optional')).toBeTruthy();
-    });
-  });
-
-  describe('the reminder', () => {
-    it('opens the chips and keeps the choice, with its time, on Done', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Reminder, not set, optional');
-      expect(isChecked(screen, 'Off')).toBe(true);
-      expect(screen.queryByLabelText(/^Sent at/)).toBeNull();
-      await press(screen, '1 day');
-      expect(screen.getByLabelText('Sent at 9:00 AM. Change the time.')).toBeTruthy();
-      await press(screen, 'Done');
-
-      onFinalPage(screen);
-      expect(screen.getByLabelText('Reminder, 1 day before · 9:00 AM')).toBeTruthy();
-    });
-
-    it('says On the day without a "before"', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Reminder, not set, optional');
-      await press(screen, 'On the day');
-      await press(screen, 'Done');
-
-      expect(screen.getByLabelText('Reminder, On the day · 9:00 AM')).toBeTruthy();
-    });
-
-    it('leaves the reminder as it was on Back, and turns it off again with Off', async () => {
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'Reminder, not set, optional');
-      await press(screen, '3 days');
-      await press(screen, 'Back');
-      expect(screen.getByLabelText('Reminder, not set, optional')).toBeTruthy();
-
-      await press(screen, 'Reminder, not set, optional');
-      await press(screen, '3 days');
-      await press(screen, 'Done');
-      await press(screen, 'Reminder, 3 days before · 9:00 AM');
-      await press(screen, 'Off');
-      await press(screen, 'Done');
-      expect(screen.getByLabelText('Reminder, not set, optional')).toBeTruthy();
     });
   });
 
@@ -1048,39 +901,51 @@ describe('Add bill — each line of the final page opens its page', () => {
     it('draws no step dots', async () => {
       const screen = await render(<AddBillScreen />);
 
-      await press(screen, 'Due on, Sun Sep 20');
+      await press(screen, 'Note, not set, optional');
 
       expect(screen.queryByRole('progressbar')).toBeNull();
+    });
+
+    it('has no page for the name, payment day, card or reminder: they are answered where they stand', async () => {
+      const screen = await render(<AddBillScreen />);
+
+      expect(
+        screen.queryByLabelText(/^(Name|Payment on|Paid with|Reminder), (needed|not set)/),
+      ).toBeNull();
+      await press(screen, 'Payment on, Sun Sep 20');
+      await press(screen, 'Skip');
+      await press(screen, '1 day');
+
+      onFinalPage(screen);
     });
   });
 });
 
-describe('Add bill — the company box on the final page', () => {
-  it('is the first line, optional, with examples for the bill’s category', async () => {
+describe('Add bill — the name box on the final page', () => {
+  it('is the first line, required, with examples for the bill’s category', async () => {
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.internet, '80');
 
-    expect(screen.getByText('Company · Optional')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Xfinity, Spectrum, Verizon')).toBeTruthy();
+    expect(screen.getByText('Name')).toBeTruthy();
+    expect(screen.getByPlaceholderText(HINT.internet)).toBeTruthy();
     expect(screen.getByDisplayValue('')).toBeTruthy();
+    expect(screen.queryByText(/Optional/)).toBeNull();
+    expect(screen.queryByText(/^Company/)).toBeNull();
     const texts = textsInOrder(screen);
-    expect(texts.indexOf('Company · Optional')).toBeGreaterThan(-1);
-    expect(texts.indexOf('Company · Optional')).toBeLessThan(texts.indexOf('Name'));
+    expect(texts.indexOf('Name')).toBeGreaterThan(-1);
+    expect(texts.indexOf('Name')).toBeLessThan(texts.indexOf('Category'));
   });
 
-  it.each([
-    [TILE.housing, 'Letting agent or management company'],
-    [TILE.energy, 'AEP, Duke Energy, National Grid'],
-    [TILE.mobile, 'T-Mobile, AT&T, Verizon'],
-    [TILE.insurance, 'Geico, State Farm, Progressive'],
-    [TILE.other, 'Search for a company'],
-  ])('gives examples to match %s', async (tile, placeholder) => {
-    const screen = await render(<AddBillScreen />);
+  it.each(Object.keys(HINT) as (keyof typeof TILE)[])(
+    'gives examples to match %s',
+    async (category) => {
+      const screen = await render(<AddBillScreen />);
 
-    await newBill(screen, tile, '80');
+      await newBill(screen, TILE[category], '80');
 
-    expect(screen.getByPlaceholderText(placeholder)).toBeTruthy();
-  });
+      expect(screen.getByPlaceholderText(HINT[category])).toBeTruthy();
+    },
+  );
 
   it('follows the category when it changes', async () => {
     const screen = await render(<AddBillScreen />);
@@ -1089,95 +954,499 @@ describe('Add bill — the company box on the final page', () => {
     await press(screen, 'Category, Internet');
     await press(screen, TILE.insurance);
 
-    expect(screen.queryByPlaceholderText('Xfinity, Spectrum, Verizon')).toBeNull();
-    expect(screen.getByPlaceholderText('Geico, State Farm, Progressive')).toBeTruthy();
+    expect(screen.queryByPlaceholderText(HINT.internet)).toBeNull();
+    expect(screen.getByPlaceholderText(HINT.insurance)).toBeTruthy();
   });
 
-  it('shows the company of a saved bill in the box, with a way to take it off', async () => {
-    editing({ ...POWER, brand_id: 'b-cc', brands: { domain: 'comcast.com' } });
-    const screen = await render(<AddBillScreen />);
-
-    expect(screen.getByText('Company · Optional')).toBeTruthy();
-    expect(screen.getByLabelText('Change company, currently Power')).toBeTruthy();
-    expect(screen.queryByPlaceholderText('AEP, Duke Energy, National Grid')).toBeNull();
-  });
-
-  it('shows an empty box for a saved bill with no company', async () => {
+  it('shows the name of a saved bill in the box, with a way to take it off', async () => {
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
-    expect(screen.getByPlaceholderText('AEP, Duke Energy, National Grid')).toBeTruthy();
-    expect(screen.queryByLabelText(/^Change store/)).toBeNull();
+    expect(screen.getByText('Name')).toBeTruthy();
+    expect(screen.getByLabelText('Change name, currently Power')).toBeTruthy();
+    expect(screen.queryByPlaceholderText(HINT.energy)).toBeNull();
+    expect(screen.queryByDisplayValue('')).toBeNull();
   });
 
-  it('lists matches inline and picks one without leaving the page', async () => {
-    const screen = await render(<AddBillScreen />);
-    await newBill(screen, TILE.internet, '80');
+  it('draws the logo of a saved bill’s company in the box, else the category’s icon', async () => {
+    editing({ ...POWER, brand_id: 'b-cc', brands: { domain: 'comcast.com' } });
+    const first = await render(<AddBillScreen />);
+    expect(first.getByTestId('logo-32')).toHaveTextContent('Power|comcast.com');
+    await first.unmount();
 
-    await searchCompany(screen, 'Xfinity, Spectrum, Verizon', 'Greys');
-    expect(await screen.findByLabelText('Greystar')).toBeTruthy();
-    expect(screen.getByLabelText('Add Greys as a new company')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Greystar'));
-
-    onFinalPage(screen);
-    expect(screen.getByLabelText('Change company, currently Greystar')).toBeTruthy();
-    expect(screen.queryByPlaceholderText('Xfinity, Spectrum, Verizon')).toBeNull();
+    editing(POWER);
+    const second = await render(<AddBillScreen />);
+    expect(second.getByTestId('logo-32')).toHaveTextContent(/^Power\|$/);
   });
 
-  it('adds a company the catalogue does not know, and asks about its logo in place', async () => {
-    const screen = await render(<AddBillScreen />);
-    await newBill(screen, TILE.internet, '80');
-
-    await searchCompany(screen, 'Xfinity, Spectrum, Verizon', 'Town Cable');
-    await fireEvent.press(await screen.findByLabelText('Add Town Cable as a new company'));
-
-    onFinalPage(screen);
-    expect(screen.getByLabelText('Name, Town Cable')).toBeTruthy();
-    expect(screen.getByLabelText('Change company, currently Town Cable')).toBeTruthy();
-    expect(screen.getByLabelText(LOGO_COPY.addWebsite)).toBeTruthy();
-  });
-
-  it('stays when the person visits another page and comes back', async () => {
-    const screen = await render(<AddBillScreen />);
-    await newBill(screen, TILE.internet, '80');
-    await chooseCompany(screen, 'Xfinity, Spectrum, Verizon', 'Comcast');
-
-    await press(screen, 'Note, not set, optional');
-    await press(screen, 'Back');
-
-    expect(screen.getByLabelText('Change company, currently Comcast')).toBeTruthy();
-    expect(screen.getByLabelText('Name, Comcast')).toBeTruthy();
-  });
-
-  it('is optional: a bill without one can be saved', async () => {
+  it('opens with the name a voice hand-off heard', async () => {
     mockParams = {
+      from: 'voice',
+      prefillName: 'Rent',
       prefillCategory: 'housing',
       prefillAmount: '1100',
       prefillDate: '2026-10-09',
     };
     const screen = await render(<AddBillScreen />);
 
-    expect(screen.getByLabelText('Save bill')).toBeEnabled();
-    expect(screen.queryByText(/^Tap to add/)).toBeNull();
+    expect(screen.getByLabelText('Change name, currently Rent')).toBeTruthy();
+    expect(screen.queryByPlaceholderText(HINT.housing)).toBeNull();
+  });
+
+  it('opens with the company a voice hand-off heard, logo and all', async () => {
+    mockParams = {
+      from: 'voice',
+      prefillIssuer: 'Comcast',
+      prefillBrandId: 'b-cc',
+      prefillDomain: 'comcast.com',
+      prefillCategory: 'internet',
+      prefillAmount: '80',
+      prefillDate: '2026-10-09',
+    };
+    const screen = await render(<AddBillScreen />);
+
+    expect(screen.getByLabelText('Change name, currently Comcast')).toBeTruthy();
+    expect(screen.getByTestId('logo-32')).toHaveTextContent('Comcast|comcast.com');
+  });
+
+  it('leaves the name to the person when a voice hand-off heard only a category', async () => {
+    mockParams = {
+      from: 'voice',
+      prefillCategory: 'internet',
+      prefillAmount: '80',
+      prefillDate: '2026-10-09',
+    };
+    const screen = await render(<AddBillScreen />);
+
+    expect(screen.getByPlaceholderText(HINT.internet)).toBeTruthy();
+    expect(screen.queryByLabelText(/^Change name/)).toBeNull();
+  });
+
+  it('opens empty for a saved bill that somehow has no name, and Save asks for one', async () => {
+    editing({ ...POWER, name: '' });
+    const screen = await render(<AddBillScreen />);
+
+    expect(screen.getByPlaceholderText(HINT.energy)).toBeTruthy();
+    await press(screen, 'Save changes');
+    expect(screen.getByText(gaps('Name'))).toBeTruthy();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('lists matches inline and picks one without leaving the page', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+
+    await typeName(screen, HINT.internet, 'Greys');
+    expect(await screen.findByLabelText('Greystar')).toBeTruthy();
+    expect(screen.getByLabelText('Use Greys as the name')).toBeTruthy();
+    expect(screen.getByText('Add “Greys”')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Greystar'));
+
+    onFinalPage(screen);
+    expect(screen.getByLabelText('Change name, currently Greystar')).toBeTruthy();
+    expect(screen.queryByPlaceholderText(HINT.internet)).toBeNull();
+    // The company's own category does not move the bill's.
+    expect(screen.getByLabelText('Category, Internet')).toBeTruthy();
+  });
+
+  it('uses a name the catalogue does not know, and asks about its logo in place', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+
+    await typeName(screen, HINT.internet, 'Town Cable');
+    await fireEvent.press(await screen.findByLabelText('Use Town Cable as the name'));
+
+    onFinalPage(screen);
+    expect(screen.getByLabelText('Change name, currently Town Cable')).toBeTruthy();
+    expect(screen.getByLabelText(LOGO_COPY.addWebsite)).toBeTruthy();
+  });
+
+  it('stays when the person visits another page and comes back', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+    await pickName(screen, HINT.internet, 'Comcast');
+
+    await press(screen, 'Note, not set, optional');
+    await press(screen, 'Back');
+
+    expect(screen.getByLabelText('Change name, currently Comcast')).toBeTruthy();
+  });
+
+  // The box is rebuilt on the way back from another page, so what was typed has to be handed to it
+  // again, or Save would go through on a name nobody can see.
+  it('still shows a typed name after a visit to another page, and saves that name', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+    await typeName(screen, HINT.internet, 'Gym');
+
+    await press(screen, 'Note, not set, optional');
+    await press(screen, 'Back');
+
+    expect(screen.getByDisplayValue('Gym')).toBeTruthy();
+    await pickDay(screen, 'Payment on, Select a date', 'Friday 9 October 2026');
+    await press(screen, 'VISA ••4421');
+    await press(screen, 'No reminder');
+    await press(screen, 'Save bill');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ name: 'Gym' });
+  });
+
+  it('keeps a typed name through a change of category and a visit to the amount', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+    await typeName(screen, HINT.internet, 'Gym');
+
+    await press(screen, 'Category, Internet');
+    await press(screen, TILE.insurance);
+    expect(screen.getByLabelText('Category, Insurance')).toBeTruthy();
+    expect(screen.getByDisplayValue('Gym')).toBeTruthy();
+
+    await pressButton(screen, 'Amount, $80.00');
+    await press(screen, 'Back');
+    expect(screen.getByDisplayValue('Gym')).toBeTruthy();
+    expect(screen.getByPlaceholderText(HINT.insurance)).toBeTruthy();
+  });
+
+  it('takes the name off with its X, which brings the empty box back', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+    await pickName(screen, HINT.internet, 'Comcast');
+
+    await press(screen, 'Change name, currently Comcast');
+
+    expect(screen.getByPlaceholderText(HINT.internet)).toBeTruthy();
+    expect(screen.getByDisplayValue('')).toBeTruthy();
+    expect(screen.queryByLabelText(/^Change name/)).toBeNull();
+    await press(screen, 'Save bill');
+    expect(screen.getByText(/^To save this bill, fill in: Name,/)).toBeTruthy();
+  });
+
+  it('lets a saved bill’s company go, and the bill is saved without it', async () => {
+    editing({ ...POWER, brand_id: 'b-cc', brands: { domain: 'comcast.com' } });
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Change name, currently Power');
+    await typeName(screen, HINT.energy, 'Electric');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({ name: 'Electric', brand_id: null });
+  });
+});
+
+describe('Add bill — the name stays what the person gave it', () => {
+  it('leaves the box empty when the category changes, and Save still asks for a name', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+
+    await press(screen, 'Category, Internet');
+    await press(screen, TILE.insurance);
+
+    expect(screen.getByLabelText('Category, Insurance')).toBeTruthy();
+    expect(screen.getByDisplayValue('')).toBeTruthy();
+    expect(screen.queryByLabelText(/^Change name/)).toBeNull();
+    await press(screen, 'Save bill');
+    expect(screen.getByText(/^To save this bill, fill in: Name,/)).toBeTruthy();
+  });
+
+  it('does not name an Other bill after the category it becomes either', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.other, '80');
+
+    await press(screen, 'Category, Other bill');
+    await press(screen, TILE.housing);
+
+    expect(screen.getByLabelText('Category, Housing')).toBeTruthy();
+    expect(screen.getByDisplayValue('')).toBeTruthy();
+    expect(screen.getByPlaceholderText(HINT.housing)).toBeTruthy();
+  });
+
+  it('keeps the name that was picked when the category changes', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+    await pickName(screen, HINT.internet, 'Comcast');
+
+    await press(screen, 'Category, Internet');
+    await press(screen, TILE.mobile);
+
+    expect(screen.getByLabelText('Category, Mobile Phone')).toBeTruthy();
+    expect(screen.getByLabelText('Change name, currently Comcast')).toBeTruthy();
+  });
+
+  it('keeps the name a voice hand-off heard', async () => {
+    mockParams = {
+      from: 'voice',
+      prefillName: 'Rent',
+      prefillCategory: 'housing',
+      prefillAmount: '1100',
+      prefillDate: '2026-10-09',
+    };
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Category, Housing');
+    await press(screen, TILE.insurance);
+
+    expect(screen.getByLabelText('Change name, currently Rent')).toBeTruthy();
+  });
+
+  it('keeps the name of a saved bill when its category changes', async () => {
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Category, Electricity & Gas');
+    await press(screen, TILE.housing);
+
+    expect(screen.getByLabelText('Change name, currently Power')).toBeTruthy();
+    expect(screen.getByLabelText('Category, Housing')).toBeTruthy();
+  });
+
+  it('saves a name typed after the category changed', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+    await press(screen, 'Category, Internet');
+    await press(screen, TILE.insurance);
+
+    await answerTheRest(screen, HINT.insurance, 'Car cover');
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      name: 'Car cover',
+      category_id: 'insurance',
+    });
+  });
+});
+
+describe('Add bill — the payment day box', () => {
+  describe('on a saved bill', () => {
+    beforeEach(() => editing(POWER));
+
+    it('shows the saved day in the box, with the calendar folded away', async () => {
+      const screen = await render(<AddBillScreen />);
+
+      expect(screen.getByText('Payment on')).toBeTruthy();
+      expect(screen.getByLabelText('Payment on, Sun Sep 20').props.accessibilityState).toEqual(
+        expect.objectContaining({ expanded: false }),
+      );
+      expect(screen.queryByLabelText('Next month')).toBeNull();
+      expect(screen.queryByLabelText(/^Due on/)).toBeNull();
+    });
+
+    it('opens a calendar right under the box, on the saved day', async () => {
+      const screen = await render(<AddBillScreen />);
+
+      await press(screen, 'Payment on, Sun Sep 20');
+
+      onFinalPage(screen);
+      expect(screen.getByLabelText('Payment on, Sun Sep 20').props.accessibilityState).toEqual(
+        expect.objectContaining({ expanded: true }),
+      );
+      expect(screen.getByLabelText('Sunday 20 September 2026').props.accessibilityState).toEqual(
+        expect.objectContaining({ selected: true }),
+      );
+      const texts = textsInOrder(screen);
+      expect(texts.indexOf('Payment on')).toBeLessThan(texts.indexOf('September 2026'));
+      expect(texts.indexOf('September 2026')).toBeLessThan(texts.indexOf('Recurring'));
+    });
+
+    it('fills the box with the day picked and folds the calendar away', async () => {
+      const screen = await render(<AddBillScreen />);
+
+      await press(screen, 'Payment on, Sun Sep 20');
+      await press(screen, 'Next month');
+      await press(screen, 'Friday 9 October 2026');
+
+      onFinalPage(screen);
+      expect(screen.getByLabelText('Payment on, Fri Oct 9')).toBeTruthy();
+      expect(screen.queryByLabelText('Next month')).toBeNull();
+    });
+
+    it('sets today with the Today pill', async () => {
+      const screen = await render(<AddBillScreen />);
+
+      await press(screen, 'Payment on, Sun Sep 20');
+      await press(screen, 'Today');
+
+      expect(screen.getByLabelText('Payment on, Today, Wed Oct 7')).toBeTruthy();
+      expect(screen.queryByLabelText('Next month')).toBeNull();
+    });
+
+    it('folds the calendar away on a second tap and keeps the day', async () => {
+      const screen = await render(<AddBillScreen />);
+
+      await press(screen, 'Payment on, Sun Sep 20');
+      await press(screen, 'Payment on, Sun Sep 20');
+
+      expect(screen.queryByLabelText('Next month')).toBeNull();
+      expect(screen.getByLabelText('Payment on, Sun Sep 20')).toBeTruthy();
+    });
+
+    it('says Today for a bill due today', async () => {
+      editing({ ...POWER, next_due_on: '2026-10-07' });
+      const screen = await render(<AddBillScreen />);
+
+      expect(screen.getByLabelText('Payment on, Today, Wed Oct 7')).toBeTruthy();
+    });
+  });
+
+  describe('on a new bill', () => {
+    it('invites a day, and opens the calendar on this month with none picked', async () => {
+      const screen = await render(<AddBillScreen />);
+      await newBill(screen, TILE.internet, '80');
+
+      expect(screen.getByText('Select a date')).toBeTruthy();
+      await press(screen, 'Payment on, Select a date');
+
+      expect(screen.getByText('October 2026')).toBeTruthy();
+      expect(screen.getByLabelText('Friday 9 October 2026').props.accessibilityState).toEqual(
+        expect.objectContaining({ selected: false }),
+      );
+    });
+
+    it('fills the box with the day picked, without leaving the page', async () => {
+      const screen = await render(<AddBillScreen />);
+      await newBill(screen, TILE.internet, '80');
+
+      await pickDay(screen, 'Payment on, Select a date', 'Friday 9 October 2026');
+
+      onFinalPage(screen);
+      expect(screen.getByLabelText('Payment on, Fri Oct 9')).toBeTruthy();
+      expect(screen.queryByText('Select a date')).toBeNull();
+      expect(screen.queryByLabelText('Next month')).toBeNull();
+    });
+  });
+});
+
+describe('Add bill — paid with', () => {
+  it('starts with nothing chosen on a new bill, and offers every card and account, then Skip', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+
+    expect(screen.getByText('Paid with')).toBeTruthy();
+    expect(lit(screen, PAID_WITH)).toEqual([]);
+    const radios = screen.getAllByRole('radio').map((chip) => chip.props.accessibilityLabel);
+    expect(radios.slice(RECURRING.length, RECURRING.length + PAID_WITH.length)).toEqual(PAID_WITH);
+  });
+
+  it('chooses a card where it stands and lets the other go', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+
+    await press(screen, 'VISA ••4421');
+    expect(lit(screen, PAID_WITH)).toEqual(['VISA ••4421']);
+    await press(screen, 'Checking ••0099');
+
+    onFinalPage(screen);
+    expect(lit(screen, PAID_WITH)).toEqual(['Checking ••0099']);
+  });
+
+  it('takes Skip as an answer, which lets the cards go', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+
+    await press(screen, 'VISA ••4421');
+    await press(screen, 'Skip');
+    expect(lit(screen, PAID_WITH)).toEqual(['Skip']);
+
+    await press(screen, 'Checking ••0099');
+    expect(lit(screen, PAID_WITH)).toEqual(['Checking ••0099']);
+  });
+
+  it('opens a saved bill on its card, its account, or Skip when it has neither', async () => {
+    editing(POWER);
+    const card = await render(<AddBillScreen />);
+    expect(lit(card, PAID_WITH)).toEqual(['VISA ••4421']);
+    await card.unmount();
+
+    editing({ ...POWER, card_id: null, bank_account_id: 'acct-1' });
+    const account = await render(<AddBillScreen />);
+    expect(lit(account, PAID_WITH)).toEqual(['Checking ••0099']);
+    await account.unmount();
+
+    editing({ ...POWER, card_id: null, bank_account_id: null });
+    const neither = await render(<AddBillScreen />);
+    expect(lit(neither, PAID_WITH)).toEqual(['Skip']);
+  });
+
+  it('opens a bill on the card the voice review heard', async () => {
+    mockParams = {
+      from: 'voice',
+      prefillCategory: 'internet',
+      prefillAmount: '80',
+      prefillDate: '2026-10-09',
+      prefillSource: 'acct-1',
+    };
+    const screen = await render(<AddBillScreen />);
+
+    expect(lit(screen, PAID_WITH)).toEqual(['Checking ••0099']);
+  });
+});
+
+describe('Add bill — the reminder', () => {
+  it('starts with nothing chosen on a new bill, and no time to set', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+
+    expect(screen.getByText('Reminder')).toBeTruthy();
+    expect(screen.getByText('Before the bill is due')).toBeTruthy();
+    expect(lit(screen, REMINDERS)).toEqual([]);
+    expect(screen.queryByLabelText(/^Sent at/)).toBeNull();
+  });
+
+  it('says No reminder, never Off, for the way to have none', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+
+    expect(screen.queryByLabelText('Off')).toBeNull();
+    await press(screen, 'No reminder');
+
+    expect(lit(screen, REMINDERS)).toEqual(['No reminder']);
+    expect(screen.queryByLabelText(/^Sent at/)).toBeNull();
+  });
+
+  it('shows the time once a reminder is on, and takes it away again with No reminder', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+
+    await press(screen, '1 day');
+
+    onFinalPage(screen);
+    expect(lit(screen, REMINDERS)).toEqual(['1 day']);
+    expect(screen.getByLabelText('Sent at 9:00 AM. Change the time.')).toBeTruthy();
+    await press(screen, 'On the day');
+    expect(lit(screen, REMINDERS)).toEqual(['On the day']);
+    expect(screen.getByLabelText('Sent at 9:00 AM. Change the time.')).toBeTruthy();
+    await press(screen, 'No reminder');
+    expect(screen.queryByLabelText(/^Sent at/)).toBeNull();
+  });
+
+  it('opens a saved bill on its reminder and its time, or on No reminder when it has none', async () => {
+    mockSavedReminder = { choice: '3', remindAt: '08:30' };
+    editing(POWER);
+    const saved = await render(<AddBillScreen />);
+    expect(lit(saved, REMINDERS)).toEqual(['3 days']);
+    expect(saved.getByLabelText('Sent at 8:30 AM. Change the time.')).toBeTruthy();
+    await saved.unmount();
+
+    mockSavedReminder = { choice: 'off', remindAt: '09:00' };
+    const none = await render(<AddBillScreen />);
+    expect(lit(none, REMINDERS)).toEqual(['No reminder']);
+    expect(none.queryByLabelText(/^Sent at/)).toBeNull();
   });
 });
 
 describe('Add bill — how often it repeats', () => {
-  it('offers five choices in a group, Monthly chosen, and is not itself a button', async () => {
+  it('offers five choices, Monthly chosen, and is not itself a button', async () => {
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.internet, '80');
 
-    expect(screen.getAllByRole('radio').map((chip) => chip.props.accessibilityLabel)).toEqual([
-      'Weekly',
-      'Monthly',
-      'Every 3 months',
-      'Yearly',
-      'Specific period',
-    ]);
-    expect(isChecked(screen, 'Monthly')).toBe(true);
-    for (const other of ['Weekly', 'Every 3 months', 'Yearly', 'Specific period']) {
-      expect(isChecked(screen, other)).toBe(false);
-    }
+    expect(
+      screen
+        .getAllByRole('radio')
+        .slice(0, RECURRING.length)
+        .map((chip) => chip.props.accessibilityLabel),
+    ).toEqual(RECURRING);
+    expect(lit(screen, RECURRING)).toEqual(['Monthly']);
     expect(screen.getByText('Recurring')).toBeTruthy();
     expect(screen.queryByLabelText(/^Recurring/)).toBeNull();
   });
@@ -1188,8 +1457,7 @@ describe('Add bill — how often it repeats', () => {
 
     await press(screen, 'Every 3 months');
 
-    expect(isChecked(screen, 'Every 3 months')).toBe(true);
-    expect(isChecked(screen, 'Monthly')).toBe(false);
+    expect(lit(screen, RECURRING)).toEqual(['Every 3 months']);
     // The label of the chip, and the value on the Recurring line.
     expect(screen.getAllByText('Every 3 months')).toHaveLength(2);
   });
@@ -1202,37 +1470,38 @@ describe('Add bill — how often it repeats', () => {
 
     await press(screen, 'Specific period');
 
-    expect(screen.getByLabelText('Starts on, needed')).toBeTruthy();
-    expect(screen.queryByLabelText(/^Due on/)).toBeNull();
-    expect(screen.getByLabelText('To, not set, optional')).toBeTruthy();
+    expect(screen.getByText('Starts on')).toBeTruthy();
+    expect(screen.getByLabelText('Starts on, Select a date')).toBeTruthy();
+    expect(screen.queryByText('Payment on')).toBeNull();
+    expect(screen.queryByLabelText(/^Payment on/)).toBeNull();
+    expect(screen.getByText('To')).toBeTruthy();
+    expect(screen.getByLabelText('To, Ongoing — no end date')).toBeTruthy();
     expect(screen.getByText('Ongoing — no end date')).toBeTruthy();
+    // Nothing to clear until there is an end.
+    expect(screen.queryByLabelText('Clear — make it ongoing')).toBeNull();
   });
 
-  it('asks when it starts, not when it is due, for a specific period', async () => {
+  it('asks when it starts in the same box, and fills it in place', async () => {
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.internet, '80');
     await press(screen, 'Specific period');
 
-    await press(screen, 'Starts on, needed');
+    await pickDay(screen, 'Starts on, Select a date', 'Friday 9 October 2026');
 
-    // The page is named for what it asks, too.
-    expect(screen.getByText('Starts on')).toBeTruthy();
-    expect(screen.getByText('When does it start?')).toBeTruthy();
-    expect(screen.queryByText('When is it due?')).toBeNull();
-    expect(screen.queryByText('Due on')).toBeNull();
+    onFinalPage(screen);
+    expect(screen.getByLabelText('Starts on, Fri Oct 9')).toBeTruthy();
+    expect(screen.queryByLabelText('Next month')).toBeNull();
   });
 
   it('keeps the first due date when the bill becomes a period and back', async () => {
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.internet, '80');
-    await press(screen, 'Due on, needed');
-    await press(screen, 'Friday 9 October 2026');
-    await press(screen, 'Done');
+    await pickDay(screen, 'Payment on, Select a date', 'Friday 9 October 2026');
 
     await press(screen, 'Specific period');
     expect(screen.getByLabelText('Starts on, Fri Oct 9')).toBeTruthy();
     await press(screen, 'Yearly');
-    expect(screen.getByLabelText('Due on, Fri Oct 9')).toBeTruthy();
+    expect(screen.getByLabelText('Payment on, Fri Oct 9')).toBeTruthy();
   });
 
   it('forgets the end date on the way back to an open-ended schedule', async () => {
@@ -1243,11 +1512,11 @@ describe('Add bill — how often it repeats', () => {
 
     await press(screen, 'Weekly');
     expect(screen.queryByLabelText(/^To,/)).toBeNull();
-    expect(screen.getByLabelText('Due on, Mon Jun 1')).toBeTruthy();
+    expect(screen.getByLabelText('Payment on, Mon Jun 1')).toBeTruthy();
 
     await press(screen, 'Specific period');
     expect(screen.getByLabelText('Starts on, Mon Jun 1')).toBeTruthy();
-    expect(screen.getByLabelText('To, not set, optional')).toBeTruthy();
+    expect(screen.getByLabelText('To, Ongoing — no end date')).toBeTruthy();
   });
 
   it('drops an end date the new start has passed', async () => {
@@ -1255,13 +1524,11 @@ describe('Add bill — how often it repeats', () => {
     const screen = await render(<AddBillScreen />);
 
     await press(screen, 'Starts on, Mon Jun 1');
-    expect(screen.getByText('When does it start?')).toBeTruthy();
     for (let month = 0; month < 7; month += 1) await press(screen, 'Next month');
     await press(screen, 'Friday 1 January 2027');
-    await press(screen, 'Done');
 
     expect(screen.getByLabelText('Starts on, Fri Jan 1')).toBeTruthy();
-    expect(screen.getByLabelText('To, not set, optional')).toBeTruthy();
+    expect(screen.getByLabelText('To, Ongoing — no end date')).toBeTruthy();
   });
 
   it('keeps an end date the new start has not passed', async () => {
@@ -1271,7 +1538,6 @@ describe('Add bill — how often it repeats', () => {
     await press(screen, 'Starts on, Mon Jun 1');
     await press(screen, 'Next month');
     await press(screen, 'Wednesday 1 July 2026');
-    await press(screen, 'Done');
 
     expect(screen.getByLabelText('Starts on, Wed Jul 1')).toBeTruthy();
     expect(screen.getByLabelText('To, Thu Dec 31')).toBeTruthy();
@@ -1289,87 +1555,114 @@ describe('Add bill — how often it repeats', () => {
       editing(STARTS_OCT_10);
       const screen = await render(<AddBillScreen />);
 
-      await press(screen, 'To, not set, optional');
+      await press(screen, 'To, Ongoing — no end date');
 
       expect(screen.getByLabelText('Friday 9 October 2026')).toBeDisabled();
       expect(screen.getByLabelText('Saturday 10 October 2026')).toBeEnabled();
       expect(screen.getByLabelText('Sunday 11 October 2026')).toBeEnabled();
     });
 
-    it('may be left empty: Done is allowed with no day', async () => {
-      editing(STARTS_OCT_10);
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'To, not set, optional');
-      expect(screen.getByLabelText('Done')).toBeEnabled();
-      await press(screen, 'Done');
-
-      expect(screen.getByLabelText('To, not set, optional')).toBeTruthy();
-    });
-
-    it('keeps a day on Done and leaves the end as it was on Back', async () => {
-      editing(STARTS_OCT_10);
-      const screen = await render(<AddBillScreen />);
-
-      await press(screen, 'To, not set, optional');
-      await press(screen, 'Sunday 11 October 2026');
-      await press(screen, 'Back');
-      expect(screen.getByLabelText('To, not set, optional')).toBeTruthy();
-
-      await press(screen, 'To, not set, optional');
-      await press(screen, 'Sunday 11 October 2026');
-      await press(screen, 'Done');
-      expect(screen.getByLabelText('To, Sun Oct 11')).toBeTruthy();
-    });
-
-    it('clears with the link and returns at once', async () => {
+    it('opens on the saved end, selected', async () => {
       editing(PERIOD);
       const screen = await render(<AddBillScreen />);
 
       await press(screen, 'To, Thu Dec 31');
+
       expect(screen.getByLabelText('Thursday 31 December 2026').props.accessibilityState).toEqual(
         expect.objectContaining({ selected: true }),
       );
+    });
+
+    it('fills the box with the day picked and folds the calendar away', async () => {
+      editing(STARTS_OCT_10);
+      const screen = await render(<AddBillScreen />);
+
+      await pickDay(screen, 'To, Ongoing — no end date', 'Sunday 11 October 2026');
+
+      onFinalPage(screen);
+      expect(screen.getByLabelText('To, Sun Oct 11')).toBeTruthy();
+      expect(screen.queryByLabelText('Saturday 10 October 2026')).toBeNull();
+    });
+
+    it('may be left empty: Save does not ask for it', async () => {
+      editing(STARTS_OCT_10);
+      const screen = await render(<AddBillScreen />);
+
+      await press(screen, 'Save changes');
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+        recurrence: 'period',
+        starts_on: '2026-10-10',
+        ends_on: null,
+      });
+    });
+
+    it('clears with the link, which goes once there is no end', async () => {
+      editing(PERIOD);
+      const screen = await render(<AddBillScreen />);
+
+      await press(screen, 'To, Thu Dec 31');
       await press(screen, 'Clear — make it ongoing');
 
       onFinalPage(screen);
-      expect(screen.getByLabelText('To, not set, optional')).toBeTruthy();
+      expect(screen.getByLabelText('To, Ongoing — no end date')).toBeTruthy();
+      expect(screen.queryByLabelText('Clear — make it ongoing')).toBeNull();
+      expect(screen.queryByLabelText('Thursday 31 December 2026')).toBeNull();
+    });
+
+    it('saves the end that was picked, and none after it was cleared', async () => {
+      editing(PERIOD);
+      const first = await render(<AddBillScreen />);
+      await press(first, 'Save changes');
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({ ends_on: '2026-12-31' });
+      await first.unmount();
+
+      const second = await render(<AddBillScreen />);
+      await press(second, 'Clear — make it ongoing');
+      await press(second, 'Save changes');
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(2));
+      expect(mockUpdate.mock.calls[1][0].values).toMatchObject({ ends_on: null });
     });
   });
 });
 
 describe('Add bill — a bill that arrives with lines missing', () => {
   it('invites the amount a voice hand-off did not hear, never drawing $0', async () => {
-    mockParams = { prefillCategory: 'internet', prefillDate: '2026-10-09' };
+    mockParams = {
+      prefillName: 'Home fibre',
+      prefillCategory: 'internet',
+      prefillDate: '2026-10-09',
+    };
     const screen = await render(<AddBillScreen />);
 
     expect(screen.getByText('Tap to add the amount')).toBeTruthy();
     expect(screen.queryByText('Tap to edit')).toBeNull();
     expect(screen.queryByText(/\$0/)).toBeNull();
-    expect(screen.getByLabelText('Save bill')).toBeDisabled();
+    expect(screen.getByLabelText('Save bill')).toBeEnabled();
+    await press(screen, 'Save bill');
+    expect(screen.getByText(gaps('Amount, Paid with, Reminder'))).toBeTruthy();
     await pressButton(screen, 'Amount, needed');
     await typeAmount(screen, '80');
     await press(screen, 'Done');
 
     expect(screen.getByRole('button', { name: 'Amount, $80.00' })).toBeTruthy();
-    expect(screen.getByLabelText('Save bill')).toBeEnabled();
+    expect(screen.queryByText(/^To save this bill/)).toBeNull();
   });
 
-  it('waits for a day on the due date page of a bill that has none', async () => {
+  it('invites the day a voice hand-off did not hear, and fills it in the box', async () => {
     mockParams = { prefillCategory: 'internet', prefillAmount: '80' };
     const screen = await render(<AddBillScreen />);
 
-    await press(screen, 'Due on, needed');
-    expect(screen.getByLabelText('Done')).toBeDisabled();
-    await press(screen, 'Friday 9 October 2026');
-    expect(screen.getByLabelText('Done')).toBeEnabled();
-    await press(screen, 'Done');
+    expect(screen.getByLabelText('Payment on, Select a date')).toBeTruthy();
+    await pickDay(screen, 'Payment on, Select a date', 'Friday 9 October 2026');
 
-    expect(screen.getByLabelText('Due on, Fri Oct 9')).toBeTruthy();
+    expect(screen.getByLabelText('Payment on, Fri Oct 9')).toBeTruthy();
     expect(screen.getByLabelText('Save bill')).toBeEnabled();
   });
 
-  it('opens a bill with a past due day on the day it names', async () => {
+  it('opens on the day it names, and its cycle', async () => {
     mockParams = {
       prefillCategory: 'internet',
       prefillAmount: '80',
@@ -1378,16 +1671,72 @@ describe('Add bill — a bill that arrives with lines missing', () => {
     };
     const screen = await render(<AddBillScreen />);
 
-    expect(screen.getByLabelText('Due on, Fri Oct 9')).toBeTruthy();
-    expect(isChecked(screen, 'Every 3 months')).toBe(true);
+    expect(screen.getByLabelText('Payment on, Fri Oct 9')).toBeTruthy();
+    expect(lit(screen, RECURRING)).toEqual(['Every 3 months']);
   });
 });
 
-describe('Add bill — what Save waits for', () => {
+describe('Add bill — Save with gaps', () => {
+  it('is never greyed out for a missing answer', async () => {
+    const screen = await render(<AddBillScreen />);
+
+    await newBill(screen, TILE.internet, '80');
+
+    expect(screen.getByLabelText('Save bill')).toBeEnabled();
+  });
+
+  it('names every gap in the order of the page and writes nothing', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+
+    await press(screen, 'Save bill');
+
+    expect(screen.getByText(gaps('Name, Payment on, Paid with, Reminder'))).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockApplyReminder).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(success).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+    onFinalPage(screen);
+  });
+
+  it('names all six when nothing at all was brought', async () => {
+    mockParams = { prefillNote: 'Autopay' };
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Save bill');
+
+    expect(
+      screen.getByText(gaps('Amount, Name, Category, Payment on, Paid with, Reminder')),
+    ).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('says Starts on in place of Payment on for a specific period', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+    await press(screen, 'Specific period');
+
+    await press(screen, 'Save bill');
+
+    expect(screen.getByText(gaps('Name, Starts on, Paid with, Reminder'))).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  const WHOLE = {
+    prefillName: 'Gym',
+    prefillCategory: 'other',
+    prefillAmount: '80',
+    prefillDate: '2026-10-09',
+    prefillSource: 'card-1',
+  };
+  const without = (key: keyof typeof WHOLE) =>
+    Object.fromEntries(Object.entries(WHOLE).filter(([name]) => name !== key));
+
   it.each([
     [
-      'an amount',
-      { prefillCategory: 'internet', prefillDate: '2026-10-09' },
+      'Amount',
+      'prefillAmount',
       async (screen: Screen) => {
         await pressButton(screen, 'Amount, needed');
         await typeAmount(screen, '80');
@@ -1395,230 +1744,274 @@ describe('Add bill — what Save waits for', () => {
       },
     ],
     [
-      'a name',
-      { prefillCategory: 'other', prefillAmount: '80', prefillDate: '2026-10-09' },
+      'Name',
+      'prefillName',
       async (screen: Screen) => {
-        await press(screen, 'Name, needed');
-        await fireEvent.changeText(nameInput(screen), 'Gym');
-        await press(screen, 'Done');
+        await typeName(screen, HINT.other, 'Gym');
       },
     ],
     [
-      'a category',
-      { prefillName: 'Water', prefillAmount: '80', prefillDate: '2026-10-09' },
+      'Category',
+      'prefillCategory',
       async (screen: Screen) => {
         await press(screen, 'Category, needed');
         await press(screen, TILE.housing);
       },
     ],
     [
-      'a due date',
-      { prefillCategory: 'internet', prefillAmount: '80' },
+      'Payment on',
+      'prefillDate',
       async (screen: Screen) => {
-        await press(screen, 'Due on, needed');
-        await press(screen, 'Friday 9 October 2026');
-        await press(screen, 'Done');
+        await pickDay(screen, 'Payment on, Select a date', 'Friday 9 October 2026');
       },
     ],
-  ])('is held back without %s, and freed by giving it', async (_what, params, give) => {
-    mockParams = params;
+    [
+      'Paid with',
+      'prefillSource',
+      async (screen: Screen) => {
+        await press(screen, 'Skip');
+      },
+    ],
+    [
+      'Reminder',
+      null,
+      async (screen: Screen) => {
+        await press(screen, 'No reminder');
+      },
+    ],
+  ])(
+    'names only %s when that is all that is left, and saves once it is given',
+    async (field, omit, give) => {
+      mockParams = omit ? without(omit as keyof typeof WHOLE) : WHOLE;
+      const screen = await render(<AddBillScreen />);
+      if (field !== 'Reminder') await press(screen, 'No reminder');
+
+      await press(screen, 'Save bill');
+      expect(screen.getByText(gaps(field))).toBeTruthy();
+      expect(mockCreate).not.toHaveBeenCalled();
+
+      await give(screen);
+      await press(screen, 'Save bill');
+
+      await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+      expect(screen.queryByText(/^To save this bill/)).toBeNull();
+    },
+  );
+
+  const inlineChanges: [string, (screen: Screen) => Promise<unknown>][] = [
+    ['typing the name', (screen) => typeName(screen, HINT.internet, 'Gym')],
+    ['picking a name from the list', (screen) => pickName(screen, HINT.internet, 'Comcast')],
+    [
+      'picking a payment day',
+      (screen) => pickDay(screen, 'Payment on, Select a date', 'Friday 9 October 2026'),
+    ],
+    ['picking a card', (screen) => press(screen, 'VISA ••4421')],
+    ['picking Skip', (screen) => press(screen, 'Skip')],
+    ['picking a reminder', (screen) => press(screen, 'On the day')],
+    ['changing how often it repeats', (screen) => press(screen, 'Yearly')],
+  ];
+
+  it.each(inlineChanges)(
+    'goes away with %s, however much is still missing',
+    async (_what, change) => {
+      const screen = await render(<AddBillScreen />);
+      await newBill(screen, TILE.internet, '80');
+      await press(screen, 'Save bill');
+      expect(screen.getByText(/^To save this bill/)).toBeTruthy();
+
+      await change(screen);
+
+      expect(screen.queryByText(/^To save this bill/)).toBeNull();
+      expect(mockCreate).not.toHaveBeenCalled();
+    },
+  );
+
+  it('goes away when a page keeps something, and stays when the page is left with Back', async () => {
     const screen = await render(<AddBillScreen />);
-
-    expect(screen.getByText(/^Tap to add/)).toBeTruthy();
-    expect(screen.getByLabelText('Save bill')).toBeDisabled();
-    await fireEvent.press(screen.getByLabelText('Save bill'));
-    expect(mockCreate).not.toHaveBeenCalled();
-
-    await give(screen);
-
-    expect(screen.queryByText(/^Tap to add/)).toBeNull();
-    expect(screen.getByLabelText('Save bill')).toBeEnabled();
+    await newBill(screen, TILE.internet, '80');
     await press(screen, 'Save bill');
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-  });
 
-  it('draws the lines it waits for as gaps to fill, and the optional ones as quiet', async () => {
-    mockParams = { prefillCategory: 'other' };
-    const screen = await render(<AddBillScreen />);
-
-    expect(screen.getByText('Tap to add the amount')).toBeTruthy();
-    expect(screen.getByLabelText('Name, needed')).toBeTruthy();
-    expect(screen.getByLabelText('Due on, needed')).toBeTruthy();
-    expect(screen.getByLabelText('Category, Other bill')).toBeTruthy();
-    // Nothing is flagged as wrong before anyone has tried to save.
-    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
-    expect(screen.getByLabelText('Note, not set, optional')).toBeTruthy();
-  });
-});
-
-describe('Add bill — the name follows the category only while it is a default', () => {
-  it('renames an untouched default when the category changes on the way back', async () => {
-    const screen = await render(<AddBillScreen />);
-    await press(screen, TILE.internet);
+    await press(screen, 'Note, not set, optional');
     await press(screen, 'Back');
+    expect(screen.getByText(/^To save this bill/)).toBeTruthy();
 
-    await press(screen, TILE.mobile);
-    await typeAmount(screen, '80');
-    await press(screen, 'Continue');
-
-    expect(screen.getByLabelText('Name, Mobile Phone')).toBeTruthy();
-  });
-
-  it('renames an untouched default when the category changes on the final page', async () => {
-    const screen = await render(<AddBillScreen />);
-    await newBill(screen, TILE.internet, '80');
-    expect(screen.getByLabelText('Name, Internet')).toBeTruthy();
-
-    await press(screen, 'Category, Internet');
-    await press(screen, TILE.insurance);
-
-    expect(screen.getByLabelText('Category, Insurance')).toBeTruthy();
-    expect(screen.getByLabelText('Name, Insurance')).toBeTruthy();
-  });
-
-  it('keeps a name that was typed', async () => {
-    const screen = await render(<AddBillScreen />);
-    await newBill(screen, TILE.internet, '80');
-    await press(screen, 'Name, Internet');
-    await fireEvent.changeText(screen.getByDisplayValue('Internet'), 'Home fibre');
+    await press(screen, 'Note, not set, optional');
+    await fireEvent.changeText(
+      screen.getByPlaceholderText('Anything worth remembering'),
+      'Autopay',
+    );
     await press(screen, 'Done');
-
-    await press(screen, 'Category, Internet');
-    await press(screen, TILE.insurance);
-
-    expect(screen.getByLabelText('Category, Insurance')).toBeTruthy();
-    expect(screen.getByLabelText('Name, Home fibre')).toBeTruthy();
+    expect(screen.queryByText(/^To save this bill/)).toBeNull();
   });
 
-  it('keeps the name of the company picked for it', async () => {
+  it('is said again on the next press, naming only what is still missing', async () => {
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.internet, '80');
-    await chooseCompany(screen, 'Xfinity, Spectrum, Verizon', 'Comcast');
-    expect(screen.getByLabelText('Name, Comcast')).toBeTruthy();
+    await press(screen, 'Save bill');
+    await press(screen, 'Save bill');
+    expect(screen.getAllByText(/^To save this bill/)).toHaveLength(1);
 
-    await press(screen, 'Category, Internet');
-    await press(screen, TILE.mobile);
+    await typeName(screen, HINT.internet, 'Gym');
+    await pickDay(screen, 'Payment on, Select a date', 'Friday 9 October 2026');
+    await press(screen, 'Save bill');
 
-    expect(screen.getByLabelText('Name, Comcast')).toBeTruthy();
+    expect(screen.getByText(gaps('Paid with, Reminder'))).toBeTruthy();
   });
 
-  it('empties the name of a bill that becomes Other, which asks for one', async () => {
+  it('counts a name that was typed but never picked from the list', async () => {
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.internet, '80');
 
-    await press(screen, 'Category, Internet');
-    await press(screen, TILE.other);
+    await answerTheRest(screen, HINT.internet, '  Gym  ');
+    await press(screen, 'Save bill');
 
-    expect(screen.getByLabelText('Name, needed')).toBeTruthy();
-    expect(screen.getByLabelText('Save bill')).toBeDisabled();
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      name: 'Gym',
+      brand_id: null,
+      category_id: 'internet',
+      amount: 80,
+      next_due_on: '2026-10-09',
+    });
+    expect(success).toHaveBeenCalledTimes(1);
+    expect(router.back).toHaveBeenCalledTimes(1);
   });
 
-  it('names an unnamed Other bill after the category it becomes', async () => {
+  it('does not count spaces as a name', async () => {
     const screen = await render(<AddBillScreen />);
-    await newBill(screen, TILE.other, '80');
-    expect(screen.getByLabelText('Name, needed')).toBeTruthy();
+    await newBill(screen, TILE.internet, '80');
+    await typeName(screen, HINT.internet, '   ');
+    await pickDay(screen, 'Payment on, Select a date', 'Friday 9 October 2026');
+    await press(screen, 'VISA ••4421');
+    await press(screen, 'No reminder');
 
-    await press(screen, 'Category, Other bill');
-    await press(screen, TILE.housing);
+    await press(screen, 'Save bill');
 
-    expect(screen.getByLabelText('Name, Housing')).toBeTruthy();
+    expect(screen.getByText(gaps('Name'))).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it('keeps the name a voice hand-off heard', async () => {
-    mockParams = {
-      from: 'voice',
-      prefillName: 'Rent',
-      prefillCategory: 'housing',
-      prefillAmount: '1100',
-      prefillDate: '2026-10-09',
-    };
+  it('saves the name that was picked, with its company', async () => {
     const screen = await render(<AddBillScreen />);
-    expect(screen.getByLabelText('Name, Rent')).toBeTruthy();
+    await newBill(screen, TILE.internet, '80');
+    await pickName(screen, HINT.internet, 'Comcast');
+    await pickDay(screen, 'Payment on, Select a date', 'Friday 9 October 2026');
+    await press(screen, 'VISA ••4421');
+    await press(screen, 'No reminder');
 
-    await press(screen, 'Category, Housing');
-    await press(screen, TILE.insurance);
+    await press(screen, 'Save bill');
 
-    expect(screen.getByLabelText('Name, Rent')).toBeTruthy();
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ name: 'Comcast', brand_id: 'b-cc' });
   });
 
-  it('keeps the name of a saved bill when its category changes', async () => {
+  it('accepts Skip as the answer to Paid with, and saves no card or account', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+    await typeName(screen, HINT.internet, 'Gym');
+    await pickDay(screen, 'Payment on, Select a date', 'Friday 9 October 2026');
+    await press(screen, 'Skip');
+    await press(screen, 'No reminder');
+
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ card_id: null, bank_account_id: null });
+  });
+
+  it('saves the card or the account that was chosen', async () => {
+    const first = await render(<AddBillScreen />);
+    await newBill(first, TILE.internet, '80');
+    await answerTheRest(first, HINT.internet);
+    await press(first, 'Save bill');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ card_id: 'card-1', bank_account_id: null });
+    await first.unmount();
+
+    const second = await render(<AddBillScreen />);
+    await newBill(second, TILE.internet, '80');
+    await answerTheRest(second, HINT.internet);
+    await press(second, 'Checking ••0099');
+    await press(second, 'Save bill');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(2));
+    expect(mockCreate.mock.calls[1][0]).toMatchObject({ card_id: null, bank_account_id: 'acct-1' });
+  });
+
+  it('accepts No reminder as the answer, and sets no reminder for the new bill', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+    await answerTheRest(screen, HINT.internet);
+
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-new', null, '09:00');
+  });
+
+  it('sets the reminder that was chosen on the bill it saved', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+    await answerTheRest(screen, HINT.internet);
+    await press(screen, '3 days');
+
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-new', 3, '09:00');
+  });
+
+  it('is greyed out only while it is saving', async () => {
+    mockCreating = true;
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.internet, '80');
+
+    expect(screen.getByLabelText('Saving…')).toBeDisabled();
+    expect(screen.queryByLabelText('Save bill')).toBeNull();
+  });
+
+  it('lets a saved bill be saved as it stands, with the answers it already has', async () => {
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
-    await press(screen, 'Category, Electricity & Gas');
-    await press(screen, TILE.housing);
+    await press(screen, 'Save changes');
 
-    expect(screen.getByLabelText('Name, Power')).toBeTruthy();
-    expect(screen.getByLabelText('Category, Housing')).toBeTruthy();
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0]).toMatchObject({
+      id: 'bill-1',
+      values: {
+        name: 'Power',
+        amount: 84.2,
+        card_id: 'card-1',
+        bank_account_id: null,
+        next_due_on: '2026-09-20',
+      },
+    });
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-1', null, '09:00');
+    expect(screen.queryByText(/^To save this bill/)).toBeNull();
   });
 
-  it('names a bill after its company while the name is still the category’s', async () => {
+  it('counts Skip on a saved bill with no card or account as an answer', async () => {
+    editing({ ...POWER, card_id: null, bank_account_id: null });
     const screen = await render(<AddBillScreen />);
-    await newBill(screen, TILE.internet, '80');
-    expect(screen.getByLabelText('Name, Internet')).toBeTruthy();
 
-    await chooseCompany(screen, 'Xfinity, Spectrum, Verizon', 'Comcast');
+    await press(screen, 'Save changes');
 
-    expect(screen.getByLabelText('Name, Comcast')).toBeTruthy();
-    expect(screen.getByLabelText('Category, Internet')).toBeTruthy();
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      card_id: null,
+      bank_account_id: null,
+    });
   });
 
-  it('names an unnamed Other bill after its company', async () => {
-    const screen = await render(<AddBillScreen />);
-    await newBill(screen, TILE.other, '80');
-    expect(screen.getByLabelText('Name, needed')).toBeTruthy();
-
-    await chooseCompany(screen, 'Search for a company', 'Comcast');
-
-    expect(screen.getByLabelText('Name, Comcast')).toBeTruthy();
-    expect(screen.getByLabelText('Save bill')).toBeDisabled();
-  });
-
-  it('does not rename a bill that was named by hand when a company is picked', async () => {
-    const screen = await render(<AddBillScreen />);
-    await newBill(screen, TILE.internet, '80');
-    await press(screen, 'Name, Internet');
-    await fireEvent.changeText(screen.getByDisplayValue('Internet'), 'Home fibre');
-    await press(screen, 'Done');
-
-    await chooseCompany(screen, 'Xfinity, Spectrum, Verizon', 'Comcast');
-
-    expect(screen.getByLabelText('Name, Home fibre')).toBeTruthy();
-    expect(screen.getByLabelText('Change company, currently Comcast')).toBeTruthy();
-  });
-
-  it('does not rename a saved bill when a company is picked for it', async () => {
+  it('asks for the name again when a saved bill’s name is taken off', async () => {
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
-    await chooseCompany(screen, 'AEP, Duke Energy, National Grid', 'Greystar');
+    await press(screen, 'Change name, currently Power');
+    await press(screen, 'Save changes');
 
-    expect(screen.getByLabelText('Name, Power')).toBeTruthy();
-  });
-
-  it('keeps the name when the company is taken off', async () => {
-    const screen = await render(<AddBillScreen />);
-    await newBill(screen, TILE.internet, '80');
-    await chooseCompany(screen, 'Xfinity, Spectrum, Verizon', 'Comcast');
-    expect(screen.getByLabelText('Name, Comcast')).toBeTruthy();
-
-    await press(screen, 'Change company, currently Comcast');
-
-    expect(screen.getByLabelText('Name, Comcast')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Xfinity, Spectrum, Verizon')).toBeTruthy();
-    expect(screen.getByLabelText('Save bill')).toBeDisabled();
-  });
-
-  it('follows the category again only for a name that is the category’s, once the company is off', async () => {
-    const screen = await render(<AddBillScreen />);
-    await newBill(screen, TILE.internet, '80');
-    await chooseCompany(screen, 'Xfinity, Spectrum, Verizon', 'Comcast');
-    await press(screen, 'Change company, currently Comcast');
-
-    await press(screen, 'Category, Internet');
-    await press(screen, TILE.mobile);
-
-    expect(screen.getByLabelText('Name, Comcast')).toBeTruthy();
+    expect(screen.getByText(gaps('Name'))).toBeTruthy();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -1704,7 +2097,7 @@ describe('Add bill — the final page keeps its place', () => {
     expect(scroller(screen).props.contentOffset).toEqual({ x: 0, y: 0 });
 
     await scrollTo(screen, 420);
-    await press(screen, 'Due on, Sun Sep 20');
+    await press(screen, 'Note, not set, optional');
     expect(screen.queryByText('You can edit this later.')).toBeNull();
     await press(screen, 'Back');
 
@@ -1716,9 +2109,11 @@ describe('Add bill — the final page keeps its place', () => {
     const screen = await render(<AddBillScreen />);
 
     await scrollTo(screen, 260);
-    await press(screen, 'Due on, Sun Sep 20');
-    await press(screen, 'Previous month');
-    await press(screen, 'Saturday 15 August 2026');
+    await press(screen, 'Note, not set, optional');
+    await fireEvent.changeText(
+      screen.getByPlaceholderText('Anything worth remembering'),
+      'Autopay',
+    );
     await press(screen, 'Done');
     expect(scroller(screen).props.contentOffset).toEqual({ x: 0, y: 260 });
 

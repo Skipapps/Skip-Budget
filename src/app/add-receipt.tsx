@@ -4,7 +4,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import {
   AlignLeft,
   CalendarDays,
-  CreditCard,
   ImageUp,
   ScanLine,
   Trash2,
@@ -27,12 +26,7 @@ import {
 import { usePaymentSources, useReceipt } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { openChangeLogo } from '@/components/brands/change-logo-button';
-import {
-  AmountEditPage,
-  NoteEditPage,
-  PaidWithEditPage,
-  DateEditPage,
-} from '@/components/entry/edit-pages';
+import { AmountEditPage, NoteEditPage, DateEditPage } from '@/components/entry/edit-pages';
 import {
   DateChips,
   EntryReview,
@@ -44,6 +38,8 @@ import { StepFlow } from '@/components/flow/step-flow';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SourceTiles } from '@/components/ui/source-tiles';
+import { FieldLabel } from '@/components/ui/typography';
 import { useDialog, useConfirm } from '@/providers/dialog-provider';
 import { t, type MessageKey } from '@/i18n';
 import { success, warn } from '@/lib/haptics';
@@ -99,13 +95,14 @@ function listWords(fields: ScanField[]): string {
 }
 
 /** The pages of one receipt: the amount keypad it starts on, the final page, and one per field. */
-type Page = 'amount' | 'review' | 'amountEdit' | 'paidWith' | 'note' | 'date';
+type Page = 'amount' | 'review' | 'amountEdit' | 'note' | 'date';
 
 type Initial = {
   store: BrandSelection | null;
   date: Date;
   amount: string;
-  sourceId: string;
+  /** '' is Skip, picked on purpose; null is not answered yet. A saved receipt has answered. */
+  sourceId: string | null;
   note: string;
   captureSource: CaptureSource;
 };
@@ -115,7 +112,7 @@ const blank = (): Initial => ({
   store: null,
   date: new Date(),
   amount: '',
-  sourceId: '',
+  sourceId: null,
   note: '',
   captureSource: 'manual',
 });
@@ -170,7 +167,7 @@ function fromScanParams(params: ScanParams): { initial: Initial; result: ScanRes
       store: store ? { ...store, categoryId: store.categoryId || 'other' } : null,
       date: readDayParam(params.scannedDate) ?? new Date(),
       amount: readAmountParam(params.scannedAmount),
-      sourceId: readSourceParam(params.scannedSource),
+      sourceId: readSourceParam(params.scannedSource) || null,
       note: readNoteParam(params.scannedNote),
       captureSource: voice ? 'voice' : 'scan',
     },
@@ -309,7 +306,9 @@ function ReceiptForm({
   };
   const [date, setDate] = useState<Date>(initial.date);
   const [amount, setAmount] = useState(initial.amount);
-  const [sourceId, setSourceId] = useState(initial.sourceId);
+  const [sourceId, setSourceId] = useState<string | null>(initial.sourceId);
+  // Typed but not picked from the list: it names the store all the same.
+  const [typedStore, setTypedStore] = useState('');
   const [note, setNote] = useState(initial.note);
   const [captureSource, setCaptureSource] = useState(initial.captureSource);
 
@@ -509,6 +508,9 @@ function ReceiptForm({
     else if (where === 'files') await pickFile();
   };
 
+  const total = Number(amount);
+  const amountReady = Number.isFinite(total) && total > 0;
+
   const fail = (message: string) => {
     warn();
     setError(message);
@@ -527,16 +529,40 @@ function ReceiptForm({
 
   const handleSave = async () => {
     setError(null);
+    const typed = typedStore.trim();
+    const chosen: BrandSelection | null =
+      store ??
+      (typed
+        ? // Keyword guess, as the box's own "Add" row files a new store. No logo: one replaced by
+          // typing must not keep the old one's.
+          {
+            brandId: null,
+            name: typed,
+            domain: null,
+            categoryId: guessCategory(typed),
+            logoDomain: null,
+            logoHidden: false,
+          }
+        : null);
+    const missing = [
+      !amountReady && t('receipts.field.amount'),
+      !chosen && t('receipts.field.store'),
+      sourceId === null && t('receipts.field.paidWith'),
+    ].filter((field): field is string => Boolean(field));
+    if (missing.length > 0 || sourceId === null) {
+      fail(t('receipts.add.missing', { fields: missing.join(', ') }));
+      return;
+    }
 
     const built = buildReceiptValues(
-      { store, amount, date, sourceId, note, captureSource },
+      { store: chosen, amount, date, sourceId, note, captureSource },
       sources,
     );
     if (!built.ok) {
       fail(built.message);
       return;
     }
-    const values = { ...built.values, ...logoColumns(store, saved) };
+    const values = { ...built.values, ...logoColumns(chosen, saved) };
 
     try {
       if (editing && id) {
@@ -583,10 +609,6 @@ function ReceiptForm({
   };
 
   const busy = createReceipt.isPending || updateReceipt.isPending;
-
-  const total = Number(amount);
-  const amountReady = Number.isFinite(total) && total > 0;
-  const sourceLabel = sources.find((source) => source.id === sourceId)?.label ?? null;
   // The page this form opened on. Anywhere else the edge swipe is off, and Back steps back.
   const isRoot = view === initialView;
 
@@ -629,21 +651,6 @@ function ReceiptForm({
         onBack={toReview}
         onDone={(next) => {
           edited(setAmount)(next);
-          settle();
-        }}
-      />
-    );
-  }
-
-  if (view === 'paidWith') {
-    return (
-      <PaidWithEditPage
-        title={t('receipts.field.paidWith')}
-        sources={sources}
-        value={sourceId}
-        onBack={toReview}
-        onDone={(next) => {
-          edited(setSourceId)(next);
           settle();
         }}
       />
@@ -765,6 +772,10 @@ function ReceiptForm({
             label={t('receipts.field.store')}
             value={store}
             onChange={edited(setStore)}
+            placeholder={t('receipts.add.storePlaceholder')}
+            // The box is drawn afresh after another page; what was typed comes back with it.
+            initialQuery={typedStore}
+            onQueryChange={edited(setTypedStore)}
             // Receipts have no page of their own, so Change logo opens from here. Until another
             // store is picked, the row's own store is the one shown.
             onChangeLogo={
@@ -804,18 +815,24 @@ function ReceiptForm({
         />
       ),
     },
-    // Without a card or account there is nothing to choose between, as before.
-    ...(sources.length > 0
-      ? [
-          {
-            key: 'paidWith',
-            label: t('receipts.field.paidWith'),
-            value: sourceLabel,
-            leading: <GlyphWell icon={CreditCard} />,
-            onPress: () => setView('paidWith'),
-          },
-        ]
-      : []),
+    {
+      key: 'paidWith',
+      field: (
+        <View className="w-full">
+          <FieldLabel className="mb-2">{t('receipts.field.paidWith')}</FieldLabel>
+          <SourceTiles
+            sources={sources}
+            value={sourceId ?? ''}
+            onChange={edited(setSourceId)}
+            skip={{
+              label: t('receipts.add.skipSource'),
+              selected: sourceId === '',
+              onPress: () => edited(setSourceId)(''),
+            }}
+          />
+        </View>
+      ),
+    },
     {
       key: 'note',
       label: t('receipts.field.note'),
@@ -853,7 +870,8 @@ function ReceiptForm({
             ? t('receipts.add.saveChanges')
             : t('receipts.add.saveReceipt')
       }
-      primaryDisabled={!amountReady || !store || busy}
+      // Never greyed out for a gap: Save says what is still missing.
+      primaryDisabled={busy}
       onPrimary={() => void handleSave()}
       error={error}
       footerSlot={

@@ -10,15 +10,14 @@ import { logoHints } from '@/lib/logo-lookup';
 
 /**
  * Golden: exactly what the bill form's Save writes. Pins the object handed to create/update, the
- * words of the checks inside Save, the icon rule (only an Other bill keeps an icon of its own),
- * 'period', `starts_on` through floorAfterCharges, the order of the past-charges question, the
- * write and the reminder, and the logo columns.
+ * line Save shows for the answers still missing and the words of the checks inside it, the icon
+ * rule (only an Other bill keeps an icon of its own), 'period', `starts_on` through
+ * floorAfterCharges, the order of the past-charges question, the write and the reminder, and the
+ * logo columns.
  *
- * The pages are the real ones, walked the way a person walks them (category grid, keypad, company
- * search, calendar, card tiles, reminder chips, note); only the network and the logo images are
- * replaced. The one exception is the primary button, a stub that accepts a press even while
- * disabled: the only way to reach the checks inside Save, which the final page normally holds back.
- * It still reports its disabled state.
+ * The pages are the real ones, walked the way a person walks them (category grid, keypad, the Name
+ * box, the day boxes, the Paid with pills, the reminder chips, note); only the network and the logo
+ * images are replaced.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -33,30 +32,6 @@ jest.mock('@/lib/haptics', () => ({
   warn: jest.fn(),
   selection: jest.fn(),
 }));
-
-jest.mock('@/components/ui/button', () => {
-  const { Pressable, Text } = jest.requireActual('react-native');
-  return {
-    Button: ({
-      label,
-      onPress,
-      disabled,
-    }: {
-      label: string;
-      onPress: () => void;
-      disabled?: boolean;
-    }) => (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityState={{ disabled: Boolean(disabled) }}
-        onPress={onPress}
-      >
-        <Text>{label}</Text>
-      </Pressable>
-    ),
-  };
-});
 
 // The logo a mark drew, readable as text: "Power|x.com", or "Power|" for the category's icon.
 jest.mock('@/components/brands/brand-logo', () => {
@@ -255,12 +230,35 @@ const PERIOD = {
   ends_on: '2026-12-31',
 };
 
+// A saved bill with a company behind its name and a logo chosen for it.
+const WITH_COMPANY = {
+  ...POWER,
+  brand_id: 'b-cc',
+  brands: { domain: 'comcast.com' },
+  logo_domain: 'x.com',
+};
+
 const TILE = {
   housing: 'Housing. Rent, mortgage, HOA fees',
+  energy: 'Electricity & Gas. Power, heating, cooking gas',
   internet: 'Internet. Home broadband and Wi-Fi',
   insurance: 'Insurance. Car, health, home, life',
-  other: 'Other bill. Name it and pick an icon',
+  other: 'Other bill. Anything else you pay',
 };
+
+// What the Name box says before anything is typed in it, per category.
+const HINT = {
+  housing: 'Rent, mortgage or your landlord',
+  energy: 'AEP, Duke Energy, National Grid',
+  internet: 'Xfinity, Spectrum, Verizon',
+};
+
+// The day boxes, as a screen reader reads them while they are empty.
+const PAYMENT_ON = 'Payment on, Select a date';
+const STARTS_ON = 'Starts on, Select a date';
+const ENDS_ON = 'To, Ongoing — no end date';
+
+const MISSING = /^To save this bill, fill in:/;
 
 type Screen = Awaited<ReturnType<typeof render>>;
 
@@ -274,19 +272,21 @@ async function typeAmount(screen: Screen, digits: string) {
   for (const key of digits) await press(screen, key === '.' ? 'Decimal point' : key);
 }
 
-/** The Name page holds one text box, and an Other bill's is empty until someone names it. */
-const nameInput = (screen: Screen) => screen.getByDisplayValue('');
-
-/** Types into the company box on the final page the way a finger does: a tap into it, then the letters. */
-async function searchCompany(screen: Screen, placeholder: string, text: string) {
-  const input = screen.getByPlaceholderText(placeholder);
+/**
+ * Types into the Name box the way a finger does: a tap into it, then the letters. It is the only
+ * text box on the page while the bill has no name, so without a placeholder it is the empty one.
+ */
+async function typeName(screen: Screen, text: string, placeholder?: string) {
+  const input = placeholder
+    ? screen.getByPlaceholderText(placeholder)
+    : screen.getByDisplayValue('');
   await fireEvent(input, 'focus');
   await fireEvent.changeText(input, text);
 }
 
-/** Picks a company the catalogue knows from the box on the final page. */
+/** Picks a company the catalogue knows from the Name box. */
 async function chooseCompany(screen: Screen, placeholder: string, text: string, result = text) {
-  await searchCompany(screen, placeholder, text);
+  await typeName(screen, text, placeholder);
   await fireEvent.press(await screen.findByLabelText(result));
 }
 
@@ -298,21 +298,39 @@ async function newBill(screen: Screen, tile: string, amount: string) {
 }
 
 /**
- * Opens the calendar from `row`, pages `ahead` months on from where it opens, picks the day and
- * keeps it.
+ * Opens a day box, pages `ahead` months on from where its calendar opens, and picks the day. The
+ * calendar folds away on its own: there is no Done.
  */
-async function pickDay(screen: Screen, row: string, day: string, ahead = 0) {
-  await press(screen, row);
+async function pickDay(screen: Screen, box: string, day: string, ahead = 0) {
+  await press(screen, box);
   for (let step = 0; step < ahead; step += 1) await press(screen, 'Next month');
   await press(screen, day);
-  await press(screen, 'Done');
 }
 
-/** Opens Paid with, picks a card or account and keeps it. */
-async function payWith(screen: Screen, row: string, source: string) {
-  await press(screen, row);
-  await press(screen, source);
-  await press(screen, 'Done');
+type Answers = {
+  name?: string | null;
+  day?: string | null;
+  source?: string | null;
+  reminder?: string | null;
+};
+
+/**
+ * Answers what a new bill still asks once it has a category and an amount: a name, a day, how it
+ * is paid and whether to remind. A test passes only what it is about; null leaves a question
+ * unanswered, for a name already picked or a gap on purpose.
+ */
+async function fillIn(screen: Screen, answers: Answers = {}) {
+  const { name, day, source, reminder } = {
+    name: 'Rent',
+    day: 'Thursday 15 October 2026',
+    source: 'Skip',
+    reminder: 'No reminder',
+    ...answers,
+  };
+  if (name !== null) await typeName(screen, name);
+  if (day !== null) await pickDay(screen, PAYMENT_ON, day);
+  if (source !== null) await press(screen, source);
+  if (reminder !== null) await press(screen, reminder);
 }
 
 const editing = (bill: Record<string, unknown>) => {
@@ -341,19 +359,26 @@ beforeEach(() => {
 });
 
 describe('Add bill — what a new bill saves', () => {
-  it('goes category, amount, final page and writes the category label as the name', async () => {
+  it('goes category, amount, final page and saves what was typed and picked', async () => {
     const screen = await render(<AddBillScreen />);
 
     await newBill(screen, TILE.housing, '1100');
-    expect(screen.getByLabelText('Name, Housing')).toBeTruthy();
-    await payWith(screen, 'Paid with, not set, optional', 'Checking ••0099');
-    await pickDay(screen, 'Due on, needed', 'Sunday 1 November 2026', 1);
+    // Nothing is filled in for the person.
+    expect(screen.getByPlaceholderText(HINT.housing)).toBeTruthy();
+    expect(screen.getByLabelText(PAYMENT_ON)).toBeTruthy();
+    await typeName(screen, 'Rent');
+    await pickDay(screen, PAYMENT_ON, 'Sunday 1 November 2026', 1);
+    // The calendar folds away behind the day; nothing leaves the page.
+    expect(screen.getByLabelText('Payment on, Sun Nov 1')).toBeTruthy();
+    expect(screen.queryByLabelText('Next month')).toBeNull();
+    await press(screen, 'Checking ••0099');
+    await press(screen, 'No reminder');
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockCreate).toHaveBeenCalledTimes(1);
     expect(mockCreate).toHaveBeenCalledWith({
-      name: 'Housing',
+      name: 'Rent',
       amount: 1100,
       brand_id: null,
       category_id: 'housing',
@@ -366,21 +391,20 @@ describe('Add bill — what a new bill saves', () => {
       bank_account_id: 'acct-1',
       note: null,
     });
-    expect(mockPast.choose).toHaveBeenCalledWith('Housing', false);
+    expect(mockPast.choose).toHaveBeenCalledWith('Rent', false);
     expect(mockPast.apply).not.toHaveBeenCalled();
     expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-new', null, '09:00');
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(router.dismissTo).not.toHaveBeenCalled();
   });
 
-  it("names the bill after its company and keeps the bill's own category", async () => {
+  it("names the bill after the company picked from the catalogue and keeps the bill's own category", async () => {
     const screen = await render(<AddBillScreen />);
 
     await newBill(screen, TILE.internet, '0.10');
-    await chooseCompany(screen, 'Xfinity, Spectrum, Verizon', 'Comcast');
-    expect(screen.getByLabelText('Name, Comcast')).toBeTruthy();
-    await payWith(screen, 'Paid with, not set, optional', 'VISA ••4421');
-    await pickDay(screen, 'Due on, needed', 'Thursday 15 October 2026');
+    await chooseCompany(screen, HINT.internet, 'Comcast');
+    expect(screen.getByLabelText('Change name, currently Comcast')).toBeTruthy();
+    await fillIn(screen, { name: null, source: 'VISA ••4421' });
     await press(screen, 'Yearly');
     await press(screen, 'Save bill');
 
@@ -401,23 +425,79 @@ describe('Add bill — what a new bill saves', () => {
     });
   });
 
-  it('keeps the icon an Other bill was given, and trims its name and note', async () => {
+  it('saves a name that was only typed, trimmed, with no company behind it', async () => {
+    const screen = await render(<AddBillScreen />);
+
+    await newBill(screen, TILE.internet, '60');
+    await typeName(screen, '  Cable  ', HINT.internet);
+    // Still a box with a suggestion under it, not a company picked.
+    expect(screen.getByLabelText('Use Cable as the name')).toBeTruthy();
+    expect(screen.queryByLabelText('Change name, currently Cable')).toBeNull();
+    await fillIn(screen, { name: null });
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      name: 'Cable',
+      brand_id: null,
+      category_id: 'internet',
+    });
+    expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('logo_domain');
+    expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('logo_hidden');
+  });
+
+  // The Name box is drawn afresh each time a row's own page closes over the final page, so what
+  // was typed has to come back with it, and still be what Save writes.
+  it.each([
+    ['note', (screen: Screen) => press(screen, 'Note, not set, optional')],
+    ['category', (screen: Screen) => press(screen, 'Category, Other bill')],
+    ['amount', (screen: Screen) => pressButton(screen, 'Amount, $25.00')],
+  ])('still shows a typed name in the box after a visit to the %s page', async (_, open) => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.other, '25');
+    await typeName(screen, 'Gym');
+
+    await open(screen);
+    await press(screen, 'Back');
+
+    expect(screen.getByDisplayValue('Gym')).toBeTruthy();
+    await fillIn(screen, { name: null });
+    await press(screen, 'Save bill');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ name: 'Gym', brand_id: null });
+  });
+
+  it('keeps the name a company was picked with when the category changes', async () => {
+    const screen = await render(<AddBillScreen />);
+
+    await newBill(screen, TILE.internet, '60');
+    await chooseCompany(screen, HINT.internet, 'Comcast');
+    await press(screen, 'Category, Internet');
+    await press(screen, TILE.insurance);
+    expect(screen.getByLabelText('Category, Insurance')).toBeTruthy();
+    expect(screen.getByLabelText('Change name, currently Comcast')).toBeTruthy();
+    await fillIn(screen, { name: null });
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      name: 'Comcast',
+      brand_id: 'b-cc',
+      category_id: 'insurance',
+    });
+  });
+
+  it('gives a new Other bill the plain Other icon, and trims its name and note', async () => {
     const screen = await render(<AddBillScreen />);
 
     await newBill(screen, TILE.other, '15.99');
-    // Nothing names an Other bill until someone does.
-    expect(screen.getByLabelText('Name, needed')).toBeTruthy();
-    await press(screen, 'Name, needed');
-    await fireEvent.changeText(nameInput(screen), '  Gym  ');
-    await press(screen, 'Pets');
-    await press(screen, 'Done');
     await press(screen, 'Note, not set, optional');
     await fireEvent.changeText(
       screen.getByPlaceholderText('Anything worth remembering'),
       '  Off-peak  ',
     );
     await press(screen, 'Done');
-    await pickDay(screen, 'Due on, needed', 'Saturday 3 October 2026');
+    await fillIn(screen, { name: '  Gym  ', day: 'Saturday 3 October 2026' });
     await press(screen, 'Weekly');
     await press(screen, 'Save bill');
 
@@ -427,7 +507,7 @@ describe('Add bill — what a new bill saves', () => {
       amount: 15.99,
       brand_id: null,
       category_id: 'other',
-      icon_id: 'pets',
+      icon_id: 'other',
       recurrence: 'weekly',
       next_due_on: '2026-10-03',
       starts_on: '2026-10-03',
@@ -438,24 +518,37 @@ describe('Add bill — what a new bill saves', () => {
     });
   });
 
-  it("saves the picker's own 'other' icon for an Other bill nobody changed", async () => {
+  it('gives a bill that is not Other no icon of its own', async () => {
     const screen = await render(<AddBillScreen />);
 
-    await newBill(screen, TILE.other, '1030.5');
-    await press(screen, 'Name, needed');
-    await fireEvent.changeText(nameInput(screen), 'Storage unit');
-    await press(screen, 'Done');
-    await pickDay(screen, 'Due on, needed', 'Tuesday 20 October 2026');
+    await newBill(screen, TILE.housing, '1030.5');
+    await fillIn(screen, { day: 'Tuesday 20 October 2026' });
     await press(screen, 'Every 3 months');
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0]).toMatchObject({
-      name: 'Storage unit',
       amount: 1030.5,
-      icon_id: 'other',
+      icon_id: null,
       recurrence: 'quarterly',
       starts_on: '2026-10-20',
+    });
+  });
+
+  it('saves today as the first payment day from the calendar’s Today', async () => {
+    const screen = await render(<AddBillScreen />);
+
+    await newBill(screen, TILE.housing, '1100');
+    await fillIn(screen, { day: null });
+    await press(screen, PAYMENT_ON);
+    await press(screen, 'Today');
+    expect(screen.getByLabelText('Payment on, Today, Wed Oct 7')).toBeTruthy();
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      next_due_on: '2026-10-07',
+      starts_on: '2026-10-07',
     });
   });
 
@@ -463,15 +556,18 @@ describe('Add bill — what a new bill saves', () => {
     const screen = await render(<AddBillScreen />);
 
     await newBill(screen, TILE.insurance, '0.10');
-    await pickDay(screen, 'Due on, needed', 'Monday 5 October 2026');
+    await fillIn(screen, { name: 'Renters', day: null });
     await press(screen, 'Specific period');
+    // The day box now asks when the period starts.
+    await pickDay(screen, STARTS_ON, 'Monday 5 October 2026');
     // October to March, from the page the calendar opens on.
-    await pickDay(screen, 'To, not set, optional', 'Wednesday 31 March 2027', 5);
+    await pickDay(screen, ENDS_ON, 'Wednesday 31 March 2027', 5);
+    expect(screen.getByLabelText('To, Wed Mar 31')).toBeTruthy();
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate).toHaveBeenCalledWith({
-      name: 'Insurance',
+      name: 'Renters',
       amount: 0.1,
       brand_id: null,
       category_id: 'insurance',
@@ -490,8 +586,9 @@ describe('Add bill — what a new bill saves', () => {
     const screen = await render(<AddBillScreen />);
 
     await newBill(screen, TILE.insurance, '42');
-    await pickDay(screen, 'Due on, needed', 'Monday 5 October 2026');
+    await fillIn(screen, { day: 'Monday 5 October 2026' });
     await press(screen, 'Specific period');
+    expect(screen.getByLabelText(ENDS_ON)).toBeTruthy();
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -506,11 +603,12 @@ describe('Add bill — what a new bill saves', () => {
     const screen = await render(<AddBillScreen />);
 
     await newBill(screen, TILE.insurance, '42');
-    await pickDay(screen, 'Due on, needed', 'Monday 5 October 2026');
+    await fillIn(screen, { day: 'Monday 5 October 2026' });
     await press(screen, 'Specific period');
-    await pickDay(screen, 'To, not set, optional', 'Thursday 15 October 2026');
+    await pickDay(screen, ENDS_ON, 'Thursday 15 October 2026');
     expect(screen.getByLabelText('To, Thu Oct 15')).toBeTruthy();
     await press(screen, 'Monthly');
+    expect(screen.queryByLabelText(/^To,/)).toBeNull();
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -532,7 +630,7 @@ describe('Add bill — what a new bill saves', () => {
   ])('saves a typed %s as exactly %p dollars', async (typed, saved) => {
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.housing, typed);
-    await pickDay(screen, 'Due on, needed', 'Thursday 15 October 2026');
+    await fillIn(screen);
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -542,7 +640,7 @@ describe('Add bill — what a new bill saves', () => {
   it('saves the amount as corrected on the final page, not as first typed', async () => {
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.housing, '49.11');
-    await pickDay(screen, 'Due on, needed', 'Thursday 15 October 2026');
+    await fillIn(screen);
 
     await pressButton(screen, 'Amount, $49.11');
     for (let key = 0; key < 5; key += 1) await press(screen, 'Delete last digit');
@@ -554,15 +652,106 @@ describe('Add bill — what a new bill saves', () => {
     expect(mockCreate.mock.calls[0][0].amount).toBe(1100);
   });
 
-  it('files a card under card_id and leaves the account column empty', async () => {
+  it('keeps the answers already given when the amount page is visited and left', async () => {
     const screen = await render(<AddBillScreen />);
-    await newBill(screen, TILE.housing, '12');
-    await payWith(screen, 'Paid with, not set, optional', 'VISA ••4421');
-    await pickDay(screen, 'Due on, needed', 'Thursday 15 October 2026');
+    await newBill(screen, TILE.housing, '49.11');
+    await fillIn(screen, { source: 'VISA ••4421', reminder: '3 days' });
+
+    await pressButton(screen, 'Amount, $49.11');
+    await press(screen, 'Back');
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    expect(mockCreate.mock.calls[0][0]).toMatchObject({ card_id: 'card-1', bank_account_id: null });
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      name: 'Rent',
+      amount: 49.11,
+      next_due_on: '2026-10-15',
+      card_id: 'card-1',
+    });
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-new', 3, '09:00');
+  });
+
+  it.each([
+    ['a card', 'VISA ••4421', { card_id: 'card-1', bank_account_id: null }],
+    ['a bank account', 'Checking ••0099', { card_id: null, bank_account_id: 'acct-1' }],
+    ['Skip', 'Skip', { card_id: null, bank_account_id: null }],
+  ])('paid with %s, saves the matching column and nulls the other', async (_, pill, columns) => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '12');
+    await fillIn(screen, { source: pill });
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject(columns);
+  });
+
+  it('lets a second pill replace the first', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '12');
+    await fillIn(screen, { source: 'VISA ••4421' });
+    await press(screen, 'Checking ••0099');
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      card_id: null,
+      bank_account_id: 'acct-1',
+    });
+  });
+});
+
+describe('Add bill — the reminder a save applies', () => {
+  it('applies "No reminder" as no lead at all, which stores nothing', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '12');
+    await fillIn(screen, { reminder: 'No reminder' });
+    expect(screen.queryByLabelText(/^Sent at/)).toBeNull();
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-new', null, '09:00');
+  });
+
+  it.each([
+    ['On the day', 0],
+    ['1 day', 1],
+    ['3 days', 3],
+    ['1 week', 7],
+  ])('turns the %s chip into a lead of %p, at nine', async (chip, lead) => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '12');
+    await fillIn(screen, { reminder: chip });
+    expect(screen.getByLabelText('Sent at 9:00 AM. Change the time.')).toBeTruthy();
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-new', lead, '09:00');
+  });
+
+  it('applies the time picked on the clock along with the chip', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '12');
+    await fillIn(screen, { reminder: '1 week' });
+
+    await press(screen, 'Sent at 9:00 AM. Change the time.');
+    await press(screen, 'PM');
+    await press(screen, 'Confirm time');
+    expect(screen.getByLabelText('Sent at 9:00 PM. Change the time.')).toBeTruthy();
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-new', 7, '21:00');
+  });
+
+  it('applies the last chip pressed', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '12');
+    await fillIn(screen, { reminder: '1 week' });
+    await press(screen, 'On the day');
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-new', 0, '09:00');
   });
 });
 
@@ -571,11 +760,7 @@ describe('Add bill — the order of a save', () => {
     const screen = await render(<AddBillScreen />);
 
     await newBill(screen, TILE.housing, '1100');
-    await pickDay(screen, 'Due on, needed', 'Thursday 15 October 2026');
-    await press(screen, 'Reminder, not set, optional');
-    await press(screen, '3 days');
-    await press(screen, 'Done');
-    expect(screen.getByLabelText('Reminder, 3 days before · 9:00 AM')).toBeTruthy();
+    await fillIn(screen, { reminder: '3 days' });
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
@@ -633,7 +818,8 @@ describe('Add bill — the order of a save', () => {
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
-    expect(screen.getByLabelText('Reminder, 3 days before · 8:30 AM')).toBeTruthy();
+    expect(screen.getByLabelText('3 days')).toBeSelected();
+    expect(screen.getByLabelText('Sent at 8:30 AM. Change the time.')).toBeTruthy();
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
@@ -644,17 +830,32 @@ describe('Add bill — the order of a save', () => {
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
-    await press(screen, 'Reminder, not set, optional');
     await press(screen, '1 week');
-    await press(screen, 'Done');
     mockSavedReminder = { choice: '1', remindAt: '07:00' };
     await screen.rerender(<AddBillScreen />);
-    expect(screen.getByLabelText('Reminder, 1 week before · 9:00 AM')).toBeTruthy();
+    expect(screen.getByLabelText('1 week')).toBeSelected();
     await press(screen, 'Save changes');
 
-    // Done keeps the choice and the time the person saw on the page.
+    // The lead is the one picked here. No time was set here, so the saved bill's own stands.
     await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
-    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-1', 7, '09:00');
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-1', 7, '07:00');
+  });
+
+  it('keeps a time set here when the saved one arrives late', async () => {
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, '1 week');
+    await press(screen, 'Sent at 9:00 AM. Change the time.');
+    await press(screen, 'PM');
+    await press(screen, 'Confirm time');
+    mockSavedReminder = { choice: '1', remindAt: '07:00' };
+    await screen.rerender(<AddBillScreen />);
+    expect(screen.getByLabelText('Sent at 9:00 PM. Change the time.')).toBeTruthy();
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-1', 7, '21:00');
   });
 });
 
@@ -663,8 +864,10 @@ describe('Add bill — what an edit saves', () => {
     editing({ ...POWER, name: 'Rent', category_id: 'housing', icon_id: 'other' });
     const screen = await render(<AddBillScreen />);
 
-    // Opens on the final page, already filled in: Save is the first thing to press.
+    // Opens on the final page, already filled in: Save is the first thing to press, and no reminder
+    // saved is the answer "No reminder".
     expect(screen.getByLabelText('Save changes')).toBeEnabled();
+    expect(screen.getByLabelText('No reminder')).toBeSelected();
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
@@ -690,12 +893,90 @@ describe('Add bill — what an edit saves', () => {
     expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-1', null, '09:00');
   });
 
+  it('keeps the name, company, account, note and reminder of a bill nobody touched', async () => {
+    mockSavedReminder = { choice: '3', remindAt: '08:30' };
+    editing({
+      ...WITH_COMPANY,
+      name: 'Comcast home',
+      card_id: null,
+      bank_account_id: 'acct-1',
+      note: 'Autopay',
+    });
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toEqual({
+      name: 'Comcast home',
+      amount: 84.2,
+      brand_id: 'b-cc',
+      category_id: 'energy',
+      icon_id: null,
+      recurrence: 'monthly',
+      next_due_on: '2026-09-01',
+      starts_on: '2026-09-01',
+      ends_on: null,
+      card_id: null,
+      bank_account_id: 'acct-1',
+      note: 'Autopay',
+    });
+    expect(mockPast.choose).toHaveBeenCalledWith('Comcast home', false);
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-1', 3, '08:30');
+  });
+
+  it('keeps an Other bill’s own icon', async () => {
+    editing({ ...POWER, name: 'Dog food', category_id: 'other', icon_id: 'pets' });
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      category_id: 'other',
+      icon_id: 'pets',
+    });
+  });
+
+  it('keeps the name when the category changes, and fits the icon to the new category', async () => {
+    editing({ ...POWER, name: 'Dog food', category_id: 'other', icon_id: 'pets' });
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Category, Other bill');
+    await press(screen, TILE.housing);
+    expect(screen.getByLabelText('Category, Housing')).toBeTruthy();
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      name: 'Dog food',
+      category_id: 'housing',
+      icon_id: null,
+    });
+  });
+
+  it('gives a bill moved onto Other the plain Other icon, under the name it had', async () => {
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Category, Electricity & Gas');
+    await press(screen, TILE.other);
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      name: 'Power',
+      category_id: 'other',
+      icon_id: 'other',
+    });
+  });
+
   it('floors the start after the last charge when the due date moves inside a charged month', async () => {
     mockPast.lastChargedOn = '2026-09-01';
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
-    await pickDay(screen, 'Due on, Tue Sep 1', 'Tuesday 15 September 2026');
+    await pickDay(screen, 'Payment on, Tue Sep 1', 'Tuesday 15 September 2026');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
@@ -710,7 +991,7 @@ describe('Add bill — what an edit saves', () => {
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
-    await pickDay(screen, 'Due on, Tue Sep 1', 'Tuesday 20 October 2026', 1);
+    await pickDay(screen, 'Payment on, Tue Sep 1', 'Tuesday 20 October 2026', 1);
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
@@ -725,7 +1006,7 @@ describe('Add bill — what an edit saves', () => {
     editing(PERIOD);
     const screen = await render(<AddBillScreen />);
 
-    // The line says where the period starts, not where the bill is next due.
+    // The box says where the period starts, not where the bill is next due.
     expect(screen.getByLabelText('Starts on, Mon Jun 1')).toBeTruthy();
     await press(screen, 'Save changes');
 
@@ -758,7 +1039,7 @@ describe('Add bill — what an edit saves', () => {
     editing({ ...POWER, ends_on: '2027-01-31' });
     const screen = await render(<AddBillScreen />);
 
-    // A repeating bill has no "To" line to show it, but Save does not lose it.
+    // A repeating bill has no "To" box to show it, but Save does not lose it.
     expect(screen.queryByLabelText(/^To,/)).toBeNull();
     await press(screen, 'Save changes');
 
@@ -773,19 +1054,36 @@ describe('Add bill — what an edit saves', () => {
     editing(PERIOD);
     const screen = await render(<AddBillScreen />);
 
-    await pickDay(screen, 'To, Thu Dec 31', 'Thursday 31 December 2026', 0);
+    await pickDay(screen, 'To, Thu Dec 31', 'Thursday 24 December 2026');
+    expect(screen.getByLabelText('To, Thu Dec 24')).toBeTruthy();
     await press(screen, 'Save changes');
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
-    expect(mockUpdate.mock.calls[0][0].values.ends_on).toBe('2026-12-31');
+    expect(mockUpdate.mock.calls[0][0].values.ends_on).toBe('2026-12-24');
 
     mockUpdate.mockClear();
-    await press(screen, 'To, Thu Dec 31');
     await press(screen, 'Clear — make it ongoing');
-    expect(screen.getByLabelText('To, not set, optional')).toBeTruthy();
+    expect(screen.getByLabelText(ENDS_ON)).toBeTruthy();
     await press(screen, 'Save changes');
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
       recurrence: 'period',
+      ends_on: null,
+    });
+  });
+
+  it('drops an end date the start has been moved past', async () => {
+    editing(PERIOD);
+    const screen = await render(<AddBillScreen />);
+
+    // June 2026 to January 2027, past the December 31 the period ended on.
+    await pickDay(screen, 'Starts on, Mon Jun 1', 'Friday 15 January 2027', 7);
+    expect(screen.getByLabelText(ENDS_ON)).toBeTruthy();
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      recurrence: 'period',
+      starts_on: '2027-01-15',
       ends_on: null,
     });
   });
@@ -799,7 +1097,7 @@ describe('Add bill — what an edit saves', () => {
     for (let key = 0; key < 4; key += 1) await press(screen, 'Delete last digit');
     await typeAmount(screen, '1030.5');
     await press(screen, 'Done');
-    await payWith(screen, 'Paid with, VISA ••4421', 'Checking ••0099');
+    await press(screen, 'Checking ••0099');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
@@ -821,9 +1119,8 @@ describe('Add bill — what an edit saves', () => {
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
-    await press(screen, 'Name, Power');
-    await fireEvent.changeText(screen.getByDisplayValue('Power'), 'Electric');
-    await press(screen, 'Done');
+    await press(screen, 'Change name, currently Power');
+    await typeName(screen, 'Electric');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
@@ -841,14 +1138,11 @@ describe('Add bill — what an edit saves', () => {
     expect(mockPast.choose).toHaveBeenCalledWith('Power', false);
   });
 
-  it('takes the card off a bill with No card or account', async () => {
+  it('takes the card off a bill with Skip', async () => {
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
-    await press(screen, 'Paid with, VISA ••4421');
-    await press(screen, 'No card or account');
-    await press(screen, 'Done');
-    expect(screen.getByLabelText('Paid with, not set, optional')).toBeTruthy();
+    await press(screen, 'Skip');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
@@ -858,62 +1152,198 @@ describe('Add bill — what an edit saves', () => {
     });
     expect(mockPast.choose).toHaveBeenCalledWith('Power', true);
   });
-});
 
-describe('Add bill — the checks inside Save', () => {
-  /** An Other bill that arrived with nothing but its category: name, amount and date all missing. */
-  const blankOther = () => {
-    mockParams = { prefillCategory: 'other' };
-  };
-
-  it('asks for a name, then the amount, then the date, each on the final page', async () => {
-    blankOther();
+  it('saves a bill that never had a card or account without asking for one', async () => {
+    editing({ ...POWER, card_id: null });
     const screen = await render(<AddBillScreen />);
 
-    expect(screen.getByLabelText('Save bill')).toBeDisabled();
+    // Skip is already its answer.
+    expect(screen.getByLabelText('Skip')).toBeSelected();
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(MISSING)).toBeNull();
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      card_id: null,
+      bank_account_id: null,
+    });
+    expect(mockPast.choose).toHaveBeenCalledWith('Power', false);
+  });
+
+  it('turns a saved reminder off with No reminder', async () => {
+    mockSavedReminder = { choice: '3', remindAt: '08:30' };
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'No reminder');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-1', null, '08:30');
+  });
+});
+
+describe('Add bill — the line Save shows for what is missing', () => {
+  it('names every unanswered line in the order of the page, and writes nothing', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.other, '25');
+
+    // Never greyed out: Save answers instead.
+    expect(screen.getByLabelText('Save bill')).toBeEnabled();
     await press(screen, 'Save bill');
-    expect(screen.getByText('Give the bill a name.')).toBeTruthy();
+
+    expect(
+      screen.getByText('To save this bill, fill in: Name, Payment on, Paid with, Reminder.'),
+    ).toBeTruthy();
     expect(warn).toHaveBeenCalled();
-
-    await press(screen, 'Name, needed');
-    await fireEvent.changeText(nameInput(screen), 'Gym');
-    await press(screen, 'Done');
-    await press(screen, 'Save bill');
-    expect(screen.getByText('Enter how much it costs.')).toBeTruthy();
-    expect(screen.queryByText('Give the bill a name.')).toBeNull();
-
-    await pressButton(screen, 'Amount, needed');
-    await typeAmount(screen, '25');
-    await press(screen, 'Done');
-    await press(screen, 'Save bill');
-    expect(screen.getByText('Pick the first due date.')).toBeTruthy();
-    expect(screen.queryByText('Enter how much it costs.')).toBeNull();
-
-    await press(screen, 'Specific period');
-    await press(screen, 'Save bill');
-    expect(screen.getByText('Pick the date it starts.')).toBeTruthy();
-    expect(screen.getByText('You can edit this later.')).toBeTruthy();
-
-    expect(mockCreate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Save bill')).toBeEnabled();
     expect(mockPast.choose).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockApplyReminder).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('asks again for only what is still missing, and saves once there is nothing left', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.other, '25');
+
+    await press(screen, 'Save bill');
+    expect(screen.getByText(/Name, Payment on, Paid with, Reminder\.$/)).toBeTruthy();
+
+    await typeName(screen, 'Gym');
+    await press(screen, 'Save bill');
+    expect(
+      screen.getByText('To save this bill, fill in: Payment on, Paid with, Reminder.'),
+    ).toBeTruthy();
+
+    await pickDay(screen, PAYMENT_ON, 'Thursday 15 October 2026');
+    await press(screen, 'Save bill');
+    expect(screen.getByText('To save this bill, fill in: Paid with, Reminder.')).toBeTruthy();
+
+    await press(screen, 'Skip');
+    await press(screen, 'Save bill');
+    expect(screen.getByText('To save this bill, fill in: Reminder.')).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+
+    await press(screen, 'No reminder');
+    await press(screen, 'Save bill');
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({ name: 'Gym', amount: 25 });
+    expect(screen.queryByText(MISSING)).toBeNull();
+  });
+
+  it('asks for Starts on, not Payment on, for a specific period', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.insurance, '25');
+    await press(screen, 'Specific period');
+
+    await press(screen, 'Save bill');
+
+    expect(
+      screen.getByText('To save this bill, fill in: Name, Starts on, Paid with, Reminder.'),
+    ).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('names a reminder left unanswered, though every other line is filled in', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '1100');
+    await fillIn(screen, { reminder: null });
+
+    await press(screen, 'Save bill');
+
+    expect(screen.getByText('To save this bill, fill in: Reminder.')).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
     expect(mockApplyReminder).not.toHaveBeenCalled();
   });
 
-  it('counts a name of spaces as no name', async () => {
-    blankOther();
+  it('names a way of paying left unanswered, though every other line is filled in', async () => {
     const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '1100');
+    await fillIn(screen, { source: null });
 
-    await press(screen, 'Name, needed');
-    await fireEvent.changeText(nameInput(screen), '   ');
-    // Done waits for something to keep.
-    expect(screen.getByLabelText('Done')).toBeDisabled();
-    await press(screen, 'Back');
     await press(screen, 'Save bill');
 
-    expect(screen.getByText('Give the bill a name.')).toBeTruthy();
+    expect(screen.getByText('To save this bill, fill in: Paid with.')).toBeTruthy();
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
+  it('names the amount and the category too, for a hand-off that brought neither', async () => {
+    // Nothing but a note: no amount, name, category, day, card or reminder.
+    mockParams = { prefillNote: 'Landlord' };
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Save bill');
+
+    expect(
+      screen.getByText(
+        'To save this bill, fill in: Amount, Name, Category, Payment on, Paid with, Reminder.',
+      ),
+    ).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('leaves the name to the person when a hand-off heard only a category', async () => {
+    mockParams = { prefillCategory: 'housing' };
+    const screen = await render(<AddBillScreen />);
+
+    expect(screen.getByPlaceholderText(HINT.housing)).toBeTruthy();
+    await press(screen, 'Save bill');
+
+    expect(
+      screen.getByText(
+        'To save this bill, fill in: Amount, Name, Payment on, Paid with, Reminder.',
+      ),
+    ).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('counts a name of spaces as no name', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.other, '25');
+    await fillIn(screen, { name: '   ' });
+
+    await press(screen, 'Save bill');
+
+    expect(screen.getByText('To save this bill, fill in: Name.')).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('asks for the name again once a saved bill’s name has been taken off', async () => {
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Change name, currently Power');
+    await press(screen, 'Save changes');
+
+    expect(screen.getByText('To save this bill, fill in: Name.')).toBeTruthy();
+    expect(mockPast.choose).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockApplyReminder).not.toHaveBeenCalled();
+  });
+
+  const CHANGES: [string, (screen: Screen) => Promise<unknown>][] = [
+    ['typing the name', (screen) => typeName(screen, 'Gym')],
+    ['picking a day', (screen) => pickDay(screen, PAYMENT_ON, 'Thursday 15 October 2026')],
+    ['picking how it is paid', (screen) => press(screen, 'Skip')],
+    ['picking a reminder', (screen) => press(screen, 'No reminder')],
+    ['picking how often it repeats', (screen) => press(screen, 'Weekly')],
+  ];
+
+  it.each(CHANGES)('drops the line once the person is %s', async (_, change) => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.other, '25');
+    await press(screen, 'Save bill');
+    expect(screen.getByText(MISSING)).toBeTruthy();
+
+    await change(screen);
+
+    expect(screen.queryByText(MISSING)).toBeNull();
+  });
+});
+
+describe('Add bill — the checks inside Save', () => {
   it('refuses a period that ends before it starts', async () => {
     editing({
       ...PERIOD,
@@ -931,9 +1361,9 @@ describe('Add bill — the checks inside Save', () => {
     expect(mockPast.choose).not.toHaveBeenCalled();
   });
 
-  // The final page has no step to move on from, so keeping a change on a page is what clears a
-  // message about it; otherwise a fixed problem shows in red above an enabled Save.
-  it('drops the message once the end date it names has been fixed', async () => {
+  // Everything on the page is a box, so changing one is what clears a message about it; otherwise
+  // a fixed problem shows in red above an enabled Save.
+  it('drops the message once a new end date has been picked, and saves with it', async () => {
     editing({
       ...PERIOD,
       starts_on: '2026-10-10',
@@ -944,10 +1374,32 @@ describe('Add bill — the checks inside Save', () => {
 
     await press(screen, 'Save changes');
     expect(screen.getByText('The end date cannot be before the start date.')).toBeTruthy();
-    await press(screen, 'To, Thu Oct 1');
+    await pickDay(screen, 'To, Thu Oct 1', 'Saturday 31 October 2026');
+
+    expect(screen.queryByText('The end date cannot be before the start date.')).toBeNull();
+    await press(screen, 'Save changes');
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      starts_on: '2026-10-10',
+      ends_on: '2026-10-31',
+    });
+  });
+
+  // The Clear link only empties the end date; the picks around it also drop the message.
+  it('drops the message once the end date it names has been cleared', async () => {
+    editing({
+      ...PERIOD,
+      starts_on: '2026-10-10',
+      next_due_on: '2026-10-10',
+      ends_on: '2026-10-01',
+    });
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Save changes');
+    expect(screen.getByText('The end date cannot be before the start date.')).toBeTruthy();
     await press(screen, 'Clear — make it ongoing');
 
-    expect(screen.getByLabelText('To, not set, optional')).toBeTruthy();
+    expect(screen.getByLabelText(ENDS_ON)).toBeTruthy();
     expect(screen.queryByText('The end date cannot be before the start date.')).toBeNull();
   });
 
@@ -987,7 +1439,7 @@ describe('Add bill — the checks inside Save', () => {
     mockCreate.mockRejectedValueOnce(new Error('network down'));
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.housing, '1100');
-    await pickDay(screen, 'Due on, needed', 'Thursday 15 October 2026');
+    await fillIn(screen);
 
     await press(screen, 'Save bill');
 
@@ -1000,6 +1452,21 @@ describe('Add bill — the checks inside Save', () => {
     await press(screen, 'Save bill');
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    log.mockRestore();
+  });
+
+  it('drops the failure line once something on the page changes', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockCreate.mockRejectedValueOnce(new Error('network down'));
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '1100');
+    await fillIn(screen);
+    await press(screen, 'Save bill');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+
+    await press(screen, 'VISA ••4421');
+
     expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
     log.mockRestore();
   });
@@ -1023,15 +1490,111 @@ describe('Add bill — the checks inside Save', () => {
   });
 });
 
-describe('Add bill — the logo', () => {
-  const ENERGY_SEARCH = 'AEP, Duke Energy, National Grid';
+describe('Add bill — leaving after a save from a voice hand-off', () => {
+  const HEARD = {
+    from: 'voice',
+    prefillName: 'Gym',
+    prefillCategory: 'other',
+    prefillAmount: '25',
+    prefillDate: '2026-10-15',
+    prefillSource: 'card-1',
+  };
 
+  it('arrives with what was heard filled in and asks only for the reminder', async () => {
+    mockParams = HEARD;
+    const screen = await render(<AddBillScreen />);
+
+    expect(screen.getByLabelText('Change name, currently Gym')).toBeTruthy();
+    expect(screen.getByLabelText('Payment on, Thu Oct 15')).toBeTruthy();
+    expect(screen.getByLabelText('VISA ••4421')).toBeSelected();
+    await press(screen, 'Save bill');
+
+    expect(screen.getByText('To save this bill, fill in: Reminder.')).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('goes back to Home, never onto the page it came from', async () => {
+    mockParams = HEARD;
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'No reminder');
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
+    expect(router.back).not.toHaveBeenCalled();
+    expect(mockCreate).toHaveBeenCalledWith({
+      name: 'Gym',
+      amount: 25,
+      brand_id: null,
+      category_id: 'other',
+      icon_id: 'other',
+      recurrence: 'monthly',
+      next_due_on: '2026-10-15',
+      starts_on: '2026-10-15',
+      ends_on: null,
+      card_id: 'card-1',
+      bank_account_id: null,
+      note: null,
+    });
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-new', null, '09:00');
+  });
+});
+
+describe('Add bill — deleting', () => {
+  it('asks first, then deletes the bill and leaves', async () => {
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Delete this bill');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Delete this bill?', destructive: true }),
+    );
+    expect(mockDelete).toHaveBeenCalledWith('bill-1');
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('keeps the bill when the question is declined', async () => {
+    mockConfirm.mockResolvedValueOnce(false);
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Delete this bill');
+
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalledTimes(1));
+    expect(mockDelete).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('says the one failure line when the delete fails, and stays', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockDelete.mockRejectedValueOnce(new Error('network down'));
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Delete this bill');
+
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(router.back).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it('offers no delete on a bill that does not exist yet', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '12');
+
+    expect(screen.queryByLabelText('Delete this bill')).toBeNull();
+  });
+});
+
+describe('Add bill — the logo', () => {
   /** A new Energy bill on its final page, with a company the catalogue does not know just added. */
   async function addTownPower() {
     const screen = await render(<AddBillScreen />);
-    await newBill(screen, 'Electricity & Gas. Power, heating, cooking gas', '84.2');
-    await searchCompany(screen, ENERGY_SEARCH, 'Town Power');
-    await fireEvent.press(await screen.findByLabelText('Add Town Power as a new company'));
+    await newBill(screen, TILE.energy, '84.2');
+    await typeName(screen, 'Town Power', HINT.energy);
+    await fireEvent.press(await screen.findByLabelText('Use Town Power as the name'));
     return screen;
   }
 
@@ -1048,11 +1611,10 @@ describe('Add bill — the logo', () => {
     const screen = await addTownPower();
 
     await fireEvent.press(await screen.findByLabelText(LOGO_COPY.yes));
-    // Named after the company, with its logo drawn on the Name line and in the box.
-    expect(screen.getByLabelText('Name, Town Power')).toBeTruthy();
-    expect(screen.getByTestId('logo-40')).toHaveTextContent('Town Power|townpower.example');
+    // Named after the company, with its logo drawn in the box.
+    expect(screen.getByLabelText('Change name, currently Town Power')).toBeTruthy();
     expect(screen.getByTestId('logo-32')).toHaveTextContent('Town Power|townpower.example');
-    await pickDay(screen, 'Due on, needed', 'Sunday 1 November 2026', 1);
+    await fillIn(screen, { name: null });
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -1067,18 +1629,17 @@ describe('Add bill — the logo', () => {
 
   it('gives a company in our own logo list its logo with no question, and saves it', async () => {
     const screen = await render(<AddBillScreen />);
-    await newBill(screen, 'Electricity & Gas. Power, heating, cooking gas', '84.2');
-    await searchCompany(screen, ENERGY_SEARCH, 'Metro Hydro');
-    await fireEvent.press(await screen.findByLabelText('Add Metro Hydro as a new company'));
+    await newBill(screen, TILE.energy, '84.2');
+    await typeName(screen, 'Metro Hydro', HINT.energy);
+    await fireEvent.press(await screen.findByLabelText('Use Metro Hydro as the name'));
 
     expect(screen.queryByLabelText(LOGO_COPY.icon)).toBeNull();
     expect(screen.queryByLabelText(LOGO_COPY.yes)).toBeNull();
     expect(screen.queryByText(/^Looks like/)).toBeNull();
-    expect(screen.getByLabelText('Name, Metro Hydro')).toBeTruthy();
-    expect(screen.getByTestId('logo-40')).toHaveTextContent('Metro Hydro|metrohydro.example');
+    expect(screen.getByLabelText('Change name, currently Metro Hydro')).toBeTruthy();
     expect(screen.getByTestId('logo-32')).toHaveTextContent('Metro Hydro|metrohydro.example');
     expect(screen.getByLabelText(LOGO_COPY.changeLogo)).toBeTruthy();
-    await pickDay(screen, 'Due on, needed', 'Sunday 1 November 2026', 1);
+    await fillIn(screen, { name: null });
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -1103,12 +1664,12 @@ describe('Add bill — the logo', () => {
   it('still asks when the service only half knows the name', async () => {
     mockLogoAnswer.mockImplementation(() => ({ ...METRO_HYDRO_LOGO, kind: 'fuzzy' }));
     const screen = await render(<AddBillScreen />);
-    await newBill(screen, 'Electricity & Gas. Power, heating, cooking gas', '84.2');
-    await searchCompany(screen, ENERGY_SEARCH, 'Metro Hydra');
-    await fireEvent.press(await screen.findByLabelText('Add Metro Hydra as a new company'));
+    await newBill(screen, TILE.energy, '84.2');
+    await typeName(screen, 'Metro Hydra', HINT.energy);
+    await fireEvent.press(await screen.findByLabelText('Use Metro Hydra as the name'));
 
     expect(screen.getByLabelText(LOGO_COPY.yes)).toBeTruthy();
-    await pickDay(screen, 'Due on, needed', 'Sunday 1 November 2026', 1);
+    await fillIn(screen, { name: null });
     await press(screen, 'Save bill');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('logo_domain');
@@ -1119,17 +1680,17 @@ describe('Add bill — the logo', () => {
       { name: 'Metro Hydro', categoryId: 'energy', logoDomain: 'old.example', logoHidden: false },
     ];
     const screen = await render(<AddBillScreen />);
-    await newBill(screen, 'Electricity & Gas. Power, heating, cooking gas', '84.2');
+    await newBill(screen, TILE.energy, '84.2');
 
-    await searchCompany(screen, ENERGY_SEARCH, 'Metro');
+    await typeName(screen, 'Metro', HINT.energy);
     await fireEvent.press(await screen.findByLabelText('Metro Hydro'));
 
     expect(screen.queryByLabelText(LOGO_COPY.yes)).toBeNull();
     expect(screen.queryByLabelText(LOGO_COPY.icon)).toBeNull();
-    expect(screen.getByLabelText('Name, Metro Hydro')).toBeTruthy();
-    expect(screen.getByTestId('logo-40')).toHaveTextContent('Metro Hydro|old.example');
+    expect(screen.getByLabelText('Change name, currently Metro Hydro')).toBeTruthy();
+    expect(screen.getByTestId('logo-32')).toHaveTextContent('Metro Hydro|old.example');
     expect(mockLogoAnswer).not.toHaveBeenCalledWith('Metro Hydro');
-    await pickDay(screen, 'Due on, needed', 'Sunday 1 November 2026', 1);
+    await fillIn(screen, { name: null });
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -1145,7 +1706,7 @@ describe('Add bill — the logo', () => {
   it('is not asked a second time: what was confirmed once is offered the next', async () => {
     const first = await addTownPower();
     await fireEvent.press(await first.findByLabelText(LOGO_COPY.yes));
-    await pickDay(first, 'Due on, needed', 'Sunday 1 November 2026', 1);
+    await fillIn(first, { name: null });
     await press(first, 'Save bill');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockRemember).toHaveBeenCalledTimes(1);
@@ -1155,13 +1716,13 @@ describe('Add bill — the logo', () => {
     mockKnown = [remembered];
     mockCreate.mockClear();
     const second = await render(<AddBillScreen />);
-    await newBill(second, 'Electricity & Gas. Power, heating, cooking gas', '90');
-    await searchCompany(second, ENERGY_SEARCH, 'town');
+    await newBill(second, TILE.energy, '90');
+    await typeName(second, 'town', HINT.energy);
     await fireEvent.press(await second.findByLabelText('Town Power'));
 
     expect(second.queryByLabelText(LOGO_COPY.yes)).toBeNull();
     expect(second.queryByLabelText(LOGO_COPY.icon)).toBeNull();
-    await pickDay(second, 'Due on, needed', 'Sunday 1 November 2026', 1);
+    await fillIn(second, { name: null });
     await press(second, 'Save bill');
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0]).toMatchObject({
@@ -1176,8 +1737,9 @@ describe('Add bill — the logo', () => {
     const screen = await addTownPower();
 
     await fireEvent.press(await screen.findByLabelText(LOGO_COPY.icon));
-    expect(screen.queryByTestId('logo-40')).toBeNull();
-    await pickDay(screen, 'Due on, needed', 'Sunday 1 November 2026', 1);
+    // No domain to draw: the mark falls back to the category's icon.
+    expect(screen.getByTestId('logo-32')).toHaveTextContent('Town Power|');
+    await fillIn(screen, { name: null });
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -1191,9 +1753,9 @@ describe('Add bill — the logo', () => {
   it('writes no logo columns for a company picked from the catalogue, whose own logo is the default', async () => {
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.internet, '0.10');
-    await chooseCompany(screen, 'Xfinity, Spectrum, Verizon', 'Comcast');
-    expect(screen.getByTestId('logo-40')).toHaveTextContent('Comcast|comcast.com');
-    await pickDay(screen, 'Due on, needed', 'Sunday 1 November 2026', 1);
+    await chooseCompany(screen, HINT.internet, 'Comcast');
+    expect(screen.getByTestId('logo-32')).toHaveTextContent('Comcast|comcast.com');
+    await fillIn(screen, { name: null });
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -1205,7 +1767,7 @@ describe('Add bill — the logo', () => {
   it('writes no logo columns when nobody answered the logo question', async () => {
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.housing, '1100');
-    await pickDay(screen, 'Due on, needed', 'Thursday 15 October 2026');
+    await fillIn(screen);
     await press(screen, 'Save bill');
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
@@ -1213,19 +1775,11 @@ describe('Add bill — the logo', () => {
     expect(mockCreate.mock.calls[0][0]).not.toHaveProperty('logo_hidden');
   });
 
-  const WITH_COMPANY = {
-    ...POWER,
-    brand_id: 'b-cc',
-    brands: { domain: 'comcast.com' },
-    logo_domain: 'x.com',
-  };
-
   it('an edit that keeps its company shows the row’s logo and leaves it alone', async () => {
     editing(WITH_COMPANY);
     const screen = await render(<AddBillScreen />);
 
-    // On the Name line and in the company box, where the row's own choice shows.
-    expect(screen.getByTestId('logo-40')).toHaveTextContent('Power|x.com');
+    // In the Name box, where the row's own choice shows.
     expect(screen.getByTestId('logo-32')).toHaveTextContent('Power|x.com');
     await press(screen, 'Save changes');
 
@@ -1239,7 +1793,7 @@ describe('Add bill — the logo', () => {
     editing({ ...WITH_COMPANY, logo_domain: null, logo_hidden: true });
     const screen = await render(<AddBillScreen />);
 
-    expect(screen.queryByTestId('logo-40')).toBeNull();
+    expect(screen.getByTestId('logo-32')).toHaveTextContent('Power|');
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
@@ -1247,16 +1801,14 @@ describe('Add bill — the logo', () => {
     expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_hidden');
   });
 
-  it('an edit that takes the company off takes its logo with it, and keeps the name', async () => {
+  it('an edit that clears the name and types a plain one takes the company and its logo off', async () => {
     editing(WITH_COMPANY);
     const screen = await render(<AddBillScreen />);
 
-    await press(screen, 'Change company, currently Power');
-    // The bill falls back to its category's icon, under the name it had.
-    expect(screen.queryByTestId('logo-40')).toBeNull();
+    await press(screen, 'Change name, currently Power');
+    // The box is a box again, with the category's suggestions and no mark.
     expect(screen.queryByTestId('logo-32')).toBeNull();
-    expect(screen.getByLabelText('Name, Power')).toBeTruthy();
-    expect(screen.getByPlaceholderText(ENERGY_SEARCH)).toBeTruthy();
+    await typeName(screen, 'Power', HINT.energy);
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
@@ -1272,52 +1824,60 @@ describe('Add bill — the logo', () => {
     editing(WITH_COMPANY);
     const screen = await render(<AddBillScreen />);
 
-    await press(screen, 'Change company, currently Power');
-    await chooseCompany(screen, ENERGY_SEARCH, 'Comcast');
-    expect(screen.getByTestId('logo-40')).toHaveTextContent('Power|comcast.com');
+    await press(screen, 'Change name, currently Power');
+    await chooseCompany(screen, HINT.energy, 'Comcast');
+    expect(screen.getByTestId('logo-32')).toHaveTextContent('Comcast|comcast.com');
     await press(screen, 'Save changes');
 
     // The earlier logo choice (x.com) went with the company that was taken off.
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
-      name: 'Power',
+      name: 'Comcast',
       brand_id: 'b-cc',
+      category_id: 'energy',
       logo_domain: null,
       logo_hidden: false,
     });
   });
 
-  it('an edit that swaps the company for another keeps the name and drops the old logo', async () => {
+  it('an edit that swaps the company for another is named after it and drops the old logo', async () => {
     editing({ ...WITH_COMPANY, name: 'My power' });
     const screen = await render(<AddBillScreen />);
 
-    await press(screen, 'Change company, currently My power');
-    await chooseCompany(screen, ENERGY_SEARCH, 'Greystar');
-    // The name is the person's own: a company picked after it does not rename the bill.
-    expect(screen.getByLabelText('Name, My power')).toBeTruthy();
+    await press(screen, 'Change name, currently My power');
+    await chooseCompany(screen, HINT.energy, 'Greystar');
+    expect(screen.getByLabelText('Change name, currently Greystar')).toBeTruthy();
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
-      name: 'My power',
+      name: 'Greystar',
       brand_id: 'b-gs',
+      category_id: 'energy',
       logo_domain: null,
       logo_hidden: false,
     });
   });
 
-  // A name a company gave the bill is not the person's own: replacing the company renames it, even
-  // though the box can only replace one by taking it off first.
   it('names the bill after the second company when the first one gave it its name', async () => {
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.internet, '0.10');
-    await chooseCompany(screen, 'Xfinity, Spectrum, Verizon', 'Comcast');
-    expect(screen.getByLabelText('Name, Comcast')).toBeTruthy();
+    await chooseCompany(screen, HINT.internet, 'Comcast');
+    expect(screen.getByLabelText('Change name, currently Comcast')).toBeTruthy();
 
-    await press(screen, 'Change company, currently Comcast');
-    await chooseCompany(screen, 'Xfinity, Spectrum, Verizon', 'Greystar');
+    await press(screen, 'Change name, currently Comcast');
+    await chooseCompany(screen, HINT.internet, 'Greystar');
+    expect(screen.getByLabelText('Change name, currently Greystar')).toBeTruthy();
+    await fillIn(screen, { name: null });
+    await press(screen, 'Save bill');
 
-    expect(screen.getByLabelText('Name, Greystar')).toBeTruthy();
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    // The bill keeps its own category, whatever the company is filed under.
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      name: 'Greystar',
+      brand_id: 'b-gs',
+      category_id: 'internet',
+    });
   });
 });
 

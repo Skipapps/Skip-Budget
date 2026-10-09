@@ -19,7 +19,8 @@ import { TEXT_CAP } from '@/theme/text-scale';
 
 type ReminderFieldProps = {
   kind: ReminderKind;
-  value: ReminderChoice;
+  /** Null until one is picked, where a form makes the person answer. */
+  value: ReminderChoice | null;
   onChange: (value: ReminderChoice) => void;
   /** "HH:MM" the reminder is sent at. */
   time: string;
@@ -28,6 +29,8 @@ type ReminderFieldProps = {
   unavailable?: string | null;
   /** Offered under `unavailable` when the reason is a failed read rather than a fact about the thing. */
   onRetry?: () => void;
+  /** Said in place of "Off" where turning it off is one of the answers ("No reminder"). */
+  offLabel?: string;
 };
 
 /**
@@ -42,11 +45,17 @@ export function ReminderField({
   onTimeChange,
   unavailable,
   onRetry,
+  offLabel,
 }: ReminderFieldProps) {
   const colors = useColors();
   const [pickerOpen, setPickerOpen] = useState(false);
   const clock = parseClock(time);
   const clockLabel = formatClock(clock.hour, clock.minute);
+  const choices = offLabel
+    ? REMINDER_CHOICES.map((choice) =>
+        choice.value === 'off' ? { value: choice.value, label: offLabel } : choice,
+      )
+    : REMINDER_CHOICES;
 
   return (
     <View className="w-full">
@@ -69,9 +78,9 @@ export function ReminderField({
 
       {unavailable ? null : (
         <>
-          <ChoiceChips options={REMINDER_CHOICES} value={value} onChange={onChange} />
+          <ChoiceChips options={choices} value={value} onChange={onChange} />
 
-          {value === 'off' ? null : (
+          {value === null || value === 'off' ? null : (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('ui.reminder.sentAt', { time: clockLabel })}

@@ -198,16 +198,3 @@ export function buildSubscriptionValues(
     },
   };
 }
-
-/**
- * The name a bill gets when nobody typed one: the company, else the category's label, and nothing
- * for Other (which asks for a name).
- */
-export function defaultBillName(
-  categoryId: string,
-  categoryLabel: string,
-  issuer: BrandSelection | null,
-): string {
-  if (issuer?.name.trim()) return issuer.name;
-  return categoryId === 'other' ? '' : categoryLabel;
-}
