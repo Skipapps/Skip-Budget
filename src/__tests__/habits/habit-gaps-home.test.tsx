@@ -49,6 +49,9 @@ jest.mock('@/components/bills/bill-mark', () => ({ BillMark: () => null }));
 jest.mock('@/components/habits/habit-icon', () => ({ HabitIcon: () => null }));
 // Artwork imports SVGs, which Jest has no transformer for.
 jest.mock('@/data/spending-categories', () => ({ spendingCategories: [] }));
+jest.mock('@/theme/home-icons', () => ({
+  useHomeIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', line: '#DDDDDD', surface: '#FFFFFF' }),
@@ -122,8 +125,8 @@ jest.mock('@/api/queries', () => ({
 
 jest.useFakeTimers().setSystemTime(new Date(`${TODAY}T09:00:00`));
 
-const LOCKED = 'Spending Habits. Pro feature. See what skipping saves.';
-const OPEN = 'Spending Habits. Opens the tool.';
+const LOCKED = 'Spending habits. Pro feature. See what skipping saves.';
+const OPEN = 'Spending habits. Opens the tool.';
 
 beforeEach(() => {
   jest.setSystemTime(new Date(`${TODAY}T09:00:00`));
@@ -195,7 +198,7 @@ describe('Home when the habits read fails', () => {
     // And that is a Home with its money on it, not an empty one.
     expect(healthyFeeds.card).toMatchObject({ balance: 2700, loading: false, error: false });
     expect(failed.getByLabelText('Bakery, -$6.00, Receipt')).toBeTruthy();
-    expect(failed.getByText('Where it goes')).toBeTruthy();
+    expect(failed.getByText('Where your money went')).toBeTruthy();
     expect(failed.getByText('Go further')).toBeTruthy();
   });
 
@@ -203,7 +206,7 @@ describe('Home when the habits read fails', () => {
     mockHabits = read('error');
     const screen = await render(<HomeScreen />);
 
-    await fireEvent.press(screen.getByLabelText('Loan Calculator. Opens the tool.'));
+    await fireEvent.press(screen.getByLabelText('Loan calculator. Opens the tool.'));
     expect(router.push).toHaveBeenCalledWith('/loan-calculator');
     expect(router.push).toHaveBeenCalledTimes(1);
   });

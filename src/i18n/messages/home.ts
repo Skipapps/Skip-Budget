@@ -76,13 +76,38 @@ export const homeMessages = defineMessages({
     es: 'Tu salario y a dónde llega',
     fr: 'Ton salaire et où il arrive',
   },
+  /** The line under each Quick add name; short enough for one line on most phones. */
+  'home.quickAdd.receiptNote': {
+    en: 'Snap or type it',
+    es: 'Foto o a mano',
+    fr: 'Photo ou saisie',
+  },
+  'home.quickAdd.billNote': {
+    en: 'Rent, phone, power',
+    es: 'Renta, teléfono, luz',
+    fr: 'Loyer, mobile, énergie',
+  },
+  'home.quickAdd.subscriptionNote': {
+    en: 'Netflix, Spotify',
+    es: 'Netflix, Spotify',
+    fr: 'Netflix, Spotify',
+  },
+  'home.quickAdd.salaryNote': {
+    en: 'Add a payday',
+    es: 'Tu día de pago',
+    fr: 'Ton jour de paie',
+  },
 
   /** What a row came from, under its name; also the Quick add tile labels. */
   'home.kind.receipt': { en: 'Receipt', es: 'Recibo', fr: 'Reçu' },
   'home.kind.bill': { en: 'Bill', es: 'Factura', fr: 'Facture' },
   'home.kind.subscription': { en: 'Subscription', es: 'Suscripción', fr: 'Abonnement' },
 
-  'home.whereItGoes': { en: 'Where it goes', es: 'A dónde se va', fr: 'Où va ton argent' },
+  'home.whereItGoes': {
+    en: 'Where your money went',
+    es: 'A dónde se fue tu dinero',
+    fr: 'Où est passé ton argent',
+  },
   'home.thisMonth': { en: 'This month', es: 'Este mes', fr: 'Ce mois-ci' },
   'home.destination.monthlyBills': {
     en: 'Monthly Bills',
@@ -114,17 +139,27 @@ export const homeMessages = defineMessages({
 
   'home.goFurther': { en: 'Go further', es: 'Ve más allá', fr: 'Va plus loin' },
   'home.tool.loanCalculator': {
-    en: 'Loan Calculator',
+    en: 'Loan calculator',
     es: 'Calculadora de préstamos',
     fr: 'Calculateur de prêt',
   },
+  'home.tool.loanCalculatorNote': {
+    en: 'See a monthly cost',
+    es: 'Mira el pago mensual',
+    fr: 'Vois la mensualité',
+  },
   'home.tool.spendingHabits': {
-    en: 'Spending Habits',
+    en: 'Spending habits',
     es: 'Hábitos de gasto',
     fr: 'Habitudes de dépense',
   },
+  'home.tool.spendingHabitsNote': {
+    en: 'Spot your patterns',
+    es: 'Mira tus patrones',
+    fr: 'Vois tes tendances',
+  },
   'home.tool.habitsLocked': {
-    en: 'Spending Habits. Pro feature. See what skipping saves.',
+    en: 'Spending habits. Pro feature. See what skipping saves.',
     es: 'Hábitos de gasto. Función Pro. Mira lo que ahorras sin comprar.',
     fr: 'Habitudes de dépense. Fonction Pro. Vois ce que tu économises en t’abstenant.',
   },

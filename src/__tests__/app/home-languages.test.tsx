@@ -41,6 +41,11 @@ jest.mock('@/providers/theme-provider', () => ({
   useMoneyColor: () => () => '#000000',
 }));
 
+// Jest turns an .svg into a number, not a component; the icons have suites of their own.
+jest.mock('@/theme/home-icons', () => ({
+  useHomeIcons: () => new Proxy({}, { get: () => () => null }),
+}));
+
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: false }) }));
 // Unknown until it answers, so the Spending Habits card carries no PRO pill here.
 jest.mock('@/api/habits', () => ({ useHabits: () => ({ isSuccess: false, data: undefined }) }));
@@ -184,13 +189,17 @@ describe('Home in Spanish', () => {
     expect(screen.getAllByText('Suscripción', all)[0]).toBeTruthy();
     expect(screen.getAllByText('Salario', all)[0]).toBeTruthy();
     expect(screen.getByLabelText('Tu salario y a dónde llega')).toBeTruthy();
+    for (const note of ['Foto o a mano', 'Renta, teléfono, luz', 'Netflix, Spotify']) {
+      expect(screen.getByText(note)).toBeTruthy();
+    }
+    expect(screen.getByText('Tu día de pago')).toBeTruthy();
 
     expect(screen.getByText('Primeros pasos')).toBeTruthy();
     expect(screen.getByText('1 de 5 listos')).toBeTruthy();
     expect(screen.getByLabelText('Pay. Listo.')).toBeTruthy();
     expect(screen.getByText('Opcional')).toBeTruthy();
 
-    expect(screen.getByText('A dónde se va')).toBeTruthy();
+    expect(screen.getByText('A dónde se fue tu dinero')).toBeTruthy();
     expect(screen.getByText('Este mes')).toBeTruthy();
     expect(screen.getByLabelText('Facturas mensuales, -$1,030.00, este mes')).toBeTruthy();
     expect(screen.getByLabelText('Recibos, -$6.00, este mes')).toBeTruthy();
@@ -202,6 +211,8 @@ describe('Home in Spanish', () => {
     const screen = await render(<HomeScreen />);
 
     expect(screen.getByText('Ve más allá')).toBeTruthy();
+    expect(screen.getByText('Mira el pago mensual')).toBeTruthy();
+    expect(screen.getByText('Mira tus patrones')).toBeTruthy();
     // The loan calculator is free, so the section no longer says it comes with Pro.
     expect(screen.queryByText('Incluido con Pro')).toBeNull();
     expect(screen.getByLabelText('Calculadora de préstamos. Abre la herramienta.')).toBeTruthy();
@@ -297,13 +308,15 @@ describe('Home in French', () => {
   it('reads Where it goes, Go further, Recent and Coming up', async () => {
     const screen = await render(<HomeScreen />);
 
-    expect(screen.getByText('Où va ton argent')).toBeTruthy();
+    expect(screen.getByText('Où est passé ton argent')).toBeTruthy();
     expect(screen.getByText('Ce mois-ci')).toBeTruthy();
     expect(screen.getAllByText('Factures mensuelles', all)[0]).toBeTruthy();
     expect(
       screen.getByLabelText(`Factures mensuelles, -1${NBSP}030,00${NBSP}$, ce mois-ci`),
     ).toBeTruthy();
     expect(screen.getByText('Va plus loin')).toBeTruthy();
+    expect(screen.getByText('Vois la mensualité')).toBeTruthy();
+    expect(screen.getByText('Vois tes tendances')).toBeTruthy();
     expect(screen.queryByText('Inclus avec Pro')).toBeNull();
     expect(screen.getByLabelText('Calculateur de prêt. Ouvre l’outil.')).toBeTruthy();
     expect(screen.getByText('Aperçu')).toBeTruthy();

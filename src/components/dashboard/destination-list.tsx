@@ -1,12 +1,4 @@
-import {
-  Calendar,
-  ChevronRight,
-  FileText,
-  Landmark,
-  Receipt,
-  RefreshCw,
-  type LucideIcon,
-} from 'lucide-react-native';
+import { ChevronRight, FileText } from 'lucide-react-native';
 import { Fragment } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -18,20 +10,16 @@ import { t } from '@/i18n';
 import { formatCurrency } from '@/lib/format';
 import { useColors, useMoneyColor } from '@/providers/theme-provider';
 import { failureText } from '@/lib/failure';
+import { useHomeIcons, type HomeIconName } from '@/theme/home-icons';
 import { TEXT_CAP } from '@/theme/text-scale';
 
-/**
- * Glyph per dashboard destination, matching the Quick add cards. Unknown ids fall back to a
- * document.
- */
-const DESTINATION_ICONS: Record<string, LucideIcon> = {
-  'monthly-bills': Calendar,
-  receipts: Receipt,
-  subscriptions: RefreshCw,
-  'loan-calculator': Landmark,
+/** The gradient icon per destination. Unknown ids get a document glyph. */
+const DESTINATION_ICONS: Record<string, HomeIconName> = {
+  'monthly-bills': 'bill',
+  receipts: 'receipt',
+  subscriptions: 'subscription',
+  'loan-calculator': 'loanCalculator',
 };
-
-const DESTINATION_FALLBACK_ICON: LucideIcon = FileText;
 
 type DestinationListProps = {
   /** Each row shows its label as given, so the caller words it in the language on screen. */
@@ -60,6 +48,7 @@ export function DestinationList({
 }: DestinationListProps) {
   const colors = useColors();
   const moneyColor = useMoneyColor();
+  const icons = useHomeIcons();
   const rows = useFitGroup({ mode: 'switch' });
   const stacked = !rows.fits;
 
@@ -71,7 +60,8 @@ export function DestinationList({
         testID="where-it-goes"
       >
         {items.map((category, index) => {
-          const Icon = DESTINATION_ICONS[category.id] ?? DESTINATION_FALLBACK_ICON;
+          const iconName = DESTINATION_ICONS[category.id];
+          const Icon = iconName ? icons[iconName] : undefined;
           const amount = amounts[category.id];
           const isMoneyRow = amount !== undefined;
 
@@ -127,7 +117,7 @@ export function DestinationList({
 
           return (
             <Fragment key={category.id}>
-              {/* Inset to start under the label, past the icon's circle. */}
+              {/* Inset to start under the label, past the icon. */}
               {index > 0 ? <View className="ml-[70px] h-px bg-line/60" /> : null}
               <Pressable
                 accessibilityRole="button"
@@ -135,9 +125,23 @@ export function DestinationList({
                 onPress={() => onPress(category.id)}
                 className="min-h-14 w-full flex-row items-center gap-[12px] px-4 py-3 active:opacity-60"
               >
-                <View className="h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-accent/10">
-                  <Icon size={20} color={colors.accentInk} strokeWidth={1.8} />
-                </View>
+                {Icon ? (
+                  <View
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                    testID={`destination-icon-${category.id}`}
+                    className="h-[44px] w-[44px] shrink-0"
+                  >
+                    <Icon width="100%" height="100%" />
+                  </View>
+                ) : (
+                  <View
+                    testID={`destination-glyph-${category.id}`}
+                    className="h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-accent/10"
+                  >
+                    <FileText size={20} color={colors.accentInk} strokeWidth={1.8} />
+                  </View>
+                )}
 
                 {stacked ? (
                   // Label first, then the amount on its own line at the same size, in the order

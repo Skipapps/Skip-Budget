@@ -1,35 +1,34 @@
 import type { Href } from 'expo-router';
-import { CalendarCheck, ChevronRight, Landmark } from 'lucide-react-native';
-import type { LucideIcon } from 'lucide-react-native';
-import { Pressable, Text, View } from 'react-native';
+import { ChevronRight } from 'lucide-react-native';
+import { Text, View } from 'react-native';
 
-import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
+import { HomeTile, type HomeTileGroups } from '@/components/dashboard/home-tile';
+import { FitGroup, useFitGroup } from '@/components/ui/fit-group';
 import { t, type MessageKey } from '@/i18n';
-import { cn } from '@/lib/cn';
-import { shadows } from '@/theme/shadows';
 import { useColors } from '@/providers/theme-provider';
+import { useHomeIcons } from '@/theme/home-icons';
 
 type Tool = {
-  id: string;
+  id: 'loanCalculator' | 'spendingHabits';
   label: MessageKey;
-  icon: LucideIcon;
+  note: MessageKey;
   href: Href;
   /** Where it goes, and what it says, while it carries the PRO pill. */
   locked?: { href: Href; label: MessageKey };
 };
 
-/** Tools rather than spending, so cards rather than list rows. */
+/** Tools rather than spending, so tiles rather than list rows. */
 const TOOLS: Tool[] = [
   {
-    id: 'loan-calculator',
+    id: 'loanCalculator',
     label: 'home.tool.loanCalculator',
-    icon: Landmark,
+    note: 'home.tool.loanCalculatorNote',
     href: '/loan-calculator',
   },
   {
-    id: 'spending-habits',
+    id: 'spendingHabits',
     label: 'home.tool.spendingHabits',
-    icon: CalendarCheck,
+    note: 'home.tool.spendingHabitsNote',
     href: '/habits',
     locked: {
       href: { pathname: '/pro-feature', params: { id: 'habits' } },
@@ -47,68 +46,64 @@ type ToolCardsProps = {
   habitsLocked?: boolean;
 };
 
-/** The chevron after the label: 16pt and the 2pt gap before it. */
-const CHEVRON_ROOM = 18;
-
 /**
- * A raised card: shadow and no border (an outline would flatten the lift). Side by side, the tool
- * names share one size; cards that cannot hold it stack.
+ * The two tools side by side, names at one size and notes at another. If either would have to go
+ * under its design size to fit, the two stack, each the full width.
  */
 export function ToolCards({ onPress, habitsLocked = false }: ToolCardsProps) {
   const colors = useColors();
-  const names = useFitGroup({ mode: 'shrink' });
+  const icons = useHomeIcons();
+  const groups: HomeTileGroups = {
+    names: useFitGroup({ mode: 'shrink' }),
+    notes: useFitGroup({ mode: 'shrink' }),
+  };
+  const sideBySide = groups.names.fits && groups.notes.fits;
 
   return (
-    <FitGroup group={names} className={names.fits ? 'w-full flex-row gap-3' : 'w-full gap-3'}>
-      {TOOLS.map((tool) => {
-        const locked = habitsLocked ? tool.locked : undefined;
-        return (
-          <Pressable
-            key={tool.id}
-            accessibilityRole="button"
-            accessibilityLabel={
-              locked ? t(locked.label) : t('home.tool.opens', { label: t(tool.label) })
-            }
-            onPress={() => onPress(locked ? locked.href : tool.href)}
-            style={shadows.raised}
-            className={cn(
-              'items-center rounded-[16px] bg-card px-3 pb-4 pt-5 active:opacity-60',
-              names.fits ? 'min-w-0 flex-1' : 'w-full',
-            )}
-          >
-            {locked ? (
-              // The Insights card's pill; its words are in the card's label.
-              <View
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-                pointerEvents="none"
-                className="absolute right-2.5 top-2.5 rounded-full bg-accent px-2 py-0.5"
-              >
-                <Text allowFontScaling={false} className="font-app-bold text-[9px] text-on-control">
-                  PRO
-                </Text>
-              </View>
-            ) : null}
-
-            {/* The same accent circle as the "Where it goes" rows above. */}
-            <View className="h-[44px] w-[44px] items-center justify-center rounded-full bg-accent/10">
-              <tool.icon size={20} color={colors.accentInk} strokeWidth={1.8} />
-            </View>
-
-            <FitText
+    <FitGroup group={groups.names} className="w-full" testID="go-further">
+      <FitGroup
+        group={groups.notes}
+        className={sideBySide ? 'w-full flex-row gap-[12px]' : 'w-full gap-[12px]'}
+        testID="go-further-tools"
+      >
+        {TOOLS.map((tool) => {
+          const locked = habitsLocked ? tool.locked : undefined;
+          return (
+            <HomeTile
+              key={tool.id}
               id={tool.id}
-              role="control"
-              size={14}
-              className="text-center font-app-medium text-ink"
-              slotClassName="mt-3 w-full flex-row items-center justify-center gap-0.5"
-              after={<ChevronRight size={16} color={colors.muted} strokeWidth={2} />}
-              reserve={CHEVRON_ROOM}
-            >
-              {t(tool.label)}
-            </FitText>
-          </Pressable>
-        );
-      })}
+              icon={icons[tool.id]}
+              mark={
+                <View className="flex-row items-center gap-[6px]">
+                  {locked ? (
+                    // A sticker: its word is in the tile's label.
+                    <View className="rounded-full bg-accent px-2 py-0.5">
+                      <Text
+                        allowFontScaling={false}
+                        className="font-app-bold text-[9px] text-on-control"
+                      >
+                        PRO
+                      </Text>
+                    </View>
+                  ) : null}
+                  {/* Lighter than the type, as drawn: the whole tile is the button. */}
+                  <View style={{ opacity: 0.55 }}>
+                    <ChevronRight size={20} color={colors.muted} strokeWidth={2} />
+                  </View>
+                </View>
+              }
+              name={t(tool.label)}
+              note={t(tool.note)}
+              groups={groups}
+              accessibilityLabel={
+                locked ? t(locked.label) : t('home.tool.opens', { label: t(tool.label) })
+              }
+              onPress={() => onPress(locked ? locked.href : tool.href)}
+              className={sideBySide ? 'min-w-0 flex-1' : 'w-full'}
+            />
+          );
+        })}
+      </FitGroup>
     </FitGroup>
   );
 }

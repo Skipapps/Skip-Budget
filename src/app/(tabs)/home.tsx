@@ -82,7 +82,8 @@ export default function HomeScreen() {
   // not this month.
   const monthRange = useMemo(() => rangeFor('month', todayDate), [todayDate]);
   const month = useLedger(monthRange, today);
-  // The headline rolls on from the typed balances and never resets; only "Where it goes" is the month.
+  // The headline rolls on from the typed balances and never resets; only "Where your money went" is
+  // the month.
   const balance = useCurrentBalance(today);
 
   // One window of real occurrences (bill on its due date, subscription on its renewal, receipt on

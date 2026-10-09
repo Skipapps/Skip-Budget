@@ -29,6 +29,17 @@ jest.mock('@/providers/theme-provider', () => ({
   useMoneyColor: () => (amount: number) => (amount < 0 ? '#FF0000' : '#00FF00'),
 }));
 
+// Each gradient icon stands in as a view named after it; the drawings have suites of their own.
+jest.mock('@/theme/home-icons', () => {
+  const { createElement } = jest.requireActual('react');
+  const { View } = jest.requireActual('react-native');
+  const icons = new Proxy(
+    {},
+    { get: (_, name) => () => createElement(View, { testID: `icon-${String(name)}` }) },
+  );
+  return { useHomeIcons: () => icons };
+});
+
 const CATEGORIES: SpendingCategory[] = [
   { id: 'monthly-bills', label: 'Monthly Bills' },
   { id: 'receipts', label: 'Receipts' },
@@ -66,6 +77,45 @@ describe('DestinationList', () => {
     );
     expect(screen.queryAllByText('PRO', { includeHiddenElements: true })).toHaveLength(0);
     expect(screen.getByLabelText('Loan calculator. Opens the tool.')).toBeTruthy();
+  });
+
+  it('draws each row with its gradient icon, the ones Quick add uses, hidden from VoiceOver', async () => {
+    const screen = await render(
+      <DestinationList items={CATEGORIES} amounts={AMOUNTS} onPress={() => {}} />,
+    );
+    const hidden = { includeHiddenElements: true };
+    const drawn = (id: string) =>
+      screen
+        .getByTestId(`destination-icon-${id}`, hidden)
+        .children.map((icon) => (typeof icon === 'string' ? icon : icon.props.testID));
+
+    expect(drawn('monthly-bills')).toEqual(['icon-bill']);
+    expect(drawn('receipts')).toEqual(['icon-receipt']);
+    expect(drawn('subscriptions')).toEqual(['icon-subscription']);
+    expect(drawn('loan-calculator')).toEqual(['icon-loanCalculator']);
+    // No plum outline circle behind them any more.
+    for (const { id } of CATEGORIES) {
+      const box = screen.getByTestId(`destination-icon-${id}`, hidden);
+      expect(box.props.className).not.toContain('rounded-full');
+      expect(box.props.className).not.toContain('bg-accent');
+      expect(screen.queryByTestId(`destination-icon-${id}`)).toBeNull();
+    }
+  });
+
+  it('gives a row it has no icon for a document glyph, so the column still lines up', async () => {
+    const screen = await render(
+      <DestinationList
+        items={[...CATEGORIES, { id: 'something-new', label: 'Something new' }]}
+        amounts={AMOUNTS}
+        onPress={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId('destination-icon-something-new')).toBeNull();
+    expect(screen.getByTestId('destination-glyph-something-new').props.className).toContain(
+      'h-[44px] w-[44px]',
+    );
+    expect(screen.queryByTestId('destination-glyph-receipts')).toBeNull();
+    expect(screen.getByLabelText('Something new. Opens the tool.')).toBeTruthy();
   });
 
   it('shows a skeleton in place of each amount while loading', async () => {

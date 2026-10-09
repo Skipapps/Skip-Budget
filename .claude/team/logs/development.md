@@ -4735,3 +4735,112 @@ bug in component behaviour found; two comments corrected. tsc 0; `rm -rf .expo/c
   - Test added in `quick-actions.test.tsx` (badge present, decorative, label slot unchanged). Quick add, dashboard-languages, Home, the Home gap suite, the shared-controls large-text suite and the large-text guard: 251 tests, all pass. tsc and ESLint clean.
 
 - 2026-10-09 (CEO): the Quick add plus badge was tried and removed at the Founder's request; quick-actions.tsx and its test are back to HEAD.
+
+---
+
+## 2026-10-09 — Diego (Developer, data and backend) — Cards redesign: optional credit limit, data layer
+
+**Outcome:** Done, uncommitted, not pushed. No Docker was used. tsc: 0 errors across the tree. Prettier and eslint are clean on my files. jest: 16 suites, 426 tests pass: the new `card-credit-limit` suite (12), the api, money-book and habit suites, and the cards, add-card and Home screen suites.
+
+- **Migration:** `supabase/migrations/20261009100005_card_credit_limit.sql`.
+  - Adds `cards.credit_limit numeric(14,2)`, nullable, with `add column if not exists`.
+  - Constraint `cards_credit_limit_positive` (null or > 0), added inside a duplicate_object guard so a re-run is a no-op.
+  - Column comment. No other schema change.
+- **Reads (`src/api/queries.ts`):**
+  - `CardRow.credit_limit: number | null`. `useCards` and `useCard` ask for it and map it: a number or numeric string becomes a number; null or absent becomes null.
+  - **Fallback chosen:** on a 42703 that names credit_limit, the read is retried without it, and every card comes back with `credit_limit: null`. Cards feed every balance and Home's Current balance, so a build reaching a database before the push must still load. Any other error is still an error.
+- **Writes (`src/api/mutations.ts`):**
+  - `CardValues.credit_limit?: number | null`.
+  - New pure helper `creditLimitValue(typed: string): number | null`. Typed amounts above 0 are kept to the cent, not rounded. Empty, 0, negative or not a number becomes null.
+  - Writes have no fallback: a database without the column refuses a save that names it, so the migration must be live before the form sends the field. That is louder than silently dropping a limit.
+- **For Dana:** in add-card.tsx `values`, add `credit_limit: creditLimitValue(creditLimitText)` on create and on edit. Null clears the limit. Read the limit from `card.credit_limit`.
+
+## 2026-10-09 — Dana — Cards tab redesign, phase 1 (DONE, ready for the Founder in the Simulator)
+
+- **Page** (`src/app/(tabs)/cards.tsx`): centred "Cards" title (header role) and "All your money in one place."; no net balance card; Credit cards and Bank accounts headings with white "+ Add" pills (ActionPill gained `tone="card"` and an optional `accessibilityLabel`, so VoiceOver still says "New credit card" / "Add account"); free-plan walls unchanged.
+- **Faces** (`card-face.tsx`, `payment-card.tsx`, `account-card.tsx`): measured from the PNG: 10pt radius, 20pt padding, content height (no fixed ratio), "Owed"/"Available" 12pt, 31pt figure, right-hand "Skip" watermark hidden from VoiceOver, uppercase tracked wordmark (AMEX, VISA, MASTERCARD), account type badge, bottom "•••• 6334". Limit bar (owed ÷ limit in cents, clamped) and "$4,050 of $10,000 limit" only with a limit; accounts read "Updated today / yesterday / 4 Oct". Fixed a pre-existing dark-mode bug: light faces (sky, lime, sand, snow) drew near-white type in dark mode; they now keep the fixed ink.
+- **Money tiles** (`components/cards/money-tile.tsx`): 2×2, gradient icon + chevron, name, figure or pill, note; Goals "Coming soon" is inert. Four fit groups (names, figures, pills measured whole, notes); the grid stacks one per row when any cannot fit.
+- **Icons** (`assets/money-icons/*.svg`): every xlink:href gradient flattened per SVG 1.1 inheritance (coordinates, units, gradientTransform, stops) into <defs>. Quick Look renders of original vs copy: pixel-identical. svgr/svgo (the transformer's own config) keeps all gradients. On the iPhone 17 Pro Simulator the four icons match the WebKit renders to ~1/255 mean colour difference.
+- **Data**: new `src/api/loans.ts` `useActiveLoans(today)` (reads `loans.bill_id` only, names from the cached `useBills`, pure rule in `src/lib/active-loans.ts`); `useSourceBalances` gained an additive `updated` map (pure `src/lib/source-updated.ts`). Credit limit wired to Diego's `credit_limit` / `creditLimitValue` on Add/Edit card and both pages' faces.
+- **Gates**: tsc clean; eslint + prettier clean on my 28 files; 37 suites / 799 tests pass incl. large-text guard, no-route-test-files, i18n messages; 4 of 5 mutations caught (the fifth was a redundant clamp, now removed).
+- Phase 2 (Add card/account steps 2–3 and the "added" pages) starts next.
+
+## 2026-10-09 — Dana — Cards redesign phase 2 (Add card / Add account steps 2–3, "added" pages) + dark gradient icons (DONE)
+
+- **Card flow** (`src/app/add-card.tsx`): step 2 = live face ("Owed", "Limit not set" until a limit is typed, then "$500 of $10,000 limit" with the bar), Card name, Network pills (VISA, Mastercard, AMEX, Discover; Amex still stored as "Amex"), Last 4, Card limit (inline currency field, decimal pad, no pop-up), Card colour (the design's 8). Step 3 = "When is the bill due?" + day strip 1–31 (chosen day scrolled into view, pressed again to clear), summary card ("Due every month on the 22nd", "…or the last day in shorter months" for 29–31, "Next due: 22 Oct 2026"), "Remind me" card (gradient bell, switch, On the day / 1 day / 3 days / 1 week, date line), the change-later note (create only), "Add card". Reminder keeps its saved time (09:00 when new). Edit: same steps, "Save changes", toast + back, no final page. Walk-in (from=setup): unchanged (toast, on to /account-offer).
+- **Final page** (`components/flow/added-page.tsx`, shared): check in a plum circle, "Card added" + reminder line (or "No reminder set…"), the face, rows Due / Next due / Reminder, Done, "Add another card", close X. No toast on it. It replaces the flow in the same route; Done/close/swipe all leave to the opener (Cards), "Add another" is a router.replace to a fresh /add-card (so the free wall is re-checked).
+- **Account flow** (`src/app/add-account.tsx`): same parts (face, fields, card-tone type pills, colour, pay link switch, expected income as an inline currency field with the calculator button; step 3 last payday calendar + frequency pills + the same Remind me card, dated from the next payday when pay is typed here, by lead alone for linked pay); "Account added" page with Type / Next payday / Reminder rows.
+- **Shared parts**: ChoiceChips `tone="card"`, TextField `filled` + `leading`, new `CurrencyField`, `DayStrip`, `FlowSummary`, `RemindMeCard`, `AddedPage`; ColorPicker restyled to one row of 8 with a ring. Pure helpers: `lib/typed-amount.ts` (keystrokes replayed through the keypad's own rule, moved to `lib/amount-keys.ts` and re-exported by the keypad), `lib/due-day.ts` (mirrors `next_month_day` and `due − lead = today`; a year-long sweep proves it), `lib/reminder-words.ts`.
+- **Palette**: `CARD_COLORS` is also the monogram palette mirrored by the push server, so it is unchanged; faces now offer `FACE_COLORS` (blue, violet, plum, teal, slate, sand, rose, black). Faces draw white type where white reaches 3.8:1 (blue and teal, as drawn), and outline a face too close to the page (black in dark mode).
+- **Dark icons**: `assets/gradient-icons/<name>.svg` + `<name>-dark.svg` for salary, savings, loans, goals, reminder, all flattened; savings-dark derived from the light file with the three navy stops lifted (Desktop originals untouched). Quick Look renders: every copy pixel-identical to its source. `src/theme/gradient-icons.ts` pairs them by the theme provider's scheme.
+- **Gates**: tsc clean; eslint + prettier clean on 55 files; whole suite 253 suites / 5,386 tests green. New suites: add-card-flow (20), add-account-flow (8), typed-amount (11), due-day (10), gradient-icons-dark (4), money-icons (35). Seen on the iPhone 17 Pro Simulator in light, dark and AX-XL (edit and create walked to step 3, nothing saved).
+- **2026-10-09 — Dana — Founder decisions on the Cards work:**
+  - New card / new account: "Remind me" starts on at 3 days before; edit opens on what is saved; an account with no pay landing keeps it off and disabled.
+  - White-type face colours now clear 4.5:1 for the name and the captions as drawn: captions 80% → 90% white; blue #4F7DBA → #426EA8, teal #3F8A86 → #367672, violet #6A5FC9 → #695EC9 (margin only). Plum, slate and black unchanged. The special 3.8:1 white rule is gone; faces use isLightColor as before.
+  - Tests: palette check reads each rendered caption colour; on-by-default and switched-off cases for both flows. 3 mutations caught. tsc clean; 95 suites / 2,461 tests incl. guards; eslint + prettier clean.
+
+## 2026-10-09 — Dmitri (Development Lead) — review of the uncommitted Cards redesign (phases 1–2, credit limit, dark icons)
+
+**Verdict: approve with fixes.** Reviewed the tree as of 16:20, after Dana's Founder-decision pass at 16:17 (reminders start on; blue, teal and violet darkened). tsc: 0 errors. eslint is clean on the changed files. 29 suites / 674 tests pass (23 targeted, plus the i18n, large-text and no-route guards).
+- **MUST-FIX (Diego):** `SINGLE_ROW_KEY` (src/api/mutations.ts:81) is missing `cards: 'card'` and `bank_accounts: 'bank_account'`. Edit pages mount on the cached `['card', id]` and `['bank_account', id]`. Re-opening Edit after a save shows the old values, and Save writes them back. That clears a new limit and reverts the balance and balance_as_of. Add both keys and a reopen test.
+- **MUST-FIX (Dana):** add-account.tsx:661 puts the calculator's `String(result)` straight into the draft. The field shows "1,233.3333333333333" while the database saves 1233.33. Round to cents and turn it into a keypad draft first, and add a fixture.
+- **SHOULD-FIX:**
+  - Diego: the account reminder date does not match the scheduler. `getNextPayday` skips today's payday. With weekly pay and a 1-week lead, the reminder never fires on the server.
+  - Diego: `useReminderChoice` reads as 'off' while loading or after a failed read, so saving an edit then deletes the card's reminder.
+  - Dana: archive the dead code (amount-tile, network-picker, money-buckets, tileSalary, moneyTone).
+  - Dana: the "Add another" wall reads a card list that may still be refetching.
+  - Dana: a card with a legacy colour shows no selected swatch.
+- **Verified:** limit bar maths in cents, clamped; credit_limit reads (with the 42703 fallback) and writes; typed-amount in en, es and fr; due-day matches next_month_day; no change to the money book, Home or Current balance; navigation matches the SDK 57 docs. All 10 icon copies match their references with gradients resolved.
+- **Open:** default-on reminders now raise the iOS notification permission prompt on save, including in the walk-in. "Updated" counts scheduled pay as something that happened.
+- **2026-10-09 — Dana — Dmitri's Cards review fixes:**
+  - **MUST:** the add-account calculator result now goes in through `draftFromAmount` (lib/typed-amount.ts): rounded with `toCents`, trailing zeros dropped, empty when ≤ 0 or not a number. Fixtures: 3700/3 → "1233.33" (field "1,233.33", saved 1233.33); 0.1+0.2 → "0.3"; −40 → empty.
+  - **SHOULD:**
+    - Both free-plan walls also wait for `!existing.isFetching`.
+    - An older colour is offered as a first "Current colour" swatch, chosen, and can be picked again (`ColorPicker saved=`).
+    - Archived to `~/Desktop/SkipBudget-design-archive/2026-10-09/` with their relative paths, then removed from the tree: amount-tile.tsx, network-picker.tsx, money-buckets.ts, tile-salary.svg (+ the `tileSalary` artwork entry), and `moneyTone` with its helpers. tone.ts and tone.test.ts were archived whole before trimming. Test references, the guard's adopted entries and the AmountTile / NetworkPicker cases in two shared suites are gone.
+  - **Nits:**
+    - data/cards.ts comment.
+    - `leaveFlow` now lives in lib/nav.ts; `asDate` became due-day's exported `dayDate`.
+    - The Loans tile ignores presses while loading.
+    - The DayStrip gutter is measured (half the bled width less the column), and the strip is hidden until known.
+  - **Gates:** tsc clean; eslint + prettier clean on 64 files; whole suite 254/255 suites pass. The one failure is Diego's in-progress edit-reopen test.
+
+## 2026-10-09 — Dana — Home redesign: Quick add, Where your money went, Go further (DONE, uncommitted)
+
+- **Quick add** (`components/dashboard/quick-actions.tsx` and the new shared `home-tile.tsx`): it is always 2×2. Each tile is a bordered card (`rounded-[20px] border-line bg-card p-[16px]`, no shadow, as in the PNG). It has a 42pt gradient icon, a decorative 28pt `bg-accent/10` plus (accentInk glyph, hidden from VoiceOver), the name (15 semibold) and a note (12 muted): "Snap or type it", "Rent, phone, power", "Netflix, Spotify", "Add a payday" (es/fr added). Routes and VoiceOver labels are unchanged. The rows are `flex-row` with no `items-*`, so the two tiles in a row stretch to the taller one.
+- **2×2 at large text:** the names and the notes are two shrink FitGroups. New opt-in `useFitGroup({ mode, onlyLayout: true })` (with `fitScale`'s `onlyLayout`): the owner has no fallback layout, so only the 11pt floor applies, as for a group of one. The default behaviour of every other group is unchanged. Measured from Montserrat advance widths, the names stay at full size or shrink only slightly (e.g. 19.1pt at 375pt and 1.3x). They go under 15pt only at 320pt Display Zoom, at about 14–14.8pt. Notes wrap between words. The large-text guard passes: no numeric ceilings, no `numberOfLines`, no shrink-to-fit.
+- **Where your money went** (en/es/fr: "A dónde se fue tu dinero", "Où est passé ton argent"): the rows draw the bill, receipt and subscription gradient icons in the same 44pt slot. An unknown id keeps the old document glyph. Nothing else changed.
+- **Go further** (heading kept): Loan calculator ("See a monthly cost") and Spending habits ("Spot your patterns") are HomeTiles with the chevron at 0.55 opacity. The PRO pill now sits in the top row, before the chevron. Insights (`insight-banner.tsx`) is the full-width bordered card: bulb, name, note, PRO pill, chevron. The pill logic and routes are unchanged. The tools still stack only if a name or note would go under its design size; that never happens on an iPhone width.
+- **Copy:** `home.tool.loanCalculator` and `spendingHabits` are now sentence case in en ("Loan calculator", "Spending habits"), to match the design and the pages' own titles. The habitsLocked label follows. The Home, habit-card and habit-gaps-home tests were updated to match.
+- **Icons:** new flattened copies in `assets/gradient-icons/`: `home-{receipt,bill,subscription,spending-habits,insights}{,-dark}.svg`. subscription-dark carries the Founder's navy swap. The designer's salary and loan-calculator drawings are byte-identical to the Cards `salary`/`loans` pairs once flattened, so the new registry `src/theme/home-icons.ts` (`useHomeIcons`) reuses those files. Quick Look renders match the originals pixel for pixel (subscription-dark checked against a hand-swapped original).
+- **Tests:** new `home-icons.test.ts` (49), `home-icons-dark.test.tsx` (8), `tool-cards.test.tsx` (6) and `insight-banner.test.tsx` (5). Rewrote `quick-actions.test.tsx` (15). Added icon cases to `destination-list.test.tsx` and an `onlyLayout` case to `fit-group.test.tsx`. Mocked the registry in the Home, languages and habit suites. 9 of 9 mutations caught.
+- **Gates:** tsc 0, and eslint and prettier are clean on all 21 files. 23 targeted suites (292 tests) pass, guards included. Full jest: 260/262 suites. The 2 failures (`add-source-wall`, `add-account-i18n`: `LEAD_OPTIONS` undefined) come from another session's 16:45 edit to `add-account.tsx`/`remind-me-card.tsx`, not from this work.
+- **Simulator:** Quick add was seen in light at the default size, XXXL and AX-XL, and stays 2×2 with equal rows. Text size was restored to `large`. The lower sections were not seen, because the Simulator window is on another Space and I did not drive the mouse.
+- **Left unused:** `shadows.raised` in `src/theme/shadows.ts` has no caller now.
+
+---
+
+## 2026-10-09 — Diego (Developer, data and backend) — Dmitri's Cards review: stale Edit cache, payday mirror, reminder guard
+
+**Outcome:** Done, uncommitted. tsc 0 errors. eslint and prettier are clean on every file I touched. jest: 56 affected suites, 1,454 tests pass, and the three guard suites pass. No migration.
+
+- **MUST (stale Edit cache):**
+  - `SINGLE_ROW_KEY` (src/api/mutations.ts) gains `cards: 'card'` and `bank_accounts: 'bank_account'`.
+  - New `src/__tests__/api/edit-reopen.test.tsx` uses a stateful fake DB with the app's 30 s staleTime. It covers: save a limit, reopen, see the new limit; and the same for an account balance and its date. Both failed before the fix and pass after.
+- **SHOULD 1 (payday dates): app-side fix, no migration.**
+  - New `src/lib/payday.ts`:
+    - `nextPaydayOn(last, frequency, from)` mirrors `public.next_payday`: today counts, monthly pay keeps its own day after a short month, and a one-off pay is null once past.
+    - `paydayReminderOn(last, frequency, lead, today)` mirrors reminders_due for an account. It returns null when the reminder never fires.
+    - `leadCanFire(lead, frequencies)`.
+  - `src/lib/payday.test.ts` sweeps a year of days against a separate step-by-step transcription of next_payday and against the scheduler's firing rule, for every frequency, lead and tricky anchor (month ends, leap day, off-grid semimonthly, stale).
+  - `getNextPayday` is rebuilt on `nextPaydayOn`, so the salary page and the account form agree with the server. It used to skip today's payday, and monthly pay drifted from the 31st to the 28th after February.
+  - add-account.tsx: the reminder preview now comes from `paydayReminderOn`, counted from the last payday. The form offers only leads that can fire for the pay it knows (typed, or linked on a new account), so "1 week" is hidden for weekly pay. A week already chosen falls back to 3 days.
+  - RemindMeCard gains an optional `leadFits` predicate.
+  - New screen test `src/__tests__/app/account-reminder-schedule.test.tsx`.
+  - Not covered: the account edit page with linked pay (the form does not know its frequency), and the Reminders page. There, weekly pay with "1 week" still never sends. The complete fix would be server-side: one line in reminders_due (`next_payday(…, local_date + lead_days)`).
+- **SHOULD 2 (reminder deleted on edit):**
+  - `useReminderChoice` now returns `unknown`: true for a saved item until the reminders read succeeds. It is inverted so that existing screen-test mocks still read as known.
+  - One-line guards (`if (!savedReminder.unknown)`) at the four Save call sites: add-card, add-account, add-bill, add-subscription. Bill and subscription had the same bug.
+  - Tests: `src/__tests__/api/reminder-choice.test.tsx` and `src/__tests__/app/edit-reminder-unknown.test.tsx`.
+  - Gap: a reminder change the person makes while the saved one is unknown is not saved either. Showing the reminder card as unavailable with Try again while unknown would be clearer (Dana).
+- **2026-10-09 — Diego — full gate before the commit:** the add-source-wall and add-account-i18n break was already gone (add-account.tsx no longer imports LEAD_OPTIONS; it passes a `leadFits` predicate). Both suites pass, 21 tests. tsc: exit 0, 0 errors. Full `npx jest --ci`: 263 of 263 suites, 5,499 of 5,499 tests, exit 0.

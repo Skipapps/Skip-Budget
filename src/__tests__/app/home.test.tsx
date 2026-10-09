@@ -69,6 +69,10 @@ jest.mock('@/components/habits/habit-icon', () => ({
 }));
 // Artwork imports SVGs, which Jest has no transformer for.
 jest.mock('@/data/spending-categories', () => ({ spendingCategories: [] }));
+// Jest turns an .svg into a number, not a component; the icons have suites of their own.
+jest.mock('@/theme/home-icons', () => ({
+  useHomeIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', line: '#DDDDDD', surface: '#FFFFFF' }),
@@ -374,11 +378,12 @@ describe('Home — the headline card', () => {
   });
 });
 
-describe('Home — Where it goes', () => {
+describe('Home — Where your money went', () => {
   it('still adds up the month: bills, receipts and subscriptions of September', async () => {
     const { getByText } = await render(<HomeScreen />);
 
-    expect(getByText('Where it goes')).toBeTruthy();
+    expect(getByText('Where your money went')).toBeTruthy();
+    expect(() => getByText('Where it goes')).toThrow();
     expect(getByText('This month')).toBeTruthy();
     // Two bill rows and the unplaceable one (1,030 + 1,030 + 1), the bakery receipt, two Netflix rows.
     expect(mockDestinations.mock.lastCall?.[0].amounts).toEqual({
@@ -390,15 +395,16 @@ describe('Home — Where it goes', () => {
 });
 
 describe('Home — Go further', () => {
-  it('offers two tools side by side: the Loan Calculator, then Spending Habits', async () => {
-    const { getAllByRole } = await render(<HomeScreen />);
+  it('keeps its heading and offers two tools side by side: the loan calculator, then spending habits', async () => {
+    const { getAllByRole, getByText } = await render(<HomeScreen />);
 
     const tools = getAllByRole('button').filter((node) =>
       String(node.props.accessibilityLabel ?? '').endsWith('Opens the tool.'),
     );
+    expect(getByText('Go further')).toBeTruthy();
     expect(tools.map((node) => node.props.accessibilityLabel)).toEqual([
-      'Loan Calculator. Opens the tool.',
-      'Spending Habits. Opens the tool.',
+      'Loan calculator. Opens the tool.',
+      'Spending habits. Opens the tool.',
     ]);
 
     const [loan, habits] = tools;
@@ -416,9 +422,9 @@ describe('Home — Go further', () => {
   });
 });
 
-describe('Home — the Spending Habits PRO pill', () => {
-  const LOCKED = 'Spending Habits. Pro feature. See what skipping saves.';
-  const OPEN = 'Spending Habits. Opens the tool.';
+describe('Home — the Spending habits PRO pill', () => {
+  const LOCKED = 'Spending habits. Pro feature. See what skipping saves.';
+  const OPEN = 'Spending habits. Opens the tool.';
 
   const card = async () => {
     const screen = await render(<HomeScreen />);

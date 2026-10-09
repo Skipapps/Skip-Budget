@@ -65,7 +65,15 @@ export function fitScale(
     size,
     role,
     fontScale,
-  }: { mode: FitMode; size: number; role: TextRole; fontScale: number },
+    onlyLayout = false,
+  }: {
+    mode: FitMode;
+    size: number;
+    role: TextRole;
+    fontScale: number;
+    /** The owner has no other layout to move to, so only the absolute floor applies. */
+    onlyLayout?: boolean;
+  },
 ): FitResult {
   const measured = members.filter((member) => member.natural > 0);
 
@@ -83,10 +91,12 @@ export function fitScale(
   if (scale >= 1) return { scale: 1, fits: true };
 
   const full = renderedSize(size, role, fontScale);
-  // Shrinking only takes back part of the user's increase. A group of one has no other layout to
-  // move to, so only the absolute floor applies to it.
+  // Shrinking only takes back part of the user's increase. A group of one, or one whose owner keeps
+  // a single layout, has nowhere else to move, so only the absolute floor applies to it.
   const floor =
-    members.length === 1 ? MIN_TEXT_SIZE : Math.max(MIN_TEXT_SIZE, size * Math.min(fontScale, 1));
+    members.length === 1 || onlyLayout
+      ? MIN_TEXT_SIZE
+      : Math.max(MIN_TEXT_SIZE, size * Math.min(fontScale, 1));
   if (full * scale >= floor - 1e-6) return { scale, fits: true };
   return { scale: Math.min(1, floor / full), fits: false };
 }
@@ -144,7 +154,17 @@ function assertAlike(mode: FitMode, members: [string, Member][]) {
   }
 }
 
-export function useFitGroup({ mode }: { mode: FitMode }): FitGroupHandle {
+export function useFitGroup({
+  mode,
+  onlyLayout = false,
+}: {
+  mode: FitMode;
+  /**
+   * The owner draws this layout at every size and has no fallback, so a shrink group may go under
+   * its design size, down to the 11pt floor, rather than report that it does not fit.
+   */
+  onlyLayout?: boolean;
+}): FitGroupHandle {
   const { width: windowWidth, fontScale } = useWindowDimensions();
   const container = useRef<View>(null);
   const membersRef = useRef(new Map<string, Member>());
@@ -222,7 +242,13 @@ export function useFitGroup({ mode }: { mode: FitMode }): FitGroupHandle {
     // Everything the right layout depends on except the slots, which move with the layout itself.
     const key = [fontScale, windowWidth, Math.round(box), ...parts].join('|');
     const [, first] = members[0];
-    const result = fitScale(inputs, { mode, size: first.size, role: first.role, fontScale });
+    const result = fitScale(inputs, {
+      mode,
+      size: first.size,
+      role: first.role,
+      fontScale,
+      onlyLayout,
+    });
 
     let next: FitResult;
     if (key !== keyRef.current) {
@@ -251,7 +277,7 @@ export function useFitGroup({ mode }: { mode: FitMode }): FitGroupHandle {
       return;
     }
     setDecision(next);
-  }, [mode, fontScale, windowWidth, decision, version]);
+  }, [mode, onlyLayout, fontScale, windowWidth, decision, version]);
 
   return { mode, scale: decision.scale, fits: decision.fits, register, noteLayout, container };
 }

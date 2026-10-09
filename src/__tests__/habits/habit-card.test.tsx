@@ -33,6 +33,10 @@ const COLORS = {
   onControl: '#FFFFFF',
   accentInk: '#905479',
 };
+// Jest turns an .svg into a number, not a component; the icons have suites of their own.
+jest.mock('@/theme/home-icons', () => ({
+  useHomeIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => COLORS,
   useTheme: () => ({ scheme: mockScheme, colors: COLORS }),
@@ -487,13 +491,13 @@ describe('the Spending Habits tool card', () => {
   it('opens the dashboard, or the explainer with the PRO pill when locked', async () => {
     const onPress = jest.fn();
     const open = await render(<ToolCards onPress={onPress} />);
-    await fireEvent.press(open.getByLabelText('Spending Habits. Opens the tool.'));
+    await fireEvent.press(open.getByLabelText('Spending habits. Opens the tool.'));
     expect(onPress).toHaveBeenLastCalledWith('/habits');
     expect(open.queryAllByText('PRO', { includeHiddenElements: true })).toHaveLength(0);
 
     const locked = await render(<ToolCards onPress={onPress} habitsLocked />);
     await fireEvent.press(
-      locked.getByLabelText('Spending Habits. Pro feature. See what skipping saves.'),
+      locked.getByLabelText('Spending habits. Pro feature. See what skipping saves.'),
     );
     expect(onPress).toHaveBeenLastCalledWith({
       pathname: '/pro-feature',
@@ -503,7 +507,7 @@ describe('the Spending Habits tool card', () => {
     expect(locked.queryAllByText('PRO')).toHaveLength(0);
     expect(locked.getAllByText('PRO', { includeHiddenElements: true })).toHaveLength(1);
     // The loan calculator never locks.
-    expect(locked.getByLabelText('Loan Calculator. Opens the tool.')).toBeTruthy();
+    expect(locked.getByLabelText('Loan calculator. Opens the tool.')).toBeTruthy();
   });
 
   it('says it in Spanish and French', async () => {

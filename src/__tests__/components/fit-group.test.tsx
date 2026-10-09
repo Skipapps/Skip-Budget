@@ -124,6 +124,28 @@ describe('fitScale', () => {
     expect(17 * tooLong.scale).toBeCloseTo(11, 5);
   });
 
+  it('lets a group whose owner keeps one layout go under its design size, to 11pt and no further', () => {
+    // Quick add is two by two at every size: 99pt per tile at 320pt, "Subscription" 127.4pt at 1.3x.
+    const grid = { ...tiles, onlyLayout: true };
+    const members = [
+      { slot: 99, natural: 127.4 },
+      { slot: 99, natural: 31.7 },
+    ];
+    expect(fitScale(members, grid)).toEqual({ scale: 0.76, fits: true });
+    // With a layout to move to, the same group would hand over at its 15pt design size instead.
+    expect(fitScale(members, tiles).fits).toBe(false);
+
+    const tooNarrow = fitScale(
+      [
+        { slot: 50, natural: 127.4 },
+        { slot: 50, natural: 31.7 },
+      ],
+      grid,
+    );
+    expect(tooNarrow.fits).toBe(false);
+    expect(15 * 1.3 * tooNarrow.scale).toBeCloseTo(11, 5);
+  });
+
   it('lets a smaller text setting shrink to 11pt rather than forcing the other layout', () => {
     const small = { ...tiles, size: 12, fontScale: 0.882 };
     // 12 x 0.882 = 10.58pt is already under 11, so any shrinking is a layout change.
