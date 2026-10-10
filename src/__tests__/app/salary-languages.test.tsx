@@ -23,6 +23,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), canGoBack: () => true },
+  useFocusEffect: () => {},
 }));
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
 jest.mock('@/theme/artwork', () => ({
@@ -48,7 +49,9 @@ jest.mock('@tanstack/react-query', () => ({
   ...jest.requireActual('@tanstack/react-query'),
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
-jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 
 const mockCreate = jest.fn(async () => ({ id: 'new' }));
 const mockUpdate = jest.fn(async (_input: { id: string; values: Record<string, unknown> }) => ({}));
@@ -114,9 +117,11 @@ function everythingRead(): string[] {
     if (!node || typeof node !== 'object') return;
     if (Array.isArray(node)) return node.forEach(walk);
     const { props, children } = node as { props?: Record<string, unknown>; children?: unknown };
-    for (const key of ['accessibilityLabel', 'placeholder']) {
+    for (const key of ['accessibilityLabel', 'accessibilityHint', 'placeholder']) {
       if (typeof props?.[key] === 'string') out.push(props[key] as string);
     }
+    const value = (props?.accessibilityValue as { text?: unknown } | undefined)?.text;
+    if (typeof value === 'string') out.push(value);
     walk(children);
   };
   walk(screen.toJSON());
@@ -151,8 +156,7 @@ it('reads in Spanish, with Mexican figures', async () => {
     'Total al mes',
     '$3,760.00',
     'Fuente 1',
-    'Nombre',
-    'Cómo te pagan',
+    'Acme',
     'Salario fijo',
     'Por hora',
     'Importe',
@@ -162,13 +166,14 @@ it('reads in Spanish, with Mexican figures', async () => {
     'Último día de pago',
     '30 sep 2026',
     'Se deposita en',
-    'Agregar fuente de salario',
+    'Agregar fuente',
     'Guardar',
   ]) {
     expect(screen.getAllByText(line, RAW).length).toBeGreaterThan(0);
   }
   expect(screen.getByText(/^Próximo día de pago: \d{1,2} [a-z]{3} \d{4}$/, RAW)).toBeTruthy();
-  for (const label of ['Quitar fuente 1', 'Ocultar fuente 1', 'Abrir calculadora']) {
+  expect(screen.getByText(/^Próximo día de pago: \d{1,2} \S+ · 1 fuente$/, RAW)).toBeTruthy();
+  for (const label of ['Quitar fuente 1', 'Cambiar el nombre de Acme', 'Abrir calculadora']) {
     expect(screen.getByLabelText(label, RAW)).toBeTruthy();
   }
   expectNoRawText();
@@ -182,7 +187,7 @@ it('reads in French, with French figures', async () => {
     'Total par mois',
     `3${NBSP}760,00${NBSP}$`,
     'Source 1',
-    'Mode de paie',
+    'Acme',
     'Paie fixe',
     'À l’heure',
     'Montant',
@@ -191,7 +196,7 @@ it('reads in French, with French figures', async () => {
     'Dernier jour de paie',
     '30 sept. 2026',
     'Versée dans',
-    'Ajouter une source de salaire',
+    'Ajouter une source',
     'Enregistrer',
   ]) {
     expect(screen.getAllByText(line, RAW).length).toBeGreaterThan(0);
@@ -199,6 +204,10 @@ it('reads in French, with French figures', async () => {
   expect(
     screen.getByText(/^Prochain jour de paie\u00a0: \d{1,2} [a-zéû.]+ \d{4}$/, RAW),
   ).toBeTruthy();
+  expect(
+    screen.getByText(/^Prochain jour de paie\u00a0: \d{1,2} [a-zéû.]+ · 1 source$/, RAW),
+  ).toBeTruthy();
+  expect(screen.getByLabelText('Renommer Acme', RAW)).toBeTruthy();
   expectNoRawText();
 });
 
@@ -267,13 +276,16 @@ it('keeps every figure whole at large text and lets every line grow', async () =
   }
   expect(screen.getByText(`1${NBSP}900,00${NBSP}$`, RAW)).toBeTruthy();
 
-  // The next payday line had no ceiling at all; it is a field hint now.
-  expect(screen.getByText(/^Prochain jour de paie/, RAW).props.maxFontSizeMultiplier).toBe(1.6);
-  // The source's name wraps beside its buttons, the add button's words inside it.
-  expect(String(screen.getByText('Source 1', RAW).props.className)).toContain('flex-1');
-  expect(String(screen.getByText('Ajouter une source de salaire', RAW).props.className)).toContain(
-    'shrink',
-  );
+  // The next payday lines, under Last payday and in the total card, are reading text.
+  for (const line of [
+    /^Prochain jour de paie\u00a0: \d{1,2} [a-zéû.]+ \d{4}$/,
+    /^Prochain jour de paie\u00a0: .+ · 1 source$/,
+  ]) {
+    expect(screen.getByText(line, RAW).props.maxFontSizeMultiplier).toBe(1.6);
+  }
+  // The source's caption and name wrap beside its buttons, the add button's words inside it.
+  expect(String(screen.getByText('Source 1', RAW).parent?.props.className)).toContain('flex-1');
+  expect(String(screen.getByText('Ajouter une source', RAW).props.className)).toContain('shrink');
 });
 
 it('says the one failure line in the language on screen', async () => {

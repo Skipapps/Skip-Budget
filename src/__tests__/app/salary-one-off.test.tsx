@@ -1,14 +1,16 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
+import type { SalaryValues } from '@/api/mutations';
 import SalaryScreen from '@/app/salary';
 
 /**
  * One-off pays on the Salary page: work that pays differently each time is recorded pay by pay.
- * Pinned: "Just this time" asks for the day it was paid, not a last payday, and promises no next
- * one; a one-off pay is free on every plan and needs no name; the monthly total stays the
- * schedules' and says what one-off pays added this month; earlier months' one-off pays wait behind
- * one row, never touched until opened; and a misclick on "Just this time" can always be undone.
+ * Pinned: a one-off pay is made with "Just this time" under How often, there is no button of its
+ * own; it asks for the day it was paid, not a last payday, and promises no next one; it needs no
+ * name; the monthly total stays the schedules' and says what one-off pays added this month; earlier
+ * months' one-off pays wait behind one row, never touched until opened; and a misclick on "Just
+ * this time" can always be undone.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -19,6 +21,7 @@ jest.mock('react-native-keyboard-controller', () =>
 );
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), canGoBack: () => true },
+  useFocusEffect: () => {},
 }));
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
 jest.mock('@/theme/artwork', () => ({
@@ -28,6 +31,9 @@ jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', body: '#222222', accentInk: '#905479' }),
 }));
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => jest.fn(async () => true) }));
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 
 // Pay that has already landed is written down before a save changes anything; none of that is under
 // test in this file, so the sweep finds nothing and an edit to a salary that has paid is not asked.
@@ -44,9 +50,6 @@ jest.mock('@tanstack/react-query', () => ({
   ...jest.requireActual('@tanstack/react-query'),
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
-
-let mockPro = false;
-jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: mockPro, ready: true }) }));
 
 const mockCreate = jest.fn(async () => ({ id: 'new' }));
 const mockUpdate = jest.fn(async () => ({}));
@@ -100,96 +103,87 @@ jest.useFakeTimers().setSystemTime(new Date('2026-10-08T10:00:00'));
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockPro = false;
   mockRows = [row];
 });
+
+type Screen = Awaited<ReturnType<typeof render>>;
+
+/** Opens a source's How often choices and picks one. */
+async function chooseFrequency(screen: Screen, index: number, label: string) {
+  await fireEvent.press(screen.getAllByLabelText('How often')[index]);
+  await fireEvent.press(screen.getByLabelText(label));
+}
+
+/** The line under Last payday; the total card's own says "Next payday 15 Oct · 1 source". */
+const NEXT_PAYDAY = /^Next payday \d+ \w+ \d{4}$/;
 
 it('asks for the day it was paid, and promises no next payday, for a pay just this time', async () => {
   const screen = await render(<SalaryScreen />);
   expect(screen.getByText('Last payday')).toBeTruthy();
-  expect(screen.getByText(/^Next payday/)).toBeTruthy();
+  expect(screen.getByText(NEXT_PAYDAY)).toBeTruthy();
 
-  await fireEvent.press(screen.getByLabelText('Just this time'));
+  await chooseFrequency(screen, 0, 'Just this time');
 
   expect(screen.getByText('Paid on')).toBeTruthy();
   expect(screen.queryByText('Last payday')).toBeNull();
-  expect(screen.queryByText(/^Next payday/)).toBeNull();
+  expect(screen.queryByText(NEXT_PAYDAY)).toBeNull();
   expect(screen.getByText('Counts once, in the month it was paid')).toBeTruthy();
   expect(screen.getByText('One-off pay')).toBeTruthy();
   // A pay just this time is dated today, not the schedule's last payday.
   expect(screen.getByText('8 Oct 2026')).toBeTruthy();
 });
 
-it('takes a saved schedule back from a misclick, with its own last payday, even after a lapse', async () => {
-  // Lapsed Pro: two schedules saved, so a second one could not be made today.
+it('takes a saved schedule back from a misclick, with its own last payday', async () => {
   mockRows = [
     row,
     { ...row, id: 's2', name: 'Weekend job', frequency: 'weekly', last_payday: '2026-10-03' },
   ];
   const screen = await render(<SalaryScreen />);
 
-  await fireEvent.press(screen.getAllByLabelText('Just this time')[0]);
-  await fireEvent.press(screen.getAllByLabelText('Twice a month')[0]);
+  await chooseFrequency(screen, 0, 'Just this time');
+  await chooseFrequency(screen, 0, 'Twice a month');
 
-  expect(router.push).not.toHaveBeenCalled();
   expect(screen.queryByText('One-off pay')).toBeNull();
   expect(screen.getByText('30 Sep 2026')).toBeTruthy();
 });
 
-it('adds a one-off pay on the free plan beside its one income, dated today', async () => {
+it('makes a one-off pay from a new source with "Just this time", dated today', async () => {
   const screen = await render(<SalaryScreen />);
+  expect(screen.queryByLabelText('Add a one-off pay')).toBeNull();
 
-  await fireEvent.press(screen.getByLabelText('Add a one-off pay'));
+  await fireEvent.press(screen.getByLabelText('Add source'));
+  await chooseFrequency(screen, 1, 'Just this time');
 
-  expect(router.push).not.toHaveBeenCalled();
   expect(screen.getByText('One-off pay')).toBeTruthy();
   expect(screen.getByText('8 Oct 2026')).toBeTruthy();
 });
 
-it('still keeps a second income schedule for Pro on the free plan', async () => {
-  const screen = await render(<SalaryScreen />);
-
-  await fireEvent.press(screen.getByLabelText('Add salary source'));
-
-  expect(router.push).toHaveBeenCalledWith({
-    pathname: '/pro-feature',
-    params: { id: 'unlimited' },
-  });
-});
-
-it('lets the free plan add a schedule when it only has one-off pays', async () => {
+it('numbers a schedule added beside one-off pays as the first source', async () => {
   mockRows = [oneOff('o1', '2026-10-02', 400)];
   const screen = await render(<SalaryScreen />);
 
-  await fireEvent.press(screen.getByLabelText('Add salary source'));
+  await fireEvent.press(screen.getByLabelText('Add source'));
 
-  expect(router.push).not.toHaveBeenCalled();
   expect(screen.getByText('Source 1')).toBeTruthy();
 });
 
-it('will not turn a one-off pay into a second schedule on the free plan', async () => {
-  mockRows = [row, oneOff('o1', '2026-10-02', 400)];
+it('turns a one-off pay into a second schedule', async () => {
+  mockRows = [row, oneOff('o1', '2026-10-02', 400, 'Shift')];
   const screen = await render(<SalaryScreen />);
 
-  await fireEvent.press(screen.getAllByLabelText('Weekly')[1]);
-
-  expect(router.push).toHaveBeenCalledWith({
-    pathname: '/pro-feature',
-    params: { id: 'unlimited' },
-  });
-  expect(screen.getByText('One-off pay')).toBeTruthy();
-});
-
-it('lets Pro turn a one-off pay into a schedule', async () => {
-  mockPro = true;
-  mockRows = [row, oneOff('o1', '2026-10-02', 400)];
-  const screen = await render(<SalaryScreen />);
-
-  await fireEvent.press(screen.getAllByLabelText('Weekly')[1]);
+  await chooseFrequency(screen, 1, 'Weekly');
 
   expect(router.push).not.toHaveBeenCalled();
   expect(screen.queryByText('One-off pay')).toBeNull();
   expect(screen.getByText('Source 2')).toBeTruthy();
+
+  await fireEvent.press(screen.getByText('Save'));
+
+  expect(mockUpdate).toHaveBeenCalledWith({
+    id: 'o1',
+    values: expect.objectContaining({ name: 'Shift', frequency: 'weekly' }),
+  });
+  expect(router.back).toHaveBeenCalled();
 });
 
 it('keeps the monthly total the schedules’, and says what one-off pays added this month', async () => {
@@ -254,18 +248,22 @@ it('opens the earlier one-off pays to change or remove, newest first', async () 
   expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ id: 'old2' }));
 });
 
-it('saves a schedule turned one-off before a one-off turned schedule, on the free plan', async () => {
+it('saves a one-off pay and a schedule that swapped places in the order of the page', async () => {
   mockRows = [oneOff('o1', '2026-10-02', 400, 'Shift'), row];
   const screen = await render(<SalaryScreen />);
 
-  await fireEvent.press(screen.getAllByLabelText('Just this time')[1]);
-  await fireEvent.press(screen.getAllByLabelText('Weekly')[0]);
-  expect(router.push).not.toHaveBeenCalled();
+  await chooseFrequency(screen, 1, 'Just this time');
+  await chooseFrequency(screen, 0, 'Weekly');
 
   await fireEvent.press(screen.getByText('Save'));
 
-  const order = (mockUpdate.mock.calls as unknown as [{ id: string }][]).map(([call]) => call.id);
-  expect(order).toEqual(['s1', 'o1']);
+  const saved = (mockUpdate.mock.calls as unknown as [{ id: string; values: SalaryValues }][]).map(
+    ([call]) => [call.id, call.values.frequency],
+  );
+  expect(saved).toEqual([
+    ['o1', 'weekly'],
+    ['s1', 'once'],
+  ]);
 });
 
 it('works an hourly one-off pay out from the hours worked for it', async () => {
@@ -294,11 +292,10 @@ it('works an hourly one-off pay out from the hours worked for it', async () => {
 });
 
 it('asks for a name rather than drop a saved pay turned into a schedule without one', async () => {
-  mockPro = true;
   mockRows = [row, oneOff('o1', '2026-10-02', 400)];
   const screen = await render(<SalaryScreen />);
 
-  await fireEvent.press(screen.getAllByLabelText('Weekly')[1]);
+  await chooseFrequency(screen, 1, 'Weekly');
   await fireEvent.press(screen.getByText('Save'));
 
   expect(screen.getByText('Give each source a name and its pay.')).toBeTruthy();

@@ -1,10 +1,28 @@
 import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
-import { PRO_MONTHLY_LABEL, PRO_YEARLY_LABEL, proMonthlyLabel, proYearlyLabel } from '@/lib/wall';
+import {
+  FREE_LIMITS,
+  PRO_MONTHLY_LABEL,
+  PRO_YEARLY_LABEL,
+  proMonthlyLabel,
+  proYearlyLabel,
+} from '@/lib/wall';
 
-/** The fallback Pro prices, written in the language on screen. */
+/** The fallback Pro prices, written in the language on screen; and what the free plan counts. */
 
 beforeEach(() => resetLocaleForTests());
 afterAll(() => resetLocaleForTests());
+
+describe('the free plan', () => {
+  it('keeps one card and one account, and counts no pay at all', () => {
+    expect(FREE_LIMITS).toEqual({
+      cards: 1,
+      bankAccounts: 1,
+      scansPerMonth: 15,
+      uploadsPerMonth: 15,
+    });
+    expect(Object.keys(FREE_LIMITS).some((key) => /income|salary|pay/i.test(key))).toBe(false);
+  });
+});
 
 describe('the Pro price labels', () => {
   it('match the old English constants', () => {

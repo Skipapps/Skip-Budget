@@ -1,5 +1,6 @@
--- Checks for 20261008100001_one_off_pay_value.sql and 20261008100002_one_off_pay.sql. LOCAL
--- database only: everything runs in one transaction and rolls back.
+-- Checks for 20261008100001_one_off_pay_value.sql and 20261008100002_one_off_pay.sql, with
+-- 20261009100006_salary_sources_free.sql applied (salary has no free limit). LOCAL database only:
+-- everything runs in one transaction and rolls back.
 --
 --   npx supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 --   docker exec -i supabase_db_SkipBudget psql -U postgres -d postgres -q -t < supabase/checks/one_off_pay.sql
@@ -46,7 +47,7 @@ select pg_temp.check(public.monthly_from_salary(400, 'once') = 0, 'a one-off pay
 select pg_temp.check(public.monthly_from_salary(3000, 'monthly') = 3000, 'a monthly pay is unchanged');
 select pg_temp.check(round(public.monthly_from_salary(1000, 'biweekly'), 2) = 2166.67, 'a two-weekly pay is unchanged');
 
--- ---------------------------------------------------------------- free keeps one schedule, any number of one-offs
+-- ---------------------------------------------------------------- free keeps any number of schedules and one-offs
 insert into public.salary_sources (id, user_id, name, amount, frequency, last_payday) values
   ('00000000-0000-0000-0000-00000000aa01', '00000000-0000-0000-0000-0000000000f1', 'Office', 3000, 'monthly', '2026-06-01');
 select pg_temp.check(true, 'free adds its one schedule');
@@ -57,13 +58,32 @@ insert into public.salary_sources (id, user_id, name, amount, frequency, last_pa
   ('00000000-0000-0000-0000-00000000aa04', '00000000-0000-0000-0000-0000000000f1', 'Shift', 90, 'once', '2026-10-20');
 select pg_temp.check(true, 'free adds one-off pays beside it, as many as it likes');
 
+-- Salary is free on every plan: a second schedule, and a one-off turned into one, are kept. Both
+-- are undone straight after, so the month figures below see only the one schedule.
+insert into public.salary_sources (id, user_id, name, amount, frequency, last_payday) values
+  ('00000000-0000-0000-0000-00000000aa06', '00000000-0000-0000-0000-0000000000f1', 'Second job', 500, 'weekly', '2026-09-04');
+update public.salary_sources set frequency = 'weekly' where id = '00000000-0000-0000-0000-00000000aa02';
+select pg_temp.check(
+  (select count(*) = 3 from public.salary_sources
+    where user_id = '00000000-0000-0000-0000-0000000000f1' and frequency <> 'once'),
+  'free keeps as many pay schedules as it likes');
+delete from public.salary_sources where id = '00000000-0000-0000-0000-00000000aa06';
+update public.salary_sources set frequency = 'once' where id = '00000000-0000-0000-0000-00000000aa02';
+select pg_temp.check(
+  not exists (select 1 from pg_trigger where tgname = 'salary_sources_free_allowance')
+  and to_regprocedure('public.enforce_income_allowance()') is null,
+  'no free limit is left on salary sources');
+
+-- Cards keep their free limit: one. Undone straight after, like the salary rows above.
+insert into public.cards (id, user_id, holder) values
+  ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000f1', 'First');
 select pg_temp.expect_refusal(
-  $$insert into public.salary_sources (user_id, name, amount, frequency, last_payday)
-    values ('00000000-0000-0000-0000-0000000000f1', 'Second job', 500, 'weekly', '2026-09-04')$$,
+  $$insert into public.cards (user_id, holder) values ('00000000-0000-0000-0000-0000000000f1', 'Second')$$,
   'Free keeps one');
-select pg_temp.expect_refusal(
-  $$update public.salary_sources set frequency = 'weekly' where id = '00000000-0000-0000-0000-00000000aa02'$$,
-  'Free keeps one');
+delete from public.cards where id = '00000000-0000-0000-0000-0000000000c1';
+select pg_temp.check(
+  not exists (select 1 from public.cards where user_id = '00000000-0000-0000-0000-0000000000f1'),
+  'and the card added for that check is gone again');
 
 update public.salary_sources set frequency = 'semimonthly' where id = '00000000-0000-0000-0000-00000000aa01';
 update public.salary_sources set frequency = 'monthly' where id = '00000000-0000-0000-0000-00000000aa01';
@@ -76,10 +96,10 @@ select pg_temp.check(true, 'free edits a one-off pay');
 update public.salary_sources set frequency = 'once' where id = '00000000-0000-0000-0000-00000000aa01';
 insert into public.salary_sources (id, user_id, name, amount, frequency, last_payday) values
   ('00000000-0000-0000-0000-00000000aa05', '00000000-0000-0000-0000-0000000000f1', 'New job', 2000, 'monthly', '2026-06-01');
-select pg_temp.check(true, 'a schedule turned one-off frees the slot for another');
+select pg_temp.check(true, 'a schedule turned one-off sits beside a new one');
 delete from public.salary_sources where id = '00000000-0000-0000-0000-00000000aa05';
 update public.salary_sources set frequency = 'monthly' where id = '00000000-0000-0000-0000-00000000aa01';
-select pg_temp.check(true, 'and turning it back is allowed while the slot is free');
+select pg_temp.check(true, 'and can be turned back');
 
 -- Pro is never counted.
 insert into public.salary_sources (user_id, name, amount, frequency, last_payday) values

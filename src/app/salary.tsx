@@ -1,19 +1,30 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Calculator, Calendar, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import {
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Pencil,
+  Plus,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react-native';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
+import { InlineCalendar } from '@/components/flow/inline-calendar';
+import { AmountBox } from '@/components/salary/amount-box';
+import { PayRow } from '@/components/salary/pay-row';
+import { SalaryTotalCard } from '@/components/salary/salary-total-card';
 import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
 import { CalculatorPad } from '@/components/ui/calculator-pad';
 import { ChoiceChips } from '@/components/ui/choice-chips';
-import { DatePicker } from '@/components/ui/date-picker';
 import { FitFigure } from '@/components/ui/fit-group';
-import { usePro } from '@/api/pro';
 import { Screen } from '@/components/ui/screen';
-import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
+import { TogglePill } from '@/components/ui/toggle-pill';
 import { FieldLabel } from '@/components/ui/typography';
 import {
   useCreateSalarySource,
@@ -44,6 +55,9 @@ import { useUserId } from '@/providers/session-provider';
 import { useColors } from '@/providers/theme-provider';
 import { failureMessage, failureText } from '@/lib/failure';
 import { OVERTIME_RATES, estimateHourlyPay, hourlyProblem, type HourlyPay } from '@/lib/hourly-pay';
+import { accountLabel } from '@/lib/account-label';
+import { onPaidIntoPicked } from '@/lib/paid-into-pick';
+import { useNavigateOnce } from '@/lib/use-navigate-once';
 import { useArtwork } from '@/theme/artwork';
 import { TEXT_CAP } from '@/theme/text-scale';
 
@@ -101,6 +115,17 @@ function paycheckOf(source: SalarySource): number {
   if (source.payType !== 'hourly') return source.amount;
   const pay = hourlyOf(source);
   return hourlyProblem(pay) ? 0 : estimateHourlyPay(pay).takeHomePerPaycheck;
+}
+
+/**
+ * What Save writes: a source with a name and its pay. An hourly source counts once named, its pay
+ * checked on Save with a reason; a one-off pay needs no name, as it shows as income on its day.
+ */
+function keptOnSave(source: SalarySource): boolean {
+  return (
+    Boolean(source.name.trim() || source.frequency === 'once') &&
+    (source.payType === 'hourly' || source.amount > 0)
+  );
 }
 
 /** The source as the shared income maths reads it. */
@@ -226,10 +251,22 @@ function SalaryEditor({
   hourlyAvailable: boolean;
 }) {
   const colors = useColors();
+  // Names this editor to the Paid into page, so the account picked there comes back here.
+  const editorId = useId();
+  const navigateOnce = useNavigateOnce();
   const [sources, setSources] = useState<SalarySource[]>(initial);
   const [padTarget, setPadTarget] = useState<PadTarget>(null);
-  const [dateTarget, setDateTarget] = useState<string | null>(null);
+  // One row control open at a time: a source's frequency choices or its calendar.
+  const [open, setOpen] = useState<{ id: string; panel: 'frequency' | 'payday' } | null>(null);
+  // Earlier months' one-off pays open folded, so a long run of them stays short until one is wanted.
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // A name is a field while there is none to show, and while it is being renamed.
+  const [naming, setNaming] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      initial.filter((source) => !source.name.trim()).map((source) => [source.id, true]),
+    ),
+  );
+  const [focusName, setFocusName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Monotonic so ids stay unique even after sources are removed.
   const nextId = useRef(initial.length + 1);
@@ -248,17 +285,35 @@ function SalaryEditor({
       ...current,
       ...Object.fromEntries(earlier.map((source) => [source.id, true])),
     }));
+    setNaming((current) => ({
+      ...current,
+      ...Object.fromEntries(
+        earlier.filter((source) => !source.name.trim()).map((source) => [source.id, true]),
+      ),
+    }));
     setSources((current) => [...current, ...earlier]);
     setEarlierShown(true);
   };
 
   const { data: accounts = [] } = useBankAccounts();
-  const accountOptions = accounts.map((account) => ({
-    value: account.id,
-    label: account.last4
-      ? `${account.nickname || account.bank_name} ••${account.last4}`
-      : account.nickname || account.bank_name,
-  }));
+  // The account the pay lands in: of several saved links, the first in account order.
+  const landingOf = (source: SalarySource) =>
+    accounts.find((account) => source.accountIds.includes(account.id)) ?? null;
+
+  useEffect(
+    () =>
+      onPaidIntoPicked((pick) => {
+        if (pick.editor !== editorId) return;
+        setSources((current) =>
+          current.map((source) =>
+            source.id === pick.source
+              ? { ...source, accountIds: pick.accountId ? [pick.accountId] : [] }
+              : source,
+          ),
+        );
+      }),
+    [editorId],
+  );
 
   const createSource = useCreateSalarySource();
   const updateSource = useUpdateSalarySource();
@@ -274,6 +329,13 @@ function SalaryEditor({
   const pays = sources.map(payLineOf);
   const monthlyTotal = scheduledPerMonth(pays);
   const onceThisMonth = oneOffsInMonth(pays, today).reduce((sum, pay) => sum + pay.amount, 0);
+  // Only what Save would keep: a source just added and still blank is not one yet.
+  const schedules = sources.filter((source) => source.frequency !== 'once' && keptOnSave(source));
+  const nextPayday =
+    schedules
+      .filter((source) => source.lastPayday)
+      .map((source) => toIsoDate(getNextPayday(asDate(source.lastPayday)!, source.frequency)))
+      .sort()[0] ?? null;
 
   const update = (id: string, patch: Partial<SalarySource>) => {
     setSources((current) =>
@@ -281,49 +343,38 @@ function SalaryEditor({
     );
   };
 
-  const { pro } = usePro();
-
-  const blankSource = (frequency: PayFrequency): SalarySource => ({
-    id: `salary-${nextId.current++}`,
-    name: '',
-    amount: 0,
-    frequency,
-    // A one-off pay is usually logged the day it lands.
-    lastPayday: frequency === 'once' ? today : null,
-    accountIds: [],
-    payType: 'fixed',
-    hourlyRate: 0,
-    hoursPerWeek: '',
-    overtime: false,
-    overtimeHours: '',
-    overtimeMultiplier: 1.5,
-  });
-
-  // One income schedule is free; a second is Pro. The database refuses it too, so this says why.
-  const scheduleNeedsPro = (exceptId?: string) =>
-    !pro && sources.some((source) => source.frequency !== 'once' && source.id !== exceptId);
-
   const addSource = () => {
-    if (scheduleNeedsPro()) {
-      router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } });
-      return;
-    }
-    setSources((current) => [...current, blankSource('monthly')]);
+    const id = `salary-${nextId.current++}`;
+    setNaming((current) => ({ ...current, [id]: true }));
+    setSources((current) => [
+      ...current,
+      {
+        id,
+        name: '',
+        amount: 0,
+        frequency: 'monthly',
+        lastPayday: null,
+        accountIds: [],
+        payType: 'fixed',
+        hourlyRate: 0,
+        hoursPerWeek: '',
+        overtime: false,
+        overtimeHours: '',
+        overtimeMultiplier: 1.5,
+      },
+    ]);
   };
 
-  // A one-off pay is a record of money in, not another income: free on every plan.
-  const addOneOff = () => setSources((current) => [...current, blankSource('once')]);
+  // A name typed in becomes the card's title once the field is left; an empty one stays a field.
+  const finishNaming = (source: SalarySource) => {
+    if (source.name.trim()) setNaming((current) => ({ ...current, [source.id]: false }));
+  };
+
+  const toggle = (id: string, panel: 'frequency' | 'payday') =>
+    setOpen((current) => (current?.id === id && current.panel === panel ? null : { id, panel }));
 
   const changeFrequency = (source: SalarySource, frequency: PayFrequency) => {
     const held = savedPays.current.get(source.id);
-    // Only a pay that is not a schedule in the database becomes a new income; taking a saved
-    // schedule back from "Just this time" is an edit, which any plan may make.
-    const newSchedule =
-      source.frequency === 'once' && frequency !== 'once' && (held?.frequency ?? 'once') === 'once';
-    if (newSchedule && scheduleNeedsPro(source.id)) {
-      router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } });
-      return;
-    }
     let lastPayday = source.lastPayday;
     // A pay just this time is usually the one that landed today; back on its schedule, a saved pay
     // gets its own last payday again.
@@ -360,13 +411,7 @@ function SalaryEditor({
 
   const handleSave = async () => {
     setError(null);
-    // Hourly sources count once named: their pay is checked below, with a reason.
-    // A one-off pay needs no name of its own: it shows as income on its day.
-    const named = sources.filter(
-      (source) =>
-        (source.name.trim() || source.frequency === 'once') &&
-        (source.payType === 'hourly' || source.amount > 0),
-    );
+    const named = sources.filter(keptOnSave);
     if (sources.length > 0 && named.length === 0) {
       setError(t('salary.needNameAndPay'));
       return;
@@ -434,12 +479,7 @@ function SalaryEditor({
         if (!stillPresent.has(id)) await deleteSource.mutateAsync(id);
       }
 
-      // One-off pays first: a schedule turned one-off frees the free plan's slot before a one-off
-      // turned schedule takes it, and the database checks each write as it lands.
-      const ordered = [...named].sort(
-        (a, b) => Number(a.frequency !== 'once') - Number(b.frequency !== 'once'),
-      );
-      for (const source of ordered) {
+      for (const source of named) {
         const values: SalaryValues = {
           name: source.name.trim(),
           amount: paycheckOf(source),
@@ -485,275 +525,309 @@ function SalaryEditor({
         </View>
       }
     >
-      <View className="mt-3 w-full items-center">
-        <Text
-          className="text-center font-app text-[13px] text-muted"
-          maxFontSizeMultiplier={TEXT_CAP.control}
-        >
-          {t('salary.totalPerMonth')}
-        </Text>
-        <FitFigure
-          id="monthly-total"
-          size={24}
-          className="text-center font-app-semibold text-ink"
-          boxClassName="mt-0.5"
-        >
-          {formatCurrency(monthlyTotal)}
-        </FitFigure>
-        {onceThisMonth > 0 ? (
-          <Text
-            className="mt-1 text-center font-app text-[13px] text-muted"
-            maxFontSizeMultiplier={TEXT_CAP.reading}
-          >
-            {t('salary.oneOffThisMonth', { amount: formatCurrency(onceThisMonth) })}
-          </Text>
-        ) : null}
-      </View>
+      <SalaryTotalCard
+        total={monthlyTotal}
+        onceThisMonth={onceThisMonth}
+        nextPayday={nextPayday}
+        sources={schedules.length}
+      />
 
-      <View className="mt-6 w-full gap-4">
-        {sources.map((source, index) => (
-          <View key={source.id} className="w-full rounded-[16px] border border-line bg-card p-4">
-            <View className="mb-3 w-full flex-row items-center justify-between gap-3">
-              <Text
-                className="min-w-0 flex-1 font-app-medium text-[15px] text-ink"
-                maxFontSizeMultiplier={TEXT_CAP.heading}
-              >
-                {source.frequency === 'once'
-                  ? t('salary.oneOffNumber')
-                  : t('salary.sourceNumber', {
-                      number: sources.slice(0, index + 1).filter((s) => s.frequency !== 'once')
-                        .length,
-                    })}
-              </Text>
+      <View className="mt-4 w-full gap-4">
+        {sources.map((source, index) => {
+          const once = source.frequency === 'once';
+          const name = source.name.trim();
+          const folded = collapsed[source.id];
+          const nameField = !folded && (naming[source.id] || !name);
+          const hourly = source.payType === 'hourly';
+          const paycheck = paycheckOf(source);
+          const landing = landingOf(source);
+          const frequencyOpen = open?.id === source.id && open.panel === 'frequency';
+          const paydayOpen = open?.id === source.id && open.panel === 'payday';
 
-              <View className="flex-row items-center gap-1">
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('salary.removeSource', { number: index + 1 })}
-                  hitSlop={8}
-                  onPress={() => void removeSource(source.id)}
-                  className="h-9 w-9 items-center justify-center rounded-full active:bg-ink/5"
-                >
-                  <Trash2 size={18} color={colors.muted} strokeWidth={1.8} />
-                </Pressable>
-
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    collapsed[source.id]
-                      ? t('salary.expandSource', { number: index + 1 })
-                      : t('salary.collapseSource', { number: index + 1 })
-                  }
-                  accessibilityState={{ expanded: !collapsed[source.id] }}
-                  hitSlop={8}
-                  onPress={() =>
-                    setCollapsed((current) => ({
-                      ...current,
-                      [source.id]: !current[source.id],
-                    }))
-                  }
-                  className="h-9 w-9 items-center justify-center rounded-full active:bg-ink/5"
-                >
-                  {collapsed[source.id] ? (
-                    <ChevronDown size={18} color={colors.ink} strokeWidth={2} />
-                  ) : (
-                    <ChevronUp size={18} color={colors.ink} strokeWidth={2} />
+          return (
+            <View
+              key={source.id}
+              className="w-full rounded-[20px] border border-line bg-card px-[18px] pb-[6px] pt-[18px]"
+            >
+              <View className="w-full flex-row items-start justify-between gap-3">
+                <View className="min-w-0 flex-1">
+                  <Text
+                    className="font-app text-[13px] text-muted"
+                    maxFontSizeMultiplier={TEXT_CAP.row}
+                  >
+                    {once
+                      ? t('salary.oneOffNumber')
+                      : t('salary.sourceNumber', {
+                          number: sources
+                            .slice(0, index + 1)
+                            .filter((other) => other.frequency !== 'once').length,
+                        })}
+                  </Text>
+                  {folded ? (
+                    <Text
+                      className="mt-0.5 font-app-semibold text-[15px] text-ink"
+                      maxFontSizeMultiplier={TEXT_CAP.row}
+                    >
+                      {[
+                        name || null,
+                        paycheck ? formatCurrency(paycheck) : null,
+                        hourly ? t('salary.payType.hourly') : null,
+                        source.lastPayday ? formatFullDate(asDate(source.lastPayday)!) : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Text>
+                  ) : nameField ? null : (
+                    <Text
+                      className="mt-0.5 font-app-bold text-[17px] text-ink"
+                      maxFontSizeMultiplier={TEXT_CAP.row}
+                    >
+                      {name}
+                    </Text>
                   )}
-                </Pressable>
+                </View>
+
+                <View className="flex-row items-center gap-2">
+                  {folded ? (
+                    <CircleButton
+                      icon={ChevronDown}
+                      label={t('salary.expandSource', { number: index + 1 })}
+                      expanded={false}
+                      onPress={() =>
+                        setCollapsed((current) => ({ ...current, [source.id]: false }))
+                      }
+                    />
+                  ) : nameField ? null : (
+                    <CircleButton
+                      icon={Pencil}
+                      label={t('salary.rename', { name })}
+                      onPress={() => {
+                        setFocusName(source.id);
+                        setNaming((current) => ({ ...current, [source.id]: true }));
+                      }}
+                    />
+                  )}
+                  <CircleButton
+                    icon={Trash2}
+                    label={t('salary.removeSource', { number: index + 1 })}
+                    onPress={() => void removeSource(source.id)}
+                  />
+                </View>
               </View>
-            </View>
 
-            {collapsed[source.id] ? (
-              <Text
-                className="font-app text-[13px] text-muted"
-                maxFontSizeMultiplier={TEXT_CAP.row}
-              >
-                {[
-                  // A one-off pay's card already says what it is.
-                  source.name.trim() || (source.frequency === 'once' ? null : t('salary.unnamed')),
-                  paycheckOf(source) ? formatCurrency(paycheckOf(source)) : null,
-                  source.payType === 'hourly' ? t('salary.payType.hourly') : null,
-                  source.frequency === 'once' && source.lastPayday
-                    ? formatFullDate(asDate(source.lastPayday)!)
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </Text>
-            ) : (
-              <View className="w-full gap-5">
-                <TextField
-                  label={t('salary.name')}
-                  value={source.name}
-                  onChangeText={(text) => update(source.id, { name: text })}
-                  autoCapitalize="words"
-                  returnKeyType="done"
-                />
+              {folded ? (
+                <View className="h-[12px]" />
+              ) : (
+                <View className="mt-4 w-full gap-4">
+                  {nameField ? (
+                    <TextField
+                      label={t('salary.name')}
+                      value={source.name}
+                      onChangeText={(text) => update(source.id, { name: text })}
+                      // A one-off pay shows as income on its day without one.
+                      optional={once}
+                      autoCapitalize="words"
+                      returnKeyType="done"
+                      autoFocus={focusName === source.id}
+                      onSubmitEditing={() => finishNaming(source)}
+                      onBlur={() => finishNaming(source)}
+                    />
+                  ) : null}
 
-                {hourlyAvailable ? (
-                  <View className="w-full">
-                    <FieldLabel className="mb-2">{t('salary.howPaid')}</FieldLabel>
-                    <ChoiceChips
+                  {hourlyAvailable ? (
+                    <TogglePill
+                      tone="segment"
                       options={PAY_TYPES}
                       value={source.payType ?? 'fixed'}
                       onChange={(payType) => update(source.id, { payType })}
                     />
-                  </View>
-                ) : null}
+                  ) : null}
 
-                {source.payType === 'hourly' ? (
-                  <>
-                    <SelectField
-                      label={t('salary.hourlyRate')}
-                      value={
-                        source.hourlyRate
-                          ? t('salary.perHour', { amount: formatCurrency(source.hourlyRate) })
-                          : ''
-                      }
-                      placeholder={t('salary.hourlyRatePlaceholder')}
-                      icon={Calculator}
-                      variant="pill"
-                      onPress={() =>
-                        setPadTarget({ sourceId: source.id, mode: 'pad', field: 'rate' })
-                      }
-                    />
-
-                    <TextField
-                      label={
-                        source.frequency === 'once'
-                          ? t('salary.hoursWorked')
-                          : t('salary.hoursAWeek')
-                      }
-                      value={source.hoursPerWeek ?? ''}
-                      onChangeText={(text) => update(source.id, { hoursPerWeek: text })}
-                      placeholder="40"
-                      keyboardType="decimal-pad"
-                      maxLength={5}
-                      trailing={<HoursUnit />}
-                    />
-
-                    <View className="w-full">
-                      <FieldLabel className="mb-2">{t('salary.overtime')}</FieldLabel>
-                      <ChoiceChips
-                        options={OVERTIME_CHOICES}
-                        value={source.overtime ? 'yes' : 'none'}
-                        onChange={(choice) => update(source.id, { overtime: choice === 'yes' })}
+                  {hourly ? (
+                    <>
+                      <AmountBox
+                        label={t('salary.hourlyRate')}
+                        value={
+                          source.hourlyRate
+                            ? t('salary.perHour', { amount: formatCurrency(source.hourlyRate) })
+                            : ''
+                        }
+                        placeholder={t('salary.hourlyRatePlaceholder')}
+                        onPress={() =>
+                          setPadTarget({ sourceId: source.id, mode: 'pad', field: 'rate' })
+                        }
                       />
-                    </View>
 
-                    {source.overtime ? (
-                      <>
-                        <TextField
-                          label={
-                            source.frequency === 'once'
-                              ? t('salary.overtimeWorked')
-                              : t('salary.overtimeHours')
-                          }
-                          value={source.overtimeHours ?? ''}
-                          onChangeText={(text) => update(source.id, { overtimeHours: text })}
-                          placeholder="5"
-                          keyboardType="decimal-pad"
-                          maxLength={5}
-                          trailing={<HoursUnit />}
+                      <TextField
+                        label={once ? t('salary.hoursWorked') : t('salary.hoursAWeek')}
+                        value={source.hoursPerWeek ?? ''}
+                        onChangeText={(text) => update(source.id, { hoursPerWeek: text })}
+                        placeholder="40"
+                        keyboardType="decimal-pad"
+                        maxLength={5}
+                        trailing={<HoursUnit />}
+                      />
+
+                      <View className="w-full">
+                        <FieldLabel className="mb-2">{t('salary.overtime')}</FieldLabel>
+                        <ChoiceChips
+                          options={OVERTIME_CHOICES}
+                          value={source.overtime ? 'yes' : 'none'}
+                          onChange={(choice) => update(source.id, { overtime: choice === 'yes' })}
                         />
-                        <View className="w-full">
-                          <FieldLabel className="mb-2">{t('salary.overtimePays')}</FieldLabel>
+                      </View>
+
+                      {source.overtime ? (
+                        <>
+                          <TextField
+                            label={once ? t('salary.overtimeWorked') : t('salary.overtimeHours')}
+                            value={source.overtimeHours ?? ''}
+                            onChangeText={(text) => update(source.id, { overtimeHours: text })}
+                            placeholder="5"
+                            keyboardType="decimal-pad"
+                            maxLength={5}
+                            trailing={<HoursUnit />}
+                          />
+                          <View className="w-full">
+                            <FieldLabel className="mb-2">{t('salary.overtimePays')}</FieldLabel>
+                            <ChoiceChips
+                              options={OVERTIME_RATES}
+                              value={String(source.overtimeMultiplier ?? 1.5) as '1.5' | '2'}
+                              onChange={(rate) =>
+                                update(source.id, { overtimeMultiplier: Number(rate) })
+                              }
+                            />
+                          </View>
+                        </>
+                      ) : null}
+
+                      <HourlyEstimateCard source={source} />
+                    </>
+                  ) : (
+                    <AmountBox
+                      label={t('salary.amount')}
+                      value={source.amount ? formatCurrency(source.amount) : ''}
+                      placeholder={t('salary.enterAmount')}
+                      onPress={() =>
+                        setPadTarget({ sourceId: source.id, mode: 'pad', field: 'amount' })
+                      }
+                      onCalculator={() =>
+                        setPadTarget({ sourceId: source.id, mode: 'calculator', field: 'amount' })
+                      }
+                      calculatorLabel={t('salary.openCalculator')}
+                    />
+                  )}
+
+                  <View className="w-full">
+                    <PayRow
+                      label={t('salary.howOften')}
+                      value={
+                        PAY_FREQUENCIES.find((option) => option.value === source.frequency)
+                          ?.label ?? ''
+                      }
+                      icon={frequencyOpen ? ChevronUp : ChevronDown}
+                      expanded={frequencyOpen}
+                      hint={t('salary.showChoices')}
+                      onPress={() => toggle(source.id, 'frequency')}
+                    >
+                      {frequencyOpen ? (
+                        <View className="w-full pb-4">
                           <ChoiceChips
-                            options={OVERTIME_RATES}
-                            value={String(source.overtimeMultiplier ?? 1.5) as '1.5' | '2'}
-                            onChange={(rate) =>
-                              update(source.id, { overtimeMultiplier: Number(rate) })
-                            }
+                            options={PAY_FREQUENCIES}
+                            value={source.frequency}
+                            onChange={(frequency) => {
+                              changeFrequency(source, frequency);
+                              setOpen(null);
+                            }}
                           />
                         </View>
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  <SelectField
-                    label={t('salary.amount')}
-                    value={source.amount ? formatCurrency(source.amount) : ''}
-                    placeholder={t('salary.enterAmount')}
-                    icon={Calculator}
-                    variant="pill"
-                    onPress={() =>
-                      setPadTarget({ sourceId: source.id, mode: 'pad', field: 'amount' })
-                    }
-                    onIconPress={() =>
-                      setPadTarget({ sourceId: source.id, mode: 'calculator', field: 'amount' })
-                    }
-                    iconAccessibilityLabel={t('salary.openCalculator')}
-                  />
-                )}
+                      ) : null}
+                    </PayRow>
 
-                <View className="w-full">
-                  <FieldLabel className="mb-2">{t('salary.howOften')}</FieldLabel>
-                  <ChoiceChips
-                    options={PAY_FREQUENCIES}
-                    value={source.frequency}
-                    onChange={(frequency) => changeFrequency(source, frequency)}
-                  />
-                </View>
-
-                {source.payType === 'hourly' ? <HourlyEstimateCard source={source} /> : null}
-
-                <SelectField
-                  label={source.frequency === 'once' ? t('salary.paidOn') : t('salary.lastPayday')}
-                  value={source.lastPayday ? formatFullDate(asDate(source.lastPayday)!) : ''}
-                  placeholder={
-                    source.frequency === 'once'
-                      ? t('salary.paidOnPlaceholder')
-                      : t('salary.lastPaydayPlaceholder')
-                  }
-                  icon={Calendar}
-                  variant="pill"
-                  onPress={() => setDateTarget(source.id)}
-                />
-
-                {source.lastPayday ? (
-                  <Text
-                    className="-mt-3 ml-4 font-app text-[13px] text-muted"
-                    maxFontSizeMultiplier={TEXT_CAP.reading}
-                  >
-                    {source.frequency === 'once'
-                      ? t('salary.countsThisMonth')
-                      : t('salary.nextPayday', {
-                          date: formatFullDate(
-                            getNextPayday(asDate(source.lastPayday)!, source.frequency),
-                          ),
-                        })}
-                  </Text>
-                ) : null}
-
-                <View className="w-full">
-                  <FieldLabel className="mb-2">{t('salary.paidInto')}</FieldLabel>
-                  {/* One account: pay lands in it on each payday, so it cannot land in two. A
-                      salary saved with several shows the one its pay lands in, the first of them. */}
-                  <ChoiceChips
-                    options={[...accountOptions, { value: '', label: t('salary.noAccount') }]}
-                    value={
-                      accountOptions.find((option) => source.accountIds.includes(option.value))
-                        ?.value ?? ''
-                    }
-                    onChange={(accountId) =>
-                      update(source.id, { accountIds: accountId ? [accountId] : [] })
-                    }
-                  />
-                  {accountOptions.some((option) =>
-                    source.accountIds.includes(option.value),
-                  ) ? null : (
-                    <Text
-                      className="mt-2 font-app text-[13px] text-muted"
-                      maxFontSizeMultiplier={TEXT_CAP.reading}
+                    <PayRow
+                      label={once ? t('salary.paidOn') : t('salary.lastPayday')}
+                      note={
+                        !source.lastPayday
+                          ? undefined
+                          : once
+                            ? t('salary.countsThisMonth')
+                            : t('salary.nextPayday', {
+                                date: formatFullDate(
+                                  getNextPayday(asDate(source.lastPayday)!, source.frequency),
+                                ),
+                              })
+                      }
+                      value={
+                        source.lastPayday
+                          ? formatFullDate(asDate(source.lastPayday)!)
+                          : once
+                            ? t('salary.paidOnPlaceholder')
+                            : t('salary.lastPaydayPlaceholder')
+                      }
+                      empty={!source.lastPayday}
+                      icon={Calendar}
+                      expanded={paydayOpen}
+                      hint={t('salary.showCalendar')}
+                      onPress={() => toggle(source.id, 'payday')}
                     >
-                      {t('salary.linkAccountHint')}
-                    </Text>
-                  )}
+                      {paydayOpen ? (
+                        <View className="w-full pb-4">
+                          <InlineCalendar
+                            value={asDate(source.lastPayday)}
+                            onChange={(date) => {
+                              update(source.id, { lastPayday: toIsoDate(date) });
+                              setOpen(null);
+                            }}
+                          />
+                        </View>
+                      ) : null}
+                    </PayRow>
+
+                    {/* One account: pay lands in it on each payday, so it cannot land in two. A
+                        salary saved with several shows the one its pay lands in. */}
+                    <PayRow
+                      last
+                      label={t('salary.paidInto')}
+                      value={landing ? accountLabel(landing) : t('salary.noAccount')}
+                      empty={!landing}
+                      leading={
+                        landing ? (
+                          <View
+                            style={{ backgroundColor: landing.color }}
+                            className="h-6 w-6 rounded-[6px] border border-ink/10"
+                          />
+                        ) : null
+                      }
+                      icon={ChevronRight}
+                      hint={t('salary.paidIntoHint')}
+                      onPress={() =>
+                        navigateOnce(() =>
+                          router.push({
+                            pathname: '/salary-paid-into',
+                            params: {
+                              editor: editorId,
+                              source: source.id,
+                              selected: landing?.id ?? '',
+                            },
+                          }),
+                        )
+                      }
+                    >
+                      {landing ? null : (
+                        <Text
+                          className="-mt-1 w-full pb-3 font-app text-[13px] text-muted"
+                          maxFontSizeMultiplier={TEXT_CAP.reading}
+                        >
+                          {t('salary.linkAccountHint')}
+                        </Text>
+                      )}
+                    </PayRow>
+                  </View>
                 </View>
-              </View>
-            )}
-          </View>
-        ))}
+              )}
+            </View>
+          );
+        })}
       </View>
 
       {earlier.length > 0 && !earlierShown ? (
@@ -778,42 +852,16 @@ function SalaryEditor({
         accessibilityRole="button"
         accessibilityLabel={t('salary.addSource')}
         onPress={addSource}
-        className="mt-4 min-h-14 w-full flex-row items-center justify-center gap-2 rounded-full bg-ink/5 active:bg-ink/10"
+        className="mb-4 mt-4 min-h-14 w-full flex-row items-center justify-center gap-2 rounded-full border border-line active:bg-ink/5"
       >
-        <Plus size={18} color={colors.ink} strokeWidth={1.8} />
+        <Plus size={18} color={colors.accentInk} strokeWidth={1.8} />
         <Text
-          className="shrink text-center font-app-medium text-[14px] text-ink"
+          className="shrink text-center font-app-medium text-[14px] text-accent-ink"
           maxFontSizeMultiplier={TEXT_CAP.row}
         >
           {t('salary.addSource')}
         </Text>
       </Pressable>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('salary.addOneOff')}
-        onPress={addOneOff}
-        className="mb-4 mt-3 min-h-14 w-full flex-row items-center justify-center gap-2 rounded-full border border-line active:bg-ink/5"
-      >
-        <Plus size={18} color={colors.ink} strokeWidth={1.8} />
-        <Text
-          className="shrink text-center font-app-medium text-[14px] text-ink"
-          maxFontSizeMultiplier={TEXT_CAP.row}
-        >
-          {t('salary.addOneOff')}
-        </Text>
-      </Pressable>
-
-      {dateTarget ? (
-        <DatePicker
-          value={asDate(sources.find((s) => s.id === dateTarget)?.lastPayday) ?? new Date()}
-          onCancel={() => setDateTarget(null)}
-          onConfirm={(date) => {
-            update(dateTarget, { lastPayday: toIsoDate(date) });
-            setDateTarget(null);
-          }}
-        />
-      ) : null}
 
       {padTarget && activeSource && padTarget.field === 'rate' ? (
         <AmountPad
@@ -855,6 +903,34 @@ function SalaryEditor({
         )
       ) : null}
     </Screen>
+  );
+}
+
+/** A source card's round header button: rename, unfold or remove. */
+function CircleButton({
+  icon: Icon,
+  label,
+  onPress,
+  expanded,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onPress: () => void;
+  expanded?: boolean;
+}) {
+  const colors = useColors();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={expanded === undefined ? undefined : { expanded }}
+      // 36pt plus 4pt all round clears the 44pt target floor.
+      hitSlop={4}
+      onPress={onPress}
+      className="h-9 w-9 items-center justify-center rounded-full bg-ink/5 active:bg-ink/10"
+    >
+      <Icon size={17} color={colors.body} strokeWidth={1.8} />
+    </Pressable>
   );
 }
 

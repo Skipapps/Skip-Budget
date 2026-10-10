@@ -183,7 +183,11 @@ function AccountForm({
 }: {
   id?: string;
   existing: ReturnType<typeof useBankAccount>['data'] | null;
-  /** 'setup' when the walk-in flow sent us; changes only where Save lands. */
+  /**
+   * 'setup' when the walk-in flow sent us; changes only where Save lands. 'salary' when the Salary
+   * page's Paid into did: that page is setting the pay, unsaved, so nothing about pay is asked or
+   * written here, or the page would reload under its own edits.
+   */
   origin?: string;
 }) {
   const colors = useColors();
@@ -245,7 +249,8 @@ function AccountForm({
   // switched off, income, payday and cycle are asked for pay of this account's own.
   // Schedules only: a one-off pay has landed already and is no account's "my pay".
   const salaries = (salarySources.data ?? []).filter((source) => source.frequency !== 'once');
-  const hasSalary = salaries.length > 0;
+  const fromSalary = origin === 'salary';
+  const hasSalary = !fromSalary && salaries.length > 0;
   const [linkPay, setLinkPay] = useState(origin === 'setup');
   const payLinked = !editing && hasSalary && linkPay;
   const salaryNames = joinNames(salaries.map((source) => source.name.trim()).filter(Boolean));
@@ -261,7 +266,7 @@ function AccountForm({
     : t('accounts.link.paydaysSet');
   // Income and payday belong to pay, not the account: asked only when adding, where they make a
   // salary source. An edit never saved them.
-  const askPay = !editing && !payLinked;
+  const askPay = !editing && !payLinked && !fromSalary;
 
   // The saved reminder until the person touches it; its time of day is kept as it is.
   const savedReminder = useReminderChoice('account', id);
@@ -335,7 +340,7 @@ function AccountForm({
       // money would land nowhere). Not while existing pay is linked: a figure typed before the
       // switch went back on would mint a second salary.
       const pay = Number(income);
-      if (!editing && !payLinked && Number.isFinite(pay) && pay > 0) {
+      if (askPay && Number.isFinite(pay) && pay > 0) {
         const salary = await createSalary.mutateAsync({
           name: nickname.trim() || bankName.trim(),
           amount: pay,
@@ -423,7 +428,11 @@ function AccountForm({
         onDone={leaveFlow}
         anotherLabel={t('accounts.added.another')}
         // A new route rather than a reset form, so the free allowance is checked again.
-        onAnother={() => router.replace('/add-account')}
+        onAnother={() =>
+          router.replace(
+            fromSalary ? { pathname: '/add-account', params: { from: 'salary' } } : '/add-account',
+          )
+        }
       />
     );
   }

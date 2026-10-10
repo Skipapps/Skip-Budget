@@ -1,7 +1,6 @@
 import {
   ArchiveRestore,
   ArrowDownUp,
-  Banknote,
   CalendarCheck,
   CalendarRange,
   ChartNoAxesColumn,
@@ -32,7 +31,7 @@ export type ProFeature = {
   title: string;
   /** One line under the title. */
   subtitle: string;
-  /** Three lines, each a single line of words with its own icon. */
+  /** Two or three lines, each a single line of words with its own icon. */
   points: { icon: LucideIcon; text: string }[];
 };
 
@@ -46,11 +45,13 @@ function point(icon: LucideIcon, text: MessageKey): ProFeature['points'][number]
   };
 }
 
-function feature(
-  id: string,
-  icon: LucideIcon,
-  points: [LucideIcon, LucideIcon, LucideIcon],
-): ProFeature {
+/**
+ * Each point's icon, keyed by the message it draws (`pro.<id>.a`, `.b`, `.c`), in that order. The
+ * middle one may go, so a page with two points keeps the keys its words already have.
+ */
+type PointIcons = { a: LucideIcon; b?: LucideIcon; c: LucideIcon };
+
+function feature(id: string, icon: LucideIcon, points: PointIcons): ProFeature {
   const key = (part: string) => `pro.${id}.${part}` as MessageKey;
   return {
     id,
@@ -64,19 +65,27 @@ function feature(
     get subtitle() {
       return t(key('subtitle'));
     },
-    points: [point(points[0], key('a')), point(points[1], key('b')), point(points[2], key('c'))],
+    points: (['a', 'b', 'c'] as const).flatMap((part) => {
+      const pointIcon = points[part];
+      return pointIcon ? [point(pointIcon, key(part))] : [];
+    }),
   };
 }
 
 /**
- * What each locked door says for itself: one example, a heading, a line, three points. Each page
- * argues for its feature in its own terms, never "this is locked".
+ * What each locked door says for itself: one example, a heading, a line, two or three points. Each
+ * page argues for its feature in its own terms, never "this is locked".
  */
 export const PRO_FEATURES: Record<string, ProFeature> = {
-  insights: feature('insights', ChartNoAxesColumn, [Wallet, ArrowDownUp, CalendarCheck]),
-  scan: feature('scan', ScanLine, [InfinityIcon, Sparkles, ShieldCheck]),
-  voice: feature('voice', Mic, [ReceiptText, CircleCheck, ShieldCheck]),
-  history: feature('history', History, [CalendarRange, ArchiveRestore, Scale]),
-  unlimited: feature('unlimited', CreditCard, [InfinityIcon, Banknote, LockOpen]),
-  habits: feature('habits', CalendarCheck, [CircleCheck, PiggyBank, ReceiptText]),
+  insights: feature('insights', ChartNoAxesColumn, {
+    a: Wallet,
+    b: ArrowDownUp,
+    c: CalendarCheck,
+  }),
+  scan: feature('scan', ScanLine, { a: InfinityIcon, b: Sparkles, c: ShieldCheck }),
+  voice: feature('voice', Mic, { a: ReceiptText, b: CircleCheck, c: ShieldCheck }),
+  history: feature('history', History, { a: CalendarRange, b: ArchiveRestore, c: Scale }),
+  // Moving money between accounts is free on every plan, so it is no point for Pro.
+  unlimited: feature('unlimited', CreditCard, { a: InfinityIcon, c: LockOpen }),
+  habits: feature('habits', CalendarCheck, { a: CircleCheck, b: PiggyBank, c: ReceiptText }),
 };

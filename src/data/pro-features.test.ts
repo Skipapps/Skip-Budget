@@ -28,7 +28,7 @@ const SAME_EVERYWHERE = new Set(['voice', 'unlimited']);
 const TWO_LINE_HEADINGS = new Set(['habits']);
 
 describe('PRO_FEATURES', () => {
-  it('keeps its ids and gives every feature an icon, three points and an icon for each', () => {
+  it('keeps its ids and gives every feature an icon, two or three points and an icon for each', () => {
     expect(features().map((feature) => feature.id)).toEqual([
       'insights',
       'scan',
@@ -39,7 +39,7 @@ describe('PRO_FEATURES', () => {
     ]);
     for (const feature of features()) {
       expect(feature.icon).toBeDefined();
-      expect(feature.points).toHaveLength(3);
+      expect(feature.points).toHaveLength(feature.id === 'unlimited' ? 2 : 3);
       feature.points.forEach((point) => expect(point.icon).toBeDefined());
     }
   });
@@ -55,7 +55,11 @@ describe('PRO_FEATURES', () => {
       'Your voice is never stored',
     ]);
     expect(PRO_FEATURES.history.title).toBe('See further back');
-    expect(PRO_FEATURES.unlimited.points[2].text).toBe('Nothing locked if Pro ends');
+    // Moving money between accounts is free on every plan, so Unlimited makes two points.
+    expect(PRO_FEATURES.unlimited.points.map((point) => point.text)).toEqual([
+      'Unlimited cards and accounts',
+      'Nothing locked if Pro ends',
+    ]);
     const habits = PRO_FEATURES.habits;
     expect(habits.example).toBe('Coffee · 3 days skipped · $15.00 saved');
     expect(habits.title).toBe('See what skipping saves');
@@ -73,11 +77,19 @@ describe('PRO_FEATURES', () => {
     expect(PRO_FEATURES.scan.subtitle).toBe('Haz la foto. Skip la lee.');
     expect(PRO_FEATURES.insights.points[0].text).toBe('Cómo estás ahora mismo');
     expect(PRO_FEATURES.habits.points[1].text).toBe('Cada día sin comprar cuenta como ahorro');
+    expect(PRO_FEATURES.unlimited.points.map((point) => point.text)).toEqual([
+      'Tarjetas y cuentas sin límite',
+      'Nada se bloquea si Pro termina',
+    ]);
   });
 
   it('reads in French', () => {
     setLanguage('fr');
     expect(PRO_FEATURES.unlimited.title).toBe('Ajoute-les tous');
+    expect(PRO_FEATURES.unlimited.points.map((point) => point.text)).toEqual([
+      'Cartes et comptes illimités',
+      'Rien n’est bloqué si Pro finit',
+    ]);
     expect(PRO_FEATURES.voice.points[2].text).toBe('Ta voix n’est jamais gardée');
     expect(PRO_FEATURES.history.example).toBe('De 90 jours à 7 ans');
     expect(PRO_FEATURES.habits.example).toBe('Café · 3 jours sans achat · 15,00 $ économisés');

@@ -11,7 +11,7 @@ import { TEXT_CAP } from '@/theme/text-scale';
 /**
  * The Salary page at the largest text size, in every language. Save is the page's one action, so
  * it is pinned in the footer below the scroll with the line that says why it could not save; the
- * page's own buttons, "Add another source" and "Add a one-off", end the scroll.
+ * page's own button, "Add salary source", ends the scroll.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -24,6 +24,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), canGoBack: () => true },
+  useFocusEffect: () => {},
 }));
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
 jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
@@ -50,7 +51,9 @@ jest.mock('@tanstack/react-query', () => ({
   ...jest.requireActual('@tanstack/react-query'),
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
-jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 
 const mockUpdate = jest.fn(async (_input: { id: string; values: Record<string, unknown> }) => ({}));
 jest.mock('@/api/mutations', () => ({
@@ -109,7 +112,7 @@ function insideScroll(node: Host | null): boolean {
 
 /** The page's own column inside the scroll: what it draws above the footer, in order. */
 function scrollColumn(screen: Screen): Host {
-  const add = screen.getByRole('button', { name: t('salary.addOneOff') });
+  const add = screen.getByRole('button', { name: t('salary.addSource') });
   for (let at = add.parent; at; at = at.parent) {
     if (String(at.props.className).includes('max-w-[520px] flex-1')) return at;
   }
@@ -132,18 +135,16 @@ beforeEach(() => {
 afterAll(() => resetLocaleForTests());
 
 describe.each(LOCALES)('in %s (%s) at the largest text size', (language, currency) => {
-  it('pins Save in the footer and ends the scroll with the page’s own buttons', async () => {
+  it('pins Save in the footer and ends the scroll with the page’s own button', async () => {
     const screen = await showIn(language, currency);
     const save = screen.getByRole('button', { name: t('common.save') });
     expect(insideScroll(save)).toBe(false);
 
     const addSource = screen.getByRole('button', { name: t('salary.addSource') });
-    const addOneOff = screen.getByRole('button', { name: t('salary.addOneOff') });
     expect(insideScroll(addSource)).toBe(true);
-    expect(insideScroll(addOneOff)).toBe(true);
     // Nothing drawn after it in the scroll: the pads and pickers are closed.
     const drawn = scrollColumn(screen).children.filter((child) => typeof child !== 'string');
-    expect(drawn.at(-1)).toBe(addOneOff);
+    expect(drawn.at(-1)).toBe(addSource);
 
     const label = screen.getByText(t('common.save'));
     expect(label.props.numberOfLines).toBeUndefined();

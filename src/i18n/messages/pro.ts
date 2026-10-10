@@ -202,11 +202,6 @@ export const proMessages = defineMessages({
     es: 'Tarjetas y cuentas sin límite',
     fr: 'Cartes et comptes illimités',
   },
-  'pro.unlimited.b': {
-    en: 'Every income counted',
-    es: 'Todos tus ingresos, contados',
-    fr: 'Tous tes revenus, comptés',
-  },
   'pro.unlimited.c': {
     en: 'Nothing locked if Pro ends',
     es: 'Nada se bloquea si Pro termina',

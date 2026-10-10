@@ -183,9 +183,9 @@ export const faqMessages = defineMessages({
   },
   // {monthly} and {yearly} are the store's own prices, so each storefront reads its own currency.
   'faq.pro.include.a': {
-    en: 'Unlimited credit cards, accounts and incomes, unlimited receipt scans and uploads, Voice entry, Insights, seven years of history, early access to new features and first-in-line support. {monthly} a month or {yearly} a year, billed by Apple.',
-    es: 'Tarjetas de crédito, cuentas e ingresos sin límite, escaneos y subidas de recibos sin límite, entrada por voz, Análisis, siete años de historial, acceso anticipado a las funciones nuevas y soporte con prioridad. {monthly} al mes o {yearly} al año, cobrados por Apple.',
-    fr: 'Cartes de crédit, comptes et revenus en nombre illimité, numérisations et imports de reçus illimités, saisie vocale, Aperçu, sept ans d’historique, accès anticipé aux nouvelles fonctionnalités et assistance prioritaire. {monthly} par mois ou {yearly} par an, facturés par Apple.',
+    en: 'Unlimited credit cards and accounts, unlimited receipt scans and uploads, Voice entry, Insights, seven years of history, early access to new features and first-in-line support. {monthly} a month or {yearly} a year, billed by Apple.',
+    es: 'Tarjetas de crédito y cuentas sin límite, escaneos y subidas de recibos sin límite, entrada por voz, Análisis, siete años de historial, acceso anticipado a las funciones nuevas y soporte con prioridad. {monthly} al mes o {yearly} al año, cobrados por Apple.',
+    fr: 'Cartes de crédit et comptes en nombre illimité, numérisations et imports de reçus illimités, saisie vocale, Aperçu, sept ans d’historique, accès anticipé aux nouvelles fonctionnalités et assistance prioritaire. {monthly} par mois ou {yearly} par an, facturés par Apple.',
   },
   'faq.pro.cancelled.q': {
     en: 'What happens to my things if I cancel?',

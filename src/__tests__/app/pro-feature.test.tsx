@@ -68,6 +68,20 @@ describe('the locked-feature screen', () => {
     feature.points.forEach((point) => expect(screen.getByText(point.text)).toBeTruthy());
   });
 
+  it('lays the Unlimited page out with its two points, one under the other', async () => {
+    mockId = 'unlimited';
+    const screen = await render(<ProFeatureScreen />);
+
+    const first = screen.getByText('Unlimited cards and accounts');
+    const second = screen.getByText('Nothing locked if Pro ends');
+    // Each point is a row of icon and words; the two rows are the list's only children.
+    const list = first.parent?.parent;
+    expect(list?.children).toHaveLength(2);
+    expect(second.parent?.parent).toBe(list);
+    expect(String(list?.props.className)).toContain('gap-5');
+    expect(screen.queryByText(/Move money|Every income/)).toBeNull();
+  });
+
   it('falls back to the cards-and-accounts page for an unknown or missing id', async () => {
     mockId = 'nonsense';
     const unknown = await render(<ProFeatureScreen />);

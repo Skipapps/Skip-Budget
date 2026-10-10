@@ -41,6 +41,25 @@ export const salaryMessages = defineMessages({
   },
 
   'salary.totalPerMonth': { en: 'Total per month', es: 'Total al mes', fr: 'Total par mois' },
+  'salary.total.next': {
+    en: {
+      one: 'Next payday {date} · {count} source',
+      other: 'Next payday {date} · {count} sources',
+    },
+    es: {
+      one: 'Próximo día de pago: {date} · {count} fuente',
+      other: 'Próximo día de pago: {date} · {count} fuentes',
+    },
+    fr: {
+      one: 'Prochain jour de paie : {date} · {count} source',
+      other: 'Prochain jour de paie : {date} · {count} sources',
+    },
+  },
+  'salary.total.count': {
+    en: { one: '{count} source', other: '{count} sources' },
+    es: { one: '{count} fuente', other: '{count} fuentes' },
+    fr: { one: '{count} source', other: '{count} sources' },
+  },
   'salary.sourceNumber': { en: 'Source {number}', es: 'Fuente {number}', fr: 'Source {number}' },
   'salary.removeSource': {
     en: 'Remove source {number}',
@@ -52,14 +71,12 @@ export const salaryMessages = defineMessages({
     es: 'Mostrar fuente {number}',
     fr: 'Afficher la source {number}',
   },
-  'salary.collapseSource': {
-    en: 'Collapse source {number}',
-    es: 'Ocultar fuente {number}',
-    fr: 'Masquer la source {number}',
+  'salary.rename': {
+    en: 'Rename {name}',
+    es: 'Cambiar el nombre de {name}',
+    fr: 'Renommer {name}',
   },
-  'salary.unnamed': { en: 'Unnamed', es: 'Sin nombre', fr: 'Sans nom' },
   'salary.name': { en: 'Name', es: 'Nombre', fr: 'Nom' },
-  'salary.howPaid': { en: 'How you are paid', es: 'Cómo te pagan', fr: 'Mode de paie' },
   'salary.hourlyRate': { en: 'Hourly rate', es: 'Tarifa por hora', fr: 'Taux horaire' },
   'salary.perHour': { en: '{amount} an hour', es: '{amount} por hora', fr: '{amount} de l’heure' },
   'salary.hourlyRatePlaceholder': {
@@ -92,6 +109,16 @@ export const salaryMessages = defineMessages({
     fr: 'Ouvrir la calculatrice',
   },
   'salary.howOften': { en: 'How often', es: 'Frecuencia', fr: 'Fréquence' },
+  'salary.showChoices': {
+    en: 'Shows the choices',
+    es: 'Muestra las opciones',
+    fr: 'Affiche les choix',
+  },
+  'salary.showCalendar': {
+    en: 'Shows a calendar',
+    es: 'Muestra un calendario',
+    fr: 'Affiche un calendrier',
+  },
   'salary.lastPayday': {
     en: 'Last payday',
     es: 'Último día de pago',
@@ -134,11 +161,6 @@ export const salaryMessages = defineMessages({
     es: '+ {amount} pagado una vez este mes',
     fr: '+ {amount} payé une fois ce mois-ci',
   },
-  'salary.addOneOff': {
-    en: 'Add a one-off pay',
-    es: 'Agregar un pago único',
-    fr: 'Ajouter une paie unique',
-  },
   'salary.oneOffNumber': { en: 'One-off pay', es: 'Pago único', fr: 'Paie unique' },
   'salary.earlierOneOffs': {
     en: { one: '{count} earlier one-off pay', other: '{count} earlier one-off pays' },
@@ -156,16 +178,31 @@ export const salaryMessages = defineMessages({
     fr: 'Prochain jour de paie : {date}',
   },
   'salary.paidInto': { en: 'Paid into', es: 'Se deposita en', fr: 'Versée dans' },
+  'salary.paidIntoHint': {
+    en: 'Opens your accounts to pick one',
+    es: 'Abre tus cuentas para elegir una',
+    fr: 'Ouvre tes comptes pour en choisir un',
+  },
   'salary.linkAccountHint': {
     en: 'Pick the account it lands in, and each payday adds to that account.',
     es: 'Elige la cuenta donde llega y cada día de pago se sumará a esa cuenta.',
     fr: 'Choisis le compte où elle arrive, et chaque jour de paie s’y ajoutera.',
   },
   'salary.noAccount': { en: 'No account', es: 'Ninguna cuenta', fr: 'Aucun compte' },
+  'salary.addAccount': {
+    en: 'Add an account',
+    es: 'Agregar una cuenta',
+    fr: 'Ajouter un compte',
+  },
+  'salary.addAccountHint': {
+    en: 'Opens a page to add a bank account',
+    es: 'Abre una página para agregar una cuenta bancaria',
+    fr: 'Ouvre une page pour ajouter un compte bancaire',
+  },
   'salary.addSource': {
-    en: 'Add salary source',
-    es: 'Agregar fuente de salario',
-    fr: 'Ajouter une source de salaire',
+    en: 'Add source',
+    es: 'Agregar fuente',
+    fr: 'Ajouter une source',
   },
   'salary.saving': { en: 'Saving…', es: 'Guardando…', fr: 'Enregistrement…' },
 

@@ -1,9 +1,10 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 
 import SalaryScreen from '@/app/salary';
 import { FAILURE_MESSAGE } from '@/lib/failure';
+import { pickPaidInto } from '@/lib/paid-into-pick';
 import { ToastContext } from '@/providers/toast-context';
 
 /**
@@ -25,8 +26,13 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 // The real SDK starts a cleanup interval that holds Jest open.
 jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
+let mockRefocus: () => void = () => {};
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), canGoBack: () => true },
+  // Kept so a test can bring this screen back into focus, as returning from a page does.
+  useFocusEffect: (effect: () => void) => {
+    mockRefocus = effect;
+  },
 }));
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
 jest.mock('@/theme/artwork', () => ({
@@ -38,24 +44,13 @@ jest.mock('@/providers/theme-provider', () => ({
 jest.mock('@/lib/use-today', () => ({
   useToday: () => ({ today: '2026-10-08', todayDate: new Date('2026-10-08T00:00:00') }),
 }));
-// The native calendar is replaced by one button that picks 2 October.
-jest.mock('@/components/ui/date-picker', () => {
-  const { Pressable } = jest.requireActual('react-native');
-  return {
-    DatePicker: ({ onConfirm }: { onConfirm: (date: Date) => void }) => (
-      <Pressable
-        accessibilityLabel="Pick 2 October"
-        onPress={() => onConfirm(new Date(2026, 9, 2))}
-      />
-    ),
-  };
-});
 
 const mockRemove = jest.fn(async (_options: Record<string, unknown>) => true);
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => mockRemove }));
 
-let mockPro = false;
-jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: mockPro, ready: true }) }));
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 
 /** What happened, in the order it happened. */
 let mockOrder: string[] = [];
@@ -154,8 +149,35 @@ async function retype(screen: Screen, shown: string, held: number, keys: string[
   await fireEvent.press(screen.getByText('Done'));
 }
 
-const rename = (screen: Screen, from: string, to: string) =>
-  fireEvent.changeText(screen.getByDisplayValue(from), to);
+/** Opens a name with its pencil and types the new one. */
+async function rename(screen: Screen, from: string, to: string) {
+  await fireEvent.press(screen.getByLabelText(`Rename ${from}`));
+  await fireEvent.changeText(screen.getByDisplayValue(from), to);
+}
+
+/** Picks an account for a salary as the Paid into page does: it hands the pick to this editor. */
+async function payInto(screen: Screen, accountId: string | null, index = 0) {
+  await fireEvent.press(screen.getAllByLabelText('Paid into')[index]);
+  const [{ params }] = jest.mocked(router.push).mock.calls.at(-1) as unknown as [
+    { params: { editor: string; source: string } },
+  ];
+  await act(async () => pickPaidInto({ editor: params.editor, source: params.source, accountId }));
+  // The page goes back, and this screen is in focus again.
+  await act(async () => mockRefocus());
+}
+
+/** Opens a source's How often choices and picks one. */
+async function chooseFrequency(screen: Screen, label: string, index = 0) {
+  await fireEvent.press(screen.getAllByLabelText('How often')[index]);
+  await fireEvent.press(screen.getByLabelText(label));
+}
+
+/** Opens the calendar on the last payday shown (September) and picks 2 October. */
+async function pickSecondOfOctober(screen: Screen) {
+  await fireEvent.press(screen.getByText('30 Sep 2026'));
+  await fireEvent.press(screen.getByLabelText('Next month'));
+  await fireEvent.press(screen.getByLabelText(/Friday 2 October 2026$/));
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -163,7 +185,6 @@ beforeEach(() => {
     (fn) => fn.mockReset(),
   );
   mockOrder = [];
-  mockPro = false;
   mockUserId = 'user-1';
   mockRows = [acme];
   mockAccounts = [CHECKING, SAVINGS];
@@ -227,7 +248,6 @@ describe('Saving writes down the pay that has come due first', () => {
   });
 
   it('sweeps before a salary is removed, so its unwritten paydays are kept', async () => {
-    mockPro = true;
     mockRows = [acme, sideJob];
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
     await fireEvent.press(screen.getByLabelText('Remove source 2'));
@@ -373,7 +393,7 @@ describe('A saved salary whose name, pay or account changed asks about the pay i
 
   it('asks when the account it lands in changes', async () => {
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
-    await fireEvent.press(screen.getByLabelText('Ally Savings ••9911'));
+    await payInto(screen, 'acc2');
 
     await save(screen);
 
@@ -382,7 +402,7 @@ describe('A saved salary whose name, pay or account changed asks about the pay i
 
   it('asks when it stops landing in an account', async () => {
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
-    await fireEvent.press(screen.getByLabelText('No account'));
+    await payInto(screen, null);
 
     await save(screen);
 
@@ -392,7 +412,7 @@ describe('A saved salary whose name, pay or account changed asks about the pay i
   it('asks when it starts landing in an account', async () => {
     mockRows = [{ ...acme, account_ids: [] }];
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
-    await fireEvent.press(screen.getByLabelText('Chase Checking ••7730'));
+    await payInto(screen, 'acc1');
 
     await save(screen);
 
@@ -429,7 +449,6 @@ describe('A saved salary whose name, pay or account changed asks about the pay i
   });
 
   it('asks once for each salary that changed, in the order of the page', async () => {
-    mockPro = true;
     mockRows = [acme, sideJob];
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
     await rename(screen, 'Side job', 'Weekend job');
@@ -456,7 +475,7 @@ describe('A change that does not touch what a pay copies does not ask', () => {
 
   it('does not ask for a change of frequency alone', async () => {
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
-    await fireEvent.press(screen.getByLabelText('Weekly'));
+    await chooseFrequency(screen, 'Weekly');
 
     await save(screen);
 
@@ -469,8 +488,7 @@ describe('A change that does not touch what a pay copies does not ask', () => {
 
   it('does not ask for a change of last payday alone', async () => {
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
-    await fireEvent.press(screen.getByText('30 Sep 2026'));
-    await fireEvent.press(screen.getByLabelText('Pick 2 October'));
+    await pickSecondOfOctober(screen);
 
     await save(screen);
 
@@ -483,9 +501,8 @@ describe('A change that does not touch what a pay copies does not ask', () => {
 
   it('does not ask when both change together', async () => {
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
-    await fireEvent.press(screen.getByLabelText('Weekly'));
-    await fireEvent.press(screen.getByText('30 Sep 2026'));
-    await fireEvent.press(screen.getByLabelText('Pick 2 October'));
+    await chooseFrequency(screen, 'Weekly');
+    await pickSecondOfOctober(screen);
 
     await save(screen);
 
@@ -517,7 +534,7 @@ describe('A change that does not touch what a pay copies does not ask', () => {
   it('does not ask when an extra account goes but the pay still lands in the same one', async () => {
     mockRows = [{ ...acme, account_ids: ['acc1', 'acc2'] }];
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
-    await fireEvent.press(screen.getByLabelText('Chase Checking ••7730'));
+    await payInto(screen, 'acc1');
 
     await save(screen);
 
@@ -528,7 +545,7 @@ describe('A change that does not touch what a pay copies does not ask', () => {
   it('does not ask when the account picked is the one the pay already lands in', async () => {
     mockRows = [{ ...acme, account_ids: ['acc2', 'acc1'] }];
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
-    await fireEvent.press(screen.getByLabelText('Chase Checking ••7730'));
+    await payInto(screen, 'acc1');
 
     await save(screen);
 
@@ -537,7 +554,8 @@ describe('A change that does not touch what a pay copies does not ask', () => {
 
   it('does not ask about a new salary, or about the saved one beside it', async () => {
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
-    await fireEvent.press(screen.getByLabelText('Add a one-off pay'));
+    await fireEvent.press(screen.getByLabelText('Add source'));
+    await chooseFrequency(screen, 'Just this time', 1);
     await fireEvent.press(screen.getByText('Enter an amount'));
     for (const key of ['2', '5', '0']) await fireEvent.press(screen.getByLabelText(key));
     await fireEvent.press(screen.getByText('Done'));
@@ -546,19 +564,17 @@ describe('A change that does not touch what a pay copies does not ask', () => {
 
     expect(mockChoose).not.toHaveBeenCalled();
     expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ amount: 250 }));
-    // A one-off pay is written first, whatever its place on the page.
     expect(mockOrder).toEqual([
       'record',
-      'create',
-      'accounts:new',
       'update:s1',
       'accounts:s1',
+      'create',
+      'accounts:new',
       ...LEAVE,
     ]);
   });
 
   it('does not ask about a salary that is removed', async () => {
-    mockPro = true;
     mockRows = [acme, sideJob];
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
     await fireEvent.press(screen.getByLabelText('Remove source 2'));
@@ -611,7 +627,7 @@ describe('The answer', () => {
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
     await rename(screen, 'Acme', 'Acme Corp');
     await retype(screen, '$1,880.00', 4, ['1', '9', '5', '0', '.', '2', '5']);
-    await fireEvent.press(screen.getByLabelText('Ally Savings ••9911'));
+    await payInto(screen, 'acc2');
 
     await save(screen);
 
@@ -635,7 +651,7 @@ describe('The answer', () => {
   it('"all" sends no account when the salary now lands in none', async () => {
     mockChoose.mockResolvedValue('all');
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
-    await fireEvent.press(screen.getByLabelText('No account'));
+    await payInto(screen, null);
 
     await save(screen);
 
@@ -702,7 +718,6 @@ describe('The answer', () => {
   });
 
   it('applies "all" only to the salary it was said for', async () => {
-    mockPro = true;
     mockRows = [acme, sideJob];
     mockChoose.mockImplementation(async (id) => (id === 's1' ? 'all' : 'upcoming'));
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });
@@ -737,7 +752,6 @@ describe('The answer', () => {
   });
 
   it('saves nothing for any salary when the person backs out on the second', async () => {
-    mockPro = true;
     mockRows = [acme, sideJob];
     mockChoose.mockImplementation(async (id) => (id === 's1' ? 'all' : null));
     const screen = await render(<SalaryScreen />, { wrapper: Toasts });

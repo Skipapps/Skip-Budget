@@ -6,11 +6,10 @@ import { getLocaleSnapshot } from '@/i18n/store';
 // not what it owns. Everything already created stays fully usable on any tier; only creation is
 // counted, and winding down (paying off, closing) is always free.
 
-/** What the free plan keeps of each countable thing. */
+/** What the free plan keeps of each countable thing. Pay is not one: every plan records all of it. */
 export const FREE_LIMITS = {
   cards: 1,
   bankAccounts: 1,
-  incomeSources: 1,
   /** Receipts read by the camera, per calendar month. */
   scansPerMonth: 15,
   /** Receipts read from a photo or a file, per calendar month, counted apart from scans. */

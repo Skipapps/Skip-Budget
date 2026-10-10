@@ -19,6 +19,7 @@ jest.mock('react-native-keyboard-controller', () =>
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), canGoBack: () => true },
+  useFocusEffect: () => {},
 }));
 
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
@@ -48,7 +49,9 @@ jest.mock('@tanstack/react-query', () => ({
   ...jest.requireActual('@tanstack/react-query'),
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
-jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 
 const mockCreate = jest.fn(async () => ({ id: 'new' }));
 const mockUpdate = jest.fn(async () => ({}));
