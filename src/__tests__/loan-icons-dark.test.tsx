@@ -4,6 +4,7 @@ import LoanCalculatorScreen from '@/app/loan-calculator';
 import { BillMark } from '@/components/bills/bill-mark';
 import { BillRow } from '@/components/bills/bill-row';
 import { LoanTypeGrid } from '@/components/calculators/loan-type-grid';
+import { LoanListCard } from '@/components/loans/loan-list-card';
 import type { Bill } from '@/data/bill-categories';
 
 /**
@@ -125,6 +126,31 @@ const DRAWN: [string, () => React.JSX.Element, string[]][] = [
   [
     'a saved loan’s mark',
     () => <BillMark categoryId="loans" iconId="loan-car" name="Car loan" />,
+    ['loan-type-car'],
+  ],
+  [
+    'a loan on the Loans page',
+    () => (
+      <LoanListCard
+        loan={{
+          billId: 'bill-1',
+          name: 'Car loan',
+          iconId: 'loan-car',
+          principal: 18_000,
+          annualRate: 6.25,
+          termMonths: 48,
+          monthly: 424.8,
+          paymentsLeft: 27,
+          paymentCount: 48,
+          nextOn: '2026-10-15',
+          left: 10_673.63,
+          paidPercent: 41,
+          ending: null,
+          endedOn: null,
+        }}
+        onPress={() => {}}
+      />
+    ),
     ['loan-type-car'],
   ],
   [

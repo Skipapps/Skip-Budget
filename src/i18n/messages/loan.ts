@@ -679,6 +679,112 @@ export const loanMessages = defineMessages({
     fr: 'Le dernier paiement est toujours ce qui reste, il ne peut donc pas être modifié.',
   },
 
+  // The Loans page: every loan saved from the calculator.
+  'loan.list.title': { en: 'Loans', es: 'Préstamos', fr: 'Prêts' },
+  'loan.list.newCalculation': {
+    en: 'New loan calculation',
+    es: 'Nuevo cálculo de préstamo',
+    fr: 'Nouveau calcul de prêt',
+  },
+  'loan.list.totalOwe': { en: 'Total you owe', es: 'Total que debes', fr: 'Total que tu dois' },
+  'loan.list.monthlyPayments': {
+    en: 'Monthly payments',
+    es: 'Pagos mensuales',
+    fr: 'Paiements mensuels',
+  },
+  'loan.list.nextPayment': {
+    en: 'Next payment',
+    es: 'Próximo pago',
+    fr: 'Prochain paiement',
+  },
+  'loan.list.nextOf': { en: '{date} · {name}', es: '{date} · {name}', fr: '{date} · {name}' },
+  'loan.list.yours': { en: 'Your loans', es: 'Tus préstamos', fr: 'Tes prêts' },
+  'loan.list.saved': {
+    en: { one: '{count} saved', other: '{count} saved' },
+    es: { one: '{count} guardado', other: '{count} guardados' },
+    fr: { one: '{count} enregistré', other: '{count} enregistrés' },
+  },
+  // What was borrowed, at what rate, over how long: "$18,000 · 6.25% · 4 years".
+  'loan.list.facts': {
+    en: '{amount} · {rate} · {term}',
+    es: '{amount} · {rate} · {term}',
+    fr: '{amount} · {rate} · {term}',
+  },
+  'loan.list.monthly': { en: 'Monthly', es: 'Mensual', fr: 'Mensuel' },
+  'loan.list.paymentsLeft': {
+    en: 'Payments left',
+    es: 'Pagos restantes',
+    fr: 'Paiements restants',
+  },
+  'loan.list.leftOf': {
+    en: '{left} of {count}',
+    es: '{left} de {count}',
+    fr: '{left} sur {count}',
+  },
+  'loan.list.next': { en: 'Next', es: 'Próximo', fr: 'Prochain' },
+  'loan.list.progress': {
+    en: '{percent} paid off · {amount} left',
+    es: '{percent} pagado · quedan {amount}',
+    fr: '{percent} remboursé · reste {amount}',
+  },
+  // Loans that need nothing more: paid off on schedule, or their bill stopped while money was owed.
+  'loan.list.finished': { en: 'Finished', es: 'Terminados', fr: 'Terminés' },
+  'loan.list.paidOffOn': {
+    en: 'Paid off on {date}',
+    es: 'Liquidado el {date}',
+    fr: 'Remboursé le {date}',
+  },
+  'loan.list.paidOffA11y': {
+    en: '{name}. Paid off on {date}.',
+    es: '{name}. Liquidado el {date}.',
+    fr: '{name}. Remboursé le {date}.',
+  },
+  'loan.list.stoppedOn': {
+    en: 'Stopped on {date} · {amount} left',
+    es: 'Detenido el {date} · quedan {amount}',
+    fr: 'Arrêté le {date} · reste {amount}',
+  },
+  'loan.list.stopped': {
+    en: 'Stopped · {amount} left',
+    es: 'Detenido · quedan {amount}',
+    fr: 'Arrêté · reste {amount}',
+  },
+  'loan.list.stoppedA11y': {
+    en: '{name}. Stopped on {date}, {amount} left.',
+    es: '{name}. Detenido el {date}, quedan {amount}.',
+    fr: '{name}. Arrêté le {date}, reste {amount}.',
+  },
+  'loan.list.stoppedNoDateA11y': {
+    en: '{name}. Stopped, {amount} left.',
+    es: '{name}. Detenido, quedan {amount}.',
+    fr: '{name}. Arrêté, reste {amount}.',
+  },
+  'loan.list.info': {
+    en: 'Saved loans from the calculator show up here.',
+    es: 'Los préstamos que guardas en la calculadora aparecen aquí.',
+    fr: 'Les prêts enregistrés dans le calculateur apparaissent ici.',
+  },
+  'loan.list.emptyTitle': {
+    en: 'No loans yet',
+    es: 'Aún no hay préstamos',
+    fr: 'Aucun prêt pour l’instant',
+  },
+  'loan.list.emptyBody': {
+    en: 'Work out a loan in the calculator and save it. Its monthly payment joins your bills, and what you owe shows here.',
+    es: 'Calcula un préstamo en la calculadora y guárdalo. Su pago mensual se suma a tus facturas, y lo que debes aparece aquí.',
+    fr: 'Calcule un prêt dans le calculateur et enregistre-le. Son paiement mensuel s’ajoute à tes factures, et ce que tu dois apparaît ici.',
+  },
+  'loan.list.cardA11y': {
+    en: '{name}. {monthly} a month. {left} of {count} payments left, the next on {date}. {percent} paid off, {amount} left.',
+    es: '{name}. {monthly} al mes. Quedan {left} de {count} pagos, el próximo el {date}. {percent} pagado, quedan {amount}.',
+    fr: '{name}. {monthly} par mois. Il reste {left} paiements sur {count}, le prochain le {date}. {percent} remboursé, reste {amount}.',
+  },
+  'loan.list.openHint': {
+    en: 'Opens the loan’s bill.',
+    es: 'Abre la factura del préstamo.',
+    fr: 'Ouvre la facture du prêt.',
+  },
+
   // What a loan is for, on the save page's grid.
   'loan.type.personal': { en: 'Personal', es: 'Personal', fr: 'Personnel' },
   'loan.type.car': { en: 'Car', es: 'Auto', fr: 'Auto' },

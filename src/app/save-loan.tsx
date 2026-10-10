@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 
@@ -19,6 +19,7 @@ import { percent, t } from '@/i18n';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { failureMessage } from '@/lib/failure';
 import { refusedLoanSave } from '@/lib/loan-refusal';
+import { finishFlowOn } from '@/lib/nav';
 import { formatCurrency } from '@/lib/format';
 import { payoffDate } from '@/lib/loan';
 import { paymentOverridesJson, scheduleWithOverrides } from '@/lib/loan-overrides';
@@ -113,8 +114,7 @@ export default function SaveLoanScreen() {
         lastPaymentOn: loan.payoffOn && loan.payoffOn < termEnds ? loan.payoffOn : null,
       });
       toast('toast.loan.saved');
-      // Back past the calculator to the bills list.
-      router.dismissTo('/bills');
+      finishFlowOn('/loans');
     } catch (thrown) {
       switch (refusedLoanSave(thrown)) {
         case 'payments':

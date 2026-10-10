@@ -22,3 +22,18 @@ export function leaveFlow(): void {
   if (router.canGoBack()) router.back();
   else router.replace('/cards');
 }
+
+/**
+ * Leaves a finished flow for a page of its own (a saved loan for /loans). Every screen above the
+ * tabs goes first, the flow and any earlier copy of the page with it, so Back from the page returns
+ * to the tab underneath, never into the finished flow.
+ */
+export function finishFlowOn(href: string): void {
+  const to = href as Parameters<typeof router.push>[0];
+  if (router.canDismiss()) {
+    router.dismissAll();
+    router.push(to);
+  } else {
+    router.replace(to);
+  }
+}

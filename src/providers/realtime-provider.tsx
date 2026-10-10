@@ -16,7 +16,8 @@ import { useUserId } from '@/providers/session-provider';
  */
 const AFFECTS: Record<string, string[]> = {
   charges: ['charges', 'dashboard'],
-  bills: ['bills', 'dashboard'],
+  // Loans are read with their bills, and deleting a bill deletes its loan.
+  bills: ['bills', 'dashboard', 'loans'],
   subscriptions: ['subscriptions', 'dashboard'],
   receipts: ['receipts', 'dashboard'],
   habits: ['habits'],

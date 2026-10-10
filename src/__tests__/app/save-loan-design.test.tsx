@@ -50,11 +50,18 @@ const mockSources = [
 ];
 jest.mock('@/api/queries', () => ({ usePaymentSources: () => ({ sources: mockSources }) }));
 
-const mockDismissTo = jest.fn();
+const mockNav = jest.fn();
+let mockCanDismiss = true;
 let mockParams: Record<string, string> = {};
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
-  router: { dismissTo: (...args: unknown[]) => mockDismissTo(...args), back: jest.fn() },
+  router: {
+    back: jest.fn(),
+    canDismiss: () => mockCanDismiss,
+    dismissAll: () => mockNav('dismissAll'),
+    push: (href: string) => mockNav('push', href),
+    replace: (href: string) => mockNav('replace', href),
+  },
 }));
 
 const DESIGN = {
@@ -70,6 +77,7 @@ beforeEach(() => {
   resetLocaleForTests();
   jest.clearAllMocks();
   mockParams = DESIGN;
+  mockCanDismiss = true;
 });
 
 async function fillIn(name: string) {
@@ -172,7 +180,17 @@ describe('Paid from', () => {
       expect.objectContaining({ cardId: null, bankAccountId: null }),
     );
     expect(mockToast).toHaveBeenCalledWith('toast.loan.saved');
-    expect(mockDismissTo).toHaveBeenCalledWith('/bills');
+    // Lands on the Loans page with nothing of the finished flow beneath it.
+    expect(mockNav.mock.calls).toEqual([['dismissAll'], ['push', '/loans']]);
+  });
+
+  it('lands on the Loans page in place of the save page when nothing is beneath it', async () => {
+    mockCanDismiss = false;
+    await render(<SaveLoanScreen />);
+    await fillIn('Car loan');
+    await fireEvent.press(screen.getByRole('radio', { name: 'Skip' }));
+    await save();
+    expect(mockNav.mock.calls).toEqual([['replace', '/loans']]);
   });
 
   it.each([

@@ -40,6 +40,8 @@ const AFFECTS_DASHBOARD = new Set([
 const DEPENDENTS: Record<string, string[]> = {
   cards: ['bills', 'receipts', 'subscriptions', 'payments', 'habits'],
   bank_accounts: ['bills', 'receipts', 'subscriptions', 'payments', 'salary_sources', 'habits'],
+  // A loan is read with its bill, and goes with it ("on delete cascade").
+  bills: ['loans'],
 };
 
 function useInvalidate() {

@@ -185,14 +185,8 @@ export default function CardsScreen() {
         : loanList.length > 0
           ? loanList.map((loan) => loan.name).join(' · ')
           : t('cards.money.trackLoans'),
-      // A loan lives behind its bill, so one loan opens that bill's page. While the loans are still
-      // being read, "none" is not known yet, so the press waits rather than open the calculator.
-      onPress: () => {
-        if (loans.isPending) return;
-        if (loanList.length === 0) router.push('/loan-calculator');
-        else if (loanList.length === 1) router.push(`/bill/${loanList[0].billId}`);
-        else router.push('/bills');
-      },
+      // The Loans page lists them, or invites a first one, so any count opens it.
+      onPress: () => router.push('/loans'),
     },
     {
       id: 'goals',

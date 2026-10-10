@@ -39,7 +39,14 @@ jest.mock('expo-router', () => ({
     funded: '2025-11-30',
     basis: 'actual/365',
   }),
-  router: { dismissTo: jest.fn(), back: jest.fn(), canGoBack: () => true },
+  router: {
+    back: jest.fn(),
+    canGoBack: () => true,
+    canDismiss: () => true,
+    dismissAll: jest.fn(),
+    push: jest.fn(),
+    replace: jest.fn(),
+  },
 }));
 
 const NBSP = '\u00a0';

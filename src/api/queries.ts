@@ -1183,8 +1183,42 @@ export type LoanRow = {
   payment_overrides: Record<string, number> | null;
 };
 
-const LOAN_COLUMNS =
+/** What `termsFromStored` and the loan pages read, less the changed payments (see below). */
+export const LOAN_COLUMNS =
   'id, bill_id, principal, annual_rate, term_months, monthly_payment, total_interest, first_payment_on, funded_on, day_count_basis, statement_on, statement_principal';
+
+/**
+ * Runs a loan read with the changed payments, and again without them when the database does not
+ * have the column yet (42703 naming it): every loan still loads, with no changes.
+ */
+export async function withPaymentOverrides<R extends { error: ReadFailure }>(
+  read: (overridesColumn: string) => PromiseLike<R>,
+): Promise<R> {
+  const full = await read(', payment_overrides');
+  const lacksOverrides =
+    full.error?.code === '42703' && /payment_overrides/.test(full.error.message ?? '');
+  return lacksOverrides ? read('') : full;
+}
+
+type RawLoan = Omit<LoanRow, 'payment_overrides'> & { payment_overrides?: unknown };
+
+/** A loan row as the app uses it: figures as numbers, no changes read as null. */
+export function readLoanRow(raw: RawLoan): LoanRow {
+  const overrides = raw.payment_overrides;
+  return {
+    ...raw,
+    principal: Number(raw.principal),
+    annual_rate: Number(raw.annual_rate),
+    term_months: Number(raw.term_months),
+    monthly_payment: Number(raw.monthly_payment),
+    total_interest: Number(raw.total_interest),
+    statement_principal: raw.statement_principal == null ? null : Number(raw.statement_principal),
+    payment_overrides:
+      overrides && typeof overrides === 'object' && !Array.isArray(overrides)
+        ? (overrides as Record<string, number>)
+        : null,
+  };
+}
 
 /**
  * The loan behind a bill, when there is one. Most bills are not loans, so this returns null rather
@@ -1196,19 +1230,15 @@ export function useLoanForBill(billId: string | undefined) {
     queryKey: ['loan', billId, userId],
     enabled: Boolean(userId && billId),
     queryFn: async (): Promise<LoanRow | null> => {
-      const read = (columns: string) =>
-        supabase.from('loans').select(columns).eq('bill_id', billId!).maybeSingle();
-      const full = await read(`${LOAN_COLUMNS}, payment_overrides`);
-      // A database without the column (42703 naming it) still has every loan, with no changes.
-      const lacksOverrides =
-        full.error?.code === '42703' && /payment_overrides/.test(full.error.message ?? '');
-      const { data, error } = lacksOverrides ? await read(LOAN_COLUMNS) : full;
+      const { data, error } = await withPaymentOverrides((overrides) =>
+        supabase
+          .from('loans')
+          .select(`${LOAN_COLUMNS}${overrides}`)
+          .eq('bill_id', billId!)
+          .maybeSingle(),
+      );
       if (error) throw error;
-      if (!data) return null;
-      const row = data as unknown as Omit<LoanRow, 'payment_overrides'> & {
-        payment_overrides?: Record<string, number> | null;
-      };
-      return { ...row, payment_overrides: row.payment_overrides ?? null };
+      return data ? readLoanRow(data as unknown as RawLoan) : null;
     },
   });
 }

@@ -280,26 +280,26 @@ describe('Cards — the Money tiles', () => {
     expect(router.push).toHaveBeenLastCalledWith('/savings');
   });
 
-  it('Loans with none offers the loan calculator', async () => {
+  it('Loans with none opens the Loans page, which invites a first one', async () => {
     const screen = await render(<CardsScreen />);
 
     expect(screen.getByText('Add a loan')).toBeTruthy();
     expect(screen.getByText('Track what you owe')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Loans, Add a loan, Track what you owe'));
-    expect(router.push).toHaveBeenLastCalledWith('/loan-calculator');
+    expect(router.push).toHaveBeenLastCalledWith('/loans');
   });
 
-  it('Loans with one opens the bill it lives behind', async () => {
+  it('Loans with one opens the Loans page', async () => {
     mockLoans.loans = [{ billId: 'bill-9', name: 'Car loan' }];
     const screen = await render(<CardsScreen />);
 
     expect(screen.getByText('1 active')).toBeTruthy();
     expect(screen.getByText('Car loan')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Loans, 1 active, Car loan'));
-    expect(router.push).toHaveBeenLastCalledWith('/bill/bill-9');
+    expect(router.push).toHaveBeenLastCalledWith('/loans');
   });
 
-  it('Loans with several names them all and opens the bills', async () => {
+  it('Loans with several names them all and opens the Loans page', async () => {
     mockLoans.loans = [
       { billId: 'bill-9', name: 'Car loan' },
       { billId: 'bill-3', name: 'Mortgage' },
@@ -309,17 +309,17 @@ describe('Cards — the Money tiles', () => {
     expect(screen.getByText('2 active')).toBeTruthy();
     expect(screen.getByText('Car loan · Mortgage')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Loans, 2 active, Car loan · Mortgage'));
-    expect(router.push).toHaveBeenLastCalledWith('/bills');
+    expect(router.push).toHaveBeenLastCalledWith('/loans');
   });
 
-  it('Loans offers nothing while the loans are still being read', async () => {
+  it('Loans shows no figure while the loans are being read, and opens the page all the same', async () => {
     mockLoans = { loans: [], isPending: true, isError: false };
     const screen = await render(<CardsScreen />);
 
     expect(screen.queryByText('Add a loan')).toBeNull();
-    // Pressed before the answer: nothing opens, least of all the calculator.
+    // The page reads them itself, so pressing before the answer opens nothing wrong.
     await fireEvent.press(screen.getByLabelText('Loans'));
-    expect(router.push).not.toHaveBeenCalled();
+    expect(router.push).toHaveBeenLastCalledWith('/loans');
   });
 
   it('Goals says Coming soon and goes nowhere', async () => {

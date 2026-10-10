@@ -5313,3 +5313,97 @@ bug in component behaviour found; two comments corrected. tsc 0; `rm -rf .expo/c
 - **Cost:** about 0.9 ms more per calculator step when a monthly payment is typed (node). Dilip should still measure on a device.
 
 ## 2026-10-09 — Dmitri (Development Lead) — final pre-push check, loans phase B: GO, provided 0007 and 0008 are live first. tsc 0; 31 loan/money/apr/save suites, 989 tests pass; Drew's M1/S2/S3/S4/S6/wholeCents/bisection fixes confirmed. Risk: unchanged loans the 1-cent round-up ends early send p_last_payment_on (save-loan.tsx:113), 74 of 1,344 realistic loans in a sweep, so they need 0007; rateSavable's nine decimals need 0008.
+
+## 2026-10-09 — Drew (Developer, money maths) — Loans page maths: loanStatus and loansSummary
+
+**Outcome:** Done, uncommitted. New `src/lib/loan-status.ts` with 20 tests in `loan-status.test.ts`. All 9 mutants caught. My files are lint, prettier and tsc clean. Loan suites: 233 tests.
+
+- **API:**
+  - `loanStatus(terms: LoanTerms, today: string /* yyyy-mm-dd */): LoanStatus`, giving borrowed, monthlyPayment, paymentCount, paymentsMade, paymentsLeft, amountLeft, percentPaid, nextPayment {number, date, amount} | null, lastPaymentOn and paidOff.
+  - `loansSummary<L extends { status: LoanStatus }>(loans): LoansSummary<L>`, giving totalOwed, monthlyPayments, nextPayment (with its loan; the first listed wins a tie), openCount and paidOffCount.
+  - It is built on `amortise`, so changed payments and statements count, and its rules follow the brief: a payment day counts as made; principal only; a half percent rounds up; 99% at most while a cent is left, and 0%, not less, when the balance is above the amount borrowed.
+- **Design reproduced to the cent** on monthly rests, with each loan funded a month before its first payment and today = 9 Oct 2026:
+  - Car: first payment 15 Jan 2025, $424.80, 27 of 48, $10,673.63, 41%, next 15 Oct.
+  - Personal: first payment 9 Oct 2026, $500.95, 59 of 60, $24,655.30, 1%, next 9 Nov.
+  - Totals: $35,328.93 owed and $925.75 a month.
+  - On the calculator's default (actual/365) the same loans would show $10,673.67 and $24,653.14.
+  - Cross-checked by Python decimal and by referenceSchedule.
+- **Other fixtures:**
+  - Not yet started: 60 of 60, $25,000, 0%.
+  - Paid off on the last payment's day: left out of the totals.
+  - Changed payments read back from a saved row: 18 of 39, $9,535.20, next $3,000.
+  - Statement: $28,698.15 on the statement day, then $28,342.21.
+  - $0.01 left reads 99%.
+- **For the others:** the full suite currently fails in `cards.test.tsx` and `save-loan-design.test.tsx`, and tsc fails in `loans-list.test.tsx`. All three are in-flight work by Dana L and Diego, not these files.
+  - `loans.tsx` uses `bill.next_due_on` as termsFromStored's fallback first payment. It should be `bills.starts_on`: next_due_on moves forward, so a row without first_payment_on would restart at 0 made.
+
+## 2026-10-09 — Dana L (Developer, UI and navigation) — Loans page (DONE, uncommitted)
+
+**Outcome:** `/loans` built to the Founder's PNG on Drew's `loanStatus`/`loansSummary` and Diego's `useLoans`/`loanTermsOf` (first payment falls back to the bill's `starts_on`). The entry points are rewired. Not seen in the Simulator: Metro is stopped by the Founder.
+
+- **Page** (`src/app/loans.tsx`, with `src/components/loans/`):
+  - Header: back, "Loans", "+" (→ /loan-calculator).
+  - Summary card: the loan-result icon, "Total you owe", then Monthly payments and "Next payment" ("9 Nov · Personal loan").
+  - "Your loans" with "N saved".
+  - One card per loan:
+    - its type icon from `bills.icon_id` (Other for a loan saved before types), the name, and "$25,000 · 7.50% · 5 years" (term in whole words per the brief; the PNG has "yrs");
+    - a 3-column SummaryGrid (Monthly / Payments left "59 of 60" / Next "9 Nov") that stacks when a word cannot fit;
+    - a progress bar and "1% paid off · $24,655.30 left".
+    - The card is one VoiceOver control with a hint, and it opens /bill/[id].
+  - "Paid off" section: listed, out of the totals, and opens its bill.
+  - Info line and "+ New loan calculation".
+  - States: empty invitation; skeleton while reading; failure page with Try again (a failed read is never "no loans").
+- **Decisions:**
+  - A loan whose bill has stopped running (`billEnded`) is listed under Paid off and left out of the totals, so the page agrees with the Cards tab's "{n} active". Its card reads the bill's end date.
+  - With only paid-off loans, the summary card stays (owing $0.00) instead of "No loans yet".
+- **Navigation:**
+  - New `finishFlowOn(href)` in `src/lib/nav.ts`: dismissAll, then push; replace when nothing is beneath. `resetTo` would leave /loans as the only screen.
+  - After "Save to Loans" the person lands on /loans with the toast, and Back returns to the tab underneath, never into the calculator or the finished save page.
+  - The Cards tab's Loans tile opens /loans for any count, including while loading; its text is unchanged.
+  - Typed routes were regenerated without Metro, through the CLI's own generator (`regenerateDeclarations`). Only `/loans` was added.
+- **Copy:** `loan.list.*` in en/es/fr.
+- **Tests:**
+  - New `app/loans.test.tsx` (14), on real schedules: the design's personal loan reproduces its card exactly ($500.95, 59 of 60, 9 Nov, 1%, $24,655.30). It also covers the totals that leave out the paid-off and ended loans, the soonest next payment, type icons, VoiceOver, empty/loading/error, es/fr, large-text ceilings and the columns stacking.
+  - `loan-icons-dark` gains the loan card.
+  - Updated: the Cards tile cases and the save-landing cases (dismissAll then push, or replace).
+  - Large-text guard: three files adopted.
+  - 9 of 9 mutants caught.
+- **Gates:** tsc 0; eslint (cache cleared) and prettier clean; full jest 292 suites, 5,978 tests green.
+
+---
+
+## 2026-10-09 — Diego (Developer, data and backend) — useLoans for the Loans page
+
+**Outcome:** Done, uncommitted. eslint and prettier clean on my files. 44 related suites, 1,109 tests pass. tsc: my files are clean. The only error is in Dana L's new `src/__tests__/app/loans.test.tsx:100`: her `loan()` fixture's `bill` default needs `starts_on: null` because the field is required.
+
+- **`useLoans(today)`** (src/api/loans.ts) returns `{ loans: LoanListRow[]; isPending; isError; refetch }`.
+  - One read: `loans` with `bill:bills!inner(id, name, icon_id, starts_on, next_due_on, ends_on)`, plus `payment_overrides` with the same 42703 fallback as `useLoanForBill`. The fallback now lives in shared `withPaymentOverrides` and `readLoanRow` in queries.ts, which turn figures into numbers.
+  - Order: oldest saved first.
+  - `billEnded` uses the exact rule `activeLoans` uses, now exported as `loanBillEnded`. Bills have no archived state, so ended is the only one.
+- **`loanTermsOf(row)`** = `termsFromStored(row, row.bill.starts_on)`. A loan without its own first payment date counts from the bill's first due date, not its next one (Drew).
+- **Invalidation:**
+  - The cache key is under 'loans', so `useSaveLoan` already refreshes it.
+  - `DEPENDENTS.bills = ['loans']`, so every bill edit, delete and logo change refreshes it.
+  - The realtime provider's `bills` entry now also invalidates 'loans'.
+  - Deleting a bill still cascades to its loan (unchanged).
+- **Tests:** `src/__tests__/api/loans-list.test.tsx`, 9 tests on a stateful fake DB:
+  - one read with the embed and overrides;
+  - the starts_on fallback;
+  - billEnded as today moves;
+  - the missing-column fallback;
+  - an error is not an empty list;
+  - empty;
+  - refreshed by save_loan, a bill edit, and a bill delete that cascades.
+
+## 2026-10-09 — Dmitri (Development Lead) — Loans page review: GO, no MUST. tsc 0; loan-status, loans, loans-list, cards, save-loan, loan-overrides-flow, loan-icons-dark, large-text-guard: 11 suites, 145 tests pass. Totals, amount left, payments left, next payment and paid-off exclusion are summed in cents; bill_id is unique, so no loan is listed twice; a failed read shows Try again. dismissAll then push run in order through expo-router 57.0.15's routing queue. Risks for the Founder: a loan whose bill was stopped early reads "Paid off on <end date>" with money left, or "Paid off on —" when it has no end date (loans.tsx:29, :49); on the last payment day /loans says paid off while the Cards tile still counts it active; landing not yet seen on a device.
+- **2026-10-09 — Diego — Dmitri's Loans note:** add-bill.tsx now builds a loan's terms with the new shared `loanTermsForBill` (src/lib/loan-start.ts), the same as `loanTermsOf`: a loan without its own first payment date counts from the bill's `starts_on`, not `next_due_on`. Its Payment schedule link now passes the start the card used (`toIsoDate(terms.firstPaymentOn)`) instead of `first_payment_on ?? ''`. Tests: src/lib/loan-start.test.ts (3), plus one case in add-bill-save.test.tsx. tsc 0, eslint clean; 6 suites, 334 tests pass. loans.tsx and active-loans.ts untouched.
+- **2026-10-09 — Dana L — Loans page, Dmitri's two fixes:**
+  - **One rule for finished:** `loanFinished(bill, today, lastPaymentOn?)` in `src/lib/active-loans.ts`. A loan is finished once its last payment is dated on or before today, or once its bill has stopped running (`loanBillEnded`, now `ends_on <= today`).
+    - The Cards tile (`activeLoans`) and `/loans` both call it, so on a loan's last payment day neither counts it as active.
+    - Test: the last-payment day, the day before, and a stopped bill.
+  - **Finished section:** the lower section is now called "Finished" (Terminados / Terminés).
+    - A loan the schedule has paid off reads "Paid off on {date}".
+    - A loan whose bill stopped with money still owed reads "Stopped on {ends_on} · $X left", or "Stopped · $X left" when it has no end date. VoiceOver says the same.
+    - Both stay out of the totals.
+  - The test fixtures carry `starts_on`, and the page and its test both build schedules with `loanTermsOf`.
+  - **Gates:** tsc 0; eslint and prettier clean; the loans, cards, loan-status and active-loans suites, guards and i18n all pass (12 suites, 123 tests).

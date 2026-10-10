@@ -50,7 +50,9 @@ import { success, warn } from '@/lib/haptics';
 import { failureMessage, failureText } from '@/lib/failure';
 import { logoColumns } from '@/lib/logo-columns';
 import { logoDomainOf } from '@/lib/logo-domain';
-import { amortise, readPaymentOverrides, termsFromStored } from '@/lib/loan';
+import { amortise, readPaymentOverrides } from '@/lib/loan';
+import { loanTermsForBill } from '@/lib/loan-start';
+import { toIsoDate } from '@/lib/date';
 import { overrideParams } from '@/lib/loan-route';
 import {
   cameFromVoice,
@@ -302,7 +304,8 @@ function BillForm({
   const { sources } = usePaymentSources();
   // Present only when this bill came from the loan calculator.
   const { data: loan } = useLoanForBill(id);
-  const terms = loan ? termsFromStored(loan, existing?.next_due_on ?? undefined) : null;
+  // The same terms the Loans page builds, so both show the same schedule.
+  const terms = loan ? loanTermsForBill(loan, existing) : null;
   const schedule = terms ? amortise(terms).rows : [];
   const createBill = useCreateBill();
   const updateBill = useUpdateBill();
@@ -772,7 +775,7 @@ function BillForm({
                   amount: String(loan.principal),
                   rate: String(loan.annual_rate),
                   months: String(loan.term_months),
-                  start: loan.first_payment_on ?? '',
+                  start: terms ? toIsoDate(terms.firstPaymentOn) : '',
                   funded: loan.funded_on ?? '',
                   basis: loan.day_count_basis,
                   payment: String(loan.monthly_payment),

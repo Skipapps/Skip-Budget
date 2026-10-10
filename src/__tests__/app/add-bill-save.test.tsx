@@ -1929,6 +1929,25 @@ describe('Add bill — a loan’s schedule', () => {
     });
   });
 
+  it('counts a loan saved without its own first payment date from the bill’s first due date', async () => {
+    mockLoan = { ...LOAN, first_payment_on: null };
+    editing({
+      ...POWER,
+      name: 'Car loan',
+      category_id: 'loans',
+      amount: 386.66,
+      starts_on: '2025-01-01',
+      next_due_on: '2026-10-01',
+    });
+    const screen = await render(<AddBillScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Payment schedule' }));
+    // From the first due date, as the Loans page counts it, not the next one.
+    expect(router.push).toHaveBeenCalledWith(
+      expect.objectContaining({ params: expect.objectContaining({ start: '2025-01-01' }) }),
+    );
+  });
+
   it('is not there for an ordinary bill', async () => {
     editing(POWER);
     const screen = await render(<AddBillScreen />);
