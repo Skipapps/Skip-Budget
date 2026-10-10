@@ -78,6 +78,8 @@ jest.mock('expo-document-picker', () => ({ getDocumentAsync: jest.fn() }));
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({
     ink: '#000000',
+    card: '#FFFFFF',
+    accent: '#905479',
     muted: '#777777',
     body: '#333333',
     line: '#DDDDDD',

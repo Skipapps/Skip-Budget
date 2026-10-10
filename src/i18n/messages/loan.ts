@@ -39,14 +39,14 @@ export const loanMessages = defineMessages({
     fr: '{label}, {value}. Modifier',
   },
 
-  // A loan term: "5 yrs 3 mo". English matches formatTerm in src/lib/loan.ts.
+  // A loan term in whole words: "5 years 3 months".
   'loan.term.months': {
-    en: { one: '{count} mo', other: '{count} mo' },
+    en: { one: '{count} month', other: '{count} months' },
     es: { one: '{count} mes', other: '{count} meses' },
     fr: { one: '{count} mois', other: '{count} mois' },
   },
   'loan.term.years': {
-    en: { one: '{count} yr', other: '{count} yrs' },
+    en: { one: '{count} year', other: '{count} years' },
     es: { one: '{count} año', other: '{count} años' },
     fr: { one: '{count} an', other: '{count} ans' },
   },
@@ -66,6 +66,13 @@ export const loanMessages = defineMessages({
     fr: 'Paiement mensuel',
   },
   'loan.borrowed': { en: 'Borrowed', es: 'Prestado', fr: 'Emprunté' },
+  'loan.interest': { en: 'Interest', es: 'Intereses', fr: 'Intérêts' },
+  'loan.rate': { en: 'Rate', es: 'Tasa', fr: 'Taux' },
+  'loan.totalInterest': {
+    en: 'Total interest',
+    es: 'Intereses totales',
+    fr: 'Intérêts totaux',
+  },
   'loan.firstPayment': { en: 'First payment', es: 'Primer pago', fr: 'Premier paiement' },
   'loan.extraMonthly': {
     en: 'Extra each month',
@@ -168,10 +175,15 @@ export const loanMessages = defineMessages({
     es: 'Dinero recibido',
     fr: 'Argent reçu',
   },
-  'loan.calculator.overpaymentsAndFees': {
-    en: 'Overpayments and fees',
-    es: 'Abonos a capital y comisiones',
-    fr: 'Versements supplémentaires et frais',
+  'loan.calculator.moreOptions': {
+    en: 'More options',
+    es: 'Más opciones',
+    fr: 'Plus d’options',
+  },
+  'loan.calculator.moreOptionsHint': {
+    en: 'Extra payments & fees',
+    es: 'Pagos extra y comisiones',
+    fr: 'Paiements supplémentaires et frais',
   },
   'loan.calculator.nothingExtra': {
     en: 'Nothing extra',
@@ -190,11 +202,6 @@ export const loanMessages = defineMessages({
     es: 'Cómo se cobran los intereses',
     fr: 'Comment les intérêts sont calculés',
   },
-  'loan.calculator.interestPaid': {
-    en: 'Interest paid',
-    es: 'Intereses pagados',
-    fr: 'Intérêts payés',
-  },
   'loan.calculator.feesAtClosing': {
     en: 'Fees at closing',
     es: 'Comisiones al contratar',
@@ -209,6 +216,78 @@ export const loanMessages = defineMessages({
     en: 'The APR is what the credit costs once the fees and the length of the first period are counted in — the figure a US lender has to disclose. It is higher than the rate whenever you pay for the loan before you start repaying it.',
     es: 'El APR es lo que cuesta el crédito una vez que se cuentan las comisiones y la duración del primer periodo: la cifra que un prestamista de EE. UU. debe informar. Es más alto que la tasa siempre que pagas por el préstamo antes de empezar a devolverlo.',
     fr: 'L’APR est ce que coûte le crédit une fois les frais et la durée de la première période comptés — le chiffre qu’un prêteur américain doit divulguer. Il dépasse le taux chaque fois que tu paies pour le prêt avant de commencer à le rembourser.',
+  },
+  // The one line under More options, in the words of the convention chosen there.
+  'loan.calculator.interestLine.actual365': {
+    en: 'Interest is worked out daily on what you still owe.',
+    es: 'Los intereses se calculan cada día sobre lo que aún debes.',
+    fr: 'Les intérêts sont calculés chaque jour sur ce que tu dois encore.',
+  },
+  'loan.calculator.interestLine.actual360': {
+    en: 'Interest is worked out daily on what you still owe, over a 360-day year.',
+    es: 'Los intereses se calculan cada día sobre lo que aún debes, con un año de 360 días.',
+    fr: 'Les intérêts sont calculés chaque jour sur ce que tu dois encore, sur une année de 360 jours.',
+  },
+  'loan.calculator.interestLine.monthly': {
+    en: 'Interest is worked out monthly on what you still owe.',
+    es: 'Los intereses se calculan cada mes sobre lo que aún debes.',
+    fr: 'Les intérêts sont calculés chaque mois sur ce que tu dois encore.',
+  },
+  'loan.calculator.interestLine.thirty360': {
+    en: 'Interest is worked out monthly on what you still owe, every month counted as 30 days.',
+    es: 'Los intereses se calculan cada mes sobre lo que aún debes, contando cada mes como de 30 días.',
+    fr: 'Les intérêts sont calculés chaque mois sur ce que tu dois encore, chaque mois comptant pour 30 jours.',
+  },
+  // The bank's own payment, and what the person's changes leave the loan with.
+  'loan.calculator.bankPayment': {
+    en: 'Your bank’s payment',
+    es: 'El pago de tu banco',
+    fr: 'Le paiement de ta banque',
+  },
+  'loan.calculator.skipWorksOut': {
+    en: 'Skip works it out as {amount}.',
+    es: 'Skip lo calcula en {amount}.',
+    fr: 'Skip le calcule à {amount}.',
+  },
+  'loan.calculator.balloon': {
+    en: 'Your last payment would be {amount}.',
+    es: 'Tu último pago sería de {amount}.',
+    fr: 'Ton dernier paiement serait de {amount}.',
+  },
+  'loan.calculator.problemMonthly': {
+    en: 'Your bank’s payment can’t keep up with this loan’s interest any more (at least {minimum}). Change it, or use Skip’s figure.',
+    es: 'El pago de tu banco ya no alcanza para cubrir los intereses de este préstamo (mínimo {minimum}). Cámbialo o usa el cálculo de Skip.',
+    fr: 'Le paiement de ta banque ne suffit plus à couvrir les intérêts de ce prêt (au moins {minimum}). Modifie-le ou utilise le calcul de Skip.',
+  },
+  'loan.calculator.problemPayment': {
+    en: 'Payment {number} is now less than its interest (at least {minimum}). Change it on the schedule.',
+    es: 'El pago {number} ahora es menor que sus intereses (mínimo {minimum}). Cámbialo en el calendario.',
+    fr: 'Le paiement {number} est maintenant inférieur à ses intérêts (au moins {minimum}). Modifie-le dans le calendrier.',
+  },
+  'loan.calculator.problemLast': {
+    en: 'Payment {number} is now the last one, which is always what’s left, so your change to it can’t be used.',
+    es: 'El pago {number} ahora es el último, que siempre es lo que queda, así que tu cambio no se puede usar.',
+    fr: 'Le paiement {number} est maintenant le dernier, qui est toujours ce qui reste : ta modification ne peut pas être utilisée.',
+  },
+  'loan.calculator.problemOther': {
+    en: 'Payment {number} can’t be used as it is. Change it on the schedule.',
+    es: 'El pago {number} no se puede usar así. Cámbialo en el calendario.',
+    fr: 'Le paiement {number} ne peut pas être utilisé tel quel. Modifie-le dans le calendrier.',
+  },
+  'loan.calculator.unused': {
+    en: {
+      one: 'Your change to payment {numbers} isn’t used: the loan is paid off before it.',
+      other: 'Your changes to payments {numbers} aren’t used: the loan is paid off before them.',
+    },
+    es: {
+      one: 'Tu cambio al pago {numbers} no se usa: el préstamo se liquida antes.',
+      other: 'Tus cambios a los pagos {numbers} no se usan: el préstamo se liquida antes.',
+    },
+    fr: {
+      one: 'Ta modification du paiement {numbers} n’est pas utilisée : le prêt est remboursé avant.',
+      other:
+        'Tes modifications des paiements {numbers} ne sont pas utilisées : le prêt est remboursé avant.',
+    },
   },
   'loan.calculator.ifYouOverpay': {
     en: 'If you overpay',
@@ -265,48 +344,31 @@ export const loanMessages = defineMessages({
     es: 'Un solo pago que se abona al saldo',
     fr: 'Un seul versement sur le solde',
   },
+  // A typed figure past a slider's end is kept as typed; these are the only figures refused.
+  'loan.calculator.amountAboveZero': {
+    en: 'Type an amount above zero.',
+    es: 'Escribe un importe mayor que cero.',
+    fr: 'Entre un montant supérieur à zéro.',
+  },
+  'loan.calculator.rateNeeded': {
+    en: 'Type a rate of zero or more.',
+    es: 'Escribe una tasa de cero o más.',
+    fr: 'Entre un taux de zéro ou plus.',
+  },
   'loan.calculator.feesCaption': {
     en: 'Arrangement fee, points — anything deducted at closing',
     es: 'Comisión por apertura, puntos: todo lo que se descuenta al contratar',
     fr: 'Frais de dossier, points — tout ce qui est retenu à la signature',
   },
 
-  // The two parts of a loan, under the bar.
-  'loan.proportion.borrowed': {
-    en: 'Borrowed {amount}',
-    es: 'Prestado {amount}',
-    fr: 'Emprunté {amount}',
-  },
-  'loan.proportion.interest': {
-    en: 'Interest {share}',
-    es: 'Intereses {share}',
-    fr: 'Intérêts {share}',
-  },
-
   // The card that opens the schedule.
-  'loan.scheduleCard.title': {
-    en: 'Where each payment goes',
-    es: 'A dónde va cada pago',
-    fr: 'Où va chaque paiement',
-  },
-  'loan.scheduleCard.summary': {
+  'loan.scheduleCard.subtitle': {
     en: {
-      one: '{share} of your first payment is interest — see the {count} payment',
-      other: '{share} of your first payment is interest — see all {count} payments',
+      one: 'See where the {count} payment goes',
+      other: 'See where all {count} payments go',
     },
-    es: {
-      one: '{share} de tu primer pago se va en intereses: ve {count} pago',
-      other: '{share} de tu primer pago se va en intereses: ve los {count} pagos',
-    },
-    fr: {
-      one: '{share} de ton premier paiement va aux intérêts — vois {count} paiement',
-      other: '{share} de ton premier paiement va aux intérêts — vois les {count} paiements',
-    },
-  },
-  'loan.scheduleCard.a11y': {
-    en: 'Where each payment goes. First payment: {interest} interest, {principal} off the balance. Opens the full schedule.',
-    es: 'A dónde va cada pago. Primer pago: {interest} de intereses, {principal} a capital. Abre el calendario completo.',
-    fr: 'Où va chaque paiement. Premier paiement : {interest} d’intérêts, {principal} en capital. Ouvre le calendrier complet.',
+    es: { one: 'Mira a dónde va {count} pago', other: 'Mira a dónde van los {count} pagos' },
+    fr: { one: 'Vois où va {count} paiement', other: 'Vois où vont les {count} paiements' },
   },
 
   // The payment schedule.
@@ -315,10 +377,12 @@ export const loanMessages = defineMessages({
     es: 'Calendario de pagos',
     fr: 'Calendrier de remboursement',
   },
-  'loan.schedule.summary': {
-    en: '{payment} a month for {term}, at {rate}.',
-    es: '{payment} al mes durante {term}, al {rate}.',
-    fr: '{payment} par mois pendant {term}, à {rate}.',
+  'loan.schedule.rateApr': { en: '{rate} APR', es: '{rate} APR', fr: '{rate} APR' },
+  // The term, then how many payments the schedule holds: "5 years · 60".
+  'loan.schedule.termCount': {
+    en: '{term} · {count}',
+    es: '{term} · {count}',
+    fr: '{term} · {count}',
   },
   'loan.basisFootnote.actual365': {
     en: 'Interest accrues daily on what is still owed, so a 31-day month costs more than a 28-day one.',
@@ -340,10 +404,19 @@ export const loanMessages = defineMessages({
     es: 'Los intereses se cobran por mes (una doceava parte de la tasa anual sobre lo que aún debes), así que febrero cuesta lo mismo que marzo. Los días sueltos antes del primer pago se cobran aparte, por día.',
     fr: 'Les intérêts sont calculés chaque mois — un douzième du taux annuel sur ce que tu dois encore — donc février coûte autant que mars. Les jours en plus avant le premier paiement sont facturés en sus, au jour le jour.',
   },
-  'loan.schedule.yearSplit': {
-    en: '{interest} interest · {principal} off',
-    es: '{interest} de intereses · {principal} a capital',
-    fr: '{interest} d’intérêts · {principal} en capital',
+  'loan.schedule.yearSummary': {
+    en: {
+      one: '{count} payment · {interest} interest',
+      other: '{count} payments · {interest} interest',
+    },
+    es: {
+      one: '{count} pago · {interest} de intereses',
+      other: '{count} pagos · {interest} de intereses',
+    },
+    fr: {
+      one: '{count} paiement · {interest} d’intérêts',
+      other: '{count} paiements · {interest} d’intérêts',
+    },
   },
   'loan.schedule.assumes': {
     en: 'Assumes every payment lands on time and the rate never moves — paying late costs the extra days.',
@@ -394,63 +467,225 @@ export const loanMessages = defineMessages({
         'Paiement {number}, {date}, couvre {count} jours. {payment} : {interest} d’intérêts, {principal} en capital, dont {extra} versés en supplément. Reste {balance}.',
     },
   },
-  'loan.schedule.rowSplitDays': {
-    en: '{principal} off · {interest} interest · {days}d',
-    es: '{principal} a capital · {interest} de intereses · {days} d',
-    fr: '{principal} en capital · {interest} d’intérêts · {days} j',
+  'loan.schedule.rowSplit': {
+    en: '{principal} principal · {interest} interest',
+    es: '{principal} a capital · {interest} de intereses',
+    fr: '{principal} en capital · {interest} d’intérêts',
   },
   'loan.schedule.rowSplitExtra': {
-    en: '{principal} off · {interest} interest · {extra} extra',
+    en: '{principal} principal · {interest} interest · {extra} extra',
     es: '{principal} a capital · {interest} de intereses · {extra} extra',
     fr: '{principal} en capital · {interest} d’intérêts · {extra} en supplément',
   },
   'loan.schedule.left': { en: '{amount} left', es: 'Quedan {amount}', fr: 'Reste {amount}' },
+  'loan.schedule.changed': { en: 'Changed', es: 'Cambiado', fr: 'Modifié' },
+  'loan.schedule.changedA11y': {
+    en: 'Changed by you.',
+    es: 'Lo cambiaste tú.',
+    fr: 'Modifié par toi.',
+  },
+  'loan.schedule.rowHint': {
+    en: 'Opens this payment so you can change it.',
+    es: 'Abre este pago para que puedas cambiarlo.',
+    fr: 'Ouvre ce paiement pour que tu puisses le modifier.',
+  },
+  'loan.schedule.showAll': {
+    en: 'Show all {count} payments',
+    es: 'Ver los {count} pagos',
+    fr: 'Voir les {count} paiements',
+  },
 
   // Filing a loan as a bill.
   'loan.save.title': {
-    en: 'Add to monthly bills',
-    es: 'Agregar a facturas mensuales',
-    fr: 'Ajouter aux factures mensuelles',
+    en: 'Save this loan',
+    es: 'Guardar este préstamo',
+    fr: 'Enregistrer ce prêt',
   },
   'loan.save.subtitle': {
-    en: 'This becomes a monthly bill under Loans, so it counts against what you have left.',
-    es: 'Se convierte en una factura mensual en Préstamos, así que cuenta contra lo que te queda.',
-    fr: 'Ça devient une facture mensuelle sous Prêts, donc elle compte dans ce qui te reste.',
+    en: 'It’ll show under Loans as a monthly bill.',
+    es: 'Aparecerá en Préstamos como una factura mensual.',
+    fr: 'Il apparaîtra sous Prêts comme une facture mensuelle.',
   },
-  'loan.save.rate': { en: 'Rate', es: 'Tasa', fr: 'Taux' },
-  'loan.save.ratePerYear': { en: '{rate} a year', es: '{rate} anual', fr: '{rate} par an' },
-  'loan.save.termPayments': {
-    en: { one: '{term} · {count} payment', other: '{term} · {count} payments' },
-    es: { one: '{term} · {count} pago', other: '{term} · {count} pagos' },
-    fr: { one: '{term} · {count} paiement', other: '{term} · {count} paiements' },
-  },
-  'loan.save.interestOverTerm': {
-    en: 'Interest over the term',
-    es: 'Intereses en todo el plazo',
-    fr: 'Intérêts sur toute la durée',
+  'loan.save.perMonth': { en: '/ month', es: '/ mes', fr: '/ mois' },
+  'loan.save.payments': { en: 'Payments', es: 'Pagos', fr: 'Paiements' },
+  'loan.save.paymentsMonthly': {
+    en: { one: '{count} monthly', other: '{count} monthly' },
+    es: { one: '{count} mensual', other: '{count} mensuales' },
+    fr: { one: '{count} mensuel', other: '{count} mensuels' },
   },
   'loan.save.name': { en: 'Name', es: 'Nombre', fr: 'Nom' },
   'loan.save.namePlaceholder': {
-    en: 'Car loan, student loan…',
-    es: 'Préstamo de auto, préstamo estudiantil…',
-    fr: 'Prêt auto, prêt étudiant…',
+    en: 'e.g. Car loan',
+    es: 'p. ej., Préstamo de auto',
+    fr: 'p. ex. Prêt auto',
   },
-  'loan.save.icon': { en: 'Icon', es: 'Ícono', fr: 'Icône' },
+  'loan.save.loanType': { en: 'Loan type', es: 'Tipo de préstamo', fr: 'Type de prêt' },
   'loan.save.paidFrom': { en: 'Paid from', es: 'Se paga desde', fr: 'Payé depuis' },
-  'loan.save.needName': {
-    en: 'Give the loan a name so you can spot it in your bills.',
-    es: 'Ponle un nombre al préstamo para encontrarlo en tus facturas.',
-    fr: 'Donne un nom au prêt pour le repérer dans tes factures.',
+  'loan.save.skipSource': { en: 'Skip', es: 'Omitir', fr: 'Passer' },
+  // {fields} is the boxes still empty, by the names they carry on the page.
+  'loan.save.missing': {
+    en: 'To save this loan, fill in: {fields}.',
+    es: 'Para guardar el préstamo, completa: {fields}.',
+    fr: 'Pour enregistrer ce prêt, remplis : {fields}.',
   },
   'loan.save.noPayment': {
     en: 'That loan does not have a payment to save.',
     es: 'Ese préstamo no tiene un pago que guardar.',
     fr: 'Ce prêt n’a pas de paiement à enregistrer.',
   },
-  'loan.save.saving': { en: 'Saving…', es: 'Guardando…', fr: 'Enregistrement…' },
-  'loan.save.addToBills': {
-    en: 'Add to bills',
-    es: 'Agregar a facturas',
-    fr: 'Ajouter aux factures',
+  // The loans table holds a rate from 0 to 100, to nine decimals.
+  'loan.save.rateOutOfRange': {
+    en: 'Skip can save rates from {min} to {max}, with up to nine decimals.',
+    es: 'Skip puede guardar tasas de {min} a {max}, con hasta nueve decimales.',
+    fr: 'Skip peut enregistrer des taux de {min} à {max}, avec neuf décimales au plus.',
   },
+  // {items} names each change that cannot be used, as the calculator lists them.
+  'loan.save.fix': {
+    en: 'To save this loan, fix: {items}.',
+    es: 'Para guardar el préstamo, corrige: {items}.',
+    fr: 'Pour enregistrer ce prêt, corrige : {items}.',
+  },
+  'loan.save.fixMonthly': {
+    en: 'the monthly payment',
+    es: 'el pago mensual',
+    fr: 'le paiement mensuel',
+  },
+  'loan.save.fixPayment': {
+    en: 'payment {number}',
+    es: 'el pago {number}',
+    fr: 'le paiement {number}',
+  },
+  // When the database refuses a loan for a reason the page can name.
+  'loan.save.refusedPayments': {
+    en: 'Skip couldn’t save your changed payments. Check them on the schedule, then try again.',
+    es: 'Skip no pudo guardar tus pagos cambiados. Revísalos en el calendario e inténtalo de nuevo.',
+    fr: 'Skip n’a pas pu enregistrer tes paiements modifiés. Vérifie-les dans le calendrier, puis réessaie.',
+  },
+  'loan.save.refusedLastPayment': {
+    en: 'Skip couldn’t save when this loan ends. Check your changed payments, then try again.',
+    es: 'Skip no pudo guardar cuándo termina este préstamo. Revisa tus pagos cambiados e inténtalo de nuevo.',
+    fr: 'Skip n’a pas pu enregistrer la fin de ce prêt. Vérifie tes paiements modifiés, puis réessaie.',
+  },
+  'loan.save.saving': { en: 'Saving…', es: 'Guardando…', fr: 'Enregistrement…' },
+  'loan.save.saveToLoans': {
+    en: 'Save to Loans',
+    es: 'Guardar en Préstamos',
+    fr: 'Enregistrer dans Prêts',
+  },
+
+  // The page for the monthly payment, or for one payment of the schedule.
+  'loan.payment.skipFigure': {
+    en: 'Skip’s figure',
+    es: 'Cálculo de Skip',
+    fr: 'Calcul de Skip',
+  },
+  'loan.payment.monthlyHint': {
+    en: 'Type the payment on your bank statement or loan papers. The last payment takes up any difference.',
+    es: 'Escribe el pago de tu estado de cuenta o de tu contrato. El último pago cubre cualquier diferencia.',
+    fr: 'Entre le paiement indiqué sur ton relevé ou ton contrat de prêt. Le dernier paiement absorbe la différence.',
+  },
+  'loan.payment.useThis': {
+    en: 'Use this payment',
+    es: 'Usar este pago',
+    fr: 'Utiliser ce paiement',
+  },
+  'loan.payment.useSkip': {
+    en: 'Use Skip’s figure',
+    es: 'Usar el cálculo de Skip',
+    fr: 'Utiliser le calcul de Skip',
+  },
+  'loan.payment.title': { en: 'Payment {number}', es: 'Pago {number}', fr: 'Paiement {number}' },
+  'loan.payment.regular': {
+    en: 'Regular payment',
+    es: 'Pago regular',
+    fr: 'Paiement régulier',
+  },
+  'loan.payment.interest': {
+    en: 'Interest this time',
+    es: 'Intereses de este pago',
+    fr: 'Intérêts de ce paiement',
+  },
+  'loan.payment.minimum': {
+    en: 'The least it can be',
+    es: 'Lo mínimo posible',
+    fr: 'Le minimum possible',
+  },
+  'loan.payment.owed': {
+    en: 'Pays the loan off',
+    es: 'Liquida el préstamo',
+    fr: 'Rembourse le prêt',
+  },
+  'loan.payment.thisPayment': { en: 'This payment', es: 'Este pago', fr: 'Ce paiement' },
+  'loan.payment.singleHint': {
+    en: 'Pay more or less this once. Every balance after it is worked out again, and the last payment takes up the difference.',
+    es: 'Paga más o menos esta vez. Todos los saldos posteriores se vuelven a calcular, y el último pago cubre la diferencia.',
+    fr: 'Paie plus ou moins cette fois. Tous les soldes suivants sont recalculés, et le dernier paiement absorbe la différence.',
+  },
+  'loan.payment.payoffHint': {
+    en: 'Anything above {owed} pays the loan off, and is taken as {owed}.',
+    es: 'Cualquier monto mayor que {owed} liquida el préstamo y se toma como {owed}.',
+    fr: 'Tout montant supérieur à {owed} rembourse le prêt et compte comme {owed}.',
+  },
+  'loan.payment.backToRegular': {
+    en: 'Back to the regular payment',
+    es: 'Volver al pago regular',
+    fr: 'Revenir au paiement régulier',
+  },
+  'loan.payment.locked': {
+    en: 'This is the last payment. It’s always what’s left on the loan, so it can’t be changed.',
+    es: 'Este es el último pago. Siempre es lo que queda del préstamo, así que no se puede cambiar.',
+    fr: 'C’est le dernier paiement. C’est toujours ce qui reste du prêt, il ne peut donc pas être modifié.',
+  },
+  'loan.payment.paidOff': {
+    en: 'The loan is paid off before this payment.',
+    es: 'El préstamo se liquida antes de este pago.',
+    fr: 'Le prêt est remboursé avant ce paiement.',
+  },
+  'loan.payment.gone': {
+    en: 'This loan isn’t open any more. Go back to the calculator to change it.',
+    es: 'Este préstamo ya no está abierto. Vuelve a la calculadora para cambiarlo.',
+    fr: 'Ce prêt n’est plus ouvert. Retourne au calculateur pour le modifier.',
+  },
+
+  // Why a typed payment is not taken.
+  'loan.refusal.notAnAmount': {
+    en: 'Type an amount, to the cent.',
+    es: 'Escribe un importe, hasta los centavos.',
+    fr: 'Entre un montant, au cent près.',
+  },
+  'loan.refusal.zero': {
+    en: 'Type an amount above zero.',
+    es: 'Escribe un importe mayor que cero.',
+    fr: 'Entre un montant supérieur à zéro.',
+  },
+  'loan.refusal.belowInterestMonthly': {
+    en: 'That can’t keep up with this loan’s interest. The least it can be is {minimum}.',
+    es: 'Eso no alcanza para cubrir los intereses de este préstamo. Lo mínimo posible es {minimum}.',
+    fr: 'Cela ne suffit pas à couvrir les intérêts de ce prêt. Le minimum possible est {minimum}.',
+  },
+  'loan.refusal.belowInterest': {
+    en: 'That doesn’t cover this payment’s interest. The least it can be is {minimum}.',
+    es: 'Eso no cubre los intereses de este pago. Lo mínimo posible es {minimum}.',
+    fr: 'Cela ne couvre pas les intérêts de ce paiement. Le minimum possible est {minimum}.',
+  },
+  'loan.refusal.noSuchPayment': {
+    en: 'This loan has no such payment.',
+    es: 'Este préstamo no tiene ese pago.',
+    fr: 'Ce prêt n’a pas ce paiement.',
+  },
+  'loan.refusal.lastPayment': {
+    en: 'The last payment is always what’s left, so it can’t be changed.',
+    es: 'El último pago siempre es lo que queda, así que no se puede cambiar.',
+    fr: 'Le dernier paiement est toujours ce qui reste, il ne peut donc pas être modifié.',
+  },
+
+  // What a loan is for, on the save page's grid.
+  'loan.type.personal': { en: 'Personal', es: 'Personal', fr: 'Personnel' },
+  'loan.type.car': { en: 'Car', es: 'Auto', fr: 'Auto' },
+  'loan.type.student': { en: 'Student', es: 'Estudiantil', fr: 'Études' },
+  'loan.type.home': { en: 'Home', es: 'Vivienda', fr: 'Maison' },
+  'loan.type.business': { en: 'Business', es: 'Negocio', fr: 'Entreprise' },
+  'loan.type.medical': { en: 'Medical', es: 'Médico', fr: 'Médical' },
+  'loan.type.creditCard': { en: 'Credit card', es: 'Tarjeta de crédito', fr: 'Carte de crédit' },
+  'loan.type.other': { en: 'Other', es: 'Otro', fr: 'Autre' },
 });

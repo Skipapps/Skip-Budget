@@ -172,6 +172,61 @@ describe('buildBillValues', () => {
     expect(housing.ok && housing.values.icon_id).toBeNull();
   });
 
+  describe("a loan's type, carried in its icon id", () => {
+    const loanBill = (patch: Partial<BillInput> = {}) =>
+      input({
+        name: 'Car loan',
+        amount: '412.37',
+        categoryId: 'loans',
+        iconId: 'loan-car',
+        ...patch,
+      });
+    const edit = { sources: SOURCES, lastChargedOn: '2026-10-01' };
+
+    it('survives an edit of the loan bill', () => {
+      const built = buildBillValues(loanBill(), { ...edit, hasLoan: true });
+      expect(built.ok && built.values.icon_id).toBe('loan-car');
+    });
+
+    it('survives on a loans bill even before its loan has been read', () => {
+      const built = buildBillValues(loanBill(), edit);
+      expect(built.ok && built.values.icon_id).toBe('loan-car');
+    });
+
+    it('survives a move to another category while a loan stands behind the bill', () => {
+      const moved = buildBillValues(loanBill({ categoryId: 'housing' }), {
+        ...edit,
+        hasLoan: true,
+      });
+      expect(moved.ok && moved.values.icon_id).toBe('loan-car');
+    });
+
+    it('goes with the loan: a bill with no loan behind it outside loans keeps none', () => {
+      const moved = buildBillValues(loanBill({ categoryId: 'housing' }), edit);
+      expect(moved.ok && moved.values.icon_id).toBeNull();
+    });
+
+    it('is only ever a known loan type', () => {
+      const unknown = buildBillValues(loanBill({ iconId: 'loan-boat' }), {
+        ...edit,
+        hasLoan: true,
+      });
+      const picker = buildBillValues(loanBill({ iconId: 'other' }), { ...edit, hasLoan: true });
+      expect(unknown.ok && unknown.values.icon_id).toBeNull();
+      expect(picker.ok && picker.values.icon_id).toBeNull();
+    });
+
+    it('leaves a normal bill exactly as before', () => {
+      expect(buildBillValues(input(), edit)).toEqual(
+        buildBillValues(input(), { ...edit, hasLoan: false }),
+      );
+      const housing = buildBillValues(input({ iconId: 'dumbbell' }), edit);
+      expect(housing.ok && housing.values.icon_id).toBeNull();
+      const other = buildBillValues(input({ categoryId: 'other', iconId: 'dumbbell' }), edit);
+      expect(other.ok && other.values.icon_id).toBe('dumbbell');
+    });
+  });
+
   it('floors starts_on after the last charge, and only when there is one', () => {
     const moved = buildBillValues(input({ startDate: day(2026, 9, 15) }), {
       sources: SOURCES,

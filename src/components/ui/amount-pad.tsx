@@ -1,6 +1,6 @@
 import { ChevronLeft } from 'lucide-react-native';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { AccessibilityInfo, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AmountFigure } from '@/components/flow/amount-figure';
@@ -17,6 +17,11 @@ type AmountPadProps = {
   unit?: 'currency' | 'percent';
   onCancel: () => void;
   onConfirm: (value: string) => void;
+  /**
+   * Why a draft cannot be used, or null. Done then stays on the pad and says so, rather than the
+   * screen behind quietly changing the figure.
+   */
+  check?: (value: string) => string | null;
 };
 
 /**
@@ -33,10 +38,22 @@ export function AmountPad({
   unit = 'currency',
   onCancel,
   onConfirm,
+  check,
 }: AmountPadProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState(value);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const done = () => {
+    const reason = check?.(draft) ?? null;
+    if (reason) {
+      setProblem(reason);
+      AccessibilityInfo.announceForAccessibility(reason);
+      return;
+    }
+    onConfirm(draft);
+  };
 
   return (
     <Modal visible animationType="slide" onRequestClose={onCancel}>
@@ -76,15 +93,28 @@ export function AmountPad({
             >
               {caption}
             </Text>
+            {problem ? (
+              <Text
+                className="mt-3 w-full text-center font-app text-[14px] text-danger"
+                maxFontSizeMultiplier={TEXT_CAP.reading}
+              >
+                {problem}
+              </Text>
+            ) : null}
           </View>
 
           <View className="px-6">
-            <AmountKeypad onKey={(key) => setDraft((current) => applyAmountKey(current, key))} />
+            <AmountKeypad
+              onKey={(key) => {
+                setProblem(null);
+                setDraft((current) => applyAmountKey(current, key));
+              }}
+            />
           </View>
         </ScrollView>
 
         <View className="px-6 pt-5">
-          <Button label={t('common.done')} onPress={() => onConfirm(draft)} />
+          <Button label={t('common.done')} onPress={done} />
         </View>
       </View>
     </Modal>

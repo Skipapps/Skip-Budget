@@ -20,8 +20,7 @@ type SliderRowProps = {
   scale?: 'linear' | 'log';
   /** Tapping the value opens a precise-entry pad, when one makes sense. */
   onValuePress?: () => void;
-  minLabel?: string;
-  maxLabel?: string;
+  className?: string;
 };
 
 /**
@@ -43,21 +42,21 @@ export function SliderRow({
   scale,
   onChange,
   onValuePress,
-  minLabel,
-  maxLabel,
+  className,
 }: SliderRowProps) {
   const stacked = !useGroupFits();
   const readout = (
     <Text
-      className="font-app-semibold text-[18px] text-ink"
+      className="font-app-semibold text-[17px] text-ink"
       maxFontSizeMultiplier={TEXT_CAP.figure}
     >
       {display}
     </Text>
   );
+  const chip = 'min-h-[36px] max-w-full shrink-0 justify-center rounded-[12px] px-4 py-1.5';
 
   return (
-    <View className="w-full">
+    <View className={cn('w-full', className)}>
       <View
         className={cn(
           'w-full',
@@ -67,8 +66,8 @@ export function SliderRow({
         <FitText
           id={`${id}-label`}
           role="row"
-          size={13}
-          className="font-app-medium text-body"
+          size={14}
+          className="font-app text-muted"
           slotClassName={stacked ? 'w-full' : 'min-w-0 flex-1'}
         >
           {label}
@@ -80,27 +79,24 @@ export function SliderRow({
             accessibilityLabel={t('loan.sliderRow.edit', { label, value: display })}
             onPress={onValuePress}
             hitSlop={8}
-            className="min-h-10 max-w-full shrink-0 justify-center rounded-full bg-ink/5 px-4 py-1.5 active:bg-ink/10"
+            className={cn(chip, 'bg-ink/5 active:bg-ink/10')}
           >
             {readout}
           </Pressable>
         ) : (
-          <View className="max-w-full shrink-0">{readout}</View>
+          <View className={cn(chip, 'bg-ink/5')}>{readout}</View>
         )}
       </View>
 
-      <Slider className="mt-1" value={value} min={min} max={max} step={step} onChange={onChange} />
-
-      {minLabel || maxLabel ? (
-        <View className="w-full flex-row items-center justify-between">
-          <Text allowFontScaling={false} className="font-app text-[11px] text-muted">
-            {minLabel}
-          </Text>
-          <Text allowFontScaling={false} className="font-app text-[11px] text-muted">
-            {maxLabel}
-          </Text>
-        </View>
-      ) : null}
+      <Slider
+        className="mt-1"
+        value={value}
+        min={min}
+        max={max}
+        step={step}
+        scale={scale}
+        onChange={onChange}
+      />
     </View>
   );
 }

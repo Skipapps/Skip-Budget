@@ -45,6 +45,8 @@ jest.mock('expo-router', () => ({
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({
     ink: '#000000',
+    card: '#FFFFFF',
+    accent: '#905479',
     body: '#333333',
     muted: '#777777',
     line: '#DDDDDD',

@@ -13,7 +13,7 @@ import { TEXT_CAP } from '@/theme/text-scale';
 
 /**
  * What a locked feature says for itself, one glance: its icon, an example, a heading, one line and
- * three points, with the price last. The comparison and the purchase live on the Pro page.
+ * two or three points, with the price last. The comparison and the purchase live on the Pro page.
  */
 export default function ProFeatureScreen() {
   const colors = useColors();

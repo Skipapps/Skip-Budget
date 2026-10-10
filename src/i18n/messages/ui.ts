@@ -135,4 +135,11 @@ export const uiMessages = defineMessages({
   'ui.color.rose': { en: 'Rose', es: 'Rosa', fr: 'Rose' },
   'ui.color.black': { en: 'Black', es: 'Negro', fr: 'Noir' },
   'ui.color.current': { en: 'Current colour', es: 'Color actual', fr: 'Couleur actuelle' },
+
+  /** A Paid with tile as VoiceOver reads it; "terminada" agrees with tarjeta and cuenta alike. */
+  'ui.source.endingIn': {
+    en: '{name}, ending in {last4}',
+    es: '{name}, terminada en {last4}',
+    fr: '{name}, se terminant par {last4}',
+  },
 });

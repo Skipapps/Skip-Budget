@@ -65,6 +65,8 @@ jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({
     ink: '#000000',
+    card: '#FFFFFF',
+    accent: '#905479',
     muted: '#777777',
     line: '#DDDDDD',
     surface: '#FFFFFF',
@@ -443,6 +445,42 @@ describe('Add receipt — what Paid with saves', () => {
 
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0]).toMatchObject({ amount: 15.99, ...columns });
+  });
+
+  it('files the card picked by its spoken name and last four', async () => {
+    // As usePaymentSources gives them: the card's own name and its digits apart from the label.
+    const named = [
+      {
+        id: 'card-9',
+        label: 'VISA ••4821',
+        name: 'Chase Sapphire',
+        last4: '4821',
+        color: '#7BC4F5',
+        kind: 'card',
+      },
+      {
+        id: 'acct-9',
+        label: 'Chase Checking ••7730',
+        name: 'Chase Checking',
+        last4: '7730',
+        color: '#2E6E5B',
+        kind: 'account',
+      },
+    ];
+    mockSources = named;
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99', 'Chase Sapphire, ending in 4821');
+
+    expect(screen.getByLabelText('Chase Sapphire, ending in 4821')).toBeSelected();
+    expect(screen.getByLabelText('Chase Checking, ending in 7730')).not.toBeSelected();
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      amount: 15.99,
+      card_id: 'card-9',
+      bank_account_id: null,
+    });
   });
 
   it('keeps only the last pill pressed, never a card and an account together', async () => {

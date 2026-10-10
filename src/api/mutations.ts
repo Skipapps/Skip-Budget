@@ -456,6 +456,13 @@ export type SaveLoanValues = {
   dayCountBasis: AccrualBasis;
   cardId: string | null;
   bankAccountId: string | null;
+  /**
+   * Payments changed on the schedule, as `paymentOverridesJson` writes them: payment numbers 1 to
+   * term - 1 as string keys, amounts exact to the cent. Null or left out when nothing changed.
+   */
+  paymentOverrides?: Record<string, number> | null;
+  /** The contract's payoff date (yyyy-mm-dd) when the changes end it before the term; else null. */
+  lastPaymentOn?: string | null;
 };
 
 /**
@@ -467,6 +474,10 @@ export function useSaveLoan() {
 
   return useMutation({
     mutationFn: async (values: SaveLoanValues) => {
+      const overrides =
+        values.paymentOverrides && Object.keys(values.paymentOverrides).length > 0
+          ? values.paymentOverrides
+          : null;
       const { data, error } = await supabase.rpc('save_loan', {
         p_name: values.name,
         p_icon_id: values.iconId,
@@ -481,6 +492,10 @@ export function useSaveLoan() {
         p_bank_account_id: values.bankAccountId,
         p_funded_on: values.fundedOn,
         p_day_count_basis: values.dayCountBasis,
+        // Named only when set: a loan with no changes is the call a database without these
+        // parameters still accepts, and one with changes is refused there rather than saved without.
+        ...(overrides ? { p_payment_overrides: overrides } : {}),
+        ...(values.lastPaymentOn ? { p_last_payment_on: values.lastPaymentOn } : {}),
       });
       if (error) throw error;
       return data as { id: string };

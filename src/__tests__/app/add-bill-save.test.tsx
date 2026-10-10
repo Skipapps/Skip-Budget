@@ -52,6 +52,8 @@ jest.mock('@/components/brands/brand-logo', () => {
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({
     ink: '#000000',
+    card: '#FFFFFF',
+    accent: '#905479',
     body: '#222222',
     muted: '#777777',
     line: '#DDDDDD',
@@ -64,6 +66,9 @@ jest.mock('@/providers/theme-provider', () => ({
 }));
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
+}));
+jest.mock('@/theme/loan-icons', () => ({
+  useLoanIcons: () => new Proxy({}, { get: () => () => null }),
 }));
 
 const mockConfirm = jest.fn(async (_: object) => true);
@@ -1899,18 +1904,14 @@ describe('Add bill — a loan’s schedule', () => {
     statement_principal: null,
   };
 
-  it('shows where the first payment goes on a bill that came from the loan calculator', async () => {
+  it('offers the payment schedule on a bill that came from the loan calculator', async () => {
     mockLoan = LOAN;
     editing({ ...POWER, name: 'Car loan', category_id: 'loans', amount: 386.66 });
     const screen = await render(<AddBillScreen />);
 
-    const card = screen.getByLabelText(
-      'Where each payment goes. First payment: $100.00 interest, $286.66 off the balance. Opens the full schedule.',
-    );
-    expect(card).toBeTruthy();
-    expect(
-      screen.getByText(/of your first payment is interest — see all 60 payments/),
-    ).toBeTruthy();
+    const card = screen.getByRole('button', { name: 'Payment schedule' });
+    expect(card.props.accessibilityHint).toBe('See where all 60 payments go');
+    expect(screen.getByText('See where all 60 payments go')).toBeTruthy();
 
     await fireEvent.press(card);
     expect(router.push).toHaveBeenCalledWith({
@@ -1932,6 +1933,6 @@ describe('Add bill — a loan’s schedule', () => {
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
-    expect(screen.queryByText('Where each payment goes')).toBeNull();
+    expect(screen.queryByText('Payment schedule')).toBeNull();
   });
 });

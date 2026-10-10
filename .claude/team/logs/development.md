@@ -4844,3 +4844,472 @@ bug in component behaviour found; two comments corrected. tsc 0; `rm -rf .expo/c
   - Tests: `src/__tests__/api/reminder-choice.test.tsx` and `src/__tests__/app/edit-reminder-unknown.test.tsx`.
   - Gap: a reminder change the person makes while the saved one is unknown is not saved either. Showing the reminder card as unavailable with Try again while unknown would be clearer (Dana).
 - **2026-10-09 — Diego — full gate before the commit:** the add-source-wall and add-account-i18n break was already gone (add-account.tsx no longer imports LEAD_OPTIONS; it passes a `leadFits` predicate). Both suites pass, 21 tests. tsc: exit 0, 0 errors. Full `npx jest --ci`: 263 of 263 suites, 5,499 of 5,499 tests, exit 0.
+
+---
+
+## 2026-10-09 — Diego (Developer, data and backend) — salary free on every plan: database and lib
+
+**Outcome:** Done, uncommitted, not pushed. No Docker used. tsc 0 errors. eslint and prettier clean on my files. 41 suites, 805 tests pass: salary, pro and add-source screens, supabase, api, wall, allowance and pay.
+
+- **Migration `20261009100006_salary_sources_free.sql`:**
+  - `drop trigger if exists salary_sources_free_allowance on public.salary_sources;` and `drop function if exists public.enforce_income_allowance();`. That function was salary-only: one_off_pay swapped the trigger onto it.
+  - The shared `enforce_free_allowance()` stays; the cards and bank_accounts free-allowance triggers still use it. The lock-extras trigger and function were already dropped in 20260928100001.
+  - Nothing else on the server limits income.
+- **`supabase/checks/one_off_pay.sql`** updated (not run: no Docker). Free accounts now keep a second schedule, and can turn a one-off into a schedule beside it. The trigger and function are gone, and a second card is still refused.
+- **Client:** `FREE_LIMITS.incomeSources` removed from `src/lib/wall.ts`; nothing read it. No other income guard exists in src/api or src/lib. The remaining gates are in src/app/salary.tsx (Dana).
+- **Tests:**
+  - `src/lib/wall.test.ts`: the free plan counts cards, accounts, scans and uploads, never pay.
+  - New `src/__tests__/supabase/free-allowance-triggers.test.ts` replays every migration's trigger creates and drops in order:
+    - salary_sources ends with no limit trigger, and the function is gone;
+    - cards and bank_accounts keep `enforce_free_allowance`;
+    - the salary trigger is found live just before 100006, which proves the replay itself.
+
+## 2026-10-09 — Dana — Salary for everyone: the page, the Pro copy and the total card (DONE, uncommitted)
+
+- **Salary page** (`src/app/salary.tsx`): every Pro gate is gone. That covers Add source, a one-off turned into a regular frequency, the `usePro` read, and the once-first save order that freed the free plan's slot; sources now save in page order. The "One-off pay" button is removed. "Just this time" stays in How often, and saved one-offs work as before: this month's line, earlier months behind their row, edit and delete. "Add salary source" is now one full-width outlined pill with plum text, as in the screenshot, and it ends the scroll.
+- **Total per month** is a card: the salary gradient icon (48pt) from `useGradientIcons`, light or dark by the app's theme, hidden from VoiceOver. The label, a 30pt bold FitFigure, and this month's one-off line sit beside it.
+- **Copy:**
+  - `pro.unlimited.b` now reads "Move money between accounts" / "Mueve dinero entre tus cuentas" / "Transfère de l'argent entre tes comptes". Its icon changed from Banknote to ArrowRightLeft.
+  - `faq.pro.include.a` no longer lists incomes (en/es/fr).
+  - The compare rows had no income claim.
+  - Removed key: `salary.addOneOff` (en/es/fr). No keys added.
+- **Other walls:** none found for income. Quick add Salary, the Cards Salary tile, Getting Started, Settings > Your money and Insights' link all go straight to /salary. The add-account pay field has no gate. The Cards tab walls are for cards and accounts only.
+- **Tests:**
+  - New `salary-free` (3): a free account adds a 2nd and 3rd source and saves them; no Pro page with 3 saved; one full-width add button and no One-off button.
+  - New `salary-total-card` (3): light and dark icon, hidden from VoiceOver; the one-off line sits in the card.
+  - New `pro-copy-salary-free` (4): no Pro copy or FAQ Pro answer names income in any language. Run against HEAD's copy, its regex flags exactly the six old claims.
+  - Rewrote the Pro cases in `salary-one-off`. `salary-past-pay` and `salary-paid-into` add through Add source plus "Just this time", and the order is now page order. In `salary-large-text`, Add source ends the scroll.
+  - The other suites swap their `@/api/pro` mock for a `@/theme/gradient-icons` mock. `pro-features.test` pins the new point.
+  - 6 of 6 mutants were caught (run from scratch copies, so the served file was never touched).
+- **Gates:** tsc 0. ESLint (cache cleared) and prettier are clean on all 15 files. The full jest run passes: 267 suites, 5,511 tests.
+- **Simulator:** seen in light at the default size (card and icon). Not seen: dark mode (the app's theme is set to Light), the bottom pill (it needs a scroll) and large text. All three are pinned by tests. The Simulator was left on /salary, opened by deep link; nothing was saved.
+- **Open:**
+  - The migration must be live before or with this build, or a free second schedule gets the failure line on Save.
+  - The screenshot has more than the brief asks for: a "Next payday · 1 source" footer on the card, and a redesigned source card. Not built.
+  - The label stays "Add salary source"; the screenshot says "Add source".
+  - Moving money is not walled on any plan.
+
+## 2026-10-09 — Dmitri (Development Lead) — loan file upload (phase C): plan for the Founder's approval
+
+**Outcome:** Done, as a plan only. I wrote `.claude/team/dev/loan-upload-plan.md` (559 lines, over the 250–400 asked for). Nothing was built, and no code was touched.
+
+**What changed and what was decided:**
+- Release in two steps. C1 reads PDFs that have a text layer, through PDFKit. C2 adds scans and photos through Vision, once they pass the corpus targets. One native build carries both paths, and JS switches OCR on in C2.
+- Dilip extends the `ReceiptScanner` module with a new file, `DocumentReader.swift`, and a `readDocument` call.
+  - No prebuild: `pod install` is enough.
+  - `fileprivate` becomes `internal` on three functions.
+  - The receipt bench output must stay byte-identical.
+- The parser goes in a new `src/lib/loan-doc/`:
+  - Diego: layout, labels, document kind, locating values.
+  - Drew: numbers, dates, cross-checks, the engine replay, rate solving, the status rules.
+  - `receipt-parser.ts` is not touched.
+- Each field gets one of four statuses: Checked, Check this, Not found, Assumed.
+  - A value is Checked only when an arithmetic identity holds.
+  - A "Check this" value is never applied until the person confirms it.
+  - There is no largest-number guess.
+- The file is never kept, and nothing about the upload is stored on the server.
+- Pro is gated on the client only.
+
+**Found while reading:**
+- The calculator silently clamps typed amounts to 500–1,000,000 and rates to 0–30. Uploaded values would be clamped the same way.
+- `loans.annual_rate` is `numeric(6,3)`, so the saved rate keeps only 3 decimals.
+- `statement_on` and `statement_principal` already exist in the database.
+- The current receipt upload reads only page 1 of a PDF, and only by OCR. I left that alone.
+- The loan design's line "Interest is worked out monthly" must not remove the interest-method choice. Dana L to confirm.
+
+**Not verified:**
+- Whether PDFKit returns text from owner-password PDFs.
+- Full-page Vision reading on an iPhone.
+- The PDFKit API names. They come from Apple's framework, not Expo docs; Dilip checks them when building.
+
+**Open questions for the Founder (7):**
+1. Ship C1 first?
+2. What to do with monthly statements.
+3. Raise the calculator caps.
+4. Fill-and-warn or refuse loans the calculator can't price exactly.
+5. Supply real loan documents.
+6. Who designs the pages.
+7. A "Scan paper pages" choice.
+
+## 2026-10-09 — Dana — Salary page rebuilt to the Founder's screenshot (DONE, uncommitted)
+
+- **Founder decision (via CEO):** match `.claude/team/design/reference/salary/salary-page.png` in full. "Move money between accounts" is approved. The DB change goes live before the build.
+- **Total card** (`components/salary/salary-total-card.tsx`): the salary icon, the total and this month's one-off line. Under a divider: "Next payday 15 Oct · 1 source". That is the soonest next payday of any schedule (`getNextPayday`, `shortDay`) and the count of schedules; one-off pays are neither. It reads "N sources" while no schedule has a payday, and the line is hidden when there are only one-offs.
+- **Source card** (`app/salary.tsx`):
+  - "Source 1" (or "One-off pay") sits over the bold name. The pencil renames in place (the field autofocuses and becomes the title again on blur or Done); a source with no name shows its Name field, optional for a one-off. The trash asks as before. Earlier months' one-offs open folded, with a chevron to unfold them; the collapse button is gone otherwise.
+  - Fixed pay / Hourly is `TogglePill tone="segment"`, a new tone on the shared control; time-picker keeps `fill`.
+  - The Amount box (`components/salary/amount-box.tsx`) opens the full-page keypad, and its calculator glyph opens the calculator. Hourly sources use the same box for the rate.
+  - Rows (`components/salary/pay-row.tsx`) wrap so the value drops under the label at large text. How often opens chips inline and closes on a pick. Last payday opens InlineCalendar inline (the DatePicker popover is no longer used here), and its note gives the next payday or "Counts once…".
+  - Paid into shows the account's colour swatch and "Name ••last4", or "No account" plus the hint. It opens the new full page `app/salary-paid-into.tsx` (radio rows with swatch and check, "No account" last). The unsaved pick comes back through `lib/paid-into-pick.ts`, a listener keyed by the editor's `useId`. Nothing is stored, so a pick made with no editor listening goes nowhere.
+  - Only one inline control is open at a time. Save, the past-pay question and the save order are unchanged.
+- **Keys:** `salary.addSource` is now "Add source" / "Agregar fuente" / "Ajouter une source".
+  - Added: `salary.total.next`, `salary.total.count`, `salary.rename`, `salary.showChoices`, `salary.showCalendar`, `salary.paidIntoHint`.
+  - Removed: `salary.collapseSource`, `salary.unnamed`, `salary.howPaid`.
+- **Tests:**
+  - New `salary-source-card` (11) and `paid-into-pick` (2). `salary-total-card` has 5 more footer cases. `salary-paid-into` is rewritten for the row, the page and the hand-off (42).
+  - The other salary suites use helpers to open How often, rename with the pencil, pick the payday on the inline calendar and hand back an account. Their queries mocks carry `accountLabel`, because the real module starts Supabase.
+  - The languages sweep now also reads hints and row values.
+  - 6 of 6 redesign mutants were caught once the empty-name test was extended.
+- **Gates:**
+  - ESLint (cache cleared) and prettier are clean on all 23 of my files, and tsc shows no error in them.
+  - The tree's 11 tsc errors are all in other sessions' loan-redesign and source-tiles tests.
+  - Full jest: 266/271 suites pass. The 5 failures are the loan redesign's `useLoanIcons` / loan keys (4 loan suites plus add-bill-save), not Salary.
+- **Simulator (light, default size):** Salary and Paid into were seen and match the screenshot. Not seen: dark mode (the app is set to Light) and large text; tests cover them. The Simulator was left on the Paid into page, opened by link; nothing was saved.
+- **Open:** no bank logos exist for accounts, so Paid into shows the account's colour swatch, not the Chase mark. The shared BackButton is a bare chevron, not the screenshot's white circle; that was left alone because it is app-wide.
+
+## 2026-10-09 — Dana P — "Paid with / Paid from" tiles in the save-loan design, everywhere (DONE, uncommitted)
+
+**Outcome:** done. The shared `src/components/ui/source-tiles.tsx` now draws the save-loan tiles, so add-bill, add-subscription, add-receipt (typed, scan, upload, voice), habit-new, source-payment, save-loan and the entry edit pages (edit and voice) all follow. No caller changed. The props API is unchanged.
+- **Tile:** a 28×18 swatch in the card's or account's own colour, the name (14 semibold ink), `••last4` under it (12 muted), and a 20pt radio at the right (1.5px muted/40 ring). The tile is `rounded-[16px]`, 54pt min height, with a 1.5px border either way so choosing one moves nothing. Unselected: card fill + line border. Selected: plum border, an `accent/10` tint laid over the card (the design's #F5EBF1, not tinted by the page), and a filled plum check (white Check). These match the PNG's measures and sampled colours.
+- **Skip tile:** same tile, a dashed muted swatch, the existing wording (Skip / Omitir / Passer, Somewhere else, New money), no last4. Semantics unchanged: '' = Skip, null = unanswered; still required where it was.
+- **Grid:** two to a row in equal columns; the tiles in a row stretch to the taller. An odd last tile keeps its column's width (a spacer fills the other half). One per row from the text size where the tiles' type hits its ceiling (`fontScale ≥ TEXT_CAP.control`, i.e. xxxL and the AX sizes), or when any name's widest word would not fit beside the swatch and radio (a FitGroup in `switch` mode). Names wrap between words and are never cut. The radio's left gap is 6pt, not 8, so "Checking" fits a half tile inside the entry pages' form card on a 402pt phone.
+- **Dark/light:** a swatch under 1.5:1 against the card (black/ink on dark, white/lime on light) gets a 1px muted outline.
+- **VoiceOver:** each tile is a radio labelled with the full label ("VISA ••4821", unchanged), with selected + checked state.
+- **Data (Diego's file, additive only):** `PaymentSourceRow` gains optional `name` and `last4`, filled by `usePaymentSources` (card: network; account: nickname or bank). `label` is unchanged, so every other "Paid with" line and the existing test queries are untouched. Without `name`, the tile shows the label.
+- **Tests:**
+  - New `src/__tests__/components/source-tiles.test.tsx` (18): parts, sizes and ceilings; selection (border, tint, check, a11y state); tap + haptic; label fallback; no-digits card; Skip tile (style, unanswered vs Skip, own handler, absent without `skip`); grid (2 + odd spacer, xxL stays 2, xxxL/AX1/AX5 stack, a too-wide word stacks); outlines in dark and light; swatch kept on selection.
+  - New `src/__tests__/api/payment-sources.test.tsx` (1).
+  - The SourceTiles case in `shared-controls-large-text` now draws name + last4 + Skip in en/es/fr.
+  - 16 caller suites had `card` added to their `useColors` mock (one line each); no assertion changed, since none asserted the old pills.
+  - 13 of 13 mutants caught (scratch copies via moduleNameMapper; the served file was never touched).
+- **Gates:** tsc exit 0. ESLint (cache cleared) and prettier are clean on all 21 files. Full jest: 267/271 suites, 5,526/5,550 tests. The 4 failures are the loan redesign in progress: `useLoanIcons` → `useTheme` missing from the loan-calculator-languages, loan-schedule-languages and add-bill-save mocks, and the deleted `bills/icon-picker` still mocked in save-loan-languages. None renders SourceTiles. The callers' 30 suites pass (1,374 tests, the same as before the change).
+- **Simulator (iPhone 17 Pro, light, default size):** the receipt final page, opened by link (nothing saved), shows the new tiles. The Founder's own sources go one per row there: a name below the fold has a word too wide for a half tile inside the form card. I could not scroll to see which (no input tooling). Not seen: dark mode (the app is set to Light), large text, and the Skip tile; tests cover them. The Simulator was left on Home.
+- **Open:** (1) Should a card tile show the card's own name (`holder`, e.g. "Chase Sapphire") rather than the network? The design's "Chase" suggests so; I kept the network, to match every other Paid with line. (2) save-loan needs no change for the restyle. The brief's "Paid from tiles (+ Skip)" would need Dana L to pass `skip` and add a null (unanswered) state: today '' means none. (3) VoiceOver reads "••" as bullets app-wide; an "ending in 4821" label would be an app-wide copy change.
+- **2026-10-09 — Dana P — CEO calls on the tiles:**
+  - A card tile is named by the card's own name (`holder`, trimmed), falling back to the network; line 2 stays "••4821". Accounts are unchanged. The change is in `usePaymentSources`; `label` is untouched.
+  - VoiceOver reads each tile as `ui.source.endingIn`: "{name}, ending in {last4}" / "{name}, terminada en {last4}" / "{name}, se terminant par {last4}". Tiles without digits read the name alone. The "••" reading elsewhere in the app stays.
+  - Stacking one per row on a too-wide word is accepted as is.
+  - Tests: spoken label in en/es/fr (3 new cases); hook test for holder, a blank holder and a spaces-only holder. 2 of 2 new mutants caught.
+  - Gates: tsc 0; 32 suites / 1,391 tests (SourceTiles, the callers and the guards); eslint + prettier clean on the 5 files.
+
+## 2026-10-09 — Dmitri (Development Lead) — review of the uncommitted Salary for everyone + Salary page redesign
+
+**Outcome:** Approve after one small MUST-FIX on the Paid into page. The migration is safe to push now. Read-only review; no code edited.
+
+- **Gates run:** `npx tsc --noEmit` passes for the whole tree with 0 errors, including the loan files. Suites: 21 (394 tests) for salary, pro copy, wall, trigger replay, paid-into-pick, pro-features, shared controls and settings; plus pay/payday, supabase/api/allowance and ui-pickers-language. All pass. ESLint (`--no-cache`) and prettier are clean on the salary files.
+- **Money:** the total and this month's one-offs use the same `scheduledPerMonth`/`oneOffsInMonth` as before. The next-payday line leaves one-offs out, and payday maths is untouched. The past-pay comparison is unchanged. Deletes still run first, then saves in page order. Cleared names still block Save on a saved schedule, and hourly fields are kept.
+- **Free plan:** no salary gate is left in the client or the DB. Cards and accounts keep theirs (cards.tsx, add-card/add-account, `enforce_free_allowance`). Every salary key is still used, and the removed keys are not referenced anywhere. The `fill` path of TogglePill is the same class for class, so TimePicker is unaffected.
+- **MUST-FIX (Dana):** `salary-paid-into.tsx:30` `choose` has no guard to make the page leave only once. `router.back()` is global in expo-router 57 (see voice-edit.tsx:137), so a second tap pops /salary and loses every unsaved edit.
+- **SHOULD-FIX:** VoiceOver does not read the PayRow note (pay-row.tsx:53; Dana). The SQL check leaves its test card behind and has never been run (Diego). The migration must be live before the build ships (CEO).
+- **Open:** the Pro page promises "Move money between accounts", which is free on every plan. The account swatch stands in for a bank logo. With no accounts, the Paid into page offers only "No account".
+- **2026-10-09 — Diego — Dmitri's salary review notes:** one_off_pay.sql now deletes the card it adds for the refusal check (and checks it is gone). free-allowance-triggers.test.ts uses one shared parser that reads `create [or replace] [constraint] trigger`, `drop trigger [if exists]` and `create [or replace] function` / `drop function [if exists]`, applied in statement order, with five synthetic cases. 8 of 8 pass. tsc: only error is in another agent's new, untracked src/__tests__/app/loan-calculator-design.test.tsx (TS2352 at 112:34).
+
+## 2026-10-09 — Dana — Salary: Dmitri's review fixes, the CEO's "Add an account", and the Unlimited explainer (DONE, uncommitted)
+
+- **MUST (leave once):** new `src/lib/use-navigate-once.ts` allows one navigation per visit and resets on `useFocusEffect`. The Paid into page's `choose` runs through it, so two presses give one pick and one back. **NIT:** the Salary page's Paid into row uses it too, so a double tap opens one page and the row works again on return.
+- **SHOULD:** PayRow reads its note with the label (`Last payday, Next payday 15 Oct 2026`).
+- **CEO (Add an account):** the Paid into page ends with an "Add an account" pill (`salary.addAccount` / `addAccountHint`, en/es/fr). It opens `/add-account?from=salary`, the free wall applies as usual, and the new account is listed on return, ready to pick.
+  - add-account gained a `from=salary` mode: no pay switch, no expected income, no salary created and nothing linked. Otherwise the open Salary editor would refetch, remount and lose its edits. "Add another" keeps the mode.
+- **NITS:**
+  - The total card's count uses Save's own rule (`keptOnSave`, now shared with handleSave), so a blank new source is not counted.
+  - The paycheck is worked out once per card.
+  - `accountLabel` moved to `src/lib/account-label.ts`, which queries.ts imports (Diego's file: only the import and the removed function changed). The salary suites now use the real helper, not a copy.
+- **Founder (via CEO):** the Unlimited explainer drops its middle point. `pro.unlimited.b` is removed in en/es/fr and the icon import is gone. `feature()` now takes the icons keyed by message part (`a`, optional `b`, `c`), so Unlimited keeps `a` and `c` and every other feature is unchanged. The Pro feature page draws the two points in its gap column.
+- **Tests:**
+  - New `add-account-from-salary` (3) and `account-label` (3). `salary-paid-into` gains the leave-once, double-tap/refocus and add-an-account cases. `salary-source-card` gains the spoken note, and `salary-total-card` the blank-source count.
+  - The pro-features test now expects two or three points, with Unlimited's two in en/es/fr. `pro-feature` checks the two-point layout.
+  - The copy guard now also rejects moving-money claims, and checks that `pro.unlimited.b` is gone.
+  - The salary suites mock `useFocusEffect`; the two that open Paid into simulate the return.
+  - 6 of 6 mutants were caught.
+- **Gates:** tsc is clean for the whole tree. ESLint (cache cleared) and prettier are clean on all 31 files. 64 affected suites (1,138 tests, guards included) pass, plus the Pro and FAQ suites (86).
+- **Simulator:** not checked this round, because the loan session was using it.
+
+## 2026-10-09 — Dana L (Developer, UI and navigation) — Loan redesign, phase A: calculator, schedule, save (DONE, uncommitted)
+
+**Outcome:** Done. The three loan screens match the Founder's PNGs. Every figure is the engine's, untouched. Also folded in, at the coordinator's request: the Founder's no-silent-clamp decision, and Dana P's call-site change (Paid from required, null/''). No commits.
+
+- **Calculator** (`src/app/loan-calculator.tsx`):
+  - Result card: payment headline, "N payments · last on", the extra and first-period notes, the borrowed/interest bar (hidden from VoiceOver), dotted rows, fees, the APR line and its note, "Total you repay".
+  - "The loan": three slider rows in one card.
+  - "Dates": two chevron rows.
+  - More options (`more-options-card.tsx`): opens in place, no sheet. It holds extra, lump sum and date, fees, and the interest chips with their note.
+  - Then the overpay card, an info line that follows the chosen convention, and the Payment schedule card.
+  - A marked empty slot (`loan-upload-slot`) for phase C, straight above the pinned Save.
+- **Schedule** (`src/app/loan-schedule.tsx`):
+  - Summary card with a 2×2 grid. The rate reads "7.50% APR" only when fees are known and `truthInLending` agrees with the rate. Otherwise it reads "7.50%", plus an APR cell when the two differ.
+  - Year headings show whole-year "N payments · $X interest".
+  - Numbered rows show the first 8, then "Show all N payments". Days stay in the spoken label.
+- **Save** (`src/app/save-loan.tsx`):
+  - "Save this loan"; summary card with "/ month" and a 3-column grid; Name ("e.g. Car loan").
+  - Loan type: a 4×2 grid (`loan-type-grid.tsx`, two columns when a name cannot fit); Personal is chosen by default.
+  - Paid from: Dana P's tiles plus a Skip tile. Null means unanswered and '' means Skip. Save lists what is missing ("To save this loan, fill in: Name, Paid from."). The line sits above the button in the footer.
+  - "Save to Loans".
+- **Loan type, no migration:** `icon_id = 'loan-<type>'` (`src/data/loan-types.ts`); `save_loan` passes it straight into the free-text `bills.icon_id`. BillMark and BillRow draw the type's gradient icon, light or dark. Any other icon id keeps its glyph.
+- **Icons:** 24 flattened copies in `assets/gradient-icons/loan-*.svg` (flattener in scratch; Desktop originals untouched).
+  - Quick Look renders are pixel-identical to the originals (0 differing pixels, all 24).
+  - Every dark original already carried the navy lift. Home has no navy, so its pair is identical.
+  - Personal is byte-identical to loan-result, so the registry `src/theme/loan-icons.ts` reuses that pair.
+- **No silent clamps (Founder):**
+  - Typed amounts and rates are kept as typed past the slider ends (the thumb waits at the end).
+  - The pad refuses an amount ≤ 0 or an empty rate, with a visible reason (new optional `check` on AmountPad).
+  - Save refuses a rate the `loans` table cannot hold: its CHECK caps it at 0–100, numeric(6,3). The reason shows from the start, and the rate is never rounded.
+  - The keypad already stops at 2 decimals and 9 whole digits.
+- **Phase B hooks:**
+  - `PaymentHeadline onEdit` (the figure becomes a button: "Monthly payment, $X. Edit").
+  - `PaymentRow onPress(row)`.
+  - Both pages read their params through `src/lib/loan-route.ts` (`readLoanRoute`), so new params land in one place. The calculator now also sends `fees` to the schedule.
+- **Copy (en/es/fr):**
+  - Terms are whole words in English ("5 years"), as drawn.
+  - Rates have at least 2 decimals, never rounded ("7.50%", "6.125%").
+  - Old keys retired: scheduleCard title/summary/a11y, proportion.*, save.icon/ratePerYear/termPayments/interestOverTerm/addToBills/needName, bills.icon.*, interestPaid, overpaymentsAndFees.
+- **Archived** to `~/Desktop/SkipBudget-design-archive/2026-10-09/` and removed from the tree: proportion-bar.tsx, bills/icon-picker.tsx, illustrations/loan-schedule.svg. Before trimming, artwork.ts, bill-categories.ts (BILL_ICON_CHOICES) and messages/bills.ts were archived whole.
+- **Tests:**
+  - New suites: loan-icons (110), loan-icons-dark (13), loan-route (15), loan-calculator-design (11), loan-schedule-design (7), save-loan-design (21), components/loan-cards (13).
+  - Updated suites: the calculator, schedule and save languages tests, calculator large-text, loan-parts-languages, shared-controls-large-text (loan cases only), add-bill-save (schedule card), large-text guard (loan-schedule and save-loan adopted).
+  - 18 of 18 mutants caught, run from a scratch copy.
+- **Gates:**
+  - tsc 0.
+  - eslint (cache cleared) and prettier are clean on my files. `npm run lint`'s only findings are in other sessions' in-progress files.
+  - Full jest: 282 suites, 5,821 tests green. Loan-maths fixtures green.
+- **Simulator (iPhone 17 Pro, light):**
+  - Calculator top, schedule and save page seen at default size; the calculator also at AX-XL (text size restored to large).
+  - Figures match the PNGs: $500.95, $5,056.96, $462.28 / $1,649.02, row 1.
+  - Row captions set to the design's 11pt after the check.
+  - Not seen: dark mode (the app is set to Light), and the calculator below the sliders (no scroll without driving the mouse); both are covered by tests.
+- **Open:**
+  - `buildBillValues` (src/api/entry-values.ts:139) saves `icon_id: null` for any non-Other bill, so editing a saved loan's bill erases its type. One-line fix for Diego: keep a `loan-*` id when the category is `loans`.
+  - The loans CHECK caps rates at 100%. Rates up to 999.999% need a migration (Diego).
+  - `SliderRow` never passed `scale="log"` to `Slider` (pre-existing), so the amount slider is linear, as the PNG also draws it. Passing it through is one line; it is the Founder's call.
+  - The default convention stays daily actual/365 ($500.97). The PNG's $500.95 is the monthly-rests figure.
+
+---
+
+## 2026-10-09 — Diego (Developer, data and backend) — loan type kept when a loan's bill is edited
+
+**Outcome:** Done, uncommitted. tsc 0 errors; eslint clean. 16 suites, 626 tests pass: entry-values, voice-draft, and the add-bill, voice-review and loan screens.
+
+- **`buildBillValues` (src/api/entry-values.ts):**
+  - A bill that is a loan (category `loans`, or the new optional `ctx.hasLoan`) keeps its icon id when that id names a known loan type (`loanTypeOf` from src/data/loan-types.ts, e.g. `loan-car`).
+  - Every other bill is unchanged: an Other bill keeps its picked icon, and the rest get null.
+- **`src/app/add-bill.tsx`:** one line, passing `hasLoan: Boolean(loan)` (`useLoanForBill` was already read there).
+- **Tests (src/api/entry-values.test.ts):**
+  - an edited loan bill keeps loan-car, with or without its loan read;
+  - it keeps it after a move to another category while a loan stands behind it, and has none without one;
+  - unknown `loan-boat` and the picker's `other` are dropped;
+  - a normal bill is exactly as before.
+- **Noted for later, no action:** `loans.annual_rate` has CHECK (0..100) (20260827100005_loans.sql), so rates over 100% cannot be saved. Waiting on the Founder.
+
+## 2026-10-09 — Dmitri (Development Lead) — review of the restyled shared Paid with / Paid from tiles (uncommitted)
+
+**Outcome:** Approved with no MUST-FIX items. Read-only review; no code edited.
+
+- **Gates run:** `npx tsc --noEmit` exits 0 for the whole tree. 32 suites (1,434 tests) pass: SourceTiles, payment-sources, shared-controls-large-text, large-text-guard, account-label, and every caller (add-bill/-subscription/-receipt incl. scan, voice and habit, source-payment, voice-edit, voice-review, habit-new, the bill/receipt/subscription/habit detail pages, save-loan). The i18n guards pass too (9 suites). ESLint (`--no-cache`) and prettier are clean on the 5 in-scope files.
+- **Semantics:** no caller file changed. The props contract is the same: `value`, `onChange(source.id)`, and `skip.selected`/`skip.onPress`. So '' = Skip, null = unanswered, required-ness, the Save "fill in" lists and the written ids are unchanged. The save suites still assert `card_id`/`bank_account_id`. `label` is byte-identical, and the `accountLabel` move is the same function body.
+- **SHOULD:** no caller suite feeds rows that have `name`/`last4`. The production VoiceOver label ("X, ending in 1234") is never pressed through a save path. Add one caller case that does (e.g. add-receipt-save).
+- **NITS:** `source-tiles.tsx:51` uses `??`, so an empty name shows a blank tile. Account `name` is not trimmed (queries.ts:440), but card `name` is. The selected border is 2.6:1 on the dark card (the check carries the state). Sand #E9CF9B sits at 1.51:1 on white, just above the 1.5 outline threshold, and contrast is measured against the card colour rather than the tinted selected background.
+- **Not verified:** dark mode, large text and the Skip tile have still not been seen in the Simulator.
+- **2026-10-09 — Diego — note:** the Founder keeps the 0–100% cap on `loans.annual_rate`, so no migration. Closed.
+- **2026-10-09 — Dana P — Dmitri's review items on the tiles (approved, no must-fix):**
+  - SHOULD: add-receipt-save gains "files the card picked by its spoken name and last four". Its sources carry name/last4 (Chase Sapphire ••4821, Chase Checking ••7730). It taps "Chase Sapphire, ending in 4821" and checks `card_id: 'card-9'`, account null.
+  - Nit 1: a blank name now falls back to the label (`||`).
+  - Nit 2: account names are trimmed (nickname, then bank).
+  - Nit 3: the chosen border is `border-accent-ink`. Light is unchanged (#905479); dark goes from 2.6:1 to over 3:1 against the card.
+  - Nit 4: the swatch outline is measured against what is behind it: the card, or the card plus the 10% plum when chosen (`mix`, now exported from theme/palette.ts). The threshold is 1.6, so Sand #E9CF9B (1.51:1 on white) is outlined.
+  - Tests: blank-name fallback; border contrast checked from the real tokens; sand outlined; a grey outlined only on the tinted tile. The SourceTiles suite now uses `buildTokens`. 17 caller mocks gained `accent`. 4 of 4 new mutants caught.
+  - Gates: tsc 0; 33 suites / 1,417 tests (SourceTiles, the callers, the guards); eslint + prettier clean on 22 files.
+- **2026-10-09 — Dana L — Founder answers folded in (curved amount slider, no upload):**
+  - **Amount slider is curved.** `SliderRow` now passes `scale` to `Slider`, and only the amount asks for `log`; rate and term stay linear.
+    - The slider's maths moved, unchanged, into `src/lib/slider-scale.ts` (`sliderRatio` / `sliderValue`).
+    - $25,000 now sits mid-track. Typed values past either end still park the thumb at that end.
+    - New `src/__tests__/slider-scale.test.ts` (9) checks every half-point on 242, 297 and 324pt tracks. Drag → value → thumb → value has no drift. 500 and 1,000,000 are exact at the ends. Values never go backwards, and snap to whole numbers with 2 significant figures. Every rate to the hundredth and every term to the month round-trips.
+    - The calculator test drags the real responder (0 → $500, 150/300 → $22,000, 300 → $1,000,000) and checks the thumb lands on the value.
+    - 3 of 4 mutants caught. The fourth (dropping the `max(value, min)` guard) is equivalent, because the final clamp already handles any amount above 0.
+  - **Upload removed (phase C cancelled).** The reserved slot and its comment are gone from the calculator, and the large-text test no longer looks for it. No i18n key had been added.
+    - New test: nothing on the calculator (More options open), in en/es/fr, mentions an upload, a file, a PDF, a photo or a scan.
+  - Daily interest stays the default; the 100% cap and its Save message stay. Diego has the bill-edit icon_id fix.
+  - `save-loan-languages` now uses a full-palette colour mock, because Dana P's tiles read `colors.card` since 19:08.
+  - **Gates:**
+    - tsc 0; eslint (cache cleared) and prettier clean on the changed files.
+    - Full jest: 284 suites, 5,855 tests green. That was the second run; the first overlapped Dana P's 19:11 test edits, and those 17 suites pass when re-run.
+    - Simulator: the curved thumb was seen at $25,000.
+
+---
+
+## 2026-10-09 — Drew (Developer, money maths) — loan phase B: overrides maths, exact interest, high values, rate precision
+
+**Outcome:** Done, uncommitted, nothing pushed. Two migrations are written as files only. tsc 0 errors. ESLint and prettier are clean on the 8 files. Full jest: 284 suites, 5,858 tests pass. Loan, APR and money suites: 196 tests. 26 of 27 mutants were caught; the survivor is an equivalent double guard.
+
+- **API (`src/lib/loan-overrides.ts`, new):**
+  - `PaymentOverrides { monthlyPayment?; payments?: Record<number, number> }`.
+  - `scheduleWithOverrides(terms, overrides)` returns `OverriddenSchedule`: the `Amortisation`, plus `contract` (the schedule without extras, i.e. what is saved), `solvedPayment`, `applied` (what to save), `problems`, `unused`, `paymentCount`, `termMonths` and `balloon`.
+  - Also `applyOverrides`, `checkOverride(terms, overrides, 'monthly' | n, amount)`, `paymentChoice(terms, overrides, n)` (for the per-payment page) and `paymentOverridesJson`.
+  - The engine (`loan.ts`) takes `LoanTerms.paymentOverrides`. Rows gain `owed` and `overridden`. `termsFromStored` reads `payment_overrides`, so `amortise`, `comparePrepayment` and `payoffQuote` all follow saved changes.
+- **Rules:**
+  - Refused: an amount that is not whole cents, or is ≤ 0; a single payment below its period's interest (or below the regular payment, where that is lower); a monthly payment below principal × rate ÷ 12; the term's last payment.
+  - A change above what is owed becomes the last payment and is saved as exactly what is owed. Changes after it are reported as `unused`.
+  - Nothing re-solves the level payment; the last payment takes up the difference.
+  - Validation always runs on the contract: extras are what-ifs and are never saved.
+- **Engine fixes:**
+  - Interest now posts as an exact BigInt fraction, rounded half up once. The old float path decided halves at 12 significant digits, which can misround postings from about $100 up. Every committed fixture is unchanged, but about 1 typical saved loan in 20,000 (1 large one in 3,000) moves by 1¢ from some row on, to the exact figure. (Corrected after Dmitri's review; the first version said every figure was unchanged.)
+  - `solvePayment` no longer leaves a rounding balloon on loans that barely shrink. Example: 90% over 40 years had a final payment of $17.5 trillion; it now ends after 173 payments. Normal loans keep the published payment.
+  - The `apr.ts` cap comment now says 120,000% (it said 1200%).
+- **Fixtures (each cross-checked by an exact-integer reference and an independent Python decimal amortiser):**
+  - $32,001 at 7.5% over 72 months: the app shows $553.21, the bank $554.23. With the bank's payment: final payment $462.11, 72 payments, interest $7,811.44. On the bank's own dates: final $554.29.
+  - Real lender ($31,394.33): the default dates give $552.64 against the bank's $554.34. Payoff $28,787.75 and maturity 2031-12-14 are kept.
+  - Bank's odd first payment ($536.28 = $478.83 + $57.45 odd days): from payment 2 on, every row is the textbook schedule's, with final $478.97.
+  - $10,000 as payment 12: ends after 49 payments. Below interest: refused, minimum $243.30.
+  - Cents: a final payment of $0.01; a half cent posts up ($5.005 → $5.01).
+  - $2.5M at 6.875%: payment $16,423.22, final $16,423.89. MXN 50,000 at 60% (actual/360): payment $3,643.23, APR 60.66925%.
+- **Storage:**
+  - `20261009100007_loan_overrides.sql`: `loans.payment_overrides jsonb` with a check function. `save_loan` gains `p_payment_overrides` and `p_last_payment_on` (both default null; old clients still resolve).
+  - `20261009100008_loan_rate_precision.sql`: `annual_rate` goes from numeric(6,3) to numeric(12,9). Three decimals is not enough: 7.4995% stored as 7.500% moves the first posting by $1.04 on a $2.5M mortgage, and its last payment by $1,153.33.
+- **Not verified:** BigInt and timings on Hermes (measured in node: about 3.7 ms per calculator step at 480 months, the same as HEAD's comparePrepayment). Not run against Postgres (no Docker); the migration test reads the files.
+- **Note:** another agent in this session uses `scratchpad/mut`. My first mutant run collided with it around 18:57–19:00, and their copy of loan.ts briefly held a mutant before it was restored. I now use `scratchpad/drew-loan-mutants`.
+
+---
+
+## 2026-10-09 — Diego (Developer, data and backend) — scratch run of Drew's loan migrations (0007 overrides, 0008 rate precision)
+
+**Outcome:** Both migrations do what they say. One defect: 0007 is not re-run safe; the one-word fix is verified. New `supabase/checks/loans.sql`: ALL CHECKS PASSED, 30 checks. habits.sql (54) and one_off_pay.sql (34) also passed on the same copy.
+
+**Docker:**
+- n8n and cloudflared were already stopped; `docker stop` was a no-op.
+- The scratch copy, `loans_check`, was owned by postgres to match the real DB. Every migration was applied as `postgres`, as the CLI does.
+- The throwaway PostgREST v14.5 was bound to 127.0.0.1. Container, image, scratch DB and tokens were removed afterwards.
+- Real local DB unchanged: 20261008100002, numeric(6,3). Docker was stopped with `docker desktop stop`; no process is left.
+
+**Migrations:**
+- 20261008100003–005 (which the copy lacked) and today's 0001–0008 were each applied in order, in their own transaction, twice.
+- 20261008100003 needed a stand-in `cron` schema on the copy: pg_cron lives only in `postgres`, and the migration only unschedules a job.
+- Second pass: all exit 0 except 0007 ("function save_loan already exists with same argument types"). It drops only the old 15-argument signature, then `create function`s the 17-argument one. With `create or replace function`, verified on a patched copy, it runs twice and the function is identical.
+
+**save_loan:**
+- Diff against 0014: security invoker, search_path=public, owner postgres, ACL {postgres, authenticated, service_role} (no anon, no public), volatile, returns bills, plpgsql are all unchanged. Only the two new defaulted parameters and the body additions differ. One overload.
+- The app's HEAD call (13 named params, through real PostgREST) returns 200 on both the old and the new function, with byte-identical bill and loan rows. payment_overrides is null.
+- The new call stores `{"1": 612.40, "14": 1000}` exactly and ends the bill on the last payment day.
+- Refused (23514 `loans_payment_overrides_valid`):
+  - keys 0, 01, x, 1.5, and = term;
+  - amounts given as a string, 0, negative, 3 decimals, or > 999999999999.99;
+  - an array instead of an object;
+  - row updates that break the rule.
+- Allowed: key term−1, amount 999999999999.99, last payment on the term's end.
+- A last payment outside the term is refused with P0001. A refused call leaves no bill.
+
+**Rate precision:**
+- Widening keeps every stored value (7.500 reads 7.500000000; 6.063 and 100.000 unchanged).
+- 7.4995 → 7.499500000; 6.0625, 8.139865, 0.000000001 and 99.999999999 are exact.
+- 100.000000001 is refused (`loans_annual_rate_check`).
+- 10+ decimals are silently rounded: 7.12345678949 → 7.123456789, and 100.0000000001 → 100 is accepted.
+- PostgREST returns the rate as a JSON number with nine decimals; JS parses it exactly enough for loan.ts's billionths.
+- Nothing else in the DB uses annual_rate (no views or rules; only save_loan).
+
+**For Dmitri:**
+1. 0007: `create function public.save_loan(` → `create or replace function`.
+2. `rateSavable` (src/lib/loan-route.ts:139) still allows only 3 decimals (`Math.round(rate*1000)/1000`, comment "to its three decimals"), so Save refuses 7.4995 although the DB now keeps it. It should allow 9 decimals, tested the way loan.ts `exactRate` does (toPrecision), and refuse more than 9 (the column would round).
+3. useSaveLoan does not send overrides or last payment yet. When it does:
+   - keys are payment numbers 1…term−1 as strings;
+   - amounts are cent-exact (fromCents(toCents(x)));
+   - out of range is refused with 23514 or P0001, so map those for the form;
+   - useLoanForBill does not select payment_overrides yet.
+4. The 0008 ALTER rewrites the loans table under an exclusive lock: tiny table, negligible.
+
+## 2026-10-09 — Dmitri (Development Lead) — review of Drew's loan phase B (maths + migrations 0007/0008, uncommitted)
+
+**Outcome:** Changes requested. The maths is sound and verified independently. One MUST in 0007: the CHECK function has no grant, which could block every loan save.
+
+- **Verified:** tsc 0. Loan/APR/money/migration suites: 7 suites, 196 tests pass. ESLint (no cache) and prettier clean on the 8 files. Committed loan/apr/money tests untouched. 9 pinned fixtures recomputed with a Python decimal amortiser that shares nothing with the app (own calendar): all match to the cent.
+- **MUST (Diego/Drew):** `20261009100007_loan_overrides.sql:33-66`: `loan_payment_overrides_valid` has no `grant execute`. A CHECK's function runs with the inserting role's EXECUTE privilege (save_loan is SECURITY INVOKER, so that role is `authenticated`). config.toml says new public functions are not auto-exposed (always-revoked from 2026-10-30). Grant it to authenticated and service_role. Test the insert as `authenticated`, and assert the grant in loan-migrations.test.ts.
+- **SHOULD:**
+  - 0007:77 `create function` fails on a re-run; use `create or replace`.
+  - The monthly floor ignores the basis. On actual/360, P×r/12 is below the interest: $25k at 24.99% over 30y ends with a $645,822.90 last payment, and 100% over 40y passes 2^53 cents.
+  - A payoff change is saved cut to what is owed. After an earlier payment is lowered it leaves a $302.84 tail; the typed amount would still end the loan.
+  - "Every figure unchanged" holds for the fixtures, not for every saved loan. About 1 in 20,000 (large loans 1 in 3,000) moves 1 cent, and the new figure is the exact one (146,049.4999997¢ is $1,460.49, not .50). The comment's "tens of thousands" threshold is wrong.
+  - Diego: select `payment_overrides` only after 0007 is live, and relax rateSavable to 9 decimals only after 0008.
+  - Each period computes both the float and the BigInt posting; it needs only one.
+- **NITS:** wholeCents silently rounds amounts of $1B and over. The floor is computed through float toCents. 0008 and the high-values header still cite the cancelled upload. The BALLOON_STEPS comment.
+- **Performance (node, not Hermes):** each calculator step at 480 months, HEAD to new: 4.5→4.8 ms with the JIT, 6.7→7.1 ms with `--jitless`. In the round-up region it is 4.1→9.3 ms with `--jitless`. Dilip should measure on a device. Fallback: float posting, with BigInt only near a half cent.
+- **Open:** Founder: the round-up rule ends small, high-rate, long loans 2–39 payments early instead of a balloon. No real-statement fixture covers overrides yet.
+
+---
+
+## 2026-10-09 — Diego (Developer, data and backend) — loans phase B, data side
+
+**Outcome:** Done, uncommitted. tsc 0 errors; eslint clean on my files. New tests: 17 of 17 pass. 47 related suites: 43 pass. The 4 that fail (loan-calculator-design, loan-schedule-design, loan-schedule-languages, save-loan-design: 6 tests) are Dana L's in-flight screen work: save-loan.tsx now passes `paymentOverrides: null, lastPaymentOn: null`, loan-calculator adds a `draft` route param, and the rate hint no longer says "three decimals". Her test files are older than those edits.
+
+- **`useSaveLoan`** (src/api/mutations.ts): `SaveLoanValues` gains `paymentOverrides?: Record<string, number> | null` (from `paymentOverridesJson`) and `lastPaymentOn?: string | null`.
+  - Sent as `p_payment_overrides` and `p_last_payment_on` only when set and non-empty.
+  - Otherwise the call is exactly the old 13 named params, which a database without 0007 still accepts.
+  - Someone had added and then reverted a version of this mid-task; this is the full one.
+- **`useLoanForBill`** (src/api/queries.ts): selects `payment_overrides` and returns it as `LoanRow.payment_overrides: Record<string, number> | null`. On a 42703 naming the column it reads again without it and returns null. `termsFromStored(row)` follows the saved edits.
+- **New `src/lib/loan-refusal.ts`:** `refusedLoanSave(thrown): 'payments' | 'rate' | 'lastPayment' | null`.
+  - 'payments': 23514 naming loans_payment_overrides_valid.
+  - 'rate': 23514 naming loans_annual_rate_check.
+  - 'lastPayment': P0001 "the last payment must fall within the term".
+  - Anything else is null, which means the house failure line.
+- **Tests:** `src/lib/loan-refusal.test.ts` (uses the exact PostgREST bodies from the scratch run) and `src/__tests__/api/loan-save.test.tsx`.
+
+## 2026-10-09 — Dana L (Developer, UI and navigation) — Loan phase B UI: the bank's payment, changed payments, Save with changes (DONE, uncommitted)
+
+**Outcome:** Done on Drew's API (`src/lib/loan-overrides.ts`, including his review changes) and Diego's data side (`SaveLoanValues.paymentOverrides`/`lastPaymentOn`, `refusedLoanSave`, `LoanRow.payment_overrides`). Nothing committed. Save sends the new fields only when set, so a loan with changes waits for migrations 20261009100007/0008.
+
+- **Flow:**
+  - The calculator opens a draft: `src/lib/loan-draft.ts`, one in-memory slot read through `useSyncExternalStore`, the same pattern as voice-draft.
+  - The payment pages write the draft on Done; back writes nothing.
+  - The calculator and the schedule underneath read it live.
+  - Forward, the changes travel as params through `loan-route.ts` (`monthly`, `overrides` as `paymentOverridesJson`, `draft`). New helpers there: `overrideParams`, `termsFromRoute`, `baseParams`.
+  - A link without the open draft is read-only.
+- **`/loan-payment`** (`src/app/loan-payment.tsx`, a full page, no sheet):
+  - **Monthly:** Skip's figure, the bank's payment if set, a field for the bank's payment, "Use this payment", and "Use Skip's figure" when one is set. Skip's own figure typed back counts as no change.
+  - **Single payment:** `paymentChoice` figures (regular, interest, the least it can be, what pays it off), a field that starts on `typed ?? current`, and "Back to the regular payment" when the payment is changed. The regular amount typed back counts as no change.
+  - **Read-only states:** the last payment shows with its reason. "Paid off before this payment", "no such payment" and "this loan isn't open any more" have their own messages.
+  - **Refusals:** `checkOverride` reasons in plain words, en/es/fr, with the minimum quoted and announced to VoiceOver. The monthly reason reads "can't keep up with this loan's interest", to match Drew's steady-payment floor.
+- **Calculator:**
+  - One `scheduleWithOverrides` per step, priced from `useDeferredValue` inputs: the thumb and its value follow the finger, and the figures catch up when it stops.
+  - "Your bank's payment" label, plus "Skip works it out as $X".
+  - Danger lines for the balloon ("Your last payment would be $X") and for changes that stopped fitting.
+  - A muted note for unused changes. They stay in the draft, so a drag cannot destroy them, but they are not saved.
+  - Save is held with "To save this loan, fix: …". It sends the TYPED draft to the save page (Drew's review point).
+  - The headline's pencil opens the monthly page.
+- **Schedule:**
+  - Prices with the changes.
+  - "Changed" tag on changed rows, spoken as "Changed by you."
+  - Rows open their payment page only on the open draft, with a hint.
+  - Bank label, balloon line, problem lines and the unused note.
+  - A saved loan's changes come from add-bill's link, which now passes `payment_overrides`.
+- **Save:**
+  - Prices the contract with the changes and labels the bank's payment.
+  - The payment count is the actual one (for example "49 monthly").
+  - Saves `monthlyPayment`, the contract's total interest, `paymentOverridesJson(applied.payments)` (as typed), and the contract's payoff date only when it falls before the term.
+  - Changes the loan no longer takes are shown from the start and block Save.
+  - `refusedLoanSave` reasons are put into words: changed payments, last payment, and rate (the range line). Anything else gets the house failure line.
+- **Rates:** `rateSavable` allows nine decimals, read as the engine reads them (×1e9, 15 significant digits), with 0–100. The message now says "nine decimals".
+- **Tests:**
+  - New suites: `loan-draft` (3), `app/loan-payment` (19), `app/loan-overrides-flow` (17). Figures are Drew's fixtures or the engine's own; floors come from `checkOverride`, so they follow his rules.
+  - Updated suites: `loan-route` (18), `loan-cards` (Changed tag, hint), and the calculator and save design tests.
+  - Large-text guard: `loan-payment.tsx` adopted.
+  - 17 of 17 mutants caught.
+  - The mutants ran in my own `scratchpad/danal-loan-mutants`; another agent is using `scratchpad/mut`.
+- **Gates:** tsc 0; eslint (cache cleared) and prettier clean; full jest 289 suites, 5,932 tests green.
+- **Not verified:**
+  - Slider smoothness on a device: no Hermes runtime here, and I can't drag in the Simulator without driving the mouse. The deferred pricing is the mitigation.
+  - The payment pages in the Simulator: opening one needs the live draft id. Tests cover them.
+  - Seen: the calculator's headline pencil.
+
+## 2026-10-09 — Drew (Developer, money maths) — Dmitri's phase B review fixes
+
+**Outcome:** All items done, uncommitted, nothing pushed. tsc 0 errors. ESLint and prettier are clean. Full jest: 289 suites, 5,932 tests pass.
+
+- **M1:** 0007 now revokes `loan_payment_overrides_valid(jsonb, integer)` from public and anon, and grants it to authenticated and service_role, before the constraint. `loan-migrations.test.ts` checks the grant, the revoke and their order. Not run on Postgres (no Docker).
+- **S2:** the monthly floor is now `steadyPayment(terms)` (new, in loan.ts).
+  - It is the least m with posting(max(P, P + opening − m), costliest scheduled period) ≤ m. That uses the exact posting, on the loan's own calendar and convention (31/365, 31/360, a 33-day 30/360 month-end period, one monthly rest). The cent is found by bisection.
+  - A typed payment is taken when it is at or above min(steady, the app's own payment), or below that if it still closes the loan without a balloon (a bank's figure a cent under the app's).
+  - Where the regular payment is under the steady one, single payments may be raised but not lowered.
+  - Fixtures:
+    - $32,001 car loan: steady $203.84; with the bank's 37-day opening, $204.09 (the balance never passes $32,040.21).
+    - $25,000 at 24.99% over 30 years, actual/360: $520.63 used to pass with a $664,264.78 last payment; it is now refused, minimum $528.18.
+    - 100% over 40 years: the old floor's last payment was over 2^53 cents; now refused.
+  - New sweep: 300 adversarial loans (100%, 480 months, 75-day openings, $10B principals). Every figure stays a safe integer. No last payment exceeds principal + opening interest + 2 payments. At or above steady, no balance passes what payment 1 leaves.
+- **S3:** a change above what is owed is saved as typed ($50,000 stays $50,000). Lowering payment 3 afterwards still ends the loan at payment 30. Saved cut to $20,970.80, it would leave a 31st payment of $302.84, and a test pins both. `PaymentChoice.typed` added.
+  - Dana L: Save needs no change (it files `applied.payments`). The payment page can open on `choice.typed ?? choice.current`.
+- **S4:** corrected the loan.ts comment and my earlier log line. About 1 typical loan in 20,000 (1 large loan in 3,000) moves 1¢, to the exact figure.
+- **S6:** each period computes only the posting it uses.
+- **Nits:**
+  - `wholeCents` now judges float noise (4 ulps) instead of 12 significant digits, and caps at numeric(14,2). Direct tests were added in money.test.ts.
+  - The upload mentions are gone from 0008 and the high-values header.
+  - The balloon round-up is one step, with the reason in the comment (rule unchanged, pending the Founder).
+- **Found while mutating:** `steadyPayment` first walked a cent at a time from its estimate, so a poor estimate on a $10B loan could walk for ever. It now bisects (O(log)).
+- **Also:** `AppliedOverrides.steadyPayment` (computed once per check; `paymentChoice` reuses it).
+- **Mutation testing:** 9 new mutants on the floor, typed amounts and wholeCents, all caught. The earlier set: all caught but the known equivalent (the last payment is guarded twice). Loan suites: 213 tests.
+- **Cost:** about 0.9 ms more per calculator step when a monthly payment is typed (node). Dilip should still measure on a device.
+
+## 2026-10-09 — Dmitri (Development Lead) — final pre-push check, loans phase B: GO, provided 0007 and 0008 are live first. tsc 0; 31 loan/money/apr/save suites, 989 tests pass; Drew's M1/S2/S3/S4/S6/wholeCents/bisection fixes confirmed. Risk: unchanged loans the 1-cent round-up ends early send p_last_payment_on (save-loan.tsx:113), 74 of 1,344 realistic loans in a sweep, so they need 0007; rateSavable's nine decimals need 0008.

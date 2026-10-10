@@ -1,4 +1,4 @@
-import { fromCents, roundMoney, sumMoney, toCents } from '@/lib/money';
+import { fromCents, MAX_MONEY_CENTS, roundMoney, sumMoney, toCents, wholeCents } from '@/lib/money';
 
 describe('toCents', () => {
   it('rounds half away from zero, which is how a lender posts', () => {
@@ -59,5 +59,35 @@ describe('sumMoney', () => {
 
     const tenths = Array.from({ length: 1000 }, () => 0.1);
     expect(sumMoney(tenths)).toBe(100);
+  });
+});
+
+describe('wholeCents', () => {
+  it('reads a typed amount as its cents, through float noise', () => {
+    expect(wholeCents(554.23)).toBe(55_423); // 554.23 × 100 is 55422.99999999999
+    expect(wholeCents(0.1 + 0.2)).toBe(30); // 0.30000000000000004
+    expect(wholeCents(0.07)).toBe(7); // 7.000000000000001
+    expect(wholeCents(1.005)).toBeNull(); // a real half cent, not noise
+    expect(wholeCents(0)).toBe(0);
+    expect(wholeCents(-12.34)).toBe(-1234);
+  });
+
+  it('refuses a fraction of a cent rather than rounding it away', () => {
+    expect(wholeCents(554.235)).toBeNull();
+    expect(wholeCents(600.001)).toBeNull();
+    expect(wholeCents(0.001)).toBeNull();
+  });
+
+  it('keeps the cents of a figure in the billions, which 12 significant digits would lose', () => {
+    expect(wholeCents(1_234_567_890.12)).toBe(123_456_789_012);
+    expect(wholeCents(1_234_567_890.123)).toBeNull();
+    expect(wholeCents(999_999_999_999.99)).toBe(MAX_MONEY_CENTS);
+  });
+
+  it('refuses what no money column can hold, and what is not a number', () => {
+    expect(wholeCents(1_000_000_000_000)).toBeNull();
+    expect(wholeCents(-1_000_000_000_000)).toBeNull();
+    expect(wholeCents(Number.NaN)).toBeNull();
+    expect(wholeCents(Number.POSITIVE_INFINITY)).toBeNull();
   });
 });

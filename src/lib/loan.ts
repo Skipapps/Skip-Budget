@@ -14,7 +14,7 @@
  * The Reg Z APR lives in `@/lib/apr`, as it is a disclosure rather than a schedule.
  */
 
-import { fromCents, roundMoney, toCents } from '@/lib/money';
+import { fromCents, roundMoney, toCents, wholeCents } from '@/lib/money';
 
 /**
  * How a lender turns a date range into an interest fraction. 'actual/365' is the US
@@ -133,6 +133,127 @@ export function interestFraction(
   return days <= 0 ? 0 : (days * rate) / DAYS_IN_YEAR[basis];
 }
 
+/**
+ * Interest posts as an exact fraction, not a float product: in cents,
+ *
+ *     balance¢ × rate% × weight / (100 × per)
+ *
+ * where weight/per is the share of a year (days/365, days/360, or for monthly rests
+ * (365·months + 12·days)/4380, which is months/12 + days/365 on one denominator), rounded half up
+ * once. Floating point decides the half on 12 significant digits (`toCents`), so from postings of
+ * about $100 up a value a hair under a half cent can round the wrong way: 146,049.4999997¢ is
+ * $1,460.49, which the float path posted as $1,460.50. That moved roughly one typical loan in
+ * 20,000 (one large loan in 3,000) by a cent from that row on; the exact figure is the lender's.
+ *
+ * The rate is held as whole billionths of a percent. A rate with more decimals than that (a
+ * solved one) has no exact form, and posts through floating point as before.
+ */
+const RATE_UNITS_PER_PERCENT = 1e9;
+const BIG_ZERO = BigInt(0);
+const BIG_TWO = BigInt(2);
+const BIG_POSTING_SCALE = BigInt(100 * RATE_UNITS_PER_PERCENT);
+
+function exactRate(annualRatePercent: number): bigint | null {
+  if (!(annualRatePercent > 0)) return null;
+  const units = Number((annualRatePercent * RATE_UNITS_PER_PERCENT).toPrecision(15));
+  return Number.isSafeInteger(units) ? BigInt(units) : null;
+}
+
+/** The denominator of a year's share under each convention. */
+const SHARE_PER: Record<AccrualBasis, number> = {
+  'actual/365': 365,
+  'actual/360': 360,
+  '30/360': 360,
+  monthly: 4380,
+};
+
+/** The numerator over `SHARE_PER`, mirroring `interestFraction` and `scheduledFraction` exactly. */
+function shareWeight(from: Date, to: Date, basis: AccrualBasis, wholeRest: boolean): number {
+  if (basis === 'monthly') {
+    if (wholeRest) return 365;
+    const { months, days } = monthsAndDaysBetween(from, to);
+    return 365 * months + 12 * days;
+  }
+  return Math.max(0, daysBetween(from, to, basis));
+}
+
+/** Σ balance¢ × weight, times the rate, as cents rounded half up. Never negative. */
+function postExact(weighted: bigint, rate: bigint, basis: AccrualBasis): number {
+  if (weighted <= BIG_ZERO) return 0;
+  const numerator = weighted * rate;
+  const denominator = BIG_POSTING_SCALE * BigInt(SHARE_PER[basis]);
+  return Number((BIG_TWO * numerator + denominator) / (BIG_TWO * denominator));
+}
+
+/** One posting in cents: exact when the rate has an exact form, floating point when it has not. */
+function postingCents(
+  balanceCents: number,
+  weight: number,
+  annualRatePercent: number,
+  basis: AccrualBasis,
+): number {
+  const rate = exactRate(annualRatePercent);
+  if (rate !== null) return postExact(BigInt(balanceCents) * BigInt(weight), rate, basis);
+  if (!(annualRatePercent > 0) || balanceCents <= 0) return 0;
+  return toCents((fromCents(balanceCents) * (annualRatePercent / 100) * weight) / SHARE_PER[basis]);
+}
+
+/**
+ * The least level payment at which the balance can never rise after the first payment: it covers
+ * the costliest scheduled period's interest (a 31-day month on daily accrual, 31/360 on
+ * actual/360, one rest on monthly rests) on the most the loan can owe from then on, which is the
+ * amount borrowed or what the first payment leaves, whichever is more. Below it a shortfall
+ * compounds; at or above it every balance stays within that amount, so no figure can run away.
+ *
+ * The opening period may cost more than the payment (its odd days are a stub). That is why the
+ * balance it leaves counts, and why the condition is solved, not read off one month's interest:
+ * the least m in cents with  posting(max(P, P + opening − m), costliest) ≤ m,  which only gets
+ * easier as m grows, so it is settled a cent at a time from the closed-form estimate.
+ */
+export function steadyPayment(terms: LoanTerms): number {
+  if (terms.principal <= 0 || terms.months <= 0 || !(terms.annualRatePercent > 0)) return 0;
+
+  const basis = terms.basis ?? 'actual/365';
+  const funded = terms.fundedOn ?? impliedFunding(terms.firstPaymentOn);
+  const dates = paymentDates(terms.firstPaymentOn, terms.months);
+
+  let costliest = 0;
+  for (let index = 1; index < dates.length; index += 1) {
+    costliest = Math.max(
+      costliest,
+      shareWeight(dates[index - 1], dates[index], basis, basis === 'monthly'),
+    );
+  }
+  // A single payment settles everything; there is no later period to keep up with.
+  if (costliest === 0) return 0;
+
+  const principal = toCents(terms.principal);
+  const rate = terms.annualRatePercent;
+  const opening = postingCents(principal, shareWeight(funded, dates[0], basis, false), rate, basis);
+  const covers = (cents: number) =>
+    postingCents(Math.max(principal, principal + opening - cents), costliest, rate, basis) <= cents;
+
+  // m ≥ (P + opening)·q / (1 + q) and m ≥ P·q, where q is the costliest period's share of the rate.
+  const share = ((rate / 100) * costliest) / SHARE_PER[basis];
+  const estimate = Math.max(
+    1,
+    Math.ceil(Math.max(principal * share, ((principal + opening) * share) / (1 + share))),
+  );
+
+  // The estimate is a cent or two out at most, but the exact cent is found by bisection on the
+  // monotone condition, so a poor estimate costs a few steps, never a walk of millions.
+  let low = estimate - 1; // does not cover, once widened
+  let high = estimate; // covers, once widened
+  for (let step = 1; !covers(high); step *= 2) high += step;
+  for (let step = 1; low >= 1 && covers(low); step *= 2) low = Math.max(0, low - step);
+  while (high - low > 1) {
+    const middle = Math.floor((low + high) / 2);
+    if (covers(middle)) high = middle;
+    else low = middle;
+  }
+  return fromCents(high);
+}
+
 /** Interest earned on a balance over a span of days, rounded to the cent as it posts. */
 export function accruedInterest(
   balance: number,
@@ -141,6 +262,10 @@ export function accruedInterest(
   basis: DayCountBasis = 'actual/365',
 ): number {
   if (balance <= 0 || days <= 0 || annualRatePercent <= 0) return 0;
+  const rate = exactRate(annualRatePercent);
+  if (rate !== null && Number.isInteger(days)) {
+    return fromCents(postExact(BigInt(toCents(balance)) * BigInt(days), rate, basis));
+  }
   return roundMoney((balance * (annualRatePercent / 100) * days) / DAYS_IN_YEAR[basis]);
 }
 
@@ -168,7 +293,16 @@ export type LoanTerms = {
   statement?: { on: Date; principal: number };
   /** Anything paid above the contract payment. */
   extra?: Prepayment;
+  /**
+   * Single payments the person changed, by 1-based payment number: the contract payment for that
+   * date in place of the level one. Validate through `@/lib/loan-overrides`; the engine only skips
+   * what would break the schedule (see `runSchedule`).
+   */
+  paymentOverrides?: PaymentOverrideMap;
 };
+
+/** Payment number to amount. A plain object, so it stores as JSON and survives a route param. */
+export type PaymentOverrideMap = Readonly<Record<number, number>>;
 
 /** A one-off overpayment: an amount, and the day it lands. */
 type LumpSum = {
@@ -183,6 +317,45 @@ type Prepayment = {
   /** One-off amounts on given dates. */
   lumpSums?: readonly LumpSum[];
 };
+
+/**
+ * The changed payments the engine can take, in cents: a whole payment number and a positive amount
+ * in whole cents. The term's last payment always settles what is left, so it is never changed.
+ */
+function overrideCents(map: PaymentOverrideMap | undefined, months: number): Map<number, number> {
+  const cents = new Map<number, number>();
+  for (const [key, amount] of Object.entries(map ?? {})) {
+    const number = Number(key);
+    const value = wholeCents(amount);
+    if (Number.isInteger(number) && number >= 1 && number < months && value !== null && value > 0) {
+      cents.set(number, value);
+    }
+  }
+  return cents;
+}
+
+/**
+ * Changed payments read back from storage (a jsonb object) or a route param (its JSON text). Keys
+ * are payment numbers, values amounts; anything else is left out, and nothing left is undefined.
+ */
+export function readPaymentOverrides(value: unknown): PaymentOverrideMap | undefined {
+  let parsed: unknown = value;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+
+  const read: Record<number, number> = {};
+  for (const [key, amount] of Object.entries(parsed as Record<string, unknown>)) {
+    const cents = typeof amount === 'number' ? wholeCents(amount) : null;
+    if (/^[1-9]\d*$/.test(key) && cents !== null && cents > 0) read[Number(key)] = fromCents(cents);
+  }
+  return Object.keys(read).length > 0 ? read : undefined;
+}
 
 function impliedFunding(firstPaymentOn: Date): Date {
   const funded = new Date(firstPaymentOn);
@@ -223,6 +396,13 @@ export type ScheduleRow = {
   extra: number;
   /** What is still owed after this payment. */
   balance: number;
+  /**
+   * What would close the loan on this date: the balance brought forward (after any lump sum) plus
+   * this period's interest. A payment at or above it is the last one.
+   */
+  owed: number;
+  /** True when the person changed this payment and the schedule took it. */
+  overridden: boolean;
   /** True for rows reconstructed from origination, before any statement anchor. */
   estimated: boolean;
 };
@@ -250,8 +430,9 @@ export type Amortisation = {
  * 1. A lump sum credits on the day it arrives (daily-accrual bases only), so the rest of the period
  *    accrues on the smaller balance.
  * 2. Interest posts, rounded to the cent once per period even if a lump sum split it.
- * 3. The contract payment covers that interest first, the rest reduces principal (a payment smaller
- *    than the interest never touches the balance).
+ * 3. The contract payment (or the person's changed payment for that date) covers that interest
+ *    first and the rest reduces principal. A level payment smaller than the interest leaves the
+ *    shortfall on the balance, which is what `solvePayment`'s recursion assumes.
  * 4. Any recurring overpayment then comes off principal.
  *
  * Under 'monthly' rests a lump sum applies at the due date of the period it falls in. The balance
@@ -263,6 +444,8 @@ function runSchedule(terms: LoanTerms, payment: number) {
   const dates = paymentDates(terms.firstPaymentOn, terms.months);
   const paymentCents = toCents(payment);
   const monthlyExtraCents = Math.max(0, toCents(terms.extra?.monthly ?? 0));
+  const changedCents = overrideCents(terms.paymentOverrides, terms.months);
+  const rate = exactRate(terms.annualRatePercent);
 
   const creditsOnTheDay = basis !== 'monthly';
   const lumpSums = (terms.extra?.lumpSums ?? [])
@@ -292,15 +475,21 @@ function runSchedule(terms: LoanTerms, payment: number) {
     );
 
     let creditedCents = 0;
+    // One form per loan: exact when the rate has an exact form, floating point when it has not.
     let interest = 0;
+    let weighted = BIG_ZERO;
     let cursor = previous;
     let split = false;
 
     if (creditsOnTheDay) {
       for (const lump of inPeriod) {
         const at = utcDay(lump.on) < utcDay(previous) ? previous : lump.on;
-        interest +=
-          fromCents(balanceCents) * interestFraction(cursor, at, terms.annualRatePercent, basis);
+        if (rate !== null) {
+          weighted += BigInt(balanceCents) * BigInt(shareWeight(cursor, at, basis, false));
+        } else {
+          interest +=
+            fromCents(balanceCents) * interestFraction(cursor, at, terms.annualRatePercent, basis);
+        }
         const applied = Math.min(lump.cents, balanceCents);
         balanceCents -= applied;
         creditedCents += applied;
@@ -310,12 +499,22 @@ function runSchedule(terms: LoanTerms, payment: number) {
     }
 
     // An unsplit period is charged as one scheduled period; the tail of a split one is a span of days.
-    interest +=
-      fromCents(balanceCents) *
-      (split
-        ? interestFraction(cursor, due, terms.annualRatePercent, basis)
-        : scheduledFraction(previous, due, terms.annualRatePercent, basis, index === 0));
-    const interestCents = toCents(interest);
+    if (rate !== null) {
+      weighted +=
+        BigInt(balanceCents) *
+        BigInt(
+          split
+            ? shareWeight(cursor, due, basis, false)
+            : shareWeight(previous, due, basis, basis === 'monthly' && index > 0),
+        );
+    } else {
+      interest +=
+        fromCents(balanceCents) *
+        (split
+          ? interestFraction(cursor, due, terms.annualRatePercent, basis)
+          : scheduledFraction(previous, due, terms.annualRatePercent, basis, index === 0));
+    }
+    const interestCents = rate !== null ? postExact(weighted, rate, basis) : toCents(interest);
 
     if (!creditsOnTheDay) {
       for (const lump of inPeriod) {
@@ -325,10 +524,19 @@ function runSchedule(terms: LoanTerms, payment: number) {
       }
     }
 
-    // The last payment settles whatever is left; an overshooting payment is trimmed.
+    const owedCents = balanceCents + interestCents;
+
+    // The last payment settles whatever is left; an overshooting payment is trimmed. A changed
+    // payment that would leave more of the period's interest unpaid than the level payment does is
+    // not taken, so a change can never make the balance grow where the contract would not.
     const last = index === dates.length - 1;
-    let principalCents = paymentCents - interestCents;
+    const asked = changedCents.get(index + 1);
+    const taken = asked !== undefined && !last && asked >= Math.min(interestCents, paymentCents);
+    let principalCents = (taken ? asked : paymentCents) - interestCents;
     if (last || principalCents > balanceCents) principalCents = balanceCents;
+    // A change that pays what the level payment would have paid anyway is no change.
+    const overridden =
+      taken && principalCents !== Math.min(paymentCents - interestCents, balanceCents);
     balanceCents -= principalCents;
 
     const extraCents = Math.min(monthlyExtraCents, balanceCents);
@@ -349,6 +557,8 @@ function runSchedule(terms: LoanTerms, payment: number) {
       principal: fromCents(offBalanceCents),
       extra: fromCents(extraCents + creditedCents),
       balance: fromCents(Math.max(0, balanceCents)),
+      owed: fromCents(owedCents),
+      overridden,
       estimated: index <= anchorIndex,
     });
 
@@ -373,6 +583,12 @@ function runSchedule(terms: LoanTerms, payment: number) {
  *     payment = P · ∏ₖ(1 + r·dₖ) / Σₖ ∏ⱼ₌ₖ₊₁(1 + r·dⱼ)
  *
  * A 0% loan needs no special case: every factor is 1, so the answer is principal / months.
+ *
+ * The payment is rounded half up, as lenders publish it, and the last payment absorbs the cents.
+ * A cent of payment moves the last one by `Σ` cents, though, and on a loan that barely shrinks
+ * (60% over 20 years) that is more than a whole payment, so rounding down can leave a balloon of
+ * thousands, even billions. There, when the last payment would be more than two regular ones, the
+ * payment rounds up a cent, as a lender's would; the loan may then end a little early.
  */
 export function solvePayment(terms: Omit<LoanTerms, 'payment'>): number {
   if (terms.principal <= 0 || terms.months <= 0) return 0;
@@ -394,7 +610,16 @@ export function solvePayment(terms: Omit<LoanTerms, 'payment'>): number {
     carried *= growth[index];
   }
 
-  return sum > 0 ? roundMoney((terms.principal * carried) / sum) : 0;
+  if (!(sum > 0)) return 0;
+  const rounded = toCents((terms.principal * carried) / sum);
+  if (sum <= rounded) return fromCents(rounded);
+
+  const plain = { ...terms, extra: undefined, statement: undefined, paymentOverrides: undefined };
+  const { rows } = runSchedule(plain, fromCents(rounded));
+  if (toCents(rows[rows.length - 1].payment) <= 2 * rounded) return fromCents(rounded);
+  // One cent up always suffices: it is at least half a cent above the exact payment, and that half
+  // cent, carried to the end by the same Σ, outweighs every half cent of interest rounding at once.
+  return fromCents(rounded + 1);
 }
 
 export function amortise(terms: LoanTerms): Amortisation {
@@ -636,6 +861,8 @@ export type StoredLoan = {
   day_count_basis: AccrualBasis;
   statement_on: string | null;
   statement_principal: number | null;
+  /** The jsonb of changed payments; optional so a row read before the column existed still fits. */
+  payment_overrides?: unknown;
 };
 
 /** A yyyy-mm-dd column as local midnight, not UTC — dates here have no time zone. */
@@ -662,5 +889,6 @@ export function termsFromStored(loan: StoredLoan, fallbackFirstPayment?: string)
       loan.statement_on && loan.statement_principal !== null
         ? { on: fromIsoDate(loan.statement_on), principal: loan.statement_principal }
         : undefined,
+    paymentOverrides: readPaymentOverrides(loan.payment_overrides),
   };
 }

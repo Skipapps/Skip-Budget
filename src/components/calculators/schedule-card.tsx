@@ -2,16 +2,14 @@ import { ChevronRight } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { percent, t } from '@/i18n';
-import { useArtwork } from '@/theme/artwork';
 import { formatCurrency } from '@/lib/format';
-import type { AmortisationRow } from '@/lib/loan';
+import type { ScheduleRow } from '@/lib/loan';
+import { toCents } from '@/lib/money';
 import { useColors } from '@/providers/theme-provider';
+import { useLoanIcons } from '@/theme/loan-icons';
 import { TEXT_CAP } from '@/theme/text-scale';
 
-/**
- * A loan term in the language on screen: "5 yrs 3 mo", "5 años 3 meses", "5 ans 3 mois". The
- * English is exactly formatTerm's in src/lib/loan.ts, which stays English for its own tests.
- */
+/** A loan term in the language on screen: "5 years 3 months", "5 años 3 meses", "5 ans 3 mois". */
 export function loanTermText(months: number): string {
   const years = Math.floor(months / 12);
   const remainder = months % 12;
@@ -24,43 +22,47 @@ export function loanTermText(months: number): string {
 }
 
 /**
- * A rate to exactly the decimals it was given: 7.5 reads "7.5%" and 6.99 "6.99%", never padded or
- * rounded. toFixed at the length of the shortest decimal String() writes gives back those digits.
+ * A rate to at least two decimals and never rounded: 7.5 reads "7.50%", 6.125 "6.125%". toFixed at
+ * the length of the shortest decimal String() writes gives back exactly those digits.
  */
 export function loanRateText(rate: number): string {
   const decimals = (String(rate).split('.')[1] ?? '').length;
-  return percent(rate, Math.min(decimals, 20));
+  return percent(rate, Math.min(Math.max(decimals, 2), 20));
+}
+
+/** An amount borrowed, in whole units unless it has cents, so $25,000.50 is never drawn as $25,001. */
+export function loanAmountText(amount: number): string {
+  return formatCurrency(amount, { cents: toCents(amount) % 100 !== 0 });
 }
 
 type ScheduleCardProps = {
-  rows: AmortisationRow[];
+  rows: readonly ScheduleRow[];
   onPress: () => void;
 };
 
-/**
- * The way into the payment-by-payment breakdown. Leads with the first payment's split because on a
- * normal loan most of it is interest, which explains the whole schedule.
- */
+/** The way into the payment-by-payment schedule. */
 export function ScheduleCard({ rows, onPress }: ScheduleCardProps) {
-  const artwork = useArtwork();
   const colors = useColors();
-  const first = rows[0];
-  if (!first) return null;
+  const { schedule: Icon } = useLoanIcons();
+  if (rows.length === 0) return null;
 
-  const interestShare = first.payment > 0 ? first.interest / first.payment : 0;
+  const title = t('loan.schedule.title');
+  const subtitle = t('loan.scheduleCard.subtitle', { count: rows.length });
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t('loan.scheduleCard.a11y', {
-        interest: formatCurrency(first.interest),
-        principal: formatCurrency(first.principal),
-      })}
+      accessibilityLabel={title}
+      accessibilityHint={subtitle}
       onPress={onPress}
-      className="w-full flex-row items-center gap-3 rounded-[16px] border border-line px-4 py-4 active:bg-ink/5"
+      className="w-full flex-row items-center gap-[14px] rounded-[20px] border border-line bg-card px-[18px] py-[16px] active:bg-ink/5"
     >
-      <View className="h-[72px] w-[72px]">
-        <artwork.loanSchedule width="100%" height="100%" />
+      <View
+        className="h-[38px] w-[38px]"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <Icon width="100%" height="100%" />
       </View>
 
       <View className="min-w-0 flex-1">
@@ -68,23 +70,14 @@ export function ScheduleCard({ rows, onPress }: ScheduleCardProps) {
           className="font-app-semibold text-[15px] text-ink"
           maxFontSizeMultiplier={TEXT_CAP.row}
         >
-          {t('loan.scheduleCard.title')}
+          {title}
         </Text>
         <Text
-          className="mt-1 font-app text-[12px] leading-[17px] text-muted"
+          className="mt-0.5 font-app text-[12px] text-muted"
           maxFontSizeMultiplier={TEXT_CAP.row}
         >
-          {t('loan.scheduleCard.summary', {
-            share: percent(Math.round(interestShare * 100), 0),
-            count: rows.length,
-          })}
+          {subtitle}
         </Text>
-
-        {/* Same two colours as the summary bar above, so the split reads as the same idea. */}
-        <View className="mt-2.5 h-2 w-full flex-row overflow-hidden rounded-full bg-ink/5">
-          <View style={{ flex: Math.max(first.principal, 0) }} className="bg-body" />
-          <View style={{ flex: Math.max(first.interest, 0) }} className="bg-accent" />
-        </View>
       </View>
 
       <ChevronRight size={20} color={colors.muted} strokeWidth={2} />

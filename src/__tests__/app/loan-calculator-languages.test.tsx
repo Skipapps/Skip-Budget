@@ -20,8 +20,8 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
-jest.mock('@/theme/artwork', () => ({
-  useArtwork: () => new Proxy({}, { get: () => () => null }),
+jest.mock('@/theme/loan-icons', () => ({
+  useLoanIcons: () => new Proxy({}, { get: () => () => null }),
 }));
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', body: '#222222', accent: '#905479' }),
@@ -106,24 +106,39 @@ describe('in Spanish', () => {
       'Plazo',
       '7.50%',
       '5 años',
-      '0%',
-      '30%',
-      '6 meses',
-      '40 años',
       'Fechas',
       'Dinero recibido',
       'Primer pago',
-      'Abonos a capital y comisiones',
+      'Más opciones',
+      'Pagos extra y comisiones',
       'Opcional',
+      'Prestado',
+      'Intereses',
+      'Total que pagas',
+      'Calendario de pagos',
+      'Mira a dónde van los 60 pagos',
+      'Guardar',
+    ]) {
+      expect(screen.getAllByText(line, RAW).length).toBeGreaterThan(0);
+    }
+    expect(
+      screen.getByText('Los intereses se calculan cada día sobre lo que aún debes.', RAW),
+    ).toBeTruthy();
+    expectNoRawText();
+  });
+
+  it('opens More options in place, in Spanish', async () => {
+    await fireEvent.press(screen.getByRole('button', { name: 'Más opciones' }));
+    for (const line of [
+      'Extra cada mes',
+      'Nada extra',
+      'Abono a capital único',
+      'Comisiones pagadas por adelantado',
+      'Ninguna',
       'Cómo se cobran los intereses',
       'Diario · 365',
       'Cálculo mensual',
       '30 / 360',
-      'Prestado',
-      'Intereses pagados',
-      'Total que pagas',
-      'A dónde va cada pago',
-      'Guardar',
     ]) {
       expect(screen.getAllByText(line, RAW).length).toBeGreaterThan(0);
     }
@@ -133,13 +148,17 @@ describe('in Spanish', () => {
     expectNoRawText();
   });
 
-  it('switches the note with the convention', async () => {
+  it('switches the note and the line under More options with the convention', async () => {
+    await fireEvent.press(screen.getByRole('button', { name: 'Más opciones' }));
     await fireEvent.press(screen.getByLabelText('Cálculo mensual', RAW));
     expect(
       screen.getByText(
         /^Una doceava parte de la tasa anual cada mes, diga lo que diga el calendario/,
         RAW,
       ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('Los intereses se calculan cada mes sobre lo que aún debes.', RAW),
     ).toBeTruthy();
   });
 
@@ -167,20 +186,15 @@ describe('in French', () => {
       'Durée',
       `7,50${NBSP}%`,
       '5 ans',
-      `0${NBSP}%`,
-      `30${NBSP}%`,
-      '6 mois',
-      '40 ans',
       `25${NBSP}000${NBSP}$`,
-      `500${NBSP}$`,
-      `1${NBSP}000${NBSP}000${NBSP}$`,
-      'Versements supplémentaires et frais',
+      'Plus d’options',
+      'Paiements supplémentaires et frais',
       'Facultatif',
-      'Aucun supplément',
-      'Quotidien · 365',
-      'Calcul mensuel',
+      'Intérêts',
       'Total remboursé',
-      'Où va chaque paiement',
+      'Calendrier de remboursement',
+      'Vois où vont les 60 paiements',
+      'Les intérêts sont calculés chaque jour sur ce que tu dois encore.',
       'Enregistrer',
     ]) {
       expect(screen.getAllByText(line, RAW).length).toBeGreaterThan(0);

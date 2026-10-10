@@ -24,8 +24,8 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
-jest.mock('@/theme/artwork', () => ({
-  useArtwork: () => new Proxy({}, { get: () => () => null }),
+jest.mock('@/theme/loan-icons', () => ({
+  useLoanIcons: () => new Proxy({}, { get: () => () => null }),
 }));
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => new Proxy({}, { get: () => '#000000' }),
@@ -136,8 +136,8 @@ describe.each(LOCALES)('in %s (%s) at the largest text size', (language, currenc
     const save = screen.getByRole('button', { name: t('common.save') });
 
     expect(insideScroll(save)).toBe(false);
-    // The schedule card is now the last thing in the scroll, with room under it.
-    const schedule = screen.getByText(t('loan.scheduleCard.title'));
+    // The schedule card is the last thing in the scroll, with room under it.
+    const schedule = screen.getByText(t('loan.schedule.title'));
     expect(insideScroll(schedule)).toBe(true);
     expect(screen.getAllByRole('button', { name: t('common.save') })).toHaveLength(1);
 

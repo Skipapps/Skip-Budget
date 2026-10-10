@@ -12,7 +12,6 @@ import DarkStateError from '@/assets/illustrations/dark/state-error.svg';
 import DarkStateNoResults from '@/assets/illustrations/dark/state-no-results.svg';
 import DarkWelcomeHero from '@/assets/illustrations/dark/welcome-hero.svg';
 
-import LoanSchedule from '@/assets/illustrations/loan-schedule.svg';
 import LoginHero from '@/assets/illustrations/login-hero.svg';
 import StateEmptyBills from '@/assets/illustrations/state-empty-bills.svg';
 import StateEmptyReceipts from '@/assets/illustrations/state-empty-receipts.svg';
@@ -40,9 +39,6 @@ const ARTWORK = {
   emptyWallet: { light: StateEmptyWallet, dark: DarkStateEmptyWallet },
   error: { light: StateError, dark: DarkStateError },
   noResults: { light: StateNoResults, dark: DarkStateNoResults },
-
-  // No dark version yet; the light drawing is reused.
-  loanSchedule: { light: LoanSchedule, dark: LoanSchedule },
 } satisfies Record<string, Pair>;
 
 export type ArtworkName = keyof typeof ARTWORK;

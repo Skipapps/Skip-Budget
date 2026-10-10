@@ -2,9 +2,11 @@ import { createElement } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { BrandLogo } from '@/components/brands/brand-logo';
+import { LoanTypeIcon } from '@/components/calculators/loan-type-icon';
 import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
 import { getBillIcon, type Bill } from '@/data/bill-categories';
 import { GLYPH_STROKE } from '@/data/glyphs';
+import { loanTypeOf } from '@/data/loan-types';
 import { t, type MessageKey } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
@@ -67,12 +69,13 @@ export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
   const moneyColor = useMoneyColor();
   const words = useFitGroup({ mode: 'switch' });
   const stacked = !words.fits;
+  const loanType = loanTypeOf(bill.iconId);
   // createElement, not JSX: a capitalised local for a looked-up component trips the lint rule.
-  const icon = createElement(getBillIcon(bill), {
-    size: 20,
-    strokeWidth: GLYPH_STROKE,
-    color: colors.body,
-  });
+  const icon = loanType ? (
+    <LoanTypeIcon type={loanType} size={26} />
+  ) : (
+    createElement(getBillIcon(bill), { size: 20, strokeWidth: GLYPH_STROKE, color: colors.body })
+  );
   const recurrence = recurrenceLabel(bill.recurrence);
   const domain = bill.domain;
 

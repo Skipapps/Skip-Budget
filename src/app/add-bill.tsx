@@ -50,7 +50,8 @@ import { success, warn } from '@/lib/haptics';
 import { failureMessage, failureText } from '@/lib/failure';
 import { logoColumns } from '@/lib/logo-columns';
 import { logoDomainOf } from '@/lib/logo-domain';
-import { amortise, termsFromStored } from '@/lib/loan';
+import { amortise, readPaymentOverrides, termsFromStored } from '@/lib/loan';
+import { overrideParams } from '@/lib/loan-route';
 import {
   cameFromVoice,
   clearVoiceDraft,
@@ -387,7 +388,7 @@ function BillForm({
         sourceId,
         note,
       },
-      { sources, lastChargedOn: pastCharges.lastChargedOn },
+      { sources, lastChargedOn: pastCharges.lastChargedOn, hasLoan: Boolean(loan) },
     );
     if (!built.ok) {
       fail(built.message);
@@ -776,6 +777,7 @@ function BillForm({
                   basis: loan.day_count_basis,
                   payment: String(loan.monthly_payment),
                   name: name || t('bills.add.paymentSchedule'),
+                  ...overrideParams({ payments: readPaymentOverrides(loan.payment_overrides) }),
                 },
               })
             }

@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import LoanScheduleScreen from '@/app/loan-schedule';
 import type { CurrencyCode, Language } from '@/i18n/config';
 import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
 import { amortise } from '@/lib/loan';
+import { formatMoney } from '@/i18n/number';
 import { toCents } from '@/lib/money';
 
 /**
@@ -19,8 +20,8 @@ jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
 );
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
-jest.mock('@/theme/artwork', () => ({
-  useArtwork: () => new Proxy({}, { get: () => () => null }),
+jest.mock('@/theme/loan-icons', () => ({
+  useLoanIcons: () => new Proxy({}, { get: () => () => null }),
 }));
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', body: '#222222', accent: '#905479' }),
@@ -95,10 +96,14 @@ const LOCALES: [Language, CurrencyCode][] = [
   ['fr', 'GBP'],
 ];
 
-async function showIn(language: Language, currency: CurrencyCode) {
+/** The page as opened, then with every row out from behind "Show all". */
+async function showIn(language: Language, currency: CurrencyCode, { all = true } = {}) {
   setLanguage(language);
   setCurrency(currency);
   await render(<LoanScheduleScreen />);
+  if (!all) return;
+  const more = screen.queryByRole('button', { name: /^(Show all|Ver los|Voir les) \d+ / });
+  if (more) await fireEvent.press(more);
 }
 
 beforeEach(() => {
@@ -149,21 +154,36 @@ describe('the real statement’s schedule', () => {
 describe('in French', () => {
   beforeEach(() => showIn('fr', 'CAD'));
 
-  it('writes the title, the summary and the rate the French way', () => {
+  it('writes the title, the summary card and the rate the French way', () => {
     expect(screen.getByText('Calendrier de remboursement', RAW)).toBeTruthy();
+    for (const line of [
+      'Paiement mensuel',
+      `554,34${NBSP}$`,
+      'Taux',
+      // A loan on file does not carry its fees, so its rate is not called an APR.
+      `8,14${NBSP}%`,
+      'Durée',
+      '6 ans · 72',
+      'Intérêts totaux',
+      formatMoney(ENGINE.totalInterest, 'fr', 'CAD'),
+      'Total remboursé',
+      formatMoney(ENGINE.totalPaid, 'fr', 'CAD'),
+    ]) {
+      expect(screen.getAllByText(line, RAW).length).toBeGreaterThan(0);
+    }
     expect(
       screen.getByText(
-        `554,34${NBSP}$ par mois pendant 6 ans, à 8,14${NBSP}%. Les intérêts courent chaque jour sur ce que tu dois encore, donc un mois de 31 jours coûte plus cher qu’un mois de 28.`,
+        /^Les intérêts courent chaque jour sur ce que tu dois encore, donc un mois de 31 jours coûte plus cher qu’un mois de 28\. /,
         RAW,
       ),
     ).toBeTruthy();
   });
 
-  it('writes the first row with French figures and day count', () => {
+  it('writes the first row with French figures, and says its day count', () => {
     const first = ENGINE.rows[0];
-    expect(screen.getByText(`1. 14 janv. 2026`, RAW)).toBeTruthy();
+    expect(screen.getByText('14 janv. 2026', RAW)).toBeTruthy();
     expect(
-      screen.getByText(`239,28${NBSP}$ en capital · 315,06${NBSP}$ d’intérêts · 45 j`, RAW),
+      screen.getByText(`239,28${NBSP}$ en capital · 315,06${NBSP}$ d’intérêts`, RAW),
     ).toBeTruthy();
     expect(
       screen.getByLabelText(
@@ -191,8 +211,8 @@ describe('in Spanish', () => {
 
   it('writes the page in Spanish with Mexican figures', () => {
     expect(screen.getByText('Calendario de pagos', RAW)).toBeTruthy();
-    expect(screen.getByText(/^\$554\.34 al mes durante 6 años, al 8\.14%\. /, RAW)).toBeTruthy();
-    expect(screen.getByText('$239.28 a capital · $315.06 de intereses · 45 d', RAW)).toBeTruthy();
+    expect(screen.getByText('6 años · 72', RAW)).toBeTruthy();
+    expect(screen.getByText('$239.28 a capital · $315.06 de intereses', RAW)).toBeTruthy();
     expect(
       screen.getByText(
         /Supone que cada pago llega a tiempo y que la tasa nunca cambia: pagar tarde cuesta los días de más\. Abonar de más al saldo acorta el plazo\.$/,
@@ -257,6 +277,6 @@ describe('a one-payment loan in English', () => {
 
     const [spoken] = everythingRead().filter((text) => text.startsWith('Payment 1,'));
     expect(spoken).toMatch(/^Payment 1, 14 Jan 2026, covering 1 day\. \$/);
-    expect(screen.getByText(/ interest · 1d$/, RAW)).toBeTruthy();
+    expect(screen.getByText(/^\$[\d,.]+ principal · \$[\d,.]+ interest$/, RAW)).toBeTruthy();
   });
 });

@@ -48,21 +48,6 @@ export const BILL_CATEGORIES: BillCategory[] = [
   { id: 'other', label: 'Other bill', hint: 'Anything else you pay', icon: GLYPHS.other },
 ];
 
-/** Extra icons offered when someone builds their own bill. */
-export const BILL_ICON_CHOICES: { id: string; icon: BillIcon }[] = [
-  'other',
-  'education',
-  'pets',
-  'tv',
-  'shopping',
-  'travel',
-  'coffee',
-  'music',
-  'waste',
-  'software',
-  'health',
-].map((id) => ({ id, icon: GLYPHS[id] }));
-
 export const RECURRENCES = [
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },

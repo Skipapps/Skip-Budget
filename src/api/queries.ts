@@ -16,6 +16,7 @@ import {
 import { habitColor, type HabitColor } from '@/data/habit-colors';
 import { t } from '@/i18n';
 import { historyFloor, NOTHING_HIDDEN, type HiddenHistory } from '@/lib/allowance';
+import { accountLabel } from '@/lib/account-label';
 import { withTimeout } from '@/lib/deadline';
 import { moneyBook, type BookSpend } from '@/lib/money-book';
 import { paydaysInRange, type PayFrequency } from '@/lib/date';
@@ -400,6 +401,9 @@ export function useSalaryAccountIds() {
 export type PaymentSourceRow = {
   id: string;
   label: string;
+  /** For the Paid with tiles' two lines: a card's own name (its network if none) and its last four. Without them the label is the name. */
+  name?: string;
+  last4?: string | null;
   color: string;
   kind: 'card' | 'account';
 };
@@ -407,13 +411,6 @@ export type PaymentSourceRow = {
 /** "Visa ••4821": the network alone when no digits were given, never a dangling "••". */
 export function cardLabel(card: Pick<CardRow, 'network' | 'last4'>): string {
   return card.last4 ? `${card.network} ••${card.last4}` : card.network;
-}
-
-export function accountLabel(
-  account: Pick<BankAccountRow, 'nickname' | 'bank_name' | 'last4'>,
-): string {
-  const name = account.nickname || account.bank_name;
-  return account.last4 ? `${name} ••${account.last4}` : name;
 }
 
 export function usePaymentSources() {
@@ -431,12 +428,17 @@ export function usePaymentSources() {
     ...usableCards.map((card) => ({
       id: card.id,
       label: cardLabel(card),
+      // Its own name tells two cards on one network apart.
+      name: card.holder?.trim() || card.network,
+      last4: card.last4,
       color: card.color,
       kind: 'card' as const,
     })),
     ...usableAccounts.map((account) => ({
       id: account.id,
       label: accountLabel(account),
+      name: account.nickname?.trim() || account.bank_name?.trim(),
+      last4: account.last4,
       color: account.color,
       kind: 'account' as const,
     })),
@@ -1174,7 +1176,15 @@ export type LoanRow = {
   /** A balance read off a statement, and the date it was true. */
   statement_on: string | null;
   statement_principal: number | null;
+  /**
+   * Payments the person changed, {"<payment number>": amount}, as saved; null for none (and on a
+   * database without the column). `termsFromStored` reads it, so every schedule follows the edits.
+   */
+  payment_overrides: Record<string, number> | null;
 };
+
+const LOAN_COLUMNS =
+  'id, bill_id, principal, annual_rate, term_months, monthly_payment, total_interest, first_payment_on, funded_on, day_count_basis, statement_on, statement_principal';
 
 /**
  * The loan behind a bill, when there is one. Most bills are not loans, so this returns null rather
@@ -1186,15 +1196,19 @@ export function useLoanForBill(billId: string | undefined) {
     queryKey: ['loan', billId, userId],
     enabled: Boolean(userId && billId),
     queryFn: async (): Promise<LoanRow | null> => {
-      const { data, error } = await supabase
-        .from('loans')
-        .select(
-          'id, bill_id, principal, annual_rate, term_months, monthly_payment, total_interest, first_payment_on, funded_on, day_count_basis, statement_on, statement_principal',
-        )
-        .eq('bill_id', billId!)
-        .maybeSingle();
+      const read = (columns: string) =>
+        supabase.from('loans').select(columns).eq('bill_id', billId!).maybeSingle();
+      const full = await read(`${LOAN_COLUMNS}, payment_overrides`);
+      // A database without the column (42703 naming it) still has every loan, with no changes.
+      const lacksOverrides =
+        full.error?.code === '42703' && /payment_overrides/.test(full.error.message ?? '');
+      const { data, error } = lacksOverrides ? await read(LOAN_COLUMNS) : full;
       if (error) throw error;
-      return data as unknown as LoanRow | null;
+      if (!data) return null;
+      const row = data as unknown as Omit<LoanRow, 'payment_overrides'> & {
+        payment_overrides?: Record<string, number> | null;
+      };
+      return { ...row, payment_overrides: row.payment_overrides ?? null };
     },
   });
 }

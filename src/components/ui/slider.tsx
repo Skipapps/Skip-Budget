@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { PanResponder, View, type LayoutChangeEvent } from 'react-native';
 
 import { cn } from '@/lib/cn';
+import { sliderRatio, sliderValue } from '@/lib/slider-scale';
 import { useColors } from '@/providers/theme-provider';
 
 type SliderProps = {
@@ -11,10 +12,7 @@ type SliderProps = {
   step?: number;
   /** Must be stable (a state setter or useCallback), or the responder is rebuilt every render. */
   onChange: (value: number) => void;
-  /**
-   * `log` spaces the track by orders of magnitude, for money ranges: on a linear 500–1,000,000 track
-   * a $30k loan sits in the leftmost 3% and is undraggable. Requires min > 0.
-   */
+  /** `log` for money ranges: see SliderScale. Requires min > 0. */
   scale?: 'linear' | 'log';
   className?: string;
 };
@@ -47,26 +45,7 @@ export function Slider({
   const responder = useMemo(() => {
     const emit = (x: number) => {
       if (width <= 0) return;
-
-      const clampedX = Math.min(width, Math.max(0, x));
-      const ratio = clampedX / width;
-
-      let raw: number;
-      let snapped: number;
-
-      if (scale === 'log') {
-        raw = min * Math.pow(max / min, ratio);
-        // Snap relative to magnitude, so it steps by 100s in the hundreds and
-        // by 10,000s in the hundred-thousands instead of one fixed increment.
-        const magnitude = Math.pow(10, Math.max(0, Math.floor(Math.log10(raw)) - 1));
-        snapped = Math.round(raw / magnitude) * magnitude;
-      } else {
-        raw = min + ratio * Math.max(max - min, 0.000001);
-        snapped = Math.round(raw / step) * step;
-      }
-
-      // Guard against float drift pushing the value a hair outside the range.
-      onChange(Math.min(max, Math.max(min, Number(snapped.toFixed(6)))));
+      onChange(sliderValue(Math.min(width, Math.max(0, x)) / width, { min, max, step, scale }));
     };
 
     return PanResponder.create({
@@ -78,10 +57,7 @@ export function Slider({
     });
   }, [width, min, max, step, scale, onChange]);
 
-  const ratio =
-    scale === 'log'
-      ? Math.min(1, Math.max(0, Math.log(Math.max(value, min) / min) / Math.log(max / min)))
-      : Math.min(1, Math.max(0, (value - min) / Math.max(max - min, 0.000001)));
+  const ratio = sliderRatio(value, { min, max, step, scale });
 
   return (
     <View

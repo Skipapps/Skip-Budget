@@ -14,6 +14,7 @@
  */
 import type { BillValues, CaptureSource, ReceiptValues, SubscriptionValues } from '@/api/mutations';
 import type { BrandSelection } from '@/components/brands/brand-field';
+import { loanTypeOf } from '@/data/loan-types';
 import { t } from '@/i18n';
 import { countFromAfterPick, floorAfterCharges } from '@/lib/charges';
 import { toIsoDate } from '@/lib/date';
@@ -92,7 +93,7 @@ export type BillInput = {
   issuer: BrandSelection | null;
   /** A BILL_CATEGORIES id. Never the issuer's spend category. */
   categoryId: string;
-  /** The picked icon; only an Other bill keeps one. */
+  /** The picked icon; only an Other bill keeps one, and a loan bill its loan type ('loan-car'). */
   iconId: string;
   recurrence: BillRecurrence;
   /** The first due date, or a period's first day. */
@@ -109,12 +110,22 @@ export type BillInput = {
  */
 export function buildBillValues(
   input: BillInput,
-  ctx: { sources: readonly SourceRef[]; lastChargedOn: string | null },
+  ctx: {
+    sources: readonly SourceRef[];
+    lastChargedOn: string | null;
+    /** The bill has a loan behind it (useLoanForBill), whatever category it is filed under now. */
+    hasLoan?: boolean;
+  },
 ): Built<BillValues, 'details' | 'amount' | 'when'> {
   const name = input.name.trim();
   if (!name) return refuse('details', t('api.entry.billName'));
   const amount = positive(input.amount);
   if (amount === null) return refuse('amount', t('api.entry.billAmount'));
+
+  // A loan's icon id is its type ('loan-car'), written by save_loan: a loan bill keeps it on every
+  // edit, or the type is lost.
+  const isLoan = input.categoryId === 'loans' || Boolean(ctx.hasLoan);
+  const loanIcon = isLoan && loanTypeOf(input.iconId) ? input.iconId : null;
 
   const isPeriod = input.recurrence === 'period';
   // A bill with no date cannot be scheduled, so it would save and never show.
@@ -134,9 +145,9 @@ export function buildBillValues(
       amount,
       brand_id: input.issuer?.brandId ?? null,
       category_id: input.categoryId,
-      // Only a self-named bill has an icon of its own; the rest wear their category's. Saving the
-      // picker's untouched 'other' onto a Housing bill would put the Other glyph on it.
-      icon_id: input.categoryId === 'other' ? input.iconId || null : null,
+      // Only a self-named bill has an icon of its own; the rest wear their category's, bar a loan's
+      // type. Saving the picker's untouched 'other' onto a Housing bill would put the Other glyph on it.
+      icon_id: input.categoryId === 'other' ? input.iconId || null : loanIcon,
       recurrence: input.recurrence,
       next_due_on: start,
       // Never on or before a charge already recorded, or an edit records that

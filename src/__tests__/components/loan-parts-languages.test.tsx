@@ -1,14 +1,18 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet, type StyleProp, type TextStyle } from 'react-native';
 
-import { ProportionBar } from '@/components/calculators/proportion-bar';
-import { ScheduleCard, loanRateText, loanTermText } from '@/components/calculators/schedule-card';
+import {
+  ScheduleCard,
+  loanAmountText,
+  loanRateText,
+  loanTermText,
+} from '@/components/calculators/schedule-card';
 import { SliderRow } from '@/components/calculators/slider-row';
 import { FlowChart } from '@/components/transactions/flow-chart';
 import { RollingNumber } from '@/components/ui/rolling-number';
 import { percent, t } from '@/i18n';
 import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
-import { formatTerm, type ScheduleRow } from '@/lib/loan';
+import type { ScheduleRow } from '@/lib/loan';
 
 /**
  * The pieces the loan screens and the money figures are built from, in Spanish and French. English
@@ -19,8 +23,8 @@ jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }))
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000', muted: '#777', body: '#222', accent: '#905479', line: '#ddd' }),
 }));
-jest.mock('@/theme/artwork', () => ({
-  useArtwork: () => new Proxy({}, { get: () => () => null }),
+jest.mock('@/theme/loan-icons', () => ({
+  useLoanIcons: () => new Proxy({}, { get: () => () => null }),
 }));
 // Reanimated's own mock needs the native worklets module. Reduced motion keeps every wheel at
 // rest, which is the state these tests read.
@@ -52,10 +56,14 @@ const RAW = { normalizer: (text: string) => text };
 beforeEach(() => resetLocaleForTests());
 
 describe('loanTermText', () => {
-  it('reads exactly as formatTerm in English, for every term the slider reaches and more', () => {
-    for (let months = 0; months <= 480; months += 1) {
-      expect(loanTermText(months)).toBe(formatTerm(months));
-    }
+  it('writes whole words in English, as the loan pages are drawn', () => {
+    expect(loanTermText(1)).toBe('1 month');
+    expect(loanTermText(6)).toBe('6 months');
+    expect(loanTermText(12)).toBe('1 year');
+    expect(loanTermText(13)).toBe('1 year 1 month');
+    expect(loanTermText(60)).toBe('5 years');
+    expect(loanTermText(30)).toBe('2 years 6 months');
+    expect(loanTermText(480)).toBe('40 years');
   });
 
   it('writes whole words in Spanish', () => {
@@ -79,22 +87,42 @@ describe('loanTermText', () => {
 });
 
 describe('loanRateText', () => {
-  const RATES = [0, 7.5, 6.99, 8.14, 12, 0.125, 29.999, 0.1 + 0.2];
-
-  it('reads exactly as the rate was given in English, never padded or rounded', () => {
-    for (const rate of RATES) expect(loanRateText(rate)).toBe(`${rate}%`);
+  it('writes at least two decimals and never rounds a rate given to more', () => {
+    const READS: [number, string][] = [
+      [0, '0.00%'],
+      [7.5, '7.50%'],
+      [6.99, '6.99%'],
+      [8.14, '8.14%'],
+      [12, '12.00%'],
+      [0.125, '0.125%'],
+      [29.999, '29.999%'],
+      // 0.30000000000000004 as typed through floating point: every digit, as given.
+      [0.1 + 0.2, `${0.1 + 0.2}%`],
+    ];
+    for (const [rate, reads] of READS) expect([rate, loanRateText(rate)]).toEqual([rate, reads]);
   });
 
   it('writes the decimal comma and a no-break space before % in French', () => {
     setLanguage('fr');
     expect(loanRateText(8.14)).toBe(`8,14${NBSP}%`);
-    expect(loanRateText(7.5)).toBe(`7,5${NBSP}%`);
-    expect(loanRateText(12)).toBe(`12${NBSP}%`);
+    expect(loanRateText(7.5)).toBe(`7,50${NBSP}%`);
+    expect(loanRateText(12)).toBe(`12,00${NBSP}%`);
   });
 
   it('keeps the point and a flush % in Spanish', () => {
     setLanguage('es');
     expect(loanRateText(8.14)).toBe('8.14%');
+  });
+});
+
+describe('loanAmountText', () => {
+  it('drops the cents only when there are none, never rounding them away', () => {
+    expect(loanAmountText(25_000)).toBe('$25,000');
+    expect(loanAmountText(25_000.5)).toBe('$25,000.50');
+    expect(loanAmountText(31_394.33)).toBe('$31,394.33');
+    setLanguage('fr');
+    setCurrency('CAD');
+    expect(loanAmountText(25_000)).toBe(`25${NBSP}000${NBSP}$`);
   });
 });
 
@@ -110,14 +138,10 @@ describe('SliderRow', () => {
         max={30}
         onChange={() => {}}
         onValuePress={() => {}}
-        minLabel={percent(0, 0)}
-        maxLabel={percent(30, 0)}
       />,
     );
 
     expect(screen.getByLabelText(`Taux d’intérêt, 7,50${NBSP}%. Modifier`, RAW)).toBeTruthy();
-    expect(screen.getByText(`0${NBSP}%`, RAW)).toBeTruthy();
-    expect(screen.getByText(`30${NBSP}%`, RAW)).toBeTruthy();
   });
 
   it('reads as before in English', async () => {
@@ -136,21 +160,6 @@ describe('SliderRow', () => {
   });
 });
 
-describe('ProportionBar', () => {
-  it.each([
-    ['en' as const, 'USD' as const, 'Borrowed $25,000', 'Interest 13%'],
-    ['es' as const, 'MXN' as const, 'Prestado $25,000', 'Intereses 13%'],
-    ['fr' as const, 'CAD' as const, `Emprunté 25${NBSP}000${NBSP}$`, `Intérêts 13${NBSP}%`],
-  ])('labels the split in %s', async (language, currency, borrowed, interest) => {
-    setLanguage(language);
-    setCurrency(currency);
-    // 3,750 of 28,750 is 13.04%.
-    await render(<ProportionBar principal={25_000} interest={3_750} />);
-    expect(screen.getByText(borrowed, RAW)).toBeTruthy();
-    expect(screen.getByText(interest, RAW)).toBeTruthy();
-  });
-});
-
 describe('ScheduleCard', () => {
   const row = (number: number): ScheduleRow =>
     ({
@@ -165,58 +174,31 @@ describe('ScheduleCard', () => {
     }) as ScheduleRow;
   const rows = Array.from({ length: 72 }, (_, i) => row(i + 1));
 
-  it('reads as before in English', async () => {
-    await render(<ScheduleCard rows={rows} onPress={() => {}} />);
-    expect(screen.getByText('Where each payment goes', RAW)).toBeTruthy();
-    expect(
-      screen.getByText('57% of your first payment is interest — see all 72 payments', RAW),
-    ).toBeTruthy();
-    expect(
-      screen.getByLabelText(
-        'Where each payment goes. First payment: $315.06 interest, $239.28 off the balance. Opens the full schedule.',
-        RAW,
-      ),
-    ).toBeTruthy();
-  });
+  it.each([
+    ['en' as const, 'Payment schedule', 'See where all 72 payments go'],
+    ['es' as const, 'Calendario de pagos', 'Mira a dónde van los 72 pagos'],
+    ['fr' as const, 'Calendrier de remboursement', 'Vois où vont les 72 paiements'],
+  ])('names the schedule and its payments in %s', async (language, title, subtitle) => {
+    setLanguage(language);
+    const onPress = jest.fn();
+    await render(<ScheduleCard rows={rows} onPress={onPress} />);
 
-  it('is in Spanish', async () => {
-    setLanguage('es');
-    await render(<ScheduleCard rows={rows} onPress={() => {}} />);
-    expect(screen.getByText('A dónde va cada pago', RAW)).toBeTruthy();
-    expect(
-      screen.getByText('57% de tu primer pago se va en intereses: ve los 72 pagos', RAW),
-    ).toBeTruthy();
-    expect(
-      screen.getByLabelText(
-        'A dónde va cada pago. Primer pago: $315.06 de intereses, $239.28 a capital. Abre el calendario completo.',
-        RAW,
-      ),
-    ).toBeTruthy();
-  });
-
-  it('is in French, with the figures written the French way', async () => {
-    setLanguage('fr');
-    await render(<ScheduleCard rows={rows} onPress={() => {}} />);
-    expect(screen.getByText('Où va chaque paiement', RAW)).toBeTruthy();
-    expect(
-      screen.getByText(
-        `57${NBSP}% de ton premier paiement va aux intérêts — vois les 72 paiements`,
-        RAW,
-      ),
-    ).toBeTruthy();
-    expect(
-      screen.getByLabelText(
-        `Où va chaque paiement. Premier paiement${NBSP}: 315,06${NBSP}$ d’intérêts, 239,28${NBSP}$ en capital. Ouvre le calendrier complet.`,
-        RAW,
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText(title, RAW)).toBeTruthy();
+    expect(screen.getByText(subtitle, RAW)).toBeTruthy();
+    const card = screen.getByRole('button', { name: title });
+    expect(card.props.accessibilityHint).toBe(subtitle);
+    await fireEvent.press(card);
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 
   it('says "the 1 payment" in English when there is only one', async () => {
     await render(<ScheduleCard rows={[row(1)]} onPress={() => {}} />);
-    expect(
-      screen.getByText('57% of your first payment is interest — see the 1 payment', RAW),
-    ).toBeTruthy();
+    expect(screen.getByText('See where the 1 payment goes', RAW)).toBeTruthy();
+  });
+
+  it('draws nothing for a loan with no payments', async () => {
+    await render(<ScheduleCard rows={[]} onPress={() => {}} />);
+    expect(screen.toJSON()).toBeNull();
   });
 });
 
@@ -240,11 +222,18 @@ describe('English loan lines at a count of one', () => {
       'First payment covers 45 days, not a month — $1.00 of it is interest.',
     ],
     [
-      'loan.save.termPayments' as const,
-      { term: '1 mo' },
-      2,
-      '1 mo · 1 payment',
-      '1 mo · 2 payments',
+      'loan.scheduleCard.subtitle' as const,
+      {},
+      60,
+      'See where the 1 payment goes',
+      'See where all 60 payments go',
+    ],
+    [
+      'loan.schedule.yearSummary' as const,
+      { interest: '$1.00' },
+      12,
+      '1 payment · $1.00 interest',
+      '12 payments · $1.00 interest',
     ],
     [
       'loan.schedule.rowA11y' as const,

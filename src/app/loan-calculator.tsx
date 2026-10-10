@@ -1,38 +1,54 @@
 import { router } from 'expo-router';
-import { Calendar } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { Info } from 'lucide-react-native';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 
-import { ChoiceChips } from '@/components/ui/choice-chips';
-import { ProportionBar } from '@/components/calculators/proportion-bar';
-import { ScheduleCard, loanTermText } from '@/components/calculators/schedule-card';
+import { LoanResultCard, LoanSummaryLine } from '@/components/calculators/loan-result-card';
+import { LoanCard, LoanCardRow, LoanSectionHeading } from '@/components/calculators/loan-section';
+import { MoreOptionsCard } from '@/components/calculators/more-options-card';
+import { fixLine, problemNote, unusedNote } from '@/components/calculators/override-words';
+import {
+  ScheduleCard,
+  loanAmountText,
+  loanRateText,
+  loanTermText,
+} from '@/components/calculators/schedule-card';
 import { SliderRow } from '@/components/calculators/slider-row';
 import { AmountPad } from '@/components/ui/amount-pad';
 import { Button } from '@/components/ui/button';
+import { ChoiceChips } from '@/components/ui/choice-chips';
 import { DatePicker } from '@/components/ui/date-picker';
-import { FitFigure, FitRows, FitText, useGroupFits } from '@/components/ui/fit-group';
+import { FitRows } from '@/components/ui/fit-group';
 import { Screen } from '@/components/ui/screen';
-import { useConfirm } from '@/providers/dialog-provider';
-import { SelectField } from '@/components/ui/select-field';
-import { FieldLabel, SectionHeading } from '@/components/ui/typography';
-import { percent, t } from '@/i18n';
+import { FieldLabel } from '@/components/ui/typography';
+import { t } from '@/i18n';
+import { truthInLending } from '@/lib/apr';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
-import { truthInLending } from '@/lib/apr';
 import {
   addMonths,
-  comparePrepayment,
   daysBetween,
   monthsAndDaysBetween,
   payoffDate,
   type AccrualBasis,
   type LoanTerms,
 } from '@/lib/loan';
-import { sumMoney } from '@/lib/money';
+import { startLoanDraft, useOpenLoanDraft } from '@/lib/loan-draft';
+import { scheduleWithOverrides, type PaymentOverrides } from '@/lib/loan-overrides';
+import { overrideParams, typedAmount, typedRate, type LoanRouteParams } from '@/lib/loan-route';
+import { roundMoney, sumMoney } from '@/lib/money';
+import { useConfirm } from '@/providers/dialog-provider';
+import { useColors } from '@/providers/theme-provider';
+import { useLoanIcons } from '@/theme/loan-icons';
 import { TEXT_CAP } from '@/theme/text-scale';
 
+// The sliders' ranges. A typed figure may go past either end: the thumb waits at the end and the
+// value shows what was typed.
 const AMOUNT_MIN = 500;
 const AMOUNT_MAX = 1_000_000;
+const RATE_MAX = 30;
+
+const NO_CHANGES: PaymentOverrides = {};
 
 /** Daily actual/365 is the default: what a US installment lender bills; the fixtures use it. */
 const basisChoices = () => [
@@ -56,8 +72,23 @@ function basisNote(basis: AccrualBasis): string {
   }
 }
 
+function interestLine(basis: AccrualBasis): string {
+  switch (basis) {
+    case 'actual/360':
+      return t('loan.calculator.interestLine.actual360');
+    case 'actual/365':
+      return t('loan.calculator.interestLine.actual365');
+    case 'monthly':
+      return t('loan.calculator.interestLine.monthly');
+    case '30/360':
+      return t('loan.calculator.interestLine.thirty360');
+  }
+}
+
 export default function LoanCalculatorScreen() {
   const confirm = useConfirm();
+  const colors = useColors();
+  const icons = useLoanIcons();
 
   const [amount, setAmount] = useState(25_000);
   const [rate, setRate] = useState(7.5);
@@ -74,6 +105,7 @@ export default function LoanCalculatorScreen() {
   // Prepaid finance charges (arrangement fee, points): they change the APR, not any payment.
   const [fees, setFees] = useState(0);
 
+  const [moreOpen, setMoreOpen] = useState(false);
   const [padOpen, setPadOpen] = useState(false);
   const [ratePadOpen, setRatePadOpen] = useState(false);
   const [extraPadOpen, setExtraPadOpen] = useState(false);
@@ -82,6 +114,15 @@ export default function LoanCalculatorScreen() {
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [fundedPickerOpen, setFundedPickerOpen] = useState(false);
   const [lumpPickerOpen, setLumpPickerOpen] = useState(false);
+
+  // The bank's payment and changed payments, which the payment pages write while this page waits.
+  useEffect(() => {
+    startLoanDraft();
+  }, []);
+  const draft = useOpenLoanDraft();
+  const draftId = draft?.id;
+  const overrides = draft?.overrides ?? NO_CHANGES;
+  const [saveTried, setSaveTried] = useState(false);
 
   const terms = useMemo<LoanTerms>(
     () => ({
@@ -99,61 +140,128 @@ export default function LoanCalculatorScreen() {
     [amount, rate, months, startDate, fundedOn, basis, extraMonthly, lumpSum, lumpOn],
   );
 
-  // Recomputed on every slider drag. With nothing extra paid, both sides are the same object and
-  // only one schedule is built.
-  const comparison = useMemo(() => comparePrepayment(terms), [terms]);
-  const contract = comparison.base;
-  const loan = comparison.accelerated;
-  const overpaying = extraMonthly > 0 || lumpSum > 0;
+  /**
+   * Every figure is priced from these, a beat behind the sliders when a step is slow to price: the
+   * thumb and its value follow the finger at once, and the figures catch up to where it stops.
+   */
+  const inputs = useMemo(() => ({ terms, fees, overrides }), [terms, fees, overrides]);
+  const priced = useDeferredValue(inputs);
+  const pricedTerms = priced.terms;
+  const pricedFundedOn = pricedTerms.fundedOn ?? fundedOn;
+
+  // One schedule per step, changes included; `contract` is the same loan without the extras.
+  const loan = useMemo(
+    () => scheduleWithOverrides(priced.terms, priced.overrides),
+    [priced.terms, priced.overrides],
+  );
+  const contract = loan.contract;
+  const overpaying =
+    (pricedTerms.extra?.monthly ?? 0) > 0 || (pricedTerms.extra?.lumpSums ?? []).length > 0;
+  const interestSaved = roundMoney(contract.totalInterest - loan.totalInterest);
+  const monthsSaved = contract.rows.length - loan.paymentCount;
+  const bankPayment = loan.applied.monthlyPayment !== undefined;
 
   // The disclosure is for the loan as contracted, not as overpaid, as a lender quotes it.
   const disclosure = useMemo(
     () =>
       truthInLending({
-        advance: amount,
-        prepaidFinanceCharge: fees,
-        advancedOn: fundedOn,
+        advance: priced.terms.principal,
+        prepaidFinanceCharge: priced.fees,
+        advancedOn: contract.fundedOn,
         payments: contract.rows.map((row) => ({
           on: new Date(`${row.date}T00:00:00`),
           amount: row.payment,
         })),
       }),
-    [amount, fees, fundedOn, contract],
+    [priced, contract],
   );
 
   const schedule = loan.rows;
   const lastPayment = loan.payoffOn
     ? new Date(`${loan.payoffOn}T00:00:00`)
-    : payoffDate(startDate, months);
+    : payoffDate(pricedTerms.firstPaymentOn, pricedTerms.months);
   const contractLastPayment = contract.payoffOn
     ? new Date(`${contract.payoffOn}T00:00:00`)
     : lastPayment;
-  const openingDays = daysBetween(fundedOn, startDate);
+  const openingDays = daysBetween(pricedFundedOn, pricedTerms.firstPaymentOn);
   // Half a basis point is where the two figures round differently on screen.
-  const aprDiffers = Math.abs(disclosure.apr - rate) >= 0.005;
+  const aprDiffers = Math.abs(disclosure.apr - pricedTerms.annualRatePercent) >= 0.005;
+  const pricedBasis = pricedTerms.basis ?? 'actual/365';
   /**
    * Leftover days of the opening period under monthly rests: one whole rest (rate / 12) plus per
    * diem (days * rate / 365) on the remainder, as the schedule bills it. The daily conventions
    * charge every day of the gap and have no stub.
    */
-  const stubDays = basis === 'monthly' ? monthsAndDaysBetween(fundedOn, startDate).days : 0;
+  const stubDays =
+    pricedBasis === 'monthly'
+      ? monthsAndDaysBetween(pricedFundedOn, pricedTerms.firstPaymentOn).days
+      : 0;
   const oddOpening =
-    basis === 'monthly'
+    pricedBasis === 'monthly'
       ? stubDays > 0
       : openingDays > 0 && openingDays !== 30 && openingDays !== 31;
 
+  const pricedExtra = pricedTerms.extra?.monthly ?? 0;
+  const notes: string[] = [];
+  if (bankPayment) {
+    notes.push(t('loan.calculator.skipWorksOut', { amount: formatCurrency(loan.solvedPayment) }));
+  }
+  if (pricedExtra > 0) {
+    notes.push(
+      t('loan.calculator.plusExtra', {
+        extra: formatCurrency(pricedExtra),
+        total: formatCurrency(sumMoney([loan.payment, pricedExtra])),
+      }),
+    );
+  }
+  if (oddOpening) {
+    notes.push(
+      pricedBasis === 'monthly'
+        ? t('loan.calculator.firstCoversMonthPlus', {
+            count: stubDays,
+            interest: formatCurrency(schedule[0]?.interest ?? 0),
+          })
+        : t('loan.calculator.firstCoversDays', {
+            count: openingDays,
+            interest: formatCurrency(schedule[0]?.interest ?? 0),
+          }),
+    );
+  }
+  const unused = unusedNote(loan.unused);
+  if (unused) notes.push(unused);
+
+  const warnings = loan.problems.map(problemNote);
+  if (loan.balloon) {
+    warnings.push(t('loan.calculator.balloon', { amount: formatCurrency(contract.finalPayment) }));
+  }
+
+  // The loan as priced, in the figures both the schedule and the save page read back.
+  const loanParams: LoanRouteParams = {
+    amount: String(amount),
+    rate: String(rate),
+    months: String(months),
+    start: toIsoDate(startDate),
+    funded: toIsoDate(fundedOn),
+    basis,
+  };
+
   /**
    * Asks before filing anything. `basis` goes to `/save-loan` untouched (`day_count_basis` holds
-   * all four conventions), so no figure moves between here and the saved schedule.
+   * all four conventions), and the changes go as the schedule took them, so no figure moves
+   * between here and the saved schedule.
    */
   const handleSave = async () => {
-    if (contract.payment <= 0) return;
+    if (loan.payment <= 0) return;
+    if (loan.problems.length > 0) {
+      setSaveTried(true);
+      return;
+    }
 
     const ok = await confirm({
       title: t('loan.calculator.confirmTitle'),
       message: t(
         overpaying ? 'loan.calculator.confirmMessageOverpaying' : 'loan.calculator.confirmMessage',
-        { payment: formatCurrency(contract.payment), term: loanTermText(months) },
+        { payment: formatCurrency(loan.payment), term: loanTermText(months) },
       ),
       confirmLabel: t('common.continue'),
       cancelLabel: t('common.notNow'),
@@ -162,239 +270,187 @@ export default function LoanCalculatorScreen() {
 
     router.push({
       pathname: '/save-loan',
-      params: {
-        amount: String(amount),
-        rate: String(rate),
-        months: String(months),
-        start: toIsoDate(startDate),
-        funded: toIsoDate(fundedOn),
-        basis,
-      },
+      // As typed: the save page prices them again and files what the schedule takes.
+      params: { ...loanParams, ...overrideParams(overrides) },
     });
   };
+
+  const openSchedule = () =>
+    router.push({
+      pathname: '/loan-schedule',
+      params: {
+        ...loanParams,
+        extra: String(extraMonthly),
+        lump: String(lumpSum),
+        lumpOn: toIsoDate(lumpOn),
+        fees: String(fees),
+        ...overrideParams(overrides),
+        ...(draftId ? { draft: draftId } : {}),
+      },
+    });
+
+  const editPayment = () =>
+    router.push({
+      pathname: '/loan-payment',
+      params: { ...loanParams, ...(draftId ? { draft: draftId } : {}), target: 'monthly' },
+    });
 
   return (
     <Screen
       title={t('loan.calculator.title')}
       showBack
-      footer={<Button label={t('common.save')} onPress={handleSave} />}
+      footer={
+        <View className="w-full">
+          {/* Above the button, so it is seen wherever the page sits. */}
+          {saveTried && loan.problems.length > 0 ? (
+            <Text
+              className="mb-3 text-center font-app text-[13px] text-danger"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
+            >
+              {fixLine(loan.problems)}
+            </Text>
+          ) : null}
+          <Button label={t('common.save')} onPress={handleSave} />
+        </View>
+      }
     >
-      <View className="mt-6 w-full items-center rounded-[16px] border border-line bg-card px-5 py-6">
-        <Text
-          className="text-center font-app text-[13px] text-muted"
-          maxFontSizeMultiplier={TEXT_CAP.control}
-        >
-          {t('loan.monthlyPayment')}
-        </Text>
-        <FitFigure
-          id="payment"
-          size={40}
-          className="text-center font-app-bold text-ink"
-          boxClassName="mt-1"
-        >
-          {formatCurrency(contract.payment)}
-        </FitFigure>
-        <Text
-          className="mt-1 text-center font-app text-[13px] text-muted"
-          maxFontSizeMultiplier={TEXT_CAP.reading}
-        >
-          {t('loan.calculator.paymentsLastOn', {
-            count: schedule.length,
-            date: formatFullDate(lastPayment),
-          })}
-        </Text>
-
-        {extraMonthly > 0 ? (
-          <Text
-            className="mt-2 text-center font-app text-[12px] leading-[17px] text-muted"
-            maxFontSizeMultiplier={TEXT_CAP.reading}
-          >
-            {t('loan.calculator.plusExtra', {
-              extra: formatCurrency(extraMonthly),
-              total: formatCurrency(sumMoney([contract.payment, extraMonthly])),
-            })}
-          </Text>
-        ) : null}
-
-        {oddOpening ? (
-          <Text
-            className="mt-2 text-center font-app text-[12px] leading-[17px] text-muted"
-            maxFontSizeMultiplier={TEXT_CAP.reading}
-          >
-            {basis === 'monthly'
-              ? t('loan.calculator.firstCoversMonthPlus', {
-                  count: stubDays,
-                  interest: formatCurrency(schedule[0]?.interest ?? 0),
-                })
-              : t('loan.calculator.firstCoversDays', {
-                  count: openingDays,
-                  interest: formatCurrency(schedule[0]?.interest ?? 0),
-                })}
-          </Text>
-        ) : null}
-      </View>
-
-      <SectionHeading className="mb-4 mt-8">{t('loan.calculator.theLoan')}</SectionHeading>
-
-      <FitRows className="w-full gap-6" testID="loan-sliders">
-        <SliderRow
-          id="amount"
-          label={t('loan.amount')}
-          display={formatCurrency(amount, { cents: false })}
-          value={amount}
-          min={AMOUNT_MIN}
-          max={AMOUNT_MAX}
-          step={500}
-          scale="log"
-          onChange={setAmount}
-          onValuePress={() => setPadOpen(true)}
-          minLabel={formatCurrency(AMOUNT_MIN, { cents: false })}
-          maxLabel={formatCurrency(AMOUNT_MAX, { cents: false })}
-        />
-
-        <SliderRow
-          id="rate"
-          label={t('loan.interestRate')}
-          display={percent(rate, 2)}
-          value={rate}
-          min={0}
-          max={30}
-          step={0.01}
-          onChange={setRate}
-          onValuePress={() => setRatePadOpen(true)}
-          minLabel={percent(0, 0)}
-          maxLabel={percent(30, 0)}
-        />
-
-        <SliderRow
-          id="term"
-          label={t('loan.termLabel')}
-          display={loanTermText(months)}
-          value={months}
-          min={6}
-          max={480}
-          step={1}
-          onChange={setMonths}
-          minLabel={loanTermText(6)}
-          maxLabel={loanTermText(480)}
-        />
-      </FitRows>
-
-      <SectionHeading className="mb-4 mt-8">{t('loan.calculator.dates')}</SectionHeading>
-
-      <View className="w-full gap-5">
-        <SelectField
-          label={t('loan.calculator.moneyReceived')}
-          value={formatFullDate(fundedOn)}
-          icon={Calendar}
-          variant="pill"
-          onPress={() => setFundedPickerOpen(true)}
-        />
-        <SelectField
-          label={t('loan.firstPayment')}
-          value={formatFullDate(startDate)}
-          icon={Calendar}
-          variant="pill"
-          onPress={() => setDatePickerOpen(true)}
+      <View className="mt-3 w-full">
+        <LoanResultCard
+          payment={loan.payment}
+          paymentLabel={bankPayment ? t('loan.calculator.bankPayment') : undefined}
+          count={loan.paymentCount}
+          lastOn={lastPayment}
+          principal={pricedTerms.principal}
+          interest={loan.totalInterest}
+          totalPaid={loan.totalPaid}
+          fees={priced.fees}
+          apr={aprDiffers ? disclosure.apr : null}
+          notes={notes}
+          warnings={warnings}
+          onEditPayment={draftId ? editPayment : undefined}
         />
       </View>
 
-      <SectionHeading caption={t('common.optional')} className="mb-4 mt-8">
-        {t('loan.calculator.overpaymentsAndFees')}
-      </SectionHeading>
-
-      <View className="w-full gap-5">
-        <SelectField
-          label={t('loan.extraMonthly')}
-          value={extraMonthly > 0 ? formatCurrency(extraMonthly) : ''}
-          placeholder={t('loan.calculator.nothingExtra')}
-          variant="pill"
-          onPress={() => setExtraPadOpen(true)}
-        />
-
-        <SelectField
-          label={t('loan.lumpSum')}
-          value={lumpSum > 0 ? formatCurrency(lumpSum) : ''}
-          placeholder={t('common.none')}
-          variant="pill"
-          onPress={() => setLumpPadOpen(true)}
-        />
-
-        {lumpSum > 0 ? (
-          <SelectField
-            label={t('loan.calculator.overpaymentLands')}
-            value={formatFullDate(lumpOn)}
-            icon={Calendar}
-            variant="pill"
-            onPress={() => setLumpPickerOpen(true)}
+      <LoanSectionHeading icon={icons.details} className="mb-3 mt-8">
+        {t('loan.calculator.theLoan')}
+      </LoanSectionHeading>
+      <LoanCard>
+        <FitRows className="w-full" testID="loan-sliders">
+          <SliderRow
+            id="amount"
+            label={t('loan.amount')}
+            display={loanAmountText(amount)}
+            value={amount}
+            min={AMOUNT_MIN}
+            max={AMOUNT_MAX}
+            step={500}
+            scale="log"
+            onChange={setAmount}
+            onValuePress={() => setPadOpen(true)}
+            className="px-[18px] pb-2 pt-[16px]"
           />
-        ) : null}
+          <View className="h-px w-full bg-line" />
+          <SliderRow
+            id="rate"
+            label={t('loan.interestRate')}
+            display={loanRateText(rate)}
+            value={rate}
+            min={0}
+            max={RATE_MAX}
+            step={0.01}
+            onChange={setRate}
+            onValuePress={() => setRatePadOpen(true)}
+            className="px-[18px] pb-2 pt-[16px]"
+          />
+          <View className="h-px w-full bg-line" />
+          <SliderRow
+            id="term"
+            label={t('loan.termLabel')}
+            display={loanTermText(months)}
+            value={months}
+            min={6}
+            max={480}
+            step={1}
+            onChange={setMonths}
+            className="px-[18px] pb-2 pt-[16px]"
+          />
+        </FitRows>
+      </LoanCard>
 
-        <SelectField
-          label={t('loan.fees')}
-          value={fees > 0 ? formatCurrency(fees) : ''}
-          placeholder={t('loan.calculator.noFees')}
-          variant="pill"
-          onPress={() => setFeePadOpen(true)}
-        />
-      </View>
+      <LoanSectionHeading icon={icons.dates} className="mb-3 mt-8">
+        {t('loan.calculator.dates')}
+      </LoanSectionHeading>
+      <LoanCard>
+        <FitRows className="w-full" testID="loan-dates">
+          <LoanCardRow
+            id="funded"
+            first
+            label={t('loan.calculator.moneyReceived')}
+            value={formatFullDate(fundedOn)}
+            onPress={() => setFundedPickerOpen(true)}
+          />
+          <LoanCardRow
+            id="first"
+            label={t('loan.firstPayment')}
+            value={formatFullDate(startDate)}
+            onPress={() => setDatePickerOpen(true)}
+          />
+        </FitRows>
+      </LoanCard>
 
       <View className="mt-8 w-full">
-        <FieldLabel className="mb-3">{t('loan.calculator.howInterestCharged')}</FieldLabel>
-        <ChoiceChips options={basisChoices()} value={basis} onChange={setBasis} />
-        <Text
-          className="mt-3 font-app text-[12px] leading-[17px] text-muted"
-          maxFontSizeMultiplier={TEXT_CAP.reading}
-        >
-          {basisNote(basis)}
-        </Text>
-      </View>
-
-      <View className="mt-6 w-full rounded-[16px] border border-line bg-card p-5">
-        <ProportionBar principal={amount} interest={loan.totalInterest} />
-
-        <FitRows className="mt-5 w-full gap-3" testID="loan-summary">
-          <SummaryLine id="borrowed" label={t('loan.borrowed')} value={formatCurrency(amount)} />
-          <SummaryLine
-            id="interest"
-            label={t('loan.calculator.interestPaid')}
-            value={formatCurrency(loan.totalInterest)}
-            accent
-          />
-          {fees > 0 ? (
-            <SummaryLine
-              id="fees"
-              label={t('loan.calculator.feesAtClosing')}
-              value={formatCurrency(fees)}
-              accent
+        <MoreOptionsCard open={moreOpen} onToggle={() => setMoreOpen((open) => !open)}>
+          <FitRows className="w-full" testID="loan-options">
+            <LoanCardRow
+              id="extra"
+              first
+              label={t('loan.extraMonthly')}
+              value={
+                extraMonthly > 0 ? formatCurrency(extraMonthly) : t('loan.calculator.nothingExtra')
+              }
+              unset={extraMonthly <= 0}
+              onPress={() => setExtraPadOpen(true)}
             />
-          ) : null}
-          <View className="h-px w-full bg-line" />
-          <SummaryLine
-            id="total"
-            label={t('loan.calculator.totalRepay')}
-            value={formatCurrency(loan.totalPaid)}
-            strong
-          />
-          {/* APR is a disclosure term and stays as written. */}
-          {aprDiffers ? (
-            <SummaryLine id="apr" label="APR" value={percent(disclosure.apr, 2)} />
-          ) : null}
-        </FitRows>
+            <LoanCardRow
+              id="lump"
+              label={t('loan.lumpSum')}
+              value={lumpSum > 0 ? formatCurrency(lumpSum) : t('common.none')}
+              unset={lumpSum <= 0}
+              onPress={() => setLumpPadOpen(true)}
+            />
+            {lumpSum > 0 ? (
+              <LoanCardRow
+                id="lump-on"
+                label={t('loan.calculator.overpaymentLands')}
+                value={formatFullDate(lumpOn)}
+                onPress={() => setLumpPickerOpen(true)}
+              />
+            ) : null}
+            <LoanCardRow
+              id="fees"
+              label={t('loan.fees')}
+              value={fees > 0 ? formatCurrency(fees) : t('loan.calculator.noFees')}
+              unset={fees <= 0}
+              onPress={() => setFeePadOpen(true)}
+            />
+          </FitRows>
 
-        {aprDiffers ? (
-          <Text
-            className="mt-4 font-app text-[12px] leading-[17px] text-muted"
-            maxFontSizeMultiplier={TEXT_CAP.reading}
-          >
-            {t('loan.calculator.aprNote')}
-          </Text>
-        ) : null}
+          <View className="w-full border-t border-line px-[18px] py-[16px]">
+            <FieldLabel className="mb-3">{t('loan.calculator.howInterestCharged')}</FieldLabel>
+            <ChoiceChips options={basisChoices()} value={basis} onChange={setBasis} />
+            <Text
+              className="mt-3 font-app text-[12px] leading-[17px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
+            >
+              {basisNote(basis)}
+            </Text>
+          </View>
+        </MoreOptionsCard>
       </View>
 
-      {overpaying && (comparison.interestSaved > 0 || comparison.monthsSaved > 0) ? (
+      {overpaying && (interestSaved > 0 || monthsSaved > 0) ? (
         <FitRows
-          className="mt-3 w-full gap-3 rounded-[16px] border border-line bg-card p-5"
+          className="mt-3 w-full gap-3 rounded-[20px] border border-line bg-card p-[20px]"
           testID="loan-overpaying"
         >
           <Text
@@ -403,17 +459,17 @@ export default function LoanCalculatorScreen() {
           >
             {t('loan.calculator.ifYouOverpay')}
           </Text>
-          <SummaryLine
+          <LoanSummaryLine
             id="saved"
             label={t('loan.calculator.interestSaved')}
-            value={formatCurrency(comparison.interestSaved)}
+            value={formatCurrency(interestSaved)}
             positive
           />
-          {comparison.monthsSaved > 0 ? (
-            <SummaryLine
+          {monthsSaved > 0 ? (
+            <LoanSummaryLine
               id="early"
               label={t('loan.calculator.paidOffEarlyBy')}
-              value={loanTermText(comparison.monthsSaved)}
+              value={loanTermText(monthsSaved)}
             />
           ) : null}
           <Text
@@ -423,32 +479,26 @@ export default function LoanCalculatorScreen() {
             {t('loan.calculator.clearOn', {
               date: formatFullDate(lastPayment),
               contractDate: formatFullDate(contractLastPayment),
-              payment: formatCurrency(contract.payment),
+              payment: formatCurrency(loan.payment),
             })}
           </Text>
         </FitRows>
       ) : null}
 
-      <View className="mb-4 mt-3 w-full">
-        <ScheduleCard
-          rows={schedule}
-          onPress={() =>
-            router.push({
-              pathname: '/loan-schedule',
-              params: {
-                amount: String(amount),
-                rate: String(rate),
-                months: String(months),
-                start: toIsoDate(startDate),
-                funded: toIsoDate(fundedOn),
-                basis,
-                extra: String(extraMonthly),
-                lump: String(lumpSum),
-                lumpOn: toIsoDate(lumpOn),
-              },
-            })
-          }
-        />
+      <View className="mt-3 w-full flex-row items-start gap-2 px-1">
+        <View className="pt-[2px]">
+          <Info size={14} color={colors.muted} strokeWidth={2} />
+        </View>
+        <Text
+          className="min-w-0 flex-1 font-app text-[12px] leading-[17px] text-muted"
+          maxFontSizeMultiplier={TEXT_CAP.reading}
+        >
+          {interestLine(basis)}
+        </Text>
+      </View>
+
+      <View className="mb-4 mt-6 w-full">
+        <ScheduleCard rows={schedule} onPress={openSchedule} />
       </View>
 
       {padOpen ? (
@@ -457,9 +507,11 @@ export default function LoanCalculatorScreen() {
           caption={t('loan.calculator.amountCaption')}
           value={String(amount)}
           onCancel={() => setPadOpen(false)}
+          check={(next) =>
+            typedAmount(next) === null ? t('loan.calculator.amountAboveZero') : null
+          }
           onConfirm={(next) => {
-            const parsed = Number(next) || 0;
-            setAmount(Math.min(AMOUNT_MAX, Math.max(AMOUNT_MIN, parsed)));
+            setAmount(typedAmount(next) ?? amount);
             setPadOpen(false);
           }}
         />
@@ -472,8 +524,9 @@ export default function LoanCalculatorScreen() {
           unit="percent"
           value={String(rate)}
           onCancel={() => setRatePadOpen(false)}
+          check={(next) => (typedRate(next) === null ? t('loan.calculator.rateNeeded') : null)}
           onConfirm={(next) => {
-            setRate(Math.min(30, Math.max(0, Number(next) || 0)));
+            setRate(typedRate(next) ?? rate);
             setRatePadOpen(false);
           }}
         />
@@ -564,64 +617,4 @@ function monthBefore(date: Date): Date {
   const lastOfMonth = new Date(earlier.getFullYear(), earlier.getMonth() + 1, 0).getDate();
   earlier.setDate(Math.min(date.getDate(), lastOfMonth));
   return earlier;
-}
-
-/**
- * A label and its figure. Every line in the card keeps its figure beside its label, or every line
- * puts it underneath.
- */
-function SummaryLine({
-  id,
-  label,
-  value,
-  strong = false,
-  accent = false,
-  positive = false,
-}: {
-  /** Names the fit slots; unique in its card. */
-  id: string;
-  label: string;
-  value: string;
-  strong?: boolean;
-  /** Money going out — interest, fees. */
-  accent?: boolean;
-  /** Money not going out. Interest saved is the only one on this screen. */
-  positive?: boolean;
-}) {
-  const stacked = !useGroupFits();
-  return (
-    <View
-      className={
-        stacked ? 'w-full items-start' : 'w-full flex-row items-center justify-between gap-3'
-      }
-    >
-      <FitText
-        id={`${id}-label`}
-        role="row"
-        size={strong ? 15 : 14}
-        className={strong ? 'font-app-medium text-ink' : 'font-app text-body'}
-        slotClassName={stacked ? 'w-full' : 'min-w-0 flex-1'}
-      >
-        {label}
-      </FitText>
-      <FitText
-        id={`${id}-value`}
-        hug
-        role="row"
-        size={strong ? 17 : 15}
-        className={
-          strong
-            ? 'font-app-bold text-ink'
-            : accent
-              ? 'font-app-semibold text-money-out'
-              : positive
-                ? 'font-app-semibold text-money-in'
-                : 'font-app-semibold text-ink'
-        }
-        slotClassName={stacked ? 'mt-0.5' : 'shrink-0'}
-      >
-        {value}
-      </FitText>
-    </View>
-  );
 }

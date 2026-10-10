@@ -6,7 +6,6 @@ import PrivacyScreen from '@/app/privacy';
 import { AppLockGate } from '@/components/app-lock-gate';
 import { BillFilterSheet, EMPTY_BILL_FILTERS } from '@/components/bills/bill-filter-sheet';
 import { CategoryPicker } from '@/components/bills/category-picker';
-import { ProportionBar } from '@/components/calculators/proportion-bar';
 import { ScheduleCard } from '@/components/calculators/schedule-card';
 import { SliderRow } from '@/components/calculators/slider-row';
 import { InlineCalendar } from '@/components/flow/inline-calendar';
@@ -47,7 +46,6 @@ import type { Language } from '@/i18n/config';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 import { voiceMessages } from '@/i18n/messages/voice';
 import { failureText } from '@/lib/failure';
-import { formatCurrency } from '@/lib/format';
 import type { AmortisationRow } from '@/lib/loan';
 import { TEXT_CAP, type TextRole } from '@/theme/text-scale';
 
@@ -98,6 +96,9 @@ jest.mock('@/providers/theme-provider', () => ({
 jest.mock('@/theme/shadows', () => ({ shadows: { floating: {} } }));
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
+}));
+jest.mock('@/theme/loan-icons', () => ({
+  useLoanIcons: () => new Proxy({}, { get: () => () => null }),
 }));
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
 jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
@@ -257,18 +258,35 @@ const CASES: Case[] = [
     name: 'SourceTiles',
     draw: () => (
       <SourceTiles
-        sources={
-          [
-            { id: 's1', label: 'VISA ••4242', color: '#000000' },
-            { id: 's2', label: 'Everyday ••1111', color: '#FFFFFF' },
-          ] as never
-        }
+        sources={[
+          {
+            id: 's1',
+            label: 'VISA ••4242',
+            name: 'VISA',
+            last4: '4242',
+            color: '#000000',
+            kind: 'card',
+          },
+          {
+            id: 's2',
+            label: 'Everyday ••1111',
+            name: 'Everyday',
+            last4: '1111',
+            color: '#FFFFFF',
+            kind: 'account',
+          },
+        ]}
         value="s1"
         onChange={noop}
+        skip={{ label: t('bills.add.skipSource'), selected: false, onPress: noop }}
       />
     ),
-    same: both(/^(VISA ••4242|Everyday ••1111)$/),
-    roles: () => [['VISA ••4242', 'control']],
+    same: both(/^(VISA|Everyday)?( ?••\d{4})?$/),
+    roles: () => [
+      ['VISA', 'control'],
+      ['••4242', 'control'],
+      [t('bills.add.skipSource'), 'control'],
+    ],
   },
   {
     name: 'TogglePill',
@@ -447,19 +465,12 @@ const CASES: Case[] = [
     ],
   },
   {
-    name: 'ProportionBar',
-    draw: () => <ProportionBar principal={25_000} interest={3_750} />,
-    roles: () => [
-      [
-        t('loan.proportion.borrowed', { amount: formatCurrency(25_000, { cents: false }) }),
-        'control',
-      ],
-    ],
-  },
-  {
     name: 'ScheduleCard',
     draw: () => <ScheduleCard rows={scheduleRows} onPress={noop} />,
-    roles: () => [[t('loan.scheduleCard.title'), 'row']],
+    roles: () => [
+      [t('loan.schedule.title'), 'row'],
+      [t('loan.scheduleCard.subtitle', { count: 72 }), 'row'],
+    ],
   },
   {
     name: 'SliderRow',
@@ -472,14 +483,10 @@ const CASES: Case[] = [
         max={30}
         onChange={noop}
         onValuePress={noop}
-        minLabel={percent(0, 0)}
-        maxLabel={percent(30, 0)}
       />
     ),
-    // The ends of the track sit under its ends, at one size.
-    fixed: /^(0|30)\s?%$/,
     // Spanish writes a rate as English does; French as "7,50 %".
-    same: { es: /^(7\.50%|0%|30%)$/ },
+    same: { es: /^7\.50%$/ },
     roles: () => [
       [t('loan.interestRate'), 'row'],
       [percent(7.5, 2), 'figure'],

@@ -22,6 +22,27 @@ export function toCents(amount: number): number {
   return corrected < 0 ? -Math.round(-corrected) : Math.round(corrected);
 }
 
+/** The most a money column holds, numeric(14,2): $999,999,999,999.99. */
+export const MAX_MONEY_CENTS = 99_999_999_999_999;
+
+/** Float noise in a product is a few units in the last place; a real fraction of a cent is far more. */
+const NOISE_ULPS = 4;
+
+/**
+ * The amount in cents when it is a whole number of cents (554.23 is, 554.235 is not) that a money
+ * column can hold, else null. Typed figures are checked with this rather than rounded, so a stray
+ * third decimal is refused instead of quietly moving a cent. The test is the distance to the
+ * nearest cent against float noise, not 12 significant digits, which would round away the cents
+ * of a billion-dollar figure.
+ */
+export function wholeCents(amount: number): number | null {
+  if (!Number.isFinite(amount)) return null;
+  const scaled = amount * 100;
+  const cents = Math.round(scaled);
+  if (Math.abs(scaled - cents) > Math.abs(scaled) * NOISE_ULPS * Number.EPSILON) return null;
+  return Math.abs(cents) <= MAX_MONEY_CENTS ? cents : null;
+}
+
 export function fromCents(cents: number): number {
   return cents / 100;
 }

@@ -38,6 +38,8 @@ jest.mock('@/lib/haptics', () => ({
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({
     ink: '#000000',
+    card: '#FFFFFF',
+    accent: '#905479',
     muted: '#777777',
     line: '#DDDDDD',
     surface: '#FFFFFF',

@@ -1185,3 +1185,72 @@ arithmetic.
 2. MXN preset prices ×10.
 3. Lock Store on habit-receipt edit, plus a same-day hint.
 4. "You can change this anytime." vs the house "You can edit this later."
+
+---
+
+## 2026-10-09 — Paulo (Product Designer) — loan file upload (C1) screens, draft for approval
+
+**Outcome:** Done, as a draft. The screens need the Founder's approval before anything is built.
+- Spec: `.claude/team/design/loan-upload.md`.
+- Mock: `.claude/team/design/loan-upload-mock.html`. It has 29 phone frames at 300px (drawn at 390pt), 5 of them dark
+  and 1 at large text. The fonts are embedded, so it needs no network.
+- Mock source and draft icons: `.claude/team/design/loan-upload-assets/`.
+- No source touched.
+
+**What it covers**
+- the calculator card (Pro, free with the PRO pill, dark) and the explainer entry;
+- Upload your loan file, with "Photos and scans · Coming soon";
+- Locked file, and the wrong-password state;
+- Reading your file, with Stop and "Nothing leaves your phone";
+- Check the numbers: all checked "to the cent", partial, resolved, estimate warning, monthly statement, dark, large
+  text, and the leave dialog;
+- one field (the rate keypad);
+- eight problem pages, including the one failure line;
+- the calculator after Fill, with its toast.
+
+**Decisions**
+- **Five marks**, each an icon and a word. They are the plan's four plus "Confirmed by you".
+- **An eighth row, "How interest is charged"**, because Fill can change it.
+- **A "How Skip checked" card** with the file's figure beside Skip's.
+- **Fill is never greyed.** It says "To fill the calculator, check: …" and moves focus to the first open row.
+- **A new `attention` amber** (#93600A / #F0B44C) for "Check this". `danger` and `moneyOut` were taken.
+- **A dark plum for "Confirmed by you"** (#C79AB6). `accentInk` is 3.14:1 on the plum tint in dark.
+- **No row tint** on "Check this" rows: it pulled the mark under 4.5:1.
+- **The privacy lines say "never leaves your phone".** The plan said "never uploaded", which contradicts the card's
+  "Upload".
+- **A draft gradient icon family**: one page with four badges (arrow, magnifier, check, "!").
+- **A proposed sixth route**, `/loan-upload-problem?kind=`.
+- **C1's picker should take PDFs only.**
+- **The plan's 3-tries password line was replaced**: I could not confirm iOS Files can save an unlocked copy.
+
+**Numbers.** Every loan figure is the engine's. I ran `amortise`, `solvePayment` and `truthInLending` via `sucrase-node`
+on copies of `src/lib/{loan,money,apr}.ts`.
+- **The Founder's design.** $25,000 at 7.50% for 60 months is $500.95 under monthly rests (interest $5,056.96), to the
+  cent.
+- **Example A.** $27,450 at 7.49% for 60 months, simple interest, with a $450 fee:
+  - 59 × $549.94 and a last payment of $549.66;
+  - total of payments $32,996.12, finance charge $5,996.12;
+  - APR 8.19%.
+- **Example B.** $12,000 at 9.99% for 36 months: $387.15 under monthly rests only. Daily 365 gives $387.23 or $387.20.
+- **Example C.** $40,000 at 8.25% for 120 months: $490.61.
+
+**Contrast** comes from the app's `contrast()`.
+
+**Could not verify**
+- Nothing ran on a phone or in the Simulator. The mock was checked by eye in headless Chrome screenshots.
+- Whether iOS offers "Save password?" on the password field.
+- Whether iOS Files can remove a PDF password.
+- The statuses in Example B depend on Drew's reading of plan 3.9 (question 7).
+
+**Open questions**
+1. "Upload" against "never leaves your phone". I kept the card's words; "Add your loan file" is the alternative
+   (Founder).
+2. Will the Founder draw the real icon (Founder)?
+3. Keep "Confirmed by you" as a separate mark (Founder)?
+4. The C2 upload page direction (Founder).
+5. Statements fill only the rate and payment, so the schedule mismatches until the amount is entered (Founder).
+6. The 3-tries password copy (Founder, or Dilip to check on a phone).
+7. Can a field be Checked by an identity whose rate is unconfirmed (Drew)?
+8. The interest-method marks, and fees "None" Checked (Drew).
+9. The sixth route, and PDF-only picker types (Dmitri).
+10. The calculator after Fill: APR line, values past the sliders, the method choice kept under More options (Dana L).

@@ -4,64 +4,70 @@ import { Text, View } from 'react-native';
 
 import { useSaveLoan } from '@/api/mutations';
 import { usePaymentSources } from '@/api/queries';
-import { IconPicker } from '@/components/bills/icon-picker';
-import { loanRateText, loanTermText } from '@/components/calculators/schedule-card';
+import { LoanTypeGrid } from '@/components/calculators/loan-type-grid';
+import { fixLine } from '@/components/calculators/override-words';
+import { PaymentHeadline } from '@/components/calculators/payment-headline';
+import { loanAmountText, loanRateText, loanTermText } from '@/components/calculators/schedule-card';
+import { SummaryGrid } from '@/components/calculators/summary-grid';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
-import { FieldLabel, Subtitle } from '@/components/ui/typography';
-import { t } from '@/i18n';
-import { formatFullDate } from '@/lib/date';
-import { formatCurrency } from '@/lib/format';
-import { amortise, type AccrualBasis } from '@/lib/loan';
+import { FieldLabel } from '@/components/ui/typography';
+import { loanTypeIconId, type LoanType } from '@/data/loan-types';
+import { percent, t } from '@/i18n';
+import { formatFullDate, toIsoDate } from '@/lib/date';
 import { failureMessage } from '@/lib/failure';
+import { refusedLoanSave } from '@/lib/loan-refusal';
+import { formatCurrency } from '@/lib/format';
+import { payoffDate } from '@/lib/loan';
+import { paymentOverridesJson, scheduleWithOverrides } from '@/lib/loan-overrides';
+import {
+  SAVABLE_RATE_MAX,
+  rateSavable,
+  readLoanRoute,
+  routeDate,
+  termsFromRoute,
+  type LoanRouteParams,
+} from '@/lib/loan-route';
 import { useToast } from '@/providers/toast-context';
+import { TEXT_CAP } from '@/theme/text-scale';
 
-/** Only the app's own conventions get through a hand-edited link. */
-const BASES: readonly AccrualBasis[] = ['actual/365', 'actual/360', '30/360', 'monthly'];
-const parseBasis = (value: string | undefined): AccrualBasis =>
-  BASES.find((basis) => basis === value) ?? 'actual/365';
+const rateRange = () =>
+  t('loan.save.rateOutOfRange', { min: percent(0, 0), max: percent(SAVABLE_RATE_MAX, 0) });
 
 /**
  * Names a calculated loan and files it as a monthly bill. The payment is recalculated here from the
  * params, so a hand-edited link cannot save one that disagrees with its principal, rate and term.
  */
 export default function SaveLoanScreen() {
-  const params = useLocalSearchParams<{
-    amount?: string;
-    rate?: string;
-    months?: string;
-    start?: string;
-    funded?: string;
-    basis?: string;
-  }>();
+  const route = readLoanRoute(useLocalSearchParams<LoanRouteParams>());
+  const principal = route.principal;
+  const annualRate = route.annualRate;
+  const termMonths = route.months;
+  const firstPaymentOn = route.start;
+  const fundedOn = route.funded;
+  const firstPaymentDate = routeDate(firstPaymentOn);
 
-  const principal = Number(params.amount) || 0;
-  const annualRate = Number(params.rate) || 0;
-  const termMonths = Number(params.months) || 0;
-  const firstPaymentOn = params.start ?? '';
-  const fundedOn = params.funded ?? '';
-  const basis = parseBasis(params.basis);
-
-  const firstPaymentDate = firstPaymentOn ? new Date(`${firstPaymentOn}T00:00:00`) : new Date();
-  const fundedDate = fundedOn ? new Date(`${fundedOn}T00:00:00`) : undefined;
-
-  // Overpayments are not carried here: the bill is the contract payment the lender takes.
-  const loan = amortise({
-    principal,
-    annualRatePercent: annualRate,
-    months: termMonths,
-    firstPaymentOn: firstPaymentDate,
-    fundedOn: fundedDate,
-    basis,
-  });
+  // Overpayments are not carried here: the bill is the contract payment the lender takes, with the
+  // bank's payment and changed payments the person typed.
+  const priced = scheduleWithOverrides(
+    termsFromRoute(route, { withExtras: false }),
+    route.overrides,
+  );
+  const loan = priced.contract;
+  const termEnds = toIsoDate(payoffDate(firstPaymentDate ?? new Date(), termMonths));
 
   const [name, setName] = useState('');
-  // 'other' exists in BILL_ICON_CHOICES; there is no loan glyph, and a missing id selects nothing.
-  const [iconId, setIconId] = useState('other');
-  const [sourceId, setSourceId] = useState('');
+  const [loanType, setLoanType] = useState<LoanType>('personal');
+  // As on a bill: null is not answered yet, '' is Skip (paid from nowhere in particular).
+  const [sourceId, setSourceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Shown from the start: the rate is already chosen, and filling in the rest would not help.
+  const rateRefused = rateSavable(annualRate) ? null : rateRange();
+  // A change the loan no longer takes has to be fixed on the calculator first.
+  const changesRefused = priced.problems.length > 0 ? fixLine(priced.problems) : null;
+  const shownError = error ?? rateRefused ?? changesRefused;
 
   const { sources } = usePaymentSources();
   const saveLoan = useSaveLoan();
@@ -70,8 +76,16 @@ export default function SaveLoanScreen() {
   const handleSave = async () => {
     setError(null);
 
-    if (!name.trim()) {
-      setError(t('loan.save.needName'));
+    if (rateRefused ?? changesRefused) {
+      setError(rateRefused ?? changesRefused);
+      return;
+    }
+    const missing = [
+      !name.trim() && t('loan.save.name'),
+      sourceId === null && t('loan.save.paidFrom'),
+    ].filter((field): field is string => Boolean(field));
+    if (missing.length > 0) {
+      setError(t('loan.save.missing', { fields: missing.join(', ') }));
       return;
     }
     if (termMonths < 1 || principal <= 0) {
@@ -83,7 +97,7 @@ export default function SaveLoanScreen() {
     try {
       await saveLoan.mutateAsync({
         name: name.trim(),
-        iconId,
+        iconId: loanTypeIconId(loanType),
         principal,
         annualRate,
         termMonths,
@@ -92,96 +106,147 @@ export default function SaveLoanScreen() {
         firstPaymentOn,
         fundedOn: fundedOn || null,
         // Saved exactly as priced (the column holds all four bases), so no figure moves later.
-        dayCountBasis: basis,
+        dayCountBasis: route.basis,
         cardId: chosen?.kind === 'card' ? chosen.id : null,
         bankAccountId: chosen?.kind === 'account' ? chosen.id : null,
+        paymentOverrides: paymentOverridesJson(priced.applied.payments),
+        lastPaymentOn: loan.payoffOn && loan.payoffOn < termEnds ? loan.payoffOn : null,
       });
       toast('toast.loan.saved');
       // Back past the calculator to the bills list.
       router.dismissTo('/bills');
     } catch (thrown) {
-      setError(failureMessage(thrown));
+      switch (refusedLoanSave(thrown)) {
+        case 'payments':
+          setError(t('loan.save.refusedPayments'));
+          break;
+        case 'lastPayment':
+          setError(t('loan.save.refusedLastPayment'));
+          break;
+        case 'rate':
+          setError(rateRange());
+          break;
+        default:
+          setError(failureMessage(thrown));
+      }
     }
   };
 
   return (
-    <Screen title={t('loan.save.title')} showBack avoidKeyboard>
-      <Subtitle className="mt-3">{t('loan.save.subtitle')}</Subtitle>
-
-      <View className="mt-6 w-full rounded-[16px] border border-line bg-card px-4 py-3">
-        <Row label={t('loan.monthlyPayment')} value={formatCurrency(loan.payment)} strong />
-        <Row label={t('loan.borrowed')} value={formatCurrency(principal)} />
-        <Row
-          label={t('loan.save.rate')}
-          value={t('loan.save.ratePerYear', { rate: loanRateText(annualRate) })}
-        />
-        <Row
-          label={t('loan.termLabel')}
-          value={t('loan.save.termPayments', {
-            term: loanTermText(termMonths),
-            count: termMonths,
-          })}
-        />
-        <Row
-          label={t('loan.firstPayment')}
-          value={firstPaymentOn ? formatFullDate(new Date(`${firstPaymentOn}T00:00:00`)) : '—'}
-        />
-        <Row label={t('loan.save.interestOverTerm')} value={formatCurrency(loan.totalInterest)} />
-      </View>
-
-      <View className="mt-8 w-full gap-6">
-        <TextField
-          label={t('loan.save.name')}
-          value={name}
-          onChangeText={setName}
-          placeholder={t('loan.save.namePlaceholder')}
-          autoCapitalize="sentences"
-          returnKeyType="done"
-        />
-
+    <Screen
+      title={t('loan.save.title')}
+      showBack
+      avoidKeyboard
+      footer={
         <View className="w-full">
-          <FieldLabel className="mb-3">{t('loan.save.icon')}</FieldLabel>
-          <IconPicker value={iconId} onChange={setIconId} />
+          {/* Above the button, not at the end of the scroll, so it is seen wherever the page sits. */}
+          {shownError ? (
+            <Text
+              className="mb-3 text-center font-app text-[13px] text-danger"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
+            >
+              {shownError}
+            </Text>
+          ) : null}
+          <Button
+            label={saveLoan.isPending ? t('loan.save.saving') : t('loan.save.saveToLoans')}
+            onPress={handleSave}
+          />
         </View>
+      }
+    >
+      <Text
+        className="mt-1 w-full text-center font-app text-[14px] leading-5 text-muted"
+        maxFontSizeMultiplier={TEXT_CAP.reading}
+      >
+        {t('loan.save.subtitle')}
+      </Text>
 
-        {sources.length > 0 ? (
-          <View className="w-full">
-            <FieldLabel className="mb-3">{t('loan.save.paidFrom')}</FieldLabel>
-            <SourceTiles sources={sources} value={sourceId} onChange={setSourceId} />
-          </View>
-        ) : null}
-
-        {error ? (
-          <Text className="font-app text-[13px] text-danger" maxFontSizeMultiplier={1.4}>
-            {error}
+      <View className="mt-5 w-full rounded-[20px] border border-line bg-card p-[20px]">
+        <PaymentHeadline
+          payment={loan.payment}
+          label={
+            priced.applied.monthlyPayment !== undefined
+              ? t('loan.calculator.bankPayment')
+              : undefined
+          }
+          size={28}
+          suffix={t('loan.save.perMonth')}
+        />
+        <View className="my-[16px] h-px w-full bg-line" />
+        <SummaryGrid
+          columns={3}
+          testID="save-loan-summary"
+          items={[
+            { id: 'borrowed', label: t('loan.borrowed'), value: loanAmountText(principal) },
+            { id: 'rate', label: t('loan.rate'), value: loanRateText(annualRate) },
+            { id: 'term', label: t('loan.termLabel'), value: loanTermText(termMonths) },
+            {
+              id: 'payments',
+              label: t('loan.save.payments'),
+              // As many as the changes leave: a higher payment can end the loan before its term.
+              value: t('loan.save.paymentsMonthly', { count: loan.rows.length }),
+            },
+            {
+              id: 'first',
+              label: t('loan.firstPayment'),
+              value: firstPaymentDate ? formatFullDate(firstPaymentDate) : '—',
+            },
+            {
+              id: 'interest',
+              label: t('loan.totalInterest'),
+              value: formatCurrency(loan.totalInterest),
+            },
+          ]}
+        />
+        {priced.balloon ? (
+          <Text
+            className="mt-4 font-app-medium text-[13px] leading-[18px] text-danger"
+            maxFontSizeMultiplier={TEXT_CAP.reading}
+          >
+            {t('loan.calculator.balloon', { amount: formatCurrency(loan.finalPayment) })}
           </Text>
         ) : null}
       </View>
 
-      <View className="mt-auto w-full pt-10">
-        <Button
-          label={saveLoan.isPending ? t('loan.save.saving') : t('loan.save.addToBills')}
-          onPress={handleSave}
+      <TextField
+        className="mt-6"
+        filled
+        label={t('loan.save.name')}
+        value={name}
+        onChangeText={(next) => {
+          setError(null);
+          setName(next);
+        }}
+        placeholder={t('loan.save.namePlaceholder')}
+        autoCapitalize="sentences"
+        returnKeyType="done"
+      />
+
+      <View className="mt-6 w-full">
+        <FieldLabel className="mb-2">{t('loan.save.loanType')}</FieldLabel>
+        <LoanTypeGrid value={loanType} onChange={setLoanType} />
+      </View>
+
+      <View className="mb-4 mt-6 w-full">
+        <FieldLabel className="mb-2">{t('loan.save.paidFrom')}</FieldLabel>
+        <SourceTiles
+          sources={sources}
+          value={sourceId ?? ''}
+          onChange={(next) => {
+            setError(null);
+            setSourceId(next);
+          }}
+          skip={{
+            label: t('loan.save.skipSource'),
+            selected: sourceId === '',
+            onPress: () => {
+              setError(null);
+              setSourceId('');
+            },
+          }}
         />
       </View>
     </Screen>
-  );
-}
-
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <View className="w-full flex-row items-center justify-between gap-3 py-1.5">
-      <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={1.3}>
-        {label}
-      </Text>
-      <Text
-        className={
-          strong ? 'font-app-semibold text-[15px] text-ink' : 'font-app text-[14px] text-body'
-        }
-        maxFontSizeMultiplier={1.3}
-      >
-        {value}
-      </Text>
-    </View>
   );
 }

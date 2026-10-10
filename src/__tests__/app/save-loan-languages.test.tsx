@@ -16,13 +16,12 @@ jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
 );
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
-jest.mock('@/theme/artwork', () => ({
-  useArtwork: () => new Proxy({}, { get: () => () => null }),
+jest.mock('@/theme/loan-icons', () => ({
+  useLoanIcons: () => new Proxy({}, { get: () => () => null }),
+  useLoanTypeIcons: () => new Proxy({}, { get: () => () => null }),
 }));
-// Its glyphs import SVGs that jest's `@/` mapper cannot resolve; the picker is another screen's test.
-jest.mock('@/components/bills/icon-picker', () => ({ IconPicker: () => null }));
 jest.mock('@/providers/theme-provider', () => ({
-  useColors: () => ({ ink: '#000000', muted: '#777777', body: '#222222', accent: '#905479' }),
+  useColors: () => new Proxy({}, { get: () => '#000000' }),
 }));
 
 const mockSave = jest.fn(async (_input: Record<string, unknown>) => ({}));
@@ -90,40 +89,56 @@ it('summarises the loan in Spanish', async () => {
   await showIn('es', 'MXN');
 
   for (const line of [
-    'Agregar a facturas mensuales',
-    'Se convierte en una factura mensual en Préstamos, así que cuenta contra lo que te queda.',
+    'Guardar este préstamo',
+    'Aparecerá en Préstamos como una factura mensual.',
     'Pago mensual',
+    '/ mes',
     'Prestado',
     '$31,394.33',
     'Tasa',
-    '8.14% anual',
+    '8.14%',
     'Plazo',
-    '6 años · 72 pagos',
+    '6 años',
+    'Pagos',
+    '72 mensuales',
     'Primer pago',
     '14 ene 2026',
-    'Intereses en todo el plazo',
+    'Intereses totales',
     'Nombre',
-    'Ícono',
-    'Agregar a facturas',
+    'Tipo de préstamo',
+    'Personal',
+    'Auto',
+    'Estudiantil',
+    'Vivienda',
+    'Negocio',
+    'Médico',
+    'Tarjeta de crédito',
+    'Otro',
+    'Guardar en Préstamos',
   ]) {
     expect(screen.getAllByText(line, RAW).length).toBeGreaterThan(0);
   }
-  expect(screen.getByPlaceholderText('Préstamo de auto, préstamo estudiantil…', RAW)).toBeTruthy();
+  expect(screen.getByPlaceholderText('p. ej., Préstamo de auto', RAW)).toBeTruthy();
 });
 
 it('summarises the loan in French, with French figures', async () => {
   await showIn('fr', 'CAD');
 
   for (const line of [
-    'Ajouter aux factures mensuelles',
+    'Enregistrer ce prêt',
+    'Il apparaîtra sous Prêts comme une facture mensuelle.',
     'Paiement mensuel',
+    '/ mois',
     `31${NBSP}394,33${NBSP}$`,
-    `8,14${NBSP}% par an`,
+    `8,14${NBSP}%`,
     'Durée',
-    '6 ans · 72 paiements',
+    '6 ans',
+    '72 mensuels',
     '14 janv. 2026',
-    'Intérêts sur toute la durée',
-    'Ajouter aux factures',
+    'Intérêts totaux',
+    'Type de prêt',
+    'Carte de crédit',
+    'Enregistrer dans Prêts',
   ]) {
     expect(screen.getAllByText(line, RAW).length).toBeGreaterThan(0);
   }
@@ -133,28 +148,34 @@ it('summarises the loan in French, with French figures', async () => {
   }
 });
 
-it('asks for a name in the language on screen', async () => {
+it('says what is still missing, by the names on the page, in the language on screen', async () => {
   await showIn('fr', 'CAD');
-  await fireEvent.press(screen.getByText('Ajouter aux factures', RAW));
+  await fireEvent.press(screen.getByText('Enregistrer dans Prêts', RAW));
   expect(
-    screen.getByText('Donne un nom au prêt pour le repérer dans tes factures.', RAW),
+    screen.getByText(`Pour enregistrer ce prêt, remplis${NBSP}: Nom, Payé depuis.`, RAW),
   ).toBeTruthy();
+  expect(mockSave).not.toHaveBeenCalled();
+
+  await fireEvent.press(screen.getByRole('radio', { name: 'Passer' }));
+  await fireEvent.press(screen.getByText('Enregistrer dans Prêts', RAW));
+  expect(screen.getByText(`Pour enregistrer ce prêt, remplis${NBSP}: Nom.`, RAW)).toBeTruthy();
   expect(mockSave).not.toHaveBeenCalled();
 });
 
 it('saves the identical loan in every language and currency', async () => {
   const LOCALES: [Language, CurrencyCode, string][] = [
-    ['en', 'USD', 'Car loan, student loan…'],
-    ['es', 'MXN', 'Préstamo de auto, préstamo estudiantil…'],
-    ['fr', 'CAD', 'Prêt auto, prêt étudiant…'],
-    ['fr', 'GBP', 'Prêt auto, prêt étudiant…'],
+    ['en', 'USD', 'e.g. Car loan'],
+    ['es', 'MXN', 'p. ej., Préstamo de auto'],
+    ['fr', 'CAD', 'p. ex. Prêt auto'],
+    ['fr', 'GBP', 'p. ex. Prêt auto'],
   ];
   for (const [language, currency, placeholder] of LOCALES) {
     await showIn(language, currency);
     await fireEvent.changeText(screen.getByPlaceholderText(placeholder, RAW), 'Auto');
+    await fireEvent.press(screen.getByRole('radio', { name: /^(Skip|Omitir|Passer)$/ }));
     await fireEvent.press(
       screen.getByRole('button', {
-        name: /^(Add to bills|Agregar a facturas|Ajouter aux factures)$/,
+        name: /^(Save to Loans|Guardar en Préstamos|Enregistrer dans Prêts)$/,
       }),
     );
     await screen.unmount();
@@ -166,6 +187,7 @@ it('saves the identical loan in every language and currency', async () => {
   expect(saved[0]).toEqual(
     expect.objectContaining({
       name: 'Auto',
+      iconId: 'loan-personal',
       principal: 31_394.33,
       annualRate: 8.14,
       termMonths: 72,

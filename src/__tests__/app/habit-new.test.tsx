@@ -43,6 +43,7 @@ const mockColors = {
   muted: '#777777',
   line: '#DDDDDD',
   card: '#FFFFFF',
+  accent: '#905479',
   surface: '#FFFFFF',
   danger: '#CC0000',
   accentInk: '#905479',

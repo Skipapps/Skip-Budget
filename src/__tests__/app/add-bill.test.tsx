@@ -78,6 +78,8 @@ jest.mock('@/components/brands/brand-logo', () => {
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({
     ink: '#000000',
+    card: '#FFFFFF',
+    accent: '#905479',
     body: '#222222',
     muted: '#777777',
     line: '#DDDDDD',

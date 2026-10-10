@@ -24,7 +24,7 @@ function toHex(r: number, g: number, b: number): string {
 }
 
 /** Blends towards another colour. `amount` is 0 (unchanged) to 1 (fully it). */
-function mix(hex: string, towards: string, amount: number): string {
+export function mix(hex: string, towards: string, amount: number): string {
   const [r1, g1, b1] = toRgb(hex);
   const [r2, g2, b2] = toRgb(towards);
   return toHex(r1 + (r2 - r1) * amount, g1 + (g2 - g1) * amount, b1 + (b2 - b1) * amount);

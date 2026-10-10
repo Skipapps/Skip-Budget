@@ -76,19 +76,6 @@ export const billsMessages = defineMessages({
     fr: 'Tout autre paiement',
   },
 
-  // The icon picker's choices, spoken by VoiceOver; the id is what is stored.
-  'bills.icon.other': { en: 'Other', es: 'Otro', fr: 'Autre' },
-  'bills.icon.education': { en: 'Education', es: 'Educación', fr: 'Éducation' },
-  'bills.icon.pets': { en: 'Pets', es: 'Mascotas', fr: 'Animaux' },
-  'bills.icon.tv': { en: 'TV', es: 'TV', fr: 'Télé' },
-  'bills.icon.shopping': { en: 'Shopping', es: 'Compras', fr: 'Magasinage' },
-  'bills.icon.travel': { en: 'Travel', es: 'Viajes', fr: 'Voyages' },
-  'bills.icon.coffee': { en: 'Coffee', es: 'Café', fr: 'Café' },
-  'bills.icon.music': { en: 'Music', es: 'Música', fr: 'Musique' },
-  'bills.icon.waste': { en: 'Waste', es: 'Basura', fr: 'Déchets' },
-  'bills.icon.software': { en: 'Software', es: 'Software', fr: 'Logiciels' },
-  'bills.icon.health': { en: 'Health', es: 'Salud', fr: 'Santé' },
-
   // Weekly and Monthly are dates.weekly and dates.monthly.
   'bills.recurrence.quarterly': {
     en: 'Every 3 months',

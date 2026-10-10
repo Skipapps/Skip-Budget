@@ -58,7 +58,7 @@ export type TruthInLending = {
 
 /** Bisection stops here: 1e-12 on a monthly rate is 1.2e-8 of a percentage point. */
 const RATE_TOLERANCE = 1e-12;
-/** A monthly rate above this is not credit, it is a typo. 1200% APR. */
+/** A monthly rate above this is not credit, it is a typo: 10,000% a month, 120,000% APR. */
 const MAX_UNIT_RATE = 100;
 /** Reported to 5 decimal places: far tighter than the 1/8 point §1026.22(a)(2) allows. */
 const APR_DECIMALS = 5;
