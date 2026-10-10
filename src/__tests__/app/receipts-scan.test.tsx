@@ -10,6 +10,18 @@ import ReceiptsScreen from '@/app/receipts';
  * past the 15th sees the explainer.
  */
 
+jest.mock('@/components/receipts/book-icon', () => ({ BookIcon: () => null }));
+jest.mock('@/api/receipt-books', () => ({
+  useReceiptBooks: () => ({
+    data: [],
+    isLoading: false,
+    isPending: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+  useReceiptBookDefault: () => ({ data: null, isPending: false }),
+  useSetReceiptBookDefault: () => ({ mutate: jest.fn() }),
+}));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),

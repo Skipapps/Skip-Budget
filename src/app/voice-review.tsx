@@ -2,6 +2,8 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AlignLeft, CalendarDays, CreditCard, RefreshCw, Repeat, Tag } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
 import { AccessibilityInfo, Text, View } from 'react-native';
+import { useReceiptBookDefault, useReceiptBooks } from '@/api/receipt-books';
+import { bookColumn, defaultBookOf } from '@/lib/receipt-books';
 
 import { useBrandDirectory } from '@/api/brands';
 import { usePro } from '@/api/pro';
@@ -190,6 +192,10 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   const remember = useRememberStore();
 
   const createReceipt = useCreateReceipt();
+  const { data: books = [] } = useReceiptBooks();
+  const storedBook = useReceiptBookDefault();
+  // A spoken receipt goes to the default book; with none chosen, to General, as before books.
+  const voiceBook = defaultBookOf(storedBook.data, books);
   const toast = useToast();
   const createBill = useCreateBill();
   const createSubscription = useCreateSubscription();
@@ -294,8 +300,13 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
       // The logo the person chose for a store the catalogue does not know; nothing when they did
       // not answer, so such a store saves as letters, as in the forms.
       const logo = logoColumns(entry.merchant);
-      if (built.kind === 'receipt') await createReceipt.mutateAsync({ ...built.values, ...logo });
-      else if (built.kind === 'bill') await createBill.mutateAsync({ ...built.values, ...logo });
+      if (built.kind === 'receipt') {
+        await createReceipt.mutateAsync({
+          ...built.values,
+          ...logo,
+          ...(voiceBook && books.length > 0 ? { book_id: bookColumn(voiceBook) } : {}),
+        });
+      } else if (built.kind === 'bill') await createBill.mutateAsync({ ...built.values, ...logo });
       else await createSubscription.mutateAsync({ ...built.values, ...logo });
 
       success();

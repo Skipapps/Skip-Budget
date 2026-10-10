@@ -21,6 +21,7 @@ const AFFECTS: Record<string, string[]> = {
   subscriptions: ['subscriptions', 'dashboard'],
   receipts: ['receipts', 'dashboard'],
   habits: ['habits'],
+  receipt_books: ['receipt_books', 'receipts'],
   payments: ['payments', 'dashboard'],
   cards: ['cards', 'dashboard'],
   bank_accounts: ['bank_accounts', 'dashboard'],

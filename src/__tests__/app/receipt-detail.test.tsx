@@ -11,6 +11,18 @@ import { publishProStatus, resetProStatusForTests } from '@/lib/pro-status';
  * header pencil to edit. A receipt deleted from its edit flow steps this page back out.
  */
 
+jest.mock('@/components/receipts/book-icon', () => ({ BookIcon: () => null }));
+jest.mock('@/api/receipt-books', () => ({
+  useReceiptBooks: () => ({
+    data: [],
+    isLoading: false,
+    isPending: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+  useReceiptBookDefault: () => ({ data: null, isPending: false }),
+  useSetReceiptBookDefault: () => ({ mutate: jest.fn() }),
+}));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
 jest.mock('react-native-keyboard-controller', () =>

@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
 import { Plus, ScanLine, SlidersHorizontal } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
 import { useCaptureAllowance } from '@/api/capture-allowance';
 import { useHistoryFloor } from '@/api/history';
 import { usePaymentSources, useReceipts } from '@/api/queries';
+import { useReceiptBookDefault, useReceiptBooks } from '@/api/receipt-books';
 import { useRefreshAll } from '@/api/refresh';
 import { draftToParams, useReceiptScan } from '@/api/scan';
 import {
@@ -17,6 +18,11 @@ import {
 } from '@/components/receipts/receipt-filter-sheet';
 import { HistoryNotice } from '@/components/pro/history-notice';
 import { ReceiptRow } from '@/components/receipts/receipt-row';
+import { BookEmpty, BookInfo } from '@/components/receipts/book-parts';
+import { BookPills } from '@/components/receipts/book-pills';
+import { GENERAL_BOOK } from '@/data/receipt-books';
+import { bookTipSeen, markBookTipSeen, useBookOnReturn } from '@/lib/book-choice';
+import { bookOfReceipt, defaultBookOf } from '@/lib/receipt-books';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
@@ -45,7 +51,62 @@ export default function ReceiptsScreen() {
   const today = toIsoDate(new Date());
   const [rangeKey, setRangeKey] = useState<RangeKey>('month');
   const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
-  const { data: receipts = [], isLoading, isError, refetch } = useReceipts();
+  const receiptsQuery = useReceipts();
+  const { data: receipts = [] } = receiptsQuery;
+  const booksQuery = useReceiptBooks();
+  const books = useMemo(() => booksQuery.data ?? [], [booksQuery.data]);
+  const storedDefault = useReceiptBookDefault();
+  // Books are read before the list is drawn: a receipt in a book must never show under General.
+  const isLoading = receiptsQuery.isLoading || booksQuery.isLoading || storedDefault.isLoading;
+  const isError = receiptsQuery.isError || booksQuery.isError;
+  const refetch = () => {
+    void receiptsQuery.refetch();
+    void booksQuery.refetch();
+  };
+
+  // The page opens on the default book; a tap, or a book just made, changes it.
+  const [picked, setPicked] = useState<string | null>(null);
+  const defaultBook = defaultBookOf(storedDefault.data, books);
+  const known = (book: string | null) =>
+    book !== null && (book === GENERAL_BOOK || books.some((row) => row.id === book));
+  const current = known(picked) ? picked! : known(defaultBook) ? defaultBook! : GENERAL_BOOK;
+  const currentBook = books.find((row) => row.id === current) ?? null;
+  const generalName = t('receipts.books.general');
+  const pills = useMemo(
+    () => [
+      { key: GENERAL_BOOK, name: generalName, iconId: 'general' },
+      ...books.map((book) => ({ key: book.id, name: book.name, iconId: book.icon_id })),
+    ],
+    [books, generalName],
+  );
+
+  useBookOnReturn(setPicked);
+
+  // "Tap to start" stays on Add book until it, or the tip, is tapped once on this phone.
+  const [tipSeen, setTipSeen] = useState(true);
+  useEffect(() => {
+    let live = true;
+    void bookTipSeen().then((seen) => {
+      if (live) setTipSeen(seen);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  const addBook = () => {
+    if (!tipSeen) {
+      setTipSeen(true);
+      markBookTipSeen();
+    }
+    router.push('/receipt-book');
+  };
+  // A new receipt starts in the book the person opened. The page as it opens names none, so the
+  // form starts in the default book, or asks.
+  const bookParams: { book?: string } = known(picked) ? { book: picked! } : {};
+  const addReceipt = () =>
+    router.push(
+      bookParams.book ? { pathname: '/add-receipt', params: bookParams } : '/add-receipt',
+    );
   // Free lists 90 days back, Pro seven years. Older receipts stay stored and say so.
   const { floor, free } = useHistoryFloor();
   // Seven years back is as far as the app keeps anything, on any plan.
@@ -70,7 +131,10 @@ export default function ReceiptsScreen() {
     try {
       const draft = await scan();
       if (!draft) return;
-      router.push({ pathname: '/add-receipt', params: draftToParams(draft) });
+      router.push({
+        pathname: '/add-receipt',
+        params: { ...draftToParams(draft), ...bookParams },
+      });
     } catch (thrown) {
       setScanError(failureMessage(thrown));
     }
@@ -86,10 +150,16 @@ export default function ReceiptsScreen() {
     [sources],
   );
 
+  // The book on screen, before any window or search: whether it has anything at all.
+  const inBook = useMemo(
+    () => receipts.filter((receipt) => bookOfReceipt(receipt.book_id, books) === current),
+    [receipts, books, current],
+  );
+
   // Everything the window, search and filters match, as Pro sees it: the heading counts and sums
   // these. Only the list stops at the plan's window.
   const matching = useMemo(() => {
-    return receipts.filter((receipt) => {
+    return inBook.filter((receipt) => {
       if (receipt.purchased_on < range.from || receipt.purchased_on > range.to) return false;
       if (receipt.purchased_on < kept) return false;
       if (!matchesSearch(receipt.merchant, query)) return false;
@@ -100,7 +170,7 @@ export default function ReceiptsScreen() {
       }
       return true;
     });
-  }, [receipts, query, filters, range, kept]);
+  }, [inBook, query, filters, range, kept]);
 
   const visible = useMemo(
     () => matching.filter((receipt) => receipt.purchased_on >= floor),
@@ -120,9 +190,9 @@ export default function ReceiptsScreen() {
     [visible],
   );
 
-  const showEmpty = !isLoading && !isError && receipts.length === 0;
+  const showEmpty = !isLoading && !isError && inBook.length === 0;
   const showNoMatches =
-    !isLoading && !isError && receipts.length > 0 && visible.length === 0 && !hiddenOlder;
+    !isLoading && !isError && inBook.length > 0 && visible.length === 0 && !hiddenOlder;
 
   return (
     <Screen
@@ -142,7 +212,7 @@ export default function ReceiptsScreen() {
               },
             ]
           : []),
-        { icon: Plus, label: t('receipts.list.add'), onPress: () => router.push('/add-receipt') },
+        { icon: Plus, label: t('receipts.list.add'), onPress: addReceipt },
       ]}
     >
       {scanError ? (
@@ -151,13 +221,39 @@ export default function ReceiptsScreen() {
         </Text>
       ) : null}
 
-      {showEmpty || isError ? null : (
+      {isLoading || isError ? null : (
         <>
-          <View className="mt-5 w-full flex-row items-center gap-3">
+          <BookPills
+            books={pills}
+            selected={current}
+            onSelect={setPicked}
+            onAdd={addBook}
+            tip={!tipSeen && books.length === 0}
+          />
+          {currentBook ? (
+            <BookInfo
+              book={currentBook}
+              sources={sources}
+              isDefault={defaultBook === currentBook.id}
+              onEdit={() =>
+                router.push({ pathname: '/receipt-book', params: { id: currentBook.id } })
+              }
+            />
+          ) : null}
+        </>
+      )}
+
+      {showEmpty || isError || isLoading ? null : (
+        <>
+          <View className="mt-4 w-full flex-row items-center gap-3">
             <SearchField
               value={query}
               onChangeText={setQuery}
-              placeholder={t('receipts.list.search')}
+              placeholder={
+                currentBook
+                  ? t('receipts.books.searchIn', { name: currentBook.name })
+                  : t('receipts.list.search')
+              }
             />
 
             <Pressable
@@ -211,14 +307,16 @@ export default function ReceiptsScreen() {
         />
       ) : null}
 
-      {showEmpty ? (
+      {showEmpty && currentBook ? <BookEmpty book={currentBook} onAdd={addReceipt} /> : null}
+
+      {showEmpty && !currentBook ? (
         // Adding, not scanning: the first receipt should never begin with a paywall.
         <PageState
           art={artwork.emptyReceipts}
           title={t('receipts.list.emptyTitle')}
           message={t('receipts.list.emptyMessage')}
           actionLabel={t('receipts.list.add')}
-          onAction={() => router.push('/add-receipt')}
+          onAction={addReceipt}
         />
       ) : null}
 

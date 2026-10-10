@@ -38,8 +38,16 @@ const AFFECTS_DASHBOARD = new Set([
  * was charged to it to null ("on delete set null"), so those caches are stale until re-read.
  */
 const DEPENDENTS: Record<string, string[]> = {
-  cards: ['bills', 'receipts', 'subscriptions', 'payments', 'habits'],
-  bank_accounts: ['bills', 'receipts', 'subscriptions', 'payments', 'salary_sources', 'habits'],
+  cards: ['bills', 'receipts', 'subscriptions', 'payments', 'habits', 'receipt_books'],
+  bank_accounts: [
+    'bills',
+    'receipts',
+    'subscriptions',
+    'payments',
+    'salary_sources',
+    'habits',
+    'receipt_books',
+  ],
   // A loan is read with its bill, and goes with it ("on delete cascade").
   bills: ['loans'],
 };
@@ -284,6 +292,11 @@ export type ReceiptValues = {
   note: string | null;
   source: CaptureSource;
   image_path: string | null;
+  /**
+   * The receipt book; null is General. Left out by anyone with no book, so a database without
+   * books still takes the write.
+   */
+  book_id?: string | null;
 } & LogoValues;
 
 export const useCreateReceipt = () => useCreate<ReceiptValues>('receipts');

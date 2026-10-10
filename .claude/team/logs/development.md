@@ -5476,3 +5476,33 @@ bug in component behaviour found; two comments corrected. tsc 0; `rm -rf .expo/c
 - **Simulator:** the page was seen in light mode as designed. Not seen: the selected state and dark mode (no taps; the app is set to Light). Both are covered by tests.
 
 ## 2026-10-10 — Dmitri (Development Lead) — Add a bill categories + bill icons review: GO, no MUST. tsc 0; 32 suites / 1,218 tests pass (bills, add-bill, insights, voice, bill-icons, retired-bill-categories, bill-categories). family folds to health on read in useBills/useBill, so Insights totals, bill filters and the money book group it under Health and an edit saves health; Home "Where your money went" groups by kind, not category. Voice ids exclude family/loans. Loan bills keep loan-<type> (billIconOf checks it first; buildBillValues unchanged); a logo still wins in BillMark; unknown ids fall back to the glyph and the stored label. Tap goes straight on, Back shows the check. Risks: an Other bill with an old picked glyph now wears the Other gradient icon; Insights receipt categories that share an id (transport, insurance, other) now show the bill gradient icon; dark mode and the selected state not seen on a device.
+
+## 2026-10-10 — Dmitri (Development Lead) — Receipt books review: GO for the device build once the migration is on the remote; changes needed before commit
+
+**Outcome:** Review only, no edits. I found no crash, no wrong total and no RLS hole. Spending totals outside the Receipts page have no book filter (checked with grep). One deploy-order MUST, two SHOULD fixes (receipts filed in the wrong book, or a book losing its Paid from) and a test gap.
+
+- **MUST before the Founder installs:** the remote database must have `20261010100001_receipt_books.sql` applied first.
+  - realtime-provider.tsx puts `receipt_books` on the single shared `skip:<user>` channel. If the table is missing, the subscribe is likely refused, which would quietly stop live sync for every table.
+  - "Create book" would also fail, because the RPC would not exist. Reads degrade cleanly (PGRST205 and 42703 fallbacks).
+  - Remote state not checked.
+- **SHOULD 1:** add-receipt.tsx:410 and :676. An edit moves a receipt to General if its book is not in the cached book list (for example, a book made on another phone within the 30s staleTime, or a realtime miss). Fix: on an edit, send book_id only when the person picked a book (`pickedBook !== undefined`).
+- **SHOULD 2:** receipt-book.tsx:97 and :177-185. Editing a book whose card or account is not offered by `usePaymentSources` (a free user after the trial or Pro ends gets only the oldest card and account) shows nothing selected. Save then writes card_id and bank_account_id as null, so a rename quietly drops the book's Paid from.
+- **Low:** voice-review.tsx:198. If books or the default have not loaded by Save, the spoken receipt goes to General.
+- **Already fixed in the tree during the review:**
+  - The receipts page now waits for the default (`storedDefault.isLoading`).
+  - A picked book that has since been deleted no longer gets sent.
+  - The book-made hand-back is now a listener.
+- **Tests:** the lib rules (11) and the SQL checks (18) are covered. Every screen suite mocks books as `[]`, so none of the with-books paths runs: book_id sent or left out, Book required, card pre-fill, filtering per pill, `book` passed by + and scan, and create/edit/delete of a book.
+- **Verified:**
+  - Someone with no books never sends book_id (add, edit, voice; habit taps never do).
+  - An edit's Paid with is never overridden by its book.
+  - Migration: RLS, invoker ownership triggers (no cross-user oracle), FK set null and the trigger that clears the default, RPC with anon revoked. Re-runs are safe.
+  - Existing receipts triggers do not refuse the set-null.
+  - The new route: back from step 1 goes to step 0, Close asks first, Save is disabled while pending, and a duplicate is refused by 23505.
+- **Gates:** tsc 0. eslint (--no-cache) clean on 13 files. Jest: 8 suites, 390 tests pass (receipt-books lib, book-icons, receipts, add-receipt-save, the large-text and no-route-test-files guards, receipts accuracy, i18n messages). Not run: the full jest suite, the SQL checks, a device.
+- **Product questions:**
+  - The "Make this my default book" switch starts on (receipt-book.tsx:59).
+  - A voice receipt with no default goes to General without asking.
+  - Habit taps ignore the default.
+  - The picker offers 23 icons, not 24 (General's is left out).
+  - Tapping + on the General pill passes `general`, so the form never asks when started from Receipts.

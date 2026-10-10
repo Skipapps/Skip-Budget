@@ -6,6 +6,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useHabit } from '@/api/habits';
 import { useHistoryFloor } from '@/api/history';
 import { useReceipts, usePaymentSources, type ReceiptRow } from '@/api/queries';
+import { useReceiptBooks } from '@/api/receipt-books';
 import { useSpendCategories } from '@/api/brands';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { ChangeLogoButton } from '@/components/brands/change-logo-button';
@@ -72,6 +73,7 @@ export default function ReceiptDetailScreen() {
   const receipts = useReceipts();
   const { sources } = usePaymentSources();
   const { data: categories = [] } = useSpendCategories();
+  const { data: books = [] } = useReceiptBooks();
   const [windowKey, setWindowKey] = useState<Window>('all');
 
   const receipt: ReceiptRow | null | undefined = receipts.data
@@ -147,6 +149,14 @@ export default function ReceiptDetailScreen() {
       ),
     },
   ];
+  // Named only for someone with books: before then every receipt is in General.
+  if (books.length > 0) {
+    const book = books.find((row) => row.id === receipt.book_id);
+    details.push({
+      label: t('receipts.field.book'),
+      value: book?.name ?? t('receipts.books.general'),
+    });
+  }
   if (receipt.note?.trim()) {
     details.push({ label: t('receipts.field.note'), value: receipt.note.trim() });
   }

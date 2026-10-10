@@ -150,6 +150,23 @@ async function withHabitColumns<R extends { error: ReadFailure }>(
   return lacksHabits(result.error) ? read('') : result;
 }
 
+const BOOK_COLUMNS = ', book_id';
+
+/** A database without receipt books yet: Postgres has no book_id column (42703). */
+const lacksBooks = (error: ReadFailure) =>
+  error?.code === '42703' && /book_id/.test(`${error.message ?? ''} ${error.details ?? ''}`);
+
+/**
+ * Runs a receipt read with its book, and again without when the database has no books yet, so
+ * every receipt list still loads (every receipt there is in General).
+ */
+async function withBookColumns<R extends { error: ReadFailure }>(
+  read: (bookColumns: string) => PromiseLike<R>,
+): Promise<R> {
+  const result = await read(BOOK_COLUMNS);
+  return lacksBooks(result.error) ? read('') : result;
+}
+
 /** The embedded habit as the app draws it; a colour it does not know falls back to the first. */
 function readReceipt(row: ReceiptRow): ReceiptRow {
   if (!row.habit) return row;
@@ -482,19 +499,23 @@ export type ReceiptRow = {
    */
   habit_id?: string | null;
   habit?: { name: string; icon_id: string; color: HabitColor } | null;
+  /** The receipt book it is kept in; null, or absent on a database without books, is General. */
+  book_id?: string | null;
 };
 
 export function useReceipts() {
   return useOwnerQuery<ReceiptRow[]>('receipts', async () => {
     const { data, error } = await withLogoColumns((logo) =>
       withHabitColumns((habit) =>
-        supabase
-          .from('receipts')
-          .select(
-            `id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path, created_at${logo}${habit}, brands(domain)`,
-          )
-          .order('purchased_on', { ascending: false })
-          .order('created_at', { ascending: false }),
+        withBookColumns((book) =>
+          supabase
+            .from('receipts')
+            .select(
+              `id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path, created_at${logo}${habit}${book}, brands(domain)`,
+            )
+            .order('purchased_on', { ascending: false })
+            .order('created_at', { ascending: false }),
+        ),
       ),
     );
     if (error) throw error;
@@ -549,13 +570,15 @@ export function useReceipt(id: string | undefined) {
     queryFn: async (): Promise<ReceiptRow | null> => {
       const { data, error } = await withLogoColumns((logo) =>
         withHabitColumns((habit) =>
-          supabase
-            .from('receipts')
-            .select(
-              `id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path${logo}${habit}, brands(domain)`,
-            )
-            .eq('id', id!)
-            .maybeSingle(),
+          withBookColumns((book) =>
+            supabase
+              .from('receipts')
+              .select(
+                `id, brand_id, merchant, amount, purchased_on, category_id, card_id, bank_account_id, note, source, image_path${logo}${habit}${book}, brands(domain)`,
+              )
+              .eq('id', id!)
+              .maybeSingle(),
+          ),
         ),
       );
       if (error) throw error;

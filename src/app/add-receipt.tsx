@@ -25,6 +25,11 @@ import {
   type CaptureSource,
 } from '@/api/mutations';
 import { usePaymentSources, useReceipt } from '@/api/queries';
+import {
+  useReceiptBookDefault,
+  useReceiptBooks,
+  useSetReceiptBookDefault,
+} from '@/api/receipt-books';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { openChangeLogo } from '@/components/brands/change-logo-button';
 import { AmountEditPage, NoteEditPage, DateEditPage } from '@/components/entry/edit-pages';
@@ -37,10 +42,12 @@ import {
 import { AmountStep } from '@/components/flow/amount-step';
 import { StepFlow } from '@/components/flow/step-flow';
 import { HabitIcon } from '@/components/habits/habit-icon';
+import { BookChoice } from '@/components/receipts/book-parts';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SourceTiles } from '@/components/ui/source-tiles';
+import { SwitchControl } from '@/components/ui/switch-control';
 import { FieldLabel } from '@/components/ui/typography';
 import type { HabitColor } from '@/data/habit-colors';
 import { useDialog, useConfirm } from '@/providers/dialog-provider';
@@ -55,6 +62,8 @@ import { logoColumns } from '@/lib/logo-columns';
 import { logoDomainOf, type LogoFields } from '@/lib/logo-domain';
 import { refusedForPro } from '@/lib/pro-refusal';
 import { receiptCategoryName } from '@/lib/receipt-category';
+import { bookColumn, bookOfReceipt, defaultBookOf } from '@/lib/receipt-books';
+import { GENERAL_BOOK } from '@/data/receipt-books';
 import { parseReceipt, parseReceiptFromLines, type ParsedReceipt } from '@/lib/receipt-parser';
 import {
   clearVoiceDraft,
@@ -195,7 +204,7 @@ function fromScanParams(params: ScanParams): { initial: Initial; result: ScanRes
 
 /** Keyed on the id so the form remounts once the row lands, seeding state without an effect. */
 export default function AddReceiptScreen() {
-  const params = useLocalSearchParams<{ id?: string } & ScanParams>();
+  const params = useLocalSearchParams<{ id?: string; book?: string } & ScanParams>();
   const { id } = params;
   // Only a new receipt can have come from the voice review page.
   const fromVoice = !id && params.from === 'voice';
@@ -286,6 +295,8 @@ export default function AddReceiptScreen() {
     // opens on the final page; only a blank one starts at the amount.
     initialView: existing || scanned.result || fromVoice ? 'review' : 'amount',
     fromVoice,
+    // An edit keeps its own book; a new one starts in the book it was added from, if any.
+    initialBook: existing ? (existing.book_id ?? GENERAL_BOOK) : (params.book ?? null),
   };
 
   if (existing?.habit_id) {
@@ -332,9 +343,15 @@ function ReceiptForm({
   initialView,
   fromVoice = false,
   habit = null,
+  initialBook = null,
 }: {
   id?: string;
   initial: Initial;
+  /**
+   * The book it opens in: the receipt's own when editing, the one on screen when added from a
+   * book. Null opens in the default book, or asks when there is none.
+   */
+  initialBook?: string | null;
   /** The row being edited, for the logo it already has. */
   saved?: LogoFields | null;
   /**
@@ -378,6 +395,28 @@ function ReceiptForm({
   const { todayDate } = useToday();
 
   const { sources } = usePaymentSources();
+  const { data: books = [] } = useReceiptBooks();
+  const storedDefault = useReceiptBookDefault();
+  const setDefaultBook = useSetReceiptBookDefault();
+  // Undefined until the person picks: until then the book follows what is read, which can land
+  // after the form opens.
+  const [pickedBook, setPickedBook] = useState<string | undefined>(undefined);
+  const [alwaysThisBook, setAlwaysThisBook] = useState(false);
+  const defaultBook = defaultBookOf(storedDefault.data, books);
+  // A book deleted on another phone since it was picked, or named by a stale link, is no book.
+  const known = (key: string | null | undefined) =>
+    key === GENERAL_BOOK || books.some((row) => row.id === key) ? key! : null;
+  const book: string | null =
+    known(pickedBook) ??
+    (editing ? bookOfReceipt(initialBook, books) : (known(initialBook) ?? defaultBook));
+  const hasBooks = books.length > 0;
+  const bookRow = books.find((row) => row.id === book) ?? null;
+  // A book paid from one card fills Paid with until the person picks one themselves. Only a card
+  // or account still on offer: a locked one cannot take new spending.
+  const bookSource = bookRow?.card_id ?? bookRow?.bank_account_id ?? null;
+  const shownSource =
+    sourceId ??
+    (bookSource && sources.some((source) => source.id === bookSource) ? bookSource : null);
   const { data: categories = [] } = useSpendCategories();
   const { data: directory = [] } = useBrandDirectory();
 
@@ -603,9 +642,10 @@ function ReceiptForm({
     const missing = [
       !amountReady && t('receipts.field.amount'),
       !chosen && t('receipts.field.store'),
-      sourceId === null && t('receipts.field.paidWith'),
+      shownSource === null && t('receipts.field.paidWith'),
+      hasBooks && book === null && t('receipts.field.book'),
     ].filter((field): field is string => Boolean(field));
-    if (missing.length > 0 || sourceId === null) {
+    if (missing.length > 0 || shownSource === null) {
       fail(t('receipts.add.missing', { fields: missing.join(', ') }));
       return;
     }
@@ -622,14 +662,23 @@ function ReceiptForm({
     }
 
     const built = buildReceiptValues(
-      { store: chosen, amount, date, sourceId, note, captureSource },
+      { store: chosen, amount, date, sourceId: shownSource, note, captureSource },
       sources,
     );
     if (!built.ok) {
       fail(built.message);
       return;
     }
-    const values = { ...built.values, ...logoColumns(chosen, saved) };
+    const values = {
+      ...built.values,
+      ...logoColumns(chosen, saved),
+      // Someone with no book leaves the column alone, so a database without books takes the write.
+      // An edit writes it only when the person picked: a book this phone has not read yet must not
+      // become General.
+      ...(hasBooks && book !== null && (!editing || known(pickedBook) !== null)
+        ? { book_id: bookColumn(book) }
+        : {}),
+    };
 
     try {
       if (editing && id) {
@@ -639,6 +688,8 @@ function ReceiptForm({
       }
       success();
       toast(editing ? 'toast.receipt.updated' : 'toast.receipt.added');
+      // The receipt is saved either way; a default that did not take is asked for next time.
+      if (alwaysThisBook && book !== null) setDefaultBook.mutate(book);
       leave();
     } catch (thrown) {
       if (habit && dayTaken(thrown)) {
@@ -898,6 +949,50 @@ function ReceiptForm({
         />
       ),
     },
+    ...(hasBooks
+      ? [
+          {
+            key: 'book',
+            field: (
+              <View className="w-full">
+                <FieldLabel className="mb-2">{t('receipts.field.book')}</FieldLabel>
+                <BookChoice
+                  books={[
+                    { key: GENERAL_BOOK, name: t('receipts.books.general'), iconId: 'general' },
+                    ...books.map((row) => ({ key: row.id, name: row.name, iconId: row.icon_id })),
+                  ]}
+                  value={book}
+                  onChange={edited(setPickedBook)}
+                />
+                {/* Asked only while there is no default: once there is, it is the book's own page. */}
+                {defaultBook === null && book !== null ? (
+                  <View className="mt-3 w-full flex-row items-center gap-3">
+                    <View className="min-w-0 flex-1">
+                      <Text
+                        className="font-app-medium text-[14px] text-ink"
+                        maxFontSizeMultiplier={TEXT_CAP.row}
+                      >
+                        {t('receipts.add.bookDefault')}
+                      </Text>
+                      <Text
+                        className="mt-0.5 font-app text-[12px] text-muted"
+                        maxFontSizeMultiplier={TEXT_CAP.row}
+                      >
+                        {t('receipts.add.bookDefaultHint')}
+                      </Text>
+                    </View>
+                    <SwitchControl
+                      value={alwaysThisBook}
+                      onValueChange={setAlwaysThisBook}
+                      accessibilityLabel={t('receipts.add.bookDefault')}
+                    />
+                  </View>
+                ) : null}
+              </View>
+            ),
+          } satisfies EntryRowSpec,
+        ]
+      : []),
     {
       key: 'paidWith',
       field: (
@@ -905,11 +1000,11 @@ function ReceiptForm({
           <FieldLabel className="mb-2">{t('receipts.field.paidWith')}</FieldLabel>
           <SourceTiles
             sources={sources}
-            value={sourceId ?? ''}
+            value={shownSource ?? ''}
             onChange={edited(setSourceId)}
             skip={{
               label: t('receipts.add.skipSource'),
-              selected: sourceId === '',
+              selected: shownSource === '',
               onPress: () => edited(setSourceId)(''),
             }}
           />

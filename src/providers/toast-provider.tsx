@@ -29,8 +29,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const next = useRef(0);
 
-  const show = useCallback<ShowToast>((key, tone = 'done') => {
-    const message = t(key);
+  const show = useCallback<ShowToast>((key, tone = 'done', params) => {
+    const message = t(key, params);
     next.current += 1;
     setToast({ id: next.current, message, tone });
     // VoiceOver users hear it: nothing on screen moves focus to it.

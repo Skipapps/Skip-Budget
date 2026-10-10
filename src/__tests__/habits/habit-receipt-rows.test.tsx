@@ -13,6 +13,18 @@ import { resetLocaleForTests, setLanguage } from '@/i18n/store';
  * leads back to the habit (or says the habit is gone) and lists that habit's receipts only.
  */
 
+jest.mock('@/components/receipts/book-icon', () => ({ BookIcon: () => null }));
+jest.mock('@/api/receipt-books', () => ({
+  useReceiptBooks: () => ({
+    data: [],
+    isLoading: false,
+    isPending: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+  useReceiptBookDefault: () => ({ data: null, isPending: false }),
+  useSetReceiptBookDefault: () => ({ mutate: jest.fn() }),
+}));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),

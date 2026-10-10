@@ -1,11 +1,11 @@
 import { createContext, useContext } from 'react';
 
-import type { MessageKey } from '@/i18n';
+import type { MessageKey, MessageParams } from '@/i18n';
 
 /** `done` is anything saved, sent or changed; `deleted` is anything removed. */
 export type ToastTone = 'done' | 'deleted';
 
-export type ShowToast = (message: MessageKey, tone?: ToastTone) => void;
+export type ShowToast = (message: MessageKey, tone?: ToastTone, params?: MessageParams) => void;
 
 /** Apart from the toast itself, so a screen can raise one without loading its animation. */
 export const ToastContext = createContext<ShowToast | null>(null);

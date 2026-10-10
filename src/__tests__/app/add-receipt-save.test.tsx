@@ -16,6 +16,18 @@ import { clearVoiceDraft } from '@/lib/voice-draft';
  * calendar, Paid with pills, note); only the network and the logo images are replaced.
  */
 
+jest.mock('@/components/receipts/book-icon', () => ({ BookIcon: () => null }));
+jest.mock('@/api/receipt-books', () => ({
+  useReceiptBooks: () => ({
+    data: [],
+    isLoading: false,
+    isPending: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+  useReceiptBookDefault: () => ({ data: null, isPending: false }),
+  useSetReceiptBookDefault: () => ({ mutate: jest.fn() }),
+}));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),

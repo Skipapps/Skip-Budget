@@ -17,6 +17,18 @@ import { clearVoiceDraft, putVoiceDraft } from '@/lib/voice-draft';
  */
 
 // The bill category icons follow the theme, which this file's theme mock does not provide.
+jest.mock('@/components/receipts/book-icon', () => ({ BookIcon: () => null }));
+jest.mock('@/api/receipt-books', () => ({
+  useReceiptBooks: () => ({
+    data: [],
+    isLoading: false,
+    isPending: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+  useReceiptBookDefault: () => ({ data: null, isPending: false }),
+  useSetReceiptBookDefault: () => ({ mutate: jest.fn() }),
+}));
 jest.mock('@/theme/bill-icons', () => ({
   useBillIcons: () => new Proxy({}, { get: () => () => null }),
 }));
