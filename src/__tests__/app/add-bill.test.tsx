@@ -20,6 +20,10 @@ import { success, warn } from '@/lib/haptics';
  * failed read must not open a blank "edit" over a real bill.
  */
 
+// The bill category icons follow the theme, which this file's theme mock does not provide.
+jest.mock('@/theme/bill-icons', () => ({
+  useBillIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
@@ -245,16 +249,16 @@ const PERIOD = {
 };
 
 const TILE = {
-  housing: 'Housing. Rent, mortgage, HOA fees',
-  energy: 'Electricity & Gas. Power, heating, cooking gas',
-  water: 'Water & Waste. Water, sewer, garbage',
-  internet: 'Internet. Home broadband and Wi-Fi',
-  mobile: 'Mobile Phone. Phone plans, device payments',
+  housing: 'Housing. Rent, mortgage, HOA',
+  energy: 'Electricity & Gas. Power, heating, gas',
+  water: 'Water & Waste. Water, sewer, trash',
+  internet: 'Internet. Broadband and Wi-Fi',
+  mobile: 'Mobile Phone. Plans and devices',
   insurance: 'Insurance. Car, health, home, life',
-  loans: 'Loans & Credit. Cards, student, auto, personal',
-  transport: 'Transportation. Car, transit, parking, tolls',
-  family: 'Family & Healthcare. Childcare, tuition, medical',
-  other: 'Other bill. Anything else you pay',
+  transport: 'Transportation. Fuel, transit, tolls',
+  health: 'Health & Medical. Doctor, dental, meds',
+  education: 'Education. Tuition and courses',
+  other: 'Other. Anything else',
 };
 
 /** What the Name box suggests for each category. */
@@ -265,9 +269,9 @@ const HINT: Record<keyof typeof TILE, string> = {
   internet: 'Xfinity, Spectrum, Verizon',
   mobile: 'T-Mobile, AT&T, Verizon',
   insurance: 'Geico, State Farm, Progressive',
-  loans: 'Chase, Discover, SoFi',
   transport: 'Transit, tolls or parking',
-  family: 'Nursery, school or clinic',
+  health: 'Your doctor, dentist or clinic',
+  education: 'Your school or college',
   other: 'Search or type a name',
 };
 
@@ -326,19 +330,19 @@ function textsInOrder(screen: Screen): string[] {
 }
 
 const onCategoryPage = (screen: Screen) => {
-  expect(screen.getByText('What is this bill for?')).toBeTruthy();
+  expect(screen.getByText('What’s this bill for?')).toBeTruthy();
   expect(screen.queryByText('How much is the bill?')).toBeNull();
   expect(screen.queryByText('You can edit this later.')).toBeNull();
 };
 const onAmountPage = (screen: Screen) => {
   expect(screen.getByText('How much is the bill?')).toBeTruthy();
-  expect(screen.queryByText('What is this bill for?')).toBeNull();
+  expect(screen.queryByText('What’s this bill for?')).toBeNull();
   expect(screen.queryByText('You can edit this later.')).toBeNull();
 };
 const onFinalPage = (screen: Screen) => {
   expect(screen.getByText('You can edit this later.')).toBeTruthy();
   expect(screen.queryByText('How much is the bill?')).toBeNull();
-  expect(screen.queryByText('What is this bill for?')).toBeNull();
+  expect(screen.queryByText('What’s this bill for?')).toBeNull();
 };
 
 /** A blank bill as far as its final page: pick the category, type the amount, Continue. */
@@ -482,7 +486,17 @@ describe('Add bill — a new bill, page by page', () => {
 
     expect(screen.getByText('Add a bill')).toBeTruthy();
     onCategoryPage(screen);
-    for (const tile of Object.values(TILE)) expect(screen.getByLabelText(tile)).toBeTruthy();
+    // The ten, in the Founder's order, and neither Loans & Credit nor Family & Healthcare.
+    expect(screen.getAllByRole('button').map((button) => button.props.accessibilityLabel)).toEqual(
+      expect.arrayContaining(Object.values(TILE)),
+    );
+    const tiles = screen
+      .getAllByRole('button')
+      .map((button) => String(button.props.accessibilityLabel))
+      .filter((label) => Object.values(TILE).includes(label));
+    expect(tiles).toEqual(Object.values(TILE));
+    expect(screen.queryByLabelText(/^Loans & Credit\./)).toBeNull();
+    expect(screen.queryByLabelText(/^Family & Healthcare\./)).toBeNull();
     expect(screen.queryByLabelText('Save bill')).toBeNull();
     expect(screen.queryByLabelText('Continue')).toBeNull();
     expect(screen.queryByRole('progressbar')).toBeNull();
@@ -635,6 +649,12 @@ describe('Add bill — back and close', () => {
     expect(router.back).not.toHaveBeenCalled();
     expect(screen.getByLabelText(TILE.internet).props.accessibilityState.selected).toBe(true);
     expect(screen.getByLabelText(TILE.housing).props.accessibilityState.selected).toBe(false);
+    // The chosen tile wears the check badge, and only it.
+    expect(
+      screen
+        .getAllByTestId(/^category-check-/, { includeHiddenElements: true })
+        .map((badge) => badge.props.testID),
+    ).toEqual(['category-check-internet']);
 
     await press(screen, TILE.internet);
     expect(screen.getByLabelText('Amount, $80.00')).toBeTruthy();
@@ -821,7 +841,7 @@ describe('Add bill — the lines that open a page of their own', () => {
 
       await press(screen, 'Category, Electricity & Gas');
 
-      expect(screen.getByText('What is this bill for?')).toBeTruthy();
+      expect(screen.getByText('What’s this bill for?')).toBeTruthy();
       expect(screen.queryByLabelText('Done')).toBeNull();
       expect(screen.queryByLabelText('Continue')).toBeNull();
       expect(screen.getByLabelText(TILE.energy).props.accessibilityState.selected).toBe(true);
@@ -1155,7 +1175,7 @@ describe('Add bill — the name stays what the person gave it', () => {
     const screen = await render(<AddBillScreen />);
     await newBill(screen, TILE.other, '80');
 
-    await press(screen, 'Category, Other bill');
+    await press(screen, 'Category, Other');
     await press(screen, TILE.housing);
 
     expect(screen.getByLabelText('Category, Housing')).toBeTruthy();

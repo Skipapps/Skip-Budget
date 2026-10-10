@@ -21,6 +21,10 @@ import {
  * pages).
  */
 
+// The bill category icons follow the theme, which this file's theme mock does not provide.
+jest.mock('@/theme/bill-icons', () => ({
+  useBillIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
 jest.mock('react-native-keyboard-controller', () =>
@@ -354,7 +358,7 @@ describe('/voice-edit', () => {
     const screen = await render(<VoiceEditScreen />);
 
     expect(screen.queryByLabelText('Done')).toBeNull();
-    await press(screen, 'Internet. Home broadband and Wi-Fi');
+    await press(screen, 'Internet. Broadband and Wi-Fi');
 
     expect(readVoiceEntry(id)?.billCategoryId).toBe('internet');
     expect(router.back).toHaveBeenCalledTimes(1);
@@ -390,8 +394,8 @@ describe('/voice-edit', () => {
     const screen = await render(<VoiceEditScreen />);
 
     await act(async () => {
-      fireEvent.press(screen.getByLabelText('Internet. Home broadband and Wi-Fi'));
-      fireEvent.press(screen.getByLabelText('Mobile Phone. Phone plans, device payments'));
+      fireEvent.press(screen.getByLabelText('Internet. Broadband and Wi-Fi'));
+      fireEvent.press(screen.getByLabelText('Mobile Phone. Plans and devices'));
     });
 
     expect(readVoiceEntry(id)?.billCategoryId).toBe('internet');

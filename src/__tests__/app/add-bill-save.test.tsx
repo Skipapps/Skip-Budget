@@ -20,6 +20,10 @@ import { logoHints } from '@/lib/logo-lookup';
  * images are replaced.
  */
 
+// The bill category icons follow the theme, which this file's theme mock does not provide.
+jest.mock('@/theme/bill-icons', () => ({
+  useBillIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
@@ -69,6 +73,7 @@ jest.mock('@/theme/artwork', () => ({
 }));
 jest.mock('@/theme/loan-icons', () => ({
   useLoanIcons: () => new Proxy({}, { get: () => () => null }),
+  useLoanTypeIcons: () => new Proxy({}, { get: () => () => null }),
 }));
 
 const mockConfirm = jest.fn(async (_: object) => true);
@@ -244,11 +249,11 @@ const WITH_COMPANY = {
 };
 
 const TILE = {
-  housing: 'Housing. Rent, mortgage, HOA fees',
-  energy: 'Electricity & Gas. Power, heating, cooking gas',
-  internet: 'Internet. Home broadband and Wi-Fi',
+  housing: 'Housing. Rent, mortgage, HOA',
+  energy: 'Electricity & Gas. Power, heating, gas',
+  internet: 'Internet. Broadband and Wi-Fi',
   insurance: 'Insurance. Car, health, home, life',
-  other: 'Other bill. Anything else you pay',
+  other: 'Other. Anything else',
 };
 
 // What the Name box says before anything is typed in it, per category.
@@ -455,7 +460,7 @@ describe('Add bill — what a new bill saves', () => {
   // was typed has to come back with it, and still be what Save writes.
   it.each([
     ['note', (screen: Screen) => press(screen, 'Note, not set, optional')],
-    ['category', (screen: Screen) => press(screen, 'Category, Other bill')],
+    ['category', (screen: Screen) => press(screen, 'Category, Other')],
     ['amount', (screen: Screen) => pressButton(screen, 'Amount, $25.00')],
   ])('still shows a typed name in the box after a visit to the %s page', async (_, open) => {
     const screen = await render(<AddBillScreen />);
@@ -865,6 +870,21 @@ describe('Add bill — the order of a save', () => {
 });
 
 describe('Add bill — what an edit saves', () => {
+  it('keeps a loan’s bill under Loans & Credit, which the picker no longer offers', async () => {
+    editing({ ...POWER, name: 'Car loan', category_id: 'loans', icon_id: 'loan-car' });
+    const screen = await render(<AddBillScreen />);
+
+    expect(screen.getByLabelText('Category, Loans & Credit')).toBeTruthy();
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        values: expect.objectContaining({ category_id: 'loans', icon_id: 'loan-car' }),
+      }),
+    );
+  });
+
   it('writes the bill back as it was when nothing was touched', async () => {
     editing({ ...POWER, name: 'Rent', category_id: 'housing', icon_id: 'other' });
     const screen = await render(<AddBillScreen />);
@@ -947,7 +967,7 @@ describe('Add bill — what an edit saves', () => {
     editing({ ...POWER, name: 'Dog food', category_id: 'other', icon_id: 'pets' });
     const screen = await render(<AddBillScreen />);
 
-    await press(screen, 'Category, Other bill');
+    await press(screen, 'Category, Other');
     await press(screen, TILE.housing);
     expect(screen.getByLabelText('Category, Housing')).toBeTruthy();
     await press(screen, 'Save changes');

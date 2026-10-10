@@ -16,6 +16,7 @@ import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { ScheduleCard } from '@/components/calculators/schedule-card';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
+import { BillIconWell } from '@/components/bills/bill-icon';
 import { CategoryPicker } from '@/components/bills/category-picker';
 import { DateBox } from '@/components/entry/date-box';
 import { AmountEditPage, FieldPage, NoteEditPage } from '@/components/entry/edit-pages';
@@ -38,8 +39,9 @@ import { FieldLabel, Title } from '@/components/ui/typography';
 import { useConfirm } from '@/providers/dialog-provider';
 import { useToast } from '@/providers/toast-context';
 import {
-  BILL_CATEGORIES,
   RECURRENCES,
+  billIconOf,
+  getBillCategory,
   type BillCategory,
   type Recurrence,
 } from '@/data/bill-categories';
@@ -90,8 +92,10 @@ function nameHint(categoryId: string): string {
       return 'Chase, Discover, SoFi';
     case 'transport':
       return t('bills.add.issuer.transport');
-    case 'family':
-      return t('bills.add.issuer.family');
+    case 'health':
+      return t('bills.add.issuer.health');
+    case 'education':
+      return t('bills.add.issuer.education');
     default:
       return t('bills.add.issuer.other');
   }
@@ -189,13 +193,10 @@ export default function AddBillScreen() {
   );
 }
 
-/**
- * What a new bill is pre-named after: its category in the language on screen. Once in the Name
- * field it is the person's own text, so a saved bill keeps it whatever the language later becomes.
- */
+/** A bill's category as read: Loans & Credit and the categories folded into others included. */
 function categoryName(categoryId: string | null | undefined): string {
-  const data = BILL_CATEGORIES.find((option) => option.id === categoryId);
-  return billCategoryLabel(categoryId, data?.label ?? '');
+  const data = categoryId ? getBillCategory(categoryId) : undefined;
+  return billCategoryLabel(data?.id ?? categoryId, data?.label ?? '');
 }
 
 /**
@@ -474,9 +475,17 @@ function BillForm({
       <Screen
         header={<FlowHeader title={title} onBack={() => router.back()} closePrompt={closePrompt} />}
       >
-        <Title className="mt-2">{t('bills.add.categoryQuestion')}</Title>
+        <Title align="left" header className="mt-2">
+          {t('bills.add.categoryQuestion')}
+        </Title>
+        <Text
+          className="mt-1 w-full font-app text-[14px] leading-5 text-muted"
+          maxFontSizeMultiplier={TEXT_CAP.reading}
+        >
+          {t('bills.add.categorySubtitle')}
+        </Text>
 
-        <View className="mt-6 w-full pb-10">
+        <View className="mt-5 w-full pb-10">
           <CategoryPicker
             onSelect={(category) => {
               applyCategory(category);
@@ -589,7 +598,10 @@ function BillForm({
     ...RECURRENCES.map((option) => ({ value: option.value, label: recurrenceLabel(option.value) })),
     { value: PERIOD, label: t('bills.add.specificPeriod') },
   ];
-  const chosenCategory = BILL_CATEGORIES.find((option) => option.id === categoryId);
+  // A loan's bill shows its loan's type; any other category its own icon, whatever icon id it holds.
+  const categoryIcon = categoryId
+    ? billIconOf({ categoryId, iconId: categoryId === 'loans' ? existing?.icon_id : null })
+    : null;
 
   const chooseName = (next: BrandSelection | null) => {
     setError(null);
@@ -636,7 +648,7 @@ function BillForm({
       label: t('bills.field.category'),
       value: categoryId ? categoryLabel : null,
       required: true,
-      leading: <GlyphWell icon={chosenCategory?.icon ?? Tag} />,
+      leading: categoryIcon ? <BillIconWell choice={categoryIcon} /> : <GlyphWell icon={Tag} />,
       onPress: () => setView('categoryEdit'),
     },
     {

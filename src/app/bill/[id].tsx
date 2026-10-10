@@ -5,7 +5,7 @@ import { BillMark } from '@/components/bills/bill-mark';
 import { ChangeLogoButton } from '@/components/brands/change-logo-button';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
 import { PlanDetail, type PlanDetailRow } from '@/components/plans/plan-detail';
-import { BILL_CATEGORIES } from '@/data/bill-categories';
+import { getBillCategory } from '@/data/bill-categories';
 import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { logoDomainOf } from '@/lib/logo-domain';
@@ -35,8 +35,7 @@ export default function BillDetailScreen() {
       label: t('bills.field.category'),
       value: billCategoryLabel(
         bill.category_id,
-        BILL_CATEGORIES.find((category) => category.id === bill.category_id)?.label ??
-          t('bills.detail.otherCategory'),
+        getBillCategory(bill.category_id)?.label ?? t('bills.detail.otherCategory'),
       ),
     });
     if (bill.starts_on) {

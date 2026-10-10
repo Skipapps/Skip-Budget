@@ -1,4 +1,4 @@
-import { BILL_CATEGORIES } from '@/data/bill-categories';
+import { getBillCategory } from '@/data/bill-categories';
 
 import { BILL_CATEGORY_IDS, categoryFromBrand } from './bill-category';
 
@@ -6,8 +6,24 @@ import { BILL_CATEGORY_IDS, categoryFromBrand } from './bill-category';
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 describe('BILL_CATEGORY_IDS', () => {
-  it('is exactly the ids of BILL_CATEGORIES, in order', () => {
-    expect([...BILL_CATEGORY_IDS]).toEqual(BILL_CATEGORIES.map((category) => category.id));
+  it('is the add-a-bill picker, in its order: never loans or family', () => {
+    expect([...BILL_CATEGORY_IDS]).toEqual([
+      'housing',
+      'energy',
+      'water',
+      'internet',
+      'mobile',
+      'insurance',
+      'transport',
+      'health',
+      'education',
+      'other',
+    ]);
+  });
+
+  it('names only categories the app can draw', () => {
+    for (const id of BILL_CATEGORY_IDS)
+      expect([id, Boolean(getBillCategory(id))]).toEqual([id, true]);
   });
 });
 
@@ -20,7 +36,11 @@ describe('categoryFromBrand', () => {
     expect(categoryFromBrand(brand('duke-energy', 'utilities'))).toBe('energy');
     expect(categoryFromBrand(brand('waste-management', 'utilities'))).toBe('water');
     expect(categoryFromBrand(brand('geico', 'insurance'))).toBe('insurance');
-    expect(categoryFromBrand(brand('chase', 'finance'))).toBe('loans');
+  });
+
+  it('suggests nothing for a lender: loans are started from the Loans page', () => {
+    expect(categoryFromBrand(brand('chase', 'finance'))).toBeNull();
+    expect(categoryFromBrand(brand('navient', 'finance'))).toBeNull();
   });
 
   it('suggests nothing for a company that bills for more than one thing, or a shop', () => {
@@ -39,7 +59,6 @@ describe('categoryFromBrand', () => {
       ['american-water', 'utilities'],
       ['aep', 'utilities'],
       ['usaa', 'insurance'],
-      ['navient', 'finance'],
     ]) {
       expect(ids.has(categoryFromBrand(brand(id, category)) as string)).toBe(true);
     }

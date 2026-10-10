@@ -3,7 +3,8 @@ import type { LogoHints, LogoMatch } from '@/api/logos';
 /**
  * The logo service's categories, keyed by the app's spend and bill category ids. The service only
  * weighs these names (others are ignored), so each app id maps to the one it honestly is, and ids
- * with no honest match (housing, water, family, other) are left out rather than guessed.
+ * with no honest match (housing, water, health, education, family, other) are left out rather than
+ * guessed.
  */
 const SERVICE_CATEGORY: Record<string, string> = {
   // Spend categories with the same name on both sides.

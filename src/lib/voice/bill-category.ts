@@ -1,11 +1,12 @@
 /**
- * Which bill category, for bills only. The ids are copied from BILL_CATEGORIES in
- * src/data/bill-categories.ts rather than imported (that module pulls in lucide icons); the test fails
- * if the two lists differ.
+ * Which bill category, for bills only. The ids are the ones the add-a-bill picker offers, copied
+ * rather than imported from src/data/bill-categories.ts (that module pulls in lucide icons). Loans
+ * are started from the Loans page and 'family' is retired, so neither is ever chosen here: loan and
+ * card payment words still make a bill, filed under Other.
  *
  * Order of evidence:
- * 1. Spoken words always win. When several are said, the more specific head noun wins (insurance
- *    and loans, then housing and family, then the utilities), then the one said first: "car
+ * 1. Spoken words always win. When several are said, the more specific head noun wins (insurance,
+ *    then housing, health and education, then the utilities), then the one said first: "car
  *    insurance" is insurance, "rent and electric" is housing.
  * 2. A known biller suggests one when no word did (Comcast -> internet, GEICO -> insurance), only
  *    where the company has one obvious category; Verizon and AT&T sell phone and internet, so
@@ -22,9 +23,9 @@ export const BILL_CATEGORY_IDS = [
   'internet',
   'mobile',
   'insurance',
-  'loans',
   'transport',
-  'family',
+  'health',
+  'education',
   'other',
 ] as const;
 
@@ -42,9 +43,9 @@ type Entry = { words: string[]; category: BillCategoryId; signal: Signal };
 
 const HEAD_RANK: Record<BillCategoryId, number> = {
   insurance: 3,
-  loans: 3,
   housing: 2,
-  family: 2,
+  health: 2,
+  education: 2,
   energy: 1,
   water: 1,
   internet: 1,
@@ -97,7 +98,7 @@ const ENTRIES: Entry[] = [
   ...entries('mobile', 'strong', ['phone bill', 'phone plan', 'cell bill', 'cell phone bill']),
   ...entries('mobile', 'weak', ['phone', 'cell phone', 'cellphone', 'cell', 'mobile', 'wireless']),
   ...entries('insurance', 'strong', ['insurance']),
-  ...entries('loans', 'strong', [
+  ...entries('other', 'strong', [
     'loan',
     'loans',
     'car payment',
@@ -108,7 +109,7 @@ const ENTRIES: Entry[] = [
     'minimum payment',
     'line of credit',
   ]),
-  ...entries('loans', 'none', ['credit card']),
+  ...entries('other', 'none', ['credit card']),
   ...entries('transport', 'strong', ['car lease']),
   ...entries('transport', 'weak', [
     'bus pass',
@@ -119,20 +120,17 @@ const ENTRIES: Entry[] = [
     'parking permit',
   ]),
   ...entries('transport', 'none', ['toll', 'tolls', 'parking', 'transit']),
-  ...entries('family', 'strong', [
+  ...entries('health', 'strong', ['medical bill', 'hospital bill', 'doctor bill', 'dental bill']),
+  ...entries('education', 'strong', ['tuition', 'school fees']),
+  // Childcare is neither health nor education: still a bill, filed under Other.
+  ...entries('other', 'strong', [
     'daycare',
     'day care',
     'childcare',
     'child care',
-    'tuition',
-    'school fees',
     'child support',
-    'medical bill',
-    'hospital bill',
-    'doctor bill',
-    'dental bill',
   ]),
-  ...entries('family', 'weak', ['nanny', 'babysitter']),
+  ...entries('other', 'weak', ['nanny', 'babysitter']),
 ].sort((a, b) => b.words.length - a.words.length);
 
 /**
@@ -222,8 +220,6 @@ export function categoryFromBrand(
   switch (brand.category_id) {
     case 'insurance':
       return 'insurance';
-    case 'finance':
-      return 'loans';
     case 'utilities':
       return WATER_BRANDS.has(brand.id) ? 'water' : 'energy';
     case 'telecom':

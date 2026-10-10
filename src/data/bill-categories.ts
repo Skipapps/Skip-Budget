@@ -1,4 +1,5 @@
-import { FALLBACK_GLYPH, GLYPHS, glyphFor, type Glyph } from '@/data/glyphs';
+import { FALLBACK_GLYPH, glyphFor, type Glyph } from '@/data/glyphs';
+import { loanTypeOf, type LoanType } from '@/data/loan-types';
 
 export type BillIcon = Glyph;
 
@@ -7,46 +8,59 @@ export type BillCategory = {
   label: string;
   /** What the category covers — shown under the label on the picker. */
   hint: string;
-  icon: BillIcon;
 };
 
-export const BILL_CATEGORIES: BillCategory[] = [
-  { id: 'housing', label: 'Housing', hint: 'Rent, mortgage, HOA fees', icon: GLYPHS.housing },
-  {
-    id: 'energy',
-    label: 'Electricity & Gas',
-    hint: 'Power, heating, cooking gas',
-    icon: GLYPHS.energy,
-  },
-  { id: 'water', label: 'Water & Waste', hint: 'Water, sewer, garbage', icon: GLYPHS.water },
-  { id: 'internet', label: 'Internet', hint: 'Home broadband and Wi-Fi', icon: GLYPHS.internet },
-  {
-    id: 'mobile',
-    label: 'Mobile Phone',
-    hint: 'Phone plans, device payments',
-    icon: GLYPHS.mobile,
-  },
-  { id: 'insurance', label: 'Insurance', hint: 'Car, health, home, life', icon: GLYPHS.insurance },
-  {
-    id: 'loans',
-    label: 'Loans & Credit',
-    hint: 'Cards, student, auto, personal',
-    icon: GLYPHS.loans,
-  },
-  {
-    id: 'transport',
-    label: 'Transportation',
-    hint: 'Car, transit, parking, tolls',
-    icon: GLYPHS.transport,
-  },
-  {
-    id: 'family',
-    label: 'Family & Healthcare',
-    hint: 'Childcare, tuition, medical',
-    icon: GLYPHS.family,
-  },
-  { id: 'other', label: 'Other bill', hint: 'Anything else you pay', icon: GLYPHS.other },
+/** The categories a new bill is offered, each drawn with its own gradient icon. */
+export type BillIconCategory =
+  | 'housing'
+  | 'energy'
+  | 'water'
+  | 'internet'
+  | 'mobile'
+  | 'insurance'
+  | 'transport'
+  | 'health'
+  | 'education'
+  | 'other';
+
+/** What a new bill can be filed under, in the picker's order. */
+export const BILL_CATEGORIES: (BillCategory & { id: BillIconCategory })[] = [
+  { id: 'housing', label: 'Housing', hint: 'Rent, mortgage, HOA' },
+  { id: 'energy', label: 'Electricity & Gas', hint: 'Power, heating, gas' },
+  { id: 'water', label: 'Water & Waste', hint: 'Water, sewer, trash' },
+  { id: 'internet', label: 'Internet', hint: 'Broadband and Wi-Fi' },
+  { id: 'mobile', label: 'Mobile Phone', hint: 'Plans and devices' },
+  { id: 'insurance', label: 'Insurance', hint: 'Car, health, home, life' },
+  { id: 'transport', label: 'Transportation', hint: 'Fuel, transit, tolls' },
+  { id: 'health', label: 'Health & Medical', hint: 'Doctor, dental, meds' },
+  { id: 'education', label: 'Education', hint: 'Tuition and courses' },
+  { id: 'other', label: 'Other', hint: 'Anything else' },
 ];
+
+/**
+ * Loans & Credit is never offered for a new bill (a loan's bill comes from the Loans page), but
+ * loans and older bills still carry it, so it still reads and filters.
+ */
+const LOANS: BillCategory = {
+  id: 'loans',
+  label: 'Loans & Credit',
+  hint: 'Cards, student, auto, personal',
+};
+
+/** Every category a bill can be listed under: the picker's, then Loans & Credit. */
+export const LISTED_BILL_CATEGORIES: BillCategory[] = [...BILL_CATEGORIES, LOANS];
+
+/** Bills filed under a category that was folded into another read as the one it became. */
+const FOLDED: Record<string, string> = { family: 'health' };
+
+export function hasBillIcon(id: string): id is BillIconCategory {
+  return BILL_CATEGORIES.some((category) => category.id === id);
+}
+
+/** The category a bill is shown under: its own, or the one its old category became. */
+export function shownCategoryId(id: string): string {
+  return FOLDED[id] ?? id;
+}
 
 export const RECURRENCES = [
   { value: 'weekly', label: 'Weekly' },
@@ -74,10 +88,29 @@ export type Bill = {
   sourceId: string;
 };
 
-const CATEGORY_BY_ID = new Map(BILL_CATEGORIES.map((category) => [category.id, category]));
+const CATEGORY_BY_ID = new Map(LISTED_BILL_CATEGORIES.map((category) => [category.id, category]));
 
+/** A bill's category by its stored id, a folded one included (Family & Healthcare is Health). */
 export function getBillCategory(id: string): BillCategory | undefined {
-  return CATEGORY_BY_ID.get(id);
+  return CATEGORY_BY_ID.get(shownCategoryId(id));
+}
+
+/**
+ * What a bill without a logo wears: its loan's type, else its category's gradient icon, else (a
+ * spending category, or one this build does not know) null, and the caller draws `getBillIcon`'s
+ * glyph. A loan saved before loan types reads as the Other type.
+ */
+export type BillIconChoice =
+  { kind: 'loan'; type: LoanType } | { kind: 'category'; id: BillIconCategory };
+
+export function billIconOf(
+  bill: Pick<Bill, 'categoryId'> & { iconId?: string | null },
+): BillIconChoice | null {
+  const loan = loanTypeOf(bill.iconId);
+  if (loan) return { kind: 'loan', type: loan };
+  if (bill.categoryId === 'loans') return { kind: 'loan', type: 'other' };
+  const id = shownCategoryId(bill.categoryId);
+  return hasBillIcon(id) ? { kind: 'category', id } : null;
 }
 
 /**

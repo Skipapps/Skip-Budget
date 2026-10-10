@@ -16,7 +16,7 @@ import { Screen } from '@/components/ui/screen';
 import { TextField } from '@/components/ui/text-field';
 import { TextLink } from '@/components/ui/text-link';
 import { StaleDraft } from '@/components/voice/stale-draft';
-import { BILL_CATEGORIES, type BillCategory } from '@/data/bill-categories';
+import { getBillCategory, type BillCategory } from '@/data/bill-categories';
 import { t, type MessageKey } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
 import { failureText } from '@/lib/failure';
@@ -86,10 +86,7 @@ const NOTE_COPY: Record<VoiceKind, { label: MessageKey; placeholder: MessageKey 
  * add-bill pre-fills it.
  */
 const labelOf = (categoryId: string | null) =>
-  billCategoryLabel(
-    categoryId,
-    BILL_CATEGORIES.find((category) => category.id === categoryId)?.label ?? '',
-  );
+  billCategoryLabel(categoryId, (categoryId && getBillCategory(categoryId)?.label) || '');
 
 /**
  * One correction, on a page of its own: `/voice-edit?draft=…&field=…`. Built from the add flows'

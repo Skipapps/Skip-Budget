@@ -102,10 +102,11 @@ export const insightsMessages = defineMessages({
     es: 'Transporte',
     fr: 'Transport',
   },
-  'insights.billCategory.family': {
-    en: 'Family & Healthcare',
-    es: 'Familia y salud',
-    fr: 'Famille et santé',
+  'insights.billCategory.health': {
+    en: 'Health & Medical',
+    es: 'Salud y gastos médicos',
+    fr: 'Santé et soins médicaux',
   },
+  'insights.billCategory.education': { en: 'Education', es: 'Educación', fr: 'Éducation' },
   'insights.billCategory.other': { en: 'Other bill', es: 'Otra factura', fr: 'Autre facture' },
 });

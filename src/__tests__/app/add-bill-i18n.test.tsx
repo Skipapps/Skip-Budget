@@ -17,6 +17,10 @@ import { resetLocaleForTests, setLanguage } from '@/i18n/store';
  * which only the person writes.
  */
 
+// The bill category icons follow the theme, which this file's theme mock does not provide.
+jest.mock('@/theme/bill-icons', () => ({
+  useBillIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
@@ -254,7 +258,7 @@ type Words = Walk & {
 
 const WORDS: { en: Walk; es: Words; fr: Words } = {
   en: {
-    housingTile: 'Housing. Rent, mortgage, HOA fees',
+    housingTile: 'Housing. Rent, mortgage, HOA',
     continue: 'Continue',
     namePlaceholder: 'Rent, mortgage or your landlord',
     paymentBox: 'Payment on, Select a date',
@@ -265,7 +269,7 @@ const WORDS: { en: Walk; es: Words; fr: Words } = {
     save: 'Save bill',
   },
   es: {
-    housingTile: 'Vivienda. Renta, hipoteca, cuotas de mantenimiento',
+    housingTile: 'Vivienda. Renta, hipoteca, mantenimiento',
     continue: 'Continuar',
     namePlaceholder: 'Renta, hipoteca o tu arrendador',
     paymentBox: 'Fecha de pago, Elige una fecha',
@@ -292,7 +296,7 @@ const WORDS: { en: Walk; es: Words; fr: Words } = {
     missing: (fields) => `Para guardar la factura, completa: ${fields}.`,
   },
   fr: {
-    housingTile: 'Logement. Loyer, hypothèque, frais de copropriété',
+    housingTile: 'Logement. Loyer, hypothèque, copropriété',
     continue: 'Continuer',
     namePlaceholder: 'Loyer, prêt immobilier ou ton propriétaire',
     paymentBox: 'Date de paiement, Choisis une date',
@@ -381,15 +385,18 @@ describe('Add a bill in Spanish', () => {
     expect(screen.getByText('Agregar una factura')).toBeTruthy();
     expect(screen.getByText('¿De qué es esta factura?')).toBeTruthy();
     expect(screen.getByText('Vivienda')).toBeTruthy();
-    expect(screen.getByText('Renta, hipoteca, cuotas de mantenimiento')).toBeTruthy();
-    expect(screen.getByText('Otra factura')).toBeTruthy();
-    expect(screen.getByText('Cualquier otro pago')).toBeTruthy();
+    expect(screen.getByText('Renta, hipoteca, mantenimiento')).toBeTruthy();
+    expect(screen.getByText('Elige una. Puedes cambiarla después.')).toBeTruthy();
+    expect(screen.getByText('Otra')).toBeTruthy();
+    expect(screen.getByText('Cualquier otra cosa')).toBeTruthy();
+    expect(screen.getByLabelText('Transporte. Gasolina, transporte público, casetas')).toBeTruthy();
     expect(
-      screen.getByLabelText('Transporte. Auto, transporte público, estacionamiento, casetas'),
+      screen.getByLabelText('Salud y gastos médicos. Médico, dentista, medicinas'),
     ).toBeTruthy();
+    expect(screen.getByLabelText('Educación. Colegiaturas y cursos')).toBeTruthy();
     expectNoRawText(screen.toJSON());
 
-    await press(screen, 'Vivienda. Renta, hipoteca, cuotas de mantenimiento');
+    await press(screen, 'Vivienda. Renta, hipoteca, mantenimiento');
     expect(screen.getByText('¿De cuánto es la factura?')).toBeTruthy();
     expect(screen.getByLabelText('Calculadora')).toBeTruthy();
     expect(screen.getByLabelText('Continuar')).toBeDisabled();
@@ -400,7 +407,7 @@ describe('Add a bill in Spanish', () => {
   it('reads the final page in Spanish, the amount, dates and chips included', async () => {
     setLanguage('es');
     const screen = await render(<AddBillScreen />);
-    await press(screen, 'Vivienda. Renta, hipoteca, cuotas de mantenimiento');
+    await press(screen, 'Vivienda. Renta, hipoteca, mantenimiento');
     await typeAmount(screen, '80');
     await press(screen, 'Continuar');
 
@@ -544,9 +551,9 @@ describe('Add a bill in French', () => {
     expect(screen.getByText('Ajouter une facture')).toBeTruthy();
     expect(screen.getByText('Cette facture, c’est pour quoi ?')).toBeTruthy();
     expect(screen.getByText('Électricité et gaz')).toBeTruthy();
-    expect(screen.getByText('Tout autre paiement')).toBeTruthy();
+    expect(screen.getByText('Tout le reste')).toBeTruthy();
 
-    await press(screen, 'Autre facture. Tout autre paiement');
+    await press(screen, 'Autre. Tout le reste');
     expect(screen.getByText('De combien est la facture ?')).toBeTruthy();
     await typeAmount(screen, '15.99');
     await press(screen, 'Continuer');
@@ -560,7 +567,7 @@ describe('Add a bill in French', () => {
   it('reads the final page in French', async () => {
     setLanguage('fr');
     const screen = await render(<AddBillScreen />);
-    await press(screen, 'Logement. Loyer, hypothèque, frais de copropriété');
+    await press(screen, 'Logement. Loyer, hypothèque, copropriété');
     await typeAmount(screen, '80');
     await press(screen, 'Continuer');
 
@@ -868,20 +875,20 @@ describe('The Name box in Spanish and French', () => {
     ['es', 'Internet', 'Xfinity, Spectrum, Verizon'],
     ['es', 'Celular', 'T-Mobile, AT&T, Verizon'],
     ['es', 'Seguros', 'Geico, State Farm, Progressive'],
-    ['es', 'Préstamos y crédito', 'Chase, Discover, SoFi'],
     ['es', 'Transporte', 'Transporte público, casetas o estacionamiento'],
-    ['es', 'Familia y salud', 'Guardería, escuela o clínica'],
-    ['es', 'Otra factura', 'Busca o escribe un nombre'],
+    ['es', 'Salud y gastos médicos', 'Tu médico, dentista o clínica'],
+    ['es', 'Educación', 'Tu escuela o universidad'],
+    ['es', 'Otra', 'Busca o escribe un nombre'],
     ['fr', 'Logement', 'Loyer, prêt immobilier ou ton propriétaire'],
     ['fr', 'Électricité et gaz', 'AEP, Duke Energy, National Grid'],
     ['fr', 'Eau et déchets', 'Ton fournisseur d’eau'],
     ['fr', 'Internet', 'Xfinity, Spectrum, Verizon'],
     ['fr', 'Cellulaire', 'T-Mobile, AT&T, Verizon'],
     ['fr', 'Assurances', 'Geico, State Farm, Progressive'],
-    ['fr', 'Prêts et crédit', 'Chase, Discover, SoFi'],
     ['fr', 'Transport', 'Transport en commun, péages ou stationnement'],
-    ['fr', 'Famille et santé', 'Garderie, école ou clinique'],
-    ['fr', 'Autre facture', 'Cherche ou écris un nom'],
+    ['fr', 'Santé et soins médicaux', 'Ton médecin, dentiste ou clinique'],
+    ['fr', 'Éducation', 'Ton école ou ton collège'],
+    ['fr', 'Autre', 'Cherche ou écris un nom'],
   ] as const)('in %s, a %s bill’s Name box hints “%s”', async (language, category, hint) => {
     setLanguage(language);
     const screen = await render(<AddBillScreen />);

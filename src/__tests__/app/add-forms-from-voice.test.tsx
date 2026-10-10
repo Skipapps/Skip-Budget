@@ -28,6 +28,10 @@ import {
  * Real pages throughout; only the network, the native scanner and the logo images are replaced.
  */
 
+// The bill category icons follow the theme, which this file's theme mock does not provide.
+jest.mock('@/theme/bill-icons', () => ({
+  useBillIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
@@ -625,7 +629,7 @@ describe('Add bill from voice', () => {
     const screen = await render(<AddBillScreen />);
 
     onFinalPage(screen);
-    expect(screen.queryByText('What is this bill for?')).toBeNull();
+    expect(screen.queryByText('What’s this bill for?')).toBeNull();
     expect(screen.queryByText('How much is the bill?')).toBeNull();
     expect(screen.getByRole('button', { name: 'Amount, $1,030.50' })).toBeTruthy();
     // The company arrives chosen in the Name box, logo and all.
@@ -802,7 +806,7 @@ describe('Add bill from voice', () => {
     expect(screen.getByLabelText('Change name, currently Xfinity')).toBeTruthy();
 
     await press(screen, 'Category, needed');
-    await press(screen, 'Internet. Home broadband and Wi-Fi');
+    await press(screen, 'Internet. Broadband and Wi-Fi');
 
     onFinalPage(screen);
     expect(screen.getByLabelText('Category, Internet')).toBeTruthy();
@@ -1108,7 +1112,7 @@ describe('After a voice hand-off', () => {
       await press(screen, 'Back');
 
       expect(router.back).toHaveBeenCalledTimes(1);
-      expect(screen.queryByText('What is this bill for?')).toBeNull();
+      expect(screen.queryByText('What’s this bill for?')).toBeNull();
       expect(screen.queryByLabelText('Continue')).toBeNull();
     },
   );
@@ -1128,7 +1132,7 @@ describe('After a voice hand-off', () => {
     const screen = await render(<AddBillScreen />);
 
     await press(screen, 'Category, needed');
-    expect(screen.getByText('What is this bill for?')).toBeTruthy();
+    expect(screen.getByText('What’s this bill for?')).toBeTruthy();
     await press(screen, 'Back');
 
     expect(router.back).not.toHaveBeenCalled();

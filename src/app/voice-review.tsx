@@ -22,6 +22,7 @@ import {
 import { usePaymentSources } from '@/api/queries';
 import { useRememberStore } from '@/api/known-stores';
 import { useLearnVoiceAlias, useVoiceAliases } from '@/api/voice-aliases';
+import { BillIconWell } from '@/components/bills/bill-icon';
 import { BillMark } from '@/components/bills/bill-mark';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
 import { BrandMark } from '@/components/brands/brand-mark';
@@ -39,7 +40,7 @@ import { ChoiceChips } from '@/components/ui/choice-chips';
 import { TextLink } from '@/components/ui/text-link';
 import { FieldLabel } from '@/components/ui/typography';
 import { StaleDraft } from '@/components/voice/stale-draft';
-import { BILL_CATEGORIES, RECURRENCES } from '@/data/bill-categories';
+import { RECURRENCES, billIconOf, getBillCategory } from '@/data/bill-categories';
 import { t, type MessageKey } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
 import { formatEntryDay } from '@/lib/entry-day';
@@ -197,7 +198,8 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   const { id, draft, entry, touched, edited } = session;
   const kind = entry.kind;
   const copy = kindCopy(kind);
-  const category = BILL_CATEGORIES.find((option) => option.id === entry.billCategoryId) ?? null;
+  const category = entry.billCategoryId ? (getBillCategory(entry.billCategoryId) ?? null) : null;
+  const categoryIcon = category ? billIconOf({ categoryId: category.id }) : null;
   // A bill with no name of its own is saved under this, in the language on screen, as add-bill
   // pre-fills it.
   const categoryLabel = category ? billCategoryLabel(category.id, category.label) : '';
@@ -402,7 +404,11 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
               label: t('voice.review.category'),
               value: categoryLabel || null,
               required: true,
-              leading: <GlyphWell icon={category?.icon ?? Tag} />,
+              leading: categoryIcon ? (
+                <BillIconWell choice={categoryIcon} />
+              ) : (
+                <GlyphWell icon={Tag} />
+              ),
               onPress: () => edit('category'),
             },
             {

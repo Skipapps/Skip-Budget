@@ -11,6 +11,10 @@ import { clearVoiceDraft, putVoiceDraft, updateVoiceEntry } from '@/lib/voice-dr
  * every language.
  */
 
+// The bill category icons follow the theme, which this file's theme mock does not provide.
+jest.mock('@/theme/bill-icons', () => ({
+  useBillIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
 jest.mock('react-native-keyboard-controller', () =>

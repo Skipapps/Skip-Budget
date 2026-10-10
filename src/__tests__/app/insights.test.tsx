@@ -39,7 +39,7 @@ jest.mock('@/components/pro/pro-gate', () => ({ useProGate: () => null }));
 
 // The category labels import SVGs through `@/assets/*`, which jest's `@/` mapper points at `src/`
 // and cannot resolve.
-jest.mock('@/data/bill-categories', () => ({ BILL_CATEGORIES: [] }));
+jest.mock('@/data/bill-categories', () => ({ LISTED_BILL_CATEGORIES: [] }));
 
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', line: '#DDDDDD', moneyOut: '#B85040' }),

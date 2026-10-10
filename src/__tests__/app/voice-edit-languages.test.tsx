@@ -17,6 +17,10 @@ import {
  * screen, and what Done writes is the same value in every language.
  */
 
+// The bill category icons follow the theme, which this file's theme mock does not provide.
+jest.mock('@/theme/bill-icons', () => ({
+  useBillIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
 jest.mock('react-native-keyboard-controller', () =>

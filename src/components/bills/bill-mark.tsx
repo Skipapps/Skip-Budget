@@ -1,11 +1,10 @@
 import { createElement } from 'react';
 import { View } from 'react-native';
 
+import { BillIcon } from '@/components/bills/bill-icon';
 import { BrandLogo } from '@/components/brands/brand-logo';
-import { LoanTypeIcon } from '@/components/calculators/loan-type-icon';
-import { getBillIcon } from '@/data/bill-categories';
+import { billIconOf, getBillIcon } from '@/data/bill-categories';
 import { GLYPH_STROKE } from '@/data/glyphs';
-import { loanTypeOf } from '@/data/loan-types';
 import { useColors } from '@/providers/theme-provider';
 
 type BillMarkProps = {
@@ -20,17 +19,17 @@ type BillMarkProps = {
 
 /**
  * A bill's mark: its issuer's logo when it has a brand (AEP, T-Mobile), else a saved loan's type,
- * else its category icon, since rent or HOA fees are not brands and a monogram would look like a
- * logo that failed to load. Matches BrandMark in size and shape because the two sit side by side in
- * a mixed list.
+ * else its category's gradient icon, since rent or HOA fees are not brands and a monogram would look
+ * like a logo that failed to load. A spending category (Insights lists them beside bills) keeps its
+ * glyph. Matches BrandMark in size and shape because the two sit side by side in a mixed list.
  */
 export function BillMark({ categoryId, iconId, domain, name, size = 40 }: BillMarkProps) {
   const colors = useColors();
-  const loanType = loanTypeOf(iconId);
+  const choice = billIconOf({ categoryId: categoryId ?? 'other', iconId });
 
   // createElement, not JSX: a capitalised local for a looked-up component trips the lint rule.
-  const icon = loanType ? (
-    <LoanTypeIcon type={loanType} size={Math.round(size * 0.6)} />
+  const icon = choice ? (
+    <BillIcon choice={choice} size={Math.round(size * 0.6)} />
   ) : (
     createElement(getBillIcon({ categoryId: categoryId ?? 'other', iconId: iconId ?? undefined }), {
       size: Math.round(size * 0.5),

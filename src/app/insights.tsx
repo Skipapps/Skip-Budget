@@ -30,7 +30,7 @@ import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { SectionHeading } from '@/components/ui/typography';
-import { BILL_CATEGORIES } from '@/data/bill-categories';
+import { LISTED_BILL_CATEGORIES } from '@/data/bill-categories';
 import { t, type MessageKey } from '@/i18n';
 import { MESSAGES } from '@/i18n/messages';
 import { toIsoDate } from '@/lib/date';
@@ -157,7 +157,7 @@ function InsightsScreenInner() {
 
   const categoryLabel = useMemo(() => {
     const labels = new Map<string, string>();
-    for (const category of BILL_CATEGORIES) {
+    for (const category of LISTED_BILL_CATEGORIES) {
       labels.set(category.id, categoryName('insights.billCategory', category.id, category.label));
     }
     for (const category of spendCategories) {

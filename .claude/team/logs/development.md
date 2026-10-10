@@ -5407,3 +5407,72 @@ bug in component behaviour found; two comments corrected. tsc 0; `rm -rf .expo/c
     - Both stay out of the totals.
   - The test fixtures carry `starts_on`, and the page and its test both build schedules with `loanTermsOf`.
   - **Gates:** tsc 0; eslint and prettier clean; the loans, cards, loan-status and active-loans suites, guards and i18n all pass (12 suites, 123 tests).
+
+---
+
+## 2026-10-09 — Diego (Developer, data and backend) — bill categories: Health & Medical, Education; family and loans retired from new bills
+
+**Outcome:** Done, uncommitted, not pushed. No Docker used. tsc and eslint are clean on my files. My new and changed suites pass. In the wider run, 24 tests fail in 5 suites, all with `useTheme is not a function` from Dana L's new src/theme/bill-icons.ts (those screen tests' theme mocks lack useTheme). tsc errors remain in her in-flight files.
+
+- **Migration `20261009100009_bill_categories_health_education.sql`:**
+  - Upserts `health` (Health & Medical, "Doctor, dental, meds", 8) and `education` (Education, "Tuition and courses", 9).
+  - Re-sorts: transport 7, other 10, loans 11, family 12.
+  - `update bills set category_id = 'health' where category_id = 'family'`.
+  - The family and loans rows stay. Re-run safe. Only the updated_at trigger is on bills.
+- **Voice (`src/lib/voice/bill-category.ts`):**
+  - Ids are now the picker's 10 (no loans, no family).
+  - Medical, hospital, doctor and dental bills → health; tuition and school fees → education.
+  - Childcare words, loan words and card-payment words → other (still a bill).
+  - A finance brand no longer suggests a category, so the review page asks.
+  - parse.test: 6 rows updated (category only; brand-only rows add 'category' to missing).
+  - bill-category.test now checks the fixed picker order, and that every id is drawable through `getBillCategory`.
+- **Reads:** new `src/lib/retired-bill-categories.ts` (`currentBillCategory`: family → health). useBills and useBill fold on read, so the ledger, money book, insights totals, the bill page, filters and the add-bill edit all see health, and an edit saves health.
+- **Unchanged on purpose:** `loans` in entry-values (loan icon), save_loan, the demo seed's car loan (`'loans'`), and logo-lookup `loans: 'banking'` (only its comment changed). No edge function or report SQL uses the ids.
+- **Tests:** retired-bill-categories (2), api/bill-categories-read (3), supabase/bill-categories-migration (3), voice (309).
+
+## 2026-10-10 — Dana L (Developer, UI and navigation) — Add a bill: the category page and bill icons everywhere (DONE, uncommitted)
+
+**Outcome:** Done on Diego's data side (migration, `retired-bill-categories`, voice ids). The first page of Add a bill matches the PNGs. Every bill renderer draws the new gradient icons, light or dark.
+
+- **Page** (`src/app/add-bill.tsx`, `src/components/bills/category-picker.tsx`):
+  - Header "Add a bill" with back and close; left-aligned "What’s this bill for?" and "Pick one. You can change it later."
+  - The ten tiles, two to a row, in the brief's order and words.
+  - Each tile: 40pt gradient icon, name (15 semibold), hint (12).
+  - Selected: a plum border, a soft plum fill and a check badge top right. They use `accent-ink`, so dark mode gets the lighter plum and a dark check, as drawn.
+  - A tap goes straight on (no Continue). Back shows the tile still selected.
+  - Large text: names and hints shrink together, one column once either would go under its size.
+  - The review page's category row shows the category's icon; a loan's bill shows its loan type.
+- **Data** (`src/data/bill-categories.ts`):
+  - `BILL_CATEGORIES` is the ten pickable categories.
+  - `LISTED_BILL_CATEGORIES` adds Loans & Credit (filters, Insights labels).
+  - `getBillCategory` folds family → health.
+  - `billIconOf(bill)` is the one rule: a loan type via `icon_id` (Other for an untyped loan), else the category's gradient icon, else null. Null means a spending category keeps its glyph, as Insights uses it.
+- **Icons:**
+  - 20 copies in `assets/gradient-icons/bill-<id>{,-dark}.svg`, with gradients moved into `<defs>`.
+  - Quick Look renders are pixel-identical to the originals once their intrinsic 48px size is set aside.
+  - Every dark copy already had the navy lift; housing, water and other have no navy.
+  - Registry: `src/theme/bill-icons.ts`; drawing: `src/components/bills/bill-icon.tsx`.
+  - BillMark and BillRow use it, so bill rows, the bill page, Home, Activity, Bills, card activity, Change logo, Insights and Voice review all follow. A logo still wins.
+- **Copy (en/es/fr):**
+  - New names and hints for every category, Health & Medical and Education, and the subtitle.
+  - "Other bill" → "Other" (Insights keeps its own "Other bill").
+  - Name-box hints for Health and Education replace Family's.
+  - Family's keys are gone; the label map still reads `family` as Health & Medical, as a fallback behind Diego's fold.
+- **Diego's follow-ups:**
+  - Insights uses `LISTED_BILL_CATEGORIES` and has health/education labels.
+  - The filter offers Loans & Credit.
+  - The bill page and voice edit/review use `getBillCategory`.
+  - Editing a loan's bill keeps `loans` and its `loan-<type>` (test added).
+- **Tests:**
+  - New: `bill-icons` (94: files, svgr, dark lift with id prefixes normalised, registry) and `bill-icons-dark` (10).
+  - `bill-icons.test.ts` (data) gains the order, words, retired categories and `billIconOf`.
+  - `category-picker-large-text` is re-measured from Montserrat's advance widths (SemiBold 15 / Regular 12); its outcomes come from replaying the fit rules.
+  - add-bill: the ten tiles in order, no Loans or Family, the check badge on Back, a loan bill keeping `loans`.
+  - 12 suites gained a registry mock; 3 had their categories mock updated.
+- **Gates:**
+  - tsc 0; eslint (cache cleared) and prettier clean on 43 changed files.
+  - Full jest 298 suites, 6,118 tests green.
+  - Two earlier full runs timed out in the long i18n suites under load; those pass alone and in this run.
+- **Simulator:** the page was seen in light mode as designed. Not seen: the selected state and dark mode (no taps; the app is set to Light). Both are covered by tests.
+
+## 2026-10-10 — Dmitri (Development Lead) — Add a bill categories + bill icons review: GO, no MUST. tsc 0; 32 suites / 1,218 tests pass (bills, add-bill, insights, voice, bill-icons, retired-bill-categories, bill-categories). family folds to health on read in useBills/useBill, so Insights totals, bill filters and the money book group it under Health and an edit saves health; Home "Where your money went" groups by kind, not category. Voice ids exclude family/loans. Loan bills keep loan-<type> (billIconOf checks it first; buildBillValues unchanged); a logo still wins in BillMark; unknown ids fall back to the glyph and the stored label. Tap goes straight on, Back shows the check. Risks: an Other bill with an old picked glyph now wears the Other gradient icon; Insights receipt categories that share an id (transport, insurance, other) now show the bill gradient icon; dark mode and the selected state not seen on a device.

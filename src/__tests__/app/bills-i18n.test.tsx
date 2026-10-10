@@ -12,6 +12,10 @@ import { resetLocaleForTests, setLanguage } from '@/i18n/store';
  * schedules and categories mapped from their stored values, the counts, the dates and the money.
  */
 
+// The bill category icons follow the theme, which this file's theme mock does not provide.
+jest.mock('@/theme/bill-icons', () => ({
+  useBillIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),

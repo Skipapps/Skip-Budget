@@ -7,7 +7,7 @@ import { FilterActions } from '@/components/ui/filter-actions';
 import { MultiChoiceChips } from '@/components/ui/multi-choice-chips';
 import { FieldLabel } from '@/components/ui/typography';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
-import { BILL_CATEGORIES, RECURRENCES } from '@/data/bill-categories';
+import { LISTED_BILL_CATEGORIES, RECURRENCES } from '@/data/bill-categories';
 import { t } from '@/i18n';
 import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
@@ -50,7 +50,8 @@ export function BillFilterSheet({
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<BillFilters>(filters);
 
-  const categoryOptions = BILL_CATEGORIES.map((category) => ({
+  // Loans & Credit too: no new bill is filed there, but loans' bills are.
+  const categoryOptions = LISTED_BILL_CATEGORIES.map((category) => ({
     value: category.id,
     label: billCategoryLabel(category.id, category.label),
   }));

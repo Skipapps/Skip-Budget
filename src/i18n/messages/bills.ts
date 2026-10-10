@@ -18,37 +18,46 @@ export const billsMessages = defineMessages({
     fr: 'Prêts et crédit',
   },
   'bills.category.transport': { en: 'Transportation', es: 'Transporte', fr: 'Transport' },
-  'bills.category.family': {
-    en: 'Family & Healthcare',
-    es: 'Familia y salud',
-    fr: 'Famille et santé',
+  'bills.category.health': {
+    en: 'Health & Medical',
+    es: 'Salud y gastos médicos',
+    fr: 'Santé et soins médicaux',
   },
-  'bills.category.other': { en: 'Other bill', es: 'Otra factura', fr: 'Autre facture' },
+  'bills.category.education': {
+    en: 'Education',
+    es: 'Educación',
+    fr: 'Éducation',
+  },
+  'bills.category.other': {
+    en: 'Other',
+    es: 'Otra',
+    fr: 'Autre',
+  },
 
   'bills.categoryHint.housing': {
-    en: 'Rent, mortgage, HOA fees',
-    es: 'Renta, hipoteca, cuotas de mantenimiento',
-    fr: 'Loyer, hypothèque, frais de copropriété',
+    en: 'Rent, mortgage, HOA',
+    es: 'Renta, hipoteca, mantenimiento',
+    fr: 'Loyer, hypothèque, copropriété',
   },
   'bills.categoryHint.energy': {
-    en: 'Power, heating, cooking gas',
-    es: 'Luz, calefacción, gas para cocinar',
-    fr: 'Électricité, chauffage, gaz de cuisson',
+    en: 'Power, heating, gas',
+    es: 'Luz, calefacción, gas',
+    fr: 'Électricité, chauffage, gaz',
   },
   'bills.categoryHint.water': {
-    en: 'Water, sewer, garbage',
+    en: 'Water, sewer, trash',
     es: 'Agua, drenaje, basura',
     fr: 'Eau, égouts, ordures',
   },
   'bills.categoryHint.internet': {
-    en: 'Home broadband and Wi-Fi',
+    en: 'Broadband and Wi-Fi',
     es: 'Internet de casa y wifi',
-    fr: 'Internet à la maison et Wi-Fi',
+    fr: 'Internet et Wi-Fi',
   },
   'bills.categoryHint.mobile': {
-    en: 'Phone plans, device payments',
-    es: 'Planes de celular, pagos del equipo',
-    fr: 'Forfaits, paiements de l’appareil',
+    en: 'Plans and devices',
+    es: 'Planes y equipos',
+    fr: 'Forfaits et appareils',
   },
   'bills.categoryHint.insurance': {
     en: 'Car, health, home, life',
@@ -61,19 +70,24 @@ export const billsMessages = defineMessages({
     fr: 'Cartes, prêts étudiants, auto, personnels',
   },
   'bills.categoryHint.transport': {
-    en: 'Car, transit, parking, tolls',
-    es: 'Auto, transporte público, estacionamiento, casetas',
-    fr: 'Auto, transport en commun, stationnement, péages',
+    en: 'Fuel, transit, tolls',
+    es: 'Gasolina, transporte público, casetas',
+    fr: 'Essence, transport en commun, péages',
   },
-  'bills.categoryHint.family': {
-    en: 'Childcare, tuition, medical',
-    es: 'Guardería, colegiaturas, médico',
-    fr: 'Garderie, frais de scolarité, soins médicaux',
+  'bills.categoryHint.health': {
+    en: 'Doctor, dental, meds',
+    es: 'Médico, dentista, medicinas',
+    fr: 'Médecin, dentiste, médicaments',
+  },
+  'bills.categoryHint.education': {
+    en: 'Tuition and courses',
+    es: 'Colegiaturas y cursos',
+    fr: 'Frais de scolarité et cours',
   },
   'bills.categoryHint.other': {
-    en: 'Anything else you pay',
-    es: 'Cualquier otro pago',
-    fr: 'Tout autre paiement',
+    en: 'Anything else',
+    es: 'Cualquier otra cosa',
+    fr: 'Tout le reste',
   },
 
   // Weekly and Monthly are dates.weekly and dates.monthly.
@@ -120,9 +134,14 @@ export const billsMessages = defineMessages({
     fr: 'Annuler la modification de cette facture ?',
   },
   'bills.add.categoryQuestion': {
-    en: 'What is this bill for?',
+    en: 'What’s this bill for?',
     es: '¿De qué es esta factura?',
     fr: 'Cette facture, c’est pour quoi ?',
+  },
+  'bills.add.categorySubtitle': {
+    en: 'Pick one. You can change it later.',
+    es: 'Elige una. Puedes cambiarla después.',
+    fr: 'Choisis-en une. Tu pourras la changer plus tard.',
   },
   'bills.add.amountQuestion': {
     en: 'How much is the bill?',
@@ -215,10 +234,15 @@ export const billsMessages = defineMessages({
     es: 'Transporte público, casetas o estacionamiento',
     fr: 'Transport en commun, péages ou stationnement',
   },
-  'bills.add.issuer.family': {
-    en: 'Nursery, school or clinic',
-    es: 'Guardería, escuela o clínica',
-    fr: 'Garderie, école ou clinique',
+  'bills.add.issuer.health': {
+    en: 'Your doctor, dentist or clinic',
+    es: 'Tu médico, dentista o clínica',
+    fr: 'Ton médecin, dentiste ou clinique',
+  },
+  'bills.add.issuer.education': {
+    en: 'Your school or college',
+    es: 'Tu escuela o universidad',
+    fr: 'Ton école ou ton collège',
   },
   'bills.add.issuer.other': {
     en: 'Search or type a name',

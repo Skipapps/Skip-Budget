@@ -68,6 +68,19 @@ jest.mock('../../assets/gradient-icons/loan-type-other-dark.svg', () =>
   mockSvg('loan-type-other-dark'),
 );
 
+// The bill categories' own drawings are bill-icons-dark.test.tsx's; here each is named by category.
+jest.mock('@/theme/bill-icons', () => {
+  const { createElement } = jest.requireActual('react');
+  const { View } = jest.requireActual('react-native');
+  return {
+    useBillIcons: () =>
+      new Proxy(
+        {},
+        { get: (_target, id) => () => createElement(View, { testID: `bill-icon-${String(id)}` }) },
+      ),
+  };
+});
+
 let mockScheme: 'light' | 'dark' = 'light';
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({ scheme: mockScheme }),
@@ -186,10 +199,17 @@ describe.each([
 
 describe('a bill that is not a saved loan', () => {
   it.each([null, 'other', 'education', 'loan-boat', 'loans'])(
-    'keeps its glyph for an icon id of %s',
+    'wears its category’s icon, not a loan’s, for an icon id of %s',
     async (iconId) => {
-      const screen = await render(<BillMark categoryId="loans" iconId={iconId} name="Loan" />);
+      const screen = await render(<BillMark categoryId="housing" iconId={iconId} name="Rent" />);
       expect(screen.queryAllByTestId(/^svg-loan-/, hidden)).toEqual([]);
+      expect(screen.getAllByTestId('bill-icon-housing', hidden)).toHaveLength(1);
     },
   );
+
+  it('draws a loan’s bill saved before loan types as the Other type', async () => {
+    mockScheme = 'light';
+    const screen = await render(<BillMark categoryId="loans" iconId="other" name="Loan" />);
+    expect(screen.getAllByTestId('svg-loan-type-other', hidden)).toHaveLength(1);
+  });
 });

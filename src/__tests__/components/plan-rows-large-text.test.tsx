@@ -20,7 +20,10 @@ jest.mock('@/providers/theme-provider', () => ({
 }));
 jest.mock('@/components/brands/brand-mark', () => ({ BrandMark: () => null }));
 jest.mock('@/components/brands/brand-logo', () => ({ BrandLogo: () => null }));
-jest.mock('@/data/bill-categories', () => ({ getBillIcon: () => () => null }));
+jest.mock('@/data/bill-categories', () => ({
+  getBillIcon: () => () => null,
+  billIconOf: () => null,
+}));
 
 type Screen = Awaited<ReturnType<typeof render>>;
 

@@ -23,6 +23,7 @@ import { paydaysInRange, type PayFrequency } from '@/lib/date';
 import { landingAccount, payProjectionStart } from '@/lib/pay';
 import type { AccrualBasis } from '@/lib/loan';
 import { logoDomainOf } from '@/lib/logo-domain';
+import { currentBillCategory } from '@/lib/retired-bill-categories';
 import type { DateRange } from '@/lib/range';
 import { lastUpdated } from '@/lib/source-updated';
 import { useKnownFree } from '@/lib/pro-status';
@@ -268,6 +269,12 @@ export function useBankAccounts() {
   });
 }
 
+/** A bill under a retired category reads as the one it became (`currentBillCategory`). */
+function readBill(row: BillRow): BillRow {
+  const category = currentBillCategory(row.category_id);
+  return category === row.category_id ? row : { ...row, category_id: category };
+}
+
 export function useBills() {
   return useOwnerQuery<BillRow[]>('bills', async () => {
     const { data, error } = await withLogoColumns((logo) =>
@@ -280,7 +287,7 @@ export function useBills() {
     );
     if (error) throw error;
     // PostgREST types an embedded relation as an array; it is one row here.
-    return (data ?? []) as unknown as BillRow[];
+    return ((data ?? []) as unknown as BillRow[]).map(readBill);
   });
 }
 
@@ -594,7 +601,7 @@ export function useBill(id: string | undefined) {
           .maybeSingle(),
       );
       if (error) throw error;
-      return data as unknown as BillRow | null;
+      return data ? readBill(data as unknown as BillRow) : null;
     },
   });
 }

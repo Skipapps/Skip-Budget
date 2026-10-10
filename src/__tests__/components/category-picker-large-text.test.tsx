@@ -12,7 +12,7 @@ import { TEXT_CAP } from '@/theme/text-scale';
  * The bill category grid at large text sizes in every language. A word cannot wrap, so the ten
  * names shrink together until the widest fits a two-up tile, and so do the ten hints; once either
  * would go under its default size the grid is one column. Which words are widest depends on the
- * language: English's "Transportation", Spanish's "estacionamiento", French's "Assurances".
+ * language: English's "Transportation", Spanish's "mantenimiento", French's "Assurances".
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -22,104 +22,107 @@ jest.mock('@/providers/theme-provider', () => ({
 }));
 jest.mock('@/components/brands/brand-mark', () => ({ BrandMark: () => null }));
 jest.mock('@/components/bills/bill-mark', () => ({ BillMark: () => null }));
+jest.mock('@/theme/bill-icons', () => ({
+  useBillIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 
 type Screen = Awaited<ReturnType<typeof render>>;
 type Host = NonNullable<Screen['root']>;
 type Id = (typeof BILL_CATEGORIES)[number]['id'];
 
 /**
- * Each name's and hint's widest word at the default text size (Montserrat Medium 14pt and Regular
- * 11pt), summed from the font's advance widths. A larger text size multiplies them, up to the
+ * Each name's and hint's widest word at the default text size (Montserrat SemiBold 15pt and Regular
+ * 12pt), summed from the font's advance widths. A larger text size multiplies them, up to the
  * control ceiling.
  */
 const WIDEST: Record<Language, { label: Record<Id, number>; hint: Record<Id, number> }> = {
   en: {
     label: {
-      housing: 59.85,
-      energy: 70.81,
-      water: 45.51,
-      internet: 57.88,
-      mobile: 48.19,
-      insurance: 70.57,
-      loans: 43.54,
-      transport: 105.35,
-      family: 78.22,
-      other: 41.4,
+      housing: 64.78,
+      energy: 77.5,
+      water: 49.68,
+      internet: 63.02,
+      mobile: 52.29,
+      insurance: 76.72,
+      transport: 114.81,
+      health: 60.45,
+      education: 79.03,
+      other: 44.9,
     },
     hint: {
-      housing: 57.98,
-      energy: 45.3,
-      water: 46.56,
-      internet: 61.56,
-      mobile: 55.49,
-      insurance: 37.76,
-      loans: 47.66,
-      transport: 45.2,
-      family: 54.68,
-      other: 33.75,
+      housing: 63.25,
+      energy: 49.42,
+      water: 39.89,
+      internet: 68.06,
+      mobile: 44.98,
+      insurance: 41.2,
+      transport: 41.38,
+      health: 43.94,
+      education: 46.12,
+      other: 55.76,
     },
   },
   es: {
     label: {
-      housing: 61.63,
-      energy: 25.09,
-      water: 48.52,
-      internet: 57.88,
-      mobile: 49.95,
-      insurance: 58.04,
-      loans: 76.3,
-      transport: 77.42,
-      family: 52.15,
-      other: 50.69,
+      housing: 67.29,
+      energy: 27.24,
+      water: 52.74,
+      internet: 63.02,
+      mobile: 54.39,
+      insurance: 63.09,
+      transport: 84.39,
+      health: 65.88,
+      education: 81.39,
+      other: 34.4,
     },
     hint: {
-      housing: 87.17,
-      energy: 64.52,
-      water: 44.43,
-      internet: 44.83,
-      mobile: 39.38,
-      insurance: 49.52,
-      loans: 72.94,
-      transport: 95.35,
-      family: 70.14,
-      other: 44.52,
+      housing: 95.1,
+      energy: 70.38,
+      water: 48.47,
+      internet: 48.9,
+      mobile: 48.19,
+      insurance: 54.02,
+      transport: 63.32,
+      health: 62.38,
+      education: 75.72,
+      other: 58.37,
     },
   },
   fr: {
     label: {
-      housing: 74.13,
-      energy: 71.55,
-      water: 57.02,
-      internet: 57.88,
-      mobile: 66.33,
-      insurance: 80.98,
-      loans: 41.55,
-      transport: 68.85,
-      family: 52.35,
-      other: 50.89,
+      housing: 80.16,
+      energy: 78.17,
+      water: 62.04,
+      internet: 63.02,
+      mobile: 72.39,
+      insurance: 88.35,
+      transport: 75.06,
+      health: 76.39,
+      education: 79.03,
+      other: 43.44,
     },
     hint: {
-      housing: 70.12,
-      energy: 57.97,
-      water: 42.58,
-      internet: 44.83,
-      mobile: 59.14,
-      insurance: 59.39,
-      loans: 60.62,
-      transport: 84.71,
-      family: 54.68,
-      other: 55.01,
+      housing: 76.5,
+      energy: 63.24,
+      water: 46.45,
+      internet: 48.9,
+      mobile: 54.8,
+      insurance: 64.79,
+      transport: 58.46,
+      health: 84,
+      education: 50.6,
+      other: 30.04,
     },
   },
 };
 
 /**
  * The grid takes the page's width less its 24pt margins. A two-up tile is 47.5% of it, and its text
- * has that less 14pt of padding and 1pt of border a side; a one-column tile has the whole width.
+ * has that less 16pt of padding and 1pt of border a side; a one-column tile has the whole width.
  */
 function room(window: number) {
   const grid = window - 48;
-  return { grid, twoUp: grid * 0.475 - 30, oneColumn: grid - 30 };
+  return { grid, twoUp: grid * 0.475 - 34, oneColumn: grid - 34 };
 }
 
 function phone(width: number, fontScale: number) {
@@ -198,21 +201,22 @@ type Expected = { columns: 1 | 2; label: number; hint: number };
 
 // The default size of a 375pt phone, its largest control size, and the same at 320pt (Display Zoom).
 const CASES: [Language, number, number, Expected][] = [
-  ['en', 375, 1, { columns: 2, label: 14, hint: 11 }],
-  ['es', 375, 1, { columns: 2, label: 14, hint: 11 }],
-  ['fr', 375, 1, { columns: 2, label: 14, hint: 11 }],
-  // "Transportation" needs 137pt of a 124pt tile: every name shrinks to 0.9 together.
-  ['en', 375, 1.3, { columns: 2, label: 12.6, hint: 11 }],
-  ['es', 375, 1.3, { columns: 2, label: 14, hint: 11 }],
-  ['fr', 375, 1.3, { columns: 2, label: 14, hint: 11 }],
-  ['en', 375, 3.1, { columns: 2, label: 12.6, hint: 11 }],
-  // At 320pt it would take 0.71, under the default size: one column, at full size.
-  ['en', 320, 1.3, { columns: 1, label: 14, hint: 11 }],
-  // "estacionamiento" takes the hints to 0.79 (11.3pt as drawn), still above 11pt.
-  ['es', 320, 1.3, { columns: 2, label: 13.58, hint: 8.69 }],
-  ['fr', 320, 1.3, { columns: 2, label: 13.02, hint: 9.79 }],
-  ['en', 320, 1, { columns: 1, label: 14, hint: 11 }],
-  ['es', 320, 1, { columns: 2, label: 14, hint: 11 }],
+  ['en', 375, 1, { columns: 2, label: 15, hint: 12 }],
+  ['es', 375, 1, { columns: 2, label: 15, hint: 12 }],
+  ['fr', 375, 1, { columns: 2, label: 15, hint: 12 }],
+  // "Transportation" needs 149pt of a 121pt tile: every name shrinks to 0.8 together, 15.6pt drawn.
+  ['en', 375, 1.3, { columns: 2, label: 12, hint: 12 }],
+  // "mantenimiento" takes the hints to 0.97, still above their 12pt.
+  ['es', 375, 1.3, { columns: 2, label: 15, hint: 11.64 }],
+  ['fr', 375, 1.3, { columns: 2, label: 15, hint: 12 }],
+  ['en', 375, 3.1, { columns: 2, label: 12, hint: 12 }],
+  // At 320pt the names would go under their size: one column, at full size.
+  ['en', 320, 1.3, { columns: 1, label: 15, hint: 12 }],
+  ['es', 320, 1.3, { columns: 1, label: 15, hint: 12 }],
+  ['fr', 320, 1.3, { columns: 2, label: 12.3, hint: 10.32 }],
+  ['en', 320, 1, { columns: 1, label: 15, hint: 12 }],
+  // "mantenimiento" is a point too wide for a 320pt two-up tile at the default size.
+  ['es', 320, 1, { columns: 1, label: 15, hint: 12 }],
 ];
 
 describe.each(CASES)('in %s at %ipt and %fx', (language, width, fontScale, expected) => {

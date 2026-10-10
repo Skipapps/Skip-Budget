@@ -2,11 +2,10 @@ import { createElement } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { BrandLogo } from '@/components/brands/brand-logo';
-import { LoanTypeIcon } from '@/components/calculators/loan-type-icon';
+import { BillIcon } from '@/components/bills/bill-icon';
 import { FitGroup, FitText, useFitGroup } from '@/components/ui/fit-group';
-import { getBillIcon, type Bill } from '@/data/bill-categories';
+import { billIconOf, getBillIcon, type Bill } from '@/data/bill-categories';
 import { GLYPH_STROKE } from '@/data/glyphs';
-import { loanTypeOf } from '@/data/loan-types';
 import { t, type MessageKey } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
@@ -41,7 +40,10 @@ const CATEGORY_KEYS = new Map<string, { label: MessageKey; hint: MessageKey }>([
   ['insurance', { label: 'bills.category.insurance', hint: 'bills.categoryHint.insurance' }],
   ['loans', { label: 'bills.category.loans', hint: 'bills.categoryHint.loans' }],
   ['transport', { label: 'bills.category.transport', hint: 'bills.categoryHint.transport' }],
-  ['family', { label: 'bills.category.family', hint: 'bills.categoryHint.family' }],
+  ['health', { label: 'bills.category.health', hint: 'bills.categoryHint.health' }],
+  ['education', { label: 'bills.category.education', hint: 'bills.categoryHint.education' }],
+  // Family & Healthcare was folded into Health & Medical; an older bill filed there reads as it.
+  ['family', { label: 'bills.category.health', hint: 'bills.categoryHint.health' }],
   ['other', { label: 'bills.category.other', hint: 'bills.categoryHint.other' }],
 ]);
 
@@ -69,10 +71,10 @@ export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
   const moneyColor = useMoneyColor();
   const words = useFitGroup({ mode: 'switch' });
   const stacked = !words.fits;
-  const loanType = loanTypeOf(bill.iconId);
+  const choice = billIconOf(bill);
   // createElement, not JSX: a capitalised local for a looked-up component trips the lint rule.
-  const icon = loanType ? (
-    <LoanTypeIcon type={loanType} size={26} />
+  const icon = choice ? (
+    <BillIcon choice={choice} size={26} />
   ) : (
     createElement(getBillIcon(bill), { size: 20, strokeWidth: GLYPH_STROKE, color: colors.body })
   );
