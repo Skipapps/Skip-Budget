@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
-import { Plus } from 'lucide-react-native';
 import { useMemo } from 'react';
 
 import { loanTermsOf, useLoans, type LoanListRow } from '@/api/loans';
 import type { LoanCardData } from '@/components/loans/loan-list-card';
 import { LoansBody } from '@/components/loans/loans-body';
+import type { LoansSummaryData } from '@/components/loans/loans-summary-card';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -43,9 +43,10 @@ function cardOf({ row, status, ending }: PricedLoan): LoanCardData {
     billId: row.bill.id,
     name: row.bill.name,
     iconId: row.bill.icon_id,
-    principal: row.principal,
-    annualRate: row.annual_rate,
+    principal: status.borrowed,
+    annualRate: status.annualRate,
     termMonths: row.term_months,
+    startedOn: status.startedOn,
     monthly: status.monthlyPayment,
     paymentsLeft: status.paymentsLeft,
     paymentCount: status.paymentCount,
@@ -57,7 +58,7 @@ function cardOf({ row, status, ending }: PricedLoan): LoanCardData {
   };
 }
 
-/** Every loan saved from the calculator: what is owed, what goes out a month, what comes next. */
+/** Every loan saved from the calculator: what is owed, what goes out a month, how far along each is. */
 export default function LoansScreen() {
   const { today } = useToday();
   const artwork = useArtwork();
@@ -65,7 +66,7 @@ export default function LoansScreen() {
 
   const priced = useMemo(() => priceLoans(loans, today), [loans, today]);
   const cards = useMemo(() => priced.map(cardOf), [priced]);
-  const summary = useMemo(() => {
+  const summary = useMemo((): LoansSummaryData => {
     // Every finished loan leaves the sums, the stopped ones as well as the paid off.
     const totals = loansSummary(
       priced.map((loan) => ({
@@ -76,9 +77,11 @@ export default function LoansScreen() {
     return {
       owed: totals.totalOwed,
       monthly: totals.monthlyPayments,
-      next: totals.nextPayment
-        ? { on: totals.nextPayment.date, name: totals.nextPayment.loan.row.bill.name }
-        : null,
+      borrowed: totals.totalBorrowed,
+      paid: totals.totalPaid,
+      percentPaid: totals.percentPaid,
+      rateRange: totals.rateRange,
+      count: totals.openCount,
     };
   }, [priced]);
 
@@ -87,10 +90,8 @@ export default function LoansScreen() {
   return (
     <Screen
       title={t('loan.list.title')}
+      subtitle={t('loan.list.subtitle')}
       showBack
-      headerActions={[
-        { icon: Plus, label: t('loan.list.newCalculation'), onPress: openCalculator },
-      ]}
       onRefresh={refetch}
     >
       {isPending ? <SkeletonList rows={3} /> : null}
@@ -109,7 +110,9 @@ export default function LoansScreen() {
           loans={cards}
           summary={summary}
           onOpen={(billId) => router.push(`/bill/${billId}`)}
-          onNew={openCalculator}
+          onCalculator={openCalculator}
+          // Saving a loan starts in the calculator until it has a form of its own.
+          onAdd={openCalculator}
         />
       ) : null}
     </Screen>

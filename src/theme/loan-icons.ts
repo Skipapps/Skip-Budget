@@ -1,11 +1,13 @@
 import type { FC } from 'react';
 import { useMemo } from 'react';
+import type { ImageSourcePropType } from 'react-native';
 import type { SvgProps } from 'react-native-svg';
 
 import type { LoanType } from '@/data/loan-types';
 import { useTheme } from '@/providers/theme-provider';
 
 // Relative paths rather than @/assets: Jest maps @/ to src/ only, and a test resolves these files.
+import Add from '../../assets/gradient-icons/loan-add.svg';
 import Business from '../../assets/gradient-icons/loan-type-business.svg';
 import BusinessDark from '../../assets/gradient-icons/loan-type-business-dark.svg';
 import Car from '../../assets/gradient-icons/loan-type-car.svg';
@@ -44,6 +46,8 @@ const ICONS = {
   dates: { light: Dates, dark: DatesDark },
   moreOptions: { light: MoreOptions, dark: MoreOptionsDark },
   schedule: { light: Schedule, dark: ScheduleDark },
+  // Drawn on the plum Add loan tile in both modes, so one drawing serves both.
+  add: { light: Add, dark: Add },
 } satisfies Record<string, Pair>;
 
 const TYPE_ICONS: Record<LoanType, Pair> = {
@@ -59,6 +63,9 @@ const TYPE_ICONS: Record<LoanType, Pair> = {
 };
 
 export type LoanIconName = keyof typeof ICONS;
+
+/** The Loans summary's hand and coin: the designer's own picture, the same in both modes. */
+export const YOUR_LOANS_IMAGE: ImageSourcePropType = require('../../assets/gradient-icons/your-loans.png');
 
 function forScheme<Name extends string>(
   pairs: Record<Name, Pair>,

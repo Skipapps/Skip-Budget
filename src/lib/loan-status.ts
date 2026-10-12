@@ -13,6 +13,7 @@
  * - A loan whose last payment has passed is paid off and leaves the totals.
  */
 
+import { toIsoDate } from '@/lib/date';
 import { amortise, type LoanTerms } from '@/lib/loan';
 import { fromCents, toCents } from '@/lib/money';
 
@@ -28,6 +29,13 @@ export type NextLoanPayment = {
 export type LoanStatus = {
   /** The amount borrowed. */
   borrowed: number;
+  /** The annual rate in percent, as saved: 6.25 is 6.25%. */
+  annualRate: number;
+  /**
+   * yyyy-mm-dd the loan was funded, read off the schedule so it is the date interest runs from:
+   * `funded_on`, else a month before the first payment.
+   */
+  startedOn: string;
   /** The regular payment, which the loan's monthly bill charges. */
   monthlyPayment: number;
   /** Every payment the schedule has. */
@@ -56,6 +64,13 @@ function wholePercent(paidCents: number, borrowedCents: number): number {
   return Number((BIG_TWO * BIG_HUNDRED * BigInt(paidCents) + borrowed) / (BIG_TWO * borrowed));
 }
 
+/** The paid-off share by the rules above, for one loan or for the page's open loans together. */
+function percentRepaid(borrowedCents: number, leftCents: number): number {
+  return leftCents <= 0
+    ? 100
+    : Math.min(99, wholePercent(borrowedCents - leftCents, borrowedCents));
+}
+
 /** `today` is the device's local day as yyyy-mm-dd (`useToday`), compared with the rows' dates. */
 export function loanStatus(terms: LoanTerms, today: string): LoanStatus {
   const schedule = amortise(terms);
@@ -67,18 +82,18 @@ export function loanStatus(terms: LoanTerms, today: string): LoanStatus {
 
   const borrowedCents = toCents(terms.principal);
   const leftCents = paidOff ? 0 : made === 0 ? borrowedCents : toCents(rows[made - 1].balance);
-  const percent =
-    leftCents <= 0 ? 100 : Math.min(99, wholePercent(borrowedCents - leftCents, borrowedCents));
   const upcoming = paidOff ? null : rows[made];
 
   return {
     borrowed: fromCents(borrowedCents),
+    annualRate: terms.annualRatePercent,
+    startedOn: toIsoDate(schedule.fundedOn),
     monthlyPayment: schedule.payment,
     paymentCount: rows.length,
     paymentsMade: made,
     paymentsLeft: rows.length - made,
     amountLeft: fromCents(leftCents),
-    percentPaid: percent,
+    percentPaid: percentRepaid(borrowedCents, leftCents),
     nextPayment: upcoming
       ? { number: upcoming.number, date: upcoming.date, amount: upcoming.payment }
       : null,
@@ -87,27 +102,28 @@ export function loanStatus(terms: LoanTerms, today: string): LoanStatus {
   };
 }
 
-export type LoansSummary<L> = {
+export type LoansSummary = {
   /** Σ what is left on every open loan. */
   totalOwed: number;
+  /** Σ the amount borrowed on every open loan. */
+  totalBorrowed: number;
+  /** totalBorrowed − totalOwed, never below 0. */
+  totalPaid: number;
+  /** totalPaid as a whole percent of totalBorrowed, by each loan's rule; 0 with no open loan. */
+  percentPaid: number;
+  /** The lowest and highest annual rate (percent) of the open loans; null with none open. */
+  rateRange: { min: number; max: number } | null;
   /** Σ the regular payments of every open loan. */
   monthlyPayments: number;
-  /** The soonest next payment of any open loan, with its loan; the first listed wins a tie. */
-  nextPayment: (NextLoanPayment & { loan: L }) | null;
   openCount: number;
-  paidOffCount: number;
 };
 
-/**
- * The totals across the page's loans. Pass each loan with its status (and whatever the page needs
- * to name it); paid-off loans are counted but left out of every sum.
- */
-export function loansSummary<L extends { status: LoanStatus }>(
-  loans: readonly L[],
-): LoansSummary<L> {
+/** The totals across the page's loans, from each one's status; paid-off loans are left out of every sum. */
+export function loansSummary(loans: readonly { status: LoanStatus }[]): LoansSummary {
   let owedCents = 0;
+  let borrowedCents = 0;
   let monthlyCents = 0;
-  let soonest: (NextLoanPayment & { loan: L }) | null = null;
+  let rateRange: { min: number; max: number } | null = null;
   let openCount = 0;
 
   for (const loan of loans) {
@@ -115,17 +131,25 @@ export function loansSummary<L extends { status: LoanStatus }>(
     if (status.paidOff) continue;
     openCount += 1;
     owedCents += toCents(status.amountLeft);
+    borrowedCents += toCents(status.borrowed);
     monthlyCents += toCents(status.monthlyPayment);
-    if (status.nextPayment && (!soonest || status.nextPayment.date < soonest.date)) {
-      soonest = { ...status.nextPayment, loan };
-    }
+    const rate = status.annualRate;
+    rateRange = rateRange
+      ? { min: Math.min(rateRange.min, rate), max: Math.max(rateRange.max, rate) }
+      : { min: rate, max: rate };
   }
+
+  // A balance grown past what was borrowed is nothing repaid, not a negative amount, so the paid
+  // figure agrees with the 0% printed beside it.
+  const paidCents = Math.max(0, borrowedCents - owedCents);
 
   return {
     totalOwed: fromCents(owedCents),
+    totalBorrowed: fromCents(borrowedCents),
+    totalPaid: fromCents(paidCents),
+    percentPaid: openCount === 0 ? 0 : percentRepaid(borrowedCents, owedCents),
+    rateRange,
     monthlyPayments: fromCents(monthlyCents),
-    nextPayment: soonest,
     openCount,
-    paidOffCount: loans.length - openCount,
   };
 }

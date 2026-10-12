@@ -32,6 +32,8 @@ type ScreenProps = {
    * their content, so every page's top row is the same height.
    */
   title?: string;
+  /** A muted line centred under the title. */
+  subtitle?: string;
   headerActions?: HeaderActionProps[];
   /**
    * A header of the screen's own, pinned in the back chevron's place (the add flows' back, title,
@@ -69,6 +71,7 @@ export function Screen({
   showBack = false,
   onBack,
   title,
+  subtitle,
   headerActions,
   header,
   avoidKeyboard = false,
@@ -146,6 +149,7 @@ export function Screen({
             {header ?? (
               <PageHeader
                 title={title}
+                subtitle={subtitle}
                 left={showBack ? <BackButton onPress={onBack} /> : null}
                 actions={headerActions}
               />

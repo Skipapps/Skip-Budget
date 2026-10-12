@@ -5,6 +5,9 @@ import { BillMark } from '@/components/bills/bill-mark';
 import { BillRow } from '@/components/bills/bill-row';
 import { LoanTypeGrid } from '@/components/calculators/loan-type-grid';
 import { LoanListCard } from '@/components/loans/loan-list-card';
+import { LoanTiles } from '@/components/loans/loan-tiles';
+import { LoansSummaryCard } from '@/components/loans/loans-summary-card';
+import { YOUR_LOANS_IMAGE } from '@/theme/loan-icons';
 import type { Bill } from '@/data/bill-categories';
 
 /**
@@ -67,6 +70,7 @@ jest.mock('../../assets/gradient-icons/loan-type-other.svg', () => mockSvg('loan
 jest.mock('../../assets/gradient-icons/loan-type-other-dark.svg', () =>
   mockSvg('loan-type-other-dark'),
 );
+jest.mock('../../assets/gradient-icons/loan-add.svg', () => mockSvg('loan-add'));
 
 // The bill categories' own drawings are bill-icons-dark.test.tsx's; here each is named by category.
 jest.mock('@/theme/bill-icons', () => {
@@ -82,9 +86,10 @@ jest.mock('@/theme/bill-icons', () => {
 });
 
 let mockScheme: 'light' | 'dark' = 'light';
+const mockColors = { ink: '#000000', muted: '#777777', body: '#222222', accentInk: '#905479' };
 jest.mock('@/providers/theme-provider', () => ({
-  useTheme: () => ({ scheme: mockScheme }),
-  useColors: () => ({ ink: '#000000', muted: '#777777', body: '#222222', accentInk: '#905479' }),
+  useTheme: () => ({ scheme: mockScheme, colors: mockColors }),
+  useColors: () => mockColors,
   useMoneyColor: () => () => '#000000',
 }));
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -152,6 +157,7 @@ const DRAWN: [string, () => React.JSX.Element, string[]][] = [
           principal: 18_000,
           annualRate: 6.25,
           termMonths: 48,
+          startedOn: '2024-12-27',
           monthly: 424.8,
           paymentsLeft: 27,
           paymentCount: 48,
@@ -161,10 +167,15 @@ const DRAWN: [string, () => React.JSX.Element, string[]][] = [
           ending: null,
           endedOn: null,
         }}
-        onPress={() => {}}
+        onOpen={() => {}}
       />
     ),
     ['loan-type-car'],
+  ],
+  [
+    'the Loans page’s calculator tile',
+    () => <LoanTiles onCalculator={() => {}} onAdd={() => {}} />,
+    ['loan-details'],
   ],
   [
     'a saved loan in a bill list',
@@ -195,6 +206,43 @@ describe.each([
       expect([file, screen.queryAllByTestId(other, hidden)]).toEqual([file, []]);
     }
   });
+});
+
+describe('the Add loan tile', () => {
+  it.each(['light', 'dark'] as const)(
+    'draws the one document drawing in %s mode, since it sits on the plum fill',
+    async (scheme) => {
+      mockScheme = scheme;
+      const screen = await render(<LoanTiles onCalculator={() => {}} onAdd={() => {}} />);
+      expect(screen.getAllByTestId('svg-loan-add', hidden)).toHaveLength(1);
+    },
+  );
+});
+
+describe('the Loans page’s summary', () => {
+  it.each(['light', 'dark'] as const)(
+    'shows the designer’s hand-and-coin picture in %s mode, the one file for both',
+    async (scheme) => {
+      mockScheme = scheme;
+      const screen = await render(
+        <LoansSummaryCard
+          summary={{
+            owed: 35_328.93,
+            monthly: 925.75,
+            borrowed: 43_000,
+            paid: 7671.07,
+            percentPaid: 18,
+            rateRange: { min: 6.25, max: 7.5 },
+            count: 2,
+          }}
+        />,
+      );
+      const image = screen.getByTestId('loans-summary-icon', hidden);
+      expect(image.props.source).toBe(YOUR_LOANS_IMAGE);
+      expect(image.props.style).toEqual(expect.objectContaining({ width: 40, height: 40 }));
+      expect(screen.queryAllByTestId(/^svg-/, hidden)).toEqual([]);
+    },
+  );
 });
 
 describe('a bill that is not a saved loan', () => {

@@ -22,7 +22,8 @@ const NAMES = [
   'loan-type-credit-card',
   'loan-type-other',
 ];
-const FILES = NAMES.flatMap((name) => [name, `${name}-dark`]);
+// Add loan sits on the plum tile in both modes, so it has no dark copy.
+const FILES = [...NAMES.flatMap((name) => [name, `${name}-dark`]), 'loan-add'];
 
 const read = (file: string) => fs.readFileSync(path.join(DIR, `${file}.svg`), 'utf8');
 
@@ -136,6 +137,15 @@ describe('the dark copies', () => {
   });
 });
 
+describe('the Loans summary’s hand and coin', () => {
+  // The designer's own 80px PNG, used as supplied in both modes and drawn at 40pt.
+  it('is a PNG of 80 by 80', () => {
+    const png = fs.readFileSync(path.join(DIR, 'your-loans.png'));
+    expect(png.subarray(1, 4).toString('latin1')).toBe('PNG');
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([80, 80]);
+  });
+});
+
 describe('the registry', () => {
   const source = fs.readFileSync(path.join(__dirname, '../theme/loan-icons.ts'), 'utf8');
   const imported = new Map(
@@ -158,6 +168,7 @@ describe('the registry', () => {
       dates: ['loan-dates', 'loan-dates-dark'],
       moreOptions: ['loan-more-options', 'loan-more-options-dark'],
       schedule: ['loan-payment-schedule', 'loan-payment-schedule-dark'],
+      add: ['loan-add', 'loan-add'],
       // The designer's Personal is the result card's drawing, file for file.
       personal: ['loan-result', 'loan-result-dark'],
       car: ['loan-type-car', 'loan-type-car-dark'],
@@ -174,5 +185,11 @@ describe('the registry', () => {
     for (const file of imported.values()) {
       expect([file, fs.existsSync(path.join(DIR, `${file}.svg`))]).toEqual([file, true]);
     }
+  });
+
+  it('gives the summary the designer’s picture, one file for both modes', () => {
+    expect(source).toContain(
+      "YOUR_LOANS_IMAGE: ImageSourcePropType = require('../../assets/gradient-icons/your-loans.png');",
+    );
   });
 });

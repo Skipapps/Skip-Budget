@@ -5869,3 +5869,125 @@ bug in component behaviour found; two comments corrected. tsc 0; `rm -rf .expo/c
 **Tests:** savings-screens 35, goals-screens 20, tint-tokens 6 (new); savings-parts, savings-i18n and the four Cards suites updated.
 
 ## 2026-10-11 — Dmitri (Development Lead) — Savings & Goals final pre-commit check: GO, no MUST. Read-only. tsc 0; eslint (cache cleared, --no-cache, max-warnings 0, src) 0 errors, 1 pre-existing warning (setup.test.tsx); prettier clean; full jest 315/315 suites, 6,738 tests. MUST fixed: goal/[id] and savings-pot/[id] go back on gone only while focused; save-goal and savings-entry keep the last-read item and the form, so Delete/Remove make one dismissTo and no failure page; tests would fail on the old code. S1 (keyset-paged closingFlows), S2 (useSavingsCore; failure page only when nothing read), S5 (batch reused for the same amount only) and S7 (Sent from the send's answer, batch moves as fallback) confirmed. en/es/fr: 362 keys in 5 files complete, placeholders match; no unused savings/goals keys; no debug logs, commented-out code or history comments. Risks: light mode is not byte-identical: the header circle on the page goes (240,233,234) to (244,238,242), ΔE 2.4, and pressing it now fades the circle instead of darkening it (page-header.tsx:103, app-wide); pills on cards are identical. dismiss(2) (save-goal.tsx:190) holds for Send → calculator → save, also after going back to the calculator once. It lands one page off only on a double-tapped Continue (shared app-wide) or a back swipe while Save is in flight; the goal is saved either way. Tia's "newest pot first" is Drew's rule to match the design (log line 5568) and has not changed; the Founder has to answer it.
+
+## 2026-10-12 — Drew (Developer, money maths) — Loans page v2 maths: startedOn, annualRate and the summary's borrowed / paid / percent / rate range (DONE, uncommitted)
+
+**Outcome:** Done. `src/lib/loan-status.ts` only; no change to `src/lib/loan.ts`, `src/app` or `src/components`. The design's figures reconcile to the cent. One choice to confirm: `totalPaid` never goes below $0.
+
+- **`LoanStatus` gains:**
+  - `annualRate: number`: `terms.annualRatePercent` as saved (6.25 = 6.25%), the unit `loanRateText` takes.
+  - `startedOn: string` (yyyy-mm-dd): `toIsoDate(amortise(terms).fundedOn)`, so it is the date the schedule runs from: `funded_on`, else `impliedFunding` (a month before the first payment, at the month end when the month is shorter: first payment 31 Mar 2025 → 2025-02-28; 29 Mar 2025 → 2025-02-28; 31 Mar 2024 → 2024-02-29).
+- **`LoansSummary` gains (open loans only):**
+  - `totalBorrowed: number`: Σ borrowed, in cents.
+  - `totalPaid: number`: totalBorrowed − totalOwed, in cents, floored at 0.
+  - `percentPaid: number`: the same helper as each loan (`percentRepaid`: half up in BigInt, 99 while a cent is owed, 0 not negative), and 0 with no open loan.
+  - `rateRange: { min: number; max: number } | null`: null with no open loan.
+- **Existing fields:** unchanged. The paid-share rule moved into `percentRepaid`, shared by both functions.
+- **Design check:**
+  - 18,000 + 25,000 = $43,000; 43,000 − 35,328.93 = $7,671.07; 17.8397% → 18%; 6.25–7.5; $925.75 a month.
+  - The v2 car loan is "Next 27 Oct". The first design's fixture paid on the 15th, so a v2 fixture pays on the 27th (first payment 27 Jan 2025, no funded_on, seen 2026-10-12). On monthly rests every amount is identical, which the exact-integer amortiser confirms row by row.
+  - "started Dec 2024" and "started Sep 2026" both come out.
+- **Tests:** loan-status 41 (was 20). They cover:
+  - the v2 design;
+  - startedOn with and without funded_on, a 45-day opening and six month-end anchors, each pinned to amortise's own fundedOn and the first row's days;
+  - the summary with 0 loans, only finished loans, 1 loan, 2 loans plus a paid-off one, and a page-marked stopped loan;
+  - an exact half: $6,235 of $43,000 is 14.5% → 15%, where a float gives 14;
+  - a cent left → 99%; a grown balance → $0 / 0%;
+  - equal rates, and a 0% rate kept in the range.
+- **Gates:**
+  - tsc 0.
+  - eslint (--no-cache, max-warnings 0) and prettier clean on both files.
+  - Full jest (`npm test`): 315/315 suites, 6,759 tests.
+- **Open:** whether `totalPaid` should be floored at $0 when the open loans owe more than was borrowed (a first period whose interest outran the payment, or a statement balance above principal). Unfloored, the caption would read "0% paid off · −$5,383.47 of $300,000". The alternative is to sum each loan's own repaid amount (never negative per loan).
+
+## 2026-10-12 — Dana L (Developer, UI and navigation) — Loans page v2 screens (DONE, uncommitted)
+
+**Outcome:** Done. The Loans page is rebuilt to the Founder's light and dark designs. It reads Drew's new fields as they are and does no maths of its own. tsc 0. eslint (cache cleared, --no-cache, src): 0 errors, plus the 1 old warning in setup.test.tsx. Prettier is clean. Full jest: 317/317 suites, 6,789 tests. Not seen on a device: the Founder tests on the 13 Pro Max.
+
+- **Page:** `Screen showBack` with the title and a new optional `subtitle` ("Everything you owe, in one place"). There is no header "+", no info line and no "+ New loan calculation" pill.
+  - **Tiles:** Loan Calculator and Add Loan. Both open `/loan-calculator`; Add Loan has a hint saying so. The tiles stack full width once a label's widest word can't fit beside its 40pt circle (FitGroup switch).
+  - **Summary card:** navy/blue. Shows the total (FitFigure 36), "Total balance across {n} loans", Monthly, the navy/periwinkle bar, "{p} paid off · {paid} of {base}", and Base / Rate (range) / Active rows with dots.
+  - **Loan cards:** "{n} active", then one card per open loan: icon, name, "4 yrs · started Dec 2024", Next and date, "$X left" with "$Y/mo", plum bar, "{p} paid off", then Base / Rate / Left "27 of 48 payments", then a View details Button → `/bill/[id]`.
+  - **Finished cards:** same card style, with the existing Paid off / Stopped line.
+  - **Empty state:** the existing invitation under the tiles.
+- **VoiceOver:** each card's words are one accessible element with a written summary. View details is the card's only control, labelled "View details, {name}". Dots and icons are hidden.
+- **Large text:** FitGroup switches are used throughout:
+  - Next drops under the name.
+  - "/mo" drops under the amount left.
+  - Fact values drop under their labels.
+  - The tiles stack.
+  - Nothing has numberOfLines or shrink-to-fit. The new files are added to the large-text guard.
+- **Shared changes (other pages look the same):**
+  - `PageHeader`/`Screen` take an optional `subtitle`. It tucks 10pt under a one-line title, or sits below a title that wraps (measured).
+  - `Button` takes an optional `accessibilityLabel`.
+- **Icons:**
+  - `assets/gradient-icons/loan-add.svg`: the source with its href gradients written out and ids prefixed. One file serves both modes (`useLoanIcons().add`).
+  - "Your loans": the Founder's 80px PNG, used as supplied in both modes (`assets/gradient-icons/your-loans.png`, `YOUR_LOANS_IMAGE`, RN `Image` at 40pt), on the Founder's later instruction. My SVG redraw was deleted.
+- **Summary contrast:** every text pair clears 4.5:1, as drawn, and a test enforces it.
+  - Light: navy #10245A 13.66:1 and muted #5B6478 5.49:1 on #EFF7FF; bar #062554 on white 15.0:1.
+  - Dark: ink #F8F6FB 14.78:1 and muted #A9B4D0 7.65:1 on #16213F; bar #8EA2E8 on the card track 5.95:1.
+- **i18n:** new en/es/fr keys. Removed the keys nothing uses any more: newCalculation, totalOwe, monthlyPayments, nextPayment, nextOf, saved, facts, paymentsLeft, leftOf, progress, info. Added short terms `loan.term.yearsShort`/`monthsShort` ("4 yrs").
+- **Tests:**
+  - `src/__tests__/app/loans.test.tsx` was rewritten. The design's own figures are reproduced on real schedules, seen on 12 Oct 2026, with the car loan paying on the 27th (23 tests).
+  - New: `components/loans-summary-tone.test.ts` (8) and `components/page-header-subtitle.test.tsx` (3).
+  - Updated: `loan-icons.test.ts`, `loan-icons-dark.test.tsx`, `large-text-guard.test.ts`.
+- **Differs from the design:**
+  - View details is the app's 64pt pill Button, not the drawn 48pt rounded rectangle.
+  - Gutters stay the app's 24pt, against the design's 20.
+  - The total is 36pt, the same as the Goals summary.
+  - es/fr tile labels ("Calculadora", "Calculateur") stack the tiles on a 390pt-wide phone. On the 428pt-wide 13 Pro Max they fit side by side.
+- **2026-10-12 — Dana — CEO calls applied:**
+  - **Tile labels:** English is now sentence case, "Loan calculator" and "Add loan". Spanish and French were already sentence case.
+  - **Compact button:** the shared `Button` takes `size?: 'regular' | 'compact'`.
+    - Compact is a 48pt pill (`min-h-[48px] py-[12px]`) with a 15pt label, the design's measure. Only the loan cards' View details uses it.
+    - Regular keeps exactly the same classes as before. The new `components/button-size.test.tsx` pins the default's className strings and the 17pt fitted label.
+  - "Base" stays. Drew's $0 floor is approved.
+  - **Gates:** tsc 0; eslint (cache cleared, --no-cache) 0 errors, with the 1 old setup.test.tsx warning; prettier clean; full jest 318/318 suites, 6,793 tests.
+
+## 2026-10-12 — Dmitri (Development Lead) — Loans page v2 pre-device review: GO, no MUST. Read-only. tsc 0; eslint (cache cleared, --no-cache, max-warnings 0, src) 0 errors, 1 pre-existing warning (setup.test.tsx); prettier clean on all changed TS files; full jest 318/318 suites, 6,793 tests. Figures: the summary and both cards reproduce the design on real schedules ($35,328.93; $43,000; $7,671.07; 18%; $925.75; 6.25% – 7.50%; 41% / 1%; 27 of 48 / 59 of 60; started Dec 2024 / Sep 2026; next 27 Oct / 9 Nov). The v2 car loan is checked row by row against the exact-integer reference amortiser, and the real-lender statement fixture still passes. Summary tones match the design PNGs pixel for pixel (hairlines #ECE8E4/#29334E, borders #E6EAF2/#242E4B, dots, bar fills and tracks); every text pair is ≥ 4.5:1 and the test enforces it. Shared components: the default Button class strings are byte-identical (pinned by a test); PageHeader returns the same single line when there is no subtitle; Screen only passes the prop through. en/es/fr: 45 loan.list/loan.term keys, complete, placeholders match; the 11 removed keys have no references; every remaining key is used. The add-loan.svg flatten is faithful: 16 gradients, each with its own stops, units and transforms, and every url(#) resolves. Nice-to-haves: (1) loansSummary().nextPayment, with its generic L, no longer has a production reader (loan-status.ts:118-119,149-151); paidOffCount had none before this change either. (2) VoiceOver reads "Next payment 27 Oct 2026" with a short month but "started December 2024" with a long one (loan-list-card.tsx:234). (3) pl-[19px] restates DOT+DOT_GAP (loan-facts.tsx:90). (4) No component-level dark render test of the summary's card colour. Device risks: the 80px PNG drawn at 40pt is upscaled 1.5x on the 3x screen (Founder's as-is call); the subtitle tuck and the baseline row are unseen on a device; es/fr tiles stack below 428pt width.
+
+## 2026-10-12 — Dmitri (Development Lead) — Add Loan flow + View loan page + Pay off: build plan (read-only)
+
+**Outcome:** Plan written to `.claude/team/dev/add-loan-plan.md`. No code was touched. It covers three pieces in
+order, each reviewed before the next starts: P1 Add Loan + the "counts toward spending" flag (migration A), P2 View
+loan page + routing + edit/delete (migration B `update_loan`), P3 Pay off (migration C `loan_payoffs`).
+
+- **Flag:** `bills.in_spending`.
+  - The rule: off = nothing new is recorded and nothing is projected; recorded charges stay counted.
+  - The filter sits in `ledgerEntries` (`queries.ts:864`, keeping recorded rows only), the two recorders, and
+    `unwrittenDatesIn`.
+  - MUST: `unwrittenDatesIn` (`savings.ts:793`) skips flag-off bills, or months stop closing.
+  - Trap: never drop flag-off bills from what `bookFlows` gets (`:1097-1103`), or their charges count.
+  - `useBills` stays unfiltered: the bill page finds its bill through it.
+  - The full map, with file:line, is in the plan.
+- **Found while mapping:**
+  - `paymentDates` anchors on the first payment's day, so the brief's own example (31 Jan, day 31 → 28 Feb) puts
+    every later payment on the 28th. Fix: store `loans.payment_day`, and save_loan's term end must use it too.
+  - `reminders_due` ignores `ends_on`, so finished loans and ended bills keep reminding today. Fix in migration A.
+  - A past start date back-fills every instalment as a charge. Default: count from the next payment on.
+  - The add-loan flow can't use the existing missing-column pattern alone: the client recorder returns 0 on any
+    read error (`charges.ts:94`), so it needs the fallback too.
+- **Flow:** one route, `src/app/add-loan.tsx`, run as a view state machine like add-bill (no draft store).
+  - The calculator hands over through `loan-route` params; its first payment is pinned when it is off the rule's
+    date; extras and fees are not carried.
+  - `/save-loan` is retired. Its parts are reused.
+  - New loan: `finishFlowOn('/loans')`. Edit: `router.back()`.
+- **Payoffs:** their own table, ledger entries `payoff-<id>` of kind bill, with a `counted` snapshot. Not charges
+  (one per bill per month) and not receipts.
+  - Engine: payoffs are part of the contract, posted interest-first on the day. Full ends the schedule; partial
+    keeps the payment and finishes sooner.
+- **Split:**
+  - Can start now, alongside Dana's v2 work: Drew (first-payment rule, anchor, review figures) and Diego
+    (migration A + filters).
+  - Dana starts after the v2 review GO.
+  - Dilip: device timing only.
+- **Not verified:** Expo v57 docs (no web access in this run). I checked `dismissTo`, `Redirect` and
+  `gestureEnabled` against the installed expo-router 57.0.15 types instead.
+- **Open (Founder):** F1 back-fill or not; F2 partial payoff posting (and a real statement to prove it); F3 remove
+  a payoff; F4 short first period; F5 bills following real per-payment amounts.
+- **2026-10-12 — Dana — Dmitri's four nice-to-haves (after his GO):**
+  1. **`loansSummary` trimmed:** `src/lib/loan-status.ts` loses `nextPayment`, `paidOffCount` and the generic `L`. It now takes `readonly { status: LoanStatus }[]`. Nothing outside the page and its tests read them. Every other field and rule is as Drew left it. The asserts on those fields and the soonest-tie test are gone from loan-status.test.ts.
+  2. **VoiceOver months:** the start month is read in the short month style that "Next payment 27 Oct 2026" and "Paid off on 1 Dec 2025" use ("4 years, started Dec 2024"). `startedMonthSpoken` is removed.
+  3. **Stacked indent:** a stacked fact value is indented by `LABEL_INDENT = DOT + DOT_GAP`, the same constant as the label's reserve. This replaces `pl-[19px]`, and a test pins indent = dot width + gap.
+  4. **No open loans:** with only finished loans, the summary keeps its $0.00 and "Total balance across 0 loans". The divider, Monthly, bar, caption and Base/Rate/Active are hidden. VoiceOver says "Your loans. $0.00 left across 0 loans." The summary's VoiceOver key is split into `summaryA11y` and `summaryPaidA11y` (en/es/fr).
+  - **Gates:** tsc 0; eslint (cache cleared, --no-cache) 0 errors, with the 1 old setup.test.tsx warning; prettier clean; full jest 318/318 suites, 6,792 tests.
