@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { countsInSpending, withSpendingFlag } from '@/lib/bill-spending';
 import { withTimeout } from '@/lib/deadline';
 import { unrecordedDates, type ChargeablePlan } from '@/lib/charges';
 import { supabase } from '@/lib/supabase';
@@ -63,6 +64,20 @@ type NewCharge = {
   bank_account_id: string | null;
 };
 
+type BillPlanRow = {
+  id: string;
+  name: string;
+  amount: number;
+  recurrence: ChargeablePlan['recurrence'];
+  next_due_on: string | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  created_at: string | null;
+  card_id: string | null;
+  bank_account_id: string | null;
+  in_spending?: boolean;
+};
+
 type Plan = ChargeablePlan & {
   label: string;
   amount: number;
@@ -77,11 +92,15 @@ type Plan = ChargeablePlan & {
  */
 export async function recordDueCharges(userId: string, today: string): Promise<number> {
   const [bills, subscriptions, existing] = await Promise.all([
-    supabase
-      .from('bills')
-      .select(
-        'id, name, amount, recurrence, next_due_on, starts_on, ends_on, created_at, card_id, bank_account_id',
-      ),
+    // With the fallback: any failed read below records nothing at all, so a database without the
+    // flag would otherwise stop every charge being written.
+    withSpendingFlag((flag) =>
+      supabase
+        .from('bills')
+        .select(
+          `id, name, amount, recurrence, next_due_on, starts_on, ends_on, created_at, card_id, bank_account_id${flag}`,
+        ),
+    ),
     supabase
       .from('subscriptions')
       .select(
@@ -104,18 +123,19 @@ export async function recordDueCharges(userId: string, today: string): Promise<n
   }
 
   const plans: Plan[] = [
-    ...(bills.data ?? []).map((row) => ({
-      id: row.id as string,
+    // The column list is built, so supabase-js cannot type the rows from it.
+    ...((bills.data ?? []) as unknown as BillPlanRow[]).filter(countsInSpending).map((row) => ({
+      id: row.id,
       kind: 'bill' as const,
-      label: (row.name as string) || 'Bill',
-      amount: row.amount as number,
-      recurrence: row.recurrence as never,
-      nextDate: row.next_due_on as string | null,
-      startsOn: row.starts_on as string | null,
-      createdAt: row.created_at as string | null,
-      endsOn: row.ends_on as string | null,
-      cardId: (row.card_id as string | null) ?? null,
-      accountId: (row.bank_account_id as string | null) ?? null,
+      label: row.name || 'Bill',
+      amount: row.amount,
+      recurrence: row.recurrence,
+      nextDate: row.next_due_on,
+      startsOn: row.starts_on,
+      createdAt: row.created_at,
+      endsOn: row.ends_on,
+      cardId: row.card_id ?? null,
+      accountId: row.bank_account_id ?? null,
     })),
     ...(subscriptions.data ?? []).map((row) => ({
       id: row.id as string,

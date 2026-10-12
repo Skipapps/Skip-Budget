@@ -13,21 +13,28 @@ const GAP = 8;
 type DayStripProps = {
   /** 1–31, or null when no day is chosen. */
   value: number | null;
-  /** Null when the chosen day is pressed again: the day is optional. */
+  /** Null when the chosen day is pressed again, unless the day is `required`. */
   onChange: (day: number | null) => void;
+  /** A day must stay chosen: pressing the chosen one keeps it. */
+  required?: boolean;
+  /**
+   * The edges the strip runs to: the screen's (past the page's gutter) or, inside a card, the
+   * card's (past its 16pt padding; give the card overflow-hidden).
+   */
+  bleed?: 'page' | 'card';
 };
 
 /**
- * The days of a month in one scrolling row, running to the screen's edges. The chosen day is
- * brought into view when the strip appears and whenever it changes.
+ * The days of a month in one scrolling row, running to the screen's (or its card's) edges. The
+ * chosen day is brought into view when the strip appears and whenever it changes.
  */
-export function DayStrip({ value, onChange }: DayStripProps) {
+export function DayStrip({ value, onChange, required = false, bleed = 'page' }: DayStripProps) {
   const scroll = useRef<ScrollView>(null);
   const [column, setColumn] = useState(0);
   const [width, setWidth] = useState(0);
   const placed = useRef(false);
-  // The strip runs past the page's padding to the screen's edges; padding it back by the same
-  // amount lines the first day up with the fields above.
+  // The strip runs past the padding around it (the page's or the card's) to that edge; padding it
+  // back by the same amount lines the first day up with the fields above.
   const gutter = width && column ? (width - column) / 2 : 0;
 
   useEffect(() => {
@@ -44,7 +51,7 @@ export function DayStrip({ value, onChange }: DayStripProps) {
       onLayout={(event) => setColumn(event.nativeEvent.layout.width)}
     >
       <View
-        className="-mx-6"
+        className={bleed === 'card' ? '-mx-4' : '-mx-6'}
         testID="day-strip-bleed"
         onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
         // Drawn once the padding is known, so the days never jump sideways into place.
@@ -64,11 +71,11 @@ export function DayStrip({ value, onChange }: DayStripProps) {
                 key={day}
                 accessibilityRole="radio"
                 accessibilityLabel={t('cards.add.dayLabel', { day })}
-                accessibilityHint={selected ? t('cards.add.dayClearHint') : undefined}
+                accessibilityHint={selected && !required ? t('cards.add.dayClearHint') : undefined}
                 accessibilityState={{ selected, checked: selected }}
                 onPress={() => {
                   selection();
-                  onChange(selected ? null : day);
+                  onChange(selected && !required ? null : day);
                 }}
                 style={{ minWidth: CHIP }}
                 className={cn(

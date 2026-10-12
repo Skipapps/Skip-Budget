@@ -22,6 +22,8 @@ type DateBoxProps = {
   minDate?: Date | null;
   /** An optional day can be taken off again ("Clear — make it ongoing"). */
   clear?: { label: string; onPress: () => void };
+  /** How the chosen day is written; by default "Yesterday, Tue Oct 6", with no year. */
+  format?: (day: Date) => string;
 };
 
 /**
@@ -36,9 +38,10 @@ export function DateBox({
   placeholder,
   minDate,
   clear,
+  format,
 }: DateBoxProps) {
   const [open, setOpen] = useState(false);
-  const shown = value ? formatEntryDay(value, today) : null;
+  const shown = value ? (format ? format(value) : formatEntryDay(value, today)) : null;
 
   return (
     <View className="w-full">

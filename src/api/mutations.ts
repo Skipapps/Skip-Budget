@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 
+import { guardLoanBillDates } from '@/api/entry-values';
 import type { AccrualBasis } from '@/lib/loan';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
@@ -101,15 +102,20 @@ const SINGLE_ROW_KEY: Record<string, string> = {
  * (row deleted, or hidden by RLS) with 204 and no error. `select('id')` returns the touched rows,
  * so an empty result becomes an error the user can act on instead of a silent no-op.
  */
-function useUpdate<TInput extends Record<string, unknown>>(table: string) {
+function useUpdate<TInput extends Record<string, unknown>>(
+  table: string,
+  /** Settles what is written from what is stored, before the write. */
+  prepare?: (id: string, values: TInput) => Promise<TInput>,
+) {
   const client = useQueryClient();
   const invalidate = useInvalidate();
 
   return useMutation({
     mutationFn: async ({ id, values }: { id: string; values: TInput }) => {
+      const written = prepare ? await prepare(id, values) : values;
       const { data, error } = await supabase
         .from(table)
-        .update(values as never)
+        .update(written as never)
         .eq('id', id)
         .select('id');
       if (error) throw error;
@@ -251,8 +257,30 @@ export type BillValues = {
   note: string | null;
 } & LogoValues;
 
+/**
+ * Reads what `guardLoanBillDates` needs before an edit writes a bill's dates. A failed read fails
+ * the save: written unguarded, a loan could restart below its count floor and back-fill spending.
+ */
+async function guardBillDates(id: string, values: Partial<BillValues>) {
+  if (!('next_due_on' in values) && !('starts_on' in values)) return values;
+  const [bill, loan] = await Promise.all([
+    supabase.from('bills').select('icon_id, next_due_on, starts_on').eq('id', id).maybeSingle(),
+    supabase.from('loans').select('id').eq('bill_id', id).maybeSingle(),
+  ]);
+  if (bill.error) throw bill.error;
+  if (loan.error) throw loan.error;
+  // Gone: the update matches nothing and says so.
+  if (!bill.data) return values;
+  const stored = bill.data as {
+    icon_id: string | null;
+    next_due_on: string | null;
+    starts_on: string | null;
+  };
+  return guardLoanBillDates(values, { ...stored, hasLoan: Boolean(loan.data) });
+}
+
 export const useCreateBill = () => useCreate<BillValues>('bills');
-export const useUpdateBill = () => useUpdate<Partial<BillValues>>('bills');
+export const useUpdateBill = () => useUpdate<Partial<BillValues>>('bills', guardBillDates);
 export const useDeleteBill = () => useRemove('bills');
 
 export type SalaryValues = {
@@ -478,6 +506,18 @@ export type SaveLoanValues = {
   paymentOverrides?: Record<string, number> | null;
   /** The contract's payoff date (yyyy-mm-dd) when the changes end it before the term; else null. */
   lastPaymentOn?: string | null;
+  /**
+   * "Add to monthly bills". False keeps the loan on the Loans page, its own page and its reminder,
+   * but out of spending and the Bills list. Left out means true.
+   */
+  inSpending?: boolean;
+  /** The day of the month payments fall on (1–31), clamped to short months. */
+  paymentDay?: number | null;
+  /**
+   * The person's today (yyyy-mm-dd). Payments before it were made before the loan was added, so
+   * they are not spending; the Loans page still shows them.
+   */
+  countsFrom?: string | null;
 };
 
 /**
@@ -493,6 +533,7 @@ export function useSaveLoan() {
         values.paymentOverrides && Object.keys(values.paymentOverrides).length > 0
           ? values.paymentOverrides
           : null;
+      const firstDay = Number(values.firstPaymentOn.slice(8, 10));
       const { data, error } = await supabase.rpc('save_loan', {
         p_name: values.name,
         p_icon_id: values.iconId,
@@ -511,6 +552,16 @@ export function useSaveLoan() {
         // parameters still accepts, and one with changes is refused there rather than saved without.
         ...(overrides ? { p_payment_overrides: overrides } : {}),
         ...(values.lastPaymentOn ? { p_last_payment_on: values.lastPaymentOn } : {}),
+        // The same for these three: each is named only when it changes what is saved. The payment
+        // day matters only when the first payment was clamped (day 31, paid 28 Feb), and the count
+        // floor only when the first payment came before it.
+        ...(values.inSpending === false ? { p_in_spending: false } : {}),
+        ...(values.paymentDay != null && values.paymentDay !== firstDay
+          ? { p_payment_day: values.paymentDay }
+          : {}),
+        ...(values.countsFrom && values.countsFrom > values.firstPaymentOn
+          ? { p_counts_from: values.countsFrom }
+          : {}),
       });
       if (error) throw error;
       return data as { id: string };

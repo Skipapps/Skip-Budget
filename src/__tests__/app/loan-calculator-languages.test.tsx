@@ -8,7 +8,7 @@ import { publishProStatus, resetProStatusForTests } from '@/lib/pro-status';
 /**
  * The loan calculator in Spanish and French. Words and the writing of figures follow the language;
  * the loan does not: the payment, interest and totals are the same cents in every language and
- * currency, and what goes on to /save-loan is the same ASCII figures.
+ * currency, and what goes on to /add-loan is the same ASCII figures.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -162,13 +162,21 @@ describe('in Spanish', () => {
     ).toBeTruthy();
   });
 
-  it('asks before filing the loan, in Spanish', async () => {
+  it('asks first only when overpayments would be left behind, in Spanish', async () => {
+    await fireEvent.press(screen.getByText('Guardar', RAW));
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenLastCalledWith(expect.objectContaining({ pathname: '/add-loan' }));
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Más opciones' }));
+    await fireEvent.press(screen.getByLabelText(/^Extra cada mes, .*\. Editar$/, RAW));
+    for (const key of ['5', '0']) await fireEvent.press(screen.getByLabelText(key, RAW));
+    await fireEvent.press(screen.getByText('Listo', RAW));
     await fireEvent.press(screen.getByText('Guardar', RAW));
 
     const [{ title, message, confirmLabel, cancelLabel }] = mockConfirm.mock.calls[0];
     expect(title).toBe('¿Agregar esto a las facturas mensuales?');
     expect(message).toMatch(
-      /^\$\d{1,3}(,\d{3})*\.\d{2} al mes durante 5 años, en la categoría Préstamos\.$/,
+      /^\$\d{1,3}(,\d{3})*\.\d{2} al mes durante 5 años, en la categoría Préstamos\. Los abonos a capital no se guardan/,
     );
     expect(confirmLabel).toBe('Continuar');
     expect(cancelLabel).toBe('Ahora no');
@@ -254,11 +262,15 @@ describe('in French', () => {
     expect(screen.getByText(`8,14${NBSP}%`, RAW)).toBeTruthy();
 
     await fireEvent.press(screen.getByText('Enregistrer', RAW));
-    expect(mockConfirm.mock.calls[0][0].title).toBe(`Ajouter ceci aux factures mensuelles${NBSP}?`);
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
-        pathname: '/save-loan',
-        params: expect.objectContaining({ amount: '25000', rate: '8.14', months: '60' }),
+        pathname: '/add-loan',
+        params: expect.objectContaining({
+          view: 'details',
+          amount: '25000',
+          rate: '8.14',
+          months: '60',
+        }),
       }),
     );
   });
@@ -283,7 +295,7 @@ describe('in every language and currency', () => {
     for (const other of figures.slice(1)) expect(other).toEqual(figures[0]);
   });
 
-  it('hands /save-loan the same figures', async () => {
+  it('hands /add-loan the same figures', async () => {
     for (const [language, currency] of LOCALES) {
       await showIn(language, currency);
       await fireEvent.press(screen.getByRole('button', { name: /^(Save|Guardar|Enregistrer)$/ }));

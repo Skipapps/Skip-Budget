@@ -218,16 +218,14 @@ describe('the header', () => {
 });
 
 describe('the two tiles', () => {
-  it('open the calculator, Add loan saying so until it has a form of its own', async () => {
+  it('open the calculator and the Add loan pages', async () => {
     await render(<LoansScreen />);
     const calculator = screen.getByRole('button', { name: 'Loan calculator' });
     const add = screen.getByRole('button', { name: 'Add loan' });
-    expect(add.props.accessibilityHint).toBe(
-      'Opens the loan calculator. Save the loan from there.',
-    );
+    expect(add.props.accessibilityHint).toBeUndefined();
     await fireEvent.press(calculator);
     await fireEvent.press(add);
-    expect(mockPush.mock.calls).toEqual([['/loan-calculator'], ['/loan-calculator']]);
+    expect(mockPush.mock.calls).toEqual([['/loan-calculator'], ['/add-loan']]);
     expect(screen.getAllByTestId('icon-details', hidden)).toHaveLength(1);
     expect(screen.getAllByTestId('icon-add', hidden)).toHaveLength(1);
   });
@@ -446,11 +444,16 @@ describe('with no loans', () => {
     await render(<LoansScreen />);
     expect(screen.getByTestId('loans-empty')).toBeTruthy();
     expect(screen.getByText('No loans yet')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Add a loan you already have, or work one out in the calculator. What you owe shows here.',
+      ),
+    ).toBeTruthy();
     expect(screen.getAllByTestId('icon-result', hidden)).toHaveLength(1);
     expect(screen.queryByTestId('loans-summary')).toBeNull();
     expect(screen.queryByText('Finished')).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Add loan' }));
-    expect(mockPush).toHaveBeenCalledWith('/loan-calculator');
+    expect(mockPush).toHaveBeenCalledWith('/add-loan');
   });
 });
 

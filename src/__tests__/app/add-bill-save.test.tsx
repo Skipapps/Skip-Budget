@@ -1949,6 +1949,31 @@ describe('Add bill — a loan’s schedule', () => {
     });
   });
 
+  it('opens the schedule on the loan’s payment day when its first payment was clamped', async () => {
+    // Day 31 from 31 Jan: first due 28 Feb, then 31 Mar. Without the day, every payment would
+    // fall on the 28th, and every period's interest with it.
+    mockLoan = {
+      ...LOAN,
+      principal: 18000,
+      annual_rate: 6.25,
+      term_months: 48,
+      monthly_payment: 424.8,
+      first_payment_on: '2025-02-28',
+      funded_on: '2025-01-31',
+      day_count_basis: 'actual/365',
+      payment_day: 31,
+    };
+    editing({ ...POWER, name: 'Car loan', category_id: 'loans', amount: 424.8 });
+    const screen = await render(<AddBillScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Payment schedule' }));
+    expect(router.push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({ start: '2025-02-28', day: '31' }),
+      }),
+    );
+  });
+
   it('counts a loan saved without its own first payment date from the bill’s first due date', async () => {
     mockLoan = { ...LOAN, first_payment_on: null };
     editing({

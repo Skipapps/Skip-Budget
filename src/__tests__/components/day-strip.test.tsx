@@ -36,3 +36,38 @@ it('stays hidden until both widths are known, so the days never jump into place'
   await fireEvent(bleed, 'layout', layout(375));
   expect(StyleSheet.flatten(screen.getByTestId('day-strip-bleed').props.style).opacity).toBe(1);
 });
+
+it('clears an optional day when it is pressed again, saying so', async () => {
+  const onChange = jest.fn();
+  const screen = await render(<DayStrip value={22} onChange={onChange} />);
+  const chosen = screen.getByRole('radio', { name: 'Day 22' });
+  expect(chosen.props.accessibilityHint).toBe('Tap again to clear the day.');
+  await fireEvent.press(chosen);
+  expect(onChange).toHaveBeenLastCalledWith(null);
+});
+
+it('keeps a required day when it is pressed again, with no hint of clearing it', async () => {
+  const onChange = jest.fn();
+  const screen = await render(<DayStrip value={22} onChange={onChange} required />);
+  const chosen = screen.getByRole('radio', { name: 'Day 22' });
+  expect(chosen.props.accessibilityHint).toBeUndefined();
+  await fireEvent.press(chosen);
+  expect(onChange).toHaveBeenLastCalledWith(22);
+  await fireEvent.press(screen.getByRole('radio', { name: 'Day 3' }));
+  expect(onChange).toHaveBeenLastCalledWith(3);
+});
+
+it('runs to a card’s edges inside a card, padding back by the card’s own 16pt', async () => {
+  const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo').mockImplementation(() => {});
+  const screen = await render(<DayStrip value={1} onChange={() => {}} bleed="card" />);
+  expect(String(screen.getByTestId('day-strip-bleed').props.className)).toBe('-mx-4');
+
+  // A 310pt card column inside a 342pt card.
+  await fireEvent(screen.getByTestId('day-strip'), 'layout', layout(310));
+  await fireEvent(screen.getByTestId('day-strip-bleed'), 'layout', layout(342));
+  const strip = screen.getByTestId('day-strip-bleed').children[0] as unknown as {
+    props: { contentContainerStyle: ViewStyle };
+  };
+  expect(StyleSheet.flatten(strip.props.contentContainerStyle).paddingHorizontal).toBe(16);
+  scrollTo.mockRestore();
+});

@@ -32,7 +32,6 @@ export const loanMessages = defineMessages({
     es: 'No se puede dividir entre cero',
     fr: 'Division par zéro impossible',
   },
-  'loan.amountTile.open': { en: 'Open', es: 'Abrir', fr: 'Ouvrir' },
   'loan.sliderRow.edit': {
     en: '{label}, {value}. Edit',
     es: '{label}, {value}. Editar',
@@ -325,11 +324,6 @@ export const loanMessages = defineMessages({
     es: '¿Agregar esto a las facturas mensuales?',
     fr: 'Ajouter ceci aux factures mensuelles ?',
   },
-  'loan.calculator.confirmMessage': {
-    en: '{payment} a month for {term}, filed under Loans.',
-    es: '{payment} al mes durante {term}, en la categoría Préstamos.',
-    fr: '{payment} par mois pendant {term}, classé sous Prêts.',
-  },
   'loan.calculator.confirmMessageOverpaying': {
     en: '{payment} a month for {term}, filed under Loans. The overpayments are not saved with it — the bill is the contract payment.',
     es: '{payment} al mes durante {term}, en la categoría Préstamos. Los abonos a capital no se guardan con el préstamo: la factura es el pago del contrato.',
@@ -506,25 +500,7 @@ export const loanMessages = defineMessages({
     fr: 'Voir les {count} paiements',
   },
 
-  // Filing a loan as a bill.
-  'loan.save.title': {
-    en: 'Save this loan',
-    es: 'Guardar este préstamo',
-    fr: 'Enregistrer ce prêt',
-  },
-  'loan.save.subtitle': {
-    en: 'It’ll show under Loans as a monthly bill.',
-    es: 'Aparecerá en Préstamos como una factura mensual.',
-    fr: 'Il apparaîtra sous Prêts comme une facture mensuelle.',
-  },
-  'loan.save.perMonth': { en: '/ month', es: '/ mes', fr: '/ mois' },
-  'loan.save.payments': { en: 'Payments', es: 'Pagos', fr: 'Paiements' },
-  'loan.save.paymentsMonthly': {
-    en: { one: '{count} monthly', other: '{count} monthly' },
-    es: { one: '{count} mensual', other: '{count} mensuales' },
-    fr: { one: '{count} mensuel', other: '{count} mensuels' },
-  },
-  'loan.save.name': { en: 'Name', es: 'Nombre', fr: 'Nom' },
+  // Saving a loan: words the Add loan pages share with the calculator's refusals.
   'loan.save.namePlaceholder': {
     en: 'e.g. Car loan',
     es: 'p. ej., Préstamo de auto',
@@ -533,17 +509,6 @@ export const loanMessages = defineMessages({
   'loan.save.loanType': { en: 'Loan type', es: 'Tipo de préstamo', fr: 'Type de prêt' },
   'loan.save.paidFrom': { en: 'Paid from', es: 'Se paga desde', fr: 'Payé depuis' },
   'loan.save.skipSource': { en: 'Skip', es: 'Omitir', fr: 'Passer' },
-  // {fields} is the boxes still empty, by the names they carry on the page.
-  'loan.save.missing': {
-    en: 'To save this loan, fill in: {fields}.',
-    es: 'Para guardar el préstamo, completa: {fields}.',
-    fr: 'Pour enregistrer ce prêt, remplis : {fields}.',
-  },
-  'loan.save.noPayment': {
-    en: 'That loan does not have a payment to save.',
-    es: 'Ese préstamo no tiene un pago que guardar.',
-    fr: 'Ce prêt n’a pas de paiement à enregistrer.',
-  },
   // The loans table holds a rate from 0 to 100, to nine decimals.
   'loan.save.rateOutOfRange': {
     en: 'Skip can save rates from {min} to {max}, with up to nine decimals.',
@@ -578,11 +543,6 @@ export const loanMessages = defineMessages({
     fr: 'Skip n’a pas pu enregistrer la fin de ce prêt. Vérifie tes paiements modifiés, puis réessaie.',
   },
   'loan.save.saving': { en: 'Saving…', es: 'Guardando…', fr: 'Enregistrement…' },
-  'loan.save.saveToLoans': {
-    en: 'Save to Loans',
-    es: 'Guardar en Préstamos',
-    fr: 'Enregistrer dans Prêts',
-  },
 
   // The page for the monthly payment, or for one payment of the schedule.
   'loan.payment.skipFigure': {
@@ -703,11 +663,6 @@ export const loanMessages = defineMessages({
     fr: 'Calculateur de prêt',
   },
   'loan.list.add': { en: 'Add loan', es: 'Agregar préstamo', fr: 'Ajouter un prêt' },
-  'loan.list.addHint': {
-    en: 'Opens the loan calculator. Save the loan from there.',
-    es: 'Abre la calculadora de préstamos. Guarda el préstamo desde ahí.',
-    fr: 'Ouvre le calculateur de prêt. Enregistre le prêt à partir de là.',
-  },
   'loan.list.yours': { en: 'Your loans', es: 'Tus préstamos', fr: 'Tes prêts' },
   'loan.list.across': {
     en: { one: 'Total balance across {count} loan', other: 'Total balance across {count} loans' },
@@ -858,9 +813,9 @@ export const loanMessages = defineMessages({
     fr: 'Aucun prêt pour l’instant',
   },
   'loan.list.emptyBody': {
-    en: 'Work out a loan in the calculator and save it. Its monthly payment joins your bills, and what you owe shows here.',
-    es: 'Calcula un préstamo en la calculadora y guárdalo. Su pago mensual se suma a tus facturas, y lo que debes aparece aquí.',
-    fr: 'Calcule un prêt dans le calculateur et enregistre-le. Son paiement mensuel s’ajoute à tes factures, et ce que tu dois apparaît ici.',
+    en: 'Add a loan you already have, or work one out in the calculator. What you owe shows here.',
+    es: 'Agrega un préstamo que ya tengas o calcula uno en la calculadora. Lo que debes aparece aquí.',
+    fr: 'Ajoute un prêt que tu as déjà, ou fais le calcul dans le calculateur. Ce que tu dois s’affiche ici.',
   },
 
   // What a loan is for, on the save page's grid.

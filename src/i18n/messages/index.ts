@@ -15,6 +15,7 @@ import { insightsMessages } from '@/i18n/messages/insights';
 import { legalMessages } from '@/i18n/messages/legal';
 import { libMessages } from '@/i18n/messages/lib';
 import { loanMessages } from '@/i18n/messages/loan';
+import { loanFlowMessages } from '@/i18n/messages/loan-flow';
 import { localeMessages } from '@/i18n/messages/locale';
 import { navMessages } from '@/i18n/messages/nav';
 import { onboardingMessages } from '@/i18n/messages/onboarding';
@@ -51,6 +52,7 @@ export const MESSAGE_AREAS = {
   legal: legalMessages,
   lib: libMessages,
   loan: loanMessages,
+  loanFlow: loanFlowMessages,
   locale: localeMessages,
   nav: navMessages,
   preferences: preferencesMessages,
@@ -91,6 +93,7 @@ export const MESSAGES = {
   ...MESSAGE_AREAS.legal,
   ...MESSAGE_AREAS.lib,
   ...MESSAGE_AREAS.loan,
+  ...MESSAGE_AREAS.loanFlow,
   ...MESSAGE_AREAS.locale,
   ...MESSAGE_AREAS.nav,
   ...MESSAGE_AREAS.preferences,

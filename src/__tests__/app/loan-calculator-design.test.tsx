@@ -277,7 +277,7 @@ describe('a figure typed past a slider’s end', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
     expect(mockPush).toHaveBeenCalledWith(
       expect.objectContaining({
-        pathname: '/save-loan',
+        pathname: '/add-loan',
         params: expect.objectContaining({ amount: '2500000' }),
       }),
     );

@@ -18,6 +18,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 
 import { usePaymentSources, useBills } from '@/api/queries';
 import { getBillCategory } from '@/data/bill-categories';
+import { countsInSpending } from '@/lib/bill-spending';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { t } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
@@ -52,7 +53,7 @@ export default function BillPlansScreen() {
   // The DB stores positive magnitudes; the UI shows outgoings as negative.
   const bills = useMemo(
     () =>
-      (query.data ?? []).map((row) => ({
+      (query.data ?? []).filter(countsInSpending).map((row) => ({
         id: row.id,
         name: row.name,
         amount: -row.amount,

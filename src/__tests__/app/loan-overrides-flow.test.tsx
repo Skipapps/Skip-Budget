@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
+import AddLoanScreen from '@/app/add-loan';
 import LoanCalculatorScreen from '@/app/loan-calculator';
 import LoanScheduleScreen from '@/app/loan-schedule';
-import SaveLoanScreen from '@/app/save-loan';
 import { resetLocaleForTests } from '@/i18n/store';
 import { failureMessage } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
@@ -12,8 +12,9 @@ import { checkOverride, scheduleWithOverrides, type PaymentOverrides } from '@/l
 
 /**
  * The person's own numbers, end to end: the calculator opens the payment pages on its draft and
- * follows what they write; the schedule marks and opens changed payments; Save files the contract
- * with the changes, or says what to fix first. Every figure is the engine's for the same changes.
+ * follows what they write; the schedule marks and opens changed payments; Save opens Add loan on the
+ * same loan, which files the contract with the changes, or the calculator says what to fix first.
+ * Every figure is the engine's for the same changes.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -24,10 +25,26 @@ jest.mock('react-native-safe-area-context', () => ({
   ...jest.requireActual('react-native-safe-area-context'),
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
+jest.mock('@/lib/haptics', () => ({
+  tap: jest.fn(),
+  selection: jest.fn(),
+  toggle: jest.fn(),
+  success: jest.fn(),
+  warn: jest.fn(),
+}));
 jest.mock('@/theme/loan-icons', () => ({
   useLoanIcons: () => new Proxy({}, { get: () => () => null }),
   useLoanTypeIcons: () => new Proxy({}, { get: () => () => null }),
+}));
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
+}));
+// The reminder choices are real; the client behind them is never called.
+jest.mock('@/lib/supabase', () => ({ supabase: {} }));
+jest.mock('@/api/push', () => ({ enableReminders: jest.fn() }));
+jest.mock('@/api/reminders', () => ({
+  ...jest.requireActual('@/api/reminders'),
+  useApplyReminder: () => jest.fn(),
 }));
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => new Proxy({}, { get: () => '#000000' }),
@@ -47,6 +64,8 @@ const mockPush = jest.fn();
 let mockParams: Record<string, string> = {};
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
+  useFocusEffect: () => {},
+  Stack: { Screen: () => null },
   router: {
     push: (...args: unknown[]) => mockPush(...args),
     back: jest.fn(),
@@ -149,8 +168,12 @@ describe('the calculator', () => {
 
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/save-loan',
-      params: expect.objectContaining({ monthly: '2500', overrides: '{"58":1000}' }),
+      pathname: '/add-loan',
+      params: expect.objectContaining({
+        view: 'details',
+        monthly: '2500',
+        overrides: '{"58":1000}',
+      }),
     });
   });
 
@@ -258,17 +281,19 @@ describe('the schedule', () => {
 });
 
 describe('saving', () => {
+  /** The calculator's hand-off as it sends it: the payment it showed goes as the bank's. */
   async function saveWith(params: Record<string, string>) {
-    mockParams = params;
-    await render(<SaveLoanScreen />);
-    await fireEvent.changeText(screen.getByPlaceholderText('e.g. Car loan'), 'Car loan');
+    mockParams = { view: 'details', monthly: '554.23', ...params };
+    await render(<AddLoanScreen />);
+    await fireEvent.press(screen.getByRole('radio', { name: 'Car' }));
     await fireEvent.press(screen.getByRole('radio', { name: 'Skip' }));
-    await fireEvent.press(screen.getByRole('button', { name: 'Save to Loans' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save loan' }));
   }
 
   it('files the bank’s payment and the contract’s interest, with nothing else to send', async () => {
     await saveWith({ ...CAR_BANK, funded: '2026-02-15', monthly: '554.23' });
-    expect(screen.getAllByText('Your bank’s payment').length).toBeGreaterThan(0);
+    expect(screen.getByText('$554.23')).toBeTruthy();
     expect(mockSave).toHaveBeenCalledWith(
       expect.objectContaining({
         monthlyPayment: 554.23,
@@ -282,7 +307,7 @@ describe('saving', () => {
 
   it('files changed payments and the earlier payoff they bring', async () => {
     await saveWith({ ...CAR_BANK, overrides: '{"12":10000}' });
-    expect(screen.getByText('49 monthly')).toBeTruthy();
+    expect(screen.getByText('6 years · 49 payments')).toBeTruthy();
     expect(mockSave).toHaveBeenCalledWith(
       expect.objectContaining({
         monthlyPayment: 554.23,
@@ -318,9 +343,32 @@ describe('saving', () => {
     expect(engine.contract.rows[29].payment).toBeLessThan(50_000);
   });
 
-  it('says what to fix from the start, and saves nothing until it is fixed', async () => {
-    await saveWith({ ...CAR_BANK, monthly: '150' });
-    expect(screen.getByText('To save this loan, fix: the monthly payment.')).toBeTruthy();
+  it('holds the loan on its details while the payment cannot keep up, saying the least it takes', async () => {
+    mockParams = { view: 'details', ...CAR_BANK, monthly: '150' };
+    await render(<AddLoanScreen />);
+    await fireEvent.press(screen.getByRole('radio', { name: 'Car' }));
+    await fireEvent.press(screen.getByRole('radio', { name: 'Skip' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Continue' }));
+
+    const refused = checkOverride(
+      {
+        principal: 32_001,
+        annualRatePercent: 7.5,
+        months: 72,
+        firstPaymentOn: new Date(2026, 2, 15),
+        fundedOn: new Date(2026, 1, 6),
+        basis: 'actual/365',
+      },
+      {},
+      'monthly',
+      150,
+    );
+    expect(
+      screen.getByText(
+        `Your monthly payment can’t keep up with this loan’s interest. The least it can be is ${formatCurrency(refused?.minimum ?? 0)}.`,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Save loan' })).toBeNull();
     expect(mockSave).not.toHaveBeenCalled();
   });
 

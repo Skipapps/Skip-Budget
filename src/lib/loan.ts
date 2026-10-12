@@ -214,8 +214,8 @@ export function steadyPayment(terms: LoanTerms): number {
   if (terms.principal <= 0 || terms.months <= 0 || !(terms.annualRatePercent > 0)) return 0;
 
   const basis = terms.basis ?? 'actual/365';
-  const funded = terms.fundedOn ?? impliedFunding(terms.firstPaymentOn);
-  const dates = paymentDates(terms.firstPaymentOn, terms.months);
+  const funded = fundingOf(terms);
+  const dates = dueDatesOf(terms);
 
   let costliest = 0;
   for (let index = 1; index < dates.length; index += 1) {
@@ -275,6 +275,12 @@ export type LoanTerms = {
   annualRatePercent: number;
   months: number;
   firstPaymentOn: Date;
+  /**
+   * The day of the month payments fall on, 1–31, clamped to each month's end. Only payments after
+   * the first follow it; without it they follow the first payment's own day. It matters when the
+   * first payment was itself clamped: a day-31 loan first due 28 Feb is next due 31 Mar, not 28 Mar.
+   */
+  paymentDay?: number;
   /** When interest starts running. Defaults to one month before the first payment. */
   fundedOn?: Date;
   basis?: AccrualBasis;
@@ -357,27 +363,52 @@ export function readPaymentOverrides(value: unknown): PaymentOverrideMap | undef
   return Object.keys(read).length > 0 ? read : undefined;
 }
 
-function impliedFunding(firstPaymentOn: Date): Date {
-  const funded = new Date(firstPaymentOn);
-  funded.setMonth(funded.getMonth() - 1);
-  if (funded.getDate() !== firstPaymentOn.getDate()) funded.setDate(0);
-  return funded;
+/** A day of the month a loan can be paid on. */
+export function isPaymentDay(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 31;
 }
 
-export function paymentDates(firstPaymentOn: Date, months: number): Date[] {
-  const anchor = firstPaymentOn.getDate();
+/** `date` moved by whole months, on `day` clamped to that month's end. */
+function onDayOfMonth(date: Date, months: number, day: number): Date {
+  const moved = new Date(date);
+  moved.setDate(1); // Set the day last, or a 31st rolls into the next month.
+  moved.setMonth(date.getMonth() + months);
+  const lastOfMonth = new Date(moved.getFullYear(), moved.getMonth() + 1, 0).getDate();
+  moved.setDate(Math.min(day, lastOfMonth));
+  return moved;
+}
+
+const anchorDay = (firstPaymentOn: Date, paymentDay: number | undefined) =>
+  isPaymentDay(paymentDay) ? paymentDay : firstPaymentOn.getDate();
+
+/** A month before the first payment, on the payment day. */
+function impliedFunding(firstPaymentOn: Date, paymentDay?: number): Date {
+  return onDayOfMonth(firstPaymentOn, -1, anchorDay(firstPaymentOn, paymentDay));
+}
+
+/**
+ * Every due date: the first payment as given, then one a month on the payment day (the first
+ * payment's day when none is given), clamped to each month's end.
+ */
+export function paymentDates(firstPaymentOn: Date, months: number, paymentDay?: number): Date[] {
+  const anchor = anchorDay(firstPaymentOn, paymentDay);
   const dates: Date[] = [];
 
   for (let index = 0; index < months; index += 1) {
-    const due = new Date(firstPaymentOn);
-    due.setDate(1); // Set the day last, or a 31st anchor rolls into next month.
-    due.setMonth(firstPaymentOn.getMonth() + index);
-    const lastOfMonth = new Date(due.getFullYear(), due.getMonth() + 1, 0).getDate();
-    due.setDate(Math.min(anchor, lastOfMonth));
-    dates.push(due);
+    dates.push(
+      onDayOfMonth(firstPaymentOn, index, index === 0 ? firstPaymentOn.getDate() : anchor),
+    );
   }
 
   return dates;
+}
+
+function dueDatesOf(terms: Omit<LoanTerms, 'payment'>): Date[] {
+  return paymentDates(terms.firstPaymentOn, terms.months, terms.paymentDay);
+}
+
+function fundingOf(terms: Omit<LoanTerms, 'payment'>): Date {
+  return terms.fundedOn ?? impliedFunding(terms.firstPaymentOn, terms.paymentDay);
 }
 
 export type ScheduleRow = {
@@ -440,8 +471,8 @@ export type Amortisation = {
  */
 function runSchedule(terms: LoanTerms, payment: number) {
   const basis = terms.basis ?? 'actual/365';
-  const funded = terms.fundedOn ?? impliedFunding(terms.firstPaymentOn);
-  const dates = paymentDates(terms.firstPaymentOn, terms.months);
+  const funded = fundingOf(terms);
+  const dates = dueDatesOf(terms);
   const paymentCents = toCents(payment);
   const monthlyExtraCents = Math.max(0, toCents(terms.extra?.monthly ?? 0));
   const changedCents = overrideCents(terms.paymentOverrides, terms.months);
@@ -594,8 +625,8 @@ export function solvePayment(terms: Omit<LoanTerms, 'payment'>): number {
   if (terms.principal <= 0 || terms.months <= 0) return 0;
 
   const basis = terms.basis ?? 'actual/365';
-  const funded = terms.fundedOn ?? impliedFunding(terms.firstPaymentOn);
-  const dates = paymentDates(terms.firstPaymentOn, terms.months);
+  const funded = fundingOf(terms);
+  const dates = dueDatesOf(terms);
 
   const growth = dates.map((due, index) => {
     const from = index === 0 ? funded : dates[index - 1];
@@ -632,7 +663,7 @@ export function amortise(terms: LoanTerms): Amortisation {
       totalInterest: 0,
       interestShare: 0,
       basis: terms.basis ?? 'actual/365',
-      fundedOn: terms.fundedOn ?? impliedFunding(terms.firstPaymentOn),
+      fundedOn: fundingOf(terms),
       payoffOn: null,
     };
   }
@@ -792,8 +823,9 @@ export function calculateLoan(
   };
 }
 
-export function payoffDate(start: Date, months: number): Date {
-  const dates = paymentDates(start, months);
+/** The term's last due date, which payments above the contract can come before. */
+export function payoffDate(start: Date, months: number, paymentDay?: number): Date {
+  const dates = paymentDates(start, months, paymentDay);
   return dates[dates.length - 1] ?? new Date(start);
 }
 
@@ -863,6 +895,8 @@ export type StoredLoan = {
   statement_principal: number | null;
   /** The jsonb of changed payments; optional so a row read before the column existed still fits. */
   payment_overrides?: unknown;
+  /** 1–31, or null when payments follow the first payment's own day; optional as above. */
+  payment_day?: number | null;
 };
 
 /** A yyyy-mm-dd column as local midnight, not UTC — dates here have no time zone. */
@@ -882,6 +916,7 @@ export function termsFromStored(loan: StoredLoan, fallbackFirstPayment?: string)
     annualRatePercent: loan.annual_rate,
     months: loan.term_months,
     firstPaymentOn: fromIsoDate(first),
+    paymentDay: isPaymentDay(loan.payment_day) ? loan.payment_day : undefined,
     fundedOn: loan.funded_on ? fromIsoDate(loan.funded_on) : undefined,
     basis: loan.day_count_basis,
     payment: loan.monthly_payment > 0 ? loan.monthly_payment : undefined,

@@ -17,6 +17,7 @@ import { habitColor, type HabitColor } from '@/data/habit-colors';
 import { t } from '@/i18n';
 import { historyFloor, NOTHING_HIDDEN, type HiddenHistory } from '@/lib/allowance';
 import { accountLabel } from '@/lib/account-label';
+import { countsInSpending, withSpendingFlag } from '@/lib/bill-spending';
 import { withTimeout } from '@/lib/deadline';
 import { moneyBook, type BookIncome, type BookSpend } from '@/lib/money-book';
 import { paydaysInRange, type PayFrequency } from '@/lib/date';
@@ -83,6 +84,8 @@ export type BillRow = {
   card_id: string | null;
   bank_account_id: string | null;
   note?: string | null;
+  /** Counts toward spending (`countsInSpending`); absent on a database without the column. */
+  in_spending?: boolean;
 };
 
 export type SalarySourceRow = {
@@ -294,13 +297,17 @@ function readBill(row: BillRow): BillRow {
 
 export function useBills() {
   return useOwnerQuery<BillRow[]>('bills', async () => {
+    // The flag's fallback sits inside withLogoColumns, which retries on any 42703: the other way
+    // round, a database without the flag costs a third request.
     const { data, error } = await withLogoColumns((logo) =>
-      supabase
-        .from('bills')
-        .select(
-          `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at, brand_id${logo}, brands(domain)`,
-        )
-        .order('next_due_on', { ascending: true, nullsFirst: false }),
+      withSpendingFlag((flag) =>
+        supabase
+          .from('bills')
+          .select(
+            `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at, brand_id${logo}${flag}, brands(domain)`,
+          )
+          .order('next_due_on', { ascending: true, nullsFirst: false }),
+      ),
     );
     if (error) throw error;
     // PostgREST types an embedded relation as an array; it is one row here.
@@ -615,13 +622,15 @@ export function useBill(id: string | undefined) {
     enabled: Boolean(userId && id),
     queryFn: async (): Promise<BillRow | null> => {
       const { data, error } = await withLogoColumns((logo) =>
-        supabase
-          .from('bills')
-          .select(
-            `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, note, brand_id${logo}, brands(domain)`,
-          )
-          .eq('id', id!)
-          .maybeSingle(),
+        withSpendingFlag((flag) =>
+          supabase
+            .from('bills')
+            .select(
+              `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, note, brand_id${logo}${flag}, brands(domain)`,
+            )
+            .eq('id', id!)
+            .maybeSingle(),
+        ),
       );
       if (error) throw error;
       return data ? readBill(data as unknown as BillRow) : null;
@@ -763,6 +772,11 @@ export type LedgerInput = {
   from: string;
   to: string;
   today: string;
+  /**
+   * A bill that does not count toward spending lists only what it recorded before ('skip', the
+   * default). 'show' projects it like any other, for its own page; no figure may be summed from it.
+   */
+  uncounted?: 'skip' | 'show';
 };
 
 /**
@@ -780,6 +794,7 @@ export function ledgerEntries({
   from,
   to,
   today,
+  uncounted = 'skip',
 }: LedgerInput): LedgerEntry[] {
   // A window wholly before the floor shows nothing; no schedule is walked backwards for it.
   if (from > to) return [];
@@ -817,6 +832,7 @@ export function ledgerEntries({
   const expand = (
     plan: Parameters<typeof planOccurrences>[0]['plan'],
     draw: (occurrence: PlanOccurrence) => Omit<LedgerEntry, 'id' | 'date' | 'amount'>,
+    recordedOnly = false,
   ) => {
     for (const occurrence of planOccurrences({
       plan,
@@ -826,6 +842,7 @@ export function ledgerEntries({
       to,
       today,
     })) {
+      if (recordedOnly && !occurrence.recorded) continue;
       entries.push({
         ...draw(occurrence),
         id: occurrence.id,
@@ -887,6 +904,9 @@ export function ledgerEntries({
         iconId: row.icon_id,
         planId: row.id,
       }),
+      // Filtered here only. bookFlows counts every charge of a bill it does not see running, so a
+      // flag-off bill left out of its `bills` would count its recorded charges twice.
+      uncounted === 'skip' && !countsInSpending(row),
     );
   }
 
@@ -938,7 +958,12 @@ export function ledgerEntries({
   return entries;
 }
 
-export function useLedger(range: DateRange | undefined, today: string) {
+export function useLedger(
+  range: DateRange | undefined,
+  today: string,
+  options: { uncounted?: 'skip' | 'show' } = {},
+) {
+  const uncounted = options.uncounted ?? 'skip';
   const receipts = useReceipts();
   const subscriptions = useSubscriptions();
   const bills = useBills();
@@ -971,6 +996,7 @@ export function useLedger(range: DateRange | undefined, today: string) {
         from,
         to,
         today,
+        uncounted,
       }),
     [
       receipts.data,
@@ -983,6 +1009,7 @@ export function useLedger(range: DateRange | undefined, today: string) {
       from,
       to,
       today,
+      uncounted,
     ],
   );
 
@@ -1303,28 +1330,48 @@ export type LoanRow = {
    * database without the column). `termsFromStored` reads it, so every schedule follows the edits.
    */
   payment_overrides: Record<string, number> | null;
+  /**
+   * The day of the month payments fall on (1–31), clamped to short months. Null means the first
+   * payment's day: every loan saved before the column, and most since, because it is stored only
+   * when the first payment was clamped (day 31, first paid 28 Feb). `readLoanRow` always sets it;
+   * optional so a row built by hand reads as null.
+   */
+  payment_day?: number | null;
 };
 
-/** What `termsFromStored` and the loan pages read, less the changed payments (see below). */
+/** What `termsFromStored` and the loan pages read, less the newer columns (see below). */
 export const LOAN_COLUMNS =
   'id, bill_id, principal, annual_rate, term_months, monthly_payment, total_interest, first_payment_on, funded_on, day_count_basis, statement_on, statement_principal';
 
+const NEWER_LOAN_COLUMNS = ['payment_overrides', 'payment_day'] as const;
+
 /**
- * Runs a loan read with the changed payments, and again without them when the database does not
- * have the column yet (42703 naming it): every loan still loads, with no changes.
+ * Runs a loan read with the columns added after LOAN_COLUMNS, and again without each one the
+ * database does not have yet (42703 naming it): every loan still loads, with no changed payments
+ * and payments on its first payment's day, as before those columns.
  */
-export async function withPaymentOverrides<R extends { error: ReadFailure }>(
-  read: (overridesColumn: string) => PromiseLike<R>,
+export async function withNewerLoanColumns<R extends { error: ReadFailure }>(
+  read: (newerColumns: string) => PromiseLike<R>,
 ): Promise<R> {
-  const full = await read(', payment_overrides');
-  const lacksOverrides =
-    full.error?.code === '42703' && /payment_overrides/.test(full.error.message ?? '');
-  return lacksOverrides ? read('') : full;
+  let columns: readonly string[] = NEWER_LOAN_COLUMNS;
+  for (;;) {
+    const result = await read(columns.map((column) => `, ${column}`).join(''));
+    const said = `${result.error?.message ?? ''} ${result.error?.details ?? ''}`;
+    const missing =
+      result.error?.code === '42703'
+        ? columns.find((column) => new RegExp(`\\b${column}\\b`).test(said))
+        : undefined;
+    if (!missing) return result;
+    columns = columns.filter((column) => column !== missing);
+  }
 }
 
-type RawLoan = Omit<LoanRow, 'payment_overrides'> & { payment_overrides?: unknown };
+type RawLoan = Omit<LoanRow, 'payment_overrides' | 'payment_day'> & {
+  payment_overrides?: unknown;
+  payment_day?: number | string | null;
+};
 
-/** A loan row as the app uses it: figures as numbers, no changes read as null. */
+/** A loan row as the app uses it: figures as numbers, no changes and no payment day read as null. */
 export function readLoanRow(raw: RawLoan): LoanRow {
   const overrides = raw.payment_overrides;
   return {
@@ -1339,6 +1386,7 @@ export function readLoanRow(raw: RawLoan): LoanRow {
       overrides && typeof overrides === 'object' && !Array.isArray(overrides)
         ? (overrides as Record<string, number>)
         : null,
+    payment_day: raw.payment_day == null ? null : Number(raw.payment_day),
   };
 }
 
@@ -1352,10 +1400,10 @@ export function useLoanForBill(billId: string | undefined) {
     queryKey: ['loan', billId, userId],
     enabled: Boolean(userId && billId),
     queryFn: async (): Promise<LoanRow | null> => {
-      const { data, error } = await withPaymentOverrides((overrides) =>
+      const { data, error } = await withNewerLoanColumns((newer) =>
         supabase
           .from('loans')
-          .select(`${LOAN_COLUMNS}${overrides}`)
+          .select(`${LOAN_COLUMNS}${newer}`)
           .eq('bill_id', billId!)
           .maybeSingle(),
       );

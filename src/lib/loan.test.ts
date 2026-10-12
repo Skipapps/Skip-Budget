@@ -659,7 +659,7 @@ describe('fixture: $25,000 at 7.5% over 60 months, monthly rests with a 14-day s
     // The calculator: the contract side of the comparison, with nothing extra paid.
     const calculator = comparePrepayment({ ...TERMS, extra: { monthly: 0, lumpSums: [] } }).base;
 
-    // /save-loan re-derives the payment from the same inputs before filing.
+    // The saved loan's schedule, priced again from the same inputs.
     const saved = amortise(TERMS);
     expect(saved.payment).toBe(calculator.payment);
     expect(saved.totalInterest).toBe(calculator.totalInterest);

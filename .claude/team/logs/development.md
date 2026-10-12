@@ -5991,3 +5991,358 @@ loan page + routing + edit/delete (migration B `update_loan`), P3 Pay off (migra
   3. **Stacked indent:** a stacked fact value is indented by `LABEL_INDENT = DOT + DOT_GAP`, the same constant as the label's reserve. This replaces `pl-[19px]`, and a test pins indent = dot width + gap.
   4. **No open loans:** with only finished loans, the summary keeps its $0.00 and "Total balance across 0 loans". The divider, Monthly, bar, caption and Base/Rate/Active are hidden. VoiceOver says "Your loans. $0.00 left across 0 loans." The summary's VoiceOver key is split into `summaryA11y` and `summaryPaidA11y` (en/es/fr).
   - **Gates:** tsc 0; eslint (cache cleared, --no-cache) 0 errors, with the 1 old setup.test.tsx warning; prettier clean; full jest 318/318 suites, 6,792 tests.
+
+## 2026-10-12 — Drew (Developer, money maths) — Add Loan P1 maths: firstPaymentOn, the payment-day anchor, loanReview (DONE, uncommitted)
+
+**Names vs the plan:** `firstPaymentOn(startDate, paymentDay)` as planned (Date in, Date | null out). The review function is `loanReview(fields, today)` in `src/lib/loan-review.ts`. `LoanTerms.paymentDay`, `StoredLoan.payment_day`. One file outside my P1 list: `src/lib/loan-route.ts` gains the `day` param (`LoanRouteParams.day`, `readLoanRoute().paymentDay`, `termsFromRoute`, `baseParams`). The plan said readLoanRoute "gains `day`", and Dana's `loanFormFromCalculator` already reads `route.paymentDay`. The change is additive, so every existing link reads as before.
+
+**Outcome:** Done. Nothing committed. Every figure matches an independent Python reference (exact fractions, its own calendar) row by row. Loans with no payment day, or with the first payment's own day as the payment day, are unchanged to the cent, the real-lender fixture included. On HEAD plus only my files the full suite passes: 321/321 suites, 6,859 tests. In the live tree, the only failures are in teammates' in-flight suites (see Gates).
+
+- **`src/lib/loan-first-payment.ts`:** `firstPaymentOn(startDate: Date, paymentDay: number): Date | null`, implementing F4.
+  - Payment day ≥ the start's day: next month. Otherwise: the month after that.
+  - The comparison uses the requested day. The result then clamps to the month's end and is local midnight.
+  - Returns null for a day outside 1–31 or an invalid date.
+  - Examples: 27 Dec + 27 → 27 Jan; 28 Dec + 2 → 2 Feb; 31 Jan 2024 + 31 → 29 Feb; 31 Jan 2025 + 31 → 28 Feb; 31 Jan + 30 → 30 Mar.
+- **Anchor in `src/lib/loan.ts`:**
+  - `LoanTerms.paymentDay?: number`.
+  - `paymentDates(first, months, paymentDay?)`: the first payment stays as given, and every later one falls on the payment day, clamped.
+  - `payoffDate(start, months, paymentDay?)`.
+  - `solvePayment`, `steadyPayment`, `runSchedule` and the implied funding date follow the anchor.
+  - `isPaymentDay(value)` is exported.
+  - `termsFromStored` reads `payment_day`. Null, absent or invalid values are ignored.
+- **`src/lib/loan-review.ts`:** `loanReview(fields: LoanReviewFields, today: string): LoanReview`.
+  - **Input fields:** principal, annualRate, termMonths, startDate, paymentDay, monthlyPayment; optional basis (default actual/365), paymentOverrides, and firstPaymentOn (a pinned calculator date).
+  - **Refusals** (`{ ok: false, refusal }`):
+    - `{ reason: 'fields', fields }`: these are missing or unusable, listed in page order. A pinned first payment that is not after the start date counts as 'startDate'.
+    - `{ reason: 'rate' }`: the rate is outside 0–100% or has more than 9 decimals.
+    - `{ reason: 'payment', problem }`: the payment never clears the loan. `problem.minimum` holds the minimum payment, and `refusalText` gives the existing wording.
+  - **Figures** (`{ ok: true, ... }`):
+    - `terms`: the same schedule `termsFromStored` reads back after the save.
+    - `firstPaymentOn`, `monthlyPayment`, `paymentCount` (the real count), `termMonths`, `totalInterest`, `totalPaid`, `finalPayment`, `balloon`.
+    - `paymentsMade` and `nextPayment` (a payment due today counts as made, as on the Loans page).
+    - `payoffOn`, `termEndsOn`, `dropped`, `unused`.
+    - `save`: the money fields for `useSaveLoan`, including `lastPaymentOn` and `paymentDay`. `paymentDay` is null unless it was clamped.
+    - `scheduleParams`: opens `/loan-schedule` on exactly this schedule.
+- **Decision:** single payments carried from the calculator that no longer fit the terms are dropped and named in `dropped`, not blocked. This is the plan's P2 CEO default applied to P1. To block them instead, show `fixLine(review.dropped)`.
+- **Fixtures** (Python reference in `src/lib/__fixtures__/add-loan-reference.ts`, plus the in-repo exact-integer amortiser):
+  - **Wireframe loan:** $18,000 at 6.25% over 48 months, from 27 Dec 2024, day 27, $424.80, actual/365.
+    - First payment 27 Jan 2025; 48 payments; final payment $424.50.
+    - Interest $2,390.10; total $20,390.10. The wireframe's $2,390.26 is a placeholder.
+    - On 12 Oct 2026: 21 made; next payment 27 Oct 2026; 27 of 48 left; $10,673.67 left.
+    - On monthly rests: $10,673.63 left, the v2 design figure.
+  - **Day 22** (the wireframe's chip): first payment 22 Feb 2025, a 57-day opening period with $175.68 interest; final payment $524.62; interest $2,490.22.
+  - **Day 31 from 31 Jan 2025:** $867.33. Due dates 28 Feb, 31 Mar, 30 Apr … 31 Jan 2026; interest $407.93. Without the anchor every payment falls on the 28th.
+  - **Leap year:** first payment 29 Feb 2024, $867.51.
+  - **31 Jan with day 30:** first payment 30 Mar (58 days), $872.62.
+  - **28 Dec with day 2:** first payment 2 Feb (36 days), $230.96.
+  - **$1,000 a month:** 19 payments, ending 27 Jul 2026, so a `lastPaymentOn` is sent.
+  - **$96 a month:** allowed as a balloon, with a final payment of $17,976.67.
+  - **$95 a month:** refused, minimum $95.55. Python checked this from the steady-payment definition.
+  - **Round trips that reproduce the same schedule:**
+    - save → `termsFromStored`/`loanTermsForBill` → `amortise`/`loanStatus`;
+    - `scheduleParams` → `readLoanRoute` → `termsFromRoute` → `scheduleWithOverrides`, as `/loan-schedule` reads them;
+    - the calculator's terms → the Review, in four cases, two of them with a pinned first payment.
+- **Diego's SQL term end** (`20261012100001`, `date_trunc` + `least(day, month end)`): emulated in Python against the reference calendar for every start day of 2023–2025 × days 1–31 × 8 terms (271,808 cases), sending `p_payment_day` only when it differs from the first payment's day, as `useSaveLoan` does. No mismatches. It agrees with the engine whenever the first payment falls on its clamped payment day, which the flow guarantees.
+- **Tests:**
+  - `loan-first-payment` 11, including every start day of 2023–2025 × days 1–31 (33,976 cases).
+  - `loan-payment-day` 26.
+  - `loan-review` 30.
+  - Loan suites together: 288.
+  - Mutation testing on a scratch copy (never in the shared tree): 25 mutants, all caught. One first survived (a picker's time of day kept on `terms.fundedOn`, which moves no figure); its test was tightened.
+- **Gates:**
+  - tsc: 0 errors in my files. The one tree error is `loan-overrides-flow.test.tsx`, which still imports the retired `save-loan` (Dana).
+  - eslint (cache cleared, --no-cache, max-warnings 0) and prettier: clean on my 9 files.
+  - Full jest on HEAD plus my files: 321/321 suites.
+  - Live tree at my last run: `large-text-guard` still lists `app/save-loan.tsx` (Dana's retirement). Earlier runs also caught `loans.test.tsx` (Add Loan now opens `/add-loan`), `loan-migrations.test.ts` (migration A supersedes 0007's signature, Diego) and `add-loan.test.tsx` mid-edit; it now passes.
+- **Dana must:**
+  - Forward `day` in `src/app/loan-schedule.tsx`: add `day: params.day` to its explicit `readLoanRoute({...})` call and its deps. Without it, the Review's "Payment schedule" for a day 29–31 loan first due in a shorter month shows every payment on the clamped day: wrong dates and wrong interest.
+  - Show "First payment" when `paymentsMade === 0`, else "Next payment". `nextPayment` is null when every payment is before today.
+  - Show `balloon` with `finalPayment` using `loan.calculator.balloon`.
+- **Diego:**
+  - `save.paymentDay` is already null unless it was clamped, which matches the `!== firstDay` guard.
+  - `termsFromStored` validates `payment_day`, so the `Number()` read is enough.
+- **Not verified:** no real-statement fixture exists for a loan paid on the 29th–31st. The anchor is proven against the Python reference only. Not run on Postgres or Hermes (no new loops; same cost as before).
+- **Open:**
+  - **(1) CEO:** should P1 drop the calculator changes that no longer fit (as now) or block them?
+  - **(2) CEO/Founder:** a payment due on the day the loan is added counts as made, and with `countsFrom = today` it also counts as spending (starts_on = today). Is today's payment "the next payment" under F1?
+  - **(3) Founder:** a statement from a loan paid on the 29th–31st would pin the anchor to a real bank.
+
+## 2026-10-12 — Diego (Developer, data and backend) — Add Loan P1 data: migration A, the "counts toward spending" flag, payment day, count floor (DONE, uncommitted, NOT pushed)
+
+**Names for Dana and Drew:** `useSaveLoan` takes `inSpending`, `paymentDay`, `countsFrom` as asked. Other changes:
+- `withPaymentOverrides` is renamed `withNewerLoanColumns`. Only `src/api/loans.ts` imported it, and it is updated.
+- `LoanRow.payment_day?: number | null`. It is optional only so hand-built fixtures (`loans.test.tsx`) still type-check; `readLoanRow` always sets it.
+- `useLedger(range, today, { uncounted: 'show' })` is the opt-in for a bill's own page.
+- `p_payment_day` is `integer`, not `smallint` (see below).
+
+**Outcome:** Done, uncommitted. Migration A is written and tested on a Docker scratch copy. It has not been pushed to the live database; that waits for Dmitri's review and the Founder's go. All app reads keep working on a database without A.
+
+**Migration `supabase/migrations/20261012100001_loan_add_flow.sql`:**
+- **New columns:**
+  - `bills.in_spending boolean not null default true`. Adding it is metadata only, with no rewrite.
+  - `loans.payment_day smallint check (payment_day between 1 and 31)`. Null means the first payment's day.
+- **`save_loan`:** the 17-argument function is dropped and recreated with the same 17 parameters (names, types, defaults) plus `p_in_spending boolean default true`, `p_payment_day integer default null` and `p_counts_from date default null`.
+  - Security invoker, `search_path=public`, owner postgres. Revoked from public and anon, granted to authenticated, as in 0007.
+  - The payment_day check is an expression, so no function needs EXECUTE. 0007's grant on `loan_payment_overrides_valid` stands.
+- **Body:**
+  - `in_spending = coalesce(p_in_spending, true)`, and `payment_day` is written.
+  - The term end falls on the payment day, clamped to its month (`date_trunc` + `least(day, month end)`). Old calls give the same dates.
+  - `starts_on = greatest(first, coalesce(p_counts_from, first))`.
+  - A payment day outside 1–31 is refused with P0001 before anything is written.
+- **Deviation 1, `p_payment_day` is integer:** Postgres does not implicitly cast an integer argument down to smallint when it picks the function, so `p_payment_day => 31` found no `save_loan` at all. Found on the scratch run.
+- **Deviation 2, `next_due_on` is the next payment on or after the floor, not the first payment:**
+  - Until the sweep rolls it (up to 15 minutes, or until the next app foreground), the bill would show a 2024 payment as due.
+  - Worse, editing that bill through add-bill (loans open the bill page until P2) saves the shown date as its floor and back-fills every earlier payment as spending.
+  - It is computed inline, because `plan_occurrences` is revoked from authenticated and `save_loan` runs as the caller. The result is the same date the sweep would roll to.
+  - Monthly only; other recurrences keep the first payment.
+- **Deviation 3, a loan whose every payment came before `p_counts_from`:** starts_on stays the first payment, because `bills_period_order` forbids starts_on > ends_on, and `next_due_on` is null (a stopped bill). Without this the save failed with 23514. A last payment that falls off the payment day with none left after the floor is also null.
+- **`record_due_charges()`:** `and b.in_spending` in the bills branch. Nothing else changed (diffed).
+- **`reminders_due()`:** a bill's due date is null once `next_due_on > ends_on` (R3). Nothing else changed (diffed).
+- **Revokes and view:** both functions' revokes are restated. `v_monthly_expenses` gains `and in_spending`; the view is unused by the app, so this is for consistency only.
+
+**Scratch test (Docker, `supabase_db_SkipBudget`, the real local DB untouched):**
+- **Setup:** the local DB was dumped and restored into `loan_add_check`; template copy is impossible because pg_cron and pg_net hold `postgres`. A stand-in `cron` schema was added for 20261008100003.
+  - 20261008100003…20261011100001 were applied as `postgres`, each in its own transaction, then A.
+  - A second pass ran everything again in order, then A a third time. All exit 0, the schema is identical after pass 2, and there is one `save_loan`.
+  - It was rebuilt from scratch after each fix, so the live DB will never have seen an intermediate version.
+- **Diff before/after A:** only the three new parameters, the `in_spending` line, the reminders `case` and the view's filter changed. Security, owner, volatility and ACLs are unchanged.
+- **Old calls** (the app's 13 named params, the 0007 extras, month ends, 29 Feb, a 1-payment loan, overrides): byte-identical bill and loan rows from the old and new functions.
+- **`supabase/checks/loans.sql` (extended, 55 checks, ALL CHECKS PASSED):**
+  - Schema, grants, the 17-arg signature gone, parameter order and defaults.
+  - Off/null switch.
+  - Term ends: day 31 from 28 Feb gives 30 Apr (the old formula gave 28 Apr and refused a last payment on 30 Apr); 31 Jan; leap 29 Feb → 28 Feb 2025 and 29 Feb 2028; day 30 from Feb.
+  - Refusals: day 0/32 (P0001), a row update to 32 (23514 `loans_payment_day_check`), and a refused call leaves no bill.
+  - Count floor: added late, not paid yet, last payment today, paid off before, paid this month already, day 31 into November (30 Nov), day 31 clamped into October (31 Oct), paid off early with none left.
+  - `record_due_charges` as the scheduler: without a floor it back-fills 4 (as before); with the floor it records nothing before today; kept out records 0; switched off keeps its 2 recorded charges and records none new; nothing is announced for either.
+  - `roll_schedules_forward` still rolls a kept-out loan.
+  - `reminders_due` fires for kept-out, last-payment-day and open bills, never for an ended one.
+  - `v_monthly_expenses` leaves out a kept-out bill.
+- **The checks catch the bugs:** with 0027's `reminders_due` and 0030's `record_due_charges` put back inside a rolled-back transaction, an ended bill reminds and a kept-out bill is charged 3 times.
+- **Other suites on the same copy:** habits 54, one_off_pay 34, savings_goals 150, receipt_books 19 and free_capture_allowance 26 all pass.
+- **Throwaway PostgREST v14.5, bound to 127.0.0.1, against A and a second copy stopped before A:**
+  - The HEAD call is 200 on both, with the same bill.
+  - Each new argument is 200 on A. The JSON number reaches the integer parameter; payment day 32 gives 400 P0001.
+  - On pre-A, each new argument gives 404 PGRST202 and leaves no bill.
+  - Pre-A reads give 400 `{"code":"42703","message":"column bills.in_spending does not exist"}` and `... loans.payment_day ...`, which is what the fallbacks match.
+  - This run came after the integer change and before deviation 2. Deviation 2 touches no call resolution, and the SQL checks cover its values.
+- **Cleanup:** scratch DBs dropped, containers and the image removed, token deleted, Docker Desktop stopped (as found). Local DB still 20261008100002.
+
+**Every filtered place (rule: off = nothing new recorded or projected; recorded charges stay counted):**
+- **`ledgerEntries`** (`src/api/queries.ts`): a flag-off bill keeps only `occurrence.recorded` rows. This covers the Bills total and list, Home (Where your money went, monthly total, Recent, Coming up, Current balance), Cards balances, card/account pages, Activity, Insights and Savings so far. Not filtered upstream: `bookFlows` still gets every bill (the trap), with a comment in place. `uncounted: 'show'` projects it for its own page.
+- **Recorders:** the server's `record_due_charges` and the client's `recordDueCharges` (`src/api/charges.ts`) skip flag-off bills.
+- **`unwrittenDatesIn`** (`src/api/savings.ts`, the MUST): skips flag-off bills. The savings close reads the flag, via `readBillRow` → `in_spending`.
+- **Screens:** `bills.tsx` plan count (empty state), `bill-plans.tsx` list, count and total, `setup-bills.tsx` list.
+- **Onboarding:** the "Add your bills" tick in `src/api/onboarding.ts`.
+- **`plan-detail.tsx:91`:** `{ uncounted: 'show' }`. It is in no one's P1 list; this is a one-argument change that only touches flag-off bills.
+- **Unfiltered, as planned:** `useBills`/`useBill`, the Loans page, the Cards loans tile, the bill page, reminders, push, voice and the money counts.
+
+**Fallbacks (until A is live):**
+- **Shared helpers:** `src/lib/bill-spending.ts` has `countsInSpending` (absent = true), `lacksSpendingFlag` (42703 naming in_spending) and `withSpendingFlag`.
+- **Bill reads:** `useBills` and `useBill` (inside `withLogoColumns`: two requests on a DB without the flag, and logos kept), the client recorder (otherwise a failed read records nothing at all) and the savings close bills read.
+- **Loan reads:** `withNewerLoanColumns` drops `payment_overrides` and/or `payment_day`, whichever the error names. It is used by `useLoanForBill` and `useLoans`.
+- **Writes:** `useSaveLoan` names `p_in_spending` only when false, `p_payment_day` only when it differs from the first payment's day, and `p_counts_from` only when it is after the first payment. Otherwise it is the old call; when any is needed, an old DB refuses with PGRST202, which shows the one failure line.
+
+**Tests:**
+- **New:** `src/lib/bill-spending.test.ts`, `src/__tests__/api/bill-spending-ledger.test.ts` (verified to fail with either filter removed), `charges-spending-flag.test.ts`, `bills-spending-flag.test.tsx`, `src/__tests__/app/bills-spending-flag.test.tsx`.
+- **Extended:** `loan-save.test.tsx` (the three arguments, PGRST202, payment_day reads and fallbacks), `savings-close.test.ts` (a kept-out loan closes on what it recorded and never waits; the bills fallback), `onboarding.test.tsx`, `loan-migrations.test.ts` (live signature, defaults, drop, body, recorder/reminders/revokes, columns).
+
+**Gates:**
+- tsc: 0 in my files. The tree's only errors are in Dana's in-flight `add-loan.test.tsx` and `add-loan-languages.test.tsx`.
+- eslint (cache cleared, `--no-cache`, `--max-warnings 0`): my 20 files are clean. In `src` as a whole the only errors are prettier in Dana's in-flight add-loan files, plus the old setup.test.tsx warning.
+- prettier clean on my files.
+- Full jest: 327/327 suites, 6,946 tests.
+
+**Open:**
+1. **Dmitri:** review A, especially deviations 1–3. The push then waits for the Founder's go (CEO).
+2. **CEO:** until P2 routes loans to `/loan/[id]`, the bill page's "Started" row shows `bills.starts_on`, which is today for a loan added late.
+3. **CEO:** editing a stopped bill through add-bill restarts it from its shown start. This is pre-existing for any stopped bill. For loans it matters only for one added already paid off (next due null), until P2's `update_loan` replaces that path.
+4. **CEO/Founder:** Drew's open (2) applies here too. A payment due on the day the loan is added counts as spending (floor = today, next due = today). If F1 means it should not, the app sends tomorrow as `countsFrom`; there is no DB change.
+5. R2 (the bill anchor's day drifts after a clamped month) is unchanged and out of scope.
+
+## 2026-10-12 — Dana L (Developer, UI and navigation) — Add Loan flow, P1 screens (DONE, uncommitted)
+
+**Outcome:** Done. `/add-loan` is one route with views `amount → details → review` plus `paymentEdit`/`principalEdit` (the keypad again). It is built on Drew's `loanReview`/`firstPaymentOn` and Diego's extended `useSaveLoan`; it does no money maths of its own. The Loans page Add loan tile and the calculator's Save both open it, and `/save-loan` is retired. Not seen on a device: the Founder tests on the 13 Pro Max.
+
+- **Pages:**
+  - **Keypad** (tile entry): header "Add loan" with back; "How much do you pay each month?" / "Enter your monthly installment."; the app's `AmountStep`. Continue is pinned and greyed until the amount is above $0.
+  - **Details** ("Your loan"): `LoanTypeGrid` (all 8, 4×2, none chosen to start), then one card:
+    - Loan name follows the type ("Car loan") until typed.
+    - Monthly payment and Amount borrowed are boxes reading "$424.80 · Edit" / "— · Add", which open the keypad. Back from the keypad writes nothing.
+    - APR is a decimal box with "%". It takes "," or "." and is never cut; a rate the table can't keep is refused on Continue.
+    - Term is a number plus Years/Months (`SegmentedChips`).
+    - Start date is `DateBox` with the year, past dates allowed.
+    - Payment day is `DayStrip` (required, bled to the card's edge), with "First payment {date}" under it.
+    - Then Paid from: `SourceTiles` with Skip, required.
+    - Pinned Continue never greys; it lists what is missing in page order.
+  - **Review** ("Review your loan"):
+    - The card: type icon, name, "First payment / Next payment / Last payment {date}", big amount borrowed, and Monthly / APR / Term "4 years · 48 payments" / Total interest / Total you'll pay. The balloon warning sits inside it. VoiceOver reads the card as one summary.
+    - Notes under the card name dropped and unused calculator changes, and any non-daily interest basis.
+    - "Add to monthly bills" switch, ON by default; off caption "Stays under Loans, out of your spending".
+    - `RemindMeCard`, ON at 3 days; the caption date comes from the schedule's own due dates.
+    - `ScheduleLink` opens `/loan-schedule` with `review.scheduleParams` plus the name.
+    - Pinned "Save loan" (reads "Saving…" while busy), with "Back to edit" under it.
+- **Navigation:**
+  - Back steps through the views. The edge swipe works only on the view the flow opened on (`Stack.Screen gestureEnabled`, as `StepFlow`).
+  - Save → `save_loan`, then `applyReminder('bill', id, lead)` (skipped when off or when no payment is left), then the toast and `finishFlowOn('/loans')`.
+  - A failed reminder write after a successful save still lands as saved (plan 2), so a retry cannot file a second loan.
+- **Calculator hand-off:** Save pushes `/add-loan?view=details` with the priced terms (not the live sliders, which run a beat ahead of the deferred figures). The payment shown goes as `monthly` (the bank's); changed payments go as typed.
+  - A first payment the rule would move is pinned until Start date or Payment day changes.
+  - The confirm now appears only when overpayments would be left behind; it was the only thing worth asking.
+- **Coordinator's items:**
+  - MUST done: `loan-schedule.tsx` passes `day` through, so a day-31 loan's schedule keeps the 31st. A test opens the schedule from Review and fails without the fix.
+  - Dropped changes are named on Review ("Your change to payment 59 no longer fits this loan, so it isn't saved.") and the save is not blocked.
+  - First vs Next follows `paymentsMade`.
+- **Shared changes** (defaults unchanged for every other caller):
+  - `DayStrip` gains `required` and `bleed: 'page' | 'card'`.
+  - `DateBox` gains `format`.
+  - `LoanTypeGrid` takes `value: LoanType | null`.
+  - `ScheduleCard` now draws through a new count-based `ScheduleLink`.
+  - `LoanTiles` drops the Tile `hint` prop, which no caller uses any more.
+- **Retired:** `src/app/save-loan.tsx` and its two suites are moved to `~/Desktop/SkipBudget-design-archive/2026-10-12/src/…`. Typed routes were regenerated with Expo's `regenerateDeclarations`: +`/add-loan`, −`/save-loan`.
+- **i18n:**
+  - New `src/i18n/messages/loan-flow.ts` (area `loanFlow`, 38 keys, en/es/fr, French no-break spaces).
+  - Removed the keys nothing reads any more: `loan.list.addHint`, `loan.calculator.confirmMessage`, and nine `loan.save.*` (title, subtitle, perMonth, payments, paymentsMonthly, name, missing, noPayment, saveToLoans).
+- **Tests:**
+  - New: `app/add-loan.test.tsx` (29; the wireframe loan reads $2,390.10 / $20,390.10, 48 payments, next 27 Oct 2026, reminder 24 Oct), `app/add-loan-languages.test.tsx` (6; es/fr words and figures, and the identical save in en/es/fr × USD/MXN/CAD/GBP), `components/add-loan-form.test.ts` (28).
+  - `day-strip` gains 3 tests.
+  - Updated: `loan-overrides-flow` (saving now walks details → Review → Save), the three calculator suites, `loans.test`, `large-text-guard`.
+- **Gates:** tsc 0. eslint (cache cleared, `--no-cache`, `--max-warnings 0`, src): 0 errors, plus the 1 old setup.test.tsx warning. Prettier clean. Full jest: 327/327 suites, 6,948 tests.
+- **Adjusted from the wireframe:**
+  - Every page has a header title on the back line.
+  - The keypad sits low, as in Add bill.
+  - Fields are our bordered boxes, not grey fills.
+  - The chosen unit chip is plum.
+  - Skip is added to Paid from.
+  - Every figure comes from the engine, not the placeholders.
+  - There is no close (X), as the brief asks.
+- **Open:**
+  1. Should the flow have the add flows' close (X), so leaving from Review is not three Backs?
+  2. A reminder that fails to write after the save is silent. Should there be a toast?
+  3. The term cap is 50 years (my default).
+  4. Start date has no default.
+  5. The Loans empty-state copy still says "Work out a loan in the calculator".
+  6. `src/lib/loan.test.ts:662` comment still names /save-loan (Drew's file).
+- **2026-10-12 — Dana — CEO answers applied:**
+  1. **Close (X):** the same `FlowHeader` close Add bill has, asking "Cancel adding this loan?" with the shared discard line. It is on the keypad, details and Review pages, but not on a figure sent back to the keypad (as Add bill's one-field pages). From Review, one tap leaves the flow (`goBack`), to Loans or to the calculator.
+  2. **Reminder failing after the save:** as Add bill, the page stays and shows `failureMessage` (the one failure line); there is no new wording.
+     - Unlike Add bill, the saved bill id is kept, so pressing Save again writes the reminder alone and never files a second loan.
+     - While the loan stands saved, "Back to edit" and close are hidden, and Back lands on Loans with the saved toast.
+     - Add bill itself can create a second bill on that retry (pre-existing; flagged to the CEO).
+  3. Term cap: 50 years kept.
+  4. Start date: stays required with no default.
+  5. **Loans empty state** (en/es/fr): "Add a loan you already have, or work one out in the calculator. What you owe shows here."
+  6. `src/lib/loan.test.ts:662`: comment only, no longer names /save-loan.
+  - **Tests:** `add-loan.test.tsx` now has 33. New: the close cases, the failed reminder retried without a second loan, and leaving after it. `loans.test` checks the new empty copy.
+  - **Gates:** tsc 0; eslint (cache cleared, `--no-cache`) 0 errors, plus the 1 old setup.test.tsx warning; prettier clean; full jest 327/327 suites, 6,952 tests.
+
+## 2026-10-12 — Dmitri (Development Lead) — Add Loan P1 review: CHANGES REQUESTED (2 small app-side MUSTs). Migration A is READY for the Founder's push go.
+
+Read-only. Gates on the live tree: tsc 0; eslint (cache cleared, --no-cache, --max-warnings 0, src) 0 errors, plus the 1 old setup.test.tsx warning; prettier clean on all 58 changed TS files; full jest 327/327 suites, 6,952 tests. The v57 router docs confirm `dismissAll` (popToTop), `canDismiss`, `useFocusEffect` and `gestureEnabled`.
+
+**Migration A (`20261012100001_loan_add_flow.sql`): ready to push.**
+- Old calls are identical. With no `p_payment_day`, the new term end is `first + (n-1) months`. With no `p_counts_from`, starts_on and next_due_on are the first payment. in_spending defaults to true and payment_day is null.
+- Grants match 0007 on the 20-argument signature.
+- The other objects differ from their only earlier definitions (0013, 0010, 0006) by exactly the intended line each:
+  - `record_due_charges`: `and b.in_spending`.
+  - `reminders_due`: the ends_on case.
+  - `v_monthly_expenses`: `and in_spending`. The view is unused by the app.
+- Re-runnable. Diego's scratch run applied it three times.
+- Pre-push step for the CEO (read-only): compare the live `pg_get_functiondef` of save_loan, record_due_charges and reminders_due with these files. The scratch run started from the local DB, not the live one.
+
+**Decisions:**
+- Deviation 1 (`p_payment_day integer`): accepted.
+- Deviation 2 (next_due_on = the next payment on or after the floor): accepted.
+  - It is the same date as the engine's next payment.
+  - It is better than the sweep for days 29–31.
+  - It closes the add-bill back-fill window for running loans.
+- Deviation 3 (all payments past: starts_on = the first payment, next_due_on null): the shape is accepted, because `bills_period_order` leaves no other. The interim edit path is M2.
+- Drew's `dropped`: accepted. Dropped changes are not saved, and the Review schedule is the saved schedule.
+- No CEO call is unsafe.
+
+**MUST:**
+- **M1 (Dana), `src/app/add-bill.tsx:784-796`:** the bill edit page's Payment schedule link leaves out the payment day. A day 29–31 loan whose first payment was clamped then opens a schedule with every payment on the clamped day: wrong dates and wrong interest. Pass `day` from `terms.paymentDay` and add a test.
+- **M2 (Diego, or CEO sequencing):** a loan added with every payment already behind it can be back-filled into spending by an edit.
+  - Path: Loans, then View details (`loans.tsx:112`), then the bill page pencil, then Save with no change.
+  - `add-bill.tsx:273` shows starts_on. `entry-values.ts:152,155` then restart the bill from the first payment.
+  - Both recorders then write every payment as spending (48 for a 2019 four-year loan). This breaks F1.
+  - Fix either way: guard the save (a loan bill with no next due date keeps next_due_on null and its starts_on, with a test), or land P2's routing before the Founder's device build.
+
+**Nice-to-haves:**
+- The "Add to monthly bills" switch stays live once the loan is saved after a failed reminder, and a retry ignores it (`loan-review-view.tsx:265-268`).
+- The busy state does not cover the reminder write (`add-loan.tsx:273`). This is the same as Add bill.
+- "Founder's order" puts a name in a comment (`loan-details-view.tsx:79`).
+- The DayStrip comment still talks only about the page's edges.
+- `source-tiles.test.tsx:12` still says "save-loan design".
+- `loan.amountTile.open` has no reader. This was already true at HEAD.
+
+**Verified:**
+- The in_spending filter is complete. It does not double-count or drop recorded rows: a running flag-off bill keeps only recorded rows in the ledger and bookFlows skips it, while a stopped one is counted once by bookFlows.
+- The fallbacks hold before A and after it. Before A, Save refuses a loan that needs a new argument, so an existing loan cannot be added until A is live.
+- My own Python re-run reproduces Drew's figures:
+  - Wireframe loan: $2,390.10 / $20,390.10, final payment $424.50, 21 made, $10,673.67 left.
+  - Day 22: 57 days and $175.68 first interest.
+  - Day 31: 28 Feb, 31 Mar, 30 Apr and $407.93 interest.
+- The real-lender fixture is unchanged.
+- Save goes to dismissAll then push /loans.
+- Shared component defaults are unchanged for add-card and add-bill.
+- en/es/fr are complete: all 38 loanFlow keys are used, and none of the 11 removed keys is referenced.
+- **2026-10-12 — Dana — Dmitri's P1 review applied:**
+  - **M1:** `src/app/add-bill.tsx`, the Payment schedule link only (two lines): it passes `day` from `terms.paymentDay`, so a loan whose first payment was clamped opens its schedule on the 31st, not the 28th. New `add-bill-save` test (day-31 loan first due 28 Feb); it fails without the fix.
+  - **(a)** After a failed reminder the loan is filed, so "Add to monthly bills" is locked. A Save again could not change it. The reminder switch and its chips stay live, since Save again writes them.
+  - **(b)** "Saving…" now lasts from the press until the page is left, the reminder write included (state plus a same-frame ref). A second tap no longer saves, toasts or lands twice. A test holds the reminder write open; it fails on the old `saveLoan.isPending`.
+  - **(c)** Dropped the name from the `loan-details-view.tsx` comment.
+  - **(d)** DayStrip's gutter comment now covers the card's edge. `source-tiles.test.tsx` says "the loan designs".
+  - **(e)** Removed `loan.amountTile.open` (en/es/fr). It had no reader.
+  - **Gates:**
+    - tsc 0; prettier clean on my files; full jest 328/328 suites, 6,962 tests.
+    - eslint (cache cleared, `--no-cache`): 0 errors in my files and the 1 old setup.test.tsx warning. The only errors are 2 prettier lines in Diego's in-flight `src/__tests__/api/loan-bill-edit-guard.test.tsx` (M2).
+
+## 2026-10-12 — Diego (Developer, data and backend) — M2 fixed (loan bill edits cannot back-fill), live definitions checked (DONE, uncommitted)
+
+**Outcome:** M2 is fixed in the data layer, with no change to `src/app/add-bill.tsx`. A read-only check shows live holds exactly what migration A assumes it replaces.
+
+**M2:**
+- **Why the builder could not hold the guard:** `buildBillValues` does not know the stored dates, and add-bill passes only `{ sources, lastChargedOn, hasLoan }`. So the guard sits on the update path.
+- **`src/api/entry-values.ts`, `guardLoanBillDates(values, stored)` (pure):** for a bill a loan lives behind (a loans row, or a `loan-*` icon):
+  - if it has no next due date, the edit keeps `next_due_on` null and its `starts_on`;
+  - if it is running, `starts_on` never moves earlier than the stored one, so it never drops below the count floor;
+  - only the dates the edit names are touched, and any other bill saves as edited.
+- **`src/api/mutations.ts`:** `useUpdate` takes an optional `prepare` step. `useUpdateBill` uses `guardBillDates`:
+  - When the edit names a date, it reads the bill (`icon_id, next_due_on, starts_on`) and its loans row first.
+  - A failed read fails the save rather than writing unguarded.
+  - An edit with no date reads nothing first.
+  - It is the only bills update path; add-bill alone uses it.
+- **The second case:** the running loan added late was reachable too. A Save with no change was safe, because the form shows the next payment (27 Oct), which moves the floor later. But picking an earlier date (Jan 2024) moved `starts_on` to Jan 2024 and back-filled 33 payments. Now guarded.
+- **Test `src/__tests__/api/loan-bill-edit-guard.test.tsx` (8 tests):**
+  - It drives the real `useUpdateBill` with the values add-bill's own `buildBillValues` produces, then runs the recorder's `unrecordedDates` on what was written.
+  - Paid off before it was added: the old code wrote 24 payments, now 0.
+  - Added late, date moved earlier: the old code wrote 33, now 0.
+  - The shown next payment still saves as before. Rent moved earlier still back-fills, as before. No date means no read. A failed read writes nothing. Detection by loans row or by icon.
+  - With the guard taken out, 3 tests fail (both M2 cases and the failed read).
+
+**Live check (read-only):**
+- **Path:** `npx supabase db query --linked` (Management API, the existing login, no new credentials). SELECTs on the catalogue only; nothing was written.
+- **`save_loan`:** one overload, the 17-argument signature. `prosrc` is byte-identical to 0007's body. Security invoker, `search_path=public`, owner postgres. ACL {postgres, authenticated, service_role}, the same as the local copy A was tested on.
+- **`record_due_charges` and `reminders_due`:** `prosrc` is byte-identical to 0013 and 0010. Security definer, `search_path=public`, ACL {postgres, service_role}.
+- **Also identical:** `plan_occurrences`, `roll_schedules_forward` and `loan_payment_overrides_valid` (its authenticated grant is live).
+- **`v_monthly_expenses`:** the definition is character-identical to the local copy's before A. `security_invoker=true`, same ACL.
+- **Live migrations:** they end at 20261011100001. `bills.in_spending` and `loans.payment_day` do not exist yet, and `loans.payment_overrides` does.
+- **Differences found:** none.
+
+**Gates:**
+- tsc 0.
+- eslint (cache cleared, `--no-cache`, `--max-warnings 0`, src): 0 errors, plus the 1 old setup.test.tsx warning.
+- prettier clean on my files.
+- Full jest: 328/328 suites, 6,962 tests.
+
+## 2026-10-12 — Dmitri (Development Lead) — Add Loan P1 final pass: GO for the P1 commit. Read-only. tsc 0; eslint (cache cleared, --no-cache, max-warnings 0, src) 0 errors + the old setup.test.tsx warning; prettier clean on all 63 changed TS files; full jest 328/328 suites, 6,962 tests.
+- **M1:** confirmed. add-bill passes `day` from `terms.paymentDay`, and a test pins it.
+- **M2:** confirmed. `guardLoanBillDates` changes nothing on a bill with no loans row and no `loan-*` icon.
+  - An old manual Loans & Credit bill has no loans row and an icon of 'loans', so it saves as before.
+  - Creates never read first.
+  - The cost: every add-bill edit always names its dates, so every bill edit now makes one extra round trip before the update (bills and loans, read in parallel). Accepted: the loan row in the form may still be loading, and only a fresh read guards on what is stored.
+  - A failed pre-read throws inside `mutationFn`. add-bill catches it and shows `failureMessage` (the one failure line), and nothing is written. The test pins the "nothing written" part.
+  - The pre-read selects only columns that exist before migration A.
+- **Dana's (a)–(e):** confirmed.
+- **Remaining risk:** the device build still waits for migration A. Diego's live check shows the live definitions are byte-identical to what A replaces.
+- **Edge left as is:** after a failed reminder, Back during the retry's reminder write could land and toast twice. Not blocking.

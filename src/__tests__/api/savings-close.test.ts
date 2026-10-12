@@ -21,9 +21,19 @@ const mockDb: {
   readErrors: Record<string, Failure>;
   rpcError: Failure;
   pageCap: number;
+  /** Columns this database does not have yet: a read naming one is refused (42703). */
+  missing: string[];
   reads: string[];
   rpcs: { name: string; args: Row }[];
-} = { tables: {}, readErrors: {}, rpcError: null, pageCap: 1000, reads: [], rpcs: [] };
+} = {
+  tables: {},
+  readErrors: {},
+  rpcError: null,
+  pageCap: 1000,
+  missing: [],
+  reads: [],
+  rpcs: [],
+};
 
 jest.mock('@/lib/supabase', () => {
   const build = (table: string) => {
@@ -32,9 +42,11 @@ jest.mock('@/lib/supabase', () => {
     let single = false;
     let limit = Infinity;
     let orderBy: string | null = null;
+    let asked: string[] = [];
     const builder: Record<string, unknown> = {
-      select: (_columns: string, options?: { count?: string }) => {
+      select: (columns: string, options?: { count?: string }) => {
         mockDb.reads.push(table);
+        asked = columns.split(',').map((column) => column.trim());
         counted = Boolean(options?.count);
         return builder;
       },
@@ -73,6 +85,11 @@ jest.mock('@/lib/supabase', () => {
       then: (resolve: (value: unknown) => unknown) => {
         const failure = mockDb.readErrors[table];
         if (failure) return Promise.resolve(resolve({ data: null, error: failure, count: null }));
+        const missing = asked.find((column) => mockDb.missing.includes(column));
+        if (missing) {
+          const error = { code: '42703', message: `column ${table}.${missing} does not exist` };
+          return Promise.resolve(resolve({ data: null, error, count: null }));
+        }
         let rows = (mockDb.tables[table] ?? []).filter((row) => filters.every((keep) => keep(row)));
         const count = rows.length;
         if (orderBy) {
@@ -230,6 +247,7 @@ beforeEach(() => {
   mockDb.readErrors = {};
   mockDb.rpcError = null;
   mockDb.pageCap = 1000;
+  mockDb.missing = [];
   mockDb.reads = [];
   mockDb.rpcs = [];
 });
@@ -382,6 +400,45 @@ describe('closeFinishedMonths', () => {
       p_spent: 3164.49,
       p_seen: false,
     });
+  });
+
+  it('closes on what a loan kept out of spending recorded, and never waits on it', async () => {
+    seed('user-loan-off');
+    // Counted in August, then "Add to monthly bills" switched off: September is never written.
+    mockDb.tables.bills.push({
+      id: 'car',
+      name: 'Car loan',
+      amount: 400,
+      category_id: 'loans',
+      icon_id: 'loan-car',
+      recurrence: 'monthly',
+      next_due_on: '2026-10-20',
+      starts_on: '2026-08-20',
+      ends_on: '2028-07-20',
+      created_at: '2026-08-20T12:00:00+00:00',
+      in_spending: false,
+    });
+    mockDb.tables.charges.push({
+      id: 'c-car',
+      bill_id: 'car',
+      subscription_id: null,
+      label: 'Car loan',
+      amount: 400,
+      charged_on: '2026-08-20',
+    });
+
+    expect(await closeFinishedMonths('user-loan-off', TODAY)).toBe(3);
+    // August keeps its $400; September has no payment it never recorded.
+    expect(mockDb.rpcs.map((call) => call.args.p_spent)).toEqual([290, 3621.04, 3135.94]);
+  });
+
+  it('closes on the same figures on a database without the flag', async () => {
+    seed('user-no-flag');
+    mockDb.missing = ['in_spending'];
+
+    expect(await closeFinishedMonths('user-no-flag', TODAY)).toBe(3);
+    expect(mockDb.rpcs.map((call) => call.args.p_spent)).toEqual([290, 3221.04, 3135.94]);
+    expect(mockDb.reads.filter((table) => table === 'bills')).toHaveLength(2);
   });
 
   it('never throws', async () => {

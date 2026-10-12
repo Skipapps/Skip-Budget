@@ -111,8 +111,7 @@ export default function LoansScreen() {
           summary={summary}
           onOpen={(billId) => router.push(`/bill/${billId}`)}
           onCalculator={openCalculator}
-          // Saving a loan starts in the calculator until it has a form of its own.
-          onAdd={openCalculator}
+          onAdd={() => router.push('/add-loan')}
         />
       ) : null}
     </Screen>

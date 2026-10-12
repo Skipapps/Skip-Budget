@@ -1,4 +1,4 @@
-import type { AccrualBasis, LoanTerms } from '@/lib/loan';
+import { isPaymentDay, type AccrualBasis, type LoanTerms } from '@/lib/loan';
 import {
   paymentOverridesJson,
   readPaymentOverrides,
@@ -13,6 +13,8 @@ export type LoanRouteParams = {
   months?: string;
   /** yyyy-mm-dd of the first payment. */
   start?: string;
+  /** The payment day, 1–31, when the first payment's own day is not it (see `LoanTerms`). */
+  day?: string;
   /** yyyy-mm-dd the money landed. */
   funded?: string;
   basis?: string;
@@ -56,6 +58,7 @@ export function readLoanRoute(params: LoanRouteParams) {
     annualRate: Number(params.rate) || 0,
     months: Number(params.months) || 0,
     start: params.start ?? '',
+    paymentDay: readPaymentDay(params.day),
     funded: params.funded ?? '',
     basis: parseBasis(params.basis),
     payment: atLeastZero(params.payment),
@@ -70,6 +73,11 @@ export function readLoanRoute(params: LoanRouteParams) {
 }
 
 export type LoanRoute = ReturnType<typeof readLoanRoute>;
+
+function readPaymentDay(value: string | undefined): number | undefined {
+  const day = Number(value);
+  return value && isPaymentDay(day) ? day : undefined;
+}
 
 function readOverrides(params: LoanRouteParams): PaymentOverrides {
   const overrides: PaymentOverrides = {};
@@ -106,6 +114,7 @@ export function termsFromRoute(
     annualRatePercent: route.annualRate,
     months: route.months,
     firstPaymentOn: routeDate(route.start) ?? new Date(),
+    paymentDay: route.paymentDay,
     fundedOn: routeDate(route.funded),
     basis: route.basis,
     // A loan on file carries the payment the lender actually bills, which can sit a cent from the
@@ -159,6 +168,7 @@ export function baseParams(route: LoanRoute): LoanRouteParams {
     funded: route.funded,
     basis: route.basis,
   };
+  if (route.paymentDay !== undefined) params.day = String(route.paymentDay);
   if (route.payment > 0) params.payment = String(route.payment);
   return params;
 }

@@ -5,6 +5,8 @@ import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
 /** The setup steps, worded in the language on screen; what each one points at never changes. */
 
+let mockBills: { in_spending?: boolean }[] = [];
+
 jest.mock('@/api/queries', () => {
   const none = { data: [], isPending: false };
   return {
@@ -12,14 +14,17 @@ jest.mock('@/api/queries', () => {
     useSalarySources: () => none,
     useCards: () => none,
     useBankAccounts: () => none,
-    useBills: () => none,
+    useBills: () => ({ data: mockBills, isPending: false }),
     useSubscriptions: () => none,
     useReceipts: () => none,
   };
 });
 jest.mock('@/api/mutations', () => ({ useUpdateProfile: () => ({ mutate: jest.fn() }) }));
 
-beforeEach(() => resetLocaleForTests());
+beforeEach(() => {
+  resetLocaleForTests();
+  mockBills = [];
+});
 afterAll(() => resetLocaleForTests());
 
 async function steps() {
@@ -71,5 +76,21 @@ describe('useGettingStarted', () => {
       'subscription',
       'receipt',
     ]);
+  });
+});
+
+describe('the bills step', () => {
+  const billStep = async () => (await steps()).find((step) => step.id === 'bill')!;
+
+  it('is not ticked by a loan kept out of monthly bills, which Bills does not list', async () => {
+    mockBills = [{ in_spending: false }];
+    expect((await billStep()).done).toBe(false);
+  });
+
+  it('is ticked by any bill that counts, a row read before the flag included', async () => {
+    mockBills = [{ in_spending: false }, { in_spending: true }];
+    expect((await billStep()).done).toBe(true);
+    mockBills = [{}];
+    expect((await billStep()).done).toBe(true);
   });
 });

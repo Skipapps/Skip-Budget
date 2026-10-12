@@ -4,7 +4,8 @@ import { join } from 'node:path';
 /**
  * What the migrations leave for loans, read from the files in the order the CLI applies them:
  * save_loan's live signature (and that its grants name that signature, or a dropped function's
- * grants are lost), the changed-payments column and its check, and the rate's precision.
+ * grants are lost), the changed-payments column and its check, the rate's precision, the payment
+ * day, and the "counts toward spending" flag in the recorder and the reminders.
  */
 
 const DIR = join(__dirname, '../../../supabase/migrations');
@@ -42,11 +43,28 @@ function liveSaveLoan(): { file: string; parameters: string; types: string[] } {
   return live;
 }
 
+/** The body of the last `create [or replace] function public.<name>(` across every migration. */
+function liveFunction(name: string): { file: string; body: string } {
+  let live: { file: string; body: string } | null = null;
+  const opening = new RegExp(`create (?:or replace )?function public\\.${name}\\(`, 'gi');
+  for (const file of files) {
+    const text = sql(file);
+    for (const match of text.matchAll(opening)) {
+      const start = match.index ?? 0;
+      const open = text.indexOf('$$', start);
+      const close = text.indexOf('$$', open + 2);
+      live = { file, body: text.slice(start, close + 2) };
+    }
+  }
+  if (!live) throw new Error(`${name} is never created`);
+  return live;
+}
+
 describe('save_loan after every migration', () => {
   const live = liveSaveLoan();
 
-  it('takes the changed payments and the last payment’s date', () => {
-    expect(live.file).toBe('20261009100007_loan_overrides.sql');
+  it('takes the add flow’s switch, payment day and count floor after every earlier parameter', () => {
+    expect(live.file).toBe('20261012100001_loan_add_flow.sql');
     expect(live.types).toEqual([
       'text',
       'text',
@@ -65,12 +83,23 @@ describe('save_loan after every migration', () => {
       'numeric',
       'jsonb',
       'date',
+      'boolean',
+      // Not smallint like its column: Postgres does not cast an integer argument down when it
+      // picks the function, so `p_payment_day => 31` would find no save_loan.
+      'integer',
+      'date',
     ]);
   });
 
-  it('still answers a call from an app that sends neither new parameter', () => {
+  it('still answers a call from an app that sends none of the newer parameters', () => {
     const lines = live.parameters.split(',').map((line) => line.trim());
-    expect(lines.slice(-2).every((line) => /default null$/i.test(line))).toBe(true);
+    expect(lines.slice(-5)).toEqual([
+      expect.stringMatching(/^p_payment_overrides\s+jsonb\s+default null$/i),
+      expect.stringMatching(/^p_last_payment_on\s+date\s+default null$/i),
+      expect.stringMatching(/^p_in_spending\s+boolean\s+default true$/i),
+      expect.stringMatching(/^p_payment_day\s+integer\s+default null$/i),
+      expect.stringMatching(/^p_counts_from\s+date\s+default null$/i),
+    ]);
   });
 
   it('is granted to signed-in callers and kept from anon, by its own signature', () => {
@@ -87,7 +116,58 @@ describe('save_loan after every migration', () => {
   it('drops the signature it replaces, so no call matches two', () => {
     const text = sql(live.file).replace(/\s+/g, ' ');
     expect(text).toContain(
-      'drop function if exists public.save_loan( text, text, numeric, numeric, integer, numeric, numeric, date, public.bill_recurrence, uuid, uuid, date, text, date, numeric );',
+      'drop function if exists public.save_loan( text, text, numeric, numeric, integer, numeric, numeric, date, public.bill_recurrence, uuid, uuid, date, text, date, numeric, jsonb, date );',
+    );
+  });
+
+  it('saves the switch and the payment day, and counts from the floor it is given', () => {
+    const body = liveFunction('save_loan').body.replace(/\s+/g, ' ');
+    expect(body).toContain('coalesce(p_in_spending, true)');
+    expect(body).toContain('payment_overrides, payment_day )');
+    expect(body).toContain(
+      'v_starts_on := greatest(p_first_payment_on, coalesce(p_counts_from, p_first_payment_on));',
+    );
+  });
+
+  it('ends the term on the payment day, clamped to its month, not first + (term - 1) months', () => {
+    const body = liveFunction('save_loan').body.replace(/\s+/g, ' ');
+    expect(body).toContain(
+      'v_day := coalesce(p_payment_day, extract(day from p_first_payment_on)::integer);',
+    );
+    expect(body).not.toContain('p_first_payment_on + make_interval(months => p_term_months - 1)');
+  });
+});
+
+describe('the bills and the scheduler after every migration', () => {
+  const all = files.map(sql).join('\n');
+
+  it('has a flag on every bill that counts unless saved otherwise', () => {
+    expect(all).toMatch(/add column if not exists in_spending boolean not null default true/i);
+  });
+
+  it('records nothing new for a bill kept out of spending, on the server as in the app', () => {
+    const live = liveFunction('record_due_charges');
+    expect(live.file).toBe('20261012100001_loan_add_flow.sql');
+    expect(live.body.replace(/\s+/g, ' ')).toContain(
+      'where b.next_due_on is not null and b.in_spending',
+    );
+  });
+
+  it('stops reminding about a bill once its date has rolled past its end', () => {
+    const live = liveFunction('reminders_due');
+    expect(live.file).toBe('20261012100001_loan_add_flow.sql');
+    expect(live.body.replace(/\s+/g, ' ')).toContain(
+      'when r.bill_id is not null then case when b.next_due_on > b.ends_on then null else b.next_due_on end',
+    );
+  });
+
+  it('keeps both for the scheduler alone', () => {
+    const text = sql('20261012100001_loan_add_flow.sql').replace(/\s+/g, ' ');
+    expect(text).toContain(
+      'revoke all on function public.record_due_charges() from public, anon, authenticated;',
+    );
+    expect(text).toContain(
+      'revoke all on function public.reminders_due() from public, anon, authenticated;',
     );
   });
 });
@@ -124,6 +204,12 @@ describe('the loans table after every migration', () => {
     expect(all).toContain("change.number !~ '^[1-9][0-9]{0,4}$'");
     expect(all).toContain('change.number::integer >= p_term_months');
     expect(all).toContain('change.amount::numeric <> round(change.amount::numeric, 2)');
+  });
+
+  it('has a payment day of 1 to 31, or none', () => {
+    expect(all).toMatch(
+      /add column if not exists payment_day smallint check \(payment_day between 1 and 31\)/i,
+    );
   });
 
   it('keeps the rate to nine decimals, the precision the engine posts exactly', () => {

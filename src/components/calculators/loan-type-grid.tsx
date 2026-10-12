@@ -15,7 +15,8 @@ export function LoanTypeGrid({
   value,
   onChange,
 }: {
-  value: LoanType;
+  /** Null while none is chosen yet. */
+  value: LoanType | null;
   onChange: (type: LoanType) => void;
 }) {
   const icons = useLoanTypeIcons();

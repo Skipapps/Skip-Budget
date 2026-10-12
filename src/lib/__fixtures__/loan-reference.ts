@@ -27,6 +27,8 @@ export type ReferenceLoan = {
   months: number;
   fundedOn: Date;
   firstPaymentOn: Date;
+  /** Payments after the first fall on this day, clamped (`LoanTerms.paymentDay`). */
+  paymentDay?: number;
   basis: AccrualBasis;
   paymentCents: number;
   changes?: Record<number, number>;
@@ -76,7 +78,7 @@ function interestCents(
 }
 
 export function referenceSchedule(loan: ReferenceLoan): ReferenceRow[] {
-  const dates = paymentDates(loan.firstPaymentOn, loan.months);
+  const dates = paymentDates(loan.firstPaymentOn, loan.months, loan.paymentDay);
   const rows: ReferenceRow[] = [];
   let balance = loan.principalCents;
   let previous = loan.fundedOn;

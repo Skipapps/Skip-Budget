@@ -20,6 +20,7 @@ const mockRpc = jest.fn();
 const mockSelects: string[] = [];
 let mockLoan: Record<string, unknown> | null = null;
 let mockHasOverridesColumn = true;
+let mockHasPaymentDayColumn = true;
 let mockReadFailure: Failure | null = null;
 
 jest.mock('@/lib/supabase', () => {
@@ -41,12 +42,20 @@ jest.mock('@/lib/supabase', () => {
             error: { code: '42703', message: 'column loans.payment_overrides does not exist' },
           });
         }
+        if (!mockHasPaymentDayColumn && /\bpayment_day\b/.test(columns)) {
+          return resolve({
+            data: null,
+            error: { code: '42703', message: 'column loans.payment_day does not exist' },
+          });
+        }
         if (!mockLoan) return resolve({ data: null, error: null });
-        const { payment_overrides: overrides, ...rest } = mockLoan;
+        const { payment_overrides: overrides, payment_day: day, ...rest } = mockLoan;
         return resolve({
-          data: /\bpayment_overrides\b/.test(columns)
-            ? { ...rest, payment_overrides: overrides }
-            : rest,
+          data: {
+            ...rest,
+            ...(/\bpayment_overrides\b/.test(columns) ? { payment_overrides: overrides } : {}),
+            ...(/\bpayment_day\b/.test(columns) ? { payment_day: day ?? null } : {}),
+          },
           error: null,
         });
       },
@@ -75,6 +84,7 @@ beforeEach(() => {
   mockSelects.length = 0;
   mockLoan = null;
   mockHasOverridesColumn = true;
+  mockHasPaymentDayColumn = true;
   mockReadFailure = null;
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
@@ -188,6 +198,106 @@ describe('useSaveLoan', () => {
     });
   });
 
+  it('names p_in_spending only for a loan kept out of monthly bills', async () => {
+    const { result } = await renderHook(() => useSaveLoan(), { wrapper });
+    await settle(() => result.current.mutateAsync({ ...LOAN, inSpending: true }));
+    await settle(() => result.current.mutateAsync({ ...LOAN, inSpending: false }));
+
+    expect(mockRpc.mock.calls[0][1]).toEqual(TODAY_ARGS);
+    expect(mockRpc.mock.calls[1][1]).toEqual({ ...TODAY_ARGS, p_in_spending: false });
+  });
+
+  it('names p_payment_day only when the first payment is not on it (clamped)', async () => {
+    const { result } = await renderHook(() => useSaveLoan(), { wrapper });
+    // First payment 1 Nov on day 1: the day says nothing new.
+    await settle(() => result.current.mutateAsync({ ...LOAN, paymentDay: 1 }));
+    await settle(() => result.current.mutateAsync({ ...LOAN, paymentDay: null }));
+    // Day 31, first paid 28 Feb: without the day every later payment would fall on the 28th.
+    await settle(() =>
+      result.current.mutateAsync({ ...LOAN, firstPaymentOn: '2027-02-28', paymentDay: 31 }),
+    );
+
+    expect(mockRpc.mock.calls[0][1]).toEqual(TODAY_ARGS);
+    expect(mockRpc.mock.calls[1][1]).toEqual(TODAY_ARGS);
+    expect(mockRpc.mock.calls[2][1]).toEqual({
+      ...TODAY_ARGS,
+      p_first_payment_on: '2027-02-28',
+      p_payment_day: 31,
+    });
+  });
+
+  it('names p_counts_from only when payments came before the loan was added', async () => {
+    const { result } = await renderHook(() => useSaveLoan(), { wrapper });
+    // Added before its first payment, or on the day of it: everything counts, as before.
+    await settle(() => result.current.mutateAsync({ ...LOAN, countsFrom: '2026-10-12' }));
+    await settle(() => result.current.mutateAsync({ ...LOAN, countsFrom: '2026-11-01' }));
+    // Added after two years of payments: they are history, not this month's spending.
+    await settle(() =>
+      result.current.mutateAsync({
+        ...LOAN,
+        firstPaymentOn: '2024-01-27',
+        fundedOn: '2023-12-27',
+        countsFrom: '2026-10-12',
+      }),
+    );
+
+    expect(mockRpc.mock.calls[0][1]).toEqual(TODAY_ARGS);
+    expect(mockRpc.mock.calls[1][1]).toEqual(TODAY_ARGS);
+    expect(mockRpc.mock.calls[2][1]).toEqual({
+      ...TODAY_ARGS,
+      p_first_payment_on: '2024-01-27',
+      p_funded_on: '2023-12-27',
+      p_counts_from: '2026-10-12',
+    });
+  });
+
+  it('sends all of them together, beside the changed payments', async () => {
+    const { result } = await renderHook(() => useSaveLoan(), { wrapper });
+    await settle(() =>
+      result.current.mutateAsync({
+        ...LOAN,
+        firstPaymentOn: '2025-02-28',
+        paymentOverrides: paymentOverridesJson({ 1: 612.4 }),
+        lastPaymentOn: '2029-12-31',
+        inSpending: false,
+        paymentDay: 31,
+        countsFrom: '2026-10-12',
+      }),
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith('save_loan', {
+      ...TODAY_ARGS,
+      p_first_payment_on: '2025-02-28',
+      p_payment_overrides: { '1': 612.4 },
+      p_last_payment_on: '2029-12-31',
+      p_in_spending: false,
+      p_payment_day: 31,
+      p_counts_from: '2026-10-12',
+    });
+  });
+
+  it('is refused, not saved without them, by a database that lacks them', async () => {
+    // PostgREST v14.5's answer on a database without 20261012100001 (scratch run, 2026-10-12).
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: {
+        code: 'PGRST202',
+        message: 'Could not find the function',
+        details: null,
+        hint: null,
+      },
+    });
+    const { result } = await renderHook(() => useSaveLoan(), { wrapper });
+
+    const thrown = await settle(() =>
+      result.current.mutateAsync({ ...LOAN, inSpending: false }),
+    ).catch((error: unknown) => error);
+
+    expect(thrown).toMatchObject({ code: 'PGRST202' });
+    expect(refusedLoanSave(thrown)).toBeNull();
+    expect(invalidated).toEqual([]);
+  });
+
   it.each([
     [
       'payments',
@@ -278,6 +388,52 @@ describe('useLoanForBill', () => {
     expect(mockSelects).toHaveLength(2);
     expect(mockSelects[1]).toBe(mockSelects[0].replace(', payment_overrides', ''));
     expect(result.current.data).toMatchObject({ principal: 32001, payment_overrides: null });
+  });
+
+  it('reads the payment day, and none on a loan saved without one', async () => {
+    mockLoan = { ...STORED, payment_day: 31 };
+    const { result } = await renderHook(() => useLoanForBill('bill-1'), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockSelects).toHaveLength(1);
+    expect(mockSelects[0]).toMatch(/, payment_overrides, payment_day$/);
+    expect(result.current.data?.payment_day).toBe(31);
+
+    mockLoan = STORED;
+    client.clear();
+    const again = await renderHook(() => useLoanForBill('bill-2'), { wrapper });
+    await waitFor(() => expect(again.result.current.isSuccess).toBe(true));
+    expect(again.result.current.data?.payment_day).toBeNull();
+  });
+
+  it('keeps the changed payments on a database without the payment day', async () => {
+    mockLoan = STORED;
+    mockHasPaymentDayColumn = false;
+    const { result } = await renderHook(() => useLoanForBill('bill-1'), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockSelects).toHaveLength(2);
+    expect(mockSelects[1]).toBe(mockSelects[0].replace(', payment_day', ''));
+    expect(result.current.data).toMatchObject({
+      payment_overrides: { '1': 612.4, '14': 1000 },
+      payment_day: null,
+    });
+  });
+
+  it('reads every loan on a database with neither column', async () => {
+    mockLoan = STORED;
+    mockHasOverridesColumn = false;
+    mockHasPaymentDayColumn = false;
+    const { result } = await renderHook(() => useLoanForBill('bill-1'), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockSelects).toHaveLength(3);
+    expect(mockSelects[2]).not.toMatch(/payment_overrides|payment_day/);
+    expect(result.current.data).toMatchObject({
+      principal: 32001,
+      payment_overrides: null,
+      payment_day: null,
+    });
   });
 
   it('is null for a bill with no loan behind it', async () => {

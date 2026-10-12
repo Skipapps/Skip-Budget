@@ -9,7 +9,7 @@ import { contrast } from '@/lib/tone';
 import { buildTokens, mix, type Tokens } from '@/theme/palette';
 
 /**
- * The Paid with / Paid from tiles, as drawn on the save-loan design: two to a row, each the card's
+ * The Paid with / Paid from tiles, as drawn on the loan designs: two to a row, each the card's
  * colour, its name, its last four and a radio that becomes a plum check; a Skip tile in the same
  * style; one to a row at large text or when a name's word would not fit.
  */

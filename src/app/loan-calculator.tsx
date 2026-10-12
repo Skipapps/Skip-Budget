@@ -235,7 +235,7 @@ export default function LoanCalculatorScreen() {
     warnings.push(t('loan.calculator.balloon', { amount: formatCurrency(contract.finalPayment) }));
   }
 
-  // The loan as priced, in the figures both the schedule and the save page read back.
+  // The loan as set, in the figures the schedule and the payment page read back.
   const loanParams: LoanRouteParams = {
     amount: String(amount),
     rate: String(rate),
@@ -246,9 +246,10 @@ export default function LoanCalculatorScreen() {
   };
 
   /**
-   * Asks before filing anything. `basis` goes to `/save-loan` untouched (`day_count_basis` holds
-   * all four conventions), and the changes go as the schedule took them, so no figure moves
-   * between here and the saved schedule.
+   * Opens the Add loan details on this loan. `basis` goes untouched (`day_count_basis` holds all
+   * four conventions), the payment shown goes as the bank's, and changed payments go as typed: the
+   * review prices them again and says which it cannot keep. Only overpayments are left behind,
+   * which is the one thing worth asking about first.
    */
   const handleSave = async () => {
     if (loan.payment <= 0) return;
@@ -257,21 +258,33 @@ export default function LoanCalculatorScreen() {
       return;
     }
 
-    const ok = await confirm({
-      title: t('loan.calculator.confirmTitle'),
-      message: t(
-        overpaying ? 'loan.calculator.confirmMessageOverpaying' : 'loan.calculator.confirmMessage',
-        { payment: formatCurrency(loan.payment), term: loanTermText(months) },
-      ),
-      confirmLabel: t('common.continue'),
-      cancelLabel: t('common.notNow'),
-    });
-    if (!ok) return;
+    if (overpaying) {
+      const ok = await confirm({
+        title: t('loan.calculator.confirmTitle'),
+        message: t('loan.calculator.confirmMessageOverpaying', {
+          payment: formatCurrency(loan.payment),
+          term: loanTermText(pricedTerms.months),
+        }),
+        confirmLabel: t('common.continue'),
+        cancelLabel: t('common.notNow'),
+      });
+      if (!ok) return;
+    }
 
+    // The priced loan, not the sliders: a beat behind a moving thumb, it is the one whose payment
+    // the card shows.
     router.push({
-      pathname: '/save-loan',
-      // As typed: the save page prices them again and files what the schedule takes.
-      params: { ...loanParams, ...overrideParams(overrides) },
+      pathname: '/add-loan',
+      params: {
+        view: 'details',
+        amount: String(pricedTerms.principal),
+        rate: String(pricedTerms.annualRatePercent),
+        months: String(pricedTerms.months),
+        start: toIsoDate(pricedTerms.firstPaymentOn),
+        funded: toIsoDate(pricedFundedOn),
+        basis: pricedBasis,
+        ...overrideParams({ ...priced.overrides, monthlyPayment: loan.payment }),
+      },
     });
   };
 

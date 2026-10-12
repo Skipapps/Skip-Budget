@@ -5,7 +5,7 @@ import {
   LOAN_COLUMNS,
   readLoanRow,
   useBills,
-  withPaymentOverrides,
+  withNewerLoanColumns,
   type LoanRow,
 } from '@/api/queries';
 import { activeLoans, loanBillEnded } from '@/lib/active-loans';
@@ -99,11 +99,11 @@ export function useLoans(today: string) {
     queryFn: () =>
       withTimeout(
         (async () => {
-          const { data, error } = await withPaymentOverrides((overrides) =>
+          const { data, error } = await withNewerLoanColumns((newer) =>
             supabase
               .from('loans')
               .select(
-                `${LOAN_COLUMNS}${overrides}, created_at, bill:bills!inner(id, name, icon_id, starts_on, next_due_on, ends_on)`,
+                `${LOAN_COLUMNS}${newer}, created_at, bill:bills!inner(id, name, icon_id, starts_on, next_due_on, ends_on)`,
               )
               .order('created_at', { ascending: true })
               .order('id', { ascending: true }),

@@ -788,6 +788,8 @@ function BillForm({
                   rate: String(loan.annual_rate),
                   months: String(loan.term_months),
                   start: terms ? toIsoDate(terms.firstPaymentOn) : '',
+                  // A clamped first payment (28 Feb for the 31st) is not the day the rest fall on.
+                  ...(terms?.paymentDay !== undefined ? { day: String(terms.paymentDay) } : {}),
                   funded: loan.funded_on ?? '',
                   basis: loan.day_count_basis,
                   payment: String(loan.monthly_payment),

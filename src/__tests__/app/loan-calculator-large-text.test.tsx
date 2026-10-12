@@ -142,8 +142,9 @@ describe.each(LOCALES)('in %s (%s) at the largest text size', (language, currenc
     expect(screen.getAllByRole('button', { name: t('common.save') })).toHaveLength(1);
 
     await fireEvent.press(save);
-    expect(mockConfirm).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/save-loan' }));
+    // Nothing is overpaid, so nothing is left behind to ask about.
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: '/add-loan' }));
   });
 
   it('keeps every value beside its label: each label’s widest word fits', async () => {

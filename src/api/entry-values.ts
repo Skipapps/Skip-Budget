@@ -160,6 +160,41 @@ export function buildBillValues(
   };
 }
 
+/** A bill as stored, for the loan guard below. */
+export type StoredBillDates = {
+  icon_id: string | null;
+  next_due_on: string | null;
+  starts_on: string | null;
+  /** A loans row hangs off the bill. */
+  hasLoan: boolean;
+};
+
+/**
+ * The dates an edit may write on a bill a loan lives behind (a loans row, or a 'loan-*' type icon).
+ * The bill form saves the date it shows as both the next due date and the floor, and for a loan
+ * added after payments were made that restarts it below save_loan's count floor: every earlier
+ * payment would be recorded as spending. So a loan with nothing left to come keeps no next due date
+ * and its floor, and a running one never moves its floor earlier. Any other bill saves as edited.
+ */
+export function guardLoanBillDates(
+  values: Partial<BillValues>,
+  stored: StoredBillDates,
+): Partial<BillValues> {
+  const isLoan = stored.hasLoan || Boolean(stored.icon_id?.startsWith('loan-'));
+  if (!isLoan) return values;
+
+  const guarded = { ...values };
+  if (stored.next_due_on === null) {
+    if ('next_due_on' in guarded) guarded.next_due_on = null;
+    if ('starts_on' in guarded) guarded.starts_on = stored.starts_on;
+    return guarded;
+  }
+  if (guarded.starts_on && stored.starts_on && guarded.starts_on < stored.starts_on) {
+    guarded.starts_on = stored.starts_on;
+  }
+  return guarded;
+}
+
 export type SubscriptionInput = {
   service: BrandSelection | null;
   amount: string;

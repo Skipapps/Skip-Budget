@@ -11,6 +11,7 @@ import {
   useSubscriptions,
 } from '@/api/queries';
 import { t } from '@/i18n';
+import { countsInSpending } from '@/lib/bill-spending';
 
 export type SetupStep = {
   id: 'salary' | 'wallet' | 'bill' | 'subscription' | 'receipt';
@@ -63,7 +64,8 @@ export function useGettingStarted() {
       id: 'bill',
       title: t('api.setup.bill.title'),
       detail: t('api.setup.bill.detail'),
-      done: (bills.data?.length ?? 0) > 0,
+      // A loan kept out of monthly bills is not in Bills, so it does not tick "Add your bills".
+      done: (bills.data ?? []).some(countsInSpending),
       href: '/add-bill',
     },
     {

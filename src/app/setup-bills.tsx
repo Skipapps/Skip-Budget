@@ -5,6 +5,7 @@ import { useBills, usePaymentSources } from '@/api/queries';
 import { BillRow } from '@/components/bills/bill-row';
 import { SetupCollection } from '@/components/setup/setup-collection';
 import { t } from '@/i18n';
+import { countsInSpending } from '@/lib/bill-spending';
 import { logoDomainOf } from '@/lib/logo-domain';
 
 /** The bills step of the setup walk-in: add as many as there are, then Done. */
@@ -20,7 +21,7 @@ export default function SetupBillsScreen() {
   // The DB stores positive magnitudes; the UI shows outgoings as negative.
   const bills = useMemo(
     () =>
-      (query.data ?? []).map((row) => ({
+      (query.data ?? []).filter(countsInSpending).map((row) => ({
         id: row.id,
         name: row.name,
         amount: -row.amount,

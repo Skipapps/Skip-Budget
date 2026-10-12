@@ -41,7 +41,6 @@ export function LoanTiles({
       <Tile
         id="add"
         label={t('loan.list.add')}
-        hint={t('loan.list.addHint')}
         icon={AddIcon}
         plum
         stacked={stacked}
@@ -54,7 +53,6 @@ export function LoanTiles({
 function Tile({
   id,
   label,
-  hint,
   icon: Icon,
   plum = false,
   stacked,
@@ -62,7 +60,6 @@ function Tile({
 }: {
   id: string;
   label: string;
-  hint?: string;
   icon: FC<SvgProps>;
   /** The accent fill with white type, as Add loan is drawn. */
   plum?: boolean;
@@ -107,7 +104,6 @@ function Tile({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityHint={hint}
       onPress={withTap(onPress)}
       testID={`loan-tile-${id}`}
       className={cn(

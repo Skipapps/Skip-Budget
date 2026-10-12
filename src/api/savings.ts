@@ -12,6 +12,7 @@ import {
   type SalaryDetailRow,
   type SubscriptionRow,
 } from '@/api/queries';
+import { countsInSpending, withSpendingFlag } from '@/lib/bill-spending';
 import type { Recurrence } from '@/lib/card-ledger';
 import { unrecordedDates } from '@/lib/charges';
 import type { PayFrequency } from '@/lib/date';
@@ -734,6 +735,7 @@ function readBillRow(raw: Raw): BillRow {
     ends_on: text(raw.ends_on),
     card_id: text(raw.card_id),
     bank_account_id: text(raw.bank_account_id),
+    in_spending: raw.in_spending !== false,
   };
 }
 
@@ -804,7 +806,9 @@ export function unwrittenDatesIn(args: {
     if (plan) recorded.set(plan, (recorded.get(plan) ?? new Set()).add(charge.charged_on));
   }
   const running = [
-    ...args.bills.map((bill) => ({
+    // A bill that does not count records nothing new, so its dates after it stopped counting stay
+    // unwritten for good: kept in, it would hold every month open from then on.
+    ...args.bills.filter(countsInSpending).map((bill) => ({
       id: bill.id,
       recurrence: bill.recurrence,
       nextDate: bill.next_due_on,
@@ -849,9 +853,11 @@ async function closingFlows(from: string, to: string, today: string) {
       'charges',
       'id, bill_id, subscription_id, label, amount, charged_on, card_id, bank_account_id',
     ),
-    readAll<Raw>(
-      'bills',
-      'id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at',
+    withSpendingFlag((flag) =>
+      readAll<Raw>(
+        'bills',
+        `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at${flag}`,
+      ),
     ),
     readAll<Raw>(
       'subscriptions',

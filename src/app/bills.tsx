@@ -6,6 +6,7 @@ import { Text, View } from 'react-native';
 import { useArtwork } from '@/theme/artwork';
 import { useBills, useLedger, usePaymentSources } from '@/api/queries';
 import { hidOlder } from '@/lib/allowance';
+import { countsInSpending } from '@/lib/bill-spending';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { FitFigure } from '@/components/ui/fit-group';
@@ -61,7 +62,7 @@ export default function BillsScreen() {
     [charges],
   );
 
-  const planCount = plans.data?.length ?? 0;
+  const planCount = (plans.data ?? []).filter(countsInSpending).length;
 
   return (
     <Screen

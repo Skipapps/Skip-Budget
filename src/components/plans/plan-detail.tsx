@@ -88,7 +88,8 @@ export function PlanDetail({
     () => rangeFor(windowKey, new Date(`${today}T00:00:00`)),
     [windowKey, today],
   );
-  const ledger = useLedger(range, today);
+  // A loan kept out of monthly bills still lists its payments on its own page.
+  const ledger = useLedger(range, today, { uncounted: 'show' });
   // Free lists 90 days back: say this plan's older charges are kept rather than look like none.
   const hiddenOlder = hidOlder(ledger.hidden, kind, id);
 

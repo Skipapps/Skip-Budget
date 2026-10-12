@@ -42,12 +42,18 @@ type ScheduleCardProps = {
 
 /** The way into the payment-by-payment schedule. */
 export function ScheduleCard({ rows, onPress }: ScheduleCardProps) {
+  if (rows.length === 0) return null;
+  return <ScheduleLink count={rows.length} onPress={onPress} />;
+}
+
+/** The same card for a page that knows how many payments there are but holds no rows. */
+export function ScheduleLink({ count, onPress }: { count: number; onPress: () => void }) {
   const colors = useColors();
   const { schedule: Icon } = useLoanIcons();
-  if (rows.length === 0) return null;
+  if (count <= 0) return null;
 
   const title = t('loan.schedule.title');
-  const subtitle = t('loan.scheduleCard.subtitle', { count: rows.length });
+  const subtitle = t('loan.scheduleCard.subtitle', { count });
 
   return (
     <Pressable
