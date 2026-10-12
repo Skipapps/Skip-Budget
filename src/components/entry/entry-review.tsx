@@ -85,7 +85,7 @@ type EntryReviewProps = {
   rows: EntryRowSpec[];
   /** Above the amount: what a scan or a voice reading found. */
   topSlot?: ReactNode;
-  /** Under the card: a bill's loan schedule. */
+  /** Under the card: anything the page adds below it. */
   bottomSlot?: ReactNode;
   primaryLabel: string;
   primaryDisabled?: boolean;

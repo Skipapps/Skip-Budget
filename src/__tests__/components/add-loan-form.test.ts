@@ -2,8 +2,10 @@ import {
   emptyLoanForm,
   firstPaymentOf,
   loanFormFromCalculator,
+  loanFormFromSaved,
   loanName,
   missingFields,
+  withSourceKept,
   paymentDayOf,
   rateFromTyped,
   rateShown,
@@ -12,6 +14,8 @@ import {
   termMonthsOf,
   type LoanForm,
 } from '@/components/loans/add/loan-form';
+import type { LoanDetail } from '@/api/loans';
+import type { PaymentSourceRow } from '@/api/queries';
 import { loanReminderOn } from '@/components/loans/add/loan-reminder';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 import { toIsoDate } from '@/lib/date';
@@ -215,5 +219,137 @@ describe('the reminder date', () => {
   it('is none once every payment is too close or behind', () => {
     expect(loanReminderOn(dues, 3, '2026-11-25')).toBeNull();
     expect(loanReminderOn([], 3, '2026-10-12')).toBeNull();
+  });
+});
+
+describe('a saved loan on the details page', () => {
+  function saved(bill: Partial<LoanDetail['bill']> = {}, loan: Partial<LoanDetail> = {}) {
+    return {
+      id: 'loan-car',
+      bill_id: 'bill-car',
+      principal: 18_000,
+      annual_rate: 6.25,
+      term_months: 48,
+      monthly_payment: 424.8,
+      total_interest: 2390.1,
+      first_payment_on: '2025-01-27',
+      funded_on: '2024-12-27',
+      day_count_basis: 'actual/365',
+      statement_on: null,
+      statement_principal: null,
+      payment_overrides: null,
+      payment_day: null,
+      created_at: '2026-10-12T09:00:00Z',
+      source: null,
+      ...loan,
+      bill: {
+        id: 'bill-car',
+        name: 'Car loan',
+        icon_id: 'loan-car',
+        category_id: 'loans',
+        amount: 424.8,
+        starts_on: '2026-10-27',
+        next_due_on: '2026-10-27',
+        ends_on: '2028-12-27',
+        card_id: null,
+        bank_account_id: 'acct-1',
+        in_spending: true,
+        created_at: '2026-10-12T09:00:00Z',
+        ...bill,
+      },
+    } as LoanDetail;
+  }
+
+  it('fills every box from what was saved, and prices back to the same loan', () => {
+    const filled = loanFormFromSaved(saved());
+    expect(filled).toEqual(
+      expect.objectContaining({
+        monthly: '424.8',
+        principal: '18000',
+        type: 'car',
+        // Still the type's own name, so it follows a change of type.
+        typedName: null,
+        rate: '6.25',
+        term: '4',
+        termUnit: 'years',
+        pickedDay: 27,
+        pinnedFirst: null,
+        sourceId: 'acct-1',
+        basis: 'actual/365',
+      }),
+    );
+    expect(toIsoDate(filled.startDate!)).toBe('2024-12-27');
+    const priced = loanReview(reviewFieldsOf(filled), '2026-10-12');
+    expect(priced.ok && priced.save).toEqual(
+      expect.objectContaining({
+        principal: 18_000,
+        monthlyPayment: 424.8,
+        totalInterest: 2390.1,
+        firstPaymentOn: '2025-01-27',
+        fundedOn: '2024-12-27',
+        paymentDay: null,
+      }),
+    );
+  });
+
+  it('keeps a name of the person’s own, and Skip as Skip', () => {
+    const filled = loanFormFromSaved(saved({ name: 'Our Civic', bank_account_id: null }));
+    expect(filled.typedName).toBe('Our Civic');
+    expect(filled.sourceId).toBe('');
+  });
+
+  it('keeps the payment day of a loan first due on a clamped day', () => {
+    const filled = loanFormFromSaved(
+      saved({}, { first_payment_on: '2025-02-28', funded_on: '2025-01-31', payment_day: 31 }),
+    );
+    expect(filled.pickedDay).toBe(31);
+    expect(filled.pinnedFirst).toBeNull();
+    expect(toIsoDate(firstPaymentOf(filled)!)).toBe('2025-02-28');
+  });
+
+  it('keeps a first payment the rule would put elsewhere, as the calculator saved it', () => {
+    const filled = loanFormFromSaved(saved({}, { first_payment_on: '2025-01-10' }));
+    expect(filled.pinnedFirst).toBe('2025-01-10');
+    expect(toIsoDate(firstPaymentOf(filled)!)).toBe('2025-01-10');
+  });
+
+  it('starts a loan saved without its funding day where its schedule does, and draws an untyped one as Other', () => {
+    const filled = loanFormFromSaved(saved({ icon_id: null, name: 'Loan' }, { funded_on: null }));
+    expect(toIsoDate(filled.startDate!)).toBe('2024-12-27');
+    expect(filled.type).toBe('other');
+    expect(filled.typedName).toBeNull();
+  });
+
+  it('carries the payments changed on the schedule', () => {
+    const filled = loanFormFromSaved(saved({}, { payment_overrides: { '12': 1000 } }));
+    expect(filled.payments).toEqual({ 12: 1000 });
+  });
+});
+
+describe('the Paid from tiles of a saved loan', () => {
+  const tile = (id: string, kind: 'card' | 'account'): PaymentSourceRow => ({
+    id,
+    kind,
+    label: id,
+    color: '#000000',
+  });
+  const offered = [tile('card-1', 'card'), tile('acct-1', 'account')];
+
+  it('adds the card or account it is paid from, among its kind, when the plan does not offer it', () => {
+    expect(withSourceKept(offered, tile('card-2', 'card')).map((source) => source.id)).toEqual([
+      'card-1',
+      'card-2',
+      'acct-1',
+    ]);
+    expect(withSourceKept(offered, tile('acct-2', 'account')).map((source) => source.id)).toEqual([
+      'card-1',
+      'acct-1',
+      'acct-2',
+    ]);
+  });
+
+  it('leaves the tiles as they are when it is offered already, or the loan has none', () => {
+    expect(withSourceKept(offered, tile('card-1', 'card'))).toBe(offered);
+    expect(withSourceKept(offered, null)).toBe(offered);
   });
 });

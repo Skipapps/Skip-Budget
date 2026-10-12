@@ -194,4 +194,103 @@ export const loanFlowMessages = defineMessages({
     es: 'Volver a editar',
     fr: 'Revenir aux détails',
   },
+
+  // Changing a saved loan: the same pages, opened on its details, filled in.
+  'loanFlow.edit.title': { en: 'Edit loan', es: 'Editar préstamo', fr: 'Modifier le prêt' },
+  'loanFlow.edit.close': {
+    en: 'Cancel editing this loan?',
+    es: '¿Dejar de editar este préstamo?',
+    fr: 'Annuler la modification de ce prêt ?',
+  },
+  'loanFlow.edit.save': {
+    en: 'Save changes',
+    es: 'Guardar cambios',
+    fr: 'Enregistrer les modifications',
+  },
+  'loanFlow.edit.delete': { en: 'Delete loan', es: 'Eliminar préstamo', fr: 'Supprimer le prêt' },
+  'loanFlow.edit.deleting': { en: 'Deleting…', es: 'Eliminando…', fr: 'Suppression…' },
+  'loanFlow.edit.deleteTitle': {
+    en: 'Delete this loan?',
+    es: '¿Eliminar este préstamo?',
+    fr: 'Supprimer ce prêt ?',
+  },
+  // Deleting a loan removes its bill, and every payment recorded against it goes too.
+  'loanFlow.edit.deleteMessage': {
+    en: 'Its payment history and reminder are deleted too. This can’t be undone.',
+    es: 'También se eliminan su historial de pagos y su recordatorio. Esto no se puede deshacer.',
+    fr: 'Son historique de paiements et son rappel sont aussi supprimés. Cette action est irréversible.',
+  },
+
+  // The loan's own page.
+  'loanFlow.view.editA11y': { en: 'Edit {name}', es: 'Editar {name}', fr: 'Modifier {name}' },
+  'loanFlow.view.leftToPay': { en: 'Left to pay', es: 'Por pagar', fr: 'Reste à payer' },
+  'loanFlow.view.paymentsLeft': {
+    en: 'Payments left',
+    es: 'Pagos restantes',
+    fr: 'Paiements restants',
+  },
+  // "27 of 48": payments left of every payment the schedule holds.
+  'loanFlow.view.paymentsOf': {
+    en: '{left} of {count}',
+    es: '{left} de {count}',
+    fr: '{left} sur {count}',
+  },
+  'loanFlow.view.seeAll': { en: 'See all', es: 'Ver todo', fr: 'Tout voir' },
+  'loanFlow.view.seeAllA11y': {
+    en: 'See all, {section}',
+    es: 'Ver todo, {section}',
+    fr: 'Tout voir, {section}',
+  },
+  'loanFlow.view.scheduleHint': {
+    en: 'Opens every payment and where it goes.',
+    es: 'Abre todos los pagos y a dónde va cada uno.',
+    fr: 'Ouvre chaque paiement et sa répartition.',
+  },
+  'loanFlow.view.noneLeft': {
+    en: 'No more payments on this loan.',
+    es: 'Este préstamo ya no tiene pagos.',
+    fr: 'Plus aucun paiement sur ce prêt.',
+  },
+  'loanFlow.view.upcomingA11y': {
+    en: 'Payment {number}, {date}. {payment}: {principal} principal, {interest} interest.',
+    es: 'Pago {number}, {date}. {payment}: {principal} a capital, {interest} de intereses.',
+    fr: 'Paiement {number}, {date}. {payment} : {principal} en capital, {interest} d’intérêts.',
+  },
+  'loanFlow.view.history': { en: 'History', es: 'Historial', fr: 'Historique' },
+  'loanFlow.view.historyHint': {
+    en: 'Shows every payment made.',
+    es: 'Muestra todos los pagos hechos.',
+    fr: 'Affiche tous les paiements effectués.',
+  },
+  'loanFlow.view.paidFrom': {
+    en: 'Paid from {source}',
+    es: 'Pagado desde {source}',
+    fr: 'Payé depuis {source}',
+  },
+  'loanFlow.view.historyA11y': {
+    en: 'Payment {number}, {date}, {payment}, paid from {source}.',
+    es: 'Pago {number}, {date}, {payment}, pagado desde {source}.',
+    fr: 'Paiement {number}, {date}, {payment}, payé depuis {source}.',
+  },
+  'loanFlow.view.historyNoSourceA11y': {
+    en: 'Payment {number}, {date}, {payment}.',
+    es: 'Pago {number}, {date}, {payment}.',
+    fr: 'Paiement {number}, {date}, {payment}.',
+  },
+  'loanFlow.view.firstOn': {
+    en: 'Your first payment is on {date}.',
+    es: 'Tu primer pago es el {date}.',
+    fr: 'Ton premier paiement est le {date}.',
+  },
+  'loanFlow.view.noPayments': {
+    en: 'No payments on this loan yet.',
+    es: 'Este préstamo aún no tiene pagos.',
+    fr: 'Aucun paiement sur ce prêt pour l’instant.',
+  },
+  // Read out for the card in one go, in place of the figures drawn.
+  'loanFlow.view.cardA11y': {
+    en: '{name}. {when}. {left} left to pay, {percent} paid off.',
+    es: '{name}. {when}. Quedan {left} por pagar, {percent} pagado.',
+    fr: '{name}. {when}. Reste {left} à payer, {percent} remboursé.',
+  },
 });

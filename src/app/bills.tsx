@@ -7,6 +7,7 @@ import { useArtwork } from '@/theme/artwork';
 import { useBills, useLedger, usePaymentSources } from '@/api/queries';
 import { hidOlder } from '@/lib/allowance';
 import { countsInSpending } from '@/lib/bill-spending';
+import { billPageHref } from '@/lib/ledger-link';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { FitFigure } from '@/components/ui/fit-group';
@@ -63,6 +64,8 @@ export default function BillsScreen() {
   );
 
   const planCount = (plans.data ?? []).filter(countsInSpending).length;
+  const openBill = (id: string, categoryId: string | null | undefined) => () =>
+    router.push(billPageHref(id, categoryId));
 
   return (
     <Screen
@@ -152,7 +155,7 @@ export default function BillsScreen() {
                     domain={entry.domain}
                     categoryId={entry.categoryId}
                     iconId={entry.iconId}
-                    onPress={entry.planId ? () => router.push(`/bill/${entry.planId}`) : undefined}
+                    onPress={entry.planId ? openBill(entry.planId, entry.categoryId) : undefined}
                   />
                 </Fragment>
               ))}

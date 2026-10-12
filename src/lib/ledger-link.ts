@@ -11,13 +11,36 @@ import type { Href } from 'expo-router';
  * - `charge-<id>`: a recorded occurrence; the id names no plan, so it is looked up via `chargeOwners`.
  * - `income-<id>@<date>`: a payday; the salary screen takes no id.
  *
+ * A loan's bill opens the loan's own page (`billPageHref`), wherever its row is.
+ *
  * The id formats come from `src/api/queries.ts`; the test pins them.
  */
 
 /** Mirrors `LedgerEntry['kind']`. */
 type LedgerLinkKind = 'bill' | 'receipt' | 'subscription' | 'income';
 
-export type LedgerLinkEntry = { id: string; kind: LedgerLinkKind };
+export type LedgerLinkEntry = {
+  id: string;
+  kind: LedgerLinkKind;
+  /** A bill's category: 'loans' sends it to the loan's page. */
+  categoryId?: string | null;
+};
+
+/** Every loan is saved under the Loans bill category (`save_loan`). */
+export function isLoanBill(categoryId: string | null | undefined): boolean {
+  return categoryId === 'loans';
+}
+
+/**
+ * A bill's page: the loan's own page for a bill filed under Loans, else the bill page. A Loans bill
+ * with no loan behind it (one added by hand before loans were saved) is sent on from the loan page
+ * to its bill page.
+ */
+export function billPageHref(id: string, categoryId: string | null | undefined): Href {
+  return isLoanBill(categoryId)
+    ? { pathname: '/loan/[id]', params: { id } }
+    : { pathname: '/bill/[id]', params: { id } };
+}
 
 export type ChargeOwnerRow = {
   id: string;
@@ -68,6 +91,6 @@ export function ledgerHref(
   if (!id) return null;
 
   return entry.kind === 'bill'
-    ? { pathname: '/bill/[id]', params: { id } }
+    ? billPageHref(id, entry.categoryId)
     : { pathname: '/subscription/[id]', params: { id } };
 }

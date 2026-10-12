@@ -1,4 +1,4 @@
-import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
+import { billPageHref, chargeOwners, isLoanBill, ledgerHref } from '@/lib/ledger-link';
 
 /**
  * Ids are written out by hand: they are the exact strings `useLedger` builds, so a format change fails here.
@@ -17,6 +17,22 @@ describe('ledgerHref', () => {
 
   it('opens a projected bill on the page of the plan that projected it, not the date', () => {
     expect(ledgerHref({ id: 'bill-b1@2026-09-12', kind: 'bill' })).toEqual({
+      pathname: '/bill/[id]',
+      params: { id: 'b1' },
+    });
+  });
+
+  it('opens a loan’s payment on the loan’s own page, projected or written down', () => {
+    const owners = chargeOwners([{ id: 'c7', bill_id: 'l1', subscription_id: null }]);
+    const loan = { pathname: '/loan/[id]', params: { id: 'l1' } };
+    expect(ledgerHref({ id: 'bill-l1@2026-10-27', kind: 'bill', categoryId: 'loans' })).toEqual(
+      loan,
+    );
+    expect(ledgerHref({ id: 'charge-c7', kind: 'bill', categoryId: 'loans' }, owners)).toEqual(
+      loan,
+    );
+    // Any other category, or none, stays a bill.
+    expect(ledgerHref({ id: 'bill-b1@2026-10-01', kind: 'bill', categoryId: 'housing' })).toEqual({
       pathname: '/bill/[id]',
       params: { id: 'b1' },
     });
@@ -90,5 +106,19 @@ describe('chargeOwners', () => {
 
     expect(owners.get('charge-c1')).toBe('b1');
     expect(owners.has('charge-c2')).toBe(false);
+  });
+});
+
+describe('billPageHref', () => {
+  it('sends a bill filed under Loans to the loan page and any other to the bill page', () => {
+    expect(isLoanBill('loans')).toBe(true);
+    expect(isLoanBill('housing')).toBe(false);
+    expect(isLoanBill(null)).toBe(false);
+    expect(billPageHref('l1', 'loans')).toEqual({ pathname: '/loan/[id]', params: { id: 'l1' } });
+    expect(billPageHref('b1', 'utilities')).toEqual({
+      pathname: '/bill/[id]',
+      params: { id: 'b1' },
+    });
+    expect(billPageHref('b1', undefined)).toEqual({ pathname: '/bill/[id]', params: { id: 'b1' } });
   });
 });

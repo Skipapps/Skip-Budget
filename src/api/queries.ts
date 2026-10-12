@@ -444,6 +444,35 @@ export function cardLabel(card: Pick<CardRow, 'network' | 'last4'>): string {
   return card.last4 ? `${card.network} ••${card.last4}` : card.network;
 }
 
+/** A card as the Paid with tiles draw it. */
+export function cardSource(
+  card: Pick<CardRow, 'id' | 'holder' | 'network' | 'last4' | 'color'>,
+): PaymentSourceRow {
+  return {
+    id: card.id,
+    label: cardLabel(card),
+    // Its own name tells two cards on one network apart.
+    name: card.holder?.trim() || card.network,
+    last4: card.last4,
+    color: card.color,
+    kind: 'card',
+  };
+}
+
+/** A bank account as the Paid with tiles draw it. */
+export function accountSource(
+  account: Pick<BankAccountRow, 'id' | 'bank_name' | 'nickname' | 'last4' | 'color'>,
+): PaymentSourceRow {
+  return {
+    id: account.id,
+    label: accountLabel(account),
+    name: account.nickname?.trim() || account.bank_name?.trim(),
+    last4: account.last4,
+    color: account.color,
+    kind: 'account',
+  };
+}
+
 export function usePaymentSources() {
   const cards = useCards();
   const accounts = useBankAccounts();
@@ -456,23 +485,8 @@ export function usePaymentSources() {
   const usableAccounts = pro ? (accounts.data ?? []) : (accounts.data ?? []).slice(0, 1);
 
   const sources: PaymentSourceRow[] = [
-    ...usableCards.map((card) => ({
-      id: card.id,
-      label: cardLabel(card),
-      // Its own name tells two cards on one network apart.
-      name: card.holder?.trim() || card.network,
-      last4: card.last4,
-      color: card.color,
-      kind: 'card' as const,
-    })),
-    ...usableAccounts.map((account) => ({
-      id: account.id,
-      label: accountLabel(account),
-      name: account.nickname?.trim() || account.bank_name?.trim(),
-      last4: account.last4,
-      color: account.color,
-      kind: 'account' as const,
-    })),
+    ...usableCards.map(cardSource),
+    ...usableAccounts.map(accountSource),
   ];
 
   return {

@@ -165,7 +165,7 @@ const LAST_TODAY = loan(
   { next_due_on: TODAY, ends_on: TODAY },
 );
 
-const statusOf = (row: LoanListRow) => loanStatus(loanTermsOf(row)!, TODAY);
+const statusOf = (row: LoanListRow, on = TODAY) => loanStatus(loanTermsOf(row)!, on);
 const hidden = { includeHiddenElements: true };
 
 /** Every string drawn or read out, in tree order. */
@@ -367,7 +367,7 @@ describe('a loan’s card', () => {
     expect(screen.getAllByTestId('icon-type-other', hidden)).toHaveLength(2);
   });
 
-  it('reads as one summary, and opens the loan’s bill from View details only', async () => {
+  it('reads as one summary, and opens the loan’s page from View details only', async () => {
     await render(<LoansScreen />);
     const card = screen.getByTestId('loan-card-bill-car');
     expect(card.props.accessibilityRole).toBeUndefined();
@@ -380,11 +380,11 @@ describe('a loan’s card', () => {
 
     expect(within(card).getAllByRole('button')).toHaveLength(1);
     const details = screen.getByRole('button', { name: 'View details, Car loan' });
-    expect(details.props.accessibilityHint).toBe('Opens the loan’s bill.');
+    expect(details.props.accessibilityHint).toBe('Opens the loan.');
     // The card's own action is the compact 48pt pill.
     expect(details.props.className).toContain('min-h-[48px]');
     await fireEvent.press(details);
-    expect(mockPush).toHaveBeenCalledWith('/bill/bill-car');
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/loan/[id]', params: { id: 'bill-car' } });
   });
 });
 
@@ -400,15 +400,16 @@ describe('finished loans', () => {
     expect(within(screen.getByTestId('loan-card-bill-old')).queryByText('Next')).toBeNull();
 
     await fireEvent.press(screen.getByRole('button', { name: 'View details, Laptop loan' }));
-    expect(mockPush).toHaveBeenCalledWith('/bill/bill-old');
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/loan/[id]', params: { id: 'bill-old' } });
   });
 
   it('says a stopped loan stopped, and keeps what it still owes in sight', async () => {
     mockLoans = { loans: [PERSONAL, ENDED, UNDATED], isPending: false, isError: false };
     await render(<LoansScreen />);
-    const owed = statusOf(ENDED).amountLeft;
+    // Read as of the day its bill stopped: nothing was paid on it after that.
+    const owed = statusOf(ENDED, '2026-06-05').amountLeft;
     expect(owed).toBeGreaterThan(0);
-    expect(statusOf(ENDED).paidOff).toBe(false);
+    expect(statusOf(ENDED, '2026-06-05').paidOff).toBe(false);
     expect(screen.getByText(`Stopped on 5 Jun 2026 · ${formatCurrency(owed)} left`)).toBeTruthy();
     expect(
       screen.getByText(`Stopped · ${formatCurrency(statusOf(UNDATED).amountLeft)} left`),
@@ -423,6 +424,21 @@ describe('finished loans', () => {
     const card = within(screen.getByTestId('loans-summary'));
     expect(card.getByText(formatCurrency(statusOf(PERSONAL).amountLeft))).toBeTruthy();
     expect(card.getByText('1 loan')).toBeTruthy();
+  });
+
+  it('freezes a stopped loan at the day it stopped, never counting the payments after it', async () => {
+    mockLoans = { loans: [PERSONAL, ENDED], isPending: false, isError: false };
+    await render(<LoansScreen />);
+    const atStop = statusOf(ENDED, '2026-06-05');
+    const ifStillPaid = statusOf(ENDED);
+    // Six payments (5 Jan to 5 Jun) were made before it stopped; today's reading would say ten.
+    expect(atStop.paymentsMade).toBe(6);
+    expect(ifStillPaid.paymentsMade).toBe(10);
+    expect(atStop.amountLeft).toBeGreaterThan(ifStillPaid.amountLeft);
+    expect(
+      screen.getByText(`Stopped on 5 Jun 2026 · ${formatCurrency(atStop.amountLeft)} left`),
+    ).toBeTruthy();
+    expect(screen.queryByText(formatCurrency(ifStillPaid.amountLeft), { exact: false })).toBeNull();
   });
 
   it('counts a loan as paid off on its last payment’s own day, as the Cards tab does', async () => {

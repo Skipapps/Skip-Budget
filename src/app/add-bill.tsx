@@ -13,7 +13,6 @@ import { buildBillValues } from '@/api/entry-values';
 import { useCreateBill, useDeleteBill, useUpdateBill } from '@/api/mutations';
 import { usePastCharges } from '@/api/past-charges';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
-import { ScheduleCard } from '@/components/calculators/schedule-card';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
 import { BillIconWell } from '@/components/bills/bill-icon';
@@ -52,10 +51,6 @@ import { success, warn } from '@/lib/haptics';
 import { failureMessage, failureText } from '@/lib/failure';
 import { logoColumns } from '@/lib/logo-columns';
 import { logoDomainOf } from '@/lib/logo-domain';
-import { amortise, readPaymentOverrides } from '@/lib/loan';
-import { loanTermsForBill } from '@/lib/loan-start';
-import { toIsoDate } from '@/lib/date';
-import { overrideParams } from '@/lib/loan-route';
 import {
   cameFromVoice,
   clearVoiceDraft,
@@ -303,11 +298,8 @@ function BillForm({
   const [error, setError] = useState<string | null>(null);
 
   const { sources } = usePaymentSources();
-  // Present only when this bill came from the loan calculator.
+  // A loan behind the bill keeps its type icon through an edit (`buildBillValues`).
   const { data: loan } = useLoanForBill(id);
-  // The same terms the Loans page builds, so both show the same schedule.
-  const terms = loan ? loanTermsForBill(loan, existing) : null;
-  const schedule = terms ? amortise(terms).rows : [];
   const createBill = useCreateBill();
   const updateBill = useUpdateBill();
   const pastCharges = usePastCharges('bill', id);
@@ -774,33 +766,6 @@ function BillForm({
       amount={amount}
       onEditAmount={() => setView('amountEdit')}
       rows={rows}
-      bottomSlot={
-        schedule.length > 0 && loan ? (
-          <ScheduleCard
-            rows={schedule}
-            onPress={() =>
-              router.push({
-                pathname: '/loan-schedule',
-                params: {
-                  // The stored convention and contract payment, not re-derived: the full schedule
-                  // must be the same loan to the cent as the card above.
-                  amount: String(loan.principal),
-                  rate: String(loan.annual_rate),
-                  months: String(loan.term_months),
-                  start: terms ? toIsoDate(terms.firstPaymentOn) : '',
-                  // A clamped first payment (28 Feb for the 31st) is not the day the rest fall on.
-                  ...(terms?.paymentDay !== undefined ? { day: String(terms.paymentDay) } : {}),
-                  funded: loan.funded_on ?? '',
-                  basis: loan.day_count_basis,
-                  payment: String(loan.monthly_payment),
-                  name: name || t('bills.add.paymentSchedule'),
-                  ...overrideParams({ payments: readPaymentOverrides(loan.payment_overrides) }),
-                },
-              })
-            }
-          />
-        ) : null
-      }
       primaryLabel={
         busy
           ? t('bills.add.saving')

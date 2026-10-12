@@ -213,11 +213,6 @@ export const billsMessages = defineMessages({
     es: 'Borrar — sin fecha de fin',
     fr: 'Effacer — sans date de fin',
   },
-  'bills.add.paymentSchedule': {
-    en: 'Payment schedule',
-    es: 'Calendario de pagos',
-    fr: 'Calendrier des paiements',
-  },
   // The company field's placeholder per category. Lists of company names are not messages.
   'bills.add.issuer.housing': {
     en: 'Rent, mortgage or your landlord',

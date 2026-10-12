@@ -17,6 +17,7 @@ import {
   type LoanForm,
   type TermUnit,
 } from '@/components/loans/add/loan-form';
+import { QuietAction } from '@/components/savings/quiet-action';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextField } from '@/components/ui/text-field';
 import { FieldLabel, SectionHeading } from '@/components/ui/typography';
@@ -77,9 +78,12 @@ const amountOf = (draft: string) => (draft ? Number(draft) : 0);
 
 /**
  * The loan's details: its type, one card of fields, then where it is paid from. Continue never
- * greys out; it says what is still missing.
+ * greys out; it says what is still missing. A saved loan being changed has its Delete at the end.
  */
 export function LoanDetailsView({
+  title = t('loanFlow.details.title'),
+  closePrompt = t('loanFlow.close'),
+  onDelete,
   form,
   onChange,
   sources,
@@ -92,6 +96,9 @@ export function LoanDetailsView({
   error,
   scrollPlace,
 }: {
+  title?: string;
+  closePrompt?: string;
+  onDelete?: { onPress: () => void; busy: boolean };
   form: LoanForm;
   onChange: (patch: Partial<LoanForm>) => void;
   sources: readonly PaymentSourceRow[];
@@ -116,9 +123,9 @@ export function LoanDetailsView({
 
   return (
     <LoanFlowPage
-      title={t('loanFlow.details.title')}
+      title={title}
       onBack={onBack}
-      closePrompt={t('loanFlow.close')}
+      closePrompt={closePrompt}
       root={root}
       avoidKeyboard
       scrollPlace={scrollPlace}
@@ -243,6 +250,17 @@ export function LoanDetailsView({
           }}
         />
       </View>
+
+      {onDelete ? (
+        <QuietAction
+          className="mb-4"
+          tone="danger"
+          label={onDelete.busy ? t('loanFlow.edit.deleting') : t('loanFlow.edit.delete')}
+          onPress={onDelete.onPress}
+          disabled={onDelete.busy}
+          testID="loan-delete"
+        />
+      ) : null}
     </LoanFlowPage>
   );
 }

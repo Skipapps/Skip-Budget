@@ -16,9 +16,14 @@ jest.mock('react-native-keyboard-controller', () =>
 );
 
 let mockId = 'b1';
+const mockRedirect = jest.fn();
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
   useLocalSearchParams: () => ({ id: mockId }),
+  Redirect: ({ href }: { href: unknown }) => {
+    mockRedirect(href);
+    return null;
+  },
 }));
 
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
@@ -62,6 +67,11 @@ const mockBills = {
   refetch: jest.fn(),
 };
 
+// No loan behind the bill unless a test says so: the page stays a bill page.
+const NO_LOAN = { data: { kind: 'bill' } as unknown, isPending: false, isError: false };
+let mockLoanRead = NO_LOAN;
+jest.mock('@/api/loans', () => ({ useLoanDetail: () => mockLoanRead }));
+
 const mockLedger = jest.fn();
 // Charges the window holds but a free list leaves out (older than 90 days).
 let mockOlder: string[] = [];
@@ -100,6 +110,7 @@ jest.mock('@/api/queries', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockId = 'b1';
+  mockLoanRead = NO_LOAN;
 });
 
 it('shows the bill, then its paid and upcoming charges as one timeline', async () => {
@@ -241,5 +252,67 @@ describe('at large text sizes', () => {
       screen.getByTestId(`fit-slot-${upcoming}-date`).parent,
     );
     expect(screen.getAllByText('-$1,030.00').length).toBeGreaterThan(0);
+  });
+});
+
+describe('a loan’s bill', () => {
+  const LOAN_BILL = {
+    id: 'l1',
+    name: 'Car loan',
+    amount: 424.8,
+    category_id: 'loans',
+    icon_id: 'loan-car',
+    recurrence: 'monthly',
+    next_due_on: '2026-10-27',
+    starts_on: '2026-10-27',
+    card_id: null,
+    bank_account_id: 'acc1',
+    brands: null,
+  };
+  const withLoanBill = () => {
+    const bills = mockBills.data;
+    mockBills.data = [...(bills ?? []), LOAN_BILL];
+    mockId = 'l1';
+    return () => {
+      mockBills.data = bills;
+    };
+  };
+
+  it('goes on to the loan’s own page once the loan is read', async () => {
+    const restore = withLoanBill();
+    mockLoanRead = { data: { kind: 'loan', loan: {} }, isPending: false, isError: false };
+    const screen = await render(<BillDetailScreen />);
+
+    expect(mockRedirect).toHaveBeenCalledWith({ pathname: '/loan/[id]', params: { id: 'l1' } });
+    expect(screen.queryByText('$424.80')).toBeNull();
+    restore();
+  });
+
+  it('waits for the loan before drawing a Loans bill, so it never flashes the bill page', async () => {
+    const restore = withLoanBill();
+    mockLoanRead = { data: undefined, isPending: true, isError: false };
+    const screen = await render(<BillDetailScreen />);
+
+    expect(screen.queryByText('$424.80')).toBeNull();
+    expect(mockRedirect).not.toHaveBeenCalled();
+    restore();
+  });
+
+  it.each([
+    ['with no loan behind it', NO_LOAN],
+    ['when the loan cannot be read', { data: undefined, isPending: false, isError: true }],
+  ])('stays a bill page for a Loans bill %s', async (_, read) => {
+    const restore = withLoanBill();
+    mockLoanRead = read;
+    const screen = await render(<BillDetailScreen />);
+    expect(screen.getByText('$424.80')).toBeTruthy();
+    expect(mockRedirect).not.toHaveBeenCalled();
+    restore();
+  });
+
+  it('never waits on the loan read for a bill of another kind', async () => {
+    mockLoanRead = { data: undefined, isPending: true, isError: false };
+    const screen = await render(<BillDetailScreen />);
+    expect(screen.getByText('$1,030.00')).toBeTruthy();
   });
 });

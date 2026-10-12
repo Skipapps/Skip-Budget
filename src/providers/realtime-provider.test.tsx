@@ -12,8 +12,13 @@ import { RealtimeProvider } from '@/providers/realtime-provider';
 
 let mockUserId: string | null = 'user-A';
 
+type Listener = { table: string; onChange: () => void };
+const mockListeners: Listener[] = [];
 const mockChain = {
-  on: () => mockChain,
+  on: (_event: string, filter: { table: string }, onChange: () => void) => {
+    mockListeners.push({ table: filter.table, onChange });
+    return mockChain;
+  },
   subscribe: () => mockChain,
 };
 const mockChannel = jest.fn((_topic: string, _options?: unknown) => mockChain);
@@ -51,6 +56,7 @@ async function renderProvider() {
 }
 
 beforeEach(() => {
+  mockListeners.length = 0;
   mockUserId = 'user-A';
   mockChannel.mockClear();
   mockRemoveChannel.mockClear();
@@ -79,4 +85,28 @@ describe('RealtimeProvider', () => {
 
     await unmount();
   });
+
+  it.each(['cards', 'bank_accounts'])(
+    'refreshes the loan pages when %s change on another device, as they name them',
+    async (table) => {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+      const invalidated: unknown[][] = [];
+      jest.spyOn(client, 'invalidateQueries').mockImplementation((filters) => {
+        invalidated.push((filters?.queryKey ?? []) as unknown[]);
+        return Promise.resolve();
+      });
+      const { unmount } = await render(
+        <QueryClientProvider client={client}>
+          <RealtimeProvider>
+            <Text>Home</Text>
+          </RealtimeProvider>
+        </QueryClientProvider>,
+      );
+
+      mockListeners.find((listener) => listener.table === table)?.onChange();
+
+      expect(invalidated).toEqual([[table], ['dashboard'], ['loans']]);
+      await unmount();
+    },
+  );
 });

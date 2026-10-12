@@ -19,6 +19,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { usePaymentSources, useBills } from '@/api/queries';
 import { getBillCategory } from '@/data/bill-categories';
 import { countsInSpending } from '@/lib/bill-spending';
+import { billPageHref } from '@/lib/ledger-link';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { t } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
@@ -207,7 +208,7 @@ export default function BillPlansScreen() {
                   key={bill.id}
                   bill={bill}
                   sourceLabel={sourceLabels.get(bill.sourceId) ?? ''}
-                  onPress={() => router.push(`/bill/${bill.id}`)}
+                  onPress={() => router.push(billPageHref(bill.id, bill.categoryId))}
                 />
               ))}
             </View>

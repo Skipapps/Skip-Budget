@@ -67,6 +67,8 @@ export type ReviewReminder = {
  * the two choices that go with it and the way into its schedule. Save is pinned.
  */
 export function LoanReviewView({
+  title = t('loanFlow.review.title'),
+  saveLabel = t('loanFlow.review.save'),
   name,
   type,
   figures,
@@ -83,6 +85,8 @@ export function LoanReviewView({
   onBackToEdit,
   closePrompt,
 }: {
+  title?: string;
+  saveLabel?: string;
   name: string;
   type: LoanType;
   figures: LoanReviewFigures;
@@ -157,14 +161,14 @@ export function LoanReviewView({
 
   return (
     <LoanFlowPage
-      title={t('loanFlow.review.title')}
+      title={title}
       onBack={onBack}
       closePrompt={closePrompt}
       root={root}
       footer={
         <LoanFlowFooter
           error={error}
-          label={busy ? t('loan.save.saving') : t('loanFlow.review.save')}
+          label={busy ? t('loan.save.saving') : saveLabel}
           onPress={onSave}
           disabled={busy}
           secondary={

@@ -1,4 +1,8 @@
-import { activeLoans, loanFinished, type LoanBill } from '@/lib/active-loans';
+import { WIREFRAME } from '@/lib/__fixtures__/add-loan-reference';
+import { activeLoans, loanFinished, loanPricingDay, type LoanBill } from '@/lib/active-loans';
+import { termsFromStored, type LoanTerms } from '@/lib/loan';
+import { loanStatus } from '@/lib/loan-status';
+import { loanHistory, upcomingPayments } from '@/lib/loan-view';
 
 const TODAY = '2026-10-09';
 
@@ -62,5 +66,99 @@ describe('loanFinished', () => {
   it('is running while both have payments to come', () => {
     expect(loanFinished(running, TODAY, '2030-01-01')).toBe(false);
     expect(loanFinished(running, TODAY)).toBe(false);
+  });
+});
+
+describe('loanPricingDay', () => {
+  /** The wireframe loan as the Add Loan flow saves it: 48 × $424.80 from 27 Jan 2025 to 27 Dec 2028. */
+  const CAR = termsFromStored({
+    principal: WIREFRAME.principal,
+    annual_rate: WIREFRAME.annualRate,
+    term_months: WIREFRAME.months,
+    monthly_payment: WIREFRAME.paymentCents / 100,
+    first_payment_on: WIREFRAME.firstPayment,
+    funded_on: WIREFRAME.start,
+    day_count_basis: 'actual/365',
+    statement_on: null,
+    statement_principal: null,
+  }) as LoanTerms;
+  const NOW = '2026-10-12';
+  const runningBill = { next_due_on: '2026-10-27', ends_on: '2028-12-27' };
+
+  /** What both pages read for a loan: its status and history on the pricing day. */
+  const priced = (bill: Pick<LoanBill, 'next_due_on' | 'ends_on'>, today: string) => {
+    const day = loanPricingDay(bill, today);
+    const status = loanStatus(CAR, day);
+    return {
+      day,
+      status,
+      history: loanHistory(CAR, day),
+      finished: loanFinished(bill, today, status.lastPaymentOn),
+    };
+  };
+
+  it('freezes a loan stopped mid-schedule at its end date: nothing after it is made', () => {
+    // Stopped 10 Apr 2026: payment 15 (27 Mar) was the last made, leaving $12,846.15.
+    const stopped = { next_due_on: '2026-04-27', ends_on: '2026-04-10' };
+    for (const today of [NOW, '2027-06-01', '2031-01-01']) {
+      const { day, status, history, finished } = priced(stopped, today);
+      expect(day).toBe('2026-04-10');
+      expect(status).toMatchObject({
+        paymentsMade: 15,
+        paymentsLeft: 33,
+        amountLeft: 12_846.15,
+        // 5,153.85 / 18,000 = 28.6%.
+        percentPaid: 29,
+        paidOff: false,
+      });
+      expect(history.total).toBe(15);
+      expect(history.entries[0]).toMatchObject({ number: 15, date: '2026-03-27' });
+      // Finished, with money left: the page's "Stopped on 10 Apr 2026 · $12,846.15 left".
+      expect(finished).toBe(true);
+    }
+    // Priced on today instead, the payments after the stop would read as made.
+    expect(loanStatus(CAR, NOW)).toMatchObject({ paymentsMade: 21, amountLeft: 10_673.67 });
+  });
+
+  it('counts a payment on the end date itself as made', () => {
+    const { status, history } = priced({ next_due_on: null, ends_on: '2026-03-27' }, NOW);
+    expect(status).toMatchObject({ paymentsMade: 15, amountLeft: 12_846.15 });
+    expect(history.entries[0].date).toBe('2026-03-27');
+  });
+
+  it('is today when the bill ends today', () => {
+    expect(loanPricingDay({ ends_on: NOW }, NOW)).toBe(NOW);
+    expect(priced({ ...runningBill, ends_on: NOW }, NOW).status).toEqual(loanStatus(CAR, NOW));
+    // Ending on a payment day: that payment is made, as on any other day.
+    const { status } = priced({ ...runningBill, ends_on: '2026-09-27' }, '2026-09-27');
+    expect(status).toMatchObject({ paymentsMade: 21, amountLeft: 10_673.67 });
+  });
+
+  it('changes nothing for a bill ended on or after the last payment: it is paid off as normal', () => {
+    for (const endsOn of ['2028-12-27', '2029-01-31']) {
+      for (const today of ['2028-12-27', '2030-01-01']) {
+        const { status, history, finished } = priced({ ...runningBill, ends_on: endsOn }, today);
+        expect(status).toEqual(loanStatus(CAR, today));
+        expect(status).toMatchObject({
+          paymentsMade: 48,
+          amountLeft: 0,
+          percentPaid: 100,
+          paidOff: true,
+        });
+        expect(history.total).toBe(48);
+        // Finished and paid off: "Paid off on 27 Dec 2028".
+        expect(finished).toBe(true);
+      }
+    }
+  });
+
+  it('is today while the bill runs on, or has no end date', () => {
+    expect(loanPricingDay(runningBill, NOW)).toBe(NOW);
+    expect(loanPricingDay({ ends_on: null }, NOW)).toBe(NOW);
+    expect(loanPricingDay({}, NOW)).toBe(NOW);
+    // A bill with neither a next date nor an end date has no stop date to freeze on.
+    const noDates: Pick<LoanBill, 'next_due_on' | 'ends_on'> = { next_due_on: null, ends_on: null };
+    expect(loanPricingDay(noDates, NOW)).toBe(NOW);
+    expect(upcomingPayments(CAR, loanPricingDay(runningBill, NOW), 1)[0].date).toBe('2026-10-27');
   });
 });

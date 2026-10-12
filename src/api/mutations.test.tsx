@@ -6,7 +6,9 @@ import {
   NOTHING_SAVED,
   NOTHING_UPDATED,
   useSetRowLogo,
+  useUpdateBankAccount,
   useUpdateBill,
+  useUpdateCard,
   useUpdateProfile,
   useUpdateReceipt,
   useUpdateSubscription,
@@ -167,6 +169,20 @@ describe('useUpdate', () => {
       expect(invalidated).toContainEqual([single, 'row-7']);
       // Only that row: every other open detail page keeps its cache.
       expect(invalidated).not.toContainEqual([single]);
+    },
+  );
+
+  it.each([
+    ['card', () => useUpdateCard()],
+    ['account', () => useUpdateBankAccount()],
+  ] as const)(
+    'refreshes the loan pages, which name the %s a loan is paid from',
+    async (_, hook) => {
+      const { result } = await renderHook(hook, { wrapper });
+
+      await result.current.mutateAsync({ id: 'row-1', values: { color: '#905479' } });
+
+      expect(invalidated).toContainEqual(['loans']);
     },
   );
 

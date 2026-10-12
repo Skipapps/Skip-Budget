@@ -65,9 +65,22 @@ const mockToast = jest.fn();
 jest.mock('@/providers/toast-context', () => ({ useToast: () => mockToast }));
 
 const mockSave = jest.fn(async (_input: Record<string, unknown>) => ({ id: 'bill-9' }));
+const mockUpdate = jest.fn(async (input: { billId: string }) => ({ id: input.billId }));
+const mockDelete = jest.fn(async (id: string) => ({ id }));
 jest.mock('@/api/mutations', () => ({
   useSaveLoan: () => ({ mutateAsync: mockSave, isPending: false }),
+  useUpdateLoan: () => ({ mutateAsync: mockUpdate, isPending: false }),
+  useDeleteBill: () => ({ mutateAsync: mockDelete, isPending: false }),
 }));
+jest.mock('@/components/ui/skeleton', () => {
+  const { View } = jest.requireActual('react-native');
+  return { SkeletonList: () => <View testID="skeleton" />, Skeleton: () => null };
+});
+jest.mock('@/theme/artwork', () => ({
+  useArtwork: () => new Proxy({}, { get: () => () => null }),
+}));
+let mockDetail: { data: unknown; isPending: boolean; isError: boolean; refetch: () => void };
+jest.mock('@/api/loans', () => ({ useLoanDetail: () => mockDetail }));
 jest.mock('@/api/queries', () => ({
   usePaymentSources: () => ({
     sources: [
@@ -94,9 +107,11 @@ jest.mock('@/api/queries', () => ({
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/api/push', () => ({ enableReminders: jest.fn() }));
 const mockApplyReminder = jest.fn(async (..._args: unknown[]) => {});
+let mockReminderChoice = { choice: 'off', remindAt: '09:00', unknown: false };
 jest.mock('@/api/reminders', () => ({
   ...jest.requireActual('@/api/reminders'),
   useApplyReminder: () => mockApplyReminder,
+  useReminderChoice: () => mockReminderChoice,
 }));
 
 const mockNav = jest.fn();
@@ -105,6 +120,7 @@ const mockSwipe: boolean[] = [];
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useFocusEffect: () => {},
+  useIsFocused: () => true,
   Stack: {
     Screen: ({ options }: { options: { gestureEnabled: boolean } }) => {
       mockSwipe.push(options.gestureEnabled);
@@ -130,6 +146,8 @@ beforeEach(() => {
   mockParams = {};
   mockSwipe.length = 0;
   mockPickedDay = new Date(2024, 11, 27);
+  mockDetail = { data: undefined, isPending: true, isError: false, refetch: jest.fn() };
+  mockReminderChoice = { choice: 'off', remindAt: '09:00', unknown: false };
 });
 
 const press = (node: Node) => fireEvent.press(node);
@@ -726,5 +744,282 @@ describe('from the calculator', () => {
         fundedOn: '2026-09-12',
       }),
     );
+  });
+});
+
+describe('changing a saved loan', () => {
+  /** The wireframe loan as Add loan saved it, paid from Chase, reminding a day ahead at 8:30. */
+  function savedLoan(bill: Record<string, unknown> = {}, loan: Record<string, unknown> = {}) {
+    return {
+      id: 'loan-car',
+      bill_id: 'bill-car',
+      principal: 18_000,
+      annual_rate: 6.25,
+      term_months: 48,
+      monthly_payment: 424.8,
+      total_interest: 2390.1,
+      first_payment_on: '2025-01-27',
+      funded_on: '2024-12-27',
+      day_count_basis: 'actual/365',
+      statement_on: null,
+      statement_principal: null,
+      payment_overrides: null,
+      payment_day: null,
+      created_at: '2026-10-12T09:00:00Z',
+      source: null,
+      ...loan,
+      bill: {
+        id: 'bill-car',
+        name: 'Car loan',
+        icon_id: 'loan-car',
+        category_id: 'loans',
+        amount: 424.8,
+        starts_on: '2026-10-27',
+        next_due_on: '2026-10-27',
+        ends_on: '2028-12-27',
+        card_id: null,
+        bank_account_id: 'acct-1',
+        in_spending: true,
+        created_at: '2026-10-12T09:00:00Z',
+        ...bill,
+      },
+    };
+  }
+  const showing = (loan = savedLoan()) => {
+    mockDetail = {
+      data: { kind: 'loan', loan },
+      isPending: false,
+      isError: false,
+      refetch: jest.fn(),
+    };
+  };
+
+  beforeEach(() => {
+    mockParams = { id: 'bill-car' };
+    mockReminderChoice = { choice: '1', remindAt: '08:30', unknown: false };
+    showing();
+  });
+
+  /** As saved, unchanged: what the edit writes back. */
+  const UNCHANGED = {
+    billId: 'bill-car',
+    name: 'Car loan',
+    iconId: 'loan-car',
+    principal: 18_000,
+    annualRate: 6.25,
+    termMonths: 48,
+    monthlyPayment: 424.8,
+    totalInterest: 2390.1,
+    firstPaymentOn: '2025-01-27',
+    fundedOn: '2024-12-27',
+    dayCountBasis: 'actual/365',
+    cardId: null,
+    bankAccountId: 'acct-1',
+    paymentOverrides: null,
+    lastPaymentOn: null,
+    paymentDay: null,
+    inSpending: true,
+    today: '2026-10-12',
+  };
+
+  it('opens straight on the details, filled in from the saved loan', async () => {
+    await render(<AddLoanScreen />);
+    expect(screen.getByText('Edit loan')).toBeTruthy();
+    expect(checked(radio('Car'))).toBe(true);
+    expect(box('Loan name').props.value).toBe('Car loan');
+    expect(button('Monthly payment, $424.80. Edit')).toBeTruthy();
+    expect(button('Amount borrowed, $18,000. Edit')).toBeTruthy();
+    expect(box('APR').props.value).toBe('6.25');
+    expect(box('Term').props.value).toBe('4');
+    expect(checked(radio('Years'))).toBe(true);
+    expect(button('Start date, 27 Dec 2024')).toBeTruthy();
+    expect(checked(radio('Day 27'))).toBe(true);
+    expect(screen.getByText('First payment 27 Jan 2025')).toBeTruthy();
+    expect(checked(radio(/^Chase/))).toBe(true);
+    // The page it opened on: the edge swipe and Back leave for the loan's page.
+    expect(swipeNow()).toBe(true);
+    await press(button('Back'));
+    expect(mockNav.mock.calls).toEqual([['back']]);
+  });
+
+  it('keeps a name of its own when the type changes, and follows the type with the type’s name', async () => {
+    showing(savedLoan({ name: 'Our Civic' }));
+    await render(<AddLoanScreen />);
+    await press(radio('Home'));
+    expect(box('Loan name').props.value).toBe('Our Civic');
+  });
+
+  it('saves an unchanged loan back as it was, with its reminder and time kept, and goes back to it', async () => {
+    await render(<AddLoanScreen />);
+    await press(button('Continue'));
+    expect(screen.getByText('Review your loan')).toBeTruthy();
+    // The reminder as saved: a day before, not the new loan's three.
+    expect(checked(radio('1 day'))).toBe(true);
+    await press(button('Save changes'));
+
+    expect(mockUpdate).toHaveBeenCalledWith(UNCHANGED);
+    expect(mockSave).not.toHaveBeenCalled();
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-car', 1, '08:30');
+    expect(mockToast).toHaveBeenCalledWith('toast.loan.updated');
+    expect(mockNav.mock.calls).toEqual([['back']]);
+  });
+
+  it('writes what was changed, the switch and the reminder too', async () => {
+    showing(savedLoan({ in_spending: false }));
+    await render(<AddLoanScreen />);
+    await fireEvent.changeText(box('APR'), '5.9');
+    await press(button('Continue'));
+    const counts = screen.getByRole('switch', { name: 'Add to monthly bills' });
+    expect(counts.props.accessibilityState).toEqual(expect.objectContaining({ checked: false }));
+    await press(counts);
+    await press(screen.getByRole('switch', { name: 'Remind me' }));
+    await press(button('Save changes'));
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ billId: 'bill-car', annualRate: 5.9, inSpending: true }),
+    );
+    // Switched off: the stored reminder goes.
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-car', null, '08:30');
+  });
+
+  it('leaves the reminder alone while the saved one could not be read', async () => {
+    mockReminderChoice = { choice: 'off', remindAt: '09:00', unknown: true };
+    await render(<AddLoanScreen />);
+    await press(button('Continue'));
+    await press(button('Save changes'));
+    expect(mockUpdate).toHaveBeenCalled();
+    expect(mockApplyReminder).not.toHaveBeenCalled();
+  });
+
+  it('shows the card it is paid from as chosen though a free plan no longer offers it, and keeps it', async () => {
+    const locked = {
+      id: 'card-locked',
+      kind: 'card',
+      label: 'Visa ••9001',
+      name: 'Sapphire',
+      last4: '9001',
+      color: '#1F2A44',
+    };
+    showing(savedLoan({ bank_account_id: null, card_id: 'card-locked' }, { source: locked }));
+    await render(<AddLoanScreen />);
+    // Among the cards, before the accounts; the offered ones stay as they were.
+    const tiles = screen
+      .getAllByRole('radio')
+      .map((node) => node.props.accessibilityLabel)
+      .filter((label: string) => /ending in|^Skip$/.test(label));
+    expect(tiles).toEqual([
+      'Amex, ending in 6334',
+      'Sapphire, ending in 9001',
+      'Chase, ending in 7010',
+      'Skip',
+    ]);
+    expect(checked(radio('Sapphire, ending in 9001'))).toBe(true);
+    await press(button('Continue'));
+    await press(button('Save changes'));
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ cardId: 'card-locked', bankAccountId: null }),
+    );
+  });
+
+  it('can still be moved off a card the plan no longer offers', async () => {
+    const locked = { id: 'card-locked', kind: 'card', label: 'Visa', name: 'Visa', color: '#000' };
+    showing(savedLoan({ bank_account_id: null, card_id: 'card-locked' }, { source: locked }));
+    await render(<AddLoanScreen />);
+    await press(radio(/^Chase/));
+    await press(button('Continue'));
+    await press(button('Save changes'));
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ cardId: null, bankAccountId: 'acct-1' }),
+    );
+  });
+
+  it('says the refusal or the one failure line when the change cannot be saved, and stays', async () => {
+    mockUpdate.mockRejectedValueOnce(new Error('offline'));
+    await render(<AddLoanScreen />);
+    await press(button('Continue'));
+    await press(button('Save changes'));
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(mockNav).not.toHaveBeenCalled();
+  });
+
+  it('asks before Close throws the changes away', async () => {
+    await render(<AddLoanScreen />);
+    await press(button('Close'));
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Cancel editing this loan?' }),
+    );
+    expect(mockNav.mock.calls).toEqual([['back']]);
+  });
+
+  describe('Delete loan', () => {
+    it('asks, deletes the loan’s bill, and lands on Loans with neither of its pages beneath', async () => {
+      await render(<AddLoanScreen />);
+      await press(button('Delete loan'));
+      expect(mockConfirm).toHaveBeenCalledWith({
+        title: 'Delete this loan?',
+        message: 'Its payment history and reminder are deleted too. This can’t be undone.',
+        confirmLabel: 'Delete',
+        destructive: true,
+      });
+      expect(mockDelete).toHaveBeenCalledWith('bill-car');
+      expect(mockToast).toHaveBeenCalledWith('toast.loan.deleted', 'deleted');
+      expect(mockNav.mock.calls).toEqual([['dismissAll'], ['push', '/loans']]);
+    });
+
+    it('does nothing when the person keeps it', async () => {
+      mockConfirm.mockResolvedValueOnce(false);
+      await render(<AddLoanScreen />);
+      await press(button('Delete loan'));
+      expect(mockDelete).not.toHaveBeenCalled();
+      expect(mockNav).not.toHaveBeenCalled();
+    });
+
+    it('says the one failure line when it cannot delete, and stays', async () => {
+      mockDelete.mockRejectedValueOnce(new Error('offline'));
+      await render(<AddLoanScreen />);
+      await press(button('Delete loan'));
+      expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+      expect(mockNav).not.toHaveBeenCalled();
+      expect(button('Delete loan').props.accessibilityState).toEqual({ disabled: false });
+    });
+
+    it('keeps the form drawn while the loans reload after the delete', async () => {
+      await render(<AddLoanScreen />);
+      await press(button('Delete loan'));
+      // The reload finds the loan gone before the page has left.
+      mockDetail = { data: { kind: 'gone' }, isPending: false, isError: false, refetch: jest.fn() };
+      await screen.rerender(<AddLoanScreen />);
+      expect(box('Loan name').props.value).toBe('Car loan');
+      expect(screen.queryByTestId('skeleton')).toBeNull();
+      // Only the one navigation Delete calls for.
+      expect(mockNav.mock.calls).toEqual([['dismissAll'], ['push', '/loans']]);
+    });
+
+    it('is offered only when changing a saved loan', async () => {
+      mockParams = {};
+      await toDetails();
+      expect(screen.queryByRole('button', { name: 'Delete loan' })).toBeNull();
+    });
+  });
+
+  it('waits for the loan, says so when it cannot be read, and leaves when it is gone', async () => {
+    mockDetail = { data: undefined, isPending: true, isError: false, refetch: jest.fn() };
+    await render(<AddLoanScreen />);
+    expect(screen.getByTestId('skeleton')).toBeTruthy();
+    expect(screen.queryByText('Loan name')).toBeNull();
+    await screen.unmount();
+
+    const refetch = jest.fn();
+    mockDetail = { data: undefined, isPending: false, isError: true, refetch };
+    await render(<AddLoanScreen />);
+    await press(button('Try again'));
+    expect(refetch).toHaveBeenCalled();
+    expect(mockNav).not.toHaveBeenCalled();
+    await screen.unmount();
+
+    mockDetail = { data: { kind: 'gone' }, isPending: false, isError: false, refetch: jest.fn() };
+    await render(<AddLoanScreen />);
+    expect(mockNav.mock.calls).toEqual([['back']]);
   });
 });

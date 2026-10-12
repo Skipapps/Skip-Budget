@@ -57,6 +57,13 @@ jest.mock('@/providers/toast-context', () => ({ useToast: () => jest.fn() }));
 const mockSave = jest.fn(async (_input: Record<string, unknown>) => ({ id: 'bill-1' }));
 jest.mock('@/api/mutations', () => ({
   useSaveLoan: () => ({ mutateAsync: mockSave, isPending: false }),
+  useUpdateLoan: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useDeleteBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
+}));
+// The edit pages' loading state; a new loan never shows it.
+jest.mock('@/components/ui/skeleton', () => ({ SkeletonList: () => null, Skeleton: () => null }));
+jest.mock('@/theme/artwork', () => ({
+  useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
 jest.mock('@/api/queries', () => ({ usePaymentSources: () => ({ sources: [] }) }));
 

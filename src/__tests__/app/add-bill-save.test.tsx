@@ -1906,97 +1906,45 @@ describe('Add bill — the logo', () => {
   });
 });
 
-describe('Add bill — a loan’s schedule', () => {
-  // $20,000 over 60 months at 6.00%, 30/360: a payment of $386.66 whose first month is $100.00 of
-  // interest and $286.66 off the balance.
-  const LOAN = {
-    id: 'loan-1',
-    bill_id: 'bill-1',
-    principal: 20000,
-    annual_rate: 6,
-    term_months: 60,
-    monthly_payment: 386.66,
-    total_interest: 3199.6,
-    first_payment_on: '2026-11-01',
-    funded_on: '2026-10-01',
-    day_count_basis: '30/360',
-    statement_on: null,
-    statement_principal: null,
-  };
-
-  it('offers the payment schedule on a bill that came from the loan calculator', async () => {
-    mockLoan = LOAN;
-    editing({ ...POWER, name: 'Car loan', category_id: 'loans', amount: 386.66 });
+describe('Add bill — a loan’s bill', () => {
+  it('offers no payment schedule: a loan is changed from its own page', async () => {
+    mockLoan = {
+      id: 'loan-1',
+      bill_id: 'bill-1',
+      principal: 20000,
+      annual_rate: 6,
+      term_months: 60,
+      monthly_payment: 386.66,
+      total_interest: 3199.6,
+      first_payment_on: '2026-11-01',
+      funded_on: '2026-10-01',
+      day_count_basis: '30/360',
+      statement_on: null,
+      statement_principal: null,
+    };
+    editing({ ...POWER, name: 'Car loan', category_id: 'loans', icon_id: 'loan-car' });
     const screen = await render(<AddBillScreen />);
 
-    const card = screen.getByRole('button', { name: 'Payment schedule' });
-    expect(card.props.accessibilityHint).toBe('See where all 60 payments go');
-    expect(screen.getByText('See where all 60 payments go')).toBeTruthy();
-
-    await fireEvent.press(card);
-    expect(router.push).toHaveBeenCalledWith({
-      pathname: '/loan-schedule',
-      params: {
-        amount: '20000',
-        rate: '6',
-        months: '60',
-        start: '2026-11-01',
-        funded: '2026-10-01',
-        basis: '30/360',
-        payment: '386.66',
-        name: 'Car loan',
-      },
-    });
+    expect(screen.getByLabelText('Category, Loans & Credit')).toBeTruthy();
+    expect(screen.queryByText('Payment schedule')).toBeNull();
   });
 
-  it('opens the schedule on the loan’s payment day when its first payment was clamped', async () => {
-    // Day 31 from 31 Jan: first due 28 Feb, then 31 Mar. Without the day, every payment would
-    // fall on the 28th, and every period's interest with it.
-    mockLoan = {
-      ...LOAN,
-      principal: 18000,
-      annual_rate: 6.25,
-      term_months: 48,
-      monthly_payment: 424.8,
-      first_payment_on: '2025-02-28',
-      funded_on: '2025-01-31',
-      day_count_basis: 'actual/365',
-      payment_day: 31,
-    };
-    editing({ ...POWER, name: 'Car loan', category_id: 'loans', amount: 424.8 });
+  it('still edits a Loans & Credit bill made by hand, with no loan behind it', async () => {
+    editing({ ...POWER, name: 'Store card', category_id: 'loans', icon_id: null });
     const screen = await render(<AddBillScreen />);
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Payment schedule' }));
-    expect(router.push).toHaveBeenCalledWith(
+    expect(screen.getByLabelText('Category, Loans & Credit')).toBeTruthy();
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        params: expect.objectContaining({ start: '2025-02-28', day: '31' }),
+        values: expect.objectContaining({
+          name: 'Store card',
+          category_id: 'loans',
+          icon_id: null,
+        }),
       }),
     );
-  });
-
-  it('counts a loan saved without its own first payment date from the bill’s first due date', async () => {
-    mockLoan = { ...LOAN, first_payment_on: null };
-    editing({
-      ...POWER,
-      name: 'Car loan',
-      category_id: 'loans',
-      amount: 386.66,
-      starts_on: '2025-01-01',
-      next_due_on: '2026-10-01',
-    });
-    const screen = await render(<AddBillScreen />);
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Payment schedule' }));
-    // From the first due date, as the Loans page counts it, not the next one.
-    expect(router.push).toHaveBeenCalledWith(
-      expect.objectContaining({ params: expect.objectContaining({ start: '2025-01-01' }) }),
-    );
-  });
-
-  it('is not there for an ordinary bill', async () => {
-    editing(POWER);
-    const screen = await render(<AddBillScreen />);
-
-    expect(screen.queryByText('Payment schedule')).toBeNull();
   });
 });

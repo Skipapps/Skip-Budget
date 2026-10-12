@@ -6,6 +6,7 @@ import { BillRow } from '@/components/bills/bill-row';
 import { SetupCollection } from '@/components/setup/setup-collection';
 import { t } from '@/i18n';
 import { countsInSpending } from '@/lib/bill-spending';
+import { billPageHref, isLoanBill } from '@/lib/ledger-link';
 import { logoDomainOf } from '@/lib/logo-domain';
 
 /** The bills step of the setup walk-in: add as many as there are, then Done. */
@@ -53,7 +54,14 @@ export default function SetupBillsScreen() {
           key={bill.id}
           bill={bill}
           sourceLabel={sourceLabels.get(bill.sourceId) ?? ''}
-          onPress={() => router.push(`/add-bill?id=${bill.id}`)}
+          // A loan is changed from its own page, which its pencil leads on from.
+          onPress={() =>
+            router.push(
+              isLoanBill(bill.categoryId)
+                ? billPageHref(bill.id, bill.categoryId)
+                : `/add-bill?id=${bill.id}`,
+            )
+          }
         />
       ))}
     </SetupCollection>

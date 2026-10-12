@@ -719,9 +719,9 @@ export const loanMessages = defineMessages({
     fr: 'Voir les détails, {name}',
   },
   'loan.list.openHint': {
-    en: 'Opens the loan’s bill.',
-    es: 'Abre la factura del préstamo.',
-    fr: 'Ouvre la facture du prêt.',
+    en: 'Opens the loan.',
+    es: 'Abre el préstamo.',
+    fr: 'Ouvre le prêt.',
   },
   // Read out for each card in one go, in place of the figures drawn.
   'loan.list.summaryA11y': {

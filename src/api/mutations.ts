@@ -39,7 +39,8 @@ const AFFECTS_DASHBOARD = new Set([
  * was charged to it to null ("on delete set null"), so those caches are stale until re-read.
  */
 const DEPENDENTS: Record<string, string[]> = {
-  cards: ['bills', 'receipts', 'subscriptions', 'payments', 'habits', 'receipt_books'],
+  // 'loans' too: a loan's own page reads its bill's card or account by name.
+  cards: ['bills', 'receipts', 'subscriptions', 'payments', 'habits', 'receipt_books', 'loans'],
   bank_accounts: [
     'bills',
     'receipts',
@@ -48,6 +49,7 @@ const DEPENDENTS: Record<string, string[]> = {
     'salary_sources',
     'habits',
     'receipt_books',
+    'loans',
   ],
   // A loan is read with its bill, and goes with it ("on delete cascade").
   bills: ['loans'],
@@ -569,6 +571,72 @@ export function useSaveLoan() {
     onSuccess: () => {
       invalidate('bills');
       invalidate('loans');
+    },
+  });
+}
+
+export type UpdateLoanValues = Omit<SaveLoanValues, 'inSpending' | 'countsFrom'> & {
+  /** The loan's bill, which keeps its id, charges and reminder through the edit. */
+  billId: string;
+  /**
+   * "Add to monthly bills" as the page shows it. Off keeps what was recorded and records nothing
+   * new; back on counts from `today`, never filling in the time it was off.
+   */
+  inSpending: boolean;
+  /** The person's today (yyyy-mm-dd, `useToday`): where a switch back on counts from. */
+  today: string;
+};
+
+/**
+ * Saves an edited loan over the one it was: the loan and its bill in one transaction, the bill id
+ * kept. What it counts as spending never reaches before the day the loan was added or into a month
+ * already charged (the rules are update_loan's). Refused as save_loan is, with the same words for
+ * `refusedLoanSave`; a loan deleted meanwhile is refused with P0002.
+ */
+export function useUpdateLoan() {
+  const client = useQueryClient();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (values: UpdateLoanValues) => {
+      const overrides =
+        values.paymentOverrides && Object.keys(values.paymentOverrides).length > 0
+          ? values.paymentOverrides
+          : null;
+      const firstDay = Number(values.firstPaymentOn.slice(8, 10));
+      const { error } = await supabase.rpc('update_loan', {
+        p_bill_id: values.billId,
+        p_name: values.name,
+        p_icon_id: values.iconId,
+        p_principal: values.principal,
+        p_annual_rate: values.annualRate,
+        p_term_months: values.termMonths,
+        p_monthly_payment: values.monthlyPayment,
+        p_total_interest: values.totalInterest,
+        p_first_payment_on: values.firstPaymentOn,
+        p_funded_on: values.fundedOn,
+        p_day_count_basis: values.dayCountBasis,
+        p_card_id: values.cardId,
+        p_bank_account_id: values.bankAccountId,
+        p_in_spending: values.inSpending,
+        // Every optional part is sent, null for none: the edit replaces the contract, so a change,
+        // a last payment or a payment day left out is one taken away. The day is kept only when it
+        // is not the first payment's own, as save_loan keeps it, so an unchanged loan saves as it was.
+        p_payment_day:
+          values.paymentDay != null && values.paymentDay !== firstDay ? values.paymentDay : null,
+        p_payment_overrides: overrides,
+        p_last_payment_on: values.lastPaymentOn ?? null,
+        p_today: values.today,
+      });
+      if (error) throw error;
+      return { id: values.billId };
+    },
+    onSuccess: ({ id }) => {
+      invalidate('bills');
+      invalidate('loans');
+      // The bill page and its edit form read these single-row keys, which the lists' keys miss.
+      client.invalidateQueries({ queryKey: ['bill', id] });
+      client.invalidateQueries({ queryKey: ['loan', id] });
     },
   });
 }

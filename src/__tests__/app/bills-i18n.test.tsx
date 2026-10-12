@@ -94,6 +94,10 @@ const charge = (date: string, planId = 'b1') => ({
 let mockBills: { data: unknown[] | undefined; isPending: boolean; isError: boolean };
 let mockEntries: ReturnType<typeof charge>[];
 
+// No loan behind these bills: the page stays a bill page.
+jest.mock('@/api/loans', () => ({
+  useLoanDetail: () => ({ data: { kind: 'bill' }, isPending: false, isError: false }),
+}));
 jest.mock('@/api/queries', () => ({
   useBills: () => ({ ...mockBills, refetch: jest.fn() }),
   usePaymentSources: () => ({

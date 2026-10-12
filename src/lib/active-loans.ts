@@ -32,6 +32,17 @@ export function loanFinished(
   return loanBillEnded(bill, today) || Boolean(lastPaymentOn && lastPaymentOn <= today);
 }
 
+/**
+ * The day a loan's figures are read on (`loanStatus`, `loanHistory`, `upcomingPayments`): today,
+ * or its bill's end date when that came first. A bill stopped before its schedule ended charges
+ * nothing after that date (inclusive, as `billWindow`), so later payments never read as made and
+ * what is left stays where it was. An end date on or after the last payment changes nothing.
+ * Whether the loan is finished is still asked with the real today (`loanFinished`).
+ */
+export function loanPricingDay(bill: Pick<LoanBill, 'ends_on'>, today: string): string {
+  return bill.ends_on && bill.ends_on < today ? bill.ends_on : today;
+}
+
 /** The loans still being paid, read off the bills they live behind, in the bills' order. */
 export function activeLoans(
   bills: readonly LoanBill[],

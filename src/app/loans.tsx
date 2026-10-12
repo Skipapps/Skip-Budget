@@ -3,42 +3,42 @@ import { useMemo } from 'react';
 
 import { loanTermsOf, useLoans, type LoanListRow } from '@/api/loans';
 import type { LoanCardData } from '@/components/loans/loan-list-card';
+import { loanEnding, type LoanEnding } from '@/components/loans/loan-ending';
 import { LoansBody } from '@/components/loans/loans-body';
 import type { LoansSummaryData } from '@/components/loans/loans-summary-card';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
-import { loanFinished } from '@/lib/active-loans';
+import { loanPricingDay } from '@/lib/active-loans';
 import { failureText } from '@/lib/failure';
 import { loanStatus, loansSummary, type LoanStatus } from '@/lib/loan-status';
 import { useToday } from '@/lib/use-today';
 import { useArtwork } from '@/theme/artwork';
 
-type PricedLoan = { row: LoanListRow; status: LoanStatus; ending: LoanCardData['ending'] };
+type PricedLoan = {
+  row: LoanListRow;
+  status: LoanStatus;
+  ending: LoanEnding;
+  endedOn: string | null;
+};
 
 /**
- * Where each saved loan stands today, from its own schedule. Finished is the rule the Cards tab
- * counts by (`loanFinished`); a finished loan the schedule has not paid off was stopped with money
- * still owed.
+ * Where each saved loan stands, from its own schedule, and whether it is finished. A loan whose
+ * bill stopped early is read as of the day it stopped (`loanPricingDay`).
  */
 function priceLoans(rows: readonly LoanListRow[], today: string): PricedLoan[] {
   const priced: PricedLoan[] = [];
   for (const row of rows) {
     const terms = loanTermsOf(row);
     if (!terms) continue;
-    const status = loanStatus(terms, today);
-    const ending = loanFinished(row.bill, today, status.lastPaymentOn)
-      ? status.paidOff
-        ? 'paid'
-        : 'stopped'
-      : null;
-    priced.push({ row, status, ending });
+    const status = loanStatus(terms, loanPricingDay(row.bill, today));
+    priced.push({ row, status, ...loanEnding(row.bill, status, today) });
   }
   return priced;
 }
 
-function cardOf({ row, status, ending }: PricedLoan): LoanCardData {
+function cardOf({ row, status, ending, endedOn }: PricedLoan): LoanCardData {
   return {
     billId: row.bill.id,
     name: row.bill.name,
@@ -54,7 +54,7 @@ function cardOf({ row, status, ending }: PricedLoan): LoanCardData {
     left: status.amountLeft,
     paidPercent: status.percentPaid,
     ending,
-    endedOn: ending === 'stopped' ? row.bill.ends_on : status.lastPaymentOn,
+    endedOn,
   };
 }
 
@@ -109,7 +109,7 @@ export default function LoansScreen() {
         <LoansBody
           loans={cards}
           summary={summary}
-          onOpen={(billId) => router.push(`/bill/${billId}`)}
+          onOpen={(billId) => router.push({ pathname: '/loan/[id]', params: { id: billId } })}
           onCalculator={openCalculator}
           onAdd={() => router.push('/add-loan')}
         />

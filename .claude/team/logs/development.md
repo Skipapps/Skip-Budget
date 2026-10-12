@@ -6346,3 +6346,292 @@ Read-only. Gates on the live tree: tsc 0; eslint (cache cleared, --no-cache, --m
 - **Dana's (a)–(e):** confirmed.
 - **Remaining risk:** the device build still waits for migration A. Diego's live check shows the live definitions are byte-identical to what A replaces.
 - **Edge left as is:** after a failed reminder, Back during the retry's reminder write could land and toast twice. Not blocking.
+
+## 2026-10-12 — Drew (Developer, money maths) — View loan P2 maths: upcomingPayments, loanHistory, loanScheduleParams (DONE, uncommitted)
+
+**API, new file `src/lib/loan-view.ts`** (`loan-status.ts` is unchanged):
+```ts
+type LoanPayment = { number: number; date: string /* yyyy-mm-dd */; payment: number; principal: number; interest: number };
+type LoanHistoryEntry = { kind: 'payment' } & LoanPayment;  // P3 adds { kind: 'payoff', ... } to this union
+type LoanHistory = { entries: LoanHistoryEntry[] /* newest first */; total: number; firstPaymentOn: string | null };
+upcomingPayments(terms: LoanTerms, today: string, count: number): LoanPayment[]
+loanHistory(terms: LoanTerms, today: string, count?: number): LoanHistory   // no count = all
+loanScheduleParams(terms: LoanTerms): LoanRouteParams | null               // null = statement-pinned loan
+```
+
+**Outcome:** Done. Nothing committed. The helpers read the same schedule as `loanStatus` (`amortise` on `loanTermsForBill`/`termsFromStored`, so `payment_day` and `payment_overrides` are honoured). Every row is the schedule's own posting, so principal + interest = payment to the cent.
+
+- **Why a new file:** it keeps `loan-status.ts` (the Loans page and its summary, 41 tests) untouched. P3 payoffs can join the history here.
+- **Rules, the same as the Loans page:**
+  - A payment dated on or before `today` is made, so `history.total === loanStatus().paymentsMade`.
+  - `upcomingPayments(…, 1)[0]` is `loanStatus().nextPayment`.
+  - A zero, negative or NaN count gives no rows. A fraction is rounded down. `Infinity` gives all.
+  - Before the first payment, a negative count would otherwise have made `slice` count back from the schedule's end.
+- **`firstPaymentOn`** is for "Your first payment is on …". It is the schedule's first row and does not depend on `today`.
+- **`loanScheduleParams`** opens `/loan-schedule` on exactly this loan:
+  - It carries the stored payment, the funding date only when saved, `day` only when the terms have one, and the changed payments as `overrides`.
+  - Round trips through the schedule page's own path (`readLoanRoute` → `termsFromRoute` → `scheduleWithOverrides`) give `amortise(terms).rows` exactly, for six saved shapes.
+  - It returns null for a loan pinned to a statement, which the route cannot carry. The app never writes statement anchors, and the demo seed has none.
+- **Wireframe figures:**
+  - On the app's default daily interest (actual/365), the wireframe car loan on 12 Oct 2026 is "27 Oct · $369.97 principal · $54.83 interest · $424.80". The Python reference has 5483¢.
+  - The wireframe's own "$369.21 · $55.59" is the same loan on monthly rests (10,673.63 × 6.25% ÷ 12). Both are pinned in the tests. Every figure comes from the engine (plan C5).
+  - History on that day: 27 Sep ($366.20 + $58.60), 27 Aug, 27 Jul; 21 made; first payment 27 Jan 2025.
+- **Tests: `src/lib/loan-view.test.ts`, 41.**
+  - **Wireframe loan:** next 4 and last 3, row for row against the independent Python reference (`add-loan-reference.ts` WIREFRAME, all 48 rows). It agrees with `loanStatus`, and with no funded_on the result is the same.
+  - **Monthly rests:** the wireframe's own figures, checked against the exact-integer amortiser.
+  - **Day 31:** 2025 and leap 2024. Payments fall on 31 May, 30 Jun, 31 Jul and 31 Aug, and without the stored day they would fall on the 28th. The 31 May payment counts as made on 31 May. Both years match the Python reference.
+  - **Changed payments:** {10: $1,500, 22: $3,000}. Row 10 is $1,423.16 + $76.84 and row 22 is $2,951.02 + $48.98; all 39 rows match the exact-integer amortiser with the same changes. A change above what is owed becomes the last payment: $10,728.50 = $10,673.67 + $54.83.
+  - **None made yet:** 27 Dec 2024 and 26 Jan 2025 give no history, the first payment is 27 Jan, and row 1 is $329.25 + $95.55. A 28 Dec start paid on the 2nd is first due 2 Feb, with $49.27 of interest over 36 days.
+  - **Finished:** nothing upcoming. The history starts with #48, $424.50 = $422.33 + $2.17.
+  - **Sweep over 13 loans:** all four bases, day 22, both day-31 loans, 28 Dec/day 2, changed payments, paid off by a change, the real lender's statement-pinned loan, 0%, and a calculator overpayment. The days checked are 40 before, each payment date ±1, and 40 after the end. On each day, history + upcoming = the schedule, the split falls on `today`, the counts agree with `loanStatus`, and principal + interest = payment on every row.
+  - **Counts:** 0, −1, −4, NaN, 2.9, and more rows than exist.
+  - **Schedule link:** the exact params, six round trips, a check that leaving out `day` moves a day-31 loan to the 28th, and statement → null.
+- **Mutation testing** (on a scratch copy, never in the shared tree): 24 mutants. 23 were killed. The survivor, `count >= 0`, is equivalent. An extras mutant first survived, because saved loans have no extras, so the sweep gained an overpayment case.
+- **Cost:** one `amortise` per call. That is about 0.4 ms for 48 rows and 4 ms for 360 rows in node. The page makes 3 calls, memoised.
+- **Gates:**
+  - tsc: 0 on HEAD plus my files. In the live tree, the only 3 errors are Dana's in-flight `/loan/[id]` typed route (`bill/[id].tsx`, `loans.tsx`, `ledger-link.ts`), and none are in my files.
+  - eslint (cache cleared, `--no-cache`, `--max-warnings 0`) and prettier are clean on both files.
+  - Full jest on HEAD plus my files: 329/329 suites, 7,003 tests.
+  - Live tree: 325/329 suites. The 4 failures are teammates' in-flight screen suites: `loans`, `bill-detail`, `bills-i18n` and `charges-edit` (P2 routing). None of them imports loan-view.
+  - Loan lib suites: 7 suites, 290 tests.
+- **Dana:** `loan-view-data.ts` already uses these exports as they are.
+- **Open:**
+  - **(1) CEO/Dmitri, stopped loans:** a loan whose bill stopped before its schedule ended. `loanViewOf` already shows no upcoming rows. But `loanHistory(terms, today)` still lists schedule payments after the stop date as made ("Paid from …"), and `loanStatus(terms, today).amountLeft` keeps going down past it. The Loans page has done the same since v2.
+    - Proposal: price a stopped loan as of `min(today, bill.ends_on)`. `ends_on` is inclusive, as in `billWindow`. Passing that date as `today` to `loanStatus` and `loanHistory` needs no API change.
+    - The same would then apply on the Loans page, so the two pages agree. Not changed until decided.
+  - **(2) P3:** payoff rows will need `id` and their own source on the `payoff` kind. `total` and `entries` then count both kinds, and the payment kind keeps its shape.
+
+## 2026-10-12 — Drew (Developer, money maths) — loanPricingDay: stopped loans priced at their stop (DONE, uncommitted)
+
+**CEO call on open question 1:** a stopped loan is priced as of the earlier of today and `bill.ends_on`. This applies on the Loans page and on the View loan page.
+
+- **API, in `src/lib/active-loans.ts`** (next to `loanFinished`): `loanPricingDay(bill: Pick<LoanBill, 'ends_on'>, today: string): string`. It returns `bill.ends_on` when that is before today, else today.
+- **How to call it:**
+  - Pass the day it returns to `loanStatus`, `loanHistory` and `upcomingPayments`.
+  - Keep asking `loanFinished`/`loanEnding` with the real today.
+  - `ends_on` is inclusive, as in `billWindow`, so a payment on the end date counts as made.
+  - An end date on or after the last payment changes nothing. save_loan writes the last payment's date there, so a normal loan still reads as paid off.
+- **Tests, in `src/lib/active-loans.test.ts`:** 5 new tests, 12 in the file. They run on the wireframe loan's real schedule:
+  - **Stopped mid-schedule** on 10 Apr 2026 and seen on three later days: 15 made, $12,846.15 left, 29%, not paid off, finished. Priced on today it would have read 21 made and $10,673.67.
+  - **Ends on a payment date:** that payment counts as made.
+  - **Ends today:** the same as `loanStatus` on today, including on a payment day.
+  - **Ends on or after the last payment:** paid off as normal, identical to pricing on today, 48 made.
+  - **Running, or no end date:** today. That includes a bill with neither a next date nor an end date, which has no stop date to freeze on.
+- **Gates:**
+  - tsc: no errors in my files. The live tree has one error: `add-loan.tsx` imports `useUpdateLoan`, which is a teammate's in-flight work.
+  - eslint (cache cleared, `--no-cache`, `--max-warnings 0`) and prettier are clean on my 4 files.
+  - Loan and Cards suites: 14 suites, 368 tests, all pass.
+- **Not changed:** `src/app/loans.tsx` and Dana's view files. The CEO tells Dana to call the helper in both places.
+- **Note for Dana:** upcoming rows are not cut at a future `ends_on`. A running loan whose bill is set to end before its schedule does still lists payments after that date. No current flow sets such a date, so this is left as it is.
+
+
+## 2026-10-12 — Dana L (Developer, UI and navigation) — Add Loan P2: the View loan page, every loan routed to it, edit mode + Delete (DONE, uncommitted)
+
+**Outcome:** Done, built on Drew's `src/lib/loan-view.ts` (`upcomingPayments`, `loanHistory`, `loanScheduleParams`), his `loanPricingDay`, and Diego's `useLoanDetail` / `useUpdateLoan`. No money maths of my own. Until migration B is live, an edit save fails with the one failure line (expected). Not seen on a device.
+
+- **`/loan/[id]`** (`src/app/loan/[id].tsx`, id = bill id) + `src/components/loans/view/`:
+  - `loan-view-card.tsx`: header back + loan name + the round tint pencil; card with type icon, name, "Next payment 27 Oct" / "First payment …", big left-to-pay figure + "Left to pay", plum bar + "N% paid off", rows Monthly / Rate / Payments left "27 of 48" / Paid from "Chase ••4821" (Skip when none). One VoiceOver summary. Finished: "Paid off on …" / "Stopped on … · $X left" (the Loans page's words).
+  - `loan-view-lists.tsx`: "Payment schedule" card (next 4: date tile day-over-month on `bg-tint`, "Payment 22", "$369.21 principal · $55.59 interest", amount; See all → `/loan-schedule` with `loanScheduleParams` + name, so `day` travels) and "History" card (latest 3 made, newest first, the source's colour chip as on the Paid from tiles, dashed for Skip, "Paid from Chase ••4821"; See all expands in place; none yet → "Your first payment is on …").
+  - `loan-view-footer.tsx`: Edit loan (outlined), with a `primary` slot above it for P3's Pay off.
+  - `loan-view-data.ts`: `loanViewOf(detail, today)`; dates read "27 Oct" within this year, with the year otherwise; VoiceOver always gets the full date.
+  - States: skeleton; failure page with Try again (a failed read is never "gone"); `kind: 'bill'` → `<Redirect>` to `/bill/[id]`; `kind: 'gone'` → `goBack` only while focused.
+- **Stopped loans (CEO call):** both `priceLoans` (`loans.tsx`) and `loanViewOf` price with `loanPricingDay(bill, today)`; finished-ness still asked with the real today. Shared `loanEnding()` in `src/components/loans/loan-ending.ts`, so the two pages cannot disagree. Tests on both pages fail with the pricing day taken out.
+- **Routing:** `billPageHref(id, categoryId)` + `isLoanBill` in `ledger-link.ts`; `ledgerHref` uses it (Home, Activity, card/account pages). `bills.tsx`, `bill-plans.tsx`, `setup-bills.tsx` (a loan opens its page; other bills keep the edit form) and Loans View details go to `/loan/[id]`. `bill/[id].tsx` redirects when Diego's `useLoanDetail` finds a loan (same read as the loan page, so they cannot bounce), and waits for it only on a Loans-category bill.
+- **Edit (`/add-loan?id=`):** opens on details ("Edit loan"), filled by `loanFormFromSaved` (reuses the calculator path, so a first payment off the rule stays pinned and a day-31 loan keeps day 31; name follows the type only while it is the type's own; pre-types loans are Other). Review says "Save changes" → `useUpdateLoan` (+ `today`) → reminder as stored (lead and time kept; untouched while unknown; off removes it) → `toast.loan.updated` → `router.back()`. A card a free plan no longer offers is kept, not dropped. Close asks "Cancel editing this loan?". The form freezes at the first read; the last-read loan is kept so Delete never flashes a skeleton.
+- **Delete loan:** red QuietAction at the end of the details page in edit mode → confirm → `useDeleteBill` → `toast.loan.deleted` → `finishFlowOn('/loans')` (dismissAll + push), so Back reaches neither the flow nor the loan page.
+- **Strings:** 27 `loanFlow.view.*` / `loanFlow.edit.*` keys (en/es/fr, French no-break spaces); `toast.loan.updated` / `toast.loan.deleted` in `toast.ts` (the messages test requires the area prefix); `loan.list.openHint` now "Opens the loan."
+- **Tests:** new `src/__tests__/app/loan-view.test.tsx` (22); `add-loan.test.tsx` +15 edit/Delete; `add-loan-form.test.ts` +6 (`loanFormFromSaved`); `bill-detail` +5 (redirect, wait, no-loan, failed read, other kinds); `ledger-link` +2; `charges-edit` +1; `loans.test` +1 (stopped loan frozen) and View details → `/loan/[id]`. Mutation-checked: pricing day on both pages, kept form on Delete, unknown-reminder guard, kept locked source.
+- **Gates:** tsc 0. eslint (cache cleared, `--no-cache`, `--max-warnings 0`) on my 31 files: 0. In `src` the only errors are in Diego's in-flight `src/api/mutations.ts` (a blank line) and `src/api/zz-scratch-loan-hooks.e2e.tsx`, plus the old setup.test.tsx warning. Prettier clean on my files. Full jest: 330/330 suites, 7,059 tests. Typed routes regenerated (+`/loan/[id]`).
+- **Adjusted from the wireframe:** upcoming rows show the date in the tile and "Payment N" as the title (not the date twice); history rows' grey squares are the source's colour chip; History See all expands in place (there is no history page); a finished loan keeps its figure and bar and says "No more payments on this loan."; only Edit loan in the footer until P3.
+- **Open:** (1) History See all in place vs a page of its own. (2) Editing a loan's name, amount or source does not ask about past charges as Add bill does; charges keep their own copy. (3) A loan with a statement balance: Review prices it without the statement (update_loan keeps it), so its Review figures can differ from its page. (4) Free plan + locked card: no Paid from tile shows chosen in edit, though Save keeps the card. (5) add-bill's loan card is now unreachable from the UI; archive after review, per plan. (6) The bill page makes one extra read (`useLoanDetail`) per open.
+
+- **2026-10-12 — Dana — CEO answers applied (P2):** (4) in edit mode the loan's current card or account is a Paid from tile, chosen, among its kind, even when a free plan would not offer it today (no locks on lapse): `withSourceKept` in `loan-form.ts`, fed by `useLoanDetail`'s `source`; Save keeps it, and the person can still move to another tile. The hidden fallback it replaces is gone. Tests: `add-loan.test` +2 (chosen locked tile in order, then moving off it; the first fails without the change), `add-loan-form.test` +2. (1), (2), (3), (6), (7) as they are; (5) add-bill's loan card is archived after Dmitri's review. Gates: tsc 0; eslint (cache cleared, `--no-cache`, `--max-warnings 0`) and prettier clean on my 31 files; affected suites 14/14, 213 tests.
+
+## 2026-10-12 — Diego (Developer, data and backend) — Add Loan P2 data: migration B `update_loan`, `useLoanDetail`, `useUpdateLoan` (DONE, uncommitted, NOT applied live)
+
+**Exports (Dana builds on these; her P2 already does):**
+- `src/api/loans.ts`
+  - `useLoanDetail(billId: string | undefined)` returns `UseQueryResult<LoanDetailRead>`. Key: `['loans', userId, 'detail', billId]`.
+  - `LoanDetailRead = { kind: 'loan'; loan: LoanDetail } | { kind: 'bill' } | { kind: 'gone' }`
+  - `LoanDetail = LoanRow & { created_at; bill: LoanDetailBill; source: PaymentSourceRow | null }`
+  - `LoanDetailBill = LoanBillSummary & { amount; category_id; card_id; bank_account_id; in_spending: boolean; created_at }`
+  - `readLoanDetail(raw)`
+  - `loanTermsOf(row)` now takes any `LoanRow & { bill: { starts_on } }`, so `loanTermsOf(detail.loan)` gives the Loans page's terms.
+- `src/api/mutations.ts`
+  - `useUpdateLoan()`.
+  - `UpdateLoanValues = Omit<SaveLoanValues, 'inSpending' | 'countsFrom'> & { billId: string; inSpending: boolean; today: string }`. This is the shape `add-loan.tsx` sends.
+- `src/api/queries.ts`: `cardSource(card)` and `accountSource(account)`, the Paid with tiles' shape. `usePaymentSources` now uses them, with identical output.
+
+**Outcome:** Done, uncommitted. Migration B is written and passed a Docker scratch test and a real PostgREST v14.5 run. It is not applied live; that waits for Dmitri's review and the Founder's go. Until B is live, saving an edit fails with the one failure line (PGRST202) and writes nothing.
+
+**Migration `supabase/migrations/20261012100002_update_loan.sql`:**
+- **Signature:** `update_loan(p_bill_id uuid, p_name, p_icon_id, p_principal, p_annual_rate, p_term_months, p_monthly_payment, p_total_interest, p_first_payment_on, p_funded_on, p_day_count_basis, p_card_id, p_bank_account_id, p_in_spending boolean, p_payment_day integer = null, p_payment_overrides jsonb = null, p_last_payment_on date = null, p_today date = null) returns bills`.
+- **Security:** invoker, `search_path=public`, owner postgres. Revoked from public and anon, granted to authenticated (live ACL on the copy: postgres, authenticated, service_role, the same as save_loan). The bill row is locked `for update`.
+- **Writes one transaction:**
+  - Bill: name, amount = monthly payment, category 'loans', icon, recurrence 'monthly', next_due_on / starts_on / ends_on, card / account, in_spending (null leaves it as stored).
+  - Loan: principal, rate, term, monthly payment, total interest, first payment, funded_on (null means a month before the first payment), basis (null means actual/365), overrides, payment_day.
+  - Kept as stored: the bill id, created_at, brand, logo, note, the statement fields, charges and the reminder.
+- **Refuses as save_loan does, in its words:**
+  - P0001: term < 1; payment day outside 1–31; last payment outside the term (the term end is computed exactly as save_loan computes it).
+  - The loans checks: overrides against the new term, rate 0–100, principal, basis.
+  - bills_single_source.
+- **New refusals:**
+  - P0001 for a first payment of null.
+  - P0001 "the card is not one of yours" / "the account is not one of yours". The foreign keys alone take anyone's card id.
+  - P0002 "there is no such loan" for an unknown bill id, a bill with no loan, or another person's bill (RLS hides it). The loan is looked up before the sources are checked, so a missing loan reads as missing whatever else is sent.
+- **Count floor** = greatest of:
+  - (a) the local day the loan was added: `created_at` in the profile's timezone;
+  - (b) the stored `starts_on`, only when it is later than the stored first payment;
+  - (c) the 1st of the month after the last charge;
+  - (d) the person's today, when the switch goes off → on.
+  - Then `starts_on = greatest(first payment, floor)`.
+  - `next_due_on` is the schedule's next payment on or after max(floor, today): the first payment, then the clamped payment day in the months after it, as `paymentDates`.
+  - Nothing counts (floor > end): `starts_on` = the first payment and `next_due_on` null, as save_loan's deviation 3.
+  - Every counted payment is ≤ today: anchored on the last payment, so a payment due since the recorders last ran is still written. The sweep then rolls it past `ends_on`, and the reminders ignore it (A's fix).
+- **Deviation from the brief, for Dmitri:** the brief says never before the stored `starts_on`. Taken literally, that is wrong for a loan added before its first payment. There `starts_on` is just the first payment, not a floor.
+  - Example: added 12 Oct with the first payment on 27 Nov, then edited on 20 Oct to 27 Oct. The literal rule would never count the 27 Oct payment, even though it is still to come.
+  - It would also back-fill a loan saved already paid off (starts_on = its 2019 first payment).
+  - (a) + (b) is the F1 floor itself. (b) keeps every floor set since: save_loan's count floor, a switch back on, a floor after a charge.
+  - The M2 client guard on the bill-form path keeps the literal rule. After P2's routing a loan never reaches that form, so I left it.
+
+**Scratch test (Docker `supabase_db_SkipBudget`, local DB untouched, still at 20261008100002):**
+- **Setup:** the local DB was dumped into `update_loan_check`, with the stand-in cron schema as for A. 20261008100003…20261012100001 were applied, A's `checks/loans.sql` passed, then B was applied twice (exit 0). A schema diff before and after B shows only the new function and its ACL.
+- **New `supabase/checks/update_loan.sql`, 52 checks, ALL CHECKS PASSED:**
+  - Signature, grants, defaults; save_loan is untouched.
+  - An unchanged edit is byte-identical to save_loan's rows (bill + loan, all but updated_at) for: added late; not started; paid off before; day 31 clamped; kept out (null and false).
+  - Every field changed reads back as sent on the same bill id: rate 7.499500000, account source, switch off, day 31, overrides, last payment. The reminder is kept and no second bill is filed. Clearing the day, overrides and last payment clears them; funding and basis default as save_loan.
+  - Floor cases, each checked against record_due_charges' own walk on a fixed day:
+    - Dates moved earlier on a loan added late: nothing back-filled.
+    - First payment moved earlier but still to come: it counts.
+    - Moved to a day after adding: it counts (F1).
+    - Moved before adding: it does not.
+    - Payment day moved later or earlier in a charged month: Nov 1 floor, nothing charged twice, and the 4 charges stay.
+    - Off: the charge is kept and nothing new is recorded. On: counts from that day, so 27 Oct while off is not filled in. A later edit keeps the switch-on floor, and saying nothing leaves the switch on.
+    - Saved paid off, then the term lengthened: counts from the add day.
+    - Ended before the last charge: no next date, 9 charges kept.
+    - Ended two days ago: the 27 Oct last payment is still recorded.
+    - Day 31: next 28 Feb.
+    - `p_today` null: today from the profile's timezone (tested with Pacific/Kiritimati).
+  - Refusals (14 kinds) leave the bill and loan identical, with no rename.
+  - RLS: e1 cannot edit e3's loan, and e3 cannot edit e1's (both P0002). anon gets 42501. A call without a JWT sub gets "not authenticated".
+  - Rows nobody edited (mine and someone else's, and a non-loan bill) are exactly as before.
+- **The checks catch the bugs:** 7 mutants of B, all caught:
+  - the literal starts_on floor;
+  - no floor after charges;
+  - no switch-on floor;
+  - no add-day floor;
+  - next date nulled when every payment is behind;
+  - security definer;
+  - a null switch read as on.
+- **Other suites on the B copy:** habits, one_off_pay, savings_goals, receipt_books, free_capture_allowance and loans all pass.
+- **Throwaway PostgREST v14.5** (the hosted version, per `supabase/.temp/rest-version`), bound to 127.0.0.1, against the B copy and a pre-A copy, with scratch HS256 tokens. The real `useLoanDetail` / `useUpdateLoan` code ran through jest with `@/lib/supabase` swapped for a real PostgrestClient. That file sat in `src/api` only for the run, matched by no default pattern, and is deleted. 6/6 passed:
+  - The detail is one request. `loan:loans(...)` comes back as an object (one-to-one by the unique `bill_id`), and `card:cards` / `account:bank_accounts` embed without ambiguity.
+  - Rent reads `bill`; an unknown id, another person's bill, or another person reading mine read `gone`.
+  - Pre-A it takes 3 requests (Postgres names `loans_1.payment_day` first) and loads with in_spending true.
+  - The edit round-trips, including switch off → on and day 31 from a clamped 28 Feb: starts 21 Oct, next 31 Oct, ends 31 Jan 2029.
+  - `refusedLoanSave` maps payments / lastPayment / rate. Another person's or an unknown loan gives P0002.
+  - Pre-B gives PGRST202 and the loan is unchanged.
+- **Cleanup:** the containers, the image, both scratch DBs, the dumps, the secret and the tokens are removed. Docker Desktop is stopped, as found.
+
+**App side:**
+- **`useLoanDetail`:**
+  - Reads from `bills` by id with `in_spending`, `loan:loans(LOAN_COLUMNS + payment_overrides, payment_day, created_at)`, and the card / account (id, holder or names, last4, color).
+  - Wrapped in `withNewerLoanColumns(withSpendingFlag(...))` with the 12 s timeout.
+  - A failed read is `isError`, never `gone`.
+  - Numerics are read through `readLoanRow`, and `amount` with `Number`.
+  - Validation is the house readers (`readLoanRow`, `readLoanDetail`), not zod: zod is not a dependency here.
+- **`useUpdateLoan`:**
+  - Sends all 18 parameters every time, with null for a change, last payment or day left out: the edit replaces the contract.
+  - `p_payment_day` is null when the day equals the first payment's own (as save_loan stores it), so an unchanged loan saves byte for byte.
+  - Invalidates 'bills' (with its dependent 'loans' and 'dashboard'), 'loans', `['bill', id]` and `['loan', id]`.
+  - Delete stays `useDeleteBill`.
+- **Cache wiring:**
+  - `DEPENDENTS.cards` / `.bank_accounts` gain 'loans', and so do the realtime `cards` / `bank_accounts`: the loan page names its card or account.
+  - Bills already reached 'loans'.
+
+**Tests:**
+- **New:**
+  - `src/__tests__/api/loan-detail.test.tsx` (13): one request; the columns; the card, the account (nickname) and Skip; kept out; bill vs gone; list-shaped embed; the three fallbacks and the flag-first order; failed read; disabled; refetched on 'loans'; `loanTermsOf(detail.loan)` equals `termsFromStored`.
+  - `src/__tests__/api/loan-update.test.tsx` (12): exact args; left-out parts sent as null; last payment; day normalisation; switch and today; the same figures as `useSaveLoan` for the same loan; invalidations; the refusal mapping; P0002; PGRST202 with no fallback write.
+- **Extended:**
+  - `loan-migrations.test.ts` (+6): B's signature, defaults, grants by signature, invoker, the floor expression, the refusal words; save_loan still lives in A.
+  - `mutations.test.tsx` (+2): card / account writes reach 'loans'.
+  - `realtime-provider.test.tsx` (+2).
+
+**Gates:**
+- tsc 0.
+- eslint (cache cleared, `--no-cache`, `--max-warnings 0`) on my 9 files: 0. In `src`: 0 errors, plus the old setup.test.tsx warning.
+- Prettier clean on my files.
+- Full jest (live tree, with Dana's and Drew's P2): 332/332 suites, 7,097 tests.
+
+**For Dana:**
+1. `kind: 'bill'` → `/bill/[id]`; `'gone'` → pop while focused. Act only on a successful read.
+2. `source` null is Skip. `name` is optional in the `PaymentSourceRow` type, but `cardSource` and `accountSource` always set it.
+3. Edit prefill:
+   - Start date is `loan.funded_on`, not `bill.starts_on`, which is the count floor.
+   - Day is `payment_day ?? the first payment's day`.
+   - Source is `card_id ?? bank_account_id ?? ''`.
+4. Refusals use `refusedLoanSave` as before. P0002 and "not one of yours" show the one failure line.
+5. B must be live before the device build.
+
+**Open:**
+1. **Dmitri:** review B, especially the floor deviation above. Push waits for the Founder's go. Pre-push, read-only: `to_regprocedure('public.update_loan(...)')` is null live.
+2. **CEO / Founder:**
+   - An edit that moves payments to after the day the loan was added (but before today) counts them, as if it had been saved that way (F1).
+   - An edit that lengthens a finished loan counts payments since its last charge.
+   - Wrapped-up months stay frozen (R7).
+3. **CEO:** statement fields stay as stored on an edit, and Review prices without them (Dana's open 3). No app path writes them today.
+4. **Known edge, accepted:** a loan switched off and back on before its first payment, whose first payment is then moved earlier into the off stretch, can count that stretch. Closing it would need a stored "counts from" column.
+5. **Dmitri (pre-existing):** nothing stops save_loan or the bill form pointing a bill at another person's card id. Nothing leaks (RLS, and charges stay the owner's); update_loan refuses it. A later trigger like `receipt_books_own_rows` on bills?
+
+## 2026-10-12 — Dmitri (Development Lead) — Add Loan P2 review: GO, no MUST. Migration B is READY for the Founder's go, after the read-only live checks below. Read-only.
+
+**Gates:** tsc 0; eslint (cache cleared, `--no-cache`, `--max-warnings 0`, src) 0 errors, plus the old setup.test.tsx warning; prettier clean on all 45 changed TS files; full jest 332/332 suites, 7,097 tests. The v57 router docs and types export `Redirect` and `useIsFocused`.
+
+**Migration B (`20261012100002_update_loan.sql`):**
+- **It touches no existing row.** It adds one new function and nothing else. Running it twice is safe (create or replace, revoke, grant).
+- **Security:** security invoker with `search_path=public`. Revoked from public and anon, granted to authenticated.
+- **RLS:** bills and loans have `for all` own-row policies, so the caller's updates are allowed and limited to their own rows. Someone else's bill reads as P0002. Card and account ownership is checked through RLS-visible existence.
+- **Refusals leave nothing half-written.** Every raise comes before the writes. A failing loans check (the changed payments against the new term, or the payment day) aborts the call and rolls back the bill update with it.
+- **Triggers:** bills and loans carry only their updated_at triggers.
+
+**Live checks wanted before the push (read-only):**
+- No `update_loan` exists live (`pg_proc` by name).
+- The migration history ends at 20261012100001.
+- `pg_policies` for bills, loans, cards, bank_accounts, charges and profiles match the files: own-row policies, and bills/loans `for all`.
+- The triggers on bills and loans are only `*_set_updated_at`.
+- `bills.in_spending` and `loans.payment_day` exist.
+
+**Decisions:**
+- **Diego's floor deviation: accepted.** The literal "never before the stored starts_on" rule is wrong in two cases. For a loan added before its first payment, starts_on is not a floor. For a loan saved already paid off, it would back-fill.
+  - (a) the add day plus (b) a stored starts_on later than the first payment is F1 itself.
+  - (c) the month after the last charge keeps to one charge per cycle.
+  - (d) a switch turned back on counts from today.
+- **Q2, both parts: agreed.** Payments moved to after the add day but before today count, as if the loan had been saved that way. Lengthening a finished loan counts from its last charge on. Both follow F1, and wrapped-up months stay frozen (R7).
+
+**Checked:**
+- **No redirect loop.** `/loan/[id]` sends a bill with no loan to `/bill/[id]`, and `/bill/[id]` sends on only when the read found a loan. Both use the same query key, so one read decides both. A failed read shows the bill.
+- **Old bills and subscriptions still open their own pages.** An old manual Loans bill goes from `/loan/[id]` to its bill page and edits in Add bill.
+- **Navigation:**
+  - An edit save goes back to `/loan/[id]`.
+  - Delete makes one `finishFlowOn('/loans')`. The loan page beneath does not pop itself while it is not focused, and the edit page keeps the last-read loan.
+  - Push taps on `/bill` land on the loan page.
+- **Cent-exact:**
+  - The card, upcoming and history rows all come from the `amortise` rows on `loanTermsForBill`, the same schedule the Loans page reads.
+  - `loanScheduleParams` carries `day`.
+  - By hand on the wireframe loan: 27 Oct is $54.83 interest + $369.97 principal, and 27 Sep is $58.60 + $366.20.
+  - Stopped loans are priced as of their stop on both pages through the shared `loanEnding`.
+- **en/es/fr:** complete, and every loan, loanFlow and toast.loan key is used. The delete wording is accurate: charges, the loans row and the reminder all cascade.
+- **Comment style:** fine.
+- **Tests:** meaningful (B's 52 SQL checks with 7 mutants caught; loan-view's sweep across 13 loans; the redirect and focus cases).
+
+**Nice-to-haves:**
+1. History "See all" draws every made payment at once, with no virtualising. Check a 30-year loan late in its term on the 13 Pro Max.
+2. `p_today` comes from the device. A wrong clock moves the switch-on floor. Clamp it to within a day of the profile's day.
+3. Diego's open 5: a trigger tying a bill's card or account to its owner, as backlog.
+4. Delete lands on Loans wherever the loan was opened from. This is fine; confirm it on the device.
+5. Archive add-bill's loan card as planned.
+
+**Commit hygiene:** `src/i18n/messages/habits.ts` and the spending-habits brief and mock are the other session's work. Keep them out of the P2 commit.
+
+- **2026-10-12 — Dana — Add bill's loan card archived (after Dmitri's P2 GO):** moved to `~/Desktop/SkipBudget-design-archive/2026-10-12/` as excerpts under their source paths: `src/app/add-bill.loan-card.tsx` (the Payment schedule card, its terms/schedule lines and its 5 imports), `src/__tests__/app/add-bill-save.loan-schedule.test.tsx` (its 4 tests), `src/i18n/messages/bills.paymentSchedule.ts` (`bills.add.paymentSchedule`, en/es/fr, read by nothing else). Kept: `ScheduleCard` (the calculator uses it), EntryReview's `bottomSlot` (voice-review and habit-new use it; comment updated), and `useLoanForBill` in add-bill, which still feeds `hasLoan` to `buildBillValues` so a loan keeps its type icon. New tests in add-bill-save: a loan's bill offers no schedule (fails on the old add-bill); a hand-made Loans & Credit bill with no loan still edits and saves under Loans. Gates: eslint (cache cleared) and prettier clean on the 4 changed files; tsc errors only in `src/__tests__/habits/habit-card.test.tsx` and `src/app/habits.tsx` (the habits session's in-flight work); full jest 328/332 suites, the 4 failing all habit suites (`habitStatus` gone from habit-card, new habit copy), none touching add-bill. Add-bill suites 353/353. No habit file touched.

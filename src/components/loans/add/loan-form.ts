@@ -1,10 +1,13 @@
-import type { LoanType } from '@/data/loan-types';
+import type { LoanDetail } from '@/api/loans';
+import type { PaymentSourceRow } from '@/api/queries';
+import { loanTypeOf, type LoanType } from '@/data/loan-types';
 import { numberMarks, t, type MessageKey } from '@/i18n';
 import { toIsoDate } from '@/lib/date';
-import type { AccrualBasis, PaymentOverrideMap } from '@/lib/loan';
+import { amortise, type AccrualBasis, type PaymentOverrideMap } from '@/lib/loan';
 import { firstPaymentOn } from '@/lib/loan-first-payment';
 import type { LoanReviewField, LoanReviewFields } from '@/lib/loan-review';
-import { routeDate, type LoanRoute } from '@/lib/loan-route';
+import { overrideParams, readLoanRoute, routeDate, type LoanRoute } from '@/lib/loan-route';
+import { loanTermsForBill } from '@/lib/loan-start';
 import { draftFromAmount } from '@/lib/typed-amount';
 
 export type TermUnit = 'years' | 'months';
@@ -88,6 +91,48 @@ export function loanFormFromCalculator(route: LoanRoute): LoanForm {
     basis: route.basis,
     payments: route.overrides.payments,
   };
+}
+
+/**
+ * A saved loan on the details page, to be changed: its figures as stored, its first payment pinned
+ * where the rule would put it elsewhere, and its name following its type only while it is still the
+ * type's own name. A loan saved before types is an Other loan, as it is drawn everywhere.
+ */
+export function loanFormFromSaved(loan: LoanDetail): LoanForm {
+  const terms = loanTermsForBill(loan, loan.bill);
+  const route = readLoanRoute({
+    amount: String(loan.principal),
+    rate: String(loan.annual_rate),
+    months: String(loan.term_months),
+    start: terms ? toIsoDate(terms.firstPaymentOn) : '',
+    day: terms?.paymentDay === undefined ? undefined : String(terms.paymentDay),
+    // A loan saved without the day the money landed starts where its schedule does.
+    funded: loan.funded_on ?? (terms ? toIsoDate(amortise(terms).fundedOn) : ''),
+    basis: loan.day_count_basis,
+    ...overrideParams({ monthlyPayment: loan.monthly_payment, payments: terms?.paymentOverrides }),
+  });
+  const type = loanTypeOf(loan.bill.icon_id) ?? 'other';
+  return {
+    ...loanFormFromCalculator(route),
+    type,
+    typedName: loan.bill.name === t(DEFAULT_NAMES[type]) ? null : loan.bill.name,
+    sourceId: loan.bill.card_id ?? loan.bill.bank_account_id ?? '',
+  };
+}
+
+/**
+ * The Paid from tiles for a saved loan: what the plan offers, plus the card or account the loan is
+ * paid from when the plan would not offer it today (no locks on lapse), among the others of its
+ * kind. Unchanged when it is offered already, or the loan has none.
+ */
+export function withSourceKept(
+  offered: readonly PaymentSourceRow[],
+  kept: PaymentSourceRow | null,
+): readonly PaymentSourceRow[] {
+  if (!kept || offered.some((source) => source.id === kept.id)) return offered;
+  const cards = offered.filter((source) => source.kind === 'card');
+  const accounts = offered.filter((source) => source.kind === 'account');
+  return kept.kind === 'card' ? [...cards, kept, ...accounts] : [...cards, ...accounts, kept];
 }
 
 /** A yyyy-mm-dd as local midnight; null for nothing or a garbled link. */

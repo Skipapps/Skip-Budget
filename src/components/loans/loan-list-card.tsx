@@ -16,7 +16,7 @@ import { TEXT_CAP } from '@/theme/text-scale';
 
 /** One saved loan as the Loans page draws it. */
 export type LoanCardData = {
-  /** The loan's bill, which View details opens. */
+  /** The loan's bill: its page (/loan/[id]) is opened by this id. */
   billId: string;
   name: string;
   /** The bill's icon id: `loan-<type>` for a loan saved with a type. */

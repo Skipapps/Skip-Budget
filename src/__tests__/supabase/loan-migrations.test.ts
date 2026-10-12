@@ -5,7 +5,7 @@ import { join } from 'node:path';
  * What the migrations leave for loans, read from the files in the order the CLI applies them:
  * save_loan's live signature (and that its grants name that signature, or a dropped function's
  * grants are lost), the changed-payments column and its check, the rate's precision, the payment
- * day, and the "counts toward spending" flag in the recorder and the reminders.
+ * day, the "counts toward spending" flag in the recorder and the reminders, and update_loan.
  */
 
 const DIR = join(__dirname, '../../../supabase/migrations');
@@ -28,20 +28,24 @@ function parameterTypes(list: string): string[] {
     .filter((type): type is string => Boolean(type));
 }
 
-/** The last `create [or replace] function public.save_loan(…)` across every migration. */
-function liveSaveLoan(): { file: string; parameters: string; types: string[] } {
+/** The last `create [or replace] function public.<name>(…)` across every migration. */
+function liveSignature(name: string): { file: string; parameters: string; types: string[] } {
   let live: { file: string; parameters: string; types: string[] } | null = null;
+  const opening = new RegExp(
+    `create (?:or replace )?function public\\.${name}\\(([\\s\\S]*?)\\)\\s*returns`,
+    'gi',
+  );
   for (const file of files) {
     const text = sql(file);
-    for (const match of text.matchAll(
-      /create (?:or replace )?function public\.save_loan\(([\s\S]*?)\)\s*returns/gi,
-    )) {
+    for (const match of text.matchAll(opening)) {
       live = { file, parameters: match[1], types: parameterTypes(match[1]) };
     }
   }
-  if (!live) throw new Error('save_loan is never created');
+  if (!live) throw new Error(`${name} is never created`);
   return live;
 }
+
+const liveSaveLoan = () => liveSignature('save_loan');
 
 /** The body of the last `create [or replace] function public.<name>(` across every migration. */
 function liveFunction(name: string): { file: string; body: string } {
@@ -216,5 +220,79 @@ describe('the loans table after every migration', () => {
     const changes = [...all.matchAll(/annual_rate\s+(?:type\s+)?numeric\((\d+),(\d+)\)/gi)];
     const last = changes[changes.length - 1];
     expect(last?.slice(1)).toEqual(['12', '9']);
+  });
+});
+
+describe('update_loan after every migration', () => {
+  const live = liveSignature('update_loan');
+  const body = () => liveFunction('update_loan').body.replace(/\s+/g, ' ');
+
+  it('takes the bill it edits and the whole contract, the optional four last', () => {
+    expect(live.file).toBe('20261012100002_update_loan.sql');
+    expect(live.types).toEqual([
+      'uuid',
+      'text',
+      'text',
+      'numeric',
+      'numeric',
+      'integer',
+      'numeric',
+      'numeric',
+      'date',
+      'date',
+      'text',
+      'uuid',
+      'uuid',
+      'boolean',
+      // Not smallint, for the reason save_loan's is not.
+      'integer',
+      'jsonb',
+      'date',
+      'date',
+    ]);
+    const lines = live.parameters.split(',').map((line) => line.trim());
+    expect(lines.slice(-4)).toEqual([
+      expect.stringMatching(/^p_payment_day\s+integer\s+default null$/i),
+      expect.stringMatching(/^p_payment_overrides\s+jsonb\s+default null$/i),
+      expect.stringMatching(/^p_last_payment_on\s+date\s+default null$/i),
+      expect.stringMatching(/^p_today\s+date\s+default null$/i),
+    ]);
+  });
+
+  it('is granted to signed-in callers and kept from anon, by its own signature', () => {
+    const text = sql(live.file).replace(/\s+/g, ' ');
+    const signature = live.types.join(', ');
+    expect(text).toContain(
+      `revoke all on function public.update_loan( ${signature} ) from public, anon;`,
+    );
+    expect(text).toContain(
+      `grant execute on function public.update_loan( ${signature} ) to authenticated;`,
+    );
+  });
+
+  it('runs as the caller, so row security keeps each person to their own loans', () => {
+    expect(body()).toContain('security invoker set search_path = public');
+    expect(body()).not.toContain('security definer');
+    expect(body()).toContain(
+      "select * into v_bill from public.bills where id = p_bill_id for update; if not found then raise exception 'there is no such loan' using errcode = 'P0002';",
+    );
+  });
+
+  it('counts from the day the loan was added, a floor set since, after the last charge, or from a switch back on', () => {
+    expect(body()).toContain(
+      "v_floor := greatest( (v_bill.created_at at time zone v_tz)::date, case when v_bill.starts_on > v_was_first then v_bill.starts_on end, (date_trunc('month', v_last_charged) + interval '1 month')::date, case when v_in_spending and not v_bill.in_spending then v_today end );",
+    );
+    expect(body()).toContain('v_starts_on := greatest(p_first_payment_on, v_floor);');
+  });
+
+  it('refuses what save_loan refuses, in its words', () => {
+    expect(body()).toContain("raise exception 'a loan needs at least one payment'");
+    expect(body()).toContain("raise exception 'the payment day must be between 1 and 31'");
+    expect(body()).toContain("raise exception 'the last payment must fall within the term'");
+  });
+
+  it('leaves save_loan as migration A made it', () => {
+    expect(liveSaveLoan().file).toBe('20261012100001_loan_add_flow.sql');
+    expect(sql('20261012100002_update_loan.sql')).not.toMatch(/function public\.save_loan/i);
   });
 });

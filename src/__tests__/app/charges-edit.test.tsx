@@ -53,6 +53,16 @@ const mockEntries = [
     planId: 'b1',
   },
   {
+    id: 'bill-l1@2026-10-27',
+    label: 'Car loan',
+    amount: -424.8,
+    date: '2026-10-27',
+    kind: 'bill',
+    sourceId: '',
+    planId: 'l1',
+    categoryId: 'loans',
+  },
+  {
     id: 'subscription-s1@2026-10-05',
     label: 'Netflix',
     amount: -15.99,
@@ -85,7 +95,15 @@ describe('Monthly bills', () => {
 
     await fireEvent.press(screen.getByLabelText(/Housing/));
 
-    expect(router.push).toHaveBeenCalledWith('/bill/b1');
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/bill/[id]', params: { id: 'b1' } });
+  });
+
+  it('opens a loan’s own page from its payment', async () => {
+    const screen = await render(<BillsScreen />);
+
+    await fireEvent.press(screen.getByLabelText(/Car loan/));
+
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/loan/[id]', params: { id: 'l1' } });
   });
 
   it('adds from the + in the header, with no tiles on the page', async () => {

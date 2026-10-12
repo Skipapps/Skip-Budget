@@ -23,8 +23,9 @@ const AFFECTS: Record<string, string[]> = {
   habits: ['habits'],
   receipt_books: ['receipt_books', 'receipts'],
   payments: ['payments', 'dashboard'],
-  cards: ['cards', 'dashboard'],
-  bank_accounts: ['bank_accounts', 'dashboard'],
+  // A loan's own page names its bill's card or account.
+  cards: ['cards', 'dashboard', 'loans'],
+  bank_accounts: ['bank_accounts', 'dashboard', 'loans'],
   salary_sources: ['salary_sources', 'dashboard'],
   pay_received: ['pay_received', 'dashboard'],
   // Long published, so listening to it adds nothing new to the channel. Goals and their moves are
