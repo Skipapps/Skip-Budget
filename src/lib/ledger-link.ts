@@ -10,6 +10,8 @@ import type { Href } from 'expo-router';
  * - `bill-<id>@<date>` / `subscription-<id>@<date>`: a projected occurrence of that plan.
  * - `charge-<id>`: a recorded occurrence; the id names no plan, so it is looked up via `chargeOwners`.
  * - `income-<id>@<date>`: a payday; the salary screen takes no id.
+ * - `payoff-<id>`: money paid toward a loan beyond its instalments; the id is the payoff's, so the
+ *   loan comes from `planId`, its bill.
  *
  * A loan's bill opens the loan's own page (`billPageHref`), wherever its row is.
  *
@@ -24,6 +26,8 @@ export type LedgerLinkEntry = {
   kind: LedgerLinkKind;
   /** A bill's category: 'loans' sends it to the loan's page. */
   categoryId?: string | null;
+  /** The bill or subscription behind the row, where its id does not name it. */
+  planId?: string | null;
 };
 
 /** Every loan is saved under the Loans bill category (`save_loan`). */
@@ -82,6 +86,12 @@ export function ledgerHref(
   if (entry.kind === 'receipt') {
     const id = recordIdFrom(entry.id, 'receipt');
     return id ? { pathname: '/receipt/[id]', params: { id } } : null;
+  }
+
+  if (entry.id.startsWith('payoff-')) {
+    return entry.kind === 'bill' && entry.planId
+      ? { pathname: '/loan/[id]', params: { id: entry.planId } }
+      : null;
   }
 
   const id = entry.id.startsWith('charge-')

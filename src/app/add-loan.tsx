@@ -21,6 +21,7 @@ import {
 import { LoanKeypadView } from '@/components/loans/add/loan-keypad-view';
 import { loanReminderOn } from '@/components/loans/add/loan-reminder';
 import { LoanReviewView } from '@/components/loans/add/loan-review-view';
+import { localDate } from '@/components/loans/loan-words';
 import { goBack } from '@/components/ui/back-button';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
@@ -30,11 +31,12 @@ import { percent, t } from '@/i18n';
 import { failureMessage, failureText } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
 import { success, warn } from '@/lib/haptics';
-import { paymentDates } from '@/lib/loan';
+import { paymentDates, readStoredPayoffs, type LoanPayoff } from '@/lib/loan';
 import { refusedLoanSave } from '@/lib/loan-refusal';
 import { loanReview, type LoanReviewRefusal } from '@/lib/loan-review';
 import { SAVABLE_RATE_MAX, readLoanRoute, type LoanRouteParams } from '@/lib/loan-route';
 import { finishFlowOn } from '@/lib/nav';
+import { formatFullDate } from '@/lib/date';
 import { billReminderCaption, type LeadDays } from '@/lib/reminder-words';
 import { useToday } from '@/lib/use-today';
 import { useConfirm } from '@/providers/dialog-provider';
@@ -53,9 +55,14 @@ const DEFAULT_LEAD: LeadDays = 3;
 const rateRange = () =>
   t('loan.save.rateOutOfRange', { min: percent(0, 0), max: percent(SAVABLE_RATE_MAX, 0) });
 
-/** A saved loan being changed: its bill, where it is paid from now, and its reminder as stored. */
+/**
+ * A saved loan being changed: its bill, where it is paid from now, its reminder as stored, and the
+ * payoffs already made on it.
+ */
 type Editing = {
   billId: string;
+  /** Kept through the edit: without them Save would end the bill where the loan as lent ends. */
+  payoffs: readonly LoanPayoff[] | undefined;
   source: PaymentSourceRow | null;
   reminder: ReturnType<typeof useReminderChoice>;
 };
@@ -98,9 +105,17 @@ function EditLoanScreen({ billId }: { billId: string }) {
   if (fresh && fresh !== kept) setKept(fresh);
   const loan = fresh ?? kept;
   // The page's starting figures, from the first read: a reload while editing never resets them.
-  const [opening, setOpening] = useState<{ form: LoanForm; inSpending: boolean } | null>(null);
+  const [opening, setOpening] = useState<{
+    form: LoanForm;
+    inSpending: boolean;
+    payoffs: readonly LoanPayoff[] | undefined;
+  } | null>(null);
   if (loan && !opening) {
-    setOpening({ form: loanFormFromSaved(loan), inSpending: loan.bill.in_spending });
+    setOpening({
+      form: loanFormFromSaved(loan),
+      inSpending: loan.bill.in_spending,
+      payoffs: readStoredPayoffs(loan.payoffs),
+    });
   }
 
   // Not a loan to change (gone on another phone, or a bill with none behind it): leave quietly.
@@ -117,6 +132,7 @@ function EditLoanScreen({ billId }: { billId: string }) {
         initialInSpending={opening.inSpending}
         editing={{
           billId,
+          payoffs: opening.payoffs,
           source: loan.source,
           reminder,
         }}
@@ -189,8 +205,8 @@ function AddLoanFlow({
 
   // Priced only on the page that shows it; the details page asks on Continue.
   const review = useMemo(
-    () => (view === 'review' ? loanReview(reviewFieldsOf(form), today) : null),
-    [view, form, today],
+    () => (view === 'review' ? loanReview(fieldsWith(form, editing?.payoffs), today) : null),
+    [view, form, today, editing?.payoffs],
   );
   const figures = review?.ok ? review : null;
 
@@ -216,11 +232,16 @@ function AddLoanFlow({
         return t('loanFlow.details.paymentTooLow', {
           minimum: formatCurrency(refusal.problem.minimum ?? 0),
         });
+      case 'start-after-payoff':
+        return t('loanFlow.edit.startAfterPayoff', {
+          amount: formatCurrency(refusal.amount),
+          date: formatFullDate(localDate(refusal.on)),
+        });
     }
   };
 
   const handleContinue = () => {
-    const fields = reviewFieldsOf(form);
+    const fields = fieldsWith(form, editing?.payoffs);
     const tooLong = termMonthsOf(form) > TERM_YEARS_MAX * 12;
     // A slip like 999 years is never priced, only asked what else is missing.
     const checked = loanReview(tooLong ? { ...fields, termMonths: 1 } : fields, today);
@@ -467,6 +488,11 @@ function AddLoanFlow({
       scrollPlace={{ y: detailsY, keep: setDetailsY }}
     />
   );
+}
+
+/** The form as Review prices it, with the payoffs a saved loan already has. */
+function fieldsWith(form: LoanForm, payoffs: readonly LoanPayoff[] | undefined) {
+  return { ...reviewFieldsOf(form), payoffs };
 }
 
 function fieldsOf(refusal: LoanReviewRefusal) {

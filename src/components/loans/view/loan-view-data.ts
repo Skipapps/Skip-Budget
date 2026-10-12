@@ -6,9 +6,11 @@ import { localDate } from '@/components/loans/loan-words';
 import { loanTypeOf, type LoanType } from '@/data/loan-types';
 import { t } from '@/i18n';
 import { loanPricingDay } from '@/lib/active-loans';
-import { formatFullDate } from '@/lib/date';
+import { formatFullDate, toIsoDate } from '@/lib/date';
 import { loanTermsForBill } from '@/lib/loan-start';
 import { loanStatus, type LoanStatus } from '@/lib/loan-status';
+import type { LoanTerms } from '@/lib/loan';
+import { paidOffOn, withoutPayoff } from '@/lib/loan-payoff';
 import {
   loanHistory,
   loanScheduleParams,
@@ -22,6 +24,41 @@ import type { LoanRouteParams } from '@/lib/loan-route';
 export const UPCOMING_SHOWN = 4;
 export const HISTORY_SHOWN = 3;
 
+/**
+ * A History row as the page draws it: a scheduled payment, from the loan's own card or account, or
+ * money paid off the loan, from wherever that came from.
+ */
+export type HistoryRow =
+  | ({ kind: 'payment' } & LoanPayment)
+  | {
+      kind: 'payoff';
+      /** The payoff on file, for taking it back out; null for one that is not. */
+      id: string | null;
+      /** yyyy-mm-dd */
+      date: string;
+      amount: number;
+      /** It cleared the loan. */
+      full: boolean;
+      /** Null is Skip. */
+      source: PaymentSourceRow | null;
+      /** The most recent payoff: payoffs come back out newest first, so only it can. */
+      latest: boolean;
+      /**
+       * yyyy-mm-dd the loan would end with this payoff taken back out (`withoutPayoff`), which its
+       * bill goes back to; null when there is no schedule to end.
+       */
+      endsWithout: string | null;
+    };
+
+export type LoanViewHistory = {
+  /** Newest first. */
+  rows: HistoryRow[];
+  /** yyyy-mm-dd of the most recent payoff, which has to come out before an earlier one. */
+  latestPayoffOn: string | null;
+  /** yyyy-mm-dd of the schedule's first payment, for "Your first payment is on …". */
+  firstPaymentOn: string | null;
+};
+
 export type LoanView = {
   billId: string;
   name: string;
@@ -32,8 +69,8 @@ export type LoanView = {
   endedOn: string | null;
   /** The next payments, soonest first; none once the loan is finished. */
   upcoming: LoanPayment[];
-  /** Every payment made, newest first. */
-  history: LoanHistory;
+  /** Every payment made and every payoff, newest first. */
+  history: LoanViewHistory;
   /** Null when its whole schedule cannot be opened (a loan pinned to a statement balance). */
   scheduleParams: LoanRouteParams | null;
   /** Null is no card or account (Skip). */
@@ -41,14 +78,15 @@ export type LoanView = {
 };
 
 /**
- * Where a saved loan stands, every figure off its own schedule, as the Loans page reads it: on
- * `today`, or on the day its bill stopped when that came first (`loanPricingDay`), so a stopped
- * loan lists no payment after it stopped. Null when the stored loan gives no schedule.
+ * Where a saved loan stands, every figure off its own schedule, its payoffs included, as the Loans
+ * page reads it: on `today`, or on the day it was paid off or its bill stopped when that came first
+ * (`loanPricingDay`), so a finished loan lists nothing after it ended. Null when the stored loan
+ * gives no schedule.
  */
 export function loanViewOf(loan: LoanDetail, today: string): LoanView | null {
   const terms = loanTermsForBill(loan, loan.bill);
   if (!terms) return null;
-  const day = loanPricingDay(loan.bill, today);
+  const day = loanPricingDay(loan.bill, today, paidOffOn(terms));
   const status = loanStatus(terms, day);
   const { ending, endedOn } = loanEnding(loan.bill, status, today);
   return {
@@ -61,9 +99,41 @@ export function loanViewOf(loan: LoanDetail, today: string): LoanView | null {
     endedOn,
     // A finished loan has nothing coming, whatever its schedule held past the stop.
     upcoming: ending ? [] : upcomingPayments(terms, day, UPCOMING_SHOWN),
-    history: loanHistory(terms, day),
+    history: historyOf(loanHistory(terms, day), payoffSources(loan), terms),
     scheduleParams: loanScheduleParams(terms),
     paidFrom: loan.source,
+  };
+}
+
+/** The card or account each payoff on file came from, by its id; null is Skip. */
+function payoffSources(loan: LoanDetail): ReadonlyMap<string, PaymentSourceRow | null> {
+  return new Map((loan.payoffs ?? []).map((payoff) => [payoff.id, payoff.source]));
+}
+
+function historyOf(
+  history: LoanHistory,
+  sources: ReadonlyMap<string, PaymentSourceRow | null>,
+  terms: LoanTerms,
+): LoanViewHistory {
+  // The loan's payoffs are in the order they were made (`readStoredPayoffs`): the last is latest.
+  const latest = terms.payoffs?.at(-1);
+  const rows = history.entries.map((entry): HistoryRow => {
+    if (entry.kind === 'payment') return entry;
+    return {
+      kind: 'payoff',
+      id: entry.id,
+      date: entry.on,
+      amount: entry.amount,
+      full: entry.full,
+      source: (entry.id && sources.get(entry.id)) || null,
+      latest: Boolean(entry.id) && entry.id === latest?.id,
+      endsWithout: entry.id ? (withoutPayoff(terms, entry.id)?.endsOn ?? null) : null,
+    };
+  });
+  return {
+    rows,
+    latestPayoffOn: latest ? toIsoDate(latest.on) : null,
+    firstPaymentOn: history.firstPaymentOn,
   };
 }
 

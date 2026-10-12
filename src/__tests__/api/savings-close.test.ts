@@ -441,6 +441,96 @@ describe('closeFinishedMonths', () => {
     expect(mockDb.reads.filter((table) => table === 'bills')).toHaveLength(2);
   });
 
+  describe('with money paid off a loan', () => {
+    /** A car loan counted since August, on the 20th, both instalments written down. */
+    function withCarLoan(userId: string, bill: Row = {}) {
+      seed(userId);
+      mockDb.tables.bills.push({
+        id: 'car',
+        name: 'Car loan',
+        amount: 400,
+        category_id: 'loans',
+        icon_id: 'loan-car',
+        recurrence: 'monthly',
+        next_due_on: '2026-10-20',
+        starts_on: '2026-08-20',
+        ends_on: '2028-07-20',
+        created_at: '2026-08-20T12:00:00+00:00',
+        in_spending: true,
+        ...bill,
+      });
+      for (const on of ['2026-08-20', '2026-09-20']) {
+        mockDb.tables.charges.push({
+          id: `car-${on}`,
+          bill_id: 'car',
+          subscription_id: null,
+          label: 'Car loan',
+          amount: 400,
+          charged_on: on,
+        });
+      }
+    }
+
+    const payoff = (id: string, paid_on: string, amount: string, over: Row = {}): Row => ({
+      id,
+      bill_id: 'car',
+      paid_on,
+      amount,
+      kind: 'partial',
+      card_id: null,
+      bank_account_id: 'checking',
+      counted: true,
+      ...over,
+    });
+
+    it('counts each in the month it was paid, and none made while the loan was kept out', async () => {
+      withCarLoan('user-payoffs');
+      mockDb.tables.loan_payoffs = [
+        payoff('po-sep', '2026-09-05', '1000.00'),
+        payoff('po-aug-off', '2026-08-07', '200.00', { counted: false }),
+        // This month: not part of any closing.
+        payoff('po-oct', '2026-10-03', '500.00'),
+      ];
+
+      expect(await closeFinishedMonths('user-payoffs', TODAY)).toBe(3);
+      // August: $400 more for the instalment; September: $400 and the $1,000 payoff.
+      expect(mockDb.rpcs.map((call) => call.args.p_spent)).toEqual([290, 3621.04, 4535.94]);
+    });
+
+    it('a full payoff stops the instalments after it and counts once itself', async () => {
+      withCarLoan('user-paid-off', { ends_on: '2026-09-05' });
+      mockDb.tables.charges = mockDb.tables.charges.filter((row) => row.id !== 'car-2026-09-20');
+      mockDb.tables.loan_payoffs = [
+        payoff('po-full', '2026-09-05', '9000.00', { kind: 'full', bank_account_id: null }),
+      ];
+
+      expect(await closeFinishedMonths('user-paid-off', TODAY)).toBe(3);
+      expect(mockDb.rpcs.map((call) => call.args.p_spent)).toEqual([290, 3621.04, 12135.94]);
+    });
+
+    it.each([
+      [
+        'PostgREST',
+        { code: 'PGRST205', message: "Could not find the table 'public.loan_payoffs'" },
+      ],
+      ['Postgres', { code: '42P01', message: 'relation "loan_payoffs" does not exist' }],
+    ])('closes on the figures without them on a database that has none (%s)', async (_, error) => {
+      seed(`user-no-payoffs-${error.code}`);
+      mockDb.readErrors.loan_payoffs = error;
+
+      expect(await closeFinishedMonths(`user-no-payoffs-${error.code}`, TODAY)).toBe(3);
+      expect(mockDb.rpcs.map((call) => call.args.p_spent)).toEqual([290, 3221.04, 3135.94]);
+    });
+
+    it('writes nothing when they cannot be read another way', async () => {
+      withCarLoan('user-payoffs-flaky');
+      mockDb.readErrors.loan_payoffs = { code: '08006', message: 'connection failure' };
+
+      expect(await closeFinishedMonths('user-payoffs-flaky', TODAY)).toBe(0);
+      expect(mockDb.rpcs).toEqual([]);
+    });
+  });
+
   it('never throws', async () => {
     seed('user-throws');
     mockDb.readErrors.profiles = { code: '08006', message: 'connection failure' };

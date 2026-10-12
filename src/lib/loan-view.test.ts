@@ -16,6 +16,7 @@ import {
   loanScheduleParams,
   upcomingPayments,
   type LoanHistory,
+  type LoanHistoryEntry,
   type LoanPayment,
 } from '@/lib/loan-view';
 import { toCents } from '@/lib/money';
@@ -70,9 +71,19 @@ const scheduleRows = (terms: LoanTerms): LoanPayment[] =>
     interest,
   }));
 
+type PaymentEntry = Extract<LoanHistoryEntry, { kind: 'payment' }>;
+
+/** The History card's rows as payments; these loans have no payoffs, so that is every row. */
+function payments(history: LoanHistory): PaymentEntry[] {
+  expect(history.entries.every((entry) => entry.kind === 'payment')).toBe(true);
+  return history.entries as PaymentEntry[];
+}
+
 /** History (oldest first) then the payments to come: the whole schedule, seen on `today`. */
 function joined(history: LoanHistory, upcoming: LoanPayment[]): LoanPayment[] {
-  const made = history.entries.map(({ kind: _kind, ...payment }) => payment).reverse();
+  const made = payments(history)
+    .map(({ kind: _kind, ...payment }) => payment)
+    .reverse();
   return [...made, ...upcoming];
 }
 
@@ -239,7 +250,7 @@ describe('a loan paid on the 31st', () => {
   it('is the independent reference’s schedule, 2025 and leap-year 2024', () => {
     expect(bothCards(DAY_31, '2025-05-15')).toEqual(referenceRows(DAY_31_2025));
     const leap = termsOf(storedOf(DAY_31_2024));
-    expect(loanHistory(leap, '2024-03-01', 3).entries.map((entry) => entry.date)).toEqual([
+    expect(payments(loanHistory(leap, '2024-03-01', 3)).map((entry) => entry.date)).toEqual([
       '2024-02-29',
     ]);
     expect(upcomingPayments(leap, '2024-03-01', 1)[0].date).toBe('2024-03-31');
@@ -254,7 +265,7 @@ describe('a loan with changed payments', () => {
   it('shows the changed payment made, and the changed one next, each split to the cent', () => {
     const history = loanHistory(CHANGED, TODAY);
     expect(history.total).toBe(21);
-    expect(history.entries.find((entry) => entry.number === 10)).toEqual({
+    expect(payments(history).find((entry) => entry.number === 10)).toEqual({
       kind: 'payment',
       number: 10,
       date: '2025-10-27',
@@ -346,7 +357,7 @@ describe('a finished loan', () => {
       expect(upcomingPayments(WIREFRAME_LOAN, today, 4)).toEqual([]);
       const history = loanHistory(WIREFRAME_LOAN, today, 3);
       expect(history.total).toBe(48);
-      expect(history.entries.map((entry) => entry.number)).toEqual([48, 47, 46]);
+      expect(payments(history).map((entry) => entry.number)).toEqual([48, 47, 46]);
       // The last payment takes up the difference: 422.33 + 2.17.
       expect(history.entries[0]).toEqual({
         kind: 'payment',
@@ -422,7 +433,7 @@ describe('every row, on every day that matters', () => {
       const status = loanStatus(terms, today);
 
       expect(joined(history, upcoming)).toEqual(rows);
-      expect(history.entries.every((entry) => entry.date <= today)).toBe(true);
+      expect(payments(history).every((entry) => entry.date <= today)).toBe(true);
       expect(upcoming.every((payment) => payment.date > today)).toBe(true);
       expect(history.total).toBe(status.paymentsMade);
       expect(history.firstPaymentOn).toBe(rows[0].date);
@@ -464,7 +475,7 @@ describe('how many rows a count gives', () => {
     expect(upcomingPayments(WIREFRAME_LOAN, '2028-10-30', 4).map((p) => p.number)).toEqual([
       47, 48,
     ]);
-    expect(loanHistory(WIREFRAME_LOAN, '2025-02-27', 3).entries.map((e) => e.number)).toEqual([
+    expect(payments(loanHistory(WIREFRAME_LOAN, '2025-02-27', 3)).map((e) => e.number)).toEqual([
       2, 1,
     ]);
     expect(loanHistory(WIREFRAME_LOAN, TODAY).entries).toHaveLength(21);
@@ -536,3 +547,190 @@ describe('the Payment schedule link', () => {
     expect(loanScheduleParams(pinned)).toBeNull();
   });
 });
+
+describe('payoffs on the View loan page', () => {
+  const stored = (payoffs: [string, number][]) =>
+    termsOf(
+      storedOf(WIREFRAME, {
+        payoffs: payoffs.map(([paidOn, amount], index) => ({
+          id: `payoff-${index}`,
+          paid_on: paidOn,
+          amount: amount.toFixed(2),
+          created_at: `2026-10-12T0${index}:00:00+00:00`,
+        })),
+      }),
+    );
+  const PARTIAL = stored([['2026-10-12', 2000]]);
+  const FULL = stored([['2026-10-12', 10_701.09]]);
+
+  const shape = (history: LoanHistory) =>
+    history.entries.map((entry) =>
+      entry.kind === 'payment' ? `#${entry.number} ${entry.date}` : `${entry.id} ${entry.on}`,
+    );
+
+  it('lists a partial payoff after the payment before it, newest first', () => {
+    const history = loanHistory(PARTIAL, TODAY, 3);
+    expect(shape(history)).toEqual(['payoff-0 2026-10-12', '#21 2026-09-27', '#20 2026-08-27']);
+    expect(history.total).toBe(22);
+    expect(history.entries[0]).toEqual({
+      kind: 'payoff',
+      id: 'payoff-0',
+      on: '2026-10-12',
+      amount: 2000,
+      interest: 27.42,
+      principal: 1_972.58,
+      balance: 8_701.09,
+      full: false,
+    });
+    expect(history.firstPaymentOn).toBe('2025-01-27');
+  });
+
+  it('does not list a payoff before its day', () => {
+    const history = loanHistory(PARTIAL, '2026-10-11');
+    expect(history.total).toBe(21);
+    expect(history.entries.every((entry) => entry.kind === 'payment')).toBe(true);
+  });
+
+  it('puts a payoff on a payment day after that day’s payment', () => {
+    const history = loanHistory(stored([['2026-09-27', 2000]]), '2026-09-27', 2);
+    expect(shape(history)).toEqual(['payoff-0 2026-09-27', '#21 2026-09-27']);
+    expect(history.entries[0]).toMatchObject({ interest: 0, principal: 2000, balance: 8_673.67 });
+  });
+
+  it('interleaves two partials with the payments by date', () => {
+    const two = stored([
+      ['2026-10-12', 2000],
+      ['2027-02-03', 1500],
+    ]);
+    const history = loanHistory(two, '2027-03-01', 7);
+    expect(shape(history)).toEqual([
+      '#26 2027-02-27',
+      'payoff-1 2027-02-03',
+      '#25 2027-01-27',
+      '#24 2026-12-27',
+      '#23 2026-11-27',
+      '#22 2026-10-27',
+      'payoff-0 2026-10-12',
+    ]);
+    expect(history.total).toBe(28);
+  });
+
+  it('lists payoffs made the same day newest first, the one that cleared the loan on top', () => {
+    const sameDay = stored([
+      ['2026-10-12', 500],
+      ['2026-10-12', 300],
+      ['2026-10-12', 9_901.09],
+    ]);
+    const history = loanHistory(sameDay, '2026-11-01', 4);
+    expect(shape(history)).toEqual([
+      'payoff-2 2026-10-12',
+      'payoff-1 2026-10-12',
+      'payoff-0 2026-10-12',
+      '#21 2026-09-27',
+    ]);
+    expect(history.entries.map((entry) => entry.kind === 'payoff' && entry.full)).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ]);
+    expect(upcomingPayments(sameDay, '2026-11-01', 4)).toEqual([]);
+  });
+
+  it('ends the History with the payoff that cleared the loan, and nothing comes after it', () => {
+    const history = loanHistory(FULL, '2027-06-01', 2);
+    expect(history.entries[0]).toMatchObject({ kind: 'payoff', full: true, amount: 10_701.09 });
+    expect(history.total).toBe(22);
+    expect(upcomingPayments(FULL, TODAY, 4)).toEqual([]);
+    expect(upcomingPayments(FULL, '2026-10-11', 4)).toEqual([]);
+    expect(loanStatus(FULL, '2027-06-01')).toMatchObject({ paidOff: true, lastPaymentOn: TODAY });
+  });
+
+  it('has only the payoff when it cleared the loan before the first payment', () => {
+    const early = stored([['2025-01-10', 18_043.15]]);
+    const history = loanHistory(early, '2025-02-01');
+    expect(history).toEqual({
+      entries: [expect.objectContaining({ kind: 'payoff', full: true, interest: 43.15 })],
+      total: 1,
+      firstPaymentOn: null,
+    });
+  });
+
+  it('shows the next payments on the smaller balance, as the reference has them', () => {
+    expect(upcomingPayments(PARTIAL, TODAY, 2)).toEqual([
+      { number: 22, date: '2026-10-27', payment: 424.8, principal: 402.45, interest: 22.35 },
+      { number: 23, date: '2026-11-27', payment: 424.8, principal: 380.75, interest: 44.05 },
+    ]);
+  });
+
+  it('on every day, splits the schedule and the payoffs between History and what is to come', () => {
+    const loans = [
+      PARTIAL,
+      FULL,
+      stored([['2026-09-27', 2000]]),
+      stored([
+        ['2026-10-12', 2000],
+        ['2027-02-03', 1500],
+      ]),
+      stored([['2025-01-10', 3000]]),
+      stored([['2026-10-12', 20]]),
+    ];
+    for (const terms of loans) {
+      const schedule = amortise(terms);
+      const days = [
+        '2024-12-26',
+        ...schedule.rows.flatMap((row) => [row.date, nextDay(row.date)]),
+        ...schedule.payoffs.flatMap((payoff) => [payoff.on, nextDay(payoff.on)]),
+        '2030-01-01',
+      ];
+      for (const today of days) {
+        const history = loanHistory(terms, today);
+        const madePayments = history.entries.filter((entry) => entry.kind === 'payment');
+        const madePayoffs = history.entries.filter((entry) => entry.kind === 'payoff');
+        expect(madePayments.length).toBe(loanStatus(terms, today).paymentsMade);
+        expect(madePayoffs.map((entry) => entry.on)).toEqual(
+          schedule.payoffs
+            .filter((payoff) => payoff.on <= today)
+            .map((payoff) => payoff.on)
+            .reverse(),
+        );
+        expect(history.total).toBe(history.entries.length);
+        const dates = history.entries.map((entry) =>
+          entry.kind === 'payment' ? entry.date : entry.on,
+        );
+        expect([...dates].sort().reverse()).toEqual(dates);
+        expect(
+          joined({ ...history, entries: madePayments }, upcomingPayments(terms, today, Infinity)),
+        ).toEqual(scheduleRows(terms));
+      }
+    }
+  });
+
+  it('opens the schedule with the payoffs, row for row', () => {
+    const params = loanScheduleParams(PARTIAL);
+    expect(params?.payoffs).toBe('[["2026-10-12",2000]]');
+    const route = readLoanRoute(params ?? {});
+    const page = scheduleWithOverrides(
+      termsFromRoute(route, { withExtras: true }),
+      route.overrides,
+    );
+    expect(page.rows).toEqual(amortise(PARTIAL).rows);
+    expect(page.payoffs.map(({ id: _id, ...posting }) => posting)).toEqual(
+      amortise(PARTIAL).payoffs.map(({ id: _id, ...posting }) => posting),
+    );
+    expect(loanScheduleParams(WIREFRAME_LOAN)?.payoffs).toBeUndefined();
+  });
+
+  it('reads a garbled payoffs link as none', () => {
+    const params = loanScheduleParams(PARTIAL)!;
+    for (const payoffs of ['[', '{}', '[["2026-02-30",10]]', '[["2026-10-12","x"]]', '[[1,2]]']) {
+      expect(readLoanRoute({ ...params, payoffs }).payoffs).toBeUndefined();
+    }
+  });
+});
+
+function nextDay(iso: string): string {
+  const date = new Date(`${iso}T00:00:00`);
+  date.setDate(date.getDate() + 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}

@@ -11,12 +11,14 @@ export function LoanViewFooter({
   primary,
   onEdit,
 }: {
-  primary?: { label: string; onPress: () => void };
+  primary?: { label: string; hint?: string; onPress: () => void };
   onEdit: () => void;
 }) {
   return (
     <View className="w-full gap-3" testID="loan-view-footer">
-      {primary ? <Button label={primary.label} onPress={primary.onPress} /> : null}
+      {primary ? (
+        <Button label={primary.label} accessibilityHint={primary.hint} onPress={primary.onPress} />
+      ) : null}
       <Button variant="outline" label={t('loanFlow.edit.title')} onPress={onEdit} />
     </View>
   );

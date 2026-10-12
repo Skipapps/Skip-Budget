@@ -5,12 +5,13 @@
  *
  * - A payment dated on or before today is made; the rest are left. "27 of 48" is payments left of
  *   the schedule's real count, which a larger payment can bring under the term.
- * - What is left is the balance after the last payment made: principal only, as a statement prints
- *   it, without interest running since. Before the first payment it is the amount borrowed.
+ * - What is left is the balance after the last payment or payoff made: principal only, as a
+ *   statement prints it, without interest running since. Before either it is the amount borrowed.
  * - Paid off is the share of the amount borrowed repaid, to the whole percent (half up), and never
  *   100 while a cent is left. A balance above the amount borrowed (a first period whose interest
  *   outran the payment) reads 0, not a negative share.
- * - A loan whose last payment has passed is paid off and leaves the totals.
+ * - A loan whose last payment has passed, or that a payoff cleared, is paid off and leaves the
+ *   totals; a payoff dated on or before today counts as made, as a payment does.
  */
 
 import { toIsoDate } from '@/lib/date';
@@ -46,9 +47,12 @@ export type LoanStatus = {
   amountLeft: number;
   /** Whole percent of the amount borrowed repaid, 0 to 100; 100 only once nothing is left. */
   percentPaid: number;
-  /** The first payment after today, or null once the loan is paid off. */
+  /**
+   * The first payment after today, or null once the loan is paid off (or when a payoff after today
+   * clears it before another payment is due).
+   */
   nextPayment: NextLoanPayment | null;
-  /** yyyy-mm-dd of the last scheduled payment. */
+  /** yyyy-mm-dd the loan ends: its last scheduled payment, or the payoff that clears it. */
   lastPaymentOn: string | null;
   /** Every payment is made: listed under "Paid off" and left out of the totals. */
   paidOff: boolean;
@@ -78,11 +82,21 @@ export function loanStatus(terms: LoanTerms, today: string): LoanStatus {
 
   const next = rows.findIndex((row) => row.date > today);
   const made = next === -1 ? rows.length : next;
-  const paidOff = made === rows.length;
+  const cleared = schedule.payoffs.find((payoff) => payoff.full);
+  const paidOff = cleared ? cleared.on <= today : made === rows.length;
 
+  // What is left after the latest posting made: a payoff, when no payment came after it.
+  const payoffsMade = schedule.payoffs.filter((payoff) => payoff.on <= today);
+  const lastPayoff = payoffsMade[payoffsMade.length - 1];
   const borrowedCents = toCents(terms.principal);
-  const leftCents = paidOff ? 0 : made === 0 ? borrowedCents : toCents(rows[made - 1].balance);
-  const upcoming = paidOff ? null : rows[made];
+  const leftCents = paidOff
+    ? 0
+    : lastPayoff && lastPayoff.afterPayments === made
+      ? toCents(lastPayoff.balance)
+      : made === 0
+        ? borrowedCents
+        : toCents(rows[made - 1].balance);
+  const upcoming = paidOff ? null : (rows[made] ?? null);
 
   return {
     borrowed: fromCents(borrowedCents),

@@ -758,6 +758,8 @@ export type LedgerEntry = {
   planId?: string;
   /** Set only on a receipt filed from a spending habit: drawn with the habit's icon and colour. */
   habit?: HabitMark;
+  /** Set only on money paid off a loan (`payoff-<id>`), whose bill is `planId`. */
+  payoff?: LoanPayoffRow['kind'];
 };
 
 export type LedgerTotals = {
@@ -781,6 +783,8 @@ export type LedgerInput = {
   >[];
   charges: readonly ChargeRow[];
   pay: readonly PayRow[];
+  /** Money paid off loans; none on a database without them. */
+  payoffs?: readonly LedgerPayoff[];
   /** Bank account ids in the person's order: a pay worked out from its schedule lands in the first. */
   accountOrder: readonly string[];
   from: string;
@@ -788,7 +792,8 @@ export type LedgerInput = {
   today: string;
   /**
    * A bill that does not count toward spending lists only what it recorded before ('skip', the
-   * default). 'show' projects it like any other, for its own page; no figure may be summed from it.
+   * default), and a payoff made while its loan did not count is left out. 'show' lists both like
+   * any other, for a bill's own page; no figure may be summed from it.
    */
   uncounted?: 'skip' | 'show';
 };
@@ -804,6 +809,7 @@ export function ledgerEntries({
   salaries,
   charges,
   pay,
+  payoffs = [],
   accountOrder,
   from,
   to,
@@ -924,6 +930,30 @@ export function ledgerEntries({
     );
   }
 
+  // A payoff is not one of its loan's charges (one a month) and is never projected: it went out on
+  // its own day, from its own card or account. Its bill may have stopped running because of it.
+  const billsById = payoffs.length > 0 ? new Map(bills.map((row) => [row.id, row])) : null;
+  for (const payoff of payoffs) {
+    if (!inRange(payoff.paid_on) || (!payoff.counted && uncounted === 'skip')) continue;
+    const bill = billsById?.get(payoff.bill_id);
+    // Gone with its loan; a read of the payoffs that landed before the bills' still has it.
+    if (!bill) continue;
+    entries.push({
+      id: `payoff-${payoff.id}`,
+      label: bill.name,
+      amount: -Math.abs(payoff.amount),
+      date: payoff.paid_on,
+      kind: 'bill',
+      sourceId: payoff.card_id ?? payoff.bank_account_id ?? '',
+      domain: logoDomainOf(bill),
+      logoHidden: Boolean(bill.logo_hidden),
+      categoryId: bill.category_id,
+      iconId: bill.icon_id,
+      planId: bill.id,
+      payoff: payoff.kind,
+    });
+  }
+
   // Pay on the record, as it landed: its own amount and the account it went into.
   const lastRecorded = new Map<string, string>();
   for (const row of pay) {
@@ -984,6 +1014,7 @@ export function useLedger(
   const salary = useSalaryDetails();
   const charges = useCharges();
   const pay = usePayReceived();
+  const payoffs = useLoanPayoffRows();
   const accounts = useBankAccounts();
   const free = useKnownFree();
 
@@ -1006,6 +1037,7 @@ export function useLedger(
         salaries: salary.data?.rows ?? [],
         charges: charges.data ?? [],
         pay: pay.data ?? [],
+        payoffs: payoffs.data ?? [],
         accountOrder: (accounts.data ?? []).map((account) => account.id),
         from,
         to,
@@ -1019,6 +1051,7 @@ export function useLedger(
       salary.data,
       charges.data,
       pay.data,
+      payoffs.data,
       accounts.data,
       from,
       to,
@@ -1072,11 +1105,12 @@ export function useLedger(
       salary.isLoading ||
       charges.isLoading ||
       pay.isLoading ||
+      payoffs.isLoading ||
       accounts.isLoading,
     // Salary and charges count: missing income makes a net figure wrong, and a failed charges read
     // substitutes the projected plan amount for the recorded one with nothing to say it is a guess.
-    // Recorded pay and the accounts it lands in count for the same reason.
-    isError: anyError([receipts, subscriptions, bills, salary, charges, pay, accounts]),
+    // Recorded pay, loan payoffs and the accounts pay lands in count for the same reason.
+    isError: anyError([receipts, subscriptions, bills, salary, charges, pay, payoffs, accounts]),
     refetch: () => {
       receipts.refetch();
       subscriptions.refetch();
@@ -1084,6 +1118,7 @@ export function useLedger(
       salary.refetch();
       charges.refetch();
       pay.refetch();
+      payoffs.refetch();
       accounts.refetch();
     },
   };
@@ -1119,6 +1154,9 @@ export function bookFlows({
       logoHidden: entry.logoHidden,
       categoryId: entry.categoryId,
       iconId: entry.iconId,
+      // A payoff's row names its loan nowhere else (see `ledgerHref`).
+      ...(entry.planId ? { planId: entry.planId } : {}),
+      ...(entry.payoff ? { payoff: entry.payoff } : {}),
       ...(entry.habit ? { habit: entry.habit } : {}),
     });
   }
@@ -1424,5 +1462,124 @@ export function useLoanForBill(billId: string | undefined) {
       if (error) throw error;
       return data ? readLoanRow(data as unknown as RawLoan) : null;
     },
+  });
+}
+
+/**
+ * Money paid on a loan beyond its instalments (`loan_payoffs`): everything owed on a day ('full')
+ * or some of it ('partial'). The schedule takes a loan's own as `StoredLoan.payoffs`; the ledger
+ * lists and counts each on its own date, from its own card or account, when `counted`.
+ */
+export type LoanPayoffRow = {
+  id: string;
+  /** The loan's bill: the id the app knows a loan by. */
+  bill_id: string;
+  /** yyyy-mm-dd */
+  paid_on: string;
+  amount: number;
+  /** As recorded. 'full' ended the loan's bill on `paid_on`. */
+  kind: 'full' | 'partial';
+  card_id: string | null;
+  bank_account_id: string | null;
+  /** Counts toward spending: the loan's "Add to monthly bills" when it was paid. */
+  counted: boolean;
+  /** Orders payoffs paid the same day. */
+  created_at: string;
+  /** Where it came from, as the Paid from tiles draw it; null for Skip (none, or deleted since). */
+  source: PaymentSourceRow | null;
+};
+
+/** As much of a payoff as the ledger counts. */
+export type LedgerPayoff = Pick<
+  LoanPayoffRow,
+  'id' | 'bill_id' | 'paid_on' | 'amount' | 'kind' | 'card_id' | 'bank_account_id' | 'counted'
+>;
+
+const PAYOFF_COLUMNS =
+  'id, bill_id, paid_on, amount, kind, card_id, bank_account_id, counted, created_at, card:cards(id, holder, network, last4, color), account:bank_accounts(id, bank_name, nickname, last4, color)';
+
+/**
+ * A database without payoffs yet: PostgREST has no such table (PGRST205), Postgres none (42P01).
+ * Every loan there has none, which is what it reads as: never an error.
+ */
+export function lacksPayoffs(error: ReadFailure): boolean {
+  return error?.code === 'PGRST205' || error?.code === '42P01';
+}
+
+type RawPayoff = Omit<LoanPayoffRow, 'amount' | 'kind' | 'counted' | 'source'> & {
+  amount: number | string;
+  kind: string;
+  counted: boolean | null;
+  card: Pick<CardRow, 'id' | 'holder' | 'network' | 'last4' | 'color'> | null;
+  account: Pick<BankAccountRow, 'id' | 'bank_name' | 'nickname' | 'last4' | 'color'> | null;
+};
+
+/** A payoff as the app uses it: the amount as a number, and its card or account as a tile. */
+export function readPayoffRow(raw: RawPayoff): LoanPayoffRow {
+  return {
+    id: raw.id,
+    bill_id: raw.bill_id,
+    paid_on: raw.paid_on,
+    amount: Number(raw.amount),
+    kind: raw.kind === 'full' ? 'full' : 'partial',
+    card_id: raw.card_id ?? null,
+    bank_account_id: raw.bank_account_id ?? null,
+    counted: raw.counted === true,
+    created_at: raw.created_at,
+    source: raw.card ? cardSource(raw.card) : raw.account ? accountSource(raw.account) : null,
+  };
+}
+
+/** Oldest first: by date, then as recorded, then by id, the order the schedule posts them in. */
+function byPosting(a: LoanPayoffRow, b: LoanPayoffRow): number {
+  if (a.paid_on !== b.paid_on) return a.paid_on < b.paid_on ? -1 : 1;
+  if (a.created_at !== b.created_at) return a.created_at < b.created_at ? -1 : 1;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/** A loan's embedded payoffs as the app uses them, oldest first; none when there are none. */
+export function readPayoffRows(raw: unknown): LoanPayoffRow[] {
+  return Array.isArray(raw) ? (raw as RawPayoff[]).map(readPayoffRow).sort(byPosting) : [];
+}
+
+/** Every payoff, or one loan's, oldest first. None on a database without them. */
+export async function readLoanPayoffs(billId?: string): Promise<LoanPayoffRow[]> {
+  let query = supabase.from('loan_payoffs').select(PAYOFF_COLUMNS);
+  if (billId) query = query.eq('bill_id', billId);
+  const { data, error } = await query;
+  if (lacksPayoffs(error)) return [];
+  if (error) throw error;
+  return readPayoffRows(data);
+}
+
+/**
+ * Runs a loan read with its payoffs embedded as `payoffs` (the name `StoredLoan.payoffs` reads),
+ * and again without them on a database that has no payoffs: PostgREST finds no relationship
+ * between loans and loan_payoffs (PGRST200). Any other failure is returned as it came.
+ */
+export async function withLoanPayoffs<R extends { error: ReadFailure }>(
+  read: (embed: string) => PromiseLike<R>,
+): Promise<R> {
+  const result = await read(`, payoffs:loan_payoffs(${PAYOFF_COLUMNS})`);
+  const said = `${result.error?.message ?? ''} ${result.error?.details ?? ''}`;
+  return result.error?.code === 'PGRST200' && /\bloan_payoffs\b/.test(said) ? read('') : result;
+}
+
+/**
+ * Every payoff the person has made, oldest first. Under 'loans': recording or removing one writes
+ * its loan's bill too, so both this phone's invalidation and the bills feed from another phone
+ * reach it, and so do card and account writes (a deleted card leaves its payoffs on Skip).
+ */
+export function useLoanPayoffRows() {
+  const userId = useUserId();
+  return useQuery({
+    queryKey: ['loans', userId, 'payoffs'],
+    enabled: Boolean(userId),
+    queryFn: () =>
+      withTimeout(
+        readLoanPayoffs(),
+        QUERY_TIMEOUT_MS,
+        'Could not load your loans. Check your connection and try again.',
+      ),
   });
 }

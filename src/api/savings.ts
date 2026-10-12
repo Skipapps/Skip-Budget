@@ -5,9 +5,11 @@ import type { ChargeRow } from '@/api/charges';
 import type { PayRow } from '@/api/pay';
 import {
   bookFlows,
+  lacksPayoffs,
   ledgerEntries,
   useBookFlows,
   type BillRow,
+  type LedgerPayoff,
   type ReceiptRow,
   type SalaryDetailRow,
   type SubscriptionRow,
@@ -775,6 +777,19 @@ function readSalaryRow(raw: Raw): LedgerSalary {
   };
 }
 
+function readPayoffRow(raw: Raw): LedgerPayoff {
+  return {
+    id: String(raw.id),
+    bill_id: String(raw.bill_id),
+    paid_on: String(raw.paid_on),
+    amount: Number(raw.amount),
+    kind: raw.kind === 'full' ? 'full' : 'partial',
+    card_id: text(raw.card_id),
+    bank_account_id: text(raw.bank_account_id),
+    counted: raw.counted === true,
+  };
+}
+
 function readPayRow(raw: Raw): PayRow {
   return {
     id: String(raw.id),
@@ -868,10 +883,18 @@ async function closingFlows(from: string, to: string, today: string) {
       'id, name, amount, frequency, last_payday, salary_source_accounts(bank_account_id)',
     ),
     readAll<Raw>('pay_received', 'id, salary_source_id, label, amount, paid_on, bank_account_id'),
+    // A database without payoffs has none to count, which is no reason to keep a month open.
+    readAll<Raw>(
+      'loan_payoffs',
+      'id, bill_id, paid_on, amount, kind, card_id, bank_account_id, counted',
+      { column: 'paid_on', from, before: movesToSavingsOn(to) },
+    ).then((read) => (lacksPayoffs(read.error) ? { rows: [], error: null } : read)),
   ]);
   const failed = reads.find((read) => read.error);
   if (failed) throw failed.error;
-  const [receipts, charges, bills, subscriptions, salaries, pay] = reads.map((read) => read.rows);
+  const [receipts, charges, bills, subscriptions, salaries, pay, payoffs] = reads.map(
+    (read) => read.rows,
+  );
 
   const chargeRows = charges.map(readChargeRow);
   const billRows = bills.map(readBillRow);
@@ -897,6 +920,7 @@ async function closingFlows(from: string, to: string, today: string) {
     salaries: salaries.map(readSalaryRow),
     charges: chargeRows,
     pay: pay.map(readPayRow),
+    payoffs: payoffs.map(readPayoffRow),
     // Where pay lands moves no figure here.
     accountOrder: [],
     from,

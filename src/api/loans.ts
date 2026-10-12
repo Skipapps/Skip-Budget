@@ -6,10 +6,14 @@ import {
   cardSource,
   LOAN_COLUMNS,
   readLoanRow,
+  readPayoffRows,
   useBills,
+  useLoanPayoffRows,
+  withLoanPayoffs,
   withNewerLoanColumns,
   type BankAccountRow,
   type CardRow,
+  type LoanPayoffRow,
   type LoanRow,
   type PaymentSourceRow,
 } from '@/api/queries';
@@ -83,6 +87,8 @@ export type LoanListRow = LoanRow & {
   /** When it was saved; the list's order. */
   created_at: string;
   bill: LoanBillSummary;
+  /** Its payoffs, oldest first; `termsFromStored` reads them as `StoredLoan.payoffs`. */
+  payoffs: LoanPayoffRow[];
   /** The bill no longer runs (no next date, or its end date has passed), as of `today`. */
   billEnded: boolean;
 };
@@ -90,12 +96,14 @@ export type LoanListRow = LoanRow & {
 type RawLoanWithBill = Parameters<typeof readLoanRow>[0] & {
   created_at: string;
   bill: LoanBillSummary | null;
+  payoffs?: unknown;
 };
 
 /**
- * Every loan the person has saved, oldest first, each with its bill, in one read. Cached under
- * 'loans', which saving a loan invalidates, and which every bill write and bill change from another
- * device invalidates too: renaming or deleting the bill changes, or removes, its loan.
+ * Every loan the person has saved, oldest first, each with its bill and its payoffs. Cached under
+ * 'loans', which saving a loan or a payoff invalidates, and which every bill write and bill change
+ * from another device invalidates too: renaming or deleting the bill changes, or removes, its loan,
+ * and a payoff always writes its bill.
  */
 export function useLoans(today: string) {
   const userId = useUserId();
@@ -105,22 +113,25 @@ export function useLoans(today: string) {
     queryFn: () =>
       withTimeout(
         (async () => {
-          const { data, error } = await withNewerLoanColumns((newer) =>
-            supabase
-              .from('loans')
-              .select(
-                `${LOAN_COLUMNS}${newer}, created_at, bill:bills!inner(id, name, icon_id, starts_on, next_due_on, ends_on)`,
-              )
-              .order('created_at', { ascending: true })
-              .order('id', { ascending: true }),
+          const { data, error } = await withLoanPayoffs((payoffs) =>
+            withNewerLoanColumns((newer) =>
+              supabase
+                .from('loans')
+                .select(
+                  `${LOAN_COLUMNS}${newer}, created_at${payoffs}, bill:bills!inner(id, name, icon_id, starts_on, next_due_on, ends_on)`,
+                )
+                .order('created_at', { ascending: true })
+                .order('id', { ascending: true }),
+            ),
           );
           if (error) throw error;
           return ((data ?? []) as unknown as RawLoanWithBill[])
             .filter((row) => row.bill)
-            .map(({ bill, created_at, ...loan }) => ({
+            .map(({ bill, created_at, payoffs, ...loan }) => ({
               ...readLoanRow(loan),
               created_at,
               bill: bill as LoanBillSummary,
+              payoffs: readPayoffRows(payoffs),
             }));
         })(),
         12_000,
@@ -167,12 +178,17 @@ export type LoanDetailBill = LoanBillSummary & {
   created_at: string;
 };
 
-/** A saved loan with its bill and where its payments come from, read in one go. */
+/** A saved loan with its bill, where its payments come from, and its payoffs, read in one go. */
 export type LoanDetail = LoanRow & {
   created_at: string;
   bill: LoanDetailBill;
   /** The bill's card or account, as the Paid from tiles draw it; null for Skip (none, or deleted). */
   source: PaymentSourceRow | null;
+  /**
+   * Its payoffs, oldest first, each with its own card or account; `termsFromStored` reads them as
+   * `StoredLoan.payoffs`. None on a database without them.
+   */
+  payoffs: LoanPayoffRow[];
 };
 
 /**
@@ -192,7 +208,10 @@ type RawLoanDetail = Omit<LoanDetailBill, 'amount' | 'in_spending'> & {
   in_spending?: boolean;
   // One-to-one through loans.bill_id's unique key, so an object; a list on a server that does not
   // see it so.
-  loan: (Parameters<typeof readLoanRow>[0] & { created_at: string }) | unknown[] | null;
+  loan:
+    | (Parameters<typeof readLoanRow>[0] & { created_at: string; payoffs?: unknown })
+    | unknown[]
+    | null;
   card: Pick<CardRow, 'id' | 'holder' | 'network' | 'last4' | 'color'> | null;
   account: Pick<BankAccountRow, 'id' | 'bank_name' | 'nickname' | 'last4' | 'color'> | null;
 };
@@ -202,9 +221,11 @@ export function readLoanDetail(raw: RawLoanDetail | null): LoanDetailRead {
   if (!raw) return { kind: 'gone' };
   const embedded = Array.isArray(raw.loan) ? (raw.loan[0] ?? null) : raw.loan;
   if (!embedded) return { kind: 'bill' };
-  const { created_at: loanCreatedAt, ...loan } = embedded as Parameters<typeof readLoanRow>[0] & {
-    created_at: string;
-  };
+  const {
+    created_at: loanCreatedAt,
+    payoffs,
+    ...loan
+  } = embedded as Parameters<typeof readLoanRow>[0] & { created_at: string; payoffs?: unknown };
   const { loan: _loan, card, account, amount, in_spending, ...bill } = raw;
   return {
     kind: 'loan',
@@ -213,16 +234,17 @@ export function readLoanDetail(raw: RawLoanDetail | null): LoanDetailRead {
       created_at: loanCreatedAt,
       bill: { ...bill, amount: Number(amount), in_spending: countsInSpending({ in_spending }) },
       source: card ? cardSource(card) : account ? accountSource(account) : null,
+      payoffs: readPayoffRows(payoffs),
     },
   };
 }
 
 /**
- * One loan for its own page and its edit page: the loan, its bill and the bill's paid-from source,
- * in one read from the bill's side, so a bill with no loan behind it and a bill that is gone read
- * differently. A failed read is an error, never "gone". Cached under 'loans', which saving or
- * editing a loan, every bill write (deleting the bill deletes the loan), card and account writes,
- * and the realtime feed all invalidate.
+ * One loan for its own page, its edit page and its Pay off page: the loan with its payoffs, its
+ * bill and the bill's paid-from source, in one read from the bill's side, so a bill with no loan
+ * behind it and a bill that is gone read differently. A failed read is an error, never "gone".
+ * Cached under 'loans', which saving or editing a loan, a payoff, every bill write (deleting the
+ * bill deletes the loan), card and account writes, and the realtime feed all invalidate.
  */
 export function useLoanDetail(billId: string | undefined) {
   const userId = useUserId();
@@ -232,15 +254,17 @@ export function useLoanDetail(billId: string | undefined) {
     queryFn: () =>
       withTimeout(
         (async () => {
-          const { data, error } = await withNewerLoanColumns((newer) =>
-            withSpendingFlag((flag) =>
-              supabase
-                .from('bills')
-                .select(
-                  `${DETAIL_BILL_COLUMNS}${flag}, loan:loans(${LOAN_COLUMNS}${newer}, created_at), ${DETAIL_SOURCE_COLUMNS}`,
-                )
-                .eq('id', billId!)
-                .maybeSingle(),
+          const { data, error } = await withLoanPayoffs((payoffs) =>
+            withNewerLoanColumns((newer) =>
+              withSpendingFlag((flag) =>
+                supabase
+                  .from('bills')
+                  .select(
+                    `${DETAIL_BILL_COLUMNS}${flag}, loan:loans(${LOAN_COLUMNS}${newer}, created_at${payoffs}), ${DETAIL_SOURCE_COLUMNS}`,
+                  )
+                  .eq('id', billId!)
+                  .maybeSingle(),
+              ),
             ),
           );
           if (error) throw error;
@@ -250,4 +274,25 @@ export function useLoanDetail(billId: string | undefined) {
         'Could not load your loan. Check your connection and try again.',
       ),
   });
+}
+
+/**
+ * One loan's payoffs, oldest first (by date, then as recorded), each with its own card or account.
+ * The same read as the ledger's, so the two never disagree; none on a database without them.
+ */
+export function useLoanPayoffs(billId: string | undefined) {
+  const query = useLoanPayoffRows();
+  const payoffs = useMemo(
+    () => (billId ? (query.data ?? []).filter((row) => row.bill_id === billId) : []),
+    [query.data, billId],
+  );
+  return {
+    payoffs,
+    isPending: query.isPending,
+    // A failed read must not pass for "no payoffs", which would show the loan as never paid down.
+    isError: query.isError,
+    refetch: () => {
+      void query.refetch();
+    },
+  };
 }

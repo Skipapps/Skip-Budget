@@ -38,6 +38,15 @@ describe('ledgerHref', () => {
     });
   });
 
+  it('opens money paid off a loan on that loan’s page, by the loan’s bill, not the payoff', () => {
+    expect(
+      ledgerHref({ id: 'payoff-p1', kind: 'bill', categoryId: 'loans', planId: 'l1' }),
+    ).toEqual({ pathname: '/loan/[id]', params: { id: 'l1' } });
+    // Without its loan the row opens nothing, rather than a bill page named by the payoff's id.
+    expect(ledgerHref({ id: 'payoff-p1', kind: 'bill', categoryId: 'loans' })).toBeNull();
+    expect(ledgerHref({ id: 'payoff-p1', kind: 'bill', planId: null })).toBeNull();
+  });
+
   it('opens a projected subscription on its page', () => {
     expect(ledgerHref({ id: 'subscription-s1@2026-10-01', kind: 'subscription' })).toEqual({
       pathname: '/subscription/[id]',

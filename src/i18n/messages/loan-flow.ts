@@ -207,6 +207,12 @@ export const loanFlowMessages = defineMessages({
     es: 'Guardar cambios',
     fr: 'Enregistrer les modifications',
   },
+  // An edit that starts the loan after money already paid off it.
+  'loanFlow.edit.startAfterPayoff': {
+    en: 'Your extra payment of {amount} on {date} comes before this start date. Remove it first or pick an earlier start.',
+    es: 'Tu pago extra de {amount} del {date} es anterior a esta fecha de inicio. Quítalo primero o elige un inicio anterior.',
+    fr: 'Ton paiement supplémentaire de {amount} du {date} est antérieur à cette date de début. Retire-le d’abord ou choisis un début plus tôt.',
+  },
   'loanFlow.edit.delete': { en: 'Delete loan', es: 'Eliminar préstamo', fr: 'Supprimer le prêt' },
   'loanFlow.edit.deleting': { en: 'Deleting…', es: 'Eliminando…', fr: 'Suppression…' },
   'loanFlow.edit.deleteTitle': {
@@ -292,5 +298,212 @@ export const loanFlowMessages = defineMessages({
     en: '{name}. {when}. {left} left to pay, {percent} paid off.',
     es: '{name}. {when}. Quedan {left} por pagar, {percent} pagado.',
     fr: '{name}. {when}. Reste {left} à payer, {percent} remboursé.',
+  },
+  // Paying a loan off, all of it or part of it, from its own page.
+  'loanFlow.payoff.action': { en: 'Pay off', es: 'Pagar', fr: 'Rembourser' },
+  'loanFlow.payoff.actionHint': {
+    en: 'Pay all of this loan, or part of it.',
+    es: 'Paga todo este préstamo o una parte.',
+    fr: 'Rembourse tout ce prêt, ou une partie.',
+  },
+  'loanFlow.payoff.title': { en: 'Pay off {name}', es: 'Pagar {name}', fr: 'Rembourser {name}' },
+  'loanFlow.payoff.close': {
+    en: 'Cancel this payment?',
+    es: '¿Cancelar este pago?',
+    fr: 'Annuler ce paiement ?',
+  },
+  'loanFlow.payoff.question': {
+    en: 'How much are you paying?',
+    es: '¿Cuánto vas a pagar?',
+    fr: 'Combien rembourses-tu ?',
+  },
+  'loanFlow.payoff.helper': {
+    en: 'All of it or part of it, as you like.',
+    es: 'Todo o una parte, como prefieras.',
+    fr: 'Tout ou une partie, comme tu veux.',
+  },
+  'loanFlow.payoff.all': { en: 'Pay it all', es: 'Pagarlo todo', fr: 'Tout rembourser' },
+  'loanFlow.payoff.allOn': {
+    en: '{amount} clears this loan on {date}',
+    es: '{amount} salda este préstamo el {date}',
+    fr: '{amount} solde ce prêt le {date}',
+  },
+  'loanFlow.payoff.allToday': {
+    en: '{amount} clears this loan today',
+    es: '{amount} salda este préstamo hoy',
+    fr: '{amount} solde ce prêt aujourd’hui',
+  },
+  // What the amount typed does, said as it is typed.
+  'loanFlow.payoff.full': {
+    en: 'This pays off {name}. No more payments after {date}.',
+    es: 'Con esto terminas de pagar {name}. No hay más pagos después del {date}.',
+    fr: 'Ce paiement solde {name}. Plus aucun paiement après le {date}.',
+  },
+  'loanFlow.payoff.partial': {
+    en: {
+      one: '{count} payment left instead of {before}, last payment {date}',
+      other: '{count} payments left instead of {before}, last payment {date}',
+    },
+    es: {
+      one: 'Queda {count} pago en vez de {before}; último pago: {date}',
+      other: 'Quedan {count} pagos en vez de {before}; último pago: {date}',
+    },
+    fr: {
+      one: '{count} paiement restant au lieu de {before}, dernier paiement le {date}',
+      other: '{count} paiements restants au lieu de {before}, dernier paiement le {date}',
+    },
+  },
+  // Too little to take a payment off the end: the count stays and the last one shrinks.
+  'loanFlow.payoff.partialSame': {
+    en: {
+      one: 'Still {count} payment left, last payment {date}',
+      other: 'Still {count} payments left, last payment {date}',
+    },
+    es: {
+      one: 'Sigue quedando {count} pago; último pago: {date}',
+      other: 'Siguen quedando {count} pagos; último pago: {date}',
+    },
+    fr: {
+      one: 'Toujours {count} paiement restant, dernier paiement le {date}',
+      other: 'Toujours {count} paiements restants, dernier paiement le {date}',
+    },
+  },
+  'loanFlow.payoff.tooMuch': {
+    en: 'That’s more than this loan needs. {amount} clears it on {date}.',
+    es: 'Es más de lo que falta por pagar. {amount} salda el préstamo el {date}.',
+    fr: 'C’est plus que ce qui reste à payer. {amount} solde le prêt le {date}.',
+  },
+  'loanFlow.payoff.tooMuchToday': {
+    en: 'That’s more than this loan needs. {amount} clears it today.',
+    es: 'Es más de lo que falta por pagar. {amount} salda el préstamo hoy.',
+    fr: 'C’est plus que ce qui reste à payer. {amount} solde le prêt aujourd’hui.',
+  },
+  'loanFlow.payoff.useAll': { en: 'Pay {amount}', es: 'Pagar {amount}', fr: 'Rembourser {amount}' },
+  'loanFlow.payoff.beforeStart': {
+    en: 'This loan started on {date}. Pick that day or later.',
+    es: 'Este préstamo empezó el {date}. Elige ese día o uno posterior.',
+    fr: 'Ce prêt a commencé le {date}. Choisis ce jour-là ou un jour suivant.',
+  },
+  'loanFlow.payoff.future': {
+    en: 'A payment can’t be dated after today.',
+    es: 'Un pago no puede tener fecha posterior a hoy.',
+    fr: 'Un paiement ne peut pas être daté après aujourd’hui.',
+  },
+  // A payment or payoff already made on or after the day picked: paying it all comes after it.
+  'loanFlow.payoff.afterPayment': {
+    en: 'Your payment on {date} is already made. You can pay it all from {earliest}.',
+    es: 'Tu pago del {date} ya está hecho. Puedes pagarlo todo a partir del {earliest}.',
+    fr: 'Ton paiement du {date} est déjà fait. Tu peux tout rembourser à partir du {earliest}.',
+  },
+  // Dated before payments already made, and so much it would end the loan before them.
+  'loanFlow.payoff.overtakes': {
+    en: 'On this day, the most you can pay is {amount}. More would pay the loan off before payments already made.',
+    es: 'En este día, lo máximo que puedes pagar es {amount}. Más saldaría el préstamo antes de pagos ya hechos.',
+    fr: 'Ce jour-là, tu peux rembourser au plus {amount}. Davantage solderait le prêt avant des paiements déjà faits.',
+  },
+  'loanFlow.payoff.overtakesNone': {
+    en: 'Nothing can be paid on this day without changing payments already made. Pick a later day.',
+    es: 'No se puede pagar nada en este día sin cambiar pagos ya hechos. Elige un día posterior.',
+    fr: 'Rien ne peut être remboursé ce jour-là sans changer des paiements déjà faits. Choisis un jour plus tard.',
+  },
+  'loanFlow.payoff.notStarted': {
+    en: 'This loan starts on {date}. You can pay it off from then.',
+    es: 'Este préstamo empieza el {date}. Podrás pagarlo a partir de entonces.',
+    fr: 'Ce prêt commence le {date}. Tu pourras le rembourser à partir de là.',
+  },
+  'loanFlow.payoff.finished': {
+    en: 'This loan is already paid off.',
+    es: 'Este préstamo ya está pagado.',
+    fr: 'Ce prêt est déjà remboursé.',
+  },
+  'loanFlow.payoff.paying': { en: 'You’re paying', es: 'Vas a pagar', fr: 'Tu rembourses' },
+  'loanFlow.payoff.interestSince': {
+    en: 'Includes {amount} of interest since {date}.',
+    es: 'Incluye {amount} de intereses desde el {date}.',
+    fr: 'Dont {amount} d’intérêts depuis le {date}.',
+  },
+  'loanFlow.payoff.date': { en: 'Paid on', es: 'Pagado el', fr: 'Payé le' },
+  'loanFlow.payoff.changeAmount': {
+    en: 'Change amount',
+    es: 'Cambiar importe',
+    fr: 'Modifier le montant',
+  },
+  'loanFlow.payoff.saving': { en: 'Paying off…', es: 'Pagando…', fr: 'Remboursement…' },
+
+  // Money paid off a loan, in its History, and taking it back out.
+  'loanFlow.view.paidOff': { en: 'Paid off', es: 'Liquidado', fr: 'Soldé' },
+  'loanFlow.view.extraPayment': {
+    en: 'Extra payment',
+    es: 'Pago extra',
+    fr: 'Paiement supplémentaire',
+  },
+  // "12 Oct · Paid from Chase ••4821"
+  'loanFlow.view.payoffDetail': {
+    en: '{date} · {source}',
+    es: '{date} · {source}',
+    fr: '{date} · {source}',
+  },
+  'loanFlow.view.payoffA11y': {
+    en: '{kind}, {date}, {amount}, paid from {source}.',
+    es: '{kind}, {date}, {amount}, pagado desde {source}.',
+    fr: '{kind}, {date}, {amount}, payé depuis {source}.',
+  },
+  'loanFlow.view.payoffNoSourceA11y': {
+    en: '{kind}, {date}, {amount}.',
+    es: '{kind}, {date}, {amount}.',
+    fr: '{kind}, {date}, {amount}.',
+  },
+  'loanFlow.view.payoffHint': {
+    en: 'Removes this payment, after you confirm.',
+    es: 'Quita este pago, después de confirmarlo.',
+    fr: 'Retire ce paiement, après confirmation.',
+  },
+  'loanFlow.view.removeTitle': {
+    en: 'Remove this payment?',
+    es: '¿Quitar este pago?',
+    fr: 'Retirer ce paiement ?',
+  },
+  'loanFlow.view.removeMessage': {
+    en: '{amount} paid on {date} comes off this loan, and its figures go back to how they were without it.',
+    es: 'Se quita de este préstamo el pago de {amount} del {date}, y sus cifras vuelven a ser como sin él.',
+    fr: 'Le paiement de {amount} du {date} est retiré de ce prêt, et ses chiffres redeviennent ceux d’avant.',
+  },
+  // Payments paid off come back out newest first: an earlier one says which to take out first.
+  'loanFlow.view.removeLaterFirst': {
+    en: 'Remove the later payment first',
+    es: 'Quita primero el pago posterior',
+    fr: 'Retire d’abord le paiement suivant',
+  },
+  'loanFlow.view.removeLaterFirstMessage': {
+    en: 'Payments come off newest first. Remove the one on {date}, then this one.',
+    es: 'Los pagos se quitan del más reciente al más antiguo. Quita el del {date} y luego este.',
+    fr: 'Les paiements se retirent du plus récent au plus ancien. Retire celui du {date}, puis celui-ci.',
+  },
+
+  // A payoff among the payments of a saved loan's schedule.
+  'loanFlow.schedule.payoffA11y': {
+    en: '{kind}, {date}. {amount}: {interest} interest, {principal} off the balance. {balance} left.',
+    es: '{kind}, {date}. {amount}: {interest} de intereses, {principal} a capital. Quedan {balance}.',
+    fr: '{kind}, {date}. {amount} : {interest} d’intérêts, {principal} en capital. Reste {balance}.',
+  },
+  // A schedule year with no payment in it, only money paid off.
+  'loanFlow.schedule.yearPaidOff': {
+    en: 'Paid off · {interest} interest',
+    es: 'Liquidado · {interest} de intereses',
+    fr: 'Soldé · {interest} d’intérêts',
+  },
+  'loanFlow.schedule.yearExtra': {
+    en: {
+      one: 'Extra payment · {interest} interest',
+      other: '{count} extra payments · {interest} interest',
+    },
+    es: {
+      one: 'Pago extra · {interest} de intereses',
+      other: '{count} pagos extra · {interest} de intereses',
+    },
+    fr: {
+      one: 'Paiement supplémentaire · {interest} d’intérêts',
+      other: '{count} paiements supplémentaires · {interest} d’intérêts',
+    },
   },
 });

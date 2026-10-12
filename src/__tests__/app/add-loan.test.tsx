@@ -864,6 +864,86 @@ describe('changing a saved loan', () => {
     expect(mockNav.mock.calls).toEqual([['back']]);
   });
 
+  it('keeps a loan a payoff cleared paid off: Save ends it that day, and its schedule shows the payoff', async () => {
+    const all = {
+      id: 'po-2',
+      bill_id: 'bill-car',
+      paid_on: '2026-10-12',
+      amount: 10_701.09,
+      kind: 'full',
+      card_id: null,
+      bank_account_id: null,
+      counted: true,
+      created_at: '2026-10-12T12:00:00Z',
+      source: null,
+    };
+    showing(savedLoan({ ends_on: '2026-10-12' }, { payoffs: [all] }));
+    await render(<AddLoanScreen />);
+    await press(button('Continue'));
+
+    await press(button('Payment schedule'));
+    const [, route] = mockNav.mock.calls.find(([kind]) => kind === 'push') as [
+      string,
+      { params: Record<string, string> },
+    ];
+    expect(route.params.payoffs).toBe('[["2026-10-12",10701.09]]');
+
+    await press(button('Save changes'));
+    // Without its payoff the loan would end on its term's own last day and the bill charge again.
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ billId: 'bill-car', lastPaymentOn: '2026-10-12' }),
+    );
+
+    await screen.unmount();
+    mockParams = route.params;
+    await render(<LoanScheduleScreen />);
+    await press(screen.getByText(/^Show all/));
+    expect(
+      screen.getByLabelText(
+        'Paid off, 12 Oct 2026. $10,701.09: $27.42 interest, $10,673.67 off the balance. $0.00 left.',
+      ),
+    ).toBeTruthy();
+    // It came after payment 21, and nothing comes after it.
+    expect(screen.getByLabelText(/^Payment 21, 27 Sep 2026,/)).toBeTruthy();
+    expect(screen.queryByLabelText(/^Payment 22,/)).toBeNull();
+  });
+
+  it('refuses a start after money already paid off it, naming that payment, and saves nothing', async () => {
+    const extra = {
+      id: 'po-1',
+      bill_id: 'bill-car',
+      paid_on: '2026-10-03',
+      amount: 2000,
+      kind: 'partial',
+      card_id: null,
+      bank_account_id: null,
+      counted: true,
+      created_at: '2026-10-03T12:00:00Z',
+      source: null,
+    };
+    showing(savedLoan({}, { payoffs: [extra] }));
+    await render(<AddLoanScreen />);
+    mockPickedDay = new Date(2026, 9, 5);
+    await press(button(/^Start date, /));
+    await press(screen.getByTestId('calendar'));
+    await press(button('Continue'));
+
+    expect(
+      screen.getByText(
+        'Your extra payment of $2,000.00 on 3 Oct 2026 comes before this start date. Remove it first or pick an earlier start.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('Review your loan')).toBeNull();
+    expect(mockUpdate).not.toHaveBeenCalled();
+
+    // A start on or before it is fine.
+    mockPickedDay = new Date(2024, 11, 27);
+    await press(button(/^Start date, /));
+    await press(screen.getByTestId('calendar'));
+    await press(button('Continue'));
+    expect(screen.getByText('Review your loan')).toBeTruthy();
+  });
+
   it('writes what was changed, the switch and the reminder too', async () => {
     showing(savedLoan({ in_spending: false }));
     await render(<AddLoanScreen />);

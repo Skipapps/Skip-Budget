@@ -9,12 +9,14 @@ import {
   paidFromSpoken,
   paidFromText,
   spokenDate,
+  type HistoryRow,
+  type LoanViewHistory,
 } from '@/components/loans/view/loan-view-data';
 import { t } from '@/i18n';
 import { monthShort } from '@/i18n/calendar';
 import { cn } from '@/lib/cn';
 import { formatCurrency } from '@/lib/format';
-import type { LoanHistory, LoanPayment } from '@/lib/loan-view';
+import type { LoanPayment } from '@/lib/loan-view';
 import { withTap } from '@/lib/press';
 import { contrast } from '@/lib/tone';
 import { useColors } from '@/providers/theme-provider';
@@ -85,6 +87,7 @@ function PaymentLine({
   spoken,
   first,
   testID,
+  action,
 }: {
   mark: ReactNode;
   title: string;
@@ -93,17 +96,16 @@ function PaymentLine({
   spoken: string;
   first: boolean;
   testID: string;
+  /** A row that can be acted on: a tap and a long press both do it. */
+  action?: { onPress: () => void; hint: string };
 }) {
-  return (
-    <View
-      accessible
-      accessibilityLabel={spoken}
-      testID={testID}
-      className={cn(
-        'w-full flex-row items-center gap-[12px] px-[16px] py-[12px]',
-        first ? undefined : 'border-t border-line',
-      )}
-    >
+  const className = cn(
+    'w-full flex-row items-center gap-[12px] px-[16px] py-[12px]',
+    first ? undefined : 'border-t border-line',
+    action ? 'active:bg-ink/5' : undefined,
+  );
+  const content = (
+    <>
       <View
         style={{ minWidth: MARK }}
         className="items-center justify-center"
@@ -132,6 +134,27 @@ function PaymentLine({
       >
         {amount}
       </Text>
+    </>
+  );
+
+  if (action) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={spoken}
+        accessibilityHint={action.hint}
+        onPress={withTap(action.onPress)}
+        onLongPress={withTap(action.onPress)}
+        testID={testID}
+        className={className}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+  return (
+    <View accessible accessibilityLabel={spoken} testID={testID} className={className}>
+      {content}
     </View>
   );
 }
@@ -248,26 +271,24 @@ export function UpcomingCard({
 }
 
 /**
- * The payments already made, newest first: the latest few, and every one after See all. Before the
- * first, the day it is due.
+ * The payments already made and the money paid off the loan, newest first: the latest few, and
+ * every one after See all. Before the first, the day it is due. A payoff can be taken back out.
  */
 export function HistoryCard({
   history,
   paidFrom,
   today,
+  onRemovePayoff,
 }: {
-  history: LoanHistory;
+  history: LoanViewHistory;
+  /** Where the scheduled payments come from; a payoff names its own. */
   paidFrom: PaymentSourceRow | null;
   today: string;
+  onRemovePayoff: (payoff: PayoffRow) => void;
 }) {
   const [all, setAll] = useState(false);
-  const shown = all ? history.entries : history.entries.slice(0, HISTORY_SHOWN);
-  const more = !all && history.entries.length > HISTORY_SHOWN;
-
-  const detail = paidFrom
-    ? t('loanFlow.view.paidFrom', { source: paidFromText(paidFrom) })
-    : t('bills.noPaymentMethod');
-  const spokenSource = paidFrom ? paidFromSpoken(paidFrom) : null;
+  const shown = all ? history.rows : history.rows.slice(0, HISTORY_SHOWN);
+  const more = !all && history.rows.length > HISTORY_SHOWN;
 
   return (
     <ViewSection
@@ -284,27 +305,115 @@ export function HistoryCard({
             : t('loanFlow.view.noPayments')}
         </EmptyLine>
       ) : (
-        shown.map((entry, index) => {
-          const amount = formatCurrency(entry.payment);
-          const said = { number: entry.number, date: spokenDate(entry.date), payment: amount };
-          return (
-            <PaymentLine
-              key={entry.number}
-              testID={`loan-history-${entry.number}`}
+        shown.map((row, index) =>
+          row.kind === 'payoff' ? (
+            <PayoffLine
+              key={`payoff-${row.id ?? `${row.date}-${index}`}`}
+              payoff={row}
               first={index === 0}
-              mark={<SourceChip source={paidFrom} />}
-              title={pageDate(entry.date, today)}
-              detail={detail}
-              amount={amount}
-              spoken={
-                spokenSource
-                  ? t('loanFlow.view.historyA11y', { ...said, source: spokenSource })
-                  : t('loanFlow.view.historyNoSourceA11y', said)
-              }
+              today={today}
+              onRemove={() => onRemovePayoff(row)}
             />
-          );
-        })
+          ) : (
+            <ScheduledLine
+              key={`payment-${row.number}`}
+              payment={row}
+              paidFrom={paidFrom}
+              first={index === 0}
+              today={today}
+            />
+          ),
+        )
       )}
     </ViewSection>
+  );
+}
+
+type PayoffRow = Extract<HistoryRow, { kind: 'payoff' }>;
+
+/** Where a payment came from, as a row's second line says it. */
+function fromLine(source: PaymentSourceRow | null): string {
+  return source
+    ? t('loanFlow.view.paidFrom', { source: paidFromText(source) })
+    : t('bills.noPaymentMethod');
+}
+
+/** "27 Sep" / "Paid from Chase ••4821" / "$424.80": a payment the schedule made. */
+function ScheduledLine({
+  payment,
+  paidFrom,
+  first,
+  today,
+}: {
+  payment: Extract<HistoryRow, { kind: 'payment' }>;
+  paidFrom: PaymentSourceRow | null;
+  first: boolean;
+  today: string;
+}) {
+  const amount = formatCurrency(payment.payment);
+  const said = { number: payment.number, date: spokenDate(payment.date), payment: amount };
+  return (
+    <PaymentLine
+      testID={`loan-history-${payment.number}`}
+      first={first}
+      mark={<SourceChip source={paidFrom} />}
+      title={pageDate(payment.date, today)}
+      detail={fromLine(paidFrom)}
+      amount={amount}
+      spoken={
+        paidFrom
+          ? t('loanFlow.view.historyA11y', { ...said, source: paidFromSpoken(paidFrom) })
+          : t('loanFlow.view.historyNoSourceA11y', said)
+      }
+    />
+  );
+}
+
+/**
+ * "Paid off" / "12 Oct · Paid from Chase ••4821" / "$10,728.50": money paid off the loan, from its
+ * own card or account. A tap or a long press offers to take the latest back out, and on an earlier
+ * one says to take out the later first.
+ */
+function PayoffLine({
+  payoff,
+  first,
+  today,
+  onRemove,
+}: {
+  payoff: PayoffRow;
+  first: boolean;
+  today: string;
+  onRemove: () => void;
+}) {
+  const kind = payoff.full ? t('loanFlow.view.paidOff') : t('loanFlow.view.extraPayment');
+  const amount = formatCurrency(payoff.amount);
+  const said = { kind, date: spokenDate(payoff.date), amount };
+  return (
+    <PaymentLine
+      testID={`loan-history-payoff-${payoff.id ?? payoff.date}`}
+      first={first}
+      mark={<SourceChip source={payoff.source} />}
+      title={kind}
+      detail={t('loanFlow.view.payoffDetail', {
+        date: pageDate(payoff.date, today),
+        source: fromLine(payoff.source),
+      })}
+      amount={amount}
+      spoken={
+        payoff.source
+          ? t('loanFlow.view.payoffA11y', { ...said, source: paidFromSpoken(payoff.source) })
+          : t('loanFlow.view.payoffNoSourceA11y', said)
+      }
+      action={
+        payoff.id
+          ? {
+              onPress: onRemove,
+              hint: payoff.latest
+                ? t('loanFlow.view.payoffHint')
+                : t('loanFlow.view.removeLaterFirst'),
+            }
+          : undefined
+      }
+    />
   );
 }

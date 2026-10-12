@@ -27,6 +27,8 @@ const mockPaymentSelects: string[] = [];
 let mockPaymentsLackFrom = false;
 // A database that has not been given the pay_received table yet.
 let mockPayTableMissing = false;
+// A database that has not been given the loan_payoffs table yet.
+let mockPayoffsMissing = false;
 
 jest.mock('@/lib/supabase', () => {
   const build = (table: string) => {
@@ -52,6 +54,15 @@ jest.mock('@/lib/supabase', () => {
             return resolve({
               data: null,
               error: { code: '42P01', message: 'relation "pay_received" does not exist' },
+            });
+          }
+          if (table === 'loan_payoffs' && mockPayoffsMissing) {
+            return resolve({
+              data: null,
+              error: {
+                code: 'PGRST205',
+                message: "Could not find the table 'public.loan_payoffs' in the schema cache",
+              },
             });
           }
           if (table === 'payments') {
@@ -368,6 +379,7 @@ beforeEach(() => {
   mockPaymentSelects.length = 0;
   mockPaymentsLackFrom = false;
   mockPayTableMissing = false;
+  mockPayoffsMissing = false;
 });
 
 afterEach(() => {
@@ -1035,6 +1047,126 @@ describe('a plan the ledger no longer walks', () => {
   });
 });
 
+describe('money paid off a loan', () => {
+  /** A car loan on the Visa, its first instalment still to come (the 27th), added on the 12th. */
+  const LOAN = bill('car', {
+    name: 'Car loan',
+    amount: 424.8,
+    category_id: 'loans',
+    icon_id: 'loan-car',
+    next_due_on: '2026-10-27',
+    starts_on: '2026-10-12',
+    ends_on: '2028-12-27',
+    card_id: 'visa',
+  });
+
+  const payoff = (
+    id: string,
+    paid_on: string,
+    amount: number | string,
+    source: Source = {},
+    over: Record<string, unknown> = {},
+  ) => ({
+    id,
+    bill_id: 'car',
+    paid_on,
+    amount,
+    kind: 'partial',
+    card_id: source.card_id ?? null,
+    bank_account_id: source.bank_account_id ?? null,
+    counted: true,
+    created_at: `${paid_on}T12:00:00Z`,
+    card: null,
+    account: null,
+    ...over,
+  });
+
+  beforeEach(() => {
+    aWorkedMonth();
+    mockRows.bills = [LOAN];
+  });
+
+  it('takes a payoff out of the account it came from, on its date, as spending', async () => {
+    mockRows.loan_payoffs = [
+      payoff('p1', '2026-10-14', '1000.00', { bank_account_id: 'checking' }),
+    ];
+
+    const snap = await bookOn();
+
+    // Checking 2,970 less the $1,000; Visa untouched: the instalment on the 27th is still to come.
+    expect(snap.balances).toEqual({ checking: 1970, visa: 250 });
+    expect(snap.current).toEqual({ balance: 1700, income: 2000, expenses: 1100 });
+    expect(entryOf(snap.ledgers.checking, 'payoff-p1')).toMatchObject({
+      label: 'Car loan',
+      amount: -1000,
+      kind: 'bill',
+      date: '2026-10-14',
+      categoryId: 'loans',
+      iconId: 'loan-car',
+    });
+    expectBooksAgree(snap, -20);
+  });
+
+  it('counts every partial payoff, from whichever card or account each came from', async () => {
+    mockRows.loan_payoffs = [
+      payoff('p1', '2026-10-06', 500, { bank_account_id: 'checking' }),
+      payoff('p2', '2026-10-14', 120.55, { card_id: 'visa' }),
+      payoff('p3', '2026-10-15', 79.45),
+    ];
+
+    const snap = await bookOn();
+
+    // The Visa owes $120.55 more; the $79.45 paid with Skip leaves no account.
+    expect(snap.balances).toEqual({ checking: 2470, visa: 370.55 });
+    expect(snap.current).toEqual({ balance: 2000, income: 2000, expenses: 800 });
+    expectBooksAgree(snap, -20 - 79.45);
+  });
+
+  it('leaves out a payoff made while the loan was kept out of spending', async () => {
+    mockRows.loan_payoffs = [
+      payoff('p1', '2026-10-14', 1000, { bank_account_id: 'checking' }, { counted: false }),
+    ];
+
+    const snap = await bookOn();
+
+    expect(snap.balances).toEqual({ checking: 2970, visa: 250 });
+    expect(snap.current).toEqual({ balance: 2700, income: 2000, expenses: 100 });
+    expect(entryOf(snap.ledgers.checking, 'payoff-p1')).toBeUndefined();
+  });
+
+  it('counts a full payoff once its bill has stopped running, and never as a charge', async () => {
+    mockRows.bills = [{ ...LOAN, starts_on: '2026-10-12', ends_on: '2026-10-14' }];
+    mockRows.charges = [];
+    mockRows.loan_payoffs = [
+      payoff('p1', '2026-10-14', 18000, { bank_account_id: 'checking' }, { kind: 'full' }),
+    ];
+
+    const snap = await bookOn();
+
+    expect(snap.balances).toEqual({ checking: -15030, visa: 250 });
+    expect(snap.current.expenses).toBe(18100);
+    expect(idsOf(snap.ledgers.visa)).not.toContain('bill-car@2026-10-27');
+  });
+
+  it('is inside a balance typed after it, as any spending is', async () => {
+    mockRows.loan_payoffs = [payoff('p1', '2026-09-20', 1000, { bank_account_id: 'checking' })];
+
+    const snap = await bookOn();
+
+    expect(snap.balances).toEqual({ checking: 2970, visa: 250 });
+  });
+
+  it('reads as none on a database without payoffs, with no error', async () => {
+    mockPayoffsMissing = true;
+    mockRows.loan_payoffs = [payoff('p1', '2026-10-14', 1000, { bank_account_id: 'checking' })];
+
+    const snap = await bookOn();
+
+    expect(snap.isError).toBe(false);
+    expect(snap.balances).toEqual({ checking: 2970, visa: 250 });
+  });
+});
+
 describe('the card or account a charge landed on', () => {
   it('is the one it was charged to then, not the one its bill uses now', async () => {
     mockRows.cards = [card('visa', 0, '2026-10-10')];
@@ -1427,6 +1559,7 @@ const PARTS: [string, string][] = [
   ['the salary', 'salary_sources'],
   ['the charges', 'charges'],
   ['the recorded pay', 'pay_received'],
+  ['the loan payoffs', 'loan_payoffs'],
   ['the cards', 'cards'],
   ['the bank accounts', 'bank_accounts'],
   ['the payments', 'payments'],

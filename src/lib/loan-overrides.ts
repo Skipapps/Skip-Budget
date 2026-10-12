@@ -75,8 +75,9 @@ export type OverrideProblem = {
 
 export type AppliedOverrides = {
   /**
-   * The terms with every accepted change folded in (`payment` and `paymentOverrides`). Give these to
-   * `amortise`, `comparePrepayment` or `payoffQuote` and they all follow the changes.
+   * The terms with every accepted change folded in (`payment` and `paymentOverrides`), payoffs
+   * kept. Give these to `amortise`, `comparePrepayment` or `payoffQuote` and they all follow the
+   * changes.
    */
   terms: LoanTerms;
   /** What the app works out for these terms with nothing typed. */
@@ -150,10 +151,12 @@ function monthlyProblem(
   // Taken without a run at the steady payment or the app's own, whichever is less.
   const floor = Math.min(toCents(steady), toCents(solvedPayment));
   if (cents >= floor) return null;
+  // Judged on the loan as lent: a payoff that clears it would pass any payment.
   const run = amortise({
     ...terms,
     extra: undefined,
     paymentOverrides: undefined,
+    payoffs: undefined,
     payment: fromCents(cents),
   });
   if (toCents(run.finalPayment) <= 2 * cents) return null;

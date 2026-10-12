@@ -38,8 +38,17 @@ export function loanFinished(
  * nothing after that date (inclusive, as `billWindow`), so later payments never read as made and
  * what is left stays where it was. An end date on or after the last payment changes nothing.
  * Whether the loan is finished is still asked with the real today (`loanFinished`).
+ *
+ * `paidOffOn` (`paidOffOn(terms)`, `@/lib/loan-payoff`) is the day a payoff cleared the loan. Once
+ * it has come the loan is read on that day, whatever the bill's end date says, so it reads paid
+ * off and not stopped with money left.
  */
-export function loanPricingDay(bill: Pick<LoanBill, 'ends_on'>, today: string): string {
+export function loanPricingDay(
+  bill: Pick<LoanBill, 'ends_on'>,
+  today: string,
+  paidOffOn?: string | null,
+): string {
+  if (paidOffOn && paidOffOn <= today) return paidOffOn;
   return bill.ends_on && bill.ends_on < today ? bill.ends_on : today;
 }
 

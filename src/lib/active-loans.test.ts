@@ -2,6 +2,7 @@ import { WIREFRAME } from '@/lib/__fixtures__/add-loan-reference';
 import { activeLoans, loanFinished, loanPricingDay, type LoanBill } from '@/lib/active-loans';
 import { termsFromStored, type LoanTerms } from '@/lib/loan';
 import { loanStatus } from '@/lib/loan-status';
+import { checkPayoff, paidOffOn, payoffQuote } from '@/lib/loan-payoff';
 import { loanHistory, upcomingPayments } from '@/lib/loan-view';
 
 const TODAY = '2026-10-09';
@@ -123,7 +124,7 @@ describe('loanPricingDay', () => {
   it('counts a payment on the end date itself as made', () => {
     const { status, history } = priced({ next_due_on: null, ends_on: '2026-03-27' }, NOW);
     expect(status).toMatchObject({ paymentsMade: 15, amountLeft: 12_846.15 });
-    expect(history.entries[0].date).toBe('2026-03-27');
+    expect(history.entries[0]).toMatchObject({ kind: 'payment', date: '2026-03-27' });
   });
 
   it('is today when the bill ends today', () => {
@@ -160,5 +161,51 @@ describe('loanPricingDay', () => {
     const noDates: Pick<LoanBill, 'next_due_on' | 'ends_on'> = { next_due_on: null, ends_on: null };
     expect(loanPricingDay(noDates, NOW)).toBe(NOW);
     expect(upcomingPayments(CAR, loanPricingDay(runningBill, NOW), 1)[0].date).toBe('2026-10-27');
+  });
+
+  describe('once a payoff cleared the loan', () => {
+    const quote = payoffQuote(CAR, NOW).payoff;
+    const check = checkPayoff(CAR, { on: NOW, amount: quote }, NOW);
+    if (!check.ok) throw new Error('refused');
+    const PAID = check.terms;
+    const paidOn = paidOffOn(PAID);
+
+    it('is read on the payoff day, whatever its bill says', () => {
+      expect(paidOn).toBe(NOW);
+      for (const ends_on of [null, '2026-09-30', NOW, '2028-12-27']) {
+        expect(loanPricingDay({ ends_on }, '2026-11-20', paidOn)).toBe(NOW);
+      }
+    });
+
+    it('reads paid off on that day, and finished, even with a bill stopped before it', () => {
+      const stoppedEarlier = { next_due_on: null, ends_on: '2026-09-30' };
+      const day = loanPricingDay(stoppedEarlier, '2026-11-20', paidOn);
+      const status = loanStatus(PAID, day);
+      expect(status).toMatchObject({ paidOff: true, amountLeft: 0, lastPaymentOn: NOW });
+      expect(loanFinished(stoppedEarlier, '2026-11-20', status.lastPaymentOn)).toBe(true);
+      expect(loanHistory(PAID, day).entries[0]).toMatchObject({ kind: 'payoff', full: true });
+      // Without the payoff day the stop would hide the payoff and leave money owing.
+      expect(loanStatus(PAID, loanPricingDay(stoppedEarlier, '2026-11-20'))).toMatchObject({
+        paidOff: false,
+        amountLeft: 10_673.67,
+      });
+    });
+
+    it('counts as finished with the bill still running, from the payoff day', () => {
+      const status = loanStatus(PAID, loanPricingDay(runningBill, NOW, paidOn));
+      expect(loanFinished(runningBill, NOW, status.lastPaymentOn)).toBe(true);
+      expect(loanFinished(runningBill, '2026-10-11', status.lastPaymentOn)).toBe(false);
+    });
+
+    it('is read on the payoff day when that is today, before an earlier bill end', () => {
+      expect(loanPricingDay({ ends_on: '2026-09-30' }, NOW, paidOn)).toBe(NOW);
+    });
+
+    it('is not read early on a payoff day still to come, nor without one', () => {
+      expect(loanPricingDay(runningBill, '2026-10-11', paidOn)).toBe('2026-10-11');
+      expect(loanPricingDay(runningBill, NOW, null)).toBe(NOW);
+      expect(loanPricingDay({ ends_on: '2026-09-30' }, NOW, null)).toBe('2026-09-30');
+      expect(paidOffOn(CAR)).toBeNull();
+    });
   });
 });

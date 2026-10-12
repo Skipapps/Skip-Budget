@@ -6682,3 +6682,406 @@ loanScheduleParams(terms: LoanTerms): LoanRouteParams | null               // nu
 - S2: `formatWeekRange(weekStart, today)` in WeekSelector (new `today` prop), the week card and the card summary; "since" gets the year via new `habits.detail.shortDateYear`. S3: a notStarted week shows "Starts {date}" instead of the bar and limit line (spoken via new `habits.detail.week.spokenStarts`).
 - S4/N2: `localDate`, `spokenDay`, `shortDay` live in day-row; `progressText` and a shared `SpendBar` (cents, empty at 0, bg-line track, testID on the track) in habit-card; `habitColorName` replaces COLOUR_NAMES. N1 soft fills are `bg-ink/[0.04]`; N3 HabitCard has the light-only shadow; N4 comments removed; N5 px sizes (hero mt-[18px], selector mt-[20px]/gap-[12px]/min-h-[44px]); N7 saved = skipped x price in cents, from one skipped count.
 - Gates: tsc 0 in app habit code (the remaining errors are in the Loans files and one in Theo's habits.test.tsx); eslint and prettier clean on my 8 files; jest habit-week + i18n + large-text-guard 11/11 suites; Theo's 5 habit suites 188/188.
+
+## 2026-10-12 — Dana L (Developer, UI and navigation) — Add Loan P3: the Pay off page, Pay off on the loan page, payoffs in History (DONE, uncommitted)
+
+**Outcome:** Done, wired to Drew's `src/lib/loan-payoff.ts` (`checkPayoff`, `payoffDays`, `payoffQuote`, `paidOffOn`) and `loanHistory`'s payoff entries, and to Diego's `useRecordPayoff`, `useDeletePayoff` and `LoanDetail.payoffs`, as they sit in the tree (both in flight). No money maths of my own. Until migration C is live a payoff save fails with the one failure line (expected). Not seen on a device.
+
+- **`/loan-payoff?id=<bill>`** (`src/app/loan-payoff.tsx` + `src/components/loans/payoff/`), the Add loan keypad/Review pattern on one route:
+  - **Keypad view:** back + close ("Cancel this payment?"), title "Pay off {loan}", "How much are you paying?" / "All of it or part of it, as you like.", the big figure, the live line under it, a "Pay it all" chip, the app's keypad, pinned Continue (off until > 0).
+  - **Live line** (from `checkPayoff`): nothing typed → "$10,701.09 clears this loan today"; full → "This pays off Car loan. No more payments after 12 Oct."; partial → "22 payments left instead of 27, last payment 27 Jul 2028" (or "Still 27 payments left, last payment …" when the count stays); every refusal in words (more than owed, before the start, after a payment already made with the day it can be paid in full from, the most on an earlier day, future, finished). Short dates drawn, full dates spoken.
+  - **Pay it all** follows the day: on, the amount is the quote for the chosen day; any key takes over from it. Continue stays on the keypad for amount refusals (warn + VoiceOver announce); day refusals go on to the page with the day.
+  - **Review view:** card (type icon, name, big amount, "You're paying", the line; for a full payoff "Includes $27.42 of interest since 27 Sep."), "Paid on" DateBox (today; floor = the loan's start, or the first day it can be paid in full while Pay it all is on; nothing after today), Paid from tiles with Skip (the loan's own source, kept even when the plan would not offer it). Pinned "Pay off" / "Paying off…" + "Change amount". A day moved so a typed amount is too much offers "Pay $X" under the line.
+  - **Save:** `useRecordPayoff({ billId, paidOn, amount, kind, cardId, bankAccountId, lastPaymentOn: check.endsOn, today })` → "Loan paid off" / "Payment recorded" → `router.back()` to the loan page. Ref guard + busy label; failure keeps the page with the one failure line.
+  - **States:** priced on the loan as first read (a reload after saving never re-prices the page under its own Pay off); skeleton; Try again; gone/bill → back while focused; finished (paid off or stopped) → "This loan is already paid off."; not started → "This loan starts on …".
+- **View loan:** plum "Pay off" (hint "Pay all of this loan, or part of it.") above outlined Edit loan, not on finished loans. History rows for payoffs: "Paid off" / "Extra payment", "12 Oct · Paid from Amex ••6334" (its own source's chip), amount; a tap or a long press → "Remove this payment?" → `useDeletePayoff({ billId, payoffId, lastPaymentOn })` → "Payment removed" (deleted tone); failure → the one failure line in a dialog; one removal at a time. `lastPaymentOn` is the engine's schedule end on the payoffs that stay (`endsWithout`), null for a bill stopped early so it stays stopped.
+- **Shared engine on both pages:** `loanTermsForBill` reads `loan.payoffs`; `loanPricingDay(bill, today, paidOffOn(terms))` in `loanViewOf`, `loans.tsx` `priceLoans` and the Pay off page.
+- **Shared components:** `InlineCalendar` / `DayGrid` / `DateBox` gain an optional `maxDate` (off by default). `ledgerHref` sends `payoff-<id>` rows to `/loan/[planId]` (`LedgerLinkEntry.planId`).
+- **Strings:** 35 `loanFlow.payoff.*` / `loanFlow.view.*` keys and `toast.loan.paidOff` / `paymentRecorded` / `paymentRemoved`, en/es/fr (es "Pagar", fr "Rembourser"; French no-break spaces). Typed routes regenerated with Expo's generator: +`/loan-payoff` only.
+- **Tests:** new `src/__tests__/app/loan-payoff.test.tsx` (26), `src/__tests__/components/loan-history-payoffs.test.tsx` (5); `loan-view.test` +9 (footer, payoff figures, History, remove/cancel/failure/one-at-a-time/stopped); `loans.test` +2; `inline-calendar.test` +3; `ledger-link.test` +1; large-text guard adopts the 4 new screen files. Wireframe car loan on 12 Oct 2026 by hand: quote $10,701.09 = $10,673.67 + $27.42 (15 days at 6.25%); after a $2,000 payoff on 3 Oct, $13.38 = 9 days on $8,684.64. 16 mutants on a scratch copy, all caught.
+- **Gates:** tsc 0. eslint (cache cleared, `--no-cache`, `--max-warnings 0`) and prettier clean on my 23 files; in `src` only Diego's in-flight `money-book-hooks.test.tsx` (prettier) and the old setup.test.tsx warning. Full jest 335/336 suites, 7,403/7,404 tests; the 1 failure is `loan-migrations.test.ts` expecting `update_loan` last defined in migration B, which Diego's in-flight migration C changes.
+- **Open:** (1) Drew/Dmitri: on a payment day `checkPayoff` refuses paying it all until tomorrow ("You can pay it all from 28 Oct"), though the engine posts a same-day payoff after that day's payment and the bill's end is inclusive. Allow the payment day itself? (2) Diego: `loan-migrations.test` vs migration C. (3) Diego: confirm `delete_loan_payoff` with null keeps a stopped bill's end. (4) `p_today` comes from the device (as update_loan). (5) Not seen on the 13 Pro Max: the long "Pay off {loan}" title at large text, the chip, the offer link.
+
+## 2026-10-12 — Drew (Developer, money maths) — Pay off P3 maths: payoffs in the engine, payoffQuote, checkPayoff, History payoff rows (DONE, uncommitted)
+
+**Exports (Dana and Diego build on these; names are final):**
+```ts
+// src/lib/loan.ts
+type LoanPayoff = { id?: string; on: Date; amount: number };            // LoanTerms.payoffs?: readonly LoanPayoff[]
+type PayoffPosting = { id: string | null; on: string; amount: number; interest: number; principal: number;
+                       balance: number; full: boolean; afterPayments: number };   // Amortisation.payoffs (reached ones, posting order)
+type StoredPayoff = { id: string; paid_on: string; amount: number | string; created_at?: string | null };
+StoredLoan.payoffs?: readonly StoredPayoff[] | null    // embed alias must be `payoffs`; termsFromStored reads it
+readStoredPayoffs(rows: unknown): LoanPayoff[] | undefined   // by paid_on, then created_at, then id; junk rows dropped
+payoffQuote(terms, asOf: Date | string): PayoffQuote    // .payoff = "Pay it all"; new field accruedSince: Date
+Amortisation.payoffOn                                   // the full payoff's day when one cleared the loan
+// src/lib/loan-payoff.ts (re-exports payoffQuote, readStoredPayoffs and the types above)
+checkPayoff(terms, { on: string, amount: number }, today: string): PayoffCheck
+  // ok: { kind: 'full' | 'partial', quote, interest, principal, balance, terms, endsOn, paymentsLeft, paymentsLeftBefore, interestSaved }
+  // refusals: finished | not-an-amount | zero | not-a-date | future {latest} | before-start {earliest}
+  //   | more-than-owed {quote} | before-last-payment {lastPaymentOn, earliest} | before-last-payoff {lastPayoffOn, earliest}
+  //   | overtakes-later {most}
+payoffDays(terms, today): { earliest, latest, earliestFull } | null
+paidOffOn(terms): string | null                         // 3rd argument of loanPricingDay
+withoutPayoff(terms, id): { terms, endsOn } | null      // F3; endsOn = delete_loan_payoff's p_last_payment_on
+// src/lib/loan-view.ts
+type LoanPayoffEntry = { kind: 'payoff'; id: string | null; on: string; amount; interest; principal; balance; full };
+type LoanHistoryEntry = ({ kind: 'payment' } & LoanPayment) | LoanPayoffEntry   // newest first, interleaved
+// src/lib/active-loans.ts
+loanPricingDay(bill, today, paidOffOn?: string | null)  // a payoff day that has come wins over ends_on
+// src/lib/loan-route.ts
+LoanRouteParams.payoffs?: string ('[["2026-10-12",2000]]'), payoffParams(payoffs), readLoanRoute(...).payoffs
+// src/lib/loan-review.ts
+LoanReviewFields.payoffs?: readonly LoanPayoff[]        // edit mode: figures, save.lastPaymentOn and scheduleParams follow them
+```
+
+**Outcome:** Done. Nothing committed. Every payoff figure matches an independent Python reference (exact fractions, own calendar) row by row. Loans without payoffs are unchanged to the cent.
+
+**Rules as built:**
+- **Interest first (F2), full and partial:**
+  - On the payoff day, the interest built up since the last payment or payoff posts, rounded half up once on the exact BigInt path.
+  - The payoff pays that interest first, then principal.
+  - Interest it does not cover (a payoff smaller than the interest) is paid first by the next payment. It is not added to the balance.
+- **Full payoff:** the schedule ends that day, with no row after it. `payoffOn` and `loanStatus.lastPaymentOn` are the payoff day.
+- **Partial payoff:** the stored monthly payment stays, later periods accrue on the smaller balance, and the last payment takes up the gap. Several partials are allowed.
+- **Same day:**
+  - A payoff on a due date posts after that day's payment.
+  - Payoffs on the same day post in the order they were recorded.
+- **Day count:** the loan's own basis. Monthly rests are per diem on actual/365 on both sides of a payoff, matching the existing quote rule. 30/360 counts pieces in thirtieths, so a payoff on the 31st charges 4 + 27 days that period.
+- **Contract:** payoffs are part of it. `scheduleWithOverrides` keeps them. `solvePayment` ignores them, so the level payment never moves. The typed monthly-payment floor is judged on the loan as lent; otherwise a clearing payoff would let any payment through.
+- **checkPayoff:**
+  - Before the start: refused.
+  - After today: refused.
+  - More than the quote: refused, with the quote.
+  - A full payoff before the last payment made, or before a payoff already recorded: refused.
+  - A back-dated partial that would cut a later payoff, or end the loan before a payment already made: refused, with the most that can be paid that day, found by bisection.
+- **CEO change, mid-task (Dana's hand-back):** a full payoff is now allowed ON a payment day. That day's payment posts first and the quote is the balance it leaves, so payoffDays.earliestFull is the last payment's own day.
+  - Proof: $424.80 + $10,303.70 = $10,673.67 + the period's $54.83, so the money is the same either way.
+  - `ends_on` = that day is inclusive, so the instalment is recorded once and nothing after it is charged.
+  - Diego's `record_loan_payoff` now uses `charged_on > p_paid_on` and "the first payment strictly after", which is equivalent.
+
+**Wireframe car loan** ($18,000 at 6.25%, $424.80 a month, the 27th, actual/365):
+- **$2,000 partial on 12 Oct 2026:**
+  - Interest: $27.42, for 15 days on $10,673.67. Principal: $1,972.58. $8,701.09 left.
+  - Next payment 27 Oct: $22.35 interest + $402.45 principal.
+  - The loan ends 27 Jul 2028 after 43 payments instead of 48, with a last payment of $279.12.
+  - Total interest $2,120.72, against $2,390.10: $269.38 saved.
+- **Full quote that day:** $10,701.09 = $10,673.67 + $27.42.
+- **Around a payment day:**
+  - On 27 Oct: $424.80, then $10,303.70.
+  - On 28 Oct: $10,305.46 (one day, $1.76).
+  - On 26 Oct: $10,726.67 (29 days, $53.00).
+
+**Tests:**
+- **Fixtures:**
+  - `src/lib/__fixtures__/loan-payoff-reference.ts`, the Python outputs:
+    - 21 named scenarios: partial mid-period; full mid-period; on, before and after a payment day; a payoff on a payment day; two partials; a payoff then changed payments; below the interest; same day ×3; before the first payment, partial and full; a day-31 loan, partial and full; 0%, partial and full; monthly rests; monthly opening; actual/360; 30/360.
+    - A 60-loan random sample.
+  - `src/lib/__fixtures__/payoff-reference.ts`, an in-repo exact-integer reference that borrows only the calendar.
+- **Suites:**
+  - `loan-payoff.test.ts`: 82 (new). It includes a 1,200-loan sweep against the in-repo reference, quote-clears-the-loan, and conservation.
+  - `loan-view`: 52 (+11). `loan-status`: 46 (+5). `active-loans`: 17 (+5). `loan-review`: 35 (+5).
+  - Loan lib suites: 12 suites, 432 tests.
+- **Off-tree checks:**
+  - Python against the engine, outside jest: 600 random loans and 1,797 quotes, 0 mismatches.
+  - A no-payoff invariance sweep of 1,500 loans against HEAD (schedules, status, history, quotes, review, route): identical. The one exception is `payoffQuote` on calculator what-if lump sums paid between the last payment and the quote day, which it now counts. Nothing in production calls it.
+- **Mutation testing:** 54 mutants on a scratch copy, never in the shared tree. All killed. 6 first survived and their tests were tightened.
+
+**Gates:**
+- tsc 0.
+- eslint (cache cleared, `--no-cache`, `--max-warnings 0`) and prettier: clean on my 15 files.
+- Full `npm test`: 334/336 suites, 7,407/7,410 tests.
+  - The 3 failures are teammates' in-flight P3 files.
+  - `src/__tests__/app/loan-payoff.test.tsx` (Dana): 2 tests still expect the old "pay it all from 28 Oct" and an earliest full-payoff day of 28 Sep. Both follow from the CEO's payment-day change; her screen already shows the new line.
+  - `loan-migrations.test.ts` caught Diego mid-edit and passes on its own (26/26).
+
+**For Dana:**
+- `/loan-schedule` reads its params explicitly. Add `payoffs: params.payoffs` to that `readLoanRoute({...})` call and its deps, or the schedule page ignores payoffs. The postings are in `loan.payoffs`, so draw them between rows using `afterPayments`.
+- In edit mode, pass `payoffs: terms.payoffs` into `loanReview`'s fields. Without it, Save sends the no-payoff end date and a paid-off loan's bill starts charging again.
+- History entries use `on`, not `date`. Map the source by `id`.
+
+**For Diego:**
+- Embed `payoffs:loan_payoffs(id, paid_on, amount, created_at)` on the loan reads.
+- `p_kind` = `check.kind`.
+- `p_last_payment_on` = `check.endsOn` on record, and `withoutPayoff(...).endsOn` on delete.
+- Consider having `update_loan` keep `ends_on` ≤ a recorded full payoff's `paid_on` server-side as well.
+
+**Not verified:**
+- No real statement or payoff letter covers payoffs (R9). The proof is the Python reference only.
+- Not run on Hermes. In node, `checkPayoff` is about 2 ms for 48 rows and about 14 ms for 360 rows per call, plus bisection only on the rare overtakes-later path. Dilip could time it per keypad press on the 13 Pro Max.
+
+**Open:**
+1. **Founder (R9):** a payoff letter or a statement showing a partial payoff would pin F2 to a real bank.
+2. **CEO:** removing a payoff (F3) before a later full payoff leaves the later one short. `withoutPayoff` then reopens the loan with a little owing, and its bill resumes. Should only the latest payoff be removable?
+3. **CEO:** a back-dated partial whose schedule now ends exactly on an instalment already charged at the level amount overstates spending by the difference (R6). It is allowed today.
+
+- **2026-10-12 — Dana — P3 follow-ups (coordinator, after Drew's final maths):**
+  - **MUST 1 — edit keeps payoffs:** `add-loan.tsx` passes the saved loan's payoffs (`readStoredPayoffs(loan.payoffs)`, frozen with the form) into `loanReview` on Review and on Continue. Save then ends the bill on the payoff day. Test: a loan a full payoff cleared on 12 Oct saves `lastPaymentOn: '2026-10-12'`; it fails without the fix (it would be null, the term's own end).
+  - **MUST 2 — the schedule shows payoffs:**
+    - `/loan-schedule` reads `payoffs: params.payoffs`.
+    - New `src/components/calculators/payoff-row.tsx` draws each posting after the payment it followed (`afterPayments`): date, a "Paid off" / "Extra payment" pill, split, amount, "left". A payoff after the last shown row waits for Show all.
+    - View loan See all (`loanScheduleParams`) and Review (`figures.scheduleParams`) carry the payoffs.
+    - Tested end to end: Review → schedule → "Paid off, 12 Oct 2026. $10,701.09: $27.42 interest, $10,673.67 off the balance. $0.00 left.", with no payment 22.
+    - The year caption's interest is still the payments' only (`scheduleByYear`), so payoff interest is not in it.
+  - **Payment-day rule:** the 27 Oct test now pays it all ($10,303.70 after that day's $424.80). The full-payoff calendar floor is 27 Sep. Added a refusal test: Pay it all dated 20 Sep → "Your payment on 27 Sep is already made. You can pay it all from 27 Sep." History rows map Drew's `on`.
+  - **F3 (CEO):** only the latest payoff can be removed. The latest is the last in the loan's payoff order.
+    - An earlier row has the hint "Remove the later payment first". A tap or long press shows a dialog, "Payments come off newest first. Remove the one on {date}, then this one.", with no confirm and no delete.
+    - Removal sends `withoutPayoff(terms, id).endsOn`. A bill stopped early still sends null, so it stays stopped.
+  - **Strings:** +3 keys (en/es/fr).
+  - **Mutants:** 6 on a scratch copy, all caught.
+  - **Gates:**
+    - tsc 0.
+    - eslint (cache cleared, `--no-cache`, `--max-warnings 0`) and prettier are clean on my 27 files. In `src` the only errors are Diego's in-flight `money-book-hooks.test.tsx` (prettier), plus the old setup.test.tsx warning.
+    - Full jest: 336/336 suites, 7,425 tests.
+
+- **2026-10-12 — Drew — follow-up: `/loan-schedule` year captions count payoffs.**
+  - **The fix:** `scheduleByYear(rows, payoffs = [])` in `src/lib/loan.ts` puts each payoff in the year it was paid, including interest that built up the December before. Each year gains `payoffs`, and its `interest` and `principal` now include them. Years are sorted, so a year with only a payoff gets its own entry.
+  - **The page:** a one-argument change in `src/app/loan-schedule.tsx:70`, `scheduleByYear(rows, payoffs)`. A payoff-only year now gets a caption that reads "0 payments · $X interest". That copy is Dana's call.
+  - **Tests:** `loan-payoff.test.ts` +5.
+    - Year totals are checked against the in-repo reference's own tuples for a partial payoff, a full payoff, and a payoff on 10 Jan 2027, partial and full: $22.92 = 14 days on $9,559.82.
+    - Also covered: a full payoff before the first payment, and 300 sweep loans where the years add up to `totalInterest` and to the amount borrowed. With no payoffs the output is unchanged.
+  - **Gates:**
+    - eslint (cache cleared, `--no-cache`, `--max-warnings 0`) and prettier are clean on the 3 files.
+    - tsc has 1 error, in Diego's in-flight `src/__tests__/api/loan-payoffs.test.tsx`.
+    - The 12 loan lib suites and the 2 loan-schedule screen suites pass: 14 suites, 459 tests.
+- **2026-10-12 — Dana — schedule year captions with payoffs:** in `/loan-schedule`, a year that holds no payment, only money paid off, now reads "Paid off · $9.25 interest" when a payoff in it cleared the loan, otherwise "Extra payment · …" / "2 extra payments · …". The figures come from Drew's `scheduleByYear(rows, payoffs)`. Years with payments keep "N payments · $X interest". 2 new keys (en/es/fr). 3 tests in `loan-schedule-design.test.tsx`. tsc: no errors in my files (the only error is in Diego's in-flight `loan-payoffs.test.tsx`). eslint (cache cleared) and prettier are clean. 8 affected suites, 164 tests, pass.
+
+## 2026-10-12 — Diego (Developer, data and backend) — Pay off P3 data: migration C `loan_payoffs`, the payoff hooks, payoffs in the ledger and the savings close (DONE, uncommitted, NOT applied live)
+
+**Hooks and types (Dana and Drew build on these; final):**
+- `src/api/queries.ts`
+  - `LoanPayoffRow = { id; bill_id; paid_on; amount: number; kind: 'full' | 'partial'; card_id; bank_account_id; counted: boolean; created_at; source: PaymentSourceRow | null }`. It is a superset of Drew's `StoredPayoff`, so `termsFromStored` reads it as `StoredLoan.payoffs`.
+  - `LedgerPayoff` is the part the ledger counts. `LedgerEntry.payoff?: 'full' | 'partial'` (id `payoff-<id>`, `planId` = the loan's bill). `LedgerInput.payoffs?`.
+  - `readLoanPayoffs(billId?)`, `readPayoffRows(raw)`, `useLoanPayoffRows()` (key `['loans', userId, 'payoffs']`), `withLoanPayoffs(read)`, `lacksPayoffs(error)`.
+- `src/api/loans.ts`
+  - `LoanDetail.payoffs` and `LoanListRow.payoffs` are `LoanPayoffRow[]`, oldest first (paid_on, then created_at, then id), embedded as `payoffs:loan_payoffs(...)` in the same read.
+  - `useLoanPayoffs(billId)` returns `{ payoffs, isPending, isError, refetch }`.
+- `src/api/mutations.ts`
+  - `useRecordPayoff()`: `RecordPayoffValues = { billId; paidOn; amount; kind; cardId; bankAccountId; lastPaymentOn: string | null; today?: string }`. Returns `{ id, billId }`. `lastPaymentOn` is `check.endsOn`; it is read for a partial payoff only.
+  - `useDeletePayoff()`: `DeletePayoffValues = { billId; payoffId; lastPaymentOn: string | null }`. `lastPaymentOn` is `withoutPayoff(...).endsOn`, or null for a loan stopped early.
+  - Both invalidate 'bills' (with 'loans' and 'dashboard'), 'loans', `['bill', id]` and `['loan', id]`.
+- **Server refusals (P0001 unless noted).** The app maps them all to the one failure line:
+  - 'a payoff is full or partial'
+  - 'a payoff is an amount above zero, in whole cents'
+  - 'a payoff needs its date'
+  - 'a payoff cannot be dated after today'
+  - 'a payoff cannot be dated before the loan started'
+  - 'the loan is already paid off'
+  - 'the loan had already finished by then'
+  - 'a full payoff must come after the last payment made'
+  - 'the last payment must fall within the term'
+  - 'only the latest payoff can be removed'
+  - P0002 'there is no such loan'
+  - 23514 for someone else's loan, card or account, or for both a card and an account.
+
+**Outcome:** Done, uncommitted. Migration C is written and passed a Docker scratch run, 19 SQL mutants, a byte-identity proof for `update_loan`, and a real PostgREST v14.5 run of the hooks. It is not applied live; that waits for Dmitri's review and the Founder's go. Until C is live, every loan read loads with no payoffs, and recording or removing a payoff fails with the one failure line (PGRST202), writing nothing.
+
+**Migration `supabase/migrations/20261012100003_loan_payoffs.sql`:**
+- **Table `loan_payoffs`:**
+  - Columns: id, user_id (default auth.uid()), bill_id, paid_on, amount numeric(14,2) > 0, kind full|partial, card_id / bank_account_id (on delete set null, at most one of them), counted, bill_ends_on_before, bill_next_due_on_before, created_at.
+  - `bill_id` references `loans(bill_id)` on delete cascade. The app knows a loan by its bill, and the payoff goes with its loan.
+  - RLS: own rows, for all commands.
+  - A unique partial index allows one full payoff per loan. Indexes on (bill_id, paid_on) and (user_id, paid_on).
+  - Trigger `loan_payoffs_own_rows`: only your own loan, card and account (as receipt_books).
+  - Published for realtime (replica identity full). The app does not listen to it (see Fallbacks).
+- **`record_loan_payoff(p_bill_id, p_paid_on, p_amount, p_kind, p_card_id, p_bank_account_id, p_last_payment_on = null, p_today = null)` returns `loan_payoffs`:**
+  - Security invoker, `search_path=public`, revoked from public and anon, granted to authenticated.
+  - Locks the bill. Every refusal comes before any write.
+  - Today: p_today, else the profile's timezone, as update_loan.
+  - Start: funded_on, else the first payment less a month.
+  - A full payoff (R5): no charge dated after it, no payoff dated after it, and no scheduled payment after its day up to today (first payment, then the clamped payment day). The payment day itself is allowed (CEO/Drew): that day's instalment counts once and `ends_on` is inclusive.
+  - `counted` = the bill's in_spending at that moment.
+  - Bill:
+    - A full payoff sets `ends_on` = paid_on.
+    - A partial one sets `ends_on` = p_last_payment_on (within the term and ≥ paid_on), or keeps it when that is null.
+    - An end before the bill's count floor stops the bill instead: next_due_on null, and ends_on stays on starts_on (bills_period_order).
+    - Lowering the floor was rejected: mutant m04 showed the recorder then writes a phantom instalment on the payoff day (first payment 27 Nov, paid 27 Oct).
+  - It always writes the bill, so other phones hear of it through the bills feed.
+- **`delete_loan_payoff(p_id, p_last_payment_on = null)` returns boolean:**
+  - False for a payoff already gone or not yours.
+  - Locks the bill, then the payoff.
+  - Only the latest payoff (paid_on, created_at, id) can be removed (CEO F3).
+  - A full payoff: `ends_on` = p_last_payment_on, else the stored `bill_ends_on_before`. A bill that payoff stopped runs again from the next due date it took.
+  - A partial payoff with a last payment: `ends_on` = that date.
+  - A partial payoff with null: the bill stays exactly as it is (Dana's stopped-early case). It is still written.
+- **`update_loan` recreated:** same 18 arguments, grants and invoker. One block is added:
+  - With a full payoff on file, `ends_on = least(contract end, paid_on)`, or stopped when that comes before the floor.
+  - The contract's end (and its next date, when stopped) goes to the payoff, so removing it puts back the edited loan.
+
+**Scratch test (Docker, the local DB untouched, still 20261008100002):**
+- **Setup:**
+  - Docker Desktop's VM was stuck (no route to the VM since before this run), so I restarted Docker Desktop.
+  - Local DB dumped as supabase_admin and restored into a scratch DB, with the cron stand-in.
+  - 20261008100003…B applied as postgres, each in its own transaction. A's and B's checks passed there before C.
+- **C applied twice:** exit 0, schema identical after the second run. A schema diff before/after C shows only the new table, policy, trigger, indexes, publication entry, the two functions and their grants, plus the added lines in update_loan.
+- **`supabase/checks/loan_payoffs.sql` (new): 100 checks, ALL CHECKS PASSED.** They cover:
+  - Schema and grants.
+  - Partials: stored as paid, several kept, the bill ends on the new last payment, nothing after it charged, no charge rows, a payoff kept out stays out.
+  - Full: ends that day, nothing after charged, 10 charges kept, the payment-day case charged once, refused for a later charge, schedule payment or payoff, clamped day 31, a pinned first payment, R2 bill drift.
+  - Stopped branch: before the first payment, and before the add day.
+  - Refusals change nothing.
+  - RLS and anon: direct writes, someone else's loan, card or account.
+  - Removal: latest only, puts back the end and the next date, the instalment it stood in for is charged again, stopped early stays stopped with no back-fill.
+  - An edit of a paid-off loan, then removal.
+  - Cascade and set null.
+  - The real-day reminder stops after a full payoff.
+- **Other suites on the C copy:** loans 55, update_loan 52, habits 54, one_off_pay 34, savings_goals 150, receipt_books 19, free_capture_allowance 26, all pass.
+- **Mutants: 19, all caught.** No charge or schedule R5, no first-month floor, a lowered floor, always counted, no bill write, no cap, cap without least, no next-date restore, full delete keeping the end, security definer, no trigger, rounding cents, payment day refused (two ways), stale next date on partials, update_loan not refreshing the next date, any payoff removable, latest by record only.
+- **update_loan old calls are byte-identical:** the same 72 edits (6 loan shapes × 12 edits, 9 of them refused) on B and on C give identical bill and loan rows, compared byte for byte. The function diff B→C is only the payoff block, and a jest test pins that.
+- **PostgREST v14.5 (127.0.0.1, scratch HS256), C and pre-C copies:**
+  - Pre-C: the table read gives PGRST205, an embed gives PGRST200 ("Could not find a relationship between 'loans' and 'loan_payoffs'"), and both functions give PGRST202.
+  - The real hooks ran through jest from the scratchpad (node-fetch PostgrestClient), 3/3:
+    - Record a partial (amount 1000.5, account source), read it back with its source, see it on `useLoanDetail`, `loanTermsOf(...).payoffs`, `useLoans` and `useLoanPayoffs`.
+    - Record a full payoff. Refused when already paid off. Removing the older one is refused, then the latest is removed twice (the second is not an error), then the partial is removed and ends_on goes back to 2028-12-27.
+    - 10.001 refused in words.
+    - Pre-C: every loan loads with no payoffs, and both writes give PGRST202.
+- **Cleanup:** scratch DBs, dumps, both PostgREST containers, the image and the secret are removed. Docker Desktop is left running, as found, with the local supabase_db container up.
+
+**Every place a payoff is counted:**
+- **`ledgerEntries`** (`src/api/queries.ts`): one `payoff-<id>` entry on paid_on, from its own card or account ('' for Skip), under its loan's bill (kind 'bill', categoryId 'loans', planId the bill). It is left out when `!counted`, unless `uncounted: 'show'`. It is listed even when the payoff stopped the bill, and dropped only when its bill is gone (deleted with it). Through `useLedger` it reaches:
+  - Home: Where your money went, totals, Recent.
+  - Activity.
+  - Insights.
+  - The Bills list and total (its row opens `/loan/[id]` through planId).
+- **`bookFlows`:** counted once as spending, and it now carries `planId` and `payoff`, so a card or account page row opens the loan (`ledgerHref`). It is never in the leftover-charges loop, because it is not a charge. Through it:
+  - The Cards tab balances, card/account pages and Home Current balance (`moneyBook`).
+  - Savings "so far" (`useBookFlows`).
+- **Savings close (`closingFlows`, `src/api/savings.ts`):** a fresh windowed read of `loan_payoffs` (paid_on in the closing months) goes into the same `ledgerEntries`/`bookFlows`. A month already closed stays frozen (R7).
+- **Not counted:** Coming up (payoffs are never future), the recorders (no charges), reminders.
+- **Schedules:** `LoanDetail.payoffs` / `LoanListRow.payoffs` go to `termsFromStored`, which feeds the Loans page, View loan, Pay off and edit. The Cards tab's Loans tile reads only the bill's dates, which the payoff already moved; it builds no terms.
+
+**Fallbacks (until C is live):**
+- **Table reads:** PGRST205 / 42P01 read as no payoffs: `readLoanPayoffs` (the ledger, `useLoanPayoffs`) and the savings close. Any other failure is an error (isError, or the close waits).
+- **Embeds:** PGRST200 naming loan_payoffs reads again without the embed (`useLoans`, `useLoanDetail`). It composes with A's column fallbacks; a pre-A, pre-C database takes three requests.
+- **Writes:** PGRST202 is thrown and the one failure line is shown. Nothing is written.
+- **Realtime:** `loan_payoffs` is not listened to, because a table missing on the server would refuse the whole channel (as goals). Both functions always write the bill, and the bills feed invalidates 'loans', where payoffs are read (comment in `realtime-provider.tsx`).
+
+**Coordinator's points:**
+1. `loan-migrations.test.ts`: update_loan now lives in C. It has new C tests (table, both signatures and grants, the strict R5 lines, and "update_loan is B's plus the payoff block only").
+2. Removing with null on a stopped-early loan keeps the bill as it is. **I found and fixed a bug here.** The first version restored the next date stored on a partial; after an edit had stopped the bill, that back-filled January–April into a loan added in May. Now a partial stores a next date only when it stopped the bill itself, and null touches no date. There is a check for it, and mutant m17 is caught.
+3. A full payoff on a payment day is allowed: `charged_on > p_paid_on`, and the schedule's first payment strictly after. This matches Drew's final `payoffDays.earliestFull`.
+4. Embed `payoffs:loan_payoffs(...)`: done. Its columns are a superset (kind, counted, sources) for History.
+5. update_loan keeps ends_on ≤ the full payoff's day. Old calls are byte-identical (above).
+6. Only the latest payoff can be removed, enforced in the database. The "partial while full stands" branch went with it; that state can no longer be reached.
+
+**Tests:**
+- **New:** `src/__tests__/api/loan-payoffs.test.tsx` (26): ledger entries, bookFlows/ledgerHref, row reads and fallbacks, `useLoanPayoffs`, `withLoanPayoffs`, the `useLoans` embed and fallback, both mutations' exact arguments and invalidations.
+- **Extended:**
+  - `loan-detail.test.tsx`: 21, payoffs embedded, ordering, fallbacks.
+  - `savings-close.test.ts`: +5.
+  - `money-book-hooks.test.tsx`: +6, plus loan_payoffs in its read list.
+  - `queries.test.tsx`: loan_payoffs in its read lists.
+  - `loan-migrations.test.ts`: 26.
+- **App mutants:** 13 on a scratch copy of the repo, never in the shared tree. All caught.
+
+**Gates:**
+- tsc 0.
+- eslint (cache cleared, `--no-cache`, `--max-warnings 0`, src): 0 errors, plus the old setup.test.tsx warning.
+- Prettier clean on my files.
+- Full jest: 337/337 suites, 7,459 tests.
+
+**Open:**
+1. **Dmitri:** review C. Before the push, read-only:
+   - Live has no `loan_payoffs`, `record_loan_payoff` or `delete_loan_payoff`.
+   - Live `update_loan` matches B's file.
+   - The migration history ends at 20261012100002.
+2. **CEO/Founder:** a payoff dated before the day the loan was added counts as spending when the switch is on. F1 covered instalments, not money the person records themselves.
+3. **Dana/Drew:** an edit after a partial payoff must send a `lastPaymentOn` worked out with the payoffs (Drew's `LoanReviewFields.payoffs`). The server cannot check partials; a full payoff is safe whatever is sent.
+4. **CEO:** an edit can move the start after an existing payoff. It is not refused; the engine decides.
+5. **Dmitri's earlier nice-to-have:** `p_today` comes from the device, as in update_loan.
+6. **Edge:** removing a full payoff with the app's `endsOn` on a loan that an edit had stopped early before the payoff restarts it at the schedule's end. This is rare.
+7. **R6** (level-amount charges versus a shortened tail) is accepted and on the backlog.
+- **2026-10-12 — Diego — CEO answers applied (P3):**
+  - **Q2, F1 for payoffs:** `record_loan_payoff` now stores `counted` = the bill's in_spending **and** paid_on ≥ the day the loan was added, in the person's timezone (`created_at at time zone` the profile's zone, as update_loan's floor).
+    - A payoff dated earlier still lowers the balance (it is in `LoanDetail.payoffs` and `LoanListRow.payoffs`, so the schedule and History have it) but is never spending.
+    - New checks: 11 Oct not counted and 12 Oct counted on a loan added 12 Oct; in Kiritimati the add day is 13 Oct; a full payoff before the add day is not counted.
+    - New app test (`loan-payoffs.test.tsx`): an uncounted payoff reaches `loanTermsOf(...).payoffs` and is left out of the ledger.
+  - **Q3 confirmed:** `add-loan.tsx` prices Review with `fieldsWith(form, editing?.payoffs)` (`:206`, `:237`). `writeLoan` sends that review's `save.lastPaymentOn` (`:302`) through `useUpdateLoan` as `p_last_payment_on`, so update_loan gets a payoff-aware last payment.
+  - **Q4/Q5:** left as they are, for Dmitri.
+  - **Latest-only test:** made deterministic. The earlier m20 catch came from random ids (created_at ties inside one transaction). A back-dated partial recorded after a later-dated one now pins it: the one dated last is the latest.
+  - **Scratch rerun (Docker, fresh from the local DB):**
+    - C applied twice, schema identical.
+    - loan_payoffs 104 checks; loans 55, update_loan 52, habits 54, one_off_pay 34, savings_goals 150, receipt_books 19, free_capture_allowance 26, all pass.
+    - 21 SQL mutants, all caught, including the new two: no add-day floor, and add day read in UTC.
+    - Scratch DBs dropped; the local DB is still at 20261008100002.
+  - **Gates:**
+    - tsc 0.
+    - eslint (cache cleared, `--no-cache`) 0 errors, plus the old setup.test.tsx warning.
+    - Prettier clean.
+    - Full jest: 337/337 suites, 7,460 tests.
+
+## 2026-10-12 — Dmitri (Development Lead) — Pay off P3 review: GO, no MUST. Migration C is READY for the Founder's go, after the read-only live checks below. Read-only.
+
+**Gates:** tsc 0; eslint (cache cleared, `--no-cache`, `--max-warnings 0`, src) 0 errors, plus the old setup.test.tsx warning; prettier clean on all 54 changed TS files; full jest 337/337 suites, 7,460 tests.
+
+**Migration C (`20261012100003_loan_payoffs.sql`):**
+- **Old `update_loan` calls are byte-identical.** The B→C diff is the payoff block alone, and it acts only when a full payoff exists. No existing loan has one, because the table is new. Grants are restated, and it stays security invoker.
+- **`record_loan_payoff` and `delete_loan_payoff`:** both are security invoker with `search_path=public`, revoked from public and anon and granted to authenticated. Both lock the bill. Every refusal comes before any write, and each call is one transaction, so nothing is half-written.
+- **`loan_payoffs`:**
+  - RLS is own rows, for all commands. The trigger allows only your own loan, card and account.
+  - One full payoff per loan (unique partial index).
+  - It cascades with its loan, and its card and account are set null on delete.
+- **Realtime:** the publication add is guarded, as in the earlier migrations. It is harmless even if the publication were `FOR ALL TABLES`.
+- Running it twice is safe.
+
+**Live checks wanted before the push (read-only):**
+- None of these exists yet: `loan_payoffs`, `record_loan_payoff`, `delete_loan_payoff`, `loan_payoffs_own_rows`, or the `loan_payoffs_all_own` policy.
+- Live `update_loan` is one overload whose source is byte-identical to B's file.
+- The migration history ends at 20261012100002.
+- Check `supabase_realtime`'s `puballtables`.
+- `loans.bill_id` is still unique, since C's foreign key targets it.
+- The cards and bank_accounts policies are still own-row.
+
+**Counting:**
+- Each payoff becomes one `payoff-<id>` ledger entry on its own date, from its own source.
+- It is never written as a charge and never projected.
+- It is filtered on `counted`, which is in_spending AND paid on or after the add day (the CEO's F1 call).
+- `bookFlows` takes it once from the entries. The charges loop is never involved.
+- The savings close reads payoffs windowed, as receipts. Before C, a missing table reads as none.
+- A payment-day full payoff adds the instalment (a charge) and the payoff, and together they are the real money: $424.80 + $10,303.70.
+
+**Cent-exact:**
+- No-payoff loans are unchanged by construction. On daily bases `splitWeight` equals the old `shareWeight(…,false)`, and monthly rests only split on a payoff. `solvePayment` ignores payoffs.
+- `loan.test.ts` and `loan-reference.ts` are untouched, so the real-lender fixture holds.
+- My own Python re-run of the $2,000 partial on 12 Oct reproduces Drew's figures:
+  - $27.42 interest + $1,972.58 principal, leaving $8,701.09.
+  - The 27 Oct payment: $22.35 + $402.45.
+  - 43 payments, the last on 27 Jul 2028 at $279.12.
+  - Total interest $2,120.72, which saves $269.38.
+- By hand: the quote is $10,701.09; on 27 Oct it is $424.80 then $10,303.70; on 28 Oct $10,305.46; on 26 Oct $10,726.67.
+
+**Navigation:** a saved payoff goes back to `/loan/[id]`. Removing a payoff stays on the page, one removal at a time.
+
+**en/es/fr:** every loan, loanFlow and toast.loan key is used.
+
+**Decisions:**
+- **Q4 (an edit moves the start after an existing payoff): it should be refused, in the app.** `loanReview` refuses with words, and Dana shows them. No spending is miscounted, but the engine then applies the payoff at the start with no interest, which is not what happened. It needs no server change, so C goes live as it is. Should-fix before the Founder's device test.
+- **Q5 (removing a full payoff from a loan an edit had stopped early): accepted.** No current flow writes a bill end before its schedule's end. If one is ever added, `delete_loan_payoff` should prefer `bill_ends_on_before` for a full payoff.
+
+**Nice-to-haves:**
+1. The Pay off page freezes the first read, which may be cached. Freeze only once a fresh fetch lands, so a partial payoff's end is never worked out on stale terms.
+2. `src/lib/loan-payoff.ts:5` names "the Founder's rule" (comment style). `loan-view.test.tsx:378` names "Diego".
+3. Dilip should time `checkPayoff` per key press on Hermes for a 30-year loan (about 14 ms in node).
+4. A large payoff lands in that month's Bills total and in "Where your money went", as planned. Point it out to the Founder.
+5. R9: there is still no real statement covering payoffs.
+
+- **2026-10-12 — Drew — Dmitri's P3 should-fixes.**
+  - **New refusal:** `LoanReviewRefusal` gains `{ reason: 'start-after-payoff'; on: string /* yyyy-mm-dd */; amount: number }`.
+    - `loanReview` returns it when an edit's start date (funded_on) is after a recorded payoff. It names the earliest such payoff.
+    - Without it, the engine would post that payoff on the start with none of the interest it really paid.
+    - Missing fields and the rate are asked about first.
+  - **What is still allowed:**
+    - A start on the payoff's own day: the payoff then pays $0 interest.
+    - A start the day before.
+    - A first payment after a payoff, as long as the start is on or before it. That is an opening-period payoff, which `checkPayoff` allows, so the first payment is not a condition.
+  - **Tests:** `loan-review` +3, 38 in all.
+  - **Comments:** `loan-payoff.ts` now states its rules themselves. "The Founder's rule, F2", "(plan R5)" and "(F3)" are gone.
+  - **Gates:**
+    - eslint (cache cleared, `--no-cache`, `--max-warnings 0`) and prettier are clean.
+    - The loan lib suites plus the add-loan screen suites pass: 14 suites, 496 tests.
+    - tsc has 1 error, which is expected. It is in `src/app/add-loan.tsx:221`: Dana's exhaustive `refusalLine` switch needs the `'start-after-payoff'` case and its wording.
+- **2026-10-12 — Dana — P3 should-fixes (Dmitri's review):**
+  - **Q4:** the edit flow now shows Drew's `start-after-payoff` refusal on Continue in plain words: "Your extra payment of $2,000.00 on 3 Oct 2026 comes before this start date. Remove it first or pick an earlier start." Review does not open and nothing is saved. There is 1 key (en/es/fr) and 1 test in `add-loan.test`.
+  - **Fresh read:** `/loan-payoff` asks for the loan again once on opening and freezes its figures only when that read lands (`isFetchedAfterMount`, not fetching, no error). A failed refresh shows Try again, never the cached figures. 2 tests: a cached loan without the 3 Oct payoff is never priced, and the fresh one gives $8,698.02.
+  - **Comment style:** `loan-view.test.tsx` and `loan-payoff.test.tsx` no longer name people.
+  - **Checks:** 4 mutants, all caught. tsc 0. eslint (cache cleared) and prettier are clean on my files; in `src` there is only the old setup.test.tsx warning. Full jest: 337/337 suites, 7,466 tests.

@@ -47,6 +47,9 @@ const MS_PER_DAY = 86_400_000;
 /** A local calendar date pinned to UTC midnight, so DST cannot bend a day count. */
 const utcDay = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
 
+/** A yyyy-mm-dd column as local midnight, not UTC — dates here have no time zone. */
+const fromIsoDate = (value: string) => new Date(`${value}T00:00:00`);
+
 /** Days from one date to another under the given convention. */
 export function daysBetween(from: Date, to: Date, basis: DayCountBasis = 'actual/365'): number {
   if (basis !== '30/360') return Math.round((utcDay(to) - utcDay(from)) / MS_PER_DAY);
@@ -305,10 +308,44 @@ export type LoanTerms = {
    * what would break the schedule (see `runSchedule`).
    */
   paymentOverrides?: PaymentOverrideMap;
+  /**
+   * Money paid on top of the schedule, full or partial, in the order it was paid. Part of the
+   * contract, unlike `extra`: see `runSchedule` for how each posts. Check new ones with
+   * `checkPayoff` (`@/lib/loan-payoff`).
+   */
+  payoffs?: readonly LoanPayoff[];
 };
 
 /** Payment number to amount. A plain object, so it stores as JSON and survives a route param. */
 export type PaymentOverrideMap = Readonly<Record<number, number>>;
+
+/** A payoff as paid: the day and the amount, in whole cents. */
+export type LoanPayoff = {
+  /** The stored row's id; absent for one that is not on file (a route param, a preview). */
+  id?: string;
+  on: Date;
+  amount: number;
+};
+
+/** How a payoff posted. */
+export type PayoffPosting = {
+  /** The stored row's id, or null. */
+  id: string | null;
+  /** yyyy-mm-dd */
+  on: string;
+  /** As paid. More than interest + principal only when it paid more than was owed. */
+  amount: number;
+  /** Interest it covered: what built up since the last payment or payoff. */
+  interest: number;
+  /** What came off the balance. */
+  principal: number;
+  /** Principal still owed after it. */
+  balance: number;
+  /** It cleared the loan: the schedule ends on its date, with no row after it. */
+  full: boolean;
+  /** Scheduled payments made before it; one due the same day posts first. */
+  afterPayments: number;
+};
 
 /** A one-off overpayment: an amount, and the day it lands. */
 type LumpSum = {
@@ -450,9 +487,56 @@ export type Amortisation = {
   interestShare: number;
   basis: AccrualBasis;
   fundedOn: Date;
-  /** yyyy-mm-dd of the last payment, which overpayments can bring forward. */
+  /**
+   * yyyy-mm-dd the loan ends: its last payment, which overpayments and payoffs can bring forward,
+   * or the payoff that cleared it.
+   */
   payoffOn: string | null;
+  /** The payoffs the loan reached, in the order they posted. */
+  payoffs: PayoffPosting[];
 };
+
+/** A yyyy-mm-dd for a local date. */
+const isoOf = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+/** A payoff as the engine posts it, in cents. `quote` stands for "whatever is owed then". */
+type PayoffEvent = { id: string | null; on: Date; cents: number; quote: boolean };
+
+/**
+ * The payoffs the engine can take (a valid date, a positive amount in whole cents), by date. The
+ * sort is stable, so payoffs paid the same day post in the order given, and a quote comes last.
+ */
+function payoffEvents(payoffs: readonly LoanPayoff[] | undefined, quoteOn?: Date): PayoffEvent[] {
+  const events: PayoffEvent[] = [];
+  for (const payoff of payoffs ?? []) {
+    const cents = wholeCents(payoff.amount);
+    if (cents !== null && cents > 0 && !Number.isNaN(payoff.on.getTime())) {
+      events.push({ id: payoff.id ?? null, on: payoff.on, cents, quote: false });
+    }
+  }
+  if (quoteOn) events.push({ id: null, on: quoteOn, cents: 0, quote: true });
+  return events.sort((a, b) => utcDay(a.on) - utcDay(b.on));
+}
+
+/**
+ * The weight of one piece of a period a payoff splits. On daily bases it is the days, as for a
+ * lump sum. On monthly rests it is per diem on actual/365 (12 × days over the 4380 denominator),
+ * as a lender's payoff figure counts the days since the last posting, so a payoff for exactly the
+ * quoted amount clears the loan.
+ */
+function splitWeight(from: Date, to: Date, basis: AccrualBasis): number {
+  return basis === 'monthly'
+    ? 12 * Math.max(0, daysBetween(from, to))
+    : Math.max(0, daysBetween(from, to, basis));
+}
+
+function splitFraction(from: Date, to: Date, annualRatePercent: number, basis: AccrualBasis) {
+  return interestFraction(from, to, annualRatePercent, dayCountOf(basis));
+}
+
+/** What `payoffQuote` asks of a run: the balance and interest owed on its day, and since when. */
+type QuotedPosting = { principalCents: number; interestCents: number; since: Date };
 
 /**
  * Walks the schedule at a fixed payment, in integer cents. The order inside a period is the order a
@@ -460,16 +544,23 @@ export type Amortisation = {
  *
  * 1. A lump sum credits on the day it arrives (daily-accrual bases only), so the rest of the period
  *    accrues on the smaller balance.
- * 2. Interest posts, rounded to the cent once per period even if a lump sum split it.
- * 3. The contract payment (or the person's changed payment for that date) covers that interest
+ * 2. A payoff posts the interest built up since the last payment or payoff, rounded to the cent,
+ *    then pays that interest first and the rest off principal. What it leaves of that interest is
+ *    paid by the next payment, before its own. One that clears the balance ends the schedule.
+ * 3. Interest posts, rounded to the cent once per period even if a lump sum split it.
+ * 4. The contract payment (or the person's changed payment for that date) covers that interest
  *    first and the rest reduces principal. A level payment smaller than the interest leaves the
  *    shortfall on the balance, which is what `solvePayment`'s recursion assumes.
- * 4. Any recurring overpayment then comes off principal.
+ * 5. Any recurring overpayment then comes off principal.
  *
- * Under 'monthly' rests a lump sum applies at the due date of the period it falls in. The balance
- * never goes below zero: an overshooting payment is trimmed to what is owed.
+ * A payoff dated on a due date posts after that day's payment. Under 'monthly' rests a lump sum
+ * applies at the due date of the period it falls in. The balance never goes below zero: an
+ * overshooting payment is trimmed to what is owed.
+ *
+ * `quoteOn` adds a payoff of whatever is owed that day, after any paid that day, and returns it as
+ * `quote` (null when the loan is already paid off by then).
  */
-function runSchedule(terms: LoanTerms, payment: number) {
+function runSchedule(terms: LoanTerms, payment: number, quoteOn?: Date) {
   const basis = terms.basis ?? 'actual/365';
   const funded = fundingOf(terms);
   const dates = dueDatesOf(terms);
@@ -483,6 +574,7 @@ function runSchedule(terms: LoanTerms, payment: number) {
     .map((lump) => ({ on: lump.on, cents: Math.max(0, toCents(lump.amount)) }))
     .filter((lump) => lump.cents > 0)
     .sort((a, b) => utcDay(a.on) - utcDay(b.on));
+  const payoffs = payoffEvents(terms.payoffs, quoteOn);
 
   // The last payment on or before the statement date is where the real balance takes over.
   const anchor = terms.statement;
@@ -491,8 +583,12 @@ function runSchedule(terms: LoanTerms, payment: number) {
     : -1;
 
   const rows: ScheduleRow[] = [];
+  const postings: PayoffPosting[] = [];
+  let quote: QuotedPosting | null = null;
   let balanceCents = toCents(terms.principal);
   let previous = funded;
+  let nextPayoff = 0;
+  let cleared = false;
 
   for (let index = 0; index < dates.length; index += 1) {
     const due = dates[index];
@@ -505,29 +601,85 @@ function runSchedule(terms: LoanTerms, payment: number) {
         : utcDay(lump.on) > utcDay(previous) && utcDay(lump.on) <= utcDay(due),
     );
 
+    // Payoffs before this due date; those dated on the last one come after its payment.
+    const payoffsInPeriod: PayoffEvent[] = [];
+    while (nextPayoff < payoffs.length && utcDay(payoffs[nextPayoff].on) < utcDay(due)) {
+      payoffsInPeriod.push(payoffs[nextPayoff]);
+      nextPayoff += 1;
+    }
+
     let creditedCents = 0;
     // One form per loan: exact when the rate has an exact form, floating point when it has not.
     let interest = 0;
     let weighted = BIG_ZERO;
     let cursor = previous;
     let split = false;
+    // Interest a payoff posted but did not cover; the next payment pays it first.
+    let carriedCents = 0;
+    let postedOn = previous;
 
-    if (creditsOnTheDay) {
-      for (const lump of inPeriod) {
-        const at = utcDay(lump.on) < utcDay(previous) ? previous : lump.on;
-        if (rate !== null) {
-          weighted += BigInt(balanceCents) * BigInt(shareWeight(cursor, at, basis, false));
-        } else {
-          interest +=
-            fromCents(balanceCents) * interestFraction(cursor, at, terms.annualRatePercent, basis);
-        }
-        const applied = Math.min(lump.cents, balanceCents);
+    const events: ({ on: Date; cents: number } | PayoffEvent)[] = creditsOnTheDay
+      ? [...inPeriod]
+      : [];
+    if (payoffsInPeriod.length > 0) {
+      // Stable, so a lump sum paid the same day as a payoff credits first.
+      events.push(...payoffsInPeriod);
+      events.sort((a, b) => utcDay(a.on) - utcDay(b.on));
+    }
+
+    for (const event of events) {
+      const at = utcDay(event.on) < utcDay(previous) ? previous : event.on;
+      if (rate !== null) {
+        weighted += BigInt(balanceCents) * BigInt(splitWeight(cursor, at, basis));
+      } else {
+        interest +=
+          fromCents(balanceCents) * splitFraction(cursor, at, terms.annualRatePercent, basis);
+      }
+      cursor = at;
+      split = true;
+
+      if (!('quote' in event)) {
+        const applied = Math.min(event.cents, balanceCents);
         balanceCents -= applied;
         creditedCents += applied;
-        cursor = at;
-        split = true;
+        continue;
+      }
+
+      const owedInterestCents =
+        carriedCents + (rate !== null ? postExact(weighted, rate, basis) : toCents(interest));
+      weighted = BIG_ZERO;
+      interest = 0;
+
+      if (event.quote) {
+        quote = { principalCents: balanceCents, interestCents: owedInterestCents, since: postedOn };
+        balanceCents = 0;
+        carriedCents = 0;
+        cleared = true;
+        break;
+      }
+
+      const interestPaidCents = Math.min(event.cents, owedInterestCents);
+      const principalPaidCents = Math.min(event.cents - interestPaidCents, balanceCents);
+      carriedCents = owedInterestCents - interestPaidCents;
+      balanceCents -= principalPaidCents;
+      postedOn = at;
+      postings.push({
+        id: event.id,
+        on: isoOf(event.on),
+        amount: fromCents(event.cents),
+        interest: fromCents(interestPaidCents),
+        principal: fromCents(principalPaidCents),
+        balance: fromCents(balanceCents),
+        full: balanceCents <= 0,
+        afterPayments: rows.length,
+      });
+      if (balanceCents <= 0) {
+        cleared = true;
+        break;
       }
     }
+
+    if (cleared) break;
 
     // An unsplit period is charged as one scheduled period; the tail of a split one is a span of days.
     if (rate !== null) {
@@ -535,17 +687,18 @@ function runSchedule(terms: LoanTerms, payment: number) {
         BigInt(balanceCents) *
         BigInt(
           split
-            ? shareWeight(cursor, due, basis, false)
+            ? splitWeight(cursor, due, basis)
             : shareWeight(previous, due, basis, basis === 'monthly' && index > 0),
         );
     } else {
       interest +=
         fromCents(balanceCents) *
         (split
-          ? interestFraction(cursor, due, terms.annualRatePercent, basis)
+          ? splitFraction(cursor, due, terms.annualRatePercent, basis)
           : scheduledFraction(previous, due, terms.annualRatePercent, basis, index === 0));
     }
-    const interestCents = rate !== null ? postExact(weighted, rate, basis) : toCents(interest);
+    const interestCents =
+      carriedCents + (rate !== null ? postExact(weighted, rate, basis) : toCents(interest));
 
     if (!creditsOnTheDay) {
       for (const lump of inPeriod) {
@@ -576,12 +729,13 @@ function runSchedule(terms: LoanTerms, payment: number) {
     const offBalanceCents = principalCents + extraCents + creditedCents;
     const paidCents = offBalanceCents + interestCents;
 
-    // Snap to what the lender says is owed, then carry on from there.
+    // Snap to what the lender says is owed, then carry on from there. A payoff before it is
+    // already in the lender's figure.
     if (anchor && index === anchorIndex) balanceCents = toCents(anchor.principal);
 
     rows.push({
       number: index + 1,
-      date: `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, '0')}-${String(due.getDate()).padStart(2, '0')}`,
+      date: isoOf(due),
       days,
       payment: fromCents(paidCents),
       interest: fromCents(interestCents),
@@ -599,7 +753,14 @@ function runSchedule(terms: LoanTerms, payment: number) {
     if (balanceCents <= 0) break;
   }
 
-  return { rows, basis, fundedOn: funded, shortfallCents: balanceCents };
+  return {
+    rows,
+    basis,
+    fundedOn: funded,
+    shortfallCents: balanceCents,
+    payoffs: postings,
+    quote,
+  };
 }
 
 /**
@@ -645,7 +806,13 @@ export function solvePayment(terms: Omit<LoanTerms, 'payment'>): number {
   const rounded = toCents((terms.principal * carried) / sum);
   if (sum <= rounded) return fromCents(rounded);
 
-  const plain = { ...terms, extra: undefined, statement: undefined, paymentOverrides: undefined };
+  const plain = {
+    ...terms,
+    extra: undefined,
+    statement: undefined,
+    paymentOverrides: undefined,
+    payoffs: undefined,
+  };
   const { rows } = runSchedule(plain, fromCents(rounded));
   if (toCents(rows[rows.length - 1].payment) <= 2 * rounded) return fromCents(rounded);
   // One cent up always suffices: it is at least half a cent above the exact payment, and that half
@@ -665,25 +832,35 @@ export function amortise(terms: LoanTerms): Amortisation {
       basis: terms.basis ?? 'actual/365',
       fundedOn: fundingOf(terms),
       payoffOn: null,
+      payoffs: [],
     };
   }
 
   const payment = terms.payment ?? solvePayment(terms);
-  const { rows, basis, fundedOn } = runSchedule(terms, payment);
+  const { rows, basis, fundedOn, payoffs } = runSchedule(terms, payment);
 
-  const totalPaidCents = rows.reduce((sum, row) => sum + toCents(row.payment), 0);
-  const totalInterestCents = rows.reduce((sum, row) => sum + toCents(row.interest), 0);
+  let totalPaidCents = rows.reduce((sum, row) => sum + toCents(row.payment), 0);
+  let totalInterestCents = rows.reduce((sum, row) => sum + toCents(row.interest), 0);
+  for (const payoff of payoffs) {
+    totalPaidCents += toCents(payoff.interest) + toCents(payoff.principal);
+    totalInterestCents += toCents(payoff.interest);
+  }
+
+  const last = rows[rows.length - 1];
+  const cleared = payoffs.find((payoff) => payoff.full);
 
   return {
     payment,
-    finalPayment: rows[rows.length - 1].payment,
+    // A payoff before the first payment leaves no rows.
+    finalPayment: last ? last.payment : 0,
     rows,
     totalPaid: fromCents(totalPaidCents),
     totalInterest: fromCents(totalInterestCents),
     interestShare: totalPaidCents > 0 ? totalInterestCents / totalPaidCents : 0,
     basis,
     fundedOn,
-    payoffOn: rows[rows.length - 1].date,
+    payoffOn: cleared ? cleared.on : last ? last.date : null,
+    payoffs,
   };
 }
 
@@ -724,6 +901,8 @@ export type PayoffQuote = {
   /** What it would take to close the loan today. */
   payoff: number;
   daysAccrued: number;
+  /** When `accruedInterest` started running: the last payment or payoff, or the funding date. */
+  accruedSince: Date;
   lastPaymentOn: Date | null;
   nextPaymentOn: Date | null;
   nextPaymentAmount: number;
@@ -738,43 +917,60 @@ export type PayoffQuote = {
 /**
  * What the lender's app shows on any given day. A payoff is not the schedule balance: it also
  * includes the interest running since the last payment posted (14 days into a period on $28.7k at
- * 8.14% is $89.60 not yet billed).
+ * 8.14% is $89.60 not yet billed). `payoff` is exactly what clears the loan that day, after any
+ * payment or payoff dated that day: the engine posts it as a payoff of that amount, so the two can
+ * never disagree. `asOf` is a date or a yyyy-mm-dd.
  */
-export function payoffQuote(terms: LoanTerms, asOf: Date): PayoffQuote {
+export function payoffQuote(terms: LoanTerms, asOf: Date | string): PayoffQuote {
+  const day = typeof asOf === 'string' ? fromIsoDate(asOf) : asOf;
   const schedule = amortise(terms);
   // A payoff is for one particular day, so even a monthly-rest loan is quoted with per diem interest
   // from the last posting, as a servicer's payoff letter does.
   const basis = dayCountOf(schedule.basis);
-  const asOfDay = utcDay(asOf);
+  const asOfDay = utcDay(day);
 
-  const paid = schedule.rows.filter((row) => utcDay(new Date(`${row.date}T00:00:00`)) <= asOfDay);
-  const upcoming = schedule.rows.filter(
-    (row) => utcDay(new Date(`${row.date}T00:00:00`)) > asOfDay,
+  const paid = schedule.rows.filter((row) => utcDay(fromIsoDate(row.date)) <= asOfDay);
+  const upcoming = schedule.rows.filter((row) => utcDay(fromIsoDate(row.date)) > asOfDay);
+  const payoffsPaid = schedule.payoffs.filter(
+    (payoff) => utcDay(fromIsoDate(payoff.on)) <= asOfDay,
   );
 
   const last = paid[paid.length - 1] ?? null;
   const next = upcoming[0] ?? null;
+  const priced = schedule.rows.length > 0 || schedule.payoffs.length > 0;
 
-  const principal = last ? last.balance : terms.principal;
-  const since = last ? new Date(`${last.date}T00:00:00`) : schedule.fundedOn;
-  const daysAccrued = Math.max(0, daysBetween(since, asOf, basis));
-  const accrued = accruedInterest(principal, terms.annualRatePercent, daysAccrued, basis);
+  const quoted =
+    priced && !Number.isNaN(asOfDay) ? runSchedule(terms, schedule.payment, day).quote : null;
 
-  const year = asOf.getFullYear();
+  // Without a quote the loan is paid off by then (or there is nothing to price): what is left is
+  // nothing, and the days run from its last posting.
+  const lastPayoff = payoffsPaid[payoffsPaid.length - 1];
+  const lastPosted =
+    lastPayoff && (!last || lastPayoff.afterPayments >= last.number) ? lastPayoff.on : last?.date;
+  const principalCents = quoted ? quoted.principalCents : priced ? 0 : toCents(terms.principal);
+  const accruedCents = quoted ? quoted.interestCents : 0;
+  const since = quoted ? quoted.since : lastPosted ? fromIsoDate(lastPosted) : schedule.fundedOn;
+  const daysAccrued = Math.max(0, daysBetween(since, day, basis));
+
+  const year = day.getFullYear();
   const interestIn = (target: number) =>
     fromCents(
       paid
         .filter((row) => Number(row.date.slice(0, 4)) === target)
-        .reduce((sum, row) => sum + toCents(row.interest), 0),
+        .reduce((sum, row) => sum + toCents(row.interest), 0) +
+        payoffsPaid
+          .filter((payoff) => Number(payoff.on.slice(0, 4)) === target)
+          .reduce((sum, payoff) => sum + toCents(payoff.interest), 0),
     );
 
   return {
-    principal,
-    accruedInterest: accrued,
-    payoff: roundMoney(principal + accrued),
+    principal: fromCents(principalCents),
+    accruedInterest: fromCents(accruedCents),
+    payoff: fromCents(principalCents + accruedCents),
     daysAccrued,
-    lastPaymentOn: last ? new Date(`${last.date}T00:00:00`) : null,
-    nextPaymentOn: next ? new Date(`${next.date}T00:00:00`) : null,
+    accruedSince: since,
+    lastPaymentOn: last ? fromIsoDate(last.date) : null,
+    nextPaymentOn: next ? fromIsoDate(next.date) : null,
     nextPaymentAmount: next ? next.payment : 0,
     interestPaidThisYear: interestIn(year),
     interestPaidLastYear: interestIn(year - 1),
@@ -865,21 +1061,38 @@ export function amortisationSchedule(
   }).rows;
 }
 
-export function scheduleByYear(rows: ScheduleRow[]) {
-  const years = new Map<string, ScheduleRow[]>();
-  for (const row of rows) {
-    const year = row.date.slice(0, 4);
-    const bucket = years.get(year);
-    if (bucket) bucket.push(row);
-    else years.set(year, [row]);
-  }
+/**
+ * Payments by year, with each year's interest and principal. Payoffs count in the year they were
+ * paid, interest built up the year before included, so the years add up to the schedule's totals.
+ */
+export function scheduleByYear(rows: ScheduleRow[], payoffs: readonly PayoffPosting[] = []) {
+  const years = new Map<string, { payments: ScheduleRow[]; payoffs: PayoffPosting[] }>();
+  const yearOf = (year: string) => {
+    let entry = years.get(year);
+    if (!entry) {
+      entry = { payments: [], payoffs: [] };
+      years.set(year, entry);
+    }
+    return entry;
+  };
+  for (const row of rows) yearOf(row.date.slice(0, 4)).payments.push(row);
+  for (const payoff of payoffs) yearOf(payoff.on.slice(0, 4)).payoffs.push(payoff);
 
-  return [...years.entries()].map(([year, payments]) => ({
-    year,
-    payments,
-    interest: fromCents(payments.reduce((sum, row) => sum + toCents(row.interest), 0)),
-    principal: fromCents(payments.reduce((sum, row) => sum + toCents(row.principal), 0)),
-  }));
+  return [...years.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([year, { payments, payoffs: paid }]) => ({
+      year,
+      payments,
+      payoffs: paid,
+      interest: fromCents(
+        payments.reduce((sum, row) => sum + toCents(row.interest), 0) +
+          paid.reduce((sum, payoff) => sum + toCents(payoff.interest), 0),
+      ),
+      principal: fromCents(
+        payments.reduce((sum, row) => sum + toCents(row.principal), 0) +
+          paid.reduce((sum, payoff) => sum + toCents(payoff.principal), 0),
+      ),
+    }));
 }
 
 /** A loan as the database holds it. Structural, so the data layer stays out of here. */
@@ -897,10 +1110,56 @@ export type StoredLoan = {
   payment_overrides?: unknown;
   /** 1–31, or null when payments follow the first payment's own day; optional as above. */
   payment_day?: number | null;
+  /** Its `loan_payoffs` rows, embedded; optional as above, and absent or null for none. */
+  payoffs?: readonly StoredPayoff[] | null;
 };
 
-/** A yyyy-mm-dd column as local midnight, not UTC — dates here have no time zone. */
-const fromIsoDate = (value: string) => new Date(`${value}T00:00:00`);
+/** A `loan_payoffs` row, as much of it as the schedule needs. */
+export type StoredPayoff = {
+  id: string;
+  /** yyyy-mm-dd */
+  paid_on: string;
+  /** numeric(14,2), which PostgREST may send as text. */
+  amount: number | string;
+  /** Orders payoffs paid the same day. */
+  created_at?: string | null;
+};
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Stored payoffs as the engine takes them, by date and then by when they were recorded, so the
+ * same day's payoffs post in the order they were made. Rows that are not a real day and a positive
+ * whole-cent amount are left out; nothing left is undefined.
+ */
+export function readStoredPayoffs(rows: unknown): LoanPayoff[] | undefined {
+  if (!Array.isArray(rows)) return undefined;
+  const read: (LoanPayoff & { recorded: string })[] = [];
+  for (const row of rows as Partial<Record<keyof StoredPayoff, unknown>>[]) {
+    if (!row || typeof row !== 'object') continue;
+    const { id, paid_on: paidOn, amount, created_at: createdAt } = row;
+    if (typeof paidOn !== 'string' || !ISO_DAY.test(paidOn)) continue;
+    const on = fromIsoDate(paidOn);
+    const cents =
+      typeof amount === 'number' || typeof amount === 'string' ? wholeCents(Number(amount)) : null;
+    if (Number.isNaN(on.getTime()) || isoOf(on) !== paidOn || cents === null || cents <= 0)
+      continue;
+    read.push({
+      ...(typeof id === 'string' ? { id } : {}),
+      on,
+      amount: fromCents(cents),
+      recorded: typeof createdAt === 'string' ? createdAt : '',
+    });
+  }
+  read.sort(
+    (a, b) =>
+      utcDay(a.on) - utcDay(b.on) ||
+      (a.recorded < b.recorded ? -1 : a.recorded > b.recorded ? 1 : 0) ||
+      ((a.id ?? '') < (b.id ?? '') ? -1 : (a.id ?? '') > (b.id ?? '') ? 1 : 0),
+  );
+  const payoffs = read.map(({ recorded: _recorded, ...payoff }) => payoff);
+  return payoffs.length > 0 ? payoffs : undefined;
+}
 
 /**
  * Terms for a loan already on file. The stored monthly payment is passed through as the contract
@@ -925,5 +1184,6 @@ export function termsFromStored(loan: StoredLoan, fallbackFirstPayment?: string)
         ? { on: fromIsoDate(loan.statement_on), principal: loan.statement_principal }
         : undefined,
     paymentOverrides: readPaymentOverrides(loan.payment_overrides),
+    payoffs: readStoredPayoffs(loan.payoffs),
   };
 }

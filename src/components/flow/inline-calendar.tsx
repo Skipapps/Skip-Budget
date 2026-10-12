@@ -29,12 +29,22 @@ type DayGridProps = {
   today?: Date | null;
   /** Earliest day that can be chosen; earlier days are dimmed and cannot be pressed. */
   minDate?: Date | null;
+  /** Latest day that can be chosen; later days are dimmed the same way. */
+  maxDate?: Date | null;
   compact?: boolean;
 };
 
 /** Midnight, so a time of day cannot decide a day comparison. */
 function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+/** Before the first day that can be chosen, or after the last. */
+function outside(date: Date, minDate: Date | null, maxDate: Date | null): boolean {
+  const day = startOfDay(date);
+  return (
+    (minDate ? day < startOfDay(minDate) : false) || (maxDate ? day > startOfDay(maxDate) : false)
+  );
 }
 
 /** The month's days, Sunday-first. Shared by the inline step and the date-picker modal. */
@@ -45,6 +55,7 @@ export function DayGrid({
   onSelectDay,
   today = null,
   minDate = null,
+  maxDate = null,
   compact = false,
 }: DayGridProps) {
   const daysInMonth = getDaysInMonth(year, month);
@@ -69,7 +80,7 @@ export function DayGrid({
         const date = new Date(year, month, dayNumber);
         const selected = dayNumber === selectedDay;
         const isToday = today ? isSameDay(date, today) : false;
-        const blocked = minDate ? startOfDay(date) < startOfDay(minDate) : false;
+        const blocked = outside(date, minDate, maxDate);
         const spoken = t('ui.calendar.day', {
           weekday: weekdayLong(date.getDay()),
           day: dayNumber,
@@ -130,6 +141,8 @@ type InlineCalendarProps = {
   onChange: (date: Date) => void;
   /** Earliest day that can be chosen, handed to the grid. */
   minDate?: Date | null;
+  /** Latest day that can be chosen, handed to the grid. */
+  maxDate?: Date | null;
 };
 
 /**
@@ -137,14 +150,19 @@ type InlineCalendarProps = {
  *
  * Paging is chevrons only: a swipeable grid inside a scrolling page fights the scroll.
  */
-export function InlineCalendar({ value, onChange, minDate = null }: InlineCalendarProps) {
+export function InlineCalendar({
+  value,
+  onChange,
+  minDate = null,
+  maxDate = null,
+}: InlineCalendarProps) {
   const colors = useColors();
   const opensOn = value ?? new Date();
   const [month, setMonth] = useState(opensOn.getMonth());
   const [year, setYear] = useState(opensOn.getFullYear());
   const [pickingMonth, setPickingMonth] = useState(false);
   const today = new Date();
-  const todayBlocked = minDate ? startOfDay(today) < startOfDay(minDate) : false;
+  const todayBlocked = outside(today, minDate, maxDate);
 
   const selectedDay =
     value && value.getFullYear() === year && value.getMonth() === month ? value.getDate() : null;
@@ -270,12 +288,13 @@ export function InlineCalendar({ value, onChange, minDate = null }: InlineCalend
             selectedDay={selectedDay}
             today={today}
             minDate={minDate}
+            maxDate={maxDate}
             onSelectDay={(day) => onChange(new Date(year, month, day))}
           />
         </View>
       )}
 
-      {/* Hidden when today is below the floor: it would pick a day the grid greys out. */}
+      {/* Hidden when today is outside the limits: it would pick a day the grid greys out. */}
       {todayBlocked ? null : (
         <View className="mt-4 w-full flex-row justify-end">
           <ActionPill

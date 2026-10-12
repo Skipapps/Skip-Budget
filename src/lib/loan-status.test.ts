@@ -586,3 +586,94 @@ describe('the page totals', () => {
     expect(summary.rateRange).toEqual({ min: 0, max: 7.5 });
   });
 });
+
+describe('a loan with payoffs (the v2 car loan on daily interest)', () => {
+  const CAR_27: LoanTerms = {
+    principal: 18_000,
+    annualRatePercent: 6.25,
+    months: 48,
+    fundedOn: new Date(2024, 11, 27),
+    firstPaymentOn: new Date(2025, 0, 27),
+    payment: 424.8,
+  };
+  const withPayoffs = (...payoffs: [string, number][]): LoanTerms => ({
+    ...CAR_27,
+    payoffs: payoffs.map(([on, amount]) => ({ on: new Date(`${on}T00:00:00`), amount })),
+  });
+
+  it('a partial counts on its day: less left, fewer payments, the same monthly payment', () => {
+    const partial = withPayoffs(['2026-10-12', 2000]);
+    expect(loanStatus(partial, '2026-10-11')).toMatchObject({
+      amountLeft: 10_673.67,
+      paymentsMade: 21,
+      paymentsLeft: 22,
+      paymentCount: 43,
+    });
+    expect(loanStatus(partial, '2026-10-12')).toEqual({
+      borrowed: 18_000,
+      annualRate: 6.25,
+      startedOn: '2024-12-27',
+      monthlyPayment: 424.8,
+      paymentCount: 43,
+      paymentsMade: 21,
+      paymentsLeft: 22,
+      amountLeft: 8_701.09,
+      // 9,298.91 of 18,000 is 51.66%.
+      percentPaid: 52,
+      nextPayment: { number: 22, date: '2026-10-27', amount: 424.8 },
+      lastPaymentOn: '2028-07-27',
+      paidOff: false,
+    });
+    expect(loanStatus(partial, '2026-10-27')).toMatchObject({
+      amountLeft: 8_298.64,
+      paymentsMade: 22,
+    });
+  });
+
+  it('a partial on a payment day counts after that payment', () => {
+    const onPaymentDay = withPayoffs(['2026-09-27', 2000]);
+    expect(loanStatus(onPaymentDay, '2026-09-27')).toMatchObject({
+      paymentsMade: 21,
+      amountLeft: 8_673.67,
+    });
+  });
+
+  it('a partial before the first payment counts before it is made', () => {
+    const early = withPayoffs(['2025-01-10', 3000]);
+    expect(loanStatus(early, '2025-01-10')).toMatchObject({
+      paymentsMade: 0,
+      amountLeft: 15_043.15,
+      nextPayment: { number: 1, date: '2025-01-27', amount: 424.8 },
+      paymentCount: 40,
+    });
+  });
+
+  it('a full payoff finishes the loan on its day, not before', () => {
+    const full = withPayoffs(['2026-10-12', 10_701.09]);
+    expect(loanStatus(full, '2026-10-12')).toMatchObject({
+      paidOff: true,
+      amountLeft: 0,
+      percentPaid: 100,
+      paymentsLeft: 0,
+      nextPayment: null,
+      lastPaymentOn: '2026-10-12',
+    });
+    expect(loanStatus(full, '2026-10-11')).toMatchObject({ paidOff: false, amountLeft: 10_673.67 });
+  });
+
+  it('leaves the totals once paid off by a payoff', () => {
+    const full = { status: loanStatus(withPayoffs(['2026-10-12', 10_701.09]), '2026-10-12') };
+    const partial = { status: loanStatus(withPayoffs(['2026-10-12', 2000]), '2026-10-12') };
+    expect(loansSummary([full, partial])).toMatchObject({
+      openCount: 1,
+      totalOwed: 8_701.09,
+      monthlyPayments: 424.8,
+    });
+  });
+
+  it('is unchanged by an empty list of payoffs', () => {
+    for (const day of ['2024-12-01', '2026-10-12', '2026-10-27', '2029-01-01']) {
+      expect(loanStatus(withPayoffs(), day)).toEqual(loanStatus(CAR_27, day));
+    }
+  });
+});

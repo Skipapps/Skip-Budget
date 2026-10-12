@@ -5,7 +5,8 @@ import { join } from 'node:path';
  * What the migrations leave for loans, read from the files in the order the CLI applies them:
  * save_loan's live signature (and that its grants name that signature, or a dropped function's
  * grants are lost), the changed-payments column and its check, the rate's precision, the payment
- * day, the "counts toward spending" flag in the recorder and the reminders, and update_loan.
+ * day, the "counts toward spending" flag in the recorder and the reminders, update_loan, and loan
+ * payoffs.
  */
 
 const DIR = join(__dirname, '../../../supabase/migrations');
@@ -228,7 +229,8 @@ describe('update_loan after every migration', () => {
   const body = () => liveFunction('update_loan').body.replace(/\s+/g, ' ');
 
   it('takes the bill it edits and the whole contract, the optional four last', () => {
-    expect(live.file).toBe('20261012100002_update_loan.sql');
+    // Recreated by the payoffs migration, with the same signature.
+    expect(live.file).toBe('20261012100003_loan_payoffs.sql');
     expect(live.types).toEqual([
       'uuid',
       'text',
@@ -294,5 +296,77 @@ describe('update_loan after every migration', () => {
   it('leaves save_loan as migration A made it', () => {
     expect(liveSaveLoan().file).toBe('20261012100001_loan_add_flow.sql');
     expect(sql('20261012100002_update_loan.sql')).not.toMatch(/function public\.save_loan/i);
+  });
+});
+
+/** A function's text in one file, comments out, whitespace as single spaces. */
+function functionIn(file: string, name: string): string {
+  const text = sql(file);
+  const start = text.search(new RegExp(`create (?:or replace )?function public\\.${name}\\(`, 'i'));
+  if (start < 0) throw new Error(`${name} is not in ${file}`);
+  const open = text.indexOf('$$', start);
+  return text.slice(start, text.indexOf('$$', open + 2) + 2).replace(/\s+/g, ' ');
+}
+
+describe('loan payoffs after every migration', () => {
+  const FILE = '20261012100003_loan_payoffs.sql';
+  const text = () => sql(FILE).replace(/\s+/g, ' ');
+
+  it('keeps payoffs in their own table, each person to their own rows, gone with their loan', () => {
+    expect(text()).toContain('create table if not exists public.loan_payoffs (');
+    expect(text()).toContain(
+      'bill_id uuid not null references public.loans (bill_id) on delete cascade',
+    );
+    expect(text()).toContain('amount numeric(14,2) not null check (amount > 0)');
+    expect(text()).toContain("kind text not null check (kind in ('full', 'partial'))");
+    expect(text()).toContain('alter table public.loan_payoffs enable row level security;');
+    expect(text()).toContain(
+      'create policy "loan_payoffs_all_own" on public.loan_payoffs for all using (auth.uid() = user_id) with check (auth.uid() = user_id);',
+    );
+    expect(text()).toContain(
+      "create unique index if not exists loan_payoffs_one_full on public.loan_payoffs (bill_id) where kind = 'full';",
+    );
+    expect(text()).toContain('alter publication supabase_realtime add table public.loan_payoffs;');
+  });
+
+  it.each([
+    ['record_loan_payoff', ['uuid', 'date', 'numeric', 'text', 'uuid', 'uuid', 'date', 'date']],
+    ['delete_loan_payoff', ['uuid', 'date']],
+  ])('%s runs as the caller, for signed-in callers only, by its own signature', (name, types) => {
+    const live = liveSignature(name);
+    expect(live.file).toBe(FILE);
+    expect(live.types).toEqual(types);
+    expect(functionIn(FILE, name)).toContain('security invoker set search_path = public');
+    expect(functionIn(FILE, name)).not.toContain('security definer');
+    const signature = types.join(', ');
+    expect(text()).toContain(
+      `revoke all on function public.${name}(${signature}) from public, anon;`,
+    );
+    expect(text()).toContain(
+      `grant execute on function public.${name}(${signature}) to authenticated;`,
+    );
+  });
+
+  it('lets a full payoff take its payment day, never a day before a payment made', () => {
+    const record = functionIn(FILE, 'record_loan_payoff');
+    expect(record).toContain(
+      'select 1 from public.charges where bill_id = p_bill_id and charged_on > p_paid_on',
+    );
+    expect(record).toContain(
+      'select 1 from public.loan_payoffs where bill_id = p_bill_id and paid_on > p_paid_on',
+    );
+    expect(record).toContain(
+      "raise exception 'a full payoff must come after the last payment made'",
+    );
+  });
+
+  it('changes update_loan only by keeping a paid-off loan ended', () => {
+    const before = functionIn('20261012100002_update_loan.sql', 'update_loan');
+    const after = functionIn(FILE, 'update_loan');
+    const block =
+      / select p\.paid_on into v_paid_off_on [\s\S]*? v_next_due_on := null; end if; end if;/;
+    expect(after).toMatch(block);
+    expect(after.replace(' v_paid_off_on date;', '').replace(block, '')).toBe(before);
+    expect(after).toContain('v_ends_on := least(v_ends_on, v_paid_off_on);');
   });
 });

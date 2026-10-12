@@ -6,7 +6,9 @@ import { loanTermsOf, type LoanListRow } from '@/api/loans';
 import type { Language } from '@/i18n/config';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 import { formatCurrency } from '@/lib/format';
+import { payoffQuote } from '@/lib/loan-payoff';
 import { loanStatus } from '@/lib/loan-status';
+import { fromCents, toCents } from '@/lib/money';
 import { TEXT_CAP } from '@/theme/text-scale';
 
 /**
@@ -102,6 +104,7 @@ function loan(
     payment_overrides: null,
     created_at: '2026-09-09T10:00:00Z',
     billEnded: false,
+    payoffs: [],
     ...fields,
     bill: {
       id,
@@ -451,6 +454,55 @@ describe('finished loans', () => {
     const summary = within(screen.getByTestId('loans-summary'));
     expect(summary.getByText(formatCurrency(statusOf(PERSONAL).amountLeft))).toBeTruthy();
     expect(summary.getByText(formatCurrency(statusOf(PERSONAL).monthlyPayment))).toBeTruthy();
+  });
+});
+
+describe('payoffs', () => {
+  const paid = (id: string, paidOn: string, amount: number, kind: 'full' | 'partial') => ({
+    id,
+    bill_id: 'bill-car',
+    paid_on: paidOn,
+    amount,
+    kind,
+    card_id: null,
+    bank_account_id: null,
+    counted: true,
+    created_at: `${paidOn}T12:00:00Z`,
+    source: null,
+  });
+
+  it('reads a loan paid down by one with it, in its card and in the sums', async () => {
+    const paidDown = { ...CAR, payoffs: [paid('po-1', '2026-10-03', 2000, 'partial')] };
+    mockLoans = { loans: [paidDown, PERSONAL], isPending: false, isError: false };
+    await render(<LoansScreen />);
+    const car = statusOf(paidDown);
+    const personal = statusOf(PERSONAL);
+    // Less left than the same loan without it.
+    expect(car.amountLeft).toBeLessThan(statusOf(CAR).amountLeft);
+    expect(screen.getAllByText(formatCurrency(car.amountLeft)).length).toBeGreaterThan(0);
+    const summary = within(screen.getByTestId('loans-summary'));
+    expect(
+      summary.getByText(
+        formatCurrency(fromCents(toCents(car.amountLeft) + toCents(personal.amountLeft))),
+      ),
+    ).toBeTruthy();
+  });
+
+  it('lists a loan one cleared as paid off on that day, out of the sums', async () => {
+    const all = payoffQuote(loanTermsOf(CAR)!, TODAY).payoff;
+    const cleared = loan(
+      'bill-car',
+      'Car loan',
+      'loan-car',
+      { ...CAR, payoffs: [paid('po-2', TODAY, all, 'full')] },
+      { ends_on: TODAY },
+    );
+    mockLoans = { loans: [cleared, PERSONAL], isPending: false, isError: false };
+    await render(<LoansScreen />);
+    expect(screen.getByText('Paid off on 12 Oct 2026')).toBeTruthy();
+    const summary = within(screen.getByTestId('loans-summary'));
+    expect(summary.getByText(formatCurrency(statusOf(PERSONAL).amountLeft))).toBeTruthy();
+    expect(summary.getByText('1 loan')).toBeTruthy();
   });
 });
 

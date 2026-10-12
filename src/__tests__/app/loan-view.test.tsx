@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 
 import LoanScreen from '@/app/loan/[id]';
 import type { LoanDetail, LoanDetailRead } from '@/api/loans';
@@ -7,6 +7,7 @@ import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 import { formatCurrency } from '@/lib/format';
 import { termsFromStored } from '@/lib/loan';
 import { loanStatus } from '@/lib/loan-status';
+import { withoutPayoff } from '@/lib/loan-payoff';
 import { loanHistory, loanScheduleParams, upcomingPayments } from '@/lib/loan-view';
 
 /**
@@ -24,7 +25,12 @@ jest.mock('react-native-safe-area-context', () => ({
   ...jest.requireActual('react-native-safe-area-context'),
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
+jest.mock('@/lib/haptics', () => ({
+  tap: jest.fn(),
+  selection: jest.fn(),
+  success: jest.fn(),
+  warn: jest.fn(),
+}));
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
@@ -93,6 +99,19 @@ let mockDetail: {
 };
 jest.mock('@/api/loans', () => ({ useLoanDetail: () => mockDetail }));
 
+const mockDeletePayoff = jest.fn(async (_input: unknown) => undefined);
+jest.mock('@/api/mutations', () => ({
+  useDeletePayoff: () => ({ mutateAsync: mockDeletePayoff, isPending: false }),
+}));
+const mockConfirm = jest.fn(async (_options: Record<string, unknown>) => true);
+const mockAsk = jest.fn(async (_request: Record<string, unknown>) => null);
+jest.mock('@/providers/dialog-provider', () => ({
+  useConfirm: () => mockConfirm,
+  useDialog: () => mockAsk,
+}));
+const mockToast = jest.fn();
+jest.mock('@/providers/toast-context', () => ({ useToast: () => mockToast }));
+
 function carLoan(
   bill: Partial<LoanDetail['bill']> = {},
   loan: Partial<Omit<LoanDetail, 'bill'>> = {},
@@ -114,6 +133,7 @@ function carLoan(
     payment_day: null,
     created_at: '2026-10-12T09:00:00Z',
     source: CHASE,
+    payoffs: [],
     ...loan,
     bill: {
       id: 'bill-car',
@@ -346,6 +366,198 @@ describe('the history', () => {
   });
 });
 
+const AMEX: PaymentSourceRow = {
+  id: 'card-amex',
+  label: 'Amex ••6334',
+  name: 'Amex',
+  last4: '6334',
+  color: '#4F7DBA',
+  kind: 'card',
+};
+
+/** A payoff as `useLoanDetail` reads it: the stored row with its own card or account. */
+function payoff(
+  id: string,
+  paidOn: string,
+  amount: number,
+  kind: 'full' | 'partial',
+  source: PaymentSourceRow | null,
+): LoanDetail['payoffs'][number] {
+  return {
+    id,
+    bill_id: 'bill-car',
+    paid_on: paidOn,
+    amount,
+    kind,
+    card_id: source?.kind === 'card' ? source.id : null,
+    bank_account_id: source?.kind === 'account' ? source.id : null,
+    counted: true,
+    created_at: `${paidOn}T12:00:00Z`,
+    source,
+  };
+}
+
+describe('payoffs', () => {
+  // $2,000 from the Amex on 3 Oct: interest since 27 Sep first, the rest off the balance.
+  const extra = payoff('po-1', '2026-10-03', 2000, 'partial', AMEX);
+
+  it('reads the loan with them: less left to pay and fewer payments left', async () => {
+    const loan = carLoan({}, { payoffs: [extra] });
+    showing(loan);
+    await render(<LoanScreen />);
+    const status = loanStatus(termsOf(loan), TODAY);
+    expect(status.amountLeft).toBe(8684.64);
+    expect(status.paymentsLeft).toBe(22);
+    const card = within(screen.getByTestId('loan-view-card'));
+    expect(card.getByText('$8,684.64')).toBeTruthy();
+    expect(card.getByText(`22 of ${status.paymentCount}`)).toBeTruthy();
+  });
+
+  it('lists one in History, newest first, from its own card, among the payments', async () => {
+    showing(carLoan({}, { payoffs: [extra] }));
+    await render(<LoanScreen />);
+    const row = within(screen.getByTestId('loan-history-payoff-po-1'));
+    expect(row.getByText('Extra payment')).toBeTruthy();
+    expect(row.getByText('3 Oct · Paid from Amex ••6334')).toBeTruthy();
+    expect(row.getByText('$2,000.00')).toBeTruthy();
+    // It came after the 27 Sep payment, so it is on top; two payments fill the three shown.
+    expect(screen.getByTestId('loan-history-21')).toBeTruthy();
+    expect(screen.getByTestId('loan-history-20')).toBeTruthy();
+    expect(screen.queryByTestId('loan-history-19')).toBeNull();
+  });
+
+  it('takes one back out after a confirm, putting the loan’s end back where it was', async () => {
+    showing(carLoan({}, { payoffs: [extra] }));
+    await render(<LoanScreen />);
+    await fireEvent.press(screen.getByTestId('loan-history-payoff-po-1'));
+    expect(mockConfirm).toHaveBeenCalledWith({
+      title: 'Remove this payment?',
+      message:
+        '$2,000.00 paid on 3 Oct 2026 comes off this loan, and its figures go back to how they were without it.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    expect(mockDeletePayoff).toHaveBeenCalledWith({
+      billId: 'bill-car',
+      payoffId: 'po-1',
+      // The schedule without it: the term's own last payment.
+      lastPaymentOn: '2028-12-27',
+    });
+    expect(mockToast).toHaveBeenCalledWith('toast.loan.paymentRemoved', 'deleted');
+  });
+
+  it('offers the same from a long press, and does nothing when the confirm is turned down', async () => {
+    mockConfirm.mockResolvedValueOnce(false);
+    showing(carLoan({}, { payoffs: [extra] }));
+    await render(<LoanScreen />);
+    await fireEvent(screen.getByTestId('loan-history-payoff-po-1'), 'longPress');
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(mockDeletePayoff).not.toHaveBeenCalled();
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it('says the one failure line when it cannot take it out, and keeps the row', async () => {
+    mockDeletePayoff.mockRejectedValueOnce(new Error('PGRST202'));
+    showing(carLoan({}, { payoffs: [extra] }));
+    await render(<LoanScreen />);
+    await fireEvent.press(screen.getByTestId('loan-history-payoff-po-1'));
+    expect(mockAsk).toHaveBeenCalledWith({ title: 'Something went wrong. Please try again.' });
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(screen.getByTestId('loan-history-payoff-po-1')).toBeTruthy();
+  });
+
+  it('shows a loan paid off by one as finished, with no Pay off, and taking it out restores the end', async () => {
+    const all = payoff('po-2', '2026-10-12', 10_701.09, 'full', null);
+    // Its bill ends the day it was paid off.
+    showing(carLoan({ ends_on: '2026-10-12' }, { payoffs: [all] }));
+    await render(<LoanScreen />);
+    const card = within(screen.getByTestId('loan-view-card'));
+    expect(card.getByText('Paid off on 12 Oct 2026')).toBeTruthy();
+    expect(card.getByText('$0.00')).toBeTruthy();
+    expect(card.getByText('100% paid off')).toBeTruthy();
+    expect(screen.getByText('No more payments on this loan.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Pay off' })).toBeNull();
+
+    const row = within(screen.getByTestId('loan-history-payoff-po-2'));
+    expect(row.getByText('Paid off')).toBeTruthy();
+    expect(row.getByText('12 Oct · No payment method')).toBeTruthy();
+    expect(row.getByText('$10,701.09')).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId('loan-history-payoff-po-2'));
+    expect(mockDeletePayoff).toHaveBeenCalledWith({
+      billId: 'bill-car',
+      payoffId: 'po-2',
+      lastPaymentOn: '2028-12-27',
+    });
+  });
+
+  it('leaves a bill stopped early stopped when one of its payoffs is taken out', async () => {
+    showing(carLoan({ next_due_on: null, ends_on: '2026-10-05' }, { payoffs: [extra] }));
+    await render(<LoanScreen />);
+    expect(screen.getByText(/^Stopped on 5 Oct 2026/)).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('loan-history-payoff-po-1'));
+    expect(mockDeletePayoff).toHaveBeenCalledWith({
+      billId: 'bill-car',
+      payoffId: 'po-1',
+      lastPaymentOn: null,
+    });
+  });
+
+  it('takes out only the latest; an earlier one says to take out the later first', async () => {
+    const later = payoff('po-3', '2026-10-10', 500, 'partial', CHASE);
+    const loan = carLoan({}, { payoffs: [extra, later] });
+    showing(loan);
+    await render(<LoanScreen />);
+
+    // The earlier one: told, in words, which to take out first; nothing asked, nothing removed.
+    const earlier = screen.getByTestId('loan-history-payoff-po-1');
+    expect(earlier.props.accessibilityHint).toBe('Remove the later payment first');
+    await fireEvent.press(earlier);
+    expect(mockAsk).toHaveBeenCalledWith({
+      title: 'Remove the later payment first',
+      message: 'Payments come off newest first. Remove the one on 10 Oct 2026, then this one.',
+    });
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockDeletePayoff).not.toHaveBeenCalled();
+
+    // The latest: confirmed, and the bill goes back to where the loan ends without it.
+    await fireEvent.press(screen.getByTestId('loan-history-payoff-po-3'));
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    const back = withoutPayoff(termsOf(loan), 'po-3')!.endsOn;
+    // The $2,000 that stays still ends the loan before its term's 27 Dec 2028.
+    expect(back! < '2028-12-27').toBe(true);
+    expect(mockDeletePayoff).toHaveBeenCalledWith({
+      billId: 'bill-car',
+      payoffId: 'po-3',
+      lastPaymentOn: back,
+    });
+  });
+
+  it('opens the whole schedule with its payoffs in it', async () => {
+    showing(carLoan({}, { payoffs: [extra] }));
+    await render(<LoanScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'See all, Payment schedule' }));
+    expect(mockPush.mock.calls[0][0].params.payoffs).toBe('[["2026-10-03",2000]]');
+  });
+
+  it('asks one removal at a time', async () => {
+    let answer: (ok: boolean) => void = () => {};
+    mockConfirm.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          answer = resolve;
+        }),
+    );
+    showing(carLoan({}, { payoffs: [extra] }));
+    await render(<LoanScreen />);
+    await fireEvent.press(screen.getByTestId('loan-history-payoff-po-1'));
+    await fireEvent.press(screen.getByTestId('loan-history-payoff-po-1'));
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    await act(async () => answer(true));
+    expect(mockDeletePayoff).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('a finished loan', () => {
   it('says when it was paid off and has nothing coming', async () => {
     mockToday = '2029-03-01';
@@ -391,10 +603,33 @@ describe('getting about', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Edit loan' }));
     const edit = { pathname: '/add-loan', params: { id: 'bill-car' } };
     expect(mockPush.mock.calls).toEqual([[edit], [edit]]);
-    // Edit loan is the footer's only action for now, outlined.
+  });
+
+  it('pins Pay off, in plum, over Edit loan, outlined, and opens the payoff for this loan', async () => {
+    await render(<LoanScreen />);
     const footer = within(screen.getByTestId('loan-view-footer'));
-    expect(footer.getAllByRole('button')).toHaveLength(1);
-    expect(footer.getByRole('button').props.className).toContain('border-control');
+    const [payOff, edit] = footer.getAllByRole('button');
+    expect(payOff.props.accessibilityLabel).toBe('Pay off');
+    expect(payOff.props.accessibilityHint).toBe('Pay all of this loan, or part of it.');
+    expect(payOff.props.className).toContain('bg-control');
+    expect(edit.props.accessibilityLabel).toBe('Edit loan');
+    expect(edit.props.className).toContain('border-control');
+
+    await fireEvent.press(payOff);
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/loan-payoff', params: { id: 'bill-car' } });
+  });
+
+  it('offers no Pay off on a finished loan, paid off or stopped', async () => {
+    mockToday = '2029-03-01';
+    const { unmount } = await render(<LoanScreen />);
+    expect(screen.queryByRole('button', { name: 'Pay off' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Edit loan' })).toBeTruthy();
+    await unmount();
+
+    mockToday = TODAY;
+    showing(carLoan({ next_due_on: null, ends_on: '2026-06-27' }));
+    await render(<LoanScreen />);
+    expect(screen.queryByRole('button', { name: 'Pay off' })).toBeNull();
   });
 
   it('waits while it reads', async () => {
@@ -448,6 +683,7 @@ describe('in other languages', () => {
     expect(screen.getByText('Historial')).toBeTruthy();
     expect(screen.getAllByText('Pagado desde Chase ••4821')).toHaveLength(3);
     expect(screen.getByRole('button', { name: 'Editar préstamo' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Pagar' })).toBeTruthy();
   });
 
   it('reads in French', async () => {
@@ -457,5 +693,6 @@ describe('in other languages', () => {
     expect(screen.getByText('27 sur 48')).toBeTruthy();
     expect(screen.getByText('Historique')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Modifier le prêt' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Rembourser' })).toBeTruthy();
   });
 });

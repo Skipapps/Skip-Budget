@@ -20,6 +20,8 @@ type DateBoxProps = {
   placeholder: string;
   /** Earlier days are dimmed and cannot be picked. */
   minDate?: Date | null;
+  /** Later days are dimmed and cannot be picked. */
+  maxDate?: Date | null;
   /** An optional day can be taken off again ("Clear — make it ongoing"). */
   clear?: { label: string; onPress: () => void };
   /** How the chosen day is written; by default "Yesterday, Tue Oct 6", with no year. */
@@ -37,6 +39,7 @@ export function DateBox({
   onChange,
   placeholder,
   minDate,
+  maxDate,
   clear,
   format,
 }: DateBoxProps) {
@@ -69,6 +72,7 @@ export function DateBox({
           <InlineCalendar
             value={value}
             minDate={minDate}
+            maxDate={maxDate}
             onChange={(day) => {
               onChange(day);
               setOpen(false);

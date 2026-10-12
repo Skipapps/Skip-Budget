@@ -84,6 +84,7 @@ const LEDGER_TABLES = [
   'salary_sources',
   'charges',
   'pay_received',
+  'loan_payoffs',
   'bank_accounts',
 ];
 
@@ -98,6 +99,7 @@ const SOURCE_TABLES = [
   'charges',
   'salary_sources',
   'pay_received',
+  'loan_payoffs',
 ];
 
 describe('useLedger', () => {

@@ -5,6 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 import { PaymentHeadline } from '@/components/calculators/payment-headline';
 import { problemNote, unusedNote } from '@/components/calculators/override-words';
 import { PaymentRow } from '@/components/calculators/payment-row';
+import { PayoffRow } from '@/components/calculators/payoff-row';
 import { loanRateText, loanTermText } from '@/components/calculators/schedule-card';
 import { SummaryGrid, type SummaryItem } from '@/components/calculators/summary-grid';
 import { Screen } from '@/components/ui/screen';
@@ -12,7 +13,12 @@ import { SectionHeading } from '@/components/ui/typography';
 import { percent, t } from '@/i18n';
 import { truthInLending } from '@/lib/apr';
 import { formatCurrency } from '@/lib/format';
-import { scheduleByYear, type AccrualBasis, type ScheduleRow } from '@/lib/loan';
+import {
+  scheduleByYear,
+  type AccrualBasis,
+  type PayoffPosting,
+  type ScheduleRow,
+} from '@/lib/loan';
 import { useLoanDraft } from '@/lib/loan-draft';
 import { scheduleWithOverrides } from '@/lib/loan-overrides';
 import { baseParams, readLoanRoute, termsFromRoute, type LoanRouteParams } from '@/lib/loan-route';
@@ -32,6 +38,60 @@ function basisFootnote(basis: AccrualBasis): string {
     case 'monthly':
       return t('loan.basisFootnote.monthly');
   }
+}
+
+type ScheduleLine =
+  { kind: 'payment'; row: ScheduleRow } | { kind: 'payoff'; posting: PayoffPosting };
+
+/**
+ * The years to draw, each with its payments up to `shown` and the payoffs among them, each right
+ * after the payment it came after. A payoff that comes after the last payment shown waits for Show
+ * all, so the list never skips one.
+ */
+function yearsShown(rows: ScheduleRow[], payoffs: readonly PayoffPosting[], shown: number) {
+  const byYear = new Map<string, ScheduleLine[]>();
+  const add = (year: string, line: ScheduleLine) => {
+    const lines = byYear.get(year);
+    if (lines) lines.push(line);
+    else byYear.set(year, [line]);
+  };
+  for (const row of rows) {
+    if (row.number <= shown) add(row.date.slice(0, 4), { kind: 'payment', row });
+  }
+  for (const posting of payoffs) {
+    if (posting.afterPayments < shown || shown === rows.length) {
+      add(posting.on.slice(0, 4), { kind: 'payoff', posting });
+    }
+  }
+  // Payment n before the payoffs made after it, and those before payment n + 1; the sort is stable,
+  // so payoffs on one day keep the order they posted in.
+  const place = (line: ScheduleLine) =>
+    line.kind === 'payment' ? line.row.number * 2 : line.posting.afterPayments * 2 + 1;
+  const totals = new Map(scheduleByYear(rows, payoffs).map((year) => [year.year, year]));
+  return [...byYear.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([year, lines]) => ({
+      year,
+      lines: lines.sort((a, b) => place(a) - place(b)),
+      totals: totals.get(year) ?? null,
+    }));
+}
+
+/**
+ * Under the year: its payments and the interest in the year. A year with no payment, only money
+ * paid off (the loan cleared before that year's first payment), names what was paid instead of
+ * counting none.
+ */
+function yearCaption(totals: ReturnType<typeof scheduleByYear>[number] | null): string | undefined {
+  if (!totals) return undefined;
+  const interest = formatCurrency(totals.interest);
+  if (totals.payments.length > 0) {
+    return t('loan.schedule.yearSummary', { count: totals.payments.length, interest });
+  }
+  if (totals.payoffs.some((payoff) => payoff.full)) {
+    return t('loanFlow.schedule.yearPaidOff', { interest });
+  }
+  return t('loanFlow.schedule.yearExtra', { count: totals.payoffs.length, interest });
 }
 
 /** Every payment and where it goes, grouped by year (a thirty-year loan is 360 rows). */
@@ -62,6 +122,7 @@ export default function LoanScheduleScreen() {
           extra: params.extra,
           lump: params.lump,
           lumpOn: params.lumpOn,
+          payoffs: params.payoffs,
         }),
         { withExtras: true },
       ),
@@ -77,6 +138,7 @@ export default function LoanScheduleScreen() {
       params.extra,
       params.lump,
       params.lumpOn,
+      params.payoffs,
     ],
   );
   const loan = useMemo(() => scheduleWithOverrides(terms, overrides), [terms, overrides]);
@@ -141,12 +203,7 @@ export default function LoanScheduleScreen() {
     : undefined;
 
   const shown = showAll ? rows.length : Math.min(rows.length, FIRST_ROWS);
-  const years = scheduleByYear(rows)
-    .map((year) => ({
-      ...year,
-      shown: year.payments.filter((row) => row.number <= shown),
-    }))
-    .filter((year) => year.shown.length > 0);
+  const years = yearsShown(rows, loan.payoffs, shown);
 
   return (
     <Screen title={route.name || t('loan.schedule.title')} showBack>
@@ -183,19 +240,26 @@ export default function LoanScheduleScreen() {
       {years.map((year) => (
         <View key={year.year} className="mt-8 w-full">
           {/* The year's own totals, whether or not all its rows are showing yet. */}
-          <SectionHeading
-            className="mb-3 px-1"
-            caption={t('loan.schedule.yearSummary', {
-              count: year.payments.length,
-              interest: formatCurrency(year.interest),
-            })}
-          >
+          <SectionHeading className="mb-3 px-1" caption={yearCaption(year.totals)}>
             {year.year}
           </SectionHeading>
           <View className="w-full overflow-hidden rounded-[20px] border border-line bg-card">
-            {year.shown.map((row, index) => (
-              <PaymentRow key={row.number} row={row} first={index === 0} onPress={openPayment} />
-            ))}
+            {year.lines.map((line, index) =>
+              line.kind === 'payment' ? (
+                <PaymentRow
+                  key={line.row.number}
+                  row={line.row}
+                  first={index === 0}
+                  onPress={openPayment}
+                />
+              ) : (
+                <PayoffRow
+                  key={`payoff-${line.posting.id ?? line.posting.on}-${index}`}
+                  posting={line.posting}
+                  first={index === 0}
+                />
+              ),
+            )}
           </View>
         </View>
       ))}

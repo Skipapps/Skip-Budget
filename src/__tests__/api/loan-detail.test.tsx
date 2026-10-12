@@ -6,10 +6,11 @@ import { loanTermsOf, readLoanDetail, useLoanDetail } from '@/api/loans';
 import { termsFromStored } from '@/lib/loan';
 
 /**
- * A loan's own page reads the loan, its bill and the bill's card or account in one request, from the
- * bill's side, so "this bill has no loan" and "this bill is gone" read differently. It still loads on
- * a database without the newer columns, and a failed read is never taken for a loan that is gone.
- * The error texts are the ones PostgREST v14.5 answered with on a copy without migration A.
+ * A loan's own page reads the loan with its payoffs, its bill and the bill's card or account in one
+ * request, from the bill's side, so "this bill has no loan" and "this bill is gone" read
+ * differently. It still loads on a database without the newer columns or without payoffs, and a
+ * failed read is never taken for a loan that is gone. The error texts are the ones PostgREST v14.5
+ * answered with on copies without migrations A and C.
  */
 
 type Failure = { code: string; message: string; details?: null; hint?: null };
@@ -21,6 +22,9 @@ let mockHasPaymentDay = true;
 /** Which missing column Postgres names first when both are missing. */
 let mockFirstMissing: 'payment_day' | 'in_spending' = 'payment_day';
 let mockFailure: Failure | null = null;
+
+let mockHasPayoffs = true;
+let mockPayoffs: Record<string, unknown>[] = [];
 
 jest.mock('@/lib/supabase', () => ({
   supabase: {
@@ -39,6 +43,21 @@ jest.mock('@/lib/supabase', () => ({
         maybeSingle: () => builder,
         then: (resolve: (value: unknown) => unknown) => {
           if (mockFailure) return resolve({ data: null, error: mockFailure });
+          const asksPayoffs = /\bloan_payoffs\b/.test(request.columns);
+          // Found from the schema cache, before any column is looked at.
+          if (asksPayoffs && !mockHasPayoffs) {
+            return resolve({
+              data: null,
+              error: {
+                code: 'PGRST200',
+                message:
+                  "Could not find a relationship between 'loans' and 'loan_payoffs' in the schema cache",
+                details:
+                  "Searched for a foreign key relationship between 'loans' and 'loan_payoffs' in the schema 'public', but no matches were found.",
+                hint: null,
+              },
+            });
+          }
           const lacksDay = !mockHasPaymentDay && /\bpayment_day\b/.test(request.columns);
           const lacksFlag = !mockHasFlag && /\bin_spending\b/.test(request.columns);
           const missing =
@@ -75,10 +94,11 @@ jest.mock('@/lib/supabase', () => ({
           const { in_spending: flag, loan, ...bill } = mockRow;
           const embedded =
             loan && typeof loan === 'object' && !Array.isArray(loan)
-              ? (({ payment_day: day, ...rest }: Record<string, unknown>) =>
-                  mockHasPaymentDay ? { ...rest, payment_day: day } : rest)(
-                  loan as Record<string, unknown>,
-                )
+              ? (({ payment_day: day, ...rest }: Record<string, unknown>) => ({
+                  ...rest,
+                  ...(mockHasPaymentDay ? { payment_day: day } : {}),
+                  ...(asksPayoffs ? { payoffs: mockPayoffs } : {}),
+                }))(loan as Record<string, unknown>)
               : loan;
           return resolve({
             data: { ...bill, ...(mockHasFlag ? { in_spending: flag } : {}), loan: embedded },
@@ -148,6 +168,8 @@ function wrapper({ children }: { children: ReactNode }) {
 
 beforeEach(() => {
   mockRequests.length = 0;
+  mockHasPayoffs = true;
+  mockPayoffs = [];
   mockRow = row();
   mockHasFlag = true;
   mockHasPaymentDay = true;
@@ -172,7 +194,9 @@ describe('useLoanDetail', () => {
     expect(mockRequests[0].columns).toMatch(
       /^id, name, icon_id, category_id, amount, starts_on, next_due_on, ends_on, card_id, bank_account_id, created_at, in_spending, loan:loans\(/,
     );
-    expect(mockRequests[0].columns).toContain('payment_overrides, payment_day, created_at)');
+    expect(mockRequests[0].columns).toContain(
+      'payment_overrides, payment_day, created_at, payoffs:loan_payoffs(',
+    );
     expect(mockRequests[0].columns).toContain('card:cards(id, holder, network, last4, color)');
     expect(mockRequests[0].columns).toContain(
       'account:bank_accounts(id, bank_name, nickname, last4, color)',
@@ -336,5 +360,169 @@ describe('useLoanDetail', () => {
     expect(terms).toEqual(termsFromStored(data.loan, data.loan.bill.starts_on ?? undefined));
     expect(terms?.paymentDay).toBe(31);
     expect(terms?.payment).toBe(424.8);
+  });
+
+  describe('its payoffs', () => {
+    /** As PostgREST answers: numerics as text, the card or account embedded. */
+    const PAYOFFS = [
+      {
+        id: 'po-1',
+        bill_id: 'bill-1',
+        paid_on: '2026-03-14',
+        amount: '1000.00',
+        kind: 'partial',
+        card_id: null,
+        bank_account_id: 'acct-1',
+        counted: true,
+        created_at: '2026-03-14T09:00:00+00:00',
+        card: null,
+        account: ACCOUNT,
+      },
+      {
+        id: 'po-2',
+        bill_id: 'bill-1',
+        paid_on: '2026-10-05',
+        amount: '250.50',
+        kind: 'partial',
+        card_id: 'card-1',
+        bank_account_id: null,
+        counted: false,
+        created_at: '2026-10-05T09:00:00+00:00',
+        card: CARD,
+        account: null,
+      },
+      {
+        id: 'po-3',
+        bill_id: 'bill-1',
+        paid_on: '2026-10-06',
+        amount: '75.25',
+        kind: 'partial',
+        card_id: null,
+        bank_account_id: null,
+        counted: true,
+        created_at: '2026-10-06T09:00:00+00:00',
+        card: null,
+        account: null,
+      },
+    ];
+
+    it('reads this loan’s in the same request, oldest first, as numbers with their sources', async () => {
+      mockPayoffs = [PAYOFFS[2], PAYOFFS[0], PAYOFFS[1]];
+      const result = await read('bill-1');
+
+      expect(mockRequests).toHaveLength(1);
+      expect(mockRequests[0].columns).toContain(
+        'created_at, payoffs:loan_payoffs(id, bill_id, paid_on, amount, kind, card_id, bank_account_id, counted, created_at, card:cards(id, holder, network, last4, color), account:bank_accounts(id, bank_name, nickname, last4, color)))',
+      );
+      const data = result.current.data;
+      if (data?.kind !== 'loan') throw new Error('no loan');
+      expect(data.loan.payoffs).toEqual([
+        {
+          id: 'po-1',
+          bill_id: 'bill-1',
+          paid_on: '2026-03-14',
+          amount: 1000,
+          kind: 'partial',
+          card_id: null,
+          bank_account_id: 'acct-1',
+          counted: true,
+          created_at: '2026-03-14T09:00:00+00:00',
+          source: {
+            id: 'acct-1',
+            label: 'Checking ••7730',
+            name: 'Checking',
+            last4: '7730',
+            color: '#225588',
+            kind: 'account',
+          },
+        },
+        expect.objectContaining({
+          id: 'po-2',
+          amount: 250.5,
+          counted: false,
+          source: expect.objectContaining({ id: 'card-1', kind: 'card', name: 'Chase' }),
+        }),
+        // Skip: no card and no account.
+        expect.objectContaining({ id: 'po-3', amount: 75.25, source: null }),
+      ]);
+    });
+
+    it('orders two paid the same day as they were recorded', async () => {
+      mockPayoffs = [
+        { ...PAYOFFS[1], id: 'later', created_at: '2026-10-05T10:00:00+00:00' },
+        { ...PAYOFFS[1], id: 'earlier', created_at: '2026-10-05T09:00:00+00:00' },
+      ];
+      const data = (await read('bill-1')).current.data;
+      if (data?.kind !== 'loan') throw new Error('no loan');
+      expect(data.loan.payoffs.map((payoff) => payoff.id)).toEqual(['earlier', 'later']);
+    });
+
+    it('gives them to the schedule, as the Loans page does', async () => {
+      mockPayoffs = PAYOFFS;
+      const result = await read('bill-1');
+      const data = result.current.data;
+      if (data?.kind !== 'loan') throw new Error('no loan');
+
+      const terms = loanTermsOf(data.loan);
+      expect(terms?.payoffs?.map((payoff) => [payoff.id, payoff.amount])).toEqual([
+        ['po-1', 1000],
+        ['po-2', 250.5],
+        ['po-3', 75.25],
+      ]);
+      expect(terms).toEqual(termsFromStored(data.loan, data.loan.bill.starts_on ?? undefined));
+    });
+
+    it('has none, but no other change, on a loan never paid down', async () => {
+      const result = await read('bill-1');
+      expect(result.current.data).toMatchObject({ kind: 'loan', loan: { payoffs: [] } });
+      const data = result.current.data;
+      if (data?.kind !== 'loan') throw new Error('no loan');
+      expect(loanTermsOf(data.loan)?.payoffs).toBeUndefined();
+    });
+
+    it('reads none on a database without them, never an error, one request more', async () => {
+      mockHasPayoffs = false;
+      mockPayoffs = PAYOFFS;
+      const result = await read('bill-1');
+
+      expect(result.current.isError).toBe(false);
+      expect(mockRequests).toHaveLength(2);
+      expect(mockRequests[1].columns).not.toMatch(/loan_payoffs/);
+      expect(result.current.data).toMatchObject({ kind: 'loan', loan: { payoffs: [] } });
+    });
+
+    it('still loads on a database without payoffs, the payment day or the flag', async () => {
+      mockHasPayoffs = false;
+      mockHasPaymentDay = false;
+      mockHasFlag = false;
+      const result = await read('bill-1');
+
+      expect(result.current.isError).toBe(false);
+      expect(mockRequests[mockRequests.length - 1].columns).not.toMatch(
+        /loan_payoffs|\bin_spending\b|\bpayment_day\b/,
+      );
+      expect(result.current.data).toMatchObject({
+        kind: 'loan',
+        loan: { payoffs: [], payment_day: null, bill: { in_spending: true } },
+      });
+    });
+
+    it('is an error when the read fails another way, never a loan with none', async () => {
+      mockFailure = { code: 'PGRST301', message: 'JWT expired' };
+      const result = await read('bill-1');
+
+      expect(result.current.isError).toBe(true);
+      expect(result.current.data).toBeUndefined();
+      expect(mockRequests).toHaveLength(1);
+    });
+
+    it('reads a bill with no loan, and a bill that is gone, as before', async () => {
+      mockPayoffs = [];
+      mockRow = row({ loan: null });
+      expect((await read('bill-1')).current.data).toEqual({ kind: 'bill' });
+      mockRow = null;
+      client.clear();
+      expect((await read('bill-1')).current.data).toEqual({ kind: 'gone' });
+    });
   });
 });

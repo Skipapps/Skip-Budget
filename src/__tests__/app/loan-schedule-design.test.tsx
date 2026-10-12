@@ -1,9 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import LoanScheduleScreen from '@/app/loan-schedule';
-import { resetLocaleForTests } from '@/i18n/store';
+import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 import { formatCurrency } from '@/lib/format';
-import { amortise, scheduleByYear } from '@/lib/loan';
+import { amortise, payoffQuote, scheduleByYear } from '@/lib/loan';
 
 /**
  * The schedule as designed: a summary card, then the payments by year, the first few showing and
@@ -146,5 +146,83 @@ describe('the payments', () => {
     await render(<LoanScheduleScreen />);
     expect(rowsShown()).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(screen.queryByRole('button', { name: /^Show all/ })).toBeNull();
+  });
+});
+
+describe('a year with only money paid off in it', () => {
+  // The wireframe car loan, funded 27 Dec 2024 and first due 27 Jan 2025, paid on 30 Dec 2024: the
+  // year 2024 holds a payoff and no payment. Three days on $18,000 at 6.25% is $9.25 (9.2466…).
+  const CAR = {
+    amount: '18000',
+    rate: '6.25',
+    months: '48',
+    start: '2025-01-27',
+    funded: '2024-12-27',
+    basis: 'actual/365',
+    payment: '424.8',
+  };
+  const terms = {
+    principal: 18_000,
+    annualRatePercent: 6.25,
+    months: 48,
+    firstPaymentOn: new Date(2025, 0, 27),
+    fundedOn: new Date(2024, 11, 27),
+    basis: 'actual/365' as const,
+    payment: 424.8,
+  };
+  const yearOf = (payoffs: [string, number][]) => {
+    const schedule = amortise({
+      ...terms,
+      payoffs: payoffs.map(([on, amount]) => ({ on: new Date(`${on}T00:00:00`), amount })),
+    });
+    return scheduleByYear(schedule.rows, schedule.payoffs);
+  };
+
+  it('says it was paid off, with the interest, when the payoff cleared the loan', async () => {
+    const all = payoffQuote(terms, '2024-12-30').payoff;
+    const years = yearOf([['2024-12-30', all]]);
+    expect(years.map((year) => year.year)).toEqual(['2024']);
+    expect(years[0].interest).toBe(9.25);
+    mockParams = { ...CAR, payoffs: JSON.stringify([['2024-12-30', all]]) };
+    await render(<LoanScheduleScreen />);
+    expect(screen.getByText('Paid off · $9.25 interest')).toBeTruthy();
+    expect(screen.queryByText(/^0 payments/)).toBeNull();
+  });
+
+  it('names an extra payment, or how many, and leaves the years with payments as they were', async () => {
+    mockParams = { ...CAR, payoffs: JSON.stringify([['2024-12-30', 1000]]) };
+    const { unmount } = await render(<LoanScheduleScreen />);
+    expect(screen.getByText('Extra payment · $9.25 interest')).toBeTruthy();
+    const nextYear = yearOf([['2024-12-30', 1000]])[1];
+    expect(
+      screen.getByText(`12 payments · ${formatCurrency(nextYear.interest)} interest`),
+    ).toBeTruthy();
+    await unmount();
+
+    const two: [string, number][] = [
+      ['2024-12-29', 500],
+      ['2024-12-30', 500],
+    ];
+    mockParams = { ...CAR, payoffs: JSON.stringify(two) };
+    await render(<LoanScheduleScreen />);
+    expect(
+      screen.getByText(`2 extra payments · ${formatCurrency(yearOf(two)[0].interest)} interest`),
+    ).toBeTruthy();
+  });
+
+  it('reads in Spanish and French', async () => {
+    const all = payoffQuote(terms, '2024-12-30').payoff;
+    setLanguage('es');
+    mockParams = { ...CAR, payoffs: JSON.stringify([['2024-12-30', all]]) };
+    const { unmount } = await render(<LoanScheduleScreen />);
+    expect(screen.getByText(`Liquidado · ${formatCurrency(9.25)} de intereses`)).toBeTruthy();
+    await unmount();
+
+    setLanguage('fr');
+    mockParams = { ...CAR, payoffs: JSON.stringify([['2024-12-30', 1000]]) };
+    await render(<LoanScheduleScreen />);
+    expect(
+      screen.getByText(`Paiement supplémentaire · ${formatCurrency(9.25)} d’intérêts`),
+    ).toBeTruthy();
   });
 });

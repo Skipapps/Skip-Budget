@@ -13,6 +13,7 @@ import {
   isPaymentDay,
   payoffDate,
   type AccrualBasis,
+  type LoanPayoff,
   type LoanTerms,
   type PaymentOverrideMap,
 } from '@/lib/loan';
@@ -22,7 +23,7 @@ import {
   scheduleWithOverrides,
   type OverrideProblem,
 } from '@/lib/loan-overrides';
-import { overrideParams, rateSavable, type LoanRouteParams } from '@/lib/loan-route';
+import { overrideParams, payoffParams, rateSavable, type LoanRouteParams } from '@/lib/loan-route';
 import type { NextLoanPayment } from '@/lib/loan-status';
 import { fromCents, wholeCents } from '@/lib/money';
 
@@ -48,6 +49,11 @@ export type LoanReviewFields = {
    * it when the start date or the payment day changes, as the rule then applies again.
    */
   firstPaymentOn?: Date | null;
+  /**
+   * A saved loan's payoffs (`termsFromStored(...).payoffs`), when it is edited: every figure, and
+   * the last payment `update_loan` ends the bill on, then follow them.
+   */
+  payoffs?: readonly LoanPayoff[];
 };
 
 export type LoanReviewField =
@@ -65,7 +71,12 @@ export type LoanReviewRefusal =
    * The monthly payment cannot clear the loan; `problem.minimum` is the least that can, as
    * `refusalText(problem)` says it.
    */
-  | { reason: 'payment'; problem: OverrideProblem };
+  | { reason: 'payment'; problem: OverrideProblem }
+  /**
+   * The start date is after a payoff already made (the earliest such, yyyy-mm-dd and amount): the
+   * schedule would take it as paid on the start, with none of the interest it really paid.
+   */
+  | { reason: 'start-after-payoff'; on: string; amount: number };
 
 /** The money part of `useSaveLoan`'s values, as `save_loan` files it. */
 export type LoanReviewSave = {
@@ -114,7 +125,7 @@ export type LoanReviewFigures = {
   paymentsMade: number;
   /** The first payment after today; null when every payment is already behind it. */
   nextPayment: NextLoanPayment | null;
-  /** yyyy-mm-dd of the schedule's last payment. */
+  /** yyyy-mm-dd of the schedule's last payment, or of the payoff that clears it. */
   payoffOn: string;
   /** yyyy-mm-dd of the term's last due date. */
   termEndsOn: string;
@@ -161,6 +172,14 @@ export function loanReview(fields: LoanReviewFields, today: string): LoanReview 
     return { ok: false, refusal: { reason: 'fields', fields: missing } };
   }
   if (!rateSavable(fields.annualRate)) return { ok: false, refusal: { reason: 'rate' } };
+  const startedOn = toIsoDate(start);
+  const paidBefore = (fields.payoffs ?? [])
+    .map((payoff) => ({ on: toIsoDate(payoff.on), amount: payoff.amount }))
+    .filter((payoff) => payoff.on < startedOn)
+    .sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0))[0];
+  if (paidBefore) {
+    return { ok: false, refusal: { reason: 'start-after-payoff', ...paidBefore } };
+  }
 
   const basis = fields.basis ?? 'actual/365';
   const terms: LoanTerms = {
@@ -171,6 +190,7 @@ export function loanReview(fields: LoanReviewFields, today: string): LoanReview 
     paymentDay: fields.paymentDay,
     fundedOn: start,
     basis,
+    payoffs: fields.payoffs && fields.payoffs.length > 0 ? fields.payoffs : undefined,
   };
   const priced = scheduleWithOverrides(terms, {
     monthlyPayment: fromCents(paymentCents),
@@ -188,7 +208,7 @@ export function loanReview(fields: LoanReviewFields, today: string): LoanReview 
   const upcoming = next === -1 ? null : rows[next];
 
   const firstOn = toIsoDate(first);
-  const fundedOn = toIsoDate(start);
+  const fundedOn = startedOn;
   const payoffOn = contract.payoffOn ?? firstOn;
   const termEndsOn = toIsoDate(payoffDate(first, fields.termMonths, fields.paymentDay));
   const savedTerms: LoanTerms = {
@@ -243,6 +263,7 @@ export function loanReview(fields: LoanReviewFields, today: string): LoanReview 
         monthlyPayment: contract.payment,
         payments: priced.applied.payments,
       }),
+      ...payoffParams(terms.payoffs),
     },
   };
 }

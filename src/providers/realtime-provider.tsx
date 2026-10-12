@@ -29,7 +29,9 @@ const AFFECTS: Record<string, string[]> = {
   salary_sources: ['salary_sources', 'dashboard'],
   pay_received: ['pay_received', 'dashboard'],
   // Long published, so listening to it adds nothing new to the channel. Goals and their moves are
-  // not listened to: a table missing on the server would refuse the whole channel.
+  // not listened to: a table missing on the server would refuse the whole channel. Nor are loan
+  // payoffs, for the same reason; recording or removing one always writes its loan's bill, and
+  // bills reach 'loans', where payoffs are read.
   savings_pots: ['savings'],
   reminders: ['reminders'],
   loans: ['loans'],

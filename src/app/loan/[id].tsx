@@ -1,11 +1,12 @@
 import { Redirect, router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { Pencil } from 'lucide-react-native';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { View } from 'react-native';
 
 import { useLoanDetail } from '@/api/loans';
+import { useDeletePayoff } from '@/api/mutations';
 import { LoanViewCard } from '@/components/loans/view/loan-view-card';
-import { loanViewOf } from '@/components/loans/view/loan-view-data';
+import { loanViewOf, spokenDate, type HistoryRow } from '@/components/loans/view/loan-view-data';
 import { LoanViewFooter } from '@/components/loans/view/loan-view-footer';
 import { HistoryCard, UpcomingCard } from '@/components/loans/view/loan-view-lists';
 import { goBack } from '@/components/ui/back-button';
@@ -13,8 +14,12 @@ import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
-import { failureText } from '@/lib/failure';
+import { failureMessage, failureText } from '@/lib/failure';
+import { formatCurrency } from '@/lib/format';
+import { success, warn } from '@/lib/haptics';
 import { useToday } from '@/lib/use-today';
+import { useConfirm, useDialog } from '@/providers/dialog-provider';
+import { useToast } from '@/providers/toast-context';
 import { useArtwork } from '@/theme/artwork';
 
 /**
@@ -31,6 +36,12 @@ export default function LoanScreen() {
 
   const view = useMemo(() => (loan ? loanViewOf(loan, today) : null), [loan, today]);
   const refetch = () => void detail.refetch();
+  const confirm = useConfirm();
+  const ask = useDialog();
+  const toast = useToast();
+  const deletePayoff = useDeletePayoff();
+  // One removal at a time: a second tap while the first is asked or sent would remove twice.
+  const removing = useRef(false);
 
   // Deleted from its edit page or on another phone. Only while this page is on top: under the edit
   // page, that page makes the one navigation its Delete calls for.
@@ -47,6 +58,48 @@ export default function LoanScreen() {
   }
 
   const openEdit = () => router.push({ pathname: '/add-loan', params: { id } });
+  const openPayoff = () => router.push({ pathname: '/loan-payoff', params: { id } });
+
+  const removePayoff = async (payoff: Extract<HistoryRow, { kind: 'payoff' }>) => {
+    if (!payoff.id || removing.current) return;
+    removing.current = true;
+    try {
+      // Taking out an earlier one would leave the later ones posted on a loan that never had it.
+      if (!payoff.latest) {
+        const later = view?.history.latestPayoffOn;
+        await ask({
+          title: t('loanFlow.view.removeLaterFirst'),
+          message: later
+            ? t('loanFlow.view.removeLaterFirstMessage', { date: spokenDate(later) })
+            : undefined,
+        });
+        return;
+      }
+      const ok = await confirm({
+        title: t('loanFlow.view.removeTitle'),
+        message: t('loanFlow.view.removeMessage', {
+          amount: formatCurrency(payoff.amount),
+          date: spokenDate(payoff.date),
+        }),
+        confirmLabel: t('common.remove'),
+        destructive: true,
+      });
+      if (!ok) return;
+      await deletePayoff.mutateAsync({
+        billId: id,
+        payoffId: payoff.id,
+        // A bill stopped early stays stopped; null leaves its end where it is.
+        lastPaymentOn: view?.ending === 'stopped' ? null : payoff.endsWithout,
+      });
+      success();
+      toast('toast.loan.paymentRemoved', 'deleted');
+    } catch (thrown) {
+      warn();
+      await ask({ title: failureMessage(thrown) });
+    } finally {
+      removing.current = false;
+    }
+  };
 
   if (!view) {
     return (
@@ -81,7 +134,20 @@ export default function LoanScreen() {
           onPress: openEdit,
         },
       ]}
-      footer={<LoanViewFooter onEdit={openEdit} />}
+      footer={
+        <LoanViewFooter
+          primary={
+            view.ending
+              ? undefined
+              : {
+                  label: t('loanFlow.payoff.action'),
+                  hint: t('loanFlow.payoff.actionHint'),
+                  onPress: openPayoff,
+                }
+          }
+          onEdit={openEdit}
+        />
+      }
     >
       <LoanViewCard view={view} today={today} />
       <UpcomingCard
@@ -96,7 +162,12 @@ export default function LoanScreen() {
             : undefined
         }
       />
-      <HistoryCard history={view.history} paidFrom={view.paidFrom} today={today} />
+      <HistoryCard
+        history={view.history}
+        paidFrom={view.paidFrom}
+        today={today}
+        onRemovePayoff={(payoff) => void removePayoff(payoff)}
+      />
       <View className="mb-4 w-full" />
     </Screen>
   );

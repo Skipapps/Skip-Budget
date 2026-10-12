@@ -640,3 +640,108 @@ export function useUpdateLoan() {
     },
   });
 }
+
+export type RecordPayoffValues = {
+  /** The loan's bill. */
+  billId: string;
+  /** yyyy-mm-dd: not after today, not before the loan started. */
+  paidOn: string;
+  /** Above zero, in whole cents; the database refuses anything else rather than round it. */
+  amount: number;
+  /**
+   * 'full' pays the loan off on `paidOn`: its bill ends that day, so nothing after it is charged,
+   * shown as coming up or reminded. It must come after the last payment made.
+   */
+  kind: 'full' | 'partial';
+  cardId: string | null;
+  bankAccountId: string | null;
+  /**
+   * A partial payoff's new last payment (yyyy-mm-dd): the schedule's last row with this payoff in
+   * it. The bill ends there, so instalments the loan no longer has are not charged. Null keeps the
+   * bill's end. Not read for a full payoff.
+   */
+  lastPaymentOn: string | null;
+  /** The person's today (yyyy-mm-dd, `useToday`); left out, the server reads the profile's day. */
+  today?: string;
+};
+
+/**
+ * Records money paid on a loan beyond its instalments, and ends or shortens its bill to match, in
+ * one transaction (`record_loan_payoff`). It counts as spending on its own date from its own card or
+ * account when the loan's "Add to monthly bills" is on. Refused (P0001) for: a date after today or
+ * before the loan started; an amount not above zero in whole cents; a loan already paid off or
+ * already finished by that date; a full payoff on or before a payment made; a last payment outside
+ * the term. P0002 when the loan is gone. Until the payoffs migration is live, every call is refused
+ * with PGRST202 and nothing is written.
+ */
+export function useRecordPayoff() {
+  const client = useQueryClient();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (values: RecordPayoffValues) => {
+      const { data, error } = await supabase.rpc('record_loan_payoff', {
+        p_bill_id: values.billId,
+        p_paid_on: values.paidOn,
+        p_amount: values.amount,
+        p_kind: values.kind,
+        p_card_id: values.cardId,
+        p_bank_account_id: values.bankAccountId,
+        p_last_payment_on: values.kind === 'partial' ? values.lastPaymentOn : null,
+        p_today: values.today ?? null,
+      });
+      if (error) throw error;
+      return { id: (data as { id: string }).id, billId: values.billId };
+    },
+    onSuccess: ({ billId }) => invalidatePayoff(client, invalidate, billId),
+  });
+}
+
+export type DeletePayoffValues = {
+  /** The loan's bill. */
+  billId: string;
+  payoffId: string;
+  /**
+   * The loan's last payment (yyyy-mm-dd) with this payoff taken out: the schedule's last row on the
+   * payoffs that stay. The bill ends there again, so the instalments the payoff stood in for are
+   * charged. Null puts back the end a full payoff replaced, and leaves a partial's where it is.
+   */
+  lastPaymentOn: string | null;
+};
+
+/**
+ * Removes a payoff typed wrong and puts its loan's bill back (`delete_loan_payoff`). One already
+ * gone (a second tap, another phone) is not an error. Until the payoffs migration is live, every
+ * call is refused with PGRST202.
+ */
+export function useDeletePayoff() {
+  const client = useQueryClient();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (values: DeletePayoffValues) => {
+      const { error } = await supabase.rpc('delete_loan_payoff', {
+        p_id: values.payoffId,
+        p_last_payment_on: values.lastPaymentOn,
+      });
+      if (error) throw error;
+      return { billId: values.billId };
+    },
+    onSuccess: ({ billId }) => invalidatePayoff(client, invalidate, billId),
+  });
+}
+
+/**
+ * Everything a payoff moves: its bill's dates (bills, and 'loans' with them, where payoffs are
+ * read), the ledger built from both, and the bill and loan's single-row keys.
+ */
+function invalidatePayoff(
+  client: ReturnType<typeof useQueryClient>,
+  invalidate: ReturnType<typeof useInvalidate>,
+  billId: string,
+) {
+  invalidate('bills');
+  invalidate('loans');
+  client.invalidateQueries({ queryKey: ['bill', billId] });
+  client.invalidateQueries({ queryKey: ['loan', billId] });
+}

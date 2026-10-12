@@ -1,10 +1,17 @@
-import { isPaymentDay, type AccrualBasis, type LoanTerms } from '@/lib/loan';
+import { toIsoDate } from '@/lib/date';
+import {
+  isPaymentDay,
+  readStoredPayoffs,
+  type AccrualBasis,
+  type LoanPayoff,
+  type LoanTerms,
+} from '@/lib/loan';
 import {
   paymentOverridesJson,
   readPaymentOverrides,
   type PaymentOverrides,
 } from '@/lib/loan-overrides';
-import { wholeCents } from '@/lib/money';
+import { fromCents, wholeCents } from '@/lib/money';
 
 /** What the loan pages are opened with: plain ASCII figures, so no language changes them. */
 export type LoanRouteParams = {
@@ -31,6 +38,8 @@ export type LoanRouteParams = {
   monthly?: string;
   /** Single payments changed on the schedule, as `paymentOverridesJson` writes them. */
   overrides?: string;
+  /** Payoffs made on a saved loan, as `payoffParams` writes them. */
+  payoffs?: string;
   /** The open calculator's draft (`loan-draft.ts`); without it the changes are read-only. */
   draft?: string;
   /** The payment page's subject: 'monthly' or a payment number. */
@@ -68,6 +77,7 @@ export function readLoanRoute(params: LoanRouteParams) {
     fees: params.fees === undefined ? null : atLeastZero(params.fees),
     name: params.name ?? '',
     overrides: readOverrides(params),
+    payoffs: readPayoffParam(params.payoffs),
     draft: params.draft ?? '',
   };
 }
@@ -87,6 +97,35 @@ function readOverrides(params: LoanRouteParams): PaymentOverrides {
   const payments = readPaymentOverrides(params.overrides);
   if (payments) overrides.payments = payments;
   return overrides;
+}
+
+/** [["2026-10-12", 2000], …], in the order they were paid; anything else reads as none. */
+function readPayoffParam(value: string | undefined): LoanPayoff[] | undefined {
+  if (!value) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+  if (!Array.isArray(parsed)) return undefined;
+  return readStoredPayoffs(
+    parsed.map((pair: unknown) =>
+      Array.isArray(pair) ? { paid_on: pair[0], amount: pair[1] } : null,
+    ),
+  );
+}
+
+/** A saved loan's payoffs as a param, or nothing when it has none. */
+export function payoffParams(
+  payoffs: readonly LoanPayoff[] | undefined,
+): Pick<LoanRouteParams, 'payoffs'> {
+  const pairs: [string, number][] = [];
+  for (const payoff of payoffs ?? []) {
+    const cents = wholeCents(payoff.amount);
+    if (cents !== null && cents > 0) pairs.push([toIsoDate(payoff.on), fromCents(cents)]);
+  }
+  return pairs.length > 0 ? { payoffs: JSON.stringify(pairs) } : {};
 }
 
 /** The changes as params, leaving out what is not set. */
@@ -120,6 +159,7 @@ export function termsFromRoute(
     // A loan on file carries the payment the lender actually bills, which can sit a cent from the
     // solved one. When passed, it wins.
     payment: route.payment > 0 ? route.payment : undefined,
+    payoffs: route.payoffs,
     extra: withExtras
       ? {
           monthly: route.extraMonthly,
@@ -170,5 +210,5 @@ export function baseParams(route: LoanRoute): LoanRouteParams {
   };
   if (route.paymentDay !== undefined) params.day = String(route.paymentDay);
   if (route.payment > 0) params.payment = String(route.payment);
-  return params;
+  return { ...params, ...payoffParams(route.payoffs) };
 }

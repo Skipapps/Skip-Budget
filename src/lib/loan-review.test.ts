@@ -465,3 +465,116 @@ describe('what the Review refuses', () => {
     expect(reviewOf({ annualRate: 100, monthlyPayment: 2000 }).paymentCount).toBeGreaterThan(0);
   });
 });
+
+describe('editing a loan that has payoffs', () => {
+  const payoff = (on: string, amount: number, id: string) => ({
+    id,
+    on: new Date(`${on}T00:00:00`),
+    amount,
+  });
+  const PARTIAL = [payoff('2026-10-12', 2000, 'p1')];
+  const FULL = [payoff('2026-10-12', 10_701.09, 'p2')];
+
+  it('prices the loan with them, so Review agrees with the loan’s page', () => {
+    const review = reviewOf({ payoffs: PARTIAL });
+    expect(review).toMatchObject({
+      paymentCount: 43,
+      monthlyPayment: 424.8,
+      finalPayment: 279.12,
+      totalInterest: 2_120.72,
+      totalPaid: 20_120.72,
+      payoffOn: '2028-07-27',
+      nextPayment: { number: 22, date: '2026-10-27', amount: 424.8 },
+    });
+    expect(review.terms.payoffs).toEqual(PARTIAL);
+    expect(review.save.lastPaymentOn).toBe('2028-07-27');
+    expect(loanStatus(review.terms, TODAY)).toEqual(
+      loanStatus({ ...termsFromStored(stored(review))!, payoffs: PARTIAL }, TODAY),
+    );
+  });
+
+  it('ends the bill on the day a payoff cleared the loan', () => {
+    const review = reviewOf({ payoffs: FULL }, '2026-11-01');
+    expect(review).toMatchObject({
+      paymentCount: 21,
+      payoffOn: '2026-10-12',
+      paymentsMade: 21,
+      nextPayment: null,
+      balloon: false,
+    });
+    expect(review.save.lastPaymentOn).toBe('2026-10-12');
+  });
+
+  it('opens the schedule with them', () => {
+    const review = reviewOf({ payoffs: PARTIAL });
+    expect(review.scheduleParams.payoffs).toBe('[["2026-10-12",2000]]');
+    const route = readLoanRoute(review.scheduleParams);
+    const page = scheduleWithOverrides(
+      termsFromRoute(route, { withExtras: false }),
+      route.overrides,
+    );
+    expect(page.rows).toEqual(amortise(review.terms).rows);
+  });
+
+  it('refuses a start date moved after a payoff, naming the earliest one', () => {
+    const later = new Date(2026, 9, 13);
+    expect(loanReview({ ...WIREFRAME_FIELDS, startDate: later, payoffs: PARTIAL }, TODAY)).toEqual({
+      ok: false,
+      refusal: { reason: 'start-after-payoff', on: '2026-10-12', amount: 2000 },
+    });
+    const two = [payoff('2026-10-12', 2000, 'p1'), payoff('2026-03-01', 500, 'p0')];
+    expect(loanReview({ ...WIREFRAME_FIELDS, startDate: later, payoffs: two }, TODAY)).toEqual({
+      ok: false,
+      refusal: { reason: 'start-after-payoff', on: '2026-03-01', amount: 500 },
+    });
+    // Only the start counts: the first payment may come after a payoff in the opening period.
+    const opening = [payoff('2025-01-10', 3000, 'p4')];
+    expect(reviewOf({ payoffs: opening }).terms.payoffs).toEqual(opening);
+  });
+
+  it('takes a start on the payoff’s own day, the payoff then paying no interest', () => {
+    const sameDay = reviewOf({ startDate: new Date(2026, 9, 12), payoffs: PARTIAL });
+    expect(amortise(sameDay.terms).payoffs[0]).toMatchObject({
+      on: '2026-10-12',
+      interest: 0,
+      principal: 2000,
+    });
+    expect(
+      loanReview({ ...WIREFRAME_FIELDS, startDate: new Date(2026, 9, 11), payoffs: PARTIAL }, TODAY)
+        .ok,
+    ).toBe(true);
+  });
+
+  it('asks for the missing fields before it names a payoff', () => {
+    const missing = loanReview(
+      {
+        ...WIREFRAME_FIELDS,
+        startDate: new Date(2026, 9, 13),
+        monthlyPayment: 0,
+        payoffs: PARTIAL,
+      },
+      TODAY,
+    );
+    expect(missing).toEqual({
+      ok: false,
+      refusal: { reason: 'fields', fields: ['monthlyPayment'] },
+    });
+  });
+
+  it('is the review it always was with none', () => {
+    expect(reviewOf({ payoffs: [] })).toEqual(reviewOf({}));
+    expect(reviewOf({}).scheduleParams.payoffs).toBeUndefined();
+  });
+
+  it('still judges the monthly payment on the loan as lent', () => {
+    const asLent = loanReview({ ...WIREFRAME_FIELDS, monthlyPayment: 50 }, TODAY);
+    expect(asLent).toMatchObject({ ok: false, refusal: { reason: 'payment' } });
+    expect(loanReview({ ...WIREFRAME_FIELDS, monthlyPayment: 50, payoffs: FULL }, TODAY)).toEqual(
+      asLent,
+    );
+    const clearsAtAnyPayment = [payoff('2025-01-10', 25_000, 'p3')];
+    expect(
+      loanReview({ ...WIREFRAME_FIELDS, monthlyPayment: 50, payoffs: clearsAtAnyPayment }, TODAY),
+    ).toEqual(asLent);
+  });
+});

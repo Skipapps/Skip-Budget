@@ -12,6 +12,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
 import { loanPricingDay } from '@/lib/active-loans';
 import { failureText } from '@/lib/failure';
+import { paidOffOn } from '@/lib/loan-payoff';
 import { loanStatus, loansSummary, type LoanStatus } from '@/lib/loan-status';
 import { useToday } from '@/lib/use-today';
 import { useArtwork } from '@/theme/artwork';
@@ -24,15 +25,15 @@ type PricedLoan = {
 };
 
 /**
- * Where each saved loan stands, from its own schedule, and whether it is finished. A loan whose
- * bill stopped early is read as of the day it stopped (`loanPricingDay`).
+ * Where each saved loan stands, from its own schedule with its payoffs, and whether it is
+ * finished. A loan paid off, or whose bill stopped early, is read as of that day (`loanPricingDay`).
  */
 function priceLoans(rows: readonly LoanListRow[], today: string): PricedLoan[] {
   const priced: PricedLoan[] = [];
   for (const row of rows) {
     const terms = loanTermsOf(row);
     if (!terms) continue;
-    const status = loanStatus(terms, loanPricingDay(row.bill, today));
+    const status = loanStatus(terms, loanPricingDay(row.bill, today, paidOffOn(terms)));
     priced.push({ row, status, ...loanEnding(row.bill, status, today) });
   }
   return priced;
