@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import RemindersScreen from '@/app/reminders';
 import { FAILURE_MESSAGE } from '@/lib/failure';
@@ -107,7 +107,26 @@ jest.mock('@/api/reminders', () => ({
   useSetReceiptReminder: () => ({ mutate: mockSetReceiptReminder }),
 }));
 
+const mockSetWrapUp = jest.fn(async (_on: boolean) => true);
+let mockWrapUp = { enabled: true, refused: false, ready: true };
+
+// The real hook reads AsyncStorage and schedules through expo-notifications.
+jest.mock('@/api/wrap-up-notification', () => ({
+  WRAP_UP_HOUR: 9,
+  useWrapUpSwitch: () => ({ ...mockWrapUp, setEnabled: mockSetWrapUp }),
+}));
+
+const mockToast = jest.fn();
+jest.mock('@/providers/toast-context', () => ({ useToast: () => mockToast }));
+
+const RECEIPTS_SWITCH = { name: 'Daily receipts reminder' };
+const WRAP_UP_SWITCH = { name: 'Monthly wrap-up' };
+
 beforeEach(() => {
+  mockSetWrapUp.mockReset();
+  mockSetWrapUp.mockImplementation(async () => true);
+  mockWrapUp = { enabled: true, refused: false, ready: true };
+  mockToast.mockClear();
   mockSetReceiptReminder.mockClear();
   mockReceiptReminder = { enabled: false, remindAt: '20:00' };
   mockFailed = null;
@@ -122,10 +141,13 @@ describe('Reminders — daily receipts reminder', () => {
     expect(getByText('A nudge to log what you bought today.')).toBeTruthy();
 
     // The switch is a press target wrapping the platform switch: state is on accessibilityState.
-    expect(getByRole('switch').props.accessibilityState).toMatchObject({ checked: false });
+    expect(getByRole('switch', RECEIPTS_SWITCH).props.accessibilityState).toMatchObject({
+      checked: false,
+    });
 
-    // The receipts reminder counts even when nothing else is remindable: "0 of 1", not "0 of 0".
-    expect(getByText(/0 of 1 will let you know\./)).toBeTruthy();
+    // The receipts reminder counts even when nothing else is remindable, beside the monthly
+    // wrap-up, which is on from the start: "1 of 2", not "0 of 0".
+    expect(getByText(/1 of 2 will let you know\./)).toBeTruthy();
   });
 
   it('drops the "nothing to remind you about" empty state', async () => {
@@ -136,7 +158,7 @@ describe('Reminders — daily receipts reminder', () => {
   it('asks for the reminder when the switch goes on', async () => {
     const { getByRole } = await render(<RemindersScreen />);
 
-    await fireEvent.press(getByRole('switch'));
+    await fireEvent.press(getByRole('switch', RECEIPTS_SWITCH));
 
     expect(mockSetReceiptReminder).toHaveBeenCalledTimes(1);
     // No time sent: turning it on must not overwrite an hour already chosen.
@@ -161,7 +183,7 @@ describe('Reminders — daily receipts reminder', () => {
   it('counts the receipts reminder in the "on" figure once it is on', async () => {
     mockReceiptReminder = { enabled: true, remindAt: '20:00' };
     const { getByText } = await render(<RemindersScreen />);
-    expect(getByText(/1 of 1 will let you know\./)).toBeTruthy();
+    expect(getByText(/2 of 2 will let you know\./)).toBeTruthy();
   });
 });
 
@@ -224,7 +246,9 @@ describe('Reminders — the receipts read alone', () => {
 
     // Not the page-level error, and not a switch drawn off over a read that never landed.
     expect(getAllByText(FAILURE_MESSAGE)).toHaveLength(1);
-    expect(queryByRole('switch')).toBeNull();
+    expect(queryByRole('switch', RECEIPTS_SWITCH)).toBeNull();
+    // The wrap-up is read from the phone, not that column, so it stays.
+    expect(queryByRole('switch', WRAP_UP_SWITCH)).toBeTruthy();
   });
 
   it('retries the receipts read by itself', async () => {
@@ -238,12 +262,83 @@ describe('Reminders — the receipts read alone', () => {
   it('leaves itself out of the count rather than guessing at it', async () => {
     const { getByText } = await render(<RemindersScreen />);
 
-    // Nothing else is remindable, so with the receipts reminder withheld there is only the prompt.
+    // Nothing else is remindable, so with the receipts reminder withheld only the wrap-up counts.
     expect(
       getByText(
-        'Add a bill, a subscription, a card or an account and Skip can remind you about those.',
+        '1 of 1 will let you know. Add a bill, a subscription, a card or an account and Skip can remind you about those too.',
       ),
     ).toBeTruthy();
     expect(getByText('Reminders')).toBeTruthy();
+  });
+});
+
+describe('Reminders — the monthly wrap-up', () => {
+  it('is on from the start, with when it arrives and what it says', async () => {
+    const { getByRole, getByText } = await render(<RemindersScreen />);
+
+    expect(getByText('Savings')).toBeTruthy();
+    expect(getByText('On the 1st of every month, at 9:00 AM.')).toBeTruthy();
+    expect(getByText('What came in last month, what went out and what was left.')).toBeTruthy();
+    expect(getByRole('switch', WRAP_UP_SWITCH).props.accessibilityState).toMatchObject({
+      checked: true,
+    });
+  });
+
+  it('turned off, says so in the switch, the count and a toast', async () => {
+    const { getByRole, getByText, rerender } = await render(<RemindersScreen />);
+
+    await fireEvent.press(getByRole('switch', WRAP_UP_SWITCH));
+
+    expect(mockSetWrapUp).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(mockToast).toHaveBeenCalledWith('toast.reminder.off', 'deleted'));
+
+    mockWrapUp = { enabled: false, refused: false, ready: true };
+    await rerender(<RemindersScreen />);
+    expect(getByRole('switch', WRAP_UP_SWITCH).props.accessibilityState).toMatchObject({
+      checked: false,
+    });
+    expect(getByText(/0 of 2 will let you know\./)).toBeTruthy();
+  });
+
+  it('turned on, saves and says so', async () => {
+    mockWrapUp = { enabled: false, refused: false, ready: true };
+    const { getByRole } = await render(<RemindersScreen />);
+
+    await fireEvent.press(getByRole('switch', WRAP_UP_SWITCH));
+
+    expect(mockSetWrapUp).toHaveBeenCalledWith(true);
+    await waitFor(() => expect(mockToast).toHaveBeenCalledWith('toast.reminder.saved'));
+  });
+
+  it('declined at the system prompt, stays off and toasts nothing', async () => {
+    mockWrapUp = { enabled: false, refused: false, ready: true };
+    mockSetWrapUp.mockImplementation(async () => false);
+    const { getByRole } = await render(<RemindersScreen />);
+
+    await fireEvent.press(getByRole('switch', WRAP_UP_SWITCH));
+
+    await waitFor(() => expect(mockSetWrapUp).toHaveBeenCalledWith(true));
+    await Promise.resolve();
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it('refused by the phone, says so, cannot be switched and leaves the count', async () => {
+    mockWrapUp = { enabled: false, refused: true, ready: true };
+    const { getByRole, getByText, queryByText } = await render(<RemindersScreen />);
+
+    expect(getByText("Notifications are off for Skip in your phone's settings.")).toBeTruthy();
+    expect(queryByText('What came in last month, what went out and what was left.')).toBeNull();
+    expect(getByRole('switch', WRAP_UP_SWITCH).props.accessibilityState).toMatchObject({
+      checked: false,
+      disabled: true,
+    });
+    // Only the receipts reminder is left to switch on.
+    expect(getByText(/0 of 1 will let you know\./)).toBeTruthy();
+  });
+
+  it('holds the page until the stored choice is read, so the switch never snaps', async () => {
+    mockWrapUp = { enabled: true, refused: false, ready: false };
+    const { queryByRole } = await render(<RemindersScreen />);
+    expect(queryByRole('switch')).toBeNull();
   });
 });

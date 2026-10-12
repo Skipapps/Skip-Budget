@@ -64,6 +64,13 @@ jest.mock('@/api/known-stores', () => ({
   forgetKnownStores: (userId: string | null | undefined) => mockForgetStores(userId),
 }));
 
+// Not added to `order`: the sequence tests above are about the session, and this cancel has no
+// session to outlive.
+const mockCancelWrapUp = jest.fn(async () => {});
+jest.mock('@/api/wrap-up-notification', () => ({
+  cancelWrapUpNotification: () => mockCancelWrapUp(),
+}));
+
 let mockRpcError: { message: string } | null = null;
 let mockLiveUser: { id: string } | null = null;
 
@@ -219,6 +226,30 @@ describe('signOut', () => {
     warn.mockRestore();
   });
 
+  it('takes the pending wrap-up notice off the phone before the session goes', async () => {
+    mockCancelWrapUp.mockClear();
+    mockCancelWrapUp.mockImplementationOnce(async () => {
+      // Still signed in at this point.
+      expect(mockAuthSignOut).not.toHaveBeenCalled();
+    });
+
+    const result = await signOut();
+
+    expect(mockCancelWrapUp).toHaveBeenCalledTimes(1);
+    expect(result.error).toBeNull();
+  });
+
+  it('takes the wrap-up notice away even when the session cannot be read', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockCancelWrapUp.mockClear();
+    mockSessionError = new Error('storage unavailable');
+
+    await signOut();
+
+    expect(mockCancelWrapUp).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
   it('signs out anyway when the voice corrections cannot be cleared', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     mockForgetVoice.mockImplementation(async () => {
@@ -274,8 +305,18 @@ describe('deleteAccount', () => {
     expect(order).toEqual(['voice', 'stores', 'signOut']);
   });
 
+  it('takes the pending wrap-up notice off the phone once the account is gone', async () => {
+    mockCancelWrapUp.mockClear();
+
+    const result = await deleteAccount();
+
+    expect(result.error).toBeNull();
+    expect(mockCancelWrapUp).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps them while the account is still there', async () => {
     jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockCancelWrapUp.mockClear();
     const id = putVoiceDraft(HEARD);
     mockRpcError = { message: 'boom' };
     expect((await deleteAccount()).error).toBe(FAILURE_MESSAGE);
@@ -286,6 +327,7 @@ describe('deleteAccount', () => {
 
     expect(mockForgetVoice).not.toHaveBeenCalled();
     expect(mockForgetStores).not.toHaveBeenCalled();
+    expect(mockCancelWrapUp).not.toHaveBeenCalled();
     expect(mockAuthSignOut).not.toHaveBeenCalled();
     expect(readVoiceDraft(id)).not.toBeNull();
     jest.restoreAllMocks();

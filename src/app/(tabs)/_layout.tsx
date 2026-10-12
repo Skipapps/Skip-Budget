@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { Dimensions } from 'react-native';
 
 import { SkipTabBar } from '@/components/navigation/skip-tab-bar';
+import { useWrapUpAutoShow } from '@/components/savings/use-wrap-up-auto-show';
 import { t, useLocale } from '@/i18n';
 import { localeScreenLayout } from '@/i18n/locale-provider';
 
@@ -10,6 +11,8 @@ const { width } = Dimensions.get('window');
 export default function TabsLayout() {
   // This layout sits above the tab screens' remount boundary, so it re-renders itself for the titles.
   useLocale();
+  // Here, under the signed-in app's tabs: never over sign-in, setup or onboarding.
+  useWrapUpAutoShow();
 
   return (
     <Tabs

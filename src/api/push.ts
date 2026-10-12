@@ -5,6 +5,7 @@ import { router, useNavigationContainerRef, type Href } from 'expo-router';
 import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 
+import { notificationsAllowed } from '@/lib/notification-permission';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
@@ -26,18 +27,6 @@ Notifications.setNotificationHandler({
 });
 
 /**
- * Whether notifications are allowed right now, without asking. Works on a simulator too (permission
- * is local to the device); only the push token needs a real phone (see registerDevice).
- */
-async function remindersAllowed(): Promise<boolean> {
-  if (Platform.OS !== 'ios') return false;
-  const existing = await Notifications.getPermissionsAsync();
-  return (
-    existing.granted || existing.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
-  );
-}
-
-/**
  * Ask for notifications, then register this device. The ask lives only behind a tap that explains
  * itself: iOS grants one system prompt per install, and spending it at launch is how most refusals
  * happen. Returns whether reminders can now send.
@@ -46,7 +35,7 @@ export async function enableReminders(userId: string): Promise<boolean> {
   // The ask works on a simulator; registerDevice is what skips it there.
   if (Platform.OS !== 'ios') return false;
 
-  const allowed = await remindersAllowed();
+  const allowed = await notificationsAllowed();
   const decision = allowed
     ? await Notifications.getPermissionsAsync()
     : await Notifications.requestPermissionsAsync();
@@ -76,7 +65,7 @@ async function registerDevice(userId: string): Promise<void> {
   if (!Device.isDevice || Platform.OS !== 'ios') return;
 
   // Register only what was already granted; asking happens in enableReminders.
-  if (!(await remindersAllowed())) return;
+  if (!(await notificationsAllowed())) return;
 
   const token = await Notifications.getDevicePushTokenAsync();
   if (typeof token.data !== 'string' || !token.data) return;
@@ -234,11 +223,19 @@ const ITEM_ROUTES = {
 
 const ROW_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** The wrap-up names its month and nothing else: "2026-10". */
+const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 /** The screen a notification's data asks for, if this build allows it. */
 export function tapTarget(data: Record<string, unknown> | undefined): Href | undefined {
   const asked = data?.route;
   if (typeof asked !== 'string') return undefined;
   if (asked in TAP_ROUTES) return TAP_ROUTES[asked];
+  if (asked === '/wrap-up') {
+    const month = data?.month;
+    if (typeof month !== 'string' || !MONTH_KEY.test(month)) return undefined;
+    return `/wrap-up?month=${month}` as Href;
+  }
   if (asked in ITEM_ROUTES) {
     const id = data?.id;
     if (typeof id !== 'string' || !ROW_ID.test(id)) return undefined;

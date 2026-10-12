@@ -7,6 +7,7 @@ import { commonMessages } from '@/i18n/messages/common';
 import { dateMessages } from '@/i18n/messages/dates';
 import { entryMessages } from '@/i18n/messages/entry';
 import { faqMessages } from '@/i18n/messages/faq';
+import { goalsMessages } from '@/i18n/messages/goals';
 import { habitFlowMessages } from '@/i18n/messages/habit-flow';
 import { habitsMessages } from '@/i18n/messages/habits';
 import { homeMessages } from '@/i18n/messages/home';
@@ -42,6 +43,7 @@ export const MESSAGE_AREAS = {
   dates: dateMessages,
   entry: entryMessages,
   faq: faqMessages,
+  goals: goalsMessages,
   habitFlow: habitFlowMessages,
   habits: habitsMessages,
   home: homeMessages,
@@ -81,6 +83,7 @@ export const MESSAGES = {
   ...MESSAGE_AREAS.dates,
   ...MESSAGE_AREAS.entry,
   ...MESSAGE_AREAS.faq,
+  ...MESSAGE_AREAS.goals,
   ...MESSAGE_AREAS.habitFlow,
   ...MESSAGE_AREAS.habits,
   ...MESSAGE_AREAS.home,

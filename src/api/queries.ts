@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { useCharges, type ChargeRow } from '@/api/charges';
-import { usePayReceived } from '@/api/pay';
+import { usePayReceived, type PayRow } from '@/api/pay';
 import type { CaptureSource } from '@/api/mutations';
 import {
   chargePlanKey,
@@ -18,7 +18,7 @@ import { t } from '@/i18n';
 import { historyFloor, NOTHING_HIDDEN, type HiddenHistory } from '@/lib/allowance';
 import { accountLabel } from '@/lib/account-label';
 import { withTimeout } from '@/lib/deadline';
-import { moneyBook, type BookSpend } from '@/lib/money-book';
+import { moneyBook, type BookIncome, type BookSpend } from '@/lib/money-book';
 import { paydaysInRange, type PayFrequency } from '@/lib/date';
 import { landingAccount, payProjectionStart } from '@/lib/pay';
 import type { AccrualBasis } from '@/lib/loan';
@@ -692,7 +692,7 @@ function usePayments() {
  * down", and a bill moved to another card has no charges on the new card but a full history on the
  * old.
  */
-function readCharges(rows: ChargeRow[]): { rows: RecordedCharge[]; plans: Set<string> } {
+function readCharges(rows: readonly ChargeRow[]): { rows: RecordedCharge[]; plans: Set<string> } {
   return {
     rows: rows.map((row) => ({
       id: `charge-${row.id}`,
@@ -747,6 +747,197 @@ export type LedgerTotals = {
   count: number;
 };
 
+/** What a ledger is built from: the rows as read, and the window asked for. */
+export type LedgerInput = {
+  receipts: readonly ReceiptRow[];
+  subscriptions: readonly SubscriptionRow[];
+  bills: readonly BillRow[];
+  salaries: readonly Pick<
+    SalaryDetailRow,
+    'id' | 'name' | 'amount' | 'frequency' | 'last_payday' | 'account_ids'
+  >[];
+  charges: readonly ChargeRow[];
+  pay: readonly PayRow[];
+  /** Bank account ids in the person's order: a pay worked out from its schedule lands in the first. */
+  accountOrder: readonly string[];
+  from: string;
+  to: string;
+  today: string;
+};
+
+/**
+ * The ledger itself, newest first (see LedgerEntry): `useLedger` on what the screens read, and the
+ * savings close on what it reads fresh, so a closed month is the month Home showed.
+ */
+export function ledgerEntries({
+  receipts,
+  subscriptions,
+  bills,
+  salaries,
+  charges,
+  pay,
+  accountOrder,
+  from,
+  to,
+  today,
+}: LedgerInput): LedgerEntry[] {
+  // A window wholly before the floor shows nothing; no schedule is walked backwards for it.
+  if (from > to) return [];
+  const inRange = (date: string) => date <= to && date >= from;
+
+  const recorded = readCharges(charges);
+  const byPlan = new Map<string, RecordedCharge[]>();
+  for (const charge of recorded.rows) {
+    const rows = byPlan.get(charge.planId);
+    if (rows) rows.push(charge);
+    else byPlan.set(charge.planId, [charge]);
+  }
+
+  const entries: LedgerEntry[] = [];
+
+  for (const row of receipts) {
+    if (!inRange(row.purchased_on)) continue;
+    const habit = habitMark(row.habit);
+    entries.push({
+      id: `receipt-${row.id}`,
+      label: row.merchant,
+      amount: -Math.abs(row.amount),
+      date: row.purchased_on,
+      kind: 'receipt',
+      sourceId: row.card_id ?? row.bank_account_id ?? '',
+      domain: logoDomainOf(row),
+      logoHidden: Boolean(row.logo_hidden),
+      ...(habit ? { habit } : {}),
+    });
+  }
+
+  // Bills and subscriptions run through the same split: what already went out is read off the
+  // record, what has not happened yet is projected. The lifetime floor is applied inside, so a
+  // plan added today cannot fill earlier months with charges nobody was billed for.
+  const expand = (
+    plan: Parameters<typeof planOccurrences>[0]['plan'],
+    draw: (occurrence: PlanOccurrence) => Omit<LedgerEntry, 'id' | 'date' | 'amount'>,
+  ) => {
+    for (const occurrence of planOccurrences({
+      plan,
+      charges: byPlan.get(plan.id) ?? [],
+      isRecorded: recorded.plans.has(plan.id),
+      from,
+      to,
+      today,
+    })) {
+      entries.push({
+        ...draw(occurrence),
+        id: occurrence.id,
+        date: occurrence.date,
+        amount: -Math.abs(occurrence.amount),
+      });
+    }
+  };
+
+  for (const row of subscriptions) {
+    if (!row.active || !row.next_renewal_on) continue;
+    expand(
+      {
+        id: planKey('subscription', row.id),
+        label: row.name,
+        amount: row.amount,
+        nextDate: row.next_renewal_on,
+        recurrence: row.cycle,
+        kind: 'subscription',
+        startsOn: row.started_on,
+        createdAt: row.created_at,
+        cardId: row.card_id,
+        accountId: row.bank_account_id,
+      },
+      (occurrence) => ({
+        label: occurrence.label,
+        kind: 'subscription',
+        sourceId: occurrence.cardId ?? occurrence.accountId ?? '',
+        domain: logoDomainOf(row),
+        logoHidden: Boolean(row.logo_hidden),
+        planId: row.id,
+      }),
+    );
+  }
+
+  for (const row of bills) {
+    if (!row.next_due_on) continue;
+    expand(
+      {
+        id: planKey('bill', row.id),
+        label: row.name,
+        amount: row.amount,
+        nextDate: row.next_due_on,
+        recurrence: row.recurrence,
+        kind: 'bill',
+        startsOn: row.starts_on,
+        createdAt: row.created_at,
+        endsOn: row.ends_on,
+        cardId: row.card_id,
+        accountId: row.bank_account_id,
+      },
+      (occurrence) => ({
+        label: occurrence.label,
+        kind: 'bill',
+        sourceId: occurrence.cardId ?? occurrence.accountId ?? '',
+        domain: logoDomainOf(row),
+        logoHidden: Boolean(row.logo_hidden),
+        categoryId: row.category_id,
+        iconId: row.icon_id,
+        planId: row.id,
+      }),
+    );
+  }
+
+  // Pay on the record, as it landed: its own amount and the account it went into.
+  const lastRecorded = new Map<string, string>();
+  for (const row of pay) {
+    const id = row.salary_source_id;
+    if (id && (!lastRecorded.has(id) || row.paid_on > lastRecorded.get(id)!)) {
+      lastRecorded.set(id, row.paid_on);
+    }
+    if (!inRange(row.paid_on)) continue;
+    entries.push({
+      id: `pay-${row.id}`,
+      label: row.label || t('api.ledger.income'),
+      amount: Math.abs(row.amount),
+      date: row.paid_on,
+      kind: 'income',
+      sourceId: row.bank_account_id ?? '',
+    });
+  }
+
+  // What the record does not hold yet is worked out from the schedule, from the day after its
+  // last recorded pay: a payday not written down yet, and every one still to come.
+  for (const row of salaries) {
+    const projected = payProjectionStart(row.last_payday, lastRecorded.get(row.id) ?? null);
+    if (!projected || !row.last_payday) continue;
+    const into = landingAccount(row.account_ids, accountOrder) ?? '';
+    for (const date of paydaysInRange(
+      new Date(`${row.last_payday}T00:00:00`),
+      row.frequency,
+      from > projected ? from : projected,
+      to,
+    )) {
+      entries.push({
+        id: `income-${row.id}@${date}`,
+        label: row.name || t('api.ledger.income'),
+        amount: Math.abs(row.amount),
+        date,
+        kind: 'income',
+        sourceId: into,
+      });
+    }
+  }
+
+  entries.sort((a, b) =>
+    a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date),
+  );
+
+  return entries;
+}
+
 export function useLedger(range: DateRange | undefined, today: string) {
   const receipts = useReceipts();
   const subscriptions = useSubscriptions();
@@ -767,175 +958,33 @@ export function useLedger(range: DateRange | undefined, today: string) {
   const to = range?.to ?? '9999-12-31';
   // Projecting every bill and payday across the window is real work (a year range walks each
   // schedule dozens of times), so it is held to once per change of the data or the window.
-  const allEntries = useMemo<LedgerEntry[]>(() => {
-    // A window wholly before the floor shows nothing; no schedule is walked backwards for it.
-    if (from > to) return [];
-    const inRange = (date: string) => date <= to && date >= from;
-
-    const recorded = readCharges(charges.data ?? []);
-    const byPlan = new Map<string, RecordedCharge[]>();
-    for (const charge of recorded.rows) {
-      const rows = byPlan.get(charge.planId);
-      if (rows) rows.push(charge);
-      else byPlan.set(charge.planId, [charge]);
-    }
-
-    const entries: LedgerEntry[] = [];
-
-    for (const row of receipts.data ?? []) {
-      if (!inRange(row.purchased_on)) continue;
-      const habit = habitMark(row.habit);
-      entries.push({
-        id: `receipt-${row.id}`,
-        label: row.merchant,
-        amount: -Math.abs(row.amount),
-        date: row.purchased_on,
-        kind: 'receipt',
-        sourceId: row.card_id ?? row.bank_account_id ?? '',
-        domain: logoDomainOf(row),
-        logoHidden: Boolean(row.logo_hidden),
-        ...(habit ? { habit } : {}),
-      });
-    }
-
-    // Bills and subscriptions run through the same split: what already went out is read off the
-    // record, what has not happened yet is projected. The lifetime floor is applied inside, so a
-    // plan added today cannot fill earlier months with charges nobody was billed for.
-    const expand = (
-      plan: Parameters<typeof planOccurrences>[0]['plan'],
-      draw: (occurrence: PlanOccurrence) => Omit<LedgerEntry, 'id' | 'date' | 'amount'>,
-    ) => {
-      for (const occurrence of planOccurrences({
-        plan,
-        charges: byPlan.get(plan.id) ?? [],
-        isRecorded: recorded.plans.has(plan.id),
+  const allEntries = useMemo<LedgerEntry[]>(
+    () =>
+      ledgerEntries({
+        receipts: receipts.data ?? [],
+        subscriptions: subscriptions.data ?? [],
+        bills: bills.data ?? [],
+        salaries: salary.data?.rows ?? [],
+        charges: charges.data ?? [],
+        pay: pay.data ?? [],
+        accountOrder: (accounts.data ?? []).map((account) => account.id),
         from,
         to,
         today,
-      })) {
-        entries.push({
-          ...draw(occurrence),
-          id: occurrence.id,
-          date: occurrence.date,
-          amount: -Math.abs(occurrence.amount),
-        });
-      }
-    };
-
-    for (const row of subscriptions.data ?? []) {
-      if (!row.active || !row.next_renewal_on) continue;
-      expand(
-        {
-          id: planKey('subscription', row.id),
-          label: row.name,
-          amount: row.amount,
-          nextDate: row.next_renewal_on,
-          recurrence: row.cycle,
-          kind: 'subscription',
-          startsOn: row.started_on,
-          createdAt: row.created_at,
-          cardId: row.card_id,
-          accountId: row.bank_account_id,
-        },
-        (occurrence) => ({
-          label: occurrence.label,
-          kind: 'subscription',
-          sourceId: occurrence.cardId ?? occurrence.accountId ?? '',
-          domain: logoDomainOf(row),
-          logoHidden: Boolean(row.logo_hidden),
-          planId: row.id,
-        }),
-      );
-    }
-
-    for (const row of bills.data ?? []) {
-      if (!row.next_due_on) continue;
-      expand(
-        {
-          id: planKey('bill', row.id),
-          label: row.name,
-          amount: row.amount,
-          nextDate: row.next_due_on,
-          recurrence: row.recurrence,
-          kind: 'bill',
-          startsOn: row.starts_on,
-          createdAt: row.created_at,
-          endsOn: row.ends_on,
-          cardId: row.card_id,
-          accountId: row.bank_account_id,
-        },
-        (occurrence) => ({
-          label: occurrence.label,
-          kind: 'bill',
-          sourceId: occurrence.cardId ?? occurrence.accountId ?? '',
-          domain: logoDomainOf(row),
-          logoHidden: Boolean(row.logo_hidden),
-          categoryId: row.category_id,
-          iconId: row.icon_id,
-          planId: row.id,
-        }),
-      );
-    }
-
-    // Pay on the record, as it landed: its own amount and the account it went into.
-    const lastRecorded = new Map<string, string>();
-    for (const row of pay.data ?? []) {
-      const id = row.salary_source_id;
-      if (id && (!lastRecorded.has(id) || row.paid_on > lastRecorded.get(id)!)) {
-        lastRecorded.set(id, row.paid_on);
-      }
-      if (!inRange(row.paid_on)) continue;
-      entries.push({
-        id: `pay-${row.id}`,
-        label: row.label || t('api.ledger.income'),
-        amount: Math.abs(row.amount),
-        date: row.paid_on,
-        kind: 'income',
-        sourceId: row.bank_account_id ?? '',
-      });
-    }
-
-    // What the record does not hold yet is worked out from the schedule, from the day after its
-    // last recorded pay: a payday not written down yet, and every one still to come.
-    const accountOrder = (accounts.data ?? []).map((account) => account.id);
-    for (const row of salary.data?.rows ?? []) {
-      const projected = payProjectionStart(row.last_payday, lastRecorded.get(row.id) ?? null);
-      if (!projected || !row.last_payday) continue;
-      const into = landingAccount(row.account_ids, accountOrder) ?? '';
-      for (const date of paydaysInRange(
-        new Date(`${row.last_payday}T00:00:00`),
-        row.frequency,
-        from > projected ? from : projected,
-        to,
-      )) {
-        entries.push({
-          id: `income-${row.id}@${date}`,
-          label: row.name || t('api.ledger.income'),
-          amount: Math.abs(row.amount),
-          date,
-          kind: 'income',
-          sourceId: into,
-        });
-      }
-    }
-
-    entries.sort((a, b) =>
-      a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date),
-    );
-
-    return entries;
-  }, [
-    receipts.data,
-    subscriptions.data,
-    bills.data,
-    salary.data,
-    charges.data,
-    pay.data,
-    accounts.data,
-    from,
-    to,
-    today,
-  ]);
+      }),
+    [
+      receipts.data,
+      subscriptions.data,
+      bills.data,
+      salary.data,
+      charges.data,
+      pay.data,
+      accounts.data,
+      from,
+      to,
+      today,
+    ],
+  );
 
   const entries = useMemo(
     () => (free ? allEntries.filter((entry) => entry.date >= floor) : allEntries),
@@ -1000,122 +1049,165 @@ export function useLedger(range: DateRange | undefined, today: string) {
 }
 
 /**
+ * What the money book counts as spent and earned, as lists: the ledger's spending and pay, plus what
+ * plans no longer running were charged. Shared by the balances and by savings, so a month's
+ * spending is one list wherever it is summed.
+ */
+export function bookFlows({
+  entries,
+  subscriptions,
+  bills,
+  charges,
+}: {
+  entries: readonly LedgerEntry[];
+  subscriptions: readonly SubscriptionRow[];
+  bills: readonly BillRow[];
+  charges: readonly ChargeRow[];
+}): { spending: BookSpend[]; income: BookIncome[] } {
+  const spending: BookSpend[] = [];
+  for (const entry of entries) {
+    if (entry.amount >= 0 || entry.kind === 'income') continue;
+    spending.push({
+      id: entry.id,
+      label: entry.label,
+      date: entry.date,
+      amount: entry.amount,
+      kind: entry.kind,
+      sourceId: entry.sourceId,
+      domain: entry.domain,
+      logoHidden: entry.logoHidden,
+      categoryId: entry.categoryId,
+      iconId: entry.iconId,
+      ...(entry.habit ? { habit: entry.habit } : {}),
+    });
+  }
+
+  // The ledger walks only plans that are still running. What a cancelled subscription or a
+  // finished bill was charged still went out, so it stays spent.
+  const running = new Set<string>();
+  const plans = new Map<
+    string,
+    { domain: string | null; logoHidden: boolean } & Partial<BillRow>
+  >();
+  for (const row of subscriptions) {
+    const key = planKey('subscription', row.id);
+    if (row.active && row.next_renewal_on) running.add(key);
+    plans.set(key, { domain: logoDomainOf(row), logoHidden: Boolean(row.logo_hidden) });
+  }
+  for (const row of bills) {
+    const key = planKey('bill', row.id);
+    if (row.next_due_on) running.add(key);
+    plans.set(key, { ...row, domain: logoDomainOf(row), logoHidden: Boolean(row.logo_hidden) });
+  }
+  for (const charge of readCharges(charges).rows) {
+    if (running.has(charge.planId)) continue;
+    const plan = plans.get(charge.planId);
+    spending.push({
+      id: charge.id,
+      label: charge.label,
+      date: charge.date,
+      amount: charge.amount,
+      kind: charge.planId.startsWith('bill') ? 'bill' : 'subscription',
+      sourceId: charge.cardId ?? charge.accountId ?? '',
+      domain: plan?.domain ?? null,
+      logoHidden: plan?.logoHidden ?? false,
+      categoryId: plan?.category_id ?? null,
+      iconId: plan?.icon_id ?? null,
+    });
+  }
+
+  const income = entries
+    .filter((entry) => entry.kind === 'income' && entry.amount > 0)
+    .map((entry) => ({
+      id: entry.id,
+      label: entry.label,
+      date: entry.date,
+      amount: entry.amount,
+      accountId: entry.sourceId || null,
+    }));
+
+  return { spending, income };
+}
+
+/**
+ * The money book's spending and pay over the whole kept history (every plan's, never the free
+ * plan's 90-day list), with the state of every read behind them.
+ */
+export function useBookFlows(today: string) {
+  const range = useMemo(() => ({ from: '0000-01-01', to: today }), [today]);
+  const ledger = useLedger(range, today);
+  const subscriptions = useSubscriptions();
+  const bills = useBills();
+  const charges = useCharges();
+
+  const flows = useMemo(
+    () =>
+      bookFlows({
+        entries: ledger.allEntries,
+        subscriptions: subscriptions.data ?? [],
+        bills: bills.data ?? [],
+        charges: charges.data ?? [],
+      }),
+    [ledger.allEntries, subscriptions.data, bills.data, charges.data],
+  );
+
+  const parts = [ledger, subscriptions, bills, charges];
+  return {
+    ...flows,
+    isLoading: parts.some((part) => part.isLoading),
+    isError: parts.some((part) => part.isError),
+    refetch: () => {
+      for (const part of parts) void part.refetch();
+    },
+  };
+}
+
+/**
  * Every card's and account's running balance and Home's Current balance, from one book (see
  * `moneyBook`). Everything that has happened is in it: receipts and bill and subscription charges,
  * pay on its paydays, and payments, which move money between the person's own accounts and cards.
  */
 function useMoneyBook(today: string) {
-  const range = useMemo(() => ({ from: '0000-01-01', to: today }), [today]);
-  const ledger = useLedger(range, today);
+  const flows = useBookFlows(today);
   const cards = useCards();
   const accounts = useBankAccounts();
   const payments = usePayments();
-  const subscriptions = useSubscriptions();
-  const bills = useBills();
-  const charges = useCharges();
 
-  const book = useMemo(() => {
-    const spending: BookSpend[] = [];
-    for (const entry of ledger.allEntries) {
-      if (entry.amount >= 0 || entry.kind === 'income') continue;
-      spending.push({
-        id: entry.id,
-        label: entry.label,
-        date: entry.date,
-        amount: entry.amount,
-        kind: entry.kind,
-        sourceId: entry.sourceId,
-        domain: entry.domain,
-        logoHidden: entry.logoHidden,
-        categoryId: entry.categoryId,
-        iconId: entry.iconId,
-        ...(entry.habit ? { habit: entry.habit } : {}),
-      });
-    }
-
-    // The ledger walks only plans that are still running. What a cancelled subscription or a
-    // finished bill was charged still went out, so it stays spent.
-    const running = new Set<string>();
-    const plans = new Map<
-      string,
-      { domain: string | null; logoHidden: boolean } & Partial<BillRow>
-    >();
-    for (const row of subscriptions.data ?? []) {
-      const key = planKey('subscription', row.id);
-      if (row.active && row.next_renewal_on) running.add(key);
-      plans.set(key, { domain: logoDomainOf(row), logoHidden: Boolean(row.logo_hidden) });
-    }
-    for (const row of bills.data ?? []) {
-      const key = planKey('bill', row.id);
-      if (row.next_due_on) running.add(key);
-      plans.set(key, { ...row, domain: logoDomainOf(row), logoHidden: Boolean(row.logo_hidden) });
-    }
-    for (const charge of readCharges(charges.data ?? []).rows) {
-      if (running.has(charge.planId)) continue;
-      const plan = plans.get(charge.planId);
-      spending.push({
-        id: charge.id,
-        label: charge.label,
-        date: charge.date,
-        amount: charge.amount,
-        kind: charge.planId.startsWith('bill') ? 'bill' : 'subscription',
-        sourceId: charge.cardId ?? charge.accountId ?? '',
-        domain: plan?.domain ?? null,
-        logoHidden: plan?.logoHidden ?? false,
-        categoryId: plan?.category_id ?? null,
-        iconId: plan?.icon_id ?? null,
-      });
-    }
-
-    return moneyBook({
-      today,
-      sources: [
-        ...(accounts.data ?? []).map((row) => ({
+  const book = useMemo(
+    () =>
+      moneyBook({
+        today,
+        sources: [
+          ...(accounts.data ?? []).map((row) => ({
+            id: row.id,
+            kind: 'account' as const,
+            name: accountLabel(row),
+            balance: Number(row.balance),
+            asOf: row.balance_as_of ?? null,
+          })),
+          ...(cards.data ?? []).map((row) => ({
+            id: row.id,
+            kind: 'card' as const,
+            name: cardLabel(row),
+            balance: Number(row.balance),
+            asOf: row.balance_as_of ?? null,
+          })),
+        ],
+        spending: flows.spending,
+        payments: (payments.data ?? []).map((row) => ({
           id: row.id,
-          kind: 'account' as const,
-          name: accountLabel(row),
-          balance: Number(row.balance),
-          asOf: row.balance_as_of ?? null,
+          amount: Number(row.amount),
+          date: row.paid_on,
+          note: row.note,
+          toId: row.card_id ?? row.bank_account_id ?? '',
+          fromAccountId: row.from_bank_account_id ?? null,
         })),
-        ...(cards.data ?? []).map((row) => ({
-          id: row.id,
-          kind: 'card' as const,
-          name: cardLabel(row),
-          balance: Number(row.balance),
-          asOf: row.balance_as_of ?? null,
-        })),
-      ],
-      spending,
-      payments: (payments.data ?? []).map((row) => ({
-        id: row.id,
-        amount: Number(row.amount),
-        date: row.paid_on,
-        note: row.note,
-        toId: row.card_id ?? row.bank_account_id ?? '',
-        fromAccountId: row.from_bank_account_id ?? null,
-      })),
-      income: ledger.allEntries
-        .filter((entry) => entry.kind === 'income' && entry.amount > 0)
-        .map((entry) => ({
-          id: entry.id,
-          label: entry.label,
-          date: entry.date,
-          amount: entry.amount,
-          accountId: entry.sourceId || null,
-        })),
-    });
-  }, [
-    ledger.allEntries,
-    subscriptions.data,
-    bills.data,
-    charges.data,
-    accounts.data,
-    cards.data,
-    payments.data,
-    today,
-  ]);
+        income: flows.income,
+      }),
+    [flows.spending, flows.income, accounts.data, cards.data, payments.data, today],
+  );
 
-  const parts = [ledger, cards, accounts, payments, subscriptions, bills, charges];
+  const parts = [flows, cards, accounts, payments];
   return {
     book,
     cards,

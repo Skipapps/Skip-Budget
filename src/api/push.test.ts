@@ -105,7 +105,18 @@ describe('tapTarget', () => {
     expect(tapTarget({ route: '/transactions' })).toBe('/transactions');
   });
 
+  it("opens a month's wrap-up", () => {
+    expect(tapTarget({ route: '/wrap-up', month: '2026-10' })).toBe('/wrap-up?month=2026-10');
+    expect(tapTarget({ route: '/wrap-up', month: '2026-12' })).toBe('/wrap-up?month=2026-12');
+  });
+
   it.each([
+    ['a wrap-up with no month', { route: '/wrap-up' }],
+    ['a wrap-up for month 13', { route: '/wrap-up', month: '2026-13' }],
+    ['a wrap-up for month 00', { route: '/wrap-up', month: '2026-00' }],
+    ['a wrap-up month with a day on it', { route: '/wrap-up', month: '2026-10-01' }],
+    ['a wrap-up month carrying more query', { route: '/wrap-up', month: '2026-10&next=/settings' }],
+    ['a wrap-up month that is a number', { route: '/wrap-up', month: 202610 }],
     ['no id', { route: '/bill' }],
     ['an id that is not a row id', { route: '/bill', id: '../settings' }],
     ['a route that is not on the list', { route: '/delete-account', id: BILL_ID }],
@@ -139,6 +150,14 @@ describe('useNotificationRouting', () => {
     await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith({ pathname: '/bill/[id]', params: { id: BILL_ID } }),
     );
+  });
+
+  it("opens the month's wrap-up from the local wrap-up notice", async () => {
+    // A local notification's data is the content's data itself, as scheduled.
+    mockResponse = tap({ route: '/wrap-up', month: '2026-10' });
+    await renderHook(() => useNotificationRouting());
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/wrap-up?month=2026-10'));
+    expect(mockPush).toHaveBeenCalledTimes(1);
   });
 
   it('leaves Remind me in 1 hour to the phone, opening nothing', async () => {

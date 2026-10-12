@@ -67,6 +67,43 @@ export const remindersMessages = defineMessages({
     fr: 'Envoyé à {time}. Change l’heure du rappel quotidien des reçus.',
   },
 
+  'reminders.wrapUp.title': { en: 'Savings', es: 'Ahorros', fr: 'Épargne' },
+  /** Spanish puts the time last, as in reminders.receipts.time. */
+  'reminders.wrapUp.caption': {
+    en: 'On the 1st of every month, at {time}.',
+    es: 'El día 1 de cada mes. Hora de envío: {time}',
+    fr: 'Le 1er de chaque mois, à {time}.',
+  },
+  'reminders.wrapUp.switch': {
+    en: 'Monthly wrap-up',
+    es: 'Resumen mensual',
+    fr: 'Bilan mensuel',
+  },
+  'reminders.wrapUp.nudge': {
+    en: 'What came in last month, what went out and what was left.',
+    es: 'Lo que entró el mes pasado, lo que salió y lo que sobró.',
+    fr: 'Ce qui est entré le mois dernier, ce qui est sorti et ce qui est resté.',
+  },
+  'reminders.wrapUp.refused': {
+    en: "Notifications are off for Skip in your phone's settings.",
+    es: 'Las notificaciones de Skip están desactivadas en los ajustes de tu teléfono.',
+    fr: 'Les notifications de Skip sont désactivées dans les réglages de ton téléphone.',
+  },
+  /**
+   * The notification. {month} is the month that just ended, lower-case in Spanish and French. French
+   * says "pour" so the line never needs "d’" before avril, août or octobre.
+   */
+  'reminders.wrapUp.notificationTitle': {
+    en: 'Your {month} wrap-up is ready',
+    es: 'Tu resumen de {month} está listo',
+    fr: 'Ton bilan pour {month} est prêt',
+  },
+  'reminders.wrapUp.notificationBody': {
+    en: 'See how {month} went.',
+    es: 'Mira cómo te fue en {month}.',
+    fr: 'Regarde comment s’est passé {month}.',
+  },
+
   'reminders.group.bills': { en: 'Bills', es: 'Facturas', fr: 'Factures' },
   'reminders.group.subscriptions': {
     en: 'Subscriptions',

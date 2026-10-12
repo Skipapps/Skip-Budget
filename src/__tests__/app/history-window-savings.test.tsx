@@ -2,26 +2,50 @@ import { act, render } from '@testing-library/react-native';
 import type { ReactTestRendererJSON } from 'react-test-renderer';
 
 import SavingsScreen from '@/app/savings';
+import { AUGUST, JULY, SEPTEMBER } from '@/components/savings/__fixtures__/design';
 import { t } from '@/i18n';
 import { publishProStatus, resetProStatusForTests, type ProStatus } from '@/lib/pro-status';
 
 /**
- * The 90-day window hides older history from the free plan. Savings has no history to hide, so it
- * is the same page on every plan: the placeholder, with no "older history" notice and no Pro wall.
+ * The 90-day window hides older history from the free plan. Savings is free on every plan and
+ * lists every month it has, however old: no "older history" notice and no Pro wall.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 jest.mock('react-native-keyboard-controller', () =>
   jest.requireActual('react-native-keyboard-controller/jest'),
 );
+jest.mock('@/components/ui/skeleton', () => ({ SkeletonList: () => null, Skeleton: () => null }));
 jest.mock('@/providers/theme-provider', () => ({
-  useColors: () => ({ ink: '#000000', muted: '#777777', line: '#DDDDDD', surface: '#FFFFFF' }),
+  useTheme: () => ({ scheme: 'light' }),
+  useColors: () => new Proxy({}, { get: () => '#000000' }),
   useMoneyColor: () => () => '#000000',
 }));
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
+jest.mock('@/theme/gradient-icons', () => ({
+  useGradientIcons: () => new Proxy({}, { get: () => () => null }),
+}));
 jest.mock('expo-router', () => ({ router: { back: jest.fn(), push: jest.fn() } }));
+
+// A year-old month among this year's: older than any free window.
+const mockPots = [
+  SEPTEMBER,
+  AUGUST,
+  JULY,
+  { ...JULY, id: 'old', month: '2025-07-01', movedOn: '2025-08-01' },
+];
+jest.mock('@/api/savings', () => ({
+  useSavings: () => ({
+    pots: mockPots,
+    summary: { readyToUse: 850, pots: mockPots },
+    soFar: null,
+    isPending: false,
+    isError: false,
+    refetch: () => {},
+  }),
+}));
 
 type Node = ReactTestRendererJSON | ReactTestRendererJSON[] | string | null;
 
@@ -49,13 +73,14 @@ const PLANS: [string, ProStatus][] = [
 beforeEach(() => resetProStatusForTests());
 
 it.each(PLANS)(
-  'shows the placeholder on the %s plan, with no history notice or wall',
+  'lists every month on the %s plan, with no history notice or wall',
   async (_name, status) => {
     await act(async () => publishProStatus(status));
     const screen = await render(<SavingsScreen />);
 
-    expect(screen.getByText('Savings is getting a fresh start')).toBeTruthy();
-    expect(screen.getByText('A new way to save is on its way. It will show up here.')).toBeTruthy();
+    expect(screen.getByText('2026')).toBeTruthy();
+    expect(screen.getByText('2025')).toBeTruthy();
+    expect(screen.getAllByText('July')).toHaveLength(2);
     expect(
       shownText(screen.toJSON() as Node).filter((line) =>
         NOTICE.some((part) => line.includes(part)),

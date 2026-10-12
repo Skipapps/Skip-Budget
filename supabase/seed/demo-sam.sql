@@ -321,17 +321,12 @@ on conflict do nothing;
 -- 9 · A savings pot
 -- ---------------------------------------------------------------------------
 --
--- `savings_pots` is read by useSavingsPots() and, as of this branch, rendered
--- by no screen — the Savings page is driven by monthly_savings below. Seeded
--- anyway so the table is not empty if a tile starts reading it.
-
-insert into public.savings_pots (id, user_id, name, amount)
-values (
-  md5('skip-demo-2026-09:pot:emergency')::uuid,
-  'bdb18bea-c7e9-4f25-bcfd-8ca2d9cf2020'::uuid,
-  'Emergency fund', 4200.00
-)
-on conflict do nothing;
+-- Nothing is seeded here any more. Since 20261011100001_savings_goals.sql,
+-- savings pots are the person's closed months and the savings they add, and
+-- the app fills the months in itself; a row written here would be money the
+-- person never put aside (and the old two-column insert now fails on `kind`).
+-- The "Emergency fund" row an earlier apply wrote is kept by that migration,
+-- marked removed; the cleanup file still deletes it.
 
 -- ---------------------------------------------------------------------------
 -- 10 · A split group, with two people who are not Skip accounts

@@ -84,6 +84,22 @@ jest.mock('@/api/queries', () => ({
     refetch: jest.fn(),
   }),
 }));
+jest.mock('@/api/savings', () => ({
+  useSavingsCore: () => ({
+    pots: [],
+    summary: { readyToUse: 850 },
+    isPending: false,
+    isError: false,
+  }),
+}));
+jest.mock('@/api/goals', () => ({
+  useGoals: () => ({
+    goals: [],
+    summary: { active: [], done: [] },
+    isPending: false,
+    isError: false,
+  }),
+}));
 jest.mock('@/api/loans', () => ({
   useActiveLoans: () => ({
     loans: [{ billId: 'b1', name: 'Car loan' }],
@@ -115,11 +131,12 @@ const NATURAL: Record<string, number> = {
   'goals-label': 50,
   'salary-figure': 111.5,
   'loans-figure': 77,
-  'savings-pill': 71.6,
-  'goals-pill': 138.5,
+  'savings-figure': 89.2,
+  'goals-pill': 115.8,
   'salary-note': 64.7,
-  'savings-note': 50.7,
+  'savings-note': 48.9,
   'loans-note': 30,
+  'goals-note': 85.7,
 };
 
 /** One layout pass with `room` points for each tile's text, then the four group boxes. */
@@ -171,8 +188,10 @@ describe('Cards — Money tiles at large text sizes', () => {
       ['Goals', 1.3],
       ['$12,345.67', 1.2],
       ['1 active', 1.2],
-      ['Open', 1.3],
-      ['Coming soon', 1.3],
+      ['$850.00', 1.2],
+      ['Add a goal', 1.3],
+      ['Ready to use', 1.3],
+      ['Save for something', 1.3],
       ['Monthly', 1.3],
       ['Car loan', 1.3],
     ];
@@ -205,13 +224,14 @@ describe('Cards — Money tiles at large text sizes', () => {
 
   it('keeps two to a row while every line fits, at its full size', async () => {
     const screen = await render(<CardsScreen />);
-    // 140pt each, a 402pt phone: "Coming soon" needs 138.5pt with its padding.
+    // 140pt each, a 402pt phone: "Add a goal" needs 115.8pt with its padding.
     await layOutTiles(screen, 140);
 
     expect(tilesStacked(screen)).toBe(false);
     expect(sizeOf(screen, '$12,345.67')).toBe(18);
     expect(sizeOf(screen, '1 active')).toBe(18);
-    expect(sizeOf(screen, 'Coming soon')).toBe(13);
+    expect(sizeOf(screen, '$850.00')).toBe(18);
+    expect(sizeOf(screen, 'Add a goal')).toBe(13);
   });
 
   it('shrinks both figures together when the wider one needs it, side by side', async () => {
@@ -227,13 +247,13 @@ describe('Cards — Money tiles at large text sizes', () => {
 
   it('stacks the tiles rather than break a pill onto two lines', async () => {
     const screen = await render(<CardsScreen />);
-    // 126.5pt each, a 375pt phone: "Coming soon" no longer fits whole.
-    await layOutTiles(screen, 126.5);
+    // 110pt each: "Add a goal" no longer fits whole, though every other line still would.
+    await layOutTiles(screen, 110);
 
     expect(tilesStacked(screen)).toBe(true);
-    expect(screen.getByText('Coming soon').props.numberOfLines).toBeUndefined();
+    expect(screen.getByText('Add a goal').props.numberOfLines).toBeUndefined();
     // Nothing shrank to make room.
-    expect(sizeOf(screen, 'Coming soon')).toBe(13);
+    expect(sizeOf(screen, 'Add a goal')).toBe(13);
   });
 
   it('stacks the tiles rather than take the figures under their default size', async () => {

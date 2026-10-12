@@ -101,6 +101,10 @@ export type Tokens = {
   accent: string;
   /** The accent as type on the page, pushed until it is legible there. */
   accentInk: string;
+  /** The accent as a soft fill: round header actions, status pills, a chosen tile. */
+  tint: string;
+  /** Type and icons on `tint`, pushed until legible there. */
+  tintInk: string;
   moneyIn: string;
   moneyOut: string;
   /** Destructive type and glyphs — Delete, Remove, Sign out. Never a fill. */
@@ -110,6 +114,9 @@ export type Tokens = {
 export function buildTokens(scheme: Scheme): Tokens {
   const ramp = RAMPS[scheme];
   const accent = ACCENT;
+  const accentInk = readable(accent.value, ramp.surface);
+  // A tenth of the accent all but vanishes on a dark card, so dark takes more of it.
+  const tint = mix(ramp.card, accent.value, scheme === 'dark' ? 0.28 : 0.1);
 
   return {
     ...ramp,
@@ -118,7 +125,9 @@ export function buildTokens(scheme: Scheme): Tokens {
     controlPressed: mix(accent.value, scheme === 'dark' ? '#FFFFFF' : '#000000', 0.18),
     onControl: accent.on,
     accent: accent.value,
-    accentInk: readable(accent.value, ramp.surface),
+    accentInk,
+    tint,
+    tintInk: readable(accentInk, tint),
     moneyIn: ramp.moneyIn,
     moneyOut: ramp.moneyOut,
     danger: ramp.danger,

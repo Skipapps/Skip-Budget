@@ -26,6 +26,9 @@ module.exports = {
         // `accent` fills; `accent-ink` is the accent adjusted until it reads as type on the page.
         accent: 'rgb(var(--color-accent) / <alpha-value>)',
         'accent-ink': 'rgb(var(--color-accent-ink) / <alpha-value>)',
+        // `tint` is the accent as a soft fill; `tint-ink` reads on it in both modes.
+        tint: 'rgb(var(--color-tint) / <alpha-value>)',
+        'tint-ink': 'rgb(var(--color-tint-ink) / <alpha-value>)',
         'on-control': 'rgb(var(--color-on-control) / <alpha-value>)',
         control: {
           DEFAULT: 'rgb(var(--color-control) / <alpha-value>)',

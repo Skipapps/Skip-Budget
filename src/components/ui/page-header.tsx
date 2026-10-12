@@ -100,12 +100,12 @@ function HeaderAction({
         height: ACTION_SIZE,
         opacity: disabled && !busy ? 0.5 : 1,
       }}
-      className="items-center justify-center rounded-full bg-accent/10 active:bg-accent/20"
+      className="items-center justify-center rounded-full bg-tint active:opacity-70"
     >
       {busy ? (
-        <ActivityIndicator size="small" color={colors.accentInk} />
+        <ActivityIndicator size="small" color={colors.tintInk} />
       ) : (
-        <Icon size={20} color={colors.accentInk} strokeWidth={1.9} />
+        <Icon size={20} color={colors.tintInk} strokeWidth={1.9} />
       )}
     </Pressable>
   );

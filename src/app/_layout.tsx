@@ -11,6 +11,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useRegisterPush } from '@/api/push';
+import { useWrapUpNotification } from '@/api/wrap-up-notification';
 import { AppLockGate } from '@/components/app-lock-gate';
 import { LaunchSplash } from '@/components/launch-splash';
 import { useLocale } from '@/i18n';
@@ -110,6 +111,7 @@ function RootNavigator() {
   // Inside the session, because a token is stored against a user. Re-runs on every launch: iOS
   // rotates tokens on restore and reinstall, and a stale one fails silently.
   useRegisterPush();
+  useWrapUpNotification();
 
   // Until the stored session is read, the first frame would route a signed-in user to onboarding.
   if (!ready) return null;

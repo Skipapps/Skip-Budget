@@ -17,10 +17,12 @@ import { PageState } from '@/components/ui/page-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Screen } from '@/components/ui/screen';
 import { SectionHeading, Title } from '@/components/ui/typography';
+import { useGoals } from '@/api/goals';
 import { useActiveLoans } from '@/api/loans';
 import { useBankAccounts, useCards, useSalarySources, useSourceBalances } from '@/api/queries';
 import { usePro } from '@/api/pro';
 import { useRefreshAll } from '@/api/refresh';
+import { useSavingsCore } from '@/api/savings';
 import { incomeForMonth } from '@/lib/pay';
 import { useToday } from '@/lib/use-today';
 import { t } from '@/i18n';
@@ -97,6 +99,8 @@ export default function CardsScreen() {
   const accounts = useBankAccounts();
   const salary = useSalarySources();
   const loans = useActiveLoans(today);
+  const savings = useSavingsCore();
+  const goals = useGoals();
   const {
     balances,
     updated,
@@ -148,6 +152,10 @@ export default function CardsScreen() {
   );
   const hasSalary = (salary.data?.length ?? 0) > 0;
   const loanList = loans.loans;
+  const activeGoals = goals.summary.active;
+  const reachedGoals = goals.summary.done.length;
+  const savingsUnread = savings.isError && savings.pots.length === 0;
+  const goalsUnread = goals.isError && goals.goals.length === 0;
 
   const tiles: Tile[] = [
     {
@@ -166,9 +174,13 @@ export default function CardsScreen() {
       id: 'savings',
       icon: 'savings',
       label: t('cards.list.savings'),
-      // Savings stands on its own while it is redesigned, so its tile carries no figure.
-      value: { kind: 'pill', text: t('cards.money.open') },
-      note: t('cards.money.startSaving'),
+      // Unread says nothing rather than $0; a failed reload behind a figure keeps the figure.
+      value: savings.isPending
+        ? { kind: 'loading' }
+        : savingsUnread
+          ? { kind: 'pill', text: t('cards.money.open') }
+          : { kind: 'figure', text: formatCurrency(savings.summary.readyToUse) },
+      note: savings.isPending || savingsUnread ? undefined : t('cards.money.readyToUse'),
       onPress: () => router.push('/savings'),
     },
     {
@@ -192,7 +204,22 @@ export default function CardsScreen() {
       id: 'goals',
       icon: 'goals',
       label: t('cards.money.goals'),
-      value: { kind: 'soon', text: t('cards.money.comingSoon') },
+      value: goals.isPending
+        ? { kind: 'loading' }
+        : activeGoals.length > 0
+          ? { kind: 'figure', text: t('cards.money.goalsActive', { count: activeGoals.length }) }
+          : { kind: 'pill', text: goalsUnread ? t('cards.money.open') : t('cards.money.addGoal') },
+      note: goals.isPending
+        ? undefined
+        : activeGoals.length > 0
+          ? activeGoals.map((goal) => goal.name).join(' · ')
+          : goalsUnread
+            ? undefined
+            : reachedGoals > 0
+              ? t('cards.money.goalsReached', { count: reachedGoals })
+              : t('cards.money.saveForSomething'),
+      // The Goals page lists them, or invites a first one, so any count opens it.
+      onPress: () => router.push('/goals'),
     },
   ];
   const rows = [tiles.slice(0, 2), tiles.slice(2, 4)];

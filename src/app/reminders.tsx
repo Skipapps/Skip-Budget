@@ -3,6 +3,7 @@ import {
   Clock,
   CreditCard,
   Landmark,
+  PiggyBank,
   ReceiptText,
   Repeat,
   Trash2,
@@ -32,6 +33,7 @@ import {
   useSalaryAccountIds,
   useSubscriptions,
 } from '@/api/queries';
+import { useWrapUpSwitch, WRAP_UP_HOUR } from '@/api/wrap-up-notification';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -46,6 +48,7 @@ import { tap } from '@/lib/haptics';
 import { useToast } from '@/providers/toast-context';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
+import { TEXT_CAP } from '@/theme/text-scale';
 import { failureText } from '@/lib/failure';
 import { t } from '@/i18n';
 
@@ -78,6 +81,7 @@ export default function RemindersScreen() {
   const reminders = useReminders();
   const receipts = useReceiptReminder();
   const salaryAccounts = useSalaryAccountIds();
+  const wrapUp = useWrapUpSwitch();
 
   // Which row's clock is open, by target key. One at a time.
   const [timeFor, setTimeFor] = useState<string | null>(null);
@@ -101,7 +105,8 @@ export default function RemindersScreen() {
     receipts.isLoading ||
     // Until this lands no account looks like one pay arrives in, so rows would flash "No pay lands
     // here yet".
-    salaryAccounts.isLoading;
+    salaryAccounts.isLoading ||
+    !wrapUp.ready;
 
   /**
    * Any read that decides what a switch says. A switch drawn off for a read that never landed would
@@ -207,12 +212,15 @@ export default function RemindersScreen() {
 
   const targets = groups.reduce((sum, group) => sum + group.items.length, 0);
   // Counted over what can actually be switched on, plus the receipts reminder (in neither number if
-  // its own read failed, since the page cannot say whether it is on).
+  // its own read failed, since the page cannot say whether it is on) and the monthly wrap-up (not
+  // when the phone refused notifications, since only its Settings can turn that on).
   const available =
     (receiptsFailed ? 0 : 1) +
+    (wrapUp.refused ? 0 : 1) +
     groups.reduce((sum, group) => sum + group.items.filter((item) => !item.blocked).length, 0);
   const on =
     (receipts.enabled && !receiptsFailed ? 1 : 0) +
+    (wrapUp.enabled ? 1 : 0) +
     (reminders.data ?? []).filter((row) => row.enabled).length;
 
   return (
@@ -325,6 +333,60 @@ export default function RemindersScreen() {
                   }}
                 />
               ) : null}
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {!loading && !failed ? (
+        <View className="mt-8 w-full">
+          <View className="flex-row items-center gap-2">
+            <PiggyBank size={18} color={colors.muted} strokeWidth={1.8} />
+            <Text
+              className="font-app-semibold text-[17px] text-ink"
+              maxFontSizeMultiplier={TEXT_CAP.heading}
+            >
+              {t('reminders.wrapUp.title')}
+            </Text>
+          </View>
+
+          <Text
+            className="mt-1 font-app text-[13px] text-muted"
+            maxFontSizeMultiplier={TEXT_CAP.heading}
+          >
+            {t('reminders.wrapUp.caption', { time: formatClock(WRAP_UP_HOUR, 0) })}
+          </Text>
+
+          <View className="mt-5 w-full rounded-[16px] border border-line bg-card px-4 py-3.5">
+            <View className="w-full flex-row items-center gap-3">
+              <View className="flex-1">
+                <Text
+                  className="font-app-semibold text-[15px] text-ink"
+                  maxFontSizeMultiplier={TEXT_CAP.row}
+                >
+                  {t('reminders.wrapUp.switch')}
+                </Text>
+                <Text
+                  className="font-app text-[13px] text-muted"
+                  maxFontSizeMultiplier={TEXT_CAP.row}
+                >
+                  {wrapUp.refused ? t('reminders.wrapUp.refused') : t('reminders.wrapUp.nudge')}
+                </Text>
+              </View>
+
+              <SwitchControl
+                value={wrapUp.enabled}
+                disabled={wrapUp.refused}
+                onValueChange={(next) => {
+                  void wrapUp.setEnabled(next).then((done) => {
+                    // Declined at the system prompt: the switch stays off and nothing was saved.
+                    if (!done) return;
+                    if (next) toast('toast.reminder.saved');
+                    else toast('toast.reminder.off', 'deleted');
+                  });
+                }}
+                accessibilityLabel={t('reminders.wrapUp.switch')}
+              />
             </View>
           </View>
         </View>

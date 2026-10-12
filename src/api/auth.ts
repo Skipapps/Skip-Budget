@@ -1,6 +1,7 @@
 import { forgetDevice } from '@/api/push';
 import { forgetKnownStores } from '@/api/known-stores';
 import { forgetVoiceAliases } from '@/api/voice-aliases';
+import { cancelWrapUpNotification } from '@/api/wrap-up-notification';
 import { t } from '@/i18n';
 import { failureMessage, failureText } from '@/lib/failure';
 import { supabase } from '@/lib/supabase';
@@ -117,6 +118,9 @@ export async function sendPasswordReset(email: string): Promise<AuthResult> {
 export async function signOut(): Promise<AuthResult> {
   await forgetThisDevice();
   await forgetThisPersonsVoice();
+  // Scheduled on the phone, so the server cannot take it back: it would announce this account's
+  // month to whoever signs in next.
+  await cancelWrapUpNotification();
 
   const { error } = await supabase.auth.signOut();
   return { error: error ? failureMessage(error) : null };
@@ -179,6 +183,7 @@ export async function deleteAccount(): Promise<AuthResult> {
   // The server has nothing left; clear the learned voice corrections while the stored session
   // still names the person.
   await forgetThisPersonsVoice();
+  await cancelWrapUpNotification();
   await supabase.auth.signOut();
   return { error: null };
 }

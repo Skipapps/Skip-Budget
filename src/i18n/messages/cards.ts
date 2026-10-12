@@ -86,11 +86,6 @@ export const cardsMessages = defineMessages({
   'cards.money.addSalary': { en: 'Add salary', es: 'Agregar salario', fr: 'Ajouter ta paie' },
   'cards.money.addPay': { en: 'Add your pay', es: 'Agrega tu salario', fr: 'Ajoute ta paie' },
   'cards.money.open': { en: 'Open', es: 'Abrir', fr: 'Ouvrir' },
-  'cards.money.startSaving': {
-    en: 'Start saving',
-    es: 'Empieza a ahorrar',
-    fr: 'Commence à épargner',
-  },
   'cards.money.addLoan': { en: 'Add a loan', es: 'Agregar uno', fr: 'Ajouter un prêt' },
   'cards.money.trackLoans': {
     en: 'Track what you owe',
@@ -102,7 +97,23 @@ export const cardsMessages = defineMessages({
     es: { one: '1 activo', other: '{count} activos' },
     fr: { one: '1 actif', other: '{count} actifs' },
   },
-  'cards.money.comingSoon': { en: 'Coming soon', es: 'Próximamente', fr: 'Bientôt' },
+  'cards.money.readyToUse': { en: 'Ready to use', es: 'Listo para usar', fr: 'Prêt à utiliser' },
+  'cards.money.addGoal': { en: 'Add a goal', es: 'Agregar una', fr: 'Nouvel objectif' },
+  'cards.money.saveForSomething': {
+    en: 'Save for something',
+    es: 'Ahorra para algo',
+    fr: 'Épargne pour un projet',
+  },
+  'cards.money.goalsReached': {
+    en: { one: '1 reached', other: '{count} reached' },
+    es: { one: '1 cumplida', other: '{count} cumplidas' },
+    fr: { one: '1 atteint', other: '{count} atteints' },
+  },
+  'cards.money.goalsActive': {
+    en: { one: '1 active', other: '{count} active' },
+    es: { one: '1 activa', other: '{count} activas' },
+    fr: { one: '1 en cours', other: '{count} en cours' },
+  },
   'cards.money.tileLabel': {
     en: '{name}, {value}, {note}',
     es: '{name}, {value}, {note}',

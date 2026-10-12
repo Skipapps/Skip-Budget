@@ -27,7 +27,9 @@ const AFFECTS: Record<string, string[]> = {
   bank_accounts: ['bank_accounts', 'dashboard'],
   salary_sources: ['salary_sources', 'dashboard'],
   pay_received: ['pay_received', 'dashboard'],
-  savings_pots: ['savings_pots', 'dashboard'],
+  // Long published, so listening to it adds nothing new to the channel. Goals and their moves are
+  // not listened to: a table missing on the server would refuse the whole channel.
+  savings_pots: ['savings'],
   reminders: ['reminders'],
   loans: ['loans'],
   profiles: ['profile'],

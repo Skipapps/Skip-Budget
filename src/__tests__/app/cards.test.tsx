@@ -107,6 +107,30 @@ jest.mock('@/api/loans', () => ({
 
 jest.mock('@/lib/use-today', () => ({ useToday: () => ({ today: '2026-09-12' }) }));
 
+let mockSavings: { readyToUse: number; isPending: boolean; isError: boolean };
+jest.mock('@/api/savings', () => ({
+  useSavingsCore: () => ({
+    pots: mockSavings.isError ? [] : [{ id: 'sep' }],
+    summary: { readyToUse: mockSavings.readyToUse },
+    isPending: mockSavings.isPending,
+    isError: mockSavings.isError,
+  }),
+}));
+let mockGoals: {
+  active: { id: string; name: string }[];
+  done: { id: string; name: string }[];
+  isPending: boolean;
+  isError: boolean;
+};
+jest.mock('@/api/goals', () => ({
+  useGoals: () => ({
+    goals: [...mockGoals.active, ...mockGoals.done],
+    summary: { active: mockGoals.active, done: mockGoals.done },
+    isPending: mockGoals.isPending,
+    isError: mockGoals.isError,
+  }),
+}));
+
 const monthly = {
   id: 's1',
   name: 'Acme',
@@ -141,6 +165,8 @@ beforeEach(() => {
   ];
   mockSalary = { data: [monthly], isPending: false, isError: false };
   mockLoans = { loans: [], isPending: false, isError: false };
+  mockSavings = { readyToUse: 850, isPending: false, isError: false };
+  mockGoals = { active: [], done: [], isPending: false, isError: false };
   mockBalancesFailed = false;
   mockCardFaces.length = 0;
   mockAccountFaces.length = 0;
@@ -208,7 +234,7 @@ describe('Cards — the two lists', () => {
 });
 
 describe('Cards — the Money tiles', () => {
-  it('draws Salary, Savings, Loans and Goals in that order, three with a chevron', async () => {
+  it('draws Salary, Savings, Loans and Goals in that order, each with a chevron', async () => {
     const screen = await render(<CardsScreen />);
 
     // In the order drawn, which is the order they stack in when they must.
@@ -217,7 +243,7 @@ describe('Cards — the Money tiles', () => {
         .getAllByTestId(/^money-tile-(salary|savings|loans|goals)$/)
         .map((tile) => tile.props.testID),
     ).toEqual(['money-tile-salary', 'money-tile-savings', 'money-tile-loans', 'money-tile-goals']);
-    for (const id of ['salary', 'savings', 'loans']) {
+    for (const id of ['salary', 'savings', 'loans', 'goals']) {
       expect(
         within(screen.getByTestId(`money-tile-${id}`)).getByTestId('icon-ChevronRight'),
       ).toBeTruthy();
@@ -256,7 +282,7 @@ describe('Cards — the Money tiles', () => {
 
     expect(screen.getByText('Add salary')).toBeTruthy();
     expect(screen.getByText('Add your pay')).toBeTruthy();
-    expect(screen.queryByText(/^\$/)).toBeNull();
+    expect(within(screen.getByTestId('money-tile-salary')).queryByText(/^\$/)).toBeNull();
     await fireEvent.press(screen.getByLabelText('Salary, Add salary, Add your pay'));
     expect(router.push).toHaveBeenLastCalledWith('/salary');
   });
@@ -271,12 +297,36 @@ describe('Cards — the Money tiles', () => {
     expect(screen.getAllByTestId('skeleton').length).toBeGreaterThan(0);
   });
 
-  it('Savings is a door to the page, with no figure', async () => {
+  it('Savings shows what is ready to use, and opens Savings', async () => {
     const screen = await render(<CardsScreen />);
 
-    expect(screen.getByText('Open')).toBeTruthy();
-    expect(screen.getByText('Start saving')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Savings, Open, Start saving'));
+    expect(screen.getByText('$850.00')).toBeTruthy();
+    expect(screen.getByText('Ready to use')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Savings, $850.00, Ready to use'));
+    expect(router.push).toHaveBeenLastCalledWith('/savings');
+  });
+
+  it('Savings shows $0.00 when nothing is ready, never an offer', async () => {
+    mockSavings.readyToUse = 0;
+    const screen = await render(<CardsScreen />);
+
+    expect(screen.getByLabelText('Savings, $0.00, Ready to use')).toBeTruthy();
+  });
+
+  it('Savings draws no figure while savings are read', async () => {
+    mockSavings = { readyToUse: 0, isPending: true, isError: false };
+    const screen = await render(<CardsScreen />);
+
+    expect(screen.getByLabelText('Savings')).toBeTruthy();
+    expect(screen.queryByText('$0.00')).toBeNull();
+  });
+
+  it('Savings shows no $0 when savings cannot be read, and still opens the page', async () => {
+    mockSavings = { readyToUse: 0, isPending: false, isError: true };
+    const screen = await render(<CardsScreen />);
+
+    expect(screen.queryByText('$0.00')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Savings, Open'));
     expect(router.push).toHaveBeenLastCalledWith('/savings');
   });
 
@@ -322,17 +372,46 @@ describe('Cards — the Money tiles', () => {
     expect(router.push).toHaveBeenLastCalledWith('/loans');
   });
 
-  it('Goals says Coming soon and goes nowhere', async () => {
+  it('Goals with none invites a first one, and opens Goals', async () => {
     const screen = await render(<CardsScreen />);
 
-    const tile = screen.getByLabelText('Goals, Coming soon');
-    expect(tile.props.accessibilityRole).toBeUndefined();
-    expect(tile.props.onPress).toBeUndefined();
-    expect(
-      within(screen.getByTestId('money-tile-goals')).queryByTestId('icon-ChevronRight'),
-    ).toBeNull();
-    await fireEvent.press(screen.getByText('Coming soon'));
-    expect(router.push).not.toHaveBeenCalled();
+    expect(screen.getByText('Add a goal')).toBeTruthy();
+    expect(screen.getByText('Save for something')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Goals, Add a goal, Save for something'));
+    expect(router.push).toHaveBeenLastCalledWith('/goals');
+  });
+
+  it('Goals counts the active ones, names them and opens Goals', async () => {
+    mockGoals.active = [
+      { id: 'g1', name: 'Trip' },
+      { id: 'g2', name: 'Emergency fund' },
+    ];
+    const screen = await render(<CardsScreen />);
+
+    expect(screen.getByText('2 active')).toBeTruthy();
+    expect(screen.getByText('Trip · Emergency fund')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Goals, 2 active, Trip · Emergency fund'));
+    expect(router.push).toHaveBeenLastCalledWith('/goals');
+  });
+
+  it('Goals with only reached ones counts them and still invites a new one', async () => {
+    mockGoals.done = [
+      { id: 'g1', name: 'New phone' },
+      { id: 'g2', name: 'Bike' },
+    ];
+    const screen = await render(<CardsScreen />);
+
+    await fireEvent.press(screen.getByLabelText('Goals, Add a goal, 2 reached'));
+    expect(router.push).toHaveBeenLastCalledWith('/goals');
+  });
+
+  it('Goals offers no first goal while the goals are read', async () => {
+    mockGoals = { active: [], done: [], isPending: true, isError: false };
+    const screen = await render(<CardsScreen />);
+
+    expect(screen.queryByText('Add a goal')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Goals'));
+    expect(router.push).toHaveBeenLastCalledWith('/goals');
   });
 });
 

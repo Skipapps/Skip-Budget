@@ -85,6 +85,22 @@ jest.mock('@/api/queries', () => ({
 // 1,000 a week normalises to 4,333.33 a month.
 let mockSalary: object[] = [];
 let mockLoans: { billId: string; name: string }[] = [];
+jest.mock('@/api/savings', () => ({
+  useSavingsCore: () => ({
+    pots: [],
+    summary: { readyToUse: 850 },
+    isPending: false,
+    isError: false,
+  }),
+}));
+jest.mock('@/api/goals', () => ({
+  useGoals: () => ({
+    goals: [],
+    summary: { active: [], done: [] },
+    isPending: false,
+    isError: false,
+  }),
+}));
 jest.mock('@/api/loans', () => ({
   useActiveLoans: () => ({
     loans: mockLoans,
@@ -158,17 +174,15 @@ describe('Cards tab in Spanish', () => {
     expect(screen.getByLabelText('Salario, $4,333.33, Mensual')).toBeTruthy();
     expect(screen.getByText('$4,333.33')).toBeTruthy();
     expect(screen.getByLabelText('Préstamos, Agregar uno, Sigue lo que debes')).toBeTruthy();
-    expect(screen.getByLabelText('Metas, Próximamente')).toBeTruthy();
+    expect(screen.getByLabelText('Metas, Agregar una, Ahorra para algo')).toBeTruthy();
     expectNoLeftovers(screen);
   });
 
-  it('draws the Savings tile with Abrir where a figure would be, and opens Ahorros', async () => {
+  it('draws the Savings tile with what is ready to use, and opens Ahorros', async () => {
     const screen = await render(<CardsScreen />);
 
-    const tile = screen.getByLabelText('Ahorros, Abrir, Empieza a ahorrar');
-    expect(screen.getByText('Abrir')).toBeTruthy();
-    // The Salary figure is the only number on the tab (the faces are drawn empty here).
-    expect(screen.getAllByText(/\d/)).toHaveLength(1);
+    const tile = screen.getByLabelText('Ahorros, $850.00, Listo para usar');
+    expect(screen.getByText('Listo para usar')).toBeTruthy();
 
     await fireEvent.press(tile);
     expect(router.push).toHaveBeenLastCalledWith('/savings');
@@ -245,16 +259,17 @@ describe('Cards tab in French', () => {
     expect(screen.getByLabelText(`Salaire, 4${NBSP}333,33${NBSP}$, Chaque mois`)).toBeTruthy();
     expect(screen.getByText(`4${NBSP}333,33${NBSP}$`)).toBeTruthy();
     expect(screen.getByLabelText('Prêts, Ajouter un prêt, Suis ce que tu dois')).toBeTruthy();
-    expect(screen.getByLabelText('Objectifs, Bientôt')).toBeTruthy();
+    expect(
+      screen.getByLabelText('Objectifs, Nouvel objectif, Épargne pour un projet'),
+    ).toBeTruthy();
     expectNoLeftovers(screen);
   });
 
-  it('draws the Savings tile with Ouvrir where a figure would be, and opens Épargne', async () => {
+  it('draws the Savings tile with what is ready to use, and opens Épargne', async () => {
     const screen = await render(<CardsScreen />);
 
-    const tile = screen.getByLabelText('Épargne, Ouvrir, Commence à épargner');
-    expect(screen.getByText('Ouvrir')).toBeTruthy();
-    expect(screen.getAllByText(/\d/)).toHaveLength(1);
+    const tile = screen.getByLabelText(`Épargne, 850,00${NBSP}$, Prêt à utiliser`);
+    expect(screen.getByText(`850,00${NBSP}$`)).toBeTruthy();
 
     await fireEvent.press(tile);
     expect(router.push).toHaveBeenLastCalledWith('/savings');

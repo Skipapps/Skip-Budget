@@ -68,6 +68,38 @@ export const toastMessages = defineMessages({
     fr: 'Paiement supprimé',
   },
   'toast.money.added': { en: 'Money added', es: 'Dinero agregado', fr: 'Argent ajouté' },
+  'toast.savings.added': {
+    en: 'Added to savings',
+    es: 'Agregado a ahorros',
+    fr: 'Ajouté à l’épargne',
+  },
+  'toast.savings.updated': {
+    en: 'Savings updated',
+    es: 'Ahorro actualizado',
+    fr: 'Épargne mise à jour',
+  },
+  'toast.savings.removed': {
+    en: 'Removed from savings',
+    es: 'Quitado de ahorros',
+    fr: 'Retiré de l’épargne',
+  },
+  'toast.goals.sent': {
+    en: 'Sent to your goals',
+    es: 'Enviado a tus metas',
+    fr: 'Envoyé à tes objectifs',
+  },
+  'toast.goal.added': { en: 'Goal added', es: 'Meta agregada', fr: 'Objectif ajouté' },
+  'toast.goal.updated': {
+    en: 'Goal updated',
+    es: 'Meta actualizada',
+    fr: 'Objectif mis à jour',
+  },
+  'toast.goal.deleted': { en: 'Goal deleted', es: 'Meta eliminada', fr: 'Objectif supprimé' },
+  'toast.goal.takenOut': {
+    en: 'Money taken out',
+    es: 'Dinero retirado',
+    fr: 'Argent retiré',
+  },
   'toast.logo.updated': { en: 'Logo updated', es: 'Logo actualizado', fr: 'Logo mis à jour' },
   'toast.message.sent': { en: 'Message sent', es: 'Mensaje enviado', fr: 'Message envoyé' },
   'toast.profile.updated': {

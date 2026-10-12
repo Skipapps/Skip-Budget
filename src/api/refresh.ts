@@ -4,6 +4,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 
 import { recordDueCharges } from '@/api/charges';
 import { recordDuePay } from '@/api/pay';
+import { closeFinishedMonths } from '@/api/savings';
 import { nextOccurrenceFrom } from '@/lib/card-ledger';
 import { settleWithin } from '@/lib/deadline';
 import { toIsoDate } from '@/lib/date';
@@ -112,6 +113,11 @@ async function sweep(client: ReturnType<typeof useQueryClient>, userId: string):
 
   const paid = await recordDuePay(userId, today);
   if (paid > 0) client.invalidateQueries({ queryKey: ['pay_received'] });
+
+  // After pay and charges are written down, so a finished month is frozen on all of them; before
+  // rolling, because it walks unrecorded dates from the same stored anchors the recorders do.
+  const closed = await closeFinishedMonths(userId, today);
+  if (closed > 0) client.invalidateQueries({ queryKey: ['savings'] });
 
   const moved = await rollSchedulesForward(today);
   if (moved === 0) return;

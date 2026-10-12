@@ -65,6 +65,22 @@ jest.mock('@/api/queries', () => ({
     refetch: jest.fn(),
   }),
 }));
+jest.mock('@/api/savings', () => ({
+  useSavingsCore: () => ({
+    pots: [],
+    summary: { readyToUse: 850 },
+    isPending: false,
+    isError: false,
+  }),
+}));
+jest.mock('@/api/goals', () => ({
+  useGoals: () => ({
+    goals: [],
+    summary: { active: [], done: [] },
+    isPending: false,
+    isError: false,
+  }),
+}));
 jest.mock('@/api/loans', () => ({
   useActiveLoans: () => ({ loans: [], isPending: false, isError: false, refetch: jest.fn() }),
 }));

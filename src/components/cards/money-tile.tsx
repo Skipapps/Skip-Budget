@@ -107,7 +107,7 @@ export function MoneyTile({
             whole
             className={cn(
               'overflow-hidden rounded-full px-[12px] py-[5px] font-app-medium',
-              value.kind === 'pill' ? 'bg-accent/10 text-accent-ink' : 'bg-ink/5 text-muted',
+              value.kind === 'pill' ? 'bg-tint text-tint-ink' : 'bg-ink/5 text-muted',
             )}
             slotClassName="w-full items-start"
           >

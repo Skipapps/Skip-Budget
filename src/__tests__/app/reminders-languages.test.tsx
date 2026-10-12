@@ -132,6 +132,12 @@ jest.mock('@/api/reminders', () => {
   };
 });
 
+// The real hook reads AsyncStorage through the session; the switch is on, as it starts.
+jest.mock('@/api/wrap-up-notification', () => ({
+  WRAP_UP_HOUR: 9,
+  useWrapUpSwitch: () => ({ enabled: true, refused: false, ready: true, setEnabled: jest.fn() }),
+}));
+
 type Screen = Awaited<ReturnType<typeof render>>;
 
 const RAW_KEY = /^[a-z]+\.[a-zA-Z]+\./;
@@ -166,10 +172,18 @@ describe('Reminders in Spanish', () => {
     const screen = await render(<RemindersScreen />);
 
     expect(screen.getByText('Recordatorios')).toBeTruthy();
-    // Receipts, the bill and the subscription can be switched on; the receipts and bill ones are.
-    expect(screen.getByText('2 de 3 te avisarán.')).toBeTruthy();
+    // Receipts, the wrap-up, the bill and the subscription can be switched on; all but the
+    // subscription are.
+    expect(screen.getByText('3 de 4 te avisarán.')).toBeTruthy();
     expect(screen.getByText('Recordatorio diario de recibos')).toBeTruthy();
     expect(screen.getByText('Un aviso para anotar lo que compraste hoy.')).toBeTruthy();
+
+    expect(screen.getByText('Ahorros')).toBeTruthy();
+    expect(screen.getByText('El día 1 de cada mes. Hora de envío: 9:00 a. m.')).toBeTruthy();
+    expect(screen.getByText('Resumen mensual')).toBeTruthy();
+    expect(
+      screen.getByText('Lo que entró el mes pasado, lo que salió y lo que sobró.'),
+    ).toBeTruthy();
 
     for (const title of ['Recibos', 'Facturas', 'Suscripciones', 'Tarjetas', 'Cuentas bancarias']) {
       expect(screen.getByText(title)).toBeTruthy();
@@ -198,6 +212,7 @@ describe('Reminders in Spanish', () => {
 
     for (const label of [
       'Recordatorio diario de recibos',
+      'Resumen mensual',
       'Cambia la hora del recordatorio diario de recibos. Hora de envío: 8:00 p. m.',
       'Recordatorio de Renta',
       'Recordar el mismo día',
@@ -228,8 +243,14 @@ describe('Reminders in French', () => {
     const screen = await render(<RemindersScreen />);
 
     expect(screen.getByText('Rappels')).toBeTruthy();
-    expect(screen.getByText('2 sur 3 te préviendront.')).toBeTruthy();
+    expect(screen.getByText('3 sur 4 te préviendront.')).toBeTruthy();
     expect(screen.getByText('Rappel quotidien des reçus')).toBeTruthy();
+    expect(screen.getByText('Épargne')).toBeTruthy();
+    expect(screen.getByText('Le 1er de chaque mois, à 9\u00A0h\u00A000.')).toBeTruthy();
+    expect(screen.getByText('Bilan mensuel')).toBeTruthy();
+    expect(
+      screen.getByText('Ce qui est entré le mois dernier, ce qui est sorti et ce qui est resté.'),
+    ).toBeTruthy();
     for (const title of ['Reçus', 'Factures', 'Abonnements', 'Cartes', 'Comptes bancaires']) {
       expect(screen.getByText(title)).toBeTruthy();
     }
@@ -256,6 +277,7 @@ describe('Reminders in French', () => {
     const screen = await render(<RemindersScreen />);
 
     for (const label of [
+      'Bilan mensuel',
       'Envoyé à 20 h 00. Change l’heure du rappel quotidien des reçus.',
       'Rappel pour Renta',
       'Rappeler le jour même',
@@ -273,7 +295,9 @@ describe('Reminders in English', () => {
   it('keeps every English line as it was', async () => {
     const screen = await render(<RemindersScreen />);
 
-    expect(screen.getByText('2 of 3 will let you know.')).toBeTruthy();
+    expect(screen.getByText('3 of 4 will let you know.')).toBeTruthy();
+    expect(screen.getByText('On the 1st of every month, at 9:00 AM.')).toBeTruthy();
+    expect(screen.getByLabelText('Monthly wrap-up')).toBeTruthy();
     expect(screen.getByText(`${formatCurrency(1234.5)} · due 4 May 2026`)).toBeTruthy();
     expect(screen.getByText('Add a payment day to this card first')).toBeTruthy();
     expect(screen.getByText('savings')).toBeTruthy();

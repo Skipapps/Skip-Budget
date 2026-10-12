@@ -5506,3 +5506,366 @@ bug in component behaviour found; two comments corrected. tsc 0; `rm -rf .expo/c
   - Habit taps ignore the default.
   - The picker offers 23 icons, not 24 (General's is left out).
   - Tapping + on the General pill passes `general`, so the form never asks when started from Receipts.
+
+## 2026-10-11 — Dilip (Developer, native and platform) — Savings & Goals: the monthly wrap-up notification (DONE, uncommitted)
+
+**Outcome:** Done. A local notification is set for 9:00 on the 1st of next month. It is rescheduled on every open under one fixed identifier, and tapping it opens `/wrap-up?month=yyyy-mm`. Reminders has a "Monthly wrap-up" switch, on by default. Sign-out cancels the notice. One cross-team dependency: the `no-splits` dangling-route guard stays red until Dana's `src/app/wrap-up.tsx` exists.
+
+- **New `src/api/wrap-up-notification.ts`:**
+  - `wrapUpSchedule(now)` is pure: the month ending (`2026-10`) and calendar fields for the next 1st at 9:00. December rolls over to January of the next year.
+  - `wrapUpContent` builds the title and body from `reminders.wrapUp.notification*`, with `monthLong`, in the language on screen.
+  - `refreshWrapUpNotification(userId)` schedules with identifier `skip-wrap-up`. iOS replaces a pending request with the same id, so only one is ever pending.
+  - The trigger is a `CALENDAR` trigger (`repeats: false`), not `DATE`: expo turns a Date into a countdown, which would drift off 9:00 local after a time-zone change.
+  - It never requests permission. Without permission, or with the switch off, it cancels instead.
+  - Schedules and cancels run one at a time, so a cancel always lands after a schedule that started before it.
+  - `useWrapUpNotification()` (called in `src/app/_layout.tsx` RootNavigator, beside `useRegisterPush`) runs once the session is read. It schedules on launch and sign-in, on every AppState `active`, and when the language changes. When ready with no user, it cancels (this covers an expired session).
+  - `useWrapUpSwitch()` stores the choice per user on the phone (`skip.wrapUp.<userId>`, AsyncStorage, lazily required). There is no profile column, and supabase is not mine.
+- **`src/lib/notification-permission.ts`:** push.ts's private `remindersAllowed` was moved here as `notificationsAllowed` (granted or provisional, iOS only). The wrap-up module therefore does not load supabase through push.ts.
+- **`src/api/push.ts`:** `tapTarget` allows `{ route: '/wrap-up', month }` only when month matches `^\d{4}-(0[1-9]|1[0-2])$`, and returns the string href `/wrap-up?month=…`. The typed-routes object form does not compile until the route exists.
+- **`src/api/auth.ts`:** `signOut` (before the session goes) and `deleteAccount` (after the deletion is verified) call `cancelWrapUpNotification()`. It never throws.
+- **`src/app/reminders.tsx`:** new "Savings" section after Receipts.
+  - Caption "On the 1st of every month, at 9:00 AM."; row "Monthly wrap-up" with "What came in last month, what went out and what was left." and a switch.
+  - Toasts `toast.reminder.saved` and `toast.reminder.off`.
+  - The page waits for the stored choice, and the wrap-up is counted in "{on} of {available}".
+  - Text caps use `TEXT_CAP` roles (large-text guard).
+- **Copy (`src/i18n/messages/reminders.ts`, en/es/fr):**
+  - en: "Your {month} wrap-up is ready" / "See how {month} went."
+  - es: "Tu resumen de {month} está listo" / "Mira cómo te fue en {month}."
+  - fr: "Ton bilan pour {month} est prêt" / "Regarde comment s’est passé {month}." ("pour" avoids d’avril, d’août, d’octobre.)
+- **Tests:**
+  - New: `src/api/wrap-up-notification.test.ts` (27).
+  - push.test: the `/wrap-up` tap and 6 refusals.
+  - auth.test: cancel on sign-out, on deletion, and not on a failed deletion.
+  - reminders.test and reminders-languages.test: the switch lookups are by name, counts are +1, and there are new wrap-up cases in en/es/fr.
+- **Gates:**
+  - tsc 0. eslint (`--no-cache`, cache cleared) and prettier clean on all 12 files.
+  - 28 related suites, 1,046 tests pass.
+  - Full jest: 302/303 suites, 6,450/6,451 tests. The 1 failure is `no-splits` "every route string points at a screen" for `/wrap-up`, which goes green when Dana's route lands.
+  - expo-doctor 19/21, the same two pre-existing failures. No app.json or native change.
+- **Not verified:** a Simulator or device run (none booted, and the tree is mid-feature). Pending-request contents and the 9:00 fire were not seen.
+- **Open:**
+  - (1) Dana's auto-show and a notification tap can both push `/wrap-up` on the 1st. The auto-show should skip when the current route is already `/wrap-up`.
+  - (2) The wrap-up page must cope with `?month=` for a month the sweep has not closed yet (a tap before the close finishes).
+  - (3) Phone permission alone gates the notice, not `reminders_enabled_at`. A second account on a phone where the first allowed notifications gets wrap-ups (its own, never the first account's).
+  - (4) Pre-existing: sign-out does not cancel snoozed reminder copies (`skip-snooze-*`, scheduled by the content extension). They can arrive after sign-out with the previous account's bill name.
+
+## 2026-10-11 — Drew (Developer, money maths) — Savings & Goals money rules (DONE, uncommitted)
+
+**Outcome:** Done. `src/lib/savings.ts` and `src/lib/goals.ts` follow the agreed contract: every name and shape kept, with fields added. Both are pure and cent-exact (toCents/fromCents), and dates stay yyyy-mm-dd text. Tests sit next to them: savings 48, goals 38, 86 green. Mutation check: 30 of 31 caught; the survivor (float product in monthly) has no distinguishing input within a money column's range. tsc 0, eslint (--no-cache) and prettier clean on my four files. Full `npm test`: 303 of 304 suites green. The one failure is `no-splits.test.ts`, which flags `/wrap-up` routes in the in-flight api/push.ts and api/wrap-up-notification.ts because that screen does not exist yet. Not mine.
+- **Added to the contract:** `PotView.movedOn`; `canChangePot` refusal `short`; `GoalView.fromSavings`; `MoneyFlow`, `FlowEntry`, `savingsFlows(entries)` (keeps income > 0 as pay and receipt/bill/subscription as spending, drops every other kind); `movesToSavingsOn(month)`; `localDayOf(timestamp)`.
+- **Account-start rule:** recordDuePay can write pay dated before the account (its floor is 7 years, and the first run walks from the typed last payday). So a month counts only rows dated on or after the local day of `profiles.created_at`, and the first month is partial. Proved on the demo account's shape: the seed's rows run from July; the account day is assumed to be 20 Aug, since the live profile was not read. July never closes; August = 1,880 − 524.55; September = 3,760 − 1,569.33. An unreadable account day closes nothing.
+- **Rules decided:**
+  - Last 12 finished months is a window, not "12 still open".
+  - A pot's age is the day its money reached savings: a month on the 1st after it, an added pot on its day; on a tie the month is older. Closing a month never re-attributes an earlier send.
+  - Per goal, money in goals is clamped at 0: taking back more than was sent cannot create savings.
+  - Percent rounds down.
+  - weekly = need ÷ (days ÷ 7); monthly = need ÷ (days × 12 ÷ 365.25). At least one week or month; rounded up to whole dollars.
+  - A goal's date is the last day of the picked month.
+  - The goals headline sums active goals only (720 of 2,200).
+  - The leftover cents of Split evenly all go to the first goal still short.
+- **Design fixtures:** Sep 640, Aug 520, Jul 410, Oct so far 738.71; Ready 850; send 400 + 300 leaves 150; Trip 25% $37/wk, then 700 of 1,200; Emergency 42% $49/wk, then 720 of 1,000; goals 720 of 2,200 (today 9 Oct, month-end dates).
+- **For the CEO:**
+  - Oldest-first gives "July sent · August $210 left", the reverse of the design. The header reads "August $210 · September $640"; totals are identical.
+  - The design's "$160 a month" cannot sit beside its $37/$49 on any single day; the rule gives $159.
+  - `toCents` drops cents from $10 billion up (shared helper, unchanged).
+- **For Diego:**
+  - "So far" (`useLedger.allEntries`) leaves out charges of cancelled subscriptions and of bills with no next date. useMoneyBook and the close step both count them, so "so far" can differ from the closed month. Share useMoneyBook's spending list.
+  - take_from_goal should cap at `fromSavings`.
+
+## 2026-10-11 — Dana L (Developer, UI and navigation) — Savings & Goals phase 1: icons, goal types, parts, words (DONE, uncommitted)
+
+**Outcome:** Phase 1 is done. No route files, and nothing imported from Drew's or Diego's files. My files pass tsc; the 5 tree errors are in-flight `pot_id` changes in api/goals.ts, lib/goals.test.ts and lib/savings.test.ts. eslint (--no-cache) and prettier are clean. 11 suites pass (149 tests): my 5 new suites, the large-text guard, messages, and the savings, cards and message-language screens.
+- **Icons:** I copied the Vol-2 globe, shield-house and medal to `assets/gradient-icons/goal-trip`, `goal-emergency` and `medal` (`.svg` and `-dark.svg`).
+  - Every `xlink:href` chain is resolved into stand-alone gradients (coordinates, units, transform and stops), inside `<defs>`.
+  - Ids are prefixed per file (`goal_trip_`, `goal_trip_dark_`, …). The Vol-2 navy is the same three hexes, lifted in the dark copies.
+  - Quick Look renders are pixel-identical to the originals. On the dark card the lifted twins read clearly; the light navy ribbon sinks.
+  - Registry: `src/theme/goal-icons.ts` (`useGoalTypeIcons`, `useSavingsIcons().medal`).
+- **Goal types:** `src/data/goal-types.ts` holds 12 ids, stored as `goals.icon_id`: trip, emergency, home, car, education, wedding, phone, gifts, health, family, pets, other. `goalIconOf` maps anything unknown to `other`. Ten types reuse the app's own drawings, as the brief lists.
+- **GoalTypeGrid** (`src/components/savings/goal-type-grid.tsx`) is the loan grid's pattern, but steps 4 → 3 → 2 columns.
+  - "Emergency" is 70.3pt at 12pt Montserrat Medium, so four across holds only from 390pt in English (tile padding trimmed to 3px for that).
+  - Spanish "emergencia" (73.5pt) needs 428pt. Below those widths the grid shows three across.
+- **Parts** (`src/components/savings/`, plain props): ReadyCard, MonthSoFarCard, ByMonthSection/PotRow, StatusPill, PotHeroCard, MonthFiguresCard (detail/wrapUp), WhereItWentCard, PotStateCard, GoalsSummaryCard, GoalCard, CompletedGoalCard, GoalInviteCard (goals/send), NewGoalButton, SendFromCard, GoalSendCard, SendTotals, SentHero, SentGoalsCard, StillInSavingsCard, WrapUpHero, SplitFigure, GoalBar, GoalIcon/PigIcon.
+  - Status kinds use Drew's words (`partly`). Rows stack by the FitRows/switch rule; hero figures are groups of one.
+  - All of them are on the large-text guard's adopted list.
+- **Words:** `savings.ts` rewritten (the `savings.list.title` and `savings.soon.*` keys stay until phase 2 replaces the placeholder). New `goals.ts` area. `toast.savings.*` / `toast.goals.sent` / `toast.goal.*` added, and `cards.money.readyToUse`/`addGoal`/`saveForSomething`/`goalsActive`. The wrap-up notification words are Dilip's (`reminders.wrapUp.notification*`); I dropped my duplicate.
+- **Interpreted:**
+  - Row figures drop ".00" only when whole (`shortMoney`); hero and table figures keep cents.
+  - Overspent "so far" hides the right figure and reads "Over by $X so far" in place of "Moves to savings on…".
+  - An overspent wrap-up has no confetti and no medal.
+  - The "+ New goal" button has a solid hairline on a transparent fill: the brief says dashed, the PNG shows solid.
+  - The in-card Send button is the shared Button (64pt, not the PNG's 48pt).
+  - The Where-it-went percents add to 100: a real share never shows 0%, neither side shows 100% beside the other, and overspent reads past 100%.
+- **Not verified:** no device or Simulator look at any part (no route yet, none booted). Light/dark is covered by the icon render test and theme tokens only.
+- **2026-10-11 — Drew — CEO decisions A, C, E applied (savings.ts, goals.ts):**
+  - **A, which pot a send came from is stored:**
+    - `MoveRow.pot_id: string | null` is required, so a reader that forgets the column fails tsc instead of quietly unclaiming every move.
+    - `allocateBatch({ pots, moves, items, preferPotId? }) → { goal_id, pot_id, amount }[]` and `allocateSend({ pots, moves, amount, preferPotId? }) → { pot_id, amount }[]`. Order: the preferred pot first, then the newest by movedOn. Goals draw in the order given, so a batch never spends a cent twice.
+    - `allocateTakeBack({ goalId, moves, amount, pots? }) → { pot_id: string | null, amount }[]`. Money returns to the pots of the goal's most recent sends first, capped at the goal's net from each pot. On a time tie the older pot comes first (`pots` breaks it, else pot id). Money no pot claims goes back last as null.
+    - `savingsSummary` takes each pot's figures from the stored pot_id. Each goal's net per pot is floored at 0. Moves with no pot, or with a removed pot, still hold money out of Ready to use. `withMoneyLeft` is newest first.
+    - Reproduces design 1 (Sep ready, Aug sent, Jul $210 left, "September $640 · July $210") and design 3 (Send $700 → $150, all July's).
+  - **canChangePot, per pot:** `{ ok: false, reason: 'in-goals' | 'zero', inGoals, short }`.
+    - 'in-goals': lowering or removing below this pot's own money in goals. Raising is always allowed.
+    - 'zero': $0 for any pot that is not an overspent month. Added pots are included as well as months (the same "$0 Ready" problem); remove is offered instead.
+  - **C:** `GoalRow.closed_at: string | null` (required); `goalsSummary` leaves out closed goals.
+  - **E:** split-evenly odd cents go one each, first goal first, still capped (0.05 → 0.02/0.02/0.01).
+  - **Gates:**
+    - My suites: 102 pass (savings 63, goals 39). Mutants: 35 of 35 caught. eslint and prettier clean.
+    - tsc: only `src/api/goals.ts:46` (readGoal needs closed_at) and `:60` (readMove needs pot_id), Diego's to map.
+    - Full jest: no-splits (/wrap-up, in flight) still fails. `src/__tests__/api/savings.test.tsx` fails 7. Only "gives a pot its status" comes from this change: its goal_moves fixtures have no pot_id and assert the old oldest-first statuses (aug partly 310/210). "has no so far … isError" fails on its own and reads only the hook's error flags. The other 5 pass in isolation, so they are knock-on failures. All Diego's to update.
+
+---
+
+## 2026-10-11 — Diego (Developer, data and backend) — Savings + Goals data layer
+
+**Outcome:** Done, uncommitted. The migration is not pushed or applied anywhere live (no Docker run). On in-memory PGlite (scratchpad), all 82 migrations replay in order, mine twice, and `supabase/checks/savings_goals.sql` passes 128 checks. tsc 0; eslint and prettier clean on my files. My 4 new suites: 63 tests, no act() warnings. Full jest: 311/312 suites, 6,639/6,640 tests. The one failure is `no-splits` flagging `/wrap-up`, which Dilip's push.ts and wrap-up-notification.ts route to before the screen exists.
+
+- **Schema (`20261011100001_savings_goals.sql`):**
+  - `savings_pots` **already existed** (20260827, never written by any build) and is reused via ALTER. Columns added: kind, month, label, earned, spent, added_on, note, wrap_up_seen_at, removed_at.
+  - Its rows are only the demo seed's "Emergency fund $4,200". They are kept, but marked removed.
+  - Shape check per kind; unique (user_id, month) for months, removed included; pots are never deleted (soft remove).
+  - New `goals` (with `closed_at`, for "I spent it"; icon_id has a length check only) and `goal_moves` (`pot_id` not null, unique (batch, goal, pot)).
+  - Ownership trigger on moves (goal and pot are the mover's).
+  - RLS is select-own only; insert/update/delete are revoked from authenticated; anon has nothing. Every write goes through definer RPCs that take a per-user advisory lock.
+- **RPCs** (anon revoked, explicit GRANT to authenticated):
+  - `close_my_savings_month(date, numeric, numeric, boolean)` (named apart from the old revoked `close_savings_month(uuid, date)`). Months the phone thinks are finished and after the account are always accepted (UTC+14 / UTC−12 allowance). The amount is computed server-side.
+  - `send_to_goals(jsonb [{goal_id, pot_id, amount}], uuid batch default null) → jsonb`. Checks per pot and per goal; a resent batch is idempotent.
+  - `take_from_goal(uuid, jsonb [{pot_id, amount}]) → uuid batch`.
+  - `save_savings_pot`, `remove_savings_pot`, `save_goal`.
+  - `delete_goal(uuid, boolean return)`.
+  - `mark_wrap_up_seen(date)`.
+  - Refusal codes SV001–SV006, with detail and hint; read them with `savingsRefusal`.
+- **Hooks:**
+  - `src/api/savings.ts`: useSavings, useSavingsPot, useWrapUpDue, useSaveSavingsPot, useRemoveSavingsPot, useMarkWrapUpSeen, useSendToGoals, useTakeFromGoal, savingsRefusal, closeFinishedMonths.
+  - `src/api/goals.ts`: useGoals, useGoal, useSaveGoal, useDeleteGoal.
+  - Every write invalidates 'savings' and 'goals'. A missing table or column reads as "no savings".
+- **One spending rule:** `queries.ts` now exports pure `ledgerEntries` and `bookFlows` plus `useBookFlows`; useLedger and useMoneyBook call them, with unchanged behaviour. "So far" and the month close both run Drew's `savingsFlows` over the same lists.
+- **Close step** (refresh.ts, after pay and charges, before rolling):
+  - Fresh paged reads; at most 12 months; older months arrive seen, only last month is left unseen.
+  - It waits, rather than freezing a month, while a recorded bill or subscription has an unrecorded date in that month.
+- **Realtime:** savings_pots, already published and on the channel, now invalidates 'savings'. Goals and moves are not added to the channel.
+- **Seed:** `demo-sam.sql` no longer inserts into savings_pots (the old two-column insert would fail on `kind`).
+- **Not verified:** real PostgREST (SV codes reaching the client as `code`/`details`/`hint`), a device, and the live database.
+- **Rename (CEO):** the close RPC is `close_my_savings_month`, so it no longer overloads the old revoked `close_savings_month(uuid, date)`. After it: PGlite replay x2 plus 128 checks pass; tsc 0; my 4 suites, 63 tests, pass. The demo Emergency fund pot stays hidden (removed).
+
+## 2026-10-11 — Dmitri (Development Lead) — Savings + Goals data layer and maths review (pre-push): changes needed, one MUST
+
+**Outcome:** Review only, no edits. The migration, the maths and the hooks are sound, and the rename to `close_my_savings_month` is consistent everywhere. One MUST before `db push`: a closed ("I spent it") goal can still be deleted with "back to savings", which brings spent money back into Ready to use. One SHOULD is also best done before the push, because it changes a function signature.
+
+- **MUST before push:** `delete_goal` (migration :544-545) deletes a goal with `p_return = true` even when it is closed.
+  - Confirmed on PGlite: Ready to use went from 300 to 600 after "I spent it" then "Delete, back to savings".
+  - The UI hides closed goals (`useGoal` reads open goals only), but goals are not on the realtime channel. A second phone's stale goal page can do this.
+  - Fix: add `and closed_at is null` to the delete (and raise P0002 when nothing matched, if the screen should know), plus one check in savings_goals.sql.
+- **SHOULD before push:** `take_from_goal` (:698) has no batch id, so a retry after a lost answer takes the money twice.
+  - Confirmed: a 100 take-back retried left the goal 200 lower.
+  - The figures stay exact, but they are not what was asked.
+  - Fix: add `p_batch uuid default null` with send_to_goals' replay check. It is a signature change, so it is cheaper before the push.
+- **SHOULD (client, does not block the push):**
+  - savings.ts:494-505. A send retried with the same batchId re-reads pots after the first send landed. When what is left is less than the send (always after Split evenly or a send of everything), it throws the client-side 'short' and never reaches the server's replay. Skip the short check when `moves` already holds the batch id.
+  - reminders.tsx:379 and wrap-up-notification.ts:191. Turning "Monthly wrap-up" on never goes through `enableReminders`, which every other switch on the page uses. With notifications off, the switch reads on and toasts "saved" while nothing is scheduled. It is on by default, so this is most people who skipped the prompt.
+  - checks/savings_goals.sql:117-119. "Closing the month still running" fails if the file is run in the last 14 hours of a UTC month (UTC+14 allowance). Confirmed: at 31 Oct 10:00 UTC, October is accepted. The check is wrong; production behaviour is as intended.
+- **Verified:**
+  - **SQL, on in-memory PGlite (my copy of Diego's runner):** all 82 migrations replay, 20261011100001 twice, and savings_goals.sql reaches ALL CHECKS PASSED.
+  - **Roles and grants:** the 8 RPCs are SECURITY DEFINER with search_path=public. Each takes the per-user advisory lock, except mark_wrap_up_seen, which needs none. Each scopes every read and write to auth.uid(). Grants are explicit to authenticated by full signature; anon has none. The helpers and the trigger function are revoked from authenticated. The old close_savings_month(uuid, date) is not executable.
+  - **Tables:** RLS is select-own on all three tables, and the old `savings_pots_all_own` is dropped. Authenticated has SELECT only.
+  - **Reuse of savings_pots:** `name` has a default, so new pots need none, and `amount >= 0` allows the overspent $0. The legacy rows (the demo "Emergency fund", a blank name, a name over 60) become removed `added` pots with a valid label.
+  - **Realtime:** only savings_pots is published, with replica identity full. Account deletion cascades through all three tables.
+  - **Timezones:** a month the phone calls finished is never refused by the UTC+14 rule. The client's local account day is never earlier than the server's UTC−12 floor.
+- **Maths (Drew):**
+  - Integer cents throughout.
+  - The pot rules match the SQL per pot: in-goals floored per goal, lowering refused below in-goals, $0 only for an overspent month.
+  - allocateBatch: the pot sent from first, then newest. allocateTakeBack is capped per pot.
+  - Percent rounds down and never shows 100 while short.
+  - Weekly and monthly: checked by hand, Trip 900 over 173 days gives $37 a week and $159 a month, and Emergency 580 over 83 days gives $49 a week. Odd cents of Split evenly go one each.
+  - Fixtures carry the design's figures and the demo-account shape. "Add money" is a `payments` row, so it is never counted as earned.
+- **Hooks and refactor (Diego):** `ledgerEntries` and `bookFlows` are a straight lift; useMoneyBook keeps the same reads, flags and refetch. The close's fresh reads take the same columns with no filter the hooks lack. Charges are never deleted by the app, and the recorder upserts with ignoreDuplicates, so the close's wait-on-gap cannot stall for good.
+- **Notification (Dilip):** the CALENDAR trigger is correct for SDK 57 (expo-notifications 57.0.13). It goes straight to UNCalendarNotificationTrigger, months 1-12, with no JS 0-11 validation (that applies to YEARLY only); the v57 docs say the same. One pending under a fixed id, cancelled on sign-out and on deletion.
+- **Gates:**
+  - tsc: 0 errors in reviewed files. 11 errors are in Dana's in-flight screens: typed routes for her new pages, plus goal-calculator.
+  - eslint (cache cleared, --no-cache, max-warnings 0) and prettier: clean on 24 and 12 files.
+  - Jest: 28 targeted suites, 553 tests pass, including 16 Home/Money/ledger suites (247).
+  - Full jest: 309/312 suites. The failures are Dana's in-flight work: no-splits (/wrap-up route), and history-window-savings plus savings-i18n, which fail to load because the new savings.tsx imports Skeleton/reanimated, unmocked there.
+  - Not run: Docker/local Supabase (not running, not started), real PostgREST (SV codes as code/details/hint; P0002 arrives as HTTP 500 but supabase-js still reads the code), the live database, a device.
+- **Product questions:**
+  - A month freezes on the 1st, so last month's receipts typed on the 3rd never reach it, apart from editing the amount. Close a few days later, or say "as of 1 Oct"?
+  - Added savings may be dated before the account.
+  - The demo account's live `profiles.created_at` was not read; August and September depend on it.
+- **For the CEO before push:** run `migration list` to confirm 20261011100001 is not already partly on the remote.
+- **2026-10-11 — Drew — `monthUpdate` (src/lib/savings.ts):**
+  - **What it does:** offers, never applies, new figures for a closed month that changed later (a late receipt, a deleted receipt, a late charge or pay). Signature: `monthUpdate({ pot, moves, now: { earned, spent } }) → null | { earned, spent, earnedChange, spentChange, amount, inGoals, capped }`.
+  - **Rules:**
+    - Null unless the pot is a live month pot whose earned or spent differs by at least a cent.
+    - Changes are signed (now − stored).
+    - amount = max(earned − spent, 0), but never below this pot's money in goals (same netting as canChangePot); `capped` says it was held there.
+  - **Note:** accepting replaces any amount the person typed by hand for that month.
+  - **Gates:** 9 new tests, 111 pass in my suites; 5 of 5 new mutants caught; tsc 0; eslint and prettier clean.
+
+**Follow-up, same day (Dilip), Dmitri's SHOULD (the wrap-up switch read ON and toasted "saved" with notifications off):**
+- **The switch tells the truth:** `useWrapUpSwitch()` shows ON only when it is chosen *and* the phone allows notifications.
+  - It reads `notificationAccess()` (new in `src/lib/notification-permission.ts`: allowed / ask / refused) on mount and on every AppState `active`, so a change in iOS Settings or the system prompt is picked up.
+  - Refused: the switch is disabled with "Notifications are off for Skip in your phone's settings." (`reminders.wrapUp.refused`, en/es/fr), and it leaves the "{on} of {available}" count.
+- **Turning it on uses the page's own enable path:** it awaits `enableReminders(userId)`, which asks while iOS still can and records `reminders_enabled_at`.
+  - Declined: `setEnabled` resolves false; nothing is stored, nothing is scheduled and there is no toast.
+  - Turning it off asks nothing.
+  - Launch and foreground (`useWrapUpNotification`) still never prompt, and a test covers that.
+- **Gates:**
+  - tsc 0; eslint (`--no-cache`) and prettier clean.
+  - 18 related suites, 388 tests pass, including wrap-up-notification (32), reminders (+2) and reminders-languages.
+  - `no-splits` is green now that Dana's `src/app/wrap-up.tsx` exists.
+- **2026-10-11 — Diego — Dmitri's review fixes and month updates (Founder):**
+  - `delete_goal` acts only on open goals and raises P0002 ('gone') when nothing matched, so a closed goal can no longer be deleted back into savings.
+  - `take_from_goal(uuid, jsonb, p_batch uuid default null)` replays like a send. In both RPCs the batch replay check now runs before the lines are read.
+  - `useSendToGoals` and `useTakeFromGoal` skip their own allocation check once the batch is among the moves, and send no lines for the server to answer. `useTakeFromGoal` takes an optional `batchId`.
+  - The "month still running" check uses the month holding now() + 15 hours, so it no longer depends on the time of day.
+  - New `update_savings_month(uuid, numeric, numeric) → numeric`: amount = greatest(earned − spent, 0, the pot's own money in goals).
+  - New hooks: `useMonthUpdate(potId)` → `{ update, isPending }` (the money-book lists through Drew's `monthUpdate`) and `useUpdateSavingsMonth()` → `{ amount }`.
+  - Gates: PGlite replays the migration twice; 150 checks pass; tsc 0; eslint and prettier clean; my 4 suites, 71 tests, pass with no act() warnings.
+
+- **2026-10-11 — Diego — month update waits like the close:** the close step's gap test is now one shared function, `unwrittenDatesIn` (src/api/savings.ts). `useMonthUpdate` returns null while a bill or subscription on the record has an unwritten date in that month; it reads the cached useBills, useSubscriptions and useCharges, so no extra requests. Two new tests: the offer is held, then shown once the date is written. tsc 0; my 4 suites, 73 tests, pass with no act() warnings over 3 runs.
+
+## 2026-10-11 — Dana L (Developer, UI and navigation) — Savings & Goals phase 2: the screens (DONE, uncommitted)
+
+**Outcome:** Done against Diego's hooks and Drew's maths; their files untouched. tsc 0; eslint (--no-cache, src) 0 errors, 1 pre-existing warning (setup.test.tsx); prettier clean. Full jest: 314/314 suites, 6,713 tests (no-splits green now that /wrap-up exists). No Simulator was booted, so no screenshots; nothing seen on a device.
+- **Routes:**
+  - `savings.tsx` (replaces the placeholder; header + = Add to savings).
+  - `savings-pot/[id].tsx`: design 2, pencil, the late-entry card.
+  - `savings-entry.tsx`: add; edit a month (amount + note) or added savings; Remove.
+  - `send-to-goals.tsx` (`?goal=` first and pre-filled, `?pot=` sent first; one randomUUID per visit) → `goals-sent.tsx` (read from the batch's moves; replaces the Send page, so Done is plain back).
+  - `wrap-up.tsx`: celebrate / overspent / "Nothing left over"; marks seen; waits up to 30s for a month still closing, polling, then goes back.
+  - `goals.tsx`, `goal-calculator.tsx` → `save-goal.tsx` (lands via finishFlowOn('/goals') with "Goal added").
+  - `save-goal.tsx?id=`: the edit page, with the figures and Delete. `goal/[id].tsx`: history, Add from savings, Take money out.
+- **Rules built in:**
+  - "Nothing left over" for a month whose leftOver is 0; a goal's date is the last day of its month.
+  - Delete: two choices when fromSavings > 0 (put back / I spent it), else a plain confirm.
+  - Take out is capped at fromSavings, with one batch id per take-out; a retry after a lost answer reuses it, the next take-out gets a new one.
+  - A 'gone' goal on take-out/edit/delete returns quietly to /goals.
+  - Edit refuses $0 (offers Remove) and Remove while money is in goals (says how much), via canChangePot before saving.
+  - Late entries: offered only, "This replaces the $X you set." when the amount was hand-set, the capped line when capped.
+  - Wrap-up auto-show: `useWrapUpAutoShow` in the tabs layout. It opens only while a tab is showing, once per month per launch (the page notes itself shown, so a notification-opened wrap-up is not re-opened).
+- **Cards tab:**
+  - Savings = Ready to use figure, or "Open" when it cannot be read.
+  - Goals = "{n} active" + names, or the "Add a goal" pill; both open /goals.
+  - `cards.money.startSaving`/`comingSoon` removed. The French pill is "Nouvel objectif": "Ajouter" duplicated the list pills; it fits like "Ajouter un prêt".
+- **Tests:**
+  - New: app/savings-screens (27), app/goals-screens (14). Rewritten for the real page: savings-i18n, history-window-savings.
+  - The cards, cards-i18n, cards-large-text and gradient-icons-dark suites have the new tile mocks and measured widths.
+  - Fixtures: `src/components/savings/__fixtures__/design.ts`.
+- **Differs from the designs:**
+  - The in-card Send button is the shared 64pt Button (no smaller size exists).
+  - Split evenly hides with one goal.
+  - The month page adds Note and late-entry cards.
+  - The new-goal calculator and the edit page were not designed (slider, Pick a month / No date chips, inline month grid, Already saved row).
+  - The Sent page also raises the "Sent to your goals" toast, as asked.
+
+## 2026-10-11 — Dmitri (Development Lead) — Savings & Goals phase 2 screens review: changes needed, one MUST
+
+**Outcome:** Review only. No edits except this entry. The screens follow Drew's views and Diego's hooks, and every Send input path is clamped. The nav doors, the auto-show, the delete dialog, the icons and en/es/fr are all right. One MUST before commit: deleting a goal, or removing savings, navigates twice and shows the failure page after a successful action. One SHOULD is a money risk to fix before release (S1). All five earlier data-layer fixes are confirmed.
+
+- **MUST (Dana): one action, one navigation, no failure page after success.**
+  - The edit pages render the failure PageState once their subject is missing after load: `save-goal.tsx:79-90` and `savings-entry.tsx:61-73`.
+  - `mutateAsync` awaits `onSuccess` (TanStack 5.102), and `onSuccess` awaits the invalidation's refetch. So the page re-renders with the goal or pot gone and shows "Something went wrong" as it leaves.
+  - The page underneath also sees `gone` and calls `goBack()`: `goal/[id].tsx:45-48`, `savings-pot/[id].tsx:58-61`. The edit page then calls `router.dismissTo(...)`, so one action navigates twice.
+  - Usual order: the failure page slides out, then an empty detail page slides out. Depending on timing, the BACK can land after the POP_TO and leave the person on the Cards tab. expo-router 57.0.15 runs its routing queue in a passive effect.
+  - Fix:
+    - Gate the detail pages' gone-effect on `useIsFocused()` (exported by expo-router 57).
+    - Make the edit pages render nothing (or keep the form) when the subject has gone, never the failure page.
+    - Add a test where the goal or pot disappears after the delete resolves.
+  - Reasoned from the code, not reproduced on a device. Tia: watch Delete goal and Remove from savings.
+- **SHOULD:**
+  - S1 (Diego, money, fix before any release): `useMonthUpdate` works out old months from `useReceipts`/`useCharges`/`usePayReceived`.
+    - Those reads are unpaged: `max_rows = 1000`, newest first. The close reads paged (`closingFlows`).
+    - Past 1,000 receipts, older months are offered a wrong "spending went down by $X", and accepting it writes the truncated figures into a frozen month.
+    - Fix: read the month's window paged, as the close does, or make no offer when a list may be cut short before that month.
+  - S2 (Diego exports, Dana uses): `useSavings` ties Send, Sent, the wrap-up, savings-entry and the Cards tile to the whole money book. They need only pots and moves.
+    - Those pages wait for it to load, and show the failure page (the tile shows "Open") when any of its reads fail.
+    - The wrap-up's 4s poll refetches the money book up to 7 times.
+    - On Send, a failed background refetch unmounts SendForm, which drops the typed amounts and the visit's batch id.
+    - Fix: export a pots+moves summary (`useSavingsCore`) and use it on those pages.
+  - S3: Send with $0 Ready to use is reachable from a goal's "Add from savings". Every control is disabled, and pressing "Send $0" says "Choose how much to send to a goal."
+  - S4: on 'gone', Send and savings-entry show a sentence but keep the stale goal or pot on screen (a failure invalidates nothing). Refresh on 'gone'. savings-entry should return quietly, as the goal pages do.
+  - S5: the take-out batch id is reused after any failure, even for a new amount. After a lost answer, the next try is answered as the first one, with a "Money taken out" toast. Reuse the id for the same amount only.
+  - S6: `savings.entry.zero` hard-codes "$0" in en/es/fr, so a £ or € user reads $. Use `{amount}` with `formatCurrency(0)`.
+  - S7: the Sent page reads cached moves. If the refetch after the send failed, it says "$0 moved". Fall back to the send's own result.
+- **NIT:**
+  - Unused keys: `savings.ready.a11y`, `savings.pot.even`, `savings.sendPage.sending`, `goals.takeOut.button`. The Send button has no "Sending…" label while it is sending.
+  - SendFromCard's doc says oldest first, but the list is newest first.
+  - `handSet` counts a capped update as hand-set, so the next offer says "the $X you set".
+  - `goals.detail.deleteEmpty` is false for a goal whose money was all taken back.
+  - `goals.tsx:97` falls back to the UTC day.
+  - The auto-show's `shown` set covers every account on the phone, not one per user.
+  - A new goal's type defaults to Trip.
+  - Later By-month years have an empty heading title.
+- **Earlier fixes confirmed:**
+  - `delete_goal` acts on open goals only and raises P0002 otherwise (:588-597).
+  - `take_from_goal(uuid, jsonb, p_batch)`: the replay check runs before the lines are read, and the old signature is dropped.
+  - In both `send_to_goals` and `take_from_goal`, the replay check runs first.
+  - `src/api/savings.ts:601-617` and `:651-662`: a landed batch skips the client check and sends no lines.
+  - The wrap-up switch awaits `enableReminders`; a decline stores nothing and shows no toast; the switch reads ON only when the phone allows notifications.
+  - `useMonthUpdate` holds while `unwrittenDatesIn` finds an unwritten date.
+- **Verified:**
+  - **Money:** every figure on screen is Drew's (readyToUse, PotView, goalProgress, goalPlan). The screens only sum, in cents, what was typed or what is stored.
+  - **Send page:**
+    - Every path (stepper, +$50, Fill goal, typed amount, Split evenly, the `?goal=` prefill) goes through `clampSend`/`splitEvenly`.
+    - There is one randomUUID per visit. `?pot=` is the preferred pot from the month page and the wrap-up.
+    - The Sent page replaces Send: Done goes back to where it began, and View goals uses finishFlowOn.
+  - **Goal creation:** it lands through `finishFlowOn('/goals')`.
+  - **Auto-show:** tabs only, at most once per month per launch. It defers to a wrap-up the notification opened. The month is marked seen once shown.
+  - **Delete dialog:** with money from savings, it offers Put $X back / I spent it / Cancel; otherwise a plain confirm.
+  - **Icons:** 6 SVGs with no href. Every `url(#)` resolves and ids are prefixed per file. The dark twins change only the three navy hexes.
+  - **i18n:** en/es/fr are enforced by types, and placeholders match across the three languages in savings/goals/toast/cards/reminders.
+  - **Large text:** CTAs sit in Screen footers, and 24 files were added to the large-text guard.
+  - **Comments:** no names, dates or history.
+- **Gates:**
+  - tsc 0.
+  - eslint (cache cleared, `--no-cache`, max-warnings 0, src): 0 errors, 1 pre-existing warning in the unchanged `setup.test.tsx`.
+  - prettier clean on every changed and new file.
+  - Full jest: 314/314 suites, 6,713 tests. "Worker failed to exit" was already there before this work (loans.test.tsx also shows it).
+  - Not run: Simulator (Tia has it), a device, the live database.
+- **Process note:** I ran a scratch i18n check from `src/__tests__/` and deleted it in the same command. No other file was touched.
+- **2026-10-11 — Diego — Dmitri's screen review, S1 and S2:**
+  - **S1:** `useMonthUpdate` now reads through the close step's own `closingFlows`: every page of that month, the same lists and the same gap wait, with a staleTime 0 query under 'savings'. The offer is what closing the month today would freeze; it returns `{ update, isPending, isError }`. New test: 1,200 receipts read as two pages (no false −$510 offer), then a late one is offered.
+  - **S2:** exported `useSavingsCore()` → `{ pots, moves, summary, isPending, isError, refetch }`, from pots and moves only. `useSavings` (with soFar) and `useSavingsPot` build on it.
+  - **Gates:** tsc 0; eslint and prettier clean; my 4 suites, 74 tests, pass with no act() warnings over 3 runs.
+
+## 2026-10-11 — Dana L (Developer, UI and navigation) — Savings & Goals: Dmitri's review and Tia's walk, fixed (DONE, uncommitted)
+
+**Outcome:** Every item done. tsc 0; eslint (--no-cache, src) 0 errors, 1 pre-existing warning (setup.test.tsx); prettier clean. Full jest 315/315 suites, 6,738 tests. Not seen on a device after the fixes: the Simulator is off.
+
+**Dmitri's MUST: one navigation per delete or remove**
+- The goal and month pages go back on "gone" only while focused (`useIsFocused`).
+- The two edit pages (save-goal `?id=`, savings-entry `?id=`) keep the item as last read and keep the form drawn. They never show the failure page when it vanishes; an id that never matched anything goes back quietly while focused.
+- Tests: Delete or Remove, then the item vanishes → one `dismissTo`, no back, no failure text. A detail page that is not focused does not go back.
+
+**Dmitri's SHOULDs**
+- **S2:** Send, Sent, the wrap-up, the savings edit page, the goal page and the Cards Savings tile read `useSavingsCore`. Every page shows the failure page only when nothing was read; a failed background reload keeps the page and what was typed (tested on Send).
+- **S3:** Add from savings is hidden at $0 ready.
+- **S4:** `gone` on Send reads again silently; on the savings edit page it dismisses to /savings.
+- **S5:** A take-out's batch id is reused only for a retry of the same amount.
+- **S6:** The zero line takes `{amount}`.
+- **S7:** The Sent page takes the send's answer (`sent=goalId:amount:after,…`, `stays=`) in the Send page's order, and falls back to the batch's moves.
+
+**Dmitri's NITs and the CEO's decisions**
+- Unused keys removed; "Sending…" is the busy label.
+- After a capped update the amount is not taken as hand-set.
+- The plain delete says "It comes off your goals. Your savings don't change."
+- The reached-date fallback uses the local day.
+- The auto-show remembers per user id.
+- A new goal has no type until one is picked, and Save lists "Goal type".
+- Later years under By month are their own headings.
+- New goal from an empty Send returns to Send (`from=send`, `router.dismiss(2)`).
+- The Cards Goals tile with only reached goals reads "{n} reached" beside "Add a goal".
+
+**Tia's walk**
+1. The month figures table was stacked by default. Its label slot was `shrink`, the width of its own text, so a one-word label never fit by the 1pt slack. The label now takes `flex-1` and the figure hugs (`hug`). The bill and subscription `DetailRow` (plans/detail-parts.tsx) has the same pattern; not touched.
+2. No-break spaces inside "Earned $X" / "Spent $Y" (en/es/fr).
+3. The Sent page follows the Send order.
+4. New `tint` / `tint-ink` tokens (palette, global.css seed, tailwind):
+   - Light: the same look as before.
+   - Dark: 28% accent over the card, with the ink lifted to 4.5:1 (it was 3.63:1).
+   - Used by every header action circle (shared PageHeader, so all pages), the status pills, the lit wrap-up row, Fill goal, the check circles, the chosen goal tile and the Money tile pill.
+5. Back button unchanged: Loans, Receipts, Salary, Habits and the calculators all use the plain chevron.
+6. "{Month} so far" always shows its signed figure in ink and keeps "Moves to savings on…"; "Over by" is removed.
+7. The plan card has the week on the headline and the month below (no-break "a week" / "a month"). The remove confirm says "$30", as the page does.
+
+**Tests:** savings-screens 35, goals-screens 20, tint-tokens 6 (new); savings-parts, savings-i18n and the four Cards suites updated.
+
+## 2026-10-11 — Dmitri (Development Lead) — Savings & Goals final pre-commit check: GO, no MUST. Read-only. tsc 0; eslint (cache cleared, --no-cache, max-warnings 0, src) 0 errors, 1 pre-existing warning (setup.test.tsx); prettier clean; full jest 315/315 suites, 6,738 tests. MUST fixed: goal/[id] and savings-pot/[id] go back on gone only while focused; save-goal and savings-entry keep the last-read item and the form, so Delete/Remove make one dismissTo and no failure page; tests would fail on the old code. S1 (keyset-paged closingFlows), S2 (useSavingsCore; failure page only when nothing read), S5 (batch reused for the same amount only) and S7 (Sent from the send's answer, batch moves as fallback) confirmed. en/es/fr: 362 keys in 5 files complete, placeholders match; no unused savings/goals keys; no debug logs, commented-out code or history comments. Risks: light mode is not byte-identical: the header circle on the page goes (240,233,234) to (244,238,242), ΔE 2.4, and pressing it now fades the circle instead of darkening it (page-header.tsx:103, app-wide); pills on cards are identical. dismiss(2) (save-goal.tsx:190) holds for Send → calculator → save, also after going back to the calculator once. It lands one page off only on a double-tapped Continue (shared app-wide) or a back swipe while Save is in flight; the goal is saved either way. Tia's "newest pot first" is Drew's rule to match the design (log line 5568) and has not changed; the Founder has to answer it.

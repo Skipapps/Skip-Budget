@@ -1904,3 +1904,32 @@ company/account/note/reminder, start moved past the end drops it, voice hand-off
 **Outcome:** Partial. Walked Home card, Pro explainer, empty dashboard, the whole create flow up to Start tracking, light/dark and large text. **Blocked at the first save:** the live database refuses `habits` INSERT for Sam ("Tracking spending habits is part of Skip Pro.", code P0001). With both Fake Pro and Fake Free off the app also says free ("Unlimited everything, $1.99/mo"), so the account has no live entitlement; the seed `supabase/seed/pro-state-pro.sql` would be needed (a live write to the Founder's entitlement row, not done). Nothing created, no day tapped, nothing to clean up; Home balance $62,849.54 and Receipts -$384.88 are identical before and after.
 **Found state:** Metro log said "FREE OVERRIDE IS ON (saved from a previous run)", so the Simulator started in Fake Free ON, Fake Pro OFF. Left at both OFF (coordinator's instruction); app theme restored to Light, iOS text size large; simctl appearance left dark (as found).
 **Steps 3-5, 7 and the "tap/untap/receipts everywhere/edit/delete" parts of the walk NOT run.** Screenshots: `/private/tmp/claude-501/-Users-sampathchowdi-Desktop-SkipBudget/135371f7-66a7-4736-beee-00ef2bcbdaf5/scratchpad/shots/`. Metro left running: wrapper pid 48782, node pid 48802, port 8081, log `/private/tmp/claude-501/-Users-sampathchowdi-Desktop-SkipBudget/135371f7-66a7-4736-beee-00ef2bcbdaf5/scratchpad/metro.log`.
+
+## 2026-10-11 — Tia (Tester) — Savings + Goals on the Simulator (PARTIAL, stopped by the coordinator so the Founder can test on their iPhone)
+
+**Outcome:** Walked steps 1 to 7 in light mode and part of 8 in dark (savings, month detail, wrap-up). Stopped before dark Send, Sent and Goals, and before cleanup. Screenshots: `.claude/team/testing/savings-goals/` (light-01 to light-22, dark-01 to dark-03).
+
+**Left on the demo account (cleanup NOT done):**
+- Goal "Emergency fund": target $1,000 by Dec 2026, $420 already saved, $580 sent from savings (drawn from the September pot). Shows Completed, "reached Oct 2026". Still exists. To clean: Goals > Emergency fund > pencil > Delete goal > "Put $580 back in savings".
+- Ready to use is $52,783.14 now; it returns to $53,363.14 after that delete.
+- Goal "Trip" ($1,200 by Mar 2027, $300 already saved): deleted with "Put back in savings" ($490.50 returned). Its sends ($450.50 and $50) and the $10 take-out went with it.
+- "Test gift": added at $25, edited to $30, removed (soft: the row stays with removed_at set).
+- Filled-in months (intended): August $18,800 (earned 18,800, spent 0) and September $34,563.14 (earned 37,600, spent 3,036.86). September now reads $33,983.14 left, $580 to goals.
+- App Appearance setting is on DARK (I changed it from Light in Settings > Preferences). The Simulator now shows /wrap-up?month=2026-09. Metro untouched.
+
+**Bugs:**
+1. MAJOR: a send from /savings draws from the NEWEST pot first. Brief says oldest first, and design 1 shows Aug sent, Jul partly sent, Sep Ready. Repro: /savings (Ready $53,363.14; Sep $34,563.14, Aug $18,800) > Send to my goals > Split evenly > set Trip to $450.50 > Send $1,030.50. September becomes "$33,532.64 left", August stays "Ready". Evidence: light-13, light-15, dark-01. Code comment in `allocateBatch` says "newest pot first".
+2. MINOR: month detail Earned / Spent / Left over stack (label above figure) at default text size; design 2 puts the figure right of the label. light-04, light-15, dark-02. The wrap-up version is side by side.
+3. MINOR: By month row wraps "Earned $37,600 · Spent" and "$3,036.86" onto two lines (light-03).
+4. MINOR: Sent page lists Emergency fund before Trip; Send page and design 4 list Trip first (light-13 vs light-14).
+5. MINOR: dark mode, header "+" and pencil circles and the "$X left" / "Ready" pills are low contrast (dark-01, dark-02). Pig, medal and icons read fine.
+6. NIT: result card wraps "a / month" (light-07, light-09). Remove confirm says "$30.00" where the page says "$30".
+7. OBSERVATION: a blue "Refreshing..." banner covered the top for about 2 s after Send (first capture of Sent).
+
+**Delete goal / Remove from savings (Dmitri's worry):** each done once. Delete goal (Trip, "Put back") landed on Goals with a red "Goal deleted" toast, screenshot about 3 s after the tap. Remove (Test gift) landed on Savings with the red "Removed from savings" toast, screenshot about 1.2 s after. No "Something went wrong" page and no double navigation seen. Not tested: pressing Back after either, and sub-second flashes (screenshots lag 1 to 2 s).
+
+**Design differences:** 1-savings: plain chevron back (design has a white circle); October so far has no right-hand figure and no "Moves to savings on 1 Nov" line in the overspent state (positive state not seen). 2-month-detail: stacked figures (bug 2). 3-send: matches, plus extra red lines ("Trip needs $900.00 more.", "Choose how much to send to a goal."). 4-sent: order (bug 4). 5-wrap-up: matches. 6-goals: matches apart from the back button.
+
+**Passed:** wrap-up showed once and closed; Cards tiles (Ready to use $53,363.14, "Add a goal" then "2 active, Trip . Emergency fund"); calculator (Trip $1,200, Mar 2027, $300 saved, $37 a week matches design); save page 12-tile grid; "Goal added" toast; Back from Goals went to Cards, not the flow; Split evenly, stepper, +$50, Fill goal, over-need refused; Sent page; goal detail history, "Money taken out" toast; Delete goal two choices; add, edit, $0 refused with "Remove it from savings instead", remove.
+**Not run:** dark Send, Sent and Goals; overspent wrap-up; no-goals Send; large text; es/fr; offline; notification; edit-month page (light-05 saved, not reviewed).
+**Open questions:** brief or code on oldest-first? Is October "Earned $0" right (salary $37,600 monthly, payday unknown)?
