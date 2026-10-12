@@ -302,6 +302,121 @@ describe('editing a habit’s receipt', () => {
     expect(await fr.findByText('Coffee a commencé le 9 oct. 2026.')).toBeTruthy();
   });
 
+  // Past days keep the name they were filed with unless the person chose Past and upcoming, so the
+  // receipt's own name and its habit's can differ in either direction.
+  describe.each([
+    { receipt: 'Coffee', habit: 'Latte' },
+    { receipt: 'Latte', habit: 'Coffee' },
+  ])('receipt "$receipt" of a habit now called "$habit"', ({ receipt, habit }) => {
+    const NAMED = {
+      ...COFFEE_RECEIPT,
+      merchant: receipt,
+      habit: { name: habit, icon_id: 'food-dining/coffee', color: 'caramel' },
+    };
+
+    beforeEach(() => {
+      mockReceipt = { data: NAMED, isError: false, isFetched: true };
+    });
+
+    it('shows the store as the receipt’s own name, with the habit’s icon', async () => {
+      const screen = await render(<AddReceiptScreen />);
+
+      expect(screen.getByText('Store')).toBeTruthy();
+      expect(screen.getByText(receipt)).toBeTruthy();
+      expect(screen.queryByText(habit)).toBeNull();
+      expect(mockHabitIcon).toHaveBeenCalledWith({
+        iconId: 'food-dining/coffee',
+        color: 'caramel',
+        size: 40,
+      });
+      expect(screen.queryByPlaceholderText(STORE_PLACEHOLDER)).toBeNull();
+    });
+
+    it('saves under the name the day was filed with, not the habit’s', async () => {
+      mockUpdate.mockResolvedValue({ id: 'receipt-1' });
+      const screen = await render(<AddReceiptScreen />);
+      await fireEvent.press(screen.getByLabelText('Save changes'));
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+        merchant: receipt,
+        amount: 5,
+        source: 'habit',
+      });
+    });
+
+    it('names the habit when it already has that day', async () => {
+      mockUpdate.mockRejectedValue({ code: '23505', message: 'duplicate key value' });
+      const screen = await render(<AddReceiptScreen />);
+      await fireEvent.press(screen.getByLabelText('Save changes'));
+
+      expect(await screen.findByText(`${habit} already has a receipt on that day.`)).toBeTruthy();
+      expect(screen.queryByText(`${receipt} already has a receipt on that day.`)).toBeNull();
+      expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    });
+
+    it('names the habit when the day is before it started', async () => {
+      mockSavedFrom = '2026-10-09';
+      mockReceipt = {
+        data: { ...NAMED, purchased_on: '2026-10-09' },
+        isError: false,
+        isFetched: true,
+      };
+      const screen = await render(<AddReceiptScreen />);
+      await fireEvent.press(screen.getByLabelText('Yesterday'));
+      await fireEvent.press(screen.getByLabelText('Save changes'));
+
+      expect(await screen.findByText(`${habit} started on 9 Oct 2026.`)).toBeTruthy();
+      expect(screen.queryByText(`${receipt} started on 9 Oct 2026.`)).toBeNull();
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it('says the day-taken line with the habit’s name in Spanish and French', async () => {
+      mockUpdate.mockRejectedValue({ code: '23505' });
+      setLanguage('es');
+      const es = await render(<AddReceiptScreen />);
+      expect(es.getByText(receipt)).toBeTruthy();
+      await fireEvent.press(es.getByLabelText('Guardar cambios'));
+      expect(await es.findByText(`${habit} ya tiene un recibo ese día.`)).toBeTruthy();
+
+      setLanguage('fr');
+      const fr = await render(<AddReceiptScreen />);
+      expect(fr.getByText(receipt)).toBeTruthy();
+      await fireEvent.press(fr.getByLabelText('Enregistrer les modifications'));
+      expect(await fr.findByText(`${habit} a déjà un reçu ce jour-là.`)).toBeTruthy();
+    });
+
+    it('says the started-on line with the habit’s name in Spanish and French', async () => {
+      mockSavedFrom = '2026-10-09';
+      mockReceipt = {
+        data: { ...NAMED, purchased_on: '2026-10-09' },
+        isError: false,
+        isFetched: true,
+      };
+      setLanguage('es');
+      const es = await render(<AddReceiptScreen />);
+      await fireEvent.press(es.getByLabelText('Ayer'));
+      await fireEvent.press(es.getByLabelText('Guardar cambios'));
+      expect(await es.findByText(`${habit} empezó el 9 oct 2026.`)).toBeTruthy();
+
+      setLanguage('fr');
+      const fr = await render(<AddReceiptScreen />);
+      await fireEvent.press(fr.getByLabelText('Hier'));
+      await fireEvent.press(fr.getByLabelText('Enregistrer les modifications'));
+      expect(await fr.findByText(`${habit} a commencé le 9 oct. 2026.`)).toBeTruthy();
+    });
+  });
+
+  it('falls back to the receipt’s own name for both lines when the habit’s name was not read', async () => {
+    mockReceipt = { data: { ...COFFEE_RECEIPT, habit: null }, isError: false, isFetched: true };
+    mockUpdate.mockRejectedValue({ code: '23505' });
+    const screen = await render(<AddReceiptScreen />);
+    expect(screen.getByText('Coffee')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Save changes'));
+
+    expect(await screen.findByText(DAY_TAKEN)).toBeTruthy();
+  });
+
   it('keeps the plain failure line for a receipt that is not a habit’s', async () => {
     mockReceipt = {
       data: { ...COFFEE_RECEIPT, source: 'manual', habit_id: null, habit: null },

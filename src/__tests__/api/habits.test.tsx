@@ -600,7 +600,7 @@ describe('useUpdateHabit', () => {
 
     expect(calls(mockRequests[0], 'update')).toEqual([[{ name: 'Lattes', price: 6 }]]);
     expect(calls(mockRequests[0], 'eq')).toEqual([['id', 'habit-coffee']]);
-    // A rename renames the habit's receipts on the server, so their lists are stale too.
+    // Receipt lists draw the habit's icon and colour through it, so they are stale too.
     expect(invalidated).toEqual(EVERY_HABIT_KEY);
   });
 

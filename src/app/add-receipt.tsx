@@ -892,7 +892,8 @@ function ReceiptForm({
     ? {
         key: 'store',
         label: t('receipts.field.store'),
-        value: habit.name,
+        // The name the day was filed under: an Upcoming only rename leaves past days theirs.
+        value: store?.name || habit.name,
         leading: <HabitIcon iconId={habit.iconId} color={habit.color} size={40} />,
       }
     : {

@@ -1,7 +1,8 @@
 -- Checks for 20261009100001_capture_source_habit.sql, 20261009100002_habits.sql,
 -- 20261009100003_receipt_reminder_ignores_habits.sql and
--- 20261009100004_habit_receipt_not_before_creation.sql. LOCAL database only, with all four applied:
--- everything runs in one transaction and rolls back.
+-- 20261009100004_habit_receipt_not_before_creation.sql, with a rename as
+-- 20261012200001_habit_past_days.sql leaves it (habit_past_days.sql checks the rest of that one).
+-- LOCAL database only, with all five applied: everything runs in one transaction and rolls back.
 --
 --   docker exec -i supabase_db_SkipBudget psql -U postgres -d postgres -q -t < supabase/checks/habits.sql
 --
@@ -184,12 +185,13 @@ select pg_temp.check(
     where habit_id = '00000000-0000-0000-0000-00000000e001' and purchased_on = '2026-10-07'),
   'an edited tap keeps its own amount and stays a habit receipt');
 
--- Rename: its receipts follow, nobody else's.
+-- A rename is the habit's alone: its days already filed take the new name only when the person
+-- asks, as the app's own update of them.
 update public.habits set name = 'Lattes' where id = '00000000-0000-0000-0000-00000000e001';
 select pg_temp.check(
-  (select bool_and(merchant = 'Lattes') and count(*) = 2 from public.receipts
+  (select bool_and(merchant = 'Coffee') and count(*) = 2 from public.receipts
     where habit_id = '00000000-0000-0000-0000-00000000e001'),
-  'renaming a habit renames its receipts');
+  'renaming a habit leaves its receipts their name');
 select pg_temp.check(
   (select count(*) = 1 from public.receipts where merchant = 'Taxi & rides')
   and (select count(*) = 1 from public.receipts where merchant = 'Corner shop'),
@@ -290,10 +292,16 @@ select pg_temp.check(
   (select amount = 12.45 and note = 'with juice' and card_id is null and purchased_on = '2026-10-06'
      from public.receipts where id = '00000000-0000-0000-0000-0000000f0b06'),
   'an older receipt keeps its day and can still be edited');
+-- "Past and upcoming" after a rename, as the app sends it: the date and habit are not written.
 update public.habits set name = 'Breakfast out' where id = '00000000-0000-0000-0000-00000000e003';
+update public.receipts
+   set merchant = 'Breakfast out', amount = 10, category_id = 'other',
+       card_id = '00000000-0000-0000-0000-0000000c00a1', bank_account_id = null
+ where habit_id = '00000000-0000-0000-0000-00000000e003';
 select pg_temp.check(
-  (select merchant = 'Breakfast out' from public.receipts where id = '00000000-0000-0000-0000-0000000f0b06'),
-  'renaming the habit still renames it');
+  (select merchant = 'Breakfast out' and amount = 10 and card_id is not null and purchased_on = '2026-10-06'
+     from public.receipts where id = '00000000-0000-0000-0000-0000000f0b06'),
+  'rewriting the habit''s days still reaches it');
 select pg_temp.expect_error(
   $q$update public.receipts set purchased_on = '2026-10-05'
       where id = '00000000-0000-0000-0000-0000000f0b06'$q$,
@@ -387,7 +395,7 @@ select pg_temp.check(
   'deleting the card leaves the habit and its receipts paid with Skip');
 delete from public.habits where id = '00000000-0000-0000-0000-00000000e001';
 select pg_temp.check(
-  (select count(*) = 2 from public.receipts where merchant = 'Lattes' and habit_id is null),
+  (select count(*) = 2 from public.receipts where merchant = 'Coffee' and habit_id is null),
   'a habit removed outright leaves its receipts, unlinked');
 reset role;
 
