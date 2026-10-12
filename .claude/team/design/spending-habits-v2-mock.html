@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Spending habits v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root { --desk: #ECE8E3; --desk-ink: #1d1a1f; --desk-muted: #6b6470; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--desk); color: var(--desk-ink); font-family: Montserrat, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+.intro { max-width: 1240px; margin: 0 auto; padding: 32px 24px 8px; }
+.intro h1 { font-size: 26px; margin: 0 0 6px; }
+.intro p { margin: 0 0 4px; color: var(--desk-muted); font-size: 14px; line-height: 1.5; }
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin: 18px 0 0; padding: 0; list-style: none; }
+.rules li { background: #fff; border-radius: 14px; padding: 12px 14px; font-size: 13px; line-height: 1.45; }
+.rules b { display: block; font-size: 13px; margin-bottom: 2px; }
+.board { display: flex; flex-wrap: wrap; gap: 36px 28px; padding: 28px 24px 60px; max-width: 1340px; margin: 0 auto; align-items: flex-start; }
+.frame { width: 390px; flex: none; }
+.frame-label { display: flex; align-items: center; gap: 8px; margin: 0 0 10px 4px; font-size: 14px; font-weight: 600; }
+.tag { font-size: 11px; padding: 2px 9px; border-radius: 99px; background: #F3E9EF; color: #905479; font-weight: 600; }
+.notes { margin: 12px 4px 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: var(--desk-muted); }
+.notes li { margin-bottom: 3px; }
+
+/* Phone */
+.phone { --surface:#FBF9F7; --card:#FFFFFF; --ink:#111111; --muted:#6F6F6F; --line:#E5E1DC; --accent:#905479; --on:#FFFFFF; --tint:#F4EEF2; --tint-ink:#905479; --in:#2F7A55; --soft: rgba(17,17,17,.04); --track:#ECE8E4; --shadow: 0 2px 14px rgba(17,17,17,.05);
+  width: 390px; border-radius: 44px; border: 1px solid #D6D0CA; background: var(--surface); color: var(--ink); overflow: hidden; padding-bottom: 28px; }
+.phone.dark { --surface:#1B181F; --card:#2A2634; --ink:#F8F6FB; --muted:#A7A1B2; --line:#3E3949; --tint:#473347; --tint-ink:#E0B9D0; --in:#7FD6A0; --soft: rgba(248,246,251,.06); --track:#3A3544; --shadow:none; border-color:#2b2731; }
+.status { height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; font-size: 15px; font-weight: 600; }
+.status .bars { display:flex; gap:5px; align-items:center; }
+.status .bars i { display:block; width: 22px; height: 11px; border-radius: 3px; border: 1.5px solid currentColor; }
+.head { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; padding: 6px 20px 0; }
+.head h2 { margin: 0; text-align: center; font-size: 20px; font-weight: 700; }
+.icon-btn { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--ink); cursor: pointer; padding: 0; }
+.icon-btn.tonal { background: var(--tint); color: var(--tint-ink); justify-self: end; }
+.icon-btn.ring { border: 1px solid var(--line); background: var(--card); }
+.icon-btn[disabled] { opacity: .3; cursor: default; }
+svg.l { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.body { padding: 0 20px; }
+
+.hero { margin-top: 18px; background: var(--accent); color: var(--on); border-radius: 22px; padding: 22px; }
+.hero .lbl { font-size: 15px; opacity: .95; }
+.hero .big { font-size: 38px; font-weight: 700; margin-top: 2px; letter-spacing: -.5px; }
+.hero .tile { margin-top: 14px; background: rgba(255,255,255,.14); border-radius: 14px; padding: 12px 16px; }
+.hero .tile .t { display: flex; gap: 6px; align-items: center; font-size: 14px; }
+.hero .tile .t svg { width: 17px; height: 17px; }
+.hero .tile .v { font-size: 22px; font-weight: 700; margin-top: 2px; }
+.after-hero { text-align: center; color: var(--muted); font-size: 13px; margin-top: 10px; }
+
+.weeksel { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+.weeksel .mid { flex: 1; text-align: center; }
+.weeksel .mid .a { font-size: 12px; color: var(--muted); }
+.weeksel .mid .b { font-size: 17px; font-weight: 600; margin-top: 1px; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 20px; margin-top: 16px; box-shadow: var(--shadow); }
+.card-head { display: flex; align-items: center; gap: 12px; }
+.hicon { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex: none; }
+.hicon svg { width: 26px; height: 26px; }
+.card-head .name { flex: 1; font-size: 17px; font-weight: 600; min-width: 0; }
+.card-head .price { font-size: 20px; font-weight: 700; }
+.big { font-size: 40px; font-weight: 700; margin-top: 18px; letter-spacing: -.6px; }
+.sub { font-size: 14px; color: var(--muted); margin-top: 4px; }
+.sub + .sub { margin-top: 6px; }
+.bar { height: 8px; border-radius: 4px; background: var(--track); margin-top: 16px; overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+.pill { margin-top: 16px; background: var(--soft); border-radius: 12px; padding: 12px; text-align: center; font-size: 15px; font-weight: 500; }
+.starts { margin-top: 18px; font-size: 15px; color: var(--muted); }
+.days { display: flex; margin-top: 14px; }
+.day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.day .ini { font-size: 13px; font-weight: 500; color: var(--muted); }
+.day .ini.today { color: var(--ink); font-weight: 700; }
+.circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--soft); border: 1.5px solid var(--line); cursor: pointer; }
+.circle.open { border-color: color-mix(in srgb, var(--muted) 70%, transparent); }
+.circle.today { border: 2px solid var(--hc); }
+.circle.tapped { background: var(--hc); border-color: var(--hc); }
+.circle.tapped svg { width: 18px; height: 18px; stroke: #fff; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.circle.future { cursor: default; }
+.circle.before { opacity: .4; cursor: default; }
+.btn { margin-top: 18px; width: 100%; min-height: 48px; border-radius: 999px; background: var(--accent); color: #fff; font: 600 15px Montserrat, sans-serif; border: 0; cursor: pointer; }
+.add { margin-top: 16px; width: 100%; height: 58px; border-radius: 20px; border: 1.5px dashed var(--line); background: transparent; color: var(--tint-ink); font: 600 16px Montserrat, sans-serif; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+.phone:not(.dark) .add { color: var(--accent); border-color: #D2CBC4; }
+
+.section { display: flex; align-items: baseline; justify-content: space-between; margin-top: 26px; }
+.section h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.section span { font-size: 13px; color: var(--muted); }
+
+.week { background: var(--card); border: 1px solid var(--line); border-radius: 20px; margin-top: 12px; box-shadow: var(--shadow); overflow: hidden; }
+.week-top { padding: 16px 16px 16px 18px; cursor: pointer; }
+.week-row { display: flex; align-items: center; gap: 10px; }
+.week-row .when { flex: 1; }
+.week-row .when .a { font-size: 12px; color: var(--muted); }
+.week-row .when .b { font-size: 16px; font-weight: 600; margin-top: 1px; }
+.chev { width: 32px; height: 32px; border-radius: 50%; background: var(--soft); display: flex; align-items: center; justify-content: center; transition: transform .15s; }
+.chev svg { width: 18px; height: 18px; }
+.week.open .chev { transform: rotate(180deg); }
+.figs { display: flex; gap: 10px; margin-top: 12px; }
+.fig { flex: 1; border-radius: 14px; background: var(--soft); padding: 10px 12px; }
+.fig .a { font-size: 12px; color: var(--muted); }
+.fig .b { font-size: 18px; font-weight: 700; margin-top: 2px; }
+.fig .b.in { color: var(--in); }
+.limit { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.week .bar { margin-top: 12px; height: 6px; }
+.dlist { border-top: 1px solid var(--line); }
+.drow { display: flex; align-items: center; gap: 12px; padding: 12px 16px 12px 18px; }
+.drow + .drow { border-top: 1px solid var(--line); }
+.drow .mini { width: 28px; height: 28px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--line); background: var(--soft); }
+.drow .mini.tapped { background: var(--hc); border-color: var(--hc); }
+.drow .mini.tapped svg { width: 14px; height: 14px; stroke: #fff; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.drow .mini.today { border: 2px solid var(--hc); }
+.drow .txt { flex: 1; min-width: 0; }
+.drow .txt .a { font-size: 15px; font-weight: 600; }
+.drow .txt .b { font-size: 13px; color: var(--muted); margin-top: 1px; }
+.drow .amt { text-align: right; font-size: 15px; font-weight: 600; }
+.drow .amt.in { color: var(--in); }
+.drow .amt small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+.drow .go { color: var(--muted); }
+.drow .go svg { width: 16px; height: 16px; }
+.drow.link { cursor: pointer; }
+
+.about { background: var(--card); border: 1px solid var(--line); border-radius: 20px; margin-top: 12px; box-shadow: var(--shadow); }
+.about .r { display: flex; justify-content: space-between; padding: 14px 18px; font-size: 15px; }
+.about .r + .r { border-top: 1px solid var(--line); }
+.about .r span:first-child { color: var(--muted); }
+.about .r span:last-child { font-weight: 600; }
+.notice { margin-top: 14px; border-radius: 14px; background: var(--tint); color: var(--tint-ink); padding: 12px 14px; font-size: 13px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="intro">
+  <h1>Spending habits: new cards + View details</h1>
+  <p>Mock for your review. It is set on <b>Friday, Oct 16</b> so the week is part-way through. Every number comes from the rules below; nothing is typed in by hand.</p>
+  <p>You can tap things: the week arrows, any empty or filled day circle, and the weeks on View details (each one opens to show its days).</p>
+  <ul class="rules">
+    <li><b>Spend limit</b>Price × the days the habit tracks that week: $5 × 7 = $35. Breakfast started on Wednesday, so its first week is $4 × 5 = $20.</li>
+    <li><b>Saved</b>Same rule as now: each finished day without a receipt saves one price. Today only counts once it's over. When a week ends, Spent + Saved = the limit.</li>
+    <li><b>Day N of 7</b>Weeks still run Monday to Sunday. Friday is "Day 5 of 7"; Breakfast is "Day 3 of 5". A finished week says "Week complete".</li>
+    <li><b>Buttons</b>The pencil opens the edit page (Delete is there). View details opens the habit's history. The card itself doesn't open anything, so a tap meant for a day can't open a page by mistake.</li>
+  </ul>
+</div>
+<div class="board" id="board"></div>
+
+<script>
+const ICONS = { coffee: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><path fill="#8a6762" d="m76 17-.72 14-.15 3H20.87L20 17z"/><path fill="#98726b" d="m76 17-.72 14H29.57a6 6 0 0 1-6-5.69L23.15 17z"/><path fill="#8a6762" d="m72.87 78-.72 14-.15 3H24l-.87-17z"/><path fill="#98726b" d="m72.87 78-.72 14H32.7a6 6 0 0 1-6-5.69L26.28 78z"/><path fill="#a67f74" d="m72 17-.72 14-.15 3h-9l.15-3L63 17zM68.87 78l-.72 14-.15 3h-9l.15-3 .72-14z"/><path fill="#b8c0ce" d="M16 11h64v6H16z"/><path fill="#ccd1dc" d="M19 11h61v3H22a3 3 0 0 1-3-3M76 11H20l4-10h48l2.8 7z"/><path fill="#dee1e7" d="M74.8 8H31.54a5.11 5.11 0 0 1-4.74-7H72z"/><path fill="#cba07a" d="m77.14 34-.67 13-.93 18-.52 10-.15 3H21.13l-.67-13-.93-18-.67-13z"/><path fill="#d9b18c" d="m77.14 34-.67 13-.93 18L75 75H37.15A13.71 13.71 0 0 1 24 65a13.4 13.4 0 0 1-.49-3l-.77-15-.16-3L22 34z"/><path fill="#dee1e7" d="M24 65h-3.54l-.93-18h3.16l.77 15a13.4 13.4 0 0 0 .54 3"/><path fill="#f3f4f5" d="m76.47 47-.93 18H24a13.4 13.4 0 0 1-.49-3l-.77-15z"/><circle cx="48" cy="56" r="15" fill="#85bd79"/><circle cx="48" cy="56" r="12" fill="#9fc98a"/><path fill="#bbd79f" d="M56.94 56a1 1 0 0 1-1-.87 8 8 0 0 0-7.08-7.08 1 1 0 0 1-.87-1 1 1 0 0 1 1.12-1 10 10 0 0 1 8.82 8.82 1 1 0 0 1-.99 1.13M46.88 65.94a10 10 0 0 1-8.82-8.82 1 1 0 0 1 1-1.12 1 1 0 0 1 1 .87A8 8 0 0 0 47.13 64a1 1 0 0 1 .87 1 1 1 0 0 1-1.12.94"/><path fill="#39426a" d="M80 10h-3.31L73 .62A1 1 0 0 0 72 0H24a1 1 0 0 0-.95.65L19.31 10H16a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h3l.79 15h-.93a1 1 0 0 0-1 1.08l.68 13 .47 9 1.13 22a1 1 0 0 0 1 1h1l.83 16a1 1 0 0 0 1 1H72a1 1 0 0 0 1-1l.83-16h1a1 1 0 0 0 1-1l1.13-22 .47-9 .68-13a1 1 0 0 0-1-1.08h-.93L77 18h3a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1M24.69 2h46.62l3.17 8h-53zm51.37 33-.57 11h-15a16 16 0 0 0-25 0h-15l-.55-11zM75 56l-.41 8H61.88a15.85 15.85 0 0 0 0-15.94h13.51zm-54 0-.41-8h13.53a15.85 15.85 0 0 0 0 15.94H21.43zm13 0a14 14 0 1 1 14 14 14 14 0 0 1-14-14m37 38H25l-.79-15h47.58zM22.1 77l-.56-11h14a16 16 0 0 0 25 0h14l-.64 11zm52.05-44h-52.3l-.77-15h53.84zM79 16H17v-4h62z"/></svg>`, breakfast: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><circle cx="48" cy="48" r="47" fill="#f3f4f5"/><circle cx="48" cy="48" r="37" fill="#dee1e7"/><circle cx="48" cy="48" r="34" fill="#ccd1dc"/><circle cx="48" cy="48" r="31" fill="#b8c0ce"/><path fill="#dc5d6b" d="M56.83 33.8c2.54-.5 3.27-1.8 7-1.8 4.6 0 4.6 2 9.2 2V20c-4.6 0-4.6-2-9.2-2s-4.6 2-9.21 2-4.62-2-9.22-2-4.6 2-9.2 2-4.6-2-9.2-2v14a10.2 10.2 0 0 1 3 .39C32 33 32.9 34 36.2 34c4.6 0 4.6-2 9.2-2a9.7 9.7 0 0 1 3.46.54 18 18 0 0 0 3.84 1.33z"/><path fill="#dc5d6b" d="m39.11 43.19-.2.21c-3.25 3.26-4.67 1.84-7.92 5.1s-1.83 4.67-5.08 7.92-4.67 1.84-7.91 5.1l-9.91-9.9c3.25-3.25 4.66-1.84 7.91-5.09s1.84-4.67 5.09-7.92 4.66-1.85 7.91-5.1a12 12 0 0 0 1-1.12L49 30z"/><path fill="#f4929c" d="M73 25c-4.6 0-4.6-2-9.2-2s-4.6 2-9.21 2-4.59-2-9.19-2-4.6 2-9.2 2-4.6-2-9.2-2v4c4.6 0 4.6 2 9.2 2s4.6-2 9.2-2 4.59 2 9.19 2 4.61-2 9.21-2 4.6 2 9.2 2zM34.74 33.92a9.9 9.9 0 0 1-2.2 3.08c-3.25 3.26-4.67 1.84-7.92 5.1s-1.83 4.67-5.08 7.92-4.66 1.84-7.91 5.1L14.46 58c3.25-3.25 4.66-1.84 7.91-5.09s1.84-4.67 5.09-7.93 4.66-1.84 7.91-5.09c2.62-2.62 2.21-4 3.65-6.21"/><path fill="#ccd1dc" d="M76 58c-3 4-4 5-7 14s-19 8-22 4-17 3-20-5a10.5 10.5 0 0 1-.54-2c-1.09-6.82 5.8-11.14 8.54-13 3-2 1-11 7-17s17-8 27 0c3.92 3.14 6.31 6.12 7.57 8.83C78.54 52 77.82 55.57 76 58"/><path fill="#dee1e7" d="M75 55c-3 4-4 5-7 14s-19 8-22 4c-2.87-3.83-15.8 2.41-19.54-4-1.09-6.82 5.8-11.14 8.54-13 3-2 1-11 7-17s17-8 27 0c3.92 3.14 6.31 6.12 7.57 8.83A8.9 8.9 0 0 1 75 55"/><circle cx="56" cy="60" r="9" fill="#f6b756"/><path fill="#fac77d" d="M61 61a1 1 0 0 1-1-1 4 4 0 0 0-4-4 1 1 0 0 1 0-2 6 6 0 0 1 6 6 1 1 0 0 1-1 1"/><path fill="#f3f4f5" d="M30.46 67.42a1 1 0 0 1-1-1.19c.63-2.79 3.18-5 6.06-7a1 1 0 0 1 1.39.27 1 1 0 0 1-.27 1.36c-2.43 1.67-4.72 3.6-5.24 5.75a1 1 0 0 1-.94.81M72.68 49.07a1 1 0 0 1-1.3-.34 24.3 24.3 0 0 0-5.5-5.83A17.55 17.55 0 0 0 55 38.72a13.54 13.54 0 0 0-8.82 3.21 1 1 0 0 1-1.33-.07 1 1 0 0 1 .07-1.49A15.6 15.6 0 0 1 55 36.72a19.5 19.5 0 0 1 12.12 4.62 26.4 26.4 0 0 1 5.93 6.3 1 1 0 0 1-.38 1.43z"/><g fill="#39426a"><path d="M48 0a48 48 0 1 0 48 48A48.09 48.09 0 0 0 48 0m0 94a46 46 0 1 1 46-46 46 46 0 0 1-46 46"/><path d="M74 24.57V20a1 1 0 0 0-1-1 8.9 8.9 0 0 1-4.19-.91A10.9 10.9 0 0 0 64.27 17 34.7 34.7 0 0 0 48 13a35 35 0 0 0-17.29 4.57A11.1 11.1 0 0 0 27 17a1 1 0 0 0-1 1v2.78a34.8 34.8 0 0 0-13 26.76 14 14 0 0 1-1.32.58 11.1 11.1 0 0 0-4.31 2.77 1 1 0 0 0 0 1.46l3.54 3.53 1.62 1.61 2.6 2.6A35 35 0 1 0 74 24.57m-14.52 53.1c-5.07.82-10.34-.53-11.66-2.29-1-1.39-2.92-1.75-5.14-1.75-1.15 0-2.4.1-3.67.2-5.6.44-9.68.46-11-3.19-2.62-7 4.1-11.46 7.33-13.6l.28-.19c1.63-1.08 2-3.34 2.55-6.2.57-3.21 1.27-7.15 4-10.29a7 7 0 0 1 .59-.63 17.3 17.3 0 0 1 10.11-4.86.4.4 0 0 0 .15 0c4.73-.54 10.12.76 15.37 4.95 11.6 9.28 8.15 15.81 6.82 17.58l-.53.7c-2.65 3.53-3.75 5-6.62 13.6-1.44 4.21-5.99 5.55-8.58 5.97m-21.3-35A9 9 0 0 1 34.57 45a12 12 0 0 0-7.07 7.09 8.84 8.84 0 0 1-2.32 3.6 8.84 8.84 0 0 1-3.6 2.31A11 11 0 0 0 18 60.09l-1.26-1.26-.8-.83a9.1 9.1 0 0 1 2.85-1.62 11 11 0 0 0 4.31-2.78 11.1 11.1 0 0 0 2.77-4.31 10 10 0 0 1 5.92-5.93 11.1 11.1 0 0 0 4.31-2.76 11 11 0 0 0 2.77-4.32 12 12 0 0 1 .82-1.75 15 15 0 0 0 1.52-.59A8.9 8.9 0 0 1 45.4 33a12 12 0 0 0-2.14 1.72 11 11 0 0 0-2.77 4.33l-.05.1a15.7 15.7 0 0 0-2.2 3.44zM13.11 55.18A8.8 8.8 0 0 1 16 53.56a10.9 10.9 0 0 0 4.31-2.77A11.1 11.1 0 0 0 23 46.47a8.8 8.8 0 0 1 2.31-3.61A9 9 0 0 1 29 40.54a10.9 10.9 0 0 0 4.31-2.77A11.4 11.4 0 0 0 35.35 35h1.85l-.21.54a8.8 8.8 0 0 1-2.32 3.61A8.84 8.84 0 0 1 31 41.46a11 11 0 0 0-4.31 2.78A11.1 11.1 0 0 0 24 48.55a8.8 8.8 0 0 1-2.32 3.61A8.84 8.84 0 0 1 18 54.48a11.1 11.1 0 0 0-3.56 2.07L14 56zm35.77-21.53h-.05zm7.93-.9a19.8 19.8 0 0 0-4.15.06 10 10 0 0 1-2.25-.75c-.39-.17-.77-.34-1.19-.49h-.08A10.8 10.8 0 0 0 45.4 31a11 11 0 0 0-5 1.09 8.9 8.9 0 0 1-4.2.91 9 9 0 0 1-4.2-.94 13 13 0 0 0-1.72-.65A9.7 9.7 0 0 0 28 31v-2.93a9 9 0 0 1 3.16.87 11 11 0 0 0 5 1.09 11 11 0 0 0 5-1.09A8.9 8.9 0 0 1 45.4 28a9 9 0 0 1 4.19.91 12 12 0 0 0 10 0 10.12 10.12 0 0 1 8.39 0 11 11 0 0 0 4 1v2.94a8.8 8.8 0 0 1-3.16-.87 12.06 12.06 0 0 0-10 0 10.2 10.2 0 0 1-2.01.77M28 24.07a8.8 8.8 0 0 1 3.16.87 11 11 0 0 0 5 1.09 11 11 0 0 0 5-1.09A8.9 8.9 0 0 1 45.4 24a9 9 0 0 1 4.19.91 12 12 0 0 0 10 0 10.12 10.12 0 0 1 8.39 0 10.7 10.7 0 0 0 4 1v1.94a8.8 8.8 0 0 1-3.16-.87 12.06 12.06 0 0 0-10 0 10.12 10.12 0 0 1-8.39 0 11 11 0 0 0-5-1.09 11 11 0 0 0-5 1.09A9 9 0 0 1 36.2 28a8.9 8.9 0 0 1-4.2-.94 10.7 10.7 0 0 0-4-1zm32.35-6.62a14 14 0 0 0-1.59.61 10.12 10.12 0 0 1-8.39 0 11 11 0 0 0-5-1.09 11 11 0 0 0-5 1.09 8.9 8.9 0 0 1-4.17.94 8.9 8.9 0 0 1-3-.44A33 33 0 0 1 48 15a32.6 32.6 0 0 1 12.38 2.45zm-29.16 2.49a11 11 0 0 0 5 1.09 11 11 0 0 0 5-1.09A8.9 8.9 0 0 1 45.4 19a8.9 8.9 0 0 1 4.18.91 12.08 12.08 0 0 0 10 0A8.9 8.9 0 0 1 63.8 19h.2a8.94 8.94 0 0 1 4 .91 10.7 10.7 0 0 0 4 1v2.94a9 9 0 0 1-3.16-.87 12.06 12.06 0 0 0-10 0 10.12 10.12 0 0 1-8.39 0 11 11 0 0 0-5-1.09 11 11 0 0 0-5 1.09A9 9 0 0 1 36.2 24a8.9 8.9 0 0 1-4.2-.94 11 11 0 0 0-4-1v-2.99a8.8 8.8 0 0 1 3.19.87M26 23.47V32a1 1 0 0 0 1 1h1a9 9 0 0 1-3.31 2 12.1 12.1 0 0 0-7.08 7.09 8.8 8.8 0 0 1-2.32 3.61l-.18.18A32.7 32.7 0 0 1 26 23.47M12.42 50a11 11 0 0 0 4.31-2.78 11.1 11.1 0 0 0 2.77-4.31 8.9 8.9 0 0 1 2.32-3.61 8.8 8.8 0 0 1 3.61-2.3 11.06 11.06 0 0 0 4.29-2.77c.23-.23.43-.44.61-.65.3.11.58.23.87.35a14 14 0 0 0 2 .73 9.7 9.7 0 0 1-1.36 1.65 8.9 8.9 0 0 1-3.61 2.31 12.1 12.1 0 0 0-7.08 7.1 8.7 8.7 0 0 1-2.31 3.6 9 9 0 0 1-3.6 2.33 11 11 0 0 0-3.55 2.07l-2.12-2.07A8.8 8.8 0 0 1 12.42 50m6 12.44a1.1 1.1 0 0 0 .34-.23 8.84 8.84 0 0 1 3.6-2.32 11.1 11.1 0 0 0 4.31-2.77 11.1 11.1 0 0 0 2.77-4.32 8.8 8.8 0 0 1 2.31-3.61 8.9 8.9 0 0 1 3.61-2.31 17 17 0 0 0 1.64-.71c-.38 1.43-.63 2.83-.86 4.12-.41 2.28-.77 4.25-1.67 4.86l-.28.18c-3.09 2.05-11.31 7.51-8.11 16a6.57 6.57 0 0 0 1.9 2.76 33 33 0 0 1-9.59-11.62zm10.14 12.15c2.82 1.88 7 1.56 10.61 1.28 3-.23 6.09-.47 7 .75 1.52 2 5.57 3.3 9.92 3.34a32.86 32.86 0 0 1-27.54-5.37zm41.26-1.9c0-.12.11-.24.15-.37 2.77-8.29 3.74-9.57 6.32-13l.53-.7c3.33-4.44 3.18-12.13-7.18-20.42a25.5 25.5 0 0 0-8.89-4.72 10.3 10.3 0 0 1 7.24.46A11 11 0 0 0 73 35a1 1 0 0 0 1-1v-6.24a32.94 32.94 0 0 1-4.21 44.93z"/><path d="M56 50a10 10 0 1 0 10 10 10 10 0 0 0-10-10m0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8"/></g></svg>` };
+const COLORS = { caramel: { fill: '#C38449', tint: { light: '#F4E8DC', dark: '#4D341E' } }, green: { fill: '#2FA573', tint: { light: '#E2F4EA', dark: '#214332' } } };
+const L = {
+  left: '<path d="m15 18-6-6 6-6"/>', right: '<path d="m9 18 6-6-6-6"/>', down: '<path d="m6 9 6 6 6-6"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>', check: '<path d="M20 6 9 17l-5-5"/>',
+  pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+  piggy: '<path d="M11 17h3v2a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a3.16 3.16 0 0 0 2-2h1a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-1a5 5 0 0 0-2-4V3a4 4 0 0 0-3.2 1.6l-.3.4H11a6 6 0 0 0-6 6v1a5 5 0 0 0 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1z"/><path d="M16 10h.01"/><path d="M2 8v1a2 2 0 0 0 2 2h1"/>',
+};
+const svg = (name, cls = 'l') => `<svg class="${cls}" viewBox="0 0 24 24">${L[name]}</svg>`;
+
+// Dates as day numbers (UTC calendar), like src/lib/habit-week.ts.
+const DAY = 86400000;
+const dn = (iso) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / DAY;
+const iso = (n) => new Date(n * DAY).toISOString().slice(0, 10);
+const mondayOf = (n) => n - ((((n + 3) % 7) + 7) % 7);
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const WD = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const fmtDay = (n) => { const d = new Date(n * DAY); return `${WD[d.getUTCDay()]}, ${MON[d.getUTCMonth()]} ${d.getUTCDate()}`; };
+const range = (m) => { const a = new Date(m * DAY), b = new Date((m + 6) * DAY); return a.getUTCMonth() === b.getUTCMonth() ? `${MON[a.getUTCMonth()]} ${a.getUTCDate()} – ${b.getUTCDate()}` : `${MON[a.getUTCMonth()]} ${a.getUTCDate()} – ${MON[b.getUTCMonth()]} ${b.getUTCDate()}`; };
+const money = (v, cents = true) => '$' + (cents ? v.toFixed(2) : (Number.isInteger(v) ? String(v) : v.toFixed(2))).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+const TODAY = dn('2026-10-16');
+const THIS_WEEK = mondayOf(TODAY);
+const HABITS = [
+  { id: 'tim', name: 'Tim Hortons', price: 5, color: 'caramel', icon: 'coffee', from: dn('2026-09-28'), paidWith: 'Visa •• 4242', category: 'Dining',
+    taps: new Set(['2026-09-28','2026-09-30','2026-10-02','2026-10-05','2026-10-06','2026-10-07','2026-10-08','2026-10-10','2026-10-12','2026-10-13','2026-10-15','2026-10-16'].map(dn)) },
+  { id: 'bfast', name: 'Breakfast', price: 4, color: 'green', icon: 'breakfast', from: dn('2026-10-14'), paidWith: 'Skip', category: 'Dining',
+    taps: new Set(['2026-10-14'].map(dn)) },
+];
+
+function weekMaths(h, m) {
+  const first = Math.max(m, h.from), sun = m + 6;
+  const tracked = first <= sun ? sun - first + 1 : 0;
+  let spent = 0, bought = 0, skipped = 0;
+  for (let d = m; d <= sun; d++) if (h.taps.has(d)) { spent += h.price; bought++; }
+  for (let d = first; d <= Math.min(sun, TODAY - 1); d++) if (!h.taps.has(d)) skipped++;
+  const limit = h.price * tracked;
+  let pill = null;
+  if (tracked > 0) pill = m === THIS_WEEK ? `Day ${TODAY - first + 1} of ${tracked}` : 'Week complete';
+  return { first, tracked, spent, saved: skipped * h.price, bought, skipped, limit, pill };
+}
+function allTime(h) {
+  let spent = 0, saved = 0, bought = 0, skipped = 0;
+  for (let m = mondayOf(h.from); m <= THIS_WEEK; m += 7) { const w = weekMaths(h, m); spent += w.spent; saved += w.saved; bought += w.bought; skipped += w.skipped; }
+  return { spent, saved, bought, skipped };
+}
+function dayState(h, d) {
+  if (h.taps.has(d)) return 'tapped';
+  if (d > TODAY) return 'future';
+  if (d < h.from) return 'before';
+  return d === TODAY ? 'today' : 'open';
+}
+const hc = (h, dark) => `--hc:${COLORS[h.color].fill}`;
+const hicon = (h, dark, size) => `<div class="hicon" style="background:${COLORS[h.color].tint[dark ? 'dark' : 'light']};${size ? `width:${size}px;height:${size}px` : ''}">${ICONS[h.icon]}</div>`;
+
+function habitCard(h, m, dark, fid) {
+  const w = weekMaths(h, m);
+  const initials = ['M','T','W','T','F','S','S'];
+  const circles = initials.map((ini, i) => {
+    const d = m + i, st = dayState(h, d);
+    const press = st === 'tapped' || st === 'open' || st === 'today';
+    return `<div class="day"><span class="ini ${d === TODAY ? 'today' : ''}">${ini}</span><div class="circle ${st}" ${press ? `data-tap="${fid}|${h.id}|${d}"` : ''}>${st === 'tapped' ? `<svg viewBox="0 0 24 24">${L.check}</svg>` : ''}</div></div>`;
+  }).join('');
+  const pct = w.limit ? Math.min(100, (w.spent / w.limit) * 100) : 0;
+  const figures = w.tracked === 0
+    ? `<div class="starts">Starts ${fmtDay(h.from)}</div>`
+    : `<div class="big">${money(w.spent)}</div>
+       <div class="sub">Out of ${money(w.limit)} spend limit</div>
+       <div class="sub">${money(w.saved)} saved</div>
+       <div class="bar"><i style="width:${pct}%"></i></div>
+       <div class="pill">${w.pill}</div>`;
+  return `<div class="card" style="${hc(h, dark)}">
+    <div class="card-head">${hicon(h, dark)}<div class="name">${h.name}</div><div class="price">${money(h.price, false)}</div>
+      <button class="icon-btn ring" title="Edit ${h.name}">${svg('pencil')}</button></div>
+    ${figures}
+    <div class="days">${circles}</div>
+    <button class="btn" data-open="${h.id}">View details</button>
+  </div>`;
+}
+
+function habitsPage(st, dark, fid) {
+  const m = THIS_WEEK - 7 * st.back;
+  const spent = HABITS.reduce((s, h) => s + weekMaths(h, m).spent, 0);
+  const saved = HABITS.reduce((s, h) => s + allTime(h).saved, 0);
+  const label = st.back === 0 ? 'This week' : st.back === 1 ? 'Last week' : '';
+  const furthest = (THIS_WEEK - mondayOf(Math.min(...HABITS.map((h) => h.from)))) / 7;
+  return `<div class="status"><span>9:41</span><span class="bars"><i></i></span></div>
+  <div class="head"><button class="icon-btn">${svg('left')}</button><h2>Spending habits</h2><button class="icon-btn tonal">${svg('plus')}</button></div>
+  <div class="body">
+    <div class="hero"><div class="lbl">${st.back === 0 ? 'Spent this week' : 'Spent that week'}</div><div class="big" style="margin-top:2px">${money(spent)}</div>
+      <div class="tile"><div class="t">${svg('piggy')}Saved so far</div><div class="v">${money(saved)}</div></div></div>
+    <div class="weeksel">
+      <button class="icon-btn ring" data-week="${fid}|1" ${st.back >= furthest ? 'disabled' : ''}>${svg('left')}</button>
+      <div class="mid">${label ? `<div class="a">${label}</div>` : ''}<div class="b">${range(m)}</div></div>
+      <button class="icon-btn ring" data-week="${fid}|-1" ${st.back === 0 ? 'disabled' : ''}>${svg('right')}</button>
+    </div>
+    ${HABITS.map((h) => habitCard(h, m, dark, fid)).join('')}
+    <button class="add">${svg('plus')}Add a habit</button>
+  </div>`;
+}
+
+function weekBlock(h, m, open, fid) {
+  const w = weekMaths(h, m);
+  const label = m === THIS_WEEK ? 'This week' : m === THIS_WEEK - 7 ? 'Last week' : '';
+  const pct = w.limit ? Math.min(100, (w.spent / w.limit) * 100) : 0;
+  const rows = [];
+  for (let d = Math.min(m + 6, TODAY); d >= w.first; d--) {
+    const st = dayState(h, d);
+    if (st === 'tapped') rows.push(`<div class="drow link"><div class="mini tapped"><svg viewBox="0 0 24 24">${L.check}</svg></div><div class="txt"><div class="a">${fmtDay(d)}</div><div class="b">${d === TODAY ? 'Today · ' : ''}Bought</div></div><div class="amt">${money(h.price)}</div><span class="go">${svg('right')}</span></div>`);
+    else if (st === 'today') rows.push(`<div class="drow"><div class="mini today"></div><div class="txt"><div class="a">${fmtDay(d)}</div><div class="b">Today · not bought yet</div></div><div class="amt" style="color:var(--muted)">–</div></div>`);
+    else rows.push(`<div class="drow"><div class="mini"></div><div class="txt"><div class="a">${fmtDay(d)}</div><div class="b">Skipped</div></div><div class="amt in">+${money(h.price)}<small>saved</small></div></div>`);
+  }
+  return `<div class="week ${open ? 'open' : ''}">
+    <div class="week-top" data-fold="${fid}|${m}">
+      <div class="week-row"><div class="when">${label ? `<div class="a">${label}</div>` : ''}<div class="b">${range(m)}</div></div><div class="chev">${svg('down')}</div></div>
+      <div class="figs"><div class="fig"><div class="a">Spent</div><div class="b">${money(w.spent)}</div></div><div class="fig"><div class="a">Saved</div><div class="b ${w.saved > 0 ? 'in' : ''}">${money(w.saved)}</div></div></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="limit"><span>Out of ${money(w.limit)} spend limit</span><span>${w.pill}</span></div>
+    </div>
+    ${open ? `<div class="dlist">${rows.join('')}</div>` : ''}
+  </div>`;
+}
+
+function detailsPage(st, dark, fid) {
+  const h = HABITS[0];
+  const a = allTime(h);
+  const weeks = [];
+  for (let m = THIS_WEEK; m >= mondayOf(h.from); m -= 7) weeks.push(weekBlock(h, m, st.open.has(m), fid));
+  return `<div class="status"><span>9:41</span><span class="bars"><i></i></span></div>
+  <div class="head"><button class="icon-btn">${svg('left')}</button><h2>${h.name}</h2><button class="icon-btn tonal">${svg('pencil')}</button></div>
+  <div class="body" style="${hc(h, dark)}">
+    <div class="hero">
+      <div style="display:flex;align-items:center;gap:10px">${hicon(h, dark, 36).replace('<svg', '<svg style="width:22px;height:22px"')}<div class="lbl">${money(h.price)} each time · since ${fmtDay(h.from).slice(5)}</div></div>
+      <div class="lbl" style="margin-top:16px">Spent so far</div><div class="big" style="margin-top:2px">${money(a.spent)}</div>
+      <div class="tile"><div class="t">${svg('piggy')}Saved so far</div><div class="v">${money(a.saved)}</div></div>
+    </div>
+    <div class="after-hero">${a.bought} days bought · ${a.skipped} days skipped</div>
+    <div class="section"><h3>Week by week</h3><span>${weeks.length} weeks</span></div>
+    ${weeks.join('')}
+    <div class="section"><h3>About this habit</h3></div>
+    <div class="about">
+      <div class="r"><span>Price</span><span>${money(h.price)} each time</span></div>
+      <div class="r"><span>Paid with</span><span>${h.paidWith}</span></div>
+      <div class="r"><span>Category</span><span>${h.category}</span></div>
+      <div class="r"><span>Colour</span><span>Caramel</span></div>
+      <div class="r"><span>Started</span><span>${fmtDay(h.from)}</span></div>
+    </div>
+  </div>`;
+}
+
+const FRAMES = [
+  { id: 'f1', kind: 'habits', dark: false, label: 'Spending habits', tag: 'Redesigned', st: { back: 0 },
+    notes: ['Hero: what this week cost across all habits, then "Saved so far" (all time), stacked as in your design.', 'Tim Hortons: 4 days bought = $20.00 of $35.00. Wednesday is over and wasn\'t bought, so $5.00 saved.', 'Breakfast started Wednesday: Monday and Tuesday are faded, the limit is $20.00, and it shows "Day 3 of 5".', 'The day circles use the habit\'s own colour. Today has the coloured ring. Tapping a day still adds or removes that day\'s receipt.'] },
+  { id: 'f2', kind: 'habits', dark: true, label: 'Spending habits · dark', tag: 'Redesigned', st: { back: 0 },
+    notes: ['Same page in dark mode: the cards use the dark card colour, and the circles keep the habit colours.'] },
+  { id: 'f3', kind: 'habits', dark: false, label: 'Spending habits · last week', tag: 'State', st: { back: 1 },
+    notes: ['A finished week says "Week complete". Spent $25.00 + Saved $10.00 = the $35.00 limit.', 'In a week before a habit started, its card says "Starts Wed, Oct 14" instead of figures, and its circles are faded.'] },
+  { id: 'f4', kind: 'details', dark: false, label: 'View details', tag: 'New page', st: { open: new Set([THIS_WEEK]) },
+    notes: ['Opens from View details. The pencil in the header edits the habit.', 'Hero: everything this habit has cost and saved since it started.', '"Week by week", newest first: each week shows Spent, Saved and the bar. This week starts open. Tap any week to see its days.', 'Each day row: a bought day shows the amount and opens its receipt; a skipped day shows +$5.00 saved in green. Days that haven\'t happened yet aren\'t listed.', 'Free plan: weeks older than 90 days are hidden behind the usual "older history" notice, as on other pages.'] },
+  { id: 'f5', kind: 'details', dark: false, label: 'View details · last week opened', tag: 'State', st: { open: new Set([THIS_WEEK - 7]) },
+    notes: ['Any week opens and closes. Several can be open at once.'] },
+  { id: 'f6', kind: 'details', dark: true, label: 'View details · dark', tag: 'New page', st: { open: new Set([THIS_WEEK]) },
+    notes: [] },
+];
+
+function render() {
+  document.getElementById('board').innerHTML = FRAMES.map((f) => `
+    <div class="frame"><div class="frame-label">${f.label}<span class="tag">${f.tag}</span></div>
+      <div class="phone ${f.dark ? 'dark' : ''}">${f.kind === 'habits' ? habitsPage(f.st, f.dark, f.id) : detailsPage(f.st, f.dark, f.id)}</div>
+      ${f.notes.length ? `<ul class="notes">${f.notes.map((n) => `<li>${n}</li>`).join('')}</ul>` : ''}
+    </div>`).join('');
+}
+document.addEventListener('click', (e) => {
+  const week = e.target.closest('[data-week]');
+  const tap = e.target.closest('[data-tap]');
+  const fold = e.target.closest('[data-fold]');
+  if (week && !week.disabled) { const [fid, by] = week.dataset.week.split('|'); FRAMES.find((f) => f.id === fid).st.back += Number(by); render(); }
+  if (tap) { const [, hid, d] = tap.dataset.tap.split('|'); const h = HABITS.find((x) => x.id === hid); const n = Number(d); h.taps.has(n) ? h.taps.delete(n) : h.taps.add(n); render(); }
+  if (fold) { const [fid, m] = fold.dataset.fold.split('|'); const s = FRAMES.find((f) => f.id === fid).st.open; const n = Number(m); s.has(n) ? s.delete(n) : s.add(n); render(); }
+});
+render();
+</script>
+</body>
+</html>

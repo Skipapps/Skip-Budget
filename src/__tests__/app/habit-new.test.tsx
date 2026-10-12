@@ -497,10 +497,14 @@ describe('New habit — the final page (step 3 of 3)', () => {
     expect(screen.getByLabelText('Step 3 of 3')).toBeTruthy();
     expect(screen.getByText('Ready to track')).toBeTruthy();
     expect(screen.getByText('Preview')).toBeTruthy();
-    // The card as the dashboard will draw it, for this habit at this price, with nothing to press.
-    // Its sentence is the card's own; only what this page hands it is checked here.
-    const preview = screen.getByLabelText(/^Coffee, .*\$5\.00/);
+    // The card as the dashboard will draw it, for this habit at this price, with nothing to press:
+    // made on a Thursday, its first week has Thursday to Sunday, so $20.00 and Day 1 of 4.
+    const preview = screen.getByLabelText(
+      'Coffee, $5.00 each time. $0.00 spent out of $20.00. $0.00 saved. Day 1 of 4.',
+    );
     expect(preview.props.accessibilityRole).toBeUndefined();
+    expect(screen.queryByLabelText('Edit Coffee')).toBeNull();
+    expect(screen.queryByLabelText(/^View details/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Habit, Coffee' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Price, $5.00 each time' })).toBeTruthy();
     expect(screen.getByText('Colour')).toBeTruthy();

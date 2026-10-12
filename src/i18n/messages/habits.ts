@@ -367,6 +367,12 @@ export const habitsMessages = defineMessages({
     es: '{label}, {spent}. Ahorrado hasta hoy, {saved}.',
     fr: '{label}, {spent}. Économisé jusqu’ici, {saved}.',
   },
+  // {top} is the line above the label, such as "$5.00 each time · since Sep 28".
+  'habits.hero.spokenTop': {
+    en: '{top}. {label}, {spent}. Saved so far, {saved}.',
+    es: '{top}. {label}, {spent}. Ahorrado hasta hoy, {saved}.',
+    fr: '{top}. {label}, {spent}. Économisé jusqu’ici, {saved}.',
+  },
 
   // The week selector.
   'habits.week.previous': { en: 'Previous week', es: 'Semana anterior', fr: 'Semaine précédente' },
@@ -380,47 +386,49 @@ export const habitsMessages = defineMessages({
   },
   'habits.week.spoken': { en: '{label}, {range}', es: '{label}, {range}', fr: '{label}, {range}' },
 
-  // A habit's card. The figures are followed by these small words: "$10.00 saved".
-  'habits.card.saved': { en: 'saved', es: 'ahorrado', fr: 'économisé' },
-  'habits.card.spent': { en: 'spent', es: 'gastado', fr: 'dépensé' },
-  'habits.card.notYet': {
-    en: 'Not tracking yet',
-    es: 'Aún sin seguimiento',
-    fr: 'Pas encore suivie',
-  },
-  'habits.card.boughtToday': { en: 'Bought today', es: 'Comprado hoy', fr: 'Acheté aujourd’hui' },
-  'habits.card.new': {
-    en: 'New · tap the days you bought it',
-    es: 'Nuevo · toca los días que lo compraste',
-    fr: 'Nouveau · touche les jours où tu l’as acheté',
-  },
-  'habits.card.skipped': {
-    en: { one: '{count} day skipped', other: '{count} days skipped' },
-    es: { one: '{count} día sin comprar', other: '{count} días sin comprar' },
-    fr: { one: '{count} jour sans achat', other: '{count} jours sans achat' },
-  },
-  'habits.card.boughtYesterday': { en: 'Bought yesterday', es: 'Comprado ayer', fr: 'Acheté hier' },
-  'habits.card.skippedWeek': {
-    en: 'Skipped all week',
-    es: 'Sin comprar en toda la semana',
-    fr: 'Aucun achat de la semaine',
-  },
-  'habits.card.boughtDays': {
-    en: { one: 'Bought on {count} day', other: 'Bought on {count} days' },
-    es: { one: 'Comprado {count} día', other: 'Comprado {count} días' },
-    fr: { one: 'Acheté {count} jour', other: 'Acheté {count} jours' },
-  },
-  'habits.card.spoken': {
-    en: '{name}, {price} each time, {status}, {saved} saved, {spent} spent.',
-    es: '{name}, {price} cada vez, {status}, {saved} ahorrado, {spent} gastado.',
-    fr: '{name}, {price} chaque fois, {status}, {saved} économisé, {spent} dépensé.',
-  },
+  // A habit's card.
   'habits.card.spokenNotYet': {
     en: '{name}, {price} each time, {status}.',
     es: '{name}, {price} cada vez, {status}.',
     fr: '{name}, {price} chaque fois, {status}.',
   },
-  'habits.card.hint': { en: 'Opens the habit.', es: 'Abre el hábito.', fr: 'Ouvre l’habitude.' },
+  'habits.card.limit': {
+    en: 'Out of {limit} spend limit',
+    es: 'De un límite de {limit}',
+    fr: 'Sur une limite de {limit}',
+  },
+  'habits.card.savedLine': {
+    en: '{amount} saved',
+    es: '{amount} ahorrado',
+    fr: '{amount} économisé',
+  },
+  'habits.card.dayOf': {
+    en: 'Day {day} of {of}',
+    es: 'Día {day} de {of}',
+    fr: 'Jour {day} sur {of}',
+  },
+  'habits.card.weekComplete': {
+    en: 'Week complete',
+    es: 'Semana completa',
+    fr: 'Semaine terminée',
+  },
+  // {date} is "Wed, Oct 14".
+  'habits.card.startsOn': {
+    en: 'Starts {date}',
+    es: 'Empieza el {date}',
+    fr: 'Commence le {date}',
+  },
+  'habits.card.viewDetails': { en: 'View details', es: 'Ver detalles', fr: 'Voir les détails' },
+  'habits.card.viewDetailsA11y': {
+    en: 'View details, {name}',
+    es: 'Ver detalles, {name}',
+    fr: 'Voir les détails, {name}',
+  },
+  'habits.card.summary': {
+    en: '{name}, {price} each time. {spent} spent out of {limit}. {saved} saved. {progress}.',
+    es: '{name}, {price} cada vez. {spent} gastado de {limit}. {saved} ahorrado. {progress}.',
+    fr: '{name}, {price} chaque fois. {spent} dépensé sur {limit}. {saved} économisé. {progress}.',
+  },
 
   // One day's circle, as VoiceOver reads it. {day} is "Monday, October 5".
   'habits.day.date': {
@@ -491,32 +499,116 @@ export const habitsMessages = defineMessages({
 
   // A habit's own page.
   'habits.detail.edit': { en: 'Edit {name}', es: 'Editar {name}', fr: 'Modifier {name}' },
-  'habits.detail.eachTime': { en: 'Each time', es: 'Cada vez', fr: 'Chaque fois' },
   'habits.detail.started': { en: 'Started', es: 'Inicio', fr: 'Début' },
   'habits.detail.spent': {
     en: 'Spent so far',
     es: 'Gastado hasta hoy',
     fr: 'Dépensé jusqu’ici',
   },
-  'habits.detail.bought': {
-    en: { one: '{count} bought', other: '{count} bought' },
-    es: { one: '{count} comprado', other: '{count} comprados' },
-    fr: { one: '{count} acheté', other: '{count} achetés' },
-  },
-  'habits.detail.skipped': {
-    en: { one: '{count} skipped', other: '{count} skipped' },
-    es: { one: '{count} sin comprar', other: '{count} sin comprar' },
-    fr: { one: '{count} sans achat', other: '{count} sans achat' },
-  },
   'habits.detail.tally': {
     en: '{bought} · {skipped}',
     es: '{bought} · {skipped}',
     fr: '{bought} · {skipped}',
   },
-  'habits.detail.empty': {
-    en: 'No receipts yet. Tap a day you bought it.',
-    es: 'Aún no hay recibos. Toca un día en que lo compraste.',
-    fr: 'Aucun reçu pour l’instant. Touche un jour où tu l’as acheté.',
+  // {date} is "Sep 28" (habits.detail.shortDate).
+  'habits.detail.eachTimeSince': {
+    en: '{price} each time · since {date}',
+    es: '{price} cada vez · desde el {date}',
+    fr: '{price} chaque fois · depuis le {date}',
+  },
+  'habits.detail.shortDate': { en: '{month} {day}', es: '{day} {month}', fr: '{day} {month}' },
+  'habits.detail.shortDateYear': {
+    en: '{month} {day}, {year}',
+    es: '{day} {month} {year}',
+    fr: '{day} {month} {year}',
+  },
+  // "Fri, Oct 16": a day in the weeks list.
+  'habits.detail.dayDate': {
+    en: '{weekday}, {month} {day}',
+    es: '{weekday} {day} {month}',
+    fr: '{weekday} {day} {month}',
+  },
+  'habits.detail.daysBought': {
+    en: { one: '{count} day bought', other: '{count} days bought' },
+    es: { one: '{count} día comprado', other: '{count} días comprados' },
+    fr: { one: '{count} jour acheté', other: '{count} jours achetés' },
+  },
+  'habits.detail.daysSkipped': {
+    en: { one: '{count} day skipped', other: '{count} days skipped' },
+    es: { one: '{count} día sin comprar', other: '{count} días sin comprar' },
+    fr: { one: '{count} jour sans achat', other: '{count} jours sans achat' },
+  },
+  'habits.detail.weeks': { en: 'Week by week', es: 'Semana a semana', fr: 'Semaine par semaine' },
+  'habits.detail.weekCount': {
+    en: { one: '{count} week', other: '{count} weeks' },
+    es: { one: '{count} semana', other: '{count} semanas' },
+    fr: { one: '{count} semaine', other: '{count} semaines' },
+  },
+  'habits.detail.week.spent': { en: 'Spent', es: 'Gastado', fr: 'Dépensé' },
+  'habits.detail.week.saved': { en: 'Saved', es: 'Ahorrado', fr: 'Économisé' },
+  'habits.detail.week.spoken': {
+    en: '{when}. {spent} spent, {saved} saved, out of {limit}. {progress}.',
+    es: '{when}. {spent} gastado, {saved} ahorrado, de {limit}. {progress}.',
+    fr: '{when}. {spent} dépensé, {saved} économisé, sur {limit}. {progress}.',
+  },
+  // {starts} is "Starts Wed, Oct 14" (habits.card.startsOn).
+  'habits.detail.week.spokenStarts': {
+    en: '{when}. {spent} spent, {saved} saved. {starts}.',
+    es: '{when}. {spent} gastado, {saved} ahorrado. {starts}.',
+    fr: '{when}. {spent} dépensé, {saved} économisé. {starts}.',
+  },
+  // A week still to come, reached only through a receipt dated in it: no day count to give.
+  'habits.detail.week.spokenNoProgress': {
+    en: '{when}. {spent} spent, {saved} saved, out of {limit}.',
+    es: '{when}. {spent} gastado, {saved} ahorrado, de {limit}.',
+    fr: '{when}. {spent} dépensé, {saved} économisé, sur {limit}.',
+  },
+  'habits.detail.week.show': {
+    en: 'Shows the days.',
+    es: 'Muestra los días.',
+    fr: 'Affiche les jours.',
+  },
+  'habits.detail.week.hide': {
+    en: 'Hides the days.',
+    es: 'Oculta los días.',
+    fr: 'Masque les jours.',
+  },
+  'habits.detail.day.bought': { en: 'Bought', es: 'Comprado', fr: 'Acheté' },
+  'habits.detail.day.boughtToday': {
+    en: 'Today · Bought',
+    es: 'Hoy · Comprado',
+    fr: 'Aujourd’hui · Acheté',
+  },
+  'habits.detail.day.skipped': { en: 'Skipped', es: 'Sin comprar', fr: 'Sans achat' },
+  'habits.detail.day.today': {
+    en: 'Today · not bought yet',
+    es: 'Hoy · aún sin comprar',
+    fr: 'Aujourd’hui · pas encore acheté',
+  },
+  // A skipped day's price saved: "+$5.00".
+  'habits.detail.day.plus': { en: '+{amount}', es: '+{amount}', fr: '+{amount}' },
+  // Under a skipped day's "+$5.00".
+  'habits.detail.day.saved': { en: 'saved', es: 'ahorrado', fr: 'économisé' },
+  'habits.detail.day.skippedSpoken': {
+    en: '{day}, skipped, {amount} saved',
+    es: '{day}, sin comprar, {amount} ahorrado',
+    fr: '{day}, sans achat, {amount} économisé',
+  },
+  'habits.detail.day.opensReceipt': {
+    en: 'Opens the receipt.',
+    es: 'Abre el recibo.',
+    fr: 'Ouvre le reçu.',
+  },
+  'habits.detail.about': {
+    en: 'About this habit',
+    es: 'Sobre este hábito',
+    fr: 'À propos de cette habitude',
+  },
+  'habits.detail.price': { en: 'Price', es: 'Precio', fr: 'Prix' },
+  'habits.detail.priceEach': {
+    en: '{price} each time',
+    es: '{price} cada vez',
+    fr: '{price} chaque fois',
   },
 
   // Editing a receipt filed from a habit.

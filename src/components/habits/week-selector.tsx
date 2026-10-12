@@ -11,6 +11,8 @@ import { TEXT_CAP } from '@/theme/text-scale';
 type WeekSelectorProps = {
   /** The Monday of the week shown. */
   weekStart: string;
+  /** Names the year of a week from an earlier one. */
+  today: string;
   /** "This week", "Last week", or nothing for older weeks. */
   label: string | null;
   canGoBack: boolean;
@@ -24,6 +26,7 @@ type WeekSelectorProps = {
 /** The week the cards and the hero show, stepped a week at a time. */
 export function WeekSelector({
   weekStart,
+  today,
   label,
   canGoBack,
   canGoForward,
@@ -31,7 +34,7 @@ export function WeekSelector({
   onForward,
   onThisWeek,
 }: WeekSelectorProps) {
-  const range = formatWeekRange(weekStart);
+  const range = formatWeekRange(weekStart, today);
   const spoken = label ? t('habits.week.spoken', { label, range }) : range;
 
   const centre = (
@@ -54,7 +57,7 @@ export function WeekSelector({
   );
 
   return (
-    <View className="mt-5 w-full flex-row items-center gap-3">
+    <View className="mt-[20px] w-full flex-row items-center gap-[12px]">
       <Arrow
         icon={ChevronLeft}
         label={t('habits.week.previous')}
@@ -68,7 +71,7 @@ export function WeekSelector({
           accessibilityLabel={spoken}
           accessibilityHint={t('habits.week.backToThis')}
           onPress={withTap(onThisWeek)}
-          className="min-h-11 min-w-0 flex-1 items-center justify-center rounded-[12px] active:bg-ink/5"
+          className="min-h-[44px] min-w-0 flex-1 items-center justify-center rounded-[12px] active:bg-ink/5"
         >
           {centre}
         </Pressable>
@@ -76,7 +79,7 @@ export function WeekSelector({
         <View
           accessible
           accessibilityLabel={spoken}
-          className="min-h-11 min-w-0 flex-1 items-center justify-center"
+          className="min-h-[44px] min-w-0 flex-1 items-center justify-center"
         >
           {centre}
         </View>
@@ -114,7 +117,7 @@ function Arrow({
       // 40pt drawn, 44pt to the finger.
       hitSlop={2}
       className={cn(
-        'h-10 w-10 items-center justify-center rounded-full border border-line bg-card active:bg-ink/5',
+        'h-[40px] w-[40px] items-center justify-center rounded-full border border-line bg-card active:bg-ink/5',
         !enabled && 'opacity-30',
       )}
     >

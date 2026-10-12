@@ -1,7 +1,7 @@
 import { monthShort } from '@/i18n/calendar';
 import { NBSP } from '@/i18n/number';
 import { getLocaleSnapshot } from '@/i18n/store';
-import { fromCents, toCents } from '@/lib/money';
+import { fromCents, roundMoney, toCents } from '@/lib/money';
 
 /**
  * Week maths for spending habits. Days are local calendar dates, `YYYY-MM-DD`, and weeks run
@@ -18,8 +18,8 @@ import { fromCents, toCents } from '@/lib/money';
 
 /**
  * `startedOn` is the Monday of the week the habit was created: the week selector starts there.
- * `savedFrom` is the local day it was created: taps, Saved and the streak start there. Pass active
- * habits only.
+ * `savedFrom` is the local day it was created: taps, Saved and the spend limit start there. Pass
+ * active habits only.
  */
 export type HabitMaths = { id: string; price: number; startedOn: string; savedFrom: string };
 
@@ -27,6 +27,30 @@ export type HabitMaths = { id: string; price: number; startedOn: string; savedFr
 export type HabitTap = { habitId: string; day: string; amount: number; receiptId: string };
 
 export type DayState = 'tapped' | 'open' | 'today' | 'future' | 'before';
+
+/** See weekProgress for which kind wins when two could apply. */
+export type WeekProgress =
+  | { kind: 'notStarted'; startsOn: string }
+  | { kind: 'current'; day: number; of: number }
+  | { kind: 'complete' }
+  | { kind: 'upcoming' };
+
+/** `amount`: a bought day's own receipt, a skipped day's price saved, 0 for today not bought yet. */
+export type HabitHistoryDay = {
+  day: string;
+  kind: 'bought' | 'skipped' | 'today';
+  amount: number;
+  receiptId?: string;
+};
+
+export type HabitWeek = {
+  weekStart: string;
+  spent: number;
+  saved: number;
+  limit: number;
+  progress: WeekProgress;
+  days: HabitHistoryDay[];
+};
 
 const DAY_MS = 86_400_000;
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -235,28 +259,149 @@ export function spentInWeek(
   return fromCents(cents);
 }
 
-/**
- * Untapped days in a row ending yesterday, never reaching before the first saving day; 0 if
- * yesterday was tapped.
- */
-export function skipStreak(habit: HabitMaths, tappedDays: Iterable<string>, today: string): number {
-  const yesterday = dayNumber(today) - 1;
-  const first = firstSavingDay(habit);
-  if (yesterday < first) return 0;
+/** Days from max(Monday, countsFrom) to Sunday; 0 for a week that ends before countsFrom. */
+export function trackedDaysInWeek(habit: HabitMaths, weekStart: string): number {
+  const monday = weekOf(weekStart);
+  const first = Math.max(monday, firstSavingDay(habit));
+  return Math.max(0, monday + 6 - first + 1);
+}
 
-  let lastTapped = first - 1;
-  for (const day of dayNumbers(tappedDays)) {
-    if (day <= yesterday && day > lastTapped) lastTapped = day;
+/**
+ * The spend limit: trackedDaysInWeek x price, in whole cents, at the current price like Saved. When a
+ * week is over, Spent + Saved equals it unless a receipt's amount was edited, a receipt was dated
+ * before countsFrom, or a day holds two receipts.
+ */
+export function weekLimit(habit: HabitMaths, weekStart: string): number {
+  return fromCents(trackedDaysInWeek(habit, weekStart) * toCents(habit.price));
+}
+
+/**
+ * Checked in this order, so every week has exactly one answer:
+ * 1. The week ends before countsFrom: 'notStarted'. It wins over 'complete' and 'upcoming' because
+ *    the habit tracks no day in it, so there is no limit or day count to show, only the start.
+ * 2. The week starts after today's week: 'upcoming'.
+ * 3. The week ended before today: 'complete'.
+ * 4. The week holds today but countsFrom is later in it: 'notStarted'. savedFrom is the creation
+ *    day, so only a clock moved back gets here.
+ * 5. 'current': `day` counts from the first tracked day to today inclusive, `of` is the tracked days.
+ */
+export function weekProgress(habit: HabitMaths, weekStart: string, today: string): WeekProgress {
+  const monday = weekOf(weekStart);
+  const sunday = monday + 6;
+  const now = dayNumber(today);
+  const startsFrom = firstSavingDay(habit);
+  const notStarted = { kind: 'notStarted', startsOn: isoDay(startsFrom) } as const;
+
+  if (sunday < startsFrom) return notStarted;
+  if (monday > now) return { kind: 'upcoming' };
+  if (sunday < now) return { kind: 'complete' };
+  if (now < startsFrom) return notStarted;
+
+  const first = Math.max(monday, startsFrom);
+  return { kind: 'current', day: now - first + 1, of: sunday - first + 1 };
+}
+
+/**
+ * One habit's weeks for its history, newest first: every week from countsFrom's week through today's,
+ * a week with no receipt included, since it was tracked (today's week is there even while countsFrom
+ * is later). Outside that run only a week holding one of its receipts is listed, so a receipt dated
+ * a year out adds that one week, not the empty weeks before it.
+ *
+ * A week lists its days newest first: each day from max(Monday, countsFrom) to min(Sunday, today) as
+ * bought, skipped or today, plus every receipt dated outside that stretch (before countsFrom or in
+ * the future), so real money is never hidden. A day with two receipts lists the first, as on the
+ * circles; Spent counts both.
+ *
+ * `floor` (a free plan's first shown day) leaves out the days before it and the weeks that end
+ * before it. It never changes spent, saved or limit.
+ */
+export function habitHistory(
+  habit: HabitMaths,
+  taps: readonly HabitTap[],
+  today: string,
+  floor?: string,
+): HabitWeek[] {
+  const now = dayNumber(today);
+  const startsFrom = firstSavingDay(habit);
+  const shownFrom = floor === undefined ? null : dayNumber(floor);
+  const price = roundMoney(habit.price);
+  const byDay = tapsForHabit(taps, habit.id);
+
+  // Bucketed so each week's spentInWeek / savedInWeek reads only its own receipts: the same figures
+  // as passing every tap, without walking years of receipts once per week.
+  const byWeek = new Map<number, HabitTap[]>();
+  for (const tap of taps) {
+    if (tap.habitId !== habit.id) continue;
+    const week = mondayOf(dayNumber(tap.day));
+    const inWeek = byWeek.get(week) ?? [];
+    inWeek.push(tap);
+    byWeek.set(week, inWeek);
   }
-  return yesterday - lastTapped;
+
+  const listed = new Set(byWeek.keys());
+  const thisWeek = mondayOf(now);
+  for (let monday = Math.min(thisWeek, mondayOf(startsFrom)); monday <= thisWeek; monday += 7) {
+    listed.add(monday);
+  }
+
+  const weeks: HabitWeek[] = [];
+  for (const monday of [...listed].sort((a, b) => b - a)) {
+    const sunday = monday + 6;
+    // Older weeks end earlier still.
+    if (shownFrom !== null && sunday < shownFrom) break;
+
+    const weekStart = isoDay(monday);
+    const openFrom = Math.max(monday, startsFrom);
+    const openTo = Math.min(sunday, now);
+    const days: HabitHistoryDay[] = [];
+    for (let day = sunday; day >= monday; day -= 1) {
+      if (shownFrom !== null && day < shownFrom) break;
+      const iso = isoDay(day);
+      const tap = byDay.get(iso);
+      if (tap) {
+        days.push({
+          day: iso,
+          kind: 'bought',
+          amount: roundMoney(tap.amount),
+          receiptId: tap.receiptId,
+        });
+      } else if (day >= openFrom && day <= openTo) {
+        days.push(
+          day === now
+            ? { day: iso, kind: 'today', amount: 0 }
+            : { day: iso, kind: 'skipped', amount: price },
+        );
+      }
+    }
+
+    const inWeek = byWeek.get(monday) ?? [];
+    weeks.push({
+      weekStart,
+      spent: spentInWeek(inWeek, weekStart),
+      saved: savedInWeek(
+        habit,
+        inWeek.map((tap) => tap.day),
+        weekStart,
+        today,
+      ),
+      limit: weekLimit(habit, weekStart),
+      progress: weekProgress(habit, weekStart, today),
+      days,
+    });
+  }
+  return weeks;
 }
 
 /**
  * "Oct 5 – 11", "Sep 28 – Oct 4", "Dec 29 – Jan 4"; Spanish and French put the day first
  * ("5 – 11 oct."). No-break spaces hold each end and the dash together, so a line that must wrap
  * breaks only after the dash.
+ *
+ * Given `today`, a week whose Sunday is in another year than today, earlier or later, ends with that
+ * year ("Oct 13 – 19, 2025", "13 – 19 oct. 2025"). The week holding today never does: on Dec 30 its
+ * own week reads "Dec 28 – Jan 3", and so does a week that began in December of today's year.
  */
-export function formatWeekRange(weekStart: string): string {
+export function formatWeekRange(weekStart: string, today?: string): string {
   const monday = weekOf(weekStart);
   const first = new Date(monday * DAY_MS);
   const last = new Date((monday + 6) * DAY_MS);
@@ -269,10 +414,17 @@ export function formatWeekRange(weekStart: string): string {
   };
 
   // Seven days share a month only within one year, so the year never needs comparing.
-  if (first.getUTCMonth() === last.getUTCMonth()) {
-    return dayFirst
-      ? `${first.getUTCDate()}${NBSP}– ${end(last)}`
-      : `${end(first)}${NBSP}– ${last.getUTCDate()}`;
-  }
-  return `${end(first)}${NBSP}– ${end(last)}`;
+  const range =
+    first.getUTCMonth() !== last.getUTCMonth()
+      ? `${end(first)}${NBSP}– ${end(last)}`
+      : dayFirst
+        ? `${first.getUTCDate()}${NBSP}– ${end(last)}`
+        : `${end(first)}${NBSP}– ${last.getUTCDate()}`;
+
+  if (today === undefined) return range;
+  const now = dayNumber(today);
+  const year = last.getUTCFullYear();
+  const holdsToday = now >= monday && now <= monday + 6;
+  if (holdsToday || year === new Date(now * DAY_MS).getUTCFullYear()) return range;
+  return dayFirst ? `${range}${NBSP}${year}` : `${range},${NBSP}${year}`;
 }

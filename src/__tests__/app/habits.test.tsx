@@ -1,5 +1,6 @@
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { StyleSheet } from 'react-native';
 
 import HabitsScreen from '@/app/habits';
 import type { HabitRow } from '@/api/habits';
@@ -48,8 +49,9 @@ jest.mock('@/providers/theme-provider', () => ({
 
 /** Friday; this week is Monday the 5th to Sunday the 11th. */
 const TODAY = '2026-10-09';
+let mockToday = TODAY;
 jest.mock('@/lib/use-today', () => ({
-  useToday: () => ({ today: '2026-10-09', todayDate: new Date('2026-10-09T00:00:00') }),
+  useToday: () => ({ today: mockToday, todayDate: new Date(`${mockToday}T00:00:00`) }),
 }));
 
 let mockPro = { pro: true, ready: true };
@@ -169,6 +171,19 @@ function wordsOn(screen: Screen): string[] {
 const hero = (screen: Screen) =>
   screen.getByLabelText(/^Spent (this|that) week, /).props.accessibilityLabel as string;
 
+/** A card's one spoken summary, by habit id. */
+const summary = (screen: Screen, id: string) =>
+  screen.getByTestId(`habit-summary-${id}`).props.accessibilityLabel as string;
+
+/** What a card's figures draw, top to bottom: the name, the price, the spent figure and the lines. */
+const figures = (screen: Screen, id: string) =>
+  within(screen.getByTestId(`habit-summary-${id}`))
+    .getAllByText(/./)
+    .map((text) => String(text.props.children));
+
+/** The header's + and the dashed button after the cards, in that order. */
+const adds = (screen: Screen, label = 'Add a habit') => screen.getAllByLabelText(label);
+
 beforeEach(() => {
   jest.clearAllMocks();
   // Queued answers too, so one test's leftovers never reach the next.
@@ -176,6 +191,7 @@ beforeEach(() => {
   mockUntapDay.mockReset();
   mockConfirm.mockReset();
   resetLocaleForTests();
+  mockToday = TODAY;
   mockPro = { pro: true, ready: true };
   mockFloor = { floor: '2019-10-09', free: false };
   mockHabits = query([COFFEE, DELIVERY]);
@@ -236,27 +252,50 @@ describe('the habits dashboard: states', () => {
   });
 });
 
-describe('the habits dashboard: + and the cards', () => {
-  it('sends Pro to the new habit page, and free or lapsed to the explainer', async () => {
+describe('the habits dashboard: Add a habit and the cards', () => {
+  it('has two Add a habit buttons: the header’s + first, the dashed one after the last card', async () => {
+    const screen = await render(<HabitsScreen />);
+    const both = adds(screen);
+    expect(both).toHaveLength(2);
+
+    // The dashed button comes after every card’s View details in the reading order.
+    const labels = screen.getAllByRole('button').map((button) => button.props.accessibilityLabel);
+    expect(labels.indexOf('Add a habit')).toBeLessThan(labels.indexOf('Edit Coffee'));
+    expect(labels.lastIndexOf('Add a habit')).toBe(labels.length - 1);
+    expect(labels.lastIndexOf('Add a habit')).toBeGreaterThan(
+      labels.indexOf('View details, Food delivery'),
+    );
+    expect(within(both[1]).getByText('Add a habit')).toBeTruthy();
+  });
+
+  it('sends Pro to the new habit page from both buttons, and free or lapsed to the explainer from both', async () => {
     const pro = await render(<HabitsScreen />);
-    await fireEvent.press(pro.getByLabelText('Add a habit'));
-    expect(router.push).toHaveBeenLastCalledWith('/habit-new');
+    for (const add of adds(pro)) {
+      jest.mocked(router.push).mockClear();
+      await fireEvent.press(add);
+      expect(router.push).toHaveBeenCalledTimes(1);
+      expect(router.push).toHaveBeenCalledWith('/habit-new');
+    }
 
     mockPro = { pro: false, ready: true };
     const free = await render(<HabitsScreen />);
-    await fireEvent.press(free.getByLabelText('Add a habit'));
-    expect(router.push).toHaveBeenLastCalledWith({
-      pathname: '/pro-feature',
-      params: { id: 'habits' },
-    });
+    for (const add of adds(free)) {
+      jest.mocked(router.push).mockClear();
+      await fireEvent.press(add);
+      expect(router.push).toHaveBeenCalledTimes(1);
+      expect(router.push).toHaveBeenCalledWith({
+        pathname: '/pro-feature',
+        params: { id: 'habits' },
+      });
+    }
     // A lapsed account keeps using its habits: the cards and days still work.
     expect(free.getByLabelText('Coffee, Tuesday, October 6, not bought')).toBeEnabled();
   });
 
-  it('does nothing on + until Pro is known', async () => {
+  it('does nothing on either button until Pro is known', async () => {
     mockPro = { pro: false, ready: false };
     const screen = await render(<HabitsScreen />);
-    await fireEvent.press(screen.getByLabelText('Add a habit'));
+    for (const add of adds(screen)) await fireEvent.press(add);
     expect(router.push).not.toHaveBeenCalled();
   });
 
@@ -266,21 +305,70 @@ describe('the habits dashboard: + and the cards', () => {
     expect(screen.getByLabelText('Food delivery, Thursday, October 8, not bought')).toBeTruthy();
   });
 
-  it('lists the cards in order, each opening its habit', async () => {
+  it('lists the cards in order, each with its figures read as one summary', async () => {
     const screen = await render(<HabitsScreen />);
-    const headers = screen
-      .getAllByRole('button')
-      .map((node) => String(node.props.accessibilityLabel))
-      .filter((label) => / spent\.$/.test(label));
-    expect(headers).toEqual([
-      'Coffee, $5.00 each time, 1 day skipped, $10.00 saved, $10.00 spent.',
-      'Food delivery, $25.00 each time, 2 days skipped, $75.00 saved, $25.00 spent.',
+    // Coffee: Monday and Wednesday bought, Tuesday and Thursday saved. Food delivery: Tuesday
+    // bought; Monday, Wednesday and Thursday saved, out of a limit counted from Sep 28.
+    expect(
+      screen
+        .getAllByTestId(/^habit-summary-/)
+        .map((stop) => [stop.props.testID, stop.props.accessibilityLabel]),
+    ).toEqual([
+      [
+        'habit-summary-coffee',
+        'Coffee, $5.00 each time. $10.00 spent out of $35.00. $10.00 saved. Day 5 of 7.',
+      ],
+      [
+        'habit-summary-delivery',
+        'Food delivery, $25.00 each time. $25.00 spent out of $175.00. $75.00 saved. Day 5 of 7.',
+      ],
     ]);
-    await fireEvent.press(screen.getByLabelText(headers[1]));
-    expect(router.push).toHaveBeenCalledWith({
+    expect(figures(screen, 'delivery')).toEqual([
+      'Food delivery',
+      '$25',
+      '$25.00',
+      'Out of $175.00 spend limit',
+      '$75.00 saved',
+      'Day 5 of 7',
+    ]);
+  });
+
+  it('opens a habit’s history from View details, and its edit page from the pencil', async () => {
+    const screen = await render(<HabitsScreen />);
+
+    await fireEvent.press(screen.getByLabelText('View details, Food delivery'));
+    expect(router.push).toHaveBeenLastCalledWith({
       pathname: '/habit/[id]',
       params: { id: 'delivery' },
     });
+    await fireEvent.press(screen.getByLabelText('View details, Coffee'));
+    expect(router.push).toHaveBeenLastCalledWith({
+      pathname: '/habit/[id]',
+      params: { id: 'coffee' },
+    });
+
+    await fireEvent.press(screen.getByLabelText('Edit Coffee'));
+    expect(router.push).toHaveBeenLastCalledWith({
+      pathname: '/habit-new',
+      params: { id: 'coffee' },
+    });
+    await fireEvent.press(screen.getByLabelText('Edit Food delivery'));
+    expect(router.push).toHaveBeenLastCalledWith({
+      pathname: '/habit-new',
+      params: { id: 'delivery' },
+    });
+    expect(router.push).toHaveBeenCalledTimes(4);
+  });
+
+  it('opens nothing when the body of a card is pressed', async () => {
+    const screen = await render(<HabitsScreen />);
+    const card = within(screen.getByTestId('habit-summary-coffee'));
+    for (const word of ['Coffee', '$5', '$10.00', 'Out of $35.00 spend limit', 'Day 5 of 7']) {
+      await fireEvent.press(card.getByText(word));
+    }
+    await fireEvent.press(screen.getByTestId('habit-summary-coffee'));
+    expect(router.push).not.toHaveBeenCalled();
+    expect(mockTapDay).not.toHaveBeenCalled();
   });
 });
 
@@ -295,6 +383,15 @@ describe('the habits dashboard: hero and weeks', () => {
     expect(screen.getByLabelText('Next week')).toBeDisabled();
   });
 
+  it('stacks the hero: the label, the big figure, then the full-width Saved so far tile', async () => {
+    const screen = await render(<HabitsScreen />);
+    expect(
+      within(screen.getByTestId('habits-hero'))
+        .getAllByText(/./)
+        .map((text) => text.props.children),
+    ).toEqual(['Spent this week', '$35.00', 'Saved so far', '$235.00']);
+  });
+
   it('steps back as far as the earliest habit began, then returns to this week', async () => {
     const screen = await render(<HabitsScreen />);
     await fireEvent.press(screen.getByLabelText('Previous week'));
@@ -302,10 +399,12 @@ describe('the habits dashboard: hero and weeks', () => {
     expect(hero(screen)).toBe('Spent that week, $25.00. Saved so far, $235.00.');
     expect(screen.getByText('Last week')).toBeTruthy();
     expect(screen.getByText(`Sep${NBSP}28${NBSP}– Oct${NBSP}4`)).toBeTruthy();
-    expect(screen.getByLabelText('Coffee, $5.00 each time, Not tracking yet.')).toBeTruthy();
-    expect(
-      screen.getByLabelText(/^Food delivery, \$25\.00 each time, Bought on 1 day, /),
-    ).toBeTruthy();
+    // Coffee began on Oct 5: nothing to count yet. Food delivery: one bought, six saved, of $175.00.
+    expect(summary(screen, 'coffee')).toBe('Coffee, $5.00 each time, Starts Mon, Oct 5.');
+    expect(figures(screen, 'coffee')).toEqual(['Coffee', '$5', 'Starts Mon, Oct 5']);
+    expect(summary(screen, 'delivery')).toBe(
+      'Food delivery, $25.00 each time. $25.00 spent out of $175.00. $150.00 saved. Week complete.',
+    );
     expect(screen.getByLabelText('Previous week')).toBeDisabled();
     expect(screen.getByLabelText('Next week')).toBeEnabled();
 
@@ -372,6 +471,39 @@ describe('the habits dashboard: hero and weeks', () => {
     expect(hero(screen)).toMatch(/^Spent that week, \$25\.00\. /);
   });
 
+  it('names no year on the week that holds today, even when it ends in the next one', async () => {
+    mockToday = '2025-12-30';
+    mockHabits = query([
+      habit({ id: 'new-year', started_on: '2025-12-22', saved_from: '2025-12-22' }),
+    ]);
+    mockTaps = query<HabitTap[]>([]);
+    const screen = await render(<HabitsScreen />);
+    expect(screen.getByText(`Dec${NBSP}29${NBSP}– Jan${NBSP}4`)).toBeTruthy();
+    expect(screen.getByLabelText(`This week, Dec${NBSP}29${NBSP}– Jan${NBSP}4`)).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('Previous week'));
+    expect(screen.getByText(`Dec${NBSP}22${NBSP}– 28`)).toBeTruthy();
+  });
+
+  it('names the year of a week that ended in an earlier one, and only that week', async () => {
+    mockToday = '2026-01-07';
+    mockHabits = query([
+      habit({ id: 'new-year', started_on: '2025-12-22', saved_from: '2025-12-22' }),
+    ]);
+    mockTaps = query<HabitTap[]>([]);
+    const screen = await render(<HabitsScreen />);
+    expect(screen.getByText(`Jan${NBSP}5${NBSP}– 11`)).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('Previous week'));
+    // Its Sunday, Jan 4, is in the year of today.
+    expect(screen.getByText(`Dec${NBSP}29${NBSP}– Jan${NBSP}4`)).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('Previous week'));
+    expect(screen.getByText(`Dec${NBSP}22${NBSP}– 28,${NBSP}2025`)).toBeTruthy();
+    expect(screen.getByLabelText(`Dec${NBSP}22${NBSP}– 28,${NBSP}2025`)).toBeTruthy();
+    expect(screen.getByLabelText('Previous week')).toBeDisabled();
+  });
+
   it('reads in Spanish', async () => {
     setLanguage('es');
     const screen = await render(<HabitsScreen />);
@@ -379,11 +511,245 @@ describe('the habits dashboard: hero and weeks', () => {
     expect(screen.getByText('Gastado esta semana')).toBeTruthy();
     expect(screen.getByText('Ahorrado hasta hoy')).toBeTruthy();
     expect(screen.getByText('Esta semana')).toBeTruthy();
-    expect(screen.getByLabelText('Agregar un hábito')).toBeTruthy();
+    expect(adds(screen, 'Agregar un hábito')).toHaveLength(2);
+    expect(screen.getByLabelText('Ver detalles, Coffee')).toBeTruthy();
+    expect(screen.getByLabelText('Editar Coffee')).toBeTruthy();
+    expect(figures(screen, 'coffee')).toContain('Día 5 de 7');
+    expect(summary(screen, 'coffee')).toBe(
+      'Coffee, $5.00 cada vez. $10.00 gastado de $35.00. $10.00 ahorrado. Día 5 de 7.',
+    );
     const words = wordsOn(screen);
     expect(words.filter((word) => /^[a-z]+\.[a-zA-Z]+\./.test(word))).toEqual([]);
     expect(words.filter((word) => /\{\w+\}/.test(word))).toEqual([]);
     expect(words).toContain('Ahorrado hasta hoy');
+  });
+
+  it('reads in French', async () => {
+    setLanguage('fr');
+    const screen = await render(<HabitsScreen />);
+    expect(screen.getByText('Habitudes de dépense')).toBeTruthy();
+    expect(screen.getByText('Dépensé cette semaine')).toBeTruthy();
+    expect(adds(screen, 'Ajouter une habitude')).toHaveLength(2);
+    expect(screen.getByLabelText('Voir les détails, Food delivery')).toBeTruthy();
+    expect(screen.getByLabelText('Modifier Food delivery')).toBeTruthy();
+    expect(summary(screen, 'delivery')).toBe(
+      `Food delivery, 25,00${NBSP}$ chaque fois. 25,00${NBSP}$ dépensé sur 175,00${NBSP}$. 75,00${NBSP}$ économisé. Jour 5 sur 7.`,
+    );
+    const words = wordsOn(screen);
+    expect(words.filter((word) => /^[a-z]+\.[a-zA-Z]+\./.test(word))).toEqual([]);
+    expect(words.filter((word) => /\{\w+\}/.test(word))).toEqual([]);
+  });
+});
+
+describe('the habits dashboard on the design’s Friday the 16th', () => {
+  /** Made Monday the 28th, bought on twelve days since. */
+  const TIM = habit({
+    id: 'tim',
+    name: 'Tim Hortons',
+    icon_id: 'food-dining/coffee',
+    price: 5,
+    started_on: '2026-09-28',
+    saved_from: '2026-09-28',
+  });
+  /** Made Wednesday the 14th: a five-day first week. */
+  const BREAKFAST = habit({
+    id: 'bfast',
+    name: 'Breakfast',
+    icon_id: 'food-dining/breakfast',
+    color: 'green',
+    price: 4,
+    sort_order: 1,
+    started_on: '2026-10-12',
+    saved_from: '2026-10-14',
+  });
+  const DESIGN_TAPS = [
+    ...[
+      '2026-09-28',
+      '2026-09-30',
+      '2026-10-02',
+      '2026-10-05',
+      '2026-10-06',
+      '2026-10-07',
+      '2026-10-08',
+      '2026-10-10',
+      '2026-10-12',
+      '2026-10-13',
+      '2026-10-15',
+      '2026-10-16',
+    ].map((day) => tap('tim', day, 5)),
+    tap('bfast', '2026-10-14', 4),
+  ];
+
+  beforeEach(() => {
+    mockToday = '2026-10-16';
+    mockHabits = query([TIM, BREAKFAST]);
+    mockTaps = query(DESIGN_TAPS);
+  });
+
+  it('shows this week: $24.00 spent, $39.00 saved so far, and each card’s own figures', async () => {
+    const screen = await render(<HabitsScreen />);
+
+    expect(hero(screen)).toBe('Spent this week, $24.00. Saved so far, $39.00.');
+    expect(
+      within(screen.getByTestId('habits-hero'))
+        .getAllByText(/./)
+        .map((text) => text.props.children),
+    ).toEqual(['Spent this week', '$24.00', 'Saved so far', '$39.00']);
+    expect(screen.getByText('This week')).toBeTruthy();
+    expect(screen.getByText(`Oct${NBSP}12${NBSP}– 18`)).toBeTruthy();
+
+    expect(figures(screen, 'tim')).toEqual([
+      'Tim Hortons',
+      '$5',
+      '$20.00',
+      'Out of $35.00 spend limit',
+      '$5.00 saved',
+      'Day 5 of 7',
+    ]);
+    expect(figures(screen, 'bfast')).toEqual([
+      'Breakfast',
+      '$4',
+      '$4.00',
+      'Out of $20.00 spend limit',
+      '$4.00 saved',
+      'Day 3 of 5',
+    ]);
+    expect(summary(screen, 'tim')).toBe(
+      'Tim Hortons, $5.00 each time. $20.00 spent out of $35.00. $5.00 saved. Day 5 of 7.',
+    );
+    expect(summary(screen, 'bfast')).toBe(
+      'Breakfast, $4.00 each time. $4.00 spent out of $20.00. $4.00 saved. Day 3 of 5.',
+    );
+  });
+
+  it('closes last week: Tim Hortons’ $25.00 and $10.00 saved are the $35.00, and Breakfast only says when it starts', async () => {
+    const screen = await render(<HabitsScreen />);
+    await fireEvent.press(screen.getByLabelText('Previous week'));
+
+    expect(hero(screen)).toBe('Spent that week, $25.00. Saved so far, $39.00.');
+    expect(screen.getByText('Last week')).toBeTruthy();
+    expect(screen.getByText(`Oct${NBSP}5${NBSP}– 11`)).toBeTruthy();
+    expect(figures(screen, 'tim')).toEqual([
+      'Tim Hortons',
+      '$5',
+      '$25.00',
+      'Out of $35.00 spend limit',
+      '$10.00 saved',
+      'Week complete',
+    ]);
+    expect(figures(screen, 'bfast')).toEqual(['Breakfast', '$4', 'Starts Wed, Oct 14']);
+    expect(screen.queryByTestId('habit-bar-bfast', { includeHiddenElements: true })).toBeNull();
+    // Both cards keep their buttons in a week with no figures.
+    expect(screen.getByLabelText('Edit Breakfast')).toBeTruthy();
+    expect(screen.getByLabelText('View details, Breakfast')).toBeTruthy();
+  });
+
+  it('goes back to the habit’s first week, where Tim Hortons’ $15.00 and $20.00 saved make $35.00', async () => {
+    const screen = await render(<HabitsScreen />);
+    await fireEvent.press(screen.getByLabelText('Previous week'));
+    await fireEvent.press(screen.getByLabelText('Previous week'));
+
+    expect(screen.getByLabelText('Previous week')).toBeDisabled();
+    expect(hero(screen)).toBe('Spent that week, $15.00. Saved so far, $39.00.');
+    expect(screen.getByText(`Sep${NBSP}28${NBSP}– Oct${NBSP}4`)).toBeTruthy();
+    expect(figures(screen, 'tim')).toEqual([
+      'Tim Hortons',
+      '$5',
+      '$15.00',
+      'Out of $35.00 spend limit',
+      '$20.00 saved',
+      'Week complete',
+    ]);
+    expect(figures(screen, 'bfast')).toEqual(['Breakfast', '$4', 'Starts Wed, Oct 14']);
+  });
+
+  it('moves the card and the hero together the moment a day is filled, before the server answers', async () => {
+    const answer = deferred<{ receiptId: string; alreadyTapped: boolean }>();
+    mockTapDay.mockReturnValue(answer.promise);
+    const screen = await render(<HabitsScreen />);
+
+    // Tim Hortons’ Wednesday, the one saved day this week.
+    await fireEvent.press(screen.getByLabelText('Tim Hortons, Wednesday, October 14, not bought'));
+    expect(mockTapDay).toHaveBeenCalledWith({ habit: TIM, day: '2026-10-14' });
+
+    expect(figures(screen, 'tim')).toEqual([
+      'Tim Hortons',
+      '$5',
+      '$25.00',
+      'Out of $35.00 spend limit',
+      '$0.00 saved',
+      'Day 5 of 7',
+    ]);
+    // Breakfast stays as it was: a receipt for one habit is not another’s.
+    expect(figures(screen, 'bfast')).toContain('$4.00');
+    expect(hero(screen)).toBe('Spent this week, $29.00. Saved so far, $34.00.');
+    await act(async () => answer.resolve({ receiptId: 'r-new', alreadyTapped: false }));
+  });
+
+  it('puts a day back on the card and the hero when its removal is cancelled or refused', async () => {
+    mockUntapDay.mockRejectedValue(new Error('offline'));
+    const screen = await render(<HabitsScreen />);
+
+    await fireEvent.press(screen.getByLabelText('Breakfast, Wednesday, October 14, bought, $4.00'));
+    expect(await screen.findByText(FAILURE)).toBeTruthy();
+    expect(figures(screen, 'bfast')).toContain('$4.00');
+    expect(hero(screen)).toBe('Spent this week, $24.00. Saved so far, $39.00.');
+  });
+
+  it('counts a receipt edited above the limit at its real amount while the bar stays full', async () => {
+    mockTaps = query(
+      DESIGN_TAPS.map((entry) =>
+        entry.receiptId === 'r-tim-2026-10-12' ? { ...entry, amount: 30 } : entry,
+      ),
+    );
+    const screen = await render(<HabitsScreen />);
+    expect(figures(screen, 'tim')).toEqual(
+      expect.arrayContaining(['$45.00', 'Out of $35.00 spend limit', '$5.00 saved']),
+    );
+    expect(hero(screen)).toBe('Spent this week, $49.00. Saved so far, $39.00.');
+    const bar = screen.getByTestId('habit-bar-tim', { includeHiddenElements: true });
+    const fill = bar.children[0] as unknown as { props: { style: unknown } };
+    expect(StyleSheet.flatten(fill.props.style as never)).toMatchObject({ width: '100%' });
+  });
+
+  it('reads in Spanish: Día 5 de 7, Día 3 de 5, Semana completa and Empieza el mié 14 oct', async () => {
+    setLanguage('es');
+    const screen = await render(<HabitsScreen />);
+    expect(figures(screen, 'tim')).toEqual([
+      'Tim Hortons',
+      '$5',
+      '$20.00',
+      'De un límite de $35.00',
+      '$5.00 ahorrado',
+      'Día 5 de 7',
+    ]);
+    expect(figures(screen, 'bfast')).toContain('Día 3 de 5');
+    expect(screen.getByLabelText('Ver detalles, Breakfast')).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('Semana anterior'));
+    expect(figures(screen, 'tim')).toContain('Semana completa');
+    expect(figures(screen, 'bfast')).toEqual(['Breakfast', '$4', 'Empieza el mié 14 oct']);
+  });
+
+  it('reads in French: Jour 3 sur 5, Semaine terminée and Commence le mer. 14 oct.', async () => {
+    setLanguage('fr');
+    const screen = await render(<HabitsScreen />);
+    expect(figures(screen, 'bfast')).toEqual([
+      'Breakfast',
+      `4${NBSP}$`,
+      `4,00${NBSP}$`,
+      `Sur une limite de 20,00${NBSP}$`,
+      `4,00${NBSP}$ économisé`,
+      'Jour 3 sur 5',
+    ]);
+
+    await fireEvent.press(screen.getByLabelText('Semaine précédente'));
+    expect(figures(screen, 'tim')).toContain('Semaine terminée');
+    expect(figures(screen, 'bfast')).toEqual([
+      'Breakfast',
+      `4${NBSP}$`,
+      'Commence le mer. 14 oct.',
+    ]);
   });
 });
 

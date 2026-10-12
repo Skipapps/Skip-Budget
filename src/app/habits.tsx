@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { useHistoryFloor } from '@/api/history';
 import { habitMaths, useHabits, useHabitTaps } from '@/api/habits';
@@ -18,8 +18,11 @@ import { t } from '@/i18n';
 import { failureText } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
 import { earliestWeek, savedAllTime, shiftWeek, spentInWeek, weekStartOf } from '@/lib/habit-week';
+import { withTap } from '@/lib/press';
 import { useToday } from '@/lib/use-today';
+import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 const WEEK_MS = 7 * 86_400_000;
 
@@ -31,11 +34,12 @@ const weeksApart = (from: string, to: string) =>
  * Spending habits: one card per habit with a circle for each day of the week shown. A tapped day
  * is a receipt at the habit's price; every untapped day since the habit began counts as saved.
  *
- * Pro starts habits; any plan keeps using the ones it has, so only + and the empty page's action
- * lead a free or lapsed account to the explainer.
+ * Pro starts habits; any plan keeps using the ones it has, so only the add buttons and the empty
+ * page's action lead a free or lapsed account to the explainer.
  */
 export default function HabitsScreen() {
   const artwork = useArtwork();
+  const colors = useColors();
   const { pro, ready } = usePro();
   const { today } = useToday();
   const habits = useHabits();
@@ -120,8 +124,6 @@ export default function HabitsScreen() {
       ) : (
         <>
           <HabitsHero
-            // A new pair of figures is judged side by side again rather than kept stacked.
-            key={`${formatCurrency(spent)}|${formatCurrency(saved)}`}
             label={back === 0 ? t('habits.hero.spentThisWeek') : t('habits.hero.spentThatWeek')}
             spent={formatCurrency(spent)}
             saved={formatCurrency(saved)}
@@ -129,6 +131,7 @@ export default function HabitsScreen() {
 
           <WeekSelector
             weekStart={weekStart}
+            today={today}
             label={back === 0 ? t('habits.week.this') : back === 1 ? t('habits.week.last') : null}
             canGoBack={back < furthestBack}
             canGoForward={back > 0}
@@ -141,7 +144,7 @@ export default function HabitsScreen() {
             <FailureLine onRetry={refreshFailed ? refetch : undefined} />
           ) : null}
 
-          <View className="mt-4 w-full gap-3 pb-10">
+          <View className="mt-[16px] w-full gap-[16px] pb-10">
             {active.map((habit) => (
               <HabitCard
                 key={habit.id}
@@ -149,13 +152,29 @@ export default function HabitsScreen() {
                 taps={shownTaps}
                 weekStart={weekStart}
                 today={today}
-                onOpen={() => router.push({ pathname: '/habit/[id]', params: { id: habit.id } })}
+                onEdit={() => router.push({ pathname: '/habit-new', params: { id: habit.id } })}
+                onDetails={() => router.push({ pathname: '/habit/[id]', params: { id: habit.id } })}
                 onTapDay={(day) => days.fill(habit, day)}
                 onUntapDay={(tap) => void days.empty(habit, tap)}
                 busyDays={days.busyDays(habit.id)}
                 floor={free ? floor : undefined}
               />
             ))}
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('habits.add')}
+              onPress={withTap(addHabit)}
+              className="min-h-[58px] w-full flex-row items-center justify-center gap-[8px] rounded-[20px] border-[1.5px] border-dashed border-ink/20 px-[20px] py-[12px] active:bg-ink/5"
+            >
+              <Plus size={20} color={colors.accentInk} strokeWidth={2} />
+              <Text
+                className="shrink text-center font-app-semibold text-[16px] text-accent-ink"
+                maxFontSizeMultiplier={TEXT_CAP.row}
+              >
+                {t('habits.add')}
+              </Text>
+            </Pressable>
           </View>
         </>
       )}

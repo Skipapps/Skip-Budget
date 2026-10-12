@@ -1,4 +1,4 @@
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import HabitsScreen from '@/app/habits';
@@ -153,12 +153,15 @@ const FILED: TapResult = { receiptId: 'r-new', alreadyTapped: false };
 const hero = (screen: Screen) =>
   screen.getByLabelText(/^(Spent|Gastado|Dépensé) /).props.accessibilityLabel as string;
 
-/** The cards' spoken headers, read from the nodes: a text matcher would fold no-break spaces away. */
+/** The cards' one spoken summary each, read from the nodes: a text matcher would fold no-break spaces away. */
 const headers = (screen: Screen) =>
-  screen
-    .getAllByRole('button')
-    .map((node) => String(node.props.accessibilityLabel))
-    .filter((label) => /^(Coffee|Food delivery), .*(spent|gastado|dépensé)\.$/.test(label));
+  screen.getAllByTestId(/^habit-summary-/).map((node) => String(node.props.accessibilityLabel));
+
+/** What a card draws, top to bottom, read the same way. */
+const figures = (screen: Screen, id: string) =>
+  within(screen.getByTestId(`habit-summary-${id}`))
+    .getAllByText(/./)
+    .map((text) => String(text.props.children));
 
 const TUE_OPEN = 'Coffee, Tuesday, October 6, not bought';
 const MON_BOUGHT = 'Coffee, Monday, October 5, bought, $5.00';
@@ -357,21 +360,30 @@ describe('an account whose Pro has lapsed', () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it('still opens a card on its habit’s page', async () => {
+  it('still opens a card’s history with View details, and its edit page with the pencil', async () => {
     const screen = await render(<HabitsScreen />);
-    await fireEvent.press(screen.getByLabelText(/^Coffee, .* spent\.$/));
-    expect(router.push).toHaveBeenCalledWith({ pathname: '/habit/[id]', params: { id: 'coffee' } });
-    expect(router.push).toHaveBeenCalledTimes(1);
+    await fireEvent.press(screen.getByLabelText('View details, Coffee'));
+    expect(router.push).toHaveBeenLastCalledWith({
+      pathname: '/habit/[id]',
+      params: { id: 'coffee' },
+    });
+    await fireEvent.press(screen.getByLabelText('Edit Coffee'));
+    expect(router.push).toHaveBeenLastCalledWith({
+      pathname: '/habit-new',
+      params: { id: 'coffee' },
+    });
+    expect(router.push).toHaveBeenCalledTimes(2);
   });
 
-  it('gates only starting one: the + goes to the explainer, never the new habit page', async () => {
+  it('gates only starting one: both Add a habit buttons go to the explainer, never the new habit page', async () => {
     const screen = await render(<HabitsScreen />);
-    await fireEvent.press(screen.getByLabelText('Add a habit'));
-    expect(router.push).toHaveBeenCalledTimes(1);
-    expect(router.push).toHaveBeenCalledWith({
-      pathname: '/pro-feature',
-      params: { id: 'habits' },
-    });
+    const adds = screen.getAllByLabelText('Add a habit');
+    expect(adds).toHaveLength(2);
+    for (const add of adds) await fireEvent.press(add);
+    expect(jest.mocked(router.push).mock.calls).toEqual([
+      [{ pathname: '/pro-feature', params: { id: 'habits' } }],
+      [{ pathname: '/pro-feature', params: { id: 'habits' } }],
+    ]);
   });
 
   it('sends the empty page’s action to the explainer too, from the page and from the +', async () => {
@@ -437,9 +449,26 @@ describe('figures in pesos and pounds, to the cent', () => {
     const screen = await render(<HabitsScreen />);
 
     expect(hero(screen)).toBe('Spent this week, $348.75. Saved so far, $2,350.00.');
+    // Seven days at $50.00 and at $250.00; the edited receipt is counted at $48.75.
     expect(headers(screen)).toEqual([
-      'Coffee, $50.00 each time, 1 day skipped, $100.00 saved, $98.75 spent.',
-      'Food delivery, $250.00 each time, 2 days skipped, $750.00 saved, $250.00 spent.',
+      'Coffee, $50.00 each time. $98.75 spent out of $350.00. $100.00 saved. Day 5 of 7.',
+      'Food delivery, $250.00 each time. $250.00 spent out of $1,750.00. $750.00 saved. Day 5 of 7.',
+    ]);
+    expect(figures(screen, 'coffee')).toEqual([
+      'Coffee',
+      '$50',
+      '$98.75',
+      'Out of $350.00 spend limit',
+      '$100.00 saved',
+      'Day 5 of 7',
+    ]);
+    expect(figures(screen, 'delivery')).toEqual([
+      'Food delivery',
+      '$250',
+      '$250.00',
+      'Out of $1,750.00 spend limit',
+      '$750.00 saved',
+      'Day 5 of 7',
     ]);
   });
 
@@ -468,12 +497,19 @@ describe('figures in pesos and pounds, to the cent', () => {
 
     // Sep 28 to Oct 4: seven days gone by, one bought, 6 x 250 = 1,500.00; Coffee had not begun.
     expect(hero(screen)).toBe('Spent that week, $250.00. Saved so far, $2,350.00.');
-    expect(
-      screen.getByLabelText(
-        'Food delivery, $250.00 each time, Bought on 1 day, $1,500.00 saved, $250.00 spent.',
-      ),
-    ).toBeTruthy();
-    expect(screen.getByLabelText('Coffee, $50.00 each time, Not tracking yet.')).toBeTruthy();
+    expect(headers(screen)).toEqual([
+      'Coffee, $50.00 each time, Starts Mon, Oct 5.',
+      'Food delivery, $250.00 each time. $250.00 spent out of $1,750.00. $1,500.00 saved. Week complete.',
+    ]);
+    expect(figures(screen, 'delivery')).toEqual(
+      expect.arrayContaining([
+        '$250.00',
+        'Out of $1,750.00 spend limit',
+        '$1,500.00 saved',
+        'Week complete',
+      ]),
+    );
+    expect(figures(screen, 'coffee')).toEqual(['Coffee', '$50', 'Starts Mon, Oct 5']);
   });
 
   it('files a tap at the habit’s own number, with nothing converted', async () => {
@@ -484,9 +520,12 @@ describe('figures in pesos and pounds, to the cent', () => {
 
     expect(mockTapDay).toHaveBeenCalledTimes(1);
     expect(mockTapDay.mock.calls[0][0].habit.price).toBe(50);
-    // The pending circle is drawn at that price, and the hero moves by exactly that.
+    // The pending circle is drawn at that price, and the hero and the card move by exactly that.
     expect(screen.getByLabelText('Coffee, Tuesday, October 6, bought, $50.00')).toBeTruthy();
     expect(hero(screen)).toBe('Spent this week, $398.75. Saved so far, $2,300.00.');
+    expect(figures(screen, 'coffee')).toEqual(
+      expect.arrayContaining(['$148.75', 'Out of $350.00 spend limit', '$50.00 saved']),
+    );
   });
 
   it('follows the currency chosen, not a dollar sign', async () => {
@@ -497,6 +536,17 @@ describe('figures in pesos and pounds, to the cent', () => {
       'Records £50.00 spent on this day.',
     );
     expect(screen.queryByLabelText(/\$/)).toBeNull();
+    expect(figures(screen, 'coffee')).toEqual([
+      'Coffee',
+      '£50',
+      '£98.75',
+      'Out of £350.00 spend limit',
+      '£100.00 saved',
+      'Day 5 of 7',
+    ]);
+    expect(headers(screen)[1]).toBe(
+      'Food delivery, £250.00 each time. £250.00 spent out of £1,750.00. £750.00 saved. Day 5 of 7.',
+    );
   });
 
   it('writes the same pesos in Spanish, with the point decimal Mexico uses', async () => {
@@ -505,9 +555,12 @@ describe('figures in pesos and pounds, to the cent', () => {
     const screen = await render(<HabitsScreen />);
     expect(hero(screen)).toBe('Gastado esta semana, $348.75. Ahorrado hasta hoy, $2,350.00.');
     expect(headers(screen)).toEqual([
-      'Coffee, $50.00 cada vez, 1 día sin comprar, $100.00 ahorrado, $98.75 gastado.',
-      'Food delivery, $250.00 cada vez, 2 días sin comprar, $750.00 ahorrado, $250.00 gastado.',
+      'Coffee, $50.00 cada vez. $98.75 gastado de $350.00. $100.00 ahorrado. Día 5 de 7.',
+      'Food delivery, $250.00 cada vez. $250.00 gastado de $1,750.00. $750.00 ahorrado. Día 5 de 7.',
     ]);
+    expect(figures(screen, 'coffee')).toEqual(
+      expect.arrayContaining(['De un límite de $350.00', '$100.00 ahorrado', 'Día 5 de 7']),
+    );
   });
 
   it('writes them in French with the comma, a no-break space for thousands, and the mark after', async () => {
@@ -518,8 +571,16 @@ describe('figures in pesos and pounds, to the cent', () => {
       `Dépensé cette semaine, 348,75${NBSP}$. Économisé jusqu’ici, 2${NBSP}350,00${NBSP}$.`,
     );
     expect(headers(screen)).toEqual([
-      `Coffee, 50,00${NBSP}$ chaque fois, 1 jour sans achat, 100,00${NBSP}$ économisé, 98,75${NBSP}$ dépensé.`,
-      `Food delivery, 250,00${NBSP}$ chaque fois, 2 jours sans achat, 750,00${NBSP}$ économisé, 250,00${NBSP}$ dépensé.`,
+      `Coffee, 50,00${NBSP}$ chaque fois. 98,75${NBSP}$ dépensé sur 350,00${NBSP}$. 100,00${NBSP}$ économisé. Jour 5 sur 7.`,
+      `Food delivery, 250,00${NBSP}$ chaque fois. 250,00${NBSP}$ dépensé sur 1${NBSP}750,00${NBSP}$. 750,00${NBSP}$ économisé. Jour 5 sur 7.`,
+    ]);
+    expect(figures(screen, 'delivery')).toEqual([
+      'Food delivery',
+      `250${NBSP}$`,
+      `250,00${NBSP}$`,
+      `Sur une limite de 1${NBSP}750,00${NBSP}$`,
+      `750,00${NBSP}$ économisé`,
+      'Jour 5 sur 7',
     ]);
   });
 });

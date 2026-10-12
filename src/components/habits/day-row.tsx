@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { habitColor, type HabitColor } from '@/data/habit-colors';
 import { t } from '@/i18n';
-import { monthLong, weekdayInitials, weekdayLong } from '@/i18n/calendar';
+import { monthLong, monthShort, weekdayInitials, weekdayLong, weekdayShort } from '@/i18n/calendar';
 import { cn } from '@/lib/cn';
 import { formatCurrency } from '@/lib/format';
 import {
@@ -17,19 +17,30 @@ import { withTap } from '@/lib/press';
 import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
 
-const CIRCLE = 34;
+const CIRCLE = 40;
 
 /** weekdayInitials() starts on Sunday; the habit weeks start on Monday. */
 const MONDAY_FIRST = [1, 2, 3, 4, 5, 6, 0];
 
-const asDate = (iso: string) => new Date(`${iso}T00:00:00`);
+/** A yyyy-mm-dd day at local midnight, so its weekday and month names are that day's. */
+export const localDate = (iso: string) => new Date(`${iso}T00:00:00`);
 
 /** "Monday, October 5", as VoiceOver reads a day. */
 export function spokenDay(iso: string): string {
-  const date = asDate(iso);
+  const date = localDate(iso);
   return t('habits.day.date', {
     weekday: weekdayLong(date.getDay()),
     month: monthLong(date.getMonth()),
+    day: date.getDate(),
+  });
+}
+
+/** "Wed, Oct 14". */
+export function shortDay(iso: string): string {
+  const date = localDate(iso);
+  return t('habits.detail.dayDate', {
+    weekday: weekdayShort(date.getDay()),
+    month: monthShort(date.getMonth()),
     day: date.getDate(),
   });
 }
@@ -56,7 +67,8 @@ type DayRowProps = {
 
 /**
  * A habit's week, Monday to Sunday, one column per day across the full width. Each column, initial
- * and circle together, is its own button, so a thumb never has to find a 34pt circle.
+ * and circle together, is its own button, so a thumb never has to find a 40pt circle. A column
+ * narrower than the circle (Display Zoom on a small phone) shrinks the circle to fit it.
  */
 export function DayRow({
   habit,
@@ -141,7 +153,7 @@ function DayCircle({
   const { fill } = habitColor(color);
 
   // A past day is tappable, so its empty ring is `muted` (it must read as a control, 3:1); a
-  // future day is inert and keeps the faint `line`.
+  // future day or one before the start is inert and keeps the faint `line`.
   const circleStyle =
     state === 'tapped'
       ? { backgroundColor: fill }
@@ -149,14 +161,12 @@ function DayCircle({
         ? { borderWidth: 2, borderColor: fill }
         : state === 'open'
           ? { borderWidth: 1.5, borderColor: colors.muted }
-          : state === 'future'
-            ? { borderWidth: 1.5, borderColor: colors.line }
-            : null;
+          : { borderWidth: 1.5, borderColor: colors.line };
 
   const label = (
     <Text
       className={cn(
-        'text-[11px]',
+        'text-[13px]',
         isToday ? 'font-app-bold text-ink' : 'font-app-medium text-muted',
         state === 'before' && 'opacity-40',
       )}
@@ -170,19 +180,25 @@ function DayCircle({
     <View
       testID={`day-${day}`}
       style={[
-        { width: CIRCLE, height: CIRCLE, transform: [{ scale: pressed ? 0.92 : 1 }] },
+        {
+          width: '100%',
+          maxWidth: CIRCLE,
+          aspectRatio: 1,
+          transform: [{ scale: pressed ? 0.92 : 1 }],
+        },
         circleStyle,
       ]}
       className={cn(
-        'mt-1 items-center justify-center rounded-full',
-        state === 'before' && 'bg-ink/5',
+        'mt-[6px] items-center justify-center rounded-full',
+        state !== 'tapped' && 'bg-ink/[0.04]',
+        state === 'before' && 'opacity-40',
       )}
     >
-      {state === 'tapped' ? <Check size={16} color="#FFFFFF" strokeWidth={3} /> : null}
+      {state === 'tapped' ? <Check size={18} color="#FFFFFF" strokeWidth={3} /> : null}
     </View>
   );
 
-  const column = 'min-h-[52px] flex-1 items-center';
+  const column = 'flex-1 items-center';
   if (!interactive) {
     return (
       <View className={column}>
