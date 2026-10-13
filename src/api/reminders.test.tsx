@@ -24,6 +24,7 @@ import { resetLocaleForTests, setLanguage } from '@/i18n/store';
  */
 
 let mockProfile: Record<string, unknown> | null = null;
+let mockReadError: { code: string; message: string } | null = null;
 const mockUpdates: {
   table: string;
   values: Record<string, unknown>;
@@ -38,7 +39,8 @@ jest.mock('@/lib/supabase', () => {
     const builder: Record<string, unknown> = {
       select: () => builder,
       eq: () => builder,
-      maybeSingle: () => Promise.resolve({ data: mockProfile, error: null }),
+      maybeSingle: () =>
+        Promise.resolve({ data: mockReadError ? null : mockProfile, error: mockReadError }),
       upsert: (values: Record<string, unknown>) => {
         mockUpserts.push({ table, values });
         return Promise.resolve({ error: null });
@@ -86,6 +88,7 @@ function wrapper({ children }: { children: ReactNode }) {
 
 beforeEach(() => {
   mockProfile = null;
+  mockReadError = null;
   mockUpdates.length = 0;
   mockUpdatedRows = [{ id: 'user-1' }];
   mockEnableReminders.mockClear();
@@ -277,6 +280,23 @@ describe('payment notices', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.enabled).toBe(true);
     expect(result.current.isError).toBe(false);
+  });
+
+  it('are on, not a failure, on a database the switch has not reached yet', async () => {
+    mockReadError = {
+      code: '42703',
+      message: 'column profiles.payment_notices does not exist',
+    };
+    const { result } = await renderHook(() => usePaymentNotices(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.enabled).toBe(true);
+    expect(result.current.isError).toBe(false);
+  });
+
+  it('still fails on any other missing column', async () => {
+    mockReadError = { code: '42703', message: 'column profiles.timezone does not exist' };
+    const { result } = await renderHook(() => usePaymentNotices(), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
   });
 
   it('are off once the profile says so', async () => {

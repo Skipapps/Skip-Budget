@@ -420,6 +420,9 @@ export function useSetReceiptReminder() {
   });
 }
 
+const paymentNoticesMissing = (error: { code?: string; message?: string; details?: string }) =>
+  error.code === '42703' && /payment_notices/.test(`${error.message ?? ''} ${error.details ?? ''}`);
+
 /**
  * Whether the scheduler may tell this account a bill or subscription payment went out
  * (profiles.payment_notices). On unless stored off: that is the column's default, and what every
@@ -440,6 +443,9 @@ export function usePaymentNotices() {
             // The select policy also returns friends' and groupmates' rows, so name this one.
             .eq('id', userId!)
             .maybeSingle();
+          // A build ahead of its migration: the server still sends every notice, so they are on,
+          // and there is nothing to fail over.
+          if (error && paymentNoticesMissing(error)) return null;
           if (error) throw error;
           return (data ?? null) as { payment_notices: boolean | null } | null;
         })(),
