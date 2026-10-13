@@ -183,9 +183,9 @@ export const faqMessages = defineMessages({
   },
   // {monthly} and {yearly} are the store's own prices, so each storefront reads its own currency.
   'faq.pro.include.a': {
-    en: 'Unlimited credit cards and accounts, unlimited receipt scans and uploads, Voice entry, Insights, seven years of history, early access to new features and first-in-line support. {monthly} a month or {yearly} a year, billed by Apple.',
-    es: 'Tarjetas de crédito y cuentas sin límite, escaneos y subidas de recibos sin límite, entrada por voz, Análisis, siete años de historial, acceso anticipado a las funciones nuevas y soporte con prioridad. {monthly} al mes o {yearly} al año, cobrados por Apple.',
-    fr: 'Cartes de crédit et comptes en nombre illimité, numérisations et imports de reçus illimités, saisie vocale, Aperçu, sept ans d’historique, accès anticipé aux nouvelles fonctionnalités et assistance prioritaire. {monthly} par mois ou {yearly} par an, facturés par Apple.',
+    en: 'Unlimited credit cards and accounts, unlimited receipt scans and uploads, Voice entry, Insights and seven years of history. {monthly} a month or {yearly} a year, billed by Apple.',
+    es: 'Tarjetas de crédito y cuentas sin límite, escaneos y subidas de recibos sin límite, entrada por voz, Análisis y siete años de historial. {monthly} al mes o {yearly} al año, cobrados por Apple.',
+    fr: 'Cartes de crédit et comptes en nombre illimité, numérisations et imports de reçus illimités, saisie vocale, Aperçu et sept ans d’historique. {monthly} par mois ou {yearly} par an, facturés par Apple.',
   },
   'faq.pro.cancelled.q': {
     en: 'What happens to my things if I cancel?',
@@ -193,9 +193,9 @@ export const faqMessages = defineMessages({
     fr: 'Qu’arrive-t-il à mes affaires si j’annule ?',
   },
   'faq.pro.cancelled.a': {
-    en: 'Nothing is deleted — ever. Every credit card, account and balance keeps working exactly as it was. Until Pro returns you cannot add past the free allowance, and lists show the last 90 days (older entries are kept, just out of view).',
-    es: 'Nada se elimina, nunca. Cada tarjeta de crédito, cuenta y saldo sigue funcionando exactamente como estaba. Hasta que Pro regrese no puedes agregar más allá del límite gratis y las listas muestran los últimos 90 días (lo anterior se guarda, solo que no se ve).',
-    fr: 'Rien n’est jamais supprimé. Chaque carte de crédit, chaque compte et chaque solde continue de fonctionner exactement comme avant. Tant que Pro n’est pas de retour, tu ne peux rien ajouter au-delà de la limite gratuite et les listes affichent les 90 derniers jours (le reste est conservé, simplement masqué).',
+    en: 'Nothing is deleted if Pro ends. Your first credit card and first bank account work as before. Any others stay in Skip and still count in your balances: you can open, edit or delete them, but not pick them for new spending. You also cannot add past the free allowance, and lists show the last 90 days (older entries are kept, just out of view until Pro returns).',
+    es: 'Nada se borra si Pro termina. Tu primera tarjeta de crédito y tu primera cuenta bancaria funcionan como antes. Las demás se quedan en Skip y siguen contando en tus saldos: puedes abrirlas, editarlas o eliminarlas, pero no elegirlas para gastos nuevos. Tampoco puedes agregar más allá del límite gratis, y las listas muestran los últimos 90 días (lo anterior se guarda, solo que no se ve hasta que Pro regrese).',
+    fr: 'Rien n’est supprimé si Pro finit. Ta première carte de crédit et ton premier compte bancaire fonctionnent comme avant. Les autres restent dans Skip et comptent toujours dans tes soldes : tu peux les ouvrir, les modifier ou les supprimer, mais pas les choisir pour de nouvelles dépenses. Tu ne peux pas non plus ajouter au-delà de la limite gratuite, et les listes affichent les 90 derniers jours (le reste est conservé, simplement masqué tant que Pro n’est pas de retour).',
   },
   'faq.pro.cancel.q': {
     en: 'How do I cancel?',

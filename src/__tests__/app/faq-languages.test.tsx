@@ -100,6 +100,18 @@ describe('Common questions in Spanish', () => {
     ).toBeTruthy();
     expect(screen.queryAllByText(/\$1\.99/)).toEqual([]);
   });
+
+  it('says the extra cards and accounts still open, edit and delete when Pro ends', async () => {
+    const screen = await render(<FaqScreen />);
+    await openEveryAnswer(screen, 'Muestra la respuesta');
+
+    expect(
+      screen.getByText(
+        'Nada se borra si Pro termina. Tu primera tarjeta de crédito y tu primera cuenta bancaria funcionan como antes. Las demás se quedan en Skip y siguen contando en tus saldos: puedes abrirlas, editarlas o eliminarlas, pero no elegirlas para gastos nuevos. Tampoco puedes agregar más allá del límite gratis, y las listas muestran los últimos 90 días (lo anterior se guarda, solo que no se ve hasta que Pro regrese).',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/en gris|no puedes abrirlas/)).toBeNull();
+  });
 });
 
 describe('Common questions in French', () => {
@@ -157,6 +169,18 @@ describe('Common questions in French', () => {
       screen.getByText(/MX\$39\.00 par mois ou MX\$399\.00 par an, facturés par Apple\.$/),
     ).toBeTruthy();
   });
+
+  it('says the extra cards and accounts still open, edit and delete when Pro ends', async () => {
+    const screen = await render(<FaqScreen />);
+    await openEveryAnswer(screen, 'Affiche la réponse');
+
+    expect(
+      screen.getByText(
+        'Rien n’est supprimé si Pro finit. Ta première carte de crédit et ton premier compte bancaire fonctionnent comme avant. Les autres restent dans Skip et comptent toujours dans tes soldes : tu peux les ouvrir, les modifier ou les supprimer, mais pas les choisir pour de nouvelles dépenses. Tu ne peux pas non plus ajouter au-delà de la limite gratuite, et les listes affichent les 90 derniers jours (le reste est conservé, simplement masqué tant que Pro n’est pas de retour).',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/grisés|ne peux pas les ouvrir/)).toBeNull();
+  });
 });
 
 describe('Common questions in English', () => {
@@ -166,9 +190,22 @@ describe('Common questions in English', () => {
 
     expect(
       screen.getByText(
-        /first-in-line support\. \$1\.99 a month or \$19\.99 a year, billed by Apple\.$/,
+        /Insights and seven years of history\. \$1\.99 a month or \$19\.99 a year, billed by Apple\.$/,
       ),
     ).toBeTruthy();
+  });
+
+  it('promises only what Skip does when Pro ends', async () => {
+    const screen = await render(<FaqScreen />);
+    await openEveryAnswer(screen, 'Shows the answer');
+
+    expect(
+      screen.getByText(
+        'Nothing is deleted if Pro ends. Your first credit card and first bank account work as before. Any others stay in Skip and still count in your balances: you can open, edit or delete them, but not pick them for new spending. You also cannot add past the free allowance, and lists show the last 90 days (older entries are kept, just out of view until Pro returns).',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/early access|first-in-line|— ever/)).toBeNull();
+    expect(screen.queryByText(/greyed out|cannot open/)).toBeNull();
   });
 
   it('quotes the store price in place of the fallback', async () => {

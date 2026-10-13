@@ -12,7 +12,6 @@ import {
   FileText,
   History,
   Infinity as InfinityIcon,
-  LockOpen,
   Mic,
   PiggyBank,
   ReceiptText,
@@ -97,7 +96,7 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
   voice: feature('voice', Mic, { a: ReceiptText, b: CircleCheck, c: ShieldCheck }, '/voice'),
   history: feature('history', History, { a: CalendarRange, b: ArchiveRestore, c: Scale }),
   // Moving money between accounts is free on every plan, so it is no point for Pro.
-  unlimited: feature('unlimited', CreditCard, { a: InfinityIcon, c: LockOpen }),
+  unlimited: feature('unlimited', CreditCard, { a: InfinityIcon, c: CircleCheck }),
   habits: feature(
     'habits',
     CalendarCheck,

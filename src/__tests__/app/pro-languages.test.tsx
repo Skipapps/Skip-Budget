@@ -153,6 +153,11 @@ describe('the Pro page in Spanish', () => {
     expect(
       screen.getByLabelText('Entrada por voz: Gratis, no incluido. Pro, incluido.'),
     ).toBeTruthy();
+    expect(screen.getByLabelText('Sube recibos: Gratis, Limitado. Pro, incluido.')).toBeTruthy();
+    expect(
+      screen.queryByText(/Sube cualquier factura|Novedades primero|Soporte prioritario/),
+    ).toBeNull();
+    expect(screen.getAllByLabelText(/: Gratis, .*\. Pro, .*\.$/)).toHaveLength(8);
     expect(screen.getByText('Anual')).toBeTruthy();
     expect(screen.getByText('$19.99/año')).toBeTruthy();
     expect(screen.getByText('$1.67/mes')).toBeTruthy();
@@ -201,6 +206,7 @@ describe('the Pro page in Spanish', () => {
     expect(screen.getByText('Mira más atrás')).toBeTruthy();
     expect(screen.getByText('Lo anterior se guarda, no se pierde.')).toBeTruthy();
     expect(screen.getByText('Hasta 7 años de historial')).toBeTruthy();
+    expect(screen.getByText('Nada se borra si Pro termina')).toBeTruthy();
     expect(screen.getByText('Incluido con Skip Pro')).toBeTruthy();
     expect(screen.getByText('Obtener Skip Pro — $1.99/mes')).toBeTruthy();
     expect(screen.getByLabelText('Ahora no')).toBeTruthy();
@@ -216,6 +222,15 @@ describe('the Pro page in French', () => {
     expect(screen.getByText('Va plus loin avec Skip Pro')).toBeTruthy();
     expect(screen.getByText('Moins qu’un café par mois.')).toBeTruthy();
     expect(screen.getByLabelText('Historique : Gratuit, 90 jours. Pro, 7 ans.')).toBeTruthy();
+    expect(
+      screen.getByLabelText(`Importe tes reçus${NBSP}: Gratuit, Limité. Pro, inclus.`),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(
+        /Importe tes factures|Nouveautés en avant-première|Assistance prioritaire/,
+      ),
+    ).toBeNull();
+    expect(screen.getAllByLabelText(/\s: Gratuit, .*\. Pro, .*\.$/)).toHaveLength(8);
     expect(screen.getByText('Annuel')).toBeTruthy();
     expect(screen.getByText(`19,99${NBSP}$/an`)).toBeTruthy();
     expect(screen.getByText(`1,67${NBSP}$/mois`)).toBeTruthy();
@@ -243,6 +258,7 @@ describe('the Pro page in French', () => {
     const screen = await render(<ProFeatureScreen />);
     expect(screen.getByText('Remonte plus loin')).toBeTruthy();
     expect(screen.getByText('L’ancien est conservé, pas perdu.')).toBeTruthy();
+    expect(screen.getByText('Rien n’est supprimé si Pro finit')).toBeTruthy();
     expect(screen.getByText('Inclus avec Skip Pro')).toBeTruthy();
     expect(screen.getByText('Obtenir Skip Pro — 2,49 $/mois')).toBeTruthy();
     expect(screen.getByLabelText('Pas maintenant')).toBeTruthy();

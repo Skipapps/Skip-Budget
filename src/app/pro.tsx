@@ -6,11 +6,9 @@ import {
   CreditCard,
   Crown,
   FileUp,
-  Headphones,
   History,
   Mic,
   ScanLine,
-  Sparkles,
   Wallet,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -68,8 +66,6 @@ const ROWS: Row[] = [
   { icon: Mic, label: 'pro.compare.voice', free: 'no', pro: 'yes' },
   { icon: ChartColumn, label: 'pro.compare.insights', free: 'no', pro: 'yes' },
   { icon: CalendarCheck, label: 'pro.compare.habits', free: 'no', pro: 'yes' },
-  { icon: Sparkles, label: 'pro.compare.early', free: 'no', pro: 'yes' },
-  { icon: Headphones, label: 'pro.compare.support', free: 'no', pro: 'yes' },
 ];
 
 /** How a cell is read aloud. */

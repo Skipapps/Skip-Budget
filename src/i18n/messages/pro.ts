@@ -143,9 +143,9 @@ export const proMessages = defineMessages({
     fr: 'Jusqu’à 7 ans d’historique',
   },
   'pro.history.b': {
-    en: 'Nothing is ever deleted',
-    es: 'Nada se borra nunca',
-    fr: 'Rien n’est jamais supprimé',
+    en: 'Nothing is deleted if Pro ends',
+    es: 'Nada se borra si Pro termina',
+    fr: 'Rien n’est supprimé si Pro finit',
   },
   'pro.history.c': {
     en: 'Balances always add up',
@@ -203,9 +203,9 @@ export const proMessages = defineMessages({
     fr: 'Cartes et comptes illimités',
   },
   'pro.unlimited.c': {
-    en: 'Nothing locked if Pro ends',
-    es: 'Nada se bloquea si Pro termina',
-    fr: 'Rien n’est bloqué si Pro finit',
+    en: 'Extras can still be opened and deleted if Pro ends',
+    es: 'Los extras se pueden abrir y eliminar si Pro termina',
+    fr: 'Tu peux ouvrir et supprimer les autres si Pro finit',
   },
   // The file's real name, which is the same in every language.
   'pro.export.example': {
@@ -357,9 +357,9 @@ export const proMessages = defineMessages({
     fr: 'Dépenses et factures',
   },
   'pro.compare.upload': {
-    en: 'Upload any bill',
-    es: 'Sube cualquier factura',
-    fr: 'Importe tes factures',
+    en: 'Upload receipts',
+    es: 'Sube recibos',
+    fr: 'Importe tes reçus',
   },
   'pro.compare.scan': { en: 'Scan receipts', es: 'Escanea recibos', fr: 'Numérise tes reçus' },
   'pro.compare.cards': {
@@ -379,16 +379,6 @@ export const proMessages = defineMessages({
     fr: 'Habitudes de dépense',
   },
   'pro.compare.insights': { en: 'Insights', es: 'Análisis', fr: 'Aperçu' },
-  'pro.compare.early': {
-    en: 'New features first',
-    es: 'Novedades primero',
-    fr: 'Nouveautés en avant-première',
-  },
-  'pro.compare.support': {
-    en: 'Priority support',
-    es: 'Soporte prioritario',
-    fr: 'Assistance prioritaire',
-  },
   'pro.compare.limited': { en: 'Limited', es: 'Limitado', fr: 'Limité' },
   'pro.compare.unlimited': { en: 'Unlimited', es: 'Ilimitado', fr: 'Illimité' },
   'pro.compare.days': {
@@ -408,22 +398,22 @@ export const proMessages = defineMessages({
     es: '{feature}: Gratis, {free}. Pro, {pro}.',
     fr: '{feature} : Gratuit, {free}. Pro, {pro}.',
   },
-  'pro.offer.badge': { en: 'ONE-TIME OFFER', es: 'OFERTA ÚNICA', fr: 'OFFRE UNIQUE' },
+  'pro.offer.badge': { en: 'ONE-TIME CHANCE', es: 'OPORTUNIDAD ÚNICA', fr: 'OCCASION UNIQUE' },
   'pro.offer.title': {
     en: 'Skip Pro, half price',
     es: 'Skip Pro a mitad de precio',
     fr: 'Skip Pro à moitié prix',
   },
   'pro.offer.titleSpecial': {
-    en: 'Skip Pro, a one-time price',
-    es: 'Skip Pro a un precio único',
-    fr: 'Skip Pro à un prix unique',
+    en: 'Skip Pro, a special yearly price',
+    es: 'Skip Pro a un precio anual especial',
+    fr: 'Skip Pro à un prix annuel spécial',
   },
   'pro.offer.year': { en: 'year', es: 'año', fr: 'an' },
   'pro.offer.wasPrice': {
-    en: 'Was {price}',
-    es: 'Antes {price}',
-    fr: 'Avant {price}',
+    en: 'Usually {price} a year',
+    es: 'Normalmente {price} al año',
+    fr: 'Habituellement {price} par an',
   },
   'pro.offer.perMonth': {
     en: 'That’s just {price} a month.',
@@ -472,6 +462,12 @@ export const proMessages = defineMessages({
     en: 'Insights',
     es: 'Análisis',
     fr: 'Aperçu',
+  },
+  // {price} is the store's own price string for the offer.
+  'pro.offer.renews': {
+    en: 'Renews at {price} a year until you cancel.',
+    es: 'Se renueva a {price} al año hasta que lo canceles.',
+    fr: 'Se renouvelle à {price} par an jusqu’à ce que tu l’annules.',
   },
   'pro.offer.once': {
     en: 'If you close this, you won’t see this offer again.',

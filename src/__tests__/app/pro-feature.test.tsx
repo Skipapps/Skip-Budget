@@ -75,7 +75,7 @@ describe('the locked-feature screen', () => {
     const screen = await render(<ProFeatureScreen />);
 
     const first = screen.getByText('Unlimited cards and accounts');
-    const second = screen.getByText('Nothing locked if Pro ends');
+    const second = screen.getByText('Extras can still be opened and deleted if Pro ends');
     // Each point is a row of icon and words; the two rows are the list's only children.
     const list = first.parent?.parent;
     expect(list?.children).toHaveLength(2);

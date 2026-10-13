@@ -100,6 +100,8 @@ export default function ProOfferScreen() {
   const title = isHalf(product?.price, regularProduct?.price)
     ? t('pro.offer.title')
     : t('pro.offer.titleSpecial');
+  // The price a person agrees to renew at: the store's own, or no line at all, never the stand-in.
+  const renews = product && !ended ? t('pro.offer.renews', { price: product.priceString }) : null;
 
   const minutes = Math.floor(left / 60000);
   const seconds = Math.floor((left % 60000) / 1000);
@@ -154,14 +156,14 @@ export default function ProOfferScreen() {
             onPress={canBuy ? handleBuy : () => void prices.refetch()}
             disabled={ended || busy || prices.isFetching}
           />
-          {ended ? null : (
+          {renews ? (
             <Text
               className="w-full text-center font-app text-[12px] text-muted"
               maxFontSizeMultiplier={TEXT_CAP.row}
             >
-              {t('pro.page.billedYearly')}
+              {renews}
             </Text>
-          )}
+          ) : null}
           <View className="w-full flex-row items-center justify-center gap-1.5">
             <Info size={14} color={colors.muted} strokeWidth={1.8} />
             <Text

@@ -4,7 +4,8 @@ import { exportFileName } from '@/lib/payment-export';
 
 /** The explainer pages behind each locked door, read in the language on screen. */
 
-jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
+// Each icon stands in as its own name, so a test can say which one a point carries.
+jest.mock('lucide-react-native', () => new Proxy({}, { get: (_target, name) => String(name) }));
 
 beforeEach(() => resetLocaleForTests());
 afterAll(() => resetLocaleForTests());
@@ -30,6 +31,12 @@ const SAME_EVERYWHERE = new Set(['voice', 'unlimited', 'export']);
  * limit), so only the points are held to one line.
  */
 const TWO_LINE_HEADINGS = new Set(['habits']);
+
+/**
+ * Approved words that wrap a point to two lines, by feature id and the point's place. The page
+ * wraps a point whole beside its icon, so only these may run past one line.
+ */
+const TWO_LINE_POINTS = new Set(['unlimited:1']);
 
 describe('PRO_FEATURES', () => {
   it('keeps its ids and gives every feature an icon, two or three points and an icon for each', () => {
@@ -63,8 +70,9 @@ describe('PRO_FEATURES', () => {
     // Moving money between accounts is free on every plan, so Unlimited makes two points.
     expect(PRO_FEATURES.unlimited.points.map((point) => point.text)).toEqual([
       'Unlimited cards and accounts',
-      'Nothing locked if Pro ends',
+      'Extras can still be opened and deleted if Pro ends',
     ]);
+    expect(PRO_FEATURES.history.points[1].text).toBe('Nothing is deleted if Pro ends');
     const habits = PRO_FEATURES.habits;
     expect(habits.example).toBe('Coffee · 3 days skipped · $15.00 saved');
     expect(habits.title).toBe('See what skipping saves');
@@ -93,8 +101,9 @@ describe('PRO_FEATURES', () => {
     expect(PRO_FEATURES.habits.points[1].text).toBe('Cada día sin comprar cuenta como ahorro');
     expect(PRO_FEATURES.unlimited.points.map((point) => point.text)).toEqual([
       'Tarjetas y cuentas sin límite',
-      'Nada se bloquea si Pro termina',
+      'Los extras se pueden abrir y eliminar si Pro termina',
     ]);
+    expect(PRO_FEATURES.history.points[1].text).toBe('Nada se borra si Pro termina');
     expect(PRO_FEATURES.export.title).toBe('Exporta tus pagos');
     expect(PRO_FEATURES.export.points[1].text).toBe('Extracto en PDF para imprimir o enviar');
   });
@@ -104,8 +113,9 @@ describe('PRO_FEATURES', () => {
     expect(PRO_FEATURES.unlimited.title).toBe('Ajoute-les tous');
     expect(PRO_FEATURES.unlimited.points.map((point) => point.text)).toEqual([
       'Cartes et comptes illimités',
-      'Rien n’est bloqué si Pro finit',
+      'Tu peux ouvrir et supprimer les autres si Pro finit',
     ]);
+    expect(PRO_FEATURES.history.points[1].text).toBe('Rien n’est supprimé si Pro finit');
     expect(PRO_FEATURES.voice.points[2].text).toBe('Ta voix n’est jamais gardée');
     expect(PRO_FEATURES.history.example).toBe('De 90 jours à 7 ans');
     expect(PRO_FEATURES.habits.example).toBe('Café · 3 jours sans achat · 15,00 $ économisés');
@@ -133,7 +143,10 @@ describe('PRO_FEATURES', () => {
         const lines = TWO_LINE_HEADINGS.has(feature.id) ? 2 : 1;
         expect(feature.title.length).toBeLessThanOrEqual(22 * lines);
         expect(feature.subtitle.length).toBeLessThanOrEqual(42 * lines);
-        feature.points.forEach((point) => expect(point.text.length).toBeLessThanOrEqual(40));
+        feature.points.forEach((point, index) => {
+          const pointLines = TWO_LINE_POINTS.has(`${feature.id}:${index}`) ? 2 : 1;
+          expect(point.text.length).toBeLessThanOrEqual(40 * pointLines);
+        });
         [
           feature.example,
           feature.title,
@@ -143,6 +156,14 @@ describe('PRO_FEATURES', () => {
       }
     },
   );
+
+  it('draws no padlock beside what happens to extra cards and accounts when Pro ends', () => {
+    const icons = PRO_FEATURES.unlimited.points.map((point) => String(point.icon));
+    expect(icons).toEqual(['Infinity', 'CircleCheck']);
+    for (const feature of features()) {
+      feature.points.forEach((point) => expect(String(point.icon)).not.toMatch(/Lock/));
+    }
+  });
 
   it('follows a change of language on the same objects, with no key left over', () => {
     const english = features().map(({ id, example, title }) => ({ id, example, title }));

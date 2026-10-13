@@ -24,7 +24,11 @@ jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', accentInk: '#905479' }),
 }));
 
-const offerPack = { product: { priceString: '$9.99', pricePerMonthString: '$0.83', price: 9.99 } };
+type Pack = { product: { priceString: string; pricePerMonthString: string; price: number } };
+const offerPack: Pack = {
+  product: { priceString: '$9.99', pricePerMonthString: '$0.83', price: 9.99 },
+};
+let mockOffer: Pack | null = offerPack;
 let mockRegular: { product: { priceString: string; price: number } } | null = {
   product: { priceString: '$19.99', price: 19.99 },
 };
@@ -38,7 +42,7 @@ jest.mock('@/api/pro', () => ({
   useOfferPrices: () =>
     mockOpen
       ? {
-          data: { offer: offerPack, regular: mockRegular },
+          data: { offer: mockOffer, regular: mockRegular },
           isFetching: false,
           refetch: jest.fn(),
         }
@@ -50,6 +54,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   jest.setSystemTime(new Date('2026-10-07T09:00:00'));
   mockUntil = String(Date.now() + 10 * 60 * 1000);
+  mockOffer = offerPack;
   mockRegular = { product: { priceString: '$19.99', price: 19.99 } };
   mockOpen = true;
   resetLocaleForTests();
@@ -66,14 +71,15 @@ const pass = async (ms: number) => {
 it('offers Pro at the store’s half price, the ordinary price struck through', async () => {
   const screen = await render(<ProOfferScreen />);
 
-  expect(screen.getByText('ONE-TIME OFFER')).toBeTruthy();
+  expect(screen.getByText('ONE-TIME CHANCE')).toBeTruthy();
   expect(screen.getByText('Skip Pro, half price')).toBeTruthy();
-  expect(screen.getByLabelText('Was $19.99')).toBeTruthy();
+  expect(screen.getByLabelText('Usually $19.99 a year')).toBeTruthy();
   expect(screen.getByText('$9.99')).toBeTruthy();
   expect(screen.getByText('That’s just $0.83 a month.')).toBeTruthy();
   expect(screen.getByText('7 years of money history')).toBeTruthy();
   expect(screen.getByLabelText('Get Pro for $9.99/year')).toBeTruthy();
-  expect(screen.getByText('Billed once a year. Cancel anytime.')).toBeTruthy();
+  expect(screen.getByText('Renews at $9.99 a year until you cancel.')).toBeTruthy();
+  expect(screen.queryByText('Billed once a year. Cancel anytime.')).toBeNull();
   expect(screen.getByText('If you close this, you won’t see this offer again.')).toBeTruthy();
 });
 
@@ -97,7 +103,7 @@ it('ends at zero: the button no longer buys, and the page says so', async () => 
   expect(button).toBeDisabled();
   await fireEvent.press(button);
   expect(mockPurchase).not.toHaveBeenCalled();
-  expect(screen.queryByText('Billed once a year. Cancel anytime.')).toBeNull();
+  expect(screen.queryByText(/^Renews at /)).toBeNull();
 });
 
 it('buys the offer’s own plan and closes once Apple confirms', async () => {
@@ -136,20 +142,89 @@ it('shows the dollar figures and offers to check again before the store answers'
   mockOpen = false;
   const screen = await render(<ProOfferScreen />);
   expect(screen.getByText('$9.99')).toBeTruthy();
-  expect(screen.getByLabelText('Was $19.99')).toBeTruthy();
+  expect(screen.getByLabelText('Usually $19.99 a year')).toBeTruthy();
   expect(screen.getByLabelText('Check again')).toBeTruthy();
+});
+
+describe('the renewal line under the button', () => {
+  it('names the store’s own offer price, not the dollar stand-in', async () => {
+    mockOffer = { product: { priceString: '$8.49', pricePerMonthString: '$0.71', price: 8.49 } };
+    mockRegular = { product: { priceString: '$16.99', price: 16.99 } };
+    const screen = await render(<ProOfferScreen />);
+    expect(screen.getByLabelText('Get Pro for $8.49/year')).toBeTruthy();
+    expect(screen.getByText('Renews at $8.49 a year until you cancel.')).toBeTruthy();
+    expect(screen.queryByText(/\$9\.99/)).toBeNull();
+  });
+
+  it('is drawn at 12pt with the row cap, not as the 10.5pt small print', async () => {
+    const screen = await render(<ProOfferScreen />);
+    const line = screen.getByText('Renews at $9.99 a year until you cancel.');
+    expect(String(line.props.className)).toContain('text-[12px]');
+    expect(String(line.props.className)).not.toContain('text-[10.5px]');
+    expect(line.props.maxFontSizeMultiplier).toBe(1.4);
+    // The small print stays as it was.
+    const small = screen.getByText(
+      'Billed by Apple. Renews automatically until you cancel in your App Store subscriptions.',
+    );
+    expect(String(small.props.className)).toContain('text-[10.5px]');
+  });
+
+  it('is left out while the store has not answered and the stand-in price is drawn', async () => {
+    mockOpen = false;
+    const screen = await render(<ProOfferScreen />);
+    expect(screen.getByText('$9.99')).toBeTruthy();
+    expect(screen.queryByText(/^Renews at /)).toBeNull();
+    expect(screen.queryByText('Billed once a year. Cancel anytime.')).toBeNull();
+  });
+
+  it('is left out when the store answers without the offer’s plan', async () => {
+    mockOffer = null;
+    const screen = await render(<ProOfferScreen />);
+    expect(screen.getByText('$9.99')).toBeTruthy();
+    expect(screen.getByLabelText('Check again')).toBeTruthy();
+    expect(screen.queryByText(/^Renews at /)).toBeNull();
+  });
 });
 
 it('reads in Spanish', async () => {
   setLanguage('es');
   const screen = await render(<ProOfferScreen />);
-  expect(screen.getByText('OFERTA ÚNICA')).toBeTruthy();
+  expect(screen.getByText('OPORTUNIDAD ÚNICA')).toBeTruthy();
   expect(screen.getByText('Skip Pro a mitad de precio')).toBeTruthy();
+  expect(screen.getByLabelText('Normalmente $19.99 al año')).toBeTruthy();
+  expect(screen.getByText('Se renueva a $9.99 al año hasta que lo canceles.')).toBeTruthy();
   expect(screen.getByText('Solo $0.83 al mes.')).toBeTruthy();
   expect(screen.getByLabelText('Quedan 10 min 0 s')).toBeTruthy();
   expect(screen.getByText('Si cierras esto, no volverás a ver esta oferta.')).toBeTruthy();
   expect(screen.getByLabelText('No, gracias')).toBeTruthy();
 });
+
+it('reads in French, with the store’s own price strings', async () => {
+  setLanguage('fr');
+  mockOffer = { product: { priceString: '9,99 €', pricePerMonthString: '0,83 €', price: 9.99 } };
+  mockRegular = { product: { priceString: '19,99 €', price: 19.99 } };
+  const screen = await render(<ProOfferScreen />);
+  expect(screen.getByText('OCCASION UNIQUE')).toBeTruthy();
+  expect(screen.getByText('Skip Pro à moitié prix')).toBeTruthy();
+  expect(screen.getByLabelText('Habituellement 19,99 € par an')).toBeTruthy();
+  expect(
+    screen.getByText('Se renouvelle à 9,99 € par an jusqu’à ce que tu l’annules.'),
+  ).toBeTruthy();
+  expect(screen.queryByText('Facturé une fois par an. Annule quand tu veux.')).toBeNull();
+});
+
+it.each([
+  ['es', 'Skip Pro a un precio anual especial'],
+  ['fr', 'Skip Pro à un prix annuel spécial'],
+] as const)(
+  'names a price that is not half a special yearly price in %s',
+  async (language, title) => {
+    setLanguage(language);
+    mockRegular = { product: { priceString: '$24.99', price: 24.99 } };
+    const screen = await render(<ProOfferScreen />);
+    expect(screen.getByText(title)).toBeTruthy();
+  },
+);
 
 describe('opened only by a claim', () => {
   it('closes at once, drawing nothing, without a deadline (a typed link)', async () => {
@@ -203,13 +278,13 @@ describe('what App Review looks for', () => {
     mockRegular = { product: { priceString: '$24.99', price: 24.99 } };
     const screen = await render(<ProOfferScreen />);
     expect(screen.queryByText('Skip Pro, half price')).toBeNull();
-    expect(screen.getByText('Skip Pro, a one-time price')).toBeTruthy();
+    expect(screen.getByText('Skip Pro, a special yearly price')).toBeTruthy();
   });
 
   it('draws no struck price rather than a dollar guess beside a store price', async () => {
     mockRegular = null;
     const screen = await render(<ProOfferScreen />);
     expect(screen.getByText('$9.99')).toBeTruthy();
-    expect(screen.queryByLabelText(/^Was /)).toBeNull();
+    expect(screen.queryByLabelText(/^Usually /)).toBeNull();
   });
 });

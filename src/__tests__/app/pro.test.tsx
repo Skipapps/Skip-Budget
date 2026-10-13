@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import ProScreen from '@/app/pro';
 
 /**
- * The Pro page as designed: Free against Pro in nine rows, the two plans with yearly chosen, and one
+ * The Pro page as designed: Free against Pro in eight rows, the two plans with yearly chosen, and one
  * button that offers the trial only to someone Apple will give it to. Prices are the store's own
  * once it answers, the dollar fallbacks before.
  */
@@ -92,19 +92,17 @@ beforeEach(() => {
 
 const ROWS = [
   'Track spending & bills: Free, included. Pro, included.',
-  'Upload any bill: Free, Limited. Pro, included.',
+  'Upload receipts: Free, Limited. Pro, included.',
   'Scan receipts: Free, Limited. Pro, Unlimited.',
   'Cards & accounts: Free, Limited. Pro, Unlimited.',
   'Money history: Free, 90 days. Pro, 7 years.',
   'Voice entry: Free, not included. Pro, included.',
   'Insights: Free, not included. Pro, included.',
   'Spending habits: Free, not included. Pro, included.',
-  'New features first: Free, not included. Pro, included.',
-  'Priority support: Free, not included. Pro, included.',
 ];
 
 describe('the table', () => {
-  it('compares Free and Pro in ten rows, each read as one sentence', async () => {
+  it('compares Free and Pro in eight rows, each read as one sentence', async () => {
     const screen = await render(<ProScreen />);
 
     expect(screen.getByText('Get more with Skip Pro')).toBeTruthy();
@@ -125,7 +123,19 @@ describe('the table', () => {
     expect(screen.getAllByText('Unlimited')).toHaveLength(2);
     expect(screen.getByText('90 days')).toBeTruthy();
     expect(screen.getByText('7 years')).toBeTruthy();
-    expect(screen.getAllByText('—')).toHaveLength(5);
+    expect(screen.getAllByText('—')).toHaveLength(3);
+  });
+
+  it('promises no early features or priority support, which are not built', async () => {
+    const screen = await render(<ProScreen />);
+    expect(screen.queryByText('New features first')).toBeNull();
+    expect(screen.queryByText('Priority support')).toBeNull();
+    expect(screen.queryByLabelText(/^(New features first|Priority support):/)).toBeNull();
+    expect(screen.queryByText(/priority|early access|first-in-line/i)).toBeNull();
+    expect(screen.queryByTestId('icon-Sparkles')).toBeNull();
+    expect(screen.queryByTestId('icon-Headphones')).toBeNull();
+    expect(screen.queryByText('Upload any bill')).toBeNull();
+    expect(screen.getByText('Upload receipts')).toBeTruthy();
   });
 
   it('sells only what this app does', async () => {
