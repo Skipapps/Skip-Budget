@@ -126,6 +126,8 @@ export function useGoal(id: string | undefined) {
     moves: own,
     isPending: goals.isPending || moves.isPending,
     isError: goals.isError || moves.isError,
+    /** The figures show, from a reload that failed behind them (RefreshNote). */
+    refreshFailed: !failedEmpty(goals) && !failedEmpty(moves) && anyRefreshFailed([goals, moves]),
     refetch: () => {
       void goals.refetch();
       void moves.refetch();

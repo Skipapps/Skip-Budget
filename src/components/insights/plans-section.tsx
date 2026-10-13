@@ -57,15 +57,17 @@ function OpenRow({
   );
 }
 
+/** Whether Bills & subscriptions is drawn once ready: with no plan and nothing due it is left off. */
+export const hasAnyPlan = (plans: PlansInsight) =>
+  plans.bills.count > 0 || plans.subscriptions.count > 0 || plans.next.length > 0;
+
 /**
  * Bills & subscriptions: what each kind is due this month and how many plans that is, the same
  * figures the Monthly bills and Subscriptions pages show, then the next two dues with their marks.
  */
 export function PlansSection({ state, plans }: { state: SectionState; plans: PlansInsight }) {
   const icons = useHomeIcons();
-  const none =
-    plans.bills.count === 0 && plans.subscriptions.count === 0 && plans.next.length === 0;
-  const shown = state.kind === 'ready' && none ? HIDDEN : state;
+  const shown = state.kind === 'ready' && !hasAnyPlan(plans) ? HIDDEN : state;
   const billsLabel = t('insights.plans.bills', { count: plans.bills.count });
   const subscriptionsLabel = t('insights.plans.subscriptions', {
     count: plans.subscriptions.count,

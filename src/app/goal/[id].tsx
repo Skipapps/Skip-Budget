@@ -14,6 +14,7 @@ import { AmountPad } from '@/components/ui/amount-pad';
 import { goBack } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
@@ -34,7 +35,10 @@ export default function GoalScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const artwork = useArtwork();
   const toast = useToast();
-  const { goal, moves, isPending, isError, refetch } = useGoal(id);
+  const { goal: read, moves, isPending, isError, refreshFailed, refetch } = useGoal(id);
+  // A read with nothing cached shows no figure: a goal counted without its moves would show less
+  // saved, and Take money out less to take.
+  const goal = isError && !refreshFailed ? null : read;
   const savings = useSavingsCore();
   const take = useTakeFromGoal();
   const [taking, setTaking] = useState(false);
@@ -126,7 +130,7 @@ export default function GoalScreen() {
     >
       {isPending ? <SkeletonList rows={3} /> : null}
 
-      {/* A failed reload behind a page already drawn keeps the page. */}
+      {/* A failed reload behind a page already drawn keeps the page, unless the goal is not in it. */}
       {isError && !goal ? (
         <PageState
           art={artwork.error}
@@ -148,6 +152,8 @@ export default function GoalScreen() {
             pace={paceOf(goal)}
             reachedOn={goal.done ? goal.reachedOn : null}
           />
+          {/* Savings decide whether Add from savings is offered. */}
+          <RefreshNote show={refreshFailed || savings.refreshFailed} />
           <View className="mb-4 w-full">
             <GoalMovesCard lines={goalMoveLines(goal, moves)} />
           </View>

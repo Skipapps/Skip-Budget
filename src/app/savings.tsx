@@ -8,6 +8,7 @@ import { ByMonthSection } from '@/components/savings/pot-row';
 import { byYear } from '@/components/savings/pot-words';
 import { ReadyCard } from '@/components/savings/ready-card';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
@@ -20,10 +21,11 @@ import { useArtwork } from '@/theme/artwork';
  */
 export default function SavingsScreen() {
   const artwork = useArtwork();
-  const { pots, summary, soFar, isPending, isError, refetch } = useSavings();
+  const { pots, summary, soFar, isPending, isError, refreshFailed, refetch } = useSavings();
   const years = useMemo(() => byYear(summary.pots), [summary.pots]);
-  // Only when nothing could be read: a failed reload behind the page keeps the page.
-  const unread = isError && pots.length === 0;
+  // Only when a read has nothing cached: a failed reload behind the page keeps the page. Ready to
+  // send worked out without the moves would offer money already in goals.
+  const unread = isError && !refreshFailed;
   // Removed months count: an account that has closed one has had its first wrap-up.
   const firstWrapUpOn =
     soFar && !pots.some((pot) => pot.kind === 'month') ? soFar.movesOn : undefined;
@@ -64,6 +66,7 @@ export default function SavingsScreen() {
               movesOn={soFar.movesOn}
             />
           ) : null}
+          <RefreshNote show={refreshFailed} />
           {years.length > 0 ? (
             <ByMonthSection
               years={years}

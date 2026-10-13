@@ -219,12 +219,17 @@ jest.mock('@/api/loans', () => ({
 }));
 
 jest.mock('@/api/payment-ledger', () => ({
-  usePlanMonth: (kind: string) => ({
-    view: mockPlanViews[kind],
-    hasPlans: true,
-    labelOf: () => null,
-    ...mockState(kind === 'bill' ? 'billMonth' : 'subscriptionMonth'),
-  }),
+  // As the hook says it: `isError` only with nothing cached, a failed reload is `refreshFailed`.
+  usePlanMonth: (kind: string) => {
+    const read = kind === 'bill' ? 'billMonth' : 'subscriptionMonth';
+    return {
+      view: mockPlanViews[kind],
+      hasPlans: true,
+      labelOf: () => null,
+      ...mockState(read),
+      isError: mockFailing.has(read),
+    };
+  },
 }));
 
 jest.mock('@/api/habits', () => ({
@@ -250,6 +255,22 @@ const mockPicker = jest.fn((params: PeriodPickerParams) => ({
 const draw = () => render(<InsightsScreen periodHref={mockPicker as never} />);
 
 const NOTE = 'Couldn’t refresh · showing your last figures';
+
+/** What is drawn straight after the element with this test id, top to bottom. */
+function after(testID: string): string | undefined {
+  const drawn: string[] = [];
+  const walk = (node: unknown): void => {
+    if (node == null) return;
+    if (typeof node === 'string') return void drawn.push(node);
+    if (Array.isArray(node)) return node.forEach(walk);
+    const element = node as { props?: { testID?: string }; children?: unknown[] | null };
+    (element.children ?? []).forEach(walk);
+    if (element.props?.testID === testID) drawn.push(`<end of ${testID}>`);
+  };
+  walk(screen.toJSON());
+  const end = drawn.indexOf(`<end of ${testID}>`);
+  return end < 0 ? undefined : drawn[end + 1];
+}
 
 /** What is drawn straight after the plum card, top to bottom. */
 function afterHero(): string | undefined {
@@ -943,6 +964,19 @@ describe('Insights — a read that fails', () => {
     expect(afterHero()).toBe(NOTE);
   });
 
+  it.each([['billMonth'], ['subscriptionMonth']] as [ReadName][])(
+    'keeps Bills & subscriptions when %s fails to reload behind it, with the note',
+    async (read) => {
+      fillThePage();
+      mockReloadFailed = new Set<ReadName>([read]);
+      await draw();
+      expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+      expect(section('plans').getByText('Next due')).toBeTruthy();
+      expect(screen.getAllByText(NOTE)).toHaveLength(1);
+      expect(afterHero()).toBe(NOTE);
+    },
+  );
+
   it('keeps a failed section’s line in its own card, the note only under the plum card', async () => {
     fillThePage();
     // Loans has nothing cached; Goals is showing figures from before a failed reload.
@@ -964,10 +998,58 @@ describe('Insights — a read that fails', () => {
     expect(screen.queryByText(NOTE)).toBeNull();
   });
 
-  it('puts no note beside the plum card’s failure', async () => {
+  it('moves the note under the first section that drew when the plum card failed', async () => {
     fillThePage();
     mockFailing = new Set<ReadName>(['ledger']);
     mockReloadFailed = new Set<ReadName>(['habits', 'goals']);
+    await draw();
+    expect(screen.getByTestId('insights-hero-failed')).toBeTruthy();
+    // Never beside the plum card's failure line, yet still said once for Habits and Goals.
+    expect(after('insights-hero-failed')).not.toBe(NOTE);
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    expect(after('insights-section-in')).toBe(NOTE);
+  });
+
+  it('passes over sections that failed on the way down', async () => {
+    fillThePage();
+    mockFailing = new Set<ReadName>(['ledger', 'salary']);
+    mockReloadFailed = new Set<ReadName>(['goals']);
+    await draw();
+    expect(screen.getByTestId('insights-section-in-failed')).toBeTruthy();
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    expect(after('insights-section-in')).not.toBe(NOTE);
+    expect(after('insights-section-owe')).toBe(NOTE);
+  });
+
+  it('passes over a section left off for having nothing to show', async () => {
+    fillThePage();
+    // No card, so What you owe is left off; the note must not land in its empty place, which sits
+    // straight under the failed What goes out.
+    mockCards = [];
+    mockFailing = new Set<ReadName>(['ledger', 'salary']);
+    mockReloadFailed = new Set<ReadName>(['goals']);
+    await draw();
+    expect(screen.queryByTestId('insights-section-owe')).toBeNull();
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    expect(after('insights-section-in')).not.toBe(NOTE);
+    expect(after('insights-section-loans')).toBe(NOTE);
+  });
+
+  it('says nothing when the plum card failed and no section below it drew', async () => {
+    fillThePage();
+    mockFailing = new Set<ReadName>([
+      'ledger',
+      'salary',
+      'cards',
+      'loans',
+      'billMonth',
+      'subscriptions',
+      'habits',
+      'goals',
+      'savings',
+    ]);
+    // Bills reloaded behind their figures, but every section they feed failed on its own.
+    mockReloadFailed = new Set<ReadName>(['bills']);
     await draw();
     expect(screen.getByTestId('insights-hero-failed')).toBeTruthy();
     expect(screen.queryByText(NOTE)).toBeNull();

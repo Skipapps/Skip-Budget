@@ -7,13 +7,16 @@ import { formatCurrency } from '@/lib/format';
 import type { SubscriptionCost } from '@/lib/insights-sections';
 import { useHomeIcons } from '@/theme/home-icons';
 
+/** Whether Coming up is drawn once ready: with no subscription running it is left off. */
+export const hasRunning = (cost: SubscriptionCost) => cost.count > 0;
+
 /**
  * Coming up: what the running subscriptions cost a month and over a year, each counted by its own
  * billing cycle. Left off with none running.
  */
 export function ComingUpSection({ state, cost }: { state: SectionState; cost: SubscriptionCost }) {
   const icons = useHomeIcons();
-  const shown = state.kind === 'ready' && cost.count === 0 ? HIDDEN : state;
+  const shown = state.kind === 'ready' && !hasRunning(cost) ? HIDDEN : state;
 
   return (
     <Section

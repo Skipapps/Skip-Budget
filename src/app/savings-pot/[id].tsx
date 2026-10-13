@@ -17,6 +17,7 @@ import { dayMonthText, monthInSentence } from '@/components/savings/savings-word
 import { goBack } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
@@ -48,8 +49,11 @@ function heroCaption(pot: PotView): string {
 export default function SavingsPotScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const artwork = useArtwork();
-  const { pot, isPending, isError, refetch } = useSavingsPot(id);
-  const { update } = useMonthUpdate(id);
+  const { pot: read, isPending, isError, refreshFailed, refetch } = useSavingsPot(id);
+  // A read with nothing cached shows no figure: a pot counted without its moves would offer money
+  // already in goals.
+  const pot = isError && !refreshFailed ? null : read;
+  const { update, refreshFailed: updateRefreshFailed } = useMonthUpdate(id);
   const takeUpdate = useUpdateSavingsMonth();
   const toast = useToast();
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -119,7 +123,7 @@ export default function SavingsPotScreen() {
     >
       {isPending ? <SkeletonList rows={3} /> : null}
 
-      {/* A failed reload behind a page already drawn keeps the page. */}
+      {/* A failed reload behind a page already drawn keeps the page, unless the pot is not in it. */}
       {isError && !pot ? (
         <PageState
           art={artwork.error}
@@ -137,6 +141,8 @@ export default function SavingsPotScreen() {
             status={potPill(pot)}
             caption={heroCaption(pot)}
           />
+          {/* The offer to take a late change is a figure too. */}
+          <RefreshNote show={refreshFailed || updateRefreshFailed} />
           {pot.kind === 'month' ? (
             <>
               <MonthFiguresCard

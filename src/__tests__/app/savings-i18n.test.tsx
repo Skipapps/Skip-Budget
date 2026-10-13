@@ -43,6 +43,7 @@ type Savings = {
   soFar: { month: string; earned: number; spent: number; leftOver: number; movesOn: string } | null;
   isPending: boolean;
   isError: boolean;
+  refreshFailed?: boolean;
 };
 let mockSavings: Savings;
 const mockRefetch = jest.fn();
@@ -218,7 +219,9 @@ describe('Savings', () => {
   });
 
   it('keeps the page when only a reload behind it failed', async () => {
+    // As useSavings says it: the figures show, from a reload that failed behind them.
     mockSavings.isError = true;
+    mockSavings.refreshFailed = true;
     await render(<SavingsScreen />);
     expect(screen.getByText('$850')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { withTimeout } from '@/lib/deadline';
+import { refreshFailed } from '@/lib/query-state';
 import { paidFromGoals, type GoalPurchase, type MoveRow } from '@/lib/savings';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
@@ -105,6 +106,8 @@ export function usePaidByGoals(moves: readonly MoveRow[] | undefined) {
     byReceipt,
     isPending: purchases.isPending,
     isError: purchases.isError,
+    /** `byReceipt` is from a reload that failed behind it (RefreshNote). */
+    refreshFailed: refreshFailed(purchases),
     refetch: () => void purchases.refetch(),
   };
 }

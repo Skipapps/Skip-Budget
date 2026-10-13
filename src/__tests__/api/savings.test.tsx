@@ -924,6 +924,22 @@ describe('useMonthUpdate', () => {
     const { result } = await renderHook(() => useMonthUpdate('sep'), { wrapper });
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.update).toBeNull();
+    // Nothing is showing, so it is not a reload that failed behind an offer.
+    expect(result.current.refreshFailed).toBe(false);
+  });
+
+  it('keeps the offer when a reload behind it fails, and says so', async () => {
+    september([{ id: 'r-late', merchant: 'Shop', amount: 100, purchased_on: '2026-09-20' }]);
+    const { result } = await renderHook(() => useMonthUpdate('sep'), { wrapper });
+    await waitFor(() => expect(result.current.update).not.toBeNull());
+    const before = result.current.update;
+    expect(result.current.refreshFailed).toBe(false);
+
+    mockDb.readErrors.charges = { code: '08006', message: 'connection failure' };
+    await act(() => client.refetchQueries());
+
+    await waitFor(() => expect(result.current.refreshFailed).toBe(true));
+    expect(result.current.update).toEqual(before);
   });
 });
 

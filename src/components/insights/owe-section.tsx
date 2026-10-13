@@ -52,13 +52,16 @@ function CardAvatar({ holder, color }: { holder: string; color: string }) {
   );
 }
 
+/** Whether What you owe is drawn once ready: with no card it is left off. */
+export const owesOnAnyCard = (rows: readonly OweRow[]) => rows.length > 0;
+
 /**
  * What you owe on cards: each card's balance where it owes, to the cent. The walked balance wins
  * over the one typed when the card was added, which is never shown in its place: a balance that
  * failed to read fails the section. With no card the section is left off.
  */
 export function OweSection({ state, rows }: { state: SectionState; rows: readonly OweRow[] }) {
-  const shown = state.kind === 'ready' && rows.length === 0 ? HIDDEN : state;
+  const shown = state.kind === 'ready' && !owesOnAnyCard(rows) ? HIDDEN : state;
 
   return (
     <Section

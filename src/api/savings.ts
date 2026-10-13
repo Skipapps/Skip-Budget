@@ -38,7 +38,7 @@ import {
   type PotView,
 } from '@/lib/savings';
 import type { BookIncome, BookSpend } from '@/lib/money-book';
-import { anyRefreshFailed, failedEmpty } from '@/lib/query-state';
+import { anyRefreshFailed, failedEmpty, refreshFailed } from '@/lib/query-state';
 import { supabase } from '@/lib/supabase';
 import { useToday } from '@/lib/use-today';
 import { useUserId } from '@/providers/session-provider';
@@ -284,11 +284,25 @@ export function useSavings() {
     today,
   ]);
 
+  // A part with nothing cached is the failure page's, never the note's.
+  const failedPart =
+    (core.isError && !core.refreshFailed) ||
+    failedEmpty(accountDay) ||
+    flows.isError ||
+    (paid.isError && !paid.refreshFailed);
+
   return {
     ...core,
     soFar,
     isPending: core.isPending || accountDay.isPending || flows.isLoading || paid.isPending,
     isError: core.isError || accountDay.isError || flows.isError || paid.isError,
+    /** The figures show, from a reload that failed behind them (RefreshNote). */
+    refreshFailed:
+      !failedPart &&
+      (core.refreshFailed ||
+        refreshFailed(accountDay) ||
+        flows.refreshFailed ||
+        paid.refreshFailed),
     refetch: () => {
       core.refetch();
       void accountDay.refetch();
@@ -303,12 +317,12 @@ export function useSavings() {
  * removed pot, or a wrong id).
  */
 export function useSavingsPot(id: string | undefined) {
-  const { summary, isPending, isError, refetch } = useSavingsCore();
+  const { summary, isPending, isError, refreshFailed, refetch } = useSavingsCore();
   const pot = useMemo<PotView | null>(
     () => summary.pots.find((view) => view.id === id) ?? null,
     [summary, id],
   );
-  return { pot, isPending, isError, refetch };
+  return { pot, isPending, isError, refreshFailed, refetch };
 }
 
 /** yyyy-mm of the month before the one holding `today`. */
@@ -383,6 +397,10 @@ export function useMonthUpdate(potId: string | undefined) {
       accountDay.isPending ||
       (Boolean(month) && flows.isPending),
     isError: pots.isError || moves.isError || accountDay.isError || flows.isError,
+    /** `update` is from a reload that failed behind it (RefreshNote). */
+    refreshFailed:
+      ![pots, moves, accountDay, flows].some(failedEmpty) &&
+      anyRefreshFailed([pots, moves, accountDay, flows]),
   };
 }
 

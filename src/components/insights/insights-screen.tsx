@@ -18,16 +18,16 @@ import {
 import { useRefreshAll } from '@/api/refresh';
 import { useSavingsCore } from '@/api/savings';
 import { CategoriesSection, categoryLabels } from '@/components/insights/categories-section';
-import { ComingUpSection } from '@/components/insights/coming-up-section';
+import { ComingUpSection, hasRunning } from '@/components/insights/coming-up-section';
 import { GoalsSection } from '@/components/insights/goals-section';
 import { HabitsSection } from '@/components/insights/habits-section';
 import { IncomeSection, type IncomeFigures } from '@/components/insights/income-section';
 import { InsightsHero } from '@/components/insights/insights-hero';
 import { LoansSection, type LoansInsight } from '@/components/insights/loans-section';
 import { MerchantsSection } from '@/components/insights/merchants-section';
-import { OweSection, type OweRow } from '@/components/insights/owe-section';
+import { OweSection, owesOnAnyCard, type OweRow } from '@/components/insights/owe-section';
 import { PeriodSwitch } from '@/components/insights/period-switch';
-import { PlansSection, type PlansInsight } from '@/components/insights/plans-section';
+import { hasAnyPlan, PlansSection, type PlansInsight } from '@/components/insights/plans-section';
 import { SavingsSection } from '@/components/insights/savings-section';
 import {
   FailedCard,
@@ -307,6 +307,8 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
     periodLedger.refreshFailed ||
     balances.refreshFailed ||
     loans.refreshFailed ||
+    billMonth.refreshFailed ||
+    subscriptionMonth.refreshFailed ||
     goals.refreshFailed ||
     savings.refreshFailed ||
     anyRefreshFailed([
@@ -320,6 +322,34 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
       stoppedHabits,
       taps,
     ]);
+
+  const incomeState = together([salary]);
+  const comingState = together([subscriptions]);
+  const habitsState = together([habits, stoppedHabits, taps]);
+  const goalsState = together([
+    { isLoading: goals.isPending, isError: goalsFailed, refetch: goals.refetch },
+  ]);
+  const savingsState = together([
+    { isLoading: savings.isPending, isError: savingsFailed, refetch: savings.refetch },
+  ]);
+  // The note goes under the plum card. When that card failed, it goes under the first section below
+  // that drew, so figures from a failed reload are never left unsaid, and never beside a failure.
+  const drawnBelow: [string, boolean][] = [
+    ['in', incomeState.kind === 'ready'],
+    ['owe', oweState.kind === 'ready' && owesOnAnyCard(owe)],
+    ['loans', loansState.kind === 'ready'],
+    ['plans', plansState.kind === 'ready' && hasAnyPlan(plans)],
+    ['coming', comingState.kind === 'ready' && hasRunning(cost)],
+    ['habits', habitsState.kind === 'ready'],
+    ['goals', goalsState.kind === 'ready'],
+    ['savings', savingsState.kind === 'ready'],
+  ];
+  const noteAfter = !refreshNote
+    ? null
+    : spendState.kind !== 'failed'
+      ? 'hero'
+      : (drawnBelow.find(([, drawn]) => drawn)?.[0] ?? null);
+  const noteHere = (id: string) => <RefreshNote show={noteAfter === id} />;
 
   const year = shownYear(period, today);
   const cardLabel =
@@ -342,10 +372,10 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
           <InsightsHero figures={hero} />
         )}
       </View>
-      {/* One note for every figure on the page, never beside the plum card's failure. */}
-      <RefreshNote show={refreshNote && spendState.kind !== 'failed'} />
+      {noteHere('hero')}
 
-      <IncomeSection state={together([salary])} figures={income} />
+      <IncomeSection state={incomeState} figures={income} />
+      {noteHere('in')}
 
       <Section
         id="out"
@@ -395,15 +425,18 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
       />
 
       <OweSection state={oweState} rows={owe} />
+      {noteHere('owe')}
       <LoansSection state={loansState} loans={loansInsight} />
+      {noteHere('loans')}
       <PlansSection state={plansState} plans={plans} />
-      <ComingUpSection state={together([subscriptions])} cost={cost} />
+      {noteHere('plans')}
+      <ComingUpSection state={comingState} cost={cost} />
+      {noteHere('coming')}
       {/* The stopped habits answer too, or Saved so far would show less than it is. */}
-      <HabitsSection state={together([habits, stoppedHabits, taps])} summary={habitSummary} />
+      <HabitsSection state={habitsState} summary={habitSummary} />
+      {noteHere('habits')}
       <GoalsSection
-        state={together([
-          { isLoading: goals.isPending, isError: goalsFailed, refetch: goals.refetch },
-        ])}
+        state={goalsState}
         goals={{
           saved: goals.summary.saved,
           target: goals.summary.target,
@@ -411,10 +444,9 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
           reached: goals.summary.done.length,
         }}
       />
+      {noteHere('goals')}
       <SavingsSection
-        state={together([
-          { isLoading: savings.isPending, isError: savingsFailed, refetch: savings.refetch },
-        ])}
+        state={savingsState}
         savings={{
           moved: moved.moved,
           total: savings.summary.readyToUse,
@@ -422,6 +454,7 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
           belowOnePercent: moved.belowOnePercent,
         }}
       />
+      {noteHere('savings')}
 
       <View className="h-10 w-full" />
     </Screen>
