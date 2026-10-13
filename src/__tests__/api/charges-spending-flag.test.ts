@@ -85,7 +85,7 @@ describe('recordDueCharges and a bill kept out of spending', () => {
     expect(await recordDueCharges('user-1', TODAY)).toBe(2);
     expect(writtenFor()).toEqual(['phone 2026-10-01', 'rent 2026-10-01']);
     expect(mockDb.billSelects).toHaveLength(1);
-    expect(mockDb.billSelects[0]).toMatch(/, in_spending$/);
+    expect(mockDb.billSelects[0]).toMatch(/, in_spending\b/);
   });
 
   it('records every bill on a database without the column, rather than none', async () => {

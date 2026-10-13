@@ -1,4 +1,5 @@
 import type { PayFrequency } from '@/lib/date';
+import { shiftMonths } from '@/lib/month-step';
 
 /**
  * Paydays as the reminder scheduler counts them. `nextPaydayOn` is `public.next_payday`, and
@@ -41,7 +42,7 @@ function advance(iso: string, frequency: Exclude<PayFrequency, 'once'>, anchorDa
     case 'biweekly':
       return isoOf(year, month, day + 14);
     case 'monthly':
-      return isoOf(year, month + 1, Math.min(anchorDay, daysIn(year, month + 1)));
+      return shiftMonths(iso, 1, anchorDay);
     case 'semimonthly': {
       // Paid on the 15th and the last day of the month.
       const last = daysIn(year, month);

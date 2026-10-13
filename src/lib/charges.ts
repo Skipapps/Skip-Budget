@@ -1,10 +1,13 @@
 import {
   billWindow,
+  cycleStart,
   dayAfter,
   occurrencesInRange,
   planFloor,
   type Recurrence,
 } from '@/lib/card-ledger';
+
+export { cycleStart };
 
 /**
  * Decides which occurrences still need writing down: every date a plan has come due on that has not
@@ -17,6 +20,8 @@ export type ChargeablePlan = {
   recurrence: Recurrence;
   /** The stored anchor. Occurrences are walked outwards from it. */
   nextDate: string | null;
+  /** The day of the month a monthly, quarterly or yearly plan keeps; none is `nextDate`'s own day. */
+  anchorDay?: number | null;
   /** When the plan began. Nothing is recorded before it. */
   startsOn?: string | null;
   /** When the row was made, as the floor of last resort. */
@@ -46,7 +51,7 @@ export function unrecordedDates(
   // The database holds the same rule (charges_one_per_cycle).
   const charged = new Set([...recorded].map((date) => cycleStart(date, plan.recurrence)));
 
-  return occurrencesInRange(plan.nextDate, plan.recurrence, window.from, window.to)
+  return occurrencesInRange(plan.nextDate, plan.recurrence, window.from, window.to, plan.anchorDay)
     .filter((date) => !recorded.has(date) && !charged.has(cycleStart(date, plan.recurrence)))
     .sort();
 }
@@ -54,30 +59,6 @@ export function unrecordedDates(
 /** The date picked, unless the plan counts from earlier: a later start would drop occurrences already on the books. */
 export function countFromAfterPick(picked: string | null, current: string | null): string | null {
   return picked && (!current || picked < current) ? picked : current;
-}
-
-/**
- * The first day of the cycle `date` falls in: its week's Monday, the 1st of its month, its calendar
- * quarter or its year. A set period has no cycle, so each date is its own. Matches Postgres's
- * date_trunc, which the database's copy of the rule uses.
- */
-export function cycleStart(date: string, recurrence: Recurrence): string {
-  const [year, month, day] = date.split('-').map(Number);
-  const at = (start: Date) => start.toISOString().slice(0, 10);
-  switch (recurrence) {
-    case 'weekly': {
-      const monday = (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7;
-      return at(new Date(Date.UTC(year, month - 1, day - monday)));
-    }
-    case 'monthly':
-      return at(new Date(Date.UTC(year, month - 1, 1)));
-    case 'quarterly':
-      return at(new Date(Date.UTC(year, Math.floor((month - 1) / 3) * 3, 1)));
-    case 'yearly':
-      return at(new Date(Date.UTC(year, 0, 1)));
-    default:
-      return date;
-  }
 }
 
 function nextCycleStart(date: string, recurrence: Recurrence): string {

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { withAnchorDay } from '@/api/anchor-day';
 import { countsInSpending, withSpendingFlag } from '@/lib/bill-spending';
 import { withTimeout } from '@/lib/deadline';
 import { unrecordedDates, type ChargeablePlan } from '@/lib/charges';
@@ -76,6 +77,20 @@ type BillPlanRow = {
   card_id: string | null;
   bank_account_id: string | null;
   in_spending?: boolean;
+  anchor_day?: number | null;
+};
+
+type SubscriptionPlanRow = {
+  id: string;
+  name: string;
+  amount: number;
+  cycle: ChargeablePlan['recurrence'];
+  next_renewal_on: string | null;
+  started_on: string | null;
+  created_at: string | null;
+  card_id: string | null;
+  bank_account_id: string | null;
+  anchor_day?: number | null;
 };
 
 type Plan = ChargeablePlan & {
@@ -95,18 +110,22 @@ export async function recordDueCharges(userId: string, today: string): Promise<n
     // With the fallback: any failed read below records nothing at all, so a database without the
     // flag would otherwise stop every charge being written.
     withSpendingFlag((flag) =>
-      supabase
-        .from('bills')
-        .select(
-          `id, name, amount, recurrence, next_due_on, starts_on, ends_on, created_at, card_id, bank_account_id${flag}`,
-        ),
+      withAnchorDay((anchor) =>
+        supabase
+          .from('bills')
+          .select(
+            `id, name, amount, recurrence, next_due_on, starts_on, ends_on, created_at, card_id, bank_account_id${flag}${anchor}`,
+          ),
+      ),
     ),
-    supabase
-      .from('subscriptions')
-      .select(
-        'id, name, amount, cycle, next_renewal_on, started_on, created_at, card_id, bank_account_id',
-      )
-      .eq('active', true),
+    withAnchorDay((anchor) =>
+      supabase
+        .from('subscriptions')
+        .select(
+          `id, name, amount, cycle, next_renewal_on, started_on, created_at, card_id, bank_account_id${anchor}`,
+        )
+        .eq('active', true),
+    ),
     supabase.from('charges').select('bill_id, subscription_id, charged_on'),
   ]);
 
@@ -131,25 +150,27 @@ export async function recordDueCharges(userId: string, today: string): Promise<n
       amount: row.amount,
       recurrence: row.recurrence,
       nextDate: row.next_due_on,
+      anchorDay: row.anchor_day ?? null,
       startsOn: row.starts_on,
       createdAt: row.created_at,
       endsOn: row.ends_on,
       cardId: row.card_id ?? null,
       accountId: row.bank_account_id ?? null,
     })),
-    ...(subscriptions.data ?? []).map((row) => ({
-      id: row.id as string,
+    ...((subscriptions.data ?? []) as unknown as SubscriptionPlanRow[]).map((row) => ({
+      id: row.id,
       kind: 'subscription' as const,
-      label: (row.name as string) || 'Subscription',
-      amount: row.amount as number,
-      recurrence: row.cycle as never,
-      nextDate: row.next_renewal_on as string | null,
-      startsOn: row.started_on as string | null,
-      createdAt: row.created_at as string | null,
+      label: row.name || 'Subscription',
+      amount: row.amount,
+      recurrence: row.cycle,
+      nextDate: row.next_renewal_on,
+      anchorDay: row.anchor_day ?? null,
+      startsOn: row.started_on,
+      createdAt: row.created_at,
       // Switching a subscription off sets active = false, not an end date, so nothing bounds it.
       endsOn: null,
-      cardId: (row.card_id as string | null) ?? null,
-      accountId: (row.bank_account_id as string | null) ?? null,
+      cardId: row.card_id ?? null,
+      accountId: row.bank_account_id ?? null,
     })),
   ];
 

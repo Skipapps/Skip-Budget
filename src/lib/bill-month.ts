@@ -95,6 +95,8 @@ export type PlanSchedule = {
   /** The stored next date the schedule is walked from (`next_due_on` / `next_renewal_on`). */
   anchor: string | null;
   recurrence: Recurrence;
+  /** The day of the month it keeps (`anchor_day`); none is the stored date's own day. */
+  anchorDay?: number | null;
   startsOn?: string | null;
   createdAt?: string | null;
   endsOn?: string | null;
@@ -112,7 +114,13 @@ export function nextDueAfter(plan: PlanSchedule, today: string): string | null {
     addDays(today, LOOK_AHEAD_DAYS),
   );
   if (window.from && window.from > window.to) return null;
-  const dates = occurrencesInRange(plan.anchor, plan.recurrence, window.from, window.to);
+  const dates = occurrencesInRange(
+    plan.anchor,
+    plan.recurrence,
+    window.from,
+    window.to,
+    plan.anchorDay,
+  );
   return dates.length > 0 ? dates[dates.length - 1] : null;
 }
 
@@ -276,6 +284,7 @@ function billPlan(row: BillRow, today: string): Plan {
     schedule: {
       anchor: row.next_due_on,
       recurrence: row.recurrence,
+      anchorDay: row.anchor_day ?? null,
       startsOn: row.starts_on,
       createdAt: row.created_at,
       endsOn: row.ends_on,
@@ -307,6 +316,7 @@ function subscriptionPlan(row: SubscriptionRow): Plan {
     schedule: {
       anchor: row.next_renewal_on,
       recurrence: row.cycle,
+      anchorDay: row.anchor_day ?? null,
       startsOn: row.started_on,
       createdAt: row.created_at,
       endsOn: null,
@@ -335,7 +345,7 @@ function owedDates(
   month: { from: string; to: string },
   today: string,
 ): string[] {
-  const { anchor, recurrence, startsOn, createdAt, endsOn } = plan.schedule;
+  const { anchor, recurrence, anchorDay, startsOn, createdAt, endsOn } = plan.schedule;
   if (!plan.recorderWrites || !anchor || !lastCharged) return [];
 
   const floor = planFloor(startsOn, createdAt) ?? today;
@@ -345,7 +355,7 @@ function owedDates(
   if (from > to) return [];
 
   const charged = cycleStart(lastCharged, recurrence);
-  return occurrencesInRange(anchor, recurrence, from, to).filter(
+  return occurrencesInRange(anchor, recurrence, from, to, anchorDay).filter(
     (date) => cycleStart(date, recurrence) > charged,
   );
 }

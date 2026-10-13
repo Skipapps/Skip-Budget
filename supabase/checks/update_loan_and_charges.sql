@@ -1,5 +1,5 @@
--- Checks for 20261012100004_update_loan_and_charges.sql. LOCAL database only, with 20261012100003
--- and it applied: everything runs in one transaction and rolls back.
+-- Checks for 20261012100004_update_loan_and_charges.sql. LOCAL database only, with 20261012100003,
+-- it and 20261013300001 applied: everything runs in one transaction and rolls back.
 --
 --   docker exec -i supabase_db_SkipBudget psql -U postgres -d postgres -q -t < supabase/checks/update_loan_and_charges.sql
 --
@@ -165,12 +165,14 @@ select pg_temp.check(
 select pg_temp.check(
   (select count(*) = 1 from pg_proc where proname = 'update_loan' and pronamespace = 'public'::regnamespace),
   'there is still one update_loan');
+-- 20261013300001 adds one line (anchor_day = v_day); supabase/checks/month_end_anchor.sql proves
+-- that taking it out gives 20261012100003's body back.
 select pg_temp.check(
-  (select md5(p.prosrc) = 'e13c129343f58382d38124abf1be0b1e'
+  (select md5(p.prosrc) = '1f26263135df0d33b5ec0a77d6619d38'
           and not p.prosecdef and p.proconfig = array['search_path=public']
           and p.proowner::regrole::text = 'postgres'
      from pg_proc p where p.proname = 'update_loan' and p.pronamespace = 'public'::regnamespace),
-  'update_loan is byte for byte the one 20261012100003 left, still run as the caller');
+  'update_loan is byte for byte the one 20261013300001 left, still run as the caller');
 select pg_temp.check(
   has_function_privilege('authenticated', 'public.update_loan(uuid,text,text,numeric,numeric,integer,numeric,numeric,date,date,text,uuid,uuid,boolean,integer,jsonb,date,date)', 'execute')
   and not has_function_privilege('anon', 'public.update_loan(uuid,text,text,numeric,numeric,integer,numeric,numeric,date,date,text,uuid,uuid,boolean,integer,jsonb,date,date)', 'execute'),

@@ -737,3 +737,103 @@ describe("the card's due figure + extras = Home's Monthly bills tile, every mont
     }
   });
 });
+
+describe('a bill on the 31st through February and April, in 2027 and leap 2028', () => {
+  // Every due date, worked out by hand: the 31st, clamped only in the month it falls in.
+  const DUE = (
+    '2027-01-31 2027-02-28 2027-03-31 2027-04-30 2027-05-31 2027-06-30 2027-07-31 2027-08-31 ' +
+    '2027-09-30 2027-10-31 2027-11-30 2027-12-31 2028-01-31 2028-02-29 2028-03-31 2028-04-30 ' +
+    '2028-05-31 2028-06-30 2028-07-31 2028-08-31 2028-09-30 2028-10-31 2028-11-30 2028-12-31'
+  ).split(' ');
+
+  /** The rent as the sweep leaves it: charged up to `sweptOn`, its stored date rolled to then. */
+  function rentAccount(stored: string, sweptOn: string): Account {
+    return {
+      bills: [
+        bill('rent31', {
+          name: 'Rent',
+          amount: 1234.56,
+          category_id: 'housing',
+          next_due_on: stored,
+          starts_on: '2027-01-31',
+          anchor_day: 31,
+          created_at: '2027-01-10T12:00:00Z',
+          bank_account_id: KOMAL,
+        }),
+      ],
+      subscriptions: [],
+      charges: charged(
+        { bill: 'rent31' },
+        DUE.filter((date) => date <= sweptOn),
+        named('Rent'),
+        flat(1234.56),
+        { account: KOMAL },
+      ),
+      payoffs: [],
+    };
+  }
+
+  // Swept every day: the stored date is the next due, shortened in February and April.
+  const SWEPT = [
+    { today: '2027-02-15', stored: '2027-02-28' },
+    { today: '2027-04-15', stored: '2027-04-30' },
+    { today: '2028-02-15', stored: '2028-02-29' },
+    { today: '2028-04-15', stored: '2028-04-30' },
+  ];
+
+  it.each(SWEPT)(
+    'on $today (stored $stored): one rent a month, each on its own day',
+    ({ today, stored }) => {
+      const account = rentAccount(stored, today);
+      const shown = months('2027-01', '2028-12').map((month) =>
+        billMonth(account, month, today).rows.flatMap((row) => row.occurrences.map((o) => o.date)),
+      );
+      expect(shown).toEqual(DUE.map((date) => [date]));
+    },
+  );
+
+  it.each(SWEPT)('on $today: month page = history = Home, to the cent', ({ today, stored }) => {
+    const account = rentAccount(stored, today);
+    expect(
+      differences(monthPageByMonth(account, 'bill', today), historyByMonth(account, 'bill', today)),
+    ).toEqual({});
+    expect(historyByMonth(account, 'bill', today).size).toBe(
+      DUE.filter((date) => date <= today).length,
+    );
+    for (const month of months('2027-01', '2028-12')) {
+      const card = billMonth(account, month, today);
+      expect([month, toCents(homeTile(account, month, today))]).toEqual([
+        month,
+        toCents(card.extras?.inAll ?? card.total),
+      ]);
+      expect([month, toCents(card.total)]).toEqual([month, 123456]);
+    }
+  });
+
+  // Last swept on a shortened due day, which is not rolled past until the day after; opened on the
+  // next due day before the sweep. The month page counts what the sweep will write; history waits.
+  it.each([
+    { sweptOn: '2027-02-28', today: '2027-03-31' },
+    { sweptOn: '2028-02-29', today: '2028-03-31' },
+    { sweptOn: '2027-04-30', today: '2027-05-31' },
+    { sweptOn: '2028-04-30', today: '2028-05-31' },
+  ])('swept $sweptOn, opened $today: the only gap is $today, then none', ({ sweptOn, today }) => {
+    const unswept = rentAccount(sweptOn, sweptOn);
+    expect(datesOf(billMonth(unswept, today.slice(0, 7), today))).toEqual([today]);
+    expect(
+      differences(monthPageByMonth(unswept, 'bill', today), historyByMonth(unswept, 'bill', today)),
+    ).toEqual({ [today.slice(0, 7)]: 123456 });
+
+    const swept = rentAccount(sweptOn, today);
+    expect(
+      differences(monthPageByMonth(swept, 'bill', today), historyByMonth(swept, 'bill', today)),
+    ).toEqual({});
+    expect(
+      differences(monthPageByMonth(swept, 'bill', today), monthPageByMonth(unswept, 'bill', today)),
+    ).toEqual({});
+  });
+
+  function datesOf(month: ReturnType<typeof billMonth>): string[] {
+    return month.rows.flatMap((row) => row.occurrences.map((o) => o.date));
+  }
+});

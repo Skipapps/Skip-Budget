@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
+import { withAnchorDay } from '@/api/anchor-day';
 import { useCharges, type ChargeRow } from '@/api/charges';
 import { usePayReceived, type PayRow } from '@/api/pay';
 import type { CaptureSource } from '@/api/mutations';
@@ -20,8 +21,8 @@ import { accountLabel } from '@/lib/account-label';
 import { countsInSpending, withSpendingFlag } from '@/lib/bill-spending';
 import { withTimeout } from '@/lib/deadline';
 import { moneyBook, type BookIncome, type BookSpend } from '@/lib/money-book';
-import { paydaysInRange, type PayFrequency } from '@/lib/date';
-import { landingAccount, payProjectionStart } from '@/lib/pay';
+import type { PayFrequency } from '@/lib/date';
+import { landingAccount, projectedPaydays } from '@/lib/pay';
 import type { AccrualBasis } from '@/lib/loan';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { currentBillCategory } from '@/lib/retired-bill-categories';
@@ -86,6 +87,11 @@ export type BillRow = {
   note?: string | null;
   /** Counts toward spending (`countsInSpending`); absent on a database without the column. */
   in_spending?: boolean;
+  /**
+   * The day of the month monthly, quarterly and yearly steps return to, so a 31st survives a short
+   * month. Set by the database, never by the app; absent on a database without the column.
+   */
+  anchor_day?: number | null;
 };
 
 export type SalarySourceRow = {
@@ -302,16 +308,18 @@ function readBill(row: BillRow): BillRow {
 
 export function useBills() {
   return useOwnerQuery<BillRow[]>('bills', async () => {
-    // The flag's fallback sits inside withLogoColumns, which retries on any 42703: the other way
-    // round, a database without the flag costs a third request.
+    // The flag's and the anchor day's fallbacks sit inside withLogoColumns, which retries on any
+    // 42703: the other way round, a database without one costs a third request.
     const { data, error } = await withLogoColumns((logo) =>
       withSpendingFlag((flag) =>
-        supabase
-          .from('bills')
-          .select(
-            `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at, brand_id${logo}${flag}, brands(domain)`,
-          )
-          .order('next_due_on', { ascending: true, nullsFirst: false }),
+        withAnchorDay((anchor) =>
+          supabase
+            .from('bills')
+            .select(
+              `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at, brand_id${logo}${flag}${anchor}, brands(domain)`,
+            )
+            .order('next_due_on', { ascending: true, nullsFirst: false }),
+        ),
       ),
     );
     if (error) throw error;
@@ -567,17 +575,24 @@ export type SubscriptionRow = {
   /** The owner's logo choice; read the logo through logoDomainOf, never these directly. */
   logo_domain?: string | null;
   logo_hidden?: boolean | null;
+  /**
+   * The day of the month monthly, quarterly and yearly renewals return to, so a 31st survives a
+   * short month. Set by the database, never by the app; absent on a database without the column.
+   */
+  anchor_day?: number | null;
 };
 
 export function useSubscriptions() {
   return useOwnerQuery<SubscriptionRow[]>('subscriptions', async () => {
     const { data, error } = await withLogoColumns((logo) =>
-      supabase
-        .from('subscriptions')
-        .select(
-          `id, brand_id, name, amount, cycle, next_renewal_on, started_on, created_at, category_id, card_id, bank_account_id, note, active${logo}, brands(domain)`,
-        )
-        .order('next_renewal_on', { ascending: true, nullsFirst: false }),
+      withAnchorDay((anchor) =>
+        supabase
+          .from('subscriptions')
+          .select(
+            `id, brand_id, name, amount, cycle, next_renewal_on, started_on, created_at, category_id, card_id, bank_account_id, note, active${logo}${anchor}, brands(domain)`,
+          )
+          .order('next_renewal_on', { ascending: true, nullsFirst: false }),
+      ),
     );
     if (error) throw error;
     return (data ?? []) as unknown as SubscriptionRow[];
@@ -620,13 +635,15 @@ export function useSubscription(id: string | undefined) {
     enabled: Boolean(userId && id),
     queryFn: async (): Promise<SubscriptionRow | null> => {
       const { data, error } = await withLogoColumns((logo) =>
-        supabase
-          .from('subscriptions')
-          .select(
-            `id, brand_id, name, amount, cycle, next_renewal_on, started_on, created_at, category_id, card_id, bank_account_id, note, active${logo}, brands(domain)`,
-          )
-          .eq('id', id!)
-          .maybeSingle(),
+        withAnchorDay((anchor) =>
+          supabase
+            .from('subscriptions')
+            .select(
+              `id, brand_id, name, amount, cycle, next_renewal_on, started_on, created_at, category_id, card_id, bank_account_id, note, active${logo}${anchor}, brands(domain)`,
+            )
+            .eq('id', id!)
+            .maybeSingle(),
+        ),
       );
       if (error) throw error;
       return data as unknown as SubscriptionRow | null;
@@ -642,13 +659,15 @@ export function useBill(id: string | undefined) {
     queryFn: async (): Promise<BillRow | null> => {
       const { data, error } = await withLogoColumns((logo) =>
         withSpendingFlag((flag) =>
-          supabase
-            .from('bills')
-            .select(
-              `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, note, brand_id${logo}${flag}, brands(domain)`,
-            )
-            .eq('id', id!)
-            .maybeSingle(),
+          withAnchorDay((anchor) =>
+            supabase
+              .from('bills')
+              .select(
+                `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, note, brand_id${logo}${flag}${anchor}, brands(domain)`,
+              )
+              .eq('id', id!)
+              .maybeSingle(),
+          ),
         ),
       );
       if (error) throw error;
@@ -930,6 +949,7 @@ export function ledgerEntries({
         amount: row.amount,
         nextDate: row.next_renewal_on,
         recurrence: row.cycle,
+        anchorDay: row.anchor_day ?? null,
         kind: 'subscription',
         startsOn: row.started_on,
         createdAt: row.created_at,
@@ -966,6 +986,7 @@ export function ledgerEntries({
         amount: row.amount,
         nextDate: row.next_due_on,
         recurrence: row.recurrence,
+        anchorDay: row.anchor_day ?? null,
         kind: 'bill',
         startsOn: row.starts_on,
         createdAt: row.created_at,
@@ -1032,15 +1053,15 @@ export function ledgerEntries({
   }
 
   // What the record does not hold yet is worked out from the schedule, from the day after its
-  // last recorded pay: a payday not written down yet, and every one still to come.
+  // last recorded pay: a payday not written down yet, and every one still to come. A monthly pay
+  // already on the record stands for its month, even on another day of it.
   for (const row of salaries) {
-    const projected = payProjectionStart(row.last_payday, lastRecorded.get(row.id) ?? null);
-    if (!projected || !row.last_payday) continue;
+    if (!row.last_payday) continue;
     const into = landingAccount(row.account_ids, accountOrder) ?? '';
-    for (const date of paydaysInRange(
-      new Date(`${row.last_payday}T00:00:00`),
-      row.frequency,
-      from > projected ? from : projected,
+    for (const date of projectedPaydays(
+      { frequency: row.frequency, lastPayday: row.last_payday },
+      lastRecorded.get(row.id) ?? null,
+      from,
       to,
     )) {
       entries.push({

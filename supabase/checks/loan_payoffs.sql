@@ -1,5 +1,5 @@
 -- Checks for 20261012100003_loan_payoffs.sql. LOCAL database only, with 20261012100001,
--- 20261012100002 and it applied: everything runs in one transaction and rolls back.
+-- 20261012100002, it and 20261013300001 applied: everything runs in one transaction and rolls back.
 --
 --   docker exec -i supabase_db_SkipBudget psql -U postgres -d postgres -q -t < supabase/checks/loan_payoffs.sql
 --
@@ -109,7 +109,7 @@ language sql security definer as $$
   from public.bills b
   cross join lateral public.plan_occurrences(
     b.next_due_on, b.recurrence::text, coalesce(b.starts_on, b.created_at::date),
-    least(p_on, coalesce(b.ends_on, p_on))) o(d)
+    least(p_on, coalesce(b.ends_on, p_on)), b.anchor_day) o(d)
   where b.name = p_name and b.next_due_on is not null and b.in_spending
     and not exists (
       select 1 from public.charges c

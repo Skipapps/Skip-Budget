@@ -871,6 +871,108 @@ describe('4. a yearly or quarterly bill not due this month', () => {
   });
 });
 
+describe('4b. a plan on the 31st after a short month (anchor_day)', () => {
+  const rent = (nextDueOn: string) =>
+    bill('rent31', {
+      name: 'Rent',
+      amount: 1234.56,
+      next_due_on: nextDueOn,
+      starts_on: '2027-01-31',
+      anchor_day: 31,
+      created_at: '2027-01-10T12:00:00Z',
+    });
+  // Every due date from the start to May 2028, worked out by hand.
+  const ALL_DUE = (
+    '2027-01-31 2027-02-28 2027-03-31 2027-04-30 2027-05-31 2027-06-30 2027-07-31 2027-08-31 ' +
+    '2027-09-30 2027-10-31 2027-11-30 2027-12-31 2028-01-31 2028-02-29 2028-03-31 2028-04-30 2028-05-31'
+  ).split(' ');
+
+  // Last swept on a shortened day, which the sweep does not roll past until the day after; opened
+  // on the next due day before the sweep has run.
+  it.each([
+    { stored: '2027-02-28', today: '2027-03-31' },
+    { stored: '2028-02-29', today: '2028-03-31' },
+    { stored: '2028-04-30', today: '2028-05-31' },
+  ])(
+    'stored $stored, opened $today: fills $today, the date the recorder writes',
+    ({ stored, today }) => {
+      const plan = rent(stored);
+      const swept = ALL_DUE.filter((date) => date <= stored);
+      const data: Data = {
+        bills: [plan],
+        charges: charges({ bill: 'rent31' }, swept, 'Rent', 1234.56),
+      };
+
+      const owed = unrecordedDates(
+        {
+          id: 'rent31',
+          recurrence: 'monthly',
+          nextDate: plan.next_due_on,
+          anchorDay: plan.anchor_day,
+          startsOn: plan.starts_on,
+          createdAt: plan.created_at,
+        },
+        today,
+        new Set(swept),
+      );
+      expect(owed).toEqual([today]);
+
+      const month = view('bill', today.slice(0, 7), today, data);
+      expect(datesOf(month.rows[0])).toEqual([`${today} paid`]);
+      expect(summary(month)).toEqual({ total: 1234.56, n: 1, p: 1, c: 0, next: null });
+    },
+  );
+
+  it('names the next quarter on the 31st, not the stored 30th', () => {
+    const quarterly = bill('insure', {
+      name: 'Insurance',
+      amount: 250,
+      recurrence: 'quarterly',
+      next_due_on: '2027-04-30',
+      starts_on: '2027-01-31',
+      anchor_day: 31,
+      created_at: '2027-01-10T12:00:00Z',
+    });
+    const data: Data = {
+      bills: [quarterly],
+      charges: charges({ bill: 'insure' }, ['2027-01-31', '2027-04-30'], 'Insurance', 250),
+    };
+    expect(rowLines(view('bill', '2027-05', '2027-05-15', data))).toEqual([
+      'Insurance 250 Next 2027-07-31 (later)',
+    ]);
+    expect(
+      nextDueAfter(
+        { anchor: '2027-04-30', recurrence: 'quarterly', anchorDay: 31, startsOn: '2027-01-31' },
+        '2027-05-15',
+      ),
+    ).toBe('2027-07-31');
+  });
+
+  it('names a yearly 29 February renewal in a leap year, from a stored 28th', () => {
+    const domain = subscription('domain', {
+      name: 'Domain',
+      amount: 12.34,
+      cycle: 'yearly',
+      next_renewal_on: '2031-02-28',
+      started_on: '2028-02-29',
+      anchor_day: 29,
+      created_at: '2028-02-01T12:00:00Z',
+    });
+    const data: Data = {
+      subscriptions: [domain],
+      charges: charges(
+        { subscription: 'domain' },
+        ['2028-02-29', '2029-02-28', '2030-02-28', '2031-02-28'],
+        'Domain',
+        12.34,
+      ),
+    };
+    expect(rowLines(view('subscription', '2031-03', '2031-03-01', data))).toEqual([
+      'Domain 12.34 Next 2032-02-29 (later)',
+    ]);
+  });
+});
+
 describe('5. a cancelled subscription', () => {
   // Cancelled after its 9 Oct charge; the stored renewal date stays as it was.
   const hulu = subscription('hulu', {

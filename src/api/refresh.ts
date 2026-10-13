@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
+import { withAnchorDay } from '@/api/anchor-day';
 import { recordDueCharges } from '@/api/charges';
 import { recordDuePay } from '@/api/pay';
 import { closeFinishedMonths } from '@/api/savings';
@@ -15,13 +16,25 @@ import { useUserId } from '@/providers/session-provider';
  * Bills and subscriptions store one date, the next time they land, and past occurrences are derived
  * by walking back from it. Once that date passes it would call last month's due date "next", so it
  * is rolled forward; the walk-back still reaches every earlier occurrence, so no charge is lost and
- * no balance moves.
+ * no balance moves. The roll lands on the plan's anchor day, never on a day already shortened by a
+ * short month, and writes only the date: the database keeps the anchor.
  */
 
 type Rollable = {
   id: string;
   date: string | null;
   recurrence: 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'period';
+  anchorDay: number | null;
+};
+
+/** A bill or subscription as the roller reads it; the column list is built, so it is not inferred. */
+type RolledRow = {
+  id: string;
+  next_due_on?: string | null;
+  next_renewal_on?: string | null;
+  recurrence?: string;
+  cycle?: string;
+  anchor_day?: number | null;
 };
 
 /** Rows whose stored date has slipped into the past, with their new one. */
@@ -29,7 +42,10 @@ function overdue(rows: Rollable[], today: string) {
   return (
     rows
       .filter((row) => row.date && row.recurrence !== 'period' && row.date < today)
-      .map((row) => ({ id: row.id, next: nextOccurrenceFrom(row.date!, row.recurrence, today) }))
+      .map((row) => ({
+        id: row.id,
+        next: nextOccurrenceFrom(row.date!, row.recurrence, today, row.anchorDay),
+      }))
       // A walk that hit its guard returns the date it started from; writing that
       // back would be a no-op round trip.
       .filter((row) => Boolean(row.next) && row.next >= today)
@@ -45,17 +61,20 @@ async function rollSchedulesForward(today: string): Promise<number> {
   let moved = 0;
 
   try {
-    const { data: bills } = await supabase
-      .from('bills')
-      .select('id, next_due_on, recurrence')
-      .not('next_due_on', 'is', null)
-      .lt('next_due_on', today);
+    const { data: bills } = await withAnchorDay((anchor) =>
+      supabase
+        .from('bills')
+        .select(`id, next_due_on, recurrence${anchor}`)
+        .not('next_due_on', 'is', null)
+        .lt('next_due_on', today),
+    );
 
     for (const bill of overdue(
-      (bills ?? []).map((row) => ({
-        id: row.id as string,
-        date: row.next_due_on as string | null,
+      ((bills ?? []) as unknown as RolledRow[]).map((row) => ({
+        id: row.id,
+        date: row.next_due_on ?? null,
         recurrence: row.recurrence as Rollable['recurrence'],
+        anchorDay: row.anchor_day ?? null,
       })),
       today,
     )) {
@@ -66,18 +85,21 @@ async function rollSchedulesForward(today: string): Promise<number> {
       if (!error) moved += 1;
     }
 
-    const { data: subscriptions } = await supabase
-      .from('subscriptions')
-      .select('id, next_renewal_on, cycle')
-      .eq('active', true)
-      .not('next_renewal_on', 'is', null)
-      .lt('next_renewal_on', today);
+    const { data: subscriptions } = await withAnchorDay((anchor) =>
+      supabase
+        .from('subscriptions')
+        .select(`id, next_renewal_on, cycle${anchor}`)
+        .eq('active', true)
+        .not('next_renewal_on', 'is', null)
+        .lt('next_renewal_on', today),
+    );
 
     for (const subscription of overdue(
-      (subscriptions ?? []).map((row) => ({
-        id: row.id as string,
-        date: row.next_renewal_on as string | null,
+      ((subscriptions ?? []) as unknown as RolledRow[]).map((row) => ({
+        id: row.id,
+        date: row.next_renewal_on ?? null,
         recurrence: row.cycle as Rollable['recurrence'],
+        anchorDay: row.anchor_day ?? null,
       })),
       today,
     )) {

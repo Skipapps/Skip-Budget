@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
+import { withAnchorDay } from '@/api/anchor-day';
 import type { ChargeRow } from '@/api/charges';
 import type { PayRow } from '@/api/pay';
 import {
@@ -689,6 +690,9 @@ export function savingsRefusal(thrown: unknown): SavingsRefusal | null {
 type Raw = Record<string, unknown> & { id: string };
 const text = (value: unknown) => (typeof value === 'string' ? value : null);
 
+/** A stored anchor day, or none: a row read without the column walks from its date's own day. */
+const anchorDay = (value: unknown) => (typeof value === 'number' ? value : null);
+
 /**
  * The rows the ledger is built from, as fresh reads give them. Only the fields a figure depends on
  * are read; the rest are neutral, since nothing here is drawn.
@@ -738,6 +742,7 @@ function readBillRow(raw: Raw): BillRow {
     card_id: text(raw.card_id),
     bank_account_id: text(raw.bank_account_id),
     in_spending: raw.in_spending !== false,
+    anchor_day: anchorDay(raw.anchor_day),
   };
 }
 
@@ -757,6 +762,7 @@ function readSubscriptionRow(raw: Raw): SubscriptionRow {
     note: null,
     active: raw.active === true,
     brands: null,
+    anchor_day: anchorDay(raw.anchor_day),
   };
 }
 
@@ -827,6 +833,7 @@ export function unwrittenDatesIn(args: {
       id: bill.id,
       recurrence: bill.recurrence,
       nextDate: bill.next_due_on,
+      anchorDay: bill.anchor_day ?? null,
       startsOn: bill.starts_on ?? null,
       createdAt: bill.created_at ?? null,
       endsOn: bill.ends_on ?? null,
@@ -837,6 +844,7 @@ export function unwrittenDatesIn(args: {
         id: subscription.id,
         recurrence: subscription.cycle as Recurrence,
         nextDate: subscription.next_renewal_on,
+        anchorDay: subscription.anchor_day ?? null,
         startsOn: subscription.started_on ?? null,
         createdAt: subscription.created_at ?? null,
         endsOn: null,
@@ -869,14 +877,18 @@ async function closingFlows(from: string, to: string, today: string) {
       'id, bill_id, subscription_id, label, amount, charged_on, card_id, bank_account_id',
     ),
     withSpendingFlag((flag) =>
-      readAll<Raw>(
-        'bills',
-        `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at${flag}`,
+      withAnchorDay((anchor) =>
+        readAll<Raw>(
+          'bills',
+          `id, name, amount, category_id, icon_id, recurrence, next_due_on, starts_on, ends_on, card_id, bank_account_id, created_at${flag}${anchor}`,
+        ),
       ),
     ),
-    readAll<Raw>(
-      'subscriptions',
-      'id, name, amount, cycle, next_renewal_on, started_on, created_at, card_id, bank_account_id, active',
+    withAnchorDay((anchor) =>
+      readAll<Raw>(
+        'subscriptions',
+        `id, name, amount, cycle, next_renewal_on, started_on, created_at, card_id, bank_account_id, active${anchor}`,
+      ),
     ),
     readAll<Raw>(
       'salary_sources',

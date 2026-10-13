@@ -3,6 +3,7 @@
  * in (worked out by `moneyBook`). Pure: no clock, no queries.
  */
 import type { HabitColor } from '@/data/habit-colors';
+import { anchorDayOf, shiftMonths } from '@/lib/month-step';
 
 export type SourceKind = 'card' | 'account';
 
@@ -25,6 +26,8 @@ export type RecurringCharge = {
   /** yyyy-mm-dd of the next time it lands. */
   nextDate: string;
   recurrence: Recurrence;
+  /** The day of the month a monthly, quarterly or yearly plan keeps; none is `nextDate`'s own day. */
+  anchorDay?: number | null;
   kind: 'bill' | 'subscription';
   domain?: string | null;
   /** The owner chose letters: no logo, not even one found by name. Display only. */
@@ -83,41 +86,35 @@ function iso(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function daysInMonth(year: number, month: number): number {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
 /**
- * Steps a date by whole cycles. Positive steps go back, negative go forward. Month arithmetic is on
- * the calendar, with the day clamped to the month's length (a bill due on the 31st charges on the
- * 30th in a 30-day month).
+ * Steps a date by whole cycles. Positive steps go back, negative go forward. Every month step lands
+ * on `day` clamped to the month's length (a bill due on the 31st charges on the 30th in a 30-day
+ * month, and on the 31st again after it). Step 0 is the stored date as it is, even off `day`: a
+ * loan's first payment can fall on another day than the ones after it.
  */
-function stepBy(date: string, recurrence: Recurrence, steps: number): string {
-  const [year, month, day] = parts(date);
-
+function stepBy(date: string, recurrence: Recurrence, steps: number, day: number): string {
   if (recurrence === 'weekly') {
-    const shifted = new Date(Date.UTC(year, month - 1, day - 7 * steps));
+    const [year, month, dayOfMonth] = parts(date);
+    const shifted = new Date(Date.UTC(year, month - 1, dayOfMonth - 7 * steps));
     return iso(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, shifted.getUTCDate());
   }
 
   const months = STEP_MONTHS[recurrence];
-  if (!months) return date;
-
-  const total = year * 12 + (month - 1) - months * steps;
-  const targetYear = Math.floor(total / 12);
-  const targetMonth = (total % 12) + 1;
-  return iso(targetYear, targetMonth, Math.min(day, daysInMonth(targetYear, targetMonth)));
+  if (!months || steps === 0) return date;
+  return shiftMonths(date, -months * steps, day);
 }
 
 /**
  * Every time a recurring charge landed inside a window, newest first. Walks outwards from the next
- * due date, the only date the schema stores. A "period" bill contributes at most its one date.
+ * due date, the only date the schema stores, on the plan's anchor day (`stepBy`). A "period" bill
+ * contributes at most its one date.
  */
 export function occurrencesInRange(
   anchor: string,
   recurrence: Recurrence,
   from: string | null,
   to: string,
+  anchorDay?: number | null,
 ): string[] {
   if (!anchor) return [];
 
@@ -126,18 +123,19 @@ export function occurrencesInRange(
   }
 
   const found: string[] = [];
+  const day = anchorDayOf(anchor, anchorDay);
   // Hard stops, so a corrupt date or an unknown recurrence cannot spin.
   const GUARD = 600;
 
   for (let step = 0; step < GUARD; step += 1) {
-    const date = stepBy(anchor, recurrence, step);
+    const date = stepBy(anchor, recurrence, step, day);
     if (from && date < from) break;
     if (date <= to) found.push(date);
     if (!from && found.length > 240) break;
   }
 
   for (let step = 1; step < GUARD; step += 1) {
-    const date = stepBy(anchor, recurrence, -step);
+    const date = stepBy(anchor, recurrence, -step, day);
     if (date > to) break;
     if (!from || date >= from) found.push(date);
   }
@@ -150,12 +148,18 @@ export function occurrencesInRange(
  * walking forward from the original anchor rather than from today keeps the user's day-of-month
  * (rent on the 1st stays on the 1st). History is unaffected, as it is derived by walking back.
  */
-export function nextOccurrenceFrom(anchor: string, recurrence: Recurrence, from: string): string {
+export function nextOccurrenceFrom(
+  anchor: string,
+  recurrence: Recurrence,
+  from: string,
+  anchorDay?: number | null,
+): string {
   if (!anchor || recurrence === 'period') return anchor;
 
+  const day = anchorDayOf(anchor, anchorDay);
   let date = anchor;
   for (let step = 1; date < from && step < 600; step += 1) {
-    date = stepBy(anchor, recurrence, -step);
+    date = stepBy(anchor, recurrence, -step, day);
   }
   return date;
 }
@@ -182,6 +186,30 @@ export function dayAfter(date: string): string {
   const [year, month, day] = parts(date);
   const next = new Date(Date.UTC(year, month - 1, day + 1));
   return iso(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate());
+}
+
+/**
+ * The first day of the cycle `date` falls in: its week's Monday, the 1st of its month, its calendar
+ * quarter or its year. A set period has no cycle, so each date is its own. Matches Postgres's
+ * date_trunc, which the database's copy of the rule uses.
+ */
+export function cycleStart(date: string, recurrence: Recurrence): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const at = (start: Date) => start.toISOString().slice(0, 10);
+  switch (recurrence) {
+    case 'weekly': {
+      const monday = (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7;
+      return at(new Date(Date.UTC(year, month - 1, day - monday)));
+    }
+    case 'monthly':
+      return at(new Date(Date.UTC(year, month - 1, 1)));
+    case 'quarterly':
+      return at(new Date(Date.UTC(year, Math.floor((month - 1) / 3) * 3, 1)));
+    case 'yearly':
+      return at(new Date(Date.UTC(year, 0, 1)));
+    default:
+      return date;
+  }
 }
 
 function laterOf(bound: string | null, floor: string): string {
@@ -255,11 +283,18 @@ export function planOccurrences(input: {
   );
 
   if (!window.from || window.from <= window.to) {
-    // A recorded charge wins its day, so a clock skewed a day forward cannot count it twice.
-    const taken = new Set(found.map((occurrence) => occurrence.date));
+    // A recorded charge stands for its whole cycle, as the recorders keep it: a clock skewed a day
+    // forward, or a due date moved within the cycle after it was charged, cannot count it twice.
+    const charged = new Set(charges.map((charge) => cycleStart(charge.date, plan.recurrence)));
 
-    for (const date of occurrencesInRange(plan.nextDate, plan.recurrence, window.from, window.to)) {
-      if (taken.has(date)) continue;
+    for (const date of occurrencesInRange(
+      plan.nextDate,
+      plan.recurrence,
+      window.from,
+      window.to,
+      plan.anchorDay,
+    )) {
+      if (charged.has(cycleStart(date, plan.recurrence))) continue;
       found.push({
         id: `${plan.id}@${date}`,
         label: plan.label,

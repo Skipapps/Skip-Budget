@@ -47,18 +47,56 @@ export function payProjectionStart(
   return after && after > lastPayday ? after : lastPayday;
 }
 
-/** Paydays due by today that are not written down yet, oldest first, none before `floor`. */
+export type PaySchedule = { frequency: PayFrequency; lastPayday: string | null };
+
+/**
+ * A salary's pay on the record: every `paid_on` day, or only the newest. Both give the same paydays,
+ * since every payday worked out is after the newest, so only its month can already be paid.
+ */
+export type RecordedPay = readonly string[] | string | null;
+
+function recordedDays(recorded: RecordedPay): readonly string[] {
+  if (recorded === null) return [];
+  return typeof recorded === 'string' ? [recorded] : recorded;
+}
+
+/**
+ * The paydays inside a window (inclusive, yyyy-mm-dd) that the record does not hold: the schedule
+ * from `payProjectionStart` on. Monthly pay comes once a month, so a month that already has a pay
+ * on the record gets no second one on any day. A pay written on a shortened day (the 28th) stands
+ * for its month when the schedule says the 30th, and a payday moved later into a month already
+ * paid first counts the month after.
+ */
+export function projectedPaydays(
+  pay: PaySchedule,
+  recorded: RecordedPay,
+  from: string,
+  to: string,
+): string[] {
+  const days = recordedDays(recorded);
+  const latest = days.reduce<string | null>((max, day) => (max && max >= day ? max : day), null);
+  const projected = payProjectionStart(pay.lastPayday, latest);
+  if (!projected || !pay.lastPayday) return [];
+  const start = projected > from ? projected : from;
+  if (start > to) return [];
+
+  const paydays = paydaysInRange(new Date(`${pay.lastPayday}T00:00:00`), pay.frequency, start, to);
+  if (pay.frequency !== 'monthly') return paydays;
+  const paidMonths = new Set(days.map((day) => day.slice(0, 7)));
+  return paydays.filter((day) => !paidMonths.has(day.slice(0, 7)));
+}
+
+/**
+ * Paydays due by today that are not written down yet, oldest first, none before `floor`. The same
+ * days the ledger projects up to today, so what is written down is what was shown.
+ */
 export function unrecordedPaydays(
-  pay: { frequency: PayFrequency; lastPayday: string | null },
-  lastRecorded: string | null,
+  pay: PaySchedule,
+  recorded: RecordedPay,
   floor: string,
   today: string,
 ): string[] {
-  const projected = payProjectionStart(pay.lastPayday, lastRecorded);
-  if (!projected || !pay.lastPayday) return [];
-  const start = projected > floor ? projected : floor;
-  if (start > today) return [];
-  return paydaysInRange(new Date(`${pay.lastPayday}T00:00:00`), pay.frequency, start, today);
+  return projectedPaydays(pay, recorded, floor, today);
 }
 
 /** The account a pay lands in: the first of its linked accounts in the person's own account order. */

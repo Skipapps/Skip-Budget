@@ -69,7 +69,8 @@ describe('save_loan after every migration', () => {
   const live = liveSaveLoan();
 
   it('takes the add flow’s switch, payment day and count floor after every earlier parameter', () => {
-    expect(live.file).toBe('20261012100001_loan_add_flow.sql');
+    // Recreated by the month-end migration, with the same signature.
+    expect(live.file).toBe('20261013300001_month_end_anchor.sql');
     expect(live.types).toEqual([
       'text',
       'text',
@@ -119,7 +120,8 @@ describe('save_loan after every migration', () => {
   });
 
   it('drops the signature it replaces, so no call matches two', () => {
-    const text = sql(live.file).replace(/\s+/g, ' ');
+    // The add flow made this signature; the month-end migration only replaces its body.
+    const text = sql('20261012100001_loan_add_flow.sql').replace(/\s+/g, ' ');
     expect(text).toContain(
       'drop function if exists public.save_loan( text, text, numeric, numeric, integer, numeric, numeric, date, public.bill_recurrence, uuid, uuid, date, text, date, numeric, jsonb, date );',
     );
@@ -132,6 +134,21 @@ describe('save_loan after every migration', () => {
     expect(body).toContain(
       'v_starts_on := greatest(p_first_payment_on, coalesce(p_counts_from, p_first_payment_on));',
     );
+  });
+
+  it('changes in the month-end migration only by storing the payment day as the bill’s anchor', () => {
+    const before = functionIn('20261012100001_loan_add_flow.sql', 'save_loan');
+    const after = functionIn('20261013300001_month_end_anchor.sql', 'save_loan');
+    expect(after).toContain('card_id, bank_account_id, anchor_day, in_spending )');
+    expect(after).toContain('p_card_id, p_bank_account_id, v_day, coalesce(p_in_spending, true) )');
+    expect(
+      after
+        .replace(
+          'card_id, bank_account_id, anchor_day, in_spending',
+          'card_id, bank_account_id, in_spending',
+        )
+        .replace('p_bank_account_id, v_day, coalesce(', 'p_bank_account_id, coalesce('),
+    ).toBe(before);
   });
 
   it('ends the term on the payment day, clamped to its month, not first + (term - 1) months', () => {
@@ -152,10 +169,21 @@ describe('the bills and the scheduler after every migration', () => {
 
   it('records nothing new for a bill kept out of spending, on the server as in the app', () => {
     const live = liveFunction('record_due_charges');
-    expect(live.file).toBe('20261012100001_loan_add_flow.sql');
+    expect(live.file).toBe('20261013300001_month_end_anchor.sql');
     expect(live.body.replace(/\s+/g, ' ')).toContain(
       'where b.next_due_on is not null and b.in_spending',
     );
+  });
+
+  it('records from each plan’s anchor day, and changes nothing else in the recorder', () => {
+    const before = functionIn('20261012100001_loan_add_flow.sql', 'record_due_charges');
+    const after = functionIn('20261013300001_month_end_anchor.sql', 'record_due_charges');
+    expect(
+      after
+        .replace('b.next_due_on as anchor, b.anchor_day,', 'b.next_due_on as anchor,')
+        .replace('s.next_renewal_on, s.anchor_day,', 's.next_renewal_on,')
+        .replace(', p.anchor_day ) o(d)', ' ) o(d)'),
+    ).toBe(before);
   });
 
   it('stops reminding about a bill once its date has rolled past its end', () => {
@@ -229,8 +257,8 @@ describe('update_loan after every migration', () => {
   const body = () => liveFunction('update_loan').body.replace(/\s+/g, ' ');
 
   it('takes the bill it edits and the whole contract, the optional four last', () => {
-    // Recreated by the payoffs migration, with the same signature.
-    expect(live.file).toBe('20261012100003_loan_payoffs.sql');
+    // Recreated by the payoffs migration, then the month-end one, with the same signature.
+    expect(live.file).toBe('20261013300001_month_end_anchor.sql');
     expect(live.types).toEqual([
       'uuid',
       'text',
@@ -293,8 +321,15 @@ describe('update_loan after every migration', () => {
     expect(body()).toContain("raise exception 'the last payment must fall within the term'");
   });
 
-  it('leaves save_loan as migration A made it', () => {
-    expect(liveSaveLoan().file).toBe('20261012100001_loan_add_flow.sql');
+  it('changes in the month-end migration only by keeping the bill’s anchor on the payment day', () => {
+    const before = functionIn('20261012100003_loan_payoffs.sql', 'update_loan');
+    const after = functionIn('20261013300001_month_end_anchor.sql', 'update_loan');
+    expect(after).toContain('ends_on = v_ends_on, anchor_day = v_day, card_id = p_card_id,');
+    expect(after.replace(' anchor_day = v_day,', '')).toBe(before);
+  });
+
+  it('leaves save_loan to the migrations that make it', () => {
+    expect(liveSaveLoan().file).toBe('20261013300001_month_end_anchor.sql');
     expect(sql('20261012100002_update_loan.sql')).not.toMatch(/function public\.save_loan/i);
   });
 });
@@ -418,8 +453,8 @@ describe('update_loan_and_charges after every migration', () => {
     expect(body()).not.toMatch(/exception/i);
   });
 
-  it('leaves update_loan as the payoffs migration made it', () => {
-    expect(liveSignature('update_loan').file).toBe('20261012100003_loan_payoffs.sql');
+  it('leaves update_loan to the migrations that make it', () => {
+    expect(liveSignature('update_loan').file).toBe('20261013300001_month_end_anchor.sql');
     expect(sql(FILE)).not.toMatch(/function public\.update_loan\(/i);
   });
 });

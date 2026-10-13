@@ -1,5 +1,6 @@
 import { clockText, monthShort, weekdayShort } from '@/i18n/calendar';
 import { t } from '@/i18n';
+import { shiftMonths } from '@/lib/month-step';
 import { nextPaydayOn } from '@/lib/payday';
 
 // Date labels without Intl, which Hermes ships inconsistently across platforms.
@@ -90,7 +91,11 @@ export type PayFrequency = (typeof PAY_FREQUENCIES)[number]['value'];
 /** The cycles a pay can repeat on: every choice but a one-off pay, for pages that set up a schedule. */
 export const PAY_SCHEDULES = PAY_FREQUENCIES.filter((option) => option.value !== 'once');
 
-function advanceOneCycle(date: Date, frequency: PayFrequency): Date {
+/** A yyyy-mm-dd day as the device's local midnight, the shape the walker below steps in. */
+const localDay = (iso: string) => new Date(`${iso}T00:00:00`);
+
+/** `anchorDay` is the day of the month monthly pay keeps: the last payday's own. */
+function advanceOneCycle(date: Date, frequency: PayFrequency, anchorDay: number): Date {
   const year = date.getFullYear();
   const month = date.getMonth();
   const day = date.getDate();
@@ -107,13 +112,29 @@ function advanceOneCycle(date: Date, frequency: PayFrequency): Date {
       if (day < lastDay) return new Date(year, month, lastDay);
       return new Date(year, month + 1, 15);
     }
-    case 'monthly': {
-      // Clamp so the 31st does not roll past a short month.
-      const nextMonthDays = getDaysInMonth(year, month + 1);
-      return new Date(year, month + 1, Math.min(day, nextMonthDays));
-    }
+    case 'monthly':
+      return localDay(shiftMonths(toIsoDate(date), 1, anchorDay));
     case 'once':
       // No cycle: a one-off pay is its own day, which the callers below return before walking.
+      return date;
+  }
+}
+
+/** One cycle back, the reverse of `advanceOneCycle`. */
+function retreatOneCycle(date: Date, frequency: PayFrequency, anchorDay: number): Date {
+  switch (frequency) {
+    case 'weekly':
+      return addDays(date, -7);
+    case 'biweekly':
+      return addDays(date, -14);
+    case 'semimonthly': {
+      const previous = new Date(date);
+      previous.setDate(previous.getDate() < 16 ? 0 : 15);
+      return previous;
+    }
+    case 'monthly':
+      return localDay(shiftMonths(toIsoDate(date), -1, anchorDay));
+    case 'once':
       return date;
   }
 }
@@ -156,33 +177,19 @@ export function paydaysInRange(
   }
 
   const found: string[] = [];
+  const anchorDay = lastPayday.getDate();
   let cursor = new Date(lastPayday);
 
   // Walk back to the window, then forward across it. Bounded so a stale date cannot spin.
   for (let guard = 0; guard < 500 && toIsoDate(cursor) > from; guard += 1) {
-    const previous = new Date(cursor);
-    switch (frequency) {
-      case 'weekly':
-        previous.setDate(previous.getDate() - 7);
-        break;
-      case 'biweekly':
-        previous.setDate(previous.getDate() - 14);
-        break;
-      case 'semimonthly':
-        previous.setDate(previous.getDate() < 16 ? 0 : 15);
-        break;
-      case 'monthly':
-        previous.setMonth(previous.getMonth() - 1);
-        break;
-    }
-    cursor = previous;
+    cursor = retreatOneCycle(cursor, frequency, anchorDay);
   }
 
   for (let guard = 0; guard < 500; guard += 1) {
     const key = toIsoDate(cursor);
     if (key > to) break;
     if (key >= from) found.push(key);
-    cursor = advanceOneCycle(cursor, frequency);
+    cursor = advanceOneCycle(cursor, frequency, anchorDay);
   }
 
   return found;
