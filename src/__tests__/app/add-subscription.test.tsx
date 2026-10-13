@@ -75,8 +75,10 @@ jest.mock('@/providers/dialog-provider', () => ({
   useDialog: () => async () => undefined,
 }));
 
+/** What `load()` answers: the charges read, none of them this plan's. */
+const NO_PAST = { count: 0, lastChargedOn: null };
 const mockChooseDelete = jest.fn(
-  async (_name: string, _options?: object): Promise<string | null> => 'everything',
+  async (_name: string, _options?: object, _past?: object): Promise<string | null> => 'everything',
 );
 jest.mock('@/api/past-charges', () => ({
   usePastCharges: () => ({
@@ -85,6 +87,7 @@ jest.mock('@/api/past-charges', () => ({
     apply: jest.fn(),
     count: 0,
     lastChargedOn: null,
+    load: async () => NO_PAST,
     ready: true,
     retry: jest.fn(),
     saving: false,
@@ -1774,7 +1777,7 @@ describe('Add subscription — deleting a saved subscription', () => {
     mockChooseDelete.mockResolvedValueOnce(null);
     await press(screen, 'Delete this subscription');
 
-    expect(mockChooseDelete).toHaveBeenCalledWith('Spotify', { stopped: false });
+    expect(mockChooseDelete).toHaveBeenCalledWith('Spotify', { stopped: false }, NO_PAST);
     expect(mockDelete).not.toHaveBeenCalled();
     expect(mockStop).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
@@ -1823,7 +1826,7 @@ describe('Add subscription — deleting a saved subscription', () => {
     await press(screen, 'Delete this subscription');
 
     await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('sub-1'));
-    expect(mockChooseDelete).toHaveBeenCalledWith('Spotify', { stopped: false });
+    expect(mockChooseDelete).toHaveBeenCalledWith('Spotify', { stopped: false }, NO_PAST);
   });
 
   it('stays on the form once Keep cancels it from here, leaving by its own step', async () => {

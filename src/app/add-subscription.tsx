@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { AlignLeft, CircleCheck, RefreshCw, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
@@ -17,7 +18,7 @@ import {
   useStopSubscription,
   useUpdateSubscription,
 } from '@/api/mutations';
-import { usePastCharges } from '@/api/past-charges';
+import { usePastCharges, type PastRead } from '@/api/past-charges';
 import { usePaymentSources, useSubscription } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { DateBox } from '@/components/entry/date-box';
@@ -284,9 +285,16 @@ function SubscriptionForm({
   const createSubscription = useCreateSubscription();
   const updateSubscription = useUpdateSubscription();
   const pastCharges = usePastCharges('subscription', id);
+  // While the charges are read before a save or a delete: the buttons wait.
+  const [readingPast, setReadingPast] = useState(false);
   // Set once the subscription took an edit whose past charges failed to follow: it then matches the
   // form, so the question would not come up again and the next Save must redo the rewrite itself.
   const [rewritePending, setRewritePending] = useState(false);
+  // A new subscription's row id for this visit, so a Save repeated after a lost answer finds the row
+  // the first may have filed instead of filing a second (`insertOnce`).
+  const [newId] = useState(() => randomUUID());
+  // The new subscription once filed: a Save again after a later step failed updates it instead.
+  const [filedId, setFiledId] = useState<string | null>(null);
   const deleteSubscription = useDeleteSubscription();
   const stopSubscription = useStopSubscription();
   const toast = useToast();
@@ -318,6 +326,20 @@ function SubscriptionForm({
     clearVoiceDraft();
   };
 
+  /** The charges, read first when they have not been; null (the line said) when the read fails. */
+  const readPast = async (): Promise<PastRead | null> => {
+    setReadingPast(true);
+    try {
+      return await pastCharges.load();
+    } catch (thrown) {
+      warn();
+      setError(failureMessage(thrown));
+      return null;
+    } finally {
+      setReadingPast(false);
+    }
+  };
+
   const handleSave = async () => {
     setError(null);
     const typed = typedService.trim();
@@ -347,12 +369,17 @@ function SubscriptionForm({
       return;
     }
 
+    // Read before anything is built or asked: the values count on from the newest charge, and the
+    // question counts them.
+    const past = await readPast();
+    if (!past) return;
+
     // Checks and values live in the shared builder, which the voice review page saves through too.
     // started_on counts from the renewal picked: only ever earlier on an edit, never on or before a
     // renewal already recorded.
     const built = buildSubscriptionValues(
       { service: chosen, amount, cycle, renewsOn, sourceId, note, active },
-      { sources, lastChargedOn: pastCharges.lastChargedOn, countsFrom: initial.countsFrom },
+      { sources, lastChargedOn: past.lastChargedOn, countsFrom: initial.countsFrom },
     );
     if (!built.ok) {
       fail(built.message);
@@ -375,20 +402,14 @@ function SubscriptionForm({
           (carried.card_id ?? carried.bank_account_id ?? '') !== (initial.sourceId ?? ''));
 
       // Asked before anything is written, so backing out leaves it as it was.
-      if (!pastCharges.ready) {
-        pastCharges.retry();
-        warn();
-        setError(failureText());
-        return;
-      }
-
-      const scope = rewritePending ? 'all' : await pastCharges.choose(carried.label, changed);
+      const scope = rewritePending ? 'all' : await pastCharges.choose(carried.label, changed, past);
       if (scope === null) return;
 
-      const subscriptionId =
-        editing && id
-          ? (await updateSubscription.mutateAsync({ id, values }), id)
-          : (await createSubscription.mutateAsync(values)).id;
+      const writtenId = editing && id ? id : filedId;
+      const subscriptionId = writtenId
+        ? (await updateSubscription.mutateAsync({ id: writtenId, values }), writtenId)
+        : (await createSubscription.mutateAsync({ ...values, id: newId })).id;
+      if (!editing) setFiledId(subscriptionId);
 
       if (scope === 'all') {
         setRewritePending(true);
@@ -421,16 +442,14 @@ function SubscriptionForm({
     if (!id) return;
     setError(null);
     // The question counts the charges, so it waits for them as Save does.
-    if (!pastCharges.ready) {
-      pastCharges.retry();
-      warn();
-      setError(failureText());
-      return;
-    }
+    const past = await readPast();
+    if (!past) return;
     // Stopped as saved, not as the Status chips stand unsaved.
-    const choice = await pastCharges.chooseDelete(initial.service?.name ?? '', {
-      stopped: !initial.active,
-    });
+    const choice = await pastCharges.chooseDelete(
+      initial.service?.name ?? '',
+      { stopped: !initial.active },
+      past,
+    );
     if (choice === null) return;
 
     try {
@@ -449,7 +468,9 @@ function SubscriptionForm({
     }
   };
 
-  const busy = createSubscription.isPending || updateSubscription.isPending || pastCharges.saving;
+  const saving = createSubscription.isPending || updateSubscription.isPending || pastCharges.saving;
+  // Reading the charges only holds the buttons: nothing is being saved or deleted yet.
+  const busy = saving || readingPast;
   const deleting = deleteSubscription.isPending || stopSubscription.isPending;
   // The page this form opened on. Anywhere else the edge swipe is off, and Back steps back.
   const isRoot = view === initialView;
@@ -701,7 +722,7 @@ function SubscriptionForm({
       onEditAmount={() => setView('amountEdit')}
       rows={rows}
       primaryLabel={
-        busy
+        saving
           ? t('subscriptions.add.saving')
           : editing
             ? t('subscriptions.add.saveChanges')
@@ -716,8 +737,8 @@ function SubscriptionForm({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('subscriptions.add.deleteA11y')}
-            accessibilityState={{ disabled: deleting }}
-            disabled={deleting}
+            accessibilityState={{ disabled: deleting || readingPast }}
+            disabled={deleting || readingPast}
             onPress={() => void handleDelete()}
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >

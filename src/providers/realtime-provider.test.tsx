@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
-import { RealtimeProvider } from '@/providers/realtime-provider';
+import { ECHO_WAIT_MS, RealtimeProvider } from '@/providers/realtime-provider';
 
 /**
  * The socket carries only the signed-in account's own rows. The shared topics the server still
@@ -89,7 +89,9 @@ describe('RealtimeProvider', () => {
   it.each(['cards', 'bank_accounts'])(
     'refreshes the loan pages when %s change on another device, as they name them',
     async (table) => {
-      const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      // What a screen would have read; a key nothing has read has nothing to refresh.
+      for (const key of [table, 'loans', 'receipts']) client.setQueryData([key, 'user-A'], []);
       const invalidated: unknown[][] = [];
       jest.spyOn(client, 'invalidateQueries').mockImplementation((filters) => {
         invalidated.push((filters?.queryKey ?? []) as unknown[]);
@@ -104,8 +106,12 @@ describe('RealtimeProvider', () => {
       );
 
       mockListeners.find((listener) => listener.table === table)?.onChange();
+      // Gathered for a moment first, so a burst of rows is one re-read.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, ECHO_WAIT_MS + 50));
+      });
 
-      expect(invalidated).toEqual([[table], ['dashboard'], ['loans']]);
+      expect(invalidated).toEqual([[table], ['loans']]);
       await unmount();
     },
   );

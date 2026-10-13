@@ -109,6 +109,9 @@ jest.mock('@/api/mutations', () => ({
 let mockPayments = 2;
 let mockPaymentsRead = true;
 const mockRetryPayments = jest.fn();
+// The payments read as the page awaits it; a test can hold it back or make it fail.
+const mockLoadPayments = jest.fn();
+const readPayments = async () => ({ count: mockPayments, lastChargedOn: null });
 jest.mock('@/api/past-charges', () => ({
   usePastCharges: () => {
     const { askDelete } = jest.requireActual('@/components/ui/past-choice').usePastChoice();
@@ -117,11 +120,16 @@ jest.mock('@/api/past-charges', () => ({
       count: mockPayments,
       lastChargedOn: null,
       retry: mockRetryPayments,
-      chooseDelete: (name: string, options: { stopped?: boolean; extra?: number } = {}) =>
+      load: mockLoadPayments,
+      chooseDelete: (
+        name: string,
+        options: { stopped?: boolean; extra?: number } = {},
+        past?: { count: number },
+      ) =>
         askDelete({
           name,
           noun: 'payments',
-          count: mockPayments + (options.extra ?? 0),
+          count: (past?.count ?? mockPayments) + (options.extra ?? 0),
           stopped: options.stopped,
         }),
     };
@@ -201,6 +209,7 @@ beforeEach(() => {
   mockFocused = true;
   mockPayments = 2;
   mockPaymentsRead = true;
+  mockLoadPayments.mockImplementation(readPayments);
   showing(carLoan());
 });
 
@@ -782,13 +791,37 @@ describe('a finished loan is final', () => {
     );
   });
 
-  it('waits for the payments, saying the one failure line, and asks nothing', async () => {
+  it('waits for the payments it has not read, then asks with their count', async () => {
     mockPaymentsRead = false;
+    let answer: (read: { count: number; lastChargedOn: null }) => void = () => {};
+    mockLoadPayments.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
     showing(stopped());
     await render(<LoanScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'Delete loan' }));
-    expect(mockRetryPayments).toHaveBeenCalled();
+    expect(mockAsk).not.toHaveBeenCalled();
+
+    await act(async () => answer({ count: 3, lastChargedOn: null }));
+    expect(mockAsk).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Delete Car loan?',
+        message: expect.stringContaining('3 past payments'),
+      }),
+    );
+    expect(mockAsk).not.toHaveBeenCalledWith({ title: 'Something went wrong. Please try again.' });
+  });
+
+  it('says the one failure line when the payments cannot be read, and asks nothing', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const refused = new Error('read failed');
+    mockLoadPayments.mockRejectedValueOnce(refused);
+    showing(stopped());
+    await render(<LoanScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete loan' }));
+    expect(mockAsk).toHaveBeenCalledTimes(1);
     expect(mockAsk).toHaveBeenCalledWith({ title: 'Something went wrong. Please try again.' });
+    // A real failure, reported with its cause.
+    expect(log).toHaveBeenCalledWith('[failure]', refused);
+    log.mockRestore();
     expect(mockDeleteBill).not.toHaveBeenCalled();
   });
 

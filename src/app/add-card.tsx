@@ -1,8 +1,10 @@
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { randomUUID } from 'expo-crypto';
+import { router, useLocalSearchParams } from 'expo-router';
 import { CalendarDays, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { useProWrite } from '@/api/confirm-pro';
 import { useApplyReminder, useReminderChoice } from '@/api/reminders';
 import { creditLimitValue, useCreateCard, useDeleteCard, useUpdateCard } from '@/api/mutations';
 import { useCard, useSourceLedger, useCards } from '@/api/queries';
@@ -18,6 +20,7 @@ import { StepFlow } from '@/components/flow/step-flow';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { CurrencyField } from '@/components/ui/currency-field';
+import { ProFeatureRedirect } from '@/components/pro/pro-gate';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -62,7 +65,7 @@ export default function AddCardScreen() {
     setWalled(decided);
   }
   if (decided) {
-    return <Redirect href={{ pathname: '/pro-feature', params: { id: 'unlimited' } }} />;
+    return <ProFeatureRedirect featureId="unlimited" />;
   }
   return <AddCardScreenInner />;
 }
@@ -175,8 +178,14 @@ function CardForm({
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
   /** Set once a new card is saved: the flow gives way to the page that says so. */
   const [added, setAdded] = useState(false);
+  // A new card's row id for this visit, so a Save repeated after a lost answer finds the card the
+  // first may have filed instead of filing a second (`insertOnce`).
+  const [newId] = useState(() => randomUUID());
+  // The new card once filed: a Save again after the reminder failed updates it instead.
+  const [filedId, setFiledId] = useState<string | null>(null);
 
   const createCard = useCreateCard();
+  const proWrite = useProWrite();
   const updateCard = useUpdateCard();
   const deleteCard = useDeleteCard();
   const confirm = useConfirm();
@@ -250,10 +259,23 @@ function CardForm({
         credit_limit: limit,
       };
 
-      const cardId =
-        editing && id
-          ? (await updateCard.mutateAsync({ id, values }), id)
-          : (await createCard.mutateAsync(values)).id;
+      let cardId: string;
+      const writtenId = editing && id ? id : filedId;
+      if (writtenId) {
+        await updateCard.mutateAsync({ id: writtenId, values });
+        cardId = writtenId;
+      } else {
+        const created = await proWrite.run(() => createCard.mutateAsync({ ...values, id: newId }));
+        // Free keeps one card, and the account is free after all: show what Pro adds, pushed so
+        // Back returns to the filled-in form.
+        if (created.status === 'free') {
+          router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } });
+          return;
+        }
+        if (created.status === 'left') return;
+        cardId = created.value.id;
+        setFiledId(cardId);
+      }
 
       // A card reminder counts back from its payment day, so it needs one. Untouched while the saved
       // one is unknown: the form's 'off' is then a guess, and writing it deletes the reminder.
@@ -284,7 +306,7 @@ function CardForm({
     }
   };
 
-  const busy = createCard.isPending || updateCard.isPending;
+  const busy = createCard.isPending || updateCard.isPending || proWrite.checking;
   const nextDue = dueDay ? nextDueOn(dueDay, today) : null;
   const remindOn = dueDay ? nextReminderOn(dueDay, lead, today) : null;
   const preview = {
@@ -334,11 +356,13 @@ function CardForm({
   const primaryLabel =
     step < 2
       ? t('common.continue')
-      : busy
-        ? t('cards.form.saving')
-        : editing
-          ? t('cards.form.saveChanges')
-          : t('cards.add.addCard');
+      : proWrite.checking
+        ? t('pro.confirm.wait')
+        : busy
+          ? t('cards.form.saving')
+          : editing
+            ? t('cards.form.saveChanges')
+            : t('cards.add.addCard');
   const stepError = error && error.step === step ? error.message : null;
 
   return (

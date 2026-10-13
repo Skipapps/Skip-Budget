@@ -73,7 +73,7 @@ export default function HabitsScreen() {
     // Until Pro is known a tap does nothing, so nobody who has paid is sent to the explainer.
     if (!ready) return;
     if (pro) router.push('/habit-new');
-    else router.push({ pathname: '/pro-feature', params: { id: 'habits' } });
+    else router.push({ pathname: '/pro-feature', params: { id: 'habits', next: '/habit-new' } });
   };
 
   const moveTo = (next: number) => {

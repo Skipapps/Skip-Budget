@@ -33,7 +33,7 @@ const TOOLS: Tool[] = [
     hint: 'home.tool.opens',
     href: '/habits',
     locked: {
-      href: { pathname: '/pro-feature', params: { id: 'habits' } },
+      href: { pathname: '/pro-feature', params: { id: 'habits', next: '/habits' } },
       label: 'home.tool.habitsLocked',
     },
   },

@@ -1,14 +1,20 @@
-import { firstPaymentOn } from '@/lib/loan-first-payment';
+import {
+  FIRST_PAYMENT_MONTHS_MAX,
+  defaultFirstPayment,
+  earliestFirstPayment,
+  firstPaymentProblem,
+  isShortMonthEnd,
+  latestFirstPayment,
+  paymentDayChoices,
+  paymentDayFits,
+} from '@/lib/loan-first-payment';
 
 const day = (year: number, month: number, date: number) => new Date(year, month - 1, date);
 
-/** yyyy-mm-dd of the rule's first payment, so a wrong date reads plainly in a failure. */
-function first(start: Date, paymentDay: number): string | null {
-  const due = firstPaymentOn(start, paymentDay);
-  if (!due) return null;
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${due.getFullYear()}-${pad(due.getMonth() + 1)}-${pad(due.getDate())}`;
-}
+const pad = (value: number) => String(value).padStart(2, '0');
+/** yyyy-mm-dd, so a wrong date reads plainly in a failure. */
+const iso = (date: Date | null) =>
+  date ? `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` : null;
 
 const daysApart = (from: Date, to: Date) =>
   Math.round(
@@ -17,121 +23,150 @@ const daysApart = (from: Date, to: Date) =>
       86_400_000,
   );
 
-describe('firstPaymentOn: the payment day on or after the start day', () => {
-  it('is the payment day of the next month (the wireframe loan and the Founder’s examples)', () => {
-    expect(first(day(2024, 12, 27), 27)).toBe('2025-01-27');
-    expect(first(day(2024, 12, 28), 28)).toBe('2025-01-28');
-    expect(first(day(2024, 12, 27), 31)).toBe('2025-01-31');
-    expect(first(day(2026, 3, 1), 15)).toBe('2026-04-15');
+describe('defaultFirstPayment: a month after the start, on its day', () => {
+  it('is the next month on the start’s day (the wireframe loan and the Founder’s screenshot)', () => {
+    expect(iso(defaultFirstPayment(day(2024, 12, 27)))).toBe('2025-01-27');
+    expect(iso(defaultFirstPayment(day(2025, 11, 30)))).toBe('2025-12-30');
+    expect(iso(defaultFirstPayment(day(2026, 3, 1)))).toBe('2026-04-01');
+    expect(iso(defaultFirstPayment(day(2025, 12, 31)))).toBe('2026-01-31');
   });
 
-  it('is next month when the payment day is the start day itself', () => {
-    for (const [start, expected] of [
-      [day(2026, 1, 1), '2026-02-01'],
-      [day(2026, 6, 15), '2026-07-15'],
-      [day(2026, 11, 30), '2026-12-30'],
-      [day(2025, 12, 31), '2026-01-31'],
-    ] as const) {
-      expect([start.toDateString(), first(start, start.getDate())]).toEqual([
-        start.toDateString(),
-        expected,
-      ]);
-    }
-  });
-});
-
-describe('firstPaymentOn: a payment day earlier in the month than the start day', () => {
-  it('skips to the month after next, so the first period is not a few days', () => {
-    expect(first(day(2025, 12, 28), 2)).toBe('2026-02-02');
-    expect(first(day(2024, 12, 27), 22)).toBe('2025-02-22');
-    expect(first(day(2026, 5, 2), 1)).toBe('2026-07-01');
+  it('clamps to a shorter month’s end: 29 Feb in a leap year, 28 Feb otherwise', () => {
+    expect(iso(defaultFirstPayment(day(2024, 1, 31)))).toBe('2024-02-29');
+    expect(iso(defaultFirstPayment(day(2025, 1, 31)))).toBe('2025-02-28');
+    expect(iso(defaultFirstPayment(day(2024, 1, 30)))).toBe('2024-02-29');
+    expect(iso(defaultFirstPayment(day(2025, 1, 29)))).toBe('2025-02-28');
+    expect(iso(defaultFirstPayment(day(2026, 3, 31)))).toBe('2026-04-30');
+    expect(iso(defaultFirstPayment(day(2026, 8, 31)))).toBe('2026-09-30');
   });
 
-  it('carries into the next year', () => {
-    expect(first(day(2025, 11, 30), 2)).toBe('2026-01-02');
-    expect(first(day(2025, 12, 15), 1)).toBe('2026-02-01');
-  });
-});
-
-describe('firstPaymentOn: days 29–31 clamp to the month’s end', () => {
-  it('29 Feb in a leap year, 28 Feb otherwise', () => {
-    expect(first(day(2024, 1, 31), 31)).toBe('2024-02-29');
-    expect(first(day(2025, 1, 31), 31)).toBe('2025-02-28');
-    expect(first(day(2024, 1, 30), 30)).toBe('2024-02-29');
-    expect(first(day(2025, 1, 29), 29)).toBe('2025-02-28');
-    expect(first(day(2024, 1, 29), 29)).toBe('2024-02-29');
+  it('starts on the last of February and is the same day of March', () => {
+    expect(iso(defaultFirstPayment(day(2024, 2, 29)))).toBe('2024-03-29');
+    expect(iso(defaultFirstPayment(day(2025, 2, 28)))).toBe('2025-03-28');
   });
 
-  it('a 31st in a 30-day month is its 30th', () => {
-    expect(first(day(2026, 3, 31), 31)).toBe('2026-04-30');
-    expect(first(day(2026, 8, 31), 31)).toBe('2026-09-30');
-    expect(first(day(2026, 10, 31), 31)).toBe('2026-11-30');
-    expect(first(day(2026, 4, 30), 31)).toBe('2026-05-31');
-  });
-
-  it('compares on the day asked for, not the day it clamps to', () => {
-    // 30 is earlier than the 31st, so it waits a month, though February has no 30th either way.
-    expect(first(day(2025, 1, 31), 30)).toBe('2025-03-30');
-    expect(first(day(2024, 1, 31), 29)).toBe('2024-03-29');
-    // Month after next is February: clamped there.
-    expect(first(day(2023, 12, 31), 30)).toBe('2024-02-29');
-    expect(first(day(2024, 12, 31), 30)).toBe('2025-02-28');
-  });
-
-  it('starts on the last of February', () => {
-    expect(first(day(2024, 2, 29), 29)).toBe('2024-03-29');
-    expect(first(day(2025, 2, 28), 28)).toBe('2025-03-28');
-    expect(first(day(2025, 2, 28), 29)).toBe('2025-03-29');
-    expect(first(day(2025, 2, 28), 31)).toBe('2025-03-31');
-    expect(first(day(2024, 2, 29), 28)).toBe('2024-04-28');
-  });
-});
-
-describe('firstPaymentOn: what it takes and gives', () => {
   it('ignores the time of day and returns local midnight', () => {
-    const due = firstPaymentOn(new Date(2024, 11, 27, 23, 59, 59), 27) as Date;
-    expect([
-      due.getFullYear(),
-      due.getMonth(),
-      due.getDate(),
-      due.getHours(),
-      due.getMinutes(),
-    ]).toEqual([2025, 0, 27, 0, 0]);
+    const due = defaultFirstPayment(new Date(2024, 11, 27, 23, 59, 59)) as Date;
+    expect([due.getFullYear(), due.getMonth(), due.getDate(), due.getHours()]).toEqual([
+      2025, 0, 27, 0,
+    ]);
   });
 
-  it('is null for a day that is not 1–31 or a start that is not a date', () => {
-    for (const bad of [0, 32, -1, 2.5, Number.NaN, Infinity]) {
-      expect([bad, firstPaymentOn(day(2025, 1, 15), bad)]).toEqual([bad, null]);
-    }
-    expect(firstPaymentOn(new Date(Number.NaN), 15)).toBeNull();
+  it('is null for a start that is not a date', () => {
+    expect(defaultFirstPayment(new Date(Number.NaN))).toBeNull();
+    expect(latestFirstPayment(new Date(Number.NaN))).toBeNull();
+    expect(earliestFirstPayment(new Date(Number.NaN))).toBeNull();
   });
 
-  it('holds for every start day of 2023–2025 and every payment day', () => {
+  it('holds for every start day of 2023–2025: next month, the start’s day or that month’s end', () => {
     const wrong: string[] = [];
-    let checked = 0;
     for (let start = day(2023, 1, 1); start <= day(2025, 12, 31);) {
-      for (let paymentDay = 1; paymentDay <= 31; paymentDay += 1) {
-        const due = firstPaymentOn(start, paymentDay) as Date;
-        const monthsAhead =
-          (due.getFullYear() - start.getFullYear()) * 12 + due.getMonth() - start.getMonth();
-        const lastOfMonth = new Date(due.getFullYear(), due.getMonth() + 1, 0).getDate();
-        const span = daysApart(start, due);
-        checked += 1;
-
-        if (
-          monthsAhead !== (paymentDay >= start.getDate() ? 1 : 2) ||
-          due.getDate() !== Math.min(paymentDay, lastOfMonth) ||
-          due.getHours() !== 0 ||
-          // Never a short first period: at least February's 28 days, at most two months less a day.
-          span < 28 ||
-          span > 61
-        ) {
-          wrong.push(`${start.toDateString()} day ${paymentDay}: ${due.toDateString()}`);
-        }
+      const due = defaultFirstPayment(start) as Date;
+      const monthsAhead =
+        (due.getFullYear() - start.getFullYear()) * 12 + due.getMonth() - start.getMonth();
+      const lastOfMonth = new Date(due.getFullYear(), due.getMonth() + 1, 0).getDate();
+      const span = daysApart(start, due);
+      if (
+        monthsAhead !== 1 ||
+        due.getDate() !== Math.min(start.getDate(), lastOfMonth) ||
+        due.getHours() !== 0 ||
+        span < 28 ||
+        span > 31 ||
+        // The start's day always fits the default, so it stays the loan's payment day.
+        !paymentDayFits(due, start.getDate())
+      ) {
+        wrong.push(`${start.toDateString()}: ${due.toDateString()}`);
       }
       start = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
     }
-    expect(checked).toBe(1096 * 31);
     expect(wrong).toEqual([]);
+  });
+});
+
+describe('the first payments the page takes', () => {
+  it('runs from the day after the start to the start’s day a year on', () => {
+    expect(FIRST_PAYMENT_MONTHS_MAX).toBe(12);
+    expect(iso(earliestFirstPayment(day(2025, 11, 30)))).toBe('2025-12-01');
+    expect(iso(latestFirstPayment(day(2025, 11, 30)))).toBe('2026-11-30');
+    expect(iso(earliestFirstPayment(day(2025, 12, 31)))).toBe('2026-01-01');
+    // 29 Feb has no day a year on; its month's end does.
+    expect(iso(latestFirstPayment(day(2024, 2, 29)))).toBe('2025-02-28');
+  });
+
+  it('takes 14 Jan for a 30 Nov start, which the payment day chips could not reach', () => {
+    expect(firstPaymentProblem(day(2025, 11, 30), day(2026, 1, 14))).toBeNull();
+  });
+
+  it('refuses a first payment on or before the start', () => {
+    expect(firstPaymentProblem(day(2025, 11, 30), day(2025, 11, 30))).toBe('not-after-start');
+    expect(firstPaymentProblem(day(2025, 11, 30), day(2025, 11, 1))).toBe('not-after-start');
+    expect(firstPaymentProblem(day(2025, 11, 30), day(2025, 12, 1))).toBeNull();
+  });
+
+  it('refuses a first payment more than a year after the start', () => {
+    expect(firstPaymentProblem(day(2025, 11, 30), day(2026, 11, 30))).toBeNull();
+    expect(firstPaymentProblem(day(2025, 11, 30), day(2026, 12, 1))).toBe('too-late');
+    expect(firstPaymentProblem(day(2024, 2, 29), day(2025, 2, 28))).toBeNull();
+    expect(firstPaymentProblem(day(2024, 2, 29), day(2025, 3, 1))).toBe('too-late');
+  });
+
+  it('compares days, not times of day', () => {
+    expect(firstPaymentProblem(new Date(2025, 10, 30, 23, 0), new Date(2025, 11, 1, 0, 0))).toBe(
+      null,
+    );
+    expect(firstPaymentProblem(new Date(2025, 10, 30, 0, 0), new Date(2025, 10, 30, 23, 59))).toBe(
+      'not-after-start',
+    );
+  });
+});
+
+describe('a first payment on a short month’s last day', () => {
+  it('is the last day of a month shorter than 31 days, and nothing else', () => {
+    for (const date of [day(2025, 2, 28), day(2024, 2, 29), day(2026, 4, 30), day(2026, 11, 30)]) {
+      expect([iso(date), isShortMonthEnd(date)]).toEqual([iso(date), true]);
+    }
+    for (const date of [day(2024, 2, 28), day(2026, 1, 31), day(2026, 4, 29), day(2026, 1, 14)]) {
+      expect([iso(date), isShortMonthEnd(date)]).toEqual([iso(date), false]);
+    }
+  });
+
+  it('can stand for its own day or a later one; any other date only for its own', () => {
+    expect([28, 29, 30, 31].map((d) => paymentDayFits(day(2025, 2, 28), d))).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect([27, 32, 0, 28.5].map((d) => paymentDayFits(day(2025, 2, 28), d))).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect([30, 31].map((d) => paymentDayFits(day(2026, 4, 30), d))).toEqual([true, true]);
+    expect([14, 15, 31].map((d) => paymentDayFits(day(2026, 1, 14), d))).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect(paymentDayFits(new Date(Number.NaN), 14)).toBe(false);
+  });
+
+  it('offers its own day and every month’s end, plus the day it was set for in between', () => {
+    expect(paymentDayChoices(day(2025, 2, 28), 28)).toEqual([28, 31]);
+    expect(paymentDayChoices(day(2025, 2, 28), 31)).toEqual([28, 31]);
+    // A 30 Jan start, first due 28 Feb: a loan paid on the 30th, which neither chip says.
+    expect(paymentDayChoices(day(2025, 2, 28), 30)).toEqual([28, 30, 31]);
+    expect(paymentDayChoices(day(2024, 2, 29), 30)).toEqual([29, 30, 31]);
+    expect(paymentDayChoices(day(2026, 4, 30), 30)).toEqual([30, 31]);
+    // A day it cannot stand for is not offered.
+    expect(paymentDayChoices(day(2025, 2, 28), 14)).toEqual([28, 31]);
+  });
+
+  it('offers nothing when the date says the day on its own', () => {
+    expect(paymentDayChoices(day(2026, 1, 14), 14)).toBeNull();
+    expect(paymentDayChoices(day(2026, 1, 31), 31)).toBeNull();
+    expect(paymentDayChoices(day(2024, 2, 28), 28)).toBeNull();
+    expect(paymentDayChoices(new Date(Number.NaN), 28)).toBeNull();
   });
 });

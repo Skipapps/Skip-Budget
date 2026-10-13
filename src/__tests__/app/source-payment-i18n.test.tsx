@@ -67,6 +67,7 @@ function Toasts({ children }: { children: ReactNode }) {
 jest.mock('@/lib/use-today', () => ({
   useToday: () => ({ today: '2026-10-08', todayDate: new Date('2026-10-08T00:00:00') }),
 }));
+jest.mock('expo-crypto', () => ({ randomUUID: () => 'payment-visit' }));
 
 const mockCreate = jest.fn(async (_values: Record<string, unknown>) => ({ id: 'payment-new' }));
 let mockPending = false;
@@ -343,6 +344,7 @@ describe.each([ES, FR])('The payment page in $language', (w) => {
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockCreate).toHaveBeenCalledTimes(1);
     expect(mockCreate.mock.calls[0][0]).toStrictEqual({
+      id: 'payment-visit',
       card_id: CARD,
       bank_account_id: null,
       amount: 1000.55,
@@ -354,7 +356,7 @@ describe.each([ES, FR])('The payment page in $language', (w) => {
     expect(mockToast).toHaveBeenCalledWith('toast.payment.added');
   });
 
-  it('writes money from outside with no account key, chosen by the language’s own pill', async () => {
+  it('writes money from outside with no account, chosen by the language’s own pill', async () => {
     mockParams = { id: CHECKING };
     const screen = await render(<SourcePaymentScreen />, { wrapper: Toasts });
     await typeAmount(screen, '75.20', w.decimalKey);
@@ -365,11 +367,13 @@ describe.each([ES, FR])('The payment page in $language', (w) => {
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0]).toStrictEqual({
+      id: 'payment-visit',
       card_id: null,
       bank_account_id: CHECKING,
       amount: 75.2,
       paid_on: '2026-10-08',
       note: null,
+      from_bank_account_id: null,
     });
     expect(mockToast).toHaveBeenCalledWith('toast.money.added');
   });
@@ -441,11 +445,13 @@ describe.each([ES, FR])('The payment page in $language', (w) => {
 
       await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
       expect(mockCreate.mock.calls[0][0]).toStrictEqual({
+        id: 'payment-visit',
         card_id: CARD,
         bank_account_id: null,
         amount: 12.5,
         paid_on: '2026-10-08',
         note: null,
+        from_bank_account_id: null,
       });
     });
 
@@ -461,11 +467,13 @@ describe.each([ES, FR])('The payment page in $language', (w) => {
 
       await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
       expect(mockCreate.mock.calls[0][0]).toStrictEqual({
+        id: 'payment-visit',
         card_id: null,
         bank_account_id: CHECKING,
         amount: 75.2,
         paid_on: '2026-10-08',
         note: null,
+        from_bank_account_id: null,
       });
     });
   });

@@ -127,6 +127,12 @@ jest.mock('expo-router', () => ({
 
 let mockPro = { pro: true, ready: true };
 jest.mock('@/api/pro', () => ({ usePro: () => mockPro }));
+// What asking the store and the database again answers, after a Pro refusal the app disagrees with.
+const mockConfirmPro = jest.fn(async () => 'unknown');
+jest.mock('@/api/confirm-pro', () => {
+  const actual = jest.requireActual('@/api/confirm-pro');
+  return { ...actual, useProWrite: () => actual.useProWrite(() => mockConfirmPro()) };
+});
 
 const mockCreate = jest.fn();
 jest.mock('@/api/mutations', () => ({
@@ -689,14 +695,16 @@ describe('Scan and Upload on the form', () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
-  it('stays on the amount page, and says so, when nothing at all was read', async () => {
+  it('stays on the amount page, and says so as a hint, not a failure, when nothing at all was read', async () => {
     const screen = await render(<AddReceiptScreen />);
 
     await scanOnForm(screen, {});
 
     onAmountPage(screen);
-    expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
-    expect(screen.getByText('Check the store, date and amount below.')).toBeTruthy();
+    expect(screen.getByText('Couldn’t read this receipt. Fill it in below.')).toBeTruthy();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    // The hint already says to fill in everything; a list of every field would only repeat it.
+    expect(screen.queryByText('Check the store, date and amount below.')).toBeNull();
     expect(screen.getByLabelText('Continue')).toBeDisabled();
     expect(mockCreate).not.toHaveBeenCalled();
   });
@@ -1025,7 +1033,46 @@ describe('the free allowance', () => {
     },
   );
 
-  it('a refusal for someone the app thinks has Pro is a failure: the line is shown and reported', async () => {
+  it('a refusal for someone the app thinks has Pro is asked again, then saved once the database agrees', async () => {
+    mockCreate.mockRejectedValueOnce({
+      code: 'P0001',
+      message: 'Scanning receipts is part of Skip Pro.',
+    });
+    mockConfirmPro.mockResolvedValueOnce('pro');
+    mockParams = ROUTE;
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(2));
+    expect(mockConfirmPro).toHaveBeenCalledTimes(1);
+    expect(mockCreate.mock.calls[1][0]).toEqual(mockCreate.mock.calls[0][0]);
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('a refusal for someone the app thinks has Pro goes to the explainer when the store says free after all', async () => {
+    mockCreate.mockRejectedValueOnce({
+      code: 'P0001',
+      message: 'Scanning receipts is part of Skip Pro.',
+    });
+    mockConfirmPro.mockResolvedValueOnce('free');
+    mockParams = ROUTE;
+    const screen = await render(<AddReceiptScreen />);
+
+    await press(screen, 'Save receipt');
+
+    await waitFor(() =>
+      expect(router.push).toHaveBeenCalledWith({
+        pathname: '/pro-feature',
+        params: { id: 'scan' },
+      }),
+    );
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+  });
+
+  it('a refusal the database still holds after asking again is a failure: the line is shown and reported', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     const refusal = { code: 'P0001', message: 'Scanning receipts is part of Skip Pro.' };
     mockCreate.mockRejectedValueOnce(refusal);
@@ -1035,6 +1082,8 @@ describe('the free allowance', () => {
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(mockConfirmPro).toHaveBeenCalledTimes(1);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
     expect(router.push).not.toHaveBeenCalled();
     // failureMessage's report: the Metro log in development, Sentry in a release build.
     expect(log).toHaveBeenCalledWith('[failure]', refusal);

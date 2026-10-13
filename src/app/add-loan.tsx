@@ -3,13 +3,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useLoanDetail, type LoanDetail } from '@/api/loans';
 import { useDeleteBill, useSaveLoan, useStopBill, useUpdateLoan } from '@/api/mutations';
-import { usePastCharges, type PastChargesScope } from '@/api/past-charges';
+import { usePastCharges, type PastChargesScope, type PastRead } from '@/api/past-charges';
 import { usePaymentSources, type PaymentSourceRow } from '@/api/queries';
 import { useApplyReminder, useReminderChoice } from '@/api/reminders';
 import { LoanDetailsView } from '@/components/loans/add/loan-details-view';
 import {
   TERM_YEARS_MAX,
   emptyLoanForm,
+  firstPaymentHint,
+  firstPaymentProblemOf,
   loanFormFromCalculator,
   loanFormFromSaved,
   loanName,
@@ -212,6 +214,10 @@ function AddLoanFlow({
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
   const [deleting, setDeleting] = useState(false);
+  // Held while the payments are read before Delete's question, so a second tap asks nothing more.
+  const readingForDelete = useRef(false);
+  // While the payments are read before Save's or Delete's question: that button shows it is busy.
+  const [readingPast, setReadingPast] = useState(false);
 
   const { today, todayDate } = useToday();
   const { sources: offered } = usePaymentSources();
@@ -252,6 +258,8 @@ function AddLoanFlow({
         });
       case 'rate':
         return rateRange();
+      case 'first-payment':
+        return t('loanFlow.firstDate.notAfterStart');
       case 'payment':
         return t('loanFlow.details.paymentTooLow', {
           minimum: formatCurrency(refusal.problem.minimum ?? 0),
@@ -270,11 +278,18 @@ function AddLoanFlow({
     // A slip like 999 years is never priced, only asked what else is missing.
     const checked = loanReview(tooLong ? { ...fields, termMonths: 1 } : fields, today);
     const missing = missingFields(form, checked.ok ? [] : fieldsOf(checked.refusal));
+    // The year limit is the page's, not the engine's, so Review never refuses it: it is asked in
+    // page order, after the dates themselves and before what the payment can clear.
+    const tooLate = firstPaymentProblemOf(form) === 'too-late' ? form.startDate : null;
     let problem: string | null = null;
     if (missing.length > 0) {
       problem = t('loanFlow.details.missing', { fields: missing.join(', ') });
     } else if (tooLong) {
       problem = t('loanFlow.term.tooLong', { years: TERM_YEARS_MAX });
+    } else if (!checked.ok && checked.refusal.reason !== 'payment') {
+      problem = refusalLine(checked.refusal);
+    } else if (tooLate) {
+      problem = firstPaymentHint('too-late', tooLate);
     } else if (!checked.ok) {
       problem = refusalLine(checked.refusal);
     }
@@ -381,14 +396,20 @@ function AddLoanFlow({
     // a Save again only retries the reminder, so there is nothing to ask.
     let past: PastChargesScope = 'upcoming';
     if (editing && !writtenId) {
-      if (!pastCharges.ready) {
+      // The question counts the payments, so it waits for that read rather than guess.
+      let read: PastRead;
+      setReadingPast(true);
+      try {
+        read = await pastCharges.load();
+      } catch (thrown) {
         inFlight.current = false;
-        pastCharges.retry();
         warn();
-        setError(failureText());
+        setError(failureMessage(thrown));
         return;
+      } finally {
+        setReadingPast(false);
       }
-      const scope = await pastCharges.choose(loanName(form).trim(), changesPayments(figures));
+      const scope = await pastCharges.choose(loanName(form).trim(), changesPayments(figures), read);
       if (scope === null) {
         inFlight.current = false;
         return;
@@ -423,19 +444,27 @@ function AddLoanFlow({
   };
 
   const handleDelete = async () => {
-    if (!editing || deleting) return;
+    if (!editing || deleting || readingForDelete.current) return;
     setError(null);
     // The question counts the payments, so it waits for them as Save does.
-    if (!pastCharges.ready) {
-      pastCharges.retry();
+    readingForDelete.current = true;
+    setReadingPast(true);
+    let read: PastRead;
+    try {
+      read = await pastCharges.load();
+    } catch (thrown) {
       warn();
-      setError(failureText());
+      setError(failureMessage(thrown));
       return;
+    } finally {
+      readingForDelete.current = false;
+      setReadingPast(false);
     }
-    const choice = await pastCharges.chooseDelete(editing.bill.name, {
-      stopped: editing.ended,
-      extra: editing.payoffCount,
-    });
+    const choice = await pastCharges.chooseDelete(
+      editing.bill.name,
+      { stopped: editing.ended, extra: editing.payoffCount },
+      read,
+    );
     if (choice === null) return;
     setDeleting(true);
     try {
@@ -524,7 +553,7 @@ function AddLoanFlow({
           })
         }
         onSave={() => void handleSave()}
-        busy={saving}
+        busy={saving || readingPast}
         inSpendingLocked={writtenId !== null}
         error={error}
         root={isRoot}
@@ -541,7 +570,9 @@ function AddLoanFlow({
     <LoanDetailsView
       title={editing ? t('loanFlow.edit.title') : undefined}
       closePrompt={closePrompt}
-      onDelete={editing ? { onPress: () => void handleDelete(), busy: deleting } : undefined}
+      onDelete={
+        editing ? { onPress: () => void handleDelete(), busy: deleting || readingPast } : undefined
+      }
       form={form}
       onChange={change}
       sources={sources}

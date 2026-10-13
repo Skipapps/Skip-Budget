@@ -445,7 +445,7 @@ describe('Home — the Spending habits PRO pill', () => {
     await fireEvent.press(node);
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/pro-feature',
-      params: { id: 'habits' },
+      params: { id: 'habits', next: '/habits' },
     });
   });
 

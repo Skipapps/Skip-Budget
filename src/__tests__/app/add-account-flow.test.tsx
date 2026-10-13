@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 
 import AddAccountScreen from '@/app/add-account';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * The add-account flow in the card flow's language: the live face and fields, the payday and the
@@ -71,15 +72,20 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
+// Counted: the account's row id is made first, then the pay's.
+let mockUuids = 0;
+jest.mock('expo-crypto', () => ({ randomUUID: () => `visit-${(mockUuids += 1)}` }));
 
 const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
 const mockCreateSalary = jest.fn();
 const mockLink = jest.fn();
+const mockDeleteUnseen = jest.fn();
 jest.mock('@/api/mutations', () => ({
   useCreateBankAccount: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateBankAccount: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteBankAccount: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useDeleteUnseenPay: () => ({ mutateAsync: mockDeleteUnseen, isPending: false }),
   useCreateSalarySource: () => ({ mutateAsync: mockCreateSalary, isPending: false }),
   useSetSalaryAccounts: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useLinkAccountToSalaries: () => ({ mutateAsync: mockLink, isPending: false }),
@@ -125,13 +131,16 @@ beforeEach(() => {
   resetLocaleForTests();
   jest.useFakeTimers({ now: new Date(2026, 9, 9, 9, 0, 0) });
   mockParams = {};
+  mockUuids = 0;
   mockAccount = { data: null, isError: false, isFetched: true };
   mockSaved = { choice: 'off', remindAt: '09:00' };
   mockSalaries = [];
   mockPaidInto = new Set();
   mockCreate.mockReset().mockResolvedValue({ id: 'acct-new' });
   mockCreateSalary.mockReset().mockResolvedValue({ id: 'pay-new' });
-  [mockUpdate, mockLink, mockApplyReminder, mockToast].forEach((fn) => fn.mockClear());
+  [mockUpdate, mockLink, mockApplyReminder, mockToast, mockDeleteUnseen].forEach((fn) =>
+    fn.mockClear(),
+  );
   [router.back, router.replace].forEach((fn) => jest.mocked(fn).mockClear());
 });
 afterEach(() => jest.useRealTimers());
@@ -296,6 +305,79 @@ describe('Add account — pay and the reminder', () => {
       screen.getByText('Te lo recordaremos 3 días antes de que llegue tu salario.'),
     ).toBeTruthy();
     expect(screen.getByText('Agregar otra cuenta')).toBeTruthy();
+  });
+});
+
+describe('Add account — saving again after a later step failed', () => {
+  it('updates the account it filed, and files the pay again under the same id', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockApplyReminder.mockRejectedValueOnce(new Error('network down'));
+    const screen = await toDetails();
+    await fireEvent.changeText(screen.getAllByDisplayValue('')[0], 'Chase');
+    await fireEvent.changeText(screen.getByPlaceholderText('Enter an amount'), '4200');
+    await fireEvent.press(screen.getByText('Continue'));
+    await fireEvent.press(screen.getByTestId('calendar'));
+
+    await fireEvent.press(screen.getByText('Add account'));
+
+    expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockCreate.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ id: 'visit-1', bank_name: 'Chase' }),
+    );
+
+    await fireEvent.press(screen.getByText('Add account'));
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      id: 'acct-new',
+      values: expect.objectContaining({ bank_name: 'Chase', balance: 900 }),
+    });
+    // Filed already, the pay's second insert under its one id becomes an update (`insertOnce`).
+    expect(mockCreateSalary.mock.calls.map(([values]) => values.id)).toEqual([
+      'visit-2',
+      'visit-2',
+    ]);
+    expect(mockApplyReminder).toHaveBeenCalledTimes(2);
+    expect(mockApplyReminder).toHaveBeenLastCalledWith('account', 'acct-new', 3, '09:00');
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    log.mockRestore();
+  });
+});
+
+describe('Add account — pay dropped after a failed Save', () => {
+  it('deletes the pay the first Save filed, with its recorded pay, once the income is cleared', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockApplyReminder.mockRejectedValueOnce(new Error('network down'));
+    const screen = await toDetails();
+    await fireEvent.changeText(screen.getAllByDisplayValue('')[0], 'Chase');
+    await fireEvent.changeText(screen.getByPlaceholderText('Enter an amount'), '4200');
+    await fireEvent.press(screen.getByText('Continue'));
+    await fireEvent.press(screen.getByTestId('calendar'));
+    await fireEvent.press(screen.getByText('Add account'));
+    expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    expect(mockCreateSalary).toHaveBeenCalledTimes(1);
+
+    await fireEvent.press(screen.getAllByLabelText('Back')[0]);
+    await fireEvent.changeText(screen.getByPlaceholderText('Enter an amount'), '');
+    await fireEvent.press(screen.getByText('Continue'));
+    await fireEvent.press(screen.getByText('Add account'));
+
+    expect(mockCreateSalary).toHaveBeenCalledTimes(1);
+    expect(mockDeleteUnseen).toHaveBeenCalledTimes(1);
+    expect(mockDeleteUnseen).toHaveBeenCalledWith('visit-2');
+    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ id: 'acct-new' }));
+    log.mockRestore();
+  });
+
+  it('deletes nothing when no Save ever tried to file pay', async () => {
+    const screen = await toDetails();
+    await fireEvent.changeText(screen.getAllByDisplayValue('')[0], 'Chase');
+    await fireEvent.press(screen.getByText('Continue'));
+    await fireEvent.press(screen.getByText('Add account'));
+
+    expect(mockCreateSalary).not.toHaveBeenCalled();
+    expect(mockDeleteUnseen).not.toHaveBeenCalled();
   });
 });
 

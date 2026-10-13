@@ -922,12 +922,22 @@ describe('export', () => {
     await accountIs('free');
     await open();
     await fireEvent.press(screen.getByRole('button', { name: 'Export payments' }));
-    expect(pushed()).toEqual([{ pathname: '/pro-feature', params: { id: 'export' } }]);
+    expect(pushed()).toEqual([
+      {
+        pathname: '/pro-feature',
+        params: { id: 'export', next: '/payment-export?kind=all&year=2026' },
+      },
+    ]);
 
     jest.clearAllMocks();
     await open();
     await fireEvent.press(screen.getByRole('button', { name: 'Export CSV or PDF' }));
-    expect(pushed()).toEqual([{ pathname: '/pro-feature', params: { id: 'export' } }]);
+    expect(pushed()).toEqual([
+      {
+        pathname: '/pro-feature',
+        params: { id: 'export', next: '/payment-export?kind=all&year=2026' },
+      },
+    ]);
   });
 
   it('does nothing until the plan is known, so nobody who paid meets the explainer', async () => {

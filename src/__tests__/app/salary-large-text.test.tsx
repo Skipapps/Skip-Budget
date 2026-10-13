@@ -63,6 +63,7 @@ jest.mock('@/api/mutations', () => ({
   }),
   useUpdateSalarySource: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteSalarySource: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useDeleteUnseenPay: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useSetSalaryAccounts: () => ({ mutateAsync: jest.fn(async () => ({})), isPending: false }),
 }));
 

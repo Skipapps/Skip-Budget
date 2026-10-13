@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AlignLeft, CalendarDays, CreditCard, RefreshCw, Repeat, Tag } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
@@ -6,7 +7,7 @@ import { useReceiptBookDefault, useReceiptBooks } from '@/api/receipt-books';
 import { bookColumn, defaultBookOf } from '@/lib/receipt-books';
 
 import { useBrandDirectory } from '@/api/brands';
-import { usePro } from '@/api/pro';
+import { useProWrite } from '@/api/confirm-pro';
 import {
   buildBillValues,
   buildReceiptValues,
@@ -50,7 +51,6 @@ import { failureMessage, failureText } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
 import { logoChosen, logoColumns, selectionLogo } from '@/lib/logo-columns';
 import { logoHints } from '@/lib/logo-lookup';
-import { refusedForPro } from '@/lib/pro-refusal';
 import { success, warn } from '@/lib/haptics';
 import { useToast } from '@/providers/toast-context';
 import { useToday } from '@/lib/use-today';
@@ -199,7 +199,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   const toast = useToast();
   const createBill = useCreateBill();
   const createSubscription = useCreateSubscription();
-  const { pro } = usePro();
+  const proWrite = useProWrite();
 
   const { id, draft, entry, touched, edited } = session;
   const kind = entry.kind;
@@ -212,6 +212,9 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
 
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
+  // The row id for what this page saves, so a Save repeated after a lost answer finds the row the
+  // first may have filed instead of filing a second (`insertOnce`).
+  const [newId] = useState(() => randomUUID());
   // Two taps inside one frame both land before the button re-renders as disabled; this is what
   // makes one tap one row.
   const busy = useRef(false);
@@ -300,14 +303,28 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
       // The logo the person chose for a store the catalogue does not know; nothing when they did
       // not answer, so such a store saves as letters, as in the forms.
       const logo = logoColumns(entry.merchant);
-      if (built.kind === 'receipt') {
-        await createReceipt.mutateAsync({
-          ...built.values,
-          ...logo,
-          ...(voiceBook && books.length > 0 ? { book_id: bookColumn(voiceBook) } : {}),
-        });
-      } else if (built.kind === 'bill') await createBill.mutateAsync({ ...built.values, ...logo });
-      else await createSubscription.mutateAsync({ ...built.values, ...logo });
+      const saved = await proWrite.run(() =>
+        built.kind === 'receipt'
+          ? createReceipt.mutateAsync({
+              id: newId,
+              ...built.values,
+              ...logo,
+              ...(voiceBook && books.length > 0 ? { book_id: bookColumn(voiceBook) } : {}),
+            })
+          : built.kind === 'bill'
+            ? createBill.mutateAsync({ id: newId, ...built.values, ...logo })
+            : createSubscription.mutateAsync({ id: newId, ...built.values, ...logo }),
+      );
+      if (saved.status !== 'saved') {
+        setSaving(false);
+        busy.current = false;
+        // The database's Pro wall, and the account is free: show what Pro adds, pushed so Back
+        // returns to this page.
+        if (saved.status === 'free') {
+          router.push({ pathname: '/pro-feature', params: { id: 'voice' } });
+        }
+        return;
+      }
 
       success();
       toast(
@@ -328,12 +345,6 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
     } catch (thrown) {
       setSaving(false);
       busy.current = false;
-      // The database's Pro wall is an answer only for someone the app also thinks is free; for a
-      // payer it is a disagreement between the two, reported like any failure.
-      if (refusedForPro(thrown) && !pro) {
-        router.push({ pathname: '/pro-feature', params: { id: 'voice' } });
-        return;
-      }
       failureMessage(thrown);
       warn();
       setFailed(true);
@@ -624,7 +635,9 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
           />
         ) : undefined
       }
-      primaryLabel={saving ? t('voice.review.saving') : copy.save}
+      primaryLabel={
+        proWrite.checking ? t('pro.confirm.wait') : saving ? t('voice.review.saving') : copy.save
+      }
       primaryDisabled={saving || !built?.ok}
       onPrimary={() => void save()}
       // What still blocks Save, in the forms' own words, until a save has failed.

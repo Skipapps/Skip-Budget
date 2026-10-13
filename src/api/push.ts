@@ -110,9 +110,14 @@ export async function forgetDevice(userId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-async function storeTimezone(userId: string): Promise<void> {
+/**
+ * Writes the phone's zone, unless `stored` says the account already has it. Every profile write
+ * echoes through realtime and re-reads the profile, so a launch that changes nothing writes nothing.
+ * `undefined` means the stored zone is not known, and then it is written.
+ */
+async function storeTimezone(userId: string, stored?: string | null): Promise<void> {
   const zone = Localization.getCalendars()[0]?.timeZone;
-  if (!zone) return;
+  if (!zone || zone === stored) return;
   await supabase
     .from('profiles')
     .update({ timezone: zone } as never)
@@ -150,21 +155,24 @@ export function useRegisterPush(): void {
 
     (async () => {
       try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('reminders_enabled_at, timezone')
+          .eq('id', userId)
+          .maybeSingle();
+        if (cancelled) return;
+
         // Every account gets its clock stored, reminders or not: the server computes each user's
         // own "today" (charge dates, reminder times) from profiles.timezone, and nobody should be
-        // billed on UTC's calendar. Runs each launch, so travel updates it.
-        await storeTimezone(userId);
+        // billed on UTC's calendar. Checked each launch, so travel updates it; when the read
+        // failed, the zone is written regardless.
+        await storeTimezone(userId, error ? undefined : (data?.timezone ?? null));
         if (cancelled) return;
 
         // Only for an account that chose reminders: the phone's permission is shared by every
         // account on it, so registering on permission alone would opt a fresh sign-in into
         // another's choice.
-        const { data } = await supabase
-          .from('profiles')
-          .select('reminders_enabled_at')
-          .eq('id', userId)
-          .maybeSingle();
-        if (cancelled || !data?.reminders_enabled_at) return;
+        if (!data?.reminders_enabled_at) return;
 
         await registerDevice(userId);
       } catch {

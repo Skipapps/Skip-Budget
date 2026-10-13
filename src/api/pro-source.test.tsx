@@ -13,6 +13,7 @@ let mockSdkActive: Record<string, string[]> = {};
 const mockListeners = new Set<(info: unknown) => void>();
 
 const infoFor = (userId: string) => ({
+  originalAppUserId: userId,
   entitlements: {
     active: Object.fromEntries((mockSdkActive[userId] ?? []).map((id) => [id, { id }])),
   },
@@ -32,12 +33,15 @@ jest.mock('react-native-purchases', () => ({
       mockListeners.delete(listener),
   },
 }));
+// is_pro() applies the row's expiry on the server; the mock does the same.
 jest.mock('@/lib/supabase', () => ({
   supabase: {
-    from: () => ({
-      select: () => ({
-        maybeSingle: async () => ({ data: mockServerRow, error: null }),
-      }),
+    rpc: async () => ({
+      data: Boolean(
+        mockServerRow?.pro &&
+        (!mockServerRow.expires_at || Date.parse(mockServerRow.expires_at) > Date.now()),
+      ),
+      error: null,
     }),
   },
 }));

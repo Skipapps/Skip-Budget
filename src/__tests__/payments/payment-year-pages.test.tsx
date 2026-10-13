@@ -523,7 +523,13 @@ describe('All years', () => {
 
   it.each([
     [true, '/payment-export?kind=all&year=all'],
-    [false, { pathname: '/pro-feature', params: { id: 'export' } }],
+    [
+      false,
+      {
+        pathname: '/pro-feature',
+        params: { id: 'export', next: '/payment-export?kind=all&year=all' },
+      },
+    ],
   ])('exports every year from the header (Pro %s)', async (pro, href) => {
     mockPro = { pro, ready: true };
     await openYears({ kind: 'all' });

@@ -1,4 +1,5 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
 
 import AddSubscriptionScreen from '@/app/add-subscription';
@@ -93,6 +94,9 @@ jest.mock('expo-router', () => ({
   },
 }));
 
+/** What the charges read answered, handed to the question. */
+const READ = expect.objectContaining({ count: 0 });
+
 /** What happened, in order: the question, the write, the rewrite of past renewals, the reminder. */
 const mockOrder: string[] = [];
 
@@ -100,13 +104,22 @@ const mockPast = {
   lastChargedOn: null as string | null,
   ready: true,
   saving: false,
+  // The charges read, as the screen awaits it: what the page has read, or the read's failure.
+  load: jest.fn(async (): Promise<{ count: number; lastChargedOn: string | null }> => ({
+    count: 0,
+    lastChargedOn: mockPast.lastChargedOn,
+  })),
   choose: jest.fn(
-    async (_label: string, _changed: boolean) => 'upcoming' as 'upcoming' | 'all' | null,
+    async (_label: string, _changed: boolean, _past?: object) =>
+      'upcoming' as 'upcoming' | 'all' | null,
   ),
   apply: jest.fn(async (_values: object) => {}),
   retry: jest.fn(),
 };
 jest.mock('@/api/past-charges', () => ({ usePastCharges: () => mockPast }));
+
+// No row id unless a test gives one, as Jest's own stand-in answers, so the goldens stay as written.
+jest.mock('expo-crypto', () => ({ randomUUID: jest.fn() }));
 
 // The real chips, leads and wording; only the two hooks that read and write the reminder are replaced.
 jest.mock('@/api/push', () => ({ enableReminders: jest.fn() }));
@@ -373,6 +386,10 @@ beforeEach(() => {
   mockPast.lastChargedOn = null;
   mockPast.ready = true;
   mockPast.saving = false;
+  mockPast.load.mockImplementation(async () => ({
+    count: 0,
+    lastChargedOn: mockPast.lastChargedOn,
+  }));
   mockPast.choose.mockResolvedValue('upcoming');
   mockPast.apply.mockImplementation(async () => void mockOrder.push('apply'));
   mockApplyReminder.mockImplementation(async () => void mockOrder.push('reminder'));
@@ -414,7 +431,7 @@ describe('Add subscription — what a new subscription saves', () => {
       note: null,
       active: true,
     });
-    expect(mockPast.choose).toHaveBeenCalledWith('Netflix', false);
+    expect(mockPast.choose).toHaveBeenCalledWith('Netflix', false, READ);
     expect(mockPast.apply).not.toHaveBeenCalled();
     expect(mockApplyReminder).toHaveBeenCalledWith('subscription', 'sub-new', null, '09:00');
     expect(mockUpdate).not.toHaveBeenCalled();
@@ -462,7 +479,7 @@ describe('Add subscription — what a new subscription saves', () => {
       next_renewal_on: '2026-09-15',
       started_on: '2026-09-15',
     });
-    expect(mockPast.choose).toHaveBeenCalledWith('Netflix', false);
+    expect(mockPast.choose).toHaveBeenCalledWith('Netflix', false, READ);
   });
 
   it.each([
@@ -679,7 +696,7 @@ describe('Add subscription — what an edit saves', () => {
     });
     expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_domain');
     expect(mockUpdate.mock.calls[0][0].values).not.toHaveProperty('logo_hidden');
-    expect(mockPast.choose).toHaveBeenCalledWith('Spotify', false);
+    expect(mockPast.choose).toHaveBeenCalledWith('Spotify', false, READ);
     expect(mockApplyReminder).toHaveBeenCalledWith('subscription', 'sub-1', null, '09:00');
   });
 
@@ -700,7 +717,7 @@ describe('Add subscription — what an edit saves', () => {
       card_id: 'card-1',
       bank_account_id: null,
     });
-    expect(mockPast.choose).toHaveBeenCalledWith('Spotify', false);
+    expect(mockPast.choose).toHaveBeenCalledWith('Spotify', false, READ);
   });
 
   it('shows a row with no card or account on Skip and saves it that way', async () => {
@@ -719,7 +736,7 @@ describe('Add subscription — what an edit saves', () => {
       card_id: null,
       bank_account_id: null,
     });
-    expect(mockPast.choose).toHaveBeenCalledWith('Spotify', false);
+    expect(mockPast.choose).toHaveBeenCalledWith('Spotify', false, READ);
   });
 
   it('moves the start earlier when an earlier renewal is picked', async () => {
@@ -763,6 +780,22 @@ describe('Add subscription — what an edit saves', () => {
 
   it('floors the start after the last renewal already recorded', async () => {
     mockPast.lastChargedOn = '2026-09-10';
+    const screen = await render(<AddSubscriptionScreen />);
+
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      cycle: 'monthly',
+      next_renewal_on: '2026-10-10',
+      started_on: '2026-10-01',
+    });
+  });
+
+  it('floors the start after the last renewal the read finds, when the page had not read it yet', async () => {
+    // The page drew before the charges answered; what it waited for is what counts.
+    mockPast.ready = false;
+    mockPast.load.mockResolvedValueOnce({ count: 1, lastChargedOn: '2026-09-10' });
     const screen = await render(<AddSubscriptionScreen />);
 
     await press(screen, 'Save changes');
@@ -887,7 +920,7 @@ describe('Add subscription — what an edit saves', () => {
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-    expect(mockPast.choose).toHaveBeenCalledWith('Spotify', true);
+    expect(mockPast.choose).toHaveBeenCalledWith('Spotify', true, READ);
     expect(mockPast.apply).toHaveBeenCalledTimes(1);
     expect(mockPast.apply).toHaveBeenCalledWith({
       label: 'Spotify',
@@ -908,7 +941,7 @@ describe('Add subscription — what an edit saves', () => {
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-    expect(mockPast.choose).toHaveBeenCalledWith('Spotify', true);
+    expect(mockPast.choose).toHaveBeenCalledWith('Spotify', true, READ);
     expect(mockPast.apply).not.toHaveBeenCalled();
     expect(mockUpdate.mock.calls[0][0].values.amount).toBe(15.99);
   });
@@ -1119,15 +1152,38 @@ describe('Add subscription — the question, the write and the reminder', () => 
     expect(mockApplyReminder).toHaveBeenCalledWith('subscription', 'sub-1', null, '08:30');
   });
 
-  it('does not write while the past charges have not been read, and says so', async () => {
+  it('waits for the past charges before it writes, then saves', async () => {
     mockPast.ready = false;
+    let answer: (read: { count: number; lastChargedOn: string | null }) => void = () => {};
+    mockPast.load.mockImplementationOnce(() => new Promise((resolve) => void (answer = resolve)));
+    const screen = await render(<AddSubscriptionScreen />);
+    await readyNetflix(screen, '15.99');
+
+    await press(screen, 'Save subscription');
+    await waitFor(() => expect(mockPast.load).toHaveBeenCalledTimes(1));
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+
+    await act(async () => answer({ count: 0, lastChargedOn: null }));
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+  });
+
+  it('does not write when the past charges cannot be read, and says so', async () => {
+    mockPast.ready = false;
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const refused = new Error('read failed');
+    mockPast.load.mockRejectedValueOnce(refused);
     const screen = await render(<AddSubscriptionScreen />);
     await readyNetflix(screen, '15.99');
 
     await press(screen, 'Save subscription');
 
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
-    expect(mockPast.retry).toHaveBeenCalledTimes(1);
+    // Reported as a real failure, with its cause.
+    expect(log).toHaveBeenCalledWith('[failure]', refused);
+    log.mockRestore();
     expect(mockPast.choose).not.toHaveBeenCalled();
     expect(mockCreate).not.toHaveBeenCalled();
     expect(mockApplyReminder).not.toHaveBeenCalled();
@@ -1833,5 +1889,39 @@ describe('Add subscription — the logo', () => {
       logo_domain: null,
       logo_hidden: false,
     });
+  });
+});
+
+describe('Add subscription — saving again after a later step failed', () => {
+  it('files it once, under the visit’s id, then updates it and writes the reminder', async () => {
+    jest.mocked(randomUUID).mockReturnValueOnce('sub-visit');
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockApplyReminder.mockRejectedValueOnce(new Error('network down'));
+    const screen = await render(<AddSubscriptionScreen />);
+    await typedSubscription(screen, '15.99');
+    await chooseService(screen, 'Net', 'Netflix');
+    await pickDay(screen, NEXT_RENEWAL, 0, 'Thursday 15 October 2026');
+    await press(screen, 'VISA ••4421');
+    await press(screen, 'No reminder');
+
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'sub-visit', name: 'Netflix' }),
+    );
+
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      id: 'sub-new',
+      values: expect.objectContaining({ name: 'Netflix', amount: 15.99, card_id: 'card-1' }),
+    });
+    expect(mockApplyReminder).toHaveBeenCalledTimes(2);
+    expect(mockApplyReminder).toHaveBeenLastCalledWith('subscription', 'sub-new', null, '09:00');
+    log.mockRestore();
   });
 });

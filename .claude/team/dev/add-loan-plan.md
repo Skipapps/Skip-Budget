@@ -346,3 +346,16 @@ helpers.
 - **F5 (CEO):** unchanged for now (backlog R6).
 - **Plan approved by the CEO.** Order P1 → P2 → P3, Dmitri's review between each. Migrations are pushed to the live
   database only with the Founder's go, after the Docker scratch test and Dmitri's review.
+
+### Founder change (2026-10-13): First payment date replaces the payment day chips
+- **The Founder replaced the payment-day chips with a First payment date on 2026-10-13** (a 30 Nov start could not
+  be given its real 14 Jan first payment; picking 15 jumped to 15 Jan by F4). The details page now has a
+  **First payment** date field, built like Start date. It defaults to a month after the start on the start's day,
+  clamped (31 Jan → 28 Feb, paid on the 31st); a picked date stays when the start moves.
+- **F4 is retired.** `firstPaymentOn(start, day)` is gone; `src/lib/loan-first-payment.ts` now holds
+  `defaultFirstPayment` (start + 1 month), the limits (the day after the start to a year after it), and the
+  month-end helpers. The payment day comes from the picked date; on a short month's last day (28/29 Feb, 30 Apr)
+  chips ask "On the 28th" / "Last day of each month" (31), plus the start's day when the untouched default
+  stands for the 29th or 30th.
+- `payment_day` is stored exactly as before: null unless the first payment's own day is not the payment day.
+  No migration.

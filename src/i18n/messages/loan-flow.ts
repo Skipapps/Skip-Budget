@@ -50,7 +50,54 @@ export const loanFlowMessages = defineMessages({
     es: 'Cuándo recibiste el dinero',
     fr: 'Quand tu as reçu l’argent',
   },
-  'loanFlow.field.paymentDay': { en: 'Payment day', es: 'Día de pago', fr: 'Jour de paiement' },
+  'loanFlow.field.firstPayment': {
+    en: 'First payment',
+    es: 'Primer pago',
+    fr: 'Premier paiement',
+  },
+  'loanFlow.field.firstPaymentPlaceholder': {
+    en: 'When your first payment is due',
+    es: 'Cuándo vence tu primer pago',
+    fr: 'Quand ton premier paiement est dû',
+  },
+  // Under the First payment: the days after it. {day} is an ordinal in English ("14th"), the
+  // number in Spanish, and "1er" or the number in French (`dayOrdinal`).
+  'loanFlow.rhythm.day': {
+    en: 'Then every month on the {day}',
+    es: 'Después, cada mes el día {day}',
+    fr: 'Puis chaque mois le {day}',
+  },
+  // The 29th or 30th, which some months do not have: those months are paid on their last day.
+  'loanFlow.rhythm.lateDay': {
+    en: 'Then every month on the {day}, or the last day in shorter months',
+    es: 'Después, cada mes el día {day}, o el último día en los meses más cortos',
+    fr: 'Puis chaque mois le {day}, ou le dernier jour des mois plus courts',
+  },
+  'loanFlow.rhythm.monthEnd': {
+    en: 'Then on the last day of every month',
+    es: 'Después, el último día de cada mes',
+    fr: 'Puis le dernier jour de chaque mois',
+  },
+  // The chips under a first payment on a short month's last day (28 Feb, 30 Apr): that day, or
+  // every month's end.
+  'loanFlow.monthEnd.label': { en: 'Payment day', es: 'Día de pago', fr: 'Jour de paiement' },
+  'loanFlow.monthEnd.onDay': { en: 'On the {day}', es: 'El día {day}', fr: 'Le {day}' },
+  'loanFlow.monthEnd.lastDay': {
+    en: 'Last day of each month',
+    es: 'Último día de cada mes',
+    fr: 'Dernier jour de chaque mois',
+  },
+  // Under the First payment, and on Continue, when the date does not fit the start date.
+  'loanFlow.firstDate.notAfterStart': {
+    en: 'Pick a first payment after the start date.',
+    es: 'Elige un primer pago posterior a la fecha de inicio.',
+    fr: 'Choisis un premier paiement après la date de début.',
+  },
+  'loanFlow.firstDate.tooLate': {
+    en: 'Pick a first payment no later than {date}, a year after the start date.',
+    es: 'Elige un primer pago que no pase del {date}, un año después de la fecha de inicio.',
+    fr: 'Choisis un premier paiement au plus tard le {date}, un an après la date de début.',
+  },
   'loanFlow.field.addA11y': {
     en: '{label}, empty. Add',
     es: '{label}, vacío. Agregar',

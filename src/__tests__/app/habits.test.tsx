@@ -285,7 +285,7 @@ describe('the habits dashboard: Add a habit and the cards', () => {
       expect(router.push).toHaveBeenCalledTimes(1);
       expect(router.push).toHaveBeenCalledWith({
         pathname: '/pro-feature',
-        params: { id: 'habits' },
+        params: { id: 'habits', next: '/habit-new' },
       });
     }
     // A lapsed account keeps using its habits: the cards and days still work.

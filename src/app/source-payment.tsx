@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
@@ -45,6 +46,9 @@ export default function SourcePaymentScreen() {
   // '' is from outside (somewhere else, or new money); null is not answered yet.
   const [from, setFrom] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The payment's row id for this visit: a Save repeated after a lost answer finds the payment the
+  // first may have filed, never a second one taking the money twice (`insertOnce`).
+  const [paymentId] = useState(() => randomUUID());
 
   const value = Number(amount);
   const amountReady = Number.isFinite(value) && value > 0;
@@ -77,13 +81,13 @@ export default function SourcePaymentScreen() {
     setError(null);
     try {
       await createPayment.mutateAsync({
+        id: paymentId,
         card_id: isCard ? id : null,
         bank_account_id: isCard ? null : id,
         amount: value,
         paid_on: today,
         note: null,
-        // Left off, not sent as null: a database without the column still takes money from outside.
-        ...(source ? { from_bank_account_id: source } : {}),
+        from_bank_account_id: source || null,
       });
       success();
       toast(isCard ? 'toast.payment.added' : 'toast.money.added');

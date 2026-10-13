@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import SubscriptionDetailScreen from '@/app/subscription/[id]';
@@ -18,7 +18,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 's1' }),
 }));
 
-jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
+jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn(), warn: jest.fn() }));
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
@@ -36,21 +36,26 @@ jest.mock('@/components/brands/brand-mark', () => ({
   },
 }));
 
-// The stopped-plan Delete reads the charges and deletes; neither is reached on a running plan.
+// The stopped-plan Delete reads the charges, asks, and deletes; none is reached on a running plan.
+const mockLoadPast = jest.fn();
+const mockChooseDelete = jest.fn();
 jest.mock('@/api/past-charges', () => ({
   usePastCharges: () => ({
     ready: true,
     count: 0,
     lastChargedOn: null,
-    chooseDelete: jest.fn(),
+    load: () => mockLoadPast(),
+    chooseDelete: (...args: unknown[]) => mockChooseDelete(...args),
     retry: jest.fn(),
   }),
 }));
+const mockDelete = jest.fn();
 jest.mock('@/api/mutations', () => ({
   useDeleteBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
-  useDeleteSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useDeleteSubscription: () => ({ mutateAsync: mockDelete, isPending: false }),
 }));
-jest.mock('@/providers/dialog-provider', () => ({ useDialog: () => jest.fn() }));
+const mockAsk = jest.fn();
+jest.mock('@/providers/dialog-provider', () => ({ useDialog: () => mockAsk }));
 
 let mockRow: Record<string, unknown>;
 jest.mock('@/api/queries', () => ({
@@ -113,4 +118,48 @@ it.each([
   await render(<SubscriptionDetailScreen />);
 
   expect(mockMark).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Calm', ...expected }));
+});
+
+describe('Delete, on a cancelled subscription', () => {
+  const DELETE = 'Delete subscription';
+  type PastRead = { count: number; lastChargedOn: string | null };
+
+  beforeEach(() => {
+    mockLoadPast.mockImplementation(async () => ({ count: 0, lastChargedOn: null }));
+    mockChooseDelete.mockResolvedValue(null);
+    mockAsk.mockResolvedValue(null);
+  });
+
+  it('waits for the charges it has not read, then asks with their count', async () => {
+    mockRow = { ...CALM, active: false };
+    let arrive: (read: PastRead) => void = () => {};
+    mockLoadPast.mockImplementationOnce(() => new Promise((resolve) => (arrive = resolve)));
+    const screen = await render(<SubscriptionDetailScreen />);
+    await fireEvent.press(screen.getByText(DELETE));
+    expect(mockChooseDelete).not.toHaveBeenCalled();
+
+    await act(async () => arrive({ count: 3, lastChargedOn: '2026-09-01' }));
+    expect(mockChooseDelete).toHaveBeenCalledWith(
+      'Calm',
+      { stopped: true },
+      { count: 3, lastChargedOn: '2026-09-01' },
+    );
+    expect(mockAsk).not.toHaveBeenCalled();
+  });
+
+  it('says the one failure line when the charges cannot be read, and asks nothing', async () => {
+    mockRow = { ...CALM, active: false };
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const refused = new Error('read failed');
+    mockLoadPast.mockRejectedValueOnce(refused);
+    const screen = await render(<SubscriptionDetailScreen />);
+    await fireEvent.press(screen.getByText(DELETE));
+
+    expect(mockAsk).toHaveBeenCalledWith({ title: 'Something went wrong. Please try again.' });
+    // A real failure, reported with its cause.
+    expect(log).toHaveBeenCalledWith('[failure]', refused);
+    log.mockRestore();
+    expect(mockChooseDelete).not.toHaveBeenCalled();
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
 });

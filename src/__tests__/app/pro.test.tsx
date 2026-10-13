@@ -19,6 +19,7 @@ jest.mock('react-native-keyboard-controller', () =>
 let mockScreenOptions: { gestureEnabled?: boolean } = {};
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
+  useLocalSearchParams: () => ({}),
   Stack: {
     Screen: ({ options }: { options: { gestureEnabled?: boolean } }) => {
       mockScreenOptions = options;

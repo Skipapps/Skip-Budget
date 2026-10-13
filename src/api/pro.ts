@@ -17,8 +17,8 @@ import { useUserId } from '@/providers/session-provider';
  * The one door to "does this account pay". RevenueCat's SDK knows the moment Apple's sheet closes
  * and caches its answer offline; the `entitlements` row is the server's copy, written by the
  * webhook and read by every database check. The hook prefers the SDK and falls back to the row, so
- * it works with no key configured. Nothing else imports react-native-purchases; features ask
- * `usePro()`.
+ * it works with no key configured. Features ask `usePro()`. Only confirm-pro.ts also reads the
+ * SDK, past its cache, when the database refuses a Pro write the app allowed.
  *
  * The answer is worked out once, by the purchases bridge at the root, and published to a shared
  * store; `usePro()` only reads that store, so it is cheap enough to call from every row of a list.
@@ -30,49 +30,71 @@ const RC_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '';
 const ENTITLEMENT_TIMEOUT_MS = 8_000;
 
 let configuredFor: string | null = null;
-let configuring: Promise<boolean> | null = null;
+/** The account most recently asked for: the one signed in now, as far as the app knows. */
+let latestAsked: string | null = null;
+/** The sign-in under way, and whose it is. */
+let configuring: { userId: string; done: Promise<boolean> } | null = null;
 /** Why configure last failed, surfaced rather than guessed at. */
 let lastConfigureError: string | null = null;
 
 /**
- * Configure exactly once, and make every SDK caller wait for it. Touching the SDK before configure
- * succeeds throws "no singleton instance", so nobody talks to it until this resolves true; a
- * failure is retried on the next call, and setLogLevel runs after configure so it cannot abort it.
+ * Configure exactly once, then sign each later account in with logIn, and make every SDK caller
+ * wait. Touching the SDK before configure succeeds throws "no singleton instance", so nobody talks
+ * to it until this resolves true; a failure is retried on the next call.
+ *
+ * A call for one account while another's sign-in is under way waits for it and then signs its own
+ * account in: answering true at once would let the second account read, and buy, as the first. A
+ * waiting call gives way (false) if someone else has been asked for since, so A, then B, then A
+ * again within one logIn ends signed in as A, not B.
  */
 function ensureConfigured(userId: string): Promise<boolean> {
   if (!RC_KEY) return Promise.resolve(false);
+  latestAsked = userId;
+  return configureFor(userId);
+}
+
+function configureFor(userId: string): Promise<boolean> {
+  if (configuring) {
+    if (configuring.userId === userId) return configuring.done;
+    return configuring.done.then(() => (latestAsked === userId ? configureFor(userId) : false));
+  }
   if (configuredFor === userId) return Promise.resolve(true);
 
-  if (!configuring) {
-    configuring = (async () => {
-      // Two attempts: the first native call of a launch can race bridge start-up, and one retry
-      // separates a transient stumble from a real fault.
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        try {
-          if (configuredFor === null) {
-            Purchases.configure({ apiKey: RC_KEY, appUserID: userId });
-            try {
-              Purchases.setLogLevel(LOG_LEVEL.WARN);
-            } catch {
-              // Log verbosity is not worth failing configuration over.
-            }
-          } else {
-            await Purchases.logIn(userId);
-          }
-          configuredFor = userId;
-          lastConfigureError = null;
-          configuring = null;
-          return true;
-        } catch (thrown) {
-          lastConfigureError = (thrown as Error).message || String(thrown);
-          await new Promise((resolve) => setTimeout(resolve, 400));
-        }
+  // Started a tick later so `configuring` is set before any of it runs: configure is synchronous,
+  // and a sign-in that finished inside this call would otherwise leave its promise behind as the
+  // answer for every later account.
+  const entry = { userId, done: Promise.resolve().then(() => signIn(userId)) };
+  configuring = entry;
+  const clear = () => {
+    if (configuring === entry) configuring = null;
+  };
+  void entry.done.then(clear, clear);
+  return entry.done;
+}
+
+async function signIn(userId: string): Promise<boolean> {
+  // Two attempts: the first native call of a launch can race bridge start-up, and one retry
+  // separates a transient stumble from a real fault.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      if (configuredFor === null) {
+        Purchases.configure({ apiKey: RC_KEY, appUserID: userId });
+        // After configure, so log verbosity can never abort it.
+        void Promise.resolve()
+          .then(() => Purchases.setLogLevel(LOG_LEVEL.WARN))
+          .catch(() => {});
+      } else {
+        await Purchases.logIn(userId);
       }
-      configuring = null;
-      return false;
-    })();
+      configuredFor = userId;
+      lastConfigureError = null;
+      return true;
+    } catch (thrown) {
+      lastConfigureError = (thrown as Error).message || String(thrown);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
   }
-  return configuring;
+  return false;
 }
 
 /** True on real hardware with a key present — the only case purchases work. */
@@ -84,6 +106,15 @@ function proFrom(info: CustomerInfo | null): boolean {
   // Either identifier counts (the dashboard entitlement is skip_budget_pro, the plan said pro), so
   // a rename can never lock out paying customers.
   return Boolean(info?.entitlements.active['pro'] || info?.entitlements.active['skip_budget_pro']);
+}
+
+/**
+ * Whether this CustomerInfo speaks for the signed-in account. Every RevenueCat customer here was
+ * created by configure or logIn with the Supabase id, so its original id is that id; anything else
+ * is another account's answer arriving late, and believing it shows Pro the database will refuse.
+ */
+function isFor(info: CustomerInfo | null | undefined, userId: string): info is CustomerInfo {
+  return info != null && info.originalAppUserId === userId;
 }
 
 /**
@@ -134,16 +165,17 @@ export function useProSource(): ProStatus {
     // app read it again anyway.
     retry: false,
     queryFn: async (): Promise<boolean> => {
-      // A ceiling on the wait: until this answers (or fails), a "no" from the SDK alone does not
-      // count as known, so a hung request would hold every gate.
+      // is_pro() is the very check the database's Pro walls make, run on the server's clock, so
+      // the app and the walls cannot disagree over a phone whose clock is wrong. A ceiling on the
+      // wait: until this answers (or fails), a "no" from the SDK alone does not count as known, so
+      // a hung request would hold every gate.
       const { data, error } = await withTimeout(
-        Promise.resolve(supabase.from('entitlements').select('pro, expires_at').maybeSingle()),
+        Promise.resolve(supabase.rpc('is_pro', { p_user: userId })),
         ENTITLEMENT_TIMEOUT_MS,
         'Could not check Skip Pro.',
       );
       if (error) throw error;
-      if (!data?.pro) return false;
-      return !data.expires_at || new Date(data.expires_at).getTime() > Date.now();
+      return data === true;
     },
   });
 
@@ -153,7 +185,7 @@ export function useProSource(): ProStatus {
     let listening = false;
 
     const listener = (info: CustomerInfo) => {
-      if (!live) return;
+      if (!live || !isFor(info, userId)) return;
       setSdk({ userId, pro: proFrom(info) });
       // The SDK heard it first; the server row lands via webhook later. Refetching keeps them
       // agreeing.
@@ -168,7 +200,7 @@ export function useProSource(): ProStatus {
       listening = true;
       try {
         const info = await Purchases.getCustomerInfo();
-        if (live) setSdk({ userId, pro: proFrom(info) });
+        if (live && isFor(info, userId)) setSdk({ userId, pro: proFrom(info) });
       } catch {
         // The server row still answers.
       }
@@ -353,7 +385,7 @@ export function usePurchasePro() {
     }
     const info = await Purchases.restorePurchases();
     client.invalidateQueries({ queryKey: ['entitlement'] });
-    return proFrom(info);
+    return isFor(info, userId) && proFrom(info);
   }, [client, userId]);
 
   return { purchase, restore };

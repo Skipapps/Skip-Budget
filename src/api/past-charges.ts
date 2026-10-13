@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
-import { useCharges } from '@/api/charges';
+import { useCharges, type ChargeRow } from '@/api/charges';
 import { usePastChoice, type PastDelete, type PastNoun } from '@/components/ui/past-choice';
 import { supabase } from '@/lib/supabase';
 
@@ -74,34 +74,64 @@ function useRewritePastCharges() {
   });
 }
 
+/** What the charges read says about one plan. */
+export type PastRead = {
+  /** How many charges (a loan's payments) are recorded for the plan. */
+  count: number;
+  /** The newest day the plan has been charged, for `floorAfterCharges`. */
+  lastChargedOn: string | null;
+};
+
+const NO_PAST: PastRead = { count: 0, lastChargedOn: null };
+
+function pastOf(charges: readonly ChargeRow[], kind: Kind, planId: string): PastRead {
+  const mine = charges.filter((charge) => charge[COLUMN[kind]] === planId);
+  return {
+    count: mine.length,
+    lastChargedOn: mine.reduce<string | null>(
+      (latest, charge) => (!latest || charge.charged_on > latest ? charge.charged_on : latest),
+      null,
+    ),
+  };
+}
+
 /**
  * The questions behind "Past and upcoming" and "Keep past". Each resolves to the answer, or null
- * when the person backed out, and then nothing may be written. Both wait for the charges read
- * (`ready`): a read that has not answered is not "no charges", so either returns null until it has.
+ * when the person backed out, and then nothing may be written. A read that has not answered is not
+ * "no charges": a screen awaits `load()` and hands its answer to the question. Asked without one
+ * before the charges are read (`ready`), either returns null.
  */
 export function usePastCharges(kind: Kind, planId: string | undefined) {
   const charges = useCharges();
   const { askChange, askDelete } = usePastChoice();
   const rewrite = useRewritePastCharges();
 
-  const mine = planId
-    ? (charges.data ?? []).filter((charge) => charge[COLUMN[kind]] === planId)
-    : [];
-  const count = mine.length;
-  // The newest day this plan has been charged, for `floorAfterCharges`.
-  const lastChargedOn = mine.reduce<string | null>(
-    (latest, charge) => (!latest || charge.charged_on > latest ? charge.charged_on : latest),
-    null,
-  );
-  const ready = !planId || charges.isSuccess;
+  const { data, isSuccess, refetch } = charges;
+  const { count, lastChargedOn } = planId ? pastOf(data ?? [], kind, planId) : NO_PAST;
+  const ready = !planId || isSuccess;
   const noun = NOUN[kind];
 
-  /** On Save of an edit; with nothing to ask (a new plan, nothing copied changed, no charges) it is 'upcoming' at once. */
+  /**
+   * The plan's charges once the read has answered: at once when it has, otherwise after waiting for
+   * it (the read already on its way, or a new one). Rejects only when the read fails.
+   */
+  const load = useCallback(async (): Promise<PastRead> => {
+    if (!planId) return NO_PAST;
+    const rows = isSuccess
+      ? (data ?? [])
+      : ((await refetch({ throwOnError: true, cancelRefetch: false })).data ?? []);
+    return pastOf(rows, kind, planId);
+  }, [data, isSuccess, kind, planId, refetch]);
+
+  /**
+   * On Save of an edit; with nothing to ask (a new plan, nothing copied changed, no charges) it is
+   * 'upcoming' at once. `past` is what `load()` answered.
+   */
   const choose = useCallback(
-    async (name: string, changed: boolean): Promise<PastChargesScope | null> => {
+    async (name: string, changed: boolean, past?: PastRead): Promise<PastChargesScope | null> => {
       if (!planId || !changed) return 'upcoming';
-      if (!ready) return null;
-      return askChange({ name, noun, count });
+      if (!past && !ready) return null;
+      return askChange({ name, noun, count: past?.count ?? count });
     },
     [askChange, count, noun, planId, ready],
   );
@@ -109,18 +139,19 @@ export function usePastCharges(kind: Kind, planId: string | undefined) {
   /**
    * On Delete. `stopped`: the plan has already stopped, so its past is kept and the only choice is
    * to remove it. `extra`: past that is not a charge but goes with the plan, a loan's payoffs.
-   * With no past at all it is the plain confirm.
+   * With no past at all it is the plain confirm. `past` is what `load()` answered.
    */
   const chooseDelete = useCallback(
     async (
       name: string,
       options: { stopped?: boolean; extra?: number } = {},
+      past?: PastRead,
     ): Promise<PastDelete | null> => {
-      if (!ready) return null;
+      if (!past && !ready) return null;
       return askDelete({
         name,
         noun,
-        count: count + (options.extra ?? 0),
+        count: (past?.count ?? count) + (options.extra ?? 0),
         stopped: options.stopped,
       });
     },
@@ -144,11 +175,12 @@ export function usePastCharges(kind: Kind, planId: string | undefined) {
     count,
     lastChargedOn,
     /**
-     * Whether an edit or a delete can go ahead yet. `lastChargedOn` stops a moved due date charging
-     * a cycle twice, and the questions need the count, so both wait for the read rather than guess.
+     * Whether the charges have been read. `lastChargedOn` stops a moved due date charging a cycle
+     * twice, and the questions need the count, so an edit or a delete awaits `load()` until then.
      */
     ready,
-    retry: () => void charges.refetch(),
+    load,
+    retry: () => void refetch(),
     saving: rewrite.isPending,
   };
 }

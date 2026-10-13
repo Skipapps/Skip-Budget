@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
-import { NOTHING_UPDATED, type ReceiptValues } from '@/api/mutations';
+import { insertOnce, NOTHING_UPDATED, type ClientId, type ReceiptValues } from '@/api/mutations';
 import { habitColor, type HabitColor } from '@/data/habit-colors';
 import { withTimeout } from '@/lib/deadline';
 import type { HabitMaths, HabitTap } from '@/lib/habit-week';
@@ -245,23 +245,18 @@ function trimmed<T extends Partial<HabitValues>>(values: T): T {
 
 /**
  * Starts a habit. Pro only: a free account is refused by the database with "part of Skip Pro"
- * (`refusedForPro`). Resolves to the saved row.
+ * (`refusedForPro`). Resolves to the saved row. Given the form's client id, saving again after a
+ * lost answer files no second habit (`insertOnce`).
  */
 export function useCreateHabit() {
   const userId = useUserId();
   const invalidate = useInvalidateHabits();
 
   return useMutation({
-    mutationFn: async (values: HabitValues): Promise<HabitRow> => {
+    mutationFn: async ({ id, ...values }: HabitValues & ClientId): Promise<HabitRow> => {
       if (!userId) throw new Error('Sign in first.');
-      const payload = { ...trimmed(values), user_id: userId };
-      const { data, error } = await supabase
-        .from('habits')
-        .insert(payload as never)
-        .select(HABIT_COLUMNS)
-        .single();
-      if (error) throw error;
-      return readHabit(data as unknown as RawHabit);
+      const row = await insertOnce('habits', trimmed(values), userId, HABIT_COLUMNS, id);
+      return readHabit(row as unknown as RawHabit);
     },
     onSuccess: invalidate,
   });
@@ -486,24 +481,37 @@ export function useUntapHabitDay() {
 /**
  * How many days a habit has filed (its receipts, whatever their date), from `useHabitTaps`'s read:
  * whether an edit or a delete has past days to ask about. `count` is null until that read has
- * answered, and unread is not "none": the screen waits for `ready`, or offers `retry`, before it
- * asks, rather than guess and rewrite or remove days nobody was asked about.
+ * answered, and unread is not "none": the screen awaits `load()` before it asks, rather than guess
+ * and rewrite or remove days nobody was asked about.
  */
 export function useHabitPastDays(habitId: string | undefined) {
   const { data, isSuccess, refetch } = useHabitTaps();
 
-  const mine = useMemo(
-    () => (habitId && data ? data.filter((tap) => tap.habitId === habitId).length : 0),
-    [data, habitId],
-  );
+  const mine = useMemo(() => (habitId && data ? daysOf(data, habitId) : 0), [data, habitId]);
   const retry = useCallback(() => void refetch(), [refetch]);
+
+  /**
+   * The count once the read has answered: at once when it has, otherwise after waiting for it (the
+   * read already on its way, or a new one). Rejects only when the read fails.
+   */
+  const load = useCallback(async (): Promise<number> => {
+    if (!habitId) return 0;
+    if (isSuccess) return mine;
+    const read = await refetch({ throwOnError: true, cancelRefetch: false });
+    return daysOf(read.data ?? [], habitId);
+  }, [habitId, isSuccess, mine, refetch]);
 
   return {
     count: !habitId ? 0 : isSuccess ? mine : null,
     /** Whether the count has been read; until then `count` is null. */
     ready: !habitId || isSuccess,
     retry,
+    load,
   };
+}
+
+function daysOf(taps: readonly HabitTap[], habitId: string): number {
+  return taps.filter((tap) => tap.habitId === habitId).length;
 }
 
 /**

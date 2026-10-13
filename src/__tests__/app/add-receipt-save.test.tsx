@@ -1,4 +1,5 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
 
 import AddReceiptScreen from '@/app/add-receipt';
@@ -112,6 +113,14 @@ jest.mock('expo-router', () => ({
 
 let mockPro = { pro: true, ready: true };
 jest.mock('@/api/pro', () => ({ usePro: () => mockPro }));
+// No row id unless a test gives one, as Jest's own stand-in answers, so the goldens stay as written.
+jest.mock('expo-crypto', () => ({ randomUUID: jest.fn() }));
+// What asking the store and the database again answers, after a Pro refusal the app disagrees with.
+const mockConfirmPro = jest.fn(async () => 'unknown');
+jest.mock('@/api/confirm-pro', () => {
+  const actual = jest.requireActual('@/api/confirm-pro');
+  return { ...actual, useProWrite: () => actual.useProWrite(() => mockConfirmPro()) };
+});
 
 const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
@@ -1464,7 +1473,7 @@ describe('Add receipt — a save the database refuses for Pro', () => {
     },
   );
 
-  it('a refusal for someone the app thinks has Pro is a failure: the line is shown and reported', async () => {
+  it('a refusal for someone the app thinks has Pro is asked again first, and only then a failure: the line is shown and reported', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     const refusal = { code: 'P0001', message: 'Scanning receipts is part of Skip Pro.' };
     mockCreate.mockRejectedValueOnce(refusal);
@@ -1474,6 +1483,8 @@ describe('Add receipt — a save the database refuses for Pro', () => {
     await press(screen, 'Save receipt');
 
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(mockConfirmPro).toHaveBeenCalledTimes(1);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
     expect(router.push).not.toHaveBeenCalled();
     expect(mockRecount).not.toHaveBeenCalled();
     // failureMessage's report: the Metro log in development, Sentry in a release build.
@@ -1866,5 +1877,26 @@ describe('Add receipt — the logo', () => {
     await readyReceipt(screen, '12');
 
     expect(screen.queryByLabelText(LOGO_COPY.changeLogo)).toBeNull();
+  });
+});
+
+describe('Add receipt — saving again after a failure', () => {
+  it('files under the visit’s one id both times, so a first write that landed is found', async () => {
+    jest.mocked(randomUUID).mockReturnValueOnce('receipt-visit');
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockCreate.mockRejectedValueOnce(new Error('TypeError: Network request failed'));
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '12.50');
+
+    await press(screen, 'Save receipt');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls.map(([values]) => values.id)).toEqual([
+      'receipt-visit',
+      'receipt-visit',
+    ]);
+    log.mockRestore();
   });
 });

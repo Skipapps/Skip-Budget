@@ -31,6 +31,10 @@ jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
   useFocusEffect: () => {},
   useLocalSearchParams: () => mockParams,
+  useCurrentRouteInfo: () => {
+    const query = new URLSearchParams(mockParams).toString();
+    return { pathnameWithParams: query ? `/payment-export?${query}` : '/payment-export' };
+  },
   Redirect: ({ href }: { href: unknown }) => {
     mockRedirect(href);
     return null;
@@ -168,7 +172,7 @@ describe('the gate', () => {
     await render(<PaymentExportRoute />);
     expect(mockRedirect).toHaveBeenCalledWith({
       pathname: '/pro-feature',
-      params: { id: 'export' },
+      params: { id: 'export', next: '/payment-export' },
     });
     expect(screen.queryByText('Export')).toBeNull();
     expect(mockRoutePayments).not.toHaveBeenCalled();

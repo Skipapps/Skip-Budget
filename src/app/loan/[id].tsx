@@ -5,7 +5,7 @@ import { View } from 'react-native';
 
 import { useLoanDetail } from '@/api/loans';
 import { useDeleteBill, useDeletePayoff } from '@/api/mutations';
-import { usePastCharges } from '@/api/past-charges';
+import { usePastCharges, type PastRead } from '@/api/past-charges';
 import { LoanViewCard } from '@/components/loans/view/loan-view-card';
 import { loanViewOf, spokenDate, type HistoryRow } from '@/components/loans/view/loan-view-data';
 import { LoanViewFooter } from '@/components/loans/view/loan-view-footer';
@@ -48,6 +48,8 @@ export default function LoanScreen() {
   const deleteBill = useDeleteBill();
   // Held from the press until the loan is gone: the page leaves once the read no longer finds it.
   const [deleting, setDeleting] = useState(false);
+  // While the payments are read before the question: Delete waits.
+  const [readingPast, setReadingPast] = useState(false);
 
   // Deleted from its edit page or on another phone. Only while this page is on top: under the edit
   // page, that page makes the one navigation its Delete calls for.
@@ -66,18 +68,24 @@ export default function LoanScreen() {
   const openEdit = () => router.push({ pathname: '/add-loan', params: { id } });
 
   const removeLoan = async () => {
-    if (!loan || !view || deleting) return;
+    if (!loan || !view || deleting || readingPast) return;
     // The question counts the payments, so it waits for them.
-    if (!pastCharges.ready) {
-      pastCharges.retry();
+    setReadingPast(true);
+    let past: PastRead;
+    try {
+      past = await pastCharges.load();
+    } catch (thrown) {
+      setReadingPast(false);
       warn();
-      await ask({ title: failureText() });
+      await ask({ title: failureMessage(thrown) });
       return;
     }
-    const choice = await pastCharges.chooseDelete(view.name, {
-      stopped: true,
-      extra: loan.payoffs.length,
-    });
+    setReadingPast(false);
+    const choice = await pastCharges.chooseDelete(
+      view.name,
+      { stopped: true, extra: loan.payoffs.length },
+      past,
+    );
     if (choice !== 'everything') return;
     setDeleting(true);
     try {
@@ -181,7 +189,11 @@ export default function LoanScreen() {
                 }
           }
           onEdit={finished ? undefined : openEdit}
-          onDelete={finished ? { onPress: () => void removeLoan(), busy: deleting } : undefined}
+          onDelete={
+            finished
+              ? { onPress: () => void removeLoan(), busy: deleting || readingPast }
+              : undefined
+          }
         />
       }
     >

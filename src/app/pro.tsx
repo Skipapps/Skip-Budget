@@ -1,4 +1,4 @@
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import {
   CalendarCheck,
   ChartColumn,
@@ -97,6 +97,8 @@ const SWIPE_BACK = { gestureEnabled: true };
 export default function ProScreen() {
   const colors = useColors();
   const { pro } = usePro();
+  // Opened from a feature's explainer, which goes on into the feature once this page returns to it.
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const prices = useProPrices();
   const { purchase, restore } = usePurchasePro();
 
@@ -194,6 +196,10 @@ export default function ProScreen() {
     setBusy(true);
     try {
       const restored = await restore();
+      if (restored && from === 'feature') {
+        goBack();
+        return;
+      }
       setMessage(t(restored ? 'pro.page.restored' : 'pro.page.nothingToRestore'));
     } catch (thrown) {
       setMessage(failureMessage(thrown));

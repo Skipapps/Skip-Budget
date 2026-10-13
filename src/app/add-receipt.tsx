@@ -1,5 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { randomUUID } from 'expo-crypto';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   AlignLeft,
@@ -15,7 +16,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { guessCategory, matchBrand, useBrandDirectory, useSpendCategories } from '@/api/brands';
 import { useHabit } from '@/api/habits';
 import { useCaptureAllowance } from '@/api/capture-allowance';
-import { usePro } from '@/api/pro';
+import { useProWrite } from '@/api/confirm-pro';
 import { buildReceiptValues } from '@/api/entry-values';
 import { receiptParseOptions } from '@/api/scan';
 import {
@@ -60,7 +61,6 @@ import { formatEntryDay } from '@/lib/entry-day';
 import { failureMessage, failureText } from '@/lib/failure';
 import { logoColumns } from '@/lib/logo-columns';
 import { logoDomainOf, type LogoFields } from '@/lib/logo-domain';
-import { refusedForPro } from '@/lib/pro-refusal';
 import { receiptCategoryName } from '@/lib/receipt-category';
 import { bookColumn, bookOfReceipt, defaultBookOf } from '@/lib/receipt-books';
 import { GENERAL_BOOK } from '@/data/receipt-books';
@@ -421,12 +421,16 @@ function ReceiptForm({
   const { data: directory = [] } = useBrandDirectory();
 
   const createReceipt = useCreateReceipt();
+  // A new receipt's row id for this visit, typed, scanned, spoken or a habit's day alike, so a Save
+  // repeated after a lost answer finds the receipt the first may have filed instead of filing a
+  // second (`insertOnce`).
+  const [newId] = useState(() => randomUUID());
   const updateReceipt = useUpdateReceipt();
   const deleteReceipt = useDeleteReceipt();
   const confirm = useConfirm();
   const toast = useToast();
   const ask = useDialog();
-  const { pro } = usePro();
+  const proWrite = useProWrite();
   const allowance = useCaptureAllowance();
 
   // A hand edit retires the scan report: telling someone to check an amount they just corrected is
@@ -684,7 +688,19 @@ function ReceiptForm({
       if (editing && id) {
         await updateReceipt.mutateAsync({ id, values });
       } else {
-        await createReceipt.mutateAsync(values);
+        const saved = await proWrite.run(() => createReceipt.mutateAsync({ ...values, id: newId }));
+        // The database's Pro wall, and the account is free: show what Pro adds, pushed so Back
+        // returns to the filled-in form.
+        if (saved.status === 'free') {
+          // Another phone, or a month already turned where the account lives: the count catches up.
+          if (captureSource === 'scan' || captureSource === 'upload') allowance.recount();
+          router.push({
+            pathname: '/pro-feature',
+            params: { id: captureSource === 'voice' ? 'voice' : 'scan' },
+          });
+          return;
+        }
+        if (saved.status === 'left') return;
       }
       success();
       toast(editing ? 'toast.receipt.updated' : 'toast.receipt.added');
@@ -694,18 +710,6 @@ function ReceiptForm({
     } catch (thrown) {
       if (habit && dayTaken(thrown)) {
         fail(t('habits.receipt.dayTaken', { name: habit.name }));
-        return;
-      }
-      // The database's Pro wall is an answer for someone the app also thinks is free: show what Pro
-      // adds, pushed so Back returns to the filled-in form. For someone the app thinks has Pro it is
-      // a disagreement between the two, so it is reported like any failure.
-      if (refusedForPro(thrown) && !pro) {
-        // Another phone, or a month already turned where the account lives: the count catches up.
-        if (captureSource === 'scan' || captureSource === 'upload') allowance.recount();
-        router.push({
-          pathname: '/pro-feature',
-          params: { id: captureSource === 'voice' ? 'voice' : 'scan' },
-        });
         return;
       }
       warn();
@@ -732,7 +736,7 @@ function ReceiptForm({
     }
   };
 
-  const busy = createReceipt.isPending || updateReceipt.isPending;
+  const busy = createReceipt.isPending || updateReceipt.isPending || proWrite.checking;
   // The page this form opened on. Anywhere else the edge swipe is off, and Back steps back.
   const isRoot = view === initialView;
 
@@ -754,11 +758,13 @@ function ReceiptForm({
           {t('receipts.scan.read', { fields: listWords(scanResult.read) })}
         </Text>
       ) : (
+        // Nothing failed: the camera worked and the receipt gave nothing back.
         <Text className="font-app text-[13px] text-ink" maxFontSizeMultiplier={TEXT_CAP.row}>
-          {failureText()}
+          {t('receipts.scan.nothing')}
         </Text>
       )}
-      {scanResult.missed.length > 0 ? (
+      {/* With nothing read, the line above already says to fill in every field. */}
+      {scanResult.read.length > 0 && scanResult.missed.length > 0 ? (
         <Text className="mt-1 font-app text-[13px] text-muted" maxFontSizeMultiplier={TEXT_CAP.row}>
           {t('receipts.scan.check', { fields: listWords(scanResult.missed) })}
         </Text>
@@ -1043,11 +1049,13 @@ function ReceiptForm({
       topSlot={scanReport}
       rows={rows}
       primaryLabel={
-        busy
-          ? t('receipts.add.saving')
-          : editing
-            ? t('receipts.add.saveChanges')
-            : t('receipts.add.saveReceipt')
+        proWrite.checking
+          ? t('pro.confirm.wait')
+          : busy
+            ? t('receipts.add.saving')
+            : editing
+              ? t('receipts.add.saveChanges')
+              : t('receipts.add.saveReceipt')
       }
       // Never greyed out for a gap: Save says what is still missing.
       primaryDisabled={busy}

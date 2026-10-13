@@ -643,7 +643,12 @@ describe('search and export', () => {
     mockPro = { pro: false, ready: true };
     await open({}, dataOf(FREE));
     await fireEvent.press(screen.getByRole('button', { name }));
-    expect(pushed()).toEqual([{ pathname: '/pro-feature', params: { id: 'export' } }]);
+    expect(pushed()).toEqual([
+      {
+        pathname: '/pro-feature',
+        params: { id: 'export', next: '/payment-export?kind=all&year=2026' },
+      },
+    ]);
   });
 
   it('does nothing until Pro is known', async () => {

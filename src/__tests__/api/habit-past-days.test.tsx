@@ -31,6 +31,8 @@ const mockRequests: Request[] = [];
 const mockRpcs: [string, unknown][] = [];
 /** Answers in the order the requests are awaited; an empty queue answers with no rows. */
 const mockAnswers: Answer[] = [];
+/** When set, every answer waits for it: a read still on its way. */
+let mockGate: Promise<void> | null = null;
 
 jest.mock('@/lib/supabase', () => {
   const answer = () => ({ data: null, error: null, count: null, ...mockAnswers.shift() });
@@ -57,7 +59,8 @@ jest.mock('@/lib/supabase', () => {
         return builder;
       };
     }
-    builder.then = (resolve: (value: unknown) => unknown) => resolve(answer());
+    builder.then = (resolve: (value: unknown) => unknown) =>
+      mockGate ? mockGate.then(() => resolve(answer())) : resolve(answer());
     return builder;
   };
   return {
@@ -84,6 +87,7 @@ beforeEach(() => {
   mockRequests.length = 0;
   mockRpcs.length = 0;
   mockAnswers.length = 0;
+  mockGate = null;
   client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },
@@ -482,5 +486,57 @@ describe('useHabitPastDays', () => {
     const { result } = await renderHook(() => useHabitPastDays(undefined), { wrapper });
 
     expect(result.current).toMatchObject({ count: 0, ready: true });
+    await expect(result.current.load()).resolves.toBe(0);
+  });
+
+  describe('load', () => {
+    it('answers at once from the taps already read, with no read of its own', async () => {
+      mockAnswers.push({ data: [tap(1, 'habit-coffee'), tap(2, 'habit-coffee')], count: 2 });
+      const { result } = await renderHook(() => useHabitPastDays('habit-coffee'), { wrapper });
+      await waitFor(() => expect(result.current.ready).toBe(true));
+
+      await expect(settle(() => result.current.load())).resolves.toBe(2);
+      expect(mockRequests).toHaveLength(1);
+    });
+
+    it('waits for the read already on its way, and starts no second one', async () => {
+      let open: () => void = () => {};
+      mockGate = new Promise<void>((resolve) => (open = resolve));
+      mockAnswers.push({
+        data: [tap(1, 'habit-coffee'), tap(2, 'habit-rides'), tap(3, 'habit-coffee')],
+        count: 3,
+      });
+      const { result } = await renderHook(() => useHabitPastDays('habit-coffee'), { wrapper });
+      await waitFor(() => expect(mockRequests).toHaveLength(1));
+      expect(result.current.ready).toBe(false);
+
+      const counted = result.current.load();
+      open();
+      await expect(settle(() => counted)).resolves.toBe(2);
+      expect(mockRequests).toHaveLength(1);
+    });
+
+    it('reads again after a failed read, and answers with the count', async () => {
+      mockAnswers.push({ error: { code: '08006', message: 'connection failure' } });
+      const { result } = await renderHook(() => useHabitPastDays('habit-coffee'), { wrapper });
+      await waitFor(() => expect(mockRequests).toHaveLength(1));
+      await settle(async () => {});
+      expect(result.current.ready).toBe(false);
+
+      mockAnswers.push({ data: [tap(1, 'habit-coffee')], count: 1 });
+      await expect(settle(() => result.current.load())).resolves.toBe(1);
+      expect(mockRequests).toHaveLength(2);
+    });
+
+    it('rejects with the failure when the read fails again: unread is never none', async () => {
+      const refused = { code: '08006', message: 'connection failure' };
+      mockAnswers.push({ error: refused });
+      const { result } = await renderHook(() => useHabitPastDays('habit-coffee'), { wrapper });
+      await waitFor(() => expect(mockRequests).toHaveLength(1));
+      await settle(async () => {});
+
+      mockAnswers.push({ error: refused });
+      await expect(settle(() => result.current.load())).rejects.toEqual(refused);
+    });
   });
 });

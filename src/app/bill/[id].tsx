@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { useLoanDetail } from '@/api/loans';
 import { useDeleteBill } from '@/api/mutations';
-import { usePastCharges } from '@/api/past-charges';
+import { usePastCharges, type PastRead } from '@/api/past-charges';
 import { useBills, usePaymentSources } from '@/api/queries';
 import { BillMark } from '@/components/bills/bill-mark';
 import { ChangeLogoButton } from '@/components/brands/change-logo-button';
@@ -12,7 +12,7 @@ import { PlanDetail, type PlanDetailRow } from '@/components/plans/plan-detail';
 import { getBillCategory } from '@/data/bill-categories';
 import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
-import { failureMessage, failureText } from '@/lib/failure';
+import { failureMessage } from '@/lib/failure';
 import { warn } from '@/lib/haptics';
 import { isLoanBill } from '@/lib/ledger-link';
 import { logoDomainOf } from '@/lib/logo-domain';
@@ -40,22 +40,31 @@ export default function BillDetailScreen() {
   const toast = useToast();
   // Held from the press until the bill is gone: the page leaves once the list no longer has it.
   const [deleting, setDeleting] = useState(false);
+  // While the charges are read before the question: Delete waits.
+  const [readingPast, setReadingPast] = useState(false);
 
   const bill = bills.data ? (bills.data.find((row) => row.id === id) ?? null) : undefined;
   const stopped = bill ? billStopped(bill, today) : false;
 
   const remove = async () => {
-    if (!bill || deleting) return;
+    if (!bill || deleting || readingPast) return;
     // The question counts the charges, so it waits for them.
-    if (!pastCharges.ready) {
-      pastCharges.retry();
+    setReadingPast(true);
+    let past: PastRead;
+    try {
+      past = await pastCharges.load();
+    } catch (thrown) {
+      setReadingPast(false);
       warn();
-      await ask({ title: failureText() });
+      await ask({ title: failureMessage(thrown) });
       return;
     }
-    const choice = await pastCharges.chooseDelete(bill.name || categoryOf(bill.category_id), {
-      stopped: true,
-    });
+    setReadingPast(false);
+    const choice = await pastCharges.chooseDelete(
+      bill.name || categoryOf(bill.category_id),
+      { stopped: true },
+      past,
+    );
     if (choice !== 'everything') return;
     setDeleting(true);
     try {
@@ -135,7 +144,7 @@ export default function BillDetailScreen() {
         stopped
           ? {
               label: deleting ? t('bills.add.deleting') : t('bills.add.deleteBill'),
-              busy: deleting,
+              busy: deleting || readingPast,
               onDelete: () => void remove(),
             }
           : undefined

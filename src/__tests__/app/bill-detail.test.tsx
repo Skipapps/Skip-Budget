@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import BillDetailScreen from '@/app/bill/[id]';
@@ -26,7 +26,7 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
+jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn(), warn: jest.fn() }));
 
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
@@ -67,21 +67,26 @@ const mockBills = {
   refetch: jest.fn(),
 };
 
-// The stopped-plan Delete reads the charges and deletes; neither is reached on a running plan.
+// The stopped-plan Delete reads the charges, asks, and deletes; none is reached on a running plan.
+const mockLoadPast = jest.fn();
+const mockChooseDelete = jest.fn();
 jest.mock('@/api/past-charges', () => ({
   usePastCharges: () => ({
     ready: true,
     count: 0,
     lastChargedOn: null,
-    chooseDelete: jest.fn(),
+    load: () => mockLoadPast(),
+    chooseDelete: (...args: unknown[]) => mockChooseDelete(...args),
     retry: jest.fn(),
   }),
 }));
+const mockDelete = jest.fn();
 jest.mock('@/api/mutations', () => ({
-  useDeleteBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useDeleteBill: () => ({ mutateAsync: mockDelete, isPending: false }),
   useDeleteSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
-jest.mock('@/providers/dialog-provider', () => ({ useDialog: () => jest.fn() }));
+const mockAsk = jest.fn();
+jest.mock('@/providers/dialog-provider', () => ({ useDialog: () => mockAsk }));
 
 // No loan behind the bill unless a test says so: the page stays a bill page.
 const NO_LOAN = { data: { kind: 'bill' } as unknown, isPending: false, isError: false };
@@ -330,5 +335,57 @@ describe('a loan’s bill', () => {
     mockLoanRead = { data: undefined, isPending: true, isError: false };
     const screen = await render(<BillDetailScreen />);
     expect(screen.getByText('$1,030.00')).toBeTruthy();
+  });
+});
+
+describe('Delete, on a stopped bill', () => {
+  const DELETE = 'Delete bill';
+  const running = mockBills.data;
+  // Ended before today (3 October), so the page is final and offers Delete.
+  const stopHousing = () => {
+    mockBills.data = [{ ...(running?.[0] as object), ends_on: '2026-09-30' }];
+  };
+  afterEach(() => {
+    mockBills.data = running;
+  });
+  type PastRead = { count: number; lastChargedOn: string | null };
+
+  beforeEach(() => {
+    mockLoadPast.mockImplementation(async () => ({ count: 0, lastChargedOn: null }));
+    mockChooseDelete.mockResolvedValue(null);
+    mockAsk.mockResolvedValue(null);
+  });
+
+  it('waits for the charges it has not read, then asks with their count', async () => {
+    stopHousing();
+    let arrive: (read: PastRead) => void = () => {};
+    mockLoadPast.mockImplementationOnce(() => new Promise((resolve) => (arrive = resolve)));
+    const screen = await render(<BillDetailScreen />);
+    await fireEvent.press(screen.getByText(DELETE));
+    expect(mockChooseDelete).not.toHaveBeenCalled();
+
+    await act(async () => arrive({ count: 3, lastChargedOn: '2026-09-01' }));
+    expect(mockChooseDelete).toHaveBeenCalledWith(
+      'Housing',
+      { stopped: true },
+      { count: 3, lastChargedOn: '2026-09-01' },
+    );
+    expect(mockAsk).not.toHaveBeenCalled();
+  });
+
+  it('says the one failure line when the charges cannot be read, and asks nothing', async () => {
+    stopHousing();
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const refused = new Error('read failed');
+    mockLoadPast.mockRejectedValueOnce(refused);
+    const screen = await render(<BillDetailScreen />);
+    await fireEvent.press(screen.getByText(DELETE));
+
+    expect(mockAsk).toHaveBeenCalledWith({ title: 'Something went wrong. Please try again.' });
+    // A real failure, reported with its cause.
+    expect(log).toHaveBeenCalledWith('[failure]', refused);
+    log.mockRestore();
+    expect(mockChooseDelete).not.toHaveBeenCalled();
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 });

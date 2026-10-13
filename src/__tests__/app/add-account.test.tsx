@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import AddAccountScreen from '@/app/add-account';
@@ -50,6 +50,12 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
+// What asking the store and the database again answers, after a Pro refusal the app disagrees with.
+const mockConfirmPro = jest.fn(async () => 'unknown');
+jest.mock('@/api/confirm-pro', () => {
+  const actual = jest.requireActual('@/api/confirm-pro');
+  return { ...actual, useProWrite: () => actual.useProWrite(() => mockConfirmPro()) };
+});
 
 const mockUpdate = jest.fn();
 const mockCreate = jest.fn();
@@ -61,6 +67,7 @@ jest.mock('@/api/mutations', () => ({
   useUpdateBankAccount: () => mockUseUpdate(),
   useCreateBankAccount: () => mockUseCreate(),
   useDeleteBankAccount: () => mockUseDelete(),
+  useDeleteUnseenPay: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useCreateSalarySource: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useSetSalaryAccounts: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useLinkAccountToSalaries: () => ({ mutateAsync: jest.fn(), isPending: false }),
@@ -408,5 +415,67 @@ describe('Add account — the day the balance is true from', () => {
     await addAccount();
 
     expect(writtenOnCreate()).toEqual(expect.objectContaining({ balance: 0, balance_as_of: null }));
+  });
+});
+
+/**
+ * Free keeps one account, and the database holds that line even when the app shows Pro: right after a
+ * purchase the server may not know yet. A refusal is asked about again before anything is said.
+ */
+describe('Add account — the free allowance, held by the database', () => {
+  const ALLOWANCE = { code: 'P0001', message: 'Free keeps one — Skip Pro removes the limit.' };
+
+  const save = async () => {
+    mockParams = {};
+    const view = await render(<AddAccountScreen />);
+    await fireEvent.press(view.getByText('Continue'));
+    await fireEvent.changeText(view.getAllByDisplayValue('')[0], 'A Bank');
+    await fireEvent.press(view.getByText('Continue'));
+    await fireEvent.press(view.getByText('Add account'));
+    return view;
+  };
+
+  beforeEach(() => {
+    mockConfirmPro.mockClear();
+    jest.mocked(router.push).mockClear();
+  });
+
+  it('saves on the second try once the database agrees', async () => {
+    mockCreate.mockRejectedValueOnce(ALLOWANCE);
+    mockConfirmPro.mockResolvedValueOnce('pro');
+    const view = await save();
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(2));
+    expect(mockConfirmPro).toHaveBeenCalledTimes(1);
+    expect(mockCreate.mock.calls[1][0]).toEqual(mockCreate.mock.calls[0][0]);
+    expect(view.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('opens what Pro adds, pushed, when the store says free after all', async () => {
+    mockCreate.mockRejectedValueOnce(ALLOWANCE);
+    mockConfirmPro.mockResolvedValueOnce('free');
+    const view = await save();
+
+    await waitFor(() =>
+      expect(router.push).toHaveBeenCalledWith({
+        pathname: '/pro-feature',
+        params: { id: 'unlimited' },
+      }),
+    );
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(view.queryByText(FAILURE_MESSAGE)).toBeNull();
+  });
+
+  it('says the one failure line when the two never agree', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockCreate.mockRejectedValueOnce(ALLOWANCE);
+    const view = await save();
+
+    await waitFor(() => expect(view.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(log).toHaveBeenCalledWith('[failure]', ALLOWANCE);
+    log.mockRestore();
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
   });
 });

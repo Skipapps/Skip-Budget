@@ -8603,3 +8603,892 @@ The "worker failed to exit" warning is in both runs, and was already in this aft
 - **Accuracy:** English held-out questions are 74.9% right first and 88.8% with the right answer on screen. Follow-ups in 270 test chats are 58.6% right and 72.7% on screen.
 - **Test page:** https://claude.ai/artifact/2fVgFTLH7NRVpXBTKWBkKq
 - **Docs:** handoff in `.claude/team/dev/ask-sam-handoff.md`; app bugs and copy issues found in `.claude/team/dev/ask-sam-findings.md`.
+
+## 2026-10-13 — Dmitri (Development Lead) — Insights v2 (Part 6) build plan (PLAN ONLY, read-only, no src edits)
+- **Plan:** returned to the CEO for `.claude/team/dev/insights-v2-plan.md`.
+  - Drew owns `src/lib/insights.ts` and `insights-sections.ts`.
+  - Dana owns `src/components/insights/**`, `src/app/insights.tsx` and the new `src/app/insights-period.tsx`.
+- **Routes:** one picker route, `insights-period?kind=month|year&owner&selected`. The pick comes back over the existing `payment-pick` bus, imported unchanged.
+- **Months listed:** read from the dates on record (receipts, charges, pay, payoffs). No ledger walk is needed. The floor is `paymentFloor`.
+- **Period ranges:** built with `periodBuckets` from the picked month or year. Past periods are whole; the current one stops at today.
+- **Every section reuses the owning page's hooks:**
+  - Loans: `priceLoans` and `loansSummary`, as the Loans page uses them.
+  - Bills & subscriptions: `usePlanMonth(...).view.total` and `.planCount`.
+  - Habits: `savedInWeek` and `savedAllTime`.
+  - Goals: `goalsSummary`.
+  - Savings: `readyToUse`.
+- **Not built yet (Drew writes these):** `nextDue`, the hero figures, "Moved this month", the months-with-money list, a per-cycle subscription cost, and cent-exact spending sums.
+- **Found:**
+  - "Where it goes" puts every receipt and subscription under Other: ledger entries carry a category only for bills.
+  - "Coming up" adds subscription amounts without looking at their cycle, so a $120 yearly plan reads as $120/mo.
+  - The hero's income ("pay due this calendar month") will differ from What comes in and the Cards tab for weekly or biweekly pay.
+  - `src/__tests__/app/insights.test.tsx` 177-275 checks that Savings is NOT on the page, which the new design reverses.
+- **Open for the CEO:** Q1–Q7. They cover the income definition, the subscription cost fix, the category fix, moving the loan pricing out of loans.tsx, paths for the old test suites, the savings definitions, and the merchant order.
+
+## 2026-10-13 — Dana — Logic fixes Part 1: card/account Transactions grouped by month (DONE, no commits)
+**Outcome:** on `/source/[id]` the Transactions list is now split into months, newest first. Each month has a heading with its name and its net figure. The search and filters run first, then the months are built.
+- **`src/app/source/[id].tsx`:** after the search and filter, `monthGroups(visible, floor)` from `src/lib/payment-years.ts` (imported, not edited). Each group draws a heading and then its rows; the hairlines now run only within a month.
+  - Rows, presses, hints, the balance card, the summary, Add money / Make a payment, the empty and no-match states and the HistoryNotice are all unchanged.
+- **New `src/components/cards/source-month-header.tsx`:** mirrors the Payment history month title (17 semibold ink, 13 regular figure, flex-wrap, both `shrink`, `TEXT_CAP.heading`, `accessibilityRole="header"`).
+  - The month reads "October 2026" via `ui.calendar.monthYear`, as HistoryList does. That includes the year in the current year, because Payment history shows it too.
+  - **Why not SectionCard:** its caption is a muted string with no colour, and a prop change there belongs to the Bills session.
+- **Figure = net, signed:** Payment history shows one figure per month on the title line, so this page does too. It is the month's rows summed, in cents by `monthGroups`.
+  - Coloured with `useMoneyColor` like the rows: in is green, out is red, zero is ink. Both colours clear 4.5:1 on the page surface.
+  - It counts only the rows shown after search and filter. Every listed row is on or after the floor, so no hidden row counts.
+- **`src/i18n/messages/accounts.ts`:** +`accounts.source.monthA11y` (en "{month}, {amount} net" / es "{month}, neto: {amount}" / fr "{month}, net : {amount}" with an NBSP before the colon).
+- **Tests:** new `src/__tests__/app/source-detail-months.test.tsx`, 14 tests. They cover:
+  - two months make two headings, newest first, with their rows;
+  - net to the cent (−0.1 − 0.2 = −$0.30; $1,211.17);
+  - colour for in, out and zero;
+  - the card case;
+  - empty months absent;
+  - search across two months, search dropping a month, and filter on/off;
+  - no match;
+  - the free window: a month the floor cuts through counts only listed rows, and the notice stays (also when all rows are older);
+  - large text (wrap, cap, no one-line cut);
+  - es/fr.
+- **Gates:**
+  - Targeted 9 suites (new + source-detail-rows, history-window-source, source-detail-i18n, habit-card-activity, history-parts, large-text-guard, i18n messages/translate): 105/105.
+  - `tsc --noEmit`: 0 errors in my files. The only error is `src/lib/ask-sam/matcher.ts(504,40) Cannot find name 'language'`, the Ask Sam session's untracked file.
+  - eslint (cache cleared, `--no-cache`, `--max-warnings 0`) and prettier: clean on all 4 files.
+  - Mutants: 14/14 killed, plus 1 sanity break. They ran on scratch copies mapped in by a scratch jest config (`moduleNameMapper`); no `src/` file was written.
+
+## 2026-10-13 — Dmitri (Development Lead) — Review of Dana's Part 1 (card/account Transactions by month): FIX-FIRST (read-only, no src edits)
+**Outcome:** FIX-FIRST, one must-fix. The grouping, order, cents, colours, keys, dividers, large text, dark mode and local dates are right. But the month figure breaks the Founder's free-history rule.
+- **Must-fix (money):** `src/app/source/[id].tsx:157-159` passes `visible`, which is already cut at the floor, to `monthGroups`. On free, the month the 90-day floor cuts through shows only the listed rows' net. The Founder ruled on 2026-10-07 that "period headings stay whole-window" and on 2026-10-12 that "totals still count everything"; Payment history's months follow that rule through this same helper.
+  - **Fix:** apply the same search and filter to the rows before the floor too, and give them to `monthGroups` with `floor`, so the rows stop at the floor and the figures do not.
+  - **Test:** `source-detail-months.test.tsx:268-296` currently pins the wrong figure (-$6.50, which leaves out a -$300 row in the same month). It also depends on the date: the case only bites when the floor is not the 1st. Pin the clock and expect -$306.50.
+- **Should-fix:**
+  - Month heading tone: 13pt medium muted (SectionCard's `label` tone) with the figure at 13pt regular in the money colour. That puts it below "Transactions" (17pt semibold) in the hierarchy. Muted is 4.78:1 light and 7.00:1 dark.
+  - Update the comment at `[id].tsx:157-158` and the `net` doc at `source-month-header.tsx:32`.
+- **Gates:**
+  - jest: source-detail, history-window-source and large-text, 15 suites, 379/379.
+  - tsc: no errors in Part 1 files. The only errors are in add-loan tests (`pinnedFirst`/`firstPaymentOn`), from Part 2+3 work in progress.
+  - eslint `--no-cache` and prettier: clean on all 4 files.
+
+## 2026-10-13 — Diego — Part 5 investigation: "Something went wrong" causes, double-filing, speed, Sentry (READ-ONLY, no src edits)
+**Outcome:** the habit failure in screenshot 5 was the database's own Pro wall refusing an account the server has never seen as Pro. It is our code, not a Supabase fault. It is also not a few seconds of webhook lag: that account has no entitlements row at all, 11 hours later.
+
+**Habit case (live DB, read-only `db query --linked`):**
+- The screenshot account is NOT Sam. It is c2ad25b3-df47-406d-919c-dae33013a164: card "Sam" (#161616) and bank ACCOUNT "Hh" (nickname Hh, bank Cuff, #FA8F6F). "Hh" is an account, not a card.
+- That account has no `entitlements` row at all, so `is_pro()` is false now and always was.
+- Its sign-in was at 2026-10-13 04:10:57 UTC, and a bill was saved at 04:27:49 UTC. The screenshot reads 12:23, which is 00:23 EDT = 04:23 UTC.
+- The previous account, 95810acb, holds the sandbox monthly subscription. Its last webhook write was at 04:13:22 UTC (expires 04:18:38) and nothing came after it, not even an EXPIRATION.
+- Sam (bdb18bea) has pro=true, product `dev.pro-state-script`, expires null, written 2026-10-09 by the seed script. `is_pro` is true for Sam, so Sam can never hit this wall.
+- The app thought c2ad25b3 was Pro: `useProGate` only shows the form when pro && ready, and Release has no override. So RevenueCat's SDK said Pro for an account the server never heard about.
+- Proven code fact: RevenueCat TRANSFER events carry no `app_user_id` (RC docs: TRANSFER uses only `transferred_from`/`transferred_to`). The webhook skips them (index.ts:39-45). A subscription that moves to a second account on the same Apple ID (sign in to another account, Restore, or a sandbox renewal posted under the new id) never reaches the server.
+- Second factor: sandbox expiry plus a stale SDK cache gives the same "app says Pro, DB says no".
+- To confirm: RC customer history for c2ad25b3 (look for "Transferred"), the RC webhook log, the edge log line "skipping non-uuid app_user_id TRANSFER", and the Sentry event "Tracking spending habits is part of Skip Pro." at about 04:23 UTC.
+
+**Other findings (full list in my report to the CEO):**
+- Background refetch errors blank Home's lists and figures even with good cached data (`anyError`, queries.ts:111/1167, which is month-end's file).
+- Not-ready past-choice reads show the failure line in 10 places.
+- A scan that reads nothing shows the failure line (add-receipt.tsx:758).
+- Partial-step double-files: add-subscription, add-card, add-account and salary have no written-id guard.
+- Dropped-response double-files: every `useCreate` insert, `useCreateHabit`, `save_loan`, `record_loan_payoff` (partial), payments, goals and pots.
+- Every direct-insert table accepts a client id (checked live), so the client-id fix for direct inserts needs no migration.
+
+**Speed:**
+- The DB is not the bottleneck. App queries average 1-25 ms on the server, and indexes cover the RLS and order filters.
+- The costs are on the client: about 14 parallel reads on Home, a refetch of every mounted query on each resume after 30 s, about 10 serial sweep round trips, realtime echoes that re-read after our own writes, and an unconditional timezone UPDATE each launch (803 calls).
+- PostgREST schema-cache reloads (1,252 since 26 Aug; `pg_timezone_names` mean 572 ms, max 3.5 s) come from our DDL.
+
+**Gates:**
+- I changed no src files.
+- jest on the 8 related suites: 92/92.
+- tsc is not clean, from other sessions' in-flight files (add-loan-form.test.ts, then insights.tsx), none of them mine.
+
+## 2026-10-13 — Dana — Part 1 FIX-FIRST from Dmitri: M1, S1, S2 (DONE, no commits)
+- **M1, `src/app/source/[id].tsx`:**
+  - The search/filter test is now one `matches(entry)`.
+  - The months are built from `monthGroups([...visible, ...ledger.entries.filter(e => e.date < floor && matches(e))], floor)`. `ledger.entries` holds the pre-floor rows; `entries` is cut at the floor.
+  - A month the free floor cuts through now shows its whole figure. Only its listed rows stop, as in Payment history.
+  - The hidden rows go through the same search and filter. A month with only hidden rows still gets no heading.
+- **S1, `source-month-header.tsx`:**
+  - The month name is SectionCard's label tone: 13 medium, muted.
+  - The figure stays 13 regular in the money colour.
+  - Kept: header role, `TEXT_CAP.heading`, shrink, flex-wrap.
+- **S2:** the comment over the grouping and the `net` doc now say the figure is the whole month's.
+- **Tests (`source-detail-months.test.tsx`, 15):**
+  - The clock is pinned (Date only) at 2026-10-13, which puts the floor at 2026-07-16.
+  - A -$300 row on 07-15 makes July -$306.50. Hardware is not drawn, May has no heading, and the notice stays.
+  - New: the search runs over hidden rows (July -$8.75 for "bakery"). A hidden-only match gives no heading and shows the no-match state.
+  - The large-text test pins the muted tone.
+- **Gates:**
+  - Targeted 9 suites: 106/106. One earlier run had 2 timeouts at load average ~80; both suites passed alone and in the rerun.
+  - eslint (cache cleared) and prettier: clean on the 4 files.
+  - tsc: nothing in my files. Others' in-progress errors in `src/lib/ask-sam/matcher.ts`, `src/api/habits.ts` (`ClientId`, `insertOnce`) and `shared-controls-large-text.test.tsx` (deleted filter sheets).
+  - Mutants on scratch copies: 11/11 killed, plus the sanity break.
+
+## 2026-10-13 — Dana — Archive the leftovers the bills/subs redesign made unused (DONE, no commits)
+**Checked before removing:**
+- The four paths had no uncommitted changes from any session (`git status` before and right before applying).
+- No key-usage guard exists. No bills/subscriptions key is built dynamically (template strings, concatenation or area prefixes), checked across src.
+- Every key in bills.ts / subscriptions.ts was scanned against all of src.
+- `bill-row.tsx` and `subscription-row.tsx` stay: setup-bills, setup-subscriptions, add-bill, bill/[id], voice-review, voice-edit, add-subscription, subscription/[id] and plan-month-row all import them.
+
+**Removed, after being archived to `~/Desktop/SkipBudget-design-archive/Removed 2026-10-13/`:**
+- `src/components/bills/bill-filter-sheet.tsx` → `…/src/components/bills/bill-filter-sheet.tsx` (byte-identical copy).
+- `src/components/subscriptions/subscription-filter-sheet.tsx` → `…/src/components/subscriptions/subscription-filter-sheet.tsx` (byte-identical copy).
+- 48 keys → `…/src/i18n/messages/bills-subscriptions-removed-keys.ts`, each entry exact (en/es/fr and its comment). Lifted out by a quote-aware script; the removed text was diffed equal to the archived text.
+  - bills.ts (24):
+    - `bills.plans.*`: title, search, filtersActive, loading, countOf, count, noMatchTitle, noMatchMessage, clearFilters, stopped
+    - `bills.charged.*`: title, label, nothing, count, emptyMessage, windowMessage
+    - `bills.filter.*`: close, title, everyCategory, everySource, howOften, everySchedule, reset, apply
+  - subscriptions.ts (24):
+    - `subscriptions.add.askService`
+    - `subscriptions.plans.*`: title, search, filtersActive, loading, countOf, count, perMonth, noMatchTitle, noMatchMessage, clearFilters, cancelled
+    - `subscriptions.renewals.*`: title, label, nothing, count, emptyMessage, windowMessage
+    - `subscriptions.filter.*`: close, title, everyCycle, everySource, reset, apply
+- Kept on purpose: `bills.plans.emptyMessage` and `subscriptions.plans.emptyMessage` (the month page's empty state).
+
+**Tests edited to match:**
+- `src/__tests__/large-text-guard.test.ts`: the two sheets are out of ADOPTED.
+- `src/__tests__/components/filter-actions-large-text.test.tsx`: the Bills/Subscriptions pages and sheets are gone; Activity is now looked up by name, not `PAGES[3]`.
+- `src/__tests__/components/shared-controls-large-text.test.tsx`: the two sheet cases are gone. The SearchField and PageState samples now use the live `payments.search.placeholder` and `bills.plans.emptyMessage`.
+
+**Gates:**
+- tsc: 0.
+- eslint (cache cleared, --no-cache, --max-warnings 0) + prettier: clean on the 5 edited files.
+- 0 references left to any removed key or file (scanned in Python).
+- jest (`--testPathIgnorePatterns .claude/worktrees`; i18n, app, payments, no-splits, fonts, large-text, no-route-test-files + the 2 edited component suites): 218/220 suites, 5,108/5,110 tests.
+  - The 2 failures are timing only, in files outside this change:
+    - savings-parts: one 5 s test timeout under load;
+    - receipt-parser.rules: a "150 lines in under 20 ms" speed check.
+- **Correction to the jest line above:** that run was invalid. `--testPathIgnorePatterns` takes several values, so jest read every path after it as another ignore pattern; the requested suites were never run. The option has to come LAST: `npx jest --ci <paths> --testPathIgnorePatterns .claude/worktrees`.
+  - **Correct run:** 138/163 suites, 3,849 tests passed, 241 failed + 1 todo, with the load average at 218–370.
+  - Every suite this change touches passes: messages, the 2 edited component suites, large-text-guard, no-splits, fonts, no-route-test-files, legal-faq-messages.
+  - **The 25 failing suites:** no failure mentions a removed key or a sheet. All are "Expected number of calls" or 5 s timeouts.
+  - **Spot checks run alone:** salary-free, add-bill-i18n and payment-history-page (35/35) pass. `settings.test` still fails 1 test, which comes from another session's uncommitted `src/app/(tabs)/settings.tsx` (one extra button). The export suites' red comes from another session's `use-export.ts`.
+
+
+## 2026-10-13 — Dana — Logic fixes Part 4: after buying Pro, straight into the feature (DONE, no commits)
+**Outcome:** the explainer is never shown to someone with Pro. Buying on `/pro`, Restore on `/pro` (when an explainer opened it), and buying or restoring on `/pro-offer` all end inside the feature the person was opening. Mid-task gates return to their filled page. `/pro` from Settings behaves as before.
+
+**How it works:**
+- `src/app/pro-feature.tsx` takes `?next=`. It uses expo-router 57's `useFocusEffect` (a fork that waits for navigation, made for redirects), fires once, and only while on top.
+- Once Pro, it goes to:
+  - a valid in-app `next`;
+  - else `router.back()`;
+  - else (a cold link, nothing beneath) the feature's own page;
+  - else `/home`.
+- It draws nothing while Pro is unknown or true, so a payer arriving by link never sees the price.
+- "Get Skip Pro" pushes `/pro?from=feature`. "Not now" uses `goBack()`, so a cold link is not a dead button.
+- `src/lib/pro-next.ts` (new): `inAppNext` keeps only `/path` values. expo-router sends `https:` and `//host` to Safari.
+- `src/data/pro-features.ts`: an optional `next` (voice → `/voice`, insights → `/insights`). It is used only when there is no `next` and nothing to go back to, so mid-save voice gates (voice-review) still return to the draft.
+- `src/app/pro.tsx`: Restore with `from=feature` calls `goBack()`. Otherwise it stays and shows the message, as before. Purchase was already `goBack()`. `/pro-offer` needed no change.
+- `src/components/pro/pro-gate.tsx`: `ProFeatureRedirect` passes `useCurrentRouteInfo()?.pathnameWithParams` (per screen, path params kept out of the query) as `next`. `useProGate`, add-card and add-account use it, so `/add-account?from=salary` survives.
+
+**Callers given `next`:**
+- voice-fab → `/voice`
+- habits.tsx → `/habit-new`
+- tool-cards:36 → `/habits`
+- cards.tsx:
+  - New card → `/add-card`
+  - Add account → `/add-account`
+  - locked card or account rows → `/source/{id}` (the person was opening that page, not adding)
+- use-export → its export page
+- Left on `back()`: receipts and add-receipt scan or upload, add-receipt, habit-new and voice-review save refusals, pro-footer, history-notice.
+
+**Tests:**
+- New in `src/__tests__/pro/` (4 files, 62 tests): pro-feature-continue, pro-purchase-flow (a simulated focus stack with the real explainer, `/pro` and `/pro-offer`), pro-gate-next, cards-pro-next.
+- One-line updates elsewhere: explainer objects and missing router mocks in 22 suites. The Bills suites were OK'd by the CEO.
+
+**Gates:**
+- Scratch tree (HEAD + my hunks only): tsc 0, and 79/79 suites. habit-new had one load flake that passes alone, 40/40.
+- Live tree: eslint (cache cleared, `--no-cache`, `--max-warnings 0`) 0 and prettier clean on all 36 files.
+- `npx jest --ci src/__tests__/payments`: 30/30 suites, except one 5 s load timeout that passes 67/67 with a longer timeout.
+- Mutants on scratch copies: 23/23 killed.
+
+**Not mine, seen in the live tree:**
+- Part 5's in-progress `voice-review.tsx` and `habit-new.tsx` (`@/api/confirm-pro`) stop voice-review.test loading and fail 5 "Edit habit" tests.
+- Insights v2's untracked `src/lib/insights*.ts` breaks the insights suites.
+- Part 5 also edited add-card.tsx and add-account.tsx. My hunks there are only the import and the wall line.
+
+## 2026-10-13 — Dana — Insights v2 UI (D1–D4), built UNWIRED for round 2 (no commits)
+**Outcome:** the full Insights v2 screen and Choose month / Choose year are built from the Founder's design on Drew's `insights.ts` / `insights-sections.ts` / `priced-loans.ts`. Per the CEO's change of plan they are NOT routed: `src/app/insights.tsx` is untouched, there is no `src/app/insights-period.tsx`, and the old insights suites are unchanged and green.
+**New files:** `src/components/insights/` (section, rows, insights-hero, period-switch, spend-chart, spend-card, use-insights-period, the ten `*-section.tsx`, `insights-screen.tsx` exporting `InsightsScreen`, `insights-period-screen.tsx` exporting `InsightsPeriodScreen`); tests `src/__tests__/insights/insights-{parts,screen,period-screen}.test.tsx`.
+**Changed:** `src/i18n/messages/insights.ts`, additive only (59 new keys, every HEAD key kept word for word; `out.thisWeek`, `out.allTime`, `in.everyMonth`, `in.thisMonth`, `in.sources`, `in.paidOnce` go at wiring).
+- Typed routes: the hook takes the picker href as a `PeriodPickerHref` argument, and `InsightsScreen` takes it as `periodHref`; the route supplies it at wiring. No casts.
+- No waterfall: every read is called at the top of `InsightsBody`; no `enabled` chaining (a test asserts every read is asked on the first render).
+- Per-section failure with Try again (income, loans, plans, coming up, habits, goals, savings); the spending block stays all-or-nothing (the plum card's place and What goes out show the failure; Where it goes and Where you spend most hide). A failed balance read hides What you owe.
+- Empty: Loans, Habits, Goals, Savings show one muted line with an action; the others hide.
+**Gates:** my files: tsc 0, eslint (cache cleared) 0, prettier clean. `npx jest --ci -- insights large-text no-route-test-files messages`: 24/24 suites, 486/486 tests. Whole-tree tsc and expo lint findings are in other sessions' in-progress files only (create-once, add-subscription*, sentry-breadcrumbs).
+**Not matched exactly:** "About N% of this month's income" sits under Moved this month (it is moved ÷ income, Q6), not under Total in savings; headings use the app's one 17pt section heading; the owe avatar is the card's face colour (plan) rather than the mock's soft plum.
+
+## 2026-10-13 — Drew — Add loan: a First payment date replaces the payment-day chips (Part 2+3) (DONE, no commits)
+**Outcome:** the details page has a **First payment** date field (the same `DateBox` + inline calendar as Start date). A 30 Nov 2025 start can now take its real 14 Jan 2026 first payment, and Review prices it as the Founder's real statement, to the cent. No engine change, no migration.
+
+**Behaviour:**
+- Default: a month after the start on the start's day, clamped (`defaultFirstPayment`); 31 Jan → 28 Feb, still paid on the 31st. Under it, one muted line: "Then every month on the 14th" (`dayOrdinal`: 14th / día 14 / le 14, 1er), "…on the 30th, or the last day in shorter months" for 29/30, "Then on the last day of every month" for 31.
+- An untouched first payment moves with the start date; a picked one stays. If the start moves onto or past it, a hint in TextField's error style, "Pick a first payment after the start date.", replaces the line. Continue says the same words.
+- **Upper bound (my pick): a year.** Up to the start's day 12 months on, clamped (`latestFirstPayment`; 29 Feb 2024 → 28 Feb 2025). It covers 90-day, 6-month and 12-month deferrals and catches a year slip. The calendar dims days outside (day after the start … a year on). Hint: "Pick a first payment no later than {date}, a year after the start date." It is a page rule, not a Review rule. A start + first payment pair carried unchanged from the calculator or a saved loan passes, so an untouched edit never gets stuck.
+- **Month end:** only for a first payment on the last day of a month shorter than 31 days, pill chips "On the 28th" / "Last day of each month" (31). The untouched default follows the start's day (31 Jan → Last day); a hand pick defaults to its own day. When the untouched default stands for the 29th/30th (30 Jan → 28 Feb), a third chip "On the 30th" is offered and chosen, so today's stored payment_day 30 is not lost. Carried 29/30 days from a saved loan work the same way.
+- `loanReview`: `firstPaymentOn` is now required. 'firstPayment' replaces 'paymentDay' as a missing field (also covers a day the date cannot stand for). A first payment not after the start is `{ reason: 'first-payment' }` (was 'startDate' in the missing list), checked after 'start-after-payoff' because an earlier start mends both. `save.paymentDay` and `scheduleParams.day` are unchanged (null unless the first payment's own day differs).
+- **F4 retired:** `firstPaymentOn(start, day)` is gone. Plan line added to `add-loan-plan.md`.
+- **Pre-fill:** the calculator's first payment is untouched when it equals the default; otherwise it is set and carries its own day (the calculator sends no `day`, so a 31 Jan → 28 Feb hand-off keeps the 28th, as its schedule had it). Edit shows the saved first payment and payment_day. Untouched edits write back identical terms (pinned for the wireframe, 31st month-end, 30th-on-28-Feb, the Founder's loan, and a >12-month legacy gap), and `choose(…, false)` means no past/upcoming question.
+
+**Files:** `src/lib/loan-first-payment.ts`, `src/lib/loan-review.ts`, `src/components/loans/add/loan-form.ts`, `src/components/loans/add/loan-details-view.tsx`, `src/app/add-loan.tsx`, `src/i18n/messages/loan-flow.ts`, `src/i18n/messages/loan.ts` (CEO extra), tests `src/lib/loan-first-payment.test.ts` (rewritten), new `src/lib/loan-first-payment-fixtures.test.ts`, `src/lib/loan-review.test.ts`, `src/__tests__/components/add-loan-form.test.ts`, `src/__tests__/app/add-loan.test.tsx`, `src/__tests__/app/add-loan-languages.test.tsx` (both now `jest.setTimeout(20000)` like the payments screen suites), `.claude/team/dev/add-loan-plan.md`. `loan-route.ts` and `loan.ts` are unchanged.
+
+**Keys:**
+- Added (en/es/fr): `loanFlow.field.firstPayment`, `loanFlow.field.firstPaymentPlaceholder`, `loanFlow.rhythm.day`, `loanFlow.rhythm.lateDay`, `loanFlow.rhythm.monthEnd`, `loanFlow.monthEnd.onDay`, `loanFlow.monthEnd.lastDay`, `loanFlow.firstDate.notAfterStart`, `loanFlow.firstDate.tooLate`.
+- Removed: `loanFlow.field.paymentDay`.
+- Changed (CEO): `loan.save.skipSource` es/fr "Omitir"/"Passer" → "Skip".
+
+**Fixtures** (engine = Python exact-fraction reference with its own calendar = exact-integer amortiser, every row; opening = principal × APR × days/365, half up, posted with payment 1, which is the engine's existing rule):
+
+| Fixture | Opening | Interest | Payment | Total interest |
+|---|---|---|---|---|
+| 15 days: $10k at 7.5%, 20 Feb → 7 Mar 2026 | 15 d | $30.82 | $865.02 | $380.30 |
+| 45 days: 15 Jan → 1 Mar 2026 | 45 d | $92.47 | $870.34 | $444.09 |
+| 45 days, monthly rests | 1 mo + 14 d | $62.50 + $28.77 = $91.27 | $870.05 | $440.66 |
+| 31 Jan 2025, last day of each month (28 Feb, 31 Mar, 30 Apr…) | 28 d | $57.53 | $867.33 | $407.93 |
+| 31 Jan 2024, leap (29 Feb, 31 Mar…) | 29 d | $59.59 | $867.51 | $410.06 |
+| 31 Jan 2025, "On the 28th" | 28 d | $57.53 | $866.90 | $402.83 |
+| 30 Nov 2025 → 14 Jan 2026, the real lender | 45 d | $315.06 | $554.34 | $8,519.22 |
+
+For the real-lender loan, rows are identical to the statement fixture, maturity is 14 Dec 2031, and with the statement balance the 28 Aug 2026 payoff is $28,787.75 (accrued $89.60 over 14 days). Left on its 30 Dec default it would be 30 d, $210.04. The real-lender fixture in `loan.test.ts` did not move.
+
+**Gates:**
+- tsc: 0.
+- Full `expo lint` (cache cleared): 21 findings, none in my files (Insights, Ask Sam, `setup.test`, `revenuecat-transfer`, `pro-source`). eslint `--no-cache --max-warnings 0` and prettier on my 13 files: clean.
+- My 8 suites: 334/334.
+- `-- loan` (43 suites) at load 50–180: everything of mine green. The red is `loan-view.test.tsx` ×4: `pastCharges.load is not a function` from another session's uncommitted `past-charges.ts` / `loan/[id].tsx` work; its mock lacks `load`.
+- No mutation testing this pass.
+
+## 2026-10-13 — Diego — B1: a failed background refetch no longer blanks Home's lists (DONE for the lists; the balance needs 2 more lines in queries.ts) (no commits)
+**Outcome:** `anyError` now counts a read as failed only when it has an error AND no cached data, so after a failed resume refetch, Recent, Coming up, the month tiles and the Transactions tab keep their cached figures. Home's Current balance (and the Cards tab balances) still flip, because `useBookFlows` and `useMoneyBook` read raw `isError` on lines I was not cleared to touch.
+
+**What changed:**
+- `src/api/queries.ts` lines 108-117, one hunk: `anyError` takes `{ isError; data?: unknown }` and returns `query.isError && query.data === undefined`.
+  - This is exactly TanStack v5's own `isLoadingError`. In @tanstack/query-core 5.102.2, `queryObserver.ts:585` sets `hasData = data !== undefined` and `:608` sets `isLoadingError: isError && !hasData`. `isRefetchError` (`:611`) is the cached-data case.
+  - I wrote the explicit form, not `isLoadingError`, so derived results with no `data` (the ledger, the book flows) can also be passed in, with their `isError` passed through.
+- The `anyError([...])` call at :1167 (now :1172) needed no edit. Nothing else in queries.ts changed.
+- `src/app/(tabs)/home.tsx`: no change needed.
+  - All four failure decisions there come from the derived hooks. The month tiles, Recent and Coming up are fixed through `useLedger`. The balance comes from `useCurrentBalance`.
+  - `habitsLocked` keeps `isSuccess` on purpose: `habit-gaps-home.test.tsx` pins "a failed refetch is not a free account's answer".
+- New tests:
+  - `src/__tests__/api/queries-refetch-error.test.tsx` (19 tests). Each of the 8 ledger tables fails on a refetch, one at a time and then all together; the figures stay unchanged to the cent and there is no error. The same tables with no data still report an error, and so does a reset cache.
+  - `src/__tests__/app/home-refetch-error.test.tsx` (2 tests + 1 todo). It renders the real Home hooks on a fake DB: cached Recent, Coming up and month figures survive a failed refetch, and a first-load failure still shows the line. The todo is the balance.
+  - Both suites check the state in the same render as the raw reads reporting `isRefetchError`, so they cannot pass by looking too early.
+- Scratch-copy mutation (scratchpad only): the old helper fails all 9 refetch cases plus the Home case; a never-error mutant fails all 9 no-data cases.
+
+**Gates:**
+- tsc: 3 errors, none mine. Two are in the untracked `src/__tests__/pro/pro-purchase-flow.test.tsx`; one is in `src/providers/query-provider.tsx`, from Dilip's in-flight `QueryCache onError` typing.
+- `expo lint` (cache cleared): no findings in my files. The 2 errors are in `ask-sam-chat.tsx` and one other session file.
+- `jest -- home queries`: 8 suites, 165 passed, 1 todo.
+- Full jest: the remaining reds also fail with the old helper on the same source (Pro-refusal lines in voice-review and add-receipt-save, source-payment-i18n, loan-schedule-languages, the habits 90-day floor), or pass when run alone (receipt-parser speed, savings-parts timeout).
+
+**Open:**
+- To fix the balance: queries.ts `useBookFlows` (~1298) and `useMoneyBook` (~1357), `isError: parts.some((part) => part.isError)` → `isError: anyError(parts)`. Month-end session's file; I tried it in scratch and Home with the balance assertion, queries.test and money-book-hooks were all green.
+- Cards tab (Quick add session's file) also reads raw `salary.isError` / `loans.isError` at cards.tsx:122.
+- Trade-off: when a write succeeds and its refetch then fails, the screen now shows the pre-write figures with no line, until the next successful read. Dilip's read-failure Sentry reporter still logs it.
+
+## 2026-10-13 — Dilip — Part 5 platform fixes: Pro identity, TRANSFER webhook, Sentry reports and breadcrumbs, realtime echo, timezone write (DONE, no commits, no deploy)
+**Outcome:** done. The likeliest cause of "app says Pro, database says no" is our own code, proven against HEAD. `ensureConfigured` in src/api/pro.ts never calls `logIn` for a second account in the same app run. `configure` is synchronous, so the first sign-in's IIFE ran `configuring = null` before the outer assignment, and the resolved-true promise stayed behind as the answer for every later account. Sign out, then sign in elsewhere without relaunching, and the SDK still spoke and BOUGHT for the first account. That fits c2ad25b3 showing Pro while 95810acb kept getting webhook writes. The TRANSFER gap is also fixed (webhook code only; the Founder deploys).
+
+**What changed (my paths only):**
+- `supabase/functions/revenuecat-webhook/index.ts`: TRANSFER handled before the app_user_id check. New Deno-free `transfer.ts` (same pattern as send-push/card.ts) plans it:
+  - copies the giver's freshest paid-up row (latest end date, then latest write) to each receiver, unless the receiver already runs as long or longer;
+  - switches the giver's rows off (pro=false, will_renew=false), but only rows written before `event_timestamp_ms`, so a delayed retry cannot undo a later purchase;
+  - never copies or switches off a `dev.*` script grant (supabase/seed/pro-state-*.sql), since copying one would hand out Pro with no end date;
+  - skips non-uuid ids and logs; idempotent on retry.
+  Docs: https://www.revenuecat.com/docs/integrations/webhooks/event-types-and-fields#transfer-fields (TRANSFER has only transferred_from/transferred_to, plus store/environment sometimes; it is sent once, for the destination).
+- `src/api/pro.ts`, exports unchanged:
+  - a per-account configure gate: a call for B while A's sign-in runs waits, then calls logIn(B);
+  - `isFor()` ignores CustomerInfo whose `originalAppUserId` is not the signed-in id (listener, getCustomerInfo, restore). Safe because configure has always passed `appUserID`, so there are no anonymous customers;
+  - the server copy is read through `rpc('is_pro', { p_user })`, granted to authenticated in 20260831100007 and the same call confirm-pro.ts makes.
+- `src/lib/failure.ts`: new `reportFailure(thrown, handled, tags)` and `failureFingerprint()`.
+  - Sends ONLY the PostgREST code (tag + extra), and fingerprints [handled, code or error name, message with ids and digits blanked].
+  - Sends a clean Error copy (name, message, stack), so `details`/`hint` never leave the phone.
+  - The on-screen line and the dev console.log are unchanged.
+- `src/providers/query-provider.tsx`: `createQueryClient()`.
+  - QueryCache onError → Sentry in Release, `handled: query-read`, `query: <first key segment>` (shape-checked, else 'other');
+  - once per query per run, at most 3 per cause, 20 per run.
+  - MutationCache onSuccess calls `noteOwnWrite()`. It runs after the server answers and before each mutation's own onSuccess.
+- `src/providers/realtime-provider.tsx`: dead `dashboard` keys gone; each key is debounced 400 ms, re-read at least every 1.5 s.
+  - An echo within 3 s of our own write skips only queries that started a read or were invalidated after that write landed. Everything else re-reads as before.
+  - The skip set is chosen once, before invalidating: invalidateQueries re-asks its predicate after its own invalidate. A test caught that bug.
+- `src/api/push.ts`: the launch read now selects `reminders_enabled_at, timezone`, and the timezone is written only when it differs or the read failed. `enableReminders` is unchanged.
+- `src/app/_layout.tsx` (Sentry.init block + one import only):
+  - `beforeBreadcrumb: scrubBreadcrumb`, `beforeSend: scrubEvent` and `...{ enableNetworkBreadcrumbs: false }`. The RN type does not list that option; RN forwards it (wrapper.js:158) and native reads it (Pods SentyOptionsInternal.m:162).
+  - New `src/lib/sentry-breadcrumbs.ts`: fetch/xhr/http keep method, host, path and status; they lose query, fragment, `http.query`/`http.fragment`, and uuids in paths become `<id>`. Navigation loses params and queries.
+- Tests:
+  - new: src/__tests__/{supabase/revenuecat-transfer, api/pro-identity, api/push-timezone, lib/failure-report, lib/sentry-breadcrumbs, providers/query-provider, providers/realtime-echo};
+  - updated: src/api/pro-source{,-sdk}.test.tsx (rpc + originalAppUserId), src/lib/failure.test.ts, src/providers/realtime-provider.test.tsx.
+
+**Gates:**
+- tsc: clean for my files. Three errors remain in others' create-once.test.tsx and add-subscription-save.test.tsx.
+- `rm -rf .expo/cache/eslint && npx expo lint`: 0 errors, and 4 old warnings in setup.test/ask-sam.
+- jest: 18 suites, 283 tests green.
+- Mutation testing on scratch copies: every planted mutant caught, and the HEAD pro.ts fails the identity test.
+- expo-doctor: 19/21. CocoaPods not on PATH and 25 patch-level packages behind; both were there before.
+- Seen in passing: screen suites voice-review, habit-new and add-receipt-save currently fail on the in-flight confirm-pro wiring. Not mine.
+
+**Open:**
+- Founder deploy: `npx supabase functions deploy revenuecat-webhook --no-verify-jwt` (no new secret).
+- Only a Release build can verify the Sentry side: one test event that shows code/fingerprint and scrubbed breadcrumbs, with no native http.query.
+- confirm-pro.ts `storeSaysPro` reads getCustomerInfo with no identity check (Diego).
+- No setUser (round 1).
+
+## 2026-10-13 — Drew — Insights v2 maths T1–T3 + Q4 priced-loans move (DONE, no commits)
+**Outcome:** every Insights figure Dana's sections need is a pure function in whole cents, with fixtures F1–F16 green and 46 of 46 mutants killed. Every number in the Founder's design reproduces to the cent from a real ledger, with one exception: Next due (below).
+
+**Files:**
+- New `src/lib/insights.ts`: `InsightsPeriod`, `CURRENT_PERIOD`, `shownMonth`, `shownYear`, `isCurrentPeriod`, `insightsRange`, `insightsBuckets`, `yearHighlight`, `periodChoices` / `PeriodChoices`, `percentOfCents`, `wholePercent`, `spendSummary` / `SpendSummary`, `spendByBucket` / `SpendBucket`, `heroFigures` / `HeroFigures`, `categoryLookups` / `CategoryLookups`, `categoryTotals` / `CategoryTotal`, `merchantTotals` / `MerchantTotal`.
+- New `src/lib/insights-sections.ts`: `nextDue` / `NextDue`, `habitsSummary` / `HabitsSummary`, `movedThisMonth` / `SavingsMoved`, `subscriptionCost` / `SubscriptionCost`.
+- New `src/components/loans/priced-loans.ts`: `PricedLoan`, `priceLoans`, `cardOf`, `loansPageSummary`, moved verbatim from loans.tsx.
+- `src/app/loans.tsx`: a pure move (−67 +3). Every removed line of logic is in priced-loans.ts unchanged. The memo body became `loansPageSummary`.
+- Tests in `src/__tests__/insights/`: `insights-period` (F1 F2 F9 F10 F16), `insights-spending` (F3–F8, on the real `ledgerEntries`), `insights-sections` (F11 F13 F15; F11 builds views as `usePlanMonth` does), `insights-habits-parity` (F12: draws the real Habits page on 8 days), `insights-loans-parity` (F14: real-lender statement rows plus the design's loans, with the real Loans page drawn). 98 tests.
+
+**Rules I decided:**
+- Year highlight: the picked month if it is in the year shown; else this month in this year; else none.
+- Choose month and Choose year take only exact yyyy-mm-dd dates, between the floor and today.
+- Percents are whole, half up, with BigInt. Values over 100 are kept; with no income the result is null.
+- `over` is left < 0.
+- Spending is money out on receipts, bills and subscriptions. Pay never counts. Payoffs are Bills.
+- Bills in retired categories are folded (family → health). Categories: top 6, ties by id. Merchants: top 5, ordered by amount, then times, then name.
+- Next due: strictly after today, one row per plan. A plan already paid this month is walked to its next date via `nextDueAfter`. Loans kept out of bills are excluded.
+- Habits: the first 3 in the Habits page's order. Saved so far covers every active habit.
+- Moved this month: a pot counts in full; removed pots are excluded.
+- Coming up: active subscriptions only. The month figure is the year ÷ 12, rounded once on the total.
+
+**Disagrees with the design:**
+- Next due: Housing is paid on the 1st, so on 12 Oct the next 2 by date are AEP (22 Oct) and Housing (1 Nov), not Netflix (9 Nov).
+- Where it goes: with Q3, Hulu files under its own category, not Other.
+- "Subscriptions · 3 $99.99" vs Coming up $115.98/mo: the mock data does not add up.
+
+**Gates:**
+- tsc: 0 errors in my files. 3 elsewhere at run time, all in other sessions' in-flight tests: create-once, add-subscription-save.
+- eslint (`--no-cache`, `--max-warnings 0`) and prettier: clean on my 9 files. Full `expo lint`: 6 findings, none mine (home-refetch-error, ask-sam, setup).
+- `jest -- insights loans`: 15/15 suites, 258/258 tests. stopped-plans and loans: 48/48.
+- Mutants: 46/46 killed, run from scratch copies via a jest moduleNameMapper in `scratchpad/drew-insights/`. No `src/` file was ever mutated.
+
+## 2026-10-13 — Dmitri — Review: Logic fixes Part 4 (Dana), FIX-FIRST (one cross-part item)
+**Outcome:** Dana's Part 4 hunks are correct and well tested. One brief requirement fails in the combined tree: habit-new's mid-save refusal does not return to the filled form. The cause is the live page gate plus Part 5's wait-for-free, not Part 4's code.
+
+**Checked:**
+- Jest (pro, payments, cards, home, habit-card, dashboard): 46/46 suites, 1516 tests, no timeouts.
+- tsc: 3 errors, none in Part 4 (create-once.test.tsx:456 and add-subscription-save.test.tsx:102/107 belong to Part 5).
+- eslint `--no-cache --max-warnings 0` and prettier on the Part 4 files: clean.
+- Ran scratch probes outside the repo against the real expo-router 57.0.15 (`renderRouter`):
+  - `useCurrentRouteInfo` is per screen. It holds even underneath: `/add-account?from=salary`, and `/source/abc?x=1` with path params kept out of the query. `usePathname` reports the top page there.
+  - Real Redirect → explainer → `/pro` → Pro arrives while covered → back: lands on `/voice-review?draft=d1`, with the explainer gone from the stack.
+  - Late flip with no `next`: the explainer shows briefly, then goes back to the form.
+  - Cold link while Pro → `/voice`. Cold link while free + Not now → `/home`.
+
+**Must-fix (combined tree):**
+- `habit-new.tsx:135-138`: the live `useProGate` unmounts `HabitForm` when confirmPro waits for the app to show free. The typed habit is lost, and the line-423 push is effectively dead.
+- Fix: latch the gate on arrival, in `useProGate` (Part 4's file) or in habit-new (Diego holds it).
+
+**Should-fix:**
+- A renderRouter test pinning the real `useCurrentRouteInfo` output.
+- `useProWrite` returns 'free' without checking `mounted`.
+- Draw the explainer's shell while Pro is unknown (up to 8 s blank on a cold link).
+- `use-export` `page as string` cast.
+- habits has no cold-link default.
+
+**Experimental hook:** keep `useCurrentRouteInfo` on SDK 57. The stable `usePathname` is global and wrong for this use.
+
+## 2026-10-13 — Dilip — CEO follow-ups: realtime echo skip per row, Postgres message privacy (DONE, no commits)
+- **Echo skip, now per row.** MutationCache onSuccess records the rows a write named: `rowIdsIn(data, variables)`.
+  - It takes bare uuids, `id` fields, and the `id` of an object one level in.
+  - It never takes ids a write only points at (`card_id`, `accountIds`).
+  - A debounced burst skips a query only when EVERY change names a row (`payload.new?.id ?? payload.old?.id`) that we wrote within 3 s, and the query started a read after the latest of those writes landed.
+  - Another device's row, a change with no id, or a mixed burst is re-read as normal.
+  - Tests pin all of it: another device's row within 3 s IS re-read, and a real mutation through createQueryClient teaches the rows.
+  - A mutant that ignores row identity fails exactly those tests.
+- **Postgres message privacy.** failure.ts scrubs the message before it reaches Sentry; the same text goes into the exception value, the stack's first line and the fingerprint.
+  - Quoted values become `"<value>"`, and `(cols)=(values)` becomes `(cols)=(<value>)`. Column names are kept.
+  - uuids become `<id>` and figures become `<n>`.
+  - Quoted names of our own database objects (`constraint "…"`, `relation "…"`, `column "…"`) are kept, since they name the rule that refused.
+  - The on-screen line and the dev console.log are unchanged.
+  - Test: `invalid input syntax for type uuid: "abc"` reaches Sentry without abc.
+- **Gates:** jest 18 suites / 295 tests green; tsc 0 errors; eslint and prettier clean on my files; both mutants caught.
+
+## 2026-10-13 — Dmitri (Development Lead) — Review of Drew's Part 2+3 (First payment date) + the priced-loans move: Part 2+3 FIX-FIRST (one small must-fix), priced-loans GO (read-only, no src edits)
+**Outcome:** the maths holds: loan.test.ts is unchanged, and every fixture row matches my own Python exact-fraction amortiser to the cent, including the lender's loan (30 Nov → 14 Jan: $315.06 opening, $8,519.22 total interest, 14 Dec 2031). Loans that don't use the new freedom give save_loan/update_loan exactly what they did before (follows from the code). One must-fix: re-picking a date can make the right terms impossible to reach.
+
+**Must-fix**
+- **M1** `src/components/loans/add/loan-form.ts:248` (`withFirstPayment`) + `loan-details-view.tsx:239`. Re-picking the shown default (30 Jan start → 28 Feb) or a carried date makes it a hand pick. The "On the 30th" chip is gone, and nothing brings it back, not even moving the start away and back (shown by a scratchpad test). In an edit, a saved 30th-on-28-Feb loan then saves payment_day 28/31, and a carried date more than a year after the start turns 'too-late'. Fix: picking the default date returns to untouched (`pickedFirst: null`); picking `carried.first` keeps `carried`. Add form tests for both.
+
+**Should-fix:** S1 for a carried date more than a year out, the calendar lets you pick days between the year limit and that date, which are then refused (`loan-details-view.tsx:128`). M1's fix gives a way back. S2 fr placeholder "est à payer" → "est dû" (`loan-flow.ts:61`). S3 give the month-end radiogroup a label for VoiceOver. S4 (already like this before Part 2+3, CEO's call) editing the start of a saved loan whose first payment is exactly a month later still moves the saved first payment.
+
+**Checked OK:** the no-op edit asks nothing (`choose(…, false, READ)`). Loans saved under F4 open with their saved date and day. Start-after-payoff is still checked before first-payment. The calculator hand-off still works. The schedule link `day` comes from unchanged code, and the fixture pins its rows. es/fr ordinals are right. Calendar min/max are inclusive, the same as `firstPaymentProblem`, so no off-by-one. Large text and dark mode follow the existing tokens and caps (not seen on a device).
+**Judgment calls:** keep the one-year limit (beyond it the engine's opening rule can't model capitalised deferment, e.g. student loans). Keep the third chip (only 29/30 Jan starts; dropping it would silently move today's stored day).
+**priced-loans.ts:** a pure move. priceLoans, cardOf and PricedLoan match token for token, and loansPageSummary is the old useMemo body unchanged. GO.
+**Runs:** loan jest 25/25 suites, 794 tests (loan-view green now). Loans/stopped-plans/insights-parity 3/3, 54 tests. eslint and prettier clean on 15 files. tsc: 5 errors, all Part 5 (add-loan.test.tsx:89/94 is the `mockPast.load` self-reference from Diego's hunk; add-subscription-save.test.tsx:102/107; create-once.test.tsx:456), none of Drew's lines.
+
+## 2026-10-13 — Dmitri (Development Lead) — Insights v2 review (maths + UI, unwired): FIX-FIRST. Read-only, no src edits.
+**Outcome:** the maths is right to the cent and matches the plan. Loans and Plans match their own pages, the hero and What goes out agree, and every Drew rule is accepted. Four must-fix items before wiring: the CEO's (a), (b) and (c), plus failed background refetches blanking sections.
+- **Gates:**
+  - `jest` (insights, app/insights, large-text-guard, app/loans): 12/12 suites, 224/224 tests, first run.
+  - tsc: 5 errors, all in other sessions' tests (create-once, add-loan, add-subscription-save), none in Insights.
+  - eslint `--no-cache` and prettier on the 30 Insights files: clean.
+- **Must-fix:**
+  - M1 (CEO a): What you owe shows the failure line with Try again; it is no longer HIDDEN (insights-screen.tsx:206-208).
+  - M2 (CEO b): with no active goals but some reached, the line reads "No active goals" (goals-section.tsx:30-38; pass `summary.done.length`).
+  - M3 (CEO c): a share above 0 that rounds to 0% reads "less than 1%" in the hero and in savings, with own en/es/fr keys and Drew fixtures.
+  - M4: `together()` (insights-screen.tsx:81-91) and the picker (insights-period-screen.tsx:63) read raw `isError`. A failed refetch with data still cached then swaps the figures for the failure line. Use `isError && data === undefined`, as Diego's B1 `anyError` does.
+- **Should-fix:**
+  - Savings shows "About 0%" when nothing moved.
+  - Loans says "No loans yet" when only finished loans exist.
+  - Coming up counts active subscriptions that have no next date.
+  - After a year pick, the switch back to Month can show a month from another year.
+  - `stateOf` is unused.
+  - Owe shows the typed balance while balances load; this needs `isLoading` from `useSourceBalances` (month-end session's file).
+  - Before the old suites are deleted, add the fr pay prompt and an es/fr spend-category label, plus a route-level test at wiring.
+
+## 2026-10-13 — Drew — Insights v2 review fixes M3 + S3 (DONE, no commits)
+- **M3:** `HeroFigures.belowOnePercent` and `SavingsMoved.belowOnePercent` are true when something was spent or moved but the share rounded to 0%. The shared helper is `belowOnePercent(partCents, percent)` in insights.ts. Fixtures for both: $0.01 → flag; $49.99 → flag; $50.00 → 1%, no flag; $0 → 0%, no flag.
+- **S3:** `subscriptionCost` counts a subscription only when it is active and has a next date, as the ledger does. Fixture: an active yearly plan with no date costs nothing.
+- **Gates:** my 5 insights suites pass. tsc is clean in my files.
+- **Dana's suites need updates:**
+  - `insights-parts.test.tsx`: 4 hand-built `HeroFigures` need `belowOnePercent` (tsc).
+  - `insights-screen.test.tsx`: its subscription fixtures have no `next_renewal_on`, so Coming up now hides.
+  - Her `insights-period-screen` failures are not from these changes.
+
+## 2026-10-13 — Diego — B1 follow-up: Current balance and the Cards tab keep cached figures after a failed reload (DONE, no commits)
+**Outcome:** after a failed background refetch, Home's Current balance and the whole Cards tab (faces, Salary, Loans) now keep their cached figures. They still show the failure when nothing is cached.
+
+**What changed:**
+- `src/api/queries.ts:1298` (`useBookFlows`) and `:1357` (`useMoneyBook`): `isError: parts.some((part) => part.isError)` → `isError: anyError(parts)`.
+  - CEO "go", with the month-end session's OK for exactly these two lines. Nothing else in the file changed.
+  - `ledger` and `flows` are combined results, so they pass their already-corrected `isError` through. `subscriptions`, `bills`, `charges`, `cards`, `accounts` and `payments` are raw reads and get the rule.
+- `src/app/(tabs)/cards.tsx:121-125`: `const salaryFailed = salary.isError && salary.data === undefined;`, used in the page-failure condition, with the comment updated. Dana's 4 `next` hunks (225+) were left alone.
+- `src/api/loans.ts:64-68`, `useActiveLoans`: `isError` is now `(bills.isError && bills.data === undefined) || (loanBillIds.isError && loanBillIds.data === undefined)`.
+  - This is OUTSIDE the path the CEO named. cards.tsx cannot apply the rule to loans: the hook exposes no data, and its bill-ids read is not exported.
+  - The hook's only consumer is cards.tsx, and the file was untouched in both the main tree and the month-end worktree.
+- Tests:
+  - `src/__tests__/app/home-refetch-error.test.tsx`: the todo is now a real test. Checking $1,200.00 less the $6.00 receipt less the $300.00 card gives $894.00, unchanged after every read fails on a reload.
+  - New `src/__tests__/app/cards-refetch-error.test.tsx` (9 tests), using the real balance, salary and loan hooks:
+    - baseline figures by hand (checking $1,194.00, card $300.00, Salary $1,880.00, Loans 1 active);
+    - the page is kept when every read fails on a reload, when only the salary list fails, when every salary read fails, and when only the loans read fails;
+    - the failure page still shows with nothing cached, for the salary list, salary_sources, loans and cards.
+  - The probe uses disabled observers with no queryFn. A first version used `skipToken`, which became the query's queryFn on reload, so its failures came from the probe and not the fake database. That was caught and fixed.
+- Scratch mutation (copies only): the old cards check, old loans `isError` and old money-book lines each fail 2-3 refetch tests; the never-error cards and loans mutants each fail their first-load test.
+
+**Gates:**
+- tsc: 0.
+- `expo lint` (cache cleared): 2 findings, in `setup.test.tsx` and `insights-sections.ts`, none mine.
+- `jest -- home queries money-book cards active-loans`: 22 suites, 450/450.
+- `-- source transactions insights savings`: green except insights-screen, insights-period-screen and the savings-parts timeout. These fail identically with all four of my edits reverted on the same source, so they come from Insights v2 in progress.
+
+## 2026-10-13 — Drew — Part 2+3 review fixes (Dmitri M1, S1–S3; CEO S4) (DONE, no commits)
+- **M1:** `withFirstPayment(form, day)` now takes the form.
+  - Re-picking the date already shown changes nothing, chips included. A deliberate extra: a re-tap on device should never flip a chip.
+  - Picking the start's default date returns to untouched (`pickedFirst: null, pickedDay: null`), except on a saved loan.
+  - Picking the carried date takes its carried day again: `carried` is no longer cleared by a pick, and its day applies whenever `pickedFirst === carried.first`.
+  - A 30 Jan start keeps the 30th through a re-tap and a pick-away-and-back; a saved 30th on 28 Feb still saves `payment_day` 30.
+- **S1:** new `latestFirstPaymentOf(form)` gives the calendar max and the page limit, so the calendar never offers a day the page refuses. It is the later of the one-year limit and the carried first payment, while the start is the carried one.
+- **S2:** French placeholder is now "Quand ton premier paiement est dû".
+- **S3:** a muted "Payment day" caption sits above the month-end chips (new key `loanFlow.monthEnd.label`: Payment day / Día de pago / Jour de paiement). It is visible because `SegmentedChips` (not my file) takes no group label, and on iOS a plain View's `accessibilityLabel` is not read.
+- **S4:** `loanFormFromSaved` always carries the saved first payment (`carried.saved: true`).
+  - It never follows a start change, even when it is a month after the start. A start past it shows the not-after-start hint.
+  - On a saved loan, picking the start's default stays a set date.
+  - New loans still move an untouched default with the start.
+- **Tests:** add-loan-form +7 (57/57); add-loan +3 screen tests (76/76): chip label and re-tap, saved first payment stays on a start change, calendar runs to a saved date past the year.
+- **Gates:**
+  - tsc: no errors in loan files; the remaining ones are in `insights-parts.test.tsx` and `pro-gate-router.test.tsx`.
+  - eslint and prettier on my files: clean.
+  - `-- loan`: 43/43 suites, 1,176/1,176 tests.
+- **Note for Diego:** I ran `prettier --write` on the shared `add-loan.test.tsx`; re-read it before your next edit.
+
+## 2026-10-13 — Dmitri (Development Lead) — Review of Dilip's Part 5 platform fixes: GO, with should-fixes (read-only, no src edits)
+**Outcome:** GO for iPhone round 1 and for the webhook deploy. Against RevenueCat's TRANSFER docs the webhook is right on every normal path, and purchase/renewal/expiry are unchanged. One narrow gap: two opposite transfers handled out of order can leave the wrong account Pro until the next renewal or expiry. S1 closes the double-grant half; RC REST verification (round 2) closes the rest.
+- **Webhook:**
+  - RC docs confirm Dilip's reading. TRANSFER has only transferred_from/to (store/env sometimes) and is sent once, for the destination. Retries reuse id + event_timestamp_ms. Delivery is at-least-once, and RC recommends GET /subscribers.
+  - The main path's only change is the stricter uuid regex; Supabase ids match it.
+  - Type-checks strict against supabase-js 2.112.3 with a Deno shim (no deno binary here). The sibling ./transfer.ts import follows send-push/card.ts, which deploys with --use-api.
+  - A replay is idempotent. Expired giver rows are never copied, and dev.* rows are never touched. There is no lifetime product, so a wrong copy ends at its expires_at.
+- **pro.ts:**
+  - The gate is right: clear runs before the chained call, and the HEAD race is gone.
+  - isFor is safe. configure has passed appUserID since ba4ec93; RC aliases only for anonymous ids or legacy-share restores.
+  - The is_pro(p_user uuid) signature matches (20260831100007:35-51). Offline behaviour is as before.
+- **Privacy:** Dilip's two choices confirmed (column names and DB object names are schema, not user values). Touch breadcrumbs carry component names only. Native network breadcrumbs are verified off (Pods SentyOptionsInternal.m:162).
+- **Realtime:** the one miss is the same row changed on another device within 3 s of our own write, after our refresh started; it heals on focus or the 30 s stale time. Figures after your own save are not delayed. Keys refreshed only by the echo wait +400 ms (at most 1.5 s).
+- **Should-fix:**
+  - S1 transfer.ts:107: skip a receiver whose row was written after eventMs. Also index.ts:83: add `.lte('updated_at', eventIso)` to the switch-off.
+  - S2 pro.ts:50: a stale chained logIn after A→B→A within one logIn.
+  - S3 failure.ts:50: use a function as the replace argument (`$&` re-inserts the raw message).
+  - S4 sentry-breadcrumbs.ts:52: scrub exception values of unhandled errors (round 2, with setUser).
+  - S5 (nit): answer 200 on 23503 for a deleted receiver.
+- **Runs:**
+  - jest, the brief's pattern: 35 suites / 686 tests green. push-timezone, which the pattern misses: 5/5.
+  - tsc: 5 errors, none in Part 5 (insights-parts.test, pro-gate-router.test).
+  - eslint --no-cache: 0. prettier: clean on all 20 files.
+- **Founder:** deploy after the commit with `npx --no-install supabase functions deploy revenuecat-webhook --project-ref jwnsdszstqlpkzwehtmq --no-verify-jwt --use-api`. Roll back from b4cb0a1 via a detached worktree (commands in my report to the CEO).
+
+## 2026-10-13 — Dmitri (logged by CEO): review of Diego's refetch-error change
+**GO.**
+- **The change:** `anyError` now counts a read as failed only when `isError && data === undefined`. Applied in queries.ts (three hunks, folded into the month-end session's commit, credited), in `useActiveLoans`, and in the Cards salary check.
+- **Tests:** 6 suites, 131 tests, all pass.
+- **Risk:** if only part of a refresh fails, old and new reads can mix with nothing on screen saying so.
+- **Follow-up:** a "showing your last figures" note. The Founder is deciding, via Jay.
+
+## 2026-10-13 — Dana — Insights v2: Dmitri's FIX-FIRST items (still unwired, no commits)
+- **M1:** What you owe shows the failure line with Try again (cards + balances) when the cards read fails, or the balances fail with a card to owe on; the typed balance never shows. It also waits while the ledger loads, since the balance walk reads the same data.
+- **M2 / S2:** "No active goals" when every goal is reached; "No open loans" when every loan is finished (new keys `insights.goals.noneActive`, `insights.loans.noneOpen`).
+- **M3:** Drew's `belowOnePercent` renders as whole sentences (`insights.hero.spentShareUnder`, `insights.savings.shareUnder`, with `{percent}` = 1%).
+- **M4:** `together()` and the picker count a read as failed only when `isError && data === undefined`; fakes carry no data when failing; a failed reload keeps its figures (screen and picker tests).
+- **S1:** the share line hides when Moved is $0.00. **S4:** picking a year drops a picked month from another year. **S6:** `stateOf` deleted.
+- **Gates:** whole-tree tsc 0; eslint 0 on my files; `npx jest --ci src/__tests__/insights src/__tests__/large-text-guard.test.ts`: 9/9 suites, 192/192 tests.
+- **For Diego:** `usePlanMonth` (payment-ledger.ts:169), `useGoals` (goals.ts:87) and `useSavingsCore` (savings.ts:244) still pass raw `isError`, so a failed reload there fails its section; `useSourceBalances` exposes no loading flag.
+
+
+## 2026-10-13 — Dana — Part 4 fixes from Dmitri's FIX-FIRST (DONE, no commits)
+- **MUST, the gate latches** (`src/components/pro/pro-gate.tsx`): `useProGate` decides once, on the first known answer, for the life of the screen.
+  - Unknown: an empty fragment, as before.
+  - First known free: `ProFeatureRedirect`.
+  - First known Pro: stays open even if Pro lapses later.
+  - So a form whose save is refused as free keeps what was typed. The explainer it pushes returns to it, after a purchase or Not now.
+  - Two old tests pinned "a lapse redirects", so I rewrote them to pin "stays open":
+    - `habit-new.test.tsx`, the "lapses partway" test, about line 322 (that block only; the file also holds Diego's hunks);
+    - `payment-export-screen.test.tsx` about line 950.
+- **S1:** `src/__tests__/pro/pro-gate-router.test.tsx` uses the real router (`renderRouter`), 5 tests:
+  - `/add-account?from=salary` → `next` keeps `from=salary`;
+  - free heard while covered → `next` is the gated page, not the top one;
+  - a form opened with Pro, refused as free → the explainer, then back → the form still holds its value;
+  - unknown, then Pro → opens, with no explainer;
+  - Pro, then a lapse → stays.
+- **S3:** `pro-feature.tsx` draws the empty `Screen` frame (title and chevron) while Pro is unknown or true, never the explainer's words.
+- **S4:** `exportHref` returns `` `/payment-export?${string}` ``, so the `as string` cast is gone, along with the `Href` import.
+- **S5:** habits' cold-link default is `/habits`.
+- **Tests:** the latch flows went into `pro-purchase-flow` (habits and voice-review form pages behind the real gate, 3 each). `pro-feature-continue` now checks the frame and the habits default.
+- **Gates:**
+  - Scratch tree (new HEAD b80ba69 + my hunks only): tsc 0, and 84/84 suites, 2,192 tests (Pro, payments, habits, voice, gated pages, Cards, Home, dashboard).
+  - Live: tsc 0 for the whole tree; eslint (cache cleared) 0; prettier clean; habit-new 42/42 run alone.
+  - Mutants on scratch copies: 8/8 killed. One survived at first (latching before Pro is known); the new unknown-then-Pro router test catches it.
+- **For Dmitri:** with the latch, an export page opened with Pro can still export after a lapse under it. payment-export.tsx is the Bills session's, so I left it.
+
+## 2026-10-13 — Dilip — Dmitri's GO fixes S1, S2, S3, S5 (DONE, no commits, no deploy)
+- **S1** (webhook):
+  - `planTransfer` also passes over a receiver whose row was written after `event_timestamp_ms`. The receiver bought since, or this copy was made by an earlier try.
+  - The switch-off adds `.lte('updated_at', <event time>)` when the event has a time, so a purchase landing between the read and the update keeps its row.
+  - To test the handler without Deno, its steps moved into `runTransfer(event, store, log, nowMs)` in transfer.ts. index.ts now only supplies the Supabase store.
+- **S5** (webhook): a receiver deleted since (FK 23503 on the copy) is logged ("receiving account no longer exists, passed over"), counted as `gone`, and answered 200. Other receivers are still granted and the giver is still switched off. Any other failed copy still answers 500.
+- **S2** (`src/api/pro.ts`): `latestAsked` is set on every ensureConfigured. A waiting call whose turn comes after someone else was asked returns false, without logIn. A, then B, then A again within one logIn ends signed in as A.
+- **S3** (`src/lib/failure.ts`): `stack.replace(thrown.message, () => message)`, so a `$&` in the scrubbed message cannot put the raw one back.
+- **Tests:**
+  - `src/__tests__/supabase/revenuecat-transfer.test.ts`: in-memory store honouring the written-by filter; receiver written since; purchase between read and switch-off; partial-failure retry; 23503 passed over; other error 500; no timestamp; index.ts wiring pin.
+  - `src/__tests__/api/pro-identity.test.tsx`: A→B→A.
+  - `src/__tests__/lib/failure-report.test.ts`: `$&`.
+- **Gates:**
+  - jest 18 suites / 306 tests green (push-timezone included); tsc 0 errors; eslint and prettier clean on my files.
+  - Edge function type-checked on a scratch copy.
+  - Scratch mutants for S1, S2, S3 and S5 were all caught.
+- **Deferred to round 2:** S4 (scrubbing unhandled-error messages), with setUser.
+
+## 2026-10-13 — Diego (second instance) — Idempotent creates, step 1: API layer + salary + source-payment (DONE, no commits; stopped before the batch-1 screens as briefed)
+**Outcome:** a create given a client id now files at most one row however often Save is pressed. Salary and source-payment are wired. The other screens wait for batch 1.
+
+**API (`src/api/mutations.ts`, `useCreateHabit` in `src/api/habits.ts`):**
+- New `insertOnce(table, values, userId, columns, id?)`, used by `useCreate` and `useCreateHabit`. Both take an optional `id` in the variables (`ClientId`). With no id, it behaves exactly as before.
+- `mayHaveWritten(error)`: no non-empty `code` means the write may have landed. postgrest-js answers a dropped fetch with `code: ''` and status 0 (checked in 2.112.3); gateway pages and deadlines carry no code. Any code means PostgREST or Postgres answered and rolled back.
+- An id whose last attempt may have landed goes in a module-wide `unanswered` set. The next attempt selects by id first. Found: it updates with the current values and resolves as a create. Not found: it inserts under that id. Success clears the mark; a coded refusal does not set one. The happy path is one request.
+- An insert refused with 23505 on `"<table>_pkey"` (a late landing, or a double tap) becomes the same update. RLS hides the key detail, so the constraint name is the signal. Every create table keeps its default pkey name, since none was ever renamed.
+- `PaymentValues.from_bank_account_id` is now `string | null`, required.
+
+**Screens:**
+- `src/app/source-payment.tsx`: `useState(() => randomUUID())` per visit, sent as `id`. `from_bank_account_id: source || null` instead of leaving the key off, so a retry that finds the first row clears an account no longer chosen. I confirmed the column is live and nullable with one read-only `information_schema` query (`db query --linked`). This reverses the pinned "no key at all" test contract.
+- `src/app/salary.tsx`:
+  - New pays get a client id the first time a Save tries to file them (`clientIds`, keyed by the page's `salary-N`). `filedIds` is the written-id guard: a filed pay is updated on Save again, never created twice.
+  - A tried pay later removed or blanked is deleted.
+  - Any tried pay gets its past pay carried back to the page's values (`pastPay.apply`, no question). `recordDuePay` at the start of Save again, or the sweep, can record its payday from the first attempt's values and with no account link.
+  - jest-expo's auto mock makes `randomUUID()` undefined, so the local `salary-N` keys stay.
+
+**Tests:**
+- New `src/__tests__/api/create-once.test.tsx` (18): an in-memory table where answers are lost, requests never arrive, or are refused with a code. Covers the 23505 path, a row deleted between the look and the update, a failed look, a payment, and habits.
+- New `src/__tests__/app/salary-retry.test.tsx` (5).
+- `source-payment.test.tsx` (54, one new retry test) and `source-payment-i18n.test.tsx` (28) updated for the id and the null.
+
+**Gates:**
+- tsc: 0 across the tree.
+- `rm -rf .expo/cache/eslint && npx expo lint`: 2 findings, neither mine (`src/__tests__/app/setup.test.tsx` warning; prettier error in `src/lib/insights-sections.ts`).
+- Targeted jest, 61 suites touching the create hooks, salary or payments: everything mine passes. One suite fails outside my files: `add-receipt-save` ("a refusal for someone the app thinks has Pro"), which is batch 1's in-flight add-receipt.tsx. That test mocks `@/api/mutations`.
+- Mutants: run on scratch copies mapped in by a scratch jest config, with no src file written. Results are in my report.
+
+**For the Add bill session:** the exact change is in my report to the CEO: an `expo-crypto` import, `const [newBillId] = useState(() => randomUUID())`, and `createBill.mutateAsync({ ...values, id: newBillId })`.
+
+## 2026-10-13 — Diego — Part 5 batch 1: confirmPro, past reads await, scan hint (DONE, no commits)
+**Outcome:** a Pro write the database refuses while the app shows Pro is now asked about again before any failure line. A save or delete whose past-charges or habit-days read has not answered waits for that read instead of failing. A scan that reads nothing shows a hint, not the failure line.
+
+**New `src/api/confirm-pro.ts`:**
+- `confirmPro()` asks in this order:
+  1. `is_pro` for the signed-in id;
+  2. RevenueCat, past its cache, trusted only when `originalAppUserId` matches the signed-in id;
+  3. `is_pro` again, every second, for up to 10 s.
+- It answers `'pro'`, `'free'` or `'unknown'`. `'free'` is only given once the published Pro status shows free, so the explainer does not bounce straight back.
+- `useProWrite().run(write)` handles a write that hits the wall:
+  - a free app gets the explainer, unless the page was already left;
+  - a Pro app gets "One moment…" (`pro.confirm.wait`) while it asks, then one retry when the database agrees;
+  - otherwise the original error is thrown.
+- The client and `react-native-purchases` are required lazily, so the screens' tests load neither.
+
+**Other changes:**
+- `src/lib/pro-refusal.ts` also matches "Skip Pro removes the limit" (the free allowance on cards and accounts).
+- `load()` added to `useHabitPastDays` (src/api/habits.ts) and `usePastCharges` (src/api/past-charges.ts). It joins a read already in flight and rejects only on a real failure.
+  - `choose` and `chooseDelete` take an optional `past` from `load()`.
+  - Without it they still return null before the read, so add-bill keeps working.
+- Wired into:
+  - habit-new, add-receipt, voice-review, add-card and add-account (`useProWrite`);
+  - habit-new, add-subscription, bill/[id], subscription/[id], loan/[id] and add-loan (`load()`).
+- add-receipt.tsx: an empty scan now says `receipts.scan.nothing`, "Couldn’t read this receipt. Fill it in below." (es/fr in messages/receipts.ts).
+- add-bill.tsx is NOT edited. Its exact change went to the CEO for the Add bill session.
+
+**Tests:**
+- New: `src/__tests__/api/confirm-pro.test.tsx` (28), `src/__tests__/api/past-charges-load.test.tsx` (8).
+- Additions to habit-past-days.
+- Mocks updated and not-ready tests rewritten in 20 screen suites.
+
+**Gates:**
+- tsc: 0, whole tree.
+- eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean on the 41 files.
+- jest: 43 affected suites, 1,290 of 1,290.
+- Two tests flake only under heavy load and pass on rerun: habit-new "answers with one tap" (a 150 ms timer race) and an add-subscription-i18n 5 s timeout.
+
+**Mutants (scratch copies plus a scratch jest config, real files checked unchanged by md5):**
+- 32 of 33 killed; the no-op control survived.
+- The survivor is `cancelRefetch: true` in useHabitPastDays.load. It is equivalent on a first read: TanStack never cancels a fetch with no data.
+
+## 2026-10-13 — Dmitri (Development Lead) — Review of Diego's Part 5 batch 1 (confirmPro, load(), scan hint): GO with should-fixes (read-only, no src edits)
+**Outcome:** GO for iPhone round 1. Nothing blocks. One risk to flag: a TRANSFER that was dropped before Dilip's deploy is not fixed by this batch.
+- **No double-filing on retry.** Every refusal it catches comes from a BEFORE INSERT row trigger that raises: cards and bank_accounts (20260831100007:57-93), receipts (20261007100001:22-64) and habits (20261009100002:108-127). The statement rolls back. Every wrapped write is a single `useCreate` insert or the `useCreateHabit` insert.
+- **The dropped TRANSFER.** After the deploy, a new TRANSFER, purchase or renewal whose webhook lands within about 10 s saves on the retry. A TRANSFER dropped before the deploy is never sent again: the person waits about 10 s on "One moment…", then sees the failure line, until the next renewal or expiry event or round-2 RC REST verification. On a slow network the worst case is about 15 s: the 4 s asks and the poll still in flight run past the 10 s clock.
+- **Unmount, identity, Release.**
+  - Leaving the page is handled, and tested, both before and after the ask.
+  - The identity check is the same as pro.ts `isFor`.
+  - The lazy requires are safe in Release. Metro bundles literal requires, and Expo resolves the tsconfig `@/` paths, as for avatars.ts:16. The RNP CJS module has `__esModule` and `exports.default`. pro.ts already imports both modules.
+- **load().**
+  - `cancelRefetch: false` joins a read in flight; this is pinned against real TanStack in habit-past-days.
+  - No onlineManager is wired, so offline it fails fast: retry 1, then the failure line.
+  - On a hung network the button is held for up to about 25 s (charges, 12 s timeout x2).
+  - `lastChargedOn` comes from the same rows as the count (add-subscription.tsx:376).
+  - add-bill is unchanged: no `past`, and `ready`, `retry` and `lastChargedOn` are kept. Its 3 suites pass.
+- **Scan hint:** shown only when `applyScan` finds nothing. A thrown camera or recognition error still gives the failure line. Both are pinned (add-receipt-scan:698, :742).
+- **Runs:**
+  - The brief's 8 suites plus 6 neighbours: 14 suites, 651 tests, green.
+  - Hook consumers (add-bill x3, add-subscription x2, habit-edit-past-days, the languages suites, loan-overrides, voice forms, source wall, pro-refusal): 12 suites, 663 tests, green.
+  - tsc: 0.
+- **Should-fix (before commit, not blocking):**
+  - S1: bill/[id].tsx and subscription/[id].tsx have no tests for the new await/failure paths; only the mock gained `load`. Mirror loan-view's two tests.
+  - S2: add-loan.tsx, Save and Delete. Reading shows nothing busy, because only refs guard it.
+  - S3: confirm-pro.ts:68 imports react-native-purchases, against pro.ts:20 "Nothing else imports…". Fix the comment or move `storeSaysPro` into pro.ts (round 2).
+  - S4 (note): a retry write that finishes after the page was left still runs success, toast and `router.back()`. This is the same one-request window as any save.
+
+## 2026-10-13 — Diego — Batch 1 should-fixes S1–S3 (DONE, no commits)
+- **S1:** two Delete tests each in `bill-detail.test.tsx` (stopped bill) and `subscription-detail.test.tsx` (cancelled subscription):
+  - waits for an unread charges read, then asks with its count;
+  - a failed read says the one failure line, is reported, and asks and deletes nothing.
+  The past-charges, dialog and delete mocks became controllable; `warn` was added to the haptics mock.
+- **S2:** `add-loan.tsx` adds a `readingPast` state. Save's `busy` (shown as "Saving…") and Delete's `busy` (shown as "Deleting…") are on while `load()` runs, and the refs still block same-frame taps. The two add-loan wait tests now assert the disabled button.
+- **S3:** the `src/api/pro.ts` header comment now names confirm-pro.ts as the one other reader of the SDK (comment only; CEO OK).
+- **Gates:**
+  - tsc: 0, whole tree.
+  - eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean.
+  - 13 affected suites: 250/250.
+
+## 2026-10-13 — Diego (second instance) — Idempotent creates, step 2: the batch-1 screens (DONE, no commits)
+**Outcome:** every add form left in round 1 files at most one row per visit. add-bill (frozen) and add-loan (`save_loan`, round 2) are untouched.
+
+**Screens:** each holds `const [newId] = useState(() => randomUUID())` and passes it to its create. Batch 1's `useProWrite`, Dana's `ProFeatureRedirect` and Drew's lines are kept.
+- `add-subscription.tsx`: `filedId` guard. Save again after the reminder failed updates the filed row with the page's values, then writes the reminder.
+- `add-card.tsx`: the same `filedId` guard.
+- `add-account.tsx`: the same guard for the account (its free allowance would refuse a second insert before the key check). The pay typed here has its own client id (`newSalaryId`). Once filed, its repeat insert under that id becomes an update through `insertOnce`'s pkey path, since salary_sources has no before-insert wall. No new hooks, so the seven add-account test mocks stay as they are.
+- `habit-new.tsx`, `add-receipt.tsx` (typed, scan, voice and habit days all go through one create), `voice-review.tsx` (receipt, bill or subscription): id only, since each is a single write.
+
+**Tests (appended, nothing else changed):**
+- add-card-flow, add-account-flow, add-subscription-save: reminder fails, Save again: one create, then an update and the reminder.
+- add-receipt-save, habit-new, voice-review: a lost answer, then Save again: both creates carry the same id.
+- The golden suites mock `randomUUID` as a bare `jest.fn()` (undefined, like Jest's own stand-in), so their exact payload pins stay as written.
+
+**Gates:**
+- tsc: 0, whole tree.
+- `rm -rf .expo/cache/eslint && npx expo lint`: 1 warning, not mine (`setup.test.tsx`).
+- eslint `--no-cache --max-warnings 0` and prettier: clean on all 20 files I touched.
+- jest on the 63 suites that touch the create hooks, these screens or expo-crypto: 1974/1974.
+
+**Known gaps:**
+- If a subscription or an add-account pay is filed, the sweep records a renewal or payday before the retry, and the person edits the amount or account in between, that recorded charge keeps the first attempt's values. salary.tsx carries back; these two pages do not.
+- A voice entry retried as a different kind leaves the first kind's row, if it landed.
+- Mutants (scratch copies through a scratch jest config, no src file written): sanity passed for the API, salary and payment suites. 8/8 API mutants were caught, including mayHaveWritten, the mark and clear, look first or not, a found row ignored, and a look error ignored. I stopped the run at 14:00 to free the CPU for round-1 gates. The other 20 (idTaken, rewrite, the habit, salary and payment screens) are listed in `scratchpad/diego2-mut/run.py`, not run.
+- CEO decisions (2026-10-13): source-payment always sending `from_bank_account_id` is OK. Salary rewriting a tried row's past pay without asking is OK. The known gaps are accepted for now and logged for round 2. Standing by for Dmitri's review; no further mutation runs during the round-1 gates.
+
+## 2026-10-13 — Dmitri (Development Lead) — Review of Diego (second instance)'s idempotent creates: FIX-FIRST, one small must-fix (read-only, no src edits)
+- **Gates:** 10 suites (create-once, salary-retry, source-payment + i18n, add-card-flow, add-account-flow, add-subscription-save, add-receipt-save, habit-new, voice-review): 484/484 pass. tsc 0. expo-crypto 57.0.1 is already in Podfile.lock and was already used in HEAD, so no native change.
+- **Sound:**
+  - All 8 create tables use the inline `id uuid primary key`. No custom or renamed pkey and no table renames in migrations, so `<table>_pkey` holds. Checked from migrations only, not live. If a live name differed, that path fails safe as a refusal.
+  - RLS on all 8 is `for all using/with check (auth.uid() = user_id)`, so neither the look nor the rewrite can reach another user's row.
+  - The only insert-only walls are the card/account allowance, habits Pro and the scan/upload count. An update never adds a row, and `receipts_keep_origin` pins source and created_at. No AFTER INSERT side effects get skipped. A rewrite grants nothing the edit screens can't already do.
+  - Ids are per visit. Add another uses `router.replace`, which already relies on a remount to reset `added`.
+  - Voice uses one id across 3 tables, but each look is per table.
+  - `PaymentValues` has one caller.
+  - carry-back is bounded by `.eq('salary_source_id', id)` on a visit-fresh id.
+- **M1 (must-fix), `src/app/salary.tsx:487-493`:** a tried pay that is then removed leaves phantom income.
+  - Save #2 runs `recordDuePay` (:453) first, which writes that pay's last payday.
+  - The delete then fires, and `pay_received.salary_source_id` is `on delete set null` (20261008100005), so the pay row stays, counted, with no source.
+  - Fix: delete that id's `pay_received` rows before deleting the source. Every such row came from this visit's attempt.
+  - Add a salary-retry test that asserts it. The current removed-row test mocks recordDuePay to 0, so it can't see this.
+- **Should-fix / round 2:**
+  - S1: the "saved pay left blank" guard at salary.tsx:426 covers only `savedIds`. A filed pay that is blanked is deleted silently, with a "saved" toast. Extend it to `filedIds`.
+  - S2: add-account never deletes a filed pay when the income is cleared or askPay is turned off before Save again.
+  - S3: Diego's known gaps stand (renewal or payday recorded with the first values on add-subscription / add-account; voice kind switch). None is a regression.
+  - S4: a typed receipt that landed and is then retried as a scan stays 'typed' (keep_origin), so that scan goes uncounted. That is one per lost answer, negligible.
+  - S5: run one read-only `pg_constraint` query to confirm the live pkey names.
+
+## 2026-10-13 — Diego (second instance) — Dmitri's FIX-FIRST: M1, S1, S2 (DONE, no commits)
+- **M1, money:**
+  - New `useDeleteUnseenPay(id)` in `src/api/mutations.ts`. It deletes `pay_received` rows by `salary_source_id`, then the source. This is needed because the key is `on delete set null`, so a plain delete orphans recorded pay that still counts as income.
+  - The owner can delete under the `pay_received_all_own` "for all" policy. pay.ts and lib/pay.ts are untouched.
+  - salary.tsx uses it for tried pays that were removed.
+- **S1:** salary.tsx's "left without a name" guard now covers every tried pay (`clientIds`, a superset of `filedIds`). A pay an earlier Save may have filed is asked for, never dropped under a saved toast.
+- **S2:** add-account.tsx records `payTried`. If a later Save no longer has typed pay (cleared, or switched to existing pay), it deletes the first attempt's pay by its client id with `useDeleteUnseenPay`.
+- **Tests:**
+  - salary-retry: `recordDuePay` really records, the pay is removed, and no pay_received is left. A blank filed pay is asked for.
+  - add-account-flow: income cleared after a failed Save deletes `visit-2`; nothing is deleted when no pay was tried.
+  - create-once: the hook's order and scope.
+  - The new hook was added to the `@/api/mutations` mocks of 9 salary suites and 7 add-account/pro suites (one line each).
+- **Gates:** tsc 0 (whole tree); eslint `--no-cache --max-warnings 0` and prettier clean on all 21 files; jest create-once + salary* + add-account* + add-source-wall + pro-gate-next + account-reminder-schedule: 18 suites, 250/250.
+
+## 2026-10-13 — Dana — L5 coffee row out, L9/L15 delete account copy and Skip Pro warning, two FAQ answers (DONE, no commits)
+**Outcome:** done. The coffee row is gone. The delete flow uses Mia's copy word for word and asks a Skip Pro account "Cancel Skip Pro first?" before the counts. The two FAQ answers are replaced.
+
+**Code (`src/app/(tabs)/settings.tsx`):**
+- Removed the coffee row, `COFFEE_URL`, and the `openBrowserAsync`, `Coffee` and `CoffeeMark` imports. Support and feedback now carries `last`.
+- `handleDeleteAccount`: when `usePro().pro` is true (the signal the Pro row uses), it first calls the app dialog (`useDialog`, the same provider as the existing confirms). Choices, in order:
+  - "Manage in the App Store" (`pro.page.manage`, read only): `Linking.openURL('https://apps.apple.com/account/subscriptions')`, as in pro.tsx, then returns. Nothing is deleted.
+  - "Continue to delete" (`settings.delete.proContinue`): goes on to the existing counts dialog.
+  - "Keep my account" (`settings.delete.keep`): the way out.
+- `pro` is false until a source says yes, so an unknown answer or a free account goes straight to the counts. The two-step confirm and the eight counts are unchanged.
+
+**Keys:**
+- Added: `settings.delete.proTitle`, `settings.delete.proMessage`, `settings.delete.proContinue`.
+- Removed: `support.coffee`, `support.coffeeDetail`.
+- New values: `settings.delete.held`, `settings.delete.nothingHeld`, `settings.delete.finalMessage`, `faq.pro.include.a`, `faq.pro.cancelled.a`.
+- All 24 lines were checked against Mia's draft by script; they match. One difference: the French title uses U+00A0 before "?", as every French title in the app does; the draft has a plain space.
+
+**Tests:**
+- settings.test.tsx (28): coffee tests out, COFFEE out of the button order, and a "no coffee link" check. New delete tests:
+  - free goes straight to the counts;
+  - Pro not known yet goes straight to the counts;
+  - Pro sees the warning first (labels, order, nothing red);
+  - Manage opens the URL and deletes nothing;
+  - asks again after coming back;
+  - Continue reaches the counts;
+  - the full Pro delete path;
+  - the nothingHeld text.
+- settings-languages.test.tsx (15): coffee lines and mock out, es/fr messages updated, Pro warning checked in es and fr.
+- faq-languages.test.tsx (11): price pin updated, plus a new "if Pro ends" check.
+- faq.test.tsx (2): one pin updated.
+
+**Gates:**
+- jest: 18 suites (Settings, FAQ, src/i18n), 189/192.
+- The 3 failures are in `legal-faq-messages.test.ts`, on `legal.privacy.updated`, `legal.privacy.who.p1` and `legal.privacy.summary`: the other Dana's in-progress legal.ts.
+- The same checks on the FAQ messages alone (scratch config, tree untouched): 6/6.
+- tsc: 0.
+- eslint (cache cleared, --no-cache, --max-warnings 0) and prettier on my 8 files: clean.
+- `npm run lint` on the whole tree: 2 prettier errors in `src/__tests__/supabase/habit-and-days-migration.test.ts`, plus the known `setup.test.tsx` warning. Neither file is mine.
+
+**Left for others:**
+- `src/components/settings/coffee-mark.ts` and `assets/illustrations/buy-me-a-coffee.svg` are now unused, left in place for archiving.
+- Ask Sam knowledge still describes the tip row: `src/lib/ask-sam/knowledge/pro-settings.ts` (:1229, :2001-2015) and `voice-privacy-help.ts:1381`, plus their es/fr copies.
+- Not verified on device: dialog height at the largest text size.
+
+## 2026-10-13 — Dana — New English Terms of service and Privacy policy in the app (DONE in English, no commits; es/fr wait for Mia)
+**Outcome:** the Terms (summary + 17 sections) and the Privacy policy (summary + 13 sections) now show the Founder-approved recommended English from `.claude/team/dev/legal-draft-terms.md` and `legal-draft-privacy.md`. The ALTs are ignored, the two GATEd claims are left out, and the placeholders stay as written. Every new or changed key carries its English in es and fr until Mia translates.
+
+**Files:**
+- `src/i18n/messages/legal.ts`: 182 keys, of which 108 are new, 31 changed and 43 unchanged (these keep their es/fr). Deleted: `legal.terms.money.heading`, `legal.terms.money.p1`, `legal.terms.law.note`.
+  - The file was generated from HEAD by a scratch script, then checked line by line against both drafts by a second script: 0 differences, apart from the title being drawn above the date.
+  - CEO change folded in: `kept.b2` reads "loans (with any extra payments)"; `kept.b1` is as drafted.
+- `src/app/terms.tsx`, `src/app/privacy.tsx`: the section order matches the drafts. Kept keys keep their names, and new keys take the next free number, as the privacy draft does. So the Law section draws `law.p2, p1, p3, p4`.
+- `src/components/ui/legal-document.tsx`:
+  - New `link` block (`{ kind: 'link', label, url }`). It opens with `openBrowserAsync`, as the Settings coffee row does, and has `accessibilityRole="link"` and TEXT_CAP.row.
+  - A tap while the browser is still up is ignored, since iOS refuses a second one; that tap is not a failure.
+  - A failed open shows `failureText()` as an `alert` in `text-danger` at TEXT_CAP.reading, announces it, and reports through `failureMessage(thrown)`.
+  - New `subheading` block (`header` role, TEXT_CAP.heading). Section headings also get the `header` role.
+  - `summary` takes `string | Block[]`; the privacy summary is still one string.
+  - `Block` is exported.
+- Tests:
+  - `src/__tests__/app/legal.test.tsx` (16): exact English headings 13/17; es/fr heading order checked against the catalogue; both links' URLs; placeholders; the Sentry bullet's exact text, with no "account id" on any Sentry line; no "reminds you before you delete"; kept.b1/b2 exact; no in-app purchases, coffee or Splits; Law section order.
+  - `src/__tests__/components/legal-document.test.tsx` (+6): summary blocks, header roles, link opens, double tap, failure line plus announce plus log, role ceilings.
+  - `src/i18n/legal-faq-messages.test.ts`: the NAMES list adds RevenueCat, Resend, Cloudflare, Wikidata, Skip Logos, App Store and Skip Pro.
+
+**New copy not in the drafts (Founder/Mia to OK):** the link labels "Read Apple’s standard licence" (`legal.terms.agree.link`) and "Ask Apple for a refund" (`legal.terms.cancel.link`). The paragraphs keep their URLs. The Terms draft's straight quotes and apostrophes became the app's curly ones.
+
+**Gates:**
+- jest, the 2 legal suites: 26/26.
+- Mutants on scratch copies via a scratch jest config, with the real files checked unchanged by md5: 10/10 killed, and the no-op control survived. Law order was caught only after the order pin was added.
+- tsc: 0, whole tree.
+- eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean on the 7 files.
+- **Expected red until Mia translates:**
+  - `src/i18n/legal-faq-messages.test.ts`, 3 checks: translated, French punctuation, no English. On a scratch copy without the 139 pending keys, all of them pass.
+  - `shared-controls-large-text`, "LegalDocument (privacy)" in es/fr ("nothing left in English"). Every leftover line is a pending key.
+  - A full run gave exactly these 5 failures in 9,586 tests. The settings and faq failures in an earlier run were other sessions' in-flight edits and have since gone green.
+
+**Left for others:**
+- Ask Sam `privacy.terms` (`src/lib/ask-sam/knowledge/voice-privacy-help.ts`) and `es/getting-started.ts:160` still say every figure comes from what you entered.
+- `pro-settings.ts` still describes the coffee row.
+- The drafts' own open checks still stand: Terms §12 "off sale … stops renewing" (Checks 3, fallback wording exists); the "Skip Budget" store name; DPAs; `[SENTRY DAYS]`.
+
+## 2026-10-13 — Diego — Habit edit "Past and upcoming" in one database step, Phase 1 (new files only; NOT applied anywhere; no commits)
+- **Migration `supabase/migrations/20261013500001_update_habit_and_days.sql`:** `update_habit_and_days(p_habit uuid, p_name text, p_icon_id text, p_color text, p_price numeric, p_card_id uuid, p_bank_account_id uuid, p_category_id text default null) returns public.habits`.
+  - Security invoker, `search_path=public`. Revoked from public/anon, granted to authenticated.
+  - Order: `auth.uid()` check, a price guard (22023: null, NaN, <= 0 or a fraction of a cent), then a `FOR UPDATE` lock. The lock refuses with P0002 'there is no such habit', delete_habit's words.
+  - The habit update is the client's patch: `btrim` name; category kept when null; card wins.
+  - Then one receipts update by habit_id, from the row as saved (`returning * into strict`). It writes merchant/amount/category/card/account, exactly `habitCarriedValues`. It never writes purchased_on or habit_id, so not-before-creation never fires. No exception handler, so any refusal undoes both. Editing stays open on every plan.
+- **Checks `supabase/checks/update_habit_and_days.sql`:** about 40 assertions in one rolled-back transaction. Covered:
+  - Function shape and grants.
+  - 14 refusals that write nothing. One is a forced failure after the habit is written, which undoes the habit too.
+  - P0002 for O's habit, H on O's, a random id and one already deleted.
+  - anon gets 42501; no claims gets 'not authenticated'.
+  - Both change together on a FREE account; the days keep date, habit, note and book.
+  - A planted receipt from another user is untouched.
+  - Category kept unless given; card wins on both; Skip.
+- **NOT RUN against a DB:** there is no local Supabase (`supabase_db_SkipBudget` does not exist; Docker is up). I didn't start one. Both files parse with libpg_query (pglast 8.3, PG17 grammar), including every PL/pgSQL body and 22 dynamic SQL strings; 2 parser mutants were caught.
+- **New static jest suite `src/__tests__/supabase/habit-and-days-migration.test.ts` (8 tests):** ties the SQL to the TS. The P0002 words equal delete_habit's and pass `refusedHabitGone`. The receipts SET columns equal `habitCarriedValues` keys. It also pins grants/signature, lock-before-write order and no handler. 8/8 SQL mutants were caught.
+- **Client patch, drafted, not applied:** `/private/tmp/claude-501/-Users-sampathchowdi-Desktop-SkipBudget/ef12afeb-86f7-4f2c-8692-51bdb17f7157/scratchpad/update-habit-and-days.patch`. It is based on the 2026-10-13 working-tree versions of habits.ts, habit-new.tsx, habit-past-days, habit-edit-past-days, habit-new and habit-new-languages tests; `git apply --check` is clean.
+  - New `useUpdateHabitAndDays` + `HabitEditValues`. `useRewriteHabitDays` is removed (no callers left).
+  - habit-new uses the RPC for 'all' and `useUpdateHabit` for 'upcoming'. `rewritePending` (the held answer) is removed.
+  - In a mirror: tsc 0, eslint/prettier clean, 26 habit+migration suites and 583 tests pass.
+- **Gates on the real tree (only my 3 new files differ):** `npm run typecheck` 0. `npm test`: 402/407 suites, 9439/9445 tests. The 6 failures belong to other sessions' live edits: `confirm-dialog.tsx` has a JSX syntax error right now, and the legal/FAQ translations are mid-edit. All habit and supabase suites pass.
+- **Found:** NaN passes `habits_price_positive` and `receipts amount >= 0`, since numeric NaN sorts above every number and numeric(14,2) stores it. zod is not a dependency at all. The `useHabitPastDays` tests have a flaky pre-existing act() warning.
+
+## 2026-10-13 — Dana — Follow-ups: Settings pitch, Manage failure line, dialog scrolls at large text (DONE, no commits)
+**Outcome:** all three CEO follow-ups are done.
+
+**Settings pitch:** `settings.pro.pitch` uses Mia's section 1 text in en/es/fr, checked against the draft by script. Pins updated in settings.test.tsx and settings-languages.test.tsx.
+
+**Manage failure:** in Settings > Delete account, "Manage in the App Store" now awaits `Linking.openURL`. If it rejects, the app dialog shows `failureMessage(thrown)` with no way out, then stops; nothing is deleted. Tested in settings.test.tsx. pro.tsx is untouched.
+
+**Dialog (`src/components/ui/confirm-dialog.tsx`):** `git status` was clean on it and on dialog-provider.tsx before editing; dialog-provider.tsx is unchanged.
+- The backdrop gets equal top and bottom padding: the larger of the two safe-area insets plus 16pt. A dialog that fits stays centred where it was.
+- The card's `maxHeight` is the window height minus that padding on both sides.
+- The title and message sit in a ScrollView (`flexGrow 0`, `flexShrink 1`, no bounce when it fits). The buttons stay outside it, so they are always on screen.
+- When the words overflow, the scroll bar flashes once.
+- Insets come from `SafeAreaInsetsContext`, falling back to zero when no provider is present, as in tests.
+
+**Tests (confirm-dialog.test.tsx, 3 new):**
+- A real French loan delete question at 3.1x on a 667pt phone with safe-area insets: card capped at the safe area; the words scroll; the three buttons are outside the scroll and each resolves; the bar flashes once.
+- A dialog that fits keeps its card, text-box and button-row classes, is centred in equal room, does not bounce, and does not flash.
+- With no provider, the card keeps 16pt clear of the screen edge.
+
+**Gates:**
+- tsc: 0, whole tree.
+- eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean on my 10 files.
+- jest: 23 suites, 428/433. All 5 failures are the other session's legal copy: 3 `legal.*` keys in legal-faq-messages, and LegalDocument (privacy) es/fr in shared-controls-large-text. The ConfirmDialog cases there pass.
+
+**Not verified:** on-device layout (jest has no layout engine). Founder check: Settings > Delete account in French at the largest accessibility text size on the 13 Pro Max.
+- **2026-10-13 — Diego — follow-up (CEO cleared a LOCAL stack): all three habit checks PASS on a fresh local DB; patch updated (scratch only, still not applied).**
+  - **Stack:** another session (worktree `claude/clever-lehmann-57d6b2`) was running `supabase db reset --local` on this repo's stack (`supabase_db_SkipBudget`, same project_id). I left it alone and started an isolated local stack from a scratch copy of `supabase/`: project_id `SkipBudgetDiegoChecks`, ports 553xx, no `.temp` link, seed/studio/smtp/edge/analytics off.
+    - No login or prompts. All 88 migrations applied, ending at 20261013500001.
+    - Stopped afterwards with `--workdir … stop --no-backup` (its volumes are gone). The peer's container stopped itself at 14:28:38, 37 s before my stop; its volumes are untouched.
+  - **Checks:**
+    - `update_habit_and_days.sql`: PASS, 39 ok lines.
+    - `habits.sql`: PASS, 54.
+    - `habit_past_days.sql`: PASS, 27.
+    - 4 behavioural DB mutants were applied to the scratch DB, and the check caught each: no lock → wrong refusal; swallowed rewrite → expected refusal; untrimmed merchant → FAILED; over-wide rewrite → FAILED. Restored and reran PASS.
+  - **Patch:** `useUpdateHabitAndDays` now refreshes the habit caches on P0002 (`refusedHabitGone`), as the delete hook does. Its test expects every habit key on gone and none on other refusals; both mutants were caught.
+    - Rebased on unchanged working-tree files (same blob hashes). `git apply --check` OK, and applying it to the base copies reproduces the mirror byte for byte.
+    - Mirror: tsc 0, eslint/prettier clean, 56 suites and 1080 tests pass.
+  - prettier is clean on `src/__tests__/supabase/habit-and-days-migration.test.ts` in the real tree.

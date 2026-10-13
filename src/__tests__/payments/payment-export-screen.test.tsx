@@ -68,6 +68,11 @@ jest.mock('expo-router', () => {
       canGoBack: () => mockNav.stack.length > 1,
     },
     useLocalSearchParams: () => useContext(ParamsContext),
+    // Only the export page is gated here, so its params are the route's query.
+    useCurrentRouteInfo: () => {
+      const query = new URLSearchParams(useContext(ParamsContext)).toString();
+      return { pathnameWithParams: query ? `/payment-export?${query}` : '/payment-export' };
+    },
     useFocusEffect: (effect: () => void) => useEffect(effect, [effect]),
     // Replaces the page it is drawn in, as expo-router's does.
     Redirect: ({ href }: { href: unknown }) => {
@@ -892,7 +897,10 @@ describe('the Pro gate', () => {
     await act(async () => {});
 
     expect(top()).toEqual(
-      expect.objectContaining({ pathname: '/pro-feature', params: { id: 'export' } }),
+      expect.objectContaining({
+        pathname: '/pro-feature',
+        params: { id: 'export', next: '/payment-export?kind=bill&year=2026' },
+      }),
     );
     // The real explainer, with its own words.
     expect(await screen.findByText('Export your payments')).toBeTruthy();
@@ -939,12 +947,11 @@ describe('the Pro gate', () => {
     expect(screen.getByText('Bills')).toBeTruthy();
   });
 
-  it('sends a page left open to the explainer when Pro lapses under it', async () => {
+  it('keeps a page left open when Pro lapses under it: nothing locks on lapse', async () => {
     await openExport('bill', '2026');
     await act(async () => publishProStatus({ pro: false, ready: true }));
-    expect(top()).toEqual(
-      expect.objectContaining({ pathname: '/pro-feature', params: { id: 'export' } }),
-    );
+    expect(top().pathname).toBe('/payment-export');
+    expect(screen.getByRole('button', { name: 'Export' })).toBeTruthy();
   });
 });
 
@@ -1453,12 +1460,12 @@ describe('from the history page', () => {
       await loaded();
       await fireEvent.press(screen.getByRole('button', { name }));
       // Straight to the explainer: free is never taken through the export page on the way.
-      expect(jest.mocked(router.push).mock.calls.map(([href]) => href)).toEqual([
-        { pathname: '/pro-feature', params: { id: 'export' } },
-      ]);
-      expect(top()).toEqual(
-        expect.objectContaining({ pathname: '/pro-feature', params: { id: 'export' } }),
-      );
+      const explainer = {
+        pathname: '/pro-feature',
+        params: { id: 'export', next: '/payment-export?kind=bill&year=2026' },
+      };
+      expect(jest.mocked(router.push).mock.calls.map(([href]) => href)).toEqual([explainer]);
+      expect(top()).toEqual(expect.objectContaining(explainer));
       expect(await screen.findByText('Export your payments')).toBeTruthy();
       expect(sharePayments).not.toHaveBeenCalled();
     },

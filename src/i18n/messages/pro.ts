@@ -278,6 +278,8 @@ export const proMessages = defineMessages({
     fr: 'Gérer dans l’App Store',
   },
   'pro.page.oneMoment': { en: 'One moment…', es: 'Un momento…', fr: 'Un instant…' },
+  // A save button while the database catches up with a purchase the phone already knows about.
+  'pro.confirm.wait': { en: 'One moment…', es: 'Un momento…', fr: 'Un instant…' },
   'pro.page.checking': {
     en: 'Checking the store…',
     es: 'Consultando el App Store…',

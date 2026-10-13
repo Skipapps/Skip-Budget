@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { router, useLocalSearchParams } from 'expo-router';
 import { CalendarDays, ChevronRight, Tag, Trash2 } from 'lucide-react-native';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -19,7 +20,7 @@ import {
   type HabitRow,
   type HabitValues,
 } from '@/api/habits';
-import { usePro } from '@/api/pro';
+import { useProWrite } from '@/api/confirm-pro';
 import { usePaymentSources, type PaymentSourceRow } from '@/api/queries';
 import {
   EntryReview,
@@ -64,7 +65,6 @@ import { formatCurrency } from '@/lib/format';
 import { weekStartOf } from '@/lib/habit-week';
 import { success, warn } from '@/lib/haptics';
 import { withTap } from '@/lib/press';
-import { refusedForPro } from '@/lib/pro-refusal';
 import { useToday } from '@/lib/use-today';
 import { useColors } from '@/providers/theme-provider';
 import { useToast } from '@/providers/toast-context';
@@ -250,7 +250,7 @@ function HabitForm({
   const habits = useHabits();
   // An edit previews the card with its real days; a new habit has none yet.
   const taps = useHabitTaps();
-  const { pro } = usePro();
+  const proWrite = useProWrite();
   const createHabit = useCreateHabit();
   const updateHabit = useUpdateHabit();
   const archiveHabit = useArchiveHabit();
@@ -258,9 +258,14 @@ function HabitForm({
   const rewriteDays = useRewriteHabitDays();
   const pastDays = useHabitPastDays(saved?.id);
   const { askChange, askDelete } = usePastChoice();
+  // While the days are read before a question that counts them: the button waits, as for a save.
+  const [readingDays, setReadingDays] = useState(false);
   // Set once the days took a Past and upcoming whose habit update then failed: the days already
   // carry the form's values, so the next Save writes both again without asking.
   const [rewritePending, setRewritePending] = useState(false);
+  // A new habit's row id for this visit, so a Save repeated after a lost answer finds the habit the
+  // first may have started instead of starting a second (`insertOnce`).
+  const [newId] = useState(() => randomUUID());
   const toast = useToast();
 
   const pickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -329,6 +334,20 @@ function HabitForm({
     setView('habit');
   };
 
+  /** The habit's days, read first when they have not been; null (the line said) when the read fails. */
+  const readDays = async (): Promise<number | null> => {
+    setReadingDays(true);
+    try {
+      return await pastDays.load();
+    } catch (thrown) {
+      warn();
+      setError(failureMessage(thrown));
+      return null;
+    } finally {
+      setReadingDays(false);
+    }
+  };
+
   const handleSave = async () => {
     setError(null);
     const trimmed = name.trim();
@@ -365,13 +384,9 @@ function HabitForm({
     let scope: PastChange = rewritePending ? 'all' : 'upcoming';
     if (saved && patch && !rewritePending && habitCarriedChanged(saved, { ...saved, ...patch })) {
       // The question counts the days, so it waits for that read rather than guess a count.
-      if (!pastDays.ready || pastDays.count === null) {
-        pastDays.retry();
-        warn();
-        setError(failureText());
-        return;
-      }
-      const choice = await askChange({ name: trimmed, noun: 'days', count: pastDays.count });
+      const count = await readDays();
+      if (count === null) return;
+      const choice = await askChange({ name: trimmed, noun: 'days', count });
       if (choice === null) return;
       scope = choice;
     }
@@ -391,31 +406,34 @@ function HabitForm({
         toast('toast.habit.updated');
       } else {
         const orders = (habits.data ?? []).map((habit) => habit.sort_order);
-        await createHabit.mutateAsync({
-          name: trimmed,
-          icon_id: iconId,
-          color,
-          price: amount,
-          category_id: categoryId,
-          ...paidWith,
-          preset_id: own ? null : presetId,
-          started_on: weekStartOf(today),
-          saved_from: today,
-          // Lowest first on the dashboard: a new habit goes on top.
-          ...(orders.length > 0 ? { sort_order: Math.min(...orders) - 1 } : null),
-        });
+        const started = await proWrite.run(() =>
+          createHabit.mutateAsync({
+            id: newId,
+            name: trimmed,
+            icon_id: iconId,
+            color,
+            price: amount,
+            category_id: categoryId,
+            ...paidWith,
+            preset_id: own ? null : presetId,
+            started_on: weekStartOf(today),
+            saved_from: today,
+            // Lowest first on the dashboard: a new habit goes on top.
+            ...(orders.length > 0 ? { sort_order: Math.min(...orders) - 1 } : null),
+          }),
+        );
+        // The database's Pro wall, and the account is free: show what Pro adds, pushed so Back
+        // returns to the filled-in page.
+        if (started.status === 'free') {
+          router.push({ pathname: '/pro-feature', params: { id: 'habits' } });
+          return;
+        }
+        if (started.status === 'left') return;
         success();
         toast('toast.habit.added');
       }
       router.back();
     } catch (thrown) {
-      // The database's Pro wall, for someone the app also thinks is free: show what Pro adds,
-      // pushed so Back returns to the filled-in page. For someone the app thinks has Pro, the two
-      // disagree, and that is reported like any failure.
-      if (!saved && refusedForPro(thrown) && !pro) {
-        router.push({ pathname: '/pro-feature', params: { id: 'habits' } });
-        return;
-      }
       warn();
       setError(failureMessage(thrown));
     }
@@ -425,13 +443,9 @@ function HabitForm({
     if (!saved) return;
     setError(null);
     // The question counts the days, so it waits for that read as Save does.
-    if (!pastDays.ready || pastDays.count === null) {
-      pastDays.retry();
-      warn();
-      setError(failureText());
-      return;
-    }
-    const choice = await askDelete({ name: saved.name, noun: 'days', count: pastDays.count });
+    const count = await readDays();
+    if (count === null) return;
+    const choice = await askDelete({ name: saved.name, noun: 'days', count });
     if (choice === null) return;
 
     try {
@@ -630,7 +644,9 @@ function HabitForm({
     );
   }
 
-  const busy = createHabit.isPending || updateHabit.isPending || rewriteDays.isPending;
+  const saving = createHabit.isPending || updateHabit.isPending || rewriteDays.isPending;
+  // Reading the days only holds the buttons: nothing is being saved or deleted yet.
+  const busy = saving || proWrite.checking || readingDays;
   const deleting = archiveHabit.isPending || deleteHabit.isPending;
   const isRoot = view === initialView;
 
@@ -739,11 +755,13 @@ function HabitForm({
       }
       rows={rows}
       primaryLabel={
-        busy
-          ? t('receipts.add.saving')
-          : editing
-            ? t('habitFlow.edit.save')
-            : t('habitFlow.confirm.start')
+        proWrite.checking
+          ? t('pro.confirm.wait')
+          : saving
+            ? t('receipts.add.saving')
+            : editing
+              ? t('habitFlow.edit.save')
+              : t('habitFlow.confirm.start')
       }
       // Never greyed out for a gap: Save says what is still missing.
       primaryDisabled={busy || deleting}

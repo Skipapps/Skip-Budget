@@ -50,9 +50,11 @@ describe('in a release build', () => {
   it('reports the real error to Sentry', () => {
     const thrown = new Error('duplicate key value violates unique constraint');
     expect(failureMessage(thrown)).toBe(FAILURE_MESSAGE);
-    expect(Sentry.captureException).toHaveBeenCalledWith(thrown, {
-      tags: { handled: 'failure-message' },
-    });
+    const [sent, context] = jest.mocked(Sentry.captureException).mock.calls[0];
+    expect(sent).toBeInstanceOf(Error);
+    expect((sent as Error).message).toBe(thrown.message);
+    expect((sent as Error).stack).toBe(thrown.stack);
+    expect(context).toEqual(expect.objectContaining({ tags: { handled: 'failure-message' } }));
   });
 
   it('turns a Supabase error object into an Error Sentry can group', () => {

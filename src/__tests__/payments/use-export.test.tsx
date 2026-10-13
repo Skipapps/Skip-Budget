@@ -32,7 +32,8 @@ jest.mock('expo-router', () => {
 
 const push = router.push as jest.Mock;
 
-const EXPLAINER = { pathname: '/pro-feature', params: { id: 'export' } };
+/** The export explainer, told which export page to open once Pro is bought. */
+const explainer = (next: string) => ({ pathname: '/pro-feature', params: { id: 'export', next } });
 
 async function mount() {
   const hook = await renderHook(() => useExport());
@@ -85,9 +86,9 @@ describe('useExport', () => {
 
     await view.open({ kind: 'bill', year: 2026 });
     expect(push).toHaveBeenCalledTimes(1);
-    expect(push).toHaveBeenCalledWith(EXPLAINER);
+    expect(push).toHaveBeenCalledWith(explainer('/payment-export?kind=bill&year=2026'));
     // An unknown id would quietly draw the cards-and-accounts explainer instead.
-    expect(PRO_FEATURES[EXPLAINER.params.id].id).toBe('export');
+    expect(PRO_FEATURES[explainer('').params.id].id).toBe('export');
   });
 
   it.each([
@@ -122,7 +123,7 @@ describe('useExport', () => {
     const view = await mount();
 
     await view.open({ kind: 'all', year: 2026 });
-    expect(push).toHaveBeenLastCalledWith(EXPLAINER);
+    expect(push).toHaveBeenLastCalledWith(explainer('/payment-export?kind=all&year=2026'));
 
     await publish({ pro: true, ready: true });
     await refocus();

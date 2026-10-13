@@ -18,6 +18,7 @@ jest.mock('react-native-keyboard-controller', () =>
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
   useLocalSearchParams: () => ({ id: 'history' }),
+  useFocusEffect: () => {},
   Stack: { Screen: () => null },
 }));
 jest.mock('@/api/pro-offer', () => ({

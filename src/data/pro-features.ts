@@ -1,3 +1,4 @@
+import type { Href } from 'expo-router';
 import {
   ArchiveRestore,
   ArrowDownUp,
@@ -36,6 +37,11 @@ export type ProFeature = {
   subtitle: string;
   /** Two or three lines, each a single line of words with its own icon. */
   points: { icon: LucideIcon; text: string }[];
+  /**
+   * Where the explainer goes once Pro when it was given no `next` and has no page to go back to (a
+   * cold link). Only where the feature is one page; the others go home.
+   */
+  next?: Href;
 };
 
 /** Read when drawn, never at import, so the words follow the language on screen. */
@@ -54,11 +60,12 @@ function point(icon: LucideIcon, text: MessageKey): ProFeature['points'][number]
  */
 type PointIcons = { a: LucideIcon; b?: LucideIcon; c: LucideIcon };
 
-function feature(id: string, icon: LucideIcon, points: PointIcons): ProFeature {
+function feature(id: string, icon: LucideIcon, points: PointIcons, next?: Href): ProFeature {
   const key = (part: string) => `pro.${id}.${part}` as MessageKey;
   return {
     id,
     icon,
+    next,
     get example() {
       return t(key('example'));
     },
@@ -80,16 +87,22 @@ function feature(id: string, icon: LucideIcon, points: PointIcons): ProFeature {
  * page argues for its feature in its own terms, never "this is locked".
  */
 export const PRO_FEATURES: Record<string, ProFeature> = {
-  insights: feature('insights', ChartNoAxesColumn, {
-    a: Wallet,
-    b: ArrowDownUp,
-    c: CalendarCheck,
-  }),
+  insights: feature(
+    'insights',
+    ChartNoAxesColumn,
+    { a: Wallet, b: ArrowDownUp, c: CalendarCheck },
+    '/insights',
+  ),
   scan: feature('scan', ScanLine, { a: InfinityIcon, b: Sparkles, c: ShieldCheck }),
-  voice: feature('voice', Mic, { a: ReceiptText, b: CircleCheck, c: ShieldCheck }),
+  voice: feature('voice', Mic, { a: ReceiptText, b: CircleCheck, c: ShieldCheck }, '/voice'),
   history: feature('history', History, { a: CalendarRange, b: ArchiveRestore, c: Scale }),
   // Moving money between accounts is free on every plan, so it is no point for Pro.
   unlimited: feature('unlimited', CreditCard, { a: InfinityIcon, c: LockOpen }),
-  habits: feature('habits', CalendarCheck, { a: CircleCheck, b: PiggyBank, c: ReceiptText }),
+  habits: feature(
+    'habits',
+    CalendarCheck,
+    { a: CircleCheck, b: PiggyBank, c: ReceiptText },
+    '/habits',
+  ),
   export: feature('export', FileDown, { a: FileSpreadsheet, b: FileText, c: CalendarRange }),
 };

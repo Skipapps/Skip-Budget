@@ -54,6 +54,7 @@ jest.mock('@/api/past-charges', () => ({
     ready: true,
     count: 0,
     lastChargedOn: null,
+    load: async () => ({ count: 0, lastChargedOn: null }),
     choose: async () => 'upcoming',
     chooseDelete: async () => 'everything',
     retry: jest.fn(),
@@ -86,6 +87,8 @@ jest.mock('expo-router', () => ({
   },
 }));
 
+// Whole flows, keypad page by page: under a full parallel run they outlast the default 5 s.
+jest.setTimeout(20000);
 jest.useFakeTimers().setSystemTime(new Date(2026, 9, 12, 9, 0));
 afterAll(() => {
   jest.useRealTimers();
@@ -151,7 +154,8 @@ async function showIn(language: Language, currency: CurrencyCode, params = WIREF
   await render(<AddLoanScreen />);
 }
 
-const SKIP = /^(Skip|Omitir|Passer)$/;
+// The Skip tile keeps the app's name in every language.
+const SKIP = 'Skip';
 const CONTINUE = /^(Continue|Continuar|Continuer)$/;
 const SAVE = /^(Save loan|Guardar préstamo|Enregistrer le prêt)$/;
 const CAR = /^(Car|Auto)$/;
@@ -185,8 +189,9 @@ describe('in Spanish', () => {
       'Meses',
       'Fecha de inicio',
       '27 dic 2024',
-      'Día de pago',
-      'Primer pago: 27 ene 2025',
+      'Primer pago',
+      '27 ene 2025',
+      'Después, cada mes el día 27',
       'Se paga desde',
       'Continuar',
     ]) {
@@ -196,7 +201,7 @@ describe('in Spanish', () => {
     expect(box('Nombre del préstamo').props.value).toBe('Préstamo de auto');
     expectAllWritten();
 
-    await fireEvent.press(screen.getByRole('radio', { name: 'Omitir' }));
+    await fireEvent.press(screen.getByRole('radio', { name: 'Skip' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Continuar' }));
     for (const line of [
       'Revisa tu préstamo',
@@ -239,8 +244,9 @@ describe('in French', () => {
       'Mois',
       'Date de début',
       '27 déc. 2024',
-      'Jour de paiement',
-      `Premier paiement${NBSP}: 27 janv. 2025`,
+      'Premier paiement',
+      '27 janv. 2025',
+      'Puis chaque mois le 27',
       'Payé depuis',
     ]) {
       expect([line, screen.queryAllByText(line, RAW).length > 0]).toEqual([line, true]);
@@ -268,7 +274,7 @@ describe('in French', () => {
   it('writes the review the French way', async () => {
     await showIn('fr', 'CAD');
     await fireEvent.press(screen.getByRole('radio', { name: 'Auto' }));
-    await fireEvent.press(screen.getByRole('radio', { name: 'Passer' }));
+    await fireEvent.press(screen.getByRole('radio', { name: 'Skip' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Continuer' }));
     for (const line of [
       'Vérifie ton prêt',

@@ -381,8 +381,8 @@ describe('an account whose Pro has lapsed', () => {
     expect(adds).toHaveLength(2);
     for (const add of adds) await fireEvent.press(add);
     expect(jest.mocked(router.push).mock.calls).toEqual([
-      [{ pathname: '/pro-feature', params: { id: 'habits' } }],
-      [{ pathname: '/pro-feature', params: { id: 'habits' } }],
+      [{ pathname: '/pro-feature', params: { id: 'habits', next: '/habit-new' } }],
+      [{ pathname: '/pro-feature', params: { id: 'habits', next: '/habit-new' } }],
     ]);
   });
 
@@ -396,8 +396,8 @@ describe('an account whose Pro has lapsed', () => {
     for (const add of adds) await fireEvent.press(add);
     expect(router.push).toHaveBeenCalledTimes(2);
     expect(jest.mocked(router.push).mock.calls).toEqual([
-      [{ pathname: '/pro-feature', params: { id: 'habits' } }],
-      [{ pathname: '/pro-feature', params: { id: 'habits' } }],
+      [{ pathname: '/pro-feature', params: { id: 'habits', next: '/habit-new' } }],
+      [{ pathname: '/pro-feature', params: { id: 'habits', next: '/habit-new' } }],
     ]);
   });
 

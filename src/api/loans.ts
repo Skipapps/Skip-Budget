@@ -61,8 +61,11 @@ export function useActiveLoans(today: string) {
   return {
     loans,
     isPending: bills.isPending || loanBillIds.isPending,
-    // A failed read must not pass for "no loans", which would offer to add one.
-    isError: bills.isError || loanBillIds.isError,
+    // A failed read must not pass for "no loans", which would offer to add one. A failed reload
+    // still holding its last answer has not lost it (TanStack keeps `isError` true for that too).
+    isError:
+      (bills.isError && bills.data === undefined) ||
+      (loanBillIds.isError && loanBillIds.data === undefined),
     refetch: () => {
       void bills.refetch();
       void loanBillIds.refetch();

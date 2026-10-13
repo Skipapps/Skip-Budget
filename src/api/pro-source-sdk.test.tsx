@@ -15,6 +15,7 @@ let mockSdkActive: Record<string, string[]> = {};
 const mockListeners = new Set<(info: unknown) => void>();
 
 const infoFor = (userId: string) => ({
+  originalAppUserId: userId,
   entitlements: {
     active: Object.fromEntries((mockSdkActive[userId] ?? []).map((id) => [id, { id }])),
   },
@@ -34,16 +35,17 @@ jest.mock('react-native-purchases', () => ({
       mockListeners.delete(listener),
   },
 }));
+// is_pro() applies the row's expiry on the server; the mock does the same.
 jest.mock('@/lib/supabase', () => ({
   supabase: {
-    from: () => ({
-      select: () => ({
-        maybeSingle: async () => {
-          if (mockServerGate) await mockServerGate;
-          return { data: mockServerRow, error: null };
-        },
-      }),
-    }),
+    rpc: async () => {
+      if (mockServerGate) await mockServerGate;
+      const row = mockServerRow;
+      return {
+        data: Boolean(row?.pro && (!row.expires_at || Date.parse(row.expires_at) > Date.now())),
+        error: null,
+      };
+    },
   },
 }));
 jest.mock('@/lib/pro-bypass', () => ({ useProOverride: () => mockOverride }));
@@ -90,7 +92,7 @@ describe('with a store key', () => {
     await waitFor(() => expect(mockListeners.size).toBe(1));
     await act(async () => {
       for (const listener of mockListeners) {
-        listener({ entitlements: { active: { pro: { id: 'pro' } } } });
+        listener({ originalAppUserId: 'user-1', entitlements: { active: { pro: { id: 'pro' } } } });
       }
     });
     expect(result.current.pro).toBe(true);

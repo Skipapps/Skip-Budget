@@ -48,7 +48,7 @@ export function VoiceFab() {
     // The press's tap, felt only when the press does something.
     tap();
     if (pro) router.push('/voice');
-    else router.push({ pathname: '/pro-feature', params: { id: 'voice' } });
+    else router.push({ pathname: '/pro-feature', params: { id: 'voice', next: '/voice' } });
   };
 
   return (

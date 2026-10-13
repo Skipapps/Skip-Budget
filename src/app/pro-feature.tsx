@@ -1,12 +1,15 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Lock } from 'lucide-react-native';
+import { useCallback, useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { useProPrices } from '@/api/pro';
+import { usePro, useProPrices } from '@/api/pro';
 import { PRO_FEATURES } from '@/data/pro-features';
+import { goBack } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { t } from '@/i18n';
+import { inAppNext } from '@/lib/pro-next';
 import { proMonthlyLabel } from '@/lib/wall';
 import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
@@ -14,20 +17,49 @@ import { TEXT_CAP } from '@/theme/text-scale';
 /**
  * What a locked feature says for itself, one glance: its icon, an example, a heading, one line and
  * two or three points, with the price last. The comparison and the purchase live on the Pro page.
+ *
+ * Never shown to someone with Pro. Once Pro, it goes on to `next` (the page the person was opening),
+ * or back to the page that asked mid-task; a cold link with neither goes to the feature itself.
  */
 export default function ProFeatureScreen() {
   const colors = useColors();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, next } = useLocalSearchParams<{ id?: string; next?: string }>();
+  const { pro, ready } = usePro();
   const prices = useProPrices();
 
   const feature = PRO_FEATURES[id ?? ''] ?? PRO_FEATURES.unlimited;
   const Icon = feature.icon;
+  const onward = inAppNext(next);
+  const fallback = feature.next ?? '/home';
+
+  // Only while on top: under the Pro page or the offer it waits, so a purchase there lands here
+  // first and then goes on. Once is enough; the page is leaving.
+  const left = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!pro || left.current) return;
+      left.current = true;
+      if (onward) router.replace(onward);
+      else if (router.canGoBack()) router.back();
+      else router.replace(fallback);
+    }, [pro, onward, fallback]),
+  );
 
   // The store's own price when it has answered; the dollar fallback until then.
   const monthlyStore = prices.data?.monthly?.product.priceString;
   const monthly = monthlyStore
     ? t('pro.price.monthly', { price: monthlyStore })
     : proMonthlyLabel();
+
+  // Only the frame until Pro is known, and only the frame for Pro: a payer never sees the price, and
+  // the page uncovered as the Pro page slides away after a purchase is the same empty frame.
+  if (!ready || pro) {
+    return (
+      <Screen title="Skip Pro" showBack>
+        {null}
+      </Screen>
+    );
+  }
 
   return (
     <Screen
@@ -44,11 +76,14 @@ export default function ProFeatureScreen() {
               {t('pro.feature.included')}
             </Text>
           </View>
-          <Button label={t('pro.feature.get', { monthly })} onPress={() => router.push('/pro')} />
+          <Button
+            label={t('pro.feature.get', { monthly })}
+            onPress={() => router.push({ pathname: '/pro', params: { from: 'feature' } })}
+          />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('common.notNow')}
-            onPress={() => router.back()}
+            onPress={goBack}
             className="min-h-11 w-full items-center justify-center rounded-full active:bg-ink/5"
           >
             <Text className="font-app text-[14px] text-muted" maxFontSizeMultiplier={TEXT_CAP.row}>

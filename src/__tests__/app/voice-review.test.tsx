@@ -1,4 +1,5 @@
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
 
 import VoiceReviewScreen from '@/app/voice-review';
@@ -58,6 +59,10 @@ jest.mock('expo-router', () => ({
     canGoBack: () => true,
   },
   useLocalSearchParams: () => mockParams,
+  useCurrentRouteInfo: () => {
+    const query = new URLSearchParams(mockParams).toString();
+    return { pathnameWithParams: query ? `/voice-review?${query}` : '/voice-review' };
+  },
   useFocusEffect: (effect: () => unknown) => {
     const React = jest.requireActual('react');
     React.useEffect(() => {
@@ -100,6 +105,12 @@ jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => mockConfirm 
 
 let mockPro = { pro: true, ready: true };
 jest.mock('@/api/pro', () => ({ usePro: () => mockPro }));
+// What asking the store and the database again answers, after a Pro refusal the app disagrees with.
+const mockConfirmPro = jest.fn(async () => 'unknown');
+jest.mock('@/api/confirm-pro', () => {
+  const actual = jest.requireActual('@/api/confirm-pro');
+  return { ...actual, useProWrite: () => actual.useProWrite(() => mockConfirmPro()) };
+});
 
 jest.mock('@/lib/haptics', () => ({
   tap: jest.fn(),
@@ -139,6 +150,8 @@ const SOURCES = [
 let mockSources: typeof SOURCES = SOURCES;
 jest.mock('@/api/queries', () => ({ usePaymentSources: () => ({ sources: mockSources }) }));
 
+// No row id unless a test gives one, as Jest's own stand-in answers.
+jest.mock('expo-crypto', () => ({ randomUUID: jest.fn() }));
 const mockCreateReceipt = jest.fn();
 const mockCreateBill = jest.fn();
 const mockCreateSubscription = jest.fn();
@@ -461,9 +474,43 @@ describe('/voice-review — saving', () => {
     expect(router.dismissTo).toHaveBeenCalledWith('/home');
   });
 
-  it('shows and reports the failure line when the database refuses for Pro someone the app thinks has it', async () => {
+  it('saves again under the same row id, so a first write that landed is found', async () => {
+    jest.mocked(randomUUID).mockReturnValueOnce('voice-visit');
+    seed();
+    mockCreateReceipt.mockRejectedValueOnce(new Error('TypeError: Network request failed'));
+    const screen = await render(<VoiceReviewScreen />);
+
+    await press(screen, 'Save receipt');
+    expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    await press(screen, 'Save receipt');
+
+    expect(router.dismissTo).toHaveBeenCalledWith('/home');
+    expect(mockCreateReceipt.mock.calls.map(([values]) => values.id)).toEqual([
+      'voice-visit',
+      'voice-visit',
+    ]);
+  });
+
+  it('asks again when the database refuses for Pro someone the app thinks has it, and saves once it agrees', async () => {
     // A free account never reaches this page (the gate sends it to the explainer), so a Pro-wall
-    // refusal here is the app and the server disagreeing, which is a failure to report.
+    // refusal here is the app and the server disagreeing: usually the server not caught up yet.
+    seed();
+    mockCreateReceipt.mockRejectedValueOnce({
+      code: 'P0001',
+      message: 'Adding receipts by voice is part of Skip Pro.',
+    });
+    mockConfirmPro.mockResolvedValueOnce('pro');
+    const screen = await render(<VoiceReviewScreen />);
+
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
+    expect(mockConfirmPro).toHaveBeenCalledTimes(1);
+    expect(mockCreateReceipt).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+  });
+
+  it('shows and reports the failure line when the database still refuses after asking again', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     const id = seed();
     const refusal = { code: 'P0001', message: 'Adding receipts by voice is part of Skip Pro.' };
@@ -472,7 +519,8 @@ describe('/voice-review — saving', () => {
 
     await press(screen, 'Save receipt');
 
-    expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(mockConfirmPro).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledWith('[failure]', refusal);
     expect(router.push).not.toHaveBeenCalledWith(
       expect.objectContaining({ pathname: '/pro-feature' }),
@@ -1187,11 +1235,11 @@ describe('/voice-review — around the page', () => {
 
   it('sends a free account to the explainer', async () => {
     mockPro = { pro: false, ready: true };
-    seed();
+    const id = seed();
     await render(<VoiceReviewScreen />);
     expect(mockRedirect).toHaveBeenCalledWith({
       pathname: '/pro-feature',
-      params: { id: 'voice' },
+      params: { id: 'voice', next: `/voice-review?draft=${id}` },
     });
   });
 

@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
 import {
   Calendar,
@@ -29,6 +30,7 @@ import { FieldLabel } from '@/components/ui/typography';
 import {
   useCreateSalarySource,
   useDeleteSalarySource,
+  useDeleteUnseenPay,
   useSetSalaryAccounts,
   useUpdateSalarySource,
   type SalaryValues,
@@ -274,6 +276,11 @@ function SalaryEditor({
   const savedIds = useRef(new Set(initial.map((source) => source.id)));
   // Each pay as the database holds it, for what a change of frequency really is.
   const savedPays = useRef(new Map(initial.map((source) => [source.id, source])));
+  // A new pay's row id, made when a Save first tries to file it, so saving again cannot file it
+  // twice (`insertOnce`).
+  const clientIds = useRef(new Map<string, string>());
+  // New pays a Save has filed: saving again after a later step failed updates them.
+  const filedIds = useRef(new Map<string, string>());
   const [earlierShown, setEarlierShown] = useState(false);
 
   const showEarlier = () => {
@@ -318,6 +325,7 @@ function SalaryEditor({
   const createSource = useCreateSalarySource();
   const updateSource = useUpdateSalarySource();
   const deleteSource = useDeleteSalarySource();
+  const deleteUnseen = useDeleteUnseenPay();
   const confirm = useConfirm();
   const setAccounts = useSetSalaryAccounts();
   const pastPay = usePastPay();
@@ -417,7 +425,9 @@ function SalaryEditor({
       return;
     }
     // A saved pay left without a name would be dropped, and so deleted, on Save: ask for it instead.
-    if (sources.some((source) => savedIds.current.has(source.id) && !named.includes(source))) {
+    // So would one an earlier Save may have filed, under a toast that says the pay was saved.
+    const kept = (id: string) => savedIds.current.has(id) || clientIds.current.has(id);
+    if (sources.some((source) => kept(source.id) && !named.includes(source))) {
       setError(t('salary.needNameAndPay'));
       return;
     }
@@ -478,6 +488,14 @@ function SalaryEditor({
       for (const id of savedIds.current) {
         if (!stillPresent.has(id)) await deleteSource.mutateAsync(id);
       }
+      // A new pay an earlier Save may have filed, and that was removed since, with any pay recorded
+      // for it: that would still count as income.
+      for (const [key, clientId] of clientIds.current) {
+        if (stillPresent.has(key)) continue;
+        await deleteUnseen.mutateAsync(filedIds.current.get(key) ?? clientId);
+        clientIds.current.delete(key);
+        filedIds.current.delete(key);
+      }
 
       for (const source of named) {
         const values: SalaryValues = {
@@ -487,9 +505,21 @@ function SalaryEditor({
           last_payday: source.lastPayday,
           ...(hourlyAvailable ? hourlyValues(source) : {}),
         };
-        const id = savedIds.current.has(source.id)
-          ? (await updateSource.mutateAsync({ id: source.id, values }), source.id)
-          : (await createSource.mutateAsync(values)).id;
+        const tried = clientIds.current.has(source.id);
+        const filed = filedIds.current.get(source.id);
+        let id: string;
+        if (savedIds.current.has(source.id) || filed) {
+          id = filed ?? source.id;
+          await updateSource.mutateAsync({ id, values });
+        } else {
+          const clientId = clientIds.current.get(source.id) ?? randomUUID();
+          clientIds.current.set(source.id, clientId);
+          id = (await createSource.mutateAsync({ ...values, id: clientId })).id;
+          filedIds.current.set(source.id, id);
+        }
+        // Pay recorded for it once an earlier Save filed it, by that Save or the sweep, carries the
+        // values and account it had then. The person never saw it saved, so it takes the page's.
+        if (tried) carryBack.set(id, carried(source));
 
         await setAccounts.mutateAsync({ salaryId: id, accountIds: source.accountIds });
       }

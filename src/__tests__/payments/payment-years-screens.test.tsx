@@ -745,7 +745,12 @@ describe('All years, export', () => {
     await accountIs('free');
     await openYears();
     await fireEvent.press(screen.getByRole('button', { name: 'Export payments' }));
-    expect(pushed()).toEqual([{ pathname: '/pro-feature', params: { id: 'export' } }]);
+    expect(pushed()).toEqual([
+      {
+        pathname: '/pro-feature',
+        params: { id: 'export', next: '/payment-export?kind=all&year=all' },
+      },
+    ]);
 
     jest.clearAllMocks();
     await accountIs('unknown');

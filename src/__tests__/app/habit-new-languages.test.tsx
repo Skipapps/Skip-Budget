@@ -78,6 +78,8 @@ const mockArchive = jest.fn();
 const mockRewrite = jest.fn();
 const mockDeleteAll = jest.fn();
 const mockRetry = jest.fn();
+// The days read as the page awaits it: the count, or the read's failure while they are unread.
+const mockLoadDays = jest.fn();
 let mockPastDays: { count: number | null; ready: boolean } = { count: 0, ready: true };
 let mockHabit: { data: HabitRow | null | undefined; isError: boolean; isFetched: boolean } = {
   data: undefined,
@@ -89,7 +91,7 @@ jest.mock('@/api/habits', () => ({
   useHabits: () => ({ data: [] }),
   useHabit: () => ({ ...mockHabit, refetch: jest.fn() }),
   useHabitTaps: () => ({ data: [] }),
-  useHabitPastDays: () => ({ ...mockPastDays, retry: mockRetry }),
+  useHabitPastDays: () => ({ ...mockPastDays, retry: mockRetry, load: mockLoadDays }),
   useCreateHabit: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateHabit: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useArchiveHabit: () => ({ mutateAsync: mockArchive, isPending: false }),
@@ -225,6 +227,10 @@ beforeEach(() => {
   mockParams = {};
   mockHabit = { data: undefined, isError: false, isFetched: false };
   mockPastDays = { count: 0, ready: true };
+  mockLoadDays.mockImplementation(async () => {
+    if (mockPastDays.count === null) throw new Error('read failed');
+    return mockPastDays.count;
+  });
   mockCreate.mockResolvedValue({ id: 'habit-new' });
   mockUpdate.mockResolvedValue({ id: 'habit-1' });
   mockArchive.mockResolvedValue({ id: 'habit-1' });
@@ -427,15 +433,16 @@ describe.each(['es', 'fr'] as const)(
       expect(mockRewrite).not.toHaveBeenCalled();
     });
 
-    it('says the one failure line in the language when the days are not read yet, and writes nothing', async () => {
+    it('says the one failure line in the language when the days cannot be read, and writes nothing', async () => {
       editing(null);
+      const log = jest.spyOn(console, 'log').mockImplementation(() => {});
       const screen = await render(<HabitNewScreen />);
       await fireEvent.press(screen.getByRole('radio', { name: 'Checking ••0099' }));
       await fireEvent.press(screen.getByRole('button', { name: words.save }));
 
       expect(await screen.findByText(t('common.failure'))).toBeTruthy();
       expect(t('common.failure')).not.toBe(FAILURE_MESSAGE);
-      expect(mockRetry).toHaveBeenCalledTimes(1);
+      log.mockRestore();
       expect(mockAsk).not.toHaveBeenCalled();
       expect(mockRewrite).not.toHaveBeenCalled();
       expect(mockUpdate).not.toHaveBeenCalled();

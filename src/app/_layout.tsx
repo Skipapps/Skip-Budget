@@ -16,6 +16,7 @@ import { AppLockGate } from '@/components/app-lock-gate';
 import { LaunchSplash } from '@/components/launch-splash';
 import { useLocale } from '@/i18n';
 import { LocaleProvider, rootScreenLayout } from '@/i18n/locale-provider';
+import { scrubBreadcrumb, scrubEvent } from '@/lib/sentry-breadcrumbs';
 import { DialogProvider } from '@/providers/dialog-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { useConfigurePurchases } from '@/api/pro';
@@ -35,6 +36,13 @@ Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
   enabled: !__DEV__,
   sendDefaultPii: false,
+  // Request and screen breadcrumbs lose query strings, fragments and ids (see sentry-breadcrumbs).
+  beforeBreadcrumb: scrubBreadcrumb,
+  beforeSend: scrubEvent,
+  // The native iOS SDK records its own request breadcrumbs, query included, which never pass
+  // beforeBreadcrumb. Forwarded to native as-is (SentryOptionsInternal reads it); the RN options
+  // type does not list it.
+  ...{ enableNetworkBreadcrumbs: false },
 });
 
 function RootLayout() {

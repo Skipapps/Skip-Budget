@@ -1,4 +1,5 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
 import { BackHandler } from 'react-native';
 
@@ -87,6 +88,7 @@ jest.mock('expo-router', () => ({
     canGoBack: jest.fn(() => true),
   },
   useLocalSearchParams: () => mockParams,
+  useCurrentRouteInfo: () => ({ pathnameWithParams: '/habit-new' }),
   // Run like a focused screen, so the hardware back listener is really subscribed.
   useFocusEffect: (effect: () => void) => {
     const React = jest.requireActual('react');
@@ -119,12 +121,22 @@ let mockSources = [
 jest.mock('@/api/queries', () => ({ usePaymentSources: () => ({ sources: mockSources }) }));
 
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
+// What asking the store and the database again answers, after a Pro refusal the app disagrees with.
+const mockConfirmPro = jest.fn();
+jest.mock('@/api/confirm-pro', () => {
+  const actual = jest.requireActual('@/api/confirm-pro');
+  return { ...actual, useProWrite: () => actual.useProWrite(() => mockConfirmPro()) };
+});
 const mockCreate = jest.fn();
+// No row id unless a test gives one, as Jest's own stand-in answers.
+jest.mock('expo-crypto', () => ({ randomUUID: jest.fn() }));
 const mockUpdate = jest.fn();
 const mockArchive = jest.fn();
 const mockRewrite = jest.fn();
 const mockDeleteAll = jest.fn();
 const mockRetry = jest.fn();
+// The days read as the page awaits it.
+const mockLoadDays = jest.fn();
 let mockPastDays: { count: number | null; ready: boolean };
 let mockHabits: HabitRow[] = [];
 let mockHabit: { data: HabitRow | null | undefined; isError: boolean; isFetched: boolean };
@@ -134,7 +146,7 @@ jest.mock('@/api/habits', () => ({
   useHabits: () => ({ data: mockHabits }),
   useHabit: () => ({ ...mockHabit, refetch: mockRefetch }),
   useHabitTaps: () => ({ data: [] }),
-  useHabitPastDays: () => ({ ...mockPastDays, retry: mockRetry }),
+  useHabitPastDays: () => ({ ...mockPastDays, retry: mockRetry, load: mockLoadDays }),
   useCreateHabit: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateHabit: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useArchiveHabit: () => ({ mutateAsync: mockArchive, isPending: false }),
@@ -250,6 +262,8 @@ beforeEach(() => {
   mockHabits = [];
   mockHabit = { data: undefined, isError: false, isFetched: false };
   mockPastDays = { count: 0, ready: true };
+  mockLoadDays.mockImplementation(async () => mockPastDays.count ?? 0);
+  mockConfirmPro.mockResolvedValue('unknown');
   mockSources = [
     { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
     { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
@@ -267,7 +281,7 @@ beforeEach(() => {
 afterAll(() => setCurrency(null));
 
 describe('Who may start a habit', () => {
-  const EXPLAINER = { pathname: '/pro-feature', params: { id: 'habits' } };
+  const EXPLAINER = { pathname: '/pro-feature', params: { id: 'habits', next: '/habit-new' } };
 
   it('sends a free account to the habits explainer before Pick', async () => {
     mockPro = { pro: false, ready: true };
@@ -308,14 +322,16 @@ describe('Who may start a habit', () => {
     expect(screen.getByRole('button', { name: 'Delete habit' })).toBeTruthy();
   });
 
-  it('sends a plan that lapses partway through to the explainer', async () => {
+  it('keeps a plan that lapses partway through open, with what was picked', async () => {
     const screen = await render(<HabitNewScreen />);
     await pickTile(screen, TILE.coffee);
+    expect(screen.getByText(PRICE_QUESTION)).toBeTruthy();
 
+    // Nothing locks on lapse: the page opened with Pro stays, and its save meets the Pro wall.
     mockPro = { pro: false, ready: true };
     await screen.rerender(<HabitNewScreen />);
-    expect(mockRedirect).toHaveBeenCalledWith(EXPLAINER);
-    expect(screen.queryByText(PRICE_QUESTION)).toBeNull();
+    expect(mockRedirect).not.toHaveBeenCalled();
+    expect(screen.getByText(PRICE_QUESTION)).toBeTruthy();
   });
 });
 
@@ -635,16 +651,65 @@ describe('New habit — the final page (step 3 of 3)', () => {
     onFinalPage(screen);
   });
 
-  it('reports the same refusal as a failure when the app thinks the account has Pro', async () => {
-    mockCreate.mockRejectedValue({ message: 'Tracking spending habits is part of Skip Pro.' });
-    const screen = await render(<HabitNewScreen />);
-    await presetToFinal(screen);
-    await press(screen, 'Skip');
-    await pressButton(screen, 'Start tracking');
+  describe('a refusal for someone the app thinks has Pro', () => {
+    const REFUSAL = { message: 'Tracking spending habits is part of Skip Pro.' };
 
-    expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
-    expect(router.push).not.toHaveBeenCalled();
-    expect(router.back).not.toHaveBeenCalled();
+    it('asks again, saying One moment…, and saves on the second try once the database agrees', async () => {
+      mockCreate.mockRejectedValueOnce(REFUSAL);
+      let agree: (answer: string) => void = () => {};
+      mockConfirmPro.mockImplementationOnce(() => new Promise((resolve) => (agree = resolve)));
+      const screen = await render(<HabitNewScreen />);
+      await presetToFinal(screen);
+      await press(screen, 'Skip');
+      await pressButton(screen, 'Start tracking');
+
+      expect(await screen.findByRole('button', { name: 'One moment…' })).toBeTruthy();
+      expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+      await act(async () => agree('pro'));
+
+      await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+      expect(mockConfirmPro).toHaveBeenCalledTimes(1);
+      // Once more, with the same values.
+      expect(mockCreate).toHaveBeenCalledTimes(2);
+      expect(mockCreate.mock.calls[1][0]).toEqual(mockCreate.mock.calls[0][0]);
+      expect(mockToast).toHaveBeenCalledWith('toast.habit.added');
+      expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    });
+
+    it('opens the habits explainer, pushed, when the store says free after all', async () => {
+      mockCreate.mockRejectedValueOnce(REFUSAL);
+      mockConfirmPro.mockResolvedValueOnce('free');
+      const screen = await render(<HabitNewScreen />);
+      await presetToFinal(screen);
+      await press(screen, 'Skip');
+      await pressButton(screen, 'Start tracking');
+
+      await waitFor(() =>
+        expect(router.push).toHaveBeenCalledWith({
+          pathname: '/pro-feature',
+          params: { id: 'habits' },
+        }),
+      );
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(router.back).not.toHaveBeenCalled();
+      expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+      onFinalPage(screen);
+    });
+
+    it('says the one failure line, and saves nothing more, when the two never agree', async () => {
+      mockCreate.mockRejectedValue(REFUSAL);
+      const screen = await render(<HabitNewScreen />);
+      await presetToFinal(screen);
+      await press(screen, 'Skip');
+      await pressButton(screen, 'Start tracking');
+
+      expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
+      expect(mockConfirmPro).toHaveBeenCalledTimes(1);
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(router.push).not.toHaveBeenCalled();
+      expect(router.back).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Start tracking' })).toBeTruthy();
+    });
   });
 
   it('says the one failure line when the save fails, and stays', async () => {
@@ -658,6 +723,24 @@ describe('New habit — the final page (step 3 of 3)', () => {
     expect(screen.queryByText(/network down/)).toBeNull();
     expect(mockToast).not.toHaveBeenCalled();
     onFinalPage(screen);
+  });
+
+  it('starts it under the visit’s one id however many times Start tracking is pressed', async () => {
+    jest.mocked(randomUUID).mockReturnValueOnce('habit-visit');
+    mockCreate.mockRejectedValueOnce(new Error('TypeError: Network request failed'));
+    const screen = await render(<HabitNewScreen />);
+    await presetToFinal(screen);
+    await press(screen, 'Skip');
+    await pressButton(screen, 'Start tracking');
+    expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
+
+    await pressButton(screen, 'Start tracking');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls.map(([values]) => values.id)).toEqual([
+      'habit-visit',
+      'habit-visit',
+    ]);
   });
 
   it('opens the Habit line on its own page: rename, change the icon, Done keeps both', async () => {

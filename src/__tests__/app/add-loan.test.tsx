@@ -48,14 +48,25 @@ jest.mock('@/providers/theme-provider', () => ({
   useColors: () => new Proxy({}, { get: () => '#000000' }),
   useTheme: () => ({ scheme: 'light' }),
 }));
-// The start date picked is 27 Dec 2024, the wireframe's.
+// The start date picked is 27 Dec 2024, the wireframe's. Each calendar opened notes the days it
+// lets be picked.
 let mockPickedDay = new Date(2024, 11, 27);
+const mockLimits: { min: Date | null; max: Date | null }[] = [];
 jest.mock('@/components/flow/inline-calendar', () => {
   const { Pressable } = jest.requireActual('react-native');
   return {
-    InlineCalendar: ({ onChange }: { onChange: (date: Date) => void }) => (
-      <Pressable testID="calendar" onPress={() => onChange(mockPickedDay)} />
-    ),
+    InlineCalendar: ({
+      onChange,
+      minDate = null,
+      maxDate = null,
+    }: {
+      onChange: (date: Date) => void;
+      minDate?: Date | null;
+      maxDate?: Date | null;
+    }) => {
+      mockLimits.push({ min: minDate, max: maxDate });
+      return <Pressable testID="calendar" onPress={() => onChange(mockPickedDay)} />;
+    },
   };
 });
 
@@ -79,14 +90,26 @@ const mockPast = {
   ready: true,
   count: 0,
   lastChargedOn: null,
+  // The payments read as the page awaits it.
+  load: jest.fn(async (): Promise<{ count: number; lastChargedOn: string | null }> => ({
+    count: mockPast.count,
+    lastChargedOn: null,
+  })),
   choose: jest.fn(
-    async (_name: string, _changed: boolean): Promise<'all' | 'upcoming' | null> => 'upcoming',
+    async (_name: string, _changed: boolean, _read?: object): Promise<'all' | 'upcoming' | null> =>
+      'upcoming',
   ),
   chooseDelete: jest.fn(
-    async (_name: string, _options?: object): Promise<'keep' | 'everything' | null> => 'everything',
+    async (
+      _name: string,
+      _options?: object,
+      _read?: object,
+    ): Promise<'keep' | 'everything' | null> => 'everything',
   ),
   retry: jest.fn(),
 };
+/** What `load()` answered, handed to the question. */
+const READ = { count: 0, lastChargedOn: null };
 jest.mock('@/api/past-charges', () => ({ usePastCharges: () => mockPast }));
 jest.mock('@/components/ui/skeleton', () => {
   const { View } = jest.requireActual('react-native');
@@ -158,6 +181,8 @@ jest.mock('expo-router', () => ({
   },
 }));
 
+// Whole flows, keypad page by page: under a full parallel run they outlast the default 5 s.
+jest.setTimeout(20000);
 jest.useFakeTimers().setSystemTime(new Date(2026, 9, 12, 9, 0));
 afterAll(() => jest.useRealTimers());
 
@@ -166,10 +191,12 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockParams = {};
   mockSwipe.length = 0;
+  mockLimits.length = 0;
   mockPickedDay = new Date(2024, 11, 27);
   mockDetail = { data: undefined, isPending: true, isError: false, refetch: jest.fn() };
   mockReminderChoice = { choice: 'off', remindAt: '09:00', unknown: false };
   mockPast.ready = true;
+  mockPast.load.mockImplementation(async () => ({ count: mockPast.count, lastChargedOn: null }));
   mockPast.choose.mockResolvedValue('upcoming');
   mockPast.chooseDelete.mockResolvedValue('everything');
 });
@@ -223,6 +250,15 @@ async function toReview() {
   await fillWireframe();
   await press(button('Continue'));
 }
+
+/** Picks a day in a date box's calendar. */
+async function pickDate(label: 'Start date' | 'First payment', date: Date) {
+  mockPickedDay = date;
+  await press(button(new RegExp(`^${label}, `)));
+  await press(screen.getByTestId('calendar'));
+}
+
+const isoOf = (date: Date | null) => (date ? date.toISOString().slice(0, 10) : null);
 
 describe('the monthly payment page', () => {
   it('asks for the installment on the keypad, and waits for an amount', async () => {
@@ -282,23 +318,106 @@ describe('the details page', () => {
     expect(box('Loan name').props.value).toBe('Our house');
   });
 
-  it('takes the payment day from the start date and shows the first payment under the days', async () => {
+  it('fills the first payment a month after the start date, and says the day it repeats on', async () => {
     await toDetails();
-    expect(screen.queryByTestId('loan-first-payment')).toBeNull();
+    expect(button('First payment, When your first payment is due')).toBeTruthy();
+    expect(screen.queryByTestId('loan-payment-rhythm')).toBeNull();
+    expect(screen.queryByRole('radio', { name: /^Day \d+$/ })).toBeNull();
     await press(button('Start date, When you got the money'));
     await press(screen.getByTestId('calendar'));
 
     expect(button('Start date, 27 Dec 2024')).toBeTruthy();
-    expect(checked(radio('Day 27'))).toBe(true);
-    expect(screen.getByText('First payment 27 Jan 2025')).toBeTruthy();
+    expect(button('First payment, 27 Jan 2025')).toBeTruthy();
+    expect(screen.getByText('Then every month on the 27th')).toBeTruthy();
+    expect(screen.queryByTestId('loan-month-end-choice')).toBeNull();
+  });
 
-    // An earlier day waits for the month after next.
-    await press(radio('Day 22'));
-    expect(screen.getByText('First payment 22 Feb 2025')).toBeTruthy();
-    // A day must stay chosen: pressing it again keeps it, and says nothing of clearing it.
-    await press(radio('Day 22'));
-    expect(checked(radio('Day 22'))).toBe(true);
-    expect(radio('Day 22').props.accessibilityHint).toBeUndefined();
+  it('takes the first payment picked as a date: 14 Jan from a 30 Nov start', async () => {
+    await toDetails();
+    await pickDate('Start date', new Date(2025, 10, 30));
+    expect(button('First payment, 30 Dec 2025')).toBeTruthy();
+    expect(
+      screen.getByText('Then every month on the 30th, or the last day in shorter months'),
+    ).toBeTruthy();
+
+    await pickDate('First payment', new Date(2026, 0, 14));
+    // Its calendar runs from the day after the start to a year on.
+    expect(mockLimits.map(({ min, max }) => [isoOf(min), isoOf(max)]).pop()).toEqual([
+      isoOf(new Date(2025, 11, 1)),
+      isoOf(new Date(2026, 10, 30)),
+    ]);
+    expect(button('First payment, 14 Jan 2026')).toBeTruthy();
+    expect(screen.getByText('Then every month on the 14th')).toBeTruthy();
+
+    // A picked first payment stays when the start moves.
+    await pickDate('Start date', new Date(2025, 11, 1));
+    expect(button('First payment, 14 Jan 2026')).toBeTruthy();
+  });
+
+  it('says under the field, and on Continue, when the first payment is not after the start', async () => {
+    await toDetails();
+    await fillWireframe();
+    await pickDate('First payment', new Date(2025, 0, 14));
+    await pickDate('Start date', new Date(2025, 0, 20));
+    expect(button('First payment, 14 Jan 2025')).toBeTruthy();
+    expect(screen.getByTestId('loan-first-payment-hint')).toHaveTextContent(
+      'Pick a first payment after the start date.',
+    );
+    expect(screen.queryByText(/^Then every month/)).toBeNull();
+    await press(button('Continue'));
+    expect(screen.getAllByText('Pick a first payment after the start date.')).toHaveLength(2);
+    expect(screen.queryByText('Review your loan')).toBeNull();
+  });
+
+  it('says so too for a first payment more than a year after the start, until the start fits', async () => {
+    await toDetails();
+    await fillWireframe();
+    await pickDate('First payment', new Date(2025, 0, 14));
+    await pickDate('Start date', new Date(2023, 11, 20));
+    const tooLate = 'Pick a first payment no later than 20 Dec 2024, a year after the start date.';
+    expect(screen.getByText(tooLate)).toBeTruthy();
+    await press(button('Continue'));
+    expect(screen.getAllByText(tooLate)).toHaveLength(2);
+
+    await pickDate('Start date', new Date(2024, 11, 20));
+    expect(screen.queryByTestId('loan-first-payment-hint')).toBeNull();
+    await press(button('Continue'));
+    expect(screen.getByText('Review your loan')).toBeTruthy();
+  });
+
+  it('asks, for a first payment on a short month’s last day, which day it repeats on', async () => {
+    await toDetails();
+    await pickDate('Start date', new Date(2025, 0, 31));
+    expect(button('First payment, 28 Feb 2025')).toBeTruthy();
+    expect(checked(radio('Last day of each month'))).toBe(true);
+    expect(checked(radio('On the 28th'))).toBe(false);
+    expect(screen.getByText('Then on the last day of every month')).toBeTruthy();
+
+    await press(radio('On the 28th'));
+    expect(checked(radio('On the 28th'))).toBe(true);
+    expect(screen.getByText('Then every month on the 28th')).toBeTruthy();
+
+    // Any other first payment says its day by itself.
+    await pickDate('First payment', new Date(2025, 2, 14));
+    expect(screen.queryByTestId('loan-month-end-choice')).toBeNull();
+    // Picked by hand on a short month's end, it is that day until month end is chosen.
+    await pickDate('First payment', new Date(2025, 3, 30));
+    expect(checked(radio('On the 30th'))).toBe(true);
+    expect(checked(radio('Last day of each month'))).toBe(false);
+  });
+
+  it('names the month-end chips, and leaves them be when the date shown is picked again', async () => {
+    await toDetails();
+    await pickDate('Start date', new Date(2025, 0, 30));
+    expect(
+      within(screen.getByTestId('loan-month-end-choice')).getByText('Payment day'),
+    ).toBeTruthy();
+    expect(checked(radio('On the 30th'))).toBe(true);
+    await pickDate('First payment', new Date(2025, 1, 28));
+    expect(checked(radio('On the 30th'))).toBe(true);
+    for (const name of ['On the 28th', 'Last day of each month']) {
+      expect(checked(radio(name))).toBe(false);
+    }
   });
 
   it('changes a figure on the keypad, and Back from there writes nothing', async () => {
@@ -331,7 +450,7 @@ describe('the details page', () => {
     await press(button('Continue'));
     expect(
       screen.getByText(
-        'To continue, fill in: Loan type, Loan name, Amount borrowed, APR, Term, Start date, Payment day, Paid from.',
+        'To continue, fill in: Loan type, Loan name, Amount borrowed, APR, Term, Start date, First payment, Paid from.',
       ),
     ).toBeTruthy();
     expect(screen.queryByText('Review your loan')).toBeNull();
@@ -341,7 +460,7 @@ describe('the details page', () => {
     await press(button('Continue'));
     expect(
       screen.getByText(
-        'To continue, fill in: Amount borrowed, APR, Term, Start date, Payment day, Paid from.',
+        'To continue, fill in: Amount borrowed, APR, Term, Start date, First payment, Paid from.',
       ),
     ).toBeTruthy();
 
@@ -380,6 +499,7 @@ describe('the details page', () => {
         annualRate: 6.25,
         termMonths: 48,
         startDate: new Date(2024, 11, 27),
+        firstPaymentOn: new Date(2025, 0, 27),
         paymentDay: 27,
         monthlyPayment: 50,
       },
@@ -512,6 +632,62 @@ describe('the review', () => {
     expect(screen.getByLabelText(/^Payment 1, 28 Feb 2025, covering 28 days\./)).toBeTruthy();
     expect(screen.getByLabelText(/^Payment 2, 31 Mar 2025, covering 31 days\./)).toBeTruthy();
     expect(screen.getByLabelText(/^Payment 3, 30 Apr 2025, covering 30 days\./)).toBeTruthy();
+  });
+
+  it('hands the schedule no day once "On the 28th" is chosen, and saves none', async () => {
+    mockPickedDay = new Date(2025, 0, 31);
+    await toDetails();
+    await fillWireframe();
+    await press(radio('On the 28th'));
+    await press(button('Continue'));
+    expect(screen.getByText('Next payment 28 Oct 2026')).toBeTruthy();
+    await press(button('Payment schedule'));
+    const [, route] = mockNav.mock.calls.find(([kind]) => kind === 'push') as [
+      string,
+      { params: Record<string, string> },
+    ];
+    expect(route.params).toEqual(
+      expect.objectContaining({ start: '2025-02-28', funded: '2025-01-31' }),
+    );
+    expect(route.params.day).toBeUndefined();
+    await press(button('Save loan'));
+    expect(mockSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        firstPaymentOn: '2025-02-28',
+        fundedOn: '2025-01-31',
+        paymentDay: null,
+      }),
+    );
+  });
+
+  it('saves the Founder’s first payment, 14 Jan 2026 from 30 Nov 2025, priced as the statement', async () => {
+    await toDetails(['5', '5', '4', '.', '3', '4']);
+    await press(radio('Car'));
+    await press(button('Amount borrowed, empty. Add'));
+    await typeKeys(['3', '1', '3', '9', '4', '.', '3', '3']);
+    await press(button('Done'));
+    await fireEvent.changeText(box('APR'), '8.14');
+    await fireEvent.changeText(box('Term'), '6');
+    await pickDate('Start date', new Date(2025, 10, 30));
+    await pickDate('First payment', new Date(2026, 0, 14));
+    await press(radio(/^Chase/));
+    await press(button('Continue'));
+    expect(screen.getByText('Next payment 14 Oct 2026')).toBeTruthy();
+    expect(screen.getByText('6 years · 72 payments')).toBeTruthy();
+    // The independent reference's interest for the statement's loan as lent.
+    expect(screen.getByText('$8,519.22')).toBeTruthy();
+    await press(button('Save loan'));
+    expect(mockSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        principal: 31_394.33,
+        annualRate: 8.14,
+        termMonths: 72,
+        monthlyPayment: 554.34,
+        firstPaymentOn: '2026-01-14',
+        fundedOn: '2025-11-30',
+        paymentDay: null,
+      }),
+    );
   });
 
   it('goes back to the details with everything kept', async () => {
@@ -706,20 +882,23 @@ describe('from the calculator', () => {
     expect(box('Term').props.value).toBe('5');
     expect(checked(radio('Years'))).toBe(true);
     expect(button('Start date, 12 Sep 2026')).toBeTruthy();
-    expect(checked(radio('Day 12'))).toBe(true);
-    expect(screen.getByText('First payment 12 Oct 2026')).toBeTruthy();
+    expect(button('First payment, 12 Oct 2026')).toBeTruthy();
+    expect(screen.getByText('Then every month on the 12th')).toBeTruthy();
     expect(swipeNow()).toBe(true);
 
     await press(button('Back'));
     expect(mockNav.mock.calls).toEqual([['back']]);
   });
 
-  it('keeps its own first payment until the dates change', async () => {
+  it('keeps its own first payment, through a change of start, until another is picked', async () => {
     mockParams = { ...CALCULATOR, start: '2026-09-20' };
     await render(<AddLoanScreen />);
-    expect(screen.getByText('First payment 20 Sep 2026')).toBeTruthy();
-    await press(radio('Day 21'));
-    expect(screen.getByText('First payment 21 Oct 2026')).toBeTruthy();
+    expect(button('First payment, 20 Sep 2026')).toBeTruthy();
+    await pickDate('Start date', new Date(2026, 8, 1));
+    expect(button('First payment, 20 Sep 2026')).toBeTruthy();
+    await pickDate('First payment', new Date(2026, 9, 21));
+    expect(button('First payment, 21 Oct 2026')).toBeTruthy();
+    expect(screen.getByText('Then every month on the 21st')).toBeTruthy();
   });
 
   it('names the changed payments the loan no longer takes, and saves without them', async () => {
@@ -859,8 +1038,8 @@ describe('changing a saved loan', () => {
     expect(box('Term').props.value).toBe('4');
     expect(checked(radio('Years'))).toBe(true);
     expect(button('Start date, 27 Dec 2024')).toBeTruthy();
-    expect(checked(radio('Day 27'))).toBe(true);
-    expect(screen.getByText('First payment 27 Jan 2025')).toBeTruthy();
+    expect(button('First payment, 27 Jan 2025')).toBeTruthy();
+    expect(screen.getByText('Then every month on the 27th')).toBeTruthy();
     expect(checked(radio(/^Chase/))).toBe(true);
     // The page it opened on: the edge swipe and Back leave for the loan's page.
     expect(swipeNow()).toBe(true);
@@ -883,12 +1062,76 @@ describe('changing a saved loan', () => {
     expect(checked(radio('1 day'))).toBe(true);
     await press(button('Save changes'));
 
-    expect(mockPast.choose).toHaveBeenCalledWith('Car loan', false);
+    expect(mockPast.choose).toHaveBeenCalledWith('Car loan', false, READ);
     expect(mockUpdate).toHaveBeenCalledWith(UNCHANGED);
     expect(mockSave).not.toHaveBeenCalled();
     expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-car', 1, '08:30');
     expect(mockToast).toHaveBeenCalledWith('toast.loan.updated');
     expect(mockNav.mock.calls).toEqual([['back']]);
+  });
+
+  it('keeps the saved first payment where it is when the start date changes', async () => {
+    await render(<AddLoanScreen />);
+    await pickDate('Start date', new Date(2025, 0, 5));
+    expect(button('First payment, 27 Jan 2025')).toBeTruthy();
+    expect(screen.getByText('Then every month on the 27th')).toBeTruthy();
+    await pickDate('Start date', new Date(2025, 1, 1));
+    expect(button('First payment, 27 Jan 2025')).toBeTruthy();
+    expect(screen.getByTestId('loan-first-payment-hint')).toHaveTextContent(
+      'Pick a first payment after the start date.',
+    );
+  });
+
+  it('offers the calendar up to a saved first payment more than a year after its start', async () => {
+    showing(savedLoan({}, { first_payment_on: '2026-03-27' }));
+    await render(<AddLoanScreen />);
+    expect(screen.queryByTestId('loan-first-payment-hint')).toBeNull();
+    await press(button('First payment, 27 Mar 2026'));
+    const [limits] = mockLimits.slice(-1);
+    expect([isoOf(limits.min), isoOf(limits.max)]).toEqual([
+      isoOf(new Date(2024, 11, 28)),
+      isoOf(new Date(2026, 2, 27)),
+    ]);
+  });
+
+  it('saves an unchanged month-end loan back as it was: 28 Feb first, the 31st after', async () => {
+    showing(
+      savedLoan(
+        {
+          amount: 867.33,
+          starts_on: '2026-10-31',
+          next_due_on: '2026-10-31',
+          ends_on: '2027-01-31',
+        },
+        {
+          principal: 10_000,
+          annual_rate: 7.5,
+          term_months: 12,
+          monthly_payment: 867.33,
+          total_interest: 407.93,
+          first_payment_on: '2026-02-28',
+          funded_on: '2026-01-31',
+          payment_day: 31,
+        },
+      ),
+    );
+    await render(<AddLoanScreen />);
+    expect(button('First payment, 28 Feb 2026')).toBeTruthy();
+    expect(checked(radio('Last day of each month'))).toBe(true);
+    await press(button('Continue'));
+    await press(button('Save changes'));
+    expect(mockPast.choose).toHaveBeenCalledWith('Car loan', false, READ);
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        principal: 10_000,
+        monthlyPayment: 867.33,
+        totalInterest: 407.93,
+        firstPaymentOn: '2026-02-28',
+        fundedOn: '2026-01-31',
+        paymentDay: 31,
+        lastPaymentOn: null,
+      }),
+    );
   });
 
   describe('a finished loan, which is final', () => {
@@ -1060,7 +1303,7 @@ describe('changing a saved loan', () => {
       mockPast.choose.mockResolvedValueOnce('all');
       await withPayment();
       await press(button('Save changes'));
-      expect(mockPast.choose).toHaveBeenCalledWith('Car loan', true);
+      expect(mockPast.choose).toHaveBeenCalledWith('Car loan', true, READ);
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ monthlyPayment: 430, past: 'all' }),
       );
@@ -1080,14 +1323,14 @@ describe('changing a saved loan', () => {
       await fireEvent.changeText(box('Loan name'), 'Civic');
       await press(button('Continue'));
       await press(button('Save changes'));
-      expect(mockPast.choose).toHaveBeenLastCalledWith('Civic', true);
+      expect(mockPast.choose).toHaveBeenLastCalledWith('Civic', true, READ);
       await screen.unmount();
 
       await render(<AddLoanScreen />);
       await press(radio(/^Amex/));
       await press(button('Continue'));
       await press(button('Save changes'));
-      expect(mockPast.choose).toHaveBeenLastCalledWith('Car loan', true);
+      expect(mockPast.choose).toHaveBeenLastCalledWith('Car loan', true, READ);
     });
 
     it('writes nothing when backed out of, and asks again on the next Save', async () => {
@@ -1106,12 +1349,33 @@ describe('changing a saved loan', () => {
       expect(mockUpdate).toHaveBeenCalledTimes(1);
     });
 
-    it('waits for the payments: says the one failure line and writes nothing until they are read', async () => {
+    it('waits for the payments it has not read, then asks with them and saves', async () => {
       mockPast.ready = false;
+      let arrive: (read: typeof READ) => void = () => {};
+      mockPast.load.mockImplementationOnce(() => new Promise((resolve) => (arrive = resolve)));
+      await withPayment();
+      await press(button('Save changes'));
+      expect(mockPast.choose).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(screen.queryByText('Something went wrong. Please try again.')).toBeNull();
+      // Busy while it reads, so a second tap does nothing.
+      expect(button('Saving…')).toBeDisabled();
+
+      await act(async () => arrive(READ));
+      expect(mockPast.choose).toHaveBeenCalledWith('Car loan', true, READ);
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it('says the one failure line and writes nothing when the payments cannot be read', async () => {
+      mockPast.ready = false;
+      const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const refused = new Error('read failed');
+      mockPast.load.mockRejectedValueOnce(refused);
       await withPayment();
       await press(button('Save changes'));
       expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
-      expect(mockPast.retry).toHaveBeenCalled();
+      expect(log).toHaveBeenCalledWith('[failure]', refused);
+      log.mockRestore();
       expect(mockPast.choose).not.toHaveBeenCalled();
       expect(mockUpdate).not.toHaveBeenCalled();
     });
@@ -1158,7 +1422,11 @@ describe('changing a saved loan', () => {
     it('asks, deletes the loan’s bill, and lands on Loans with neither of its pages beneath', async () => {
       await render(<AddLoanScreen />);
       await press(button('Delete loan'));
-      expect(mockPast.chooseDelete).toHaveBeenCalledWith('Car loan', { stopped: false, extra: 0 });
+      expect(mockPast.chooseDelete).toHaveBeenCalledWith(
+        'Car loan',
+        { stopped: false, extra: 0 },
+        READ,
+      );
       expect(mockDelete).toHaveBeenCalledWith('bill-car');
       expect(mockStop).not.toHaveBeenCalled();
       expect(mockToast).toHaveBeenCalledWith('toast.loan.deleted', 'deleted');
@@ -1180,7 +1448,11 @@ describe('changing a saved loan', () => {
       showing(savedLoan({}, { payoffs: [payoff] }));
       await render(<AddLoanScreen />);
       await press(button('Delete loan'));
-      expect(mockPast.chooseDelete).toHaveBeenCalledWith('Car loan', { stopped: false, extra: 1 });
+      expect(mockPast.chooseDelete).toHaveBeenCalledWith(
+        'Car loan',
+        { stopped: false, extra: 1 },
+        READ,
+      );
     });
 
     it('does nothing when the person keeps it', async () => {
@@ -1192,12 +1464,35 @@ describe('changing a saved loan', () => {
       expect(mockNav).not.toHaveBeenCalled();
     });
 
-    it('waits for the payments: says the one failure line and asks nothing until they are read', async () => {
+    it('waits for the payments it has not read, then asks with them', async () => {
       mockPast.ready = false;
+      let arrive: (read: typeof READ) => void = () => {};
+      mockPast.load.mockImplementationOnce(() => new Promise((resolve) => (arrive = resolve)));
+      await render(<AddLoanScreen />);
+      await press(button('Delete loan'));
+      expect(mockPast.chooseDelete).not.toHaveBeenCalled();
+      // Busy while it reads, so a second tap does nothing.
+      expect(button('Deleting…')).toBeDisabled();
+
+      await act(async () => arrive({ count: 4, lastChargedOn: null }));
+      expect(mockPast.chooseDelete).toHaveBeenCalledWith(
+        'Car loan',
+        { stopped: false, extra: 0 },
+        { count: 4, lastChargedOn: null },
+      );
+      expect(screen.queryByText('Something went wrong. Please try again.')).toBeNull();
+    });
+
+    it('says the one failure line and asks nothing when the payments cannot be read', async () => {
+      mockPast.ready = false;
+      const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const refused = new Error('read failed');
+      mockPast.load.mockRejectedValueOnce(refused);
       await render(<AddLoanScreen />);
       await press(button('Delete loan'));
       expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
-      expect(mockPast.retry).toHaveBeenCalled();
+      expect(log).toHaveBeenCalledWith('[failure]', refused);
+      log.mockRestore();
       expect(mockPast.chooseDelete).not.toHaveBeenCalled();
       expect(mockDelete).not.toHaveBeenCalled();
     });

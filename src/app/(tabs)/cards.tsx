@@ -118,8 +118,11 @@ export default function CardsScreen() {
 
   // A stale balance is worse than none: if any of the reads behind `balances` fails, the faces
   // would fall back to the balance typed when the card was added. A failed salary or loan read
-  // would pass for having none, and offer to add one. After all hooks, so hook order holds.
-  if (balancesError || salary.isError || loans.isError) {
+  // would pass for having none, and offer to add one. A failed reload that still holds its last
+  // answer has not failed: TanStack keeps `isError` true for it, so salary is asked for its data.
+  // After all hooks, so hook order holds.
+  const salaryFailed = salary.isError && salary.data === undefined;
+  if (balancesError || salaryFailed || loans.isError) {
     return (
       <Screen onRefresh={refresh} refreshing={refreshing}>
         <PageState
@@ -219,7 +222,10 @@ export default function CardsScreen() {
           onAction={() =>
             // The second of anything is where Pro begins (the database refuses it too).
             !pro && (cards.data?.length ?? 0) >= 1
-              ? router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } })
+              ? router.push({
+                  pathname: '/pro-feature',
+                  params: { id: 'unlimited', next: '/add-card' },
+                })
               : router.push('/add-card')
           }
         />
@@ -241,7 +247,10 @@ export default function CardsScreen() {
               // Locked, not lost: extras beyond the free allowance survive a downgrade; the oldest
               // stays fully usable.
               !pro && index > 0
-                ? router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } })
+                ? router.push({
+                    pathname: '/pro-feature',
+                    params: { id: 'unlimited', next: `/source/${card.id}` },
+                  })
                 : router.push(`/source/${card.id}`)
             }
             className="active:opacity-80"
@@ -273,7 +282,10 @@ export default function CardsScreen() {
           actionLabel={t('cards.list.addAccount')}
           onAction={() =>
             !pro && (accounts.data?.length ?? 0) >= 1
-              ? router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } })
+              ? router.push({
+                  pathname: '/pro-feature',
+                  params: { id: 'unlimited', next: '/add-account' },
+                })
               : router.push('/add-account')
           }
         />
@@ -291,7 +303,10 @@ export default function CardsScreen() {
             }
             onPress={() =>
               !pro && index > 0
-                ? router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } })
+                ? router.push({
+                    pathname: '/pro-feature',
+                    params: { id: 'unlimited', next: `/source/${account.id}` },
+                  })
                 : router.push(`/source/${account.id}`)
             }
             className="active:opacity-80"

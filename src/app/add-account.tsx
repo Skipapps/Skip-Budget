@@ -1,4 +1,5 @@
-import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { randomUUID } from 'expo-crypto';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Calculator, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -13,6 +14,7 @@ import { CalculatorPad } from '@/components/ui/calculator-pad';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { CurrencyField } from '@/components/ui/currency-field';
+import { ProFeatureRedirect } from '@/components/pro/pro-gate';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,11 +33,13 @@ import { FieldLabel } from '@/components/ui/typography';
 import {
   useCreateBankAccount,
   useCreateSalarySource,
+  useDeleteUnseenPay,
   useLinkAccountToSalaries,
   useSetSalaryAccounts,
   useDeleteBankAccount,
   useUpdateBankAccount,
 } from '@/api/mutations';
+import { useProWrite } from '@/api/confirm-pro';
 import { useApplyReminder, useReminderChoice } from '@/api/reminders';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
@@ -107,7 +111,7 @@ export default function AddAccountScreen() {
     setWalled(decided);
   }
   if (decided) {
-    return <Redirect href={{ pathname: '/pro-feature', params: { id: 'unlimited' } }} />;
+    return <ProFeatureRedirect featureId="unlimited" />;
   }
   return <AddAccountScreenInner />;
 }
@@ -215,8 +219,19 @@ function AccountForm({
   const nextPayday = lastPayday ? getNextPayday(lastPayday, payFrequency) : null;
 
   const [error, setError] = useState<{ message: string; step: number } | null>(null);
+  // Row ids for this visit, so a Save repeated after a lost answer finds the account and the pay the
+  // first may have filed instead of filing seconds (`insertOnce`). Pay filed already is found by its
+  // id again, its insert turned into an update: salary sources have no before-insert wall.
+  const [newId] = useState(() => randomUUID());
+  const [newSalaryId] = useState(() => randomUUID());
+  // Whether a Save has tried to file the pay: then it may exist, and dropping it must delete it.
+  const [payTried, setPayTried] = useState(false);
+  // The new account once filed: a Save again after a later step failed updates it instead, since
+  // the free allowance would refuse a second insert before its key was checked.
+  const [filedId, setFiledId] = useState<string | null>(null);
 
   const createAccount = useCreateBankAccount();
+  const proWrite = useProWrite();
   const updateAccount = useUpdateBankAccount();
   const deleteAccount = useDeleteBankAccount();
   const confirm = useConfirm();
@@ -241,6 +256,7 @@ function AccountForm({
     }
   };
   const createSalary = useCreateSalarySource();
+  const deleteUnseenPay = useDeleteUnseenPay();
   const setSalaryAccounts = useSetSalaryAccounts();
   const linkSalaries = useLinkAccountToSalaries();
   const salarySources = useSalarySources();
@@ -331,17 +347,34 @@ function AccountForm({
               : null,
       };
 
-      const accountId =
-        editing && id
-          ? (await updateAccount.mutateAsync({ id, values }), id)
-          : (await createAccount.mutateAsync(values)).id;
+      let accountId: string;
+      const writtenId = editing && id ? id : filedId;
+      if (writtenId) {
+        await updateAccount.mutateAsync({ id: writtenId, values });
+        accountId = writtenId;
+      } else {
+        const created = await proWrite.run(() =>
+          createAccount.mutateAsync({ ...values, id: newId }),
+        );
+        // Free keeps one account, and the account is free after all: show what Pro adds, pushed
+        // so Back returns to the filled-in form.
+        if (created.status === 'free') {
+          router.push({ pathname: '/pro-feature', params: { id: 'unlimited' } });
+          return;
+        }
+        if (created.status === 'left') return;
+        accountId = created.value.id;
+        setFiledId(accountId);
+      }
 
       // Income entered here becomes a salary source pointed at this account (without the link the
       // money would land nowhere). Not while existing pay is linked: a figure typed before the
       // switch went back on would mint a second salary.
       const pay = Number(income);
       if (askPay && Number.isFinite(pay) && pay > 0) {
+        setPayTried(true);
         const salary = await createSalary.mutateAsync({
+          id: newSalaryId,
           name: nickname.trim() || bankName.trim(),
           amount: pay,
           frequency: payFrequency,
@@ -351,6 +384,11 @@ function AccountForm({
           salaryId: salary.id,
           accountIds: [accountId],
         });
+      } else if (payTried) {
+        // Cleared or switched to existing pay after an earlier Save tried to file it: that pay, and
+        // any payday recorded for it, would still count as income.
+        await deleteUnseenPay.mutateAsync(newSalaryId);
+        setPayTried(false);
       }
 
       // Existing pay is pointed at this account rather than retyped; additive, so links made on the
@@ -388,7 +426,7 @@ function AccountForm({
     }
   };
 
-  const busy = createAccount.isPending || updateAccount.isPending;
+  const busy = createAccount.isPending || updateAccount.isPending || proWrite.checking;
   const face = {
     id: 'preview',
     bankName,
@@ -443,11 +481,13 @@ function AccountForm({
   const primaryLabel =
     step < 2
       ? t('common.continue')
-      : busy
-        ? t('cards.form.saving')
-        : editing
-          ? t('cards.form.saveChanges')
-          : t('accounts.add.addAccount');
+      : proWrite.checking
+        ? t('pro.confirm.wait')
+        : busy
+          ? t('cards.form.saving')
+          : editing
+            ? t('cards.form.saveChanges')
+            : t('accounts.add.addAccount');
   const stepError = error && error.step === step ? error.message : null;
 
   return (

@@ -96,7 +96,10 @@ describe('VoiceFab', () => {
 
     fireEvent.press(fab);
     expect(router.push).toHaveBeenCalledTimes(1);
-    expect(router.push).toHaveBeenCalledWith({ pathname: '/pro-feature', params: { id: 'voice' } });
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/pro-feature',
+      params: { id: 'voice', next: '/voice' },
+    });
   });
 
   it('takes a Pro account straight to the voice page, with no pill', async () => {

@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
 import { useDeleteSubscription } from '@/api/mutations';
-import { usePastCharges } from '@/api/past-charges';
+import { usePastCharges, type PastRead } from '@/api/past-charges';
 import { usePaymentSources, useSubscriptions } from '@/api/queries';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { ChangeLogoButton } from '@/components/brands/change-logo-button';
@@ -10,7 +10,7 @@ import { PlanDetail, type PlanDetailRow } from '@/components/plans/plan-detail';
 import { cycleLabel } from '@/components/subscriptions/subscription-row';
 import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
-import { failureMessage, failureText } from '@/lib/failure';
+import { failureMessage } from '@/lib/failure';
 import { warn } from '@/lib/haptics';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { useDialog } from '@/providers/dialog-provider';
@@ -32,6 +32,8 @@ export default function SubscriptionDetailScreen() {
   const toast = useToast();
   // Held from the press until the subscription is gone: the page leaves once the list lacks it.
   const [deleting, setDeleting] = useState(false);
+  // While the charges are read before the question: Delete waits.
+  const [readingPast, setReadingPast] = useState(false);
 
   const subscription = subscriptions.data
     ? (subscriptions.data.find((row) => row.id === id) ?? null)
@@ -39,15 +41,20 @@ export default function SubscriptionDetailScreen() {
   const cancelled = subscription ? !subscription.active : false;
 
   const remove = async () => {
-    if (!subscription || deleting) return;
+    if (!subscription || deleting || readingPast) return;
     // The question counts the charges, so it waits for them.
-    if (!pastCharges.ready) {
-      pastCharges.retry();
+    setReadingPast(true);
+    let past: PastRead;
+    try {
+      past = await pastCharges.load();
+    } catch (thrown) {
+      setReadingPast(false);
       warn();
-      await ask({ title: failureText() });
+      await ask({ title: failureMessage(thrown) });
       return;
     }
-    const choice = await pastCharges.chooseDelete(subscription.name, { stopped: true });
+    setReadingPast(false);
+    const choice = await pastCharges.chooseDelete(subscription.name, { stopped: true }, past);
     if (choice !== 'everything') return;
     setDeleting(true);
     try {
@@ -128,7 +135,7 @@ export default function SubscriptionDetailScreen() {
               label: deleting
                 ? t('subscriptions.add.deleting')
                 : t('subscriptions.add.deleteSubscription'),
-              busy: deleting,
+              busy: deleting || readingPast,
               onDelete: () => void remove(),
             }
           : undefined

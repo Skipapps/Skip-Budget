@@ -154,6 +154,7 @@ jest.mock('@/api/past-charges', () => ({
     ready: true,
     count: 0,
     lastChargedOn: null,
+    load: async () => ({ count: 0, lastChargedOn: null }),
     chooseDelete: jest.fn(),
     retry: jest.fn(),
   }),

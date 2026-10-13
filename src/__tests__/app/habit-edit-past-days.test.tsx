@@ -91,6 +91,8 @@ const mockArchive = jest.fn();
 const mockRewrite = jest.fn();
 const mockDeleteAll = jest.fn();
 const mockRetry = jest.fn();
+// The days read as the page awaits it: the count, or the read's failure while they are unread.
+const mockLoadDays = jest.fn();
 let mockPastDays: { count: number | null; ready: boolean };
 let mockHabit: { data: HabitRow | null | undefined; isError: boolean; isFetched: boolean };
 // The real helpers (`habitCarriedChanged`, `habitCarriedValues`, `refusedHabitGone`) run; only the
@@ -117,7 +119,7 @@ jest.mock('@/api/habits', () => {
     useHabits: () => ({ data: [] }),
     useHabit: () => ({ ...mockHabit, refetch: jest.fn() }),
     useHabitTaps: () => ({ data: [] }),
-    useHabitPastDays: () => ({ ...mockPastDays, retry: mockRetry }),
+    useHabitPastDays: () => ({ ...mockPastDays, retry: mockRetry, load: mockLoadDays }),
     useCreateHabit: () => ({ mutateAsync: jest.fn(), isPending: false }),
     useUpdateHabit: () => useFakeMutation(() => mockUpdate),
     useArchiveHabit: () => useFakeMutation(() => mockArchive),
@@ -304,6 +306,14 @@ const withDays = (count: number) => {
 const daysUnread = () => {
   mockPastDays = { count: null, ready: false };
 };
+/** The read, held until the test lets it answer with `count`. */
+const daysArriveLater = () => {
+  daysUnread();
+  let arrive: (count: number) => void = () => {};
+  mockLoadDays.mockImplementationOnce(() => new Promise<number>((resolve) => (arrive = resolve)));
+  return (count: number) => act(async () => arrive(count));
+};
+const READ_FAILED = new Error('read failed');
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -312,6 +322,10 @@ beforeEach(() => {
   mockParams = {};
   editing();
   withDays(12);
+  mockLoadDays.mockImplementation(async () => {
+    if (mockPastDays.count === null) throw READ_FAILED;
+    return mockPastDays.count;
+  });
   for (const mock of [mockUpdate, mockArchive, mockRewrite, mockDeleteAll, mockAsk]) {
     mock.mockReset();
   }
@@ -410,14 +424,17 @@ describe.each(CHANGE_CASES)('Edit habit: %s changed', (_label, change) => {
   });
 
   describe('with the days not read yet', () => {
-    it('asks for the read again, warns, says the one failure line, and writes nothing', async () => {
+    it('says the one failure line, warns, and writes nothing when the days cannot be read', async () => {
       daysUnread();
+      const log = jest.spyOn(console, 'log').mockImplementation(() => {});
       const screen = await render(<HabitNewScreen />);
       await change.apply(screen);
       await pressButton(screen, 'Save changes');
 
       expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
-      expect(mockRetry).toHaveBeenCalledTimes(1);
+      // A real failure, reported with its cause.
+      expect(log).toHaveBeenCalledWith('[failure]', READ_FAILED);
+      log.mockRestore();
       expect(warn).toHaveBeenCalled();
       await settle();
       expect(mockAsk).not.toHaveBeenCalled();
@@ -427,17 +444,19 @@ describe.each(CHANGE_CASES)('Edit habit: %s changed', (_label, change) => {
       expect(router.back).not.toHaveBeenCalled();
     });
 
-    it('saves as soon as the days are read, asking then', async () => {
-      daysUnread();
+    it('waits for the days, holding Save, then asks with their count and saves', async () => {
+      const arrive = daysArriveLater();
       mockAsk.mockResolvedValue('upcoming');
       const screen = await render(<HabitNewScreen />);
       await change.apply(screen);
       await pressButton(screen, 'Save changes');
-      expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
+      expect(
+        screen.getByRole('button', { name: 'Save changes' }).props.accessibilityState,
+      ).toMatchObject({ disabled: true });
+      expect(mockAsk).not.toHaveBeenCalled();
+      expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
 
-      withDays(4);
-      await screen.rerender(<HabitNewScreen />);
-      await pressButton(screen, 'Save changes');
+      await arrive(4);
 
       await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
       expect(mockAsk).toHaveBeenCalledTimes(1);
@@ -881,13 +900,15 @@ describe('Delete habit', () => {
     expect(lastAsk().message).toBe(t('ui.past.delete.body.days', { name: 'Coffee', count: 12 }));
   });
 
-  it('with the days not read yet asks for the read again, warns, says the one failure line, and removes nothing', async () => {
+  it('says the one failure line, warns, and removes nothing when the days cannot be read', async () => {
     daysUnread();
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     const screen = await render(<HabitNewScreen />);
     await pressDelete(screen);
 
     expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
-    expect(mockRetry).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith('[failure]', READ_FAILED);
+    log.mockRestore();
     expect(warn).toHaveBeenCalled();
     await settle();
     expect(mockAsk).not.toHaveBeenCalled();
@@ -897,16 +918,14 @@ describe('Delete habit', () => {
     expect(router.back).not.toHaveBeenCalled();
   });
 
-  it('asks once the days are read', async () => {
-    daysUnread();
+  it('waits for the days it has not read, then asks with their count', async () => {
+    const arrive = daysArriveLater();
     mockAsk.mockResolvedValue('keep');
     const screen = await render(<HabitNewScreen />);
     await pressDelete(screen);
-    expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
+    expect(mockAsk).not.toHaveBeenCalled();
 
-    withDays(3);
-    await screen.rerender(<HabitNewScreen />);
-    await pressDelete(screen);
+    await arrive(3);
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(lastAsk().message).toBe(t('ui.past.delete.body.days', { name: 'Coffee', count: 3 }));

@@ -42,6 +42,7 @@ jest.mock('expo-router', () => {
   return {
     router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), canGoBack: () => true },
     useLocalSearchParams: () => mockParams,
+    useCurrentRouteInfo: () => undefined,
     useFocusEffect: () => {},
     Stack: { Screen: () => null },
     Redirect: ({ href }: { href: { pathname: string; params: { id: string } } }) => (
@@ -67,6 +68,7 @@ jest.mock('@/api/mutations', () => ({
   useCreateBankAccount: () => mockUseCreateAccount(),
   useUpdateBankAccount: idle,
   useDeleteBankAccount: idle,
+  useDeleteUnseenPay: idle,
   useCreateSalarySource: idle,
   useSetSalaryAccounts: idle,
   useLinkAccountToSalaries: idle,

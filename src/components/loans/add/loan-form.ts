@@ -2,9 +2,17 @@ import type { LoanDetail } from '@/api/loans';
 import type { PaymentSourceRow } from '@/api/queries';
 import { loanTypeOf, type LoanType } from '@/data/loan-types';
 import { numberMarks, t, type MessageKey } from '@/i18n';
-import { toIsoDate } from '@/lib/date';
+import { formatFullDate, toIsoDate } from '@/lib/date';
+import { LATE_DAYS, dayOrdinal } from '@/lib/due-day';
 import { amortise, type AccrualBasis, type PaymentOverrideMap } from '@/lib/loan';
-import { firstPaymentOn } from '@/lib/loan-first-payment';
+import {
+  defaultFirstPayment,
+  firstPaymentProblem,
+  latestFirstPayment,
+  paymentDayChoices,
+  paymentDayFits,
+  type FirstPaymentProblem,
+} from '@/lib/loan-first-payment';
 import type { LoanReviewField, LoanReviewFields } from '@/lib/loan-review';
 import { overrideParams, readLoanRoute, routeDate, type LoanRoute } from '@/lib/loan-route';
 import { loanTermsForBill } from '@/lib/loan-start';
@@ -28,13 +36,23 @@ export type LoanForm = {
   termUnit: TermUnit;
   /** The day the money landed (`funded_on`), local midnight. */
   startDate: Date | null;
-  /** Null while the payment day follows the start date's day. */
+  /**
+   * The first payment (yyyy-mm-dd) once it is set: picked on the page, or carried in from the
+   * calculator or the saved loan. Null while it follows the start date (`defaultFirstPayment`).
+   */
+  pickedFirst: string | null;
+  /**
+   * The payment day picked with the month-end chips. Null for the first payment's default; ignored
+   * unless the first payment is a short month's last day and the day is one of the chips.
+   */
   pickedDay: number | null;
   /**
-   * The calculator's first payment when the rule would put it elsewhere (yyyy-mm-dd). It stands
-   * until the start date or the payment day changes.
+   * The dates and payment day the calculator or the saved loan came with. While the first payment
+   * is theirs, their day is its default; while the start is theirs, the page takes a first payment
+   * up to theirs, however far past the year (the limit guards a slip in this calendar, not a loan
+   * set up elsewhere). A saved loan's first payment is a fact, so it never follows the start.
    */
-  pinnedFirst: string | null;
+  carried: { start: string; first: string; day: number; saved: boolean } | null;
   /** Null is not answered yet; '' is Skip. */
   sourceId: string | null;
   basis: AccrualBasis;
@@ -55,8 +73,9 @@ export function emptyLoanForm(): LoanForm {
     term: '',
     termUnit: 'years',
     startDate: null,
+    pickedFirst: null,
     pickedDay: null,
-    pinnedFirst: null,
+    carried: null,
     sourceId: null,
     basis: 'actual/365',
     payments: undefined,
@@ -68,14 +87,14 @@ export function emptyLoanForm(): LoanForm {
  * page opens on the same loan. Extras and fees stay behind: they were what-ifs.
  */
 export function loanFormFromCalculator(route: LoanRoute): LoanForm {
+  return formFromRoute(route, false);
+}
+
+function formFromRoute(route: LoanRoute, saved: boolean): LoanForm {
   const months = Number.isInteger(route.months) && route.months > 0 ? route.months : 0;
   const inYears = months > 0 && months % 12 === 0;
   const first = dayOrNull(route.start);
   const startDate = dayOrNull(route.funded);
-  const day = route.paymentDay ?? first?.getDate() ?? null;
-  const ruled = startDate && day ? firstPaymentOn(startDate, day) : null;
-  const pinned =
-    first && (!ruled || toIsoDate(ruled) !== toIsoDate(first)) ? toIsoDate(first) : null;
 
   return {
     ...emptyLoanForm(),
@@ -86,17 +105,50 @@ export function loanFormFromCalculator(route: LoanRoute): LoanForm {
     term: months > 0 ? String(inYears ? months / 12 : months) : '',
     termUnit: months > 0 && !inYears ? 'months' : 'years',
     startDate,
-    pickedDay: day,
-    pinnedFirst: pinned,
+    ...firstPaymentCarried(startDate, first, route.paymentDay ?? first?.getDate() ?? 0, saved),
     basis: route.basis,
     payments: route.overrides.payments,
   };
 }
 
 /**
- * A saved loan on the details page, to be changed: its figures as stored, its first payment pinned
- * where the rule would put it elsewhere, and its name following its type only while it is still the
- * type's own name. A loan saved before types is an Other loan, as it is drawn everywhere.
+ * A first payment handed over with its payment day. From the calculator, on the start date's
+ * default with the day the default would give, it follows the start date like an untouched one; on
+ * the default with another day, that day is the chips' answer. Anywhere else, and always for a saved
+ * loan, it is set, and its dates and day carried.
+ */
+function firstPaymentCarried(
+  startDate: Date | null,
+  first: Date | null,
+  day: number,
+  saved: boolean,
+): Pick<LoanForm, 'pickedFirst' | 'pickedDay' | 'carried'> {
+  if (!first) return { pickedFirst: null, pickedDay: null, carried: null };
+  const fits = paymentDayFits(first, day) ? day : first.getDate();
+  const onDefault = startDate ? defaultFirstPayment(startDate) : null;
+  if (!saved && startDate && onDefault && sameDay(onDefault, first)) {
+    return {
+      pickedFirst: null,
+      pickedDay: fits === startDate.getDate() ? null : fits,
+      carried: null,
+    };
+  }
+  return {
+    pickedFirst: toIsoDate(first),
+    pickedDay: null,
+    carried: {
+      start: startDate ? toIsoDate(startDate) : '',
+      first: toIsoDate(first),
+      day: fits,
+      saved,
+    },
+  };
+}
+
+/**
+ * A saved loan on the details page, to be changed: its figures as stored, its first payment and
+ * payment day as saved, and its name following its type only while it is still the type's own
+ * name. A loan saved before types is an Other loan, as it is drawn everywhere.
  */
 export function loanFormFromSaved(loan: LoanDetail): LoanForm {
   const terms = loanTermsForBill(loan, loan.bill);
@@ -113,7 +165,7 @@ export function loanFormFromSaved(loan: LoanDetail): LoanForm {
   });
   const type = loanTypeOf(loan.bill.icon_id) ?? 'other';
   return {
-    ...loanFormFromCalculator(route),
+    ...formFromRoute(route, true),
     type,
     typedName: loan.bill.name === t(DEFAULT_NAMES[type]) ? null : loan.bill.name,
     sourceId: loan.bill.card_id ?? loan.bill.bank_account_id ?? '',
@@ -142,6 +194,8 @@ function dayOrNull(iso: string): Date | null {
   return date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
+const sameDay = (a: Date, b: Date) => toIsoDate(a) === toIsoDate(b);
+
 const DEFAULT_NAMES: Record<LoanType, MessageKey> = {
   personal: 'loanFlow.defaultName.personal',
   car: 'loanFlow.defaultName.car',
@@ -159,8 +213,116 @@ export function loanName(form: LoanForm): string {
   return form.type ? t(DEFAULT_NAMES[form.type]) : '';
 }
 
+/** The first payment: as set, else a month after the start date. Null with neither. */
+export function firstPaymentOf(form: LoanForm): Date | null {
+  if (form.pickedFirst) return dayOrNull(form.pickedFirst);
+  return form.startDate ? defaultFirstPayment(form.startDate) : null;
+}
+
+/**
+ * The day the first payment stands for when no chip is picked: the start date's for the untouched
+ * default (a 31 Jan start, first due 28 Feb, is paid at each month's end), the carried day for a
+ * carried date, and the date's own day for a date picked here.
+ */
+function defaultDayOf(form: LoanForm, first: Date): number {
+  const fromStart = form.pickedFirst === null ? form.startDate?.getDate() : undefined;
+  const fromCarried =
+    form.carried && form.carried.first === form.pickedFirst ? form.carried.day : undefined;
+  const day = fromStart ?? fromCarried;
+  return day !== undefined && paymentDayFits(first, day) ? day : first.getDate();
+}
+
+/**
+ * The payment day chips, when the first payment is the last day of a month shorter than 31 days
+ * and so could mean that day or every month's end. Null when the date says it on its own.
+ */
+export function paymentDayChoicesOf(form: LoanForm): number[] | null {
+  const first = firstPaymentOf(form);
+  return first ? paymentDayChoices(first, defaultDayOf(form, first)) : null;
+}
+
+/** The day later payments fall on (31 is the last day of each month); null with no first payment. */
 export function paymentDayOf(form: LoanForm): number | null {
-  return form.pickedDay ?? form.startDate?.getDate() ?? null;
+  const first = firstPaymentOf(form);
+  if (!first) return null;
+  const choices = paymentDayChoices(first, defaultDayOf(form, first));
+  if (!choices) return first.getDate();
+  if (form.pickedDay !== null && choices.includes(form.pickedDay)) return form.pickedDay;
+  return defaultDayOf(form, first);
+}
+
+/** A new start date: an untouched first payment moves with it; a set one stays where it is. */
+export function withStartDate(form: LoanForm, startDate: Date): Partial<LoanForm> {
+  return form.pickedFirst === null ? { startDate, pickedDay: null } : { startDate };
+}
+
+/**
+ * A first payment picked in the calendar. The date already shown changes nothing, chips included.
+ * The start date's default goes back to following the start (not on a saved loan, whose first
+ * payment never moves by itself); the carried date takes its carried day again; any other date is
+ * its own day until a chip says otherwise.
+ */
+export function withFirstPayment(form: LoanForm, day: Date): Partial<LoanForm> {
+  const on = toIsoDate(day);
+  const shown = firstPaymentOf(form);
+  if (shown && toIsoDate(shown) === on) return {};
+  const onDefault = form.startDate ? defaultFirstPayment(form.startDate) : null;
+  if (!form.carried?.saved && onDefault && toIsoDate(onDefault) === on) {
+    return { pickedFirst: null, pickedDay: null };
+  }
+  return { pickedFirst: on, pickedDay: null };
+}
+
+/**
+ * The last first payment the page takes for this start: a year on, or the carried first payment
+ * when that is later and the start is still the carried one.
+ */
+export function latestFirstPaymentOf(form: LoanForm): Date | null {
+  if (!form.startDate) return null;
+  const latest = latestFirstPayment(form.startDate);
+  const carried =
+    form.carried && form.carried.start === toIsoDate(form.startDate)
+      ? dayOrNull(form.carried.first)
+      : null;
+  return latest && carried && carried > latest ? carried : latest;
+}
+
+/**
+ * What is wrong with the first payment against the start date, if anything: not after it, or later
+ * than the page takes (`latestFirstPaymentOf`).
+ */
+export function firstPaymentProblemOf(form: LoanForm): FirstPaymentProblem | null {
+  const first = firstPaymentOf(form);
+  if (!form.startDate || !first) return null;
+  const problem = firstPaymentProblem(form.startDate, first);
+  if (problem !== 'too-late') return problem;
+  const latest = latestFirstPaymentOf(form);
+  return latest && toIsoDate(first) <= toIsoDate(latest) ? null : problem;
+}
+
+/** The line under the First payment: the day later payments fall on. */
+export function paymentRhythm(day: number): string {
+  if (day >= 31) return t('loanFlow.rhythm.monthEnd');
+  if (day >= LATE_DAYS) return t('loanFlow.rhythm.lateDay', { day: dayOrdinal(day) });
+  return t('loanFlow.rhythm.day', { day: dayOrdinal(day) });
+}
+
+/** What the month-end chips choose, said above them so VoiceOver reads the chips in context. */
+export const paymentDayChoiceTitle = () => t('loanFlow.monthEnd.label');
+
+/** A month-end chip: "On the 28th", or "Last day of each month" for 31. */
+export function paymentDayChoiceLabel(day: number): string {
+  return day >= 31
+    ? t('loanFlow.monthEnd.lastDay')
+    : t('loanFlow.monthEnd.onDay', { day: dayOrdinal(day) });
+}
+
+/** The words under the First payment, and on Continue, for a date that does not fit the start. */
+export function firstPaymentHint(problem: FirstPaymentProblem, startDate: Date): string {
+  const latest = latestFirstPayment(startDate);
+  return problem === 'too-late' && latest
+    ? t('loanFlow.firstDate.tooLate', { date: formatFullDate(latest) })
+    : t('loanFlow.firstDate.notAfterStart');
 }
 
 /** The term in months; NaN while the box is empty. */
@@ -170,13 +332,6 @@ export function termMonthsOf(form: LoanForm): number {
   return form.termUnit === 'years' ? typed * 12 : typed;
 }
 
-/** The first payment the page shows under the days: the carried one, else the rule's. */
-export function firstPaymentOf(form: LoanForm): Date | null {
-  if (form.pinnedFirst) return dayOrNull(form.pinnedFirst);
-  const day = paymentDayOf(form);
-  return form.startDate && day ? firstPaymentOn(form.startDate, day) : null;
-}
-
 /** What Review prices. An empty box is passed as nothing, never as zero. */
 export function reviewFieldsOf(form: LoanForm): LoanReviewFields {
   return {
@@ -184,11 +339,11 @@ export function reviewFieldsOf(form: LoanForm): LoanReviewFields {
     annualRate: form.rate ? Number(form.rate) : Number.NaN,
     termMonths: termMonthsOf(form),
     startDate: form.startDate ?? new Date(Number.NaN),
+    firstPaymentOn: firstPaymentOf(form),
     paymentDay: paymentDayOf(form) ?? 0,
     monthlyPayment: form.monthly ? Number(form.monthly) : Number.NaN,
     basis: form.basis,
     paymentOverrides: form.payments,
-    firstPaymentOn: form.pinnedFirst ? dayOrNull(form.pinnedFirst) : null,
   };
 }
 
@@ -203,7 +358,7 @@ const PAGE_ORDER: readonly Field[] = [
   'rate',
   'term',
   'startDate',
-  'paymentDay',
+  'firstPayment',
   'source',
 ];
 
@@ -215,7 +370,7 @@ const FIELD_LABELS: Record<Field, MessageKey> = {
   rate: 'loanFlow.field.apr',
   term: 'loan.termLabel',
   startDate: 'loanFlow.field.start',
-  paymentDay: 'loanFlow.field.paymentDay',
+  firstPayment: 'loanFlow.field.firstPayment',
   source: 'loan.save.paidFrom',
 };
 

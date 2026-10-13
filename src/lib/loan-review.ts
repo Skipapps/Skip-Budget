@@ -3,21 +3,23 @@
  * same terms the Loans page, the bill page and the schedule read back once it is saved: the bank's
  * payment as typed is the contract payment, and the last payment takes up any difference.
  *
- * Fields → terms (first payment by `firstPaymentOn`, the start date as `funded_on`, the payment day
- * as the anchor) → `scheduleWithOverrides` → figures, the values `save_loan` takes, and the params
- * that open `/loan-schedule` on exactly this schedule.
+ * Fields → terms (the first payment as picked, the start date as `funded_on`, the payment day as
+ * the anchor) → `scheduleWithOverrides` → figures, the values `save_loan` takes, and the params that
+ * open `/loan-schedule` on exactly this schedule.
+ *
+ * The opening period is the engine's: interest from the start date to the first payment, on the
+ * days between them, posted once with the first payment (`runSchedule`), however short or long.
  */
 
 import { toIsoDate } from '@/lib/date';
 import {
-  isPaymentDay,
   payoffDate,
   type AccrualBasis,
   type LoanPayoff,
   type LoanTerms,
   type PaymentOverrideMap,
 } from '@/lib/loan';
-import { firstPaymentOn as ruleFirstPayment } from '@/lib/loan-first-payment';
+import { paymentDayFits } from '@/lib/loan-first-payment';
 import {
   paymentOverridesJson,
   scheduleWithOverrides,
@@ -36,7 +38,12 @@ export type LoanReviewFields = {
   termMonths: number;
   /** The Start date field, the day the money landed (`funded_on`). */
   startDate: Date;
-  /** 1–31. */
+  /** The First payment field: any day after the start date. Null while it is empty. */
+  firstPaymentOn: Date | null;
+  /**
+   * The day later payments fall on (`LoanTerms.paymentDay`): the first payment's own day, or, when
+   * that is a short month's last day, a later day it stands for (31 for every month's end).
+   */
   paymentDay: number;
   /** The bank's monthly payment, as typed. */
   monthlyPayment: number;
@@ -45,11 +52,6 @@ export type LoanReviewFields = {
   /** Single payments changed in the calculator, carried over. */
   paymentOverrides?: PaymentOverrideMap;
   /**
-   * A first payment carried from the calculator that is not the rule's date, used as given. Clear
-   * it when the start date or the payment day changes, as the rule then applies again.
-   */
-  firstPaymentOn?: Date | null;
-  /**
    * A saved loan's payoffs (`termsFromStored(...).payoffs`), when it is edited: every figure, and
    * the last payment `update_loan` ends the bill on, then follow them.
    */
@@ -57,16 +59,18 @@ export type LoanReviewFields = {
 };
 
 export type LoanReviewField =
-  'principal' | 'rate' | 'term' | 'startDate' | 'paymentDay' | 'monthlyPayment';
+  'principal' | 'rate' | 'term' | 'startDate' | 'firstPayment' | 'monthlyPayment';
 
 export type LoanReviewRefusal =
   /**
-   * Missing or unusable, in the page's order. 'startDate' also covers a carried first payment
-   * that is not after the start date.
+   * Missing or unusable, in the page's order. 'firstPayment' also covers a payment day the first
+   * payment cannot carry, which the page never sends.
    */
   | { reason: 'fields'; fields: LoanReviewField[] }
   /** Outside 0–100%, or more decimals than the loans table keeps (`loan.save.rateOutOfRange`). */
   | { reason: 'rate' }
+  /** The first payment is on or before the start date: there would be no days of interest. */
+  | { reason: 'first-payment' }
   /**
    * The monthly payment cannot clear the loan; `problem.minimum` is the least that can, as
    * `refusalText(problem)` says it.
@@ -157,16 +161,14 @@ export function loanReview(fields: LoanReviewFields, today: string): LoanReview 
   const principalCents = positiveCents(fields.principal);
   const paymentCents = positiveCents(fields.monthlyPayment);
   const start = isDate(fields.startDate) ? calendarDay(fields.startDate) : null;
-  const ruled =
-    start && isPaymentDay(fields.paymentDay) ? ruleFirstPayment(start, fields.paymentDay) : null;
-  const first = isDate(fields.firstPaymentOn) ? calendarDay(fields.firstPaymentOn) : ruled;
+  const first = isDate(fields.firstPaymentOn) ? calendarDay(fields.firstPaymentOn) : null;
 
   const missing: LoanReviewField[] = [];
   if (principalCents === null) missing.push('principal');
   if (!Number.isFinite(fields.annualRate)) missing.push('rate');
   if (!Number.isInteger(fields.termMonths) || fields.termMonths < 1) missing.push('term');
-  if (!start || (first && toIsoDate(first) <= toIsoDate(start))) missing.push('startDate');
-  if (!isPaymentDay(fields.paymentDay)) missing.push('paymentDay');
+  if (!start) missing.push('startDate');
+  if (!first || !paymentDayFits(first, fields.paymentDay)) missing.push('firstPayment');
   if (paymentCents === null) missing.push('monthlyPayment');
   if (missing.length > 0 || !start || !first || principalCents === null || paymentCents === null) {
     return { ok: false, refusal: { reason: 'fields', fields: missing } };
@@ -177,9 +179,11 @@ export function loanReview(fields: LoanReviewFields, today: string): LoanReview 
     .map((payoff) => ({ on: toIsoDate(payoff.on), amount: payoff.amount }))
     .filter((payoff) => payoff.on < startedOn)
     .sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0))[0];
+  // Before the first payment's own check: an earlier start, which it asks for, mends both.
   if (paidBefore) {
     return { ok: false, refusal: { reason: 'start-after-payoff', ...paidBefore } };
   }
+  if (toIsoDate(first) <= startedOn) return { ok: false, refusal: { reason: 'first-payment' } };
 
   const basis = fields.basis ?? 'actual/365';
   const terms: LoanTerms = {

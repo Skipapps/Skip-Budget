@@ -11,8 +11,8 @@ import { ToastContext } from '@/providers/toast-context';
  * A payment to a card, or money added to an account: how much, then where it came from. Pinned: the
  * second step exists only when there is another account to choose; its pills are the usable
  * accounts other than the page's own, then a last pill for money from outside; an unanswered Save
- * writes nothing and says why; what is written carries `from_bank_account_id` only when an account
- * was chosen; and the amount survives Back.
+ * writes nothing and says why; what is written carries the account chosen as `from_bank_account_id`,
+ * null for money from outside, under one row id for the visit; and the amount survives Back.
  *
  * The page is the real one, walked on its own keypad and pills; only the reads, the write, the
  * clock and the navigation are replaced.
@@ -70,6 +70,10 @@ function Toasts({ children }: { children: ReactNode }) {
 jest.mock('@/lib/use-today', () => ({
   useToday: () => ({ today: '2026-10-08', todayDate: new Date('2026-10-08T00:00:00') }),
 }));
+
+// Counted, so an id made again on a later render or a second Save would show as a new one.
+let mockUuids = 0;
+jest.mock('expo-crypto', () => ({ randomUUID: () => `payment-${(mockUuids += 1)}` }));
 
 const mockCreate = jest.fn(async (_values: Record<string, unknown>) => ({ id: 'payment-new' }));
 let mockPending = false;
@@ -137,13 +141,15 @@ async function toSecondStep(screen: Screen, amount = '12.50') {
   await pressButton(screen, 'Continue');
 }
 
-/** A $12.50 card payment from outside: no key for the account it came out of. */
+/** A $12.50 card payment from outside: the account it came out of is null. */
 const FROM_OUTSIDE = {
+  id: 'payment-1',
   card_id: CARD,
   bank_account_id: null,
   amount: 12.5,
   paid_on: '2026-10-08',
   note: null,
+  from_bank_account_id: null,
 };
 const FROM_CHECKING = { ...FROM_OUTSIDE, from_bank_account_id: CHECKING };
 
@@ -158,6 +164,7 @@ beforeEach(() => {
   mockConfirm.mockResolvedValue(false);
   mockCreate.mockResolvedValue({ id: 'payment-new' });
   mockPending = false;
+  mockUuids = 0;
   mockParams = { id: CARD };
   openWallet();
 });
@@ -270,7 +277,7 @@ describe('A card payment with accounts to pay from', () => {
     expect(screen.getByLabelText('Somewhere else')).toBeSelected();
   });
 
-  it('saves a payment from somewhere else with no `from_bank_account_id` at all', async () => {
+  it('saves a payment from somewhere else with `from_bank_account_id` null', async () => {
     const screen = await render(<SourcePaymentScreen />, { wrapper: Toasts });
     await toSecondStep(screen);
 
@@ -278,7 +285,7 @@ describe('A card payment with accounts to pay from', () => {
     await pressButton(screen, 'Save payment');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-    // Not `null`, and not `undefined`: a database without the column still takes this write.
+    // Null, not left off: a Save that finds an earlier attempt's row must clear its account too.
     expect(written()).toStrictEqual(FROM_OUTSIDE);
   });
 
@@ -295,7 +302,7 @@ describe('A card payment with accounts to pay from', () => {
     expect(written()).toStrictEqual({ ...FROM_CHECKING, from_bank_account_id: CAPITAL });
   });
 
-  it('leaves the account off the write when the last pill pressed is somewhere else', async () => {
+  it('writes no account when the last pill pressed is somewhere else', async () => {
     const screen = await render(<SourcePaymentScreen />, { wrapper: Toasts });
     await toSecondStep(screen);
 
@@ -421,6 +428,26 @@ describe('A card payment with accounts to pay from', () => {
     expect(mockCreate).toHaveBeenCalledTimes(2);
     expect(mockCreate).toHaveBeenLastCalledWith(FROM_CHECKING);
     expect(mockToast).toHaveBeenCalledTimes(1);
+    log.mockRestore();
+  });
+
+  it('saves again under the same row id, with the answers as they are now', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockCreate.mockRejectedValueOnce(new Error('network down'));
+    const screen = await render(<SourcePaymentScreen />, { wrapper: Toasts });
+    await toSecondStep(screen);
+    await press(screen, 'Chase Checking ••7730');
+    await pressButton(screen, 'Save payment');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+
+    await press(screen, 'Somewhere else');
+    await pressButton(screen, 'Save payment');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(mockCreate.mock.calls[0][0]).toStrictEqual(FROM_CHECKING);
+    // One id: a first write that did land is found and given these answers, Chase cleared off it.
+    expect(mockCreate.mock.calls[1][0]).toStrictEqual(FROM_OUTSIDE);
     log.mockRestore();
   });
 
@@ -620,6 +647,7 @@ describe('Money added to an account that has other accounts', () => {
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(written()).toStrictEqual({
+      id: 'payment-1',
       card_id: null,
       bank_account_id: CHECKING,
       amount: 250,
@@ -632,7 +660,7 @@ describe('Money added to an account that has other accounts', () => {
     expect(mockToast).toHaveBeenCalledWith('toast.money.added');
   });
 
-  it('adds new money with no `from_bank_account_id` at all', async () => {
+  it('adds new money with `from_bank_account_id` null', async () => {
     const screen = await render(<SourcePaymentScreen />, { wrapper: Toasts });
     await toSecondStep(screen, '250');
 
@@ -641,11 +669,13 @@ describe('Money added to an account that has other accounts', () => {
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(written()).toStrictEqual({
+      id: 'payment-1',
       card_id: null,
       bank_account_id: CHECKING,
       amount: 250,
       paid_on: '2026-10-08',
       note: null,
+      from_bank_account_id: null,
     });
     expect(mockToast).toHaveBeenCalledWith('toast.money.added');
   });
@@ -737,7 +767,7 @@ describe('Money added to the only account there is', () => {
     expect(screen.getByRole('button', { name: 'Add money' })).toBeDisabled();
   });
 
-  it('saves straight away as money from outside, with no `from_bank_account_id`', async () => {
+  it('saves straight away as money from outside, with `from_bank_account_id` null', async () => {
     const screen = await render(<SourcePaymentScreen />, { wrapper: Toasts });
     await typeAmount(screen, '75.20');
 
@@ -746,11 +776,13 @@ describe('Money added to the only account there is', () => {
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(screen.queryByText('Where did it come from?')).toBeNull();
     expect(written()).toStrictEqual({
+      id: 'payment-1',
       card_id: null,
       bank_account_id: CHECKING,
       amount: 75.2,
       paid_on: '2026-10-08',
       note: null,
+      from_bank_account_id: null,
     });
     expect(mockToast).toHaveBeenCalledTimes(1);
     expect(mockToast).toHaveBeenCalledWith('toast.money.added');

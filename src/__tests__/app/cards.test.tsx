@@ -204,7 +204,7 @@ describe('Cards — the two lists', () => {
     await fireEvent.press(screen.getByLabelText('New credit card'));
     expect(router.push).toHaveBeenLastCalledWith({
       pathname: '/pro-feature',
-      params: { id: 'unlimited' },
+      params: { id: 'unlimited', next: '/add-card' },
     });
   });
 

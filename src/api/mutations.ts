@@ -70,19 +70,119 @@ function useInvalidate() {
   };
 }
 
+/**
+ * The row id a form keeps for its visit (`randomUUID()` from expo-crypto), so saving again after a
+ * lost answer finds the first row instead of filing a second. Optional on every create.
+ */
+export type ClientId = { id?: string };
+
+type Row = Record<string, unknown>;
+
+/**
+ * Client ids whose last write got no answer, so the row may or may not exist. Module-wide rather
+ * than per hook: it is a fact about the server, and the id outlives any one component holding it.
+ */
+const unanswered = new Set<string>();
+
+/**
+ * True when a failed write may still have been made. PostgREST and Postgres answer every refusal
+ * with a code, and that request's transaction is rolled back. A dropped connection (postgrest-js
+ * answers code '' with status 0), a gateway's own error page, or a deadline carries none.
+ */
+export function mayHaveWritten(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  return typeof code !== 'string' || code === '';
+}
+
+/**
+ * Postgres leaves the key out of the detail on a table with row level security, so the constraint
+ * name is the only sign. Every create table keeps Postgres's default primary key name.
+ */
+function idTaken(error: { code?: string; message?: string }, table: string): boolean {
+  return error.code === '23505' && Boolean(error.message?.includes(`"${table}_pkey"`));
+}
+
+async function rewrite(table: string, values: Row, columns: string, id: string): Promise<Row> {
+  const { data, error } = await supabase
+    .from(table)
+    .update(values as never)
+    .eq('id', id)
+    .select(columns);
+  if (error) throw error;
+  const rows = data as unknown as Row[] | null;
+  if (!rows || rows.length === 0) throw new Error(NOTHING_UPDATED);
+  return rows[0];
+}
+
+async function insertOrRewrite(
+  table: string,
+  values: Row,
+  userId: string,
+  columns: string,
+  id: string,
+): Promise<Row> {
+  // Looked up, not inserted and caught: each table's before-insert walls (free allowance, scan
+  // count, Pro) run before the key check, so a re-insert could be refused over the very row it
+  // would duplicate.
+  if (unanswered.has(id)) {
+    const found = await supabase.from(table).select('id').eq('id', id).maybeSingle();
+    if (found.error) throw found.error;
+    if (found.data) return rewrite(table, values, columns, id);
+  }
+  const { data, error } = await supabase
+    .from(table)
+    .insert({ ...values, id, user_id: userId } as never)
+    .select(columns)
+    .single();
+  // The unanswered attempt landed after the look, or a second tap raced the first.
+  if (error && idTaken(error, table)) return rewrite(table, values, columns, id);
+  if (error) throw error;
+  return data as unknown as Row;
+}
+
+/**
+ * Inserts one row and answers with its `columns`. Given a client id, a save repeated after an
+ * attempt that got no answer files nothing new: a row the first attempt left is found and given
+ * the values as they are now, since the person may have changed a field before saving again.
+ * Without an unanswered attempt before it, it is still one request.
+ */
+export async function insertOnce(
+  table: string,
+  values: Row,
+  userId: string,
+  columns: string,
+  id?: string,
+): Promise<Row> {
+  if (!id) {
+    const { data, error } = await supabase
+      .from(table)
+      .insert({ ...values, user_id: userId } as never)
+      .select(columns)
+      .single();
+    if (error) throw error;
+    return data as unknown as Row;
+  }
+  try {
+    const row = await insertOrRewrite(table, values, userId, columns, id);
+    unanswered.delete(id);
+    return row;
+  } catch (error) {
+    if (mayHaveWritten(error)) unanswered.add(id);
+    throw error;
+  }
+}
+
 function useCreate<TInput extends Record<string, unknown>>(table: string) {
   const userId = useUserId();
   const invalidate = useInvalidate();
 
   return useMutation({
-    mutationFn: async (values: TInput) => {
+    // No generated Database types, so a generic payload cannot be narrowed; the per-table Values
+    // types keep call sites honest.
+    mutationFn: async ({ id, ...values }: TInput & ClientId) => {
       if (!userId) throw new Error('Sign in first.');
-      // No generated Database types, so a generic payload cannot be narrowed; the cast buys one
-      // shared helper, and the per-table Values types keep call sites honest.
-      const payload = { ...values, user_id: userId } as never;
-      const { data, error } = await supabase.from(table).insert(payload).select('id').single();
-      if (error) throw error;
-      return data as { id: string };
+      const row = await insertOnce(table, values, userId, 'id', id);
+      return row as { id: string };
     },
     onSuccess: () => invalidate(table),
   });
@@ -349,6 +449,33 @@ export const useUpdateSalarySource = () => useUpdate<Partial<SalaryValues>>('sal
 export const useDeleteSalarySource = () => useRemove('salary_sources');
 
 /**
+ * Deletes pay a Save filed on this visit that the person then dropped, with any pay recorded for it.
+ * A saved salary's delete keeps its received pay as history (the key is set to null), but this pay
+ * was never seen saved: a payday the sweep or a later Save recorded for it would stay counted as
+ * income. Safe on a row that never landed: both deletes may match nothing.
+ */
+export function useDeleteUnseenPay() {
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error: payError } = await supabase
+        .from('pay_received')
+        .delete()
+        .eq('salary_source_id', id);
+      if (payError) throw payError;
+      const { error } = await supabase.from('salary_sources').delete().eq('id', id);
+      if (error) throw error;
+      return { id };
+    },
+    onSuccess: () => {
+      invalidate('salary_sources');
+      invalidate('pay_received');
+    },
+  });
+}
+
+/**
  * How a receipt got into the app. Mirrors the `public.capture_source` enum. 'scan', 'upload' and
  * 'voice' are Pro verbs, limited or refused on a free account by the server's `enforce_scan_is_pro`
  * trigger; 'habit' is a tapped day on a spending habit, which every plan may file.
@@ -544,8 +671,11 @@ export function useLinkAccountToSalaries() {
 export type PaymentValues = {
   card_id: string | null;
   bank_account_id: string | null;
-  /** The account the money came out of. Left off for money from outside. */
-  from_bank_account_id?: string;
+  /**
+   * The account the money came out of; null for money from outside. Sent as null rather than left
+   * off, so a save repeated after a lost answer clears an account no longer chosen.
+   */
+  from_bank_account_id: string | null;
   amount: number;
   paid_on: string;
   note: string | null;

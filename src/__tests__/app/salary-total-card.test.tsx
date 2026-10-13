@@ -56,6 +56,7 @@ jest.mock('@/api/mutations', () => {
     useCreateSalarySource: idle,
     useUpdateSalarySource: idle,
     useDeleteSalarySource: idle,
+    useDeleteUnseenPay: idle,
     useSetSalaryAccounts: idle,
   };
 });

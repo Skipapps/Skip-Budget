@@ -139,6 +139,12 @@ export const receiptsMessages = defineMessages({
     es: 'Revisa {fields} abajo.',
     fr: 'Vérifie {fields} ci-dessous.',
   },
+  // A scan that found nothing: a hint, not a failure.
+  'receipts.scan.nothing': {
+    en: 'Couldn’t read this receipt. Fill it in below.',
+    es: 'No pudimos leer este recibo. Complétalo abajo.',
+    fr: 'Nous n’avons pas pu lire ce reçu. Remplis-le ci-dessous.',
+  },
   'receipts.scan.and': {
     en: '{first} and {last}',
     es: '{first} y {last}',

@@ -18,8 +18,9 @@ jest.mock('react-native-keyboard-controller', () =>
 
 let mockId: string | undefined;
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), back: jest.fn() },
+  router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
   useLocalSearchParams: () => ({ id: mockId }),
+  useFocusEffect: () => {},
   Stack: { Screen: () => null },
 }));
 
@@ -29,6 +30,7 @@ jest.mock('@/providers/theme-provider', () => ({
 
 let mockStorePrice: string | null;
 jest.mock('@/api/pro', () => ({
+  usePro: () => ({ pro: false, ready: true }),
   useProPrices: () => ({
     data: mockStorePrice ? { monthly: { product: { priceString: mockStorePrice } } } : undefined,
   }),
@@ -97,7 +99,7 @@ describe('the locked-feature screen', () => {
     const screen = await render(<ProFeatureScreen />);
 
     await fireEvent.press(screen.getByLabelText('Get Skip Pro — $1.99/mo'));
-    expect(router.push).toHaveBeenCalledWith('/pro');
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/pro', params: { from: 'feature' } });
     expect(router.back).not.toHaveBeenCalled();
 
     await fireEvent.press(screen.getByLabelText('Not now'));

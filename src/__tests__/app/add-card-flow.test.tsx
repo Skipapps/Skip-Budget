@@ -4,6 +4,7 @@ import { StyleSheet } from 'react-native';
 
 import AddCardScreen from '@/app/add-card';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * The add-card flow as designed: details with a live face and an inline limit, the day of the
@@ -59,6 +60,8 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
+// The visit's row id for a new card.
+jest.mock('expo-crypto', () => ({ randomUUID: () => 'card-visit' }));
 
 const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
@@ -427,5 +430,32 @@ describe('Add card — editing and the walk-in', () => {
     expect(mockToast).toHaveBeenCalledWith('toast.card.added');
     expect(router.replace).toHaveBeenCalledWith('/account-offer');
     expect(screen.queryByText('Card added')).toBeNull();
+  });
+});
+
+describe('Add card — saving again after a later step failed', () => {
+  it('files the card once, under the visit’s id, then updates it and writes the reminder', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockApplyReminder.mockRejectedValueOnce(new Error('network down'));
+    const screen = await toDetails('500');
+    await toDue(screen);
+
+    await fireEvent.press(screen.getByText('Add card'));
+
+    expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(created()).toEqual(expect.objectContaining({ id: 'card-visit', holder: 'Amex Komal' }));
+
+    await fireEvent.press(screen.getByText('Add card'));
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      id: 'card-new',
+      values: expect.objectContaining({ holder: 'Amex Komal', balance: 500 }),
+    });
+    expect(mockApplyReminder).toHaveBeenCalledTimes(2);
+    expect(mockApplyReminder).toHaveBeenLastCalledWith('card', 'card-new', null, '09:00');
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    log.mockRestore();
   });
 });

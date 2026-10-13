@@ -508,7 +508,8 @@ export const loanMessages = defineMessages({
   },
   'loan.save.loanType': { en: 'Loan type', es: 'Tipo de préstamo', fr: 'Type de prêt' },
   'loan.save.paidFrom': { en: 'Paid from', es: 'Se paga desde', fr: 'Payé depuis' },
-  'loan.save.skipSource': { en: 'Skip', es: 'Omitir', fr: 'Passer' },
+  // The app's name on the tile, so it stays Skip in every language.
+  'loan.save.skipSource': { en: 'Skip', es: 'Skip', fr: 'Skip' },
   // The loans table holds a rate from 0 to 100, to nine decimals.
   'loan.save.rateOutOfRange': {
     en: 'Skip can save rates from {min} to {max}, with up to nine decimals.',

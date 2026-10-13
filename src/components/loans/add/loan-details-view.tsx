@@ -5,15 +5,23 @@ import { LoanTypeGrid } from '@/components/calculators/loan-type-grid';
 import { loanAmountText } from '@/components/calculators/schedule-card';
 import { SegmentedChips } from '@/components/entry/entry-review';
 import { DateBox } from '@/components/entry/date-box';
-import { DayStrip } from '@/components/flow/day-strip';
 import { LoanFlowFooter, LoanFlowPage } from '@/components/loans/add/loan-flow-page';
 import {
+  firstPaymentHint,
   firstPaymentOf,
+  firstPaymentProblemOf,
   loanName,
+  latestFirstPaymentOf,
+  paymentDayChoiceLabel,
+  paymentDayChoiceTitle,
+  paymentDayChoicesOf,
   paymentDayOf,
+  paymentRhythm,
   rateFromTyped,
   rateShown,
   termFromTyped,
+  withFirstPayment,
+  withStartDate,
   type LoanForm,
   type TermUnit,
 } from '@/components/loans/add/loan-form';
@@ -24,6 +32,7 @@ import { FieldLabel, SectionHeading } from '@/components/ui/typography';
 import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
+import { earliestFirstPayment } from '@/lib/loan-first-payment';
 import { withTap } from '@/lib/press';
 import { TEXT_CAP } from '@/theme/text-scale';
 
@@ -111,8 +120,12 @@ export function LoanDetailsView({
   error: string | null;
   scrollPlace: { y: number; keep: (y: number) => void };
 }) {
-  const day = paymentDayOf(form);
   const first = firstPaymentOf(form);
+  const day = paymentDayOf(form);
+  const dayChoices = paymentDayChoicesOf(form);
+  const firstProblem = firstPaymentProblemOf(form);
+  const earliest = form.startDate ? earliestFirstPayment(form.startDate) : null;
+  const latest = latestFirstPaymentOf(form);
   const monthly = amountOf(form.monthly);
   const principal = amountOf(form.principal);
 
@@ -211,27 +224,54 @@ export function LoanDetailsView({
           today={todayDate}
           placeholder={t('loanFlow.field.startPlaceholder')}
           format={formatFullDate}
-          // A carried first payment belongs to the dates it came with.
-          onChange={(startDate) => onChange({ startDate, pinnedFirst: null })}
+          onChange={(startDate) => onChange(withStartDate(form, startDate))}
         />
 
         <View className="w-full">
-          <FieldLabel className="mb-2">{t('loanFlow.field.paymentDay')}</FieldLabel>
-          <DayStrip
-            value={day}
-            required
-            bleed="card"
-            onChange={(picked) => {
-              if (picked !== null) onChange({ pickedDay: picked, pinnedFirst: null });
-            }}
+          <DateBox
+            label={t('loanFlow.field.firstPayment')}
+            value={first}
+            today={todayDate}
+            placeholder={t('loanFlow.field.firstPaymentPlaceholder')}
+            format={formatFullDate}
+            minDate={earliest}
+            maxDate={latest}
+            onChange={(picked) => onChange(withFirstPayment(form, picked))}
           />
-          {first ? (
+          {dayChoices ? (
+            <View className="mt-3 w-full" testID="loan-month-end-choice">
+              <Text
+                className="mb-2 font-app text-[13px] text-muted"
+                maxFontSizeMultiplier={TEXT_CAP.row}
+              >
+                {paymentDayChoiceTitle()}
+              </Text>
+              <SegmentedChips
+                variant="pills"
+                options={dayChoices.map((choice) => ({
+                  key: String(choice),
+                  label: paymentDayChoiceLabel(choice),
+                  selected: day === choice,
+                  onPress: () => onChange({ pickedDay: choice }),
+                }))}
+              />
+            </View>
+          ) : null}
+          {firstProblem && form.startDate ? (
+            <Text
+              className="ml-5 mt-1.5 font-app text-[13px] text-danger"
+              maxFontSizeMultiplier={TEXT_CAP.reading}
+              testID="loan-first-payment-hint"
+            >
+              {firstPaymentHint(firstProblem, form.startDate)}
+            </Text>
+          ) : day ? (
             <Text
               className="mt-3 font-app text-[13px] text-muted"
               maxFontSizeMultiplier={TEXT_CAP.row}
-              testID="loan-first-payment"
+              testID="loan-payment-rhythm"
             >
-              {t('loanFlow.firstPayment', { date: formatFullDate(first) })}
+              {paymentRhythm(day)}
             </Text>
           ) : null}
         </View>

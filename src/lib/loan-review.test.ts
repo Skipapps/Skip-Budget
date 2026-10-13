@@ -19,12 +19,16 @@ import { loanStatus } from '@/lib/loan-status';
 
 const TODAY = '2026-10-12';
 
-/** The wireframe's loan: $18,000 at 6.25% over 4 years from 27 Dec 2024, paid on the 27th. */
+/**
+ * The wireframe's loan: $18,000 at 6.25% over 4 years from 27 Dec 2024, first due 27 Jan 2025 (a
+ * month after the start, the First payment field's default) and paid on the 27th.
+ */
 const WIREFRAME_FIELDS: LoanReviewFields = {
   principal: 18_000,
   annualRate: 6.25,
   termMonths: 48,
   startDate: new Date(2024, 11, 27),
+  firstPaymentOn: new Date(2025, 0, 27),
   paymentDay: 27,
   monthlyPayment: 424.8,
 };
@@ -164,15 +168,18 @@ describe('the wireframe loan on the Review page (daily interest, actual/365)', (
   });
 
   it('ignores the time of day the date picker carries', () => {
-    const late = reviewOf({ startDate: new Date(2024, 11, 27, 22, 30) });
+    const late = reviewOf({
+      startDate: new Date(2024, 11, 27, 22, 30),
+      firstPaymentOn: new Date(2025, 0, 27, 23, 59),
+    });
     expect(late.save.fundedOn).toBe('2024-12-27');
     expect(late.terms).toEqual(review.terms);
     expect(amortise(late.terms)).toEqual(amortise(review.terms));
   });
 });
 
-describe('the wireframe’s chip, day 22: earlier than the 27th, so first due 22 Feb 2025', () => {
-  const review = reviewOf({ paymentDay: 22 });
+describe('a first payment picked 57 days after the start: 22 Feb 2025 from 27 Dec 2024', () => {
+  const review = reviewOf({ firstPaymentOn: new Date(2025, 1, 22), paymentDay: 22 });
 
   it('charges the 57-day opening period and lets the last payment take up the difference', () => {
     expect(review.firstPaymentOn).toBe('2025-02-22');
@@ -187,13 +194,14 @@ describe('the wireframe’s chip, day 22: earlier than the 27th, so first due 22
   });
 });
 
-describe('a payment day the first month cannot hold', () => {
-  it('day 31 from 31 Jan 2025: first due 28 Feb, then the 31st or month end, and the day is saved', () => {
+describe('a first payment on a short month’s last day', () => {
+  it('28 Feb 2025 at each month’s end, from 31 Jan: then the 31st or month end, and the day is saved', () => {
     const review = reviewOf({
       principal: 10_000,
       annualRate: 7.5,
       termMonths: 12,
       startDate: new Date(2025, 0, 31),
+      firstPaymentOn: new Date(2025, 1, 28),
       paymentDay: 31,
       monthlyPayment: 867.33,
     });
@@ -217,12 +225,13 @@ describe('a payment day the first month cannot hold', () => {
     ).toEqual(amortise(review.terms).rows);
   });
 
-  it('day 31 from 31 Jan 2024: first due 29 Feb', () => {
+  it('29 Feb 2024 at each month’s end, from 31 Jan 2024', () => {
     const review = reviewOf({
       principal: 10_000,
       annualRate: 7.5,
       termMonths: 12,
       startDate: new Date(2024, 0, 31),
+      firstPaymentOn: new Date(2024, 1, 29),
       paymentDay: 31,
       monthlyPayment: 867.51,
     });
@@ -231,12 +240,13 @@ describe('a payment day the first month cannot hold', () => {
     expect(review.save.paymentDay).toBe(31);
   });
 
-  it('day 30 from 31 Jan: earlier than the 31st, so first due 30 Mar; nothing to anchor', () => {
+  it('30 Mar picked from 31 Jan: on its own day, nothing to anchor', () => {
     const review = reviewOf({
       principal: 10_000,
       annualRate: 7.5,
       termMonths: 12,
       startDate: new Date(2025, 0, 31),
+      firstPaymentOn: new Date(2025, 2, 30),
       paymentDay: 30,
       monthlyPayment: 872.62,
     });
@@ -309,7 +319,7 @@ describe('a payment other than the loan’s own', () => {
   });
 });
 
-describe('a first payment carried from the calculator', () => {
+describe('the first payment as picked', () => {
   it('is used as given, with the payment day on its own day', () => {
     const review = reviewOf({ firstPaymentOn: new Date(2025, 0, 15), paymentDay: 15 });
     expect(review.firstPaymentOn).toBe('2025-01-15');
@@ -320,11 +330,38 @@ describe('a first payment carried from the calculator', () => {
 
   it('is refused when it is not after the start date', () => {
     for (const first of [new Date(2024, 11, 27), new Date(2024, 11, 1)]) {
-      expect(loanReview({ ...WIREFRAME_FIELDS, firstPaymentOn: first }, TODAY)).toEqual({
+      const fields = { ...WIREFRAME_FIELDS, firstPaymentOn: first, paymentDay: first.getDate() };
+      expect(loanReview(fields, TODAY)).toEqual({
         ok: false,
-        refusal: { reason: 'fields', fields: ['startDate'] },
+        refusal: { reason: 'first-payment' },
       });
     }
+    // The day after is the earliest it can be.
+    expect(reviewOf({ firstPaymentOn: new Date(2024, 11, 28), paymentDay: 28 }).paymentCount).toBe(
+      48,
+    );
+  });
+
+  it('is missing when empty, or when its payment day is one the date cannot stand for', () => {
+    const missing = (fields: Partial<LoanReviewFields>) =>
+      loanReview({ ...WIREFRAME_FIELDS, ...fields }, TODAY);
+    for (const fields of [
+      { firstPaymentOn: null },
+      { firstPaymentOn: new Date(Number.NaN) },
+      // 27 Jan says the 27th on its own.
+      { paymentDay: 28 },
+      { paymentDay: 31 },
+      // 28 Feb can stand for the 28th to the 31st, never an earlier day.
+      { firstPaymentOn: new Date(2025, 1, 28), paymentDay: 27 },
+    ]) {
+      expect(missing(fields)).toEqual({
+        ok: false,
+        refusal: { reason: 'fields', fields: ['firstPayment'] },
+      });
+    }
+    expect(
+      reviewOf({ firstPaymentOn: new Date(2025, 1, 28), paymentDay: 30 }).save.paymentDay,
+    ).toBe(30);
   });
 });
 
@@ -362,11 +399,11 @@ describe('the calculator’s loan, carried to the Review', () => {
           annualRate: route.annualRate,
           termMonths: route.months,
           startDate: new Date(`${route.funded}T00:00:00`),
+          firstPaymentOn: first,
           paymentDay: first.getDate(),
           monthlyPayment: priced.payment,
           basis: route.basis,
           paymentOverrides: priced.applied.payments,
-          firstPaymentOn: first,
         },
         TODAY,
       ),
@@ -422,6 +459,7 @@ describe('what the Review refuses', () => {
           annualRate: Number.NaN,
           termMonths: 0,
           startDate: new Date(Number.NaN),
+          firstPaymentOn: null,
           paymentDay: 32,
           monthlyPayment: 0,
         },
@@ -431,7 +469,7 @@ describe('what the Review refuses', () => {
       ok: false,
       refusal: {
         reason: 'fields',
-        fields: ['principal', 'rate', 'term', 'startDate', 'paymentDay', 'monthlyPayment'],
+        fields: ['principal', 'rate', 'term', 'startDate', 'firstPayment', 'monthlyPayment'],
       },
     });
     const one = (fields: Partial<LoanReviewFields>) =>
@@ -446,7 +484,7 @@ describe('what the Review refuses', () => {
     });
     expect(one({ paymentDay: 0 })).toEqual({
       ok: false,
-      refusal: { reason: 'fields', fields: ['paymentDay'] },
+      refusal: { reason: 'fields', fields: ['firstPayment'] },
     });
     expect(one({ monthlyPayment: 424.805 })).toEqual({
       ok: false,
@@ -518,14 +556,22 @@ describe('editing a loan that has payoffs', () => {
 
   it('refuses a start date moved after a payoff, naming the earliest one', () => {
     const later = new Date(2026, 9, 13);
-    expect(loanReview({ ...WIREFRAME_FIELDS, startDate: later, payoffs: PARTIAL }, TODAY)).toEqual({
+    // The first payment follows the start, as the page's untouched one does.
+    const moved = { startDate: later, firstPaymentOn: new Date(2026, 10, 13), paymentDay: 13 };
+    expect(loanReview({ ...WIREFRAME_FIELDS, ...moved, payoffs: PARTIAL }, TODAY)).toEqual({
       ok: false,
       refusal: { reason: 'start-after-payoff', on: '2026-10-12', amount: 2000 },
     });
     const two = [payoff('2026-10-12', 2000, 'p1'), payoff('2026-03-01', 500, 'p0')];
-    expect(loanReview({ ...WIREFRAME_FIELDS, startDate: later, payoffs: two }, TODAY)).toEqual({
+    expect(loanReview({ ...WIREFRAME_FIELDS, ...moved, payoffs: two }, TODAY)).toEqual({
       ok: false,
       refusal: { reason: 'start-after-payoff', on: '2026-03-01', amount: 500 },
+    });
+    // A first payment that stayed put is behind the start too; the payoff is named first, as an
+    // earlier start mends both.
+    expect(loanReview({ ...WIREFRAME_FIELDS, startDate: later, payoffs: PARTIAL }, TODAY)).toEqual({
+      ok: false,
+      refusal: { reason: 'start-after-payoff', on: '2026-10-12', amount: 2000 },
     });
     // Only the start counts: the first payment may come after a payoff in the opening period.
     const opening = [payoff('2025-01-10', 3000, 'p4')];
@@ -533,15 +579,28 @@ describe('editing a loan that has payoffs', () => {
   });
 
   it('takes a start on the payoff’s own day, the payoff then paying no interest', () => {
-    const sameDay = reviewOf({ startDate: new Date(2026, 9, 12), payoffs: PARTIAL });
+    const sameDay = reviewOf({
+      startDate: new Date(2026, 9, 12),
+      firstPaymentOn: new Date(2026, 10, 12),
+      paymentDay: 12,
+      payoffs: PARTIAL,
+    });
     expect(amortise(sameDay.terms).payoffs[0]).toMatchObject({
       on: '2026-10-12',
       interest: 0,
       principal: 2000,
     });
     expect(
-      loanReview({ ...WIREFRAME_FIELDS, startDate: new Date(2026, 9, 11), payoffs: PARTIAL }, TODAY)
-        .ok,
+      loanReview(
+        {
+          ...WIREFRAME_FIELDS,
+          startDate: new Date(2026, 9, 11),
+          firstPaymentOn: new Date(2026, 10, 11),
+          paymentDay: 11,
+          payoffs: PARTIAL,
+        },
+        TODAY,
+      ).ok,
     ).toBe(true);
   });
 

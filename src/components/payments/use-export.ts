@@ -1,4 +1,4 @@
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 
 import { usePro } from '@/api/pro';
 import type { ExportKind } from '@/lib/payment-export';
@@ -8,8 +8,8 @@ import { useNavigateOnce } from '@/lib/use-navigate-once';
 export type ExportScope = { kind: ExportKind; year: number | 'all' };
 
 /** Both params are fixed words or digits, so the query needs no encoding. */
-export function exportHref({ kind, year }: ExportScope): Href {
-  return `/payment-export?kind=${kind}&year=${year}` as Href;
+export function exportHref({ kind, year }: ExportScope): `/payment-export?${string}` {
+  return `/payment-export?kind=${kind}&year=${year}`;
 }
 
 /**
@@ -23,8 +23,9 @@ export function useExport(): { open: (scope: ExportScope) => void } {
 
   const open = (scope: ExportScope) => {
     if (!ready) return;
+    const page = exportHref(scope);
     navigateOnce(() =>
-      router.push(pro ? exportHref(scope) : { pathname: '/pro-feature', params: { id: 'export' } }),
+      router.push(pro ? page : { pathname: '/pro-feature', params: { id: 'export', next: page } }),
     );
   };
 

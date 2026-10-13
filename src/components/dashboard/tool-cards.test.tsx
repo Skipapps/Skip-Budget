@@ -107,7 +107,7 @@ describe('ToolCards', () => {
     await fireEvent.press(screen.getByLabelText(HABITS_LOCKED));
     expect(onPress).toHaveBeenLastCalledWith({
       pathname: '/pro-feature',
-      params: { id: 'habits' },
+      params: { id: 'habits', next: '/habits' },
     });
     // Loans never locks.
     expect(within(screen.getByLabelText(LOANS)).queryAllByText('PRO', hidden)).toHaveLength(0);

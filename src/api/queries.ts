@@ -107,9 +107,14 @@ const QUERY_TIMEOUT_MS = 12_000;
  * if any input is missing the figure is not the truth and the screen must say so. One helper rather
  * than a hand-written chain per hook, because an omitted query (a failed *charges* read) would
  * silently swap a recorded amount for the plan's projected one. A new input goes in one list.
+ *
+ * A read with data still cached has not failed: TanStack keeps `isError` true after a failed
+ * background refetch (a resume on a weak network) while the last good answer stays in `data`, and
+ * that answer is still the figure to show. This is TanStack's own `isLoadingError`. A combined
+ * result with no `data` of its own passes its `isError` through, so it can be listed here too.
  */
-function anyError(queries: readonly { isError: boolean }[]): boolean {
-  return queries.some((query) => query.isError);
+function anyError(queries: readonly { isError: boolean; data?: unknown }[]): boolean {
+  return queries.some((query) => query.isError && query.data === undefined);
 }
 
 const LOGO_COLUMNS = 'logo_domain, logo_hidden';
@@ -1290,7 +1295,7 @@ export function useBookFlows(today: string) {
   return {
     ...flows,
     isLoading: parts.some((part) => part.isLoading),
-    isError: parts.some((part) => part.isError),
+    isError: anyError(parts),
     refetch: () => {
       for (const part of parts) void part.refetch();
     },
@@ -1349,7 +1354,7 @@ function useMoneyBook(today: string) {
     accounts,
     isLoading: parts.some((part) => part.isLoading),
     // Every part is a term in some balance, so a missing one would show a wrong figure as a real one.
-    isError: parts.some((part) => part.isError),
+    isError: anyError(parts),
     refetch: () => {
       for (const part of parts) void part.refetch();
     },

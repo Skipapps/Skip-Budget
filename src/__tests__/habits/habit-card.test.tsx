@@ -1035,7 +1035,7 @@ describe('the Spending Habits tool card', () => {
     );
     expect(onPress).toHaveBeenLastCalledWith({
       pathname: '/pro-feature',
-      params: { id: 'habits' },
+      params: { id: 'habits', next: '/habits' },
     });
     // The pill is a sticker: its word is in the card's label, not read again.
     expect(locked.queryAllByText('PRO')).toHaveLength(0);
