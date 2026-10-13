@@ -280,6 +280,15 @@ async function answer(screen: Screen, source = 'Skip', reminder = 'No reminder')
   await press(screen, reminder);
 }
 
+/** A receipt's Save, with Paid with answered as Skip unless a card or account is already lit. */
+async function saveReceipt(screen: Screen) {
+  const answered = [...mockSources.map((source) => source.label), 'Skip'].some((label) =>
+    isLit(screen, label),
+  );
+  if (!answered) await press(screen, 'Skip');
+  await press(screen, 'Save receipt');
+}
+
 /** Every line of text on the page, top to bottom. */
 function lines(screen: Screen): string[] {
   const found: string[] = [];
@@ -352,7 +361,7 @@ describe('/voice-review — saving', () => {
     expect(screen.getByLabelText('Store, Starbucks')).toBeTruthy();
     expect(screen.getByLabelText('Date, Today, Thu Oct 1')).toBeTruthy();
 
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
 
     expect(mockCreateReceipt).toHaveBeenCalledTimes(1);
     expect(mockCreateReceipt).toHaveBeenCalledWith({
@@ -373,19 +382,16 @@ describe('/voice-review — saving', () => {
     expect(mockLearn).not.toHaveBeenCalled();
   });
 
-  it('files a receipt against the card picked on its page, to the cent', async () => {
+  it('files a receipt against the card picked on the page, to the cent', async () => {
     const id = seed({ amount: 1030.5 });
     const screen = await render(<VoiceReviewScreen />);
 
-    await press(screen, 'Paid with, not set, optional');
-    expect(openedField()).toBe('source');
-
-    // What the card page's Done writes.
-    await act(async () => {
-      updateVoiceEntry(id, { sourceId: 'card-1' });
-    });
-    expect(screen.getByLabelText('Paid with, VISA ••4821')).toBeTruthy();
-    await press(screen, 'Save receipt');
+    await press(screen, 'VISA ••4821');
+    expect(isLit(screen, 'VISA ••4821')).toBe(true);
+    expect(readVoiceEntry(id)?.sourceId).toBe('card-1');
+    // A pill is the answer: no page opens for it.
+    expect(router.push).not.toHaveBeenCalled();
+    await saveReceipt(screen);
 
     expect(mockCreateReceipt).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 1030.5, card_id: 'card-1', bank_account_id: null }),
@@ -476,7 +482,8 @@ describe('/voice-review — saving', () => {
       updateVoiceEntry(id, { note: 'Split with Sam' });
     });
     expect(screen.getByLabelText('Note, Split with Sam')).toBeTruthy();
-    if (kind !== 'receipt') await answer(screen);
+    if (kind === 'receipt') await press(screen, 'Skip');
+    else await answer(screen);
     await press(screen, save);
 
     expect(create).toHaveBeenCalledTimes(1);
@@ -490,6 +497,7 @@ describe('/voice-review — saving', () => {
       () => new Promise((resolve) => (finish = resolve as typeof finish)),
     );
     const screen = await render(<VoiceReviewScreen />);
+    await press(screen, 'Skip');
 
     const save = screen.getByLabelText('Save receipt');
     await act(async () => {
@@ -507,7 +515,7 @@ describe('/voice-review — saving', () => {
     mockCreateReceipt.mockRejectedValueOnce(new Error('offline'));
     const screen = await render(<VoiceReviewScreen />);
 
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
 
     expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(warn).toHaveBeenCalledTimes(1);
@@ -517,7 +525,7 @@ describe('/voice-review — saving', () => {
     expect(screen.getByLabelText('Save receipt').props.accessibilityHint).toBeUndefined();
 
     // The button is the retry.
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
     expect(mockCreateReceipt).toHaveBeenCalledTimes(2);
     expect(router.dismissTo).toHaveBeenCalledWith('/home');
   });
@@ -528,9 +536,9 @@ describe('/voice-review — saving', () => {
     mockCreateReceipt.mockRejectedValueOnce(new Error('TypeError: Network request failed'));
     const screen = await render(<VoiceReviewScreen />);
 
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
     expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
 
     expect(router.dismissTo).toHaveBeenCalledWith('/home');
     expect(mockCreateReceipt.mock.calls.map(([values]) => values.id)).toEqual([
@@ -550,7 +558,7 @@ describe('/voice-review — saving', () => {
     mockConfirmPro.mockResolvedValueOnce('pro');
     const screen = await render(<VoiceReviewScreen />);
 
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
 
     await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
     expect(mockConfirmPro).toHaveBeenCalledTimes(1);
@@ -565,7 +573,7 @@ describe('/voice-review — saving', () => {
     mockCreateReceipt.mockRejectedValueOnce(refusal);
     const screen = await render(<VoiceReviewScreen />);
 
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
 
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
     expect(mockConfirmPro).toHaveBeenCalledTimes(1);
@@ -728,14 +736,17 @@ describe('/voice-review — the final page, as each form draws it', () => {
       'Today',
       'Yesterday',
       'Pick date',
-      'Paid with · Optional',
+      'Paid with',
+      'VISA ••4821',
+      'Checking',
+      'Skip',
       'Note',
       'You can edit this later.',
       'Save receipt',
       'Say it again',
       'More options',
     ]);
-    // No reminder: a voice entry saves with none, as the review always has.
+    // No reminder: a receipt has none, as on its form.
     expect(screen.queryByText('Reminder')).toBeNull();
   });
 
@@ -789,13 +800,21 @@ describe('/voice-review — the final page, as each form draws it', () => {
     expect(screen.getByLabelText('Service, Netflix')).toBeTruthy();
   });
 
-  it('leaves out Paid with when there is no card or account to choose', async () => {
+  it('still asks Paid with when there is no card or account, with Skip as the answer', async () => {
     mockSources = [];
     seed();
     const screen = await render(<VoiceReviewScreen />);
 
-    expect(screen.queryByText(/^Paid with/)).toBeNull();
-    expect(screen.getByLabelText('Note, not set, optional')).toBeTruthy();
+    expect(screen.getByText('Paid with')).toBeTruthy();
+    await press(screen, 'Save receipt');
+    expect(screen.getByText('To save this receipt, fill in: Paid with.')).toBeTruthy();
+    expect(mockCreateReceipt).not.toHaveBeenCalled();
+
+    await press(screen, 'Skip');
+    await press(screen, 'Save receipt');
+    expect(mockCreateReceipt).toHaveBeenCalledWith(
+      expect.objectContaining({ card_id: null, bank_account_id: null }),
+    );
   });
 
   it('opens one page per line, each for its own field', async () => {
@@ -813,14 +832,13 @@ describe('/voice-review — the final page, as each form draws it', () => {
       ['Store, Starbucks', 'merchant'],
       ['Date, Today, Thu Oct 1', 'date'],
       ['Pick date', 'date'],
-      ['Paid with, not set, optional', 'source'],
       ['Note, not set, optional', 'note'],
     ] as const) {
       await press(screen, label);
       expect([label, openedField()]).toEqual([label, field]);
       await refocus();
     }
-    expect(router.push).toHaveBeenCalledTimes(6);
+    expect(router.push).toHaveBeenCalledTimes(5);
   });
 
   it('opens a bill’s category and due date on their own pages', async () => {
@@ -853,7 +871,7 @@ describe('/voice-review — the date chips', () => {
     expect(screen.getByLabelText('Date, Yesterday, Wed Sep 30')).toBeTruthy();
     expect(router.push).not.toHaveBeenCalled();
 
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
     expect(mockCreateReceipt).toHaveBeenCalledWith(
       expect.objectContaining({ purchased_on: '2026-09-30' }),
     );
@@ -884,7 +902,7 @@ describe('/voice-review — the date chips', () => {
     expect(readVoiceEntry(id)?.date).toBeNull();
     expect(mockScreenOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
 
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
     expect(mockCreateReceipt).toHaveBeenCalledWith(
       expect.objectContaining({ purchased_on: '2026-10-01' }),
     );
@@ -967,7 +985,7 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
     expect(screen.queryByLabelText(LOGO_COPY.yes)).toBeNull();
     expect(screen.getByText(LOGO_COPY.changeLogo)).toBeTruthy();
 
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
 
     expect(mockCreateReceipt).toHaveBeenCalledTimes(1);
     expect(mockCreateReceipt).toHaveBeenCalledWith(
@@ -994,7 +1012,7 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
     const screen = await render(<VoiceReviewScreen />);
 
     await press(screen, LOGO_COPY.letters);
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
 
     expect(mockCreateReceipt).toHaveBeenCalledWith(
       expect.objectContaining({ logo_domain: null, logo_hidden: true }),
@@ -1006,7 +1024,7 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
     seedRainbow();
     const screen = await render(<VoiceReviewScreen />);
 
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
 
     const saved = mockCreateReceipt.mock.calls[0][0];
     expect(saved).not.toHaveProperty('logo_domain');
@@ -1020,7 +1038,7 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
     expect(screen.queryByLabelText(LOGO_COPY.yes)).toBeNull();
     expect(screen.getByText(LOGO_COPY.addWebsite)).toBeTruthy();
 
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
     expect(mockCreateReceipt.mock.calls[0][0]).not.toHaveProperty('logo_domain');
   });
 
@@ -1044,7 +1062,7 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
     expect(screen.getByText(LOGO_COPY.changeLogo)).toBeTruthy();
     expect(mockLogoAsked.filter(Boolean)).toEqual([]);
 
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
     expect(mockCreateReceipt).toHaveBeenCalledWith(
       expect.objectContaining({ logo_domain: 'rainbowshops.com', logo_hidden: false }),
     );
@@ -1163,7 +1181,7 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
       seedRainbow();
       const screen = await render(<VoiceReviewScreen />);
 
-      await press(screen, 'Save receipt');
+      await saveReceipt(screen);
 
       expect(mockCreateReceipt).toHaveBeenCalledTimes(1);
       expect(mockRemember).not.toHaveBeenCalled();
@@ -1199,7 +1217,7 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
       expect(screen.queryByText('rainbowshops.com')).toBeNull();
       expect(screen.getByText(LOGO_COPY.changeLogo)).toBeTruthy();
 
-      await press(screen, 'Save receipt');
+      await saveReceipt(screen);
 
       expect(mockCreateReceipt).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1231,7 +1249,7 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
       const screen = await render(<VoiceReviewScreen />);
 
       expect(screen.getByLabelText(LOGO_COPY.yes)).toBeTruthy();
-      await press(screen, 'Save receipt');
+      await saveReceipt(screen);
       expect(mockCreateReceipt.mock.calls[0][0]).not.toHaveProperty('logo_domain');
       expect(mockRemember).not.toHaveBeenCalled();
     });
@@ -1271,7 +1289,7 @@ describe('/voice-review — what a saved correction teaches', () => {
     const id = seed(patch);
     if (merchant) updateVoiceEntry(id, { merchant });
     const screen = await render(<VoiceReviewScreen />);
-    await press(screen, 'Save receipt');
+    await saveReceipt(screen);
     expect(mockCreateReceipt).toHaveBeenCalledTimes(1);
   }
 
@@ -1338,8 +1356,11 @@ describe('/voice-review — what still blocks Save', () => {
     expect(screen.getByText('Tap to add the amount')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Amount, needed' })).toBeTruthy();
     expect(screen.queryByText(/\$0/)).toBeNull();
-    expect(screen.getByText('Enter how much you spent.')).toBeTruthy();
-    expect(isDisabled(screen, 'Save receipt')).toBe(true);
+    // Never greyed out for a gap, as on the form: Save says what is missing.
+    expect(isDisabled(screen, 'Save receipt')).toBe(false);
+    await press(screen, 'Save receipt');
+    expect(screen.getByText('To save this receipt, fill in: Amount, Paid with.')).toBeTruthy();
+    expect(mockCreateReceipt).not.toHaveBeenCalled();
 
     await press(screen, 'Amount, needed');
     expect(openedField()).toBe('amount');
@@ -1350,14 +1371,12 @@ describe('/voice-review — what still blocks Save', () => {
     const screen = await render(<VoiceReviewScreen />);
 
     expect(screen.getByLabelText('Store, needed')).toBeTruthy();
-    // A hint, not a failure: nothing has gone wrong yet. Save says it too.
-    expect(screen.getByText('Pick a store first.')).toBeTruthy();
-    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
-    expect(screen.getByLabelText('Save receipt').props.accessibilityHint).toBe(
-      'Pick a store first.',
-    );
-    expect(isDisabled(screen, 'Save receipt')).toBe(true);
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
+
+    // Nothing has gone wrong: Save names what is still missing, in the form's own words.
+    expect(screen.getByText('To save this receipt, fill in: Store.')).toBeTruthy();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(mockCreateReceipt).not.toHaveBeenCalled();
   });
 
@@ -1366,18 +1385,15 @@ describe('/voice-review — what still blocks Save', () => {
     const screen = await render(<VoiceReviewScreen />);
 
     expect(screen.getByText('Which amount did you mean?')).toBeTruthy();
-    expect(screen.getByText('Pick the amount you meant.')).toBeTruthy();
-    expect(screen.getByLabelText('Save receipt').props.accessibilityHint).toBe(
-      'Pick the amount you meant.',
-    );
     // The chooser stands in for the figure: no amount is drawn, not even as a gap.
     expect(screen.queryByRole('button', { name: /^Amount, / })).toBeNull();
     expect(screen.queryByText('Tap to add the amount')).toBeNull();
-    expect(isDisabled(screen, 'Save receipt')).toBe(true);
     expect(screen.getByLabelText('$12.50').props.accessibilityState.selected).toBe(false);
     expect(screen.getByLabelText('$1,250.00').props.accessibilityState.selected).toBe(false);
 
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
+    expect(screen.getByText('To save this receipt, fill in: Amount.')).toBeTruthy();
     expect(mockCreateReceipt).not.toHaveBeenCalled();
 
     await press(screen, '$1,250.00');

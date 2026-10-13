@@ -241,7 +241,7 @@ describe('/voice-review in Spanish', () => {
     expect(screen.getByLabelText('Recibo')).toBeTruthy();
     expect(screen.getByLabelText('Factura')).toBeTruthy();
     expect(screen.getByLabelText('Suscripción')).toBeTruthy();
-    expect(screen.getByText('Pagado con · Opcional')).toBeTruthy();
+    expect(screen.getByText('Pagado con')).toBeTruthy();
     expect(screen.getByLabelText('Nota, sin definir, opcional')).toBeTruthy();
     expect(screen.getByText('Agregar una nota')).toBeTruthy();
     expect(screen.getByText('Puedes editarlo más tarde.')).toBeTruthy();
@@ -255,6 +255,7 @@ describe('/voice-review in Spanish', () => {
   it('saves the same number it would save in English', async () => {
     seed(RECEIPT);
     const screen = await render(<VoiceReviewScreen />);
+    await press(screen, 'Skip');
     await press(screen, 'Guardar recibo');
 
     expect(mockCreateReceipt).toHaveBeenCalledTimes(1);
@@ -335,6 +336,7 @@ describe('/voice-review in Spanish', () => {
       updateVoiceEntry(id, { note: 'Comida del equipo' });
     });
     expect(screen.getByLabelText('Nota, Comida del equipo')).toBeTruthy();
+    await press(screen, 'Skip');
     await press(screen, 'Guardar recibo');
 
     expect(mockCreateReceipt).toHaveBeenCalledWith(
@@ -361,7 +363,7 @@ describe('/voice-review in French', () => {
     expect(screen.getByLabelText('Date, Aujourd’hui, jeu. 1 oct.')).toBeTruthy();
     expect(screen.getByLabelText('Hier')).toBeTruthy();
     expect(screen.getByLabelText('Choisir une date')).toBeTruthy();
-    expect(screen.getByText('Payé avec · Facultatif')).toBeTruthy();
+    expect(screen.getByText('Payé avec')).toBeTruthy();
     expect(screen.getByText('Ajouter une note')).toBeTruthy();
     expect(screen.getByText('Tu pourras le modifier plus tard.')).toBeTruthy();
     expectNoRawKeys(screen);
@@ -370,6 +372,7 @@ describe('/voice-review in French', () => {
   it('saves the same number it would save in English', async () => {
     seed(RECEIPT);
     const screen = await render(<VoiceReviewScreen />);
+    await press(screen, 'Skip');
     await press(screen, 'Enregistrer le reçu');
 
     expect(mockCreateReceipt).toHaveBeenCalledWith(

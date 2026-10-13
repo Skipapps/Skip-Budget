@@ -203,8 +203,9 @@ describe('money check — an ambiguous amount can never be saved without a pick'
     seed({ amount: 12.5, amountChoices: [12.5, 1250] });
     const screen = await render(<VoiceReviewScreen />);
 
-    // A press on the button as rendered — proves the handler itself (not
-    // merely the pill's dimmed look) refuses to file anything.
+    // Everything else answered: a press on the button as rendered proves the handler itself refuses
+    // to file anything while the amount is unpicked.
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
 
     expect(mockCreateReceipt).not.toHaveBeenCalled();
@@ -260,6 +261,7 @@ describe('money check — no path shows or saves $0 or NaN', () => {
     expect(screen.queryByText(/\$0\b/)).toBeNull();
     expect(screen.getByText('Tap to add the amount')).toBeTruthy();
 
+    await press(screen, 'Skip');
     await press(screen, 'Save receipt');
     expect(mockCreateReceipt).not.toHaveBeenCalled();
     expect(router.dismissTo).not.toHaveBeenCalled();
@@ -291,6 +293,7 @@ describe('money check — every amount saved equals fromCents(toCents(x))', () =
     async (amount) => {
       seed({ amount });
       const screen = await render(<VoiceReviewScreen />);
+      await press(screen, 'Skip');
       await press(screen, 'Save receipt');
 
       expect(mockCreateReceipt).toHaveBeenCalledTimes(1);

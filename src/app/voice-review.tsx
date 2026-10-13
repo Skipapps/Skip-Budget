@@ -1,6 +1,6 @@
 import { randomUUID } from 'expo-crypto';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { AlignLeft, CalendarDays, CreditCard, RefreshCw, Repeat, Tag } from 'lucide-react-native';
+import { AlignLeft, CalendarDays, RefreshCw, Repeat, Tag } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
 import { AccessibilityInfo, Text, View } from 'react-native';
 import { useReceiptBookDefault, useReceiptBooks } from '@/api/receipt-books';
@@ -160,10 +160,22 @@ const KIND_OPTIONS = [
   },
 ] as const;
 
+/** Each form's own line for what Save still needs, and its Skip pill. */
+const MISSING: Record<VoiceKind, MessageKey> = {
+  receipt: 'receipts.add.missing',
+  bill: 'bills.add.missing',
+  subscription: 'subscriptions.add.missing',
+};
+const SKIP: Record<VoiceKind, MessageKey> = {
+  receipt: 'receipts.add.skipSource',
+  bill: 'bills.add.skipSource',
+  subscription: 'subscriptions.add.skipSource',
+};
+
 /** add-subscription's own billing cycles. */
 const SUBSCRIPTION_CYCLES: readonly VoiceCycle[] = ['weekly', 'monthly', 'quarterly', 'yearly'];
 
-type EditField = 'amount' | 'merchant' | 'date' | 'category' | 'source' | 'note';
+type EditField = 'amount' | 'merchant' | 'date' | 'category' | 'note';
 
 /**
  * "Is this right?": what Skip heard, on the same final page the add forms end on, before anything
@@ -258,7 +270,6 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   const sourceRefs: SourceRef[] = sources;
   const blocker = voiceSaveBlocker(entry);
   const built = blocker ? null : buildFor(entry, { todayDate, categoryLabel, sources: sourceRefs });
-  const hint = blocker ?? (built && !built.ok ? built.message : null);
 
   // One move at a time: a fast double tap on a row, "More options" or back would push two pages or,
   // since `router.back()` is a global "go back", pop this page and the mic page under it. Coming
@@ -347,37 +358,32 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
     );
   };
 
-  const asks = kind !== 'receipt';
+  const asksReminder = kind !== 'receipt';
   const sourceGiven = sourceAnswered || entry.sourceId !== null;
   // Answers kept on this page count as changes too: leaving would throw them away.
   const changed = edited || sourceAnswered || reminder !== null;
 
-  /** A bill's or subscription's unanswered lines, in the page's order and its own words. */
+  /** The lines still unanswered, in the page's order and its own words, as the form lists them. */
   const unanswered = (): string[] =>
     [
       entry.amount === null && t('voice.review.amount'),
       !(kind === 'bill' ? voiceBillName(entry, categoryLabel) : entry.merchant) && copy.merchant,
       kind === 'bill' && !entry.billCategoryId && t('voice.review.category'),
-      !entry.date && copy.date,
+      // A receipt with no day heard is bought today, the form's own default.
+      kind !== 'receipt' && !entry.date && copy.date,
       !sourceGiven && copy.paidWith,
-      reminder === null && t('ui.reminder.label'),
+      asksReminder && reminder === null && t('ui.reminder.label'),
     ].filter((field): field is string => Boolean(field));
 
   const save = async () => {
     if (busy.current) return;
     setFailed(false);
     setProblem(null);
-    if (asks) {
-      const missing = unanswered();
-      if (missing.length > 0) {
-        warn();
-        setProblem(
-          t(kind === 'bill' ? 'bills.add.missing' : 'subscriptions.add.missing', {
-            fields: missing.join(', '),
-          }),
-        );
-        return;
-      }
+    const missing = unanswered();
+    if (missing.length > 0) {
+      warn();
+      setProblem(t(MISSING[kind], { fields: missing.join(', ') }));
+      return;
     }
     if (!built?.ok) {
       if (built) {
@@ -449,7 +455,6 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   // A receipt with no day heard is bought today, the form's own default.
   const receiptDay = entry.date ? dayToDate(entry.date) : todayDate;
   const dayValue = entry.date ? formatEntryDay(dayToDate(entry.date), todayDate) : null;
-  const sourceLabel = sources.find((source) => source.id === entry.sourceId)?.label ?? null;
 
   // A chip already lit is no change, so tapping it does not make back ask.
   const pickDay = (day: Date) => {
@@ -584,63 +589,52 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
     if (next !== entry.sourceId) updateVoiceEntry(id, { sourceId: next });
   };
 
-  // A bill or subscription answers both inline, as its form does; a receipt keeps its own page.
-  const answerRows: EntryRowSpec[] = asks
-    ? [
-        {
-          key: 'paidWith',
-          field: (
-            <View className="w-full">
-              <FieldLabel className="mb-2">{copy.paidWith}</FieldLabel>
-              <SourceTiles
-                sources={sources}
-                value={entry.sourceId ?? ''}
-                onChange={pickSource}
-                skip={{
-                  label: t(
-                    kind === 'bill' ? 'bills.add.skipSource' : 'subscriptions.add.skipSource',
-                  ),
-                  selected: sourceAnswered && entry.sourceId === null,
-                  onPress: () => pickSource(null),
-                }}
-              />
-            </View>
-          ),
-        },
-        {
-          key: 'reminder',
-          field: (
-            <ReminderField
-              kind={kind}
-              value={reminder}
-              onChange={(choice) => {
-                setProblem(null);
-                setReminder(choice);
-              }}
-              time={remindAt}
-              onTimeChange={(at) => {
-                setProblem(null);
-                setRemindAt(at);
-              }}
-              offLabel={t(
-                kind === 'bill' ? 'bills.add.noReminder' : 'subscriptions.add.noReminder',
-              )}
-            />
-          ),
-        },
-      ]
-    : // Without a card or account there is nothing to choose between, as in the form.
-      sources.length > 0
+  // Answered inline, as on the forms: Skip is one of the answers, so it shows with no card at all.
+  const answerRows: EntryRowSpec[] = [
+    {
+      key: 'paidWith',
+      field: (
+        <View className="w-full">
+          <FieldLabel className="mb-2">{copy.paidWith}</FieldLabel>
+          <SourceTiles
+            sources={sources}
+            value={entry.sourceId ?? ''}
+            onChange={pickSource}
+            skip={{
+              label: t(SKIP[kind]),
+              selected: sourceAnswered && entry.sourceId === null,
+              onPress: () => pickSource(null),
+            }}
+          />
+        </View>
+      ),
+    },
+    ...(asksReminder
       ? [
           {
-            key: 'paidWith',
-            label: copy.paidWith,
-            value: sourceLabel,
-            leading: <GlyphWell icon={CreditCard} />,
-            onPress: () => edit('source'),
+            key: 'reminder',
+            field: (
+              <ReminderField
+                kind={kind}
+                value={reminder}
+                onChange={(choice) => {
+                  setProblem(null);
+                  setReminder(choice);
+                }}
+                time={remindAt}
+                onTimeChange={(at) => {
+                  setProblem(null);
+                  setRemindAt(at);
+                }}
+                offLabel={t(
+                  kind === 'bill' ? 'bills.add.noReminder' : 'subscriptions.add.noReminder',
+                )}
+              />
+            ),
           },
         ]
-      : [];
+      : []),
+  ];
 
   const rows: EntryRowSpec[] = [
     merchantRow,
@@ -790,12 +784,10 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
       primaryLabel={
         proWrite.checking ? t('pro.confirm.wait') : saving ? t('voice.review.saving') : copy.save
       }
-      // A bill or subscription is never greyed out for a gap: Save says what is still missing.
-      primaryDisabled={saving || (!asks && !built?.ok)}
+      // Never greyed out for a gap, as on the forms: Save says what is still missing.
+      primaryDisabled={saving}
       onPrimary={() => void save()}
       error={failed ? failureText() : problem}
-      // A receipt's Save says ahead what still blocks it, in the form's own words.
-      hint={failed || asks ? null : hint}
       footerSlot={
         // Filed, saying it again or opening the form would file a second one.
         filed ? undefined : (
