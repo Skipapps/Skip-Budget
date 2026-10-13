@@ -1,13 +1,15 @@
 import { fireEvent, render, within } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { openBrowserAsync } from 'expo-web-browser';
+import { Linking } from 'react-native';
 
 import SettingsScreen from '@/app/(tabs)/settings';
 import AboutScreen from '@/app/settings/about';
 import PreferencesScreen from '@/app/settings/preferences';
 import SupportScreen from '@/app/settings/support';
 import YourMoneyScreen from '@/app/settings/your-money';
-import { signOut } from '@/api/auth';
+import { deleteAccount, signOut } from '@/api/auth';
+import type { DialogRequest } from '@/components/ui/confirm-dialog';
 import { resetTo } from '@/lib/nav';
 
 /**
@@ -79,9 +81,10 @@ jest.mock('@/api/auth', () => ({
 jest.mock('@/lib/nav', () => ({ resetTo: jest.fn() }));
 
 // No store answer: the price line falls back to the US dollar labels.
+let mockPro = { pro: false, ready: true };
 jest.mock('@/api/pro-offer', () => ({ resetExitOfferForDev: jest.fn(async () => true) }));
 jest.mock('@/api/pro', () => ({
-  usePro: () => ({ pro: false }),
+  usePro: () => mockPro,
   useProPrices: () => ({ data: undefined }),
 }));
 
@@ -123,6 +126,22 @@ const PAGES = [
 /** The tip link sits under Support: it opens a web page, so it has a small line and no route. */
 const COFFEE = 'Buy a coffee for team. Keep Skip brewing';
 
+/** What the first delete dialog says for the rows set in beforeEach, plus five recorded charges. */
+const HELD =
+  'This removes your account and everything you added. That includes 1 card, 2 bank accounts, 2 bills, 3 subscriptions, 4 receipts, 5 recorded charges, 1 salary source, and everything else, such as loans, savings, goals and spending habits. It cannot be undone.';
+
+const PRO_TITLE = 'Cancel Skip Pro first?';
+const MANAGE = 'Manage in the App Store';
+const CONTINUE = 'Continue to delete';
+
+/** Answers the next app dialog with the choice labelled so; null is the way out, "Keep my account". */
+const answerDialog = (label: string | null) =>
+  mockAsk.mockImplementationOnce(async (request: DialogRequest) =>
+    label === null
+      ? null
+      : (request.actions?.find((action) => action.label === label)?.id ?? 'no such choice'),
+  );
+
 /** Every line of text on the page, top to bottom. */
 const textsOf = (screen: Awaited<ReturnType<typeof render>>) =>
   screen.getAllByText(/./).map((node) => String(node.props.children));
@@ -132,6 +151,8 @@ const buttonLabels = (screen: Awaited<ReturnType<typeof render>>) =>
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+  mockPro = { pro: false, ready: true };
   mockRows = { bills: 2, subscriptions: 3, cards: 1, accounts: 2, salary: 1, receipts: 4 };
 });
 
@@ -140,7 +161,7 @@ describe('Settings, the main page', () => {
     const screen = await render(<SettingsScreen />);
 
     expect(buttonLabels(screen)).toEqual([
-      'Skip Pro. Unlimited everything, $1.99/mo or $19.99/yr',
+      'Skip Pro. Voice, Insights and more, $1.99/mo or $19.99/yr',
       // Development builds only, under Developer.
       'Show the one-time offer again. Leave the Pro page without buying to see it',
       'Profile picture. Pick one to show on your dashboard',
@@ -267,8 +288,179 @@ describe('Settings, the main page', () => {
     await fireEvent.press(screen.getByRole('button', { name: /^Delete account/ }));
 
     expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(mockConfirm.mock.calls[0][0].message).toBe(HELD);
+  });
+});
+
+describe('Settings, deleting the account', () => {
+  const pressDelete = async (screen: Awaited<ReturnType<typeof render>>) =>
+    fireEvent.press(screen.getByRole('button', { name: /^Delete account/ }));
+
+  beforeEach(() => {
+    mockRows.charges = 5;
+  });
+
+  it('takes a free account straight to the counts, with no Skip Pro question', async () => {
+    mockConfirm.mockResolvedValue(false);
+    const screen = await render(<SettingsScreen />);
+
+    await pressDelete(screen);
+
+    expect(mockAsk).not.toHaveBeenCalled();
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(mockConfirm.mock.calls[0][0]).toMatchObject({
+      title: 'Delete your account?',
+      message: HELD,
+      confirmLabel: 'Continue',
+      cancelLabel: 'Keep my account',
+      destructive: true,
+    });
+  });
+
+  it('does not hold an account whose Skip Pro answer has not landed', async () => {
+    mockPro = { pro: false, ready: false };
+    mockConfirm.mockResolvedValue(false);
+    const screen = await render(<SettingsScreen />);
+
+    await pressDelete(screen);
+
+    expect(mockAsk).not.toHaveBeenCalled();
+    expect(mockConfirm.mock.calls[0][0].title).toBe('Delete your account?');
+  });
+
+  it('asks a Skip Pro account to cancel first, before the counts', async () => {
+    mockPro = { pro: true, ready: true };
+    answerDialog(null);
+    const screen = await render(<SettingsScreen />);
+
+    await pressDelete(screen);
+
+    expect(mockAsk).toHaveBeenCalledTimes(1);
+    const request: DialogRequest = mockAsk.mock.calls[0][0];
+    expect(request).toMatchObject({
+      title: PRO_TITLE,
+      message:
+        'Deleting your account does not cancel Skip Pro. Apple keeps billing you until you cancel. Cancel it in your App Store subscriptions first. If you have already cancelled, you can go on.',
+      cancelLabel: 'Keep my account',
+    });
+    // The safe choice is first, so it is the filled one; neither is red.
+    expect(request.actions?.map((action) => action.label)).toEqual([MANAGE, CONTINUE]);
+    expect(request.actions?.some((action) => action.destructive)).toBe(false);
+
+    // "Keep my account" ends it there.
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(Linking.openURL).not.toHaveBeenCalled();
+    expect(deleteAccount).not.toHaveBeenCalled();
+    expect(resetTo).not.toHaveBeenCalled();
+  });
+
+  it('opens the App Store subscriptions from Manage, and deletes nothing', async () => {
+    mockPro = { pro: true, ready: true };
+    answerDialog(MANAGE);
+    const screen = await render(<SettingsScreen />);
+
+    await pressDelete(screen);
+
+    expect(Linking.openURL).toHaveBeenCalledTimes(1);
+    expect(Linking.openURL).toHaveBeenCalledWith('https://apps.apple.com/account/subscriptions');
+    expect(openBrowserAsync).not.toHaveBeenCalled();
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(deleteAccount).not.toHaveBeenCalled();
+    expect(resetTo).not.toHaveBeenCalled();
+  });
+
+  it('says the one failure line when the App Store cannot be opened, and deletes nothing', async () => {
+    mockPro = { pro: true, ready: true };
+    answerDialog(MANAGE);
+    mockAsk.mockResolvedValueOnce('ok');
+    jest.mocked(Linking.openURL).mockRejectedValueOnce(new Error('Unable to open URL'));
+    // Development builds log the cause to Metro.
+    const quiet = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const screen = await render(<SettingsScreen />);
+
+    await pressDelete(screen);
+
+    expect(Linking.openURL).toHaveBeenCalledWith('https://apps.apple.com/account/subscriptions');
+    expect(mockAsk).toHaveBeenCalledTimes(2);
+    expect(mockAsk.mock.calls[1][0]).toEqual({
+      title: 'Something went wrong. Please try again.',
+      cancelLabel: null,
+    });
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(deleteAccount).not.toHaveBeenCalled();
+    expect(resetTo).not.toHaveBeenCalled();
+    quiet.mockRestore();
+  });
+
+  it('asks again when they come back from the App Store and tap Delete account', async () => {
+    mockPro = { pro: true, ready: true };
+    answerDialog(MANAGE);
+    answerDialog(CONTINUE);
+    mockConfirm.mockResolvedValue(false);
+    const screen = await render(<SettingsScreen />);
+
+    await pressDelete(screen);
+    await pressDelete(screen);
+
+    expect(mockAsk.mock.calls.map(([request]) => request.title)).toEqual([PRO_TITLE, PRO_TITLE]);
+    expect(Linking.openURL).toHaveBeenCalledTimes(1);
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it('goes on to the counts from Continue to delete', async () => {
+    mockPro = { pro: true, ready: true };
+    answerDialog(CONTINUE);
+    mockConfirm.mockResolvedValue(false);
+    const screen = await render(<SettingsScreen />);
+
+    await pressDelete(screen);
+
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(mockConfirm.mock.calls[0][0]).toMatchObject({
+      title: 'Delete your account?',
+      message: HELD,
+    });
+    expect(mockAsk.mock.invocationCallOrder[0]).toBeLessThan(
+      mockConfirm.mock.invocationCallOrder[0],
+    );
+    expect(Linking.openURL).not.toHaveBeenCalled();
+    expect(deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it('deletes a Skip Pro account only after Continue, the counts and the final warning', async () => {
+    mockPro = { pro: true, ready: true };
+    answerDialog(CONTINUE);
+    mockConfirm.mockResolvedValueOnce(true).mockResolvedValueOnce(true);
+    const screen = await render(<SettingsScreen />);
+
+    await pressDelete(screen);
+
+    expect(mockConfirm.mock.calls.map(([options]) => options.title)).toEqual([
+      'Delete your account?',
+      'Delete everything, for good?',
+    ]);
+    expect(mockConfirm.mock.calls[1][0]).toMatchObject({
+      message:
+        'There is no way back from here. A few records outside Skip, such as crash reports, can stay.',
+      confirmLabel: 'Delete everything',
+      cancelLabel: 'Keep my account',
+      destructive: true,
+    });
+    expect(deleteAccount).toHaveBeenCalledTimes(1);
+    expect(resetTo).toHaveBeenCalledWith('/welcome');
+    expect(Linking.openURL).not.toHaveBeenCalled();
+  });
+
+  it('says it removes the account and everything added, when nothing is counted', async () => {
+    mockRows = {};
+    mockConfirm.mockResolvedValue(false);
+    const screen = await render(<SettingsScreen />);
+
+    await pressDelete(screen);
+
     expect(mockConfirm.mock.calls[0][0].message).toBe(
-      'This removes 1 card, 2 bank accounts, 2 bills, 3 subscriptions, 4 receipts, 5 recorded charges, 1 salary source — everything Skip holds for you. It cannot be undone.',
+      'This removes your account and everything you added to Skip. It cannot be undone.',
     );
   });
 });

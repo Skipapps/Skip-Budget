@@ -16,9 +16,9 @@ export const settingsMessages = defineMessages({
   },
   /** {monthly} and {yearly} are whole price labels, such as "$1.99/mo". */
   'settings.pro.pitch': {
-    en: 'Unlimited everything, {monthly} or {yearly}',
-    es: 'Todo ilimitado, {monthly} o {yearly}',
-    fr: 'Tout en illimité, {monthly} ou {yearly}',
+    en: 'Voice, Insights and more, {monthly} or {yearly}',
+    es: 'Entrada por voz, Análisis y más, {monthly} o {yearly}',
+    fr: 'Saisie vocale, Aperçu et plus encore, {monthly} ou {yearly}',
   },
 
   'settings.profile.title': { en: 'Profile', es: 'Perfil', fr: 'Profil' },
@@ -75,6 +75,23 @@ export const settingsMessages = defineMessages({
     fr: 'Définitif et irréversible',
   },
 
+  /** Shown to a Skip Pro subscriber before the counts; its first button is `pro.page.manage`. */
+  'settings.delete.proTitle': {
+    en: 'Cancel Skip Pro first?',
+    es: '¿Cancelar Skip Pro primero?',
+    fr: 'Annuler Skip Pro d’abord ?',
+  },
+  'settings.delete.proMessage': {
+    en: 'Deleting your account does not cancel Skip Pro. Apple keeps billing you until you cancel. Cancel it in your App Store subscriptions first. If you have already cancelled, you can go on.',
+    es: 'Eliminar tu cuenta no cancela Skip Pro. Apple sigue cobrándote hasta que lo canceles. Cancélalo primero en tus suscripciones del App Store. Si ya lo cancelaste, puedes continuar.',
+    fr: 'Supprimer ton compte n’annule pas Skip Pro. Apple continue de te facturer jusqu’à ce que tu l’annules. Annule-le d’abord dans tes abonnements de l’App Store. Si tu l’as déjà annulé, tu peux continuer.',
+  },
+  'settings.delete.proContinue': {
+    en: 'Continue to delete',
+    es: 'Continuar y eliminar',
+    fr: 'Continuer la suppression',
+  },
+
   'settings.delete.title': {
     en: 'Delete your account?',
     es: '¿Eliminar tu cuenta?',
@@ -82,14 +99,14 @@ export const settingsMessages = defineMessages({
   },
   /** {held} is a list of counts: "1 card, 2 bank accounts". */
   'settings.delete.held': {
-    en: 'This removes {held} — everything Skip holds for you. It cannot be undone.',
-    es: 'Esto elimina {held}: todo lo que Skip guarda para ti. No se puede deshacer.',
-    fr: 'Cela supprime {held} — tout ce que Skip conserve pour toi. C’est irréversible.',
+    en: 'This removes your account and everything you added. That includes {held}, and everything else, such as loans, savings, goals and spending habits. It cannot be undone.',
+    es: 'Esto elimina tu cuenta y todo lo que agregaste. Incluye {held}, y todo lo demás, como préstamos, ahorros, metas y hábitos de gasto. No se puede deshacer.',
+    fr: 'Cela supprime ton compte et tout ce que tu as ajouté. Cela comprend {held}, et tout le reste, comme les prêts, l’épargne, les objectifs et les habitudes de dépense. C’est irréversible.',
   },
   'settings.delete.nothingHeld': {
-    en: 'This removes your account and everything Skip holds for you. It cannot be undone.',
-    es: 'Esto elimina tu cuenta y todo lo que Skip guarda para ti. No se puede deshacer.',
-    fr: 'Cela supprime ton compte et tout ce que Skip conserve pour toi. C’est irréversible.',
+    en: 'This removes your account and everything you added to Skip. It cannot be undone.',
+    es: 'Esto elimina tu cuenta y todo lo que agregaste a Skip. No se puede deshacer.',
+    fr: 'Cela supprime ton compte et tout ce que tu as ajouté dans Skip. C’est irréversible.',
   },
   'settings.delete.keep': {
     en: 'Keep my account',
@@ -102,9 +119,9 @@ export const settingsMessages = defineMessages({
     fr: 'Tout supprimer pour de bon ?',
   },
   'settings.delete.finalMessage': {
-    en: 'There is no way back from here, and no copy kept.',
-    es: 'No hay vuelta atrás y no se guarda ninguna copia.',
-    fr: 'Il n’y a pas de retour en arrière, et aucune copie n’est conservée.',
+    en: 'There is no way back from here. A few records outside Skip, such as crash reports, can stay.',
+    es: 'No hay vuelta atrás. Unos pocos registros fuera de Skip, como los informes de fallos, pueden quedarse.',
+    fr: 'Il n’y a pas de retour en arrière. Quelques traces hors de Skip, comme les rapports de plantage, peuvent rester.',
   },
   'settings.delete.everything': {
     en: 'Delete everything',

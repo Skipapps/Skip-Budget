@@ -1,10 +1,12 @@
 import { fireEvent, render } from '@testing-library/react-native';
+import { Linking } from 'react-native';
 
 import SettingsScreen from '@/app/(tabs)/settings';
 import AboutScreen from '@/app/settings/about';
 import SupportScreen from '@/app/settings/support';
 import YourMoneyScreen from '@/app/settings/your-money';
 import { plural } from '@/components/settings/use-money-counts';
+import type { DialogRequest } from '@/components/ui/confirm-dialog';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 import { proMonthlyLabel, proYearlyLabel } from '@/lib/wall';
 
@@ -39,9 +41,10 @@ jest.mock('@/providers/theme-provider', () => ({
   }),
 }));
 
+const mockAsk = jest.fn();
 const mockConfirm = jest.fn();
 jest.mock('@/providers/dialog-provider', () => ({
-  useDialog: () => jest.fn(),
+  useDialog: () => mockAsk,
   useConfirm: () => mockConfirm,
 }));
 jest.mock('@/api/auth', () => ({
@@ -101,6 +104,7 @@ function expectAllWorded(lines: string[]) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
   resetLocaleForTests();
   mockPro = false;
   mockPrices = {};
@@ -133,7 +137,9 @@ describe('Settings, the main page', () => {
     ]) {
       expect(texts).toContain(line);
     }
-    expect(screen.getByText('Todo ilimitado, $1.99/mes o $19.99/año')).toBeTruthy();
+    expect(
+      screen.getByText('Entrada por voz, Análisis y más, $1.99/mes o $19.99/año'),
+    ).toBeTruthy();
     expect(screen.getByPlaceholderText('Tu nombre')).toBeTruthy();
     expectAllWorded([...texts, ...labelsOf(screen)]);
   });
@@ -160,7 +166,9 @@ describe('Settings, the main page', () => {
       expect(texts).toContain(line);
     }
     expect(
-      screen.getByText(`Tout en illimité, ${proMonthlyLabel()} ou ${proYearlyLabel()}`),
+      screen.getByText(
+        `Saisie vocale, Aperçu et plus encore, ${proMonthlyLabel()} ou ${proYearlyLabel()}`,
+      ),
     ).toBeTruthy();
     expect(proMonthlyLabel()).toMatch(/^1,99\s\$\/mois$/);
     expectAllWorded([...texts, ...labelsOf(screen)]);
@@ -176,7 +184,9 @@ describe('Settings, the main page', () => {
     };
     const screen = await render(<SettingsScreen />);
 
-    expect(screen.getByText('Todo ilimitado, $39.00 MXN/mes o $399.00 MXN/año')).toBeTruthy();
+    expect(
+      screen.getByText('Entrada por voz, Análisis y más, $39.00 MXN/mes o $399.00 MXN/año'),
+    ).toBeTruthy();
   });
 
   it('says Pro is active in the language on screen', async () => {
@@ -200,13 +210,14 @@ describe('Settings, the main page', () => {
     expect(mockConfirm.mock.calls[0][0]).toMatchObject({
       title: '¿Eliminar tu cuenta?',
       message:
-        'Esto elimina 1 tarjeta, 2 cuentas bancarias, 2 facturas, 3 suscripciones, 4 recibos, 5 cargos registrados, 1 fuente de ingresos: todo lo que Skip guarda para ti. No se puede deshacer.',
+        'Esto elimina tu cuenta y todo lo que agregaste. Incluye 1 tarjeta, 2 cuentas bancarias, 2 facturas, 3 suscripciones, 4 recibos, 5 cargos registrados, 1 fuente de ingresos, y todo lo demás, como préstamos, ahorros, metas y hábitos de gasto. No se puede deshacer.',
       confirmLabel: 'Continuar',
       cancelLabel: 'Conservar mi cuenta',
     });
     expect(mockConfirm.mock.calls[1][0]).toMatchObject({
       title: '¿Eliminar todo para siempre?',
-      message: 'No hay vuelta atrás y no se guarda ninguna copia.',
+      message:
+        'No hay vuelta atrás. Unos pocos registros fuera de Skip, como los informes de fallos, pueden quedarse.',
       confirmLabel: 'Eliminar todo',
       cancelLabel: 'Conservar mi cuenta',
     });
@@ -223,11 +234,52 @@ describe('Settings, the main page', () => {
     expect(mockConfirm.mock.calls[0][0]).toMatchObject({
       title: 'Supprimer ton compte ?',
       message:
-        'Cela supprime 1 carte, 2 comptes bancaires — tout ce que Skip conserve pour toi. C’est irréversible.',
+        'Cela supprime ton compte et tout ce que tu as ajouté. Cela comprend 1 carte, 2 comptes bancaires, et tout le reste, comme les prêts, l’épargne, les objectifs et les habitudes de dépense. C’est irréversible.',
       confirmLabel: 'Continuer',
       cancelLabel: 'Garder mon compte',
     });
   });
+
+  it.each([
+    [
+      'es',
+      /^Eliminar cuenta/,
+      {
+        title: '¿Cancelar Skip Pro primero?',
+        message:
+          'Eliminar tu cuenta no cancela Skip Pro. Apple sigue cobrándote hasta que lo canceles. Cancélalo primero en tus suscripciones del App Store. Si ya lo cancelaste, puedes continuar.',
+        cancelLabel: 'Conservar mi cuenta',
+      },
+      ['Administrar en el App Store', 'Continuar y eliminar'],
+    ],
+    [
+      'fr',
+      /^Supprimer le compte/,
+      {
+        title: 'Annuler Skip Pro d’abord ?',
+        message:
+          'Supprimer ton compte n’annule pas Skip Pro. Apple continue de te facturer jusqu’à ce que tu l’annules. Annule-le d’abord dans tes abonnements de l’App Store. Si tu l’as déjà annulé, tu peux continuer.',
+        cancelLabel: 'Garder mon compte',
+      },
+      ['Gérer dans l’App Store', 'Continuer la suppression'],
+    ],
+  ] as const)(
+    'asks a Skip Pro account to cancel first, in %s',
+    async (language, deleteRow, dialog, choices) => {
+      setLanguage(language);
+      mockPro = true;
+      mockAsk.mockResolvedValueOnce(null);
+      const screen = await render(<SettingsScreen />);
+
+      await fireEvent.press(screen.getByRole('button', { name: deleteRow }));
+
+      const request: DialogRequest = mockAsk.mock.calls[0][0];
+      expect(request).toMatchObject(dialog);
+      expect(request.actions?.map((action) => action.label)).toEqual(choices);
+      expect(mockConfirm).not.toHaveBeenCalled();
+      expect(Linking.openURL).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('Settings, Your money', () => {

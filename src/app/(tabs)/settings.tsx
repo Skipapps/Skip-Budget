@@ -16,13 +16,14 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, Text, View } from 'react-native';
 
 import { deleteAccount, signOut } from '@/api/auth';
 import { resetTo } from '@/lib/nav';
 import { usePro, useProPrices } from '@/api/pro';
 import { resetExitOfferForDev } from '@/api/pro-offer';
 import { t } from '@/i18n';
+import { failureMessage } from '@/lib/failure';
 import { proMonthlyLabel, proYearlyLabel } from '@/lib/wall';
 import { setProOverride, useProOverride } from '@/lib/pro-bypass';
 import { useUpdateProfile } from '@/api/mutations';
@@ -46,6 +47,9 @@ import { useProfile, useReceipts } from '@/api/queries';
 
 /** The voluntary tip page, opened in the in-app browser. */
 const COFFEE_URL = 'https://buymeacoffee.com/Weknd_team';
+
+/** Apple's own list of the person's subscriptions, where Skip Pro is cancelled. */
+const APP_STORE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 
 /** Each opens a page of its own, so the rows carry no summary line. */
 const PAGES: { readonly title: string; icon: LucideIcon; href: Href }[] = [
@@ -121,8 +125,33 @@ export default function SettingsScreen() {
    * Two dialogs: the first counts what is about to go ("3 cards, 57 transactions" can be weighed),
    * the second is the point of no return. Account deletion cannot be undone, so it does not use the
    * single-confirm pattern.
+   *
+   * A subscriber is asked about Skip Pro first, because deleting the account does not stop Apple's
+   * billing. `pro` is true only once a source has said yes, so an unknown answer goes straight on,
+   * as a free account does. The App Store choice ends this attempt without deleting anything.
    */
   const handleDeleteAccount = async () => {
+    if (pro) {
+      const choice = await ask({
+        title: t('settings.delete.proTitle'),
+        message: t('settings.delete.proMessage'),
+        actions: [
+          { id: 'manage', label: t('pro.page.manage') },
+          { id: 'continue', label: t('settings.delete.proContinue') },
+        ],
+        cancelLabel: t('settings.delete.keep'),
+      });
+      if (choice === 'manage') {
+        try {
+          await Linking.openURL(APP_STORE_SUBSCRIPTIONS_URL);
+        } catch (thrown) {
+          await ask({ title: failureMessage(thrown), cancelLabel: null });
+        }
+        return;
+      }
+      if (choice !== 'continue') return;
+    }
+
     const tally: [number, Counted][] = [
       [counts.cards, 'card'],
       [counts.accounts, 'bankAccount'],

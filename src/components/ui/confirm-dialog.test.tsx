@@ -1,9 +1,18 @@
-import { fireEvent, render } from '@testing-library/react-native';
-import { Dimensions } from 'react-native';
+import { act, fireEvent, render, renderHook } from '@testing-library/react-native';
+import { Dimensions, ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaInsetsContext, type EdgeInsets } from 'react-native-safe-area-context';
 
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ConfirmDialog, type DialogRequest } from '@/components/ui/confirm-dialog';
+import { usePastChoice } from '@/components/ui/past-choice';
+import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
 jest.mock('@/theme/shadows', () => ({ shadows: { floating: {} } }));
+
+// The plan questions are asked through the root dialog; here they are only worded.
+const mockAsk = jest.fn<Promise<string | null>, [DialogRequest]>();
+jest.mock('@/providers/dialog-provider', () => ({
+  useDialog: () => (request: DialogRequest) => mockAsk(request),
+}));
 
 type Screen = Awaited<ReturnType<typeof render>>;
 
@@ -15,8 +24,8 @@ const rowOf = (node: { parent?: unknown; props?: { className?: string } } | null
   return '';
 };
 
-function phone(width: number, fontScale: number) {
-  const window = { width, height: 812, scale: 3, fontScale };
+function phone(width: number, fontScale: number, height = 812) {
+  const window = { width, height, scale: 3, fontScale };
   Dimensions.set({ window, screen: window });
 }
 
@@ -166,5 +175,123 @@ describe('ConfirmDialog at large text sizes', () => {
       />,
     );
     expect(rowOf(screen.getByText('A'))).not.toContain('flex-row');
+  });
+});
+
+describe('ConfirmDialog when its words need more room than the screen has', () => {
+  /** A Face ID phone's safe area: the top and the home indicator differ. */
+  const INSETS: EdgeInsets = { top: 47, right: 0, bottom: 34, left: 0 };
+  /** The larger inset plus the 16pt kept clear, on both sides. */
+  const EDGE = 47 + 16;
+
+  let flash: jest.SpyInstance;
+  beforeEach(() => {
+    resetLocaleForTests();
+    mockAsk.mockResolvedValue(null);
+    flash = jest.spyOn(ScrollView.prototype, 'flashScrollIndicators');
+    flash.mockClear();
+  });
+  afterAll(() => resetLocaleForTests());
+
+  const inSafeArea = (dialog: React.ReactElement) => (
+    <SafeAreaInsetsContext.Provider value={INSETS}>{dialog}</SafeAreaInsetsContext.Provider>
+  );
+
+  /** Whether a node is drawn inside the scrolling words. */
+  const scrolls = (node: { parent?: unknown; props?: { testID?: string } } | null) => {
+    for (let at = node; at; at = at.parent as typeof node) {
+      if (at.props?.testID === 'dialog-words') return true;
+    }
+    return false;
+  };
+
+  /** The card: the box the words and the buttons share. */
+  const cardOf = (screen: Screen) => screen.getByTestId('dialog-words').parent!;
+
+  /** The French delete question for a loan with a past: two choices and the way out. */
+  async function frenchLoanDelete(): Promise<DialogRequest> {
+    await act(async () => setLanguage('fr'));
+    const { result } = await renderHook(() => usePastChoice());
+    await result.current.askDelete({ name: 'Prêt auto Desjardins', noun: 'payments', count: 12 });
+    return mockAsk.mock.calls[mockAsk.mock.calls.length - 1][0];
+  }
+
+  it('scrolls a long French plan question at the largest text and keeps its three buttons on screen', async () => {
+    phone(375, 3.1, 667);
+    const request = await frenchLoanDelete();
+    const onResolve = jest.fn();
+    const screen = await render(inSafeArea(<ConfirmDialog {...request} onResolve={onResolve} />));
+
+    // The card stops inside the safe area, with the same room above as below.
+    expect(StyleSheet.flatten(cardOf(screen).props.style).maxHeight).toBe(667 - 2 * EDGE);
+    expect(StyleSheet.flatten(cardOf(screen).parent!.props.style)).toMatchObject({
+      paddingVertical: EDGE,
+    });
+
+    // Only the words scroll; the buttons are below them, never scrolled away.
+    expect(scrolls(screen.getByText(request.title))).toBe(true);
+    expect(scrolls(screen.getByText(request.message!))).toBe(true);
+    const buttons = [...(request.actions ?? []).map((action) => action.label), 'Annuler'];
+    expect(buttons).toEqual(['Garder les paiements passés', 'Tout supprimer', 'Annuler']);
+    for (const label of buttons) {
+      expect([label, scrolls(screen.getByRole('button', { name: label }))]).toEqual([label, false]);
+    }
+
+    // Taller than its box: the scroll bar shows once, so there is plainly more to read.
+    const words = screen.getByTestId('dialog-words');
+    await fireEvent(words, 'layout', { nativeEvent: { layout: { width: 311, height: 240 } } });
+    await fireEvent(words, 'contentSizeChange', 311, 980);
+    await fireEvent(words, 'contentSizeChange', 311, 1010);
+    expect(flash).toHaveBeenCalledTimes(1);
+
+    for (const label of buttons) {
+      await fireEvent.press(screen.getByRole('button', { name: label }));
+    }
+    expect(onResolve.mock.calls).toEqual([['keep'], ['everything'], [null]]);
+  });
+
+  it('keeps a dialog that fits as it was: same boxes, centred, not scrolling or bouncing', async () => {
+    phone(375, 1);
+    const screen = await render(
+      inSafeArea(
+        <ConfirmDialog
+          title="Delete this bill?"
+          message="This cannot be undone."
+          actions={[{ id: 'confirm', label: 'Delete', destructive: true }]}
+          onResolve={() => {}}
+        />,
+      ),
+    );
+
+    const card = cardOf(screen);
+    expect(card.props.className).toBe(
+      'w-full max-w-[340px] overflow-hidden rounded-[16px] bg-card',
+    );
+    // Equal room above and below leaves its centre where it was; no edge has a padding of its own.
+    const backdrop = StyleSheet.flatten(card.parent!.props.style);
+    expect(backdrop.paddingVertical).toBe(EDGE);
+    expect([backdrop.paddingTop, backdrop.paddingBottom]).toEqual([undefined, undefined]);
+    expect(card.parent!.props.className).toBe(
+      'flex-1 items-center justify-center bg-black/40 px-8',
+    );
+
+    // The words keep their box, as tall as they are, and stay put under a finger.
+    const words = screen.getByTestId('dialog-words');
+    expect(StyleSheet.flatten(words.props.style)).toMatchObject({ flexGrow: 0, flexShrink: 1 });
+    expect(words.props.alwaysBounceVertical).toBe(false);
+    expect(screen.getByText('Delete this bill?').parent!.props.className).toBe('px-5 pb-4 pt-5');
+    expect(rowOf(screen.getByText('Delete'))).toMatch(/^w-full gap-2\.5 px-5 pb-5 pt-1/);
+
+    await fireEvent(words, 'layout', { nativeEvent: { layout: { width: 311, height: 92 } } });
+    await fireEvent(words, 'contentSizeChange', 311, 92);
+    expect(flash).not.toHaveBeenCalled();
+  });
+
+  it('keeps 16pt clear of the screen edge when drawn outside the app’s safe area', async () => {
+    phone(375, 1);
+    const screen = await render(<ConfirmDialog title="Done" onResolve={() => {}} />);
+
+    expect(StyleSheet.flatten(cardOf(screen).props.style).maxHeight).toBe(812 - 32);
+    expect(StyleSheet.flatten(cardOf(screen).parent!.props.style).paddingVertical).toBe(16);
   });
 });
