@@ -1422,8 +1422,8 @@ export const homeFr: IntentText[] = [
       'mes économies sur le café dans aperçu stp',
     ],
     answer:
-      '**Habitudes** (« Ce que tu as économisé sans acheter ») affiche « 4 jours sans achat cette semaine » (par exemple) avec ce que ça t’a fait économiser cette semaine, puis **Économisé jusqu’ici** pour toutes tes habitudes. Les chiffres sont les mêmes que sur tes cartes d’habitude : jours sans achat × le prix de l’habitude.\n\n' +
-      'S’il n’y en a aucune, la section affiche **Aucune habitude pour l’instant** avec **Commencer une habitude**.',
+      '**Habitudes** (« Ce que tu as économisé sans acheter ») affiche « 4 jours sans achat cette semaine » (par exemple) avec ce que ça t’a fait économiser cette semaine, puis **Économisé jusqu’ici** pour toutes tes habitudes, y compris ce que les habitudes arrêtées ont économisé jusqu’à la veille de leur arrêt. Les chiffres correspondent à la page **Habitudes de dépense** : jours sans achat × le prix de l’habitude.\n\n' +
+      'Sans habitude en cours, la section affiche **Aucune habitude pour l’instant** avec **Commencer une habitude**, sous **Économisé jusqu’ici** si des habitudes arrêtées ont économisé quelque chose.',
     keywords: ['habitudes', 'sans acheter', 'Économisé jusqu’ici', 'jours sans achat'],
   },
   {

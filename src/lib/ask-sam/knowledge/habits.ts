@@ -957,7 +957,7 @@ export const habitsIntents: Intent[] = [
       'saved so far at the top of the habits page',
     ],
     answer:
-      "Saved = skipped days × the habit's price.\n\nA skipped day is a finished day, from the day you made the habit up to yesterday, that you didn't tap. Today counts only once it's over, so Saved goes up overnight.\n\nExample: Coffee at $5, made 10 days ago. Of those 10 finished days you tapped 4, so 6 were skipped: 6 × $5 = **$30.00**.\n\n**Saved so far** at the top adds this up for all your current habits. It uses each habit's current price, so a new price changes the whole figure. A deleted habit's days are no longer included.",
+      "Saved = skipped days × the habit's price.\n\nA skipped day is a finished day, from the day you made the habit up to yesterday, that you didn't tap. Today counts only once it's over, so Saved goes up overnight.\n\nExample: Coffee at $5, made 10 days ago. Of those 10 finished days you tapped 4, so 6 were skipped: 6 × $5 = **$30.00**.\n\n**Saved so far** at the top adds this up for all your habits. It uses each habit's current price, so a new price changes the whole figure. A habit stopped with **Keep past days** keeps what it saved up to the day before you stopped it; one deleted with **Remove everything** adds nothing.",
     keywords: ['saved', 'saved so far', 'formula', 'calculation', 'piggy bank'],
     related: [
       'habits.saved.zero',
@@ -1008,7 +1008,7 @@ export const habitsIntents: Intent[] = [
       "saved numbers don't add up",
     ],
     answer:
-      "They cover different stretches of time:\n\n- **$10.00 saved** on a card: that habit, the week shown only.\n- **Saved so far** at the top of **Spending habits**: all your current habits, each since it began.\n- **Saved so far** on a habit's **View details**: that one habit, since it began.\n\nSo the top figure is usually the biggest. All three use the same rule: skipped finished days × the current price. A deleted habit no longer counts in the top figure.",
+      "They cover different stretches of time:\n\n- **$10.00 saved** on a card: that habit, the week shown only.\n- **Saved so far** at the top of **Spending habits**: all your habits, each since it began. A stopped habit counts up to the day before you stopped it.\n- **Saved so far** on a habit's **View details**: that one habit, since it began.\n\nSo the top figure is usually the biggest. All three use the same rule: skipped finished days × the current price. A habit deleted with **Remove everything** no longer counts in the top figure.",
     keywords: ['saved so far', 'saved', 'different', 'mismatch'],
     related: ['habits.saved.how', 'habits.card.saved-week', 'habits.details.totals'],
     route: '/habits',
@@ -1071,7 +1071,7 @@ export const habitsIntents: Intent[] = [
       "don't count these days as saved",
     ],
     answer:
-      "There's no pause. Every finished day you don't tap counts as skipped, wherever you were, because you really didn't spend that money.\n\nIf you'd rather those days didn't count, you can:\n- Leave it running. The days are honest: no coffee, no spending.\n- Stop it: tap the pencil, **Delete habit**, then **Keep past days**. Your receipts stay, and you can start a new habit when you're back. A stopped habit's saved days leave **Saved so far**, and the new one starts from zero.\n\nA pause is a good one to send from **Settings → Support and feedback → Share an idea**.",
+      "There's no pause. Every finished day you don't tap counts as skipped, wherever you were, because you really didn't spend that money.\n\nIf you'd rather those days didn't count, you can:\n- Leave it running. The days are honest: no coffee, no spending.\n- Stop it: tap the pencil, **Delete habit**, then **Keep past days**. Your receipts stay, what it saved stays in **Saved so far** up to the day before you stopped it, and you can start a new habit when you're back. The new one starts from zero.\n\nA pause is a good one to send from **Settings → Support and feedback → Share an idea**.",
     keywords: ['pause', 'holiday', 'vacation', 'away', 'sick'],
     related: ['habits.delete.keep-or-remove', 'habits.day.skip', 'habits.saved.how'],
     route: '/habits',
@@ -1093,7 +1093,7 @@ export const habitsIntents: Intent[] = [
       'habits summary card',
     ],
     answer:
-      "It's the total for all your current habits:\n\n- **Spent this week**: every habit's receipts dated this week, added up. Go back a week and it reads **Spent that week**.\n- **Saved so far**, with the piggy bank: every skipped day since each habit began, times its price, for all of them.\n\nA deleted habit isn't in either figure, though any receipts you kept still count in your spending everywhere else in Skip.",
+      "It's the total for all your habits:\n\n- **Spent this week**: every habit's receipts dated this week, added up, including a habit you stopped this week. Go back a week and it reads **Spent that week**.\n- **Saved so far**, with the piggy bank: every skipped day since each habit began, times its price. A habit stopped with **Keep past days** counts up to the day before you stopped it, then stays as it is.\n\nThe cards below show only the habits still running. If you've stopped them all, this card stays above the empty page while either figure is above $0.00. A habit deleted with **Remove everything** isn't in either figure.",
     keywords: ['spent this week', 'saved so far', 'purple card', 'top card', 'hero'],
     related: ['habits.saved.three', 'habits.saved.how', 'habits.week.browse'],
     route: '/habits',
@@ -1459,7 +1459,7 @@ export const habitsIntents: Intent[] = [
       'nothing after today is recorded habit',
     ],
     answer:
-      "Both stop the habit for good, so nothing after today is recorded. The difference is its past receipts:\n\n- **Keep past days**: every day you tapped stays as a receipt in **Receipts**, **Activity**, your totals and your balance, with the habit's icon. The card leaves **Spending habits**, its saved days leave **Saved so far**, and each receipt says **From a deleted habit: Coffee**.\n- **Remove everything**: the habit and all its receipts are deleted. Your spending drops, and your balance rises by what they added up to.\n\nPick **Keep past days** if you really bought those things. Pick **Remove everything** if the habit was a test or a mistake.",
+      "Both stop the habit for good, so nothing after today is recorded. The difference is its past receipts:\n\n- **Keep past days**: every day you tapped stays as a receipt in **Receipts**, **Activity**, your totals and your balance, with the habit's icon. The card leaves **Spending habits**, what it saved up to the day before stays in **Saved so far**, and each receipt says **From a deleted habit: Coffee**. Receipts on or after the day you stop it count as spent, never as saved.\n- **Remove everything**: the habit and all its receipts are deleted. Your spending drops, and your balance rises by what they added up to.\n\nPick **Keep past days** if you really bought those things. Pick **Remove everything** if the habit was a test or a mistake.",
     keywords: ['keep past days', 'remove everything', 'delete', 'history'],
     related: ['habits.delete.how', 'habits.delete.leftover', 'habits.balance.current'],
   },

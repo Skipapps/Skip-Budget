@@ -1559,7 +1559,7 @@ export const voicePrivacyHelpEs: IntentText[] = [
       '1. Revisa que estés en línea, con Wi-Fi o datos móviles.\n' +
       '2. Toca **Intentar de nuevo** en la página, o toca otra vez el mismo botón, como **Guardar**.\n' +
       '3. ¿Sigue igual? Cierra Skip por completo y ábrelo de nuevo.\n\n' +
-      'No se pierde nada de lo que ya guardaste. Cuando falla un guardado, lo que ingresaste se queda en la página para que lo intentes de nuevo, y guardar otra vez nunca crea una segunda copia de un recibo, suscripción, tarjeta, cuenta, salario, hábito o pago de tarjeta. Si **Inicio** o **Tarjetas** no pueden actualizarse, conservan las cifras que ya mostraban.\n\n' +
+      'No se pierde nada de lo que ya guardaste. Cuando falla un guardado, lo que ingresaste se queda en la página para que lo intentes de nuevo, y guardar otra vez nunca crea una segunda copia de un recibo, factura, suscripción, tarjeta, cuenta, salario, hábito o pago de tarjeta. Si **Inicio** o **Tarjetas** no pueden actualizarse, conservan las cifras que ya mostraban.\n\n' +
       'Los mensajes que te dicen qué corregir, como “Ingresa el nombre del banco.” o “Primero elige una tienda.”, no son fallos. Señalan algo que todavía necesita una respuesta.',
     keywords: ['Algo salió mal', 'Inténtalo de nuevo', 'Intentar de nuevo', 'error'],
   },

@@ -522,14 +522,18 @@ export function createAskSam(options: AskSamOptions): AskSam {
 
     // "Hi, how do I add a bill?": drop the greeting's words from the original text, which keeps
     // the question marks that split two questions apart.
-    const greeting = rules.greetingPrefix.exec(plainOf(text))?.[0].trim();
+    // The trailing space lets a message that is only a greeting ("good morning sam!") count as one.
+    const greeting = rules.greetingPrefix.exec(`${plainOf(text)} `)?.[0].trim();
     const withoutGreeting = greeting
       ? text.trim().split(/\s+/).slice(greeting.split(' ').length).join(' ')
       : text;
+    // A bare greeting is answered as one; its "sam" would otherwise ask who Sam is.
     const query =
       withoutGreeting.length >= 3 && matcher.terms(withoutGreeting).length > 0
         ? withoutGreeting
-        : text;
+        : greeting && !withoutGreeting.trim()
+          ? greeting.replace(/\s+sam$/, '')
+          : text;
 
     const parts = splitQuestions(query, matcher);
     if (parts.length > 1) {

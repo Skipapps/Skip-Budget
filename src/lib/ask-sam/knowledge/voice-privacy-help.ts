@@ -1710,7 +1710,7 @@ export const voicePrivacyHelpIntents: Intent[] = [
       '1. Check you’re online, on Wi-Fi or mobile data.\n' +
       '2. Tap **Try again** on the page, or tap the same button again, like **Save**.\n' +
       '3. Still stuck? Close Skip fully and open it again.\n\n' +
-      'Nothing you already saved is lost. When a save fails, what you entered stays on the page so you can try again, and saving again never makes a second copy of a receipt, subscription, card, account, salary, habit or card payment. If **Home** or **Cards** can’t refresh, they keep the figures they already showed.\n\n' +
+      'Nothing you already saved is lost. When a save fails, what you entered stays on the page so you can try again, and saving again never makes a second copy of a receipt, bill, subscription, card, account, salary, habit or card payment. If **Home** or **Cards** can’t refresh, they keep the figures they already showed.\n\n' +
       'Messages that tell you what to fix, like “Enter the bank name.” or “Pick a store first.”, aren’t failures. They point to something that still needs an answer.',
     keywords: ['Something went wrong', 'Please try again', 'Try again', 'error', 'failed'],
     related: [

@@ -2314,7 +2314,7 @@ export const billsSubscriptionsIntents: Intent[] = [
       '1. Open the duplicate from **Monthly bills** (or **Subscriptions**).\n' +
       '2. Tap the pencil, then **Delete bill** (or **Delete subscription**).\n' +
       '3. Tap **Remove everything**.\n\n' +
-      'Totals and balances update straight away. A single bill is never charged twice for the same month (or week, quarter or year), so a double usually means two copies were added. Tapping **Save bill** twice doesn’t make one: the button holds on **Saving…** until the page closes.',
+      'Totals and balances update straight away. A single bill is never charged twice for the same month (or week, quarter or year), so a double usually means two copies were added. Tapping **Save bill** twice, or saving again after a lost connection, doesn’t make one: the button holds on **Saving…** until the page closes, and a retry finds the bill the first tap filed.',
     keywords: ['duplicate', 'twice', 'double', 'counted twice'],
     related: ['bills.delete.choices', 'bills.delete.how', 'subscriptions.delete.how'],
   },

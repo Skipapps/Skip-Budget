@@ -1414,8 +1414,8 @@ export const homeEs: IntentText[] = [
       'xq el ahorro de habitos no coincide con mis tarjetas de habito',
     ],
     answer:
-      '**Hábitos** (“Lo que ahorraste al no comprar”) muestra “4 días sin comprar esta semana” (por ejemplo) con lo que eso te ahorró esta semana, y después **Ahorrado hasta ahora** con todos tus hábitos juntos. Las cifras son las mismas de tus tarjetas de hábitos: días sin comprar × el precio del hábito.\n\n' +
-      'Si no tienes ninguno, dice **Aún no hay hábitos** con **Empezar un hábito**.',
+      '**Hábitos** (“Lo que ahorraste al no comprar”) muestra “4 días sin comprar esta semana” (por ejemplo) con lo que eso te ahorró esta semana, y después **Ahorrado hasta ahora** con todos tus hábitos juntos, incluido lo que ahorraron los detenidos hasta el día antes de detenerlos. Las cifras coinciden con la página **Hábitos de gasto**: días sin comprar × el precio del hábito.\n\n' +
+      'Si no tienes ningún hábito activo, dice **Aún no hay hábitos** con **Empezar un hábito**, debajo de **Ahorrado hasta ahora** si los hábitos detenidos ahorraron algo.',
     keywords: ['hábitos', 'al no comprar', 'ahorrado hasta ahora', 'días sin comprar'],
   },
   {

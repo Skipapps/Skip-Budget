@@ -1774,8 +1774,8 @@ export const homeIntents: Intent[] = [
       'where do habit savings show in insights',
     ],
     answer:
-      '**Habits** (“What you saved by skipping”) shows “Skipped 4 times this week” (for example) with what that saved this week, then **Saved so far** across all your habits. The figures are the same as on your habit cards: skipped days × the habit’s price.\n\n' +
-      'With none, it says **No habits yet** with **Start a habit**.',
+      '**Habits** (“What you saved by skipping”) shows “Skipped 4 times this week” (for example) with what that saved this week, then **Saved so far** across all your habits, including what stopped ones saved up to the day before you stopped them. The figures match the **Spending habits** page: skipped days × the habit’s price.\n\n' +
+      'With no habits running, it says **No habits yet** with **Start a habit**, under **Saved so far** if stopped habits saved something.',
     keywords: ['habits', 'saved by skipping', 'Saved so far', 'skipped'],
     pro: true,
     related: ['home.insights.goals', 'home.insights.what'],

@@ -9,6 +9,14 @@ export const PHRASES: [RegExp, string][] = [
     'areyouhuman',
   ],
   [/\b(for good|forever|permanently|for ever)\b/g, 'permanent'],
+  // "No" and "help" are too common alone; together they're a complaint about Sam.
+  [/\b(no help|not helpful|not helping|not much help|unhelpful|useless)\b/g, 'unhelpful'],
+  // "I didn't get my reminder" is a different question from "how do I get a reminder", and "not"
+  // alone is too common to tell them apart.
+  [
+    /\b(did not get|did not receive|never got|never get|never received|have not got|have not received|has not come|have not had|not getting|not receiving|was not notified|were not notified|was never notified|did not come|never came|never arrived|did not arrive|did not go off|no notification|no reminder)\b/g,
+    'notreceived',
+  ],
   // "Skip" is the app's name everywhere; these are the times it means the verb.
   [
     /\b(skip (?:a |the |this |my |that |one |another )?(?:habit )?day|skipped (?:a |the |that |my )?(?:habit )?day|skipping (?:a |the )?day|skip days|skip today|skipped today|skipped it today)\b/g,
@@ -19,6 +27,7 @@ export const PHRASES: [RegExp, string][] = [
     'skipstep',
   ],
   // "Free trial" is about trying Pro, not about what costs nothing.
+  [/\b(try (?:skip )?pro|try (?:it |skip )?(?:for )?free|try out pro|test pro)\b/g, 'trial'],
   [/\b(free trials|free trial|trial period|free period)\b/g, 'trial'],
   [/\bfree(?: [a-z0-9]+){1,2} trials?\b/g, 'trial'],
   [
@@ -159,17 +168,7 @@ const GROUPS: Record<string, string[]> = {
     'changed',
     'pencil',
   ],
-  wrong: [
-    'incorrect',
-    'inaccurate',
-    'mistake',
-    'mistaken',
-    'weird',
-    'strange',
-    'odd',
-    'bogus',
-    'off',
-  ],
+  wrong: ['incorrect', 'inaccurate', 'mistake', 'mistaken', 'weird', 'strange', 'odd', 'bogus'],
   missing: [
     'disappear',
     'disappeared',
@@ -237,7 +236,7 @@ const GROUPS: Record<string, string[]> = {
   save: ['saving', 'saved', 'saves'],
   savings: ['savings'],
   goal: ['target', 'targets', 'aim'],
-  habit: ['streak', 'streaks', 'tracker'],
+  habit: ['streak', 'streaks'],
   scan: ['scanner', 'camera', 'scanning', 'scanned', 'ocr'],
   photo: [
     'picture',

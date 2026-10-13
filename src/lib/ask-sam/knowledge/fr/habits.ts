@@ -788,7 +788,7 @@ export const habitsFr: IntentText[] = [
       "économisé jusqu'ici en haut de la page des habitudes",
     ],
     answer:
-      'Économisé = jours sans achat × le prix de l’habitude.\n\nUn jour sans achat est un jour terminé, depuis la création de l’habitude jusqu’à hier, que tu n’as pas touché. Aujourd’hui ne compte qu’une fois terminé : l’économisé monte donc pendant la nuit.\n\nExemple : Café à $5, créé il y a 10 jours. Sur ces 10 jours terminés, tu en as touché 4, donc 6 sont sans achat : 6 × $5 = **$30.00**.\n\n**Économisé jusqu’ici**, en haut, additionne cela pour toutes tes habitudes actuelles. Il utilise le prix actuel de chaque habitude, donc un nouveau prix change tout le chiffre. Les jours d’une habitude supprimée n’y sont plus inclus.',
+      'Économisé = jours sans achat × le prix de l’habitude.\n\nUn jour sans achat est un jour terminé, depuis la création de l’habitude jusqu’à hier, que tu n’as pas touché. Aujourd’hui ne compte qu’une fois terminé : l’économisé monte donc pendant la nuit.\n\nExemple : Café à $5, créé il y a 10 jours. Sur ces 10 jours terminés, tu en as touché 4, donc 6 sont sans achat : 6 × $5 = **$30.00**.\n\n**Économisé jusqu’ici**, en haut, additionne cela pour toutes tes habitudes. Il utilise le prix actuel de chaque habitude, donc un nouveau prix change tout le chiffre. Une habitude arrêtée avec **Garder les jours passés** garde ce qu’elle a économisé jusqu’à la veille de son arrêt ; une habitude supprimée avec **Tout supprimer** n’ajoute rien.',
     keywords: ['économisé', 'économisé jusqu’ici', 'formule', 'calcul'],
   },
   {
@@ -826,7 +826,7 @@ export const habitsFr: IntentText[] = [
       "les chiffres économisés ne s'additionnent pas",
     ],
     answer:
-      'Ils couvrent des périodes différentes :\n\n- **$10.00 économisé** sur une carte : cette habitude, la semaine affichée seulement.\n- **Économisé jusqu’ici** en haut de **Habitudes de dépense** : toutes tes habitudes actuelles, chacune depuis son début.\n- **Économisé jusqu’ici** sur **Voir les détails** d’une habitude : cette habitude seule, depuis son début.\n\nLe chiffre du haut est donc en général le plus grand. Les trois suivent la même règle : jours terminés sans achat × le prix actuel. Une habitude supprimée n’est plus comptée dans le chiffre du haut.',
+      'Ils couvrent des périodes différentes :\n\n- **$10.00 économisé** sur une carte : cette habitude, la semaine affichée seulement.\n- **Économisé jusqu’ici** en haut de **Habitudes de dépense** : toutes tes habitudes, chacune depuis son début. Une habitude arrêtée compte jusqu’à la veille de son arrêt.\n- **Économisé jusqu’ici** sur **Voir les détails** d’une habitude : cette habitude seule, depuis son début.\n\nLe chiffre du haut est donc en général le plus grand. Les trois suivent la même règle : jours terminés sans achat × le prix actuel. Une habitude supprimée avec **Tout supprimer** n’est plus comptée dans le chiffre du haut.',
     keywords: ['économisé jusqu’ici', 'économisé', 'différent', 'écart'],
   },
   {
@@ -868,7 +868,7 @@ export const habitsFr: IntentText[] = [
       'ne pas compter ces jours comme économisés',
     ],
     answer:
-      'Il n’y a pas de pause. Chaque jour terminé que tu ne touches pas compte comme sans achat, où que tu sois, parce que tu n’as vraiment pas dépensé cet argent.\n\nSi tu préfères que ces jours ne comptent pas, tu peux :\n- La laisser tourner. Les jours sont honnêtes : pas de café, pas de dépense.\n- L’arrêter : touche le crayon, **Supprimer l’habitude**, puis **Garder les jours passés**. Tes reçus restent, et tu pourras commencer une nouvelle habitude à ton retour. Les jours économisés d’une habitude arrêtée quittent **Économisé jusqu’ici**, et la nouvelle repart de zéro.\n\nUne pause est une bonne idée à envoyer depuis **Réglages → Assistance et commentaires → Partage une idée**.',
+      'Il n’y a pas de pause. Chaque jour terminé que tu ne touches pas compte comme sans achat, où que tu sois, parce que tu n’as vraiment pas dépensé cet argent.\n\nSi tu préfères que ces jours ne comptent pas, tu peux :\n- La laisser tourner. Les jours sont honnêtes : pas de café, pas de dépense.\n- L’arrêter : touche le crayon, **Supprimer l’habitude**, puis **Garder les jours passés**. Tes reçus restent, ce qu’elle a économisé jusqu’à la veille de son arrêt reste dans **Économisé jusqu’ici**, et tu pourras commencer une nouvelle habitude à ton retour. La nouvelle repart de zéro.\n\nUne pause est une bonne idée à envoyer depuis **Réglages → Assistance et commentaires → Partage une idée**.',
     keywords: ['pause', 'vacances', 'absence', 'malade'],
   },
   {
@@ -887,7 +887,7 @@ export const habitsFr: IntentText[] = [
       'carte résumé des habitudes',
     ],
     answer:
-      'C’est le total de toutes tes habitudes actuelles :\n\n- **Dépensé cette semaine** : les reçus de chaque habitude datés de cette semaine, additionnés. Si tu recules d’une semaine, cela affiche **Dépensé cette semaine-là**.\n- **Économisé jusqu’ici**, avec la tirelire : chaque jour sans achat depuis le début de chaque habitude, multiplié par son prix, pour toutes.\n\nUne habitude supprimée n’est dans aucun des deux chiffres, mais les reçus que tu as gardés comptent toujours dans tes dépenses partout ailleurs dans Skip.',
+      'C’est le total de toutes tes habitudes :\n\n- **Dépensé cette semaine** : les reçus de chaque habitude datés de cette semaine, additionnés, y compris ceux d’une habitude que tu as arrêtée cette semaine. Si tu recules d’une semaine, cela affiche **Dépensé cette semaine-là**.\n- **Économisé jusqu’ici**, avec la tirelire : chaque jour sans achat depuis le début de chaque habitude, multiplié par son prix. Une habitude arrêtée avec **Garder les jours passés** compte jusqu’à la veille de son arrêt, puis ne bouge plus.\n\nLes cartes en dessous ne montrent que les habitudes encore en cours. Si tu les as toutes arrêtées, cette carte reste au-dessus de la page vide tant que l’un des deux chiffres dépasse $0.00. Une habitude supprimée avec **Tout supprimer** n’est dans aucun des deux chiffres.',
     keywords: ['dépensé cette semaine', 'économisé jusqu’ici', 'carte violette', 'tirelire'],
   },
   {
@@ -1201,9 +1201,10 @@ export const habitsFr: IntentText[] = [
       'tout supprimer habitude et solde',
       "supprimer l'habitude mais garder l'historique",
       "plus rien n'est enregistré après aujourd'hui habitude",
+      "si j'arrête une habitude je perds ce que j'ai économisé",
     ],
     answer:
-      'Les deux arrêtent l’habitude pour de bon, donc plus rien n’est enregistré après aujourd’hui. La différence, ce sont ses reçus passés :\n\n- **Garder les jours passés** : chaque jour que tu as touché reste un reçu dans **Reçus**, **Activité**, tes totaux et ton solde, avec l’icône de l’habitude. La carte quitte **Habitudes de dépense**, ses jours économisés quittent **Économisé jusqu’ici**, et chaque reçu indique **D’une habitude supprimée : Café**.\n- **Tout supprimer** : l’habitude et tous ses reçus sont supprimés. Tes dépenses baissent, et ton solde monte du total de ces reçus.\n\nChoisis **Garder les jours passés** si tu as vraiment acheté ces choses. Choisis **Tout supprimer** si l’habitude était un test ou une erreur.',
+      'Les deux arrêtent l’habitude pour de bon, donc plus rien n’est enregistré après aujourd’hui. La différence, ce sont ses reçus passés :\n\n- **Garder les jours passés** : chaque jour que tu as touché reste un reçu dans **Reçus**, **Activité**, tes totaux et ton solde, avec l’icône de l’habitude. La carte quitte **Habitudes de dépense**, ce qu’elle a économisé jusqu’à la veille reste dans **Économisé jusqu’ici**, et chaque reçu indique **D’une habitude supprimée : Café**. Les reçus datés du jour de l’arrêt ou après comptent comme dépensés, jamais comme économisés.\n- **Tout supprimer** : l’habitude et tous ses reçus sont supprimés. Tes dépenses baissent, et ton solde monte du total de ces reçus.\n\nChoisis **Garder les jours passés** si tu as vraiment acheté ces choses. Choisis **Tout supprimer** si l’habitude était un test ou une erreur.',
     keywords: ['garder les jours passés', 'tout supprimer', 'supprimer', 'historique'],
   },
   {

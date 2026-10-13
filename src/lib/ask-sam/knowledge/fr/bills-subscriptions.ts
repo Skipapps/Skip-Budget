@@ -2073,7 +2073,7 @@ export const billsSubscriptionsFr: IntentText[] = [
       '1. Ouvre le doublon depuis **Factures mensuelles** (ou **Abonnements**).\n' +
       '2. Touche le crayon, puis **Supprimer la facture** (ou **Supprimer l’abonnement**).\n' +
       '3. Touche **Tout supprimer**.\n\n' +
-      'Les totaux et les soldes se mettent à jour tout de suite. Une même facture n’est jamais prélevée deux fois pour le même mois (ou la même semaine, le même trimestre ou la même année), donc un doublon veut généralement dire que deux copies ont été ajoutées. Toucher deux fois **Enregistrer la facture** ne crée pas de doublon : le bouton reste sur **Enregistrement…** jusqu’à ce que la page se ferme.',
+      'Les totaux et les soldes se mettent à jour tout de suite. Une même facture n’est jamais prélevée deux fois pour le même mois (ou la même semaine, le même trimestre ou la même année), donc un doublon veut généralement dire que deux copies ont été ajoutées. Toucher deux fois **Enregistrer la facture**, ou enregistrer de nouveau après une perte de connexion, ne crée pas de doublon : le bouton reste sur **Enregistrement…** jusqu’à ce que la page se ferme, et un nouvel essai retrouve la facture enregistrée par le premier.',
     keywords: ['doublon', 'deux fois', 'en double', 'compté deux fois'],
   },
   {

@@ -682,22 +682,29 @@ export function makeSpellFixer(vocabulary: Map<string, number>): (word: string) 
     if (cached) return cached;
 
     const limit = word.length <= 5 ? 1 : 2;
+    const letters = [...word].sort().join('');
     let bestWord = word;
     let bestDistance = limit + 1;
-    let bestCount = 0;
+    let bestRank = 0;
     for (let length = word.length - limit; length <= word.length + limit; length += 1) {
       for (const candidate of byLength.get(length) ?? []) {
         const distance = damerauLevenshtein(word, candidate, limit);
         if (distance > limit) continue;
-        const frequency = vocabulary.get(candidate) ?? 0;
+        // Between equally close words, the likelier slip wins: a dropped letter ("limt" is limit,
+        // not list) or two swapped, then an extra one, before a wrong one; then the commoner word.
+        const slip =
+          candidate.length > word.length ||
+          (candidate.length === word.length && [...candidate].sort().join('') === letters)
+            ? 2
+            : candidate.length < word.length
+              ? 1
+              : 0;
         const sameStart = candidate[0] === word[0] ? 1 : 0;
-        if (
-          distance < bestDistance ||
-          (distance === bestDistance && frequency + sameStart * 1000 > bestCount)
-        ) {
+        const rank = sameStart * 1e9 + slip * 1e6 + (vocabulary.get(candidate) ?? 0);
+        if (distance < bestDistance || (distance === bestDistance && rank > bestRank)) {
           bestWord = candidate;
           bestDistance = distance;
-          bestCount = frequency + sameStart * 1000;
+          bestRank = rank;
         }
       }
     }

@@ -2002,7 +2002,7 @@ export const billsSubscriptionsEs: IntentText[] = [
       'toqué guardar factura dos veces, ¿se duplica?',
     ],
     answer:
-      'Elimina la que sobra con **Eliminar todo**, para que sus pagos dejen de contar:\n\n1. Abre la repetida desde **Facturas mensuales** (o **Suscripciones**).\n2. Toca el lápiz y luego **Eliminar factura** (o **Eliminar suscripción**).\n3. Toca **Eliminar todo**.\n\nLos totales y saldos se actualizan al instante. Una sola factura nunca se cobra dos veces el mismo mes (ni la misma semana, trimestre o año), así que un doble casi siempre significa que se agregaron dos copias. Tocar **Guardar factura** dos veces no crea un doble: el botón se queda en **Guardando…** hasta que se cierra la página.',
+      'Elimina la que sobra con **Eliminar todo**, para que sus pagos dejen de contar:\n\n1. Abre la repetida desde **Facturas mensuales** (o **Suscripciones**).\n2. Toca el lápiz y luego **Eliminar factura** (o **Eliminar suscripción**).\n3. Toca **Eliminar todo**.\n\nLos totales y saldos se actualizan al instante. Una sola factura nunca se cobra dos veces el mismo mes (ni la misma semana, trimestre o año), así que un doble casi siempre significa que se agregaron dos copias. Tocar **Guardar factura** dos veces, o volver a guardar después de perder la conexión, no crea un doble: el botón se queda en **Guardando…** hasta que se cierra la página, y un nuevo intento encuentra la factura que guardó el primero.',
     keywords: ['duplicada', 'doble', 'repetida', 'dos veces'],
   },
 

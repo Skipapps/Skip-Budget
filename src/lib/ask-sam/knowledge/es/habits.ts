@@ -824,7 +824,7 @@ export const habitsEs: IntentText[] = [
       'cuánta plata llevo ahorrada con el hábito y de dónde sale',
     ],
     answer:
-      'Ahorrado = días sin comprar × el precio del hábito.\n\nUn día sin comprar es un día terminado, desde que creaste el hábito hasta ayer, en el que no tocaste nada. Hoy cuenta solo cuando termina, así que Ahorrado sube durante la noche.\n\nEjemplo: Café a $5, creado hace 10 días. De esos 10 días terminados tocaste 4, así que 6 fueron días sin comprar: 6 × $5 = **$30.00**.\n\n**Ahorrado hasta hoy**, arriba, suma esto para todos tus hábitos actuales. Usa el precio actual de cada hábito, así que un precio nuevo cambia toda la cifra. Los días de un hábito eliminado ya no se incluyen.',
+      'Ahorrado = días sin comprar × el precio del hábito.\n\nUn día sin comprar es un día terminado, desde que creaste el hábito hasta ayer, en el que no tocaste nada. Hoy cuenta solo cuando termina, así que Ahorrado sube durante la noche.\n\nEjemplo: Café a $5, creado hace 10 días. De esos 10 días terminados tocaste 4, así que 6 fueron días sin comprar: 6 × $5 = **$30.00**.\n\n**Ahorrado hasta hoy**, arriba, suma esto para todos tus hábitos. Usa el precio actual de cada hábito, así que un precio nuevo cambia toda la cifra. Un hábito detenido con **Conservar los días anteriores** conserva lo que ahorró hasta el día antes de detenerlo; uno eliminado con **Eliminar todo** no suma nada.',
     keywords: ['ahorrado', 'ahorrado hasta hoy', 'fórmula', 'cálculo'],
   },
   {
@@ -865,7 +865,7 @@ export const habitsEs: IntentText[] = [
       'por que no cuadra lo ahorrado en mis habitos',
     ],
     answer:
-      'Cubren tramos de tiempo distintos:\n\n- **$10.00 ahorrado** en una tarjeta: ese hábito, solo la semana que ves.\n- **Ahorrado hasta hoy**, arriba de **Hábitos de gasto**: todos tus hábitos actuales, cada uno desde que empezó.\n- **Ahorrado hasta hoy** en **Ver detalles** de un hábito: ese hábito, desde que empezó.\n\nPor eso la cifra de arriba suele ser la más grande. Las tres usan la misma regla: días terminados sin comprar × el precio actual. Un hábito eliminado ya no cuenta en la cifra de arriba.',
+      'Cubren tramos de tiempo distintos:\n\n- **$10.00 ahorrado** en una tarjeta: ese hábito, solo la semana que ves.\n- **Ahorrado hasta hoy**, arriba de **Hábitos de gasto**: todos tus hábitos, cada uno desde que empezó. Un hábito detenido cuenta hasta el día antes de detenerlo.\n- **Ahorrado hasta hoy** en **Ver detalles** de un hábito: ese hábito, desde que empezó.\n\nPor eso la cifra de arriba suele ser la más grande. Las tres usan la misma regla: días terminados sin comprar × el precio actual. Un hábito eliminado con **Eliminar todo** ya no cuenta en la cifra de arriba.',
     keywords: ['ahorrado hasta hoy', 'ahorrado', 'distinto', 'no coincide'],
   },
   {
@@ -908,7 +908,7 @@ export const habitsEs: IntentText[] = [
       'hay forma de pausar habitos',
     ],
     answer:
-      'No hay pausa. Cada día terminado que no tocas cuenta como día sin comprar, estés donde estés, porque de verdad no gastaste ese dinero.\n\nSi prefieres que esos días no cuenten, puedes:\n- Dejarlo funcionando. Los días son honestos: sin café, sin gasto.\n- Detenerlo: toca el lápiz, **Eliminar hábito** y luego **Conservar los días anteriores**. Tus recibos se quedan, y puedes empezar un hábito nuevo cuando regreses. Los días ahorrados de un hábito detenido salen de **Ahorrado hasta hoy**, y el nuevo empieza desde cero.\n\nUna pausa es una buena idea para mandar desde **Ajustes → Soporte y comentarios → Comparte una idea**.',
+      'No hay pausa. Cada día terminado que no tocas cuenta como día sin comprar, estés donde estés, porque de verdad no gastaste ese dinero.\n\nSi prefieres que esos días no cuenten, puedes:\n- Dejarlo funcionando. Los días son honestos: sin café, sin gasto.\n- Detenerlo: toca el lápiz, **Eliminar hábito** y luego **Conservar los días anteriores**. Tus recibos se quedan, lo que ahorró se queda en **Ahorrado hasta hoy** hasta el día antes de detenerlo, y puedes empezar un hábito nuevo cuando regreses. El nuevo empieza desde cero.\n\nUna pausa es una buena idea para mandar desde **Ajustes → Soporte y comentarios → Comparte una idea**.',
     keywords: ['pausa', 'vacaciones', 'viaje', 'enfermo'],
   },
   {
@@ -929,7 +929,7 @@ export const habitsEs: IntentText[] = [
       'qué es la hucha de la pantalla de hábitos',
     ],
     answer:
-      'Es el total de todos tus hábitos actuales:\n\n- **Gastado esta semana**: los recibos de todos los hábitos con fecha de esta semana, sumados. Si retrocedes una semana, dice **Gastado esa semana**.\n- **Ahorrado hasta hoy**, con la alcancía: cada día sin comprar desde que empezó cada hábito, por su precio, de todos ellos.\n\nUn hábito eliminado no entra en ninguna de las dos cifras, aunque los recibos que conservaste siguen contando en tus gastos en el resto de Skip.',
+      'Es el total de todos tus hábitos:\n\n- **Gastado esta semana**: los recibos de todos los hábitos con fecha de esta semana, sumados, incluidos los de un hábito que detuviste esta semana. Si retrocedes una semana, dice **Gastado esa semana**.\n- **Ahorrado hasta hoy**, con la alcancía: cada día sin comprar desde que empezó cada hábito, por su precio. Un hábito detenido con **Conservar los días anteriores** cuenta hasta el día antes de detenerlo y luego ya no cambia.\n\nLas tarjetas de abajo muestran solo los hábitos que siguen activos. Si los detuviste todos, esta tarjeta se queda arriba de la página vacía mientras alguna de las dos cifras sea mayor que $0.00. Un hábito eliminado con **Eliminar todo** no entra en ninguna de las dos cifras.',
     keywords: ['gastado esta semana', 'ahorrado hasta hoy', 'tarjeta morada', 'alcancía'],
   },
   {
@@ -1253,9 +1253,10 @@ export const habitsEs: IntentText[] = [
       'borrar el hábito pero guardar el historial',
       'después de hoy ya no se registra nada, hábito',
       'borro el habito y mi saldo sube o baja',
+      'si paro un hábito se pierde lo ahorrado',
     ],
     answer:
-      'Las dos detienen el hábito para siempre, así que no se registra nada después de hoy. La diferencia son sus recibos pasados:\n\n- **Conservar los días anteriores**: cada día que tocaste se queda como recibo en **Recibos**, **Actividad**, tus totales y tu saldo, con el ícono del hábito. La tarjeta sale de **Hábitos de gasto**, sus días ahorrados salen de **Ahorrado hasta hoy**, y cada recibo dice **De un hábito eliminado: Café**.\n- **Eliminar todo**: se eliminan el hábito y todos sus recibos. Tus gastos bajan, y tu saldo sube por lo que sumaban.\n\nElige **Conservar los días anteriores** si de verdad compraste esas cosas. Elige **Eliminar todo** si el hábito fue una prueba o un error.',
+      'Las dos detienen el hábito para siempre, así que no se registra nada después de hoy. La diferencia son sus recibos pasados:\n\n- **Conservar los días anteriores**: cada día que tocaste se queda como recibo en **Recibos**, **Actividad**, tus totales y tu saldo, con el ícono del hábito. La tarjeta sale de **Hábitos de gasto**, lo que ahorró hasta el día anterior se queda en **Ahorrado hasta hoy**, y cada recibo dice **De un hábito eliminado: Café**. Los recibos con fecha del día en que lo detienes o posterior cuentan como gastado, nunca como ahorrado.\n- **Eliminar todo**: se eliminan el hábito y todos sus recibos. Tus gastos bajan, y tu saldo sube por lo que sumaban.\n\nElige **Conservar los días anteriores** si de verdad compraste esas cosas. Elige **Eliminar todo** si el hábito fue una prueba o un error.',
     keywords: ['conservar los días anteriores', 'eliminar todo', 'borrar', 'historial'],
   },
   {

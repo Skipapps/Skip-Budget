@@ -1496,7 +1496,7 @@ export const voicePrivacyHelpFr: IntentText[] = [
       '1. Vérifie que tu es en ligne, en Wi-Fi ou avec les données cellulaires.\n' +
       '2. Touche **Réessayer** sur la page, ou touche de nouveau le même bouton, comme **Enregistrer**.\n' +
       '3. Ça bloque encore ? Ferme Skip complètement et rouvre-la.\n\n' +
-      'Rien de ce que tu as déjà enregistré n’est perdu. Quand un enregistrement échoue, ce que tu avais saisi reste sur la page pour que tu puisses réessayer, et enregistrer de nouveau ne crée jamais de deuxième copie d’un reçu, d’un abonnement, d’une carte, d’un compte, d’un salaire, d’une habitude ou d’un paiement de carte. Si **Accueil** ou **Cartes** n’arrive pas à s’actualiser, ils gardent les chiffres qu’ils affichaient déjà.\n\n' +
+      'Rien de ce que tu as déjà enregistré n’est perdu. Quand un enregistrement échoue, ce que tu avais saisi reste sur la page pour que tu puisses réessayer, et enregistrer de nouveau ne crée jamais de deuxième copie d’un reçu, d’une facture, d’un abonnement, d’une carte, d’un compte, d’un salaire, d’une habitude ou d’un paiement de carte. Si **Accueil** ou **Cartes** n’arrive pas à s’actualiser, ils gardent les chiffres qu’ils affichaient déjà.\n\n' +
       'Les messages qui te disent quoi corriger, comme « Indique le nom de la banque. » ou « Choisis d’abord un magasin. », ne sont pas des échecs. Ils indiquent quelque chose qui attend encore une réponse.',
     keywords: ['Une erreur est survenue', 'Réessaie', 'Réessayer', 'erreur'],
   },
