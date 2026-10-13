@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { Redirect, router, useLocalSearchParams, type Href } from 'expo-router';
 import {
   AlignLeft,
@@ -19,7 +20,7 @@ import {
 } from '@/api/reminders';
 import { buildBillValues } from '@/api/entry-values';
 import { useCreateBill, useDeleteBill, useStopBill, useUpdateBill } from '@/api/mutations';
-import { usePastCharges, type CarriedValues } from '@/api/past-charges';
+import { usePastCharges, type CarriedValues, type PastRead } from '@/api/past-charges';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
@@ -330,6 +331,11 @@ function BillForm({
   const createBill = useCreateBill();
   const updateBill = useUpdateBill();
   const pastCharges = usePastCharges('bill', id);
+  // While the charges are read before a save or a delete: the buttons wait.
+  const [readingPast, setReadingPast] = useState(false);
+  // A new bill's row id for this visit, so a Save repeated after a lost answer finds the row the
+  // first may have filed instead of filing a second (`insertOnce`).
+  const [newBillId] = useState(() => randomUUID());
   // The bill once it is written (filed, or changed), with the past-charges rewrite still owed when
   // that failed: a Save pressed again after a later step failed finishes those steps alone, never
   // a second bill or a second change.
@@ -342,19 +348,30 @@ function BillForm({
   const stopBill = useStopBill();
   const toast = useToast();
 
+  /** The charges, read first when they have not been; null (the line said) when the read fails. */
+  const readPast = async (): Promise<PastRead | null> => {
+    setReadingPast(true);
+    try {
+      return await pastCharges.load();
+    } catch (thrown) {
+      warn();
+      setError(failureMessage(thrown));
+      return null;
+    } finally {
+      setReadingPast(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!id || !existing) return;
     setError(null);
     // The question counts the charges, so it waits for them as Save does.
-    if (!pastCharges.ready) {
-      pastCharges.retry();
-      warn();
-      setError(failureText());
-      return;
-    }
+    const past = await readPast();
+    if (!past) return;
     const choice = await pastCharges.chooseDelete(
       existing.name || categoryName(existing.category_id),
       { stopped: billStopped(existing, today) },
+      past,
     );
     if (choice === null) return;
 
@@ -456,6 +473,14 @@ function BillForm({
       fail(t('bills.add.missing', { fields: missing.join(', ') }));
       return;
     }
+    inFlight.current = true;
+    // Read before anything is built or asked: starts_on counts on from the newest charge, and the
+    // question counts them.
+    const past = await readPast();
+    if (!past) {
+      inFlight.current = false;
+      return;
+    }
     // Checks, icon rule and starts_on floor live in the shared builder, which the voice review page
     // saves through too.
     const built = buildBillValues(
@@ -471,9 +496,10 @@ function BillForm({
         sourceId,
         note,
       },
-      { sources, lastChargedOn: pastCharges.lastChargedOn, hasLoan: Boolean(loan) },
+      { sources, lastChargedOn: past.lastChargedOn, hasLoan: Boolean(loan) },
     );
     if (!built.ok) {
+      inFlight.current = false;
       fail(built.message);
       return;
     }
@@ -503,15 +529,7 @@ function BillForm({
           carried.bank_account_id !== (existing?.bank_account_id ?? null));
 
       // Asked before anything is written, so backing out leaves the bill as it was.
-      if (!pastCharges.ready) {
-        pastCharges.retry();
-        warn();
-        setError(failureText());
-        return;
-      }
-
-      inFlight.current = true;
-      const scope = await pastCharges.choose(carried.label, changed);
+      const scope = await pastCharges.choose(carried.label, changed, past);
       if (scope === null) {
         inFlight.current = false;
         return;
@@ -520,7 +538,7 @@ function BillForm({
       const billId =
         editing && id
           ? (await updateBill.mutateAsync({ id, values }), id)
-          : (await createBill.mutateAsync(values)).id;
+          : (await createBill.mutateAsync({ ...values, id: newBillId })).id;
       const done = { id: billId, rewrite: scope === 'all' ? carried : null };
       setWritten(done);
       await finishSave(done);
@@ -945,7 +963,7 @@ function BillForm({
             : t('bills.add.saveBill')
       }
       // Never greyed out for a gap: Save says what is still missing.
-      primaryDisabled={busy}
+      primaryDisabled={busy || readingPast}
       onPrimary={() => void handleSave()}
       error={error}
       footerSlot={
@@ -953,8 +971,8 @@ function BillForm({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('bills.add.deleteA11y')}
-            accessibilityState={{ disabled: deleting }}
-            disabled={deleting}
+            accessibilityState={{ disabled: deleting || readingPast }}
+            disabled={deleting || readingPast}
             onPress={() => void handleDelete()}
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >

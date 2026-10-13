@@ -139,6 +139,7 @@ jest.mock('@/api/past-charges', () => ({
     count: 0,
     lastChargedOn: null,
     ready: true,
+    load: async () => ({ count: 0, lastChargedOn: null }),
     retry: jest.fn(),
     saving: false,
   }),
@@ -2065,7 +2066,11 @@ describe('Add bill — deleting a saved bill', () => {
 
     await press(screen, 'Delete this bill');
 
-    expect(mockChooseDelete).toHaveBeenCalledWith('Power', { stopped: false });
+    expect(mockChooseDelete).toHaveBeenCalledWith(
+      'Power',
+      { stopped: false },
+      expect.objectContaining({ count: 0 }),
+    );
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockDelete).toHaveBeenCalledWith('bill-1');
     expect(mockUpdate).not.toHaveBeenCalled();

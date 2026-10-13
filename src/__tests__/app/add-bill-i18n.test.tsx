@@ -86,6 +86,7 @@ jest.mock('@/api/past-charges', () => ({
       ready: true,
       saving: false,
       count: 2,
+      load: async () => ({ count: 2, lastChargedOn: null }),
       choose: async () => 'upcoming',
       chooseDelete: (name: string, options: { stopped?: boolean } = {}) =>
         askDelete({ name, noun: 'charges', count: 2, stopped: options.stopped }),
