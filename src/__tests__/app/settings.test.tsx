@@ -347,8 +347,8 @@ describe('Settings, Your money', () => {
     await fireEvent.press(screen.getByRole('button', { name: /^Payday/ }));
 
     expect(jest.mocked(router.push).mock.calls.map(([href]) => href)).toEqual([
-      '/bill-plans',
-      '/subscription-plans',
+      '/bills',
+      '/subscriptions',
       '/salary',
     ]);
     expect(router.dismissTo).toHaveBeenCalledWith('/cards');

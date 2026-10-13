@@ -5,6 +5,8 @@
  */
 
 // babel-plugin-jest-hoist lifts the jest.mock() calls below above this import.
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { deleteAccount, signInWithEmail, signOut, verifyOtp } from './auth';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 import { FAILURE_MESSAGE } from '@/lib/failure';
@@ -50,6 +52,9 @@ const mockGetSession = jest.fn(async () => {
   return { data: { session: mockSession } };
 });
 
+// The real SDK starts a cleanup interval that holds Jest open.
+jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
+
 jest.mock('@/api/push', () => ({
   forgetDevice: (userId: string) => mockForgetDevice(userId),
 }));
@@ -62,6 +67,29 @@ jest.mock('@/api/voice-aliases', () => ({
 const mockForgetStores = jest.fn(async (_userId: string | null | undefined) => {});
 jest.mock('@/api/known-stores', () => ({
   forgetKnownStores: (userId: string | null | undefined) => mockForgetStores(userId),
+}));
+
+jest.mock('@react-native-async-storage/async-storage', () => {
+  const storage = jest.requireActual(
+    '@react-native-async-storage/async-storage/jest/async-storage-mock',
+  );
+  // However it is loaded (import, import(), require), `default` is the same storage.
+  storage.default = storage;
+  return storage;
+});
+
+const SEARCHES_A = 'skip.paymentSearches.user-A';
+const SEARCHES_B = 'skip.paymentSearches.user-B';
+
+/** The real forgetting, over the storage above: what each test starts from. */
+const forgetRealSearches = (userId: string | null | undefined) =>
+  jest
+    .requireActual<typeof import('@/api/payment-searches')>('@/api/payment-searches')
+    .forgetRecentSearches(userId);
+
+const mockForgetSearches = jest.fn(async (_userId: string | null | undefined) => {});
+jest.mock('@/api/payment-searches', () => ({
+  forgetRecentSearches: (userId: string | null | undefined) => mockForgetSearches(userId),
 }));
 
 // Not added to `order`: the sequence tests above are about the session, and this cancel has no
@@ -88,7 +116,8 @@ jest.mock('@/lib/supabase', () => ({
 }));
 
 describe('signOut', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
     order.length = 0;
     mockForgetDevice.mockClear();
     mockAuthSignOut.mockClear();
@@ -103,6 +132,8 @@ describe('signOut', () => {
     mockForgetVoice.mockImplementation(async () => {});
     mockForgetStores.mockReset();
     mockForgetStores.mockImplementation(async () => {});
+    mockForgetSearches.mockReset();
+    mockForgetSearches.mockImplementation(forgetRealSearches);
   });
 
   it("deletes this device's push row before the session is cleared", async () => {
@@ -194,6 +225,7 @@ describe('signOut', () => {
     const result = await signOut();
 
     expect(mockForgetStores).not.toHaveBeenCalled();
+    expect(mockForgetSearches).not.toHaveBeenCalled();
     expect(mockAuthSignOut).toHaveBeenCalledTimes(1);
     expect(result.error).toBeNull();
     warn.mockRestore();
@@ -202,6 +234,57 @@ describe('signOut', () => {
   it('signs out anyway when the remembered stores cannot be cleared', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     mockForgetStores.mockImplementation(async () => {
+      throw new Error('storage unavailable');
+    });
+
+    const result = await signOut();
+
+    expect(order).toEqual(['forget', 'signOut']);
+    expect(result.error).toBeNull();
+    warn.mockRestore();
+  });
+
+  it("forgets the signed-out person's recent payment searches, and nobody else's", async () => {
+    await AsyncStorage.setItem(SEARCHES_A, JSON.stringify(['Rent', 'Netflix']));
+    await AsyncStorage.setItem(SEARCHES_B, JSON.stringify(['Gym']));
+    mockForgetVoice.mockImplementation(async () => {
+      order.push('voice');
+    });
+    mockForgetStores.mockImplementation(async () => {
+      order.push('stores');
+    });
+    mockForgetSearches.mockImplementation(async (userId) => {
+      order.push('searches');
+      await forgetRealSearches(userId);
+    });
+
+    const result = await signOut();
+
+    expect(mockForgetSearches).toHaveBeenCalledTimes(1);
+    expect(mockForgetSearches).toHaveBeenCalledWith('user-A');
+    expect(await AsyncStorage.getItem(SEARCHES_A)).toBeNull();
+    expect(await AsyncStorage.getItem(SEARCHES_B)).toBe('["Gym"]');
+    expect(order).toEqual(['forget', 'voice', 'stores', 'searches', 'signOut']);
+    expect(result.error).toBeNull();
+  });
+
+  it('signs out anyway when the phone refuses to clear the recent searches', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    await AsyncStorage.setItem(SEARCHES_A, JSON.stringify(['Rent']));
+    (AsyncStorage.removeItem as jest.Mock).mockRejectedValueOnce(new Error('storage full'));
+
+    const result = await signOut();
+
+    expect(mockForgetSearches).toHaveBeenCalledWith('user-A');
+    expect(warn).toHaveBeenCalledWith('Could not clear recent searches', expect.any(Error));
+    expect(mockAuthSignOut).toHaveBeenCalledTimes(1);
+    expect(result.error).toBeNull();
+    warn.mockRestore();
+  });
+
+  it('signs out anyway when forgetting the recent searches fails outright', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockForgetSearches.mockImplementation(async () => {
       throw new Error('storage unavailable');
     });
 
@@ -265,7 +348,8 @@ describe('signOut', () => {
 });
 
 describe('deleteAccount', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
     order.length = 0;
     mockAuthSignOut.mockClear();
     mockSession = { user: { id: 'user-A' } };
@@ -279,6 +363,8 @@ describe('deleteAccount', () => {
     });
     mockForgetStores.mockReset();
     mockForgetStores.mockImplementation(async () => {});
+    mockForgetSearches.mockReset();
+    mockForgetSearches.mockImplementation(forgetRealSearches);
   });
 
   it("forgets the person's voice corrections once the account is really gone", async () => {
@@ -305,6 +391,21 @@ describe('deleteAccount', () => {
     expect(order).toEqual(['voice', 'stores', 'signOut']);
   });
 
+  it('forgets their recent payment searches too, before signing out', async () => {
+    await AsyncStorage.setItem(SEARCHES_A, JSON.stringify(['Rent']));
+    mockForgetSearches.mockImplementation(async (userId) => {
+      order.push('searches');
+      await forgetRealSearches(userId);
+    });
+
+    const result = await deleteAccount();
+
+    expect(result.error).toBeNull();
+    expect(mockForgetSearches).toHaveBeenCalledWith('user-A');
+    expect(await AsyncStorage.getItem(SEARCHES_A)).toBeNull();
+    expect(order).toEqual(['voice', 'searches', 'signOut']);
+  });
+
   it('takes the pending wrap-up notice off the phone once the account is gone', async () => {
     mockCancelWrapUp.mockClear();
 
@@ -327,6 +428,7 @@ describe('deleteAccount', () => {
 
     expect(mockForgetVoice).not.toHaveBeenCalled();
     expect(mockForgetStores).not.toHaveBeenCalled();
+    expect(mockForgetSearches).not.toHaveBeenCalled();
     expect(mockCancelWrapUp).not.toHaveBeenCalled();
     expect(mockAuthSignOut).not.toHaveBeenCalled();
     expect(readVoiceDraft(id)).not.toBeNull();

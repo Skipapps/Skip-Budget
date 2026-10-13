@@ -5,20 +5,19 @@ import type { ReactElement } from 'react';
 
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
-import BillPlansScreen from '@/app/bill-plans';
 import BillDetailScreen from '@/app/bill/[id]';
 import BillsScreen from '@/app/bills';
 import SetupBillsScreen from '@/app/setup-bills';
 import SetupSubscriptionsScreen from '@/app/setup-subscriptions';
-import SubscriptionPlansScreen from '@/app/subscription-plans';
 import SubscriptionsScreen from '@/app/subscriptions';
 import SubscriptionDetailScreen from '@/app/subscription/[id]';
 
 /**
  * A bill or subscription whose past was kept on Delete has stopped, and stopped is final: its page
- * has no pencil, only Delete, and that Delete can only remove it, the way out keeping its past. The
- * lists keep it under the running ones ("Stopped", "Cancelled") with no date groups and out of every
- * count and total. Seen on 12 Oct 2026; Gym was stopped today, Course before its first day.
+ * has no pencil, only Delete, and that Delete can only remove it, the way out keeping its past.
+ * Monthly bills and Subscriptions keep it in a section under the running ones ("Stopped",
+ * "Cancelled"), out of every count and total. Seen on 12 Oct 2026; Gym was stopped today, Course
+ * before its first day.
  *
  * The questions are the real ones (`usePastCharges` over `usePastChoice`), over the charges below.
  */
@@ -65,6 +64,9 @@ jest.mock('@/providers/theme-provider', () => ({
 }));
 
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
+jest.mock('@/providers/session-provider', () => ({ useUserId: () => null }));
+jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
+jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
 const mockAsk = jest.fn(async (_request: object): Promise<string | null> => null);
 jest.mock('@/providers/dialog-provider', () => ({ useDialog: () => mockAsk }));
 const mockToast = jest.fn();
@@ -74,13 +76,17 @@ jest.mock('@/api/mutations', () => ({
   useDeleteBill: () => ({ mutateAsync: mockDelete, isPending: false }),
   useDeleteSubscription: () => ({ mutateAsync: mockDelete, isPending: false }),
 }));
-jest.mock('@/api/loans', () => ({
-  useLoanDetail: () => ({ data: { kind: 'bill' }, isPending: false, isError: false }),
-}));
-let mockLoanEndings = new Map<string, { ending: 'paid' | 'stopped'; endedOn: string }>();
-jest.mock('@/components/loans/use-loan-endings', () => ({
-  useLoanEndings: () => mockLoanEndings,
-}));
+let mockLoans: ReturnType<typeof loanRow>[] = [];
+jest.mock('@/api/loans', () => {
+  const { termsFromStored } = jest.requireActual('@/lib/loan');
+  return {
+    useLoanDetail: () => ({ data: { kind: 'bill' }, isPending: false, isError: false }),
+    // A stopped loan's row reads whether it was paid off from these, with its real schedule behind.
+    useLoans: () => ({ loans: mockLoans, isPending: false, isError: false, refetch: jest.fn() }),
+    loanTermsOf: (row: ReturnType<typeof loanRow>) =>
+      termsFromStored(row, row.bill.starts_on ?? undefined),
+  };
+});
 
 const RENT = {
   id: 'b1',
@@ -118,8 +124,8 @@ const COURSE = {
   starts_on: '2026-10-12',
   ends_on: '2026-10-12',
 };
-// Loans' bills: one paid off with a payoff, one stopped by "Keep past payments", and one whose
-// last payment is behind while its bill still names a date ahead.
+// Loans' bills: one paid off (its schedule's last payment came on 3 Oct) and one stopped by "Keep
+// past payments" on 5 Oct with money still owed.
 const CAR = {
   ...RENT,
   id: 'l1',
@@ -127,16 +133,55 @@ const CAR = {
   amount: 424.8,
   category_id: 'loans',
   icon_id: 'loan-car',
-  next_due_on: '2026-10-27',
+  next_due_on: null,
+  starts_on: '2025-11-03',
   ends_on: '2026-10-03',
 };
-const VAN = { ...CAR, id: 'l2', name: 'Van loan', next_due_on: null, ends_on: '2026-10-05' };
+const VAN = {
+  ...CAR,
+  id: 'l2',
+  name: 'Van loan',
+  starts_on: '2026-01-05',
+  ends_on: '2026-10-05',
+};
+
+// A loan whose bill still runs, as the setup step lists it.
 const TRUCK = { ...CAR, id: 'l3', name: 'Truck loan', next_due_on: '2026-11-01', ends_on: null };
-const LOAN_ENDINGS = new Map([
-  ['l1', { ending: 'paid' as const, endedOn: '2026-10-03' }],
-  ['l2', { ending: 'stopped' as const, endedOn: '2026-10-05' }],
-  ['l3', { ending: 'paid' as const, endedOn: '2026-10-01' }],
-]);
+
+/** A loan as the Loans read has it, with the terms its bill was saved under. */
+function loanRow(
+  bill: typeof CAR,
+  fields: { principal: number; term_months: number; monthly_payment: number; annual_rate: number },
+) {
+  return {
+    id: `loan-${bill.id}`,
+    bill_id: bill.id,
+    total_interest: 0,
+    first_payment_on: bill.starts_on,
+    funded_on: null,
+    day_count_basis: 'monthly',
+    statement_on: null,
+    statement_principal: null,
+    payment_overrides: null,
+    created_at: '2025-10-01T10:00:00Z',
+    billEnded: true,
+    payoffs: [],
+    ...fields,
+    bill,
+  };
+}
+const CAR_LOAN = loanRow(CAR, {
+  principal: 1200,
+  annual_rate: 0,
+  term_months: 12,
+  monthly_payment: 100,
+});
+const VAN_LOAN = loanRow(VAN, {
+  principal: 9000,
+  annual_rate: 7.5,
+  term_months: 60,
+  monthly_payment: 210,
+});
 
 const NETFLIX = {
   id: 's1',
@@ -158,25 +203,49 @@ const mockCharge = (
   id: string,
   plan: { bill_id?: string; subscription_id?: string },
   on: string,
+  label: string,
+  amount: number,
 ) => ({
   id,
   bill_id: null,
   subscription_id: null,
-  label: '',
-  amount: 0,
+  label,
+  amount,
   card_id: null,
   bank_account_id: null,
   ...plan,
   charged_on: on,
 });
 const mockCharges = [
-  mockCharge('c1', { bill_id: 'b2' }, '2026-09-15'),
-  mockCharge('c2', { bill_id: 'b2' }, '2026-08-15'),
-  mockCharge('c3', { subscription_id: 's2' }, '2026-09-03'),
-  mockCharge('c4', { subscription_id: 's2' }, '2026-08-03'),
+  ...['2026-01-01', '2026-02-01', '2026-03-01', '2026-04-01', '2026-05-01'].map((on, index) =>
+    mockCharge(`r${index}`, { bill_id: 'b1' }, on, 'Rent', 1100),
+  ),
+  ...['2026-06-01', '2026-07-01', '2026-08-01', '2026-09-01', '2026-10-01'].map((on, index) =>
+    mockCharge(`r${index + 5}`, { bill_id: 'b1' }, on, 'Rent', 1100),
+  ),
+  mockCharge('c1', { bill_id: 'b2' }, '2026-09-15', 'Gym', 40),
+  mockCharge('c2', { bill_id: 'b2' }, '2026-08-15', 'Gym', 40),
+  mockCharge('c3', { subscription_id: 's2' }, '2026-09-03', 'Calm', 14.99),
+  mockCharge('c4', { subscription_id: 's2' }, '2026-08-03', 'Calm', 14.99),
+  mockCharge('n1', { subscription_id: 's1' }, '2026-09-20', 'Netflix', 15.99),
 ];
 jest.mock('@/api/charges', () => ({
-  useCharges: () => ({ data: mockCharges, isSuccess: true, refetch: jest.fn() }),
+  useCharges: () => ({
+    data: mockCharges,
+    isSuccess: true,
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+}));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: [],
+    labelOf: () => null,
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
 }));
 
 let mockBills: unknown[] = [];
@@ -189,8 +258,10 @@ const mockQuery = (data: unknown[]) => ({
   refetch: jest.fn(),
 });
 jest.mock('@/api/queries', () => ({
+  ...jest.requireActual('@/api/queries'),
   useBills: () => mockQuery(mockBills),
   useSubscriptions: () => mockQuery(mockSubscriptions),
+  useLoanPayoffRows: () => mockQuery([]),
   usePaymentSources: () => ({ sources: [] }),
   useLedger: () => ({
     entries: [],
@@ -218,7 +289,7 @@ const EITHER = 'Either way, nothing after today is recorded.';
 beforeEach(() => {
   jest.clearAllMocks();
   resetLocaleForTests();
-  mockLoanEndings = new Map();
+  mockLoans = [];
   mockBills = [RENT, GYM, COURSE];
   mockSubscriptions = [NETFLIX, CALM];
   mockId = 'b2';
@@ -339,107 +410,144 @@ describe('a cancelled subscription’s page', () => {
   });
 });
 
-describe('Your bills', () => {
-  it('lists stopped bills under Stopped, out of the count and the total', async () => {
-    await show(<BillPlansScreen />);
+describe('Monthly bills: stopped bills', () => {
+  it('lists stopped bills in a Stopped section at the bottom, out of the count and the figure', async () => {
+    await show(<BillsScreen />);
 
-    expect(screen.getByText('1 bill')).toBeTruthy();
-    // Rent alone: the header, its day's total and its row. With the stopped ones it would be $1,340.
-    expect(screen.getAllByText('-$1,100.00')).toHaveLength(3);
-    expect(screen.queryByText('-$1,340.00')).toBeNull();
-    const stopped = within(screen.getByTestId('bills-stopped'));
-    expect(stopped.getByText('Stopped')).toBeTruthy();
+    // Rent alone: the 1 Oct payment. With the stopped ones the figure would be $1,340.00.
+    expect(screen.getByText('1 bill · 1 paid · 0 coming up')).toBeTruthy();
+    expect(
+      within(screen.getByTestId('fit-figure-month-card-figure')).getByText('$1,100.00'),
+    ).toBeTruthy();
+    expect(screen.queryByText('$1,340.00')).toBeNull();
+    expect(
+      within(screen.getByTestId('all-plans')).getByRole('header', { name: 'All bills, 1' }),
+    ).toBeTruthy();
+
+    const stopped = within(screen.getByTestId('stopped-plans'));
+    expect(stopped.getByRole('header', { name: 'Stopped, 2' })).toBeTruthy();
     expect(stopped.getAllByText('Stopped on 12 Oct 2026')).toHaveLength(2);
     expect(stopped.queryByText('Rent')).toBeNull();
-    expect(stopped.getByLabelText(/^Gym, .*\. Stopped on 12 Oct 2026$/)).toBeTruthy();
+    expect(stopped.getByLabelText(/^Gym, .*, Stopped on 12 Oct 2026$/)).toBeTruthy();
+    // Under the running ones, and above the link to the history.
+    expect(
+      screen
+        .getAllByTestId(/^(all-plans|stopped-plans|see-history)$/)
+        .map((node) => node.props.testID),
+    ).toEqual(['all-plans', 'stopped-plans', 'see-history']);
+    // Stopped is final: no "Add a card" on its rows.
+    expect(screen.queryByTestId('stopped-row-b2-add-card')).toBeNull();
 
     await fireEvent.press(stopped.getByLabelText(/^Gym,/));
     expect(router.push).toHaveBeenCalledWith({ pathname: '/bill/[id]', params: { id: 'b2' } });
   });
 
-  it('searches the stopped ones too, counting only the running', async () => {
-    await show(<BillPlansScreen />);
+  it('never lists a stopped bill under Coming up or All bills', async () => {
+    await show(<BillsScreen />);
 
-    await fireEvent.changeText(screen.getByPlaceholderText('Search bills'), 'gym');
-
-    expect(screen.getByText('0 of 1 bills')).toBeTruthy();
-    expect(screen.getByLabelText(/^Gym,/)).toBeTruthy();
-    expect(screen.queryByLabelText(/^Course,/)).toBeNull();
-    expect(screen.queryByLabelText(/^Rent,/)).toBeNull();
+    expect(screen.queryByTestId('coming-up')).toBeNull();
+    const all = within(screen.getByTestId('all-plans'));
+    expect(all.queryByText('Gym')).toBeNull();
+    expect(all.queryByText('Course')).toBeNull();
+    expect(all.getByText('Rent')).toBeTruthy();
   });
 
   it('says a finished loan was paid off, or stopped, as the Loans page does', async () => {
-    mockBills = [RENT, CAR, VAN, TRUCK];
-    mockLoanEndings = LOAN_ENDINGS;
-    await show(<BillPlansScreen />);
+    mockBills = [RENT, CAR, VAN];
+    mockLoans = [CAR_LOAN, VAN_LOAN];
+    await show(<BillsScreen />);
 
-    expect(screen.getByText('1 bill')).toBeTruthy();
-    const stopped = within(screen.getByTestId('bills-stopped'));
-    expect(stopped.getByLabelText(/^Car loan, .*\. Paid off on 3 Oct 2026$/)).toBeTruthy();
-    expect(stopped.getByLabelText(/^Van loan, .*\. Stopped on 5 Oct 2026$/)).toBeTruthy();
-    // Finished by its schedule though its bill still names a day ahead.
-    expect(stopped.getByLabelText(/^Truck loan, .*\. Paid off on 1 Oct 2026$/)).toBeTruthy();
+    expect(screen.getByText('1 bill · 1 paid · 0 coming up')).toBeTruthy();
+    const stopped = within(screen.getByTestId('stopped-plans'));
+    expect(stopped.getByLabelText(/^Car loan, .*, Paid off on 3 Oct 2026$/)).toBeTruthy();
+    expect(stopped.getByLabelText(/^Van loan, .*, Stopped on 5 Oct 2026$/)).toBeTruthy();
 
     await fireEvent.press(stopped.getByLabelText(/^Car loan,/));
     expect(router.push).toHaveBeenCalledWith({ pathname: '/loan/[id]', params: { id: 'l1' } });
   });
 
   it.each([
-    ['es', 'Liquidado el 3 oct 2026', 'Detenido el 5 oct 2026'],
-    ['fr', 'Remboursé le 3 oct. 2026', 'Arrêté le 5 oct. 2026'],
+    ['es', 'Liquidado el 3 oct 2026'],
+    ['fr', 'Remboursé le 3 oct. 2026'],
+  ] as const)('says a paid-off loan in %s, in the loan’s own gender', async (language, paid) => {
+    setLanguage(language);
+    mockBills = [CAR, VAN];
+    mockLoans = [CAR_LOAN, VAN_LOAN];
+    await show(<BillsScreen />);
+
+    expect(within(screen.getByTestId('stopped-plans')).getByText(paid)).toBeTruthy();
+  });
+
+  // The loan's bill words, bills.loanStoppedOn, are the loan's own gender ("Detenido", "Arrêté");
+  // the row says the bill's ("Detenida", "Arrêtée"): stopped-row.tsx, stoppedWords, uses
+  // bills.stoppedOn for a stopped loan. Fix: for a loan with ending 'stopped', say bills.loanStoppedOn
+  // (bills.loanStopped with no date).
+  it.each([
+    ['es', 'Detenido el 5 oct 2026'],
+    ['fr', 'Arrêté le 5 oct. 2026'],
   ] as const)(
-    'says how a loan ended in %s, in the loan’s own gender',
-    async (language, paid, end) => {
+    'BUG: says a stopped loan in %s in the loan’s own gender',
+    async (language, stoppedOn) => {
       setLanguage(language);
       mockBills = [CAR, VAN];
-      mockLoanEndings = LOAN_ENDINGS;
-      await show(<BillPlansScreen />);
+      mockLoans = [CAR_LOAN, VAN_LOAN];
+      await show(<BillsScreen />);
 
-      const stopped = within(screen.getByTestId('bills-stopped'));
-      expect(stopped.getByText(paid)).toBeTruthy();
-      expect(stopped.getByText(end)).toBeTruthy();
+      expect(within(screen.getByTestId('stopped-plans')).getByText(stoppedOn)).toBeTruthy();
     },
   );
 
   it('has no Stopped section while every bill runs', async () => {
     mockBills = [RENT];
-    await show(<BillPlansScreen />);
+    await show(<BillsScreen />);
 
-    expect(screen.queryByTestId('bills-stopped')).toBeNull();
+    expect(screen.queryByTestId('stopped-plans')).toBeNull();
   });
-});
 
-describe('Your subscriptions', () => {
-  it('lists cancelled ones under Cancelled with their last charge, out of the count', async () => {
-    await show(<SubscriptionPlansScreen />);
-
-    expect(screen.getByText('1 subscription')).toBeTruthy();
-    const cancelled = within(screen.getByTestId('subscriptions-cancelled'));
-    expect(cancelled.getByText('Cancelled')).toBeTruthy();
-    expect(cancelled.getByText('Cancelled · last charged 3 Sep 2026')).toBeTruthy();
-    // Read aloud without the dot.
-    expect(
-      cancelled.getByLabelText('Calm, $14.99 Monthly. Cancelled, last charged 3 Sep 2026'),
-    ).toBeTruthy();
-    expect(cancelled.queryByText('Netflix')).toBeNull();
-  });
-});
-
-describe('Monthly bills', () => {
-  it('says there are no bills yet when every bill has stopped and nothing was charged', async () => {
+  it('keeps stopped bills on the page when every bill has stopped, with nothing due, not as no bills', async () => {
     mockBills = [GYM, COURSE];
     await show(<BillsScreen />);
 
-    expect(screen.getByText('No bills yet')).toBeTruthy();
+    expect(screen.queryByText('No bills yet')).toBeNull();
+    expect(screen.getByText('Nothing due in October')).toBeTruthy();
+    expect(screen.queryByTestId('all-plans')).toBeNull();
+    expect(within(screen.getByTestId('stopped-plans')).getByText('Gym')).toBeTruthy();
   });
 });
 
-describe('Subscriptions', () => {
-  it('says there are none yet when every one is cancelled and nothing renewed', async () => {
+describe('Subscriptions: cancelled subscriptions', () => {
+  it('lists cancelled ones in a Cancelled section with their last charge, out of the count', async () => {
+    await show(<SubscriptionsScreen />);
+
+    expect(screen.getByText('1 subscription · 0 paid · 1 coming up')).toBeTruthy();
+    expect(
+      within(screen.getByTestId('all-plans')).getByRole('header', { name: 'All subscriptions, 1' }),
+    ).toBeTruthy();
+    const cancelled = within(screen.getByTestId('stopped-plans'));
+    expect(cancelled.getByRole('header', { name: 'Cancelled, 1' })).toBeTruthy();
+    expect(cancelled.getByText('Cancelled · last charged 3 Sep 2026')).toBeTruthy();
+    expect(
+      cancelled.getByLabelText(
+        'Calm, $14.99, Monthly, Card not set, Cancelled, last charged 3 Sep 2026',
+      ),
+    ).toBeTruthy();
+    expect(cancelled.queryByText('Netflix')).toBeNull();
+    // Final: no "Add a card", and its row opens its read-only page.
+    expect(screen.queryByTestId('stopped-row-s2-add-card')).toBeNull();
+    await fireEvent.press(cancelled.getByLabelText(/^Calm,/));
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/subscription/[id]',
+      params: { id: 's2' },
+    });
+  });
+
+  it('keeps a cancelled subscription on the page when every one is cancelled, not as none yet', async () => {
     mockSubscriptions = [CALM];
     await show(<SubscriptionsScreen />);
 
-    expect(screen.getByText('No subscriptions yet')).toBeTruthy();
+    expect(screen.queryByText('No subscriptions yet')).toBeNull();
+    expect(screen.getByText('Nothing due in October')).toBeTruthy();
+    expect(within(screen.getByTestId('stopped-plans')).getByText('Calm')).toBeTruthy();
   });
 });
 

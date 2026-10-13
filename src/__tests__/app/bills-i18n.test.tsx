@@ -1,15 +1,23 @@
-import { fireEvent, getDefaultNormalizer, render } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  fireEvent,
+  getDefaultNormalizer,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 import { Dimensions, StyleSheet } from 'react-native';
 import type { ReactTestRendererJSON } from 'react-test-renderer';
 
-import BillPlansScreen from '@/app/bill-plans';
 import BillDetailScreen from '@/app/bill/[id]';
 import BillsScreen from '@/app/bills';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 /**
- * The bill list, the charged bills and one bill's page read in Spanish and French: the words, the
- * schedules and categories mapped from their stored values, the counts, the dates and the money.
+ * Monthly bills and one bill's page read in Spanish and French: the words, the schedules and
+ * categories mapped from their stored values, the counts, the dates and the money. The month page
+ * runs its own hook, `usePlanMonth`, over the real ledger; only the reads under it are fakes.
  */
 
 // The bill category icons follow the theme, which this file's theme mock does not provide.
@@ -24,19 +32,20 @@ jest.mock('react-native-safe-area-context', () => ({
   ...jest.requireActual('react-native-safe-area-context'),
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
+let mockParams: Record<string, string> = { id: 'b1' };
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
-  useLocalSearchParams: () => ({ id: 'b1' }),
+  useLocalSearchParams: () => mockParams,
 }));
 jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
+jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
 jest.mock('@/components/brands/brand-logo', () => ({ BrandLogo: () => null }));
 jest.mock('@/components/brands/brand-mark', () => ({ BrandMark: () => null }));
 jest.mock('@/components/bills/bill-mark', () => ({ BillMark: () => null }));
 jest.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null, SkeletonList: () => null }));
-jest.mock('@/components/ui/range-dropdown', () => ({ RangeDropdown: () => null }));
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({
     ink: '#000000',
@@ -46,7 +55,11 @@ jest.mock('@/providers/theme-provider', () => ({
     accentInk: '#905479',
   }),
   useMoneyColor: () => () => '#000000',
+  useTheme: () => ({ scheme: 'light' }),
 }));
+jest.mock('@/lib/supabase', () => ({ supabase: {} }));
+jest.mock('@/providers/session-provider', () => ({ useUserId: () => null }));
+jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
 
 const BILLS = [
   {
@@ -61,6 +74,7 @@ const BILLS = [
     ends_on: null,
     card_id: 'card-1',
     bank_account_id: null,
+    created_at: '2026-07-20T12:00:00Z',
     note: 'Depto 4',
     brands: null,
   },
@@ -76,8 +90,33 @@ const BILLS = [
     ends_on: null,
     card_id: null,
     bank_account_id: null,
+    created_at: '2026-07-20T12:00:00Z',
     note: null,
     brands: null,
+  },
+];
+
+// What was recorded: Renta on 15 Sep, CFE on 1 Aug. Today is 3 Oct, so 15 Oct is still to come.
+const CHARGES = [
+  {
+    id: 'c1',
+    bill_id: 'b1',
+    subscription_id: null,
+    label: 'Renta',
+    amount: 1100,
+    charged_on: '2026-09-15',
+    card_id: 'card-1',
+    bank_account_id: null,
+  },
+  {
+    id: 'c2',
+    bill_id: 'b2',
+    subscription_id: null,
+    label: 'CFE',
+    amount: 30.5,
+    charged_on: '2026-08-01',
+    card_id: null,
+    bank_account_id: null,
   },
 ];
 
@@ -91,7 +130,14 @@ const charge = (date: string, planId = 'b1') => ({
   planId,
 });
 
-let mockBills: { data: unknown[] | undefined; isPending: boolean; isError: boolean };
+type Read = {
+  data: unknown[] | undefined;
+  isPending: boolean;
+  isLoading: boolean;
+  isError: boolean;
+};
+let mockBills: Read;
+let mockCharges: unknown[];
 let mockEntries: ReturnType<typeof charge>[];
 
 // No loan behind these bills: the page stays a bill page.
@@ -113,11 +159,45 @@ jest.mock('@/providers/dialog-provider', () => ({ useDialog: () => jest.fn() }))
 
 jest.mock('@/api/loans', () => ({
   useLoanDetail: () => ({ data: { kind: 'bill' }, isPending: false, isError: false }),
+  // No loan here: a stopped loan's row reads these, and none is shown.
+  useLoans: () => ({ loans: [], isPending: false, isError: false, refetch: jest.fn() }),
+  loanTermsOf: () => null,
 }));
-// How each loan ended, for a loan's bill under Stopped; none here has ended.
-jest.mock('@/components/loans/use-loan-endings', () => ({ useLoanEndings: () => new Map() }));
+jest.mock('@/api/charges', () => ({
+  ...jest.requireActual('@/api/charges'),
+  useCharges: () => ({
+    data: mockCharges,
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+}));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: [],
+    labelOf: (id: string) => (id === 'card-1' ? 'VISA ••4421' : null),
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+}));
 jest.mock('@/api/queries', () => ({
+  ...jest.requireActual('@/api/queries'),
   useBills: () => ({ ...mockBills, refetch: jest.fn() }),
+  useSubscriptions: () => ({
+    data: [],
+    isPending: false,
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+  useLoanPayoffRows: () => ({
+    data: [],
+    isPending: false,
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
   usePaymentSources: () => ({
     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
   }),
@@ -136,7 +216,7 @@ jest.useFakeTimers({
   doNotFake: ['nextTick', 'setImmediate'],
 });
 
-const NBSP = '\u00a0';
+const NBSP = ' ';
 
 type Node = ReactTestRendererJSON | ReactTestRendererJSON[] | string | null;
 
@@ -158,176 +238,204 @@ function expectNoRawText(tree: Node) {
   expect(lines.filter((line) => /\{\w+\}/.test(line))).toEqual([]);
 }
 
+const textOf = (node: { props: Record<string, unknown> }) =>
+  [node.props.children as unknown]
+    .flat(Infinity)
+    .filter((part) => typeof part === 'string' || typeof part === 'number')
+    .join('');
+/** Every line a node draws, top to bottom. */
+const linesIn = (node: Parameters<typeof within>[0]) => within(node).getAllByText(/./).map(textOf);
+
+/** The page, with what its refresh needs around it. */
+function show(page: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  return render(<QueryClientProvider client={client}>{page}</QueryClientProvider>);
+}
+
 beforeEach(() => {
+  jest.clearAllMocks();
   resetLocaleForTests();
-  mockBills = { data: BILLS, isPending: false, isError: false };
+  mockParams = { id: 'b1' };
+  mockBills = { data: BILLS, isPending: false, isLoading: false, isError: false };
+  mockCharges = CHARGES;
   mockEntries = [charge('2026-09-15'), charge('2026-10-15'), charge('2026-10-01', 'b2')];
+  const window = { width: 390, height: 844, scale: 3, fontScale: 1 };
+  Dimensions.set({ window, screen: window });
 });
 afterAll(() => resetLocaleForTests());
 
-describe('Your bills', () => {
-  it('reads in Spanish, with each schedule and category from its stored value', async () => {
+describe('Monthly bills', () => {
+  it('reads in Spanish: the card, Coming up and every bill, with each schedule from its stored value', async () => {
     setLanguage('es');
-    const screen = await render(<BillPlansScreen />);
+    await show(<BillsScreen />);
 
-    expect(screen.getByText('Tus facturas')).toBeTruthy();
-    expect(screen.getByLabelText('Agregar factura')).toBeTruthy();
-    expect(screen.getByPlaceholderText('Buscar facturas')).toBeTruthy();
-    expect(screen.getByLabelText('Filtrar facturas')).toBeTruthy();
-    expect(screen.getByText('2 facturas')).toBeTruthy();
-    expect(screen.getByText('-$1,130.50')).toBeTruthy();
-    expect(screen.getByText('Mensual · VISA ••4421')).toBeTruthy();
-    expect(screen.getByText('Cada 3 meses')).toBeTruthy();
-    // The row's due date, and the day heading over it.
-    expect(screen.getAllByText('15 oct 2026').length).toBeGreaterThan(0);
+    expect(screen.getByRole('header', { name: 'Facturas mensuales' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Agregar factura' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Buscar pagos' })).toBeTruthy();
+    expect(linesIn(screen.getByTestId('month-card-summary'))).toEqual([
+      'A pagar en octubre',
+      '$1,100.00',
+      '1 factura · pagadas: 0 · por pagar: 1',
+      'Próximo: Renta · 15 oct',
+    ]);
+    expect(screen.getByTestId('month-card-summary').props.accessibilityLabel).toBe(
+      'A pagar en octubre: $1,100.00. 1 factura · pagadas: 0 · por pagar: 1. Próximo: Renta · 15 oct',
+    );
     expect(
-      screen.getByLabelText('Renta, -$1,100.00, Mensual, se paga con VISA ••4421'),
+      screen.getByRole('button', { name: 'Mes: octubre de 2026. Elige otro mes' }),
     ).toBeTruthy();
+
+    const coming = within(screen.getByTestId('coming-up'));
+    expect(coming.getByRole('header', { name: 'Próximos, 1' })).toBeTruthy();
+    expect(
+      coming.getByLabelText('Renta, $1,100.00, vence el 15 oct, en 12 días, VISA ••4421'),
+    ).toBeTruthy();
+
+    const all = within(screen.getByTestId('all-plans'));
+    expect(all.getByRole('header', { name: 'Todas las facturas, 2' })).toBeTruthy();
+    // Each schedule is the stored value in words: monthly, and every 3 months for quarterly.
+    expect(linesIn(screen.getByTestId('plan-row-b1'))).toEqual([
+      'Renta',
+      'Mensual · VISA ••4421',
+      '$1,100.00',
+      'Próximo: 15 oct',
+    ]);
+    expect(linesIn(screen.getByTestId('plan-row-b2'))).toEqual([
+      'CFE',
+      'Cada 3 meses ·',
+      'Agregar una tarjeta',
+      '$30.50',
+      'Próximo: 1 nov 2026',
+    ]);
+    expect(
+      all.getByLabelText('Renta, $1,100.00, Mensual, VISA ••4421, Próximo: 15 oct'),
+    ).toBeTruthy();
+    expect(
+      all.getByLabelText('CFE, $30.50, Cada 3 meses, Sin tarjeta, Próximo: 1 nov 2026'),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Ver historial de pagos' })).toBeTruthy();
     expectNoRawText(screen.toJSON());
   });
 
-  it('finds a bill by the category name read on screen, and says when nothing matches', async () => {
-    setLanguage('es');
-    const screen = await render(<BillPlansScreen />);
-
-    await fireEvent.changeText(screen.getByPlaceholderText('Buscar facturas'), 'vivienda');
-    expect(screen.getByText('1 de 2 facturas')).toBeTruthy();
-    expect(screen.getByText('Renta')).toBeTruthy();
-
-    await fireEvent.changeText(screen.getByPlaceholderText('Buscar facturas'), 'zzz');
-    expect(screen.getByText('Nada coincide')).toBeTruthy();
-    expect(
-      screen.getByText(
-        'Ninguna factura coincide con esa búsqueda y esos filtros. Prueba otro nombre o borra lo que elegiste.',
-      ),
-    ).toBeTruthy();
-    expect(screen.getByText('Borrar filtros')).toBeTruthy();
-    expectNoRawText(screen.toJSON());
-  });
-
-  it('reads in French, filters through the sheet and counts what is left', async () => {
+  it('reads in French, the money with its no-break spaces', async () => {
     setLanguage('fr');
-    const screen = await render(<BillPlansScreen />);
+    await show(<BillsScreen />);
 
-    expect(screen.getByText('Tes factures')).toBeTruthy();
-    expect(screen.getByText('2 factures')).toBeTruthy();
+    expect(screen.getByRole('header', { name: 'Factures mensuelles' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Ajouter une facture' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Rechercher des paiements' })).toBeTruthy();
+    expect(screen.getByTestId('month-card-summary').props.accessibilityLabel).toBe(
+      `À payer en octobre${NBSP}: 1${NBSP}100,00${NBSP}$. 1 facture · payées${NBSP}: 0 · à venir${NBSP}: 1. Prochain${NBSP}: Renta · 15 oct.`,
+    );
     // Matched without folding spaces, so the no-break spaces are proven.
     expect(
-      screen.getByText(`-1${NBSP}130,50${NBSP}$`, {
-        normalizer: getDefaultNormalizer({ collapseWhitespace: false }),
-      }),
-    ).toBeTruthy();
-    expect(screen.getByText('Chaque mois · VISA ••4421')).toBeTruthy();
-    expect(screen.getByText('Tous les 3 mois')).toBeTruthy();
-    expect(screen.getAllByText('1 nov. 2026').length).toBeGreaterThan(0);
-    expect(
-      screen.getByLabelText(`Renta, -1${NBSP}100,00${NBSP}$, Chaque mois, payée avec VISA ••4421`),
-    ).toBeTruthy();
-
-    await fireEvent.press(screen.getByLabelText('Filtrer les factures'));
-    expect(screen.getByLabelText('Fermer les filtres')).toBeTruthy();
-    expect(screen.getByText('Catégorie')).toBeTruthy();
-    expect(screen.getByText('Toutes les catégories sont affichées.')).toBeTruthy();
-    expect(screen.getByText('Payée avec')).toBeTruthy();
-    expect(screen.getByText('Fréquence')).toBeTruthy();
-    expect(screen.getByText('Chaque année')).toBeTruthy();
-    expect(screen.getByText('Effacer')).toBeTruthy();
-    expectNoRawText(screen.toJSON());
-
-    await fireEvent.press(screen.getByLabelText('Logement'));
-    await fireEvent.press(screen.getByText('Appliquer'));
-
-    expect(screen.getByLabelText('Filtres, 1 actif')).toBeTruthy();
-    expect(screen.getByText('1 sur 2 factures')).toBeTruthy();
-    expect(screen.queryByText('CFE')).toBeNull();
-    expectNoRawText(screen.toJSON());
-  });
-
-  it('says so in French when there are no bills, and when the list cannot be read', async () => {
-    setLanguage('fr');
-    mockBills = { data: [], isPending: false, isError: false };
-    const empty = await render(<BillPlansScreen />);
-
-    expect(empty.getByText('Pas encore de factures')).toBeTruthy();
-    expect(empty.getByText('Ajouter une facture')).toBeTruthy();
-    expectNoRawText(empty.toJSON());
-    await empty.unmount();
-
-    mockBills = { data: undefined, isPending: false, isError: true };
-    const failed = await render(<BillPlansScreen />);
-    expect(failed.getByText('Une erreur est survenue. Réessaie.')).toBeTruthy();
-    expect(failed.getByText('Réessayer')).toBeTruthy();
-  });
-});
-
-describe('Monthly bills', () => {
-  it('reads in Spanish', async () => {
-    setLanguage('es');
-    const screen = await render(<BillsScreen />);
-
-    expect(screen.getByText('Facturas mensuales')).toBeTruthy();
-    expect(screen.getByText('Facturas cobradas')).toBeTruthy();
-    expect(screen.getByText('3 cargos')).toBeTruthy();
-    expect(screen.getByText('-$2,230.50')).toBeTruthy();
-    expect(screen.getByText('Sin forma de pago')).toBeTruthy();
-    expectNoRawText(screen.toJSON());
-  });
-
-  it('reads in French, empty and with no bills at all', async () => {
-    setLanguage('fr');
-    mockEntries = [charge('2026-10-01', 'b2')];
-    const one = await render(<BillsScreen />);
-    expect(one.getByText('Factures mensuelles')).toBeTruthy();
-    expect(one.getByText('1 prélèvement')).toBeTruthy();
-    expect(one.getByText('Aucun mode de paiement')).toBeTruthy();
-    await one.unmount();
-
-    mockEntries = [];
-    const quiet = await render(<BillsScreen />);
-    expect(quiet.getAllByText('Rien dans cette période')).toHaveLength(2);
-    expect(
-      quiet.getByText(
-        'Aucune de tes factures n’est arrivée dans cette période. Essaie une période plus longue.',
+      within(screen.getByTestId('fit-figure-month-card-figure')).getByText(
+        `1${NBSP}100,00${NBSP}$`,
+        {
+          normalizer: getDefaultNormalizer({ collapseWhitespace: false }),
+        },
       ),
     ).toBeTruthy();
-    expectNoRawText(quiet.toJSON());
-    await quiet.unmount();
-
-    mockBills = { data: [], isPending: false, isError: false };
-    const none = await render(<BillsScreen />);
-    expect(none.getByText('Pas encore de factures')).toBeTruthy();
-    expect(none.getByText('Ajouter une facture')).toBeTruthy();
-    expectNoRawText(none.toJSON());
+    expect(screen.getByText('1 facture · payées : 0 · à venir : 1')).toBeTruthy();
+    expect(screen.getByText('À venir')).toBeTruthy();
+    expect(screen.getByText('Toutes les factures')).toBeTruthy();
+    expect(screen.getByText('Chaque mois · VISA ••4421')).toBeTruthy();
+    expect(screen.getByText('Tous les 3 mois ·')).toBeTruthy();
+    expect(screen.getByText('Ajouter une carte')).toBeTruthy();
+    expect(screen.getByText('Prochain : 1 nov. 2026')).toBeTruthy();
+    expect(
+      screen.getByLabelText(
+        `Renta, 1${NBSP}100,00${NBSP}$, Chaque mois, VISA ••4421, Prochain : 15 oct.`,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText(
+        `Renta, 1${NBSP}100,00${NBSP}$, à payer le 15 oct., dans 12 jours, VISA ••4421`,
+      ),
+    ).toBeTruthy();
+    expectNoRawText(screen.toJSON());
   });
 
-  it('keeps the total whole at large text, in French too, and shrinks it alone if it must', async () => {
+  it('says a paid bill is Payé in a month already gone, with nothing coming up', async () => {
+    setLanguage('fr');
+    mockParams = { month: '2026-09' };
+    await show(<BillsScreen />);
+
+    expect(screen.getByText('1 facture · payées : 1 · à venir : 0')).toBeTruthy();
+    expect(screen.queryByTestId('coming-up')).toBeNull();
+    expect(
+      screen.getByLabelText(`Renta, 1${NBSP}100,00${NBSP}$, Chaque mois, VISA ••4421, Payé`),
+    ).toBeTruthy();
+    expect(screen.getByTestId('month-chip')).toBeTruthy();
+    expectNoRawText(screen.toJSON());
+  });
+
+  it('says in French what is due when no bill falls in the month, and lists the bill with its next date', async () => {
+    setLanguage('fr');
+    mockBills = { ...mockBills, data: [BILLS[1]] };
+    await show(<BillsScreen />);
+
+    expect(linesIn(screen.getByTestId('month-card-summary'))).toEqual([
+      'À payer en octobre',
+      `0,00${NBSP}$`,
+      'Rien à payer en octobre',
+    ]);
+    expect(screen.queryByTestId('coming-up')).toBeNull();
+    expect(screen.getByText('Prochain : 1 nov. 2026')).toBeTruthy();
+    expectNoRawText(screen.toJSON());
+  });
+
+  it('says so in French when there are no bills, and when the page cannot be read', async () => {
+    setLanguage('fr');
+    mockBills = { ...mockBills, data: [] };
+    mockCharges = [];
+    const empty = await show(<BillsScreen />);
+
+    expect(screen.getByText('Pas encore de factures')).toBeTruthy();
+    // The page's own button, and the + in the header.
+    expect(screen.getAllByRole('button', { name: 'Ajouter une facture' })).toHaveLength(2);
+    expectNoRawText(screen.toJSON());
+    await empty.unmount();
+
+    mockBills = { data: undefined, isPending: false, isLoading: false, isError: true };
+    await show(<BillsScreen />);
+    expect(screen.getByText('Une erreur est survenue. Réessaie.')).toBeTruthy();
+    expect(screen.getByText('Réessayer')).toBeTruthy();
+  });
+
+  it('keeps the figure whole at large text, in French too, and shrinks it alone if it must', async () => {
     setLanguage('fr');
     const window = { width: 375, height: 812, scale: 3, fontScale: 1.3 };
     Dimensions.set({ window, screen: window });
-    const screen = await render(<BillsScreen />);
+    await show(<BillsScreen />);
 
-    const total = `-2${NBSP}230,50${NBSP}$`;
-    const figure = screen.getByText(total);
+    const total = `1${NBSP}100,00${NBSP}$`;
+    const figure = within(screen.getByTestId('fit-figure-month-card-figure')).getByText(total, {
+      normalizer: getDefaultNormalizer({ collapseWhitespace: false }),
+    });
     expect(figure.props.numberOfLines).toBeUndefined();
     expect(figure.props.adjustsFontSizeToFit).toBeUndefined();
-    expect(figure.props.maxFontSizeMultiplier).toBe(1.2);
+    expect(figure.props.maxFontSizeMultiplier).toBe(TEXT_CAP.figure);
     // Measured as one piece: its no-break spaces are not places to wrap.
-    const copy = screen.getByTestId('fit-copy-total', { includeHiddenElements: true });
+    const copy = screen.getByTestId('fit-copy-month-card-figure', { includeHiddenElements: true });
     expect(copy.props.children).toBe(total);
 
     for (const [testID, width] of [
-      ['fit-slot-total', 150],
-      ['fit-copy-total', 200],
-      ['fit-figure-total', 150],
+      ['fit-slot-month-card-figure', 150],
+      ['fit-copy-month-card-figure', 200],
+      ['fit-figure-month-card-figure', 150],
     ] as const) {
       await fireEvent(screen.getByTestId(testID, { includeHiddenElements: true }), 'layout', {
         nativeEvent: { layout: { x: 0, y: 0, width, height: 30 } },
       });
     }
-    expect(StyleSheet.flatten(screen.getByText(total).props.style).fontSize).toBeCloseTo(
-      26 * 0.74,
-      5,
-    );
+    expect(
+      StyleSheet.flatten(
+        within(screen.getByTestId('fit-figure-month-card-figure')).getByText(total, {
+          normalizer: getDefaultNormalizer({ collapseWhitespace: false }),
+        }).props.style,
+      ).fontSize,
+    ).toBeCloseTo(36 * 0.74, 5);
   });
 });
 

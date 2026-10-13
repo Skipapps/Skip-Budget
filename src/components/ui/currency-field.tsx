@@ -15,6 +15,8 @@ type CurrencyFieldProps = {
   optional?: boolean;
   filled?: boolean;
   trailing?: ReactNode;
+  /** What VoiceOver calls the field, for one with no placeholder to name it. */
+  accessibilityLabel?: string;
 };
 
 /**
@@ -29,6 +31,7 @@ export function CurrencyField({
   optional,
   filled,
   trailing,
+  accessibilityLabel,
 }: CurrencyFieldProps) {
   const shown = formatDraft(value);
   const { symbol, after } = currencyMark();
@@ -54,6 +57,7 @@ export function CurrencyField({
       filled={filled}
       keyboardType="decimal-pad"
       returnKeyType="done"
+      accessibilityLabel={accessibilityLabel}
       leading={after ? undefined : mark}
       trailing={
         (after && mark) || trailing ? (

@@ -6,6 +6,9 @@ import {
   ChartNoAxesColumn,
   CircleCheck,
   CreditCard,
+  FileDown,
+  FileSpreadsheet,
+  FileText,
   History,
   Infinity as InfinityIcon,
   LockOpen,
@@ -88,4 +91,5 @@ export const PRO_FEATURES: Record<string, ProFeature> = {
   // Moving money between accounts is free on every plan, so it is no point for Pro.
   unlimited: feature('unlimited', CreditCard, { a: InfinityIcon, c: LockOpen }),
   habits: feature('habits', CalendarCheck, { a: CircleCheck, b: PiggyBank, c: ReceiptText }),
+  export: feature('export', FileDown, { a: FileSpreadsheet, b: FileText, c: CalendarRange }),
 };

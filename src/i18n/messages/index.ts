@@ -19,6 +19,7 @@ import { loanFlowMessages } from '@/i18n/messages/loan-flow';
 import { localeMessages } from '@/i18n/messages/locale';
 import { navMessages } from '@/i18n/messages/nav';
 import { onboardingMessages } from '@/i18n/messages/onboarding';
+import { paymentsMessages } from '@/i18n/messages/payments';
 import { preferencesMessages } from '@/i18n/messages/preferences';
 import { proMessages } from '@/i18n/messages/pro';
 import { receiptsMessages } from '@/i18n/messages/receipts';
@@ -57,6 +58,7 @@ export const MESSAGE_AREAS = {
   nav: navMessages,
   preferences: preferencesMessages,
   onboarding: onboardingMessages,
+  payments: paymentsMessages,
   pro: proMessages,
   receipts: receiptsMessages,
   reminders: remindersMessages,
@@ -98,6 +100,7 @@ export const MESSAGES = {
   ...MESSAGE_AREAS.nav,
   ...MESSAGE_AREAS.preferences,
   ...MESSAGE_AREAS.onboarding,
+  ...MESSAGE_AREAS.payments,
   ...MESSAGE_AREAS.pro,
   ...MESSAGE_AREAS.receipts,
   ...MESSAGE_AREAS.reminders,

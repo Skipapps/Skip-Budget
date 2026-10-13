@@ -37,6 +37,7 @@ type TextFieldProps = {
   | 'onBlur'
   | 'multiline'
   | 'maxLength'
+  | 'accessibilityLabel'
 >;
 
 /** Labelled text input. Password fields get a reveal toggle inside the border, so its tap target never overlaps the text. */

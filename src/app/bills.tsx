@@ -1,172 +1,23 @@
-import { router } from 'expo-router';
-import { Plus } from 'lucide-react-native';
-import { Fragment, useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 
-import { useArtwork } from '@/theme/artwork';
-import { useBills, useLedger, usePaymentSources } from '@/api/queries';
-import { hidOlder } from '@/lib/allowance';
-import { countsInSpending } from '@/lib/bill-spending';
-import { billPageHref } from '@/lib/ledger-link';
-import { billStopped } from '@/lib/plan-stop';
-import { TransactionRow } from '@/components/dashboard/transaction-row';
-import { DateGroupHeader } from '@/components/ui/date-group-header';
-import { FitFigure } from '@/components/ui/fit-group';
-import { HistoryNotice } from '@/components/pro/history-notice';
-import { PageState } from '@/components/ui/page-state';
-import { RangeDropdown } from '@/components/ui/range-dropdown';
-import { Screen } from '@/components/ui/screen';
-import { SkeletonList } from '@/components/ui/skeleton';
-import { t } from '@/i18n';
-import { toIsoDate } from '@/lib/date';
-import { formatCurrency } from '@/lib/format';
-import { groupByDate } from '@/lib/group';
-import { rangeFor, type RangeKey } from '@/lib/range';
-import { useMoneyColor } from '@/providers/theme-provider';
-import { failureText } from '@/lib/failure';
-import { TEXT_CAP } from '@/theme/text-scale';
+import { useHistoryFloor } from '@/api/history';
+import { PlanMonthScreen } from '@/components/payments/plan-month-screen';
+import { parseMonth } from '@/lib/payment-entries';
+import { paymentFloor } from '@/lib/payment-years';
+import { useToday } from '@/lib/use-today';
 
 /**
- * What the bills have cost over a window: it lists the times a bill landed (a monthly bill is one
- * line per month it ran), not the bills themselves. A charge opens its bill's page. The full list
- * of bills, including any with no charge in the window, is under Settings → Your money → Bills.
+ * Monthly bills (`?month=yyyy-mm`). A month from a link is held between the oldest month the plan
+ * lists (90 days back on free, seven calendar years on Pro) and a year ahead, as Choose month offers.
  */
 export default function BillsScreen() {
-  const artwork = useArtwork();
-  const moneyColor = useMoneyColor();
-  const [rangeKey, setRangeKey] = useState<RangeKey>('month');
-  const today = toIsoDate(new Date());
-  const range = useMemo(() => rangeFor(rangeKey, new Date()), [rangeKey]);
-
-  const plans = useBills();
-  const { entries, allEntries, hidden, isLoading, isError, refetch } = useLedger(range, today);
-  // Free lists 90 days back: say the older charges are kept rather than look like none.
-  const hiddenOlder = hidOlder(hidden, 'bill');
-  const { sources } = usePaymentSources();
-
-  const sourceLabels = useMemo(
-    () => new Map(sources.map((source) => [source.id, source.label])),
-    [sources],
-  );
-
-  const charges = useMemo(() => entries.filter((entry) => entry.kind === 'bill'), [entries]);
-  // The heading sums the whole window, as Pro sees it; only the list stops at the plan's window.
-  const inWindow = useMemo(() => allEntries.filter((entry) => entry.kind === 'bill'), [allEntries]);
-  const total = inWindow.reduce((sum, entry) => sum + entry.amount, 0);
-
-  // Oldest day first, today last; stated rather than relying on groupByDate's default.
-  const groups = useMemo(
-    () =>
-      groupByDate(charges, (entry) => entry.date, {
-        amountOf: (e) => e.amount,
-        direction: 'asc',
-      }),
-    [charges],
-  );
-
-  // A stopped bill keeps its charges in the list but is no longer a bill to add to or count.
-  const planCount = (plans.data ?? []).filter(
-    (bill) => countsInSpending(bill) && !billStopped(bill, today),
-  ).length;
-  const openBill = (id: string, categoryId: string | null | undefined) => () =>
-    router.push(billPageHref(id, categoryId));
-
+  const { month } = useLocalSearchParams<{ month?: string }>();
+  const { today } = useToday();
+  const { floor, free } = useHistoryFloor();
   return (
-    <Screen
-      title={t('bills.charged.title')}
-      showBack
-      onRefresh={refetch}
-      headerActions={[
-        { icon: Plus, label: t('bills.addBill'), onPress: () => router.push('/add-bill') },
-      ]}
-    >
-      <View className="mt-3 w-full rounded-[16px] bg-ink/[0.035] px-4 py-4">
-        <View className="w-full flex-row items-start justify-between gap-3">
-          <View className="min-w-0 flex-1">
-            <Text
-              className="font-app text-[13px] text-muted"
-              maxFontSizeMultiplier={TEXT_CAP.control}
-            >
-              {t('bills.charged.label')}
-            </Text>
-            <FitFigure
-              id="total"
-              size={26}
-              // text-ink underneath: a zero total gets no money colour, and an unstyled figure is
-              // black, invisible in dark mode.
-              className="font-app-bold text-ink"
-              style={{ color: moneyColor(total) }}
-              boxClassName="mt-0.5"
-            >
-              {formatCurrency(total)}
-            </FitFigure>
-          </View>
-          <RangeDropdown value={rangeKey} onChange={setRangeKey} />
-        </View>
-
-        <Text
-          className="mt-2 font-app text-[12px] text-muted"
-          maxFontSizeMultiplier={TEXT_CAP.reading}
-        >
-          {inWindow.length === 0
-            ? t('bills.charged.nothing')
-            : t('bills.charged.count', { count: inWindow.length })}
-        </Text>
-      </View>
-
-      {isLoading ? <SkeletonList rows={5} /> : null}
-
-      {isError ? (
-        <PageState
-          art={artwork.error}
-          title={failureText()}
-          actionLabel={t('common.tryAgain')}
-          onAction={refetch}
-        />
-      ) : null}
-
-      {!isLoading && !isError && charges.length === 0 && hiddenOlder ? (
-        <HistoryNotice className="mt-5" />
-      ) : null}
-
-      {!isLoading && !isError && charges.length === 0 && !hiddenOlder ? (
-        <PageState
-          art={artwork.emptyBills}
-          title={planCount === 0 ? t('bills.noBillsYet') : t('bills.charged.nothing')}
-          message={
-            planCount === 0 ? t('bills.charged.emptyMessage') : t('bills.charged.windowMessage')
-          }
-          actionLabel={planCount === 0 ? t('bills.addABill') : undefined}
-          onAction={planCount === 0 ? () => router.push('/add-bill') : undefined}
-        />
-      ) : null}
-
-      {!isLoading && !isError && charges.length > 0 ? (
-        <View className="w-full pb-10">
-          {/* Oldest first, so the list starts where the plan's window does. */}
-          {hiddenOlder ? <HistoryNotice className="mt-5" /> : null}
-          {groups.map((group) => (
-            <View key={group.date || 'undated'} className="w-full">
-              <DateGroupHeader date={group.date} today={today} total={group.total} />
-              {group.items.map((entry, index) => (
-                <Fragment key={entry.id}>
-                  {index > 0 ? <View className="ml-[52px] h-px bg-line/60" /> : null}
-                  <TransactionRow
-                    label={entry.label}
-                    amount={entry.amount}
-                    kindLabel={sourceLabels.get(entry.sourceId) ?? t('bills.noPaymentMethod')}
-                    kind="bill"
-                    domain={entry.domain}
-                    categoryId={entry.categoryId}
-                    iconId={entry.iconId}
-                    onPress={entry.planId ? openBill(entry.planId, entry.categoryId) : undefined}
-                  />
-                </Fragment>
-              ))}
-            </View>
-          ))}
-        </View>
-      ) : null}
-    </Screen>
+    <PlanMonthScreen
+      kind="bill"
+      month={parseMonth(month, today, free ? floor : paymentFloor(today))}
+    />
   );
 }

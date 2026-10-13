@@ -29,6 +29,9 @@ const BUILT_IN =
  */
 const PENDING = new Set<string>();
 
+/** PDF HTML, not NativeWind classes: its `font-*` text is print CSS. */
+const PRINT_CSS = new Set(['lib/payment-export.ts']);
+
 function sourceFiles(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
@@ -68,7 +71,7 @@ describe('the app font', () => {
     const unknown: string[] = [];
     for (const file of sourceFiles(SRC)) {
       const relative = path.relative(SRC, file);
-      if (PENDING.has(relative)) continue;
+      if (PENDING.has(relative) || PRINT_CSS.has(relative)) continue;
       for (const name of familyClasses(file)) {
         if (!(name in FAMILIES)) unknown.push(`${relative}: font-${name}`);
       }

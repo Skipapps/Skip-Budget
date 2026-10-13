@@ -15,6 +15,8 @@ export type HeaderActionProps = {
   hint?: string;
   disabled?: boolean;
   busy?: boolean;
+  /** `plain` is a white circle with a hairline, for a quiet action beside a tinted one. */
+  tone?: 'tinted' | 'plain';
 };
 
 const ACTION_SIZE = 40;
@@ -113,9 +115,12 @@ function HeaderAction({
   hint,
   disabled = false,
   busy = false,
+  tone = 'tinted',
 }: HeaderActionProps) {
   const colors = useColors();
   const inert = disabled || busy;
+  const plain = tone === 'plain';
+  const glyph = plain ? colors.ink : colors.tintInk;
 
   return (
     <Pressable
@@ -132,12 +137,16 @@ function HeaderAction({
         height: ACTION_SIZE,
         opacity: disabled && !busy ? 0.5 : 1,
       }}
-      className="items-center justify-center rounded-full bg-tint active:opacity-70"
+      className={
+        plain
+          ? 'items-center justify-center rounded-full border border-line bg-card active:opacity-70'
+          : 'items-center justify-center rounded-full bg-tint active:opacity-70'
+      }
     >
       {busy ? (
-        <ActivityIndicator size="small" color={colors.tintInk} />
+        <ActivityIndicator size="small" color={glyph} />
       ) : (
-        <Icon size={20} color={colors.tintInk} strokeWidth={1.9} />
+        <Icon size={20} color={glyph} strokeWidth={1.9} />
       )}
     </Pressable>
   );

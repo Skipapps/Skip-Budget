@@ -17,8 +17,7 @@ export default function YourMoneyScreen() {
         subtitle={
           counts.bills > 0 ? plural(counts.bills, 'recurringBill') : t('settings.yourMoney.noBills')
         }
-        // Every bill, including those with no charge this month; cost is on Home's Monthly bills.
-        onPress={() => router.push('/bill-plans')}
+        onPress={() => router.push('/bills')}
       />
       <SettingsRow
         icon={Repeat}
@@ -28,7 +27,7 @@ export default function YourMoneyScreen() {
             ? t('settings.yourMoney.tracked', { count: counts.subscriptions })
             : t('settings.yourMoney.noSubscriptions')
         }
-        onPress={() => router.push('/subscription-plans')}
+        onPress={() => router.push('/subscriptions')}
       />
       <SettingsRow
         icon={CreditCard}

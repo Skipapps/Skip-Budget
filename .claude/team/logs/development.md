@@ -8339,3 +8339,252 @@ expo-print needs the Release build to prove the PDF share on the phone.
 **Gates:** tsc 0 (whole tree); eslint (cache cleared, `--no-cache`, `--max-warnings 0`) 0; prettier clean; jest 257/257 (stable in local time, UTC, Pacific/Kiritimati, America/Los_Angeles, Europe/Paris; 5 repeats under load); repo guards (no-splits, fonts, large-text-guard, no-route-test-files, src/i18n, src/data) 144/144.
 **Mutants:** 31 one-line mutants in a scratch copy of the tree (never the real files), all caught. One was first an equivalent mutant (free sent through the export page, which the gate redirects), so a test now pins that free's only push is the explainer.
 **Result for the CEO's contrast question:** Cancel (`search-input.tsx:82`) and the results links "Date range" / "Clear filters" (`search-results.tsx:186`, drawn from :93) sit on the page surface, not on a card, in light and dark: accent-ink is 4.5:1 or more there. No `text-accent-ink` sits on a card on the search or filter pages. A mutant that puts the link on a card fails the dark test.
+
+## 2026-10-12 — Dilip — Export failure line: VoiceOver announce and pinned footer (Theo's finding). DONE (no commits).
+- **`src/components/payments/export-choices.tsx`:**
+  - The page no longer uses the app-wide `FailureLine`, which stays untouched.
+  - The failure is now an `accessibilityRole="alert"` line in the pinned footer, right above Export (the amount filter's pattern), so large text can't scroll it out of sight.
+  - Each time a failure appears (a failed share, or a throw while building the file), `fail()` calls `AccessibilityInfo.announceForAccessibility(failureText())` once.
+- **`src/__tests__/payments/payment-export-page.test.tsx`:** 30 tests (was 28).
+  - One announce per failure: failed, then done (no announce), then failed, then a build throw, for 1, 1, 2, 3 calls.
+  - At fontScale 3, the alert is outside the scroll, in the same footer column as Export and before it, and shown only once.
+  - Mutants that never announce or announce twice are both caught.
+- **Gates:**
+  - tsc: 0 errors.
+  - eslint (cache cleared, `--no-cache`, `--max-warnings 0`): 0. prettier: clean.
+  - jest: my suites and the guards are green (11 suites).
+- **For Theo:** 4 tests in `payment-export-screen.test.tsx` now fail because they assert the old placement: "keeps the failure line in the scroll, above the pinned button" (en/es/fr) and "draws the failure as a polite live line, under the summary and the choices". They need the new behaviour: an alert in the footer above Export, plus the announce. I have not edited that file.
+
+## 2026-10-12 — Diego — Bills/subs pages P24: sign-out forgets recent payment searches (DONE, no commits)
+**Outcome:** sign-out and account deletion now clear the person's recent payment searches on the phone. The clearing runs while the session can still say whose they are, and a refusal never blocks signing out.
+
+**auth.ts hunk (7 lines, the only diff in the file):**
+- One import.
+- `await forgetRecentSearches(data.session?.user?.id)` right after `forgetKnownStores`, inside the same try in `forgetThisPersonsVoice`. Both `signOut` and `deleteAccount` run that function.
+- The doc comment updated to name the searches.
+
+**auth.test.ts:**
+- AsyncStorage now uses the official jest mock, and `@/api/payment-searches` is mocked so that by default it calls through to the real `forgetRecentSearches`.
+- 5 new tests:
+  - Sign-out clears user-A's searches and leaves user-B's, in the order forget, voice, stores, searches, signOut.
+  - A refused `removeItem` warns and still signs out.
+  - A forget that throws outright still signs out.
+  - Account deletion clears them too, before signing out.
+- Assertions added to two existing tests: an unreadable session clears nobody's searches, and nothing is cleared while the account still exists.
+
+**Gates:**
+- `tsc --noEmit`: 0 errors.
+- eslint (cache cleared, `--no-cache`, `--max-warnings 0`) on both files: 0.
+- prettier: clean.
+- jest: 137/137 across auth, payment-searches, known-stores (both suites), and the route, large-text and messages guards.
+- Mutants: 5 of 5 were killed.
+- `git diff src/api/auth.ts` holds only this hunk.
+
+**Pre-existing, not P24:** `auth.test.ts` leaves one open handle, Sentry's AsyncExpiringMap interval, loaded through `src/lib/failure.ts`. In a multi-suite run it shows as "worker failed to exit gracefully". Other suites stop it with `jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }))`.
+
+## 2026-10-12 — Diego — P24 follow-up: Sentry mock in auth.test.ts (DONE, no commits)
+- Added `jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }))` to `src/api/auth.test.ts`. `captureException` is the only Sentry call reached through `src/lib/failure.ts`.
+- `npx jest --ci src/api/auth.test.ts --detectOpenHandles`: 30/30 with no open handle. The multi-suite run no longer says "worker failed to exit".
+- Gates: tsc 0; eslint (cache cleared) 0 on auth.ts and auth.test.ts; prettier clean.
+- `forgetThisPersonsVoice` was not renamed (CEO).
+
+## 2026-10-12 — Dana — search results: every filter changeable above the results; the month card's extra-loan line (DONE, no commits)
+**Search (CEO):**
+- `search-results.tsx` now draws `Date range · Amount · Paid from` above the results, as small plum links on the page (accent-ink on the surface, 12pt hitSlop, as before).
+  - Each reads "{filter}: {value}" once set (new key `payments.search.filterSet`; fr has the no-break space before ":") and opens its filter page via the page's `openFilter`.
+  - "Clear filters" follows when any filter is set.
+  - On an empty result the links stay, minus Clear filters, which the empty page offers itself: one button of a name.
+- `SearchResults` props: `filtersActive`/`onDateRange` replaced by `filters`/`onFilter`. `app/payment-search.tsx` passes them.
+- Kept for Theo's suites: testID `results-date-range` and the plain "Date range" name while unset. New testIDs: `results-amount`, `results-paid-from`, `results-filters`.
+
+**Month card extra line (Founder decision; Drew's `view.extras` is in the tree):**
+- New key `payments.month.extra` (one: "+ {amount} extra on {name} · {total} in all"; other: "… on {count} loans …"; es/fr).
+- `MonthCard` draws it under the counts, bills only, from `view.extras` (`loans`, `total`, `name`, `inAll`). It is appended to the card's single VoiceOver stop. The due figure is unchanged.
+- Wired now, since `extras` is optional and null without a payoff.
+
+**Tests:**
+- payment-search-page: 26 (+3: links with values that open their pages, filters kept on an empty result, small plum on the page).
+- plan-month-parts: 49 (+4: one loan, two loans, none and subscriptions, es/fr).
+- payment-parts pins the 2 keys.
+- Mutants: 9/9 caught.
+
+**Gates:**
+- tsc: 0, whole repo.
+- eslint (cache cleared, --no-cache, --max-warnings 0) + prettier: clean on the 7 files.
+- Payments folder + repo guards + src/components/ui: 49/50 suites.
+  - The 1 red suite is Theo's untracked `payment-filter-screen.test.tsx` (2 tests): it presses the results link by the exact name 'Date range' while a range is set, and the link now reads "Date range: Last 3 months".
+  - Fix for Theo: `press(/^Date range/)` at lines 1005, 1017, 1022 and 1168.
+  - Theo's `payment-search-screen.test.tsx` passes.
+  - Note: `payment-search-screen.test.tsx` failed once in a small parallel batch (an 87 s run, under load). It passed alone (76/76) and in the full-folder run, so it is timing, not this change.
+
+## 2026-10-12 — Drew — `bill-month` payoffs on the card (`extras`), per the Founder's decision: DONE (no commits)
+**Outcome:** the card keeps its due figure. `PlanMonth.extras` now carries the month's loan payoffs, and the line "+ $X extra on … · $Y in all" can be drawn from it. In every month of the seven-year fixture (2020-01 to 2026-12), the due figure plus the extras equals Home's Monthly bills tile to the cent.
+
+**Type:**
+```ts
+export type MonthExtras = {
+  total: number;  // payoffs in the month, whole cents
+  count: number;  // payoffs
+  loans: number;  // distinct loans
+  name: string | null;  // the loan's name when every payoff is on one loan
+  inAll: number;  // PlanMonth.total + total, whole cents (Home's tile)
+};
+PlanMonth.extras?: MonthExtras | null;
+```
+- It is null when the month has no payoff, and always null for subscriptions.
+- `planMonth` always sets it. It is declared optional only because Dana's `plan-month-parts.test.tsx` builds two `PlanMonth`s by hand without it (lines 195 and 246), and a required field breaks tsc there. It can be made required once those two literals add `extras: null`.
+- Payoffs still never count in the total, n, p, c or Coming up.
+- A payoff counts whatever its loan's flag is. One made while the loan did not count is not in the ledger, as on Home.
+- Only payoffs dated in the month count, whatever window `entries` covers.
+
+**Tests:**
+- `bill-month.test.ts`, now 64:
+  - one loan ($2,884.00 in all);
+  - two loans, one of them kept out of monthly bills ($1,500.00, 2 loans, $3,384.00);
+  - two payoffs on one loan;
+  - an uncounted payoff;
+  - a month with nothing due;
+  - Subscriptions;
+  - a wide entries window.
+- `payment-cross-check.test.ts`, now 10:
+  - Home's tile, built exactly as home.tsx builds it: `rangeFor('month')`, `kind === 'bill'`, the sum of `Math.abs`. It equals the card's due + extras in every month from 2020-01 to 2026-12. Extras fall in 2024-03 (a loan now kept out of bills), 2025-09 (partial), 2025-11 (two loans) and 2026-02 (full).
+  - A separate account with a payoff in a month where nothing is due.
+  - History's month totals now also check `extras.total` in past months.
+
+**Gates:**
+- tsc 0 project-wide.
+- eslint (cache cleared, `--no-cache`, `--max-warnings 0`) and prettier are clean on my 5 files.
+- My 3 suites, the 2 guards and Dana's `plan-month-parts`: 155/155 under New_York, Kiritimati, Los_Angeles, Paris and Pago_Pago.
+- Mutants on `extras`: 7 of 7 caught.
+- Full `npm test`: 363/375 suites, 8956/8973 tests. The 17 failures are not mine; none references `bill-month` or `extras`:
+  - the `/bills` and `/subscriptions` swap is in progress, so the old-page suites (bills-i18n, subscriptions-i18n, stopped-plans, charges-edit, bills-spending-flag) await P25;
+  - a test mock lacks `useLoanPayoffRows`, which `payment-ledger.ts` now calls;
+  - AsyncStorage is null in three suites;
+  - another agent's `_probe-bills.test.tsx` was deleted mid-run;
+  - the rest are 5 s timeouts in 75–100 s suites under load.
+
+**Note:** the scratchpad is shared. Another agent recreated `scratchpad/mutants/` during my run and deleted my backup. My file was left holding one mutant line, which I restored by hand and checked. My mutation runs now keep the original in memory, in `scratchpad/drew-mutants/`.
+
+## 2026-10-12 — Dana — Bills/subs pages P23: the swap (DONE, no commits)
+**Files:**
+- `src/app/bills.tsx` and `src/app/subscriptions.tsx` are now thin routes. Each reads `?month=` and passes `parseMonth(month, today, free ? useHistoryFloor().floor : paymentFloor(today))` to `<PlanMonthScreen kind=… month=… />`, the same floor rule as Choose month:
+  - free: from the floor's month (Jul 2026 today);
+  - Pro: from Jan 2020;
+  - up to a year ahead;
+  - anything that is not a month reads as this month.
+- `src/app/bill-plans.tsx` and `src/app/subscription-plans.tsx` are now `<Redirect href="/bills" />` and `<Redirect href="/subscriptions" />`, as in the v57 Link/Redirect docs, so old links and pushes still land.
+- `src/app/settings/your-money.tsx`: the Bills and Subscriptions rows push `/bills` and `/subscriptions`. The Bills row's comment, which explained the old split, is gone.
+- `src/__tests__/large-text-guard.test.ts`: the `app/bill-plans.tsx` and `app/subscription-plans.tsx` ALLOWED rows are dropped. `bills.tsx` and `subscriptions.tsx` stay in ADOPTED, clean.
+- New test: `src/__tests__/payments/plan-month-routes.test.tsx` (25). It checks that:
+  - each route draws the page for its kind;
+  - a link month is shown;
+  - bad months fall back to this month;
+  - free and Pro floors and the year ahead are held;
+  - the redirects land;
+  - the Settings rows push the new routes.
+- **Other links:** a grep of src (tests aside) finds nothing else that links to `/bill-plans` or `/subscription-plans`. Home's tiles already push `/bills` and `/subscriptions`. `plan-month-screen.tsx` and `home.tsx` were not touched.
+
+**Gates:**
+- tsc: 0, whole repo.
+- eslint (cache cleared, `--no-cache`, `--max-warnings 0`) and prettier: clean on the 7 files.
+- Mutants: 11 of 11 killed (kind swaps, free and Pro floor, param ignored, redirect targets, Settings pushes), run from scratch copies.
+- Payments folder plus guards: 44 of 45 suites. The one failure is Theo's in-progress `payment-filter-screen.test.tsx`: 2 tests can't find the search page's "Date range" button (P16/P21 work, not touched by the swap).
+
+**Full suite, 374 suites, 10 failing:**
+- **From the swap, for Theo's P25:**
+  - `bills-spending-flag`, `charges-edit` and `subscriptions-i18n` no longer load. They render the new `/bills` or `/subscriptions`, whose imports reach AsyncStorage, and their mocks don't cover it.
+  - `stopped-plans`: 4 "Your bills" tests render the old `/bill-plans` list, which is now a redirect.
+  - `bills-i18n` (uncommitted edits in the tree, likely Theo's rewrite) failed in the full run and passes alone (8/8).
+  - `settings` already expects `/bills` and `/subscriptions`, and passes (20/20).
+- **Not from the swap:** `add-loan`, `add-loan-languages`, `salary-languages` and `savings-parts` pass alone; they fail only under full parallel load. `payment-filter-screen` is the in-progress suite above.
+
+## 2026-10-12 — Theo (Tester) — P25 + follow-ups: six old suites rewritten for the new pages, export failure placement, filter links (DONE, test files only, no app file touched)
+**Files:** `src/__tests__/app/{bills-i18n,subscriptions-i18n,charges-edit,bills-spending-flag,stopped-plans,settings}.test.tsx` (rewritten or updated), `src/__tests__/payments/payment-export-screen.test.tsx` (106) and `payment-filter-screen.test.tsx` (88).
+- Each rewritten suite drives the real route (`bills.tsx` / `subscriptions.tsx`) and the real `usePlanMonth` over the real ledger; only the reads under it (bills, subscriptions, charges, payoffs, labels, loans) are fakes. The bill and subscription detail pages, and the setup lists, keep their old tests as they were.
+- Export: the failure is now an alert in the pinned footer, in the block that holds Export, announced once per failure; a file that cannot be built is the same one line.
+- Filter: the links above the results carry their value ("Date range: Last 3 months"), open their pages on the current value, keep the others set, stay on an empty result, and Clear filters is there once.
+**Gates:** tsc 0 (whole tree); eslint (cache cleared) 0 and prettier clean on all 9 files; the six suites 72 of 74; payments screens 106 + 88 + 76 green; full `npx jest --ci`: 373 of 374 suites, 9,008 of 9,010 tests. Mutants: 11 on this pass, all caught (export announce and alert, empty page repeating Clear filters, amount link value, stopped section, month ignored, Settings and redirect targets, Add a card target, kept-out loan counted, cancelled last charge).
+**Failing on purpose (a real bug, marked BUG in `stopped-plans.test.tsx`):** a stopped loan reads in the bill's gender on the new page ("Detenida el 5 oct 2026", "Arrêtée le 5 oct. 2026"); the Loans page and the old list said "Detenido" / "Arrêté". Cause: `stopped-row.tsx` `stoppedWords` uses `bills.stoppedOn` for a stopped loan. Fix: for a loan with ending 'stopped', use `bills.loanStoppedOn` (and `bills.loanStopped` with no date); both keys exist. Owner: Dana.
+
+## 2026-10-12 — Dana — stopped loan in its own gender; `extras` required (DONE, no commits)
+- **`src/components/payments/stopped-row.tsx` → `stoppedWords`:** a stopped loan (`isLoanBill(row.categoryId)`) now takes `bills.loanStoppedOn` / `bills.loanStopped` ("Detenido el …", "Arrêté le …"), as the old list and the Loans page do. Other bills keep `bills.stoppedOn` / `bills.stopped`. English is unchanged.
+  - Gender is read from the row being a loan, so a stopped loan reads right even before the loans read classifies it. Paid off still says "Paid off on {date}".
+  - `stoppedWords` now also takes `categoryId`.
+- **`src/lib/bill-month.ts`** (Drew agreed): `extras: MonthExtras | null` is required. The two hand-built PlanMonth literals in plan-month-parts set `extras: null`; Drew's own test already did.
+- **Tests:**
+  - plan-month-parts +1: en/es/fr, loan and bill, with and without a date.
+  - Theo's two "BUG:" tests in `src/__tests__/app/stopped-plans.test.tsx` now pass.
+- **Mutants:** 1 real, caught. The other (the loan's `endedOn` instead of the row's `stoppedOn`) was equivalent, since a stopped loan's end is its bill's `ends_on`, so that indirection was removed.
+- **Gates:**
+  - tsc: 0, whole repo.
+  - eslint (cache cleared, --no-cache, --max-warnings 0) + prettier: clean on the 3 files.
+  - **Full `npx jest --ci`: 374/374 suites, 9,011/9,011 tests, no timeouts.**
+
+## 2026-10-12 — Dmitri (Development Lead) — Bills/subs pages final review (P26): COMMIT. Read-only.
+**Outcome:** ready to commit. Every must-fix and should-fix from my FIX-FIRST review is in. Dana's stopped-loan fix and the required `extras` landed at 23:17. Nothing in our paths changed after 23:20:30, so every gate below covers the final tree. I also proved the commit stands alone on a scratch copy holding only HEAD and our 48 paths.
+
+**Gates:**
+
+| Run | Result |
+|---|---|
+| tsc, live tree | 0 |
+| tsc, HEAD + our 48 paths only (scratch tree) | 0 |
+| eslint (cache cleared, `--no-cache`, `--max-warnings 0`) on the 97 source files we commit | 0 |
+| eslint, whole `src` on the scratch tree | 0 errors; 1 warning, the old `setup.test.tsx` one (not ours) |
+| prettier on the 97 files + package.json | clean |
+| full `npx jest --ci`, live tree | 374/374 suites, 9,011/9,011 tests |
+| full `npx jest --ci`, scratch tree | 374/374 suites, 9,008/9,008 tests (Quick add's uncommitted tests account for the 3) |
+
+The "worker failed to exit" warning is in both runs, and was already in this afternoon's.
+
+**Checked:**
+- **`bill-month.ts`:** no leftover mutant. Every line outside the extras block matches what I reviewed this afternoon. The extras block:
+  - sums payoffs in cents;
+  - keeps them out of the total, n, p, c and Coming up;
+  - counts distinct loans and names the loan when there is only one;
+  - computes `inAll` in cents;
+  - is null for subscriptions.
+- **`stopped-row.tsx`:** the dropped `loan.endedOn` was equivalent: `loanEnding` sets a stopped loan's `endedOn` to `bill.ends_on`, which is `row.stoppedOn`.
+- **Shared files hold only our hunks:**
+  - index.ts: 3 lines;
+  - pro.ts: `pro.export.*`;
+  - pro-features and its test;
+  - page-header: the `tone` hunk;
+  - text-field: one picked prop;
+  - currency-field: an optional prop, set only by the amount filter;
+  - fonts.test: `PRINT_CSS`;
+  - large-text-guard: the two retired ALLOWED rows;
+  - auth.ts: `forgetRecentSearches` after `forgetKnownStores`;
+  - auth.test.ts: AsyncStorage mock, Sentry mock and 5 tests;
+  - package files: expo-print and expo-file-system only.
+- **Logs:** both log diffs hold only Bills/subs entries.
+- **No dependency on other sessions' uncommitted work:** every borrowed key and import is in HEAD (Loans 5b81aea, Habits b6357dd). Nothing of ours imports Quick add's uncommitted files or uses their new keys.
+- **P23:** thin routes clamp `?month=` to the same floors as Choose month. bill-plans and subscription-plans become `<Redirect>`, Settings pushes the new routes, and nothing else links to the old pages.
+- **P25 deletions (Theo's list):** each is a design removal (in-page search, filter sheet, charged-renewals list, list totals and date groups). One note: Theo's line "a subscription with no renewal date is no longer a row" is loose. It is still a row with no status, pinned in bill-month and plan-month-screen.
+- **i18n:** 122 payments keys en/es/fr, all used.
+
+**Commit exactly these 48 paths (`git add` by path; never `-A` or `.`):**
+- `.claude/team/dev/bills-subs-pages-brief.md`, `.claude/team/dev/bills-subs-pages-plan.md`, `.claude/team/logs/development.md`, `.claude/team/logs/testing.md`
+- `package.json`, `package-lock.json`
+- `src/__tests__/payments/` (30 files), `src/__tests__/large-text-guard.test.ts`
+- `src/__tests__/app/{bills-i18n,bills-spending-flag,charges-edit,settings,stopped-plans,subscriptions-i18n}.test.tsx`
+- `src/api/auth.ts`, `src/api/auth.test.ts`, `src/api/{payment-export,payment-labels,payment-ledger,payment-searches}.ts`
+- `src/app/{bills,subscriptions,bill-plans,subscription-plans}.tsx`, `src/app/settings/your-money.tsx`
+- `src/app/{payment-export,payment-filter,payment-history,payment-month,payment-search,payment-year,payment-years}.tsx`
+- `src/components/payments/` (27 files), `src/components/ui/{currency-field,page-header,text-field}.tsx`
+- `src/data/pro-features.ts`, `src/data/pro-features.test.ts`
+- `src/i18n/messages/{index,payments,pro}.ts`
+- `src/lib/{bill-month,payment-entries,payment-export,payment-pick,payment-search,payment-years}.ts`
+- `src/theme/fonts.test.ts`
+
+**Leave out:**
+- Quick add's 25 modified files: the cards, notifications and receipts screens, their tests, dashboard tiles, money-tile, home-icons, and messages cards/home/reminders.
+- `.claude/team/testing/`: Savings walk material and screenshots, not ours.
+
+**Risks for the CEO and Founder:**
+1. **Process:** Dana's mutation scripts write mutants into the real `src/` files and restore them in a `finally` (`scratchpad/dana/mutate8.py`). Her logs say "scratch copies". This is the same pattern that left Drew's file holding a mutant. Have no mutation or jest run in progress when you `git add`, and use Theo's scratch-tree method from now on.
+2. **Legacy loans (Theo's open point):** a hand-added or pre-0007 Loans bill whose schedule has ended but which still names a next date reads as running and counts its instalment. Home counts it the same way, so the two agree. The old list said Paid off. `save_loan` now writes `ends_on`, so new loans cannot do this.
+3. **Category search:** finding a bill by category name went away with the in-page search; payment search matches names.
+4. **Dead code for the later archive (Founder approval):** `bill-filter-sheet`, `subscription-filter-sheet`, and the unused `bills.charged/plans.*` and `subscriptions.renewals/plans.*` keys.
+5. **expo-print:** the PDF share is proven only on the Release build. `ios/` is git-ignored, so the pod change is not in the commit.
+6. **Midnight:** a pull now runs the sweep. Without a pull or a resume, the month page still counts today's due before history and Home do, until the next resume.

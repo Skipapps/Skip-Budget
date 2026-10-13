@@ -1,5 +1,6 @@
 import { PRO_FEATURES } from '@/data/pro-features';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
+import { exportFileName } from '@/lib/payment-export';
 
 /** The explainer pages behind each locked door, read in the language on screen. */
 
@@ -18,8 +19,11 @@ const allText = () =>
     ...feature.points.map((point) => point.text),
   ]);
 
-/** The examples are the same in every language: dictation is English, and a card is a card. */
-const SAME_EVERYWHERE = new Set(['voice', 'unlimited']);
+/**
+ * The examples are the same in every language: dictation is English, a card is a card, and an
+ * export's file name is not translated.
+ */
+const SAME_EVERYWHERE = new Set(['voice', 'unlimited', 'export']);
 
 /**
  * Approved with a heading and line that wrap to two lines; the page wraps them whole (no line
@@ -36,6 +40,7 @@ describe('PRO_FEATURES', () => {
       'history',
       'unlimited',
       'habits',
+      'export',
     ]);
     for (const feature of features()) {
       expect(feature.icon).toBeDefined();
@@ -69,6 +74,15 @@ describe('PRO_FEATURES', () => {
       'Every day you skip counts as saved',
       'Counts in your receipts and balance',
     ]);
+    const exporting = PRO_FEATURES.export;
+    expect(exporting.example).toBe('skip-payments-all-years.pdf');
+    expect(exporting.title).toBe('Export your payments');
+    expect(exporting.subtitle).toBe('Every payment, as a spreadsheet or a PDF.');
+    expect(exporting.points.map((point) => point.text)).toEqual([
+      'CSV for Numbers, Excel or Google Sheets',
+      'A PDF statement to print or send',
+      'Any year, up to 7 years back',
+    ]);
   });
 
   it('reads in Spanish', () => {
@@ -81,6 +95,8 @@ describe('PRO_FEATURES', () => {
       'Tarjetas y cuentas sin límite',
       'Nada se bloquea si Pro termina',
     ]);
+    expect(PRO_FEATURES.export.title).toBe('Exporta tus pagos');
+    expect(PRO_FEATURES.export.points[1].text).toBe('Extracto en PDF para imprimir o enviar');
   });
 
   it('reads in French', () => {
@@ -93,7 +109,20 @@ describe('PRO_FEATURES', () => {
     expect(PRO_FEATURES.voice.points[2].text).toBe('Ta voix n’est jamais gardée');
     expect(PRO_FEATURES.history.example).toBe('De 90 jours à 7 ans');
     expect(PRO_FEATURES.habits.example).toBe('Café · 3 jours sans achat · 15,00 $ économisés');
+    expect(PRO_FEATURES.export.subtitle).toBe('Chaque paiement, en tableur ou en PDF.');
+    expect(PRO_FEATURES.export.points[0].text).toBe('CSV pour Numbers, Excel ou Google Sheets');
   });
+
+  it.each(['en', 'es', 'fr'] as const)(
+    'shows a file name the export really writes, with no year to go stale, in %s',
+    (language) => {
+      setLanguage(language);
+      expect(PRO_FEATURES.export.example).toBe(
+        exportFileName({ kind: 'all', year: 'all', ext: 'pdf' }),
+      );
+      expect(PRO_FEATURES.export.example).not.toMatch(/\d{4}/);
+    },
+  );
 
   it.each(['en', 'es', 'fr'] as const)(
     'keeps every line short enough for one line in %s',

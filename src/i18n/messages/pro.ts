@@ -207,6 +207,37 @@ export const proMessages = defineMessages({
     es: 'Nada se bloquea si Pro termina',
     fr: 'Rien n’est bloqué si Pro finit',
   },
+  // The file's real name, which is the same in every language.
+  'pro.export.example': {
+    en: 'skip-payments-all-years.pdf',
+    es: 'skip-payments-all-years.pdf',
+    fr: 'skip-payments-all-years.pdf',
+  },
+  'pro.export.title': {
+    en: 'Export your payments',
+    es: 'Exporta tus pagos',
+    fr: 'Exporte tes paiements',
+  },
+  'pro.export.subtitle': {
+    en: 'Every payment, as a spreadsheet or a PDF.',
+    es: 'Cada pago, en hoja de cálculo o en PDF.',
+    fr: 'Chaque paiement, en tableur ou en PDF.',
+  },
+  'pro.export.a': {
+    en: 'CSV for Numbers, Excel or Google Sheets',
+    es: 'CSV para Numbers, Excel o Google Sheets',
+    fr: 'CSV pour Numbers, Excel ou Google Sheets',
+  },
+  'pro.export.b': {
+    en: 'A PDF statement to print or send',
+    es: 'Extracto en PDF para imprimir o enviar',
+    fr: 'Un relevé en PDF à imprimer ou envoyer',
+  },
+  'pro.export.c': {
+    en: 'Any year, up to 7 years back',
+    es: 'Cualquier año, hasta 7 años atrás',
+    fr: 'N’importe quelle année, sur 7 ans',
+  },
 
   'pro.history.notice.title': {
     en: 'Older history is saved',
