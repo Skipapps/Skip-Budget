@@ -1,11 +1,13 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import CardsScreen from '@/app/(tabs)/cards';
 
 /**
- * The Cards tab's four doors to Pro say where the person was going, so buying Pro from the
- * explainer lands there: a new card, a new account, or the locked card or account they tapped.
+ * The Cards tab's two doors to Pro, a new card and a new account, say where the person was going,
+ * so buying Pro from the explainer lands there. A card or account beyond the free allowance is no
+ * door: it opens its own page on any plan, where it can be edited or deleted.
  */
 
 // Each icon is a drawn view named after itself, so a test can count the chevrons.
@@ -179,6 +181,13 @@ const explainer = (next: string) => ({
   params: { id: 'unlimited', next },
 });
 
+const VISA_FREE =
+  'Visa Sam. On the free plan you can open, edit or delete it, but not use it for new spending.';
+const ALLY_FREE =
+  'Ally. On the free plan you can open, edit or delete it, but not use it for new spending.';
+const opacityOf = (row: { props: { style?: StyleProp<ViewStyle> } }) =>
+  StyleSheet.flatten(row.props.style)?.opacity;
+
 describe('a free account at its allowance', () => {
   beforeEach(() => {
     mockPro = false;
@@ -198,18 +207,27 @@ describe('a free account at its allowance', () => {
     expect(router.push).toHaveBeenLastCalledWith(explainer('/add-account'));
   });
 
-  it('a locked card opens the explainer, then that card’s page', async () => {
+  it('a second card opens its own page, not the explainer', async () => {
     const screen = await render(<CardsScreen />);
-    await fireEvent.press(
-      screen.getByLabelText('Visa Sam, locked on the free plan. Opens Skip Pro.'),
-    );
-    expect(router.push).toHaveBeenLastCalledWith(explainer('/source/card-2'));
+    await fireEvent.press(screen.getByLabelText(VISA_FREE));
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenLastCalledWith('/source/card-2');
   });
 
-  it('a locked account opens the explainer, then that account’s page', async () => {
+  it('a second account opens its own page, not the explainer', async () => {
     const screen = await render(<CardsScreen />);
-    await fireEvent.press(screen.getByLabelText('Ally, locked on the free plan. Opens Skip Pro.'));
-    expect(router.push).toHaveBeenLastCalledWith(explainer('/source/acct-2'));
+    await fireEvent.press(screen.getByLabelText(ALLY_FREE));
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenLastCalledWith('/source/acct-2');
+  });
+
+  it('fades only the card and account beyond the allowance', async () => {
+    const screen = await render(<CardsScreen />);
+
+    expect(opacityOf(screen.getByLabelText('Amex Komal, view transactions'))).toBeUndefined();
+    expect(opacityOf(screen.getByLabelText('Chase, view transactions'))).toBeUndefined();
+    expect(opacityOf(screen.getByLabelText(VISA_FREE))).toBe(0.45);
+    expect(opacityOf(screen.getByLabelText(ALLY_FREE))).toBe(0.45);
   });
 
   it('the first card and account stay open, straight to their pages', async () => {
@@ -218,5 +236,37 @@ describe('a free account at its allowance', () => {
     expect(router.push).toHaveBeenLastCalledWith('/source/card-1');
     await fireEvent.press(screen.getByLabelText('Chase, view transactions'));
     expect(router.push).toHaveBeenLastCalledWith('/source/acct-1');
+  });
+});
+
+describe('a Pro account with more than one of each', () => {
+  beforeEach(() => {
+    mockCards.push({ ...mockCards[0], id: 'card-2', holder: 'Visa Sam' });
+    mockAccounts.push({ ...mockAccounts[0], id: 'acct-2', bank_name: 'Ally' });
+  });
+
+  it('reads, draws and opens every card and account alike', async () => {
+    const screen = await render(<CardsScreen />);
+
+    for (const [label, page] of [
+      ['Amex Komal, view transactions', '/source/card-1'],
+      ['Visa Sam, view transactions', '/source/card-2'],
+      ['Chase, view transactions', '/source/acct-1'],
+      ['Ally, view transactions', '/source/acct-2'],
+    ]) {
+      const row = screen.getByLabelText(label);
+      expect(opacityOf(row)).toBeUndefined();
+      await fireEvent.press(row);
+      expect(router.push).toHaveBeenLastCalledWith(page);
+    }
+    expect(screen.queryByLabelText(/On the free plan/)).toBeNull();
+  });
+
+  it('adds a card or account straight away', async () => {
+    const screen = await render(<CardsScreen />);
+    await fireEvent.press(screen.getByLabelText('New credit card'));
+    expect(router.push).toHaveBeenLastCalledWith('/add-card');
+    await fireEvent.press(screen.getByLabelText('Add account'));
+    expect(router.push).toHaveBeenLastCalledWith('/add-account');
   });
 });

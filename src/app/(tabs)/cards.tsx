@@ -240,20 +240,13 @@ export default function CardsScreen() {
             accessibilityRole="button"
             accessibilityLabel={
               !pro && index > 0
-                ? t('cards.list.cardLocked', { name: card.holder })
+                ? t('cards.list.cardBeyondFree', { name: card.holder })
                 : t('cards.list.viewTransactions', { name: card.holder })
             }
-            onPress={() =>
-              // Locked, not lost: extras beyond the free allowance survive a downgrade; the oldest
-              // stays fully usable.
-              !pro && index > 0
-                ? router.push({
-                    pathname: '/pro-feature',
-                    params: { id: 'unlimited', next: `/source/${card.id}` },
-                  })
-                : router.push(`/source/${card.id}`)
-            }
+            onPress={() => router.push(`/source/${card.id}`)}
             className="active:opacity-80"
+            // Faded, never locked: beyond the free allowance a card still opens, edits and deletes
+            // on any plan. Only the "Paid with" pickers leave it out (usePaymentSources).
             style={!pro && index > 0 ? { opacity: 0.45 } : undefined}
           >
             <PaymentCard
@@ -298,17 +291,10 @@ export default function CardsScreen() {
             accessibilityRole="button"
             accessibilityLabel={
               !pro && index > 0
-                ? t('cards.list.accountLocked', { name: account.nickname || account.bank_name })
+                ? t('cards.list.accountBeyondFree', { name: account.nickname || account.bank_name })
                 : t('cards.list.viewTransactions', { name: account.nickname || account.bank_name })
             }
-            onPress={() =>
-              !pro && index > 0
-                ? router.push({
-                    pathname: '/pro-feature',
-                    params: { id: 'unlimited', next: `/source/${account.id}` },
-                  })
-                : router.push(`/source/${account.id}`)
-            }
+            onPress={() => router.push(`/source/${account.id}`)}
             className="active:opacity-80"
             style={!pro && index > 0 ? { opacity: 0.45 } : undefined}
           >

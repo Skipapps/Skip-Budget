@@ -37,16 +37,16 @@ export const cardsMessages = defineMessages({
     es: 'Aún no hay cuentas bancarias. Agrega una para ver el dinero que entra y sale.',
     fr: 'Aucun compte bancaire pour l’instant. Ajoutes-en un pour voir l’argent qui entre et qui sort.',
   },
-  // Two keys with one English line: French agrees "verrouillée" with carte, "verrouillé" with compte.
-  'cards.list.cardLocked': {
-    en: '{name}, locked on the free plan. Opens Skip Pro.',
-    es: '{name}, bloqueada en el plan gratis. Abre Skip Pro.',
-    fr: '{name}, verrouillée avec le forfait gratuit. Ouvre Skip Pro.',
+  // Two keys with one English line: French says "la" for carte and "le" for compte.
+  'cards.list.cardBeyondFree': {
+    en: '{name}. On the free plan you can open, edit or delete it, but not use it for new spending.',
+    es: '{name}. Con el plan gratis puedes abrirla, editarla o eliminarla, pero no usarla para gastos nuevos.',
+    fr: '{name}. Avec le forfait gratuit, tu peux l’ouvrir, la modifier ou la supprimer, mais pas l’utiliser pour de nouvelles dépenses.',
   },
-  'cards.list.accountLocked': {
-    en: '{name}, locked on the free plan. Opens Skip Pro.',
-    es: '{name}, bloqueada en el plan gratis. Abre Skip Pro.',
-    fr: '{name}, verrouillé avec le forfait gratuit. Ouvre Skip Pro.',
+  'cards.list.accountBeyondFree': {
+    en: '{name}. On the free plan you can open, edit or delete it, but not use it for new spending.',
+    es: '{name}. Con el plan gratis puedes abrirla, editarla o eliminarla, pero no usarla para gastos nuevos.',
+    fr: '{name}. Avec le forfait gratuit, tu peux l’ouvrir, le modifier ou le supprimer, mais pas l’utiliser pour de nouvelles dépenses.',
   },
   'cards.list.viewTransactions': {
     en: '{name}, view transactions',

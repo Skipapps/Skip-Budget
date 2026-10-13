@@ -5,8 +5,8 @@ import CardsScreen from '@/app/(tabs)/cards';
 import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
 
 /**
- * The Cards tab in Spanish and French: title, headings, pills, empty notes, locked rows and the four
- * Money tiles, which are the real ones.
+ * The Cards tab in Spanish and French: title, headings, pills, empty notes, the rows past the free
+ * allowance and the four Money tiles, which are the real ones.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -202,17 +202,24 @@ describe('Cards tab in Spanish', () => {
     expect(screen.queryByText('Auto · Casa')).toBeNull();
   });
 
-  it('says which rows open and which are locked on the free plan', async () => {
+  it('says what the free plan still allows on the rows past its allowance, which still open', async () => {
     const screen = await render(<CardsScreen />);
 
     expect(screen.getByLabelText('Everyday Visa, ver movimientos')).toBeTruthy();
-    expect(
-      screen.getByLabelText('Travel card, bloqueada en el plan gratis. Abre Skip Pro.'),
-    ).toBeTruthy();
     expect(screen.getByLabelText('Main, ver movimientos')).toBeTruthy();
-    expect(
-      screen.getByLabelText('Rainy day, bloqueada en el plan gratis. Abre Skip Pro.'),
-    ).toBeTruthy();
+    await fireEvent.press(
+      screen.getByLabelText(
+        'Travel card. Con el plan gratis puedes abrirla, editarla o eliminarla, pero no usarla para gastos nuevos.',
+      ),
+    );
+    expect(router.push).toHaveBeenLastCalledWith('/source/c2');
+    await fireEvent.press(
+      screen.getByLabelText(
+        'Rainy day. Con el plan gratis puedes abrirla, editarla o eliminarla, pero no usarla para gastos nuevos.',
+      ),
+    );
+    expect(router.push).toHaveBeenLastCalledWith('/source/a2');
+    expect(screen.queryByLabelText(/bloquead|Abre Skip Pro/)).toBeNull();
   });
 
   it('explains an empty wallet in Spanish', async () => {
@@ -297,16 +304,23 @@ describe('Cards tab in French', () => {
     expect(screen.queryByText('Ajoute ta paie')).toBeNull();
   });
 
-  it('agrees a locked card and a locked account in French', async () => {
+  it('agrees the card and the account past the free allowance in French, and opens them', async () => {
     const screen = await render(<CardsScreen />);
 
     expect(screen.getByLabelText('Everyday Visa, voir les transactions')).toBeTruthy();
-    expect(
-      screen.getByLabelText('Travel card, verrouillée avec le forfait gratuit. Ouvre Skip Pro.'),
-    ).toBeTruthy();
-    expect(
-      screen.getByLabelText('Rainy day, verrouillé avec le forfait gratuit. Ouvre Skip Pro.'),
-    ).toBeTruthy();
+    await fireEvent.press(
+      screen.getByLabelText(
+        'Travel card. Avec le forfait gratuit, tu peux l’ouvrir, la modifier ou la supprimer, mais pas l’utiliser pour de nouvelles dépenses.',
+      ),
+    );
+    expect(router.push).toHaveBeenLastCalledWith('/source/c2');
+    await fireEvent.press(
+      screen.getByLabelText(
+        'Rainy day. Avec le forfait gratuit, tu peux l’ouvrir, le modifier ou le supprimer, mais pas l’utiliser pour de nouvelles dépenses.',
+      ),
+    );
+    expect(router.push).toHaveBeenLastCalledWith('/source/a2');
+    expect(screen.queryByLabelText(/verrouill|Ouvre Skip Pro/)).toBeNull();
   });
 
   it('explains an empty wallet in French', async () => {
