@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useHistoryFloor } from '@/api/history';
-import { habitMaths, useHabits, useHabitTaps } from '@/api/habits';
+import { habitMaths, useHabits, useHabitTaps, useStoppedHabits } from '@/api/habits';
 import { usePro } from '@/api/pro';
 import { FailureLine } from '@/components/habits/failure-line';
 import { HabitCard } from '@/components/habits/habit-card';
@@ -43,6 +43,7 @@ export default function HabitsScreen() {
   const { pro, ready } = usePro();
   const { today } = useToday();
   const habits = useHabits();
+  const stopped = useStoppedHabits();
   const taps = useHabitTaps();
   const days = useHabitDays(taps.data, today);
   // Free lists 90 days back: the week holding that day is as far back as it goes.
@@ -51,6 +52,13 @@ export default function HabitsScreen() {
 
   const active = useMemo(() => habits.data ?? [], [habits.data]);
   const maths = useMemo(() => active.map(habitMaths), [active]);
+  // The hero counts the stopped habits too: Saved so far up to the day before each stopped, and the
+  // week's spending their receipts in it, so a habit stopped mid-week keeps its earlier days. The
+  // cards and the week selector are the running ones'.
+  const savers = useMemo(
+    () => [...active, ...(stopped.data ?? [])].map(habitMaths),
+    [active, stopped.data],
+  );
 
   const thisWeek = weekStartOf(today);
   const startWeek = earliestWeek(maths) ?? thisWeek;
@@ -65,9 +73,10 @@ export default function HabitsScreen() {
   const spent = spentInWeek(
     shownTaps,
     weekStart,
-    active.map((habit) => habit.id),
+    savers.map((habit) => habit.id),
   );
-  const saved = savedAllTime(maths, shownTaps, today);
+  const saved = savedAllTime(savers, shownTaps, today);
+  const heroLabel = back === 0 ? t('habits.hero.spentThisWeek') : t('habits.hero.spentThatWeek');
 
   const addHabit = () => {
     // Until Pro is known a tap does nothing, so nobody who has paid is sent to the explainer.
@@ -83,13 +92,18 @@ export default function HabitsScreen() {
 
   const refetch = () => {
     void habits.refetch();
+    void stopped.refetch();
     void taps.refetch();
   };
 
-  const loading = habits.isPending || taps.isPending;
+  const loading = habits.isPending || stopped.isPending || taps.isPending;
   // Only a read with nothing to show is a failed page; a refresh that fails keeps the last read.
-  const failed = (habits.isError && !habits.data) || (taps.isError && !taps.data);
-  const refreshFailed = habits.isError || taps.isError;
+  // Without the stopped habits Saved so far would be short, so their read counts like the others.
+  const failed =
+    (habits.isError && !habits.data) ||
+    (stopped.isError && !stopped.data) ||
+    (taps.isError && !taps.data);
+  const refreshFailed = habits.isError || stopped.isError || taps.isError;
 
   return (
     <Screen
@@ -114,17 +128,27 @@ export default function HabitsScreen() {
           </View>
         </View>
       ) : active.length === 0 ? (
-        <PageState
-          art={artwork.emptyWallet}
-          title={t('habits.empty.title')}
-          message={t('habits.empty.message')}
-          actionLabel={t('habits.add')}
-          onAction={addHabit}
-        />
+        <>
+          {/* Stopping the last habit keeps what the stopped ones saved, and spent this week, in view. */}
+          {saved > 0 || spent > 0 ? (
+            <HabitsHero
+              label={heroLabel}
+              spent={spent > 0 ? formatCurrency(spent) : undefined}
+              saved={formatCurrency(saved)}
+            />
+          ) : null}
+          <PageState
+            art={artwork.emptyWallet}
+            title={t('habits.empty.title')}
+            message={t('habits.empty.message')}
+            actionLabel={t('habits.add')}
+            onAction={addHabit}
+          />
+        </>
       ) : (
         <>
           <HabitsHero
-            label={back === 0 ? t('habits.hero.spentThisWeek') : t('habits.hero.spentThatWeek')}
+            label={heroLabel}
             spent={formatCurrency(spent)}
             saved={formatCurrency(saved)}
           />

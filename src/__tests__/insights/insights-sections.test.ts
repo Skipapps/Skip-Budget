@@ -2,7 +2,7 @@ import type { ChargeRow } from '@/api/charges';
 import { planLedger } from '@/api/payment-ledger';
 import type { BillRow, LedgerPayoff, SubscriptionRow } from '@/api/queries';
 import { lastChargedBy, monthBounds, planMonth, type PlanKind } from '@/lib/bill-month';
-import { movedThisMonth, nextDue, subscriptionCost } from '@/lib/insights-sections';
+import { habitsSummary, movedThisMonth, nextDue, subscriptionCost } from '@/lib/insights-sections';
 import { savingsSummary, type MoveRow, type PotRow } from '@/lib/savings';
 
 /**
@@ -591,5 +591,46 @@ describe('F15 Coming up: subscriptions by billing cycle', () => {
       },
     ];
     expect(subscriptionCost(odd)).toEqual({ perMonth: 20.99, perYear: 251.88, count: 2 });
+  });
+});
+
+describe('habitsSummary', () => {
+  // Hand-counted. Today is Tuesday 13 Oct 2026; the week began on Monday the 12th.
+  const TODAY = '2026-10-13';
+  const coffee = {
+    id: 'coffee',
+    price: 4.35,
+    started_on: '2026-10-05',
+    saved_from: '2026-10-07',
+    archived_at: null,
+  };
+  // Stopped with Keep past days at 10 pm on Friday 9 Oct, its days kept.
+  const delivery = {
+    id: 'delivery',
+    price: 23.99,
+    started_on: '2026-09-21',
+    saved_from: '2026-09-21',
+    archived_at: new Date(2026, 9, 9, 22, 0).toISOString(),
+  };
+  const taps = [
+    { habitId: 'coffee', day: '2026-10-08', amount: 4.35, receiptId: 'c-8' },
+    { habitId: 'coffee', day: '2026-10-12', amount: 4.35, receiptId: 'c-12' },
+    { habitId: 'delivery', day: '2026-09-25', amount: 23.99, receiptId: 'd-25' },
+    { habitId: 'delivery', day: '2026-10-02', amount: 31.5, receiptId: 'd-2' },
+    // On the stop day, before the stop: spent, never saved.
+    { habitId: 'delivery', day: '2026-10-09', amount: 23.99, receiptId: 'd-9' },
+  ];
+
+  it('adds a stopped habit’s saving until the day before it stopped to Saved so far only', () => {
+    // Coffee: 7 to 12 Oct is 6 days, the 8th and the 12th bought: 4 x $4.35 = $17.40. This week
+    // only the 12th has ended, and it was bought.
+    // Food delivery: 21 Sep to 8 Oct is 18 days, the 25th and the 2nd bought: 16 x $23.99 = $383.84.
+    const summary = habitsSummary([coffee], [delivery], taps, TODAY);
+    expect(summary.rows).toEqual([{ habit: coffee, skipped: 0, saved: 0 }]);
+    expect(summary.count).toBe(1);
+    expect(summary.savedSoFar).toBe(401.24);
+    // The same on any later day: the stopped habit's part never grows.
+    expect(habitsSummary([], [delivery], taps, '2027-06-30').savedSoFar).toBe(383.84);
+    expect(habitsSummary([], [delivery], taps, '2026-10-09').savedSoFar).toBe(383.84);
   });
 });

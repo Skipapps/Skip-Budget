@@ -1,6 +1,7 @@
 import { monthShort } from '@/i18n/calendar';
 import { NBSP } from '@/i18n/number';
 import { getLocaleSnapshot } from '@/i18n/store';
+import { toIsoDate } from '@/lib/date';
 import { fromCents, roundMoney, toCents } from '@/lib/money';
 
 /**
@@ -8,9 +9,15 @@ import { fromCents, roundMoney, toCents } from '@/lib/money';
  * Monday to Sunday. Money is summed in whole cents and turned back into a decimal once, at the end.
  *
  * Product rules:
- * - Saved = skipped days x price. A skipped day is one from the day the habit was created to
- *   yesterday with no receipt for the habit; today saves nothing until it is over. The price is the
- *   habit's current one.
+ * - Saved = skipped days x price. A skipped day is a saving day with no receipt for the habit
+ *   dated on it (two receipts on one day are one bought day). Saving days run from countsFrom (the
+ *   day the habit was created) to the last saving day:
+ *   - running: yesterday. Today saves nothing until it is over.
+ *   - stopped ("Keep past days", `stoppedOn`): the day before it stopped, or yesterday if that is
+ *     earlier. The stop day was not over while the habit ran, so it never saves, and no later day
+ *     does: stopping leaves Saved where it stood that moment, and it never grows after.
+ *   Days x price is taken in whole cents, at the habit's stored price. A stopped habit cannot be
+ *   edited in the app, so that is the price it had when it stopped.
  * - A day can be tapped from the creation day through today, never earlier: a receipt back-dated
  *   before the habit existed would not match the bank's record of that day.
  * - Spent = the sum of the habit receipts' own amounts dated in the week, edits included.
@@ -18,10 +25,19 @@ import { fromCents, roundMoney, toCents } from '@/lib/money';
 
 /**
  * `startedOn` is the Monday of the week the habit was created: the week selector starts there.
- * `savedFrom` is the local day it was created: taps, Saved and the spend limit start there. Pass
- * active habits only.
+ * `savedFrom` is the local day it was created: taps, Saved and the spend limit start there.
+ * `stoppedOn` is the local day "Keep past days" stopped it (`stoppedOnDay(archived_at)`), absent or
+ * null while it runs. It ends the saving days (skippedDays*, savedInWeek, savedAllTime) and the
+ * skipped days habitHistory lists. The card's maths (dayState, weekLimit, weekProgress, the weeks
+ * habitHistory lists) describes a running habit and ignores it: a stopped habit has no card.
  */
-export type HabitMaths = { id: string; price: number; startedOn: string; savedFrom: string };
+export type HabitMaths = {
+  id: string;
+  price: number;
+  startedOn: string;
+  savedFrom: string;
+  stoppedOn?: string | null;
+};
 
 /** One receipt behind a filled day circle; `amount` is the receipt's own, which may differ from the price. */
 export type HabitTap = { habitId: string; day: string; amount: number; receiptId: string };
@@ -101,6 +117,22 @@ function firstSavingDay(habit: HabitMaths): number {
   return Math.max(dayNumber(habit.startedOn), dayNumber(habit.savedFrom));
 }
 
+/** Null while the habit runs. */
+function stopDay(habit: HabitMaths): number | null {
+  const stopped = habit.stoppedOn ?? null;
+  return stopped === null ? null : dayNumber(stopped);
+}
+
+/**
+ * The last day that can save, as a day number: yesterday, or the day before the habit stopped if
+ * that is earlier. Earlier than firstSavingDay when nothing can save yet, or a habit stopped on the
+ * day it was made.
+ */
+function lastSavingDay(habit: HabitMaths, now: number): number {
+  const stopped = stopDay(habit);
+  return (stopped === null ? now : Math.min(now, stopped)) - 1;
+}
+
 /** Days in [from, to] without a tap. Tapped days are a set, so two receipts on one day count once. */
 function skippedDays(tapped: ReadonlySet<number>, from: number, to: number): number {
   if (to < from) return 0;
@@ -109,6 +141,20 @@ function skippedDays(tapped: ReadonlySet<number>, from: number, to: number): num
     if (day >= from && day <= to) tappedInside += 1;
   }
   return to - from + 1 - tappedInside;
+}
+
+/**
+ * The device's local calendar day of a habit's `archived_at`, the day "Keep past days" stopped it;
+ * null while it runs. Local like today: a habit stopped at 11 pm in New York stopped that day, not
+ * on the next one, which its UTC timestamp names. A bare `YYYY-MM-DD` is taken as that day; anything
+ * that is not a timestamp throws, rather than let a habit save for ever or never.
+ */
+export function stoppedOnDay(archivedAt: string | null | undefined): string | null {
+  if (archivedAt === null || archivedAt === undefined) return null;
+  if (ISO_DAY.test(archivedAt)) return isoDay(dayNumber(archivedAt));
+  const at = new Date(archivedAt);
+  if (Number.isNaN(at.getTime())) throw new RangeError(`Not a timestamp: ${archivedAt}`);
+  return toIsoDate(at);
 }
 
 /** The Monday on or before `day`. */
@@ -178,7 +224,10 @@ export function countsFrom(habit: HabitMaths): string {
   return isoDay(firstSavingDay(habit));
 }
 
-/** Untapped days from max(countsFrom, Monday) to min(yesterday, Sunday): the days Saved pays for. */
+/**
+ * Untapped days from max(countsFrom, Monday) to min(the last saving day, Sunday): the days Saved
+ * pays for. The last saving day is yesterday, or the day before a stopped habit stopped.
+ */
 export function skippedDaysInWeek(
   habit: HabitMaths,
   tappedDays: Iterable<string>,
@@ -187,17 +236,21 @@ export function skippedDaysInWeek(
 ): number {
   const monday = weekOf(weekStart);
   const from = Math.max(monday, firstSavingDay(habit));
-  const to = Math.min(monday + 6, dayNumber(today) - 1);
+  const to = Math.min(monday + 6, lastSavingDay(habit, dayNumber(today)));
   return skippedDays(dayNumbers(tappedDays), from, to);
 }
 
-/** Untapped days from countsFrom to yesterday. */
+/** Untapped days from countsFrom to the last saving day (see skippedDaysInWeek). */
 export function skippedDaysAllTime(
   habit: HabitMaths,
   tappedDays: Iterable<string>,
   today: string,
 ): number {
-  return skippedDays(dayNumbers(tappedDays), firstSavingDay(habit), dayNumber(today) - 1);
+  return skippedDays(
+    dayNumbers(tappedDays),
+    firstSavingDay(habit),
+    lastSavingDay(habit, dayNumber(today)),
+  );
 }
 
 /** Saved this week: skippedDaysInWeek x price, in whole cents. */
@@ -211,7 +264,12 @@ export function savedInWeek(
   return fromCents(days * toCents(habit.price));
 }
 
-/** Saved: skippedDaysAllTime x price for each habit given (the active ones), in whole cents. */
+/**
+ * Saved so far: skippedDaysAllTime x price for each habit given, summed in whole cents. Give it the
+ * running habits and the stopped ones (Keep past days), each with its `stoppedOn`: a stopped habit
+ * adds what it saved until it stopped. A habit removed with everything is in neither list, and its
+ * receipts are gone, so it adds nothing. Taps of a habit not given are ignored.
+ */
 export function savedAllTime(
   habits: readonly HabitMaths[],
   taps: readonly HabitTap[],
@@ -310,7 +368,8 @@ export function weekProgress(habit: HabitMaths, weekStart: string, today: string
  * A week lists its days newest first: each day from max(Monday, countsFrom) to min(Sunday, today) as
  * bought, skipped or today, plus every receipt dated outside that stretch (before countsFrom or in
  * the future), so real money is never hidden. A day with two receipts lists the first, as on the
- * circles; Spent counts both.
+ * circles; Spent counts both. A stopped habit lists no today, and no skipped day from its stop day
+ * on, so the skipped days listed are always the ones its saved figure pays for.
  *
  * `floor` (a free plan's first shown day) leaves out the days before it and the weeks that end
  * before it. It never changes spent, saved or limit.
@@ -323,6 +382,8 @@ export function habitHistory(
 ): HabitWeek[] {
   const now = dayNumber(today);
   const startsFrom = firstSavingDay(habit);
+  const lastSaving = lastSavingDay(habit, now);
+  const running = stopDay(habit) === null;
   const shownFrom = floor === undefined ? null : dayNumber(floor);
   const price = roundMoney(habit.price);
   const byDay = tapsForHabit(taps, habit.id);
@@ -352,7 +413,6 @@ export function habitHistory(
 
     const weekStart = isoDay(monday);
     const openFrom = Math.max(monday, startsFrom);
-    const openTo = Math.min(sunday, now);
     const days: HabitHistoryDay[] = [];
     for (let day = sunday; day >= monday; day -= 1) {
       if (shownFrom !== null && day < shownFrom) break;
@@ -365,12 +425,10 @@ export function habitHistory(
           amount: roundMoney(tap.amount),
           receiptId: tap.receiptId,
         });
-      } else if (day >= openFrom && day <= openTo) {
-        days.push(
-          day === now
-            ? { day: iso, kind: 'today', amount: 0 }
-            : { day: iso, kind: 'skipped', amount: price },
-        );
+      } else if (day >= openFrom && day <= lastSaving) {
+        days.push({ day: iso, kind: 'skipped', amount: price });
+      } else if (day === now && running && day >= openFrom) {
+        days.push({ day: iso, kind: 'today', amount: 0 });
       }
     }
 

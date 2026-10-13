@@ -124,6 +124,7 @@ const mockUntapDay = jest.fn();
 jest.mock('@/api/habits', () => ({
   useHabits: () => mockHabits,
   useHabitTaps: () => mockTaps,
+  useStoppedHabits: () => query<HabitRow[]>([]),
   useTapHabitDay: () => ({ mutateAsync: mockTapDay }),
   useUntapHabitDay: () => ({ mutateAsync: mockUntapDay }),
   habitMaths: (row: HabitRow) => ({

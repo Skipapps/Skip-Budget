@@ -4,7 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { insertOnce, NOTHING_UPDATED, type ClientId, type ReceiptValues } from '@/api/mutations';
 import { habitColor, type HabitColor } from '@/data/habit-colors';
 import { withTimeout } from '@/lib/deadline';
-import type { HabitMaths, HabitTap } from '@/lib/habit-week';
+import { stoppedOnDay, type HabitMaths, type HabitTap } from '@/lib/habit-week';
 import { fromCents, toCents, wholeCents } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
@@ -76,15 +76,20 @@ export function readHabit(raw: RawHabit): HabitRow {
   };
 }
 
-/** The fields the week maths reads. */
+/**
+ * The fields the week maths reads. `archived_at`, when given, tells a habit stopped with Keep past
+ * days from a running one: its Saved so far ends the day before it stopped.
+ */
 export function habitMaths(
-  habit: Pick<HabitRow, 'id' | 'price' | 'started_on' | 'saved_from'>,
+  habit: Pick<HabitRow, 'id' | 'price' | 'started_on' | 'saved_from'> &
+    Partial<Pick<HabitRow, 'archived_at'>>,
 ): HabitMaths {
   return {
     id: habit.id,
     price: habit.price,
     startedOn: habit.started_on,
     savedFrom: habit.saved_from,
+    stoppedOn: stoppedOnDay(habit.archived_at),
   };
 }
 
@@ -103,6 +108,33 @@ export function useHabits() {
             .is('archived_at', null)
             .order('sort_order', { ascending: true })
             .order('created_at', { ascending: true });
+          if (error) throw error;
+          return ((data ?? []) as unknown as RawHabit[]).map(readHabit);
+        })(),
+        QUERY_TIMEOUT_MS,
+        'Could not load your habits. Check your connection and try again.',
+      ),
+  });
+}
+
+/**
+ * The habits stopped with Keep past days, oldest stop first: no card, but the days they saved still
+ * count in Saved so far. Under the 'habits' key, so every habit write refreshes it; the key's last
+ * part is an object, so no habit id can ever name this list.
+ */
+export function useStoppedHabits() {
+  const userId = useUserId();
+  return useQuery({
+    queryKey: ['habits', userId, { stopped: true }],
+    enabled: Boolean(userId),
+    queryFn: () =>
+      withTimeout(
+        (async () => {
+          const { data, error } = await supabase
+            .from('habits')
+            .select(HABIT_COLUMNS)
+            .not('archived_at', 'is', null)
+            .order('archived_at', { ascending: true });
           if (error) throw error;
           return ((data ?? []) as unknown as RawHabit[]).map(readHabit);
         })(),

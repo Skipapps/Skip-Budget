@@ -126,6 +126,7 @@ const READS = [
   'billMonth',
   'subscriptionMonth',
   'habits',
+  'stopped',
   'taps',
   'goals',
   'savings',
@@ -176,6 +177,7 @@ let mockReceipts: object[] = [];
 let mockLoans: LoanListRow[] = [];
 let mockPlanViews: Record<string, object> = {};
 let mockHabits: object[] = [];
+let mockStopped: object[] = [];
 let mockTaps: object[] = [];
 let mockGoals = { saved: 0, target: 0, active: [] as object[], done: [] as object[] };
 let mockSavings = { readyToUse: 0, pots: [] as object[] };
@@ -221,6 +223,7 @@ jest.mock('@/api/payment-ledger', () => ({
 jest.mock('@/api/habits', () => ({
   ...jest.requireActual('@/api/habits'),
   useHabits: () => mockAnswer('habits', mockHabits),
+  useStoppedHabits: () => mockAnswer('stopped', mockStopped),
   useHabitTaps: () => mockAnswer('taps', mockTaps),
 }));
 
@@ -452,6 +455,7 @@ beforeEach(() => {
     subscription: planView('subscription', 0, 0, []),
   };
   mockHabits = [];
+  mockStopped = [];
   mockTaps = [];
   mockGoals = { saved: 0, target: 0, active: [], done: [] };
   mockSavings = { readyToUse: 0, pots: [] };
@@ -689,6 +693,40 @@ describe('Insights — nothing yet', () => {
     }
   });
 
+  it('keeps Saved so far above the empty Habits line while only stopped habits are left', async () => {
+    // Stopped with Keep past days at 6 pm on Monday 5 Oct: 28 Sep to 4 Oct, the 30th bought,
+    // 6 x $6.50 = $39.00.
+    mockStopped = [
+      {
+        id: 'lunch',
+        name: 'Lunch out',
+        icon_id: 'lunch',
+        color: 'blue',
+        price: 6.5,
+        started_on: '2026-09-28',
+        saved_from: '2026-09-28',
+        archived_at: new Date(2026, 9, 5, 18, 0).toISOString(),
+      },
+    ];
+    mockTaps = [{ habitId: 'lunch', day: '2026-09-30', amount: 6.5, receiptId: 'r-lunch' }];
+    await draw();
+
+    const habits = section('habits');
+    expect(
+      habits
+        .getAllByTestId(/^insights-(habits|section-habits-empty)$/)
+        .map((node) => node.props.testID),
+    ).toEqual(['insights-habits', 'insights-section-habits-empty']);
+    const saved = within(screen.getByTestId('insights-habits'));
+    expect(saved.getByText('Saved so far')).toBeTruthy();
+    expect(saved.getByText('$39.00')).toBeTruthy();
+    expect(habits.queryByText('Lunch out')).toBeNull();
+    const empty = within(screen.getByTestId('insights-section-habits-empty'));
+    expect(empty.getByText('No habits yet')).toBeTruthy();
+    await fireEvent.press(empty.getByRole('button', { name: 'Start a habit' }));
+    expect(mockPush.mock.calls).toEqual([['/habit-new']]);
+  });
+
   it('leaves off the sections with nothing to show', async () => {
     mockSalary = [
       { id: 'pay', name: 'Acme', amount: 3_000, frequency: 'monthly', last_payday: '2026-09-01' },
@@ -709,7 +747,7 @@ describe('Insights — a read that fails', () => {
   /** A section's own reads, and a figure only that section draws. */
   const OWN: [string, ReadName[], string][] = [
     ['loans', ['loans'], 'Monthly payments'],
-    ['habits', ['habits', 'taps'], 'Saved so far'],
+    ['habits', ['habits', 'stopped', 'taps'], 'Saved so far'],
     ['goals', ['goals'], 'Saved toward goals'],
     ['savings', ['savings'], 'Total in savings'],
     ['in', ['salary'], 'Salary'],
@@ -738,6 +776,32 @@ describe('Insights — a read that fails', () => {
       );
     },
   );
+
+  it('fails Habits when only the stopped habits could not be read, never a lower Saved so far', async () => {
+    fillThePage();
+    mockFailing = new Set<ReadName>(['stopped']);
+    await draw();
+
+    const card = within(screen.getByTestId('insights-section-habits-failed'));
+    expect(card.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    expect(screen.queryByText('Saved so far')).toBeNull();
+    expect(screen.queryByText('$32.00')).toBeNull();
+    await fireEvent.press(card.getByRole('button', { name: 'Try again' }));
+    expect(READS.filter((read) => mockRefetch[read].mock.calls.length > 0)).toEqual([
+      'habits',
+      'stopped',
+      'taps',
+    ]);
+  });
+
+  it('holds the Habits card while the stopped habits are still loading', async () => {
+    fillThePage();
+    mockLoading = new Set<ReadName>(['stopped']);
+    await draw();
+    expect(section('habits').queryByText('Saved so far')).toBeNull();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect(screen.getByText('Saved toward goals')).toBeTruthy();
+  });
 
   it.each(['ledger', 'receipts', 'subscriptions', 'categories'] as ReadName[])(
     'shows no spending figure at all while %s has failed, and asks every spending read again',
@@ -816,6 +880,7 @@ describe('Insights — a read that fails', () => {
       'salary',
       'cards',
       'habits',
+      'stopped',
       'taps',
     ]);
     await draw();

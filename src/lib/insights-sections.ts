@@ -129,25 +129,34 @@ export function nextDue(
     .map(({ cents, ...due }) => ({ ...due, amount: fromCents(cents) }));
 }
 
-/** What the Habits card reads of a habit; a full `HabitRow` passes through to its row. */
-export type SummaryHabit = Pick<HabitRow, 'id' | 'price' | 'started_on' | 'saved_from'>;
+/**
+ * What the Habits card reads of a habit; a full `HabitRow` passes through to its row. `archived_at`
+ * marks a habit stopped with Keep past days.
+ */
+export type SummaryHabit = Pick<HabitRow, 'id' | 'price' | 'started_on' | 'saved_from'> &
+  Partial<Pick<HabitRow, 'archived_at'>>;
 
 /** The Habits card. */
 export type HabitsSummary<H extends SummaryHabit = SummaryHabit> = {
-  /** The first `limit` habits, in the Habits page's order, each with this week's figures. */
+  /** The first `limit` running habits, in the Habits page's order, each with this week's figures. */
   rows: { habit: H; skipped: number; saved: number }[];
-  /** Saved so far by every active habit, shown or not: the Habits page's hero figure. */
+  /**
+   * Saved so far by every habit, running or stopped, shown or not: the Habits page's hero figure. A
+   * stopped habit adds what it saved until the day before it stopped.
+   */
   savedSoFar: number;
-  /** Active habits. */
+  /** Running habits. */
   count: number;
 };
 
 /**
- * This week's skipped days and saving per habit, as each habit card computes them, and Saved so
- * far as the Habits page does. Pass `useHabits().data` (active only) and `useHabitTaps().data`.
+ * This week's skipped days and saving per running habit, as each habit card computes them, and
+ * Saved so far as the Habits page's hero does: `savedAllTime([...habits, ...stopped].map(habitMaths),
+ * taps, today)`. Pass `useHabits().data`, `useStoppedHabits().data` and `useHabitTaps().data`.
  */
 export function habitsSummary<H extends SummaryHabit>(
   habits: readonly H[],
+  stopped: readonly SummaryHabit[],
   taps: readonly HabitTap[],
   today: string,
   limit = 3,
@@ -164,7 +173,7 @@ export function habitsSummary<H extends SummaryHabit>(
   });
   return {
     rows,
-    savedSoFar: savedAllTime(habits.map(habitMaths), taps, today),
+    savedSoFar: savedAllTime([...habits, ...stopped].map(habitMaths), taps, today),
     count: habits.length,
   };
 }

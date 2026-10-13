@@ -4,14 +4,18 @@ import { Text, View } from 'react-native';
 
 import { FitFigure } from '@/components/ui/fit-group';
 import { t } from '@/i18n';
+import { cn } from '@/lib/cn';
 import { useColors } from '@/providers/theme-provider';
 import { TEXT_CAP } from '@/theme/text-scale';
 
 type HabitsHeroProps = {
   /** "Spent this week", "Spent that week" or "Spent so far". */
   label: string;
-  /** Already formatted. */
-  spent: string;
+  /**
+   * Already formatted. Left out, the hero is the Saved so far tile alone, with no label or `top`:
+   * the Habits page once only stopped habits are left and nothing was spent this week.
+   */
+  spent?: string;
   saved: string;
   /** Drawn above the label, such as one habit's icon and price. */
   top?: ReactNode;
@@ -26,9 +30,12 @@ type HabitsHeroProps = {
  */
 export function HabitsHero({ label, spent, saved, top, topLabel }: HabitsHeroProps) {
   const colors = useColors();
-  const spoken = topLabel
-    ? t('habits.hero.spokenTop', { top: topLabel, label, spent, saved })
-    : t('habits.hero.spoken', { label, spent, saved });
+  const spoken =
+    spent === undefined
+      ? t('habits.hero.spokenSaved', { saved })
+      : topLabel
+        ? t('habits.hero.spokenTop', { top: topLabel, label, spent, saved })
+        : t('habits.hero.spoken', { label, spent, saved });
 
   return (
     <View
@@ -37,24 +44,33 @@ export function HabitsHero({ label, spent, saved, top, topLabel }: HabitsHeroPro
       className="mt-[18px] w-full rounded-[22px] bg-accent p-[22px]"
       testID="habits-hero"
     >
-      {top ? <View className="mb-[16px] w-full">{top}</View> : null}
-      <Text
-        className="font-app text-[15px] text-on-control"
-        maxFontSizeMultiplier={TEXT_CAP.control}
-      >
-        {label}
-      </Text>
-      <FitFigure
-        id="hero-spent"
-        size={38}
-        className="font-app-bold text-on-control"
-        boxClassName="mt-[2px]"
-      >
-        {spent}
-      </FitFigure>
+      {spent === undefined ? null : (
+        <>
+          {top ? <View className="mb-[16px] w-full">{top}</View> : null}
+          <Text
+            className="font-app text-[15px] text-on-control"
+            maxFontSizeMultiplier={TEXT_CAP.control}
+          >
+            {label}
+          </Text>
+          <FitFigure
+            id="hero-spent"
+            size={38}
+            className="font-app-bold text-on-control"
+            boxClassName="mt-[2px]"
+          >
+            {spent}
+          </FitFigure>
+        </>
+      )}
 
       {/* A tenth of white, not more: the tile's white type needs its 4.5:1. */}
-      <View className="mt-[14px] w-full rounded-[14px] bg-on-control/10 px-[16px] py-[12px]">
+      <View
+        className={cn(
+          'w-full rounded-[14px] bg-on-control/10 px-[16px] py-[12px]',
+          spent !== undefined && 'mt-[14px]',
+        )}
+      >
         <View className="flex-row items-center gap-[6px]">
           <PiggyBank size={17} color={colors.onControl} strokeWidth={1.8} />
           <Text

@@ -13,6 +13,7 @@ import {
   skippedDaysAllTime,
   skippedDaysInWeek,
   spentInWeek,
+  stoppedOnDay,
   tapsForHabit,
   trackedDaysInWeek,
   weekDays,
@@ -578,6 +579,254 @@ describe('skipped-day counts and countsFrom', () => {
       const taps = tapped.map((day) => tap('dinner', day, price));
       expect(toCents(savedAllTime([priced], taps, '2026-11-04'))).toBe(all * toCents(price));
     }
+  });
+});
+
+// Keep past days stops a habit: its days stay and count in Saved so far up to the day before it
+// stopped, never later. Hand-counted on the calendar above: Monday 28 Sep, Monday 5 Oct, Monday
+// 12 Oct 2026; stopped on Thursday 8 Oct.
+describe('a stopped habit (Keep past days)', () => {
+  const STOP_DAY = '2026-10-08';
+  const FRIDAY_16 = '2026-10-16';
+  const lunchRunning = habit('lunch', 5, '2026-09-28');
+  const lunchStopped: HabitMaths = { ...lunchRunning, stoppedOn: STOP_DAY };
+  const lunchTaps = [
+    tap('lunch', '2026-09-30', 5, 'lunch-sep-30'),
+    tap('lunch', '2026-09-30', 5, 'lunch-sep-30-again'), // a second receipt the same day
+    tap('lunch', '2026-10-02', 7.5, 'lunch-oct-2'), // edited above the price
+    tap('lunch', '2026-10-06', 5, 'lunch-oct-6'),
+  ];
+
+  it('counts its skipped days from its start to the day before it stopped', () => {
+    // 28 Sep to 7 Oct is 10 days; 30 Sep, 2 Oct and 6 Oct bought: 7 x $5.00 = $35.00.
+    expect(
+      skippedDaysAllTime(lunchStopped, ['2026-09-30', '2026-10-02', '2026-10-06'], FRIDAY_16),
+    ).toBe(7);
+    expect(savedAllTime([lunchStopped], lunchTaps, FRIDAY_16)).toBe(35);
+    // Still running, it would have reached 15 Oct: 18 days, 15 skipped, $75.00.
+    expect(savedAllTime([lunchRunning], lunchTaps, FRIDAY_16)).toBe(75);
+  });
+
+  it('saves nothing on the day it stopped or after, however long ago that was', () => {
+    for (const today of [
+      STOP_DAY,
+      '2026-10-09',
+      FRIDAY_16,
+      '2026-12-31',
+      '2027-01-04',
+      '2028-02-29',
+    ]) {
+      expect([today, savedAllTime([lunchStopped], lunchTaps, today)]).toEqual([today, 35]);
+    }
+  });
+
+  it('leaves Saved where it stood the moment it stopped', () => {
+    // On the stop day a running habit has saved through yesterday, 7 Oct: the same $35.00.
+    expect(savedAllTime([lunchRunning], lunchTaps, STOP_DAY)).toBe(35);
+    expect(savedAllTime([lunchStopped], lunchTaps, STOP_DAY)).toBe(35);
+  });
+
+  it('is unmoved by a receipt on the stop day or re-dated after it: spent, never saved', () => {
+    const later = [
+      ...lunchTaps,
+      tap('lunch', STOP_DAY, 5, 'lunch-stop-day'),
+      tap('lunch', '2026-10-13', 5, 'lunch-redated'),
+    ];
+    expect(savedAllTime([lunchStopped], later, FRIDAY_16)).toBe(35);
+    expect(spentInWeek(later, THIS_WEEK, ['lunch'])).toBe(10);
+    expect(spentInWeek(later, '2026-10-12', ['lunch'])).toBe(5);
+  });
+
+  it('adds up week by week: $25.00, then $10.00 in its last week, then nothing', () => {
+    const days = [...tapsForHabit(lunchTaps, 'lunch').keys()];
+    // 28 Sep to 4 Oct: 7 days, 30 Sep and 2 Oct bought.
+    expect(skippedDaysInWeek(lunchStopped, days, '2026-09-28', FRIDAY_16)).toBe(5);
+    expect(savedInWeek(lunchStopped, days, '2026-09-28', FRIDAY_16)).toBe(25);
+    // 5 to 7 Oct: 3 days, 6 Oct bought. Thursday the 8th is the stop day.
+    expect(skippedDaysInWeek(lunchStopped, days, THIS_WEEK, FRIDAY_16)).toBe(2);
+    expect(savedInWeek(lunchStopped, days, THIS_WEEK, FRIDAY_16)).toBe(10);
+    expect(savedInWeek(lunchStopped, days, '2026-10-12', FRIDAY_16)).toBe(0);
+    expect(savedInWeek(lunchStopped, days, '2027-01-04', '2027-01-06')).toBe(0);
+  });
+
+  it('adds what it saved to the running habits’ figure, to the cent', () => {
+    // Stopped 1 Oct. Made Wednesday 2 Sep in the week of Monday 31 Aug: 2 to 30 Sep is 29 days,
+    // the 10th bought: 28 x $2.35 = $65.80.
+    const snacks: HabitMaths = {
+      ...habit('snacks', 2.35, '2026-08-31', '2026-09-02'),
+      stoppedOn: '2026-10-01',
+    };
+    // Running: 5 to 15 Oct is 11 days, the 5th and the 7th bought: 9 x $5.00 = $45.00.
+    const running = habit('coffee', 5, THIS_WEEK);
+    const taps = [
+      ...lunchTaps,
+      tap('snacks', '2026-09-10', 2.35),
+      tap('coffee', THIS_WEEK, 5),
+      tap('coffee', WEDNESDAY, 5),
+    ];
+    expect(savedAllTime([snacks], taps, FRIDAY_16)).toBe(65.8);
+    expect(savedAllTime([running], taps, FRIDAY_16)).toBe(45);
+    // $45.00 + $35.00 + $65.80.
+    expect(toCents(savedAllTime([running, lunchStopped, snacks], taps, FRIDAY_16))).toBe(14580);
+    expect(savedAllTime([running, lunchStopped, snacks], taps, FRIDAY_16)).toBe(145.8);
+  });
+
+  it('adds nothing once removed with everything: the habit and its days are gone', () => {
+    const running = habit('coffee', 5, THIS_WEEK);
+    const coffeeTaps = [tap('coffee', THIS_WEEK, 5), tap('coffee', WEDNESDAY, 5)];
+    // Keep past days: $45.00 + $35.00.
+    expect(savedAllTime([running, lunchStopped], [...coffeeTaps, ...lunchTaps], FRIDAY_16)).toBe(
+      80,
+    );
+    // Remove everything: the habit is in no list and its receipts are deleted.
+    expect(savedAllTime([running], coffeeTaps, FRIDAY_16)).toBe(45);
+    // A receipt of it left in a stale read still adds nothing without its habit.
+    expect(savedAllTime([running], [...coffeeTaps, ...lunchTaps], FRIDAY_16)).toBe(45);
+  });
+
+  it('saves nothing when stopped on the day it was made, or on a clock that put the stop first', () => {
+    const sameDay: HabitMaths = { ...habit('tea', 3, THIS_WEEK, WEDNESDAY), stoppedOn: WEDNESDAY };
+    const before: HabitMaths = {
+      ...habit('tea', 3, THIS_WEEK, WEDNESDAY),
+      stoppedOn: '2026-10-06',
+    };
+    for (const today of [WEDNESDAY, '2026-10-08', '2027-01-04']) {
+      expect(savedAllTime([sameDay], [], today)).toBe(0);
+      expect(savedAllTime([before], [], today)).toBe(0);
+      expect(skippedDaysAllTime(before, [], today)).toBe(0);
+      expect(skippedDaysInWeek(before, [], THIS_WEEK, today)).toBe(0);
+    }
+  });
+
+  it('runs as before with no stop, or a null one', () => {
+    const nulled: HabitMaths = { ...lunchRunning, stoppedOn: null };
+    expect(savedAllTime([nulled], lunchTaps, FRIDAY_16)).toBe(75);
+    expect(habitHistory(nulled, lunchTaps, FRIDAY_16)).toEqual(
+      habitHistory(lunchRunning, lunchTaps, FRIDAY_16),
+    );
+  });
+
+  it('freezes at its figure on the stop day for any price, in whole cents', () => {
+    const tapped = ['2026-09-29', '2026-10-01', '2026-10-01', '2026-10-09', '2026-10-20'];
+    for (const price of [5, 4.35, 0.07, 19.99, 1.15]) {
+      const running = habit('made', price, '2026-09-28', '2026-09-29');
+      const taps = tapped.map((day) => tap('made', day, price));
+      for (const stoppedOn of [
+        '2026-09-29',
+        '2026-09-30',
+        '2026-10-05',
+        '2026-10-12',
+        '2026-10-21',
+      ]) {
+        const stopped: HabitMaths = { ...running, stoppedOn };
+        const atStop = savedAllTime([running], taps, stoppedOn);
+        const skipped = skippedDaysAllTime(stopped, tapped, '2027-03-01');
+        expect(toCents(atStop)).toBe(skipped * toCents(price));
+        for (const later of [stoppedOn, '2026-10-25', '2027-03-01']) {
+          expect(savedAllTime([stopped], taps, later)).toBe(atStop);
+        }
+      }
+    }
+    // Spot checks: stopped Monday 5 Oct, made Tuesday 29 Sep: 29 Sep to 4 Oct is 6 days, the 29th
+    // and the 1st bought, 4 skipped. At $4.35 that is $17.40; at $0.07, $0.28.
+    const stoppedMonday = (price: number): HabitMaths => ({
+      ...habit('made', price, '2026-09-28', '2026-09-29'),
+      stoppedOn: THIS_WEEK,
+    });
+    const taps = (price: number) => tapped.map((day) => tap('made', day, price));
+    expect(savedAllTime([stoppedMonday(4.35)], taps(4.35), FRIDAY_16)).toBe(17.4);
+    expect(savedAllTime([stoppedMonday(0.07)], taps(0.07), FRIDAY_16)).toBe(0.28);
+  });
+
+  it('lists in its history only the skipped days it saved, and every receipt it has', () => {
+    const later = [
+      ...lunchTaps,
+      tap('lunch', STOP_DAY, 5, 'lunch-stop-day'),
+      tap('lunch', '2026-10-13', 5, 'lunch-redated'),
+    ];
+    const weeks = habitHistory(lunchStopped, later, FRIDAY_16);
+    expect(weeks.map((week) => [week.weekStart, week.spent, week.saved])).toEqual([
+      ['2026-10-12', 5, 0],
+      [THIS_WEEK, 10, 10],
+      ['2026-09-28', 17.5, 25],
+    ]);
+    const listed = (week: HabitWeek) =>
+      week.days.map((day) => [day.day, day.kind, day.amount, day.receiptId]);
+    expect(listed(weeks[0])).toEqual([['2026-10-13', 'bought', 5, 'lunch-redated']]);
+    expect(listed(weeks[1])).toEqual([
+      [STOP_DAY, 'bought', 5, 'lunch-stop-day'],
+      ['2026-10-07', 'skipped', 5, undefined],
+      ['2026-10-06', 'bought', 5, 'lunch-oct-6'],
+      [THIS_WEEK, 'skipped', 5, undefined],
+    ]);
+    expect(listed(weeks[2])).toEqual([
+      ['2026-10-04', 'skipped', 5, undefined],
+      ['2026-10-03', 'skipped', 5, undefined],
+      ['2026-10-02', 'bought', 7.5, 'lunch-oct-2'],
+      ['2026-10-01', 'skipped', 5, undefined],
+      ['2026-09-30', 'bought', 5, 'lunch-sep-30'],
+      ['2026-09-29', 'skipped', 5, undefined],
+      ['2026-09-28', 'skipped', 5, undefined],
+    ]);
+
+    const skippedCents = weeks
+      .flatMap((week) => week.days)
+      .filter((day) => day.kind === 'skipped')
+      .reduce((cents, day) => cents + toCents(day.amount), 0);
+    const weekCents = weeks.reduce((cents, week) => cents + toCents(week.saved), 0);
+    expect(skippedCents).toBe(3500);
+    expect(weekCents).toBe(3500);
+    expect(toCents(savedAllTime([lunchStopped], later, FRIDAY_16))).toBe(3500);
+  });
+
+  it('lists no today once stopped, even on the stop day itself', () => {
+    const running = habitHistory(lunchRunning, lunchTaps, STOP_DAY)[0].days;
+    expect(running[0]).toEqual({ day: STOP_DAY, kind: 'today', amount: 0 });
+    const stopped = habitHistory(lunchStopped, lunchTaps, STOP_DAY)[0].days;
+    expect(stopped.map((day) => day.day)).toEqual(['2026-10-07', '2026-10-06', THIS_WEEK]);
+    expect(stopped.some((day) => day.kind === 'today')).toBe(false);
+  });
+
+  it('refuses a stop that is not a calendar day rather than save for ever or never', () => {
+    for (const bad of ['2026-10-08T21:00:00Z', '2026-02-30', '8/10/2026', '']) {
+      const broken: HabitMaths = { ...lunchRunning, stoppedOn: bad };
+      expect(() => savedAllTime([broken], lunchTaps, FRIDAY_16)).toThrow(RangeError);
+      expect(() => skippedDaysInWeek(broken, [], THIS_WEEK, FRIDAY_16)).toThrow(RangeError);
+      expect(() => habitHistory(broken, lunchTaps, FRIDAY_16)).toThrow(RangeError);
+    }
+  });
+});
+
+describe('stoppedOnDay', () => {
+  it('is null while the habit runs', () => {
+    expect(stoppedOnDay(null)).toBeNull();
+    expect(stoppedOnDay(undefined)).toBeNull();
+  });
+
+  it('is the local day of the timestamp, late evening included, in any timezone', () => {
+    // Built from local times, so the expectation holds wherever the tests run.
+    const lateEvening = new Date(2026, 9, 8, 23, 30).toISOString();
+    const pastMidnight = new Date(2026, 9, 9, 0, 30).toISOString();
+    expect(stoppedOnDay(lateEvening)).toBe('2026-10-08');
+    expect(stoppedOnDay(pastMidnight)).toBe('2026-10-09');
+    // PostgREST writes the offset out.
+    expect(stoppedOnDay(lateEvening.replace('Z', '+00:00'))).toBe('2026-10-08');
+  });
+
+  it('takes a bare day as that day', () => {
+    expect(stoppedOnDay('2026-10-08')).toBe('2026-10-08');
+    expect(stoppedOnDay('2028-02-29')).toBe('2028-02-29');
+  });
+
+  it.each(['', 'yesterday', '2026-02-30', '2026-13-01'])('refuses %p', (bad) => {
+    expect(() => stoppedOnDay(bad)).toThrow(RangeError);
+  });
+
+  it('gives the habit maths the day it stopped', () => {
+    const stoppedOn = stoppedOnDay(new Date(2026, 9, 8, 21, 0).toISOString());
+    expect(
+      savedAllTime([{ ...habit('lunch', 5, '2026-09-28'), stoppedOn }], [], '2026-10-16'),
+    ).toBe(50);
   });
 });
 

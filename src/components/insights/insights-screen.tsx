@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { useSpendCategories } from '@/api/brands';
 import { useGoals } from '@/api/goals';
-import { useHabits, useHabitTaps } from '@/api/habits';
+import { useHabits, useHabitTaps, useStoppedHabits } from '@/api/habits';
 import { useLoans } from '@/api/loans';
 import { usePlanMonth } from '@/api/payment-ledger';
 import {
@@ -140,6 +140,7 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
   const billMonth = usePlanMonth('bill', thisMonth, today);
   const subscriptionMonth = usePlanMonth('subscription', thisMonth, today);
   const habits = useHabits();
+  const stoppedHabits = useStoppedHabits();
   const taps = useHabitTaps();
   const goals = useGoals();
   const savings = useSavingsCore();
@@ -277,8 +278,15 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
   const cost = useMemo(() => subscriptionCost(subscriptions.data ?? []), [subscriptions.data]);
 
   const habitSummary = useMemo(
-    () => habitsSummary(habits.data ?? [], taps.data ?? [], today, HABIT_ROWS),
-    [habits.data, taps.data, today],
+    () =>
+      habitsSummary(
+        habits.data ?? [],
+        stoppedHabits.data ?? [],
+        taps.data ?? [],
+        today,
+        HABIT_ROWS,
+      ),
+    [habits.data, stoppedHabits.data, taps.data, today],
   );
 
   const moved = useMemo(
@@ -364,7 +372,8 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
       <LoansSection state={loansState} loans={loansInsight} />
       <PlansSection state={plansState} plans={plans} />
       <ComingUpSection state={together([subscriptions])} cost={cost} />
-      <HabitsSection state={together([habits, taps])} summary={habitSummary} />
+      {/* The stopped habits answer too, or Saved so far would show less than it is. */}
+      <HabitsSection state={together([habits, stoppedHabits, taps])} summary={habitSummary} />
       <GoalsSection
         state={together([
           { isLoading: goals.isPending, isError: goals.isError, refetch: goals.refetch },

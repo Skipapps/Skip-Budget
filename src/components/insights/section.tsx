@@ -91,19 +91,21 @@ export function FailedCard({ onRetry, testID }: { onRetry: () => void; testID: s
 }
 
 /** Nothing here yet: one muted line, and the action that changes that. */
-function EmptyCard({
+export function EmptyCard({
   line,
   actionLabel,
   onAction,
   testID,
+  className,
 }: {
   line: string;
   actionLabel: string;
   onAction: () => void;
   testID: string;
+  className?: string;
 }) {
   return (
-    <View className={cn(CARD, 'items-start')} testID={testID}>
+    <View className={cn(CARD, 'items-start', className)} testID={testID}>
       <Text
         className="font-app text-[14px] leading-5 text-muted"
         maxFontSizeMultiplier={TEXT_CAP.reading}

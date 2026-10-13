@@ -10,8 +10,9 @@ import { toCents } from '@/lib/money';
 
 /**
  * F12: Insights' Habits card says what the Habits page says. The real page is drawn on the same
- * habits and taps, on days across a week, and its hero's Saved so far and each card's saved figure
- * must be Insights' to the cent. Only the reads are fakes; the week maths is the real one.
+ * habits, stopped habits and taps, on days across a week, and its hero's Saved so far and each
+ * card's saved figure must be Insights' to the cent. Only the reads are fakes; the week maths is the
+ * real one.
  */
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
@@ -56,12 +57,14 @@ jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'owner' }));
 
 let mockHabits: HabitRow[] = [];
+let mockStopped: HabitRow[] = [];
 let mockTaps: HabitTap[] = [];
 const answer = <T,>(data: T) => ({ data, isPending: false, isError: false, refetch: jest.fn() });
 jest.mock('@/api/habits', () => ({
   ...jest.requireActual('@/api/habits'),
   useHabits: () => answer(mockHabits),
   useHabitTaps: () => answer(mockTaps),
+  useStoppedHabits: () => answer(mockStopped),
   useTapHabitDay: () => ({ mutateAsync: jest.fn() }),
   useUntapHabitDay: () => ({ mutateAsync: jest.fn() }),
 }));
@@ -91,7 +94,7 @@ const tap = (habitId: string, day: string, amount: number, id = `${habitId}-${da
   receiptId: `r-${id}`,
 });
 
-/** Four habits: Insights shows three, and Saved so far counts all four. */
+/** Four running habits: Insights shows three, and Saved so far counts all four and STOPPED. */
 const HABITS = [
   habit({}),
   habit({
@@ -121,6 +124,20 @@ const HABITS = [
   }),
 ];
 
+/**
+ * Stopped with Keep past days at 9 pm on Thursday 1 Oct, its days kept: 16 to 30 Sep, the 18th and
+ * the 24th bought, 13 x $12.40 = $161.20 on every day after.
+ */
+const STOPPED = habit({
+  id: 'lunch',
+  name: 'Lunch out',
+  price: 12.4,
+  started_on: '2026-09-14',
+  saved_from: '2026-09-16',
+  sort_order: 4,
+  archived_at: new Date(2026, 9, 1, 21, 0).toISOString(),
+});
+
 const TAPS = [
   tap('coffee', '2026-10-05', 5),
   tap('coffee', '2026-10-07', 6.5),
@@ -134,7 +151,9 @@ const TAPS = [
   tap('timhortons', '2026-10-15', 8),
   tap('snacks', '2026-09-10', 2.35),
   tap('snacks', '2026-10-01', 2.35),
-  // An archived habit's receipt counts on neither page.
+  tap('lunch', '2026-09-18', 12.4),
+  tap('lunch', '2026-09-24', 12.4),
+  // A receipt whose habit is in neither list (removed with everything) counts on neither page.
   tap('gone', '2026-10-07', 9),
 ];
 
@@ -163,6 +182,7 @@ function cardSaved(screen: Screen, id: string): string {
 beforeEach(() => {
   resetLocaleForTests();
   mockHabits = HABITS;
+  mockStopped = [STOPPED];
   mockTaps = TAPS;
 });
 
@@ -181,7 +201,7 @@ describe('F12 Insights’ Habits card agrees with the Habits page', () => {
 
   it.each(DAYS)('on %s, to the cent', async (today) => {
     mockToday = today;
-    const insights = habitsSummary(HABITS, TAPS, today);
+    const insights = habitsSummary(HABITS, [STOPPED], TAPS, today);
     const screen = await render(<HabitsScreen />);
 
     expect(formatCurrency(insights.savedSoFar)).toBe(heroSaved(screen));
@@ -199,7 +219,7 @@ describe('F12 Insights’ Habits card agrees with the Habits page', () => {
   });
 
   it('reads Friday 9 Oct as the cards do: skipped days this week and what they saved', () => {
-    const insights = habitsSummary(HABITS, TAPS, '2026-10-09');
+    const insights = habitsSummary(HABITS, [STOPPED], TAPS, '2026-10-09');
     expect(insights.rows.map((row) => [row.habit.name, row.skipped, row.saved])).toEqual([
       // Mon bought, Tue skipped, Wed bought, Thu bought (twice); Friday is not over.
       ['Coffee', 1, 5],
@@ -209,17 +229,37 @@ describe('F12 Insights’ Habits card agrees with the Habits page', () => {
       ['Tim Hortons', 2, 16],
     ]);
     // Every untapped finished day since each began, Snacks included: $5.00 + 9 × $25.00 + $16.00
-    // + 35 × $2.35 (2 Sep to 8 Oct, less the 10th and the 1st).
-    expect(insights.savedSoFar).toBe(328.25);
+    // + 35 × $2.35 (2 Sep to 8 Oct, less the 10th and the 1st) = $328.25, and Lunch out's $161.20.
+    expect(insights.savedSoFar).toBe(489.45);
+    expect(habitsSummary(HABITS, [], TAPS, '2026-10-09').savedSoFar).toBe(328.25);
   });
 
+  it.each(['2026-10-01', '2026-10-05', '2026-10-09', '2026-10-12', '2027-01-04'])(
+    'keeps the stopped habit’s saving frozen at $161.20 on %s, on Insights and the Habits page alike',
+    async (today) => {
+      mockToday = today;
+      mockHabits = [];
+      const insights = habitsSummary([], [STOPPED], TAPS, today);
+      expect(insights).toEqual({ rows: [], savedSoFar: 161.2, count: 0 });
+
+      const screen = await render(<HabitsScreen />);
+      expect(heroSaved(screen)).toBe(formatCurrency(insights.savedSoFar));
+      expect(heroSaved(screen)).toBe('$161.20');
+      await screen.unmount();
+    },
+  );
+
   it('shows the design’s line: Tim Hortons skipped once this week, $8.00', () => {
-    const insights = habitsSummary(HABITS, TAPS, '2026-10-08');
+    const insights = habitsSummary(HABITS, [STOPPED], TAPS, '2026-10-08');
     expect(insights.rows[2]).toMatchObject({ skipped: 1, saved: 8 });
   });
 
   it('shows fewer rows when there are fewer habits, and none with none', () => {
-    expect(habitsSummary(HABITS.slice(0, 1), TAPS, '2026-10-09').rows).toHaveLength(1);
-    expect(habitsSummary([], TAPS, '2026-10-09')).toEqual({ rows: [], savedSoFar: 0, count: 0 });
+    expect(habitsSummary(HABITS.slice(0, 1), [STOPPED], TAPS, '2026-10-09').rows).toHaveLength(1);
+    expect(habitsSummary([], [], TAPS, '2026-10-09')).toEqual({
+      rows: [],
+      savedSoFar: 0,
+      count: 0,
+    });
   });
 });

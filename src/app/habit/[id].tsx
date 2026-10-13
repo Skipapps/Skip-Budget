@@ -28,11 +28,12 @@ import { formatCurrency } from '@/lib/format';
 import {
   countsFrom,
   habitHistory,
+  savedAllTime,
   skippedDaysAllTime,
   weekStartOf,
   type HabitTap,
 } from '@/lib/habit-week';
-import { fromCents, sumMoney, toCents } from '@/lib/money';
+import { sumMoney } from '@/lib/money';
 import { receiptCategoryName } from '@/lib/receipt-category';
 import { useToday } from '@/lib/use-today';
 import { useArtwork } from '@/theme/artwork';
@@ -47,7 +48,10 @@ function sinceDate(iso: string, today: string): string {
     : t('habits.detail.shortDate', parts);
 }
 
-/** Everything the page shows; the totals count every receipt whatever the plan lists. */
+/**
+ * Everything the page shows; the totals count every receipt whatever the plan lists. Saved is the
+ * Habits page's own sum for this one habit, so the two always agree to the cent.
+ */
 function habitFigures(
   row: HabitRow,
   taps: readonly HabitTap[],
@@ -63,7 +67,7 @@ function habitFigures(
   return {
     since,
     spent: sumMoney(own.map((tap) => tap.amount)),
-    saved: fromCents(skipped * toCents(row.price)),
+    saved: savedAllTime([maths], own, today),
     bought: boughtDays.size,
     skipped,
     weeks: habitHistory(maths, own, today, floor),

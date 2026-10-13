@@ -367,6 +367,12 @@ export const habitsMessages = defineMessages({
     es: '{label}, {spent}. Ahorrado hasta hoy, {saved}.',
     fr: '{label}, {spent}. Économisé jusqu’ici, {saved}.',
   },
+  // The hero with only Saved so far: no running habit left, nothing spent this week.
+  'habits.hero.spokenSaved': {
+    en: 'Saved so far, {saved}.',
+    es: 'Ahorrado hasta hoy, {saved}.',
+    fr: 'Économisé jusqu’ici, {saved}.',
+  },
   // {top} is the line above the label, such as "$5.00 each time · since Sep 28".
   'habits.hero.spokenTop': {
     en: '{top}. {label}, {spent}. Saved so far, {saved}.',

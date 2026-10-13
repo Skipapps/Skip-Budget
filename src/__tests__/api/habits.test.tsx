@@ -11,6 +11,7 @@ import {
   useHabit,
   useHabits,
   useHabitTaps,
+  useStoppedHabits,
   useTapHabitDay,
   useUntapHabitDay,
   useUpdateHabit,
@@ -137,7 +138,53 @@ describe('habitMaths', () => {
       price: 5,
       startedOn: '2026-10-05',
       savedFrom: '2026-10-08',
+      stoppedOn: null,
     });
+  });
+
+  it('hands it the local day a habit was stopped, late evening included', () => {
+    const archived_at = new Date(2026, 9, 12, 23, 40).toISOString();
+    expect(habitMaths({ ...COFFEE, archived_at }).stoppedOn).toBe('2026-10-12');
+    // A caller that reads no archived_at gets a running habit.
+    const { archived_at: _, ...unread } = COFFEE;
+    expect(habitMaths(unread).stoppedOn).toBeNull();
+  });
+});
+
+describe('useStoppedHabits', () => {
+  it('lists the habits stopped with Keep past days, oldest stop first, under the habits key', async () => {
+    mockAnswers.push({
+      data: [
+        { ...COFFEE, price: '4.35', archived_at: '2026-10-10T01:00:00+00:00' },
+        { ...COFFEE, id: 'habit-rides', price: 15.5, archived_at: '2026-10-11T12:00:00+00:00' },
+      ],
+    });
+    const { result } = await renderHook(() => useStoppedHabits(), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data?.map((habit) => [habit.id, habit.price, habit.archived_at])).toEqual(
+      [
+        ['habit-coffee', 4.35, '2026-10-10T01:00:00+00:00'],
+        ['habit-rides', 15.5, '2026-10-11T12:00:00+00:00'],
+      ],
+    );
+    const read = mockRequests[0];
+    expect(read.table).toBe('habits');
+    expect(calls(read, 'not')).toEqual([['archived_at', 'is', null]]);
+    expect(calls(read, 'is')).toEqual([]);
+    expect(calls(read, 'order')).toEqual([['archived_at', { ascending: true }]]);
+    expect(client.getQueryCache().getAll()[0].queryKey).toEqual([
+      'habits',
+      'user-1',
+      { stopped: true },
+    ]);
+  });
+
+  it('is an error, never no habits, when the read fails', async () => {
+    mockAnswers.push({ error: { code: 'PGRST205', message: 'missing' } });
+    const { result } = await renderHook(() => useStoppedHabits(), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.data).toBeUndefined();
   });
 });
 

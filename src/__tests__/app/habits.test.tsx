@@ -119,12 +119,14 @@ const TAPS = [
 ];
 
 let mockHabits: Query<HabitRow[]>;
+let mockStopped: Query<HabitRow[]>;
 let mockTaps: Query<HabitTap[]>;
 const mockTapDay = jest.fn();
 const mockUntapDay = jest.fn();
 jest.mock('@/api/habits', () => ({
   useHabits: () => mockHabits,
   useHabitTaps: () => mockTaps,
+  useStoppedHabits: () => mockStopped,
   useTapHabitDay: () => ({ mutateAsync: mockTapDay }),
   useUntapHabitDay: () => ({ mutateAsync: mockUntapDay }),
   habitMaths: (row: HabitRow) => ({
@@ -132,6 +134,7 @@ jest.mock('@/api/habits', () => ({
     price: row.price,
     startedOn: row.started_on,
     savedFrom: row.saved_from,
+    stoppedOn: jest.requireActual('@/lib/habit-week').stoppedOnDay(row.archived_at),
   }),
 }));
 
@@ -195,6 +198,7 @@ beforeEach(() => {
   mockPro = { pro: true, ready: true };
   mockFloor = { floor: '2019-10-09', free: false };
   mockHabits = query([COFFEE, DELIVERY]);
+  mockStopped = query<HabitRow[]>([]);
   mockTaps = query(TAPS);
   mockConfirm.mockResolvedValue(true);
 });
@@ -381,6 +385,112 @@ describe('the habits dashboard: hero and weeks', () => {
     expect(screen.getByText('This week')).toBeTruthy();
     expect(screen.getByText(`Oct${NBSP}5${NBSP}– 11`)).toBeTruthy();
     expect(screen.getByLabelText('Next week')).toBeDisabled();
+  });
+
+  it('counts a stopped habit in Saved so far and in each week’s spending, with no card', async () => {
+    // Snacks, $9.00 from Monday 14 Sep, stopped with Keep past days at 8 pm on Thursday 8 Oct.
+    // Saved: 14 Sep to 7 Oct is 24 days, the 1st and the 7th bought: 22 x $9.00 = $198.00, on top
+    // of the running habits' $235.00. This week: $35.00 + its $9.00 of the 7th, before it stopped.
+    mockStopped = query([
+      habit({
+        id: 'gone',
+        name: 'Snacks',
+        price: 9,
+        started_on: '2026-09-14',
+        saved_from: '2026-09-14',
+        sort_order: 2,
+        archived_at: new Date(2026, 9, 8, 20, 0).toISOString(),
+      }),
+    ]);
+    mockTaps = query([...TAPS, tap('gone', '2026-10-01', 9)]);
+    const screen = await render(<HabitsScreen />);
+    expect(hero(screen)).toBe('Spent this week, $44.00. Saved so far, $433.00.');
+    expect(screen.queryByTestId('habit-summary-gone')).toBeNull();
+
+    // Last week: Food delivery's $25.00 of the 29th and Snacks' $9.00 of the 1st.
+    await fireEvent.press(screen.getByLabelText('Previous week'));
+    expect(hero(screen)).toBe('Spent that week, $34.00. Saved so far, $433.00.');
+    // The selector stops at the running habits' first week, not the stopped habit's.
+    expect(screen.getByLabelText('Previous week')).toBeDisabled();
+  });
+
+  it('keeps the hero above the empty page when only stopped habits are left', async () => {
+    // Snacks from 28 Sep, stopped Thursday 8 Oct: 28 Sep to 7 Oct, the 7th bought: 9 x $9.00.
+    mockHabits = query<HabitRow[]>([]);
+    mockStopped = query([
+      habit({
+        id: 'gone',
+        name: 'Snacks',
+        price: 9,
+        started_on: '2026-09-28',
+        saved_from: '2026-09-28',
+        archived_at: new Date(2026, 9, 8, 20, 0).toISOString(),
+      }),
+    ]);
+    const screen = await render(<HabitsScreen />);
+    expect(hero(screen)).toBe('Spent this week, $9.00. Saved so far, $81.00.');
+    expect(screen.getByText('Track a spending habit')).toBeTruthy();
+    expect(adds(screen)).toHaveLength(2);
+    expect(screen.queryByLabelText('Previous week')).toBeNull();
+    expect(screen.queryByTestId('habit-summary-gone')).toBeNull();
+  });
+
+  it('shows only Saved so far over the empty page when nothing was spent this week', async () => {
+    // Stopped on Saturday 3 Oct, nothing bought: 28 Sep to 2 Oct, 5 x $9.00.
+    mockHabits = query<HabitRow[]>([]);
+    mockStopped = query([
+      habit({
+        id: 'gone',
+        price: 9,
+        started_on: '2026-09-28',
+        saved_from: '2026-09-28',
+        archived_at: new Date(2026, 9, 3, 10, 0).toISOString(),
+      }),
+    ]);
+    mockTaps = query(TAPS.filter((each) => each.habitId !== 'gone'));
+    const screen = await render(<HabitsScreen />);
+    const tile = screen.getByTestId('habits-hero');
+    expect(tile.props.accessibilityLabel).toBe('Saved so far, $45.00.');
+    expect(
+      within(tile)
+        .getAllByText(/./)
+        .map((text) => text.props.children),
+    ).toEqual(['Saved so far', '$45.00']);
+    expect(screen.queryByText('Spent this week')).toBeNull();
+    expect(screen.getByText('Track a spending habit')).toBeTruthy();
+  });
+
+  it('keeps the plain empty page when the stopped habits saved and spent nothing', async () => {
+    // Made and stopped on Thursday 8 Oct, nothing bought.
+    mockHabits = query<HabitRow[]>([]);
+    mockStopped = query([
+      habit({
+        id: 'gone',
+        started_on: '2026-10-05',
+        saved_from: '2026-10-08',
+        archived_at: new Date(2026, 9, 8, 12, 0).toISOString(),
+      }),
+    ]);
+    mockTaps = query(TAPS.filter((each) => each.habitId !== 'gone'));
+    const screen = await render(<HabitsScreen />);
+    expect(screen.queryByTestId('habits-hero')).toBeNull();
+    expect(screen.getByText('Track a spending habit')).toBeTruthy();
+  });
+
+  it('waits for the stopped habits, and says it failed without them rather than a short Saved', async () => {
+    mockStopped = { ...query<HabitRow[]>([]), data: undefined, isPending: true };
+    const waiting = await render(<HabitsScreen />);
+    expect(waiting.getByTestId('hero-skeleton')).toBeTruthy();
+    await waiting.unmount();
+
+    mockStopped = { ...query<HabitRow[]>([]), data: undefined, isError: true };
+    const screen = await render(<HabitsScreen />);
+    expect(screen.getByText(FAILURE)).toBeTruthy();
+    expect(screen.queryByTestId('habits-hero')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Try again'));
+    expect(mockStopped.refetch).toHaveBeenCalledTimes(1);
+    expect(mockHabits.refetch).toHaveBeenCalledTimes(1);
+    expect(mockTaps.refetch).toHaveBeenCalledTimes(1);
   });
 
   it('stacks the hero: the label, the big figure, then the full-width Saved so far tile', async () => {
