@@ -1,6 +1,14 @@
 import { Redirect, router, useLocalSearchParams, type Href } from 'expo-router';
-import { AlignLeft, Calculator, Repeat, Trash2, Tag } from 'lucide-react-native';
-import { useState } from 'react';
+import {
+  AlignLeft,
+  Calculator,
+  CalendarDays,
+  CreditCard,
+  Repeat,
+  Trash2,
+  Tag,
+} from 'lucide-react-native';
+import { useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import {
@@ -11,11 +19,12 @@ import {
 } from '@/api/reminders';
 import { buildBillValues } from '@/api/entry-values';
 import { useCreateBill, useDeleteBill, useStopBill, useUpdateBill } from '@/api/mutations';
-import { usePastCharges } from '@/api/past-charges';
+import { usePastCharges, type CarriedValues } from '@/api/past-charges';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
 import { BillIconWell } from '@/components/bills/bill-icon';
+import { BillMark } from '@/components/bills/bill-mark';
 import { CategoryPicker } from '@/components/bills/category-picker';
 import { DateBox } from '@/components/entry/date-box';
 import { AmountEditPage, FieldPage, NoteEditPage } from '@/components/entry/edit-pages';
@@ -25,6 +34,7 @@ import {
   SegmentedChips,
   type EntryRowSpec,
 } from '@/components/entry/entry-review';
+import { AmountFigure } from '@/components/flow/amount-figure';
 import { AmountStep } from '@/components/flow/amount-step';
 import { FlowHeader, StepFlow } from '@/components/flow/step-flow';
 import { ActionPill } from '@/components/ui/action-pill';
@@ -44,11 +54,13 @@ import {
   type Recurrence,
 } from '@/data/bill-categories';
 import { t } from '@/i18n';
+import { amountForDisplay, formatEntryDay } from '@/lib/entry-day';
+import { formatCurrency } from '@/lib/format';
 import { useToday } from '@/lib/use-today';
 import { TEXT_CAP } from '@/theme/text-scale';
 import { success, warn } from '@/lib/haptics';
 import { failureMessage, failureText } from '@/lib/failure';
-import { logoColumns } from '@/lib/logo-columns';
+import { logoColumns, selectionLogo } from '@/lib/logo-columns';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { billPageHref } from '@/lib/ledger-link';
 import { billStopped } from '@/lib/plan-stop';
@@ -104,6 +116,9 @@ function nameHint(categoryId: string): string {
 type Page = 'category' | 'amount' | 'review' | 'amountEdit' | 'categoryEdit' | 'note';
 
 const asDate = (value?: string | null) => (value ? new Date(`${value}T00:00:00`) : null);
+
+/** A bill Save has written, and the past charges still to carry what it was written with. */
+type Written = { id: string; rewrite: CarriedValues | null };
 
 /**
  * An edit with no record in hand never becomes a blank form: `id` makes Save an update, so a form
@@ -315,9 +330,14 @@ function BillForm({
   const createBill = useCreateBill();
   const updateBill = useUpdateBill();
   const pastCharges = usePastCharges('bill', id);
-  // Set once the bill took an edit whose past charges failed to follow: the bill then matches the
-  // form, so the question would not come up again and the next Save must redo the rewrite itself.
-  const [rewritePending, setRewritePending] = useState(false);
+  // The bill once it is written (filed, or changed), with the past-charges rewrite still owed when
+  // that failed: a Save pressed again after a later step failed finishes those steps alone, never
+  // a second bill or a second change.
+  const [written, setWritten] = useState<Written | null>(null);
+  // Held from the press until the page is left, the reminder write included: a second tap in that
+  // time would toast and navigate twice. The ref answers within the same frame.
+  const [saving, setSaving] = useState(false);
+  const inFlight = useRef(false);
   const deleteBill = useDeleteBill();
   const stopBill = useStopBill();
   const toast = useToast();
@@ -383,8 +403,47 @@ function BillForm({
     clearVoiceDraft();
   };
 
+  const leaveSaved = () => {
+    success();
+    toast(editing ? 'toast.bill.updated' : 'toast.bill.added');
+    leave();
+  };
+
+  const saveFailed = (thrown: unknown) => {
+    inFlight.current = false;
+    setSaving(false);
+    warn();
+    setError(failureMessage(thrown));
+  };
+
+  /** What follows the bill's own write, and all a Save again has left to do once it is written. */
+  const finishSave = async ({ id: billId, rewrite }: Written) => {
+    setSaving(true);
+    try {
+      if (rewrite) {
+        await pastCharges.apply(rewrite);
+        setWritten({ id: billId, rewrite: null });
+      }
+      // After the bill exists, because a reminder points at a row. Untouched while the saved one is
+      // unknown: the form's 'off' is then a guess, and writing it deletes the reminder.
+      if (!savedReminder.unknown && reminder !== null) {
+        await applyReminder('bill', billId, choiceToLead(reminder), remindAt);
+      }
+      leaveSaved();
+    } catch (thrown) {
+      saveFailed(thrown);
+    }
+  };
+
   const handleSave = async () => {
+    if (inFlight.current) return;
     setError(null);
+    // The bill stands as written: nothing on the page is checked or asked about again.
+    if (written) {
+      inFlight.current = true;
+      await finishSave(written);
+      return;
+    }
     const missing = [
       !amountReady && t('receipts.field.amount'),
       !name && t('bills.field.name'),
@@ -451,36 +510,26 @@ function BillForm({
         return;
       }
 
-      const scope = rewritePending ? 'all' : await pastCharges.choose(carried.label, changed);
-      if (scope === null) return;
+      inFlight.current = true;
+      const scope = await pastCharges.choose(carried.label, changed);
+      if (scope === null) {
+        inFlight.current = false;
+        return;
+      }
 
       const billId =
         editing && id
           ? (await updateBill.mutateAsync({ id, values }), id)
           : (await createBill.mutateAsync(values)).id;
-
-      if (scope === 'all') {
-        setRewritePending(true);
-        await pastCharges.apply(carried);
-        setRewritePending(false);
-      }
-
-      // After the bill exists, because a reminder points at a row. Untouched while the saved one is
-      // unknown: the form's 'off' is then a guess, and writing it deletes the reminder.
-      if (!savedReminder.unknown) {
-        await applyReminder('bill', billId, choiceToLead(reminder), remindAt);
-      }
-
-      success();
-      toast(editing ? 'toast.bill.updated' : 'toast.bill.added');
-      leave();
+      const done = { id: billId, rewrite: scope === 'all' ? carried : null };
+      setWritten(done);
+      await finishSave(done);
     } catch (thrown) {
-      warn();
-      setError(failureMessage(thrown));
+      saveFailed(thrown);
     }
   };
 
-  const busy = createBill.isPending || updateBill.isPending || pastCharges.saving;
+  const busy = saving || createBill.isPending || updateBill.isPending || pastCharges.saving;
   const deleting = deleteBill.isPending || stopBill.isPending;
   // The page this form opened on. Anywhere else the edge swipe is off, and Back steps back.
   const isRoot = view === initialView;
@@ -646,6 +695,26 @@ function BillForm({
     setSourceId(next);
   };
 
+  const reminderRow: EntryRowSpec = {
+    key: 'reminder',
+    field: (
+      <ReminderField
+        kind="bill"
+        value={reminder}
+        onChange={(choice) => {
+          setError(null);
+          setReminderDraft(choice);
+        }}
+        time={remindAt}
+        onTimeChange={(at) => {
+          setError(null);
+          setTimeDraft(at);
+        }}
+        offLabel={t('bills.add.noReminder')}
+      />
+    ),
+  };
+
   const rows: EntryRowSpec[] = [
     {
       key: 'name',
@@ -751,25 +820,7 @@ function BillForm({
         </View>
       ),
     },
-    {
-      key: 'reminder',
-      field: (
-        <ReminderField
-          kind="bill"
-          value={reminder}
-          onChange={(choice) => {
-            setError(null);
-            setReminderDraft(choice);
-          }}
-          time={remindAt}
-          onTimeChange={(at) => {
-            setError(null);
-            setTimeDraft(at);
-          }}
-          offLabel={t('bills.add.noReminder')}
-        />
-      ),
-    },
+    reminderRow,
     {
       key: 'note',
       label: t('bills.field.note'),
@@ -780,13 +831,80 @@ function BillForm({
     },
   ];
 
+  // Once the bill is written, Save again writes the reminder alone: any other line changed here
+  // would be dropped while the toast says the bill was saved, so only the reminder stays open.
+  const writtenRows: EntryRowSpec[] = [
+    {
+      key: 'name',
+      label: t('bills.field.name'),
+      value: name || null,
+      leading: (
+        <BillMark
+          categoryId={categoryId}
+          iconId={categoryId === 'loans' ? existing?.icon_id : null}
+          domain={issuer ? selectionLogo(issuer) : null}
+          name={name}
+        />
+      ),
+    },
+    {
+      key: 'category',
+      label: t('bills.field.category'),
+      value: categoryLabel,
+      leading: categoryIcon ? <BillIconWell choice={categoryIcon} /> : <GlyphWell icon={Tag} />,
+    },
+    {
+      key: 'due',
+      label: dateLabel,
+      value: startDate ? formatEntryDay(startDate, todayDate) : null,
+      leading: <GlyphWell icon={CalendarDays} />,
+    },
+    {
+      key: 'recurrence',
+      label: t('bills.field.recurring'),
+      value: recurrenceChoices.find((option) => option.value === recurrence)?.label ?? null,
+      leading: <GlyphWell icon={Repeat} />,
+    },
+    ...(hasPeriod
+      ? [
+          {
+            key: 'end',
+            label: t('bills.field.to'),
+            value: endDate ? formatEntryDay(endDate, todayDate) : t('bills.add.noEndDate'),
+            leading: <GlyphWell icon={CalendarDays} />,
+          },
+        ]
+      : []),
+    {
+      key: 'paidWith',
+      label: t('bills.field.paidWith'),
+      value: sources.find((source) => source.id === sourceId)?.label ?? t('bills.noPaymentMethod'),
+      leading: <GlyphWell icon={CreditCard} />,
+    },
+    reminderRow,
+    {
+      key: 'note',
+      label: t('bills.field.note'),
+      value: note.trim() || null,
+      leading: <GlyphWell icon={AlignLeft} />,
+    },
+  ];
+  const writtenAmount = amountForDisplay(amount);
+
   return (
     <EntryReview
       scrollPlace={{ y: reviewY, keep: setReviewY }}
       title={title}
-      closePrompt={closePrompt}
-      root={isRoot}
+      // Once the bill is written there is nothing here to throw away: no close (an empty prompt
+      // draws none), no edge swipe, and Back leaves the way a save does.
+      closePrompt={written ? '' : closePrompt}
+      root={isRoot && !written}
       onBack={() => {
+        if (written) {
+          // A Save still writing the reminder leaves by itself.
+          if (!inFlight.current) leaveSaved();
+          return;
+        }
         if (isRoot) {
           router.back();
           return;
@@ -798,7 +916,27 @@ function BillForm({
       amountLabel={t('receipts.field.amount')}
       amount={amount}
       onEditAmount={() => setView('amountEdit')}
-      rows={rows}
+      amountSlot={
+        written ? (
+          <View
+            accessible
+            accessibilityLabel={t('entry.row.spoken', {
+              label: t('receipts.field.amount'),
+              value: formatCurrency(Number(writtenAmount)),
+            })}
+            className="mt-6 w-full items-center py-2"
+          >
+            <Text
+              className="font-app text-[14px] text-muted"
+              maxFontSizeMultiplier={TEXT_CAP.control}
+            >
+              {t('receipts.field.amount')}
+            </Text>
+            <AmountFigure value={writtenAmount ?? amount} />
+          </View>
+        ) : undefined
+      }
+      rows={written ? writtenRows : rows}
       primaryLabel={
         busy
           ? t('bills.add.saving')

@@ -5,7 +5,7 @@ import AddBillScreen from '@/app/add-bill';
 import type { KnownStore } from '@/api/known-stores';
 import { LOGO_COPY } from '@/components/brands/logo-choices';
 import { FAILURE_MESSAGE } from '@/lib/failure';
-import { warn } from '@/lib/haptics';
+import { success, warn } from '@/lib/haptics';
 import { logoHints } from '@/lib/logo-lookup';
 
 /**
@@ -87,6 +87,8 @@ jest.mock('@/providers/toast-context', () => ({ useToast: () => mockToast }));
 
 let mockParams: Record<string, string | undefined> = {};
 const mockRedirect = jest.fn();
+// What the page last asked of its screen: whether the edge swipe may take it away.
+const mockScreenOptions = jest.fn();
 jest.mock('expo-router', () => ({
   router: {
     back: jest.fn(),
@@ -97,7 +99,12 @@ jest.mock('expo-router', () => ({
   },
   useLocalSearchParams: () => mockParams,
   useFocusEffect: () => {},
-  Stack: { Screen: () => null },
+  Stack: {
+    Screen: ({ options }: { options?: object }) => {
+      mockScreenOptions(options);
+      return null;
+    },
+  },
   Redirect: ({ href }: { href: unknown }) => {
     mockRedirect(href);
     return null;
@@ -1100,10 +1107,14 @@ describe('Add bill — what an edit saves', () => {
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     expect(mockUpdate.mock.calls[0][0].values.ends_on).toBe('2026-12-24');
 
+    // Saved, the page is left; the bill opens again ending where it was moved to.
+    await screen.unmount();
     mockUpdate.mockClear();
-    await press(screen, 'Clear — make it ongoing');
-    expect(screen.getByLabelText(ENDS_ON)).toBeTruthy();
-    await press(screen, 'Save changes');
+    editing({ ...PERIOD, ends_on: '2026-12-24' });
+    const again = await render(<AddBillScreen />);
+    await press(again, 'Clear — make it ongoing');
+    expect(again.getByLabelText(ENDS_ON)).toBeTruthy();
+    await press(again, 'Save changes');
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
       recurrence: 'period',
@@ -2068,5 +2079,243 @@ describe('Add bill — a loan’s bill', () => {
         }),
       }),
     );
+  });
+});
+
+describe('Add bill — Save again once the bill is written', () => {
+  let log: jest.SpyInstance;
+  beforeEach(() => {
+    log = jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => log.mockRestore());
+
+  /** A new bill on its final page whose first Save files it, then fails on the reminder. */
+  async function filedWithoutReminder(screen: Screen) {
+    mockApplyReminder.mockRejectedValueOnce(new Error('offline'));
+    await newBill(screen, TILE.housing, '1100');
+    await fillIn(screen, { reminder: '3 days' });
+    await press(screen, 'Save bill');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  }
+
+  it('writes the reminder alone after a failed one, never a second bill', async () => {
+    const screen = await render(<AddBillScreen />);
+    await filedWithoutReminder(screen);
+    expect(router.back).not.toHaveBeenCalled();
+    expect(mockToast).not.toHaveBeenCalled();
+
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockPast.choose).toHaveBeenCalledTimes(1);
+    expect(mockApplyReminder).toHaveBeenCalledTimes(2);
+    expect(mockApplyReminder).toHaveBeenLastCalledWith('bill', 'bill-new', 3, '09:00');
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith('toast.bill.added');
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+  });
+
+  it('shows the bill as filed, with only the reminder left to change', async () => {
+    mockApplyReminder.mockRejectedValueOnce(new Error('offline'));
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '1100');
+    await fillIn(screen, { source: 'Skip', reminder: '3 days' });
+    await press(screen, 'Note, not set, optional');
+    await fireEvent.changeText(
+      screen.getByPlaceholderText('Anything worth remembering'),
+      'Landlord',
+    );
+    await press(screen, 'Done');
+    await press(screen, 'Save bill');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+
+    // Read, not changed: no keypad, box, calendar, pill or page behind any of them.
+    expect(screen.queryByRole('button', { name: 'Amount, $1,100.00' })).toBeNull();
+    expect(screen.getAllByLabelText('Amount, $1,100.00')).not.toHaveLength(0);
+    expect(screen.queryByDisplayValue('Rent')).toBeNull();
+    expect(screen.getByText('Rent')).toBeTruthy();
+    expect(screen.queryByLabelText('Category, Housing')).toBeNull();
+    expect(screen.getByText('Housing')).toBeTruthy();
+    expect(screen.queryByLabelText('Payment on, Thu Oct 15')).toBeNull();
+    expect(screen.getByText('Thu Oct 15')).toBeTruthy();
+    expect(screen.queryByRole('radio', { name: 'Monthly' })).toBeNull();
+    expect(screen.getByText('Monthly')).toBeTruthy();
+    expect(screen.queryByLabelText('Skip')).toBeNull();
+    expect(screen.getByText('No payment method')).toBeTruthy();
+    expect(screen.queryByLabelText('Note, Landlord')).toBeNull();
+    expect(screen.getByText('Landlord')).toBeTruthy();
+    expect(screen.getByLabelText('3 days')).toBeSelected();
+    expect(screen.getByLabelText('No reminder')).toBeTruthy();
+  });
+
+  it('shows an edit as saved too: the card it was moved to, not the pills', async () => {
+    editing(POWER);
+    mockApplyReminder.mockRejectedValueOnce(new Error('offline'));
+    const screen = await render(<AddBillScreen />);
+    await press(screen, 'Checking ••0099');
+    await press(screen, 'Save changes');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+
+    expect(screen.queryByLabelText('Checking ••0099')).toBeNull();
+    expect(screen.queryByLabelText('VISA ••4421')).toBeNull();
+    expect(screen.getByText('Checking ••0099')).toBeTruthy();
+    expect(screen.queryByLabelText('Change name, currently Power')).toBeNull();
+    expect(screen.getByText('Power')).toBeTruthy();
+    expect(screen.getAllByLabelText('Amount, $84.20')).not.toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Amount, $84.20' })).toBeNull();
+  });
+
+  it('writes the reminder as changed after the failure, on the bill already filed', async () => {
+    const screen = await render(<AddBillScreen />);
+    await filedWithoutReminder(screen);
+
+    await press(screen, 'No reminder');
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockApplyReminder).toHaveBeenLastCalledWith('bill', 'bill-new', null, '09:00');
+  });
+
+  it('says the one failure line again when the reminder fails again, and still files nothing more', async () => {
+    const screen = await render(<AddBillScreen />);
+    await filedWithoutReminder(screen);
+
+    mockApplyReminder.mockRejectedValueOnce(new Error('offline'));
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(router.back).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Save bill')).toBeEnabled();
+
+    await press(screen, 'Save bill');
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockApplyReminder).toHaveBeenCalledTimes(3);
+  });
+
+  it('offers no close once filed, and Back leaves to where a save lands, saying it was added', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '1100');
+    // Before Save there is a draft to throw away, and Back steps back to the keypad.
+    expect(screen.getByLabelText('Close')).toBeTruthy();
+    mockApplyReminder.mockRejectedValueOnce(new Error('offline'));
+    await fillIn(screen, { reminder: '3 days' });
+    await press(screen, 'Save bill');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+
+    expect(screen.queryByLabelText('Close')).toBeNull();
+    await press(screen, 'Back');
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('How much is the bill?')).toBeNull();
+    expect(mockToast).toHaveBeenCalledWith('toast.bill.added');
+    expect(success).toHaveBeenCalledTimes(1);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockApplyReminder).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds Save from the press until the page is left, so a second tap neither files nor lands twice', async () => {
+    let release: () => void = () => {};
+    mockApplyReminder.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (release = resolve)),
+    );
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '1100');
+    await fillIn(screen);
+
+    await press(screen, 'Save bill');
+    await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText('Saving…')).toBeDisabled();
+    // A tap that lands before the button redraws.
+    await fireEvent.press(screen.getByLabelText('Saving…'));
+    await press(screen, 'Back');
+    release();
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockApplyReminder).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledTimes(1);
+  });
+
+  it('turns the edge swipe off once a bill opened on its final page is written', async () => {
+    editing(POWER);
+    mockApplyReminder.mockRejectedValueOnce(new Error('offline'));
+    const screen = await render(<AddBillScreen />);
+    expect(mockScreenOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
+
+    await press(screen, 'Save changes');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+
+    expect(mockScreenOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+    expect(screen.queryByLabelText('Close')).toBeNull();
+  });
+
+  it('writes an edit once: Save again after a failed reminder asks nothing and changes nothing more', async () => {
+    editing(POWER);
+    mockPast.choose.mockResolvedValue('all');
+    mockApplyReminder.mockRejectedValueOnce(new Error('offline'));
+    const screen = await render(<AddBillScreen />);
+    await press(screen, 'Checking ••0099');
+
+    await press(screen, 'Save changes');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockPast.choose).toHaveBeenCalledTimes(1);
+    expect(mockPast.apply).toHaveBeenCalledTimes(1);
+    expect(mockApplyReminder).toHaveBeenCalledTimes(2);
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith('toast.bill.updated');
+  });
+
+  it('finishes a failed rewrite of past charges without writing the change a second time', async () => {
+    editing(POWER);
+    mockPast.choose.mockResolvedValue('all');
+    mockPast.apply.mockRejectedValueOnce(new Error('network down'));
+    const screen = await render(<AddBillScreen />);
+    await press(screen, 'Checking ••0099');
+
+    await press(screen, 'Save changes');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockPast.apply).toHaveBeenCalledTimes(2);
+    expect(mockPast.apply).toHaveBeenLastCalledWith({
+      label: 'Power',
+      amount: 84.2,
+      card_id: null,
+      bank_account_id: 'acct-1',
+    });
+  });
+
+  it('goes back to Home after a voice hand-off, never onto the page it came from', async () => {
+    mockParams = {
+      from: 'voice',
+      prefillName: 'Gym',
+      prefillCategory: 'other',
+      prefillAmount: '25',
+      prefillDate: '2026-10-15',
+      prefillSource: 'card-1',
+    };
+    mockApplyReminder.mockRejectedValueOnce(new Error('offline'));
+    const screen = await render(<AddBillScreen />);
+    await press(screen, 'No reminder');
+    await press(screen, 'Save bill');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+
+    await press(screen, 'Back');
+
+    expect(router.dismissTo).toHaveBeenCalledWith('/home');
+    expect(router.back).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledWith('toast.bill.added');
+    expect(mockCreate).toHaveBeenCalledTimes(1);
   });
 });
