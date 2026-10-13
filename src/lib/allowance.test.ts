@@ -4,6 +4,8 @@ import {
   hidOlder,
   historyFloor,
   isWithinHistory,
+  keptFrom,
+  keptFromDate,
   NOTHING_HIDDEN,
 } from '@/lib/allowance';
 import { FREE_LIMITS } from '@/lib/wall';
@@ -126,6 +128,30 @@ describe('historyFloor', () => {
     expect(isWithinHistory('2026-07-10', floor)).toBe(true);
     expect(isWithinHistory('2026-07-09', floor)).toBe(false);
     expect(isWithinHistory('2026-10-07', floor)).toBe(true);
+  });
+});
+
+describe('keptFrom', () => {
+  it('is today less seven years, the first day the deletion job keeps', () => {
+    expect(keptFrom('2026-10-07')).toBe('2019-10-07');
+    expect(keptFrom('2033-03-01')).toBe('2026-03-01');
+  });
+
+  it('takes a leap day back to the 28th, as Postgres does', () => {
+    expect(keptFrom('2028-02-29')).toBe('2021-02-28');
+    expect(keptFrom('2028-02-28')).toBe('2021-02-28');
+    expect(keptFrom('2035-02-28')).toBe('2028-02-28');
+  });
+
+  it('is a local midnight for a date picker', () => {
+    const day = keptFromDate('2028-02-29');
+    expect([day.getFullYear(), day.getMonth(), day.getDate(), day.getHours()]).toEqual([
+      2021, 1, 28, 0,
+    ]);
+  });
+
+  it('is the Pro floor', () => {
+    expect(historyFloor(true, new Date(2028, 1, 29))).toBe('2021-02-28');
   });
 });
 

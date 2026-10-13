@@ -10,6 +10,12 @@
 \set ON_ERROR_STOP on
 begin;
 
+-- Each case is set on its own day (p_today). update_loan and record_loan_payoff hold that day to
+-- within one of person_today; in this transaction person_today knows no day, so each case's day
+-- stands as given. supabase/checks/loan_ids.sql checks the hold itself, on the real day.
+create or replace function public.person_today(p_user uuid) returns date
+language sql stable as $$ select null::date $$;
+
 -- f1 edits; f3 is someone else.
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000f1', 'loan-and-charges@test.local'),
@@ -165,14 +171,14 @@ select pg_temp.check(
 select pg_temp.check(
   (select count(*) = 1 from pg_proc where proname = 'update_loan' and pronamespace = 'public'::regnamespace),
   'there is still one update_loan');
--- 20261013300001 adds one line (anchor_day = v_day); supabase/checks/month_end_anchor.sql proves
--- that taking it out gives 20261012100003's body back.
+-- 20261013300001 adds anchor_day = v_day and 20261013600001 the day clamp;
+-- supabase/checks/loan_ids.sql proves that taking them out gives 20261012100003's body back.
 select pg_temp.check(
-  (select md5(p.prosrc) = '1f26263135df0d33b5ec0a77d6619d38'
+  (select md5(p.prosrc) = '94fac9ad72317b763f3c341a520761a5'
           and not p.prosecdef and p.proconfig = array['search_path=public']
           and p.proowner::regrole::text = 'postgres'
      from pg_proc p where p.proname = 'update_loan' and p.pronamespace = 'public'::regnamespace),
-  'update_loan is byte for byte the one 20261013300001 left, still run as the caller');
+  'update_loan is byte for byte the one 20261013600001 left, still run as the caller');
 select pg_temp.check(
   has_function_privilege('authenticated', 'public.update_loan(uuid,text,text,numeric,numeric,integer,numeric,numeric,date,date,text,uuid,uuid,boolean,integer,jsonb,date,date)', 'execute')
   and not has_function_privilege('anon', 'public.update_loan(uuid,text,text,numeric,numeric,integer,numeric,numeric,date,date,text,uuid,uuid,boolean,integer,jsonb,date,date)', 'execute'),
@@ -216,11 +222,14 @@ select '00000000-0000-0000-0000-0000000000f3', b.id, 9000, 5, 34, 400, 600, '202
 select pg_temp.charge((pg_temp.bill('Theirs')).id, d)
   from (values ('2026-09-01'::date), ('2026-10-01'::date)) v(d);
 reset role;
--- Someone else's charge filed under my loan's id: the foreign key takes any bill id. In a month
--- Car has no charge, or charges_one_per_cycle drops it.
+-- Someone else's charge filed under my loan's id: the foreign key takes any bill id. charges_own_rows
+-- (20261013600004) refuses one now, so it is planted with triggers off, as one written before it.
+-- In a month Car has no charge.
+set local session_replication_role = replica;
 insert into public.charges (user_id, bill_id, label, amount, charged_on, card_id)
 values ('00000000-0000-0000-0000-0000000000f3', (pg_temp.bill('Car')).id, 'Planted', 5, '2025-12-15',
         '00000000-0000-0000-0000-0000000c00f3');
+set local session_replication_role = origin;
 
 create temp table ids as
   select name, id from public.bills where name in ('Car', 'Van', 'Rent', 'Theirs');

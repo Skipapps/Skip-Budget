@@ -1653,3 +1653,82 @@ describe('/voice-review — around the page', () => {
     expect(screen.queryByText('Nothing to check yet')).toBeNull();
   });
 });
+
+describe('/voice-review — seven years back', () => {
+  // Thursday 1 October 2026 here: the first kept day is Tuesday 1 October 2019.
+  const HINT = 'Pick a day in the last seven years.';
+
+  it('refuses a receipt heard for the day before the first kept day, with the hint', async () => {
+    seed({ date: '2019-09-30', transcript: 'Spent $12.50 at Starbucks on September 30 2019' });
+    const screen = await render(<VoiceReviewScreen />);
+    await saveReceipt(screen);
+
+    expect(await screen.findByText(HINT)).toBeTruthy();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect(mockCreateReceipt).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('saves a receipt heard for the first kept day', async () => {
+    seed({ date: '2019-10-01' });
+    const screen = await render(<VoiceReviewScreen />);
+    await saveReceipt(screen);
+
+    await waitFor(() => expect(mockCreateReceipt).toHaveBeenCalledTimes(1));
+    expect(mockCreateReceipt.mock.calls[0][0]).toMatchObject({ purchased_on: '2019-10-01' });
+    expect(screen.queryByText(HINT)).toBeNull();
+  });
+
+  it.each([
+    ['bill', RENT, 'Save bill', mockCreateBill],
+    ['subscription', STREAMING, 'Save subscription', mockCreateSubscription],
+  ] as const)('holds a %s’s first payment to the same day', async (_kind, patch, save, create) => {
+    const id = seed({ ...patch, date: '2019-09-30' });
+    const refused = await render(<VoiceReviewScreen />);
+    await answer(refused);
+    await press(refused, save);
+
+    expect(await refused.findByText(HINT)).toBeTruthy();
+    expect(create).not.toHaveBeenCalled();
+
+    // The first kept day itself goes through.
+    await act(async () => {
+      updateVoiceEntry(id, { date: '2019-10-01' });
+    });
+    expect(refused.queryByText(HINT)).toBeNull();
+    await press(refused, save);
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows the hint when the database refuses the day, and Save can be pressed again', async () => {
+    mockCreateReceipt.mockRejectedValueOnce({
+      code: 'SK007',
+      message: 'Pick a day in the last seven years.',
+    });
+    seed({ date: '2019-10-01' });
+    const screen = await render(<VoiceReviewScreen />);
+    await saveReceipt(screen);
+
+    expect(await screen.findByText(HINT)).toBeTruthy();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+
+    await press(screen, 'Save receipt');
+    await waitFor(() => expect(mockCreateReceipt).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(router.dismissTo).toHaveBeenCalledWith('/home'));
+  });
+
+  it('keeps the failure line for a 22023, which the database raises for other reasons', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockCreateReceipt.mockRejectedValueOnce({ code: '22023', message: 'Say where it was bought.' });
+    seed({ date: '2019-10-01' });
+    const screen = await render(<VoiceReviewScreen />);
+    await saveReceipt(screen);
+
+    expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
+    expect(screen.queryByText(HINT)).toBeNull();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+});

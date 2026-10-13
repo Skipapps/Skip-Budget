@@ -19,8 +19,8 @@ import {
   type ReminderChoice,
 } from '@/api/reminders';
 import { buildBillValues, withSavedSource } from '@/api/entry-values';
-import { useCreateBill, useDeleteBill, useStopBill, useUpdateBill } from '@/api/mutations';
-import { usePastCharges, type CarriedValues, type PastRead } from '@/api/past-charges';
+import { useCreateBill, useDeleteBill, useStopBill } from '@/api/mutations';
+import { usePastCharges, useUpdatePlanAndCharges, type PastRead } from '@/api/past-charges';
 import { usePaymentLabels } from '@/api/payment-labels';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
@@ -56,6 +56,8 @@ import {
   type Recurrence,
 } from '@/data/bill-categories';
 import { t } from '@/i18n';
+import { keptFrom, keptFromDate } from '@/lib/allowance';
+import { toIsoDate } from '@/lib/date';
 import { amountForDisplay, formatEntryDay } from '@/lib/entry-day';
 import { formatCurrency } from '@/lib/format';
 import { useToday } from '@/lib/use-today';
@@ -118,9 +120,6 @@ function nameHint(categoryId: string): string {
 type Page = 'category' | 'amount' | 'review' | 'amountEdit' | 'categoryEdit' | 'note';
 
 const asDate = (value?: string | null) => (value ? new Date(`${value}T00:00:00`) : null);
-
-/** A bill Save has written, and the past charges still to carry what it was written with. */
-type Written = { id: string; rewrite: CarriedValues | null };
 
 /**
  * An edit with no record in hand never becomes a blank form: `id` makes Save an update, so a form
@@ -337,17 +336,17 @@ function BillForm({
   // A loan behind the bill keeps its type icon through an edit (`buildBillValues`).
   const { data: loan } = useLoanForBill(id);
   const createBill = useCreateBill();
-  const updateBill = useUpdateBill();
+  const updatePlan = useUpdatePlanAndCharges('bill');
   const pastCharges = usePastCharges('bill', id);
   // While the charges are read before a save or a delete: the buttons wait.
   const [readingPast, setReadingPast] = useState(false);
   // A new bill's row id for this visit, so a Save repeated after a lost answer finds the row the
   // first may have filed instead of filing a second (`insertOnce`).
   const [newBillId] = useState(() => randomUUID());
-  // The bill once it is written (filed, or changed), with the past-charges rewrite still owed when
-  // that failed: a Save pressed again after a later step failed finishes those steps alone, never
-  // a second bill or a second change.
-  const [written, setWritten] = useState<Written | null>(null);
+  // The bill's id once it is written (filed, or changed with its past charges in the same write): a
+  // Save pressed again after the reminder failed writes the reminder alone, never a second bill or a
+  // second change.
+  const [written, setWritten] = useState<string | null>(null);
   // Held from the press until the page is left, the reminder write included: a second tap in that
   // time would toast and navigate twice. The ref answers within the same frame.
   const [saving, setSaving] = useState(false);
@@ -442,13 +441,9 @@ function BillForm({
   };
 
   /** What follows the bill's own write, and all a Save again has left to do once it is written. */
-  const finishSave = async ({ id: billId, rewrite }: Written) => {
+  const finishSave = async (billId: string) => {
     setSaving(true);
     try {
-      if (rewrite) {
-        await pastCharges.apply(rewrite);
-        setWritten({ id: billId, rewrite: null });
-      }
       // After the bill exists, because a reminder points at a row. Untouched while the saved one is
       // unknown: the form's 'off' is then a guess, and writing it deletes the reminder.
       if (!savedReminder.unknown && reminder !== null) {
@@ -479,6 +474,12 @@ function BillForm({
     ].filter((field): field is string => Boolean(field));
     if (missing.length > 0 || sourceId === null || reminder === null) {
       fail(t('bills.add.missing', { fields: missing.join(', ') }));
+      return;
+    }
+    // A day heard by voice arrives without the calendar. Only a new bill: a saved period bill can
+    // have started before the first kept day.
+    if (!editing && startDate && toIsoDate(startDate) < keptFrom(today)) {
+      fail(t('receipts.add.dateTooOld'));
       return;
     }
     inFlight.current = true;
@@ -550,17 +551,16 @@ function BillForm({
 
       const billId =
         editing && id
-          ? (await updateBill.mutateAsync({ id, values }), id)
+          ? (await updatePlan.mutateAsync({ id, values, past: scope }), id)
           : (await createBill.mutateAsync({ ...values, id: newBillId })).id;
-      const done = { id: billId, rewrite: scope === 'all' ? carried : null };
-      setWritten(done);
-      await finishSave(done);
+      setWritten(billId);
+      await finishSave(billId);
     } catch (thrown) {
       saveFailed(thrown);
     }
   };
 
-  const busy = saving || createBill.isPending || updateBill.isPending || pastCharges.saving;
+  const busy = saving || createBill.isPending || updatePlan.isPending;
   const deleting = deleteBill.isPending || stopBill.isPending;
   // The page this form opened on. Anywhere else the edge swipe is off, and Back steps back.
   const isRoot = view === initialView;
@@ -784,6 +784,7 @@ function BillForm({
           value={startDate}
           today={todayDate}
           placeholder={t('bills.add.pickDay')}
+          minDate={keptFromDate(today)}
           onChange={pickStart}
         />
       ),

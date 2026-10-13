@@ -55,6 +55,7 @@ import { FieldLabel } from '@/components/ui/typography';
 import { StaleDraft } from '@/components/voice/stale-draft';
 import { RECURRENCES, billIconOf, getBillCategory } from '@/data/bill-categories';
 import { t, type MessageKey } from '@/i18n';
+import { keptFrom } from '@/lib/allowance';
 import { toIsoDate } from '@/lib/date';
 import { formatEntryDay } from '@/lib/entry-day';
 import { failureMessage, failureText } from '@/lib/failure';
@@ -385,6 +386,14 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
       setProblem(t(MISSING[kind], { fields: missing.join(', ') }));
       return;
     }
+    // A year heard ("March 2015") or "ten years ago" can name any day. Nothing before the first kept
+    // day is recorded: the database refuses such a receipt, and a plan's first payment is held to
+    // the same day.
+    if (entry.date && entry.date < keptFrom(today)) {
+      warn();
+      setProblem(t('receipts.add.dateTooOld'));
+      return;
+    }
     if (!built?.ok) {
       if (built) {
         warn();
@@ -443,8 +452,15 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
     } catch (thrown) {
       setSaving(false);
       busy.current = false;
-      failureMessage(thrown);
       warn();
+      // SK007: the database's seven-year guard, under a code of its own. Its day is the profile's
+      // time zone, which can be a day ahead of the phone's, so a day this page allowed can still be
+      // refused.
+      if ((thrown as { code?: unknown } | null)?.code === 'SK007') {
+        setProblem(t('receipts.add.dateTooOld'));
+        return;
+      }
+      failureMessage(thrown);
       setFailed(true);
     }
   };

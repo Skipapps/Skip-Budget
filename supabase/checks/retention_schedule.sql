@@ -51,11 +51,11 @@ select pg_temp.check(
 
 -- ---------------------------------------------------------------- the functions
 select pg_temp.check(
-  (select md5(p.prosrc) = '917089e69adee667728ed25b1e7002bb' and p.prosecdef
+  (select md5(p.prosrc) = '16046a4f201271cdafd2758b436dc07b' and p.prosecdef
           and p.proconfig = array['search_path=public']
           and pg_get_function_identity_arguments(p.oid) = 'p_years integer'
      from pg_proc p where p.proname = 'prune_expired_data' and p.pronamespace = 'public'::regnamespace),
-  'prune_expired_data is the one 20261013300002 left (the balance rule), same signature, run as its owner');
+  'prune_expired_data is the one 20261013600004 left (the balance rule, folded into the same person''s sources only), same signature, run as its owner');
 select pg_temp.check(
   not has_function_privilege('authenticated', 'public.prune_expired_data(integer)', 'execute')
   and not has_function_privilege('anon', 'public.prune_expired_data(integer)', 'execute')
@@ -312,19 +312,23 @@ select pg_temp.check(pg_temp.write_pay(pg_temp.c() - 1) = 0, 'the same for pay')
 select pg_temp.check(pg_temp.write_charge(pg_temp.c()) = 1 and pg_temp.write_pay(pg_temp.c()) = 1,
   'a charge and a pay dated C, exactly seven years old, are written, as the job keeps them');
 
--- Receipts and payments are only ever written by a person: not refused, and gone at the next run.
-insert into public.receipts (user_id, merchant, amount, purchased_on, card_id)
-values ('00000000-0000-0000-0000-0000000000a7', 'Typed in late', 1, pg_temp.c() - 1, '00000000-0000-0000-0000-0000000c00a7');
+-- Receipts and payments are only ever written by a person: one dated older than seven years is
+-- refused with its reason (20261013600004), so there is nothing of it to delete.
+do $$
+begin
+  insert into public.receipts (user_id, merchant, amount, purchased_on, card_id)
+  values ('00000000-0000-0000-0000-0000000000a7', 'Typed in late', 1, pg_temp.c() - 1,
+          '00000000-0000-0000-0000-0000000c00a7');
+  raise exception 'FAILED: a receipt older than seven years was saved';
+exception when sqlstate 'SK007' then
+  if sqlerrm <> 'Pick a day in the last seven years.' then raise; end if;
+end $$;
 select pg_temp.check(
-  exists (select 1 from public.receipts where merchant = 'Typed in late'),
-  'a receipt typed in with a date older than seven years is saved');
+  not exists (select 1 from public.receipts where merchant = 'Typed in late'),
+  'a receipt typed in with a date older than seven years is refused (SK007): Pick a day in the last seven years.');
 
 reset role;
 select set_config('request.jwt.claims', '', true);
-select public.prune_expired_data();
-select pg_temp.check(
-  not exists (select 1 from public.receipts where merchant = 'Typed in late'),
-  'and goes at the next run');
 
 -- ---------------------------------------------------------------- the server recorder
 -- A rent started more than seven years ago and never recorded: the recorder walks every due date

@@ -1,5 +1,6 @@
 import { planKey } from '@/lib/card-ledger';
 import { toIsoDate } from '@/lib/date';
+import { shiftMonths } from '@/lib/month-step';
 import { FREE_HISTORY_DAYS, FREE_LIMITS, PRO_HISTORY_YEARS } from '@/lib/wall';
 
 /**
@@ -68,17 +69,28 @@ export function captureAllowance(
 }
 
 /**
- * The earliest day each plan sees, as yyyy-mm-dd: seven years back on Pro, and on free the 90 days
- * ending today (today is the 90th). Only for what is listed; balances always walk the whole history.
+ * The first day the app keeps, yyyy-mm-dd: `today` less seven years. A leap day goes back to the
+ * 28th, as Postgres takes years off a date, so this is the deletion job's first kept day
+ * (`retention_cutoff`) exactly: nothing the app shows or lets a person date is deleted that night.
+ */
+export function keptFrom(today: string): string {
+  return shiftMonths(today, -12 * PRO_HISTORY_YEARS, Number(today.slice(8, 10)));
+}
+
+/** `keptFrom` as local midnight, the shape a date picker's minimum takes. */
+export function keptFromDate(today: string): Date {
+  return new Date(`${keptFrom(today)}T00:00:00`);
+}
+
+/**
+ * The earliest day each plan sees, as yyyy-mm-dd: seven years back on Pro (`keptFrom`), and on free
+ * the 90 days ending today (today is the 90th). Only for what is listed; balances always walk the
+ * whole history.
  */
 export function historyFloor(pro: boolean, today: Date): string {
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  const day = today.getDate();
+  if (pro) return keptFrom(toIsoDate(today));
   return toIsoDate(
-    pro
-      ? new Date(year - PRO_HISTORY_YEARS, month, day)
-      : new Date(year, month, day - (FREE_HISTORY_DAYS - 1)),
+    new Date(today.getFullYear(), today.getMonth(), today.getDate() - (FREE_HISTORY_DAYS - 1)),
   );
 }
 

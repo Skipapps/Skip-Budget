@@ -249,6 +249,7 @@ function checkMonthPage(row: Row) {
       recurrence: row.recurrence,
       anchorDay: row.anchorDay ?? Number(row.picked.slice(8, 10)),
       startsOn: savedBill(row).starts_on,
+      lastCharged: row.lastChargedOn,
     },
     editDay,
   );

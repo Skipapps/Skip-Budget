@@ -116,7 +116,11 @@ const mockPast = {
   apply: jest.fn(async (_values: object) => {}),
   retry: jest.fn(),
 };
-jest.mock('@/api/past-charges', () => ({ usePastCharges: () => mockPast }));
+jest.mock('@/api/past-charges', () => ({
+  usePastCharges: () => mockPast,
+  // An edit and its past renewals are one write.
+  useUpdatePlanAndCharges: () => ({ mutateAsync: mockUpdate, isPending: mockUpdating }),
+}));
 
 // No row id unless a test gives one, as Jest's own stand-in answers, so the goldens stay as written.
 jest.mock('expo-crypto', () => ({ randomUUID: jest.fn() }));
@@ -134,9 +138,9 @@ jest.mock('@/api/reminders', () => ({
 const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
 let mockPending = false;
+let mockUpdating = false;
 jest.mock('@/api/mutations', () => ({
   useCreateSubscription: () => ({ mutateAsync: mockCreate, isPending: mockPending }),
-  useUpdateSubscription: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useStopSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
@@ -391,6 +395,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockParams = {};
   mockPending = false;
+  mockUpdating = false;
   mockOrder.length = 0;
   mockSavedReminder = { choice: 'off', remindAt: '09:00' };
   mockSubscription = { data: null, isError: false, isFetched: false };
@@ -696,6 +701,7 @@ describe('Add subscription — what an edit saves', () => {
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     expect(mockUpdate).toHaveBeenCalledWith({
       id: 'sub-1',
+      past: 'upcoming',
       values: {
         brand_id: 'b-sp',
         name: 'Spotify',
@@ -937,14 +943,13 @@ describe('Add subscription — what an edit saves', () => {
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockPast.choose).toHaveBeenCalledWith('Spotify', true, READ);
-    expect(mockPast.apply).toHaveBeenCalledTimes(1);
-    expect(mockPast.apply).toHaveBeenCalledWith({
-      label: 'Spotify',
-      amount: 15.99,
-      card_id: null,
-      bank_account_id: 'acct-1',
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate.mock.calls[0][0]).toMatchObject({
+      id: 'sub-1',
+      past: 'all',
+      values: { name: 'Spotify', amount: 15.99, card_id: null, bank_account_id: 'acct-1' },
     });
-    expect(mockUpdate.mock.calls[0][0].values.amount).toBe(15.99);
+    expect(mockPast.apply).not.toHaveBeenCalled();
   });
 
   it('leaves past renewals alone when told only the upcoming ones change', async () => {
@@ -959,6 +964,7 @@ describe('Add subscription — what an edit saves', () => {
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockPast.choose).toHaveBeenCalledWith('Spotify', true, READ);
     expect(mockPast.apply).not.toHaveBeenCalled();
+    expect(mockUpdate.mock.calls[0][0].past).toBe('upcoming');
     expect(mockUpdate.mock.calls[0][0].values.amount).toBe(15.99);
   });
 
@@ -1031,7 +1037,7 @@ describe('Add subscription — the question, the write and the reminder', () => 
     expect(mockCreate).toHaveBeenCalledTimes(1);
   });
 
-  it('writes the row first, then rewrites past renewals, then sets the reminder', async () => {
+  it('writes the row and its past renewals in one write, then sets the reminder', async () => {
     mockPast.choose.mockResolvedValue('all');
     mockParams = { id: 'sub-1' };
     mockSubscription = { data: SPOTIFY, isError: false, isFetched: true };
@@ -1045,13 +1051,14 @@ describe('Add subscription — the question, the write and the reminder', () => 
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-    expect(mockOrder).toEqual(['update', 'apply', 'reminder']);
+    expect(mockOrder).toEqual(['update', 'reminder']);
+    expect(mockUpdate.mock.calls[0][0]).toMatchObject({ past: 'all', values: { amount: 12.99 } });
   });
 
-  it('retries a failed rewrite of past renewals on the next Save, without asking again', async () => {
+  it('leaves nothing half done when an edit and its past renewals fail together', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     mockPast.choose.mockResolvedValue('all');
-    mockPast.apply.mockImplementationOnce(async () => {
+    mockUpdate.mockImplementationOnce(async () => {
       throw new Error('network down');
     });
     mockParams = { id: 'sub-1' };
@@ -1065,20 +1072,21 @@ describe('Add subscription — the question, the write and the reminder', () => 
     expect(mockApplyReminder).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
 
-    // Saved, the row now matches the form: nothing it copies differs, so nothing would be asked.
-    mockPast.choose.mockResolvedValue('upcoming');
+    // Nothing was written, so the question is asked again and both go together once more.
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-    expect(mockPast.choose).toHaveBeenCalledTimes(1);
-    expect(mockPast.apply).toHaveBeenCalledTimes(2);
-    expect(mockPast.apply).toHaveBeenLastCalledWith({
-      label: 'Spotify',
-      amount: 11.99,
-      card_id: 'card-1',
-      bank_account_id: null,
-    });
-    expect(mockOrder).toEqual(['update', 'update', 'apply', 'reminder']);
+    expect(mockPast.choose).toHaveBeenCalledTimes(2);
+    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    for (const [edit] of mockUpdate.mock.calls) {
+      expect(edit).toMatchObject({
+        id: 'sub-1',
+        past: 'all',
+        values: { name: 'Spotify', amount: 11.99, card_id: 'card-1', bank_account_id: null },
+      });
+    }
+    expect(mockPast.apply).not.toHaveBeenCalled();
+    expect(mockOrder).toEqual(['update', 'reminder']);
     log.mockRestore();
   });
 
@@ -1551,9 +1559,9 @@ describe('Add subscription — a failed or held save', () => {
     expect(screen.queryByLabelText('Save subscription')).toBeNull();
   });
 
-  it('says Saving… and holds Save while past renewals are being rewritten', async () => {
+  it('says Saving… and holds Save while an edit and its past renewals are being written', async () => {
     mockParams = { from: 'voice', prefillName: 'Netflix', prefillAmount: '12' };
-    mockPast.saving = true;
+    mockUpdating = true;
     const screen = await render(<AddSubscriptionScreen />);
 
     expect(screen.getByLabelText('Saving…')).toBeDisabled();
@@ -1934,6 +1942,7 @@ describe('Add subscription — saving again after a later step failed', () => {
     expect(mockCreate).toHaveBeenCalledTimes(1);
     expect(mockUpdate).toHaveBeenCalledWith({
       id: 'sub-new',
+      past: 'upcoming',
       values: expect.objectContaining({ name: 'Netflix', amount: 15.99, card_id: 'card-1' }),
     });
     expect(mockApplyReminder).toHaveBeenCalledTimes(2);
@@ -2049,5 +2058,116 @@ describe('Add subscription — a card or account the free plan has locked', () =
     const screen = await render(<AddSubscriptionScreen />);
 
     expect(tiles(screen)).toEqual(['VISA ••4421', 'Checking ••0099', 'Skip']);
+  });
+});
+
+describe('Add subscription — seven years back', () => {
+  afterEach(() => jest.setSystemTime(new Date('2026-10-07T09:00:00')));
+
+  const blocked = (screen: Screen, label: string) =>
+    Boolean(screen.getByLabelText(label).props.accessibilityState?.disabled);
+
+  /** The open calendar walked back the way a person would: the month title, the years, the month. */
+  async function yearsBack(screen: Screen, month: string, years: number) {
+    await fireEvent.press(screen.getByLabelText(/Choose a different month\.$/));
+    for (let i = 0; i < years; i += 1) await press(screen, 'Previous year');
+    await press(screen, month);
+  }
+
+  it('greys out the day before the first kept day, and a new subscription saves the first', async () => {
+    // Wednesday 7 October 2026: the first kept day is Monday 7 October 2019.
+    const screen = await render(<AddSubscriptionScreen />);
+    await netflixAt(screen, '15.99');
+    await press(screen, NEXT_RENEWAL);
+    await yearsBack(screen, 'October', 7);
+
+    expect(blocked(screen, 'Sunday 6 October 2019')).toBe(true);
+    expect(blocked(screen, 'Monday 7 October 2019')).toBe(false);
+
+    await press(screen, 'Monday 7 October 2019');
+    await press(screen, 'VISA ••4421');
+    await press(screen, 'No reminder');
+    await press(screen, 'Save subscription');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      next_renewal_on: '2019-10-07',
+      started_on: '2019-10-07',
+    });
+  });
+
+  it('holds an edit’s renewal day to the same first day', async () => {
+    mockParams = { id: 'sub-1' };
+    mockSubscription = { data: SPOTIFY, isError: false, isFetched: true };
+    const screen = await render(<AddSubscriptionScreen />);
+    await press(screen, renewalOn('Sat Oct 10'));
+    await yearsBack(screen, 'October', 7);
+
+    expect(blocked(screen, 'Sunday 6 October 2019')).toBe(true);
+    expect(blocked(screen, 'Monday 7 October 2019')).toBe(false);
+  });
+
+  it('takes a leap day back to the 28th, as the database does', async () => {
+    // Tuesday 29 February 2028: the first kept day is Sunday 28 February 2021, not 1 March.
+    jest.setSystemTime(new Date('2028-02-29T09:00:00'));
+    const screen = await render(<AddSubscriptionScreen />);
+    await netflixAt(screen, '15.99');
+    await press(screen, NEXT_RENEWAL);
+    await yearsBack(screen, 'February', 7);
+
+    expect(blocked(screen, 'Saturday 27 February 2021')).toBe(true);
+    expect(blocked(screen, 'Sunday 28 February 2021')).toBe(false);
+  });
+
+  describe('Save, with a renewal day that came without the calendar', () => {
+    const HEARD = {
+      from: 'voice',
+      prefillName: 'Netflix',
+      prefillBrandId: 'b-nf',
+      prefillDomain: 'netflix.com',
+      prefillCategory: 'entertainment',
+      prefillAmount: '15.99',
+      prefillCycle: 'monthly',
+      prefillSource: 'card-1',
+    };
+
+    it('refuses a new subscription heard for the day before the first kept day', async () => {
+      mockParams = { ...HEARD, prefillDate: '2019-10-06' };
+      const screen = await render(<AddSubscriptionScreen />);
+      await press(screen, 'No reminder');
+      await press(screen, 'Save subscription');
+
+      expect(await screen.findByText('Pick a day in the last seven years.')).toBeTruthy();
+      expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+      // Refused before anything is read, asked or written.
+      expect(mockPast.load).not.toHaveBeenCalled();
+      expectNothingWritten();
+    });
+
+    it('saves a new subscription heard for the first kept day', async () => {
+      mockParams = { ...HEARD, prefillDate: '2019-10-07' };
+      const screen = await render(<AddSubscriptionScreen />);
+      await press(screen, 'No reminder');
+      await press(screen, 'Save subscription');
+
+      await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+      expect(mockCreate.mock.calls[0][0]).toMatchObject({ next_renewal_on: '2019-10-07' });
+      expect(screen.queryByText('Pick a day in the last seven years.')).toBeNull();
+    });
+
+    it('leaves an edit alone: a saved renewal day before the first kept day still saves', async () => {
+      mockParams = { id: 'sub-1' };
+      mockSubscription = {
+        data: { ...SPOTIFY, started_on: '2019-05-10', next_renewal_on: '2019-06-10' },
+        isError: false,
+        isFetched: true,
+      };
+      const screen = await render(<AddSubscriptionScreen />);
+      await press(screen, 'Save changes');
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({ next_renewal_on: '2019-06-10' });
+      expect(screen.queryByText('Pick a day in the last seven years.')).toBeNull();
+    });
   });
 });

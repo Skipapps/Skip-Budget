@@ -18,6 +18,7 @@ import { TextLink } from '@/components/ui/text-link';
 import { StaleDraft } from '@/components/voice/stale-draft';
 import { getBillCategory, type BillCategory } from '@/data/bill-categories';
 import { t, type MessageKey } from '@/i18n';
+import { keptFromDate } from '@/lib/allowance';
 import { toIsoDate } from '@/lib/date';
 import { failureText } from '@/lib/failure';
 import { warn } from '@/lib/haptics';
@@ -353,7 +354,7 @@ function BillNameEdit({ session }: { session: VoiceSession }) {
 
 function DateEdit({ session }: { session: VoiceSession }) {
   const { commit, failed, leave } = useCommit(session);
-  const { todayDate } = useToday();
+  const { today, todayDate } = useToday();
   const { entry } = session;
   const kind = entry.kind;
 
@@ -385,7 +386,7 @@ function DateEdit({ session }: { session: VoiceSession }) {
         ) : null
       }
     >
-      <InlineCalendar value={day} onChange={setDay} />
+      <InlineCalendar value={day} onChange={setDay} minDate={keptFromDate(today)} />
     </EditShell>
   );
 }

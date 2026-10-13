@@ -40,6 +40,6 @@ describe('the month-end date table', () => {
     const rows = phone
       .split('\n')
       .filter((line) => line.trim() !== '' && !line.trim().startsWith('#'));
-    expect(rows).toHaveLength(45);
+    expect(rows).toHaveLength(51);
   });
 });

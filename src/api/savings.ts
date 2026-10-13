@@ -449,6 +449,8 @@ export type SavingsPotValues = {
   addedOn?: string | null;
   /** Up to 200 characters; empty clears it. */
   note?: string | null;
+  /** The visit's own id for new savings: adding again after a lost answer adds it once. */
+  newId?: string | null;
 };
 
 /**
@@ -466,6 +468,7 @@ export function useSaveSavingsPot() {
         p_amount: moneyArg(values.amount),
         p_added_on: values.addedOn ?? null,
         p_note: values.note ?? null,
+        ...(values.newId && !values.id ? { p_new_id: values.newId } : {}),
       });
       if (error) throw error;
       return { id: data as string };

@@ -11,6 +11,13 @@
 \set ON_ERROR_STOP on
 begin;
 
+-- Each case is set on its own day (p_today). update_loan and record_loan_payoff hold that day to
+-- within one of person_today; in this transaction person_today knows no day, so each case's day
+-- stands as given. supabase/checks/loan_ids.sql checks the hold itself, on the real day.
+alter function public.person_today(uuid) rename to person_today_real;
+create function public.person_today(p_user uuid) returns date
+language sql stable as $$ select null::date $$;
+
 -- e1 edits; e3 is someone else, whose loan e1 must not reach.
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000e1', 'update-loan@test.local'),
@@ -170,8 +177,8 @@ select pg_temp.check(
   'only the optional four have defaults; every figure must be sent');
 select pg_temp.check(
   (select count(*) = 1 from pg_proc where proname = 'save_loan' and pronamespace = 'public'::regnamespace)
-  and to_regprocedure('public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date,boolean,integer,date)') is not null,
-  'save_loan is still the one 20-argument function');
+  and to_regprocedure('public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date,boolean,integer,date,uuid)') is not null,
+  'save_loan is still one function, now taking the app''s own id last');
 
 -- ---------------------------------------------------------------- loans nobody edits
 select pg_temp.as_user('e1');
@@ -387,8 +394,11 @@ select pg_temp.check(
   pg_temp.dates('Floor: day 31') = '2026-10-12 2027-02-28 2027-02-28',
   'a day-31 loan is next due on the 28th of February, its last payment');
 
--- With no day sent, today is the person's own, from their profile.
+-- With no day sent, today is the person's own, from their profile: person_today is the real one
+-- again for this case.
 reset role;
+create or replace function public.person_today(p_user uuid) returns date
+language sql stable as $$ select public.person_today_real(p_user) $$;
 update public.profiles set timezone = 'Pacific/Kiritimati' where id = '00000000-0000-0000-0000-0000000000e1';
 select pg_temp.as_user('e1');
 select pg_temp.save_on('Floor: today from profile', '2026-01-15', 600, '2026-01-01', $x$, p_in_spending => false$x$);

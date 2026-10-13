@@ -92,6 +92,7 @@ jest.mock('@/api/past-charges', () => ({
     retry: jest.fn(),
     saving: false,
   }),
+  useUpdatePlanAndCharges: () => mockUseUpdate(),
 }));
 
 const mockToast = jest.fn();
@@ -137,7 +138,6 @@ const mockUseDelete = jest.fn(() => ({ mutateAsync: mockDelete, isPending: false
 const mockStop = jest.fn();
 
 jest.mock('@/api/mutations', () => ({
-  useUpdateSubscription: () => mockUseUpdate(),
   useCreateSubscription: () => mockUseCreate(),
   useDeleteSubscription: () => mockUseDelete(),
   useStopSubscription: () => ({ mutateAsync: mockStop, isPending: false }),

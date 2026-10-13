@@ -41,7 +41,8 @@ type RolledRow = {
 function overdue(rows: Rollable[], today: string) {
   return (
     rows
-      .filter((row) => row.date && row.recurrence !== 'period' && row.date < today)
+      // A set period repeats monthly too, so it rolls on like any monthly plan.
+      .filter((row) => row.date && row.date < today)
       .map((row) => ({
         id: row.id,
         next: nextOccurrenceFrom(row.date!, row.recurrence, today, row.anchorDay),

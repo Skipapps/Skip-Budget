@@ -384,11 +384,13 @@ describe('the design month: October 2026 on 12 Oct', () => {
 // R1: a due the recorders have not written yet.
 
 describe('a due today before the sweep has recorded it', () => {
-  it('is in the ledger nowhere, and the month still counts it as paid', () => {
+  it('is in the ledger already, and the month counts it once as paid', () => {
     const today = '2026-10-22';
     expect(
-      ledger('2026-10', today, DESIGN_BILLS).filter((entry) => entry.planId === 'aep'),
-    ).toEqual([]);
+      ledger('2026-10', today, DESIGN_BILLS)
+        .filter((entry) => entry.planId === 'aep')
+        .map((entry) => [entry.id, entry.date, entry.amount]),
+    ).toEqual([['bill-aep@2026-10-22', '2026-10-22', -150]]);
 
     const october = view('bill', '2026-10', today, DESIGN_BILLS);
     expect(summary(october)).toEqual({
@@ -441,7 +443,7 @@ describe('a due today before the sweep has recorded it', () => {
     });
   });
 
-  it('fills exactly the dates the recorder will write in the month', () => {
+  it('holds exactly the dates the recorder will write in the month', () => {
     const today = '2026-10-22';
     const recorded = new Set(['2026-08-22', '2026-09-22']);
     const owed = unrecordedDates(
@@ -458,29 +460,20 @@ describe('a due today before the sweep has recorded it', () => {
     );
     expect(owed).toEqual(['2026-10-22']);
 
+    const october = view('bill', '2026-10', today, DESIGN_BILLS);
+    const aep = october.rows.find((row) => row.planId === 'aep');
+    expect(aep?.occurrences.map((o) => o.date)).toEqual(owed);
+    // The ledger lists today's due itself, so the fill adds nothing for today.
     const listed = new Set(ledger('2026-10', today, DESIGN_BILLS).map((entry) => entry.id));
-    const filled = view('bill', '2026-10', today, DESIGN_BILLS)
-      .rows.flatMap((row) => row.occurrences)
-      .filter((o) => !listed.has(o.id))
-      .map((o) => o.date);
-    expect(filled).toEqual(owed);
+    expect(october.rows.flatMap((row) => row.occurrences).filter((o) => !listed.has(o.id))).toEqual(
+      [],
+    );
   });
 
   it('adds nothing once the ledger projects today itself: never counted twice', () => {
     const today = '2026-10-22';
-    // The ledger as it will read when it projects a recorded plan's unrecorded due from today.
-    const projected = [
-      ...ledger('2026-10', today, DESIGN_BILLS),
-      {
-        id: 'bill-aep@2026-10-22',
-        label: 'AEP',
-        date: '2026-10-22',
-        amount: -150,
-        kind: 'bill' as const,
-        sourceId: KOMAL,
-        planId: 'aep',
-      },
-    ];
+    // The ledger projects a recorded plan's unrecorded due from today.
+    const projected = ledger('2026-10', today, DESIGN_BILLS);
     const october = planMonth({
       kind: 'bill',
       month: '2026-10',
@@ -1740,7 +1733,12 @@ describe('nextDueAfter', () => {
     expect(nextDueAfter({ anchor: '2026-11-01', recurrence: 'period' }, '2026-10-12')).toBe(
       '2026-11-01',
     );
-    expect(nextDueAfter({ anchor: '2026-10-01', recurrence: 'period' }, '2026-10-12')).toBe(null);
+    expect(
+      nextDueAfter(
+        { anchor: '2026-10-01', recurrence: 'period', endsOn: '2026-10-31' },
+        '2026-10-12',
+      ),
+    ).toBe(null);
   });
 });
 

@@ -250,6 +250,7 @@ describe('a new goal', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Save to Goals' }));
     expect(mockSaveGoal).toHaveBeenCalledWith({
       id: null,
+      newId: expect.stringMatching(/^uuid-\d+$/),
       values: {
         name: 'Japan',
         icon_id: 'emergency',
@@ -260,6 +261,27 @@ describe('a new goal', () => {
     });
     expect(mockToast).toHaveBeenCalledWith('toast.goal.added');
     expect(mockFinish).toHaveBeenCalledWith('/goals');
+  });
+
+  it('sends the visit’s one id again after a lost answer, so Save again makes one goal', async () => {
+    mockParams = { target: '1200', date: '2027-03-31', saved: '0' };
+    mockSaveGoal.mockRejectedValueOnce(new Error('Network request failed'));
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    await render(<SaveGoalScreen />);
+    await fireEvent.changeText(screen.getByPlaceholderText('e.g. Trip to Japan'), 'Japan');
+    await fireEvent.press(screen.getByRole('radio', { name: 'Emergency fund' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save to Goals' }));
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Save to Goals' }));
+
+    expect(mockSaveGoal).toHaveBeenCalledTimes(2);
+    const [first, again] = mockSaveGoal.mock.calls.map(([call]) => call.newId);
+    expect(first).toEqual(expect.stringMatching(/^uuid-\d+$/));
+    expect(again).toBe(first);
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith('toast.goal.added');
+    log.mockRestore();
   });
 
   it('started from an empty Send page, returns there with the new goal', async () => {

@@ -75,6 +75,8 @@ const STEP_MONTHS: Partial<Record<Recurrence, number>> = {
   monthly: 1,
   quarterly: 3,
   yearly: 12,
+  // A set period repeats monthly; its own start and end bound it, through the window it is walked in.
+  period: 1,
 };
 
 function parts(iso: string): [number, number, number] {
@@ -106,8 +108,7 @@ function stepBy(date: string, recurrence: Recurrence, steps: number, day: number
 
 /**
  * Every time a recurring charge landed inside a window, newest first. Walks outwards from the next
- * due date, the only date the schema stores, on the plan's anchor day (`stepBy`). A "period" bill
- * contributes at most its one date.
+ * due date, the only date the schema stores, on the plan's anchor day (`stepBy`).
  */
 export function occurrencesInRange(
   anchor: string,
@@ -117,10 +118,6 @@ export function occurrencesInRange(
   anchorDay?: number | null,
 ): string[] {
   if (!anchor) return [];
-
-  if (recurrence === 'period') {
-    return anchor <= to && (!from || anchor >= from) ? [anchor] : [];
-  }
 
   const found: string[] = [];
   const day = anchorDayOf(anchor, anchorDay);
@@ -154,7 +151,7 @@ export function nextOccurrenceFrom(
   from: string,
   anchorDay?: number | null,
 ): string {
-  if (!anchor || recurrence === 'period') return anchor;
+  if (!anchor) return anchor;
 
   const day = anchorDayOf(anchor, anchorDay);
   let date = anchor;
@@ -189,9 +186,9 @@ export function dayAfter(date: string): string {
 }
 
 /**
- * The first day of the cycle `date` falls in: its week's Monday, the 1st of its month, its calendar
- * quarter or its year. A set period has no cycle, so each date is its own. Matches Postgres's
- * date_trunc, which the database's copy of the rule uses.
+ * The first day of the cycle `date` falls in: its week's Monday, the 1st of its month (a set period
+ * repeats monthly), its calendar quarter or its year. Matches Postgres's date_trunc, which the
+ * database's copy of the rule uses.
  */
 export function cycleStart(date: string, recurrence: Recurrence): string {
   const [year, month, day] = date.split('-').map(Number);
@@ -202,13 +199,12 @@ export function cycleStart(date: string, recurrence: Recurrence): string {
       return at(new Date(Date.UTC(year, month - 1, day - monday)));
     }
     case 'monthly':
+    case 'period':
       return at(new Date(Date.UTC(year, month - 1, 1)));
     case 'quarterly':
       return at(new Date(Date.UTC(year, Math.floor((month - 1) / 3) * 3, 1)));
     case 'yearly':
       return at(new Date(Date.UTC(year, 0, 1)));
-    default:
-      return date;
   }
 }
 
@@ -244,7 +240,8 @@ export type PlanOccurrence = {
 /**
  * Every time a plan landed or is going to, inside a window. The past is read from the charges
  * written down at the time (their label, amount and source then, so a rent rise or a card change
- * leaves earlier months alone); only what has not happened yet is projected from the plan.
+ * leaves earlier months alone); from today on, what the record does not hold yet is projected from
+ * the plan.
  *
  * `isRecorded` is whether the plan has ever been written down, in any window. When it has not, the
  * projection carries the past too. A plan on the record gets no such fallback: gaps stay gaps.
@@ -278,7 +275,9 @@ export function planOccurrences(input: {
 
   const window = billWindow(
     { starts_on: plan.startsOn, ends_on: plan.endsOn, created_at: plan.createdAt },
-    isRecorded ? laterOf(from, dayAfter(today)) : from,
+    // From today, not tomorrow: a due today counts before a recorder has written it (they run on
+    // opening and every few minutes on the server), and the cycle skip below drops it once one has.
+    isRecorded ? laterOf(from, today) : from,
     to,
   );
 

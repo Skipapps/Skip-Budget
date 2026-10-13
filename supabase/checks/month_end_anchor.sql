@@ -192,8 +192,8 @@ select pg_temp.check(
 select pg_temp.check(
   (select count(*) = 1 from pg_proc where proname = 'save_loan' and pronamespace = 'public'::regnamespace)
   and (select count(*) = 1 from pg_proc where proname = 'update_loan' and pronamespace = 'public'::regnamespace)
-  and has_function_privilege('authenticated', 'public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date,boolean,integer,date)', 'execute')
-  and not has_function_privilege('anon', 'public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date,boolean,integer,date)', 'execute')
+  and has_function_privilege('authenticated', 'public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date,boolean,integer,date,uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date,boolean,integer,date,uuid)', 'execute')
   and has_function_privilege('authenticated', 'public.update_loan(uuid,text,text,numeric,numeric,integer,numeric,numeric,date,date,text,uuid,uuid,boolean,integer,jsonb,date,date)', 'execute')
   and not has_function_privilege('anon', 'public.update_loan(uuid,text,text,numeric,numeric,integer,numeric,numeric,date,date,text,uuid,uuid,boolean,integer,jsonb,date,date)', 'execute')
   and (select bool_and(not p.prosecdef and p.proconfig = array['search_path=public'])
@@ -217,8 +217,11 @@ select pg_temp.check(
   'the anchor triggers run before insert and update; the pay one before insert');
 
 -- ---------------------------------------------------------------- one change each
--- Each recreated function, with this migration's lines taken back out, is the body it replaced,
--- to the byte (md5 of the source as 20261012200001 left it). The ones it must not touch are pinned.
+-- record_due_charges, with this migration's lines taken back out, is the body it replaced, to the
+-- byte. save_loan, update_loan, plan_occurrences and roll_schedules_forward were recreated again
+-- later (20261013600001, 20261013600005), and loan_ids.sql and period_monthly.sql prove those
+-- bodies are this migration's with only their own changes; here they must still carry the anchor
+-- day. The ones nothing has touched since are pinned.
 create or replace function pg_temp.src(p_name text) returns text
 language sql as $$ select prosrc from pg_proc where proname = p_name and pronamespace = 'public'::regnamespace $$;
 
@@ -227,18 +230,12 @@ create or replace function pg_temp.times(p_text text, p_piece text) returns inte
 language sql immutable as $$ select (length(p_text) - length(replace(p_text, p_piece, ''))) / length(p_piece) $$;
 
 select pg_temp.check(
-  pg_temp.times(pg_temp.src('update_loan'), E'         anchor_day      = v_day,\n') = 1
-  and md5(replace(pg_temp.src('update_loan'), E'         anchor_day      = v_day,\n', ''))
-      = 'e13c129343f58382d38124abf1be0b1e',
-  'update_loan is 20261012100003''s with one line added: anchor_day = v_day');
+  pg_temp.times(pg_temp.src('update_loan'), E'         anchor_day      = v_day,\n') = 1,
+  'update_loan still keeps the bill''s anchor on the payment day: anchor_day = v_day');
 select pg_temp.check(
   pg_temp.times(pg_temp.src('save_loan'), E'card_id, bank_account_id,\n    anchor_day,\n') = 1
-  and pg_temp.times(pg_temp.src('save_loan'), E'p_card_id, p_bank_account_id,\n    v_day,\n') = 1
-  and md5(replace(replace(pg_temp.src('save_loan'),
-        E'card_id, bank_account_id,\n    anchor_day,\n', E'card_id, bank_account_id,\n'),
-        E'p_card_id, p_bank_account_id,\n    v_day,\n', E'p_card_id, p_bank_account_id,\n'))
-      = '5223d6dacf0c4612ffe4b09d0e93d675',
-  'save_loan is 20261012100001''s with anchor_day and its value added to the insert');
+  and pg_temp.times(pg_temp.src('save_loan'), E'p_card_id, p_bank_account_id,\n    v_day,\n') = 1,
+  'save_loan still files the payment day as the bill''s anchor');
 select pg_temp.check(
   pg_temp.times(pg_temp.src('record_due_charges'), E'      b.anchor_day,\n') = 1
   and pg_temp.times(pg_temp.src('record_due_charges'), E'      s.anchor_day,\n') = 1
@@ -249,32 +246,18 @@ select pg_temp.check(
       = 'b2314db288ecde53ec0be6f0cb5e970d',
   'record_due_charges is 20261012100001''s, passing each plan''s anchor day');
 select pg_temp.check(
-  md5(replace(replace(pg_temp.src('roll_schedules_forward'),
-        E'(t.today + interval ''5 years'')::date,\n        b.anchor_day\n', E'(t.today + interval ''5 years'')::date\n'),
-        E'(t.today + interval ''5 years'')::date,\n        s.anchor_day\n', E'(t.today + interval ''5 years'')::date\n'))
-      = 'e1c8cec489e5306db9175d19f8e6be75',
-  'roll_schedules_forward is 0030''s, passing each plan''s anchor day');
+  pg_temp.times(pg_temp.src('roll_schedules_forward'), E'(t.today + interval ''5 years'')::date,\n        b.anchor_day\n') = 1
+  and pg_temp.times(pg_temp.src('roll_schedules_forward'), E'(t.today + interval ''5 years'')::date,\n        s.anchor_day\n') = 1,
+  'roll_schedules_forward still passes each plan''s anchor day');
 select pg_temp.check(
-  md5(replace(replace(replace(pg_temp.src('plan_occurrences'),
-        E'  -- The day every step but the stored one returns to. Out of range (the\n'
-        || E'  -- columns'' check stops it) reads as none, rather than a date in the wrong month.\n'
-        || E'  anchor_day := case when p_anchor_day between 1 and 31 then p_anchor_day\n'
-        || E'                     else extract(day from p_anchor)::int end;\n',
-        E'  anchor_day := extract(day from p_anchor)::int;\n'),
-        E' Never\n    -- clamped from the stored date: after a short month that is already\n'
-        || E'    -- shortened, and every month after it would be too.\n',
-        E'\n'),
-        E'    -- The stored date stands as it is, even off the anchor day: a loan''s first\n'
-        || E'    -- payment can be.\n    if s = 0 then d := p_anchor; end if;\n',
-        ''))
-      = '2b47124cb2460f892d4aff47c3e4fd6c',
-  'plan_occurrences is 0030''s walk with the anchor day and the stored date kept as step 0');
+  pg_temp.times(pg_temp.src('plan_occurrences'), E'    if s = 0 then d := p_anchor; end if;\n') = 1
+  and pg_temp.times(pg_temp.src('plan_occurrences'), E'  anchor_day := case when p_anchor_day between 1 and 31 then p_anchor_day\n') = 1,
+  'plan_occurrences still walks on the anchor day and keeps the stored date as step 0');
 select pg_temp.check(
   md5(pg_temp.src('reminders_due')) = 'a77e563c57a6ea7edef540a16b2b1fde'
-  and md5(pg_temp.src('record_loan_payoff')) = '204b8f94c756989257be3abe5eae0fd6'
   and md5(pg_temp.src('delete_loan_payoff')) = 'e4c933f54c09d6dfa3d19ac0a59d3b46'
   and md5(pg_temp.src('update_loan_and_charges')) = '2302c2388e8e1f01dac6f2c78c57648b',
-  'reminders_due, record_loan_payoff, delete_loan_payoff and update_loan_and_charges are untouched');
+  'reminders_due, delete_loan_payoff and update_loan_and_charges are untouched');
 
 -- ---------------------------------------------------------------- the shared date table
 create temp table date_table as select $table$
@@ -339,11 +322,19 @@ create temp table date_table as select $table$
 2031-02-28 29 yearly    2028-01-01 2032-12-31 | 2028-02-29 2029-02-28 2030-02-28 2031-02-28 2032-02-29
 2029-02-28  - yearly    2028-01-01 2032-12-31 | 2028-02-28 2029-02-28 2030-02-28 2031-02-28 2032-02-28
 
-# Weekly and a set period have no day of the month to keep
+# Weekly has no day of the month to keep
 2027-01-31 31 weekly    2027-02-01 2027-02-28 | 2027-02-07 2027-02-14 2027-02-21 2027-02-28
 2027-02-28 31 weekly    2027-02-01 2027-03-31 | 2027-02-07 2027-02-14 2027-02-21 2027-02-28 2027-03-07 2027-03-14 2027-03-21 2027-03-28
-2027-03-31 31 period    2027-01-01 2027-12-31 | 2027-03-31
-2027-02-28 31 period    2027-01-01 2027-12-31 | 2027-02-28
+
+# A set period repeats monthly on its anchor day, inside the window it is walked in (its start to its end)
+2027-03-31 31 period    2027-01-01 2027-12-31 | 2027-01-31 2027-02-28 2027-03-31 2027-04-30 2027-05-31 2027-06-30 2027-07-31 2027-08-31 2027-09-30 2027-10-31 2027-11-30 2027-12-31
+2027-02-28 31 period    2027-01-01 2027-12-31 | 2027-01-31 2027-02-28 2027-03-31 2027-04-30 2027-05-31 2027-06-30 2027-07-31 2027-08-31 2027-09-30 2027-10-31 2027-11-30 2027-12-31
+2027-01-15 15 period    2027-01-15 2027-06-30 | 2027-01-15 2027-02-15 2027-03-15 2027-04-15 2027-05-15 2027-06-15
+2027-01-31 31 period    2027-01-15 2027-06-30 | 2027-01-31 2027-02-28 2027-03-31 2027-04-30 2027-05-31 2027-06-30
+2028-01-31 31 period    2028-01-15 2028-06-30 | 2028-01-31 2028-02-29 2028-03-31 2028-04-30 2028-05-31 2028-06-30
+2027-04-30  - period    2027-01-01 2027-06-30 | 2027-01-30 2027-02-28 2027-03-30 2027-04-30 2027-05-30 2027-06-30
+2027-03-15 31 period    2027-01-15 2027-06-30 | 2027-01-31 2027-02-28 2027-03-15 2027-04-30 2027-05-31 2027-06-30
+2027-01-31 31 period    2027-02-01 2027-02-27 |
 $table$::text as body;
 
 create temp table date_rows as
@@ -373,8 +364,8 @@ select
 from parts;
 
 select pg_temp.check(
-  (select count(*) = 45 and bool_and(n_inputs = 5 and bars = 2) from date_rows),
-  'the table reads as 45 rows, as the phone''s test reads it');
+  (select count(*) = 51 and bool_and(n_inputs = 5 and bars = 2) from date_rows),
+  'the table reads as 51 rows, as the phone''s test reads it');
 
 do $$
 declare
@@ -413,16 +404,16 @@ cross join (values ('2027-01-01'::date, '2028-12-31'::date),
                    ('2028-02-01'::date, '2028-03-31'::date)) as w(from_on, to_on);
 
 select pg_temp.check(
-  (select count(*) = 852 * 6 * 3 and bool_and(four = was) from old_vs_new),
-  'a four-argument call returns what the old walk did, date for date and in its order (15,336 walks)');
+  (select count(*) = 852 * 6 * 3 and bool_and(four = was) filter (where every <> 'period') from old_vs_new),
+  'a four-argument call returns what the old walk did, date for date and in its order (12,780 walks; a set period now repeats, and the shared table holds it)');
 select pg_temp.check(
-  (select bool_and(null_day = was and own_day = was) from old_vs_new),
+  (select bool_and(null_day = was and own_day = was) filter (where every <> 'period') from old_vs_new),
   'and so does no anchor day, or the stored date''s own day');
 select pg_temp.check(
-  (select count(*) = 8129 from old_vs_new where cardinality(was) > 0)
+  (select count(*) = 7141 from old_vs_new where cardinality(was) > 0 and every <> 'period')
   and (select bool_and(n > 0) from (select count(*) filter (where cardinality(was) > 0) as n
-                                      from old_vs_new where every <> 'fortnightly' group by every) x),
-  'and 8,129 of those walks find dates, in every recurrence the walk knows');
+                                      from old_vs_new where every not in ('fortnightly', 'period') group by every) x),
+  'and 7,141 of those walks find dates, in every recurrence the walk knows');
 select pg_temp.check(
   (select count(*) = 0 from public.plan_occurrences(null, 'monthly', null, '2027-01-01', 31))
   and (select count(*) = 0 from public.plan_occurrences('2027-01-31', 'monthly', null, null, 31)),
@@ -466,7 +457,7 @@ select pg_temp.check(pg_temp.after(null, null, null, null, 'monthly', 'monthly',
 select pg_temp.check(pg_temp.after('2027-01-31', '2027-02-07', 31, 31, 'weekly', 'weekly', false, '2027-02-01') = '7 2027-02-07',
   '(c) a weekly roll takes the new day');
 select pg_temp.check(pg_temp.after('2027-03-31', '2027-06-15', 31, 31, 'period', 'period', false, '2027-04-01') = '15 2027-06-15',
-  '(c) a set period takes the new day');
+  '(f) a set period moved to another day takes it, as a monthly plan does');
 select pg_temp.check(pg_temp.after('2027-04-30', '2027-05-07', 31, 31, 'monthly', 'weekly', false, '2027-05-01') = '7 2027-05-07',
   '(c) a monthly bill made weekly takes the new day');
 select pg_temp.check(pg_temp.after('2027-01-31', '2027-02-07', 31, 31, 'weekly', 'weekly', true, '2027-02-01') = '7 2027-02-07',
@@ -672,8 +663,9 @@ select set_config('request.jwt.claims', '', true);
 update public.profiles set timezone = 'Nowhere/Never' where id = '00000000-0000-0000-0000-0000000000a5';
 select pg_temp.check(public.anchor_today('00000000-0000-0000-0000-0000000000a5') = pg_temp.today(),
   'an unknown zone reads as UTC');
-update public.bills set next_due_on = pg_temp.today() + 40 where name = 'Ins: weekly';
-select pg_temp.check((pg_temp.bill('Ins: weekly')).next_due_on = pg_temp.today() + 40,
+-- After the bill's start, so the date stands as written.
+update public.bills set next_due_on = starts_on + 21 where name = 'Ins: weekly';
+select pg_temp.check((pg_temp.bill('Ins: weekly')).next_due_on = (pg_temp.bill('Ins: weekly')).starts_on + 21,
   'and a bill whose date moves still saves');
 update public.profiles set timezone = 'UTC' where id = '00000000-0000-0000-0000-0000000000a5';
 select pg_temp.check(public.anchor_today('00000000-0000-0000-0000-0000000000a5'::uuid) = pg_temp.today()
@@ -683,12 +675,14 @@ select pg_temp.check(public.anchor_today('00000000-0000-0000-0000-0000000000a5':
 -- ---------------------------------------------------------------- the server roll and its reminder
 create temp table server_case as
 select (date_trunc('month', pg_temp.today()) - interval '2 months')::date + 27 as stored_on;
+-- No start of their own: the recorders count them from the day they were made (today), and no
+-- start sits after the stored date for the next-due floor to act on, so only the roller moves them.
 
 insert into public.bills (user_id, name, amount, category_id, recurrence, next_due_on, starts_on, anchor_day, card_id)
 select '00000000-0000-0000-0000-0000000000a5', v.name, 75, 'housing', v.every::public.bill_recurrence,
        case when v.every = 'quarterly' then (date_trunc('month', pg_temp.today()) - interval '3 months')::date + 27
             else s.stored_on end,
-       pg_temp.today(), v.anchor, '00000000-0000-0000-0000-0000000c00a5'::uuid
+       null, v.anchor, '00000000-0000-0000-0000-0000000c00a5'::uuid
 from server_case s,
      (values ('Server: 31', 'monthly', 31), ('Server: 30', 'monthly', 30), ('Server: quarterly 31', 'quarterly', 31),
              ('Server: weekly', 'weekly', 28), ('Server: loan', 'monthly', 31)) as v(name, every, anchor);
@@ -698,17 +692,17 @@ insert into public.loans (user_id, bill_id, principal, annual_rate, term_months,
 select '00000000-0000-0000-0000-0000000000a5', (pg_temp.bill('Server: loan')).id, 1000, 5, 24, 75, 10,
        (date_trunc('month', pg_temp.today()) - interval '3 months')::date + 27, 31;
 insert into public.subscriptions (user_id, name, amount, cycle, next_renewal_on, started_on, category_id, active, anchor_day)
-select '00000000-0000-0000-0000-0000000000a5', 'Server: 31', 7.5, 'monthly', s.stored_on, pg_temp.today(),
+select '00000000-0000-0000-0000-0000000000a5', 'Server: 31', 7.5, 'monthly', s.stored_on, null,
        'other', true, 31
 from server_case s;
 -- Stored on the 1st with anchor 31. From the 2nd on, the stored day's next one has passed this
 -- month while the anchor day has not: only a walk from the anchor day finds this month.
 insert into public.bills (user_id, name, amount, category_id, recurrence, next_due_on, starts_on, anchor_day)
 select '00000000-0000-0000-0000-0000000000a5', 'Server: off-day', 75, 'housing', 'monthly',
-       (date_trunc('month', pg_temp.today()) - interval '1 month')::date, pg_temp.today(), 31;
+       (date_trunc('month', pg_temp.today()) - interval '1 month')::date, null, 31;
 insert into public.subscriptions (user_id, name, amount, cycle, next_renewal_on, started_on, category_id, active, anchor_day)
 select '00000000-0000-0000-0000-0000000000a5', 'Server: off-day', 7.5, 'monthly',
-       (date_trunc('month', pg_temp.today()) - interval '1 month')::date, pg_temp.today(), 'other', true, 31;
+       (date_trunc('month', pg_temp.today()) - interval '1 month')::date, null, 'other', true, 31;
 
 insert into public.reminders (user_id, bill_id, lead_days, remind_at)
 select '00000000-0000-0000-0000-0000000000a5', (pg_temp.bill('Server: 31')).id,

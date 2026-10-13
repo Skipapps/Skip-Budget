@@ -54,6 +54,7 @@ import {
 } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { t } from '@/i18n';
+import { keptFromDate } from '@/lib/allowance';
 import { success, warn } from '@/lib/haptics';
 import { failureMessage, failureText } from '@/lib/failure';
 import { leaveFlow } from '@/lib/nav';
@@ -647,7 +648,11 @@ function AccountForm({
                 {t('accounts.add.paySubtitle')}
               </Text>
               <View className="mt-[16px] w-full">
-                <InlineCalendar value={lastPayday} onChange={setLastPayday} />
+                <InlineCalendar
+                  value={lastPayday}
+                  onChange={setLastPayday}
+                  minDate={keptFromDate(toIsoDate(new Date()))}
+                />
                 {nextPayday ? (
                   <Text
                     className="mt-2 w-full text-center font-app text-[13px] text-muted"

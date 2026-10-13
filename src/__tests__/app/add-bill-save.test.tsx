@@ -135,7 +135,11 @@ const mockPast = {
   apply: jest.fn(async (_values: object) => {}),
   retry: jest.fn(),
 };
-jest.mock('@/api/past-charges', () => ({ usePastCharges: () => mockPast }));
+jest.mock('@/api/past-charges', () => ({
+  usePastCharges: () => mockPast,
+  // An edit and its past charges are one write.
+  useUpdatePlanAndCharges: () => ({ mutateAsync: mockUpdate, isPending: mockUpdating }),
+}));
 
 // No row id unless a test gives one, as Jest's own stand-in answers, so the goldens stay as written.
 jest.mock('expo-crypto', () => ({ randomUUID: jest.fn() }));
@@ -156,9 +160,9 @@ const mockUpdate = jest.fn();
 const mockDelete = jest.fn();
 const mockStop = jest.fn();
 let mockPending = false;
+let mockUpdating = false;
 jest.mock('@/api/mutations', () => ({
   useCreateBill: () => ({ mutateAsync: mockCreate, isPending: mockPending }),
-  useUpdateBill: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteBill: () => ({ mutateAsync: mockDelete, isPending: false }),
   useStopBill: () => ({ mutateAsync: mockStop, isPending: false }),
 }));
@@ -402,6 +406,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockParams = {};
   mockPending = false;
+  mockUpdating = false;
   mockBill = { data: null, isError: false, isFetched: false };
   mockLoan = null;
   mockEvery = [...SOURCES, ...LOCKED];
@@ -840,7 +845,7 @@ describe('Add bill — the order of a save', () => {
     expect(written).toBeLessThan(reminded);
   });
 
-  it('rewrites past charges between the write and the reminder', async () => {
+  it('rewrites past charges in the bill’s own write, before the reminder', async () => {
     mockPast.choose.mockResolvedValue('all');
     editing(POWER);
     const screen = await render(<AddBillScreen />);
@@ -852,16 +857,15 @@ describe('Add bill — the order of a save', () => {
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(mockApplyReminder).toHaveBeenCalledTimes(1));
-    expect(mockPast.apply).toHaveBeenCalledWith({
-      label: 'Power',
-      amount: 84.25,
-      card_id: 'card-1',
-      bank_account_id: null,
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate.mock.calls[0][0]).toMatchObject({
+      id: 'bill-1',
+      past: 'all',
+      values: { name: 'Power', amount: 84.25, card_id: 'card-1', bank_account_id: null },
     });
+    // Never a second write of the charges after the bill's.
+    expect(mockPast.apply).not.toHaveBeenCalled();
     expect(mockUpdate.mock.invocationCallOrder[0]).toBeLessThan(
-      mockPast.apply.mock.invocationCallOrder[0],
-    );
-    expect(mockPast.apply.mock.invocationCallOrder[0]).toBeLessThan(
       mockApplyReminder.mock.invocationCallOrder[0],
     );
   });
@@ -957,6 +961,7 @@ describe('Add bill — what an edit saves', () => {
     expect(mockCreate).not.toHaveBeenCalled();
     expect(mockUpdate).toHaveBeenCalledWith({
       id: 'bill-1',
+      past: 'upcoming',
       values: {
         name: 'Rent',
         amount: 84.2,
@@ -1189,12 +1194,8 @@ describe('Add bill — what an edit saves', () => {
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockPast.choose).toHaveBeenCalledWith('Power', true, READ);
-    expect(mockPast.apply).toHaveBeenCalledWith({
-      label: 'Power',
-      amount: 1030.5,
-      card_id: null,
-      bank_account_id: 'acct-1',
-    });
+    expect(mockUpdate.mock.calls[0][0].past).toBe('all');
+    expect(mockPast.apply).not.toHaveBeenCalled();
     expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
       amount: 1030.5,
       card_id: null,
@@ -1223,6 +1224,7 @@ describe('Add bill — what an edit saves', () => {
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     expect(mockPast.choose).toHaveBeenCalledWith('Power', false, READ);
+    expect(mockUpdate.mock.calls[0][0].past).toBe('upcoming');
   });
 
   it('takes the card off a bill with Skip', async () => {
@@ -1511,10 +1513,10 @@ describe('Add bill — the checks inside Save', () => {
     });
   });
 
-  it('retries a failed rewrite of past charges on the next Save, without asking again', async () => {
+  it('asks again after a failed edit, and writes the answer given then', async () => {
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
-    mockPast.choose.mockResolvedValue('all');
-    mockPast.apply.mockRejectedValueOnce(new Error('network down'));
+    mockPast.choose.mockResolvedValueOnce('all').mockResolvedValueOnce('upcoming');
+    mockUpdate.mockRejectedValueOnce(new Error('network down'));
     editing(POWER);
     const screen = await render(<AddBillScreen />);
     await press(screen, 'Checking ••0099');
@@ -1525,19 +1527,13 @@ describe('Add bill — the checks inside Save', () => {
     expect(mockApplyReminder).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
 
-    // Saved, the bill now matches the form: nothing it copies differs, so nothing would be asked.
-    mockPast.choose.mockResolvedValue('upcoming');
+    // Nothing was written, so nothing is owed: the question is asked again and its answer stands.
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-    expect(mockPast.choose).toHaveBeenCalledTimes(1);
-    expect(mockPast.apply).toHaveBeenCalledTimes(2);
-    expect(mockPast.apply).toHaveBeenLastCalledWith({
-      label: 'Power',
-      amount: 84.2,
-      card_id: null,
-      bank_account_id: 'acct-1',
-    });
+    expect(mockPast.choose).toHaveBeenCalledTimes(2);
+    expect(mockUpdate.mock.calls.map(([edit]) => edit.past)).toEqual(['all', 'upcoming']);
+    expect(mockPast.apply).not.toHaveBeenCalled();
     expect(mockApplyReminder).toHaveBeenCalledTimes(1);
     log.mockRestore();
   });
@@ -1647,13 +1643,12 @@ describe('Add bill — the checks inside Save', () => {
     expect(screen.getByLabelText('Saving…')).toBeDisabled();
   });
 
-  it('holds Save, saying so, while past charges are being rewritten', async () => {
-    mockPast.saving = true;
+  it('holds Save, saying so, while an edit and its past charges are being written', async () => {
+    mockUpdating = true;
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
     expect(screen.getByLabelText('Saving…')).toBeDisabled();
-    mockPast.saving = false;
   });
 });
 
@@ -2404,33 +2399,45 @@ describe('Add bill — Save again once the bill is written', () => {
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate.mock.calls[0][0].past).toBe('all');
     expect(mockPast.choose).toHaveBeenCalledTimes(1);
-    expect(mockPast.apply).toHaveBeenCalledTimes(1);
+    expect(mockPast.apply).not.toHaveBeenCalled();
     expect(mockApplyReminder).toHaveBeenCalledTimes(2);
     expect(mockToast).toHaveBeenCalledTimes(1);
     expect(mockToast).toHaveBeenCalledWith('toast.bill.updated');
   });
 
-  it('finishes a failed rewrite of past charges without writing the change a second time', async () => {
+  it('leaves nothing half done when an edit and its past charges fail together', async () => {
     editing(POWER);
     mockPast.choose.mockResolvedValue('all');
-    mockPast.apply.mockRejectedValueOnce(new Error('network down'));
+    mockUpdate.mockRejectedValueOnce(new Error('network down'));
     const screen = await render(<AddBillScreen />);
     await press(screen, 'Checking ••0099');
 
     await press(screen, 'Save changes');
     await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    // Nothing was written, so nothing reads as saved: the page is still the form, and no reminder.
+    expect(screen.getByLabelText('Checking ••0099')).toBeTruthy();
+    expect(mockApplyReminder).not.toHaveBeenCalled();
+    expect(mockToast).not.toHaveBeenCalled();
+
     await press(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-    expect(mockUpdate).toHaveBeenCalledTimes(1);
-    expect(mockPast.apply).toHaveBeenCalledTimes(2);
-    expect(mockPast.apply).toHaveBeenLastCalledWith({
-      label: 'Power',
-      amount: 84.2,
-      card_id: null,
-      bank_account_id: 'acct-1',
-    });
+    // Asked again, since nothing was written; both tries send the bill and its past as one.
+    expect(mockPast.choose).toHaveBeenCalledTimes(2);
+    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    for (const [edit] of mockUpdate.mock.calls) {
+      expect(edit).toMatchObject({
+        id: 'bill-1',
+        past: 'all',
+        values: { name: 'Power', amount: 84.2, card_id: null, bank_account_id: 'acct-1' },
+      });
+    }
+    expect(mockPast.apply).not.toHaveBeenCalled();
+    expect(mockApplyReminder).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith('toast.bill.updated');
   });
 
   it('goes back to Home after a voice hand-off, never onto the page it came from', async () => {
@@ -2529,5 +2536,115 @@ describe('Add bill — a card or account the free plan has locked', () => {
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     expect(mockUpdate.mock.calls[0][0].values).toMatchObject({ card_id: 'card-2' });
+  });
+});
+
+describe('Add bill — seven years back', () => {
+  afterEach(() => jest.setSystemTime(new Date('2026-10-07T09:00:00')));
+
+  const blocked = (screen: Screen, label: string) =>
+    Boolean(screen.getByLabelText(label).props.accessibilityState?.disabled);
+
+  /** The open calendar walked back the way a person would: the month title, the years, the month. */
+  async function yearsBack(screen: Screen, month: string, years: number) {
+    await fireEvent.press(screen.getByLabelText(/Choose a different month\.$/));
+    for (let i = 0; i < years; i += 1) await press(screen, 'Previous year');
+    await press(screen, month);
+  }
+
+  it('greys out the day before the first kept day, and a new bill saves the first', async () => {
+    // Wednesday 7 October 2026: the first kept day is Monday 7 October 2019.
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '1100');
+    await typeName(screen, 'Rent');
+    await press(screen, PAYMENT_ON);
+    await yearsBack(screen, 'October', 7);
+
+    expect(blocked(screen, 'Sunday 6 October 2019')).toBe(true);
+    expect(blocked(screen, 'Monday 7 October 2019')).toBe(false);
+
+    await press(screen, 'Monday 7 October 2019');
+    await press(screen, 'Skip');
+    await press(screen, 'No reminder');
+    await press(screen, 'Save bill');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      next_due_on: '2019-10-07',
+      starts_on: '2019-10-07',
+    });
+  });
+
+  it('holds an edit’s Payment on to the same first day', async () => {
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+    await press(screen, 'Payment on, Tue Sep 1');
+    await yearsBack(screen, 'October', 7);
+
+    expect(blocked(screen, 'Sunday 6 October 2019')).toBe(true);
+    expect(blocked(screen, 'Monday 7 October 2019')).toBe(false);
+  });
+
+  it('takes a leap day back to the 28th, as the database does', async () => {
+    // Tuesday 29 February 2028: the first kept day is Sunday 28 February 2021, not 1 March.
+    jest.setSystemTime(new Date('2028-02-29T09:00:00'));
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '1100');
+    await press(screen, PAYMENT_ON);
+    await yearsBack(screen, 'February', 7);
+
+    expect(blocked(screen, 'Saturday 27 February 2021')).toBe(true);
+    expect(blocked(screen, 'Sunday 28 February 2021')).toBe(false);
+  });
+
+  describe('Save, with a first payment that came without the calendar', () => {
+    const HEARD = {
+      from: 'voice',
+      prefillName: 'Gym',
+      prefillCategory: 'other',
+      prefillAmount: '25',
+      prefillSource: 'card-1',
+    };
+
+    it('refuses a new bill heard for the day before the first kept day', async () => {
+      mockParams = { ...HEARD, prefillDate: '2019-10-06' };
+      const screen = await render(<AddBillScreen />);
+      await press(screen, 'No reminder');
+      await press(screen, 'Save bill');
+
+      expect(await screen.findByText('Pick a day in the last seven years.')).toBeTruthy();
+      expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+      // Refused before anything is read, asked or written.
+      expect(mockPast.load).not.toHaveBeenCalled();
+      expect(mockPast.choose).not.toHaveBeenCalled();
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockApplyReminder).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalled();
+      expect(router.dismissTo).not.toHaveBeenCalled();
+    });
+
+    it('saves a new bill heard for the first kept day', async () => {
+      mockParams = { ...HEARD, prefillDate: '2019-10-07' };
+      const screen = await render(<AddBillScreen />);
+      await press(screen, 'No reminder');
+      await press(screen, 'Save bill');
+
+      await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+      expect(mockCreate.mock.calls[0][0]).toMatchObject({ next_due_on: '2019-10-07' });
+      expect(screen.queryByText('Pick a day in the last seven years.')).toBeNull();
+    });
+
+    it('leaves an edit alone: a saved period bill that began earlier still saves', async () => {
+      editing({ ...PERIOD, starts_on: '2019-06-01' });
+      const screen = await render(<AddBillScreen />);
+      await press(screen, 'Save changes');
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+        recurrence: 'period',
+        starts_on: '2019-06-01',
+      });
+      expect(screen.queryByText('Pick a day in the last seven years.')).toBeNull();
+    });
   });
 });

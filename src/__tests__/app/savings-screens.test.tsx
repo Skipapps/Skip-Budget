@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { randomUUID } from 'expo-crypto';
 import { router } from 'expo-router';
 
 import GoalsSentScreen from '@/app/goals-sent';
@@ -57,7 +58,7 @@ jest.mock('@/theme/goal-icons', () => ({
   useGoalTypeIcons: () => new Proxy({}, { get: () => () => null }),
   useSavingsIcons: () => new Proxy({}, { get: () => () => null }),
 }));
-jest.mock('expo-crypto', () => ({ randomUUID: () => 'batch-visit' }));
+jest.mock('expo-crypto', () => ({ randomUUID: jest.fn(() => 'batch-visit') }));
 let mockUserId = 'user-1';
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => mockUserId }));
 jest.mock('@/lib/use-today', () => ({
@@ -376,9 +377,29 @@ describe('adding and changing savings', () => {
       amount: 75,
       addedOn: '2026-10-11',
       note: '',
+      newId: 'batch-visit',
     });
     expect(mockToast).toHaveBeenCalledWith('toast.savings.added');
     expect(router.back).toHaveBeenCalled();
+  });
+
+  it('sends the visit’s one id again after a lost answer, so adding again adds once', async () => {
+    // The visit's id, made once as the page opens; any later id would differ.
+    jest.mocked(randomUUID).mockReturnValueOnce('pot-visit');
+    mockSavePot.mockRejectedValueOnce(new Error('Network request failed'));
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    await render(<SavingsEntryScreen />);
+    await fireEvent.changeText(screen.getByPlaceholderText('e.g. Birthday gift'), 'Birthday gift');
+    await fireEvent.changeText(screen.getByPlaceholderText('0'), '75');
+    await fireEvent.press(screen.getByRole('button', { name: 'Add to savings' }));
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Add to savings' }));
+
+    expect(mockSavePot).toHaveBeenCalledTimes(2);
+    expect(mockSavePot.mock.calls.map(([call]) => call.newId)).toEqual(['pot-visit', 'pot-visit']);
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    log.mockRestore();
   });
 
   it('refuses $0 for a month that left something, and offers Remove', async () => {

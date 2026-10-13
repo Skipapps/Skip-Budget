@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
@@ -102,6 +103,9 @@ function EntryForm({
   const confirm = useConfirm();
   const save = useSaveSavingsPot();
   const remove = useRemoveSavingsPot();
+  // New savings' row id for this visit, so adding again after a lost answer finds what the first
+  // may have added instead of adding it twice.
+  const [newId] = useState(() => randomUUID());
 
   const month = pot?.kind === 'month';
   const [name, setName] = useState(pot?.label ?? '');
@@ -153,6 +157,7 @@ function EntryForm({
         amount: amount ?? 0,
         addedOn: month ? null : toIsoDate(day),
         note: note.trim(),
+        ...(pot ? {} : { newId }),
       });
       success();
       toast(pot ? 'toast.savings.updated' : 'toast.savings.added');

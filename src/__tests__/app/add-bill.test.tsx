@@ -143,6 +143,7 @@ jest.mock('@/api/past-charges', () => ({
     retry: jest.fn(),
     saving: false,
   }),
+  useUpdatePlanAndCharges: () => mockUseUpdateBill(),
 }));
 
 // The real choices and lead conversion; only the table reads and writes are replaced.
@@ -157,7 +158,7 @@ jest.mock('@/api/reminders', () => ({
 }));
 
 /*
- * Mutations are spied on as hooks: the form runs `useUpdateBill()` at mount, so a hook never called
+ * Mutations are spied on as hooks: the form runs its update hook at mount, so a hook never called
  * proves the form was never on screen, which is stronger than "nobody pressed Save".
  */
 const mockUpdate = jest.fn();
@@ -170,7 +171,6 @@ let mockDeleting = false;
 const mockUseDeleteBill = jest.fn(() => ({ mutateAsync: mockDelete, isPending: mockDeleting }));
 
 jest.mock('@/api/mutations', () => ({
-  useUpdateBill: () => mockUseUpdateBill(),
   useCreateBill: () => mockUseCreateBill(),
   useDeleteBill: () => mockUseDeleteBill(),
   useStopBill: () => ({ mutateAsync: jest.fn(), isPending: false }),

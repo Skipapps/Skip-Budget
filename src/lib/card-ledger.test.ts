@@ -54,11 +54,16 @@ describe('occurrencesBetween', () => {
     ]);
   });
 
-  it('treats a period bill as a single dated charge', () => {
-    expect(occurrencesInRange('2026-08-10', 'period', '2026-08-01', '2026-08-27')).toEqual([
+  it('repeats a set period monthly on its day, inside the window it is walked in', () => {
+    expect(occurrencesInRange('2026-08-10', 'period', '2026-08-01', '2026-10-31')).toEqual([
+      '2026-10-10',
+      '2026-09-10',
       '2026-08-10',
     ]);
-    expect(occurrencesInRange('2026-09-10', 'period', '2026-08-01', '2026-08-27')).toEqual([]);
+    expect(occurrencesInRange('2026-09-10', 'period', '2026-08-01', '2026-08-27')).toEqual([
+      '2026-08-10',
+    ]);
+    expect(occurrencesInRange('2026-09-10', 'period', '2026-08-11', '2026-09-09')).toEqual([]);
   });
 });
 
@@ -84,8 +89,9 @@ describe('nextOccurrenceFrom', () => {
     expect(nextOccurrenceFrom('2024-06-10', 'yearly', '2026-08-28')).toBe('2027-06-10');
   });
 
-  it('never moves a one-off, which has no next', () => {
-    expect(nextOccurrenceFrom('2026-01-05', 'period', '2026-08-28')).toBe('2026-01-05');
+  it('moves a set period on a month at a time, as monthly', () => {
+    expect(nextOccurrenceFrom('2026-01-05', 'period', '2026-08-28')).toBe('2026-09-05');
+    expect(nextOccurrenceFrom('2026-01-31', 'period', '2026-02-01', 31)).toBe('2026-02-28');
   });
 });
 

@@ -790,7 +790,8 @@ describe('the year', () => {
   it('on New Year’s Day it moves on by itself, and the oldest year drops out of the window', async () => {
     mockToday = '2027-01-01';
     await open();
-    expect(card().slice(0, 2)).toEqual(['Paid in 2027', '$0.00']);
+    // The rent due today counts on its day, before the sweep writes it.
+    expect(card().slice(0, 2)).toEqual(['Paid in 2027', '$1,035.00']);
     expect(within(screen.getByTestId('year-chip')).getByText('This year')).toBeTruthy();
 
     await open({ year: '2020' });

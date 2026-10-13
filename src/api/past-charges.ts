@@ -2,6 +2,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import { useCharges, type ChargeRow } from '@/api/charges';
+import {
+  assertFinite,
+  guardBillDates,
+  NOTHING_UPDATED,
+  type BillValues,
+  type SubscriptionValues,
+} from '@/api/mutations';
 import { usePastChoice, type PastDelete, type PastNoun } from '@/components/ui/past-choice';
 import { supabase } from '@/lib/supabase';
 
@@ -70,6 +77,77 @@ function useRewritePastCharges() {
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ['charges'] });
       client.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+type PlanKind = 'bill' | 'subscription';
+
+/** A bill's edit or a subscription's, as its form builds it, with the answer to the past question. */
+export type PlanEdit<K extends PlanKind> = {
+  id: string;
+  values: K extends 'bill' ? Partial<BillValues> : Partial<SubscriptionValues>;
+  past: PastChargesScope;
+};
+
+/** The call is not on this database yet: PostgREST has not seen it (PGRST202), or Postgres has not. */
+const lacksFunction = (error: { code?: string } | null) =>
+  error?.code === 'PGRST202' || error?.code === '42883';
+
+/** The plan alone, as `useUpdateBill` / `useUpdateSubscription` write it. */
+async function savePlanOnly(table: 'bills' | 'subscriptions', id: string, values: object) {
+  const { data, error } = await supabase
+    .from(table)
+    .update(values as never)
+    .eq('id', id)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error(NOTHING_UPDATED);
+}
+
+/**
+ * Saves an edited bill or subscription and, for `past: 'all'`, gives every charge already recorded
+ * for it the name, amount and card or account it now has: one transaction
+ * (`update_bill_and_charges` / `update_subscription_and_charges`), so a failure leaves neither
+ * written and nothing is owed afterwards. 'upcoming' saves the plan alone.
+ *
+ * On a database without the functions, 'upcoming' saves the plan with a plain update instead, so
+ * an app that reaches it first still saves edits. 'all' fails there and writes nothing: two writes
+ * could save the plan without its past.
+ */
+export function useUpdatePlanAndCharges<K extends PlanKind>(kind: K) {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (edit: PlanEdit<K>) => {
+      const values =
+        kind === 'bill'
+          ? await guardBillDates(edit.id, edit.values as Partial<BillValues>)
+          : edit.values;
+      assertFinite(values);
+      const { data, error } = await supabase.rpc(
+        kind === 'bill' ? 'update_bill_and_charges' : 'update_subscription_and_charges',
+        { p_id: edit.id, p_values: values, p_rewrite: edit.past === 'all' },
+      );
+      if (error) {
+        // The plan is gone, or not this person's: the same answer an empty update gives.
+        if (error.code === 'P0002') throw new Error(NOTHING_UPDATED);
+        if (edit.past !== 'all' && lacksFunction(error)) {
+          await savePlanOnly(kind === 'bill' ? 'bills' : 'subscriptions', edit.id, values);
+          return { id: edit.id };
+        }
+        throw error;
+      }
+      if (!data) throw new Error(NOTHING_UPDATED);
+      return { id: edit.id };
+    },
+    onSuccess: ({ id }, edit) => {
+      client.invalidateQueries({ queryKey: [kind === 'bill' ? 'bills' : 'subscriptions'] });
+      client.invalidateQueries({ queryKey: [kind, id] });
+      client.invalidateQueries({ queryKey: ['dashboard'] });
+      // A loan is read with its bill.
+      if (kind === 'bill') client.invalidateQueries({ queryKey: ['loans'] });
+      if (edit.past === 'all') client.invalidateQueries({ queryKey: ['charges'] });
     },
   });
 }

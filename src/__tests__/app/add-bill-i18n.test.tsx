@@ -94,6 +94,7 @@ jest.mock('@/api/past-charges', () => ({
       retry: jest.fn(),
     };
   },
+  useUpdatePlanAndCharges: () => ({ mutateAsync: mockUpdate, isPending: false }),
 }));
 
 const mockApplyReminder = jest.fn(async (..._: unknown[]) => {});
@@ -128,7 +129,6 @@ const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
 jest.mock('@/api/mutations', () => ({
   useCreateBill: () => ({ mutateAsync: mockCreate, isPending: false }),
-  useUpdateBill: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useStopBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));

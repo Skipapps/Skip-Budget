@@ -27,6 +27,25 @@ export const NOTHING_UPDATED =
  */
 export const NOTHING_SAVED = 'Skip could not save that. Close this and open it again.';
 
+/**
+ * Refuses a payload holding NaN or ±Infinity, nested values included, before it is sent.
+ * supabase-js sends each as null, so a figure worked out wrong would save as no figure instead of
+ * failing; the database refuses them in every amount column too. Shown as the one failure line.
+ */
+export function assertFinite(values: unknown): void {
+  if (typeof values === 'number') {
+    if (Number.isFinite(values)) return;
+    const error = new Error('A figure to save is not a number.');
+    error.name = 'NotFinite';
+    throw error;
+  }
+  if (Array.isArray(values)) {
+    for (const value of values) assertFinite(value);
+  } else if (values && typeof values === 'object') {
+    for (const value of Object.values(values)) assertFinite(value);
+  }
+}
+
 /** Tables whose totals feed the dashboard, so a write there refreshes it too. */
 const AFFECTS_DASHBOARD = new Set([
   'bills',
@@ -155,6 +174,7 @@ export async function insertOnce(
   columns: string,
   id?: string,
 ): Promise<Row> {
+  assertFinite(values);
   if (!id) {
     const { data, error } = await supabase
       .from(table)
@@ -219,6 +239,7 @@ function useUpdate<TInput extends Record<string, unknown>>(
   return useMutation({
     mutationFn: async ({ id, values }: { id: string; values: TInput }) => {
       const written = prepare ? await prepare(id, values) : values;
+      assertFinite(written);
       const { data, error } = await supabase
         .from(table)
         .update(written as never)
@@ -366,8 +387,9 @@ export type BillValues = {
 /**
  * Reads what `guardLoanBillDates` needs before an edit writes a bill's dates. A failed read fails
  * the save: written unguarded, a loan could restart below its count floor and back-fill spending.
+ * Every bill edit runs it, `useUpdateBill`'s and `useUpdatePlanAndCharges`'s.
  */
-async function guardBillDates(id: string, values: Partial<BillValues>) {
+export async function guardBillDates(id: string, values: Partial<BillValues>) {
   if (!('next_due_on' in values) && !('starts_on' in values)) return values;
   const [bill, loan] = await Promise.all([
     supabase.from('bills').select('icon_id, next_due_on, starts_on').eq('id', id).maybeSingle(),
@@ -723,7 +745,7 @@ export type SaveLoanValues = {
    * they are not spending; the Loans page still shows them.
    */
   countsFrom?: string | null;
-};
+} & ClientId;
 
 /**
  * Turns a calculated loan into a monthly bill. One RPC so the bill and its loan detail are created
@@ -734,6 +756,7 @@ export function useSaveLoan() {
 
   return useMutation({
     mutationFn: async (values: SaveLoanValues) => {
+      assertFinite(values);
       const overrides =
         values.paymentOverrides && Object.keys(values.paymentOverrides).length > 0
           ? values.paymentOverrides
@@ -767,6 +790,9 @@ export function useSaveLoan() {
         ...(values.countsFrom && values.countsFrom > values.firstPaymentOn
           ? { p_counts_from: values.countsFrom }
           : {}),
+        // The visit's own id: saving again after a lost answer returns the loan the first save
+        // filed instead of filing a second.
+        ...(values.id ? { p_id: values.id } : {}),
       });
       if (error) throw error;
       return data as { id: string };
@@ -812,6 +838,7 @@ export function useUpdateLoan() {
 
   return useMutation({
     mutationFn: async (values: UpdateLoanValues) => {
+      assertFinite(values);
       const overrides =
         values.paymentOverrides && Object.keys(values.paymentOverrides).length > 0
           ? values.paymentOverrides
@@ -880,7 +907,7 @@ export type RecordPayoffValues = {
   lastPaymentOn: string | null;
   /** The person's today (yyyy-mm-dd, `useToday`); left out, the server reads the profile's day. */
   today?: string;
-};
+} & ClientId;
 
 /**
  * Records money paid on a loan beyond its instalments, and ends or shortens its bill to match, in
@@ -897,6 +924,7 @@ export function useRecordPayoff() {
 
   return useMutation({
     mutationFn: async (values: RecordPayoffValues) => {
+      assertFinite(values);
       const { data, error } = await supabase.rpc('record_loan_payoff', {
         p_bill_id: values.billId,
         p_paid_on: values.paidOn,
@@ -906,6 +934,8 @@ export function useRecordPayoff() {
         p_bank_account_id: values.bankAccountId,
         p_last_payment_on: values.kind === 'partial' ? values.lastPaymentOn : null,
         p_today: values.today ?? null,
+        // The visit's own id: recording again after a lost answer returns the first payoff.
+        ...(values.id ? { p_id: values.id } : {}),
       });
       if (error) throw error;
       return { id: (data as { id: string }).id, billId: values.billId };

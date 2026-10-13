@@ -48,6 +48,9 @@ function liveSignature(name: string): { file: string; parameters: string; types:
 
 const liveSaveLoan = () => liveSignature('save_loan');
 
+/** Where save_loan, update_loan and record_loan_payoff now live. */
+const LOAN_IDS = '20261013600001_loan_ids_and_today.sql';
+
 /** The body of the last `create [or replace] function public.<name>(` across every migration. */
 function liveFunction(name: string): { file: string; body: string } {
   let live: { file: string; body: string } | null = null;
@@ -68,9 +71,8 @@ function liveFunction(name: string): { file: string; body: string } {
 describe('save_loan after every migration', () => {
   const live = liveSaveLoan();
 
-  it('takes the add flow’s switch, payment day and count floor after every earlier parameter', () => {
-    // Recreated by the month-end migration, with the same signature.
-    expect(live.file).toBe('20261013300001_month_end_anchor.sql');
+  it('takes the add flow’s switch, payment day, count floor and the app’s own id after every earlier parameter', () => {
+    expect(live.file).toBe(LOAN_IDS);
     expect(live.types).toEqual([
       'text',
       'text',
@@ -94,17 +96,19 @@ describe('save_loan after every migration', () => {
       // picks the function, so `p_payment_day => 31` would find no save_loan.
       'integer',
       'date',
+      'uuid',
     ]);
   });
 
   it('still answers a call from an app that sends none of the newer parameters', () => {
     const lines = live.parameters.split(',').map((line) => line.trim());
-    expect(lines.slice(-5)).toEqual([
+    expect(lines.slice(-6)).toEqual([
       expect.stringMatching(/^p_payment_overrides\s+jsonb\s+default null$/i),
       expect.stringMatching(/^p_last_payment_on\s+date\s+default null$/i),
       expect.stringMatching(/^p_in_spending\s+boolean\s+default true$/i),
       expect.stringMatching(/^p_payment_day\s+integer\s+default null$/i),
       expect.stringMatching(/^p_counts_from\s+date\s+default null$/i),
+      expect.stringMatching(/^p_id\s+uuid\s+default null$/i),
     ]);
   });
 
@@ -124,6 +128,10 @@ describe('save_loan after every migration', () => {
     const text = sql('20261012100001_loan_add_flow.sql').replace(/\s+/g, ' ');
     expect(text).toContain(
       'drop function if exists public.save_loan( text, text, numeric, numeric, integer, numeric, numeric, date, public.bill_recurrence, uuid, uuid, date, text, date, numeric, jsonb, date );',
+    );
+    // A parameter added at the end makes a second function unless the old one is dropped.
+    expect(sql(LOAN_IDS).replace(/\s+/g, ' ')).toContain(
+      'drop function if exists public.save_loan( text, text, numeric, numeric, integer, numeric, numeric, date, public.bill_recurrence, uuid, uuid, date, text, date, numeric, jsonb, date, boolean, integer, date );',
     );
   });
 
@@ -148,6 +156,21 @@ describe('save_loan after every migration', () => {
           'card_id, bank_account_id, in_spending',
         )
         .replace('p_bank_account_id, v_day, coalesce(', 'p_bank_account_id, coalesce('),
+    ).toBe(before);
+  });
+
+  it('changes in the loan-ids migration only by finding a loan already saved under the app’s id', () => {
+    const before = functionIn('20261013300001_month_end_anchor.sql', 'save_loan');
+    const after = functionIn(LOAN_IDS, 'save_loan');
+    const lookup =
+      "if p_id is not null then perform pg_advisory_xact_lock(hashtextextended('save_loan:' || p_id::text, 0)); select * into v_bill from public.bills where id = p_id and user_id = v_user; if found then return v_bill; end if; end if; ";
+    expect(after).toContain(lookup);
+    expect(
+      after
+        .replace(lookup, '')
+        .replace(', p_id uuid default null )', ' )')
+        .replace('insert into public.bills ( id, user_id,', 'insert into public.bills ( user_id,')
+        .replace('values ( coalesce(p_id, gen_random_uuid()), v_user,', 'values ( v_user,'),
     ).toBe(before);
   });
 
@@ -257,8 +280,8 @@ describe('update_loan after every migration', () => {
   const body = () => liveFunction('update_loan').body.replace(/\s+/g, ' ');
 
   it('takes the bill it edits and the whole contract, the optional four last', () => {
-    // Recreated by the payoffs migration, then the month-end one, with the same signature.
-    expect(live.file).toBe('20261013300001_month_end_anchor.sql');
+    // Recreated by the payoffs, month-end and loan-ids migrations, with the same signature.
+    expect(live.file).toBe(LOAN_IDS);
     expect(live.types).toEqual([
       'uuid',
       'text',
@@ -328,11 +351,24 @@ describe('update_loan after every migration', () => {
     expect(after.replace(' anchor_day = v_day,', '')).toBe(before);
   });
 
+  it('changes in the loan-ids migration only by holding the day it is given to one either side of the person’s own', () => {
+    const before = functionIn('20261013300001_month_end_anchor.sql', 'update_loan');
+    const after = functionIn(LOAN_IDS, 'update_loan');
+    expect(after.replace(' v_profile_today date;', '').replace(TODAY_AFTER, TODAY_BEFORE)).toBe(
+      before,
+    );
+  });
+
   it('leaves save_loan to the migrations that make it', () => {
-    expect(liveSaveLoan().file).toBe('20261013300001_month_end_anchor.sql');
+    expect(liveSaveLoan().file).toBe(LOAN_IDS);
     expect(sql('20261012100002_update_loan.sql')).not.toMatch(/function public\.save_loan/i);
   });
 });
+
+/** The day a loan function works on, before and after the loan-ids migration. */
+const TODAY_BEFORE = 'v_today := coalesce(p_today, (now() at time zone v_tz)::date);';
+const TODAY_AFTER =
+  "v_profile_today := public.person_today(v_user); v_today := least(greatest(coalesce(p_today, v_profile_today), v_profile_today - 1), v_profile_today + 1); begin perform now() at time zone v_tz; exception when invalid_parameter_value then v_tz := 'UTC'; end;";
 
 /** A function's text in one file, comments out, whitespace as single spaces. */
 function functionIn(file: string, name: string): string {
@@ -365,21 +401,58 @@ describe('loan payoffs after every migration', () => {
   });
 
   it.each([
-    ['record_loan_payoff', ['uuid', 'date', 'numeric', 'text', 'uuid', 'uuid', 'date', 'date']],
-    ['delete_loan_payoff', ['uuid', 'date']],
-  ])('%s runs as the caller, for signed-in callers only, by its own signature', (name, types) => {
-    const live = liveSignature(name);
-    expect(live.file).toBe(FILE);
-    expect(live.types).toEqual(types);
-    expect(functionIn(FILE, name)).toContain('security invoker set search_path = public');
-    expect(functionIn(FILE, name)).not.toContain('security definer');
-    const signature = types.join(', ');
-    expect(text()).toContain(
-      `revoke all on function public.${name}(${signature}) from public, anon;`,
+    [
+      'record_loan_payoff',
+      LOAN_IDS,
+      ['uuid', 'date', 'numeric', 'text', 'uuid', 'uuid', 'date', 'date', 'uuid'],
+    ],
+    ['delete_loan_payoff', FILE, ['uuid', 'date']],
+  ])(
+    '%s runs as the caller, for signed-in callers only, by its own signature',
+    (name, file, types) => {
+      const live = liveSignature(name);
+      expect(live.file).toBe(file);
+      expect(live.types).toEqual(types);
+      expect(functionIn(file, name)).toContain('security invoker set search_path = public');
+      expect(functionIn(file, name)).not.toContain('security definer');
+      const signature = types.join(', ');
+      const own = sql(file).replace(/\s+/g, ' ');
+      expect(own).toContain(
+        `revoke all on function public.${name}(${signature}) from public, anon;`,
+      );
+      expect(own).toContain(
+        `grant execute on function public.${name}(${signature}) to authenticated;`,
+      );
+    },
+  );
+
+  it('drops the record_loan_payoff it replaces and adds the app’s own id last', () => {
+    expect(sql(LOAN_IDS).replace(/\s+/g, ' ')).toContain(
+      'drop function if exists public.record_loan_payoff(uuid, date, numeric, text, uuid, uuid, date, date);',
     );
-    expect(text()).toContain(
-      `grant execute on function public.${name}(${signature}) to authenticated;`,
+    expect(liveSignature('record_loan_payoff').parameters.split(',').at(-1)?.trim()).toMatch(
+      /^p_id\s+uuid\s+default null$/i,
     );
+  });
+
+  it('changes record_loan_payoff in the loan-ids migration only by the app’s own id and the held day', () => {
+    const before = functionIn(FILE, 'record_loan_payoff');
+    const after = functionIn(LOAN_IDS, 'record_loan_payoff');
+    const lookup =
+      'if p_id is not null then select * into v_payoff from public.loan_payoffs where id = p_id and user_id = v_user; if found then return v_payoff; end if; end if; ';
+    expect(after).toContain(lookup);
+    expect(
+      after
+        .replace(lookup, '')
+        .replace(', p_id uuid default null )', ' )')
+        .replace(' v_profile_today date;', '')
+        .replace(TODAY_AFTER, TODAY_BEFORE)
+        .replace(
+          'insert into public.loan_payoffs ( id, user_id,',
+          'insert into public.loan_payoffs ( user_id,',
+        )
+        .replace('values ( coalesce(p_id, gen_random_uuid()), v_user,', 'values ( v_user,'),
+    ).toBe(before);
   });
 
   it('lets a full payoff take its payment day, never a day before a payment made', () => {
@@ -454,7 +527,7 @@ describe('update_loan_and_charges after every migration', () => {
   });
 
   it('leaves update_loan to the migrations that make it', () => {
-    expect(liveSignature('update_loan').file).toBe('20261013300001_month_end_anchor.sql');
+    expect(liveSignature('update_loan').file).toBe(LOAN_IDS);
     expect(sql(FILE)).not.toMatch(/function public\.update_loan\(/i);
   });
 });

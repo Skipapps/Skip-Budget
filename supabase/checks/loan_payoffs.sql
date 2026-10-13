@@ -11,6 +11,12 @@
 \set ON_ERROR_STOP on
 begin;
 
+-- Each case is set on its own day (p_today). update_loan and record_loan_payoff hold that day to
+-- within one of person_today; in this transaction person_today knows no day, so each case's day
+-- stands as given. supabase/checks/loan_ids.sql checks the hold itself, on the real day.
+create or replace function public.person_today(p_user uuid) returns date
+language sql stable as $$ select null::date $$;
+
 -- e1 pays; e3 is someone else, whose loan, card and account e1 must not reach.
 insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-0000000000e1', 'loan-payoffs@test.local'),
@@ -193,7 +199,7 @@ select pg_temp.check(
            and not has_function_privilege('public', f, 'execute')),
   'signed-in people may call each, signed-out ones may not')
 from unnest(array[
-  'public.record_loan_payoff(uuid,date,numeric,text,uuid,uuid,date,date)',
+  'public.record_loan_payoff(uuid,date,numeric,text,uuid,uuid,date,date,uuid)',
   'public.delete_loan_payoff(uuid,date)',
   'public.update_loan(uuid,text,text,numeric,numeric,integer,numeric,numeric,date,date,text,uuid,uuid,boolean,integer,jsonb,date,date)'
 ]) f;
@@ -203,8 +209,8 @@ select pg_temp.check(
      join information_schema.routines r on r.specific_name = p.specific_name
     where r.routine_schema = 'public' and r.routine_name = 'record_loan_payoff')
   = array['p_bill_id', 'p_paid_on', 'p_amount', 'p_kind', 'p_card_id', 'p_bank_account_id',
-          'p_last_payment_on=NULL::date', 'p_today=NULL::date'],
-  'record_loan_payoff''s parameters, in the order the app names them');
+          'p_last_payment_on=NULL::date', 'p_today=NULL::date', 'p_id=NULL::uuid'],
+  'record_loan_payoff''s parameters, in the order the app names them, the app''s own id last');
 select pg_temp.check(
   (select array_agg(p.parameter_name::text || coalesce('=' || p.parameter_default, '') order by p.ordinal_position)
      from information_schema.parameters p
@@ -232,9 +238,11 @@ select pg_temp.check(
           and p.counted and p.bill_ends_on_before = '2028-12-27' and p.bill_next_due_on_before is null
      from public.loan_payoffs p where p.id = (select id from first_partial)),
   'a partial payoff is stored as paid, from its own account, counted, with the end it replaced');
+-- Its next date was still October's, already charged, as the sweep had not run; the bill's update
+-- moves it on to November's, as the sweep would (the next-due floor, 20261013600005).
 select pg_temp.check(
-  pg_temp.dates('Partial') = '2026-10-12 2026-10-27 2028-05-27',
-  'it ends the bill on the schedule''s new last payment, its next payment unchanged');
+  pg_temp.dates('Partial') = '2026-10-12 2026-11-27 2028-05-27',
+  'it ends the bill on the schedule''s new last payment; its next payment is the one after October''s charge');
 select pg_temp.check(
   pg_temp.would_record('Partial', '2029-12-31') like '2026-11-27 % 2028-05-27',
   'so the instalments the loan no longer has are never charged');
@@ -290,7 +298,10 @@ update public.profiles set timezone = 'UTC' where id = '00000000-0000-0000-0000-
 select pg_temp.as_user('e1');
 
 -- ---------------------------------------------------------------- full payoffs
--- Charged January to October, paid off on 3 Nov.
+-- Charged January to October, paid off on 3 Nov. These loans keep January's next date while their
+-- months are charged, as no sweep runs here; the first write to the bill moves it on to the month
+-- after the newest charge, as the sweep would (the next-due floor, 20261013600005). Nothing reads
+-- a next date past the bill's end as due.
 select pg_temp.save_on('Full', '2026-01-27', 24, '2026-01-20');
 select pg_temp.charge('Full', ('2026-01-27'::date + make_interval(months => m))::date) from generate_series(0, 9) m;
 select pg_temp.check(pg_temp.would_record('Full', '2026-11-27') = '2026-11-27', 'before: November is still to be charged');
@@ -298,7 +309,7 @@ update v set before = pg_temp.version('Full');
 create temp table full_id as select pg_temp.pay('Full', '2026-11-03', 8900.12, 'full', '2026-11-03', '2026-11-03') as id;
 grant select on full_id to authenticated;
 select pg_temp.check(
-  pg_temp.dates('Full') = '2026-01-27 2026-01-27 2026-11-03'
+  pg_temp.dates('Full') = '2026-01-27 2026-11-27 2026-11-03'
   and (select before from v) <> pg_temp.version('Full'),
   'a full payoff ends the bill on its date');
 select pg_temp.check(
@@ -352,7 +363,7 @@ select pg_temp.save_on('Payment day', '2026-01-27', 24, '2026-01-20');
 select pg_temp.charge('Payment day', ('2026-01-27'::date + make_interval(months => m))::date) from generate_series(0, 9) m;
 select pg_temp.pay('Payment day', '2026-10-27', 9000, 'full', '2026-11-03');
 select pg_temp.check(
-  pg_temp.dates('Payment day') = '2026-01-27 2026-01-27 2026-10-27'
+  pg_temp.dates('Payment day') = '2026-01-27 2026-11-27 2026-10-27'
   and pg_temp.would_record('Payment day', '2027-12-31') = '-'
   and (select count(*) = 1 from public.charges
         where bill_id = (pg_temp.bill('Payment day')).id and charged_on = '2026-10-27'),
@@ -514,7 +525,7 @@ select pg_temp.as_user('e1');
 update v set before = pg_temp.version('Full');
 select pg_temp.check((select public.delete_loan_payoff((select id from full_id))), 'removing a payoff says it did');
 select pg_temp.check(
-  pg_temp.dates('Full') = '2026-01-27 2026-01-27 2027-12-27'
+  pg_temp.dates('Full') = '2026-01-27 2026-11-27 2027-12-27'
   and pg_temp.would_record('Full', '2026-11-27') = '2026-11-27'
   and (select before from v) <> pg_temp.version('Full')
   and pg_temp.payoffs_of('Full') = '-',
@@ -526,9 +537,9 @@ create temp table refull as select pg_temp.pay('Full', '2026-11-03', 8900.12, 'f
 grant select on refull to authenticated;
 select pg_temp.expect_error($s$select public.delete_loan_payoff((select id from refull), '2028-01-28')$s$,
   'P0001', 'the last payment must fall within the term');
-select pg_temp.check(pg_temp.dates('Full') = '2026-01-27 2026-01-27 2026-11-03', 'a refused removal keeps the payoff');
+select pg_temp.check(pg_temp.dates('Full') = '2026-01-27 2026-11-27 2026-11-03', 'a refused removal keeps the payoff');
 select public.delete_loan_payoff((select id from refull), '2027-11-27');
-select pg_temp.check(pg_temp.dates('Full') = '2026-01-27 2026-01-27 2027-11-27',
+select pg_temp.check(pg_temp.dates('Full') = '2026-01-27 2026-11-27 2027-11-27',
   'with the last payment the app sends, the bill ends there');
 
 select public.delete_loan_payoff((select id from before_first));
@@ -553,7 +564,7 @@ select pg_temp.check(
 select public.delete_loan_payoff((select id from public.loan_payoffs where paid_on = '2026-11-10'), '2028-05-27');
 select public.delete_loan_payoff((select id from first_partial), '2028-12-27');
 select pg_temp.check(
-  pg_temp.dates('Partial') = '2026-10-12 2026-10-27 2028-12-27' and pg_temp.payoffs_of('Partial') = '-',
+  pg_temp.dates('Partial') = '2026-10-12 2026-11-27 2028-12-27' and pg_temp.payoffs_of('Partial') = '-',
   'removed latest first, each ends the bill where the app says the others leave it');
 
 -- Added late (20 May), charged in May and June, a partial payoff on 1 Jun, then stopped early by

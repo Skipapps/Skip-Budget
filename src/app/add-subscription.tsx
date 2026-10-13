@@ -12,13 +12,8 @@ import {
 } from '@/api/reminders';
 import { guessCategory, useSpendCategories } from '@/api/brands';
 import { buildSubscriptionValues, withSavedSource, type SavedSource } from '@/api/entry-values';
-import {
-  useCreateSubscription,
-  useDeleteSubscription,
-  useStopSubscription,
-  useUpdateSubscription,
-} from '@/api/mutations';
-import { usePastCharges, type PastRead } from '@/api/past-charges';
+import { useCreateSubscription, useDeleteSubscription, useStopSubscription } from '@/api/mutations';
+import { usePastCharges, useUpdatePlanAndCharges, type PastRead } from '@/api/past-charges';
 import { usePaymentLabels } from '@/api/payment-labels';
 import { usePaymentSources, useSubscription } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
@@ -41,6 +36,8 @@ import { SourceTiles } from '@/components/ui/source-tiles';
 import { FieldLabel } from '@/components/ui/typography';
 import { useToast } from '@/providers/toast-context';
 import { t, type MessageKey } from '@/i18n';
+import { keptFrom, keptFromDate } from '@/lib/allowance';
+import { toIsoDate } from '@/lib/date';
 import { logoColumns } from '@/lib/logo-columns';
 import { useToday } from '@/lib/use-today';
 import { TEXT_CAP } from '@/theme/text-scale';
@@ -278,7 +275,7 @@ function SubscriptionForm({
   // Outlives the review page while a row's own page is open, so coming back lands where it was.
   const [reviewY, setReviewY] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const { todayDate } = useToday();
+  const { today, todayDate } = useToday();
 
   // New spending takes only what the plan offers; an edit also shows, and keeps, the card or
   // account the subscription is already paid with, though the plan has locked it since.
@@ -288,13 +285,10 @@ function SubscriptionForm({
   const { data: categories = [] } = useSpendCategories();
 
   const createSubscription = useCreateSubscription();
-  const updateSubscription = useUpdateSubscription();
+  const updatePlan = useUpdatePlanAndCharges('subscription');
   const pastCharges = usePastCharges('subscription', id);
   // While the charges are read before a save or a delete: the buttons wait.
   const [readingPast, setReadingPast] = useState(false);
-  // Set once the subscription took an edit whose past charges failed to follow: it then matches the
-  // form, so the question would not come up again and the next Save must redo the rewrite itself.
-  const [rewritePending, setRewritePending] = useState(false);
   // A new subscription's row id for this visit, so a Save repeated after a lost answer finds the row
   // the first may have filed instead of filing a second (`insertOnce`).
   const [newId] = useState(() => randomUUID());
@@ -373,6 +367,12 @@ function SubscriptionForm({
       fail(t('subscriptions.add.missing', { fields: missing.join(', ') }));
       return;
     }
+    // A day heard by voice arrives without the calendar. Only a new subscription: a saved one keeps
+    // the renewal day it has.
+    if (!editing && renewsOn && toIsoDate(renewsOn) < keptFrom(today)) {
+      fail(t('receipts.add.dateTooOld'));
+      return;
+    }
 
     // Read before anything is built or asked: the values count on from the newest charge, and the
     // question counts them.
@@ -412,20 +412,14 @@ function SubscriptionForm({
           (carried.card_id ?? carried.bank_account_id ?? '') !== (initial.sourceId ?? ''));
 
       // Asked before anything is written, so backing out leaves it as it was.
-      const scope = rewritePending ? 'all' : await pastCharges.choose(carried.label, changed, past);
+      const scope = await pastCharges.choose(carried.label, changed, past);
       if (scope === null) return;
 
       const writtenId = editing && id ? id : filedId;
       const subscriptionId = writtenId
-        ? (await updateSubscription.mutateAsync({ id: writtenId, values }), writtenId)
+        ? (await updatePlan.mutateAsync({ id: writtenId, values, past: scope }), writtenId)
         : (await createSubscription.mutateAsync({ ...values, id: newId })).id;
       if (!editing) setFiledId(subscriptionId);
-
-      if (scope === 'all') {
-        setRewritePending(true);
-        await pastCharges.apply(carried);
-        setRewritePending(false);
-      }
 
       // After the row exists, because a reminder points at one. Untouched while the saved one is
       // unknown: the form's 'off' is then a guess, and writing it deletes the reminder.
@@ -478,7 +472,7 @@ function SubscriptionForm({
     }
   };
 
-  const saving = createSubscription.isPending || updateSubscription.isPending || pastCharges.saving;
+  const saving = createSubscription.isPending || updatePlan.isPending;
   // Reading the charges only holds the buttons: nothing is being saved or deleted yet.
   const busy = saving || readingPast;
   const deleting = deleteSubscription.isPending || stopSubscription.isPending;
@@ -617,6 +611,7 @@ function SubscriptionForm({
           value={renewsOn}
           today={todayDate}
           placeholder={t('subscriptions.add.pickDay')}
+          minDate={keptFromDate(today)}
           onChange={(day) => {
             setError(null);
             setRenewsOn(day);

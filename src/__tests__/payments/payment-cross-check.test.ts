@@ -209,6 +209,7 @@ const BILLS: BillRow[] = [
     recurrence: 'period',
     next_due_on: '2024-11-04',
     starts_on: '2024-11-04',
+    ends_on: '2024-11-04',
   }),
 ];
 
@@ -811,27 +812,38 @@ describe('a bill on the 31st through February and April, in 2027 and leap 2028',
   });
 
   // Last swept on a shortened due day, which is not rolled past until the day after; opened on the
-  // next due day before the sweep. The month page counts what the sweep will write; history waits.
+  // next due day before the sweep. The ledger counts a due today before the sweep writes it, so the
+  // month page and history agree on the day, and again once it is written.
   it.each([
     { sweptOn: '2027-02-28', today: '2027-03-31' },
     { sweptOn: '2028-02-29', today: '2028-03-31' },
     { sweptOn: '2027-04-30', today: '2027-05-31' },
     { sweptOn: '2028-04-30', today: '2028-05-31' },
-  ])('swept $sweptOn, opened $today: the only gap is $today, then none', ({ sweptOn, today }) => {
-    const unswept = rentAccount(sweptOn, sweptOn);
-    expect(datesOf(billMonth(unswept, today.slice(0, 7), today))).toEqual([today]);
-    expect(
-      differences(monthPageByMonth(unswept, 'bill', today), historyByMonth(unswept, 'bill', today)),
-    ).toEqual({ [today.slice(0, 7)]: 123456 });
+  ])(
+    'swept $sweptOn, opened $today: $today counts once, before the sweep and after',
+    ({ sweptOn, today }) => {
+      const unswept = rentAccount(sweptOn, sweptOn);
+      expect(datesOf(billMonth(unswept, today.slice(0, 7), today))).toEqual([today]);
+      expect(
+        differences(
+          monthPageByMonth(unswept, 'bill', today),
+          historyByMonth(unswept, 'bill', today),
+        ),
+      ).toEqual({});
+      expect(historyByMonth(unswept, 'bill', today).get(today.slice(0, 7))).toBe(123456);
 
-    const swept = rentAccount(sweptOn, today);
-    expect(
-      differences(monthPageByMonth(swept, 'bill', today), historyByMonth(swept, 'bill', today)),
-    ).toEqual({});
-    expect(
-      differences(monthPageByMonth(swept, 'bill', today), monthPageByMonth(unswept, 'bill', today)),
-    ).toEqual({});
-  });
+      const swept = rentAccount(sweptOn, today);
+      expect(
+        differences(monthPageByMonth(swept, 'bill', today), historyByMonth(swept, 'bill', today)),
+      ).toEqual({});
+      expect(
+        differences(
+          monthPageByMonth(swept, 'bill', today),
+          monthPageByMonth(unswept, 'bill', today),
+        ),
+      ).toEqual({});
+    },
+  );
 
   function datesOf(month: ReturnType<typeof billMonth>): string[] {
     return month.rows.flatMap((row) => row.occurrences.map((o) => o.date));

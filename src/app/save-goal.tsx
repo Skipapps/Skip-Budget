@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
@@ -137,6 +138,9 @@ function GoalForm({
   const ask = useDialog();
   const save = useSaveGoal();
   const remove = useDeleteGoal();
+  // A new goal's row id for this visit, so a Save repeated after a lost answer finds the goal the
+  // first may have made instead of making a second.
+  const [newId] = useState(() => randomUUID());
 
   const [name, setName] = useState(goal?.name ?? '');
   // No type until the person picks one, as on the app's other final pages.
@@ -176,6 +180,7 @@ function GoalForm({
     try {
       await save.mutateAsync({
         id: goal?.id ?? null,
+        ...(goal ? {} : { newId }),
         values: {
           name: name.trim(),
           icon_id: type,

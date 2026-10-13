@@ -41,6 +41,7 @@ import { usePastChoice, type PastDelete } from '@/components/ui/past-choice';
 import { RefreshNote } from '@/components/ui/refresh-note';
 import { type SalarySource } from '@/data/salary';
 import { t } from '@/i18n';
+import { keptFromDate } from '@/lib/allowance';
 import {
   PAY_FREQUENCIES,
   formatFullDate,
@@ -855,6 +856,7 @@ function SalaryEditor({
                         <View className="w-full pb-4">
                           <InlineCalendar
                             value={asDate(source.lastPayday)}
+                            minDate={keptFromDate(today)}
                             onChange={(date) => {
                               update(source.id, { lastPayday: toIsoDate(date) });
                               setOpen(null);

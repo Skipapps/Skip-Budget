@@ -150,7 +150,16 @@ export type GoalValues = {
 export function useSaveGoal() {
   const invalidate = useInvalidateSavings();
   return useMutation({
-    mutationFn: async ({ id, values }: { id?: string | null; values: GoalValues }) => {
+    mutationFn: async ({
+      id,
+      newId,
+      values,
+    }: {
+      id?: string | null;
+      /** The visit's own id for a new goal: saving again after a lost answer creates it once. */
+      newId?: string | null;
+      values: GoalValues;
+    }) => {
       const { data, error } = await supabase.rpc('save_goal', {
         p_id: id ?? null,
         p_name: values.name.trim(),
@@ -158,6 +167,7 @@ export function useSaveGoal() {
         p_target: moneyArg(values.target),
         p_target_date: values.target_date,
         p_start_amount: moneyArg(values.start_amount),
+        ...(newId && !id ? { p_new_id: newId } : {}),
       });
       if (error) throw error;
       return { id: data as string };

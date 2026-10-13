@@ -6,8 +6,9 @@ import { useKeepSchedulesCurrent } from '@/api/refresh';
 
 /**
  * The phone's roller moves a stored date that has passed onto the plan's anchor day, not onto the
- * day a short month left it on, and writes only the date: the database keeps the anchor. A database
- * without the column rolls from the stored day, as before.
+ * day a short month left it on, and writes only the date: the database keeps the anchor. A set
+ * period rolls monthly, as the server's roller does. A database without the column rolls from the
+ * stored day, as before.
  */
 
 type Row = Record<string, unknown>;
@@ -98,6 +99,7 @@ beforeEach(() => {
       // Rolled into April on the anchor day's clamp; due again on the 31st.
       { id: 'rent', next_due_on: '2027-04-30', recurrence: 'monthly', anchor_day: 31 },
       { id: 'gym', next_due_on: '2027-05-07', recurrence: 'weekly', anchor_day: 7 },
+      { id: 'course', next_due_on: '2027-04-10', recurrence: 'period', anchor_day: 10 },
     ],
     subscriptions: [
       { id: 'stream', next_renewal_on: '2027-02-28', cycle: 'monthly', anchor_day: 30 },
@@ -121,8 +123,9 @@ const written = () =>
 
 it('rolls a bill stored on 30 Apr with anchor 31 to 31 May, writing only the date', async () => {
   await renderHook(() => useKeepSchedulesCurrent(), { wrapper });
-  await waitFor(() => expect(mockDb.updates).toHaveLength(4));
+  await waitFor(() => expect(mockDb.updates).toHaveLength(5));
   expect(written()).toEqual([
+    'bills course {"next_due_on":"2027-06-10"}',
     'bills gym {"next_due_on":"2027-05-21"}',
     'bills rent {"next_due_on":"2027-05-31"}',
     'subscriptions insurance {"next_renewal_on":"2027-07-31"}',
@@ -133,8 +136,9 @@ it('rolls a bill stored on 30 Apr with anchor 31 to 31 May, writing only the dat
 it('on a database without the column, rolls from the stored day as before', async () => {
   mockDb.hasAnchorDay = false;
   await renderHook(() => useKeepSchedulesCurrent(), { wrapper });
-  await waitFor(() => expect(mockDb.updates).toHaveLength(4));
+  await waitFor(() => expect(mockDb.updates).toHaveLength(5));
   expect(written()).toEqual([
+    'bills course {"next_due_on":"2027-06-10"}',
     'bills gym {"next_due_on":"2027-05-21"}',
     'bills rent {"next_due_on":"2027-05-30"}',
     'subscriptions insurance {"next_renewal_on":"2027-07-30"}',

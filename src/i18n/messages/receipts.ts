@@ -47,6 +47,12 @@ export const receiptsMessages = defineMessages({
     es: 'Para guardar el recibo, completa: {fields}.',
     fr: 'Pour enregistrer le reçu, remplis : {fields}.',
   },
+  // The database's own refusal, word for word: anything older is deleted that night.
+  'receipts.add.dateTooOld': {
+    en: 'Pick a day in the last seven years.',
+    es: 'Elige un día de los últimos siete años.',
+    fr: 'Choisis un jour des sept dernières années.',
+  },
   'receipts.add.saving': { en: 'Saving…', es: 'Guardando…', fr: 'Enregistrement…' },
   'receipts.add.saveChanges': {
     en: 'Save changes',

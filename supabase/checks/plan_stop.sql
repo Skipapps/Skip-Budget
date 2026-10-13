@@ -78,9 +78,15 @@ select pg_temp.add_bill('Due in 3 days, running', pg_temp.today() - 10, pg_temp.
 select pg_temp.add_bill('Ended 20 days ago, stopped', pg_temp.today() - 30, pg_temp.today() - 5, pg_temp.today() - 20);
 select pg_temp.add_bill('Due 5 days ago, running', pg_temp.today() - 30, pg_temp.today() - 5);
 -- Counting from after today (an edit moved its start past the cycle already charged): it stops
--- with no next date.
+-- with no next date. Running, its next date is the first one on or after its start, never the
+-- day picked before it (20261013600005).
 select pg_temp.add_bill('Counts from later, stopped', pg_temp.today() + 20, pg_temp.today() + 3);
 select pg_temp.add_bill('Counts from later, running', pg_temp.today() + 20, pg_temp.today() + 3);
+select pg_temp.check(
+  (pg_temp.bill('Counts from later, running')).next_due_on
+  = (select min(d) from public.plan_occurrences(pg_temp.today() + 3, 'monthly', pg_temp.today() + 20,
+                                                 pg_temp.today() + 400, extract(day from pg_temp.today() + 3)::integer) d),
+  'set up: a running bill counting from after today is next due on its first date from then on');
 
 -- Loans as saved: one paying since 20 days ago, one added before its first payment.
 select set_config('role', 'authenticated', true);
@@ -174,10 +180,10 @@ create temp table reminded as
 
 select pg_temp.check(
   (select array_agg(title order by title) from reminded)
-  = array['Counts from later, running', 'Due 5 days ago, running', 'Due in 3 days, running',
+  = array['Due 5 days ago, running', 'Due in 3 days, running',
           'Due today, running', 'Due today, stopped', 'Loan not started, running',
           'Loan paying, running', 'Renewed 5 days ago, active', 'Renews in 3 days, active'],
-  'reminded: every running plan, and a stopped bill only for the payment due on its stop day');
+  'reminded: every running plan due within the month, and a stopped bill only for the payment due on its stop day');
 select pg_temp.check(
   not exists (select 1 from reminded where title in (
     'Due in 3 days, stopped', 'Ended 20 days ago, stopped', 'Counts from later, stopped',

@@ -137,6 +137,7 @@ jest.mock('@/api/past-charges', () => ({
     apply: jest.fn(),
     retry: jest.fn(),
   }),
+  useUpdatePlanAndCharges: () => ({ mutateAsync: mockUpdate, isPending: false }),
 }));
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 jest.mock('@/api/push', () => ({ enableReminders: jest.fn() }));
@@ -175,11 +176,9 @@ jest.mock('@/api/mutations', () => ({
   useUpdateReceipt: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteReceipt: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useCreateBill: () => mutation(),
-  useUpdateBill: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useStopBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useCreateSubscription: () => mutation(),
-  useUpdateSubscription: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useStopSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));

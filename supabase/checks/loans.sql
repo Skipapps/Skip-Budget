@@ -81,9 +81,9 @@ select pg_temp.check(
      from pg_proc p where p.proname = 'save_loan' and p.pronamespace = 'public'::regnamespace),
   'save_loan runs as the caller, on search_path public, owned by postgres, as before');
 select pg_temp.check(
-  has_function_privilege('authenticated', 'public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date,boolean,integer,date)', 'execute')
-  and not has_function_privilege('anon', 'public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date,boolean,integer,date)', 'execute')
-  and not has_function_privilege('public', 'public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date,boolean,integer,date)', 'execute'),
+  has_function_privilege('authenticated', 'public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date,boolean,integer,date,uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date,boolean,integer,date,uuid)', 'execute')
+  and not has_function_privilege('public', 'public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date,boolean,integer,date,uuid)', 'execute'),
   'signed-in people may call it, signed-out ones may not');
 select pg_temp.check(
   to_regprocedure('public.save_loan(text,text,numeric,numeric,integer,numeric,numeric,date,public.bill_recurrence,uuid,uuid,date,text,date,numeric,jsonb,date)') is null,
@@ -97,8 +97,8 @@ select pg_temp.check(
           'p_monthly_payment', 'p_total_interest', 'p_first_payment_on', 'p_recurrence',
           'p_card_id', 'p_bank_account_id', 'p_funded_on', 'p_day_count_basis', 'p_statement_on',
           'p_statement_principal', 'p_payment_overrides', 'p_last_payment_on', 'p_in_spending',
-          'p_payment_day', 'p_counts_from'],
-  'every earlier parameter keeps its name and place; the three new ones come last');
+          'p_payment_day', 'p_counts_from', 'p_id'],
+  'every earlier parameter keeps its name and place; the newer ones come last, the app''s own id last of all');
 select pg_temp.check(
   (select count(*) = 3 from information_schema.parameters p
      join information_schema.routines r on r.specific_name = p.specific_name

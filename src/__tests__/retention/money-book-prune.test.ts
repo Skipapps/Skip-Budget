@@ -334,9 +334,9 @@ describe('the prune and the money book', () => {
     expect(CUTOFF).toBe('2026-11-15');
     expect(sevenYearsBefore('2035-02-28')).toBe('2028-02-28');
     expect(sevenYearsBefore('2035-03-01')).toBe('2028-03-01');
-    // Never later than the app's own floor, which rolls 29 February on to 1 March.
+    // The app's own floor is the same day.
     expect(sevenYearsBefore('2028-02-29')).toBe('2021-02-28');
-    expect(historyFloor(true, new Date('2028-02-29T00:00:00'))).toBe('2021-03-01');
+    expect(historyFloor(true, new Date('2028-02-29T00:00:00'))).toBe('2021-02-28');
   });
 
   it('reads these balances before the prune', () => {

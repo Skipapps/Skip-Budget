@@ -1,7 +1,6 @@
 import {
   billWindow,
   cycleStart,
-  dayAfter,
   occurrencesInRange,
   planFloor,
   type Recurrence,
@@ -70,13 +69,12 @@ function nextCycleStart(date: string, recurrence: Recurrence): string {
       return at(new Date(Date.UTC(year, month - 1, day + 7 - monday)));
     }
     case 'monthly':
+    case 'period':
       return at(new Date(Date.UTC(year, month, 1)));
     case 'quarterly':
       return at(new Date(Date.UTC(year, (Math.floor((month - 1) / 3) + 1) * 3, 1)));
     case 'yearly':
       return at(new Date(Date.UTC(year + 1, 0, 1)));
-    default:
-      return dayAfter(date);
   }
 }
 

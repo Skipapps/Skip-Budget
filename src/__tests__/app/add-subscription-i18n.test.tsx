@@ -118,6 +118,7 @@ jest.mock('@/api/past-charges', () => ({
       retry: jest.fn(),
     };
   },
+  useUpdatePlanAndCharges: () => ({ mutateAsync: mockUpdate, isPending: false }),
 }));
 
 // The real chips and wording; only the two hooks that read and write the reminder are replaced.
@@ -170,7 +171,6 @@ const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
 jest.mock('@/api/mutations', () => ({
   useCreateSubscription: () => ({ mutateAsync: mockCreate, isPending: false }),
-  useUpdateSubscription: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useStopSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));

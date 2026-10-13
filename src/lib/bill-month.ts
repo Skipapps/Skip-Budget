@@ -12,7 +12,7 @@ import {
   planKey,
   type Recurrence,
 } from '@/lib/card-ledger';
-import { cycleStart } from '@/lib/charges';
+import { cycleStart, floorAfterCharges } from '@/lib/charges';
 import { billPageHref, isLoanBill } from '@/lib/ledger-link';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { fromCents, toCents } from '@/lib/money';
@@ -100,17 +100,22 @@ export type PlanSchedule = {
   startsOn?: string | null;
   createdAt?: string | null;
   endsOn?: string | null;
+  /** The newest charge's day, when it has one. */
+  lastCharged?: string | null;
 };
 
 /**
  * The first date after today that a plan is due on, inside its running window (`billWindow`, the
- * ledger's own), or null. The ledger projects from the same day after today, so the two agree.
+ * ledger's own), or null. Nothing is due again in a cycle already charged, whatever day the plan
+ * now names in it: the floor is the cycle after the newest charge, as the database floors the
+ * stored date. A set period keeps its own start, so its start alone does not.
  */
 export function nextDueAfter(plan: PlanSchedule, today: string): string | null {
   if (!plan.anchor) return null;
+  const tomorrow = dayAfter(today);
   const window = billWindow(
     { starts_on: plan.startsOn, ends_on: plan.endsOn, created_at: plan.createdAt },
-    dayAfter(today),
+    plan.lastCharged ? floorAfterCharges(tomorrow, plan.lastCharged, plan.recurrence) : tomorrow,
     addDays(today, LOOK_AHEAD_DAYS),
   );
   if (window.from && window.from > window.to) return null;
@@ -376,8 +381,13 @@ function shown({ cents, ...rest }: Occurrence): MonthOccurrence {
 }
 
 /** A running plan with nothing due in the month: its next date after today, else its end. */
-function notDueStatus(plan: Plan, month: string, today: string): MonthStatus {
-  const next = nextDueAfter(plan.schedule, today);
+function notDueStatus(
+  plan: Plan,
+  month: string,
+  today: string,
+  lastCharged: string | undefined,
+): MonthStatus {
+  const next = nextDueAfter({ ...plan.schedule, lastCharged }, today);
   if (next) return { kind: 'next', date: next, inMonth: monthOf(next) === month };
   return plan.stoppedOn ? { kind: 'ends', date: plan.stoppedOn } : { kind: 'none' };
 }
@@ -505,7 +515,11 @@ export function planMonth(input: PlanMonthInput): PlanMonth {
           : { kind: 'paid' },
       });
     } else if (plan.running) {
-      notDue.push({ ...row, editHref: plan.editHref, status: notDueStatus(plan, month, today) });
+      notDue.push({
+        ...row,
+        editHref: plan.editHref,
+        status: notDueStatus(plan, month, today, lastCharged.get(plan.key)),
+      });
     }
   }
 

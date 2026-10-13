@@ -55,6 +55,7 @@ import type { HabitColor } from '@/data/habit-colors';
 import { useDialog, useConfirm } from '@/providers/dialog-provider';
 import { useToast } from '@/providers/toast-context';
 import { t, type MessageKey } from '@/i18n';
+import { keptFrom, keptFromDate } from '@/lib/allowance';
 import { success, warn } from '@/lib/haptics';
 import { withTap } from '@/lib/press';
 import { formatFullDate, toIsoDate } from '@/lib/date';
@@ -145,6 +146,13 @@ type ReceiptHabit = {
 
 /** 23505: a habit has one receipt a day, and the day this one moved to already has one. */
 const dayTaken = (thrown: unknown) => (thrown as { code?: unknown } | null)?.code === '23505';
+
+/**
+ * SK007: the database's seven-year guard, under a code of its own (22023 is raised for other
+ * reasons too). Its day is the profile's time zone, which can be a day ahead of the phone's, so a
+ * day the form allowed can still be refused.
+ */
+const tooOld = (thrown: unknown) => (thrown as { code?: unknown } | null)?.code === 'SK007';
 
 type ScanParams = {
   scannedStore?: string;
@@ -393,7 +401,7 @@ function ReceiptForm({
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(initialScan);
-  const { todayDate } = useToday();
+  const { today, todayDate } = useToday();
 
   // New spending takes only what the plan offers; an edit also shows, and keeps, the card or
   // account the receipt was paid with, though the plan has locked it since.
@@ -659,8 +667,14 @@ function ReceiptForm({
       fail(t('receipts.add.missing', { fields: missing.join(', ') }));
       return;
     }
-    // Only a move is refused: a receipt already dated earlier can still be edited where it is.
     const day = toIsoDate(date);
+    // A scan or a voice hand-off sets the day without the calendar. Unlike the habit's rule below,
+    // a day left as it was is refused too: the database refuses any write of it.
+    if (day < keptFrom(today)) {
+      fail(t('receipts.add.dateTooOld'));
+      return;
+    }
+    // Only a move is refused: a receipt already dated earlier can still be edited where it is.
     if (habit?.savedFrom && day < habit.savedFrom && day !== toIsoDate(initial.date)) {
       fail(
         t('habits.receipt.startedOn', {
@@ -717,6 +731,10 @@ function ReceiptForm({
     } catch (thrown) {
       if (habit && dayTaken(thrown)) {
         fail(t('habits.receipt.dayTaken', { name: habit.name }));
+        return;
+      }
+      if (tooOld(thrown)) {
+        fail(t('receipts.add.dateTooOld'));
         return;
       }
       warn();
@@ -816,7 +834,11 @@ function ReceiptForm({
         title={t('receipts.field.date')}
         question={t('receipts.add.askDate')}
         value={date}
-        minDate={habit?.savedFrom ? new Date(`${habit.savedFrom}T00:00:00`) : null}
+        minDate={
+          habit?.savedFrom && habit.savedFrom > keptFrom(today)
+            ? new Date(`${habit.savedFrom}T00:00:00`)
+            : keptFromDate(today)
+        }
         onBack={toReview}
         onDone={(day) => {
           if (day) edited(setDate)(day);
