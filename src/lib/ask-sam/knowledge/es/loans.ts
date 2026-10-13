@@ -862,9 +862,10 @@ export const loansEs: IntentText[] = [
       'quitar préstamo repetido',
       'hay 2 préstamos de auto y solo tengo 1',
       'préstamo doble',
+      'toqué guardar préstamo dos veces y salen dos',
     ],
     answer:
-      'Elimina la copia que no necesitas.\n\n1. Ábrela desde **Préstamos** con **Ver detalles**.\n2. Toca **Editar préstamo**.\n3. Baja y toca **Eliminar préstamo**.\n4. Elige **Eliminar todo** (o **Eliminar**, si aún no tiene pagos).\n\n**Eliminar todo** también quita sus pagos de los meses pasados, para que dejen de contarse dos veces en tus gastos. Deja la otra copia como está.\n\nConsejo: si las dos se ven distintas, conserva la que tenga las cifras que coinciden con tu estado de cuenta.',
+      'Tocar **Guardar préstamo** dos veces no crea una copia, así que si hay dos, casi siempre es porque el préstamo se agregó dos veces. Elimina la copia que no necesitas.\n\n1. Ábrela desde **Préstamos** con **Ver detalles**.\n2. Toca **Editar préstamo**.\n3. Baja y toca **Eliminar préstamo**.\n4. Elige **Eliminar todo** (o **Eliminar**, si aún no tiene pagos).\n\n**Eliminar todo** también quita sus pagos de los meses pasados, para que dejen de contarse dos veces en tus gastos. Deja la otra copia como está.\n\nConsejo: si las dos se ven distintas, conserva la que tenga las cifras que coinciden con tu estado de cuenta.',
     keywords: ['duplicado', 'dos veces', 'copia'],
   },
 

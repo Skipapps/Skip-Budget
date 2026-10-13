@@ -1771,8 +1771,8 @@ export const gettingStartedFr: IntentText[] = [
       'Il n’y a pas de visite à part. Skip te guide au fur et à mesure :\n\n' +
       '- Les pages de bienvenue expliquent ce qu’est Skip avant l’inscription.\n' +
       '- **Configurons Skip** et la carte **Premiers pas** sur **Accueil** te guident à travers les cinq étapes de configuration.\n' +
-      '- **Réglages → Assistance et commentaires → Questions fréquentes** contient de courtes réponses.\n\n' +
-      'Et tu peux me demander n’importe quoi, à tout moment.',
+      '- **Questions fréquentes** est une page de réponses courtes. Ouvre-la avec le lien ci-dessous.\n\n' +
+      'Et tu peux me demander n’importe quoi, à tout moment : je suis dans **Réglages → Assistance et commentaires** et en bas de **Réglages**.',
     keywords: ['visite guidée', 'tutoriel', 'guide', 'faq'],
   },
   {

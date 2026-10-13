@@ -9492,3 +9492,26 @@ For the real-lender loan, rows are identical to the statement fixture, maturity 
     - Rebased on unchanged working-tree files (same blob hashes). `git apply --check` OK, and applying it to the base copies reproduces the mirror byte for byte.
     - Mirror: tsc 0, eslint/prettier clean, 56 suites and 1080 tests pass.
   - prettier is clean on `src/__tests__/supabase/habit-and-days-migration.test.ts` in the real tree.
+
+## 2026-10-13 — CEO: Ask Sam kept in step with today's app, FAQ → Ask Sam, accuracy
+- **FAQ → Ask Sam:** in **Settings → Support and feedback**, **Common questions** is now the **Ask Sam** row. The FAQ's button reads **Still stuck? Ask Sam** and opens Sam. The FAQ page stays reachable from Sam's "Is there a list of common questions?" answer.
+- **Answers updated in en/es/fr** to match what's committed:
+  - card pages by month;
+  - Pro opens the feature you wanted;
+  - "One moment…";
+  - fewer false failures;
+  - saving twice never duplicates;
+  - "Couldn't read this receipt";
+  - Delete account's new steps;
+  - the Pro page's honest list (no priority support or early access);
+  - extra cards and accounts after Pro ends;
+  - the double tap on Add bill / Add loan;
+  - the month-end rules (from that chat);
+  - Insights v2: 8 answers rewritten, 6 new.
+- **Legal parked:** Sam describes the committed Terms and Privacy and the coffee row. The answers for the new legal text are in `.claude/team/dev/legal-parked/ask-sam-answers.patch`.
+- **Screen names** in "Open {screen} ›" now match the app's own es/fr labels.
+- **Accuracy:**
+  - A fresh blind set of 318 questions (`eval/held-out-fresh.ts`, run with `eval.mjs --fresh`) is now the honest measure.
+  - On it, Sam went from 70.1% to 70.8% right first, and from 85.5% to 86.8% helpful. The old, now-tuned set went from 74.5% to 80.2%, and from 88.9% to 93.0%.
+  - The bigger lever is the matcher (negation, the spelling fixer, stopwords, synonyms): next.
+- **Held until their code lands:** Goals "I spent it" (needs the live migration), bills on the never-duplicate list, and the bills page refresh line, due-date change and specific-period rules.

@@ -1534,9 +1534,10 @@ export const habitsEs: IntentText[] = [
       'mensaje de error al editar un hábito',
       'no me deja guardar el habito',
       'al editar mi habito sale error',
+      'si guardo dos veces, ¿se duplica mi hábito?',
     ],
     answer:
-      'Skip muestra **Algo salió mal. Inténtalo de nuevo.** cuando un guardado o una eliminación no puede comunicarse con tu cuenta, o antes de haber leído cuántos días tiene registrados el hábito (necesita ese número para preguntar por los días anteriores).\n\n1. Revisa tu conexión a internet.\n2. Espera un momento y toca **Guardar cambios** o **Eliminar hábito** otra vez.\n\n**Guardar cambios** está en gris solo mientras un guardado o una eliminación sigue en curso.\n\nSi ves **Para guardar el hábito, completa: ...**, completa primero lo que enumera.',
+      'Si tocas **Guardar cambios** o **Eliminar hábito** antes de que Skip termine de leer el hábito, Skip espera a terminar de leerlo y luego sigue, así que no necesitas tocar otra vez. **Algo salió mal. Inténtalo de nuevo.** significa que el guardado o la eliminación no pudo comunicarse con tu cuenta.\n\n1. Revisa tu conexión a internet.\n2. Toca **Guardar cambios** o **Eliminar hábito** otra vez. Guardar dos veces nunca crea un segundo hábito.\n\n**Guardar cambios** está en gris solo mientras un guardado o una eliminación sigue en curso.\n\nSi ves **Para guardar el hábito, completa: ...**, completa primero lo que enumera.',
     keywords: ['no se guarda', 'error', 'en gris', 'no puedo eliminar'],
   },
 ];

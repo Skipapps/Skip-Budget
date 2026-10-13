@@ -504,7 +504,7 @@ export const homeEs: IntentText[] = [
       'cuánto me queda de mi pago',
     ],
     answer:
-      'Inicio ya no muestra **Te queda este mes**. La tarjeta de arriba ahora es **Saldo actual**: un total acumulado de tu dinero que no se reinicia cada mes y no cuenta los pagos que aún no llegan.\n\nPara las cifras del mes:\n- **A dónde se fue tu dinero** en Inicio muestra las facturas, recibos y suscripciones de este mes.\n- **Actividad → Mes** muestra los **Ingresos** y **Gastos** de este mes, y una de estas dos etiquetas: **Te sobran**, si te queda dinero de más, o **Te faltan**, si te falta.\n- El cuadro **Salario** en **Tarjetas** muestra el pago de este mes.\n- **Ahorros** muestra lo que sobró de cada mes terminado.\n\nQuizá aún veas “Te queda este mes” como ejemplo en la página de Skip Pro para **Análisis**.',
+      'Inicio ya no muestra **Te queda este mes**. La tarjeta de arriba ahora es **Saldo actual**: un total acumulado de tu dinero que no se reinicia cada mes y no cuenta los pagos que aún no llegan.\n\nPara las cifras del mes:\n- **A dónde se fue tu dinero** en Inicio muestra las facturas, recibos y suscripciones de este mes.\n- **Actividad → Mes** muestra los **Ingresos** y **Gastos** de este mes, y una de estas dos etiquetas: **Te sobran**, si te queda dinero de más, o **Te faltan**, si te falta.\n- El cuadro **Salario** en **Tarjetas** muestra el pago de este mes.\n- **Ahorros** muestra lo que sobró de cada mes terminado.\n- **Análisis** (Skip Pro) muestra **Te queda este mes** arriba: el pago de este mes menos lo que ha salido hasta ahora.',
     keywords: ['te queda este mes', 'número de antes', 'presupuesto mensual', 'restante'],
   },
   {
@@ -1163,10 +1163,36 @@ export const homeEs: IntentText[] = [
       'que incluye la pagina de analisis',
       'enumera lo que muestra analisis: categorias, lugares y lo que debo',
       'analisis me muestra mis tiendas y categorias top',
+      '¿Análisis también muestra mis préstamos y metas?',
     ],
     answer:
-      '**Análisis** reúne tu dinero en una sola página. Ábrela desde la tarjeta **Análisis** de Inicio, debajo de **Ve más allá**.\n- **Lo que entra**: tu pago como cifra mensual.\n- **Lo que sale**: tus gastos de esta semana, este mes, este año o desde siempre, con un gráfico y un desglose en **Recibos de compras**, **Facturas** y **Suscripciones**.\n- **A dónde se va**: tus 6 categorías de gasto principales.\n- **Dónde gastas más**: tus 5 lugares principales, con cuántas veces.\n- **Lo que debes**: lo que debe ahora cada tarjeta de crédito.\n- **Próximos**: tus suscripciones por mes y a lo largo de un año.\n\nAnálisis es parte de Skip Pro.',
+      '**Análisis** reúne tu dinero en una sola página. Ábrela desde la tarjeta **Análisis** de Inicio, debajo de **Ve más allá**. De arriba abajo:\n\n' +
+      '- **Te queda este mes**: el pago de este mes menos lo que salió, y cuánto de tus ingresos ya gastaste.\n- **Lo que entra**: tu pago.\n- **Lo que sale**: tus gastos en el mes o el año que elijas, con un gráfico.\n- **A dónde se va**: tus gastos por categoría.\n- **Dónde gastas más**: los lugares donde más gastas.\n- **Lo que debes**: lo que debe ahora cada tarjeta de crédito.\n- **Préstamos**: lo que aún debes en préstamos.\n- **Facturas y suscripciones**: lo que vence este mes y las dos próximas que vencen.\n- **Próximos**: lo que te cuestan tus suscripciones al mes y al año.\n- **Hábitos**, **Metas** y **Ahorros**: lo que ahorraste al no comprar, cómo van tus metas y lo que apartaste.\n\n' +
+      'Cada sección tiene **Ver todo ›** para abrir su página completa. Análisis es parte de Skip Pro.',
     keywords: ['análisis', 'gráficos', 'estadísticas', 'historia de tus gastos'],
+  },
+  {
+    id: 'home.insights.hero',
+    title: '¿Qué es Te queda este mes en Análisis?',
+    questions: [
+      'que es te queda este mes en analisis',
+      'q significa te pasaste este mes',
+      'la tarjeta morada de arriba en analisis',
+      'llevas gastado el 45% de tus ingresos, que quiere decir',
+      'xq analisis dice que ya gaste el 80% de mi sueldo',
+      'que es entra y sale en analisis',
+      'te queda este mes de analisis esta mal',
+      '¿por qué no aparece la línea del porcentaje en Análisis?',
+      'cuanto de mi sueldo llevo gastado este mes',
+      'dice menos del 1% de tus ingresos',
+      '¿te queda este mes cuenta las facturas que todavía no pago?',
+      'por que dice te pasaste este mes si todavia no me pagan',
+    ],
+    answer:
+      'La tarjeta color ciruela de arriba en **Análisis** siempre muestra el mes calendario actual. Muestra **Te queda este mes**: los pagos con fecha de este mes, menos todo lo que salió este mes hasta hoy. Si salió más de lo que entró, dice **Te pasaste este mes**.\n\n' +
+      'Debajo, “Entra $3,200.00 · Sale $1,450.00” muestra los dos lados, y “Llevas gastado el 45% de tus ingresos.” dice cuánto del pago de este mes ya se fue. Si es menos del 1%, se lee “menos del 1%”. Si no hay pagos con fecha de este mes, esa línea no aparece.\n\n' +
+      'Las facturas y suscripciones que vencen más adelante este mes no se cuentan hasta su día. Esto es distinto del **Saldo actual** de Inicio, que es tu total acumulado, no solo el de este mes.',
+    keywords: ['te queda este mes', 'te pasaste este mes', 'gastado de tus ingresos', 'entra sale'],
   },
   {
     id: 'home.insights.pro',
@@ -1180,8 +1206,10 @@ export const homeEs: IntentText[] = [
       'analisis dejo de funcionar cuando acabo mi pro',
       'insignia pro en la tarjeta de analisis',
       'como desbloqueo analisis',
-      'analisis dice tu dinero en una sola pagina',
+      'analisis dice todo en una pagina',
       'muro de pago de analisis',
+      'analisis no me abre',
+      'no puedo entrar a analisis',
     ],
     answer:
       '**Análisis** es parte de Skip Pro, por eso su tarjeta en Inicio muestra una etiqueta **PRO** en el plan gratis. Al tocarla se abre una página que explica Análisis, con **Obtener Skip Pro** para mejorar tu plan.\n\nCon Pro, la etiqueta desaparece y la tarjeta abre Análisis directamente. Si Pro termina, Análisis se bloquea otra vez, pero no se pierde nada de lo que ingresaste.\n\nTodo lo demás de Inicio, incluidos **Saldo actual**, **A dónde se fue tu dinero**, **Recientes** y **Próximos**, es gratis.',
@@ -1197,13 +1225,17 @@ export const homeEs: IntentText[] = [
       'pago quincenal por mes en analisis',
       'analisis dice que skip aun no sabe cuanto ganas',
       'pagado una vez este mes en analisis',
-      'que significa de 2 fuentes',
+      'que significa cada mes · 2 fuentes',
       'pago semanal convertido a mensual',
       'los ingresos de analisis estan mal',
       'boton configurar dia de pago',
+      'pagos unicos en analisis',
     ],
     answer:
-      '**Cada mes** convierte cada salario en un importe mensual y los suma:\n- **Semanal**: pago × 52 ÷ 12\n- **Cada 2 semanas**: pago × 26 ÷ 12\n- **Dos veces al mes**: pago × 2\n- **Mensual**: pago × 1\n\nEjemplo: $1,000 cada 2 semanas son $1,000 × 26 ÷ 12 = $2,166.67 al mes. Debajo dice de cuántas fuentes viene.\n\nEl pago de **Solo esta vez** no está en **Cada mes**; se muestra como “+ $500 pagado una vez este mes” (por ejemplo) en el mes en que se pagó. Si solo tienes pagos únicos, la tarjeta dice **Este mes**.\n\n¿Todavía no hay pago? Verás **Skip aún no sabe cuánto ganas** y un botón **Configurar día de pago**.',
+      '**Lo que entra** muestra tu **Salario** como cifra mensual, con “Cada mes · 2 fuentes” (por ejemplo) debajo. Cada salario se convierte en un importe mensual y se suman:\n\n' +
+      '- **Semanal**: pago × 52 ÷ 12\n- **Cada 2 semanas**: pago × 26 ÷ 12\n- **Dos veces al mes**: pago × 2\n- **Mensual**: pago × 1\n\n' +
+      'Ejemplo: $1,000 cada 2 semanas son $1,000 × 26 ÷ 12 = $2,166.67 al mes. El pago de **Solo esta vez** se suma como “+ $500.00 pagado una vez este mes”. Si solo tienes pagos únicos, en cambio dice “Este mes · 2 pagos únicos”.\n\n' +
+      '¿Todavía no hay pago? Verás **Skip aún no sabe cuánto ganas** con **Configurar día de pago**. **Ver todo ›** abre **Salario**.',
     keywords: ['lo que entra', 'cada mes', 'ingreso mensual', 'quincenal'],
   },
   {
@@ -1214,20 +1246,25 @@ export const homeEs: IntentText[] = [
       'grafico de gastos de analisis explicado',
       'que es registrado en este periodo',
       'recibos de compras facturas suscripciones en analisis',
-      'analisis semana mes año todo',
+      'selector de mes y año en analisis',
       'que significan las barras de analisis',
       'total de este mes en analisis',
-      'gasto de todo el tiempo',
       'por que el grafico de analisis tiene barras vacias',
       'analisis gastado este año',
+      'xq una barra sale mas oscura en analisis',
+      'las facturas de analisis dan mas que en facturas mensuales',
+      'por que las barras van de domingo a sabado',
     ],
     answer:
-      'Elige **Semana**, **Mes**, **Año** o **Todo**; se abre en **Mes**. La cifra grande es todo lo que salió en ese período hasta hoy: **Esta semana**, **Este mes**, **Este año** o **Desde el inicio**.\n\nEl gráfico muestra solo gastos, una barra por día, semana, mes o año. Debajo, la cifra se divide en **Recibos de compras**, **Facturas** (con los pagos de préstamos incluidos) y **Suscripciones**, con **Registrado en este periodo** como total.\n\nLas semanas van de domingo a sábado. **Todo** cubre este año y los 6 anteriores. Los pagos no se cuentan aquí; están en **Lo que entra**.',
+      'Elige **Mes** o **Año** con el selector. La tarjeta muestra **Este mes** o **Este año**, o el nombre del mes o año que elegiste, con su total y un gráfico:\n\n' +
+      '- **Mes**: una barra por semana, de domingo a sábado, recortada al mes.\n- **Año**: una barra por mes, de E a D, con el mes elegido o este mes en oscuro.\n\n' +
+      'Debajo del gráfico, el total se divide en **Recibos de compras**, **Facturas** y **Suscripciones**, con **Registrado en este periodo** como suma. Aquí **Facturas** incluye los pagos extra a préstamos, igual que el cuadro de Inicio, así que puede ser mayor que **Facturas y suscripciones** más abajo.\n\n' +
+      'El mes o año actual cuenta lo que ha pasado hasta hoy. Los pagos no se cuentan aquí; están en **Lo que entra**. **Ver todo ›** abre **Actividad**.',
     keywords: ['lo que sale', 'gráfico', 'barras', 'registrado en este periodo'],
   },
   {
     id: 'home.insights.where-it-goes',
-    title: '¿Por qué Otros es tan grande en A dónde se va?',
+    title: '¿Qué es A dónde se va en Análisis?',
     questions: [
       'que es a donde se va en analisis',
       'por que otros es mi categoria mas grande',
@@ -1235,15 +1272,17 @@ export const homeEs: IntentText[] = [
       'las categorias de analisis estan mal',
       'donde estan mis recibos del super en las categorias de analisis',
       'categorias principales en analisis',
-      'las suscripciones cuentan como otros',
+      'en que categoria salen mis suscripciones en analisis',
       'desglose por categoria',
-      'por que sale vivienda en analisis',
+      'cuantas categorias muestra analisis',
       'gastos por categoria en analisis',
       'por que analisis dice Otros',
     ],
     answer:
-      '**A dónde se va** en **Análisis** agrupa los gastos del período en categorías y muestra las 6 principales, la mayor primero, cada una con una barra medida frente a la mayor.\n\nLas facturas se agrupan por la categoría que les diste, como Vivienda, Internet o Seguros. Los recibos y las suscripciones se cuentan juntos en **Otros**, junto con las facturas archivadas como Otra. Por eso **Otros** suele ser la más grande.\n\nPara ver los recibos por tienda, mira **Dónde gastas más**, justo debajo.',
-    keywords: ['a dónde se va', 'categorías', 'otros', 'desglose'],
+      '**A dónde se va** (“Gastos por categoría”) agrupa por categoría los gastos del mes o año elegido en **Lo que sale**, y muestra las 6 principales, la mayor primero.\n\n' +
+      'Los recibos cuentan en su propia categoría, las suscripciones en la suya, y las facturas en la categoría que les diste, como Vivienda o Internet. Lo que no tiene categoría cuenta como **Otros**.\n\n' +
+      'Para ver lugares en vez de categorías, mira **Dónde gastas más**, justo debajo. **Ver todo ›** abre **Actividad**.',
+    keywords: ['a dónde se va', 'categorías', 'otros', 'gastos por categoría'],
   },
   {
     id: 'home.insights.spend-most',
@@ -1263,7 +1302,8 @@ export const homeEs: IntentText[] = [
       'donde gasto mas dinero',
     ],
     answer:
-      'Lista los 5 nombres en los que más gastaste en el período elegido, el mayor primero: tiendas, facturas y suscripciones. Cada uno muestra el total, una barra comparada con el primero, y cuántas veces, como “4 veces”.\n\nLas filas se agrupan por nombre exacto, así que “Starbucks” y “Starbucks Coffee” cuentan como dos lugares. Si editas los recibos para que los nombres coincidan, se juntan.',
+      '**Dónde gastas más** (“Los lugares donde más gastas”) lista los 5 nombres en los que más gastaste en el periodo elegido en **Lo que sale**, el mayor primero: tiendas, facturas y suscripciones. Cada uno muestra su total y cuántas veces, como “4 veces”.\n\n' +
+      'Las filas se agrupan por nombre exacto, así que “Starbucks” y “Starbucks Coffee” cuentan como dos lugares. Si editas los recibos para que los nombres coincidan, se juntan. **Ver todo ›** abre **Actividad**.',
     keywords: ['dónde gastas más', 'tiendas principales', 'comercios', 'veces'],
   },
   {
@@ -1276,14 +1316,65 @@ export const homeEs: IntentText[] = [
       'lo que debes incluye prestamos',
       'falta lo que debes',
       'cuanto debo en mis tarjetas',
-      'monto adeudado en analisis',
+      'monto adeudado de tarjetas en analisis',
       'deuda total de tarjetas de credito',
       'tarjeta con saldo a favor sale en cero',
-      'seccion de deudas de analisis',
+      'seccion de lo que debes en analisis',
+      'lo que debes dice algo salio mal',
     ],
     answer:
-      '**Lo que debes** lista cada tarjeta de crédito con lo que debe ahora mismo: la misma cifra acumulada que en **Tarjetas**, el saldo que escribiste más los cargos desde entonces, menos los pagos. Una tarjeta con saldo a favor muestra $0.00.\n\nNo incluye préstamos; para esos mira la página **Préstamos**. La sección solo aparece cuando ya agregaste una tarjeta de crédito.',
+      '**Lo que debes** (“Lo que debes en tarjetas”) lista cada tarjeta de crédito con lo que debe ahora mismo: la misma cifra en vivo que en **Tarjetas**, nunca solo el saldo que escribiste. Una tarjeta con saldo a favor muestra $0.00.\n\n' +
+      'Los préstamos tienen su propia sección, **Préstamos**, justo debajo. **Lo que debes** solo aparece cuando ya agregaste una tarjeta de crédito. Si no se pueden leer los saldos, la sección muestra **Algo salió mal. Inténtalo de nuevo.** con **Intentar de nuevo**, y el resto de la página sigue funcionando. **Ver todo ›** abre **Tarjetas**.',
     keywords: ['lo que debes', 'adeudado', 'deuda de tarjetas', 'tarjetas'],
+  },
+  {
+    id: 'home.insights.loans',
+    title: '¿Qué muestra la sección Préstamos en Análisis?',
+    questions: [
+      'seccion de prestamos en analisis',
+      'cuanto debo de prestamos en analisis',
+      'total de prestamos en analisis',
+      'que significa 35% pagado en analisis',
+      'pagos mensuales en la seccion de prestamos',
+      'xq los prestamos de analisis son distintos a la pagina de prestamos',
+      'analisis dice no hay prestamos activos',
+      'por que analisis dice aun no hay prestamos si tengo uno',
+      'proximo pago del prestamo en analisis',
+      '¿cuánto debo en total de mis créditos en Análisis?',
+      'cuanto llevo pagado de mis prestamos segun analisis',
+      'el porcentaje pagado de mis préstamos q es',
+    ],
+    answer:
+      '**Préstamos** (“Lo que debes en préstamos”) muestra el total que aún debes en tus préstamos, cuántos son y cuánto ya está pagado, como “35% pagado”. Cada préstamo muestra “Auto · próximo 14 nov.” con su pago, y **Pagos mensuales** los suma.\n\n' +
+      'Son las mismas cifras de la página **Préstamos**. Toca un préstamo para abrirlo, o **Ver todo ›** para ir a **Préstamos**. Si no tienes ninguno, dice **Aún no hay préstamos** (o **No hay préstamos activos** cuando ya están todos pagados o detenidos), con un botón para agregar uno.',
+    keywords: ['préstamos', 'pagado', 'pagos mensuales', 'préstamos activos'],
+  },
+  {
+    id: 'home.insights.plans',
+    title: '¿Qué muestra Facturas y suscripciones en Análisis?',
+    questions: [
+      'seccion facturas y suscripciones en analisis',
+      'lo que pagas cada mes en analisis',
+      'cuantas facturas cuenta analisis',
+      'proximos pagos en analisis',
+      'por que las dos cifras de facturas en analisis no coinciden',
+      'total de facturas de analisis vs pagina de facturas mensuales',
+      'que vence este mes segun analisis',
+      'cuantas suscripciones salen en analisis',
+      'cuales son las proximas facturas en analisis',
+      'las facturas de analisis no cuadran con lo que sale',
+      'xq en analisis solo salen 2 proximos pagos',
+      '¿las facturas en Análisis incluyen los pagos extra a préstamos?',
+    ],
+    answer:
+      '**Facturas y suscripciones** (“Lo que pagas cada mes”) muestra **Facturas · 4** y **Suscripciones · 6** (por ejemplo), cada una con lo que vence este mes: los mismos totales que las páginas **Facturas mensuales** y **Suscripciones**. En **Próximos pagos** están las dos siguientes, por fecha.\n\n' +
+      'Estas cifras no incluyen los pagos extra a préstamos, así que pueden ser distintas de **Facturas** en **Lo que sale**, que sí los cuenta, igual que el cuadro de Inicio.',
+    keywords: [
+      'facturas y suscripciones',
+      'próximos pagos',
+      'vence este mes',
+      'lo que pagas cada mes',
+    ],
   },
   {
     id: 'home.insights.coming-up',
@@ -1295,14 +1386,79 @@ export const homeEs: IntentText[] = [
       'el total de suscripciones de analisis parece demasiado alto',
       'suscripcion anual contada como mensual en analisis',
       'cuanto me cuestan las suscripciones al año',
-      'por mes de suscripciones en analisis esta mal',
+      'gastos fijos por venir',
       'que significa /mes en analisis',
       'costo de suscripciones por año',
       'seccion proximos de analisis',
+      'por que falta una suscripcion en proximos',
     ],
     answer:
-      'Suma el precio de cada suscripción activa y lo muestra como una cifra mensual, con esa cifra × 12 como “al año”. Tócala para abrir **Suscripciones**.\n\nUsa el precio de cada suscripción tal como está guardado, sea cual sea su ciclo. Una suscripción anual de $120 suma $120 aquí, no $10, y una semanal suma el precio de una semana. Si tienes suscripciones anuales o semanales, la página **Suscripciones** muestra lo que realmente vence cada mes.\n\nLas suscripciones canceladas no se cuentan.',
-    keywords: ['próximos', 'al mes', 'al año', 'total de suscripciones'],
+      '**Próximos** (“Gastos fijos por venir”) muestra lo que te cuestan tus suscripciones al mes, y eso mismo “al año”. Cada una se cuenta según su ciclo de cobro: semanal × 52, mensual × 12, cada 3 meses × 4 y anual × 1 dan el año, y el mes es el año ÷ 12. Así, una suscripción anual de $120 suma $10.00 al mes y $120.00 al año.\n\n' +
+      'Solo cuentan las suscripciones activas con fecha de renovación; las canceladas y las que no tienen próxima fecha, no.',
+    keywords: ['próximos', 'al mes', 'al año', 'gastos fijos por venir'],
+  },
+  {
+    id: 'home.insights.habits',
+    title: '¿Qué muestra la sección Hábitos en Análisis?',
+    questions: [
+      'seccion de habitos en analisis',
+      'cuanto ahorre al no comprar',
+      'que significa 4 dias sin comprar esta semana',
+      'ahorrado hasta ahora en analisis',
+      'analisis dice aun no hay habitos',
+      'cuanto me ahorre por no comprar cafe',
+      'empezar un habito desde analisis',
+      'ahorro de mis habitos en analisis',
+      'habitos en analisis explicado',
+      '¿dónde veo en Análisis lo que ahorré con mis hábitos?',
+      'xq el ahorro de habitos no coincide con mis tarjetas de habito',
+    ],
+    answer:
+      '**Hábitos** (“Lo que ahorraste al no comprar”) muestra “4 días sin comprar esta semana” (por ejemplo) con lo que eso te ahorró esta semana, y después **Ahorrado hasta ahora** con todos tus hábitos juntos. Las cifras son las mismas de tus tarjetas de hábitos: días sin comprar × el precio del hábito.\n\n' +
+      'Si no tienes ninguno, dice **Aún no hay hábitos** con **Empezar un hábito**.',
+    keywords: ['hábitos', 'al no comprar', 'ahorrado hasta ahora', 'días sin comprar'],
+  },
+  {
+    id: 'home.insights.goals',
+    title: '¿Qué muestra la sección Metas en Análisis?',
+    questions: [
+      'seccion de metas en analisis',
+      'que significa ahorrado para tus metas',
+      'progreso de mis metas en analisis',
+      'q significa 3 activas en las metas de analisis',
+      'analisis dice no hay metas activas',
+      'porcentaje de la meta en analisis',
+      'que tan cerca estoy de mis metas',
+      'las metas en analisis salen vacias',
+      'agregar una meta desde analisis',
+      '¿cómo voy con lo que estoy ahorrando?',
+      'cuanto llevo juntado para mis metas',
+    ],
+    answer:
+      '**Metas** (“Cómo vas con lo que estás ahorrando”) muestra **Ahorrado para tus metas** con el total, “de $5,000.00 · 3 activas” (por ejemplo), y luego cada meta con su porcentaje y “$1,200.00 de $2,000.00”.\n\n' +
+      'Si no tienes ninguna, dice **Aún no hay metas** (o **No hay metas activas** cuando todas están cumplidas o cerradas), con un botón para agregar una.',
+    keywords: ['metas', 'ahorrado para tus metas', 'activas', 'progreso'],
+  },
+  {
+    id: 'home.insights.savings',
+    title: '¿Qué muestra la sección Ahorros en Análisis?',
+    questions: [
+      'seccion de ahorros en analisis',
+      'que es movido este mes en analisis',
+      'total en ahorros en analisis',
+      'porcentaje de los ingresos de este mes en ahorros',
+      'analisis dice aun no hay nada en ahorros',
+      'dinero apartado en analisis',
+      'cuanto ahorre este mes segun analisis',
+      'por que no sale el porcentaje de ahorro en analisis',
+      'dice menos del 1% de los ingresos de este mes',
+      'ahorros en analisis explicado',
+      'cuanta plata aparte este mes',
+    ],
+    answer:
+      '**Ahorros** (“Dinero apartado”) muestra **Movido este mes**, lo que pasó a ahorros este mes, con “Cerca del 12% de los ingresos de este mes” (por ejemplo) debajo. Esa línea no aparece si no se movió nada, y dice “Menos del 1%” cuando es muy poco. Después viene **Total en ahorros**.\n\n' +
+      'Si todavía no tienes nada ahorrado, dice **Aún no hay nada en ahorros** con **Ver ahorros**.',
+    keywords: ['ahorros', 'movido este mes', 'total en ahorros', 'dinero apartado'],
   },
   {
     id: 'home.insights.past',
@@ -1311,17 +1467,19 @@ export const homeEs: IntentText[] = [
       'puedo ver el mes pasado en analisis',
       'analisis de un mes anterior',
       'como retrocedo en analisis',
-      'analisis no tiene flechas',
+      'elegir mes en analisis',
       'ver el analisis del año pasado',
       'comparar meses en analisis',
       'analisis solo muestra este mes',
       'ver los gastos de un mes viejo',
       'historial de analisis',
-      'analisis de la semana anterior',
+      'elegir un año en analisis',
+      'analisis solo muestra los meses con movimientos',
     ],
     answer:
-      '**Análisis** siempre muestra el período actual: esta semana, este mes, este año o desde siempre. No tiene flechas para retroceder.\n\nPara ver un mes anterior, usa **Actividad**: toca **Mes** y retrocede con la flecha izquierda. Verás los **Ingresos**, los **Gastos** y todos los movimientos de ese mes.\n\nLo que sobró de cada mes terminado también se guarda en **Ahorros**.',
-    keywords: ['mes pasado', 'anterior', 'historial', 'comparar'],
+      'Sí, para **Lo que sale** y las secciones que van debajo. Toca el lado del selector **Mes | Año** que ya está elegido para abrir **Elige el mes** o **Elige el año**. Solo aparecen los meses y años con dinero registrado. Si eliges un año, se olvida el mes que habías elegido de otro año.\n\n' +
+      'La tarjeta color ciruela de arriba, **Te queda este mes**, siempre se queda en el mes actual. Para ver el pago de un mes y cada movimiento, **Actividad → Mes** retrocede con la flecha izquierda.',
+    keywords: ['mes pasado', 'anterior', 'Elige el mes', 'Elige el año', 'historial'],
   },
 
   // ---------------------------------------------------------------- Actividad
@@ -1704,7 +1862,7 @@ export const homeEs: IntentText[] = [
       'informe de categorias',
     ],
     answer:
-      '**Actividad** filtra por tipo (**Ingresos**, **Facturas mensuales**, **Recibos**, **Suscripciones**) y por tarjeta o cuenta, no por categoría.\n\nLas vistas más parecidas:\n- **Análisis** (Pro) tiene **A dónde se va**, que agrupa las facturas por su categoría, con los recibos y suscripciones contados en Otros, y **Dónde gastas más**, que suma cada tienda.\n- En **Actividad**, busca el nombre de una tienda y lee los totales de los encabezados.\n\nSi te gustarían los totales por categoría para los recibos, envíalo como idea desde **Ajustes → Soporte y comentarios → Comparte una idea**.',
+      '**Actividad** filtra por tipo (**Ingresos**, **Facturas mensuales**, **Recibos**, **Suscripciones**) y por tarjeta o cuenta, no por categoría.\n\nLas vistas más parecidas:\n- **Análisis** (Pro) tiene **A dónde se va**, que suma los recibos, facturas y suscripciones por sus categorías, y **Dónde gastas más**, que suma cada lugar.\n- En **Actividad**, busca el nombre de una tienda y lee los totales de los encabezados.\n\nSi te gustarían los totales por categoría para los recibos, envíalo como idea desde **Ajustes → Soporte y comentarios → Comparte una idea**.',
     keywords: ['categoría', 'categorías', 'super', 'gráfico circular'],
   },
   {

@@ -1336,14 +1336,16 @@ export const voicePrivacyHelpEs: IntentText[] = [
       'borrar mi cuenta',
       'ya no quiero usar skip, cómo quito mi info',
       'qué significa Eliminar todo para siempre',
-      'Esto elimina 2 tarjetas, 5 facturas y 40 recibos, todo lo que Skip guarda para ti. No se puede deshacer.',
+      'Esto elimina tu cuenta y todo lo que agregaste. Incluye 2 tarjetas, 5 facturas y 40 recibos',
+      'que queda despues de eliminar mi cuenta',
     ],
     answer:
       'Ve a **Ajustes**, baja hasta **Cuenta** y toca **Eliminar cuenta**.\n\n' +
-      '1. **¿Eliminar tu cuenta?** enumera lo que se irá, con la cantidad de tus tarjetas, cuentas, facturas, suscripciones, recibos y más. Toca **Continuar**, o **Conservar mi cuenta** para detenerte.\n' +
-      '2. **¿Eliminar todo para siempre?** dice “No hay vuelta atrás y no se guarda ninguna copia.” Toca **Eliminar todo**.\n\n' +
-      'Tu cuenta y todo lo que contiene se eliminan de inmediato, y vuelves a la pantalla de bienvenida. Skip también borra del teléfono tus correcciones de nombres de voz y las tiendas que agregaste.\n\n' +
-      'Necesitas estar en línea. Eliminar tu cuenta no cancela Skip Pro, así que cancélalo también con Apple.',
+      '1. Con Skip Pro, primero aparece **¿Cancelar Skip Pro primero?**: eliminar tu cuenta no cancela Pro, y Apple sigue cobrándote hasta que lo canceles. **Administrar en el App Store** abre tus suscripciones y no elimina nada. Si ya lo cancelaste, toca **Continuar y eliminar**.\n' +
+      '2. **¿Eliminar tu cuenta?** cuenta lo que se irá, como tus tarjetas, cuentas bancarias, facturas, suscripciones, recibos y pagos, y todo lo demás, como préstamos, ahorros, metas y hábitos de gasto. Toca **Continuar**, o **Conservar mi cuenta** para detenerte.\n' +
+      '3. **¿Eliminar todo para siempre?** es el último paso. Toca **Eliminar todo**.\n\n' +
+      'Tu cuenta y todo lo que contiene se eliminan de inmediato, y vuelves a la pantalla de bienvenida. Skip también borra del teléfono tus correcciones de nombres de voz, las tiendas recordadas y las búsquedas recientes. Unos pocos registros fuera de Skip, como los informes de fallos, pueden quedarse.\n\n' +
+      'Necesitas estar en línea.',
     keywords: ['Eliminar cuenta', 'borrar cuenta', 'cerrar cuenta', 'Eliminar todo'],
   },
   {
@@ -1364,7 +1366,7 @@ export const voicePrivacyHelpEs: IntentText[] = [
       'borré mi cuenta x error, se puede recuperar',
     ],
     answer:
-      'No. Eliminar es inmediato y permanente. No hay periodo de gracia y Skip no guarda ninguna copia para restaurar, así que no se puede recuperar. Por eso Skip pregunta dos veces.\n\n' +
+      'No. Eliminar es inmediato y permanente. No hay periodo de gracia ni forma de restaurarla, así que no se puede recuperar. Por eso Skip pregunta antes de eliminar nada.\n\n' +
       'Puedes registrarte de nuevo con el mismo correo, o con la misma cuenta de Apple o Google, pero empezarás con un Skip vacío.',
     keywords: ['deshacer', 'recuperar', 'restaurar', 'periodo de gracia'],
   },
@@ -1550,13 +1552,14 @@ export const voicePrivacyHelpEs: IntentText[] = [
       'la página dice algo salió mal con un botón de intentar de nuevo',
       'perdí mis datos, dijo algo salió mal',
       'qué significa intentar de nuevo',
+      'si vuelvo a guardar, ¿se crea una copia?',
     ],
     answer:
       'Es el único mensaje que Skip muestra cuando algo falla, como cargar una página, guardar, eliminar o enviar. Casi siempre significa que Skip no pudo comunicarse con tu cuenta por un momento, normalmente por la conexión.\n\n' +
       '1. Revisa que estés en línea, con Wi-Fi o datos móviles.\n' +
       '2. Toca **Intentar de nuevo** en la página, o toca otra vez el mismo botón, como **Guardar**.\n' +
       '3. ¿Sigue igual? Cierra Skip por completo y ábrelo de nuevo.\n\n' +
-      'No se pierde nada de lo que ya guardaste. Cuando falla un guardado, lo que ingresaste se queda en la página para que lo intentes de nuevo.\n\n' +
+      'No se pierde nada de lo que ya guardaste. Cuando falla un guardado, lo que ingresaste se queda en la página para que lo intentes de nuevo, y guardar otra vez nunca crea una segunda copia de un recibo, suscripción, tarjeta, cuenta, salario, hábito o pago de tarjeta. Si **Inicio** o **Tarjetas** no pueden actualizarse, conservan las cifras que ya mostraban.\n\n' +
       'Los mensajes que te dicen qué corregir, como “Ingresa el nombre del banco.” o “Primero elige una tienda.”, no son fallos. Señalan algo que todavía necesita una respuesta.',
     keywords: ['Algo salió mal', 'Inténtalo de nuevo', 'Intentar de nuevo', 'error'],
   },

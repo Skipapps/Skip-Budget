@@ -1,0 +1,745 @@
+--- a/src/lib/ask-sam/knowledge/pro-settings.ts
++++ b/src/lib/ask-sam/knowledge/pro-settings.ts
+@@ -1227,7 +1227,6 @@
+       '- **Your money**: shortcuts to bills, subscriptions, cards and payday',
+       '- **About**: privacy policy, terms and version',
+       '- **Support and feedback**: common questions, email support and ideas',
+-      '- **Buy a coffee for team**: an optional tip',
+       '- **Account**: **Sign out** and **Delete account**',
+       '- **Ask Sam**: questions about Skip, answered right away',
+     ),
+@@ -2000,27 +1999,27 @@
+   {
+     id: 'settings.coffee.tip',
+     topic: 'settings',
+-    title: 'What is Buy a coffee for team?',
+-    questions: [
+-      'What is Buy a coffee for team?',
++    title: 'Can I tip or donate to Skip?',
++    questions: [
++      'Can I tip or donate to Skip?',
+       'buy me a coffee',
+       'how do I tip the developers',
+       'donate to skip',
+-      'Keep Skip brewing?',
+-      'does buying a coffee give me pro',
++      'where did buy a coffee for team go',
++      'the coffee button is gone from settings',
+       'support the team with money',
+-      'coffee button in settings',
+-      'is the coffee thing required',
+-      'tip jar',
+-    ],
+-    answer: text(
+-      "It's an optional tip for the people who make Skip. Tapping **Buy a coffee for team** in **Settings** opens their Buy Me a Coffee page in a browser inside the app, where you can choose to give.",
+-      '',
+-      "It's completely voluntary. A coffee doesn't unlock Skip Pro or change anything in the app, and the payment happens on that website, not through Apple or your Skip account. For Pro, use **Settings → Skip Pro**.",
+-    ),
+-    keywords: ['coffee', 'tip', 'donate', 'Buy Me a Coffee'],
++      'how can I support skip',
++      'is there a tip jar',
++      'I want to give the makers of skip something',
++    ],
++    answer: text(
++      "There's no tip or donation option in Skip, and **Settings** no longer has a **Buy a coffee for team** row. Skip is paid for by **Skip Pro**, so that's the way to support it: **Settings → Skip Pro**.",
++      '',
++      'Telling the team what would make Skip better helps too: **Settings → Support and feedback → Share an idea**.',
++    ),
++    keywords: ['tip', 'donate', 'support Skip', 'Buy Me a Coffee'],
+     related: ['pro.buy.how', 'settings.overview.page'],
+-    route: '/settings',
++    route: '/pro',
+   },
+   {
+     id: 'settings.rate.app',
+--- a/src/lib/ask-sam/knowledge/voice-privacy-help.ts
++++ b/src/lib/ask-sam/knowledge/voice-privacy-help.ts
+@@ -1256,7 +1256,14 @@
+       'does skip store my time zone',
+     ],
+     answer:
+-      'Only what you put in, plus what’s needed to run your account:\n\n- **Your account**: your email address, or the sign-in ID Apple or Google gives us if you use them.\n- **Your profile**: the display name and picture you choose from Skip’s set, and your phone’s time zone, so dates and reminders follow your day.\n- **Your money**: the bills, subscriptions, receipts, loans, pay, savings, goals, habits and card payments you enter, and the record of what your bills and subscriptions have charged.\n- **Your cards and accounts**: the name you give them, the network or bank, a colour, a balance you type, a due day, and at most the last four digits.\n- **Your settings**: your reminders, whether you have Skip Pro, and, if you turn reminders on, your phone’s notification address so they can reach it.\n\nSkip never asks for a full card number, expiry date, security code or bank login. More detail is in **Settings → About → Privacy policy**.',
++      'Only what you put in, plus what Skip needs to sign you in, send your reminders and know whether you have Skip Pro:\n\n' +
++      '- **Your account**: your email address, and your password scrambled so it can’t be read back. With Apple or Google sign-in, the account ID and email they give Skip (Apple’s can be a private relay address).\n' +
++      '- **Your profile**: the display name you choose and the avatar you pick from Skip’s set.\n' +
++      '- **Your money**: the bills, subscriptions, receipts, receipt books, loans, salaries, pay, savings, goals and spending habits you enter, with their notes and logo choices; what your bills and subscriptions have charged; your card payments and transfers; and how and when each receipt was added.\n' +
++      '- **Your cards and accounts**: the name you give them, the network or bank, the type, a colour, the balance you type and its date, a due day, an optional credit limit, and at most the last four digits.\n' +
++      '- **Skip Pro**: whether you have it, which plan, and when it renews or ends.\n' +
++      '- **Your settings**: your time zone, so reminders arrive at the right hour; your reminder choices; your default receipt book; and, once you turn on a reminder, your phone’s notification address.\n\n' +
++      'Messages you send from the contact form come to us by email; Skip doesn’t keep them. Skip never asks for a full card number, expiry date, security code or bank login. Every detail is in **Settings → About → Privacy policy**.',
+     keywords: ['data', 'collect', 'personal information', 'what is stored', 'privacy policy'],
+     related: ['privacy.stored.where', 'privacy.phone-only', 'privacy.who-sees', 'privacy.bank'],
+     route: '/privacy',
+@@ -1279,7 +1286,7 @@
+       'cloud storage skip',
+     ],
+     answer:
+-      'Your entries are stored in your Skip account on our server, not only on the phone. That’s why they come back when you sign in on a new phone, and why your phones show the same thing.\n\nA few things belong to the phone and stay there: appearance, language, haptics and app lock, your voice name fixes, and the list of stores Skip remembers for you.\n\nSkip doesn’t keep your entries in iCloud. If you lose your phone, sign in on the new one and they’re all there.',
++      'Your entries are stored in your Skip account on our servers, in Canada (Montréal), not only on the phone. That’s why they come back when you sign in on a new phone, and why your phones show the same thing.\n\nA few things belong to the phone and stay there: appearance, language, currency, haptics and app lock, your voice name fixes, the stores Skip remembers for you, and your recent payment searches.\n\nSkip doesn’t keep your entries in iCloud. If you lose your phone, sign in on the new one and they’re all there.',
+     keywords: ['cloud', 'server', 'backup', 'iCloud', 'lost phone', 'stored where'],
+     related: ['privacy.phone-only', 'troubleshooting.new-phone', 'privacy.retention'],
+   },
+@@ -1300,7 +1307,7 @@
+       'on device processing skip',
+     ],
+     answer:
+-      'These stay on your iPhone and are never sent to us:\n\n- **Receipt photos.** Scans and uploads are read on the phone by Apple’s own text recognition. The picture isn’t uploaded; Skip saves only the details you confirm.\n- **Your voice**, when your iPhone can recognise speech on the device.\n- **Appearance, haptics and app lock settings**, and your language choice.\n- **Voice name fixes** and the list of stores Skip remembers for you. The receipts themselves, store names included, are saved in your account.\n- **Face ID.** App lock asks iPhone to check it’s you. Skip never sees your face data.\n\nBecause these live on the phone, they don’t move to a new one.',
++      'These stay on your iPhone and are never sent to us:\n\n- **Receipt photos.** Scans and uploads are read on the phone by Apple’s own text recognition. The picture isn’t uploaded; Skip saves only the details you confirm.\n- **Your voice**, when your iPhone can recognise speech on the device.\n- **Appearance, haptics, app lock, language, currency and wrap-up settings**, and which tips you’ve already seen.\n- **Voice name fixes**, the stores and logo answers Skip remembers, and your last 10 payment searches. They’re erased when you sign out.\n- **Insights**, worked out on the phone.\n- **Exports**: the CSV or PDF is made on the phone, and where you send it is up to you.\n- **Face ID.** App lock asks iPhone to check it’s you. Skip never sees your face data.\n\nOne exception: a shop or service name you type, or that Skip reads from a receipt, is looked up to find its logo. The receipts themselves, store names included, are saved in your account. Because these live on the phone, they don’t move to a new one.',
+     keywords: ['on device', 'local', 'never uploaded', 'Face ID', 'receipt photo', 'private'],
+     related: ['privacy.stored.where', 'voice.on-device', 'privacy.permissions'],
+     route: '/privacy',
+@@ -1378,7 +1385,7 @@
+       'is my data a product',
+     ],
+     answer:
+-      'No. Skip doesn’t sell your data, doesn’t share it for advertising, and has no ads. There’s no third-party analytics either, only crash reports that help fix faults.\n\nSkip is paid for by Skip Pro, which is {proMonthly} a month or {proYearly} a year, billed by Apple. There’s also a voluntary tip, **Buy a coffee for team**, in **Settings**.',
++      'No. Skip doesn’t sell your data, doesn’t share it for advertising, and has no ads. There’s no third-party analytics either, only crash reports that help fix faults.\n\nSkip is paid for by Skip Pro, which is {proMonthly} a month or {proYearly} a year, billed by Apple.',
+     keywords: ['sell', 'tracking', 'analytics', 'advertisers', 'business model'],
+     related: ['privacy.who-sees', 'privacy.crash-reports'],
+   },
+@@ -1399,7 +1406,7 @@
+       'what information goes with an error',
+     ],
+     answer:
+-      'When something goes wrong, Skip sends a report so the fault can be found and fixed. It describes what the app was doing, not what your budget contains, and Skip is set up not to attach personal details to it.\n\n' +
++      'When something goes wrong, Skip sends a report so the fault can be found and fixed. It carries your iPhone model, the iOS and app versions, and what the app was doing, not what your budget contains. Like any web service, the crash-report service may also see the internet address a report comes from, and it deletes reports automatically after a set time.\n\n' +
+       'There’s no switch for this in the app. Reports only come from the version of Skip you download, and only when something fails or crashes.',
+     keywords: ['crash report', 'error report', 'diagnostics', 'logs'],
+     related: ['privacy.who-sees', 'troubleshooting.crash'],
+@@ -1447,10 +1454,12 @@
+       'are old charges removed',
+     ],
+     answer:
+-      'Skip’s privacy policy sets two rules:\n\n' +
+-      '- **Things that happened**, like receipts, recorded charges and card payments, are kept for seven years, then let go a day at a time as each one passes that age.\n' +
+-      '- **Things still running**, like bills, subscriptions, cards, accounts and salaries, are kept until you delete them.\n\n' +
+-      'How far back you can see is separate. The free plan shows the last 90 days, and older entries are kept out of view, not deleted. Skip Pro shows up to 7 years.',
++      'Skip’s privacy policy sets these rules:\n\n' +
++      '- **Things that happened**: receipts (habit days included), recorded bill and subscription payments, card payments, transfers between accounts, and pay you received are deleted automatically, every night, once they’re more than seven years old. Your card and account balances on screen stay the same: an old payment they still count is folded into their starting balance.\n' +
++      '- **Things you set up**: bills, subscriptions, loans (with any extra payments), cards, accounts, salaries, savings, goals, habits and receipt books are kept until you delete them.\n' +
++      '- **Your account, profile and settings** are kept until you delete your account.\n' +
++      '- **Messages you send us** stay in our email inbox until you ask us to delete them.\n\n' +
++      'How far back you can see is separate. The free plan shows the last 90 days, and older entries are hidden, not deleted: they still count in your balances, and Skip Pro shows them again.',
+     keywords: ['retention', 'how long', 'seven years', '7 years', 'old data', 'kept'],
+     related: ['privacy.delete-account', 'privacy.stored.where'],
+     route: '/privacy',
+@@ -1577,8 +1586,8 @@
+       'ccpa skip',
+     ],
+     answer:
+-      'You can see everything Skip holds about you in the app, correct any of it by editing it, and delete all of it in **Settings → Account → Delete account**.\n\n' +
+-      'Depending on where you live, you may also have a right to a copy of your data in a portable form, or to object to some processing. Write to **admin@skipapps.net** and we’ll act on it. The details are in **Settings → About → Privacy policy**.',
++      'You can correct most of what you entered by editing it, and delete it, or your whole account in **Settings → Account → Delete account**. For anything you can’t remove yourself, write to us.\n\n' +
++      'Write to **admin@skipapps.net** and we’ll send you a copy of everything we hold about you. Depending on where you live, you may also have the right to get your data in a portable form, to object to or limit some processing, and to complain to your data protection authority. Write to us and we’ll act on it. The details are in **Settings → About → Privacy policy**.',
+     keywords: ['rights', 'GDPR', 'CCPA', 'correct', 'object', 'privacy contact'],
+     related: ['privacy.export', 'privacy.delete-account', 'privacy.terms'],
+     route: '/privacy',
+@@ -1599,13 +1608,16 @@
+       'liability skip',
+       'is skip a financial adviser',
+       'are the spanish terms official',
++      "which law applies to skip's terms",
+     ],
+     answer:
+       'In short:\n\n' +
++      '- Skip is free to download, and most of it is free. **Skip Pro** is an optional subscription, billed by Apple.\n' +
+       '- Skip is a tool for writing down and looking at your own money. It isn’t a bank, a payment service or a financial adviser, and nothing in it is financial, tax or legal advice.\n' +
+-      '- Every figure comes from what you entered. Forecasts of bills and paydays are estimates from the schedules you set.\n' +
++      '- A figure can come from something you typed, a scan, your voice or Skip’s own arithmetic, and Skip can’t know whether it’s right. Forecasts of bills and paydays are estimates from the schedules you set.\n' +
+       '- What you put in stays yours, and you can delete it whenever you like.\n' +
+-      '- An account is for one person. An account that breaks the terms can be suspended or closed.\n\n' +
++      '- You must be 18 or older. An account is for one person, and an account that breaks the terms can be suspended or closed.\n' +
++      '- The terms are governed by the law of the State of Ohio, United States. You keep the consumer protections of the place where you live, and you can use your local courts.\n\n' +
+       'Read it all in **Settings → About → Terms of service**. In Spanish or French it’s a courtesy translation, and the English version is the one that counts.',
+     keywords: ['terms', 'terms of service', 'agreement', 'advice', 'liability', 'owns data'],
+     related: ['privacy.rights', 'privacy.stored.what'],
+@@ -1628,7 +1640,7 @@
+       'protect skip from people who borrow my phone',
+     ],
+     answer:
+-      'Sign out first, in **Settings → Account → Sign out**. Signing out:\n\n- stops your reminders going to that phone,\n- clears your voice name fixes and the stores Skip remembered for you from it,\n- and returns Skip to the welcome screen.\n\nIt also signs you out of Skip on your other phones, so sign in again on your new one if it asks.\n\nYour entries stay safe in your account, ready on your next phone. If someone shares your phone day to day, turn on **App lock** in **Settings → Preferences**, so Skip asks for Face ID before it opens.',
++      'Sign out first, in **Settings → Account → Sign out**. Signing out:\n\n- stops your reminders going to that phone,\n- clears your voice name fixes, the stores Skip remembered and your recent payment searches from it,\n- and returns Skip to the welcome screen.\n\nIt also signs you out of Skip on your other phones, so sign in again on your new one if it asks.\n\nYour entries stay safe in your account, ready on your next phone. If someone shares your phone day to day, turn on **App lock** in **Settings → Preferences**, so Skip asks for Face ID before it opens.',
+     keywords: ['sell phone', 'give away', 'shared phone', 'sign out', 'App lock', 'trade in'],
+     related: ['privacy.account.compromised', 'troubleshooting.new-phone'],
+   },
+--- a/src/lib/ask-sam/knowledge/getting-started.ts
++++ b/src/lib/ask-sam/knowledge/getting-started.ts
+@@ -237,7 +237,7 @@
+     answer:
+       'No. Skip is not a bank or a payment app, so it cannot pay bills, send money, or move money between your accounts. It keeps a record of your money and does the adding up.\n\n' +
+       'When a bill is due, you pay it the usual way: through your bank, your card or the company. Skip reminds you before it is due and shows it in your month.\n\n' +
+-      'Skip does not give financial, tax or legal advice either. Every figure comes from what you entered.',
++      'Skip does not give financial, tax or legal advice either. A figure can come from what you typed, a scan, your voice or Skip’s own arithmetic, and Skip can’t know whether it’s right.',
+     keywords: ['pay bills', 'transfer', 'send money', 'bank', 'advice', 'venmo', 'paypal', 'taxes'],
+     related: ['getting-started.skip.bank', 'getting-started.skip.what'],
+   },
+@@ -456,7 +456,8 @@
+       'is skip made by a bank',
+       'Who do I talk to about Skip?',
+       'who runs skip',
+-      'what is the weknd team',
++      'is skip made by a company or one person',
++      'what is skip budget',
+       'how do i reach the people who make skip',
+       'who created skip budget',
+       'whose app is this',
+@@ -465,12 +466,12 @@
+       "who is behind this app's development",
+     ],
+     answer:
+-      'Skip is made by the Weknd team. It is not made by a bank, and there are no ads in it.\n\n' +
+-      'To reach the team, go to **Settings → Support and feedback**:\n' +
++      'Skip comes from Skip Budget, which its founder runs as an individual. It is not made by a bank, and there are no ads in it.\n\n' +
++      'To get in touch, go to **Settings → Support and feedback**:\n' +
+       '- **Email support** if something is wrong or unclear\n' +
+       '- **Share an idea** for something you would like Skip to do\n\n' +
+       'Replies go to the email address you signed in with.',
+-    keywords: ['developer', 'company', 'owner', 'weknd', 'team', 'maker', 'creator'],
++    keywords: ['developer', 'company', 'owner', 'Skip Budget', 'team', 'maker', 'creator'],
+     related: ['getting-started.skip.what', 'getting-started.help.tour'],
+     route: '/settings/support',
+   },
+--- a/src/lib/ask-sam/knowledge/receipts.ts
++++ b/src/lib/ask-sam/knowledge/receipts.ts
+@@ -1738,7 +1738,7 @@
+       'will skip delete my receipts from months ago on the free plan',
+     ],
+     answer:
+-      'On the free plan, receipt lists show the last 90 days: today and the 89 days before. Skip Pro shows up to 7 years.\n\nHiding older receipts doesn’t delete them. They stay saved, still count in your **Current balance** and card balances, and show again as soon as you have Pro. Where the list stops, a card says **Older history is saved** and **Free shows the last 90 days. Skip Pro shows up to 7 years.** Tap it to see what Pro adds.\n\nYou can still add a receipt with an older date on the free plan. It’s saved and counted, just not listed.',
++      'On the free plan, receipt lists show the last 90 days: today and the 89 days before. Skip Pro shows up to 7 years.\n\nHiding older receipts doesn’t delete them. They stay saved, still count in your **Current balance** and card balances, and show again as soon as you have Pro. Where the list stops, a card says **Older history is saved** and **Free shows the last 90 days. Skip Pro shows up to 7 years.** Tap it to see what Pro adds.\n\nYou can still add a receipt with an older date on the free plan. It’s saved and counted, just not listed.\n\nOn every plan, receipts are deleted automatically seven years after their date.',
+     keywords: ['history', '90 days', '7 years', 'older history is saved', 'old receipts', 'hidden'],
+     related: ['receipts.history.count-mismatch', 'receipts.pro.ended', 'receipts.list.missing'],
+   },
+--- a/src/lib/ask-sam/knowledge/es/pro-settings.ts
++++ b/src/lib/ask-sam/knowledge/es/pro-settings.ts
+@@ -1142,7 +1142,6 @@
+       '- **Tu dinero**: accesos directos a facturas, suscripciones, tarjetas y día de pago',
+       '- **Acerca de**: política de privacidad, términos y versión',
+       '- **Soporte y comentarios**: preguntas frecuentes, escribir a soporte e ideas',
+-      '- **Invita un café al equipo**: una propina opcional',
+       '- **Cuenta**: **Cerrar sesión** y **Eliminar cuenta**',
+       '- **Pregúntale a Sam**: respuestas al momento sobre Skip',
+     ),
+@@ -1823,27 +1822,25 @@
+   },
+   {
+     id: 'settings.coffee.tip',
+-    title: '¿Qué es Invita un café al equipo?',
+-    questions: [
+-      '¿Qué es Invita un café al equipo?',
++    title: '¿Puedo dar una propina o donar a Skip?',
++    questions: [
++      '¿Puedo dar una propina o donar a Skip?',
+       'invitame un cafe',
+       'como le doy propina a los desarrolladores',
+       'donar a skip',
+-      'Para que Skip siga con energía, ¿qué es?',
+-      'comprar un cafe me da pro',
++      'donde quedo invita un cafe al equipo',
++      'ya no esta el boton del cafe en ajustes',
+       'apoyar al equipo con dinero',
+-      'boton de cafe en ajustes',
+-      'es obligatorio lo del cafe',
+-      'frasco de propinas',
+-      'dar una propina en skip',
+-      'invitar un cafe da algo',
+-    ],
+-    answer: text(
+-      'Es una propina opcional para las personas que hacen Skip. Al tocar **Invita un café al equipo** en **Ajustes** se abre su página de Buy Me a Coffee en un navegador dentro de la app, donde puedes elegir si quieres dar algo.',
+-      '',
+-      'Es totalmente voluntario. Un café no desbloquea Skip Pro ni cambia nada en la app, y el pago se hace en ese sitio web, no a través de Apple ni de tu cuenta de Skip. Para Pro, usa **Ajustes → Skip Pro**.',
+-    ),
+-    keywords: ['café', 'propina', 'donar', 'Buy Me a Coffee'],
++      'como puedo apoyar a skip',
++      'hay frasco de propinas?',
++      'quiero darle algo a los q hacen skip',
++    ],
++    answer: text(
++      'Skip no tiene opción de propina ni de donación, y **Ajustes** ya no tiene la fila **Invita un café al equipo**. Skip se mantiene con **Skip Pro**, así que esa es la forma de apoyarlo: **Ajustes → Skip Pro**.',
++      '',
++      'Contarle al equipo qué haría mejor a Skip también ayuda: **Ajustes → Soporte y comentarios → Comparte una idea**.',
++    ),
++    keywords: ['propina', 'donar', 'apoyar a Skip', 'Buy Me a Coffee'],
+   },
+   {
+     id: 'settings.rate.app',
+--- a/src/lib/ask-sam/knowledge/es/voice-privacy-help.ts
++++ b/src/lib/ask-sam/knowledge/es/voice-privacy-help.ts
+@@ -1123,13 +1123,14 @@
+       'skip guarda mi zona horaria',
+     ],
+     answer:
+-      'Solo lo que tú ingresas, más lo necesario para que tu cuenta funcione:\n\n' +
+-      '- **Tu cuenta**: tu correo, o el identificador de inicio de sesión que nos da Apple o Google si los usas.\n' +
+-      '- **Tu perfil**: el nombre para mostrar y la imagen que eliges del conjunto de Skip, y la zona horaria de tu teléfono, para que las fechas y los recordatorios sigan tu día.\n' +
+-      '- **Tu dinero**: las facturas, suscripciones, recibos, préstamos, sueldo, ahorros, metas, hábitos y pagos de tarjeta que ingresas, y el registro de lo que han cobrado tus facturas y suscripciones.\n' +
+-      '- **Tus tarjetas y cuentas**: el nombre que les pones, la red o el banco, un color, un saldo que escribes, un día de vencimiento y, como máximo, los últimos cuatro dígitos.\n' +
+-      '- **Tus ajustes**: tus recordatorios, si tienes Skip Pro y, si activas los recordatorios, la dirección de notificaciones de tu teléfono para que lleguen.\n\n' +
+-      'Skip nunca pide un número de tarjeta completo, fecha de vencimiento, código de seguridad ni acceso a tu banco. Hay más detalle en **Ajustes → Acerca de → Política de privacidad**.',
++      'Solo lo que tú ingresas, más lo que Skip necesita para iniciar tu sesión, enviarte tus recordatorios y saber si tienes Skip Pro:\n\n' +
++      '- **Tu cuenta**: tu correo y tu contraseña, codificada para que nadie pueda volver a leerla. Si inicias sesión con Apple o Google, el ID de cuenta y el correo que le dan a Skip (el de Apple puede ser una dirección privada de reenvío).\n' +
++      '- **Tu perfil**: el nombre para mostrar que eliges y el avatar que escoges del conjunto de Skip.\n' +
++      '- **Tu dinero**: las facturas, suscripciones, recibos, libros de recibos, préstamos, salarios, ingresos, ahorros, metas y hábitos de gasto que ingresas, con sus notas y los logos que eliges; lo que han cobrado tus facturas y suscripciones; tus pagos de tarjeta y transferencias; y cómo y cuándo se agregó cada recibo.\n' +
++      '- **Tus tarjetas y cuentas**: el nombre que les pones, la red o el banco, el tipo, un color, el saldo que escribes y su fecha, un día de vencimiento, un límite de crédito opcional y, como máximo, los últimos cuatro dígitos.\n' +
++      '- **Skip Pro**: si lo tienes, qué plan y cuándo se renueva o termina.\n' +
++      '- **Tus ajustes**: tu zona horaria, para que los recordatorios lleguen a la hora correcta; lo que eliges en tus recordatorios; tu libro de recibos predeterminado; y, cuando activas un recordatorio, la dirección de notificaciones de tu teléfono.\n\n' +
++      'Los mensajes que envías desde el formulario de contacto nos llegan por correo; Skip no los guarda. Skip nunca pide un número de tarjeta completo, fecha de vencimiento, código de seguridad ni acceso a tu banco. Todos los detalles están en **Ajustes → Acerca de → Política de privacidad**.',
+     keywords: ['datos', 'recopilar', 'información personal', 'política de privacidad'],
+   },
+   {
+@@ -1148,9 +1149,10 @@
+       'se guarda algo en el propio teléfono',
+       'almacenamiento en la nube skip',
+       'respaldo de skip',
+-    ],
+-    answer:
+-      'Tus entradas se guardan en tu cuenta de Skip, en nuestro servidor, no solo en el teléfono. Por eso vuelven cuando inicias sesión en un teléfono nuevo, y por eso tus teléfonos muestran lo mismo.\n\nAlgunas cosas pertenecen al teléfono y se quedan ahí: la apariencia, el idioma, la respuesta háptica y el bloqueo de la app, tus correcciones de nombres de voz, y la lista de tiendas que Skip recuerda para ti.\n\nSkip no guarda tus entradas en iCloud. Si pierdes tu teléfono, inicia sesión en el nuevo y ahí están todas.',
++      'en qué país se guardan mis datos',
++    ],
++    answer:
++      'Tus entradas se guardan en tu cuenta de Skip, en nuestros servidores, en Canadá (Montreal), no solo en el teléfono. Por eso vuelven cuando inicias sesión en un teléfono nuevo, y por eso tus teléfonos muestran lo mismo.\n\nAlgunas cosas pertenecen al teléfono y se quedan ahí: la apariencia, el idioma, la moneda, la respuesta háptica y el bloqueo de la app, tus correcciones de nombres de voz, las tiendas que Skip recuerda para ti y tus búsquedas recientes de pagos.\n\nSkip no guarda tus entradas en iCloud. Si pierdes tu teléfono, inicia sesión en el nuevo y ahí están todas.',
+     keywords: ['nube', 'servidor', 'copia de seguridad', 'iCloud'],
+   },
+   {
+@@ -1168,15 +1170,18 @@
+       'qué datos quedan privados en mi iphone',
+       'procesamiento en el dispositivo skip',
+       'las fotos de mis recibos se suben',
++      'el pdf que exporto se sube a algún lado',
+     ],
+     answer:
+       'Esto se queda en tu iPhone y nunca se nos envía:\n\n' +
+       '- **Fotos de recibos.** Los escaneos y las subidas los lee el teléfono con el reconocimiento de texto de Apple. La imagen no se sube; Skip guarda solo los detalles que confirmas.\n' +
+       '- **Tu voz**, cuando tu iPhone puede reconocer la voz en el propio dispositivo.\n' +
+-      '- **Los ajustes de apariencia, respuesta háptica y bloqueo de la app**, y tu elección de idioma.\n' +
+-      '- **Las correcciones de nombres de voz** y la lista de tiendas que Skip recuerda para ti. Los recibos en sí, con los nombres de tienda incluidos, se guardan en tu cuenta.\n' +
++      '- **Los ajustes de apariencia, respuesta háptica, bloqueo de la app, idioma, moneda y resumen mensual**, y qué consejos ya viste.\n' +
++      '- **Las correcciones de nombres de voz**, las tiendas y las respuestas de logos que Skip recuerda, y tus últimas 10 búsquedas de pagos. Se borran al cerrar sesión.\n' +
++      '- **Análisis**, que se calcula en el teléfono.\n' +
++      '- **Exportaciones**: el CSV o el PDF se crea en el teléfono, y tú decides adónde lo envías.\n' +
+       '- **Face ID.** El bloqueo de la app le pide al iPhone que verifique que eres tú. Skip nunca ve los datos de tu rostro.\n\n' +
+-      'Como viven en el teléfono, no pasan a uno nuevo.',
++      'Una excepción: el nombre de una tienda o servicio que escribes, o que Skip lee de un recibo, se consulta para encontrar su logo. Los recibos en sí, con los nombres de tienda incluidos, se guardan en tu cuenta. Como estas cosas viven en el teléfono, no pasan a uno nuevo.',
+     keywords: ['en el dispositivo', 'local', 'nunca se sube', 'Face ID'],
+   },
+   {
+@@ -1249,7 +1254,7 @@
+       'tiene publicidad skip',
+     ],
+     answer:
+-      'No. Skip no vende tus datos, no los comparte para publicidad y no tiene anuncios. Tampoco hay analíticas de terceros, solo reportes de fallos que ayudan a corregir errores.\n\nSkip se sostiene con Skip Pro, que cuesta {proMonthly} al mes o {proYearly} al año, cobrado por Apple. También hay una propina voluntaria, **Invita un café al equipo**, en **Ajustes**.',
++      'No. Skip no vende tus datos, no los comparte para publicidad y no tiene anuncios. Tampoco hay analíticas de terceros, solo reportes de fallos que ayudan a corregir errores.\n\nSkip se sostiene con Skip Pro, que cuesta {proMonthly} al mes o {proYearly} al año, cobrado por Apple.',
+     keywords: ['vender', 'rastreo', 'analíticas', 'anunciantes'],
+   },
+   {
+@@ -1266,9 +1271,10 @@
+       'mi correo va en los reportes de fallos',
+       'skip registra lo que hago',
+       'qué información va con un error',
+-    ],
+-    answer:
+-      'Cuando algo sale mal, Skip envía un reporte para poder encontrar y corregir el fallo. Describe lo que hacía la app, no lo que contiene tu presupuesto, y el reporte está configurado para no incluir datos personales.\n\n' +
++      'cuánto tiempo guardan los reportes de fallos',
++    ],
++    answer:
++      'Cuando algo sale mal, Skip envía un reporte para poder encontrar y corregir el fallo. Incluye el modelo de tu iPhone, las versiones de iOS y de la app, y lo que hacía la app, no lo que contiene tu presupuesto. Como cualquier servicio web, el servicio de reportes de fallos también puede ver la dirección de internet desde la que llega un reporte, y borra los reportes automáticamente pasado un tiempo fijo.\n\n' +
+       'En la app no hay un interruptor para esto. Los reportes solo vienen de la versión de Skip que descargas, y solo cuando algo falla o se cierra.',
+     keywords: ['reporte de fallos', 'reporte de error', 'diagnósticos', 'registros'],
+   },
+@@ -1312,12 +1318,15 @@
+       'cuándo borra skip mi historial',
+       'se eliminan los cargos antiguos',
+       'por cuánto tiempo guardan mi info',
+-    ],
+-    answer:
+-      'La política de privacidad de Skip fija dos reglas:\n\n' +
+-      '- **Lo que ya ocurrió**, como recibos, cargos registrados y pagos de tarjeta, se guarda siete años y luego se va soltando día a día, a medida que cada cosa pasa esa edad.\n' +
+-      '- **Lo que sigue en marcha**, como facturas, suscripciones, tarjetas, cuentas y salarios, se guarda hasta que lo elimines.\n\n' +
+-      'Hasta dónde puedes ver hacia atrás es aparte. El plan gratis muestra los últimos 90 días, y las entradas más antiguas quedan fuera de la vista, no eliminadas. Skip Pro muestra hasta 7 años.',
++      'mis saldos cambian cuando se borran pagos de hace 7 años',
++    ],
++    answer:
++      'La política de privacidad de Skip fija estas reglas:\n\n' +
++      '- **Lo que ya ocurrió**: los recibos (incluidos los días de hábitos), los pagos registrados de facturas y suscripciones, los pagos de tarjeta, las transferencias entre cuentas y los ingresos que recibiste se eliminan automáticamente, cada noche, cuando tienen más de siete años. Los saldos de tus tarjetas y cuentas en pantalla no cambian: si todavía cuentan un pago antiguo, este pasa a formar parte de su saldo inicial.\n' +
++      '- **Lo que configuraste**: las facturas, suscripciones, préstamos (con sus pagos extra), tarjetas, cuentas, salarios, ahorros, metas, hábitos y libros de recibos se guardan hasta que los elimines.\n' +
++      '- **Tu cuenta, tu perfil y tus ajustes** se guardan hasta que elimines tu cuenta.\n' +
++      '- **Los mensajes que nos envías** se quedan en nuestro buzón de correo hasta que nos pidas eliminarlos.\n\n' +
++      'Hasta dónde puedes ver hacia atrás es aparte. El plan gratis muestra los últimos 90 días, y las entradas más antiguas quedan ocultas, no eliminadas: siguen contando en tus saldos, y Skip Pro las vuelve a mostrar.',
+     keywords: ['retención', 'cuánto tiempo', 'siete años', 'datos viejos'],
+   },
+   {
+@@ -1433,10 +1442,11 @@
+       'derechos rgpd',
+       'derechos ARCO skip',
+       'ccpa skip',
+-    ],
+-    answer:
+-      'Puedes ver en la app todo lo que Skip guarda sobre ti, corregirlo editándolo y eliminarlo todo en **Ajustes → Cuenta → Eliminar cuenta**.\n\n' +
+-      'Según dónde vivas, también puedes tener derecho a una copia de tus datos en un formato portátil, o a oponerte a ciertos tratamientos. Escribe a **admin@skipapps.net** y nos ocuparemos. Los detalles están en **Ajustes → Acerca de → Política de privacidad**.',
++      'puedo poner una queja ante la autoridad de protección de datos',
++    ],
++    answer:
++      'Puedes corregir casi todo lo que ingresaste editándolo, y también eliminarlo, o eliminar toda tu cuenta en **Ajustes → Cuenta → Eliminar cuenta**. Si hay algo que no puedes quitar tú, escríbenos.\n\n' +
++      'Escribe a **admin@skipapps.net** y te enviaremos una copia de todo lo que tenemos sobre ti. Según dónde vivas, también puedes tener derecho a recibir tus datos en un formato portátil, a oponerte a ciertos tratamientos o a limitarlos, y a presentar una queja ante tu autoridad de protección de datos. Escríbenos y nos ocuparemos. Los detalles están en **Ajustes → Acerca de → Política de privacidad**.',
+     keywords: ['derechos', 'RGPD', 'CCPA', 'contacto de privacidad'],
+   },
+   {
+@@ -1455,14 +1465,18 @@
+       'skip es un asesor financiero',
+       'los términos en español son oficiales',
+       'términos y condiciones',
++      'qué edad necesito para usar skip',
++      'que leyes aplican a los terminos de skip',
+     ],
+     answer:
+       'En resumen:\n\n' +
++      '- Descargar Skip es gratis, y la mayor parte de la app también lo es. **Skip Pro** es una suscripción opcional, cobrada por Apple.\n' +
+       '- Skip es una herramienta para anotar y consultar tu propio dinero. No es un banco, un servicio de pagos ni un asesor financiero, y nada en la app es asesoría financiera, fiscal ni legal.\n' +
+-      '- Cada cifra sale de lo que ingresaste. Las previsiones de facturas y días de pago son estimaciones basadas en los calendarios que configuraste.\n' +
++      '- Una cifra puede salir de algo que escribiste, de un escaneo, de tu voz o de los propios cálculos de Skip, y Skip no puede saber si es correcta. Las previsiones de facturas y días de pago son estimaciones basadas en los calendarios que configuraste.\n' +
+       '- Lo que ingresas sigue siendo tuyo, y puedes eliminarlo cuando quieras.\n' +
+-      '- Una cuenta es para una sola persona. Una cuenta que incumpla los términos puede suspenderse o cerrarse.\n\n' +
+-      'Léelos completos en **Ajustes → Acerca de → Términos del servicio**. En español o francés es una traducción de cortesía, y la versión en inglés es la que cuenta.',
++      '- Debes tener 18 años o más. Una cuenta es para una sola persona, y una cuenta que incumpla los términos puede suspenderse o cerrarse.\n' +
++      '- Los términos se rigen por las leyes del estado de Ohio, Estados Unidos. Conservas las protecciones al consumidor del lugar donde vives, y puedes recurrir a los tribunales locales.\n\n' +
++      'Léelos completos en **Ajustes → Acerca de → Términos del servicio**. En español o en francés, el texto es una traducción de cortesía, y la versión en inglés es la que cuenta.',
+     keywords: ['términos', 'términos del servicio', 'acuerdo', 'responsabilidad'],
+   },
+   {
+@@ -1481,7 +1495,7 @@
+       'proteger skip de quien me pide mi teléfono prestado',
+     ],
+     answer:
+-      'Primero cierra sesión, en **Ajustes → Cuenta → Cerrar sesión**. Al cerrar sesión:\n\n- se dejan de enviar tus recordatorios a ese teléfono,\n- se borran de él tus correcciones de nombres de voz y las tiendas que Skip recordaba para ti,\n- y Skip vuelve a la pantalla de bienvenida.\n\nTambién se cierra tu sesión de Skip en tus otros teléfonos, así que vuelve a iniciar sesión en el nuevo si te lo pide.\n\nTus entradas están a salvo en tu cuenta, listas en tu próximo teléfono. Si alguien comparte tu teléfono a diario, activa **Bloqueo de la app** en **Ajustes → Preferencias**, para que Skip pida Face ID antes de abrirse.',
++      'Primero cierra sesión, en **Ajustes → Cuenta → Cerrar sesión**. Al cerrar sesión:\n\n- se dejan de enviar tus recordatorios a ese teléfono,\n- se borran de él tus correcciones de nombres de voz, las tiendas que Skip recordaba y tus búsquedas recientes de pagos,\n- y Skip vuelve a la pantalla de bienvenida.\n\nTambién se cierra tu sesión de Skip en tus otros teléfonos, así que vuelve a iniciar sesión en el nuevo si te lo pide.\n\nTus entradas están a salvo en tu cuenta, listas en tu próximo teléfono. Si alguien comparte tu teléfono a diario, activa **Bloqueo de la app** en **Ajustes → Preferencias**, para que Skip pida Face ID antes de abrirse.',
+     keywords: ['vender teléfono', 'regalar', 'teléfono compartido', 'cerrar sesión'],
+   },
+   {
+--- a/src/lib/ask-sam/knowledge/es/getting-started.ts
++++ b/src/lib/ask-sam/knowledge/es/getting-started.ts
+@@ -157,7 +157,7 @@
+     answer:
+       'No. Skip no es un banco ni una app de pagos, así que no puede pagar facturas, enviar dinero ni mover dinero entre tus cuentas. Lleva un registro de tu dinero y hace las sumas.\n\n' +
+       'Cuando vence una factura, la pagas como siempre: por tu banco, tu tarjeta o la empresa. Skip te avisa antes de que venza y la muestra en tu mes.\n\n' +
+-      'Skip tampoco da asesoría financiera, fiscal ni legal. Cada cifra sale de lo que tú registraste.',
++      'Skip tampoco da asesoría financiera, fiscal ni legal. Una cifra puede salir de lo que escribiste, de un escaneo, de tu voz o de los propios cálculos de Skip, y Skip no puede saber si es correcta.',
+     keywords: ['pagar facturas', 'transferir', 'venmo', 'impuestos'],
+   },
+   {
+@@ -308,7 +308,8 @@
+       '¿Skip lo hizo un banco?',
+       '¿Con quién hablo sobre Skip?',
+       'quien maneja skip',
+-      '¿Quién es el equipo de Weknd?',
++      '¿Skip lo hace una empresa o una sola persona?',
++      'que es skip budget',
+       '¿cómo contacto a la gente que hace skip?',
+       '¿Quién creó Skip Budget?',
+       'de quien es esta app',
+@@ -316,12 +317,12 @@
+       'quienes desarrollaron skip',
+     ],
+     answer:
+-      'Skip lo hace el equipo de Weknd. No lo hace un banco y no tiene anuncios.\n\n' +
+-      'Para contactar al equipo, ve a **Ajustes → Soporte y comentarios**:\n' +
++      'Skip es de Skip Budget, que su fundador lleva como persona física. No lo hace un banco y no tiene anuncios.\n\n' +
++      'Para ponerte en contacto, ve a **Ajustes → Soporte y comentarios**:\n' +
+       '- **Escribir a soporte** si algo falla o no está claro\n' +
+       '- **Comparte una idea** para algo que te gustaría que Skip hiciera\n\n' +
+       'Las respuestas llegan al correo con el que iniciaste sesión.',
+-    keywords: ['desarrollador', 'empresa', 'weknd', 'equipo'],
++    keywords: ['desarrollador', 'empresa', 'Skip Budget', 'equipo'],
+   },
+   {
+     id: 'getting-started.account.required',
+--- a/src/lib/ask-sam/knowledge/es/receipts.ts
++++ b/src/lib/ask-sam/knowledge/es/receipts.ts
+@@ -1521,9 +1521,10 @@
+       '¿Volverán mis recibos viejos con pro?',
+       '¿Se borran los recibos de más de 3 meses en el plan gratis?',
+       'mis recibos viejos desaparecieron, ¿los borraron por no tener pro?',
++      '¿a los 7 años se borran mis recibos?',
+     ],
+     answer:
+-      'En el plan gratis, las listas de recibos muestran los últimos 90 días: hoy y los 89 días anteriores. Skip Pro muestra hasta 7 años.\n\nOcultar los recibos más antiguos no los elimina. Siguen guardados, siguen contando en tu **Saldo actual** y en los saldos de tus tarjetas, y vuelven a mostrarse en cuanto tengas Pro. Donde la lista se corta, un recuadro dice **Tu historial anterior está guardado** y **Gratis muestra los últimos 90 días. Skip Pro muestra hasta 7 años.** Tócalo para ver lo que agrega Pro.\n\nIgual puedes agregar un recibo con una fecha más antigua en el plan gratis. Se guarda y se cuenta, solo que no aparece en la lista.',
++      'En el plan gratis, las listas de recibos muestran los últimos 90 días: hoy y los 89 días anteriores. Skip Pro muestra hasta 7 años.\n\nOcultar los recibos más antiguos no los elimina. Siguen guardados, siguen contando en tu **Saldo actual** y en los saldos de tus tarjetas, y vuelven a mostrarse en cuanto tengas Pro. Donde la lista se corta, un recuadro dice **Tu historial anterior está guardado** y **Gratis muestra los últimos 90 días. Skip Pro muestra hasta 7 años.** Tócalo para ver lo que agrega Pro.\n\nIgual puedes agregar un recibo con una fecha más antigua en el plan gratis. Se guarda y se cuenta, solo que no aparece en la lista.\n\nEn todos los planes, los recibos se eliminan automáticamente siete años después de su fecha.',
+     keywords: ['historial', '90 días', '7 años', 'recibos ocultos'],
+   },
+   {
+--- a/src/lib/ask-sam/knowledge/fr/pro-settings.ts
++++ b/src/lib/ask-sam/knowledge/fr/pro-settings.ts
+@@ -1112,9 +1112,8 @@
+       '- **Ton argent** : raccourcis vers les factures, abonnements, cartes et jour de paie',
+       '- **À propos** : politique de confidentialité, conditions et version',
+       '- **Assistance et commentaires** : questions fréquentes, assistance par courriel et idées',
+-      '- **Offre un café à l’équipe** : un pourboire facultatif',
+       '- **Compte** : **Se déconnecter** et **Supprimer le compte**',
+-      '- **Demande à Sam** : des réponses tout de suite sur Skip',
++      '- **Demande à Sam** : des réponses tout de suite sur Skip',
+     ),
+     keywords: ['réglages', 'options', 'menu', 'compte'],
+   },
+@@ -1766,25 +1765,25 @@
+   },
+   {
+     id: 'settings.coffee.tip',
+-    title: 'C’est quoi Offre un café à l’équipe ?',
+-    questions: [
+-      "C'est quoi Offre un café à l'équipe ?",
++    title: 'Je peux donner un pourboire ou faire un don à Skip ?',
++    questions: [
++      'Je peux donner un pourboire ou faire un don à Skip ?',
+       'offre-moi un café',
+       'comment donner un pourboire aux développeurs',
+       'faire un don à skip',
+-      'Pour que Skip continue de carburer ?',
+-      'acheter un café me donne pro',
++      "ou est passe offre un cafe a l'equipe",
++      'le bouton café a disparu des réglages',
+       "soutenir l'équipe avec de l'argent",
+-      'bouton café dans les réglages',
+-      'le café est obligatoire',
+-      'pot à pourboires',
+-    ],
+-    answer: text(
+-      'C’est un pourboire facultatif pour les gens qui font Skip. Toucher **Offre un café à l’équipe** dans **Réglages** ouvre leur page Buy Me a Coffee dans un navigateur à l’intérieur de l’app, où tu peux choisir de donner.',
+-      '',
+-      'C’est entièrement volontaire. Un café ne débloque pas Skip Pro et ne change rien dans l’app, et le paiement se fait sur ce site Web, pas par Apple ni par ton compte Skip. Pour Pro, passe par **Réglages → Skip Pro**.',
+-    ),
+-    keywords: ['café', 'pourboire', 'don', 'Buy Me a Coffee'],
++      'comment soutenir skip',
++      'y a un pot à pourboires ?',
++      'je veux donner un petit qqch à ceux qui font skip',
++    ],
++    answer: text(
++      'Skip n’a pas d’option de pourboire ni de don, et **Réglages** n’a plus la ligne **Offre un café à l’équipe**. Skip est financée par **Skip Pro**, c’est donc la façon de la soutenir : **Réglages → Skip Pro**.',
++      '',
++      'Dire à l’équipe ce qui rendrait Skip meilleure aide aussi : **Réglages → Assistance et commentaires → Partage une idée**.',
++    ),
++    keywords: ['pourboire', 'don', 'soutenir Skip', 'Buy Me a Coffee'],
+   },
+   {
+     id: 'settings.rate.app',
+--- a/src/lib/ask-sam/knowledge/fr/voice-privacy-help.ts
++++ b/src/lib/ask-sam/knowledge/fr/voice-privacy-help.ts
+@@ -1096,9 +1096,18 @@
+       'données collectées par skip budget',
+       'quelles infos sont gardées quand je m’inscris',
+       'skip garde mon fuseau horaire ?',
+-    ],
+-    answer:
+-      'Seulement ce que tu y mets, plus ce qui est nécessaire pour faire fonctionner ton compte :\n\n- **Ton compte** : ton adresse courriel, ou l’identifiant de connexion que nous donne Apple ou Google si tu les utilises.\n- **Ton profil** : le nom d’affichage et l’image que tu choisis parmi celles de Skip, ainsi que le fuseau horaire de ton téléphone, pour que les dates et les rappels suivent ta journée.\n- **Ton argent** : les factures, abonnements, reçus, prêts, paie, épargne, objectifs, habitudes et paiements de carte que tu saisis, ainsi que l’historique des prélèvements de tes factures et de tes abonnements.\n- **Tes cartes et tes comptes** : le nom que tu leur donnes, le réseau ou la banque, une couleur, un solde que tu saisis, un jour d’échéance et, au plus, les quatre derniers chiffres.\n- **Tes réglages** : tes rappels, le fait que tu aies Skip Pro ou non et, si tu actives les rappels, l’adresse de notification de ton téléphone pour qu’ils puissent l’atteindre.\n\nSkip ne demande jamais de numéro de carte complet, de date d’expiration, de code de sécurité ni d’identifiants bancaires. Tu trouveras plus de détails dans **Réglages → À propos → Politique de confidentialité**.',
++      'vous gardez mon mot de passe ?',
++      'skip garde les messages que je vous envoie ?',
++    ],
++    answer:
++      'Seulement ce que tu y mets, plus ce dont Skip a besoin pour te connecter, t’envoyer tes rappels et savoir si tu as Skip Pro :\n\n' +
++      '- **Ton compte** : ton adresse courriel, et ton mot de passe brouillé pour qu’il ne puisse pas être relu. Avec la connexion Apple ou Google, l’identifiant de compte et le courriel qu’ils donnent à Skip (celui d’Apple peut être une adresse de relais privé).\n' +
++      '- **Ton profil** : le nom d’affichage que tu choisis et l’avatar que tu prends parmi ceux de Skip.\n' +
++      '- **Ton argent** : les factures, abonnements, reçus, carnets de reçus, prêts, salaires, paie, épargne, objectifs et habitudes de dépense que tu saisis, avec leurs notes et tes choix de logos ; ce que tes factures et tes abonnements ont prélevé ; tes paiements de carte et tes transferts ; et comment et quand chaque reçu a été ajouté.\n' +
++      '- **Tes cartes et tes comptes** : le nom que tu leur donnes, le réseau ou la banque, le type, une couleur, le solde que tu saisis et sa date, un jour d’échéance, une limite de crédit facultative et, au plus, les quatre derniers chiffres.\n' +
++      '- **Skip Pro** : si tu l’as, quel forfait, et quand il se renouvelle ou prend fin.\n' +
++      '- **Tes réglages** : ton fuseau horaire, pour que les rappels arrivent à la bonne heure ; tes choix de rappels ; ton carnet de reçus par défaut ; et, dès que tu actives un rappel, l’adresse de notification de ton téléphone.\n\n' +
++      'Les messages que tu envoies depuis le formulaire de contact nous arrivent par courriel ; Skip ne les garde pas. Skip ne demande jamais de numéro de carte complet, de date d’expiration, de code de sécurité ni d’identifiants bancaires. Tous les détails sont dans **Réglages → À propos → Politique de confidentialité**.',
+     keywords: ['données', 'collecte', 'renseignements personnels', 'politique de confidentialité'],
+   },
+   {
+@@ -1116,9 +1125,13 @@
+       'où sont stockées mes entrées',
+       'y a-t-il quelque chose de sauvegardé sur le téléphone lui-même',
+       'stockage dans le nuage skip',
+-    ],
+-    answer:
+-      'Tes entrées sont conservées dans ton compte Skip, sur notre serveur, et pas seulement sur le téléphone. C’est pourquoi elles reviennent quand tu te connectes sur un nouveau téléphone, et pourquoi tes téléphones affichent la même chose.\n\nQuelques éléments appartiennent au téléphone et y restent : l’apparence, la langue, le retour haptique et le verrouillage de l’app, tes corrections de noms de la voix, et la liste des magasins que Skip retient pour toi.\n\nSkip ne garde pas tes entrées dans iCloud. Si tu perds ton téléphone, connecte-toi sur le nouveau et tout est là.',
++      'mes données sont stockées dans quel pays',
++      'mes données sont au canada ?',
++    ],
++    answer:
++      'Tes entrées sont conservées dans ton compte Skip, sur nos serveurs, au Canada (Montréal), et pas seulement sur le téléphone. C’est pourquoi elles reviennent quand tu te connectes sur un nouveau téléphone, et pourquoi tes téléphones affichent la même chose.\n\n' +
++      'Quelques éléments appartiennent au téléphone et y restent : l’apparence, la langue, la devise, le retour haptique et le verrouillage de l’app, tes corrections de noms de la voix, les magasins que Skip retient pour toi, et tes recherches de paiements récentes.\n\n' +
++      'Skip ne garde pas tes entrées dans iCloud. Si tu perds ton téléphone, connecte-toi sur le nouveau et elles sont toutes là.',
+     keywords: ['nuage', 'serveur', 'sauvegarde', 'iCloud'],
+   },
+   {
+@@ -1135,9 +1148,18 @@
+       'qu’est-ce qui est gardé sur l’appareil',
+       'quelles données restent privées sur mon iphone',
+       'traitement sur l’appareil skip',
+-    ],
+-    answer:
+-      'Ceci reste sur ton iPhone et ne nous est jamais envoyé :\n\n- **Les photos de reçus.** Les numérisations et les imports sont lus sur le téléphone par la reconnaissance de texte d’Apple. L’image n’est pas téléversée ; Skip n’enregistre que les détails que tu confirmes.\n- **Ta voix**, quand ton iPhone peut reconnaître la voix directement sur l’appareil.\n- **Les réglages d’apparence, de retour haptique et de verrouillage de l’app**, et ton choix de langue.\n- **Les corrections de noms de la voix** et la liste des magasins que Skip retient pour toi. Les reçus eux-mêmes, noms de magasins compris, sont enregistrés dans ton compte.\n- **Face ID.** Le verrouillage de l’app demande à l’iPhone de vérifier que c’est toi. Skip ne voit jamais tes données faciales.\n\nParce qu’elles vivent sur le téléphone, elles ne passent pas sur un nouveau.',
++      'mes exports passent par vos serveurs ?',
++    ],
++    answer:
++      'Ceci reste sur ton iPhone et ne nous est jamais envoyé :\n\n' +
++      '- **Les photos de reçus.** Les numérisations et les imports sont lus sur le téléphone par la reconnaissance de texte d’Apple. L’image n’est pas téléversée ; Skip n’enregistre que les détails que tu confirmes.\n' +
++      '- **Ta voix**, quand ton iPhone peut reconnaître la voix directement sur l’appareil.\n' +
++      '- **Les réglages d’apparence, de retour haptique, de verrouillage de l’app, de langue, de devise et de bilan mensuel**, et les astuces que tu as déjà vues.\n' +
++      '- **Les corrections de noms de la voix**, les magasins et les réponses sur les logos que Skip retient, et tes 10 dernières recherches de paiements. Ils sont effacés quand tu te déconnectes.\n' +
++      '- **Aperçu**, calculé sur le téléphone.\n' +
++      '- **Les exports** : le CSV ou le PDF est créé sur le téléphone, et c’est toi qui décides où tu l’envoies.\n' +
++      '- **Face ID.** Le verrouillage de l’app demande à l’iPhone de vérifier que c’est toi. Skip ne voit jamais tes données faciales.\n\n' +
++      'Une exception : un nom de magasin ou de service que tu saisis, ou que Skip lit sur un reçu, est recherché pour trouver son logo. Les reçus eux-mêmes, noms de magasins compris, sont enregistrés dans ton compte. Parce que ces éléments vivent sur le téléphone, ils ne passent pas sur un nouveau.',
+     keywords: ['sur l’appareil', 'local', 'jamais téléversé', 'Face ID'],
+   },
+   {
+@@ -1199,7 +1221,7 @@
+       'mes données sont-elles un produit',
+     ],
+     answer:
+-      'Non. Skip ne vend pas tes données, ne les partage pas à des fins publicitaires, et n’a aucune publicité. Il n’y a pas non plus d’outil d’analyse tiers, seulement des rapports de plantage qui aident à corriger les défauts.\n\nSkip est financée par Skip Pro, qui coûte {proMonthly} par mois ou {proYearly} par an, facturés par Apple. Il y a aussi un pourboire volontaire, **Offre un café à l’équipe**, dans **Réglages**.',
++      'Non. Skip ne vend pas tes données, ne les partage pas à des fins publicitaires, et n’a aucune publicité. Il n’y a pas non plus d’outil d’analyse tiers, seulement des rapports de plantage qui aident à corriger les défauts.\n\nSkip est financée par Skip Pro, qui coûte {proMonthly} par mois ou {proYearly} par an, facturés par Apple.',
+     keywords: ['vendre', 'pistage', 'analyse', 'annonceurs'],
+   },
+   {
+@@ -1216,9 +1238,11 @@
+       'mon courriel est dans les rapports de plantage',
+       'skip enregistre ce que je fais',
+       'quelles informations accompagnent une erreur',
+-    ],
+-    answer:
+-      'Quand quelque chose ne va pas, Skip envoie un rapport pour que le défaut puisse être trouvé et corrigé. Il décrit ce que faisait l’app, pas ce que contient ton budget, et Skip est configurée pour ne pas y joindre de détails personnels.\n\n' +
++      'les rapports de plantage sont gardés combien de temps',
++      'vous voyez mon adresse ip ?',
++    ],
++    answer:
++      'Quand quelque chose ne va pas, Skip envoie un rapport pour que le défaut puisse être trouvé et corrigé. Il contient le modèle de ton iPhone, les versions d’iOS et de l’app, et ce que faisait l’app, pas ce que contient ton budget. Comme tout service web, le service de rapports de plantage peut aussi voir l’adresse internet d’où vient un rapport, et il supprime les rapports automatiquement après un délai fixé.\n\n' +
+       'Il n’y a pas d’interrupteur pour ça dans l’app. Les rapports ne viennent que de la version de Skip que tu télécharges, et seulement quand quelque chose échoue ou plante.',
+     keywords: ['rapport de plantage', 'rapport d’erreur', 'diagnostics', 'journaux'],
+   },
+@@ -1260,12 +1284,16 @@
+       'vieilles factures supprimées automatiquement',
+       'quand skip supprime mon historique',
+       'les anciens prélèvements sont retirés',
+-    ],
+-    answer:
+-      'La politique de confidentialité de Skip fixe deux règles :\n\n' +
+-      '- **Ce qui s’est produit**, comme les reçus, les prélèvements enregistrés et les paiements de carte, est conservé sept ans, puis retiré jour après jour à mesure que chaque élément dépasse cet âge.\n' +
+-      '- **Ce qui est toujours en cours**, comme les factures, abonnements, cartes, comptes et salaires, est conservé jusqu’à ce que tu les supprimes.\n\n' +
+-      'Jusqu’où tu peux remonter est une question distincte. Le forfait gratuit affiche les 90 derniers jours, et les entrées plus anciennes sont gardées hors de vue, pas supprimées. Skip Pro en affiche jusqu’à 7 ans.',
++      'mes reçus sont supprimés après 7 ans ?',
++      'mon solde va changer quand les vieux paiements sont supprimés ?',
++    ],
++    answer:
++      'La politique de confidentialité de Skip fixe ces règles :\n\n' +
++      '- **Ce qui s’est produit** : les reçus (jours d’habitude compris), les paiements de factures et d’abonnements enregistrés, les paiements de carte, les transferts entre comptes et la paie que tu as reçue sont supprimés automatiquement, chaque nuit, dès qu’ils ont plus de sept ans. Les soldes de tes cartes et de tes comptes à l’écran ne changent pas : un ancien paiement qu’ils comptent encore est intégré à leur solde de départ.\n' +
++      '- **Ce que tu as mis en place** : les factures, abonnements, prêts (avec leurs éventuels paiements supplémentaires), cartes, comptes, salaires, épargne, objectifs, habitudes et carnets de reçus sont conservés jusqu’à ce que tu les supprimes.\n' +
++      '- **Ton compte, ton profil et tes réglages** sont conservés jusqu’à ce que tu supprimes ton compte.\n' +
++      '- **Les messages que tu nous envoies** restent dans notre boîte courriel jusqu’à ce que tu nous demandes de les supprimer.\n\n' +
++      'Jusqu’où tu peux remonter est une question à part. Le forfait gratuit affiche les 90 derniers jours, et les entrées plus anciennes sont masquées, pas supprimées : elles comptent toujours dans tes soldes, et Skip Pro les affiche de nouveau.',
+     keywords: ['conservation', 'combien de temps', 'sept ans', 'anciennes données'],
+   },
+   {
+@@ -1378,10 +1406,11 @@
+       'adresse de contact pour la vie privée',
+       'droits rgpd',
+       'loi 25 vie privée skip',
+-    ],
+-    answer:
+-      'Tu peux voir dans l’app tout ce que Skip détient à ton sujet, corriger n’importe quel élément en le modifiant, et tout supprimer dans **Réglages → Compte → Supprimer le compte**.\n\n' +
+-      'Selon l’endroit où tu vis, tu peux aussi avoir le droit d’obtenir une copie de tes données dans un format portable, ou de t’opposer à certains traitements. Écris à **admin@skipapps.net** et nous y donnerons suite. Les détails sont dans **Réglages → À propos → Politique de confidentialité**.',
++      'comment porter plainte pour mes données personnelles',
++    ],
++    answer:
++      'Tu peux corriger la plupart de ce que tu as saisi en le modifiant, et le supprimer, ou supprimer tout ton compte dans **Réglages → Compte → Supprimer le compte**. Pour tout ce que tu ne peux pas retirer toi-même, écris-nous.\n\n' +
++      'Écris à **admin@skipapps.net** et nous t’enverrons une copie de tout ce que nous détenons à ton sujet. Selon l’endroit où tu vis, tu peux aussi avoir le droit d’obtenir tes données dans un format portable, de t’opposer à certains traitements ou de les limiter, et de porter plainte auprès de ton autorité de protection des données. Écris-nous et nous y donnerons suite. Les détails sont dans **Réglages → À propos → Politique de confidentialité**.',
+     keywords: ['droits', 'RGPD', 'corriger', 'contact confidentialité'],
+   },
+   {
+@@ -1399,13 +1428,18 @@
+       'responsabilité skip',
+       'skip est un conseiller financier',
+       'les conditions en espagnol sont officielles',
++      'il faut avoir quel âge pour utiliser skip',
++      'skip pro c’est obligatoire ?',
++      'quel droit s’applique aux conditions de skip',
+     ],
+     answer:
+       'En bref :\n\n' +
++      '- Skip se télécharge gratuitement, et la plus grande partie de l’app est gratuite. **Skip Pro** est un abonnement facultatif, facturé par Apple.\n' +
+       '- Skip est un outil pour noter et regarder ton propre argent. Ce n’est ni une banque, ni un service de paiement, ni un conseiller financier, et rien dans l’app n’est un conseil financier, fiscal ou juridique.\n' +
+-      '- Chaque chiffre vient de ce que tu as saisi. Les prévisions de factures et de jours de paie sont des estimations tirées des horaires que tu as réglés.\n' +
++      '- Un chiffre peut venir de ce que tu as saisi, d’une numérisation, de ta voix ou des propres calculs de Skip, et Skip ne peut pas savoir s’il est juste. Les prévisions de factures et de jours de paie sont des estimations tirées des échéanciers que tu as définis.\n' +
+       '- Ce que tu y mets reste à toi, et tu peux le supprimer quand tu veux.\n' +
+-      '- Un compte est pour une seule personne. Un compte qui enfreint les conditions peut être suspendu ou fermé.\n\n' +
++      '- Tu dois avoir 18 ans ou plus. Un compte est pour une seule personne, et un compte qui enfreint les conditions peut être suspendu ou fermé.\n' +
++      '- Les conditions sont régies par le droit de l’État de l’Ohio, aux États-Unis. Tu conserves les protections des consommateurs de l’endroit où tu vis, et tu peux faire appel aux tribunaux locaux.\n\n' +
+       'Lis tout dans **Réglages → À propos → Conditions d’utilisation**. En espagnol ou en français, c’est une traduction de courtoisie, et c’est la version anglaise qui fait foi.',
+     keywords: ['conditions', 'conditions d’utilisation', 'conseil financier', 'responsabilité'],
+   },
+@@ -1423,9 +1457,15 @@
+       'arrêter d’afficher mes infos sur mon ancien téléphone',
+       'reprise de mon iphone skip',
+       'protéger skip des gens qui empruntent mon téléphone',
+-    ],
+-    answer:
+-      'Déconnecte-toi d’abord, dans **Réglages → Compte → Se déconnecter**. Se déconnecter :\n\n- arrête l’envoi de tes rappels vers ce téléphone,\n- efface de celui-ci tes corrections de noms de la voix et les magasins que Skip avait retenus pour toi,\n- et ramène Skip à l’écran de bienvenue.\n\nCela te déconnecte aussi de Skip sur tes autres téléphones, alors reconnecte-toi sur ton nouveau si on te le demande.\n\nTes entrées restent en sécurité dans ton compte, prêtes sur ton prochain téléphone. Si quelqu’un partage ton téléphone au quotidien, active le **Verrouillage de l’app** dans **Réglages → Préférences**, pour que Skip demande Face ID avant de s’ouvrir.',
++      'me déconnecter efface mes recherches récentes ?',
++    ],
++    answer:
++      'Déconnecte-toi d’abord, dans **Réglages → Compte → Se déconnecter**. Se déconnecter :\n\n' +
++      '- arrête l’envoi de tes rappels vers ce téléphone,\n' +
++      '- efface de celui-ci tes corrections de noms de la voix, les magasins que Skip avait retenus et tes recherches de paiements récentes,\n' +
++      '- et ramène Skip à l’écran de bienvenue.\n\n' +
++      'Cela te déconnecte aussi de Skip sur tes autres téléphones, alors reconnecte-toi sur ton nouveau si on te le demande.\n\n' +
++      'Tes entrées restent en sécurité dans ton compte, prêtes sur ton prochain téléphone. Si quelqu’un partage ton téléphone au quotidien, active le **Verrouillage de l’app** dans **Réglages → Préférences**, pour que Skip demande Face ID avant de s’ouvrir.',
+     keywords: ['vendre mon téléphone', 'donner', 'téléphone partagé', 'Verrouillage de l’app'],
+   },
+   {
+--- a/src/lib/ask-sam/knowledge/fr/getting-started.ts
++++ b/src/lib/ask-sam/knowledge/fr/getting-started.ts
+@@ -153,11 +153,12 @@
+       'c’est comme paypal ?',
+       'skip peut m’aider pour mes impôts',
+       'est ce que skip fait les paiements à ma place',
++      'les chiffres de skip sont toujours exacts ?',
+     ],
+     answer:
+       'Non. Skip n’est ni une banque ni une app de paiement, donc elle ne peut pas payer de factures, envoyer de l’argent ni en déplacer entre tes comptes. Elle garde une trace de ton argent et fait l’addition.\n\n' +
+       'Quand une facture arrive à échéance, tu la paies comme d’habitude : par ta banque, ta carte ou l’entreprise. Skip te rappelle avant l’échéance et l’affiche dans ton mois.\n\n' +
+-      'Skip ne donne pas non plus de conseils financiers, fiscaux ou juridiques. Chaque chiffre vient de ce que tu as entré.',
++      'Skip ne donne pas non plus de conseils financiers, fiscaux ou juridiques. Un chiffre peut venir de ce que tu as saisi, d’une numérisation, de ta voix ou des propres calculs de Skip, et Skip ne peut pas savoir s’il est juste.',
+     keywords: ['payer des factures', 'virement', 'conseils', 'impôts'],
+   },
+   {
+@@ -308,19 +309,20 @@
+       'skip est fait par une banque ?',
+       'À qui je parle pour Skip ?',
+       'qui dirige skip',
+-      'c est quoi l’équipe weknd',
++      'skip c’est une entreprise ou une seule personne',
++      'c est quoi skip budget',
+       'comment joindre les gens qui font skip',
+       'qui a créé skip budget',
+       'c’est l’app de qui',
+       'quelle équipe a développé skip',
+     ],
+     answer:
+-      'Skip est faite par l’équipe Weknd. Elle n’est pas faite par une banque, et il n’y a aucune publicité dedans.\n\n' +
+-      'Pour joindre l’équipe, va dans **Réglages → Assistance et commentaires** :\n' +
++      'Skip vient de Skip Budget, que son fondateur gère en tant que personne physique. Elle n’est pas faite par une banque, et il n’y a aucune publicité dedans.\n\n' +
++      'Pour nous joindre, va dans **Réglages → Assistance et commentaires** :\n' +
+       '- **Écrire à l’assistance** si quelque chose ne va pas ou n’est pas clair\n' +
+       '- **Partage une idée** pour quelque chose que tu aimerais que Skip fasse\n\n' +
+       'Les réponses arrivent à l’adresse utilisée pour te connecter.',
+-    keywords: ['développeur', 'entreprise', 'weknd', 'équipe'],
++    keywords: ['développeur', 'entreprise', 'Skip Budget', 'équipe'],
+   },
+   {
+     id: 'getting-started.account.required',
+--- a/src/lib/ask-sam/knowledge/fr/receipts.ts
++++ b/src/lib/ask-sam/knowledge/fr/receipts.ts
+@@ -1509,11 +1509,13 @@
+       'mes anciens reçus reviendront avec pro ?',
+       'les reçus de plus de 3 mois seront effacés en gratuit ?',
+       'skip va effacer mes reçus d’il y a plusieurs mois ?',
++      'mes reçus sont supprimés après 7 ans ?',
+     ],
+     answer: text(
+       'Avec le forfait gratuit, les listes de reçus montrent les 90 derniers jours : aujourd’hui et les 89 jours d’avant. Skip Pro montre jusqu’à 7 ans.',
+       'Masquer les reçus plus anciens ne les supprime pas. Ils restent enregistrés, comptent toujours dans ton **Solde actuel** et les soldes de tes cartes, et réapparaissent dès que tu as Pro. Là où la liste s’arrête, une carte indique **Ton historique plus ancien est conservé** et **Gratuit affiche les 90 derniers jours. Skip Pro affiche jusqu’à 7 ans.** Touche-la pour voir ce que Pro ajoute.',
+       'Tu peux quand même ajouter un reçu avec une date plus ancienne avec le forfait gratuit. Il est enregistré et compté, mais pas listé.',
++      'Quel que soit le forfait, les reçus sont supprimés automatiquement sept ans après leur date.',
+     ),
+     keywords: ['90 jours', '7 ans', 'historique', 'anciens reçus'],
+   },

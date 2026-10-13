@@ -389,6 +389,7 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'bills',
     title: 'Can I add a note to a bill?',
     questions: [
+      'write extra details about a subscription',
       'Can I add a note to a bill?',
       'where do i write the account number for my bill',
       'add a note to a subscription',
@@ -407,7 +408,7 @@ export const billsSubscriptionsIntents: Intent[] = [
     ],
     answer:
       'Yes. You can add one on the bill or subscription form, while adding it or after tapping the pencil.\n\n1. Tap **Note**, which says **Add a note**.\n2. Type what you like ("Anything worth remembering" for a bill, "Which plan, for example" for a subscription).\n3. Tap **Done**.\n\nThe note is optional. It shows as **Note** on the bill\'s or subscription\'s page. To change or clear it, tap the pencil, tap **Note**, edit it and tap **Save changes**.',
-    keywords: ['note', 'memo', 'add a note'],
+    keywords: ['comment', 'note', 'memo', 'add a note'],
     related: ['bills.detail.page', 'bills.edit.how'],
   },
   {
@@ -442,6 +443,8 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'bills',
     title: 'How do I leave a bill without saving?',
     questions: [
+      'the back arrow while adding a bill or subscription',
+      'what happens if I tap back halfway through adding a bill',
       'How do I leave a bill without saving?',
       'cancel adding this bill',
       'how do I get out of the add subscription page',
@@ -707,6 +710,8 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'bills',
     title: 'How do I edit a bill?',
     questions: [
+      "fix details on a bill I've already made",
+      'can I still make changes to a bill I made earlier',
       'How do I edit a bill?',
       'change my bill',
       'edit bill',
@@ -856,6 +861,7 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'bills',
     title: 'How do I change when a bill is due?',
     questions: [
+      'changed my rent due day and the next one jumped to next month',
       'How do I change when a bill is due?',
       'change the due date of my bill',
       'my rent moved from the 1st to the 15th',
@@ -1008,6 +1014,7 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'bills',
     title: 'Keep past charges or Remove everything?',
     questions: [
+      'which delete option should I pick for a bill I stopped paying',
       'Keep past charges or Remove everything?',
       'what does keep past charges do',
       'what does remove everything do',
@@ -1172,6 +1179,7 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'subscriptions',
     title: 'What does Cancelled mean on a subscription?',
     questions: [
+      'cancelled subscription still listed',
       'What does Cancelled mean on a subscription?',
       'cancelled last charged meaning',
       'what is the cancelled section',
@@ -1320,8 +1328,8 @@ export const billsSubscriptionsIntents: Intent[] = [
       'yearly bill on 29 feb',
     ],
     answer:
-      "In a month without that day, Skip uses the month's last day. A bill due on the 31st is counted on 30 April, and on 28 February (29 February in a leap year). A yearly bill on 29 February is counted on 28 February in other years.\n\n" +
-      "After a shorter month, check **Next due** on the bill's page. If it stayed on the earlier day, tap the pencil and set **Payment on** back to the date you want.\n\n" +
+      "In a month without that day, Skip uses the month's last day, then goes back to your day the month after. A bill due on the 31st is counted on 31 March, 30 April and 31 May, and on 28 February (29 February in a leap year). A yearly bill on 29 February is counted on 28 February in other years and on the 29th again in a leap year. Subscriptions, loan payments and bills set to **Every 3 months** work the same way.\n\n" +
+      "So **Next due** can show the 30th or the 28th in a short month; the month after, it's back on your day. If you set **Payment on** to a new date, that's the day Skip keeps from then on.\n\n" +
       'Tip: a date from the 1st to the 28th never shifts.',
     keywords: ['31st', '30th', '29th', 'end of month', 'february', 'leap year', 'last day'],
     related: ['bills.edit.date-change', 'bills.add.payment-on', 'bills.dates.weekend'],
@@ -1331,6 +1339,7 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'bills',
     title: 'Does Skip move a bill due on a weekend?',
     questions: [
+      'bill due on a saturday or sunday, which day does skip use',
       'Does Skip move a bill due on a weekend?',
       'my bill is due on a sunday',
       'bank holiday bill date',
@@ -1398,6 +1407,7 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'bills',
     title: "What's on the Monthly bills page?",
     questions: [
+      'what does the large card on monthly bills show',
       "What's on the Monthly bills page?",
       'explain the monthly bills screen',
       'what is the purple card on monthly bills',
@@ -1469,6 +1479,7 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'bills',
     title: 'How is the Due in month figure worked out?',
     questions: [
+      'are unpaid bills counted in the due figure',
       'How is the Due in month figure worked out?',
       'what does due in october mean',
       'how is the monthly bills total calculated',
@@ -1490,7 +1501,7 @@ export const billsSubscriptionsIntents: Intent[] = [
       '- Loans added to monthly bills count. Extra loan payments get their own line.\n\n' +
       "Example, on 13 October: rent $1,000 on the 1st, internet $60 on the 25th and a $25 cleaner every Monday (4 Mondays). **Due in October** is $1,000 + $60 + $100 = $1,160.00. A $600 yearly insurance due in March isn't counted until March.\n\n" +
       'It updates as soon as you add or change a bill.',
-    keywords: ['due in', 'total', 'monthly total', 'figure', 'big number'],
+    keywords: ['due this month', 'due in', 'total', 'monthly total', 'figure', 'big number'],
     related: ['bills.month.counts', 'bills.balance.vs-month', 'bills.month.extra'],
     route: '/bills',
   },
@@ -2033,6 +2044,7 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'bills',
     title: 'How do bills change my Current balance?',
     questions: [
+      'does a bill take money out of my balance on the due day',
       'How do bills change my Current balance?',
       'why did my balance go down on the 1st',
       'do bills come off my bank account balance in skip',
@@ -2094,6 +2106,7 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'bills',
     title: 'I deleted a card my bills were paid with',
     questions: [
+      'if I delete a card, are the subscriptions paid with it deleted too',
       'I deleted a card my bills were paid with',
       'what happens to my bills if i delete a card',
       'removed my credit card now bills say add a card',
@@ -2144,6 +2157,7 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'bills',
     title: "Why didn't my bill reminder come?",
     questions: [
+      'my subscription renewed and no reminder showed up',
       "Why didn't my bill reminder come?",
       'no notification for my bill',
       'bill reminder not working',
@@ -2300,7 +2314,7 @@ export const billsSubscriptionsIntents: Intent[] = [
       '1. Open the duplicate from **Monthly bills** (or **Subscriptions**).\n' +
       '2. Tap the pencil, then **Delete bill** (or **Delete subscription**).\n' +
       '3. Tap **Remove everything**.\n\n' +
-      'Totals and balances update straight away. A single bill is never charged twice for the same month (or week, quarter or year), so a double usually means two copies were added.',
+      'Totals and balances update straight away. A single bill is never charged twice for the same month (or week, quarter or year), so a double usually means two copies were added. Tapping **Save bill** twice doesn’t make one: the button holds on **Saving…** until the page closes.',
     keywords: ['duplicate', 'twice', 'double', 'counted twice'],
     related: ['bills.delete.choices', 'bills.delete.how', 'subscriptions.delete.how'],
   },
@@ -2336,6 +2350,7 @@ export const billsSubscriptionsIntents: Intent[] = [
     topic: 'subscriptions',
     title: 'Can Skip cancel a subscription for me?',
     questions: [
+      'does skip contact netflix to cancel',
       'Can Skip cancel a subscription for me?',
       'will cancelling in skip stop netflix charging me',
       'cancel my spotify through skip',

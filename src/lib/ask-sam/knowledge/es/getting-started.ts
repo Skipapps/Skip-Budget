@@ -1793,8 +1793,8 @@ export const gettingStartedEs: IntentText[] = [
       'No hay un tour aparte. Skip te va mostrando todo sobre la marcha:\n\n' +
       '- Las páginas de bienvenida explican qué es Skip antes de que te registres.\n' +
       '- **Configuremos Skip** y la tarjeta **Primeros pasos** en **Inicio** te guían por los cinco pasos de configuración.\n' +
-      '- **Ajustes → Soporte y comentarios → Preguntas frecuentes** tiene respuestas cortas.\n\n' +
-      'Y puedes preguntarme lo que quieras, cuando quieras.',
+      '- **Preguntas frecuentes** es una página de respuestas cortas. Ábrela con el enlace de abajo.\n\n' +
+      'Y puedes preguntarme lo que quieras, cuando quieras: estoy en **Ajustes → Soporte y comentarios** y al final de **Ajustes**.',
     keywords: ['tour', 'tutorial', 'guía', 'preguntas frecuentes'],
   },
   {

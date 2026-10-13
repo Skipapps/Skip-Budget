@@ -61,6 +61,8 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'How can Skip help me stop buying coffee?',
     questions: [
+      'how can skip help me quit my morning starbucks habit',
+      'how can skip help me stop a daily coffee shop visit',
       'how do I stop buying coffee',
       'I spend too much on takeout, can skip help',
       'how to cut back on uber eats',
@@ -91,6 +93,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'How is a habit different from receipts?',
     questions: [
+      'habit or receipt for my daily coffee, which should I use',
       "what's the difference between a habit and a receipt",
       'why use habits instead of just adding receipts',
       'habit vs receipt',
@@ -113,6 +116,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'Where do my habit days show up?',
     questions: [
+      "where does a habit day's receipt end up",
       'where do my habit days show up',
       'why is my receipts list full of coffee',
       'does tapping a habit day add a receipt',
@@ -144,6 +148,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'How do I start a spending habit?',
     questions: [
+      'walk me through making a new habit',
       'How do I start a spending habit?',
       'how do i add a habit',
       'create a new habit',
@@ -174,6 +179,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'Which ready-made habits are there?',
     questions: [
+      'are there habits already made for me to pick',
       'what habits can I pick from',
       'which ready-made habits are there',
       'list of preset habits',
@@ -262,6 +268,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'Which spending category does a habit use?',
     questions: [
+      'change the category my habit receipts go under',
       'which category do my habit receipts go in',
       'how do I change the category of a habit',
       'why is my coffee under dining and takeout',
@@ -283,6 +290,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'What price should I set for a habit?',
     questions: [
+      "how much should I put in as the habit's amount",
       'what price should I set for a habit',
       'what does the habit price do',
       'how much does it cost each time meaning',
@@ -348,6 +356,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'When does a new habit start?',
     questions: [
+      'why are earlier days grey on a habit I just made',
       'when does a new habit start',
       'can I start a habit from last week',
       'can I backdate a habit',
@@ -443,6 +452,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'How do I cancel adding a habit?',
     questions: [
+      'chose the wrong ready-made habit, how do I go back and pick another',
       'how do I cancel adding a habit',
       'I started making a habit by mistake',
       'go back a step when creating a habit',
@@ -710,6 +720,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: "Why can't I tap a day on my habit?",
     questions: [
+      "the app won't let me fill in a habit day",
       "why can't I tap a day on my habit",
       "the circle won't fill",
       'can I tap tomorrow on my habit',
@@ -787,6 +798,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: "How do I edit one habit day's receipt?",
     questions: [
+      'edit the price for a single habit day',
       "how do I edit one habit day's receipt",
       'change the date of a habit receipt',
       'move a habit day to another date',
@@ -809,6 +821,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: "I added a normal receipt. Why isn't it ticked?",
     questions: [
+      'day shows as skipped on my habit though I logged a receipt',
       "I added coffee as a normal receipt why isn't the circle filled",
       "scanned my coffee receipt but the habit didn't update",
       'does a receipt with the same name fill the habit',
@@ -831,6 +844,8 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'Why did a day on my habit change by itself?',
     questions: [
+      'my habit circles keep changing on their own',
+      'my habit days change without me touching them',
       'why did a day on my habit change by itself',
       'the circle went back to empty',
       'my tick disappeared from monday',
@@ -957,6 +972,8 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'Why is my Saved zero?',
     questions: [
+      'habit saved shows $0.00',
+      'it shows 0 saved on my habit card',
       'why is my saved zero',
       'saved says 0.00',
       "why hasn't saved gone up",
@@ -1001,6 +1018,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'Does Saved go into my savings or balance?',
     questions: [
+      'habit says I saved money but my balance stayed the same',
       'does saved go into my savings',
       'is saved real money',
       'will saved so far show in my current balance',
@@ -1040,6 +1058,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'Can I pause a habit while I am away?',
     questions: [
+      'my trip days are counted as saved on my habit',
       'can I pause a habit',
       'I was on holiday and it counted as saved',
       'stop the habit for a while',
@@ -1084,6 +1103,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'Why is my spent higher than my limit?',
     questions: [
+      'spent figure bigger than the weekly limit',
       'why is my spent higher than my limit',
       "spent and saved don't add up to the limit",
       'spent is over the spend limit',
@@ -1230,6 +1250,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'Why are older habit weeks missing on free?',
     questions: [
+      'only a few weeks show in habit details on free',
       'why are older habit weeks missing',
       'older history is saved on the habit page',
       'habit only shows 90 days',
@@ -1594,6 +1615,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'How do habit days affect my balance?',
     questions: [
+      'tapping a habit circle lowered my balance',
       'how do habit days affect my current balance',
       'does tapping a habit lower my balance',
       'my balance dropped by 5 when I tapped coffee',
@@ -1640,6 +1662,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'Can I track habits that are not spending?',
     questions: [
+      'track a habit that has nothing to do with money',
       "can I track habits that aren't spending",
       'track drinking water',
       'habit tracker for gym or meditation',
@@ -1688,6 +1711,7 @@ export const habitsIntents: Intent[] = [
     topic: 'habits',
     title: 'Can habit days be filled in automatically?',
     questions: [
+      'will my habit tick days off on its own',
       'can habit days be filled in automatically',
       'does skip read my bank to fill my habit',
       'auto track coffee purchases',
@@ -1778,7 +1802,7 @@ export const habitsIntents: Intent[] = [
       'habit edit error message',
     ],
     answer:
-      "Skip shows **Something went wrong. Please try again.** when a save or delete can't reach your account, or before it has read how many days the habit has logged (it needs that count to ask about past days).\n\n1. Check your internet connection.\n2. Wait a moment, then tap **Save changes** or **Delete habit** again.\n\n**Save changes** is greyed out only while a save or delete is still running.\n\nIf you see **To save this habit, fill in: ...**, fill in what it lists first.",
+      'When you tap **Save changes** or **Delete habit** before Skip has finished reading the habit, it waits for it and then carries on, so you don’t need to tap again. **Something went wrong. Please try again.** means the save or delete couldn’t reach your account.\n\n1. Check your internet connection.\n2. Tap **Save changes** or **Delete habit** again. Saving twice never makes a second habit.\n\n**Save changes** is greyed out only while a save or delete is still running.\n\nIf you see **To save this habit, fill in: ...**, fill in what it lists first.',
     keywords: ['will not save', 'error', 'greyed out', 'cannot delete'],
     related: ['habits.edit.how', 'habits.delete.how', 'habits.problem.not-loading'],
   },

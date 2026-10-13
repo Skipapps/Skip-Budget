@@ -10,6 +10,7 @@ export const chatIntents: Intent[] = [
     topic: 'chat',
     title: 'Hello',
     questions: [
+      'hello sam',
       'hi',
       'hello',
       'hey',
@@ -93,6 +94,9 @@ export const chatIntents: Intent[] = [
     topic: 'chat',
     title: 'Who is Sam?',
     questions: [
+      'who made sam',
+      'who created sam',
+      'who is behind ask sam',
       'who are you',
       'what are you',
       'what is ask sam',
@@ -114,6 +118,7 @@ export const chatIntents: Intent[] = [
     topic: 'chat',
     title: 'Are you a bot or a real person?',
     questions: [
+      'is there a person behind this chat or is it automatic',
       'are you a bot',
       'are you ai',
       'are you a real person',
@@ -203,6 +208,7 @@ export const chatIntents: Intent[] = [
     topic: 'chat',
     title: 'That didn’t help',
     questions: [
+      'you have been no help',
       'this is useless',
       'you are not helping',
       'that did not help',
@@ -225,6 +231,9 @@ export const chatIntents: Intent[] = [
     topic: 'chat',
     title: 'You’re great',
     questions: [
+      'this is so nice',
+      'such a nice app',
+      'awesome job on this app',
       'you are great',
       'i love this app',
       'great app',
@@ -251,13 +260,13 @@ export const chatIntents: Intent[] = [
     topic: 'chat',
     title: 'I have an idea for Skip',
     questions: [
+      'it would be nice if you added this',
       'i have an idea',
       'feature request',
       'can you add a feature',
       'i have a suggestion',
       'i want to suggest something',
       'you should add',
-      'it would be nice if',
       'request a feature',
       'how do i suggest a feature',
       'wish list',
@@ -311,6 +320,7 @@ export const chatIntents: Intent[] = [
     topic: 'chat',
     title: 'Can you answer in another language?',
     questions: [
+      'will you talk with me in another language',
       'do you speak spanish',
       'can you answer in french',
       'hablas espanol',
@@ -335,6 +345,7 @@ export const chatIntents: Intent[] = [
     topic: 'chat',
     title: 'Is this working?',
     questions: [
+      'hello? does this work',
       'test',
       'testing',
       'is this working',
@@ -358,6 +369,10 @@ export const chatIntents: Intent[] = [
     topic: 'chat',
     title: 'Questions about Sam',
     questions: [
+      'is sam a boy',
+      'is sam a girl or a guy',
+      'are you male or female',
+      'what gender are you',
       'how old are you',
       'where are you from',
       'do you have feelings',
@@ -377,6 +392,9 @@ export const chatIntents: Intent[] = [
     topic: 'chat',
     title: 'Can you give me money advice?',
     questions: [
+      'is it smart to save part of my salary every month',
+      'is saving 20 percent of my salary enough',
+      'what percent of my paycheck should go to savings',
       'should i invest',
       'what stock should i buy',
       'how do i get rich',
@@ -412,6 +430,8 @@ export const chatIntents: Intent[] = [
     topic: 'chat',
     title: 'Something not about Skip',
     questions: [
+      'will it rain tomorrow',
+      'weather forecast for this week',
       'what is the weather',
       'who won the game',
       'write me a poem',

@@ -454,9 +454,10 @@ export const receiptsFr: IntentText[] = [
       'le scan est revenu vide',
       'pourquoi mon reçu ne se scanne pas',
       'le scanner ne trouve rien sur mon ticket',
+      'ça dit nous n’avons pas pu lire ce reçu',
     ],
     answer: text(
-      'Quand tu numérises ou importes depuis **Ajouter un reçu** et que Skip ne trouve rien en quoi elle a confiance, elle affiche **Une erreur est survenue. Réessaie.** avec **Vérifie le magasin, la date et le montant ci-dessous.** et reste sur le clavier numérique du montant. Depuis le bouton de numérisation de la page **Reçus**, elle ouvre simplement un reçu vide à remplir.',
+      'Quand tu numérises ou importes depuis **Ajouter un reçu** et que Skip ne trouve rien en quoi elle a confiance, elle affiche **Nous n’avons pas pu lire ce reçu. Remplis-le ci-dessous.** et reste sur le clavier numérique du montant. Depuis le bouton de numérisation de la page **Reçus**, elle ouvre simplement un reçu vide à remplir.',
       'Essaie ceci :',
       [
         '- Numérise de nouveau avec une meilleure lumière, le reçu entier posé à plat dans le cadre.',
@@ -1294,9 +1295,10 @@ export const receiptsFr: IntentText[] = [
       'supprimer le reçu en double',
       'mes dépenses sont doublées',
       'même achat saisi deux fois',
+      'j’ai touché deux fois enregistrer le reçu',
     ],
     answer: text(
-      'Skip ne vérifie pas les doublons, donc le même achat enregistré deux fois compte deux fois. Supprime celui en trop :',
+      'Toucher deux fois **Enregistrer le reçu**, ou enregistrer de nouveau après une perte de connexion, ne crée jamais de deuxième reçu. Mais Skip ne vérifie pas les doublons que tu ajoutes exprès, donc le même achat ajouté deux fois compte deux fois. Supprime celui en trop :',
       [
         '1. Touche l’un des deux reçus.',
         '2. Touche le crayon en haut à droite.',

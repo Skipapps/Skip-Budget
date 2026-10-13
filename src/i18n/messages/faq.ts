@@ -16,9 +16,9 @@ export const faqMessages = defineMessages({
     fr: 'Des réponses courtes aux questions les plus fréquentes. Si la tienne n’y est pas, écris-nous — une vraie personne lit chaque message.',
   },
   'faq.stuck': {
-    en: 'Still stuck? Message us',
-    es: '¿Sigues con dudas? Escríbenos',
-    fr: 'Toujours pas de réponse ? Écris-nous',
+    en: 'Still stuck? Ask Sam',
+    es: '¿Sigues con dudas? Pregúntale a Sam',
+    fr: 'Toujours pas de réponse ? Demande à Sam',
   },
   'faq.hint.show': {
     en: 'Shows the answer',

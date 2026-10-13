@@ -94,6 +94,7 @@ const payIntents: Intent[] = [
     topic: 'pay',
     title: 'How is Total per month worked out?',
     questions: [
+      'how is my income per month added up',
       'How is Total per month worked out?',
       'what is total per month on the salary page',
       'why is my monthly total not what I get paid',
@@ -140,6 +141,7 @@ const payIntents: Intent[] = [
     topic: 'pay',
     title: 'What do the How often choices mean?',
     questions: [
+      'can I get paid quarterly in skip',
       'What do the How often options mean?',
       'how often am i paid options',
       'difference between every 2 weeks and twice a month',
@@ -262,7 +264,7 @@ const payIntents: Intent[] = [
       'short month salary date',
     ],
     answer:
-      'Monthly pay keeps the day of your **Last payday**. When a month is too short for that day, Skip uses that month’s last day instead. So pay on the 31st shows as 30 April, and as 28 February (29 February in a leap year).\n\n**Twice a month** already uses the last day of each month, plus the 15th. If you’re only paid on the last day, use **Monthly** with a **Last payday** on the 31st of a month that has one.',
+      'Monthly pay keeps the day of your **Last payday** every month. When a month is too short for that day, Skip uses that month’s last day, then goes back to your day the month after. So pay on the 31st lands on 31 March, 30 April and 31 May, and on 28 February (29 February in a leap year).\n\n**Next payday**, your **Current balance** and **Activity** all use these same dates, and monthly pay is counted once a month.\n\n**Twice a month** already uses the last day of each month, plus the 15th. If you’re only paid on the last day, use **Monthly** with a **Last payday** on the 31st of a month that has one.',
     keywords: ['31st', '30th', '29th', 'February', 'leap year', 'month end'],
     related: ['pay.payday.next', 'pay.frequency.semimonthly', 'pay.payday.weekend'],
     route: '/salary',
@@ -321,6 +323,7 @@ const payIntents: Intent[] = [
     topic: 'pay',
     title: 'When does my pay show up in my balance?',
     questions: [
+      "skip already has my pay but my bank doesn't yet",
       'When does my pay get added to my balance?',
       'what time does skip add my salary',
       'pay shows before it reaches my bank',
@@ -576,6 +579,7 @@ const payIntents: Intent[] = [
     topic: 'pay',
     title: 'What does Paid into do?',
     questions: [
+      'pick the account my salary is paid into',
       'What does Paid into do?',
       'which account does my pay go into',
       'how do I choose where my salary lands',
@@ -807,6 +811,7 @@ const payIntents: Intent[] = [
     topic: 'pay',
     title: 'Why isn’t my pay in my balance?',
     questions: [
+      'got paid yesterday but my balance is the same',
       'Why isn’t my pay showing in my balance?',
       'my salary didn’t get added',
       'payday came but balance didn’t change',
@@ -836,6 +841,7 @@ const payIntents: Intent[] = [
     topic: 'pay',
     title: 'Why is my pay counted twice?',
     questions: [
+      'balance jumped by twice my pay after setting my account balance',
       'Why is my pay counted twice?',
       'salary added two times',
       'my balance is too high after payday',
@@ -933,6 +939,7 @@ const payIntents: Intent[] = [
     topic: 'pay',
     title: 'Should I add pay from before I used Skip?',
     questions: [
+      'should I put in paychecks from before I had skip',
       'Should I add pay from before I started using Skip?',
       'add last month’s salary',
       'add past paychecks',
@@ -1239,6 +1246,8 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'How do I add a credit card?',
     questions: [
+      'what do I have to fill in when I add a card',
+      'which fields are required when adding a credit card',
       'How do I add a credit card?',
       'add my visa',
       'new credit card',
@@ -1264,6 +1273,9 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'What balance should I type for my card?',
     questions: [
+      'type how much I owe on the card when I add it',
+      'which number goes in the card balance box when adding a card',
+      'what amount do I put as the balance owed when setting up my card',
       'What is the credit card balance right now question',
       'what balance do I enter for my credit card',
       'statement balance or current balance',
@@ -1287,6 +1299,9 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'What does my card show on the Cards tab?',
     questions: [
+      'why does the owed amount on my card have a minus',
+      'what do all the bits on the card image mean',
+      'what is everything shown on the picture of my card',
       'What does the card on the Cards tab show?',
       'what does owed mean on my card',
       'why is my card balance negative',
@@ -1381,6 +1396,7 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'Why is my limit bar empty or full?',
     questions: [
+      "the bar under my credit card isn't filling up as I spend",
       'Why is my limit bar empty?',
       'limit bar full',
       'over my credit limit in skip',
@@ -1452,6 +1468,7 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'How do I edit a credit card?',
     questions: [
+      "I entered my card's last four digits wrong, how do I change them",
       'How do I edit my credit card?',
       'change card name',
       'change card network',
@@ -1569,6 +1586,7 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'What balance should I type for my account?',
     questions: [
+      'should my starting balance include pay that just came in',
       'What is in the account today question',
       'what balance do I enter for my bank account',
       'available or current balance bank',
@@ -1728,6 +1746,7 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'What happens when I delete a bank account?',
     questions: [
+      'is anything lost if I delete my bank account',
       'What happens to my salary if I delete the account?',
       'deleted account, bills paid from it',
       'Receipts, bills and subscriptions paid from it are kept',
@@ -1777,6 +1796,7 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'How is my card’s balance worked out?',
     questions: [
+      'the maths behind what my card owes',
       'How is my credit card balance worked out?',
       'owed now calculation',
       'what is charged since',
@@ -1845,6 +1865,7 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'How do I record paying my credit card?',
     questions: [
+      'log a payment I made toward my credit card',
       'How do I pay off my credit card in Skip?',
       'record a credit card payment',
       'make a payment button',
@@ -1900,6 +1921,7 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'Can I log a payment on an earlier date?',
     questions: [
+      "change the date of a card payment I'm logging",
       'Can I backdate a card payment?',
       'change the date of a payment',
       'I paid my card last week',
@@ -1949,6 +1971,7 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'What is New money?',
     questions: [
+      'which source do I choose when adding money from a refund',
       'What does New money mean?',
       'new money or another account',
       'Where did it come from? options',
@@ -2025,7 +2048,7 @@ const cardIntents: Intent[] = [
       'transactions for one card',
     ],
     answer:
-      'Tap a card or account on **Cards** to open its page:\n\n- Its face, with the live balance.\n- A box with the sum behind it: the balance you typed, what went out, what came in, and **Owed now** or **Balance now**.\n- **Transactions**: every receipt, bill, subscription, pay and payment on it, newest first, with search and a filter.\n- The pencil at the top to edit it, and **Make a payment** (cards) or **Add money** (accounts) at the bottom.\n\nTap a row to open the receipt, bill, subscription or Salary page behind it.',
+      'Tap a card or account on **Cards** to open its page:\n\n- Its face, with the live balance.\n- A box with the sum behind it: the balance you typed, what went out, what came in, and **Owed now** or **Balance now**.\n- **Transactions**: every receipt, bill, subscription, pay and payment on it, under month headings, newest first. Each month shows its net figure beside it, green when more came in and red when more went out. There’s search and a filter too.\n- The pencil at the top to edit it, and **Make a payment** (cards) or **Add money** (accounts) at the bottom.\n\nTap a row to open the receipt, bill, subscription or Salary page behind it.',
     keywords: ['card page', 'account page', 'Transactions', 'details'],
     related: ['cards.balance.card-calc', 'cards.source.row-labels', 'cards.source.search'],
   },
@@ -2034,6 +2057,7 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'Why is something missing from my card’s list?',
     questions: [
+      "my receipt doesn't appear on the card it was paid with",
       'A receipt is missing from my card page',
       'my bill isn’t showing on my card',
       'card transactions missing',
@@ -2046,7 +2070,7 @@ const cardIntents: Intent[] = [
       'missing rows on bank account',
     ],
     answer:
-      'A row shows on a card or account page when:\n\n- It was paid with that card or account, in **Paid with** (**Charged to** on a subscription).\n- Its date has come. Bills and subscriptions appear on their due days, not before.\n- It’s on or after the day of the balance you typed. Older things are taken as already inside that balance.\n- On Free, it’s within the last 90 days. Older rows are kept and still count, behind **Older history is saved**.\n\nAn empty page says **Nothing on this one yet**. If a receipt is on the wrong card, open it and change **Paid with**.',
+      'A row shows on a card or account page when:\n\n- It was paid with that card or account, in **Paid with** (**Charged to** on a subscription).\n- Its date has come. Bills and subscriptions appear on their due days, not before.\n- It’s on or after the day of the balance you typed. Older things are taken as already inside that balance.\n- On Free, it’s within the last 90 days. Older rows are kept and still count, behind **Older history is saved**. A month cut by that limit still shows its whole month’s figure.\n\nAn empty page says **Nothing on this one yet**. If a receipt is on the wrong card, open it and change **Paid with**.',
     keywords: ['missing', 'not showing', 'Nothing on this one yet', 'empty'],
     related: ['cards.purchase.on-card', 'cards.source.history', 'cards.card.new-balance'],
   },
@@ -2055,6 +2079,7 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'What do From and To mean on a payment?',
     questions: [
+      'Payment and Pay rows on my account, how are they different',
       'what does From Checking mean on my card',
       'To Visa row on my account',
       'payment row meaning',
@@ -2076,6 +2101,8 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'How do I search a card’s transactions?',
     questions: [
+      'search for one specific charge on my credit card',
+      'how do I look up a single transaction on a card',
       'search transactions on my card',
       'filter my account transactions',
       'find a purchase on my card',
@@ -2088,7 +2115,7 @@ const cardIntents: Intent[] = [
       'filter money sent',
     ],
     answer:
-      'On a card or account page:\n\n- Type in **Search transactions** to find rows by name.\n- Tap the sliders button to open **Filter**. Pick a **Date** and a **Type of transaction**: **Receipts**, **Monthly Bills**, **Subscriptions**, and **Payments** on a card, or **Money in**, **Money sent** and **Pay** on an account. Tap **Apply**.\n\nThe button shows how many filters are on. If nothing fits, tap **Clear search** to see everything again; **Reset** in the filter clears it too.',
+      'On a card or account page:\n\n- Type in **Search transactions** to find rows by name.\n- Tap the sliders button to open **Filter**. Pick a **Date** and a **Type of transaction**: **Receipts**, **Monthly Bills**, **Subscriptions**, and **Payments** on a card, or **Money in**, **Money sent** and **Pay** on an account. Tap **Apply**.\n\nThe button shows how many filters are on, and a month with no matches has no heading. If nothing fits, tap **Clear search** to see everything again; **Reset** in the filter clears it too.',
     keywords: ['search', 'filter', 'Search transactions', 'Type of transaction'],
     related: ['cards.source.page', 'cards.source.row-labels', 'cards.source.missing'],
   },
@@ -2097,6 +2124,7 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'Why does my card only show 90 days?',
     questions: [
+      'is card history limited to 3 months on free',
       'Why does my card only show 90 days?',
       'older history is saved on my account',
       'old transactions hidden on card',
@@ -2187,7 +2215,7 @@ const cardIntents: Intent[] = [
       'need my card details back after pro',
     ],
     answer:
-      'Your cards and accounts are all still there. On the free plan, your first credit card and your first bank account (the ones you added earliest) stay fully usable. Any extra cards or accounts from your time on Pro are kept, but drawn faded on **Cards**:\n\n- Tapping one opens a page about Skip Pro instead of its own page.\n- They don’t appear under **Paid with** for new spending.\n- Their balances, history and everything already paid with them still count everywhere, including your **Current balance**.\n\nNothing is deleted. To open them again, get Skip Pro again from **Settings → Skip Pro**. If you paid on this Apple ID and your paid time hasn’t ended, tap **Restore purchase** there. They then open and work as before.',
+      'Your cards and accounts are all still there. On the free plan, your first credit card and your first bank account (the ones you added earliest) work as before. Any extra cards or accounts from your time on Pro are kept, but drawn faded on **Cards**:\n\n- Tap one to open its own page, with its balance and transactions. You can edit it, delete it, make a payment to a card or add money to an account, all for free.\n- It isn’t offered under **Paid with**, **Charged to** or **Paid from** for new spending. Bills, subscriptions and loans already linked to it keep using it.\n- Its balance, history and everything already paid with it still count everywhere, including your **Current balance**.\n\nIf you delete your first card, the next oldest becomes the free one and works as before. Nothing is deleted when Pro ends, and the day you have Skip Pro again, every card and account can be picked for spending again.',
     keywords: [
       'faded',
       'greyed out',
@@ -2251,6 +2279,8 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'How do my cards and accounts make my balance?',
     questions: [
+      'my balance went down after I added a card',
+      'adding a credit card made my home balance smaller',
       'How do my cards affect Current balance?',
       'does my credit card debt reduce my balance',
       'current balance includes my accounts',
@@ -2406,6 +2436,7 @@ const cardIntents: Intent[] = [
     topic: 'cards',
     title: 'Can I enter an overdrawn account?',
     questions: [
+      'my bank account shows a negative number',
       'my account is overdrawn, what do I type',
       'can I enter a negative balance',
       'no minus key',
@@ -2512,7 +2543,7 @@ const cardIntents: Intent[] = [
       'balances missing',
     ],
     answer:
-      'When any figure behind your balances can’t be read, Skip shows **Something went wrong. Please try again.** instead of the page. It does this on purpose, so you never see an old or half-worked-out balance as if it were real.\n\nTap **Try again**, or pull down to refresh, and check that you’re online. Your cards and accounts aren’t lost; they come back as soon as Skip can read them.',
+      'If a refresh fails while your cards are showing, Skip keeps the figures you already had on screen. **Something went wrong. Please try again.** shows instead of the page only when nothing could be read yet, so you never see a half-worked-out balance as if it were real.\n\nTap **Try again**, or pull down to refresh, and check that you’re online. Your cards and accounts aren’t lost; they come back as soon as Skip can read them.',
     keywords: ['error', 'Something went wrong', 'Try again', 'not loading'],
     related: ['cards.tab.overview', 'cards.balance.no-sync'],
     route: '/cards',

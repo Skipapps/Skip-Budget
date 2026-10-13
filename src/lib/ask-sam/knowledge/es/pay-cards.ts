@@ -216,7 +216,7 @@ export const payCardsEs: IntentText[] = [
       'me pagan a fin de mes, ¿qué pongo en último día de pago?',
     ],
     answer:
-      'El pago mensual conserva el día de tu **Último día de pago**. Cuando un mes es demasiado corto para ese día, Skip usa el último día de ese mes. Así, un pago el 31 aparece el 30 de abril, y el 28 de febrero (29 de febrero en año bisiesto).\n\n**Dos veces al mes** ya usa el último día de cada mes, además del 15. Si solo te pagan el último día, usa **Mensual** con un **Último día de pago** el día 31 de un mes que lo tenga.',
+      'El pago mensual conserva el día de tu **Último día de pago** todos los meses. Cuando un mes es demasiado corto para ese día, Skip usa el último día de ese mes y vuelve a tu día al mes siguiente. Así, un pago el 31 cae el 31 de marzo, el 30 de abril y el 31 de mayo, y el 28 de febrero (29 de febrero en año bisiesto).\n\n**Próximo día de pago**, tu **Saldo actual** y **Actividad** usan estas mismas fechas, y el pago mensual se cuenta una vez al mes.\n\n**Dos veces al mes** ya usa el último día de cada mes, además del 15. Si solo te pagan el último día, usa **Mensual** con un **Último día de pago** el día 31 de un mes que lo tenga.',
     keywords: ['día 31', 'día 30', 'febrero', 'año bisiesto'],
   },
   {
@@ -1706,9 +1706,11 @@ export const payCardsEs: IntentText[] = [
       'página de la cuenta explicada',
       'cómo veo el historial de mi tarjeta',
       'movimientos de una sola tarjeta',
+      '¿Por qué la página de mi tarjeta está separada por meses?',
+      'qué es la cifra al lado de cada mes',
     ],
     answer:
-      'Toca una tarjeta o cuenta en **Tarjetas** para abrir su página:\n\n- Su imagen, con el saldo al día.\n- Un cuadro con la cuenta que hay detrás: el saldo que escribiste, lo que salió, lo que entró, y **Adeudo actual** o **Saldo actual**.\n- **Movimientos**: cada recibo, factura, suscripción, salario y pago, del más reciente al más antiguo, con búsqueda y filtro.\n- El lápiz de arriba para editarla, y **Hacer un pago** (tarjetas) o **Agregar dinero** (cuentas) al final.\n\nToca una fila para abrir el recibo, la factura, la suscripción o la página Salario que está detrás.',
+      'Toca una tarjeta o cuenta en **Tarjetas** para abrir su página:\n\n- Su imagen, con el saldo al día.\n- Un cuadro con la cuenta que hay detrás: el saldo que escribiste, lo que salió, lo que entró, y **Adeudo actual** o **Saldo actual**.\n- **Movimientos**: cada recibo, factura, suscripción, salario y pago que tiene, bajo encabezados por mes, del más reciente al más antiguo. Cada mes muestra su cifra neta al lado, en verde cuando entró más y en rojo cuando salió más. También hay búsqueda y filtro.\n- El lápiz de arriba para editarla, y **Hacer un pago** (tarjetas) o **Agregar dinero** (cuentas) al final.\n\nToca una fila para abrir el recibo, la factura, la suscripción o la página Salario que está detrás.',
     keywords: ['página de la tarjeta', 'página de la cuenta', 'Movimientos', 'detalles'],
   },
   {
@@ -1725,9 +1727,10 @@ export const payCardsEs: IntentText[] = [
       'movimientos viejos que no están en la página de la cuenta',
       'dónde están las compras de antes de agregar la tarjeta',
       'faltan filas en la cuenta bancaria',
+      '¿Por qué la cifra del mes no coincide con las filas que veo?',
     ],
     answer:
-      'Una fila aparece en la página de una tarjeta o cuenta cuando:\n\n- Se pagó con esa tarjeta o cuenta, en **Pagado con** (**Se cobra a** en una suscripción).\n- Ya llegó su fecha. Las facturas y suscripciones aparecen en sus días de vencimiento, no antes.\n- Es del día del saldo que escribiste o posterior. Lo más antiguo se toma como ya incluido en ese saldo.\n- En el plan gratis, está dentro de los últimos 90 días. Las filas más antiguas se conservan y siguen contando, tras **Tu historial anterior está guardado**.\n\nUna página vacía dice **Aún no hay nada aquí**. Si un recibo está en la tarjeta equivocada, ábrelo y cambia **Pagado con**.',
+      'Una fila aparece en la página de una tarjeta o cuenta cuando:\n\n- Se pagó con esa tarjeta o cuenta, en **Pagado con** (**Se cobra a** en una suscripción).\n- Ya llegó su fecha. Las facturas y suscripciones aparecen en sus días de vencimiento, no antes.\n- Es del día del saldo que escribiste o posterior. Lo más antiguo se toma como ya incluido en ese saldo.\n- En el plan gratis, está dentro de los últimos 90 días. Las filas más antiguas se conservan y siguen contando, tras **Tu historial anterior está guardado**. Un mes recortado por ese límite igual muestra la cifra de todo el mes.\n\nUna página vacía dice **Aún no hay nada aquí**. Si un recibo está en la tarjeta equivocada, ábrelo y cambia **Pagado con**.',
     keywords: ['faltante', 'no aparece', 'Aún no hay nada aquí', 'vacía'],
   },
   {
@@ -1765,7 +1768,7 @@ export const payCardsEs: IntentText[] = [
       'filtrar dinero enviado',
     ],
     answer:
-      'En la página de una tarjeta o cuenta:\n\n- Escribe en **Buscar movimientos** para encontrar filas por nombre.\n- Toca el botón de controles deslizantes para abrir **Filtrar**. Elige una **Fecha** y un **Tipo de movimiento**: **Recibos**, **Facturas mensuales**, **Suscripciones**, y **Pagos** en una tarjeta, o **Dinero recibido**, **Dinero enviado** y **Sueldo** en una cuenta. Toca **Aplicar**.\n\nEl botón muestra cuántos filtros están activos. Si nada coincide, toca **Borrar búsqueda** para volver a ver todo; **Borrar todo** en el filtro también lo limpia.',
+      'En la página de una tarjeta o cuenta:\n\n- Escribe en **Buscar movimientos** para encontrar filas por nombre.\n- Toca el botón de controles deslizantes para abrir **Filtrar**. Elige una **Fecha** y un **Tipo de movimiento**: **Recibos**, **Facturas mensuales**, **Suscripciones**, y **Pagos** en una tarjeta, o **Dinero recibido**, **Dinero enviado** y **Sueldo** en una cuenta. Toca **Aplicar**.\n\nEl botón muestra cuántos filtros están activos, y un mes sin coincidencias no tiene encabezado. Si nada coincide, toca **Borrar búsqueda** para volver a ver todo; **Borrar todo** en el filtro también lo limpia.',
     keywords: ['buscar', 'filtrar', 'Buscar movimientos', 'Tipo de movimiento'],
   },
   {
@@ -1828,9 +1831,11 @@ export const payCardsEs: IntentText[] = [
       'cómo recupero los datos de mi tarjeta tras cancelar pro',
       'volví al plan gratis, ¿adónde se fueron mis tarjetas?',
       'como desbloquear mis tarjetas tras cancelar',
+      'puedo borrar mi segunda tarjeta sin pro',
+      'si elimino mi primera tarjeta, ¿cuál queda gratis?',
     ],
     answer:
-      'Todas tus tarjetas y cuentas siguen ahí. En el plan gratis, tu primera tarjeta de crédito y tu primera cuenta bancaria (las que agregaste antes) se pueden usar por completo. Las tarjetas o cuentas extra de tu tiempo con Pro se conservan, pero se ven atenuadas en **Tarjetas**:\n\n- Al tocar una, se abre una página sobre Skip Pro en lugar de su propia página.\n- No aparecen en **Pagado con** para gastos nuevos.\n- Sus saldos, su historial y todo lo ya pagado con ellas siguen contando en todas partes, incluido tu **Saldo actual**.\n\nNo se elimina nada. Para abrirlas otra vez, vuelve a obtener Skip Pro en **Ajustes → Skip Pro**. Si pagaste con este Apple ID y tu tiempo pagado no ha terminado, toca **Restaurar compra** ahí. Entonces se abren y funcionan como antes.',
+      'Todas tus tarjetas y cuentas siguen ahí. En el plan gratis, tu primera tarjeta de crédito y tu primera cuenta bancaria (las que agregaste primero) funcionan como antes. Las tarjetas o cuentas extra de tu tiempo con Pro se conservan, pero se ven atenuadas en **Tarjetas**:\n\n- Toca una para abrir su propia página, con su saldo y sus movimientos. Puedes editarla, eliminarla, hacer un pago a una tarjeta o agregar dinero a una cuenta, todo gratis.\n- No se ofrece en **Pagado con**, **Se cobra a** ni **Se paga desde** para gastos nuevos. Las facturas, suscripciones y préstamos que ya están vinculados a ella la siguen usando.\n- Su saldo, su historial y todo lo ya pagado con ella siguen contando en todas partes, incluido tu **Saldo actual**.\n\nSi eliminas tu primera tarjeta, la más antigua de las que quedan pasa a ser la gratuita y funciona como antes. No se borra nada cuando termina Pro, y el día que vuelvas a tener Skip Pro, todas las tarjetas y cuentas se pueden elegir otra vez para tus gastos.',
     keywords: ['atenuada', 'bloqueada', 'Pro terminó', 'tarjeta extra'],
   },
   {
@@ -2092,9 +2097,10 @@ export const payCardsEs: IntentText[] = [
       'no puedo abrir la página de mi cuenta',
       'la pestaña tarjetas está en blanco',
       'faltan los saldos',
+      'no se actualizó pero sigo viendo mis saldos',
     ],
     answer:
-      'Cuando no se puede leer alguna cifra detrás de tus saldos, Skip muestra **Algo salió mal. Inténtalo de nuevo.** en lugar de la página. Lo hace a propósito, para que nunca veas un saldo viejo o a medio calcular como si fuera real.\n\nToca **Intentar de nuevo**, o desliza hacia abajo para actualizar, y revisa que estés en línea. Tus tarjetas y cuentas no se pierden; vuelven en cuanto Skip pueda leerlas.',
+      'Si una actualización falla mientras tus tarjetas están en pantalla, Skip conserva las cifras que ya tenías a la vista. **Algo salió mal. Inténtalo de nuevo.** aparece en lugar de la página solo cuando todavía no se pudo leer nada, así nunca ves un saldo a medio calcular como si fuera real.\n\nToca **Intentar de nuevo**, o desliza hacia abajo para actualizar, y revisa que estés en línea. Tus tarjetas y cuentas no se pierden; vuelven en cuanto Skip pueda leerlas.',
     keywords: ['error', 'Algo salió mal', 'Intentar de nuevo', 'no carga'],
   },
   {

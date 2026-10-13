@@ -592,8 +592,8 @@ describe('Settings, Support', () => {
       'Support and feedback',
       'Getting started',
       'Put the setup steps back on Home',
-      'Common questions',
-      'Short answers, no waiting',
+      'Ask Sam',
+      'Questions about Skip, answered right away',
       'Email support',
       'Something is wrong or unclear',
       'Share an idea',
@@ -620,12 +620,12 @@ describe('Settings, Support', () => {
   it('opens each help page, and has no coffee link of its own', async () => {
     const screen = await render(<SupportScreen />);
 
-    for (const name of [/^Common questions/, /^Email support/, /^Share an idea/]) {
+    for (const name of [/^Ask Sam/, /^Email support/, /^Share an idea/]) {
       await fireEvent.press(screen.getByRole('button', { name }));
     }
 
     expect(jest.mocked(router.push).mock.calls.map(([href]) => href)).toEqual([
-      '/faq',
+      '/ask-sam',
       '/contact?topic=support',
       '/contact?topic=idea',
     ]);

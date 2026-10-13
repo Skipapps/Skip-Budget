@@ -100,11 +100,7 @@ export default function FaqScreen() {
       ))}
 
       <View className="mb-10 mt-9 w-full">
-        <Button
-          label={t('faq.stuck')}
-          variant="outline"
-          onPress={() => router.push('/contact?topic=support')}
-        />
+        <Button label={t('faq.stuck')} variant="outline" onPress={() => router.push('/ask-sam')} />
       </View>
     </Screen>
   );

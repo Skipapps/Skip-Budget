@@ -1,6 +1,6 @@
 # Ask Sam: handoff
 
-Built 2026-10-13. In the app at `/ask-sam`, opened from the Ask Sam button at the bottom of **Settings**, in English, Spanish and French.
+Built 2026-10-13. In the app at `/ask-sam`, in English, Spanish and French.
 
 ## What it is
 
@@ -47,7 +47,8 @@ small talk), asked 10,736 ways in English, with every answer also written in Spa
 
 - `src/app/ask-sam.tsx` renders `AskSamChat` with the store's prices (US dollar fallback), the account email, the profile name, `router.push` for "Open {screen} ›", and `useSendMessage` for the contact form, followed by the usual toast.
 - The screen's words are in `src/i18n/messages/ask-sam.ts`. The library follows the app's language: `matcherFor(language)` is built once per language per app run, after the page first draws.
-- The FAQ's link is to be swapped for Ask Sam later; for now the only way in is the Settings button.
+- Three ways in: the Ask Sam button at the bottom of **Settings**, the **Ask Sam** row in **Settings → Support and feedback** (where **Common questions** was), and **Still stuck? Ask Sam** at the bottom of the FAQ page. The FAQ page is now reached from Sam's "Is there a list of common questions?" answer.
+- Legal answers: Sam describes the committed Terms and Privacy. The answers for the new legal text are parked in `.claude/team/dev/legal-parked/ask-sam-answers.patch`, to apply with the legal patch after the LLC.
 
 ## Keeping it right
 

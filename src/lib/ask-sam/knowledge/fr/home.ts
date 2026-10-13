@@ -495,7 +495,7 @@ export const homeFr: IntentText[] = [
   },
   {
     id: 'home.balance.left-this-month',
-    title: 'Où est passé « Reste ce mois-ci » ?',
+    title: 'Où est passé « Reste ce mois-ci » ?',
     questions: [
       "reste ce mois-ci a disparu de l'accueil",
       "qu'est-il arrivé à la carte reste ce mois-ci",
@@ -513,7 +513,7 @@ export const homeFr: IntentText[] = [
       'reste ce mois-ci vs solde actuel',
     ],
     answer:
-      'Accueil n’affiche plus **Reste ce mois-ci**. La carte du haut est maintenant **Solde actuel** : un total courant de ton argent qui ne se remet pas à zéro chaque mois et qui ne compte pas la paie pas encore arrivée.\n\nPour les chiffres du mois :\n- **Où est passé ton argent** sur Accueil affiche les factures, reçus et abonnements de ce mois-ci.\n- **Activité → Mois** affiche les **Revenus** et **Dépenses** de ce mois-ci, et indique soit **Il reste** un montant, soit **Il manque** un montant.\n- La tuile **Salaire** dans **Cartes** affiche la paie de ce mois-ci.\n- **Épargne** affiche ce qui est resté de chaque mois terminé.\n\nTu verras peut-être encore « Reste ce mois-ci » comme exemple sur la page Skip Pro pour **Aperçu**.',
+      'Accueil n’affiche plus **Reste ce mois-ci**. La carte du haut est maintenant **Solde actuel** : un total courant de ton argent qui ne se remet pas à zéro chaque mois et qui ne compte pas la paie pas encore arrivée.\n\nPour les chiffres du mois :\n- **Où est passé ton argent** sur Accueil affiche les factures, reçus et abonnements de ce mois-ci.\n- **Activité → Mois** affiche les **Revenus** et **Dépenses** de ce mois-ci, et indique soit **Il reste** un montant, soit **Il manque** un montant.\n- La tuile **Salaire** dans **Cartes** affiche la paie de ce mois-ci.\n- **Épargne** affiche ce qui est resté de chaque mois terminé.\n- **Aperçu** (Skip Pro) affiche **Reste ce mois-ci** en haut : la paie de ce mois-ci moins ce qui est sorti jusqu’ici.',
     keywords: ['reste ce mois-ci', 'ancien chiffre', 'reste du mois', 'budget mensuel'],
   },
   {
@@ -1153,7 +1153,7 @@ export const homeFr: IntentText[] = [
   },
   {
     id: 'home.insights.what',
-    title: 'Que montre Aperçu ?',
+    title: 'Que montre Aperçu ?',
     questions: [
       "c'est quoi aperçu",
       'la carte aperçu sur accueil sert à quoi',
@@ -1168,14 +1168,41 @@ export const homeFr: IntentText[] = [
       'que contient la page aperçu',
       'liste ce que montre aperçu, comme les catégories, les endroits et ce que je dois',
       'aperçu montre mes magasins et catégories principaux ?',
+      'aperçu montre aussi mes prêts et mes objectifs ?',
     ],
     answer:
-      '**Aperçu** réunit ton argent sur une seule page. Ouvre-le depuis la carte **Aperçu** sur Accueil, sous **Va plus loin**.\n- **Ce qui entre** : ta paie sous forme de chiffre mensuel.\n- **Ce qui sort** : les dépenses de la semaine, du mois, de l’année ou depuis le début, avec un graphique et une répartition en **Reçus d’achats**, **Factures** et **Abonnements**.\n- **Où va l’argent** : tes 6 principales catégories de dépenses.\n- **Où tu dépenses le plus** : tes 5 principaux endroits, avec le nombre de fois.\n- **Ce que tu dois** : ce que doit chaque carte de crédit en ce moment.\n- **À venir** : tes abonnements par mois et sur une année.\n\nAperçu fait partie de Skip Pro.',
+      '**Aperçu** réunit ton argent sur une seule page. Ouvre-le depuis la carte **Aperçu** sur Accueil, sous **Va plus loin**. De haut en bas :\n\n' +
+      '- **Reste ce mois-ci** : la paie de ce mois-ci moins ce qui est sorti, et quelle part de tes revenus tu as dépensée.\n- **Ce qui entre** : ta paie.\n- **Ce qui sort** : les dépenses d’un mois ou d’une année que tu choisis, avec un graphique.\n- **Où va l’argent** : les dépenses par catégorie.\n- **Où tu dépenses le plus** : les endroits où tu dépenses le plus.\n- **Ce que tu dois** : ce que doit chaque carte de crédit en ce moment.\n- **Prêts** : ce que tu dois encore sur tes prêts.\n- **Factures et abonnements** : ce qui est dû ce mois-ci, et les deux prochaines échéances.\n- **À venir** : ce que tes abonnements coûtent par mois et par an.\n- **Habitudes**, **Objectifs** et **Épargne** : ce que tu as économisé sans acheter, où en sont tes objectifs, et ce que tu as mis de côté.\n\n' +
+      'Chaque section a **Tout voir ›** pour ouvrir sa page complète. Aperçu fait partie de Skip Pro.',
     keywords: ['aperçu', 'insights', 'graphiques', 'analyse'],
   },
   {
+    id: 'home.insights.hero',
+    title: 'C’est quoi Reste ce mois-ci dans Aperçu ?',
+    questions: [
+      "c'est quoi il te reste ce mois-ci dans aperçu",
+      'ça veut dire quoi dépassement ce mois-ci',
+      "la carte violette en haut d'apercu c'est quoi",
+      'la grande carte en haut de la page aperçu',
+      "tu as dépensé 45% de tes revenus jusqu'ici ça veut dire quoi",
+      "pourquoi aperçu dit que j'ai dépensé 80% de mes revenus",
+      "entrées sorties en haut d'aperçu",
+      'il te reste ce mois-ci est faux dans aperçu',
+      'pourquoi la ligne avec le pourcentage a disparu dans aperçu',
+      "aperçu quel pourcentage de ma paie j'ai deja depensé ce mois ci",
+      "moins de 1% de tes revenus jusqu'ici",
+      'les factures pas encore payées comptent dans il te reste ce mois-ci ?',
+      'il me reste combien ce mois ci sur apercu stp',
+    ],
+    answer:
+      'La carte prune en haut d’**Aperçu** porte toujours sur le mois civil en cours. Elle affiche **Reste ce mois-ci** : la paie datée de ce mois-ci, moins tout ce qui est sorti ce mois-ci jusqu’à aujourd’hui. Si plus d’argent est sorti qu’entré, elle affiche **Dépassement ce mois-ci** à la place.\n\n' +
+      'En dessous, « Entrées $3,200.00 · Sorties $1,450.00 » donne les deux côtés, et « Tu as dépensé 45 % de tes revenus jusqu’ici. » indique quelle part de la paie de ce mois-ci est partie. Une part sous 1 % s’affiche « moins de 1 % ». Sans paie datée de ce mois-ci, cette ligne est masquée.\n\n' +
+      'Les factures et abonnements dus plus tard ce mois-ci ne comptent qu’à leur date. C’est différent du **Solde actuel** sur Accueil, qui est ton total courant, pas seulement ce mois-ci.',
+    keywords: ['Reste ce mois-ci', 'Dépassement ce mois-ci', 'revenus dépensés', 'entrées sorties'],
+  },
+  {
     id: 'home.insights.pro',
-    title: 'Pourquoi Aperçu est-il verrouillé ?',
+    title: 'Pourquoi Aperçu est-il verrouillé ?',
     questions: [
       'pourquoi aperçu est verrouillé',
       'aperçu a une étiquette pro',
@@ -1187,52 +1214,63 @@ export const homeFr: IntentText[] = [
       'comment débloquer aperçu',
       "aperçu dit que l'argent tient sur une seule page",
       'aperçu mur payant',
+      "aperçu s'ouvre pas",
+      "j'arrive pas à ouvrir aperçu",
     ],
     answer:
-      '**Aperçu** fait partie de Skip Pro, ce qui explique que sa carte sur Accueil affiche une étiquette **Pro** avec le forfait gratuit. La toucher ouvre une page qui présente Aperçu, avec **Obtenir Skip Pro** pour passer à l’offre payante.\n\nAvec Pro, l’étiquette disparaît et la carte ouvre Aperçu tout de suite. Si Pro se termine, Aperçu se verrouille de nouveau, mais rien de ce que tu as saisi n’est perdu.\n\nTout le reste sur Accueil, y compris le **Solde actuel**, **Où est passé ton argent**, **Récents** et **À venir**, est gratuit.',
+      '**Aperçu** fait partie de Skip Pro, ce qui explique que sa carte sur Accueil affiche une étiquette **PRO** avec le forfait gratuit. La toucher ouvre une page qui présente Aperçu, avec **Obtenir Skip Pro** pour passer à l’offre payante.\n\nAvec Pro, l’étiquette disparaît et la carte ouvre Aperçu tout de suite. Si Pro se termine, Aperçu se verrouille de nouveau, mais rien de ce que tu as saisi n’est perdu.\n\nTout le reste sur Accueil, y compris le **Solde actuel**, **Où est passé ton argent**, **Récents** et **À venir**, est gratuit.',
     keywords: ['aperçu', 'verrouillé', 'pro', 'abonnement pro'],
   },
   {
     id: 'home.insights.comes-in',
-    title: 'Comment Ce qui entre est-il calculé ?',
+    title: 'Comment Ce qui entre est-il calculé ?',
     questions: [
       'comment ce qui entre est calculé',
+      "c'est quoi ce qui entre dans aperçu",
       'le chiffre chaque mois dans aperçu',
       "pourquoi mon revenu mensuel dans aperçu n'est pas ma paie",
       'paie aux deux semaines par mois aperçu',
       'aperçu dit que skip ne sait pas encore combien tu gagnes',
       'payé une seule fois ce mois-ci dans aperçu',
-      'de 2 sources ça veut dire quoi',
+      'chaque mois 2 sources dans aperçu ça veut dire quoi',
       'paie hebdomadaire convertie en mensuel',
       'revenu aperçu faux',
       'bouton configurer le jour de paie',
+      'paies uniques dans aperçu',
     ],
     answer:
-      '**Chaque mois** transforme chaque salaire en montant mensuel et les additionne :\n- **Chaque semaine** : paie × 52 ÷ 12\n- **Toutes les 2 semaines** : paie × 26 ÷ 12\n- **Deux fois par mois** : paie × 2\n- **Chaque mois** : paie × 1\n\nExemple : $1,000 toutes les 2 semaines font $1,000 × 26 ÷ 12 = $2,166.67 par mois. En dessous, il est indiqué de combien de sources vient ce montant.\n\nLa paie **Juste cette fois** n’est pas dans **Chaque mois** ; elle est affichée sous la forme « + $500 payé une fois ce mois-ci » (par exemple) pour le mois où elle a été payée. Si tu n’as que des paies ponctuelles, la carte affiche **Ce mois-ci** à la place.\n\nPas encore de paie ? Tu verras **Skip ne sait pas encore combien tu gagnes** et un bouton **Configurer le jour de paie**.',
+      '**Ce qui entre** affiche ton **Salaire** sous forme de chiffre mensuel, avec « Chaque mois · 2 sources » (par exemple) en dessous. Chaque salaire est transformé en montant mensuel, puis le tout est additionné :\n\n' +
+      '- **Chaque semaine** : paie × 52 ÷ 12\n- **Toutes les 2 semaines** : paie × 26 ÷ 12\n- **Deux fois par mois** : paie × 2\n- **Chaque mois** : paie × 1\n\n' +
+      'Exemple : $1,000 toutes les 2 semaines font $1,000 × 26 ÷ 12 = $2,166.67 par mois. La paie **Juste cette fois** est ajoutée sous la forme « + $500.00 payé une fois ce mois-ci ». Si tu n’as que des paies ponctuelles, on lit « Ce mois-ci · 2 paies uniques » à la place.\n\n' +
+      'Pas encore de paie ? Tu verras **Skip ne sait pas encore combien tu gagnes** avec **Configurer le jour de paie**. **Tout voir ›** ouvre **Salaire**.',
     keywords: ['ce qui entre', 'chaque mois', 'revenu mensuel', 'aux deux semaines'],
   },
   {
     id: 'home.insights.goes-out',
-    title: 'Comment fonctionne Ce qui sort ?',
+    title: 'Comment fonctionne Ce qui sort ?',
     questions: [
       "c'est quoi ce qui sort dans aperçu",
       'graphique des dépenses dans aperçu expliqué',
       "c'est quoi enregistré pour cette période",
       "reçus d'achats factures abonnements dans aperçu",
-      'aperçu semaine mois année tout',
+      'passer de mois à année dans aperçu',
       'les barres dans aperçu veulent dire quoi',
       'aperçu total de ce mois-ci',
-      'dépenses depuis le début',
+      'pourquoi une barre est plus foncée dans aperçu',
       "pourquoi le graphique d'aperçu a des barres vides",
       'aperçu dépensé cette année',
+      'factures dans ce qui sort plus hautes que la page factures mensuelles',
     ],
     answer:
-      'Choisis **Semaine**, **Mois**, **Année** ou **Tout** ; il s’ouvre sur **Mois**. Le gros chiffre est tout ce qui est sorti pendant cette période jusqu’à aujourd’hui : **Cette semaine**, **Ce mois-ci**, **Cette année** ou **Depuis le début**.\n\nLe graphique ne montre que les dépenses, une barre par jour, semaine, mois ou année. En dessous, le chiffre est réparti en **Reçus d’achats**, **Factures** (paiements de prêt compris) et **Abonnements**, avec **Enregistré pour cette période** comme total.\n\nLes semaines vont du dimanche au samedi. **Tout** couvre cette année et les 6 précédentes. La paie n’est pas comptée ici ; elle est dans **Ce qui entre**.',
+      'Choisis **Mois** ou **Année** avec le sélecteur. La carte affiche **Ce mois-ci** ou **Cette année**, ou le nom du mois ou de l’année que tu as choisi, avec son total et un graphique :\n\n' +
+      '- **Mois** : une barre par semaine, du dimanche au samedi, coupée aux limites du mois.\n- **Année** : une barre par mois, de J à D, avec le mois choisi ou le mois en cours en foncé.\n\n' +
+      'Sous le graphique, le total est réparti en **Reçus d’achats**, **Factures** et **Abonnements**, avec **Enregistré pour cette période** comme somme. Ici, **Factures** inclut les paiements supplémentaires de prêt, comme la tuile d’Accueil, donc le chiffre peut être plus élevé que **Factures et abonnements** plus bas.\n\n' +
+      'Le mois ou l’année en cours compte ce qui s’est passé jusqu’à aujourd’hui. La paie n’est pas comptée ici ; elle est dans **Ce qui entre**. **Tout voir ›** ouvre **Activité**.',
     keywords: ['ce qui sort', 'graphique', 'barres', 'enregistré pour cette période'],
   },
   {
     id: 'home.insights.where-it-goes',
-    title: 'Pourquoi Autre est-il si gros dans Où va l’argent ?',
+    title: 'C’est quoi Où va l’argent dans Aperçu ?',
     questions: [
       "c'est quoi où va l'argent dans aperçu",
       'pourquoi autre est ma plus grosse catégorie',
@@ -1240,19 +1278,21 @@ export const homeFr: IntentText[] = [
       'catégories aperçu fausses',
       "où sont mes reçus de courses dans les catégories d'aperçu",
       'principales catégories aperçu',
-      'abonnements comptés dans autre',
+      'combien de catégories aperçu affiche',
       'répartition par catégorie',
       'pourquoi logement apparaît dans aperçu',
       'dépenses par catégorie aperçu',
       'pourquoi aperçu dit autre',
     ],
     answer:
-      '**Où va l’argent** dans **Aperçu** regroupe les dépenses de la période en catégories et montre tes 6 premières, de la plus grosse à la plus petite, chacune avec une barre mesurée par rapport à la plus grosse.\n\nLes factures sont regroupées selon la catégorie que tu leur as donnée, comme Logement, Internet ou Assurances. Les reçus et les abonnements sont comptés ensemble sous **Autre**, avec les factures classées dans Autre. C’est pourquoi **Autre** est souvent la plus grande.\n\nPour voir les reçus par magasin à la place, regarde **Où tu dépenses le plus** juste en dessous.',
-    keywords: ['où va l’argent', 'catégories', 'autre', 'répartition par catégorie'],
+      '**Où va l’argent** (« Dépenses par catégorie ») regroupe par catégorie les dépenses du mois ou de l’année choisis dans **Ce qui sort**, et montre les 6 premières, de la plus grosse à la plus petite.\n\n' +
+      'Les reçus comptent dans leur propre catégorie, les abonnements dans la leur, et les factures dans la catégorie que tu leur as donnée, comme Logement ou Internet. Tout ce qui n’a pas de catégorie compte comme **Autre**.\n\n' +
+      'Pour voir des endroits plutôt que des catégories, regarde **Où tu dépenses le plus** juste en dessous. **Tout voir ›** ouvre **Activité**.',
+    keywords: ['où va l’argent', 'catégories', 'autre', 'dépenses par catégorie'],
   },
   {
     id: 'home.insights.spend-most',
-    title: 'C’est quoi Où tu dépenses le plus ?',
+    title: 'C’est quoi Où tu dépenses le plus ?',
     questions: [
       "c'est quoi où tu dépenses le plus",
       "les endroits où je dépense le plus d'argent",
@@ -1268,12 +1308,13 @@ export const homeFr: IntentText[] = [
       "où je dépense le plus d'argent",
     ],
     answer:
-      'Elle liste les 5 noms pour lesquels tu as le plus dépensé pendant la période choisie, du plus gros au plus petit : magasins, factures et abonnements. Chacun affiche le total, une barre comparée au premier, et le nombre de fois, comme « 4 fois ».\n\nLes lignes sont regroupées par nom exact, donc « Starbucks » et « Starbucks Coffee » comptent comme deux endroits. Modifier les reçus pour que les noms soient identiques les réunit.',
+      '**Où tu dépenses le plus** (« Les endroits où tu dépenses le plus ») liste les 5 noms pour lesquels tu as le plus dépensé pendant la période choisie dans **Ce qui sort**, du plus gros au plus petit : magasins, factures et abonnements. Chacun affiche son total et le nombre de fois, comme « 4 fois ».\n\n' +
+      'Les lignes sont regroupées par nom exact, donc « Starbucks » et « Starbucks Coffee » comptent comme deux endroits. Modifier les reçus pour que les noms soient identiques les réunit. **Tout voir ›** ouvre **Activité**.',
     keywords: ['où tu dépenses le plus', 'meilleurs magasins', 'commerçants', 'fois'],
   },
   {
     id: 'home.insights.owe',
-    title: 'C’est quoi Ce que tu dois dans Aperçu ?',
+    title: 'C’est quoi Ce que tu dois dans Aperçu ?',
     questions: [
       "c'est quoi ce que tu dois dans aperçu",
       'aperçu carte de crédit dû',
@@ -1285,33 +1326,152 @@ export const homeFr: IntentText[] = [
       'dette totale de carte de crédit',
       'carte créditrice affiche zéro',
       'section dû dans aperçu',
+      'ce que tu dois affiche une erreur dans aperçu',
     ],
     answer:
-      '**Ce que tu dois** liste chaque carte de crédit avec ce qu’elle doit en ce moment : le même chiffre courant que dans **Cartes**, le solde que tu as saisi plus les dépenses depuis, moins les paiements. Une carte créditrice affiche $0.00.\n\nÇa n’inclut pas les prêts ; consulte la page **Prêts** pour ceux-là. La section n’apparaît qu’une fois que tu as ajouté une carte de crédit.',
+      '**Ce que tu dois** (« Ce que tu dois sur tes cartes ») liste chaque carte de crédit avec ce qu’elle doit en ce moment : le même chiffre courant que dans **Cartes**, jamais simplement le solde que tu as saisi. Une carte créditrice affiche $0.00.\n\n' +
+      'Les prêts ont leur propre section, **Prêts**, juste en dessous. **Ce que tu dois** n’apparaît qu’une fois que tu as ajouté une carte de crédit. Si les soldes ne peuvent pas être lus, la section affiche **Une erreur est survenue. Réessaie.** avec **Réessayer**, et le reste de la page fonctionne toujours. **Tout voir ›** ouvre **Cartes**.',
     keywords: ['ce que tu dois', 'montant dû', 'dette de carte de crédit', 'cartes'],
   },
   {
+    id: 'home.insights.loans',
+    title: 'Que montre la section Prêts dans Aperçu ?',
+    questions: [
+      'section prêts dans aperçu',
+      'combien je dois sur mes prêts dans aperçu',
+      'total des prêts aperçu',
+      '35% rembousé dans aperçu ça veut dire quoi',
+      "paiements mensuels dans la section prêts d'aperçu",
+      'les prêts dans aperçu sont pas pareils que la page prêts ?',
+      'aperçu dit aucun prêt en cours',
+      "pourquoi aperçu dit aucun pret pour l'instant",
+      'prochain paiement de prêt dans aperçu',
+      'dette totale de mes emprunts aperçu',
+      'ajouter un prêt depuis aperçu',
+      'mon crédit auto dans apercu stp',
+    ],
+    answer:
+      '**Prêts** (« Ce que tu dois sur tes prêts ») affiche le total que tu dois encore sur tes prêts, combien il y en a, et la part remboursée, comme « 35 % remboursé ». Chaque prêt affiche « Auto · prochain 14 nov. » avec son paiement, et **Paiements mensuels** les additionne.\n\n' +
+      'Ce sont les mêmes chiffres que sur la page **Prêts**. Touche un prêt pour l’ouvrir, ou **Tout voir ›** pour **Prêts**. S’il n’y en a aucun, la section affiche **Aucun prêt pour l’instant** (ou **Aucun prêt en cours** une fois qu’ils sont tous remboursés ou arrêtés), avec un bouton pour en ajouter un.',
+    keywords: ['prêts', 'remboursé', 'Paiements mensuels', 'Aucun prêt en cours'],
+  },
+  {
+    id: 'home.insights.plans',
+    title: 'Que montre Factures et abonnements dans Aperçu ?',
+    questions: [
+      'section factures et abonnements dans aperçu',
+      'ce que tu paies chaque mois aperçu',
+      'nombre de factures dans aperçu',
+      'prochaines échéances dans aperçu',
+      'pourquoi les deux chiffres de factures dans aperçu sont différents',
+      'le total factures et abonnements est le même que la page factures mensuelles ?',
+      "qu'est-ce qui est dû ce mois-ci dans aperçu",
+      "nombre d'abonnements aperçu",
+      'quelles factures arrivent ensuite dans aperçu',
+      'factures et abonnements correspond pas à ce qui sort',
+      'mes factures du mois dans apercu stp',
+      'abonnements 6 dans aperçu ça veut dire quoi',
+    ],
+    answer:
+      '**Factures et abonnements** (« Ce que tu paies chaque mois ») affiche **Factures · 4** et **Abonnements · 6** (par exemple), chacun avec ce qui est dû ce mois-ci : les mêmes totaux que sur les pages **Factures mensuelles** et **Abonnements**. Sous **Prochaines échéances**, tu vois les deux suivantes, par date.\n\n' +
+      'Ces chiffres laissent de côté les paiements supplémentaires de prêt, donc ils peuvent différer de **Factures** dans **Ce qui sort**, qui les compte comme le fait la tuile d’Accueil.',
+    keywords: [
+      'Factures et abonnements',
+      'Prochaines échéances',
+      'dû ce mois-ci',
+      'ce que tu paies chaque mois',
+    ],
+  },
+  {
     id: 'home.insights.coming-up',
-    title: 'C’est quoi À venir dans Aperçu ?',
+    title: 'C’est quoi À venir dans Aperçu ?',
     questions: [
       "c'est quoi à venir dans aperçu",
       'abonnements par mois dans aperçu',
-      'chiffre sur une année aperçu',
+      'chiffre sur un an aperçu',
       'le total des abonnements dans aperçu semble trop élevé',
-      'abonnement annuel compté en mensuel dans aperçu',
+      'comment un abonnement annuel est compté dans aperçu',
       'combien mes abonnements coûtent par an',
       'par mois abonnements aperçu faux',
       'ça veut dire quoi /mois dans aperçu',
       'coût des abonnements par an',
       "section à venir d'aperçu",
+      'dépenses régulières à venir',
+      'pourquoi un abonnement manque dans à venir',
     ],
     answer:
-      'Elle additionne le prix de chaque abonnement actif et l’affiche en chiffre mensuel, avec ce chiffre × 12 en « sur une année ». Touche-la pour ouvrir **Abonnements**.\n\nElle utilise le prix de chaque abonnement tel qu’enregistré, quel que soit son cycle. Un abonnement annuel de $120 ajoute $120 ici, pas $10, et un abonnement hebdomadaire ajoute le prix d’une semaine. Si tu as des abonnements annuels ou hebdomadaires, la page **Abonnements** montre ce qui est réellement dû chaque mois.\n\nLes abonnements annulés ne sont pas comptés.',
-    keywords: ['à venir', 'par mois', 'sur une année', 'total des abonnements'],
+      '**À venir** (« Dépenses régulières à venir ») affiche ce que tes abonnements coûtent par mois, et ce que ça fait « sur un an ». Chacun est compté selon son cycle de facturation : hebdomadaire × 52, mensuel × 12, tous les 3 mois × 4 et annuel × 1 donnent l’année, et le mois est l’année ÷ 12. Ainsi, un abonnement annuel de $120 ajoute $10.00 par mois et $120.00 par an.\n\n' +
+      'Seuls les abonnements actifs avec une date de renouvellement comptent ; ceux qui sont annulés ou sans prochaine date ne comptent pas.',
+    keywords: ['à venir', 'par mois', 'abonnements par an', 'dépenses régulières à venir'],
+  },
+  {
+    id: 'home.insights.habits',
+    title: 'Que montre la section Habitudes dans Aperçu ?',
+    questions: [
+      'section habitudes dans aperçu',
+      'ce que tu as économisé sans acheter',
+      'jours sans achat cette semaine dans aperçu',
+      "économisé jusqu'ici dans aperçu",
+      "aperçu dit aucune habitude pour l'instant",
+      "combien j'ai économisé en me privant cette semaine aperçu",
+      'commencer une habitude depuis aperçu',
+      'economies des habitudes dans apercu',
+      'les habitudes dans aperçu expliquées',
+      'où aperçu montre ce que mes habitudes me font économiser',
+      "le chiffre habitudes d'aperçu est pas le même que ma carte d'habitude",
+      'mes économies sur le café dans aperçu stp',
+    ],
+    answer:
+      '**Habitudes** (« Ce que tu as économisé sans acheter ») affiche « 4 jours sans achat cette semaine » (par exemple) avec ce que ça t’a fait économiser cette semaine, puis **Économisé jusqu’ici** pour toutes tes habitudes. Les chiffres sont les mêmes que sur tes cartes d’habitude : jours sans achat × le prix de l’habitude.\n\n' +
+      'S’il n’y en a aucune, la section affiche **Aucune habitude pour l’instant** avec **Commencer une habitude**.',
+    keywords: ['habitudes', 'sans acheter', 'Économisé jusqu’ici', 'jours sans achat'],
+  },
+  {
+    id: 'home.insights.goals',
+    title: 'Que montre la section Objectifs dans Aperçu ?',
+    questions: [
+      'section objectifs dans aperçu',
+      'mis de côté pour tes objectifs dans aperçu ça veut dire quoi',
+      'progression des objectifs aperçu',
+      '3 actifs ça veut dire quoi dans aperçu',
+      'aperçu dit aucun objectif actif',
+      "pourcentage d'un objectif dans aperçu",
+      "ou j'en suis de mes objectifs dans apercu",
+      'objectifs vides dans aperçu',
+      'ajouter un objectif depuis aperçu',
+      "aperçu dit aucun objectif pour l'instant",
+      "combien j'ai mis de côté pour mes projets dans aperçu stp",
+    ],
+    answer:
+      '**Objectifs** (« Où tu en es pour ce que tu mets de côté ») affiche **Mis de côté pour tes objectifs** avec le total, « sur $5,000.00 · 3 actifs » (par exemple), puis chaque objectif avec son pourcentage et « $1,200.00 sur $2,000.00 ».\n\n' +
+      'S’il n’y en a aucun, la section affiche **Aucun objectif pour l’instant** (ou **Aucun objectif actif** quand ils sont tous atteints ou fermés), avec un bouton pour en ajouter un.',
+    keywords: ['objectifs', 'Mis de côté pour tes objectifs', 'objectifs actifs', 'progression'],
+  },
+  {
+    id: 'home.insights.savings',
+    title: 'Que montre la section Épargne dans Aperçu ?',
+    questions: [
+      'section épargne dans aperçu',
+      'transféré ce mois-ci aperçu',
+      "total de l'épargne aperçu",
+      'pourcentage des revenus de ce mois-ci épargne',
+      "aperçu dit rien dans l'épargne pour l'instant",
+      'argent mis de côté dans aperçu',
+      "combien j'ai épargné ce mois-ci dans aperçu",
+      "le pourcentage d'épargne a disparu dans aperçu",
+      'moins de 1% des revenus de ce mois-ci',
+      "l'épargne dans aperçu expliquée",
+      'environ 12% de mes revenus ça veut dire quoi',
+      'total epargne sur apercu stp',
+    ],
+    answer:
+      '**Épargne** (« Argent mis de côté ») affiche **Transféré ce mois-ci**, ce qui est allé dans l’épargne ce mois-ci, avec « Environ 12 % des revenus de ce mois-ci » (par exemple) en dessous. Cette ligne est masquée quand rien n’a été transféré, et affiche « Moins de 1 % » quand c’est minime. Vient ensuite **Total de l’épargne**.\n\n' +
+      'S’il n’y a encore rien d’épargné, la section affiche **Rien dans l’épargne pour l’instant** avec **Voir l’épargne**.',
+    keywords: ['épargne', 'Transféré ce mois-ci', 'Total de l’épargne', 'argent mis de côté'],
   },
   {
     id: 'home.insights.past',
-    title: 'Puis-je voir le mois dernier dans Aperçu ?',
+    title: 'Puis-je voir le mois dernier dans Aperçu ?',
     questions: [
       'je peux voir le mois dernier dans aperçu ?',
       "aperçu d'un mois précédent",
@@ -1322,11 +1482,15 @@ export const homeFr: IntentText[] = [
       'aperçu ne montre que ce mois-ci',
       "voir les dépenses d'un ancien mois",
       'historique aperçu',
-      'semaine précédente aperçu',
+      'revoir un autre mois dans aperçu',
+      'choisis le mois dans aperçu',
+      'aperçu montre seulement les mois avec des dépenses',
+      'choisir une année dans aperçu',
     ],
     answer:
-      '**Aperçu** montre toujours la période en cours : cette semaine, ce mois-ci, cette année ou depuis le début. Il n’a pas de flèches pour reculer.\n\nPour regarder un mois plus ancien, utilise **Activité** : touche **Mois** et recule avec la flèche de gauche. Tu y verras les **Revenus**, les **Dépenses** de ce mois-là et chaque transaction.\n\nCe qui est resté de chaque mois terminé est aussi conservé dans **Épargne**.',
-    keywords: ['mois dernier', 'précédent', 'historique', 'comparer'],
+      'Oui, pour **Ce qui sort** et les sections en dessous. Touche le côté déjà choisi du sélecteur **Mois | Année** pour ouvrir **Choisis le mois** ou **Choisis l’année**. Seuls les mois et années où de l’argent est enregistré sont listés. Choisir une année oublie un mois choisi dans une autre année.\n\n' +
+      'La carte prune en haut, **Reste ce mois-ci**, reste toujours sur le mois en cours. Pour la paie d’un mois et chaque transaction, **Activité → Mois** recule avec la flèche de gauche.',
+    keywords: ['mois dernier', 'Choisis le mois', 'Choisis l’année', 'historique'],
   },
   {
     id: 'activity.list.what',
@@ -1693,7 +1857,7 @@ export const homeFr: IntentText[] = [
   },
   {
     id: 'activity.categories.see',
-    title: 'Puis-je voir mes dépenses par catégorie ?',
+    title: 'Puis-je voir mes dépenses par catégorie ?',
     questions: [
       'je peux voir mes dépenses par catégorie ?',
       'filtrer activité par catégorie',
@@ -1707,7 +1871,7 @@ export const homeFr: IntentText[] = [
       'rapport par catégorie',
     ],
     answer:
-      '**Activité** filtre par type (**Revenus**, **Factures mensuelles**, **Reçus**, **Abonnements**) et par carte ou compte, pas par catégorie.\n\nLes vues qui s’en rapprochent le plus :\n- **Aperçu** (Pro) a **Où va l’argent**, qui regroupe les factures par catégorie, avec les reçus et abonnements comptés sous Autre, et **Où tu dépenses le plus**, qui totalise chaque magasin.\n- Dans **Activité**, cherche le nom d’un magasin et lis les totaux des titres.\n\nSi tu aimerais des totaux par catégorie pour les reçus, envoie l’idée depuis **Réglages → Assistance et commentaires → Partage une idée**.',
+      '**Activité** filtre par type (**Revenus**, **Factures mensuelles**, **Reçus**, **Abonnements**) et par carte ou compte, pas par catégorie.\n\nLes vues qui s’en rapprochent le plus :\n- **Aperçu** (Pro) a **Où va l’argent**, qui totalise les reçus, les factures et les abonnements par catégorie, et **Où tu dépenses le plus**, qui totalise chaque endroit.\n- Dans **Activité**, cherche le nom d’un magasin et lis les totaux des titres.\n\nSi tu aimerais des totaux par catégorie pour les reçus, envoie l’idée depuis **Réglages → Assistance et commentaires → Partage une idée**.',
     keywords: ['catégorie', 'catégories', 'courses', 'camembert'],
   },
   {

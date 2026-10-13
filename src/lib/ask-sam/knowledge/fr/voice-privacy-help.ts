@@ -1284,14 +1284,16 @@ export const voicePrivacyHelpFr: IntentText[] = [
       'effacer mon compte',
       'je ne veux plus utiliser skip, comment retirer mes infos',
       'ça veut dire quoi Tout supprimer pour de bon',
-      'Cela supprime 2 cartes, 5 factures et 40 reçus, tout ce que Skip conserve pour toi. C’est irréversible.',
+      'Cela supprime ton compte et tout ce que tu as ajouté. Cela comprend 2 cartes, 5 factures et 40 reçus',
+      'qu’est-ce qui reste apres la suppression de mon compte',
     ],
     answer:
       'Va dans **Réglages**, descends jusqu’à **Compte**, et touche **Supprimer le compte**.\n\n' +
-      '1. **Supprimer ton compte ?** liste ce qui sera supprimé, avec le nombre de tes cartes, comptes, factures, abonnements, reçus et plus encore. Touche **Continuer**, ou **Garder mon compte** pour t’arrêter.\n' +
-      '2. **Tout supprimer pour de bon ?** dit « Il n’y a pas de retour en arrière, et aucune copie n’est conservée. » Touche **Tout supprimer**.\n\n' +
-      'Ton compte et tout ce qu’il contient sont supprimés aussitôt, et tu reviens à l’écran de bienvenue. Skip efface aussi du téléphone tes corrections de noms de la voix et les magasins que tu as ajoutés.\n\n' +
-      'Tu dois être en ligne. Supprimer ton compte n’annule pas Skip Pro : annule-le aussi auprès d’Apple.',
+      '1. Avec Skip Pro, **Annuler Skip Pro d’abord ?** s’affiche d’abord : supprimer ton compte n’annule pas Pro, et Apple continue de te facturer jusqu’à ce que tu l’annules. **Gérer dans l’App Store** ouvre tes abonnements et ne supprime rien. Si tu l’as déjà annulé, touche **Continuer la suppression**.\n' +
+      '2. **Supprimer ton compte ?** compte ce qui sera supprimé, comme tes cartes, comptes bancaires, factures, abonnements, reçus et paies, et tout le reste, comme les prêts, l’épargne, les objectifs et les habitudes de dépense. Touche **Continuer**, ou **Garder mon compte** pour t’arrêter.\n' +
+      '3. **Tout supprimer pour de bon ?** est la dernière étape. Touche **Tout supprimer**.\n\n' +
+      'Ton compte et tout ce qu’il contient sont supprimés aussitôt, et tu reviens à l’écran de bienvenue. Skip efface aussi du téléphone tes corrections de noms de la voix, les magasins mémorisés et les recherches récentes. Quelques traces hors de Skip, comme les rapports de plantage, peuvent rester.\n\n' +
+      'Tu dois être en ligne.',
     keywords: ['Supprimer le compte', 'retirer le compte', 'effacer', 'Tout supprimer'],
   },
   {
@@ -1311,7 +1313,7 @@ export const voicePrivacyHelpFr: IntentText[] = [
       'la suppression du compte est-elle définitive',
     ],
     answer:
-      'Non. La suppression est immédiate et définitive. Il n’y a pas de délai de grâce et Skip ne garde aucune copie à partir de laquelle restaurer, alors elle ne peut pas être récupérée. C’est pourquoi Skip demande deux fois.\n\n' +
+      'Non. La suppression est immédiate et définitive. Il n’y a pas de délai de grâce ni de moyen de restaurer le compte, alors il ne peut pas être récupéré. C’est pourquoi Skip demande avant de supprimer quoi que ce soit.\n\n' +
       'Tu peux t’inscrire de nouveau avec le même courriel, ou le même compte Apple ou Google, mais tu repartiras avec un Skip vide.',
     keywords: ['annuler', 'récupérer', 'restaurer', 'délai de grâce'],
   },
@@ -1487,13 +1489,14 @@ export const voicePrivacyHelpFr: IntentText[] = [
       'la page affiche une erreur avec un bouton réessayer',
       'j’ai perdu mes données, ça a dit une erreur est survenue',
       'ça veut dire quoi réessayer',
+      'si je réessaie, ça fait un doublon ?',
     ],
     answer:
       'C’est l’unique message que Skip affiche chaque fois que quelque chose échoue, comme charger une page, enregistrer, supprimer ou envoyer. Cela veut presque toujours dire que Skip n’a pas pu joindre ton compte pendant un moment, le plus souvent à cause de la connexion.\n\n' +
       '1. Vérifie que tu es en ligne, en Wi-Fi ou avec les données cellulaires.\n' +
       '2. Touche **Réessayer** sur la page, ou touche de nouveau le même bouton, comme **Enregistrer**.\n' +
       '3. Ça bloque encore ? Ferme Skip complètement et rouvre-la.\n\n' +
-      'Rien de ce que tu as déjà enregistré n’est perdu. Quand un enregistrement échoue, ce que tu avais saisi reste sur la page pour que tu puisses réessayer.\n\n' +
+      'Rien de ce que tu as déjà enregistré n’est perdu. Quand un enregistrement échoue, ce que tu avais saisi reste sur la page pour que tu puisses réessayer, et enregistrer de nouveau ne crée jamais de deuxième copie d’un reçu, d’un abonnement, d’une carte, d’un compte, d’un salaire, d’une habitude ou d’un paiement de carte. Si **Accueil** ou **Cartes** n’arrive pas à s’actualiser, ils gardent les chiffres qu’ils affichaient déjà.\n\n' +
       'Les messages qui te disent quoi corriger, comme « Indique le nom de la banque. » ou « Choisis d’abord un magasin. », ne sont pas des échecs. Ils indiquent quelque chose qui attend encore une réponse.',
     keywords: ['Une erreur est survenue', 'Réessaie', 'Réessayer', 'erreur'],
   },

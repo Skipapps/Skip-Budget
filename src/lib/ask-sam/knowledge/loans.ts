@@ -48,6 +48,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'What is the big number on Your loans?',
     questions: [
+      'the main number on the loans page',
       'What is the big number on Your loans?',
       'what does total balance across loans mean',
       'How is the total I owe on all my loans worked out?',
@@ -224,6 +225,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'What does 27 of 48 payments mean?',
     questions: [
+      'payments left is lower than the loan term',
       'What does 27 of 48 payments mean?',
       'what is payments left on my loan',
       'Why does my loan have fewer payments than the term?',
@@ -456,6 +458,9 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'What do I type for my monthly payment?',
     questions: [
+      'which amount goes in the monthly payment box on add loan',
+      'which payment figure should I type when adding a loan',
+      'not sure of the exact amount I pay each month on my loan',
       'What do I type for How much do you pay each month?',
       'what is the monthly installment on add loan',
       'Why does add loan ask for my payment first?',
@@ -493,11 +498,12 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'What are the loan types for?',
     questions: [
+      'why does skip ask for my loan type',
+      'why does add loan want to know the kind of loan',
       'What are the loan types for?',
       'which loan type should I pick',
       'Does the loan type change the interest?',
       'what are the 8 loan types',
-      'how do I rename my loan',
       'loan name required',
       'Why is my loan called Loan?',
       'can I change the type of a loan later',
@@ -763,6 +769,8 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'What does Review your loan show?',
     questions: [
+      'final step of adding a loan explained',
+      'the screen where I check my loan before saving',
       'What does Review your loan show?',
       'what is total you’ll pay',
       'review page add loan explained',
@@ -800,6 +808,8 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'What does Add to monthly bills do?',
     questions: [
+      'turn on monthly bills for my loan',
+      'is it a good idea to put my loan in monthly bills',
       'What does Add to monthly bills do?',
       'should I turn on add to monthly bills for my loan',
       'stays under loans out of your spending meaning',
@@ -834,6 +844,9 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'Can Skip remind me before a loan payment?',
     questions: [
+      'set the loan reminder for a few days early',
+      'how many days ahead can a loan reminder come',
+      'I want my loan reminder earlier',
       'Can Skip remind me before a loan payment?',
       'loan payment reminder',
       'how do I change when my loan reminder comes',
@@ -859,6 +872,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: "I've paid this loan for years. How do I add it?",
     questions: [
+      "add a car loan I've been paying for years",
       "I've been paying this loan for years. How do I add it?",
       'add a loan that is halfway paid',
       'Will Skip count the payments I already made?',
@@ -1009,6 +1023,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'I added the same loan twice',
     questions: [
+      'my loan shows up twice in spending',
       'I added the same loan twice',
       'duplicate loan',
       'my loan shows two times',
@@ -1021,7 +1036,7 @@ export const loansIntents: Intent[] = [
       'double loan',
     ],
     answer:
-      'Delete the copy you don’t need.\n\n1. Open it from **Loans** with **View details**.\n2. Tap **Edit loan**.\n3. Scroll down and tap **Delete loan**.\n4. Choose **Remove everything** (or **Delete**, if it has no payments yet).\n\n**Remove everything** also takes its payments out of past months, so they stop being counted twice in your spending. Leave the other copy as it is.\n\nTip: if the two look different, keep the one whose figures match your statement.',
+      'Tapping **Save loan** twice doesn’t make a copy, so two usually means the loan was added twice. Delete the copy you don’t need.\n\n1. Open it from **Loans** with **View details**.\n2. Tap **Edit loan**.\n3. Scroll down and tap **Delete loan**.\n4. Choose **Remove everything** (or **Delete**, if it has no payments yet).\n\n**Remove everything** also takes its payments out of past months, so they stop being counted twice in your spending. Leave the other copy as it is.\n\nTip: if the two look different, keep the one whose figures match your statement.',
     keywords: ['duplicate', 'twice', 'copy'],
     related: ['loans.delete.how', 'loans.add.as-bill'],
   },
@@ -1063,6 +1078,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'Daily, Monthly rests or 30/360: which?',
     questions: [
+      'my lender uses a different interest method',
       'Daily · 365, Monthly rests or 30 / 360: which one should I pick?',
       'what is monthly rests',
       'what does 30/360 mean',
@@ -1090,6 +1106,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'How does the calculator work out the payment?',
     questions: [
+      "skip's payment doesn't match an online loan calculator",
       'How does the calculator work out the payment?',
       'how is the monthly payment calculated',
       'Why is Skip’s payment different from another calculator?',
@@ -1116,6 +1133,8 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'Why is my last loan payment different?',
     questions: [
+      "last payment doesn't match the rest",
+      'final installment is a different amount',
       'Why is my last loan payment different?',
       'last payment is one cent more',
       'how does skip round loan figures',
@@ -1218,6 +1237,8 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'Why does most of my payment go to interest?',
     questions: [
+      'loan barely moving after years of payments',
+      'loan balance hardly drops at the start',
       'Why does most of my payment go to interest?',
       'principal vs interest in my payment',
       'why is so little going to my balance',
@@ -1533,6 +1554,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'Why did my calculator numbers reset?',
     questions: [
+      'calculator always starts with the same numbers',
       'Why did my calculator numbers reset?',
       'calculator forgot my loan',
       'loan calculator back to 25000',
@@ -1595,6 +1617,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'Can I change just one payment?',
     questions: [
+      'edit the payment for a single month in the calculator',
       'Can I change just one payment?',
       'change payment 12 on the schedule',
       'how do I edit a single loan payment',
@@ -1668,6 +1691,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'Loan calculator or Add loan: which one?',
     questions: [
+      'where do I put a loan I already have, calculator or add loan',
       'Loan calculator or Add loan: which one should I use?',
       'difference between add loan and loan calculator',
       'should I use the calculator for my existing loan',
@@ -1724,6 +1748,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'What is the History card on a loan?',
     questions: [
+      'see past loan payments already made',
       'What is the History card on a loan?',
       'where do I see payments I made on my loan',
       'loan history',
@@ -1748,6 +1773,8 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'Do I need to mark loan payments as paid?',
     questions: [
+      'do I tick each loan payment as paid',
+      'do I check off each loan payment myself',
       'Do I need to mark loan payments as paid?',
       'how do I record my monthly loan payment',
       'is there a make payment button',
@@ -1798,6 +1825,8 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'How do I edit a loan?',
     questions: [
+      'typo in my loan details',
+      "spelling mistake in a loan's name",
       'How do I edit a loan?',
       'change my loan details',
       'edit loan',
@@ -2050,6 +2079,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'What happens if I pay off part of a loan?',
     questions: [
+      'what does a large extra payment do to my loan',
       'What happens if I pay off part of a loan?',
       'partial payoff',
       'payments left instead of',
@@ -2101,10 +2131,10 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: "Why won't Skip let me pay this amount?",
     questions: [
+      'your payment is already made. you can pay it all from',
       "Why won't Skip let me pay this amount?",
       'that’s more than this loan needs',
       'a payment can’t be dated after today',
-      'is already made you can pay it all from',
       'the most you can pay is',
       'nothing can be paid on this day without changing payments already made',
       'this loan started on pick that day or later',
@@ -2198,6 +2228,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'How do I delete a loan?',
     questions: [
+      'remove a loan I no longer have',
       'How do I delete a loan?',
       'remove a loan',
       'delete loan',
@@ -2277,6 +2308,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'Are there limits on loan amounts or terms?',
     questions: [
+      'is there a maximum loan size',
       'Are there limits on loan amounts or terms?',
       'maximum loan amount skip',
       'max interest rate for a loan',
@@ -2308,6 +2340,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: "Why don't Skip's figures match my lender's?",
     questions: [
+      "lender's balance is higher than skip's",
       "Why don't Skip's figures match my lender's?",
       'my loan balance is wrong',
       'skip says I owe more than my bank',
@@ -2367,6 +2400,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: 'My loan disappeared from Loans',
     questions: [
+      'my car loan is gone from loans',
       'My loan disappeared from Loans',
       'where did my loan go',
       'loan missing',
@@ -2396,6 +2430,7 @@ export const loansIntents: Intent[] = [
     topic: 'loans',
     title: "Why isn't my loan in my monthly bills?",
     questions: [
+      'loan left out of my monthly bills total',
       "Why isn't my loan in my monthly bills?",
       'loan not showing in bills',
       'my loan payment is not in my spending',
@@ -2404,7 +2439,6 @@ export const loansIntents: Intent[] = [
       'why is my mortgage not in activity',
       'loan does not count toward spending',
       'my loan payments dont show on home',
-      'turn on monthly bills for my loan',
       'loan not in budget',
     ],
     answer: p(
@@ -2427,7 +2461,6 @@ export const loansIntents: Intent[] = [
       'why no reminder for my loan',
       'loan reminder missing',
       'reminder came at the wrong time',
-      'I want my loan reminder earlier',
       'turned on remind me but nothing',
       'loan due reminder never arrives',
       'reminder for my loan payment never showed up, are notifications blocked on my phone',

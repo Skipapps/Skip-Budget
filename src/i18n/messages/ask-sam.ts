@@ -156,7 +156,11 @@ export const askSamMessages = defineMessages({
   'askSam.screen.savings': { en: 'Savings', es: 'Ahorros', fr: 'Épargne' },
   'askSam.screen.voice': { en: 'Voice', es: 'Voz', fr: 'Voix' },
   'askSam.screen.insights': { en: 'Insights', es: 'Análisis', fr: 'Aperçu' },
-  'askSam.screen.bills': { en: 'Monthly bills', es: 'Facturas del mes', fr: 'Factures du mois' },
+  'askSam.screen.bills': {
+    en: 'Monthly bills',
+    es: 'Facturas mensuales',
+    fr: 'Factures mensuelles',
+  },
   'askSam.screen.addBill': { en: 'Add bill', es: 'Agregar factura', fr: 'Ajouter une facture' },
   'askSam.screen.subscriptions': { en: 'Subscriptions', es: 'Suscripciones', fr: 'Abonnements' },
   'askSam.screen.addSubscription': {
@@ -200,7 +204,7 @@ export const askSamMessages = defineMessages({
   'askSam.screen.paymentSearch': {
     en: 'Search payments',
     es: 'Buscar pagos',
-    fr: 'Chercher des paiements',
+    fr: 'Rechercher des paiements',
   },
   'askSam.screen.paymentHistory': {
     en: 'Payment history',
@@ -212,7 +216,7 @@ export const askSamMessages = defineMessages({
   'askSam.screen.contact': {
     en: 'Email support',
     es: 'Escribir a soporte',
-    fr: 'Écrire au support',
+    fr: 'Écrire à l’assistance',
   },
   'askSam.screen.addAccount': {
     en: 'Add bank account',

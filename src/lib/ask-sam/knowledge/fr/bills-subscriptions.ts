@@ -1201,8 +1201,8 @@ export const billsSubscriptionsFr: IntentText[] = [
       'mon loyer est le 30, et en février ?',
     ],
     answer:
-      'Dans un mois qui n’a pas ce jour, Skip utilise le dernier jour du mois. Une facture due le 31 est comptée le 30 avril, et le 28 février (le 29 février les années bissextiles). Une facture annuelle du 29 février est comptée le 28 février les autres années.\n\n' +
-      'Après un mois plus court, vérifie **Prochaine échéance** sur la page de la facture. Si elle est restée sur le jour plus bas, touche le crayon et remets **Date de paiement** à la date que tu veux.\n\n' +
+      'Dans un mois qui n’a pas ce jour, Skip utilise le dernier jour du mois, puis revient à ton jour le mois suivant. Une facture due le 31 est comptée le 31 mars, le 30 avril et le 31 mai, et le 28 février (le 29 février les années bissextiles). Une facture annuelle du 29 février est comptée le 28 février les autres années, et de nouveau le 29 les années bissextiles. Les abonnements, les remboursements de prêt et les factures **Tous les 3 mois** fonctionnent de la même façon.\n\n' +
+      'C’est pourquoi **Prochaine échéance** peut afficher le 30 ou le 28 dans un mois court ; le mois suivant, elle revient à ton jour. Si tu changes **Date de paiement** pour une autre date, c’est ce jour-là que Skip garde ensuite.\n\n' +
       'Astuce : une date du 1er au 28 ne se décale jamais.',
     keywords: ['le 31', 'fin de mois', 'février', 'année bissextile'],
   },
@@ -2066,13 +2066,14 @@ export const billsSubscriptionsFr: IntentText[] = [
       'comment me débarrasser d’un abonnement en double',
       'le même abonnement a été ajouté deux fois par erreur',
       "facture saisie deux fois, comment j'en retire une",
+      'si je touche deux fois enregistrer la facture, ça crée un doublon',
     ],
     answer:
       'Supprime celle en trop avec **Tout supprimer**, pour que ses paiements arrêtent de compter :\n\n' +
       '1. Ouvre le doublon depuis **Factures mensuelles** (ou **Abonnements**).\n' +
       '2. Touche le crayon, puis **Supprimer la facture** (ou **Supprimer l’abonnement**).\n' +
       '3. Touche **Tout supprimer**.\n\n' +
-      'Les totaux et les soldes se mettent à jour tout de suite. Une même facture n’est jamais prélevée deux fois pour le même mois (ou la même semaine, le même trimestre ou la même année), donc un doublon veut généralement dire que deux copies ont été ajoutées.',
+      'Les totaux et les soldes se mettent à jour tout de suite. Une même facture n’est jamais prélevée deux fois pour le même mois (ou la même semaine, le même trimestre ou la même année), donc un doublon veut généralement dire que deux copies ont été ajoutées. Toucher deux fois **Enregistrer la facture** ne crée pas de doublon : le bouton reste sur **Enregistrement…** jusqu’à ce que la page se ferme.',
     keywords: ['doublon', 'deux fois', 'en double', 'compté deux fois'],
   },
   {

@@ -207,6 +207,8 @@ export const homeIntents: Intent[] = [
     topic: 'home',
     title: 'How do I make my balance match my bank?',
     questions: [
+      'set my balance to the correct amount',
+      'can I overwrite the current balance with the right number',
       'How do I fix my current balance?',
       'how do i correct the number on home',
       'how to make skip match my bank balance',
@@ -237,6 +239,7 @@ export const homeIntents: Intent[] = [
     topic: 'home',
     title: 'What does it show with no cards or accounts?',
     questions: [
+      'balance is zero with no accounts added',
       'do i need to add a bank account for the balance to work',
       'current balance without a bank account',
       'i only added my salary what does the balance show',
@@ -259,6 +262,7 @@ export const homeIntents: Intent[] = [
     topic: 'home',
     title: 'Why didn’t my balance change?',
     questions: [
+      "current balance won't budge",
       "i added a receipt and my balance didn't change",
       'balance stayed the same after adding a bill',
       "why didn't my salary show in current balance",
@@ -273,7 +277,7 @@ export const homeIntents: Intent[] = [
     ],
     answer:
       'The total only moves for things that have happened since your balances were typed. It stays the same when:\n\n- The date is before the day you typed that card’s or account’s balance. Skip treats it as already inside that balance.\n- A bill or subscription isn’t due yet. It comes off on its due day and shows under **Coming up** until then.\n- Your next payday hasn’t come.\n- It’s a loan with **Add to monthly bills** off. Its payments don’t count as spending.\n- It was a payment between your own card and account, which only moves money.\n\nIf none of these fit, pull down on Home to refresh.',
-    keywords: ['not changing', 'not updating', 'stayed the same', 'no change'],
+    keywords: ['not moving', 'not changing', 'not updating', 'stayed the same', 'no change'],
     related: [
       'home.balance.since',
       'home.balance.when',
@@ -367,6 +371,7 @@ export const homeIntents: Intent[] = [
     topic: 'home',
     title: 'Why is the balance big and in the centre?',
     questions: [
+      'current balance is negative but not in red',
       'why is the card number on centre',
       'why is the number in the middle of the card',
       'why is the balance so big',
@@ -670,7 +675,7 @@ export const homeIntents: Intent[] = [
       'left this month vs current balance',
     ],
     answer:
-      'Home no longer shows **Left this month**. The top card is now **Current balance**: a running total of your money that doesn’t reset each month and doesn’t count pay that hasn’t arrived yet.\n\nFor month figures:\n- **Where your money went** on Home shows this month’s bills, receipts and subscriptions.\n- **Activity → Month** shows this month’s **Income**, **Expenses**, and whether you have money **Left over** or are **Short by** some.\n- The **Salary** tile on **Cards** shows this month’s pay.\n- **Savings** shows what was left from each finished month.\n\nYou may still see “Left this month” as an example on the Skip Pro page for **Insights**.',
+      'Home no longer shows **Left this month**. The top card is now **Current balance**: a running total of your money that doesn’t reset each month and doesn’t count pay that hasn’t arrived yet.\n\nFor month figures:\n- **Where your money went** on Home shows this month’s bills, receipts and subscriptions.\n- **Activity → Month** shows this month’s **Income**, **Expenses**, and whether you have money **Left over** or are **Short by** some.\n- The **Salary** tile on **Cards** shows this month’s pay.\n- **Savings** shows what was left from each finished month.\n- **Insights** (Skip Pro) shows **Left this month** at the top: this month’s pay minus what went out so far.',
     keywords: [
       'left this month',
       'old number',
@@ -710,6 +715,8 @@ export const homeIntents: Intent[] = [
     topic: 'home',
     title: 'My bank took a bill on a different day',
     questions: [
+      'bill was charged later by my bank than the date in skip',
+      'my bank took the payment a few days after skip counted it',
       'bill came out late but skip took it already',
       'rent is due saturday but my bank takes it monday',
       'payday falls on a weekend',
@@ -732,6 +739,7 @@ export const homeIntents: Intent[] = [
     topic: 'home',
     title: 'What if my pay goes to No account?',
     questions: [
+      'my pay counts on home but no account on cards shows it',
       'salary paid into no account does it count',
       'what does no account mean for my pay',
       'my pay is not going into my bank account in skip',
@@ -905,6 +913,7 @@ export const homeIntents: Intent[] = [
     topic: 'home',
     title: 'How do I change my name or picture on Home?',
     questions: [
+      'change the name shown on my home screen',
       'what is at the top of the home screen',
       'the circle next to my name on home',
       'what happens if i tap my picture on home',
@@ -1047,6 +1056,8 @@ export const homeIntents: Intent[] = [
     topic: 'home',
     title: 'Can I change or rearrange Home?',
     questions: [
+      'can I shuffle the home sections around',
+      'drag the tiles on home to new spots',
       'can i change the quick add tiles',
       'can i rearrange the home screen',
       'how do i hide a section on home',
@@ -1151,6 +1162,7 @@ export const homeIntents: Intent[] = [
     topic: 'home',
     title: 'What is Go further on Home?',
     questions: [
+      'the home section that has loans and habits',
       'what is go further',
       'what are the tool cards on home',
       'where is the loan calculator',
@@ -1166,6 +1178,8 @@ export const homeIntents: Intent[] = [
       'what is in the tools section of the home page',
       'where do loans, habits and insights live on home',
       'the home area that holds loans, spending habits and insights, what is it called',
+      'the part of home with the loans and habits cards',
+      'what is the section with loans and habits on home',
     ],
     answer:
       '**Go further** holds Skip’s tools:\n- **Loans** opens your **Loans** page, where you see your loans and use the loan calculator.\n- **Spending habits** opens your habit cards, where one tap on a day records what you spent on a habit like coffee.\n- **Insights**, the wide card below them, opens a page showing what comes in, what goes out and where it goes.\n\n**Spending habits** and **Insights** are part of Skip Pro. **Loans** and the loan calculator are free.',
@@ -1465,7 +1479,6 @@ export const homeIntents: Intent[] = [
     questions: [
       'what is insights',
       'what does the insights card on home do',
-      'see the story behind your spending meaning',
       'what is on the insights page',
       'how do i open insights',
       'where are my spending charts',
@@ -1474,19 +1487,48 @@ export const homeIntents: Intent[] = [
       'is there a chart of my spending',
       'where is the analysis page',
       'what does the insights page include',
-      'list what insights shows, like categories, places and what i owe',
-      'does insights show my top stores and categories',
+      'list everything insights shows',
+      'does insights show my loans and goals too',
+      'does insights show categories, places, loans and goals',
     ],
     answer:
-      '**Insights** puts your money on one page. Open it from the **Insights** card on Home, under **Go further**.\n- **What comes in**: your pay as a monthly figure.\n- **What goes out**: spending this week, month, year or all time, with a chart and a split into **Shop receipts**, **Bills** and **Subscriptions**.\n- **Where it goes**: your top 6 spending categories.\n- **Where you spend most**: your top 5 places, with how many times.\n- **What you owe**: what each credit card owes now.\n- **Coming up**: your subscriptions per month and over a year.\n\nInsights is part of Skip Pro.',
-    keywords: ['insights', 'charts', 'analysis', 'story behind your spending'],
+      '**Insights** puts your money on one page. Open it from the **Insights** card on Home, under **Go further**. From the top:\n\n' +
+      '- **Left this month**: this month’s pay minus what went out, and how much of your income you’ve spent.\n- **What comes in**: your pay.\n- **What goes out**: spending in a month or a year you pick, with a chart.\n- **Where it goes**: spending by category.\n- **Where you spend most**: the places you spend the most.\n- **What you owe**: what each credit card owes now.\n- **Loans**: what you still owe on loans.\n- **Bills & subscriptions**: what’s due this month, and the next two due.\n- **Coming up**: what your subscriptions cost a month and a year.\n- **Habits**, **Goals** and **Savings**: what you saved by skipping, how your goals are doing, and what you set aside.\n\n' +
+      'Each section has **See all ›** to open its full page. Insights is part of Skip Pro.',
+    keywords: ['insights', 'charts', 'analysis', 'money on one page'],
     pro: true,
     related: [
-      'home.insights.pro',
-      'home.insights.comes-in',
+      'home.insights.hero',
       'home.insights.goes-out',
-      'home.insights.where-it-goes',
+      'home.insights.pro',
+      'home.insights.past',
     ],
+    route: '/insights',
+  },
+  {
+    id: 'home.insights.hero',
+    topic: 'home',
+    title: 'What is Left this month in Insights?',
+    questions: [
+      'what is left this month in insights',
+      'what does over this month mean',
+      'the purple card at the top of insights',
+      'you have spent percent of your income',
+      'why does insights say i spent 80% of my income',
+      'what is in and out on insights',
+      'insights left this month is wrong',
+      'why is the percent line missing on insights',
+      'how much of my pay have i spent this month',
+      'less than 1% of your income',
+      'does left this month count bills not paid yet',
+    ],
+    answer:
+      'The plum card at the top of **Insights** is always the current calendar month. It shows **Left this month**: pay dated this month, minus everything that went out this month up to today. If more went out than came in, it says **Over this month** instead.\n\n' +
+      'Under it, “$3,200.00 in · $1,450.00 out” gives both sides, and “You’ve spent 45% of your income so far.” says how much of this month’s pay has gone. A share under 1% reads “less than 1%”. With no pay dated this month, that line is hidden.\n\n' +
+      'Bills and subscriptions due later this month aren’t counted until their day. This is different from **Current balance** on Home, which is your running total, not just this month.',
+    keywords: ['Left this month', 'Over this month', 'spent of your income', 'in out'],
+    pro: true,
+    related: ['home.insights.comes-in', 'home.insights.goes-out', 'home.balance.left-this-month'],
     route: '/insights',
   },
   {
@@ -1504,6 +1546,8 @@ export const homeIntents: Intent[] = [
       'how do i unlock insights',
       'insights says money on one page',
       'insights paywall',
+      'insights won’t open for me',
+      'i can’t get into insights',
     ],
     answer:
       '**Insights** is part of Skip Pro, which is why its card on Home shows a **PRO** tag on the free plan. Tapping it opens a page explaining Insights, with **Get Skip Pro** to upgrade.\n\nWith Pro, the tag disappears and the card opens Insights straight away. If Pro ends, Insights locks again, but nothing you entered is lost.\n\nEverything else on Home, including **Current balance**, **Where your money went**, **Recent** and **Coming up**, is free.',
@@ -1517,22 +1561,27 @@ export const homeIntents: Intent[] = [
     topic: 'home',
     title: 'How is What comes in worked out?',
     questions: [
+      'insights monthly income with fortnightly pay',
       'how is what comes in calculated',
       'every month figure in insights',
       'why is my monthly income in insights not my paycheck',
       'biweekly pay per month insights',
       'insights says skip does not know what you earn yet',
       'paid once this month in insights',
-      'from 2 sources meaning',
+      'every month 2 sources meaning',
       'weekly pay converted to monthly',
       'insights income wrong',
       'set up payday button',
+      'one-off pays in insights',
     ],
     answer:
-      '**Every month** turns each salary into a monthly amount and adds them up:\n- **Weekly**: pay × 52 ÷ 12\n- **Every 2 weeks**: pay × 26 ÷ 12\n- **Twice a month**: pay × 2\n- **Monthly**: pay × 1\n\nExample: $1,000 every 2 weeks is $1,000 × 26 ÷ 12 = $2,166.67 a month. Underneath, it says how many sources that’s from.\n\n**Just this time** pay isn’t in **Every month**; it’s shown as “+ $500 paid once this month” (for example) in the month it was paid. If you only have one-off pay, the card says **This month** instead.\n\nNo pay yet? You’ll see **Skip does not know what you earn yet** and a **Set up payday** button.',
+      '**What comes in** shows your **Salary** as a monthly figure, with “Every month · 2 sources” (for example) under it. Each salary is turned into a monthly amount and added up:\n\n' +
+      '- **Weekly**: pay × 52 ÷ 12\n- **Every 2 weeks**: pay × 26 ÷ 12\n- **Twice a month**: pay × 2\n- **Monthly**: pay × 1\n\n' +
+      'Example: $1,000 every 2 weeks is $1,000 × 26 ÷ 12 = $2,166.67 a month. **Just this time** pay is added as “+ $500.00 paid once this month”. If you only have one-off pay, it reads “This month · 2 one-off pays” instead.\n\n' +
+      'No pay yet? You’ll see **Skip does not know what you earn yet** with **Set up payday**. **See all ›** opens **Salary**.',
     keywords: ['what comes in', 'every month', 'monthly income', 'biweekly', 'one-off'],
     pro: true,
-    related: ['home.insights.goes-out', 'home.insights.what', 'home.balance.income'],
+    related: ['home.insights.hero', 'home.insights.what', 'home.balance.income'],
     route: '/insights',
   },
   {
@@ -1544,40 +1593,45 @@ export const homeIntents: Intent[] = [
       'insights spending chart explained',
       'what is recorded in this period',
       'shop receipts bills subscriptions in insights',
-      'insights week month year all',
+      'insights month year switch',
       'what do the bars in insights mean',
       'insights this month total',
-      'all time spending',
       'why does the insights chart have empty bars',
       'insights spent this year',
+      'why is one bar darker in insights',
+      'insights bills higher than monthly bills page',
     ],
     answer:
-      'Pick **Week**, **Month**, **Year** or **All**; it opens on **Month**. The big figure is everything that went out in that period up to today: **This week**, **This month**, **This year** or **All time**.\n\nThe chart shows spending only, one bar per day, week, month or year. Under it, the figure is split into **Shop receipts**, **Bills** (loan payments included) and **Subscriptions**, with **Recorded in this period** as the total.\n\nWeeks run Sunday to Saturday. **All** covers this year and the 6 before. Pay isn’t counted here; it’s in **What comes in**.',
-    keywords: ['what goes out', 'chart', 'bars', 'recorded in this period', 'shop receipts'],
+      'Pick **Month** or **Year** with the switch. The card shows **This month** or **This year**, or the name of the month or year you picked, with its total and a chart:\n\n' +
+      '- **Month**: one bar per week, Sunday to Saturday, cut to the month.\n- **Year**: one bar per month, J to D, with the picked month or this month drawn dark.\n\n' +
+      'Under the chart the total is split into **Shop receipts**, **Bills** and **Subscriptions**, with **Recorded in this period** as the sum. **Bills** here includes extra loan payoffs, as Home’s tile does, so it can be higher than **Bills & subscriptions** further down.\n\n' +
+      'The current month or year counts what has happened up to today. Pay isn’t counted here; it’s in **What comes in**. **See all ›** opens **Activity**.',
+    keywords: ['what goes out', 'chart', 'bars', 'recorded in this period', 'Month', 'Year'],
     pro: true,
-    related: ['home.insights.where-it-goes', 'home.insights.past', 'home.where.vs-activity'],
+    related: ['home.insights.past', 'home.insights.where-it-goes', 'home.where.vs-activity'],
     route: '/insights',
   },
   {
     id: 'home.insights.where-it-goes',
     topic: 'home',
-    title: 'Why is Other so big in Where it goes?',
+    title: 'What is Where it goes in Insights?',
     questions: [
       'what is where it goes in insights',
       'why is other my biggest category',
       'my receipts are all under other',
       'insights categories wrong',
-      'where are my grocery receipts in insights categories',
       'top categories insights',
-      'subscriptions counted as other',
       'category breakdown',
-      'why does housing show in insights',
       'spending by category insights',
       'why does insights say Other',
+      'where are my groceries in insights',
+      'how many categories does insights show',
     ],
     answer:
-      '**Where it goes** in **Insights** groups the period’s spending into categories and shows your top 6, biggest first, each with a bar measured against the biggest.\n\nBills are grouped by the category you gave them, like Housing, Internet or Insurance. Receipts and subscriptions are counted together under **Other**, along with bills filed as Other. That’s why **Other** is often the largest.\n\nTo see receipts by store instead, look at **Where you spend most** just below.',
-    keywords: ['where it goes', 'categories', 'other', 'category breakdown'],
+      '**Where it goes** (“Spending by category”) groups the spending of the month or year picked in **What goes out** by category, and shows the top 6, biggest first.\n\n' +
+      'Receipts count under their own category, subscriptions under theirs, and bills under the category you gave them, like Housing or Internet. Anything without a category counts as **Other**.\n\n' +
+      'To see places instead of categories, look at **Where you spend most** just below. **See all ›** opens **Activity**.',
+    keywords: ['where it goes', 'categories', 'other', 'spending by category'],
     pro: true,
     related: ['home.insights.spend-most', 'home.insights.goes-out', 'activity.categories.see'],
     route: '/insights',
@@ -1587,6 +1641,7 @@ export const homeIntents: Intent[] = [
     topic: 'home',
     title: 'What is Where you spend most?',
     questions: [
+      'what decides which stores are my top places',
       'what is where you spend most',
       'top places i spend money',
       'what does 4 times mean in insights',
@@ -1595,13 +1650,12 @@ export const homeIntents: Intent[] = [
       'which shop do i spend most at',
       'insights merchant list',
       'where you spend most is wrong',
-      'most visited stores',
       'biggest spending places',
-      "what's my biggest expense",
       'where do i spend the most money',
     ],
     answer:
-      'It lists the 5 names you spent the most on in the chosen period, biggest first: stores, bills and subscriptions. Each shows the total, a bar compared with the top one, and how many times, like “4 times”.\n\nRows are grouped by exact name, so “Starbucks” and “Starbucks Coffee” count as two places. Editing the receipts so the names match brings them together.',
+      '**Where you spend most** (“Places you spend the most”) lists the 5 names you spent the most on in the period picked in **What goes out**, biggest first: stores, bills and subscriptions. Each shows its total and how many times, like “4 times”.\n\n' +
+      'Rows are grouped by exact name, so “Starbucks” and “Starbucks Coffee” count as two places. Editing the receipts so the names match brings them together. **See all ›** opens **Activity**.',
     keywords: ['where you spend most', 'top stores', 'merchants', 'times'],
     pro: true,
     related: ['home.insights.where-it-goes', 'home.insights.goes-out'],
@@ -1618,16 +1672,65 @@ export const homeIntents: Intent[] = [
       'does what you owe include loans',
       'what you owe is missing',
       'how much do i owe on my cards',
-      'owed amount insights',
       'total credit card debt',
       'card in credit shows zero',
       'insights owe section',
+      'what you owe shows something went wrong',
     ],
     answer:
-      '**What you owe** lists each credit card with what it owes right now: the same running figure as in **Cards**, the balance you typed plus charges since, minus payments. A card in credit shows $0.00.\n\nIt doesn’t include loans; see the **Loans** page for those. The section only appears once you’ve added a credit card.',
+      '**What you owe** (“Money you owe on cards”) lists each credit card with what it owes right now: the same live figure as on **Cards**, never just the balance you typed. A card in credit shows $0.00.\n\n' +
+      'Loans have their own section, **Loans**, just below. **What you owe** only appears once you’ve added a credit card. If the balances can’t be read, the section shows **Something went wrong. Please try again.** with **Try again**, and the rest of the page still works. **See all ›** opens **Cards**.',
     keywords: ['what you owe', 'owed', 'credit card debt', 'cards'],
     pro: true,
-    related: ['home.balance.vs-cards', 'home.insights.what'],
+    related: ['home.insights.loans', 'home.balance.vs-cards', 'home.insights.what'],
+    route: '/insights',
+  },
+  {
+    id: 'home.insights.loans',
+    topic: 'home',
+    title: 'What does the Loans section in Insights show?',
+    questions: [
+      'loans section in insights',
+      'how much do i owe on loans in insights',
+      'insights loan total',
+      'paid off percent in insights',
+      'monthly payments in insights loans',
+      'insights loans different from loans page',
+      'no open loans in insights',
+      'why does insights say no loans yet',
+      'next loan payment in insights',
+      'total debt on loans insights',
+    ],
+    answer:
+      '**Loans** (“Money you owe on loans”) shows the total you still owe on your loans, how many there are, and how much is paid off, like “35% paid off”. Each loan shows “Name · next date” with its payment, and **Monthly payments** adds them up.\n\n' +
+      'These are the same figures as the **Loans** page. Tap a loan to open it, or **See all ›** for **Loans**. With none, it says **No loans yet** (or **No open loans** once they’re all paid off or stopped), with a button to add one.',
+    keywords: ['loans', 'paid off', 'Monthly payments', 'No open loans'],
+    pro: true,
+    related: ['home.insights.owe', 'home.insights.what'],
+    route: '/insights',
+  },
+  {
+    id: 'home.insights.plans',
+    topic: 'home',
+    title: 'What does Bills & subscriptions in Insights show?',
+    questions: [
+      'bills and subscriptions section in insights',
+      'what you pay every month insights',
+      'bills count in insights',
+      'next due in insights',
+      'why do the two bills figures in insights differ',
+      'insights bills total vs monthly bills page',
+      'what is due this month in insights',
+      'subscriptions count insights',
+      'which bills are next in insights',
+      'insights bills does not match what goes out',
+    ],
+    answer:
+      '**Bills & subscriptions** (“What you pay every month”) shows **Bills · 4** and **Subscriptions · 6** (for example), each with what’s due this month: the same totals as the **Monthly bills** and **Subscriptions** pages. Under **Next due** are the next two, by date.\n\n' +
+      'These leave out extra loan payoffs, so they can differ from **Bills** in **What goes out**, which counts them as Home’s tile does.',
+    keywords: ['Bills & subscriptions', 'Next due', 'due this month', 'what you pay every month'],
+    pro: true,
+    related: ['home.insights.coming-up', 'home.insights.goes-out'],
     route: '/insights',
   },
   {
@@ -1641,16 +1744,89 @@ export const homeIntents: Intent[] = [
       'insights subscription total looks too high',
       'yearly subscription counted monthly in insights',
       'how much do my subscriptions cost a year',
-      'insights per month subscriptions wrong',
-      'what does /mo mean in insights',
+      'regular costs ahead',
       'subscriptions cost per year',
       'insights coming up section',
+      'why is a subscription missing from coming up',
     ],
     answer:
-      'It adds up the price of every active subscription and shows it as a monthly figure, with that × 12 as “over a year”. Tap it to open **Subscriptions**.\n\nIt uses each subscription’s price as saved, whatever its cycle. A $120 yearly subscription adds $120 here, not $10, and a weekly one adds one week’s price. If you have yearly or weekly subscriptions, the **Subscriptions** page shows what’s actually due each month.\n\nCancelled subscriptions aren’t counted.',
-    keywords: ['coming up', 'per month', 'over a year', 'subscriptions total'],
+      '**Coming up** (“Regular costs ahead”) shows what your subscriptions cost a month, and that “over a year”. Each is counted by its billing cycle: weekly × 52, monthly × 12, every 3 months × 4 and yearly × 1 make the year, and the month is the year ÷ 12. So a $120 yearly subscription adds $10.00 a month and $120.00 a year.\n\n' +
+      'Only active subscriptions with a renewal date count; cancelled ones and ones with no next date don’t.',
+    keywords: ['coming up', 'per month', 'over a year', 'regular costs ahead'],
     pro: true,
-    related: ['home.insights.what', 'home.coming-up.what'],
+    related: ['home.insights.plans', 'home.insights.what'],
+    route: '/insights',
+  },
+  {
+    id: 'home.insights.habits',
+    topic: 'home',
+    title: 'What does the Habits section in Insights show?',
+    questions: [
+      'habits section in insights',
+      'what you saved by skipping',
+      'skipped times this week insights',
+      'saved so far insights',
+      'insights habits shows no habits yet',
+      'how much did skipping save me',
+      'start a habit from insights',
+      'insights habit savings',
+      'habits in insights explained',
+      'where do habit savings show in insights',
+    ],
+    answer:
+      '**Habits** (“What you saved by skipping”) shows “Skipped 4 times this week” (for example) with what that saved this week, then **Saved so far** across all your habits. The figures are the same as on your habit cards: skipped days × the habit’s price.\n\n' +
+      'With none, it says **No habits yet** with **Start a habit**.',
+    keywords: ['habits', 'saved by skipping', 'Saved so far', 'skipped'],
+    pro: true,
+    related: ['home.insights.goals', 'home.insights.what'],
+    route: '/insights',
+  },
+  {
+    id: 'home.insights.goals',
+    topic: 'home',
+    title: 'What does the Goals section in Insights show?',
+    questions: [
+      'goals section in insights',
+      'what does saved toward goals mean in insights',
+      'insights goals progress',
+      'of active goals insights',
+      'insights says no active goals',
+      'goal percentage in insights',
+      'how close am i to my goals',
+      'insights goals empty',
+      'add a goal from insights',
+      'progress toward what i am saving for',
+    ],
+    answer:
+      '**Goals** (“Progress toward what you’re saving for”) shows **Saved toward goals** with the total, “of $5,000.00 · 3 active” (for example), then each goal with its percentage and “$1,200.00 of $2,000.00”.\n\n' +
+      'With none, it says **No goals yet** (or **No active goals** when all are reached or closed), with a button to add one.',
+    keywords: ['goals', 'Saved toward goals', 'active', 'progress'],
+    pro: true,
+    related: ['home.insights.savings', 'home.insights.what'],
+    route: '/insights',
+  },
+  {
+    id: 'home.insights.savings',
+    topic: 'home',
+    title: 'What does the Savings section in Insights show?',
+    questions: [
+      'savings section in insights',
+      'moved this month insights',
+      'total in savings insights',
+      'percent of this months income savings',
+      'insights says nothing in savings yet',
+      'money set aside in insights',
+      'how much did i save this month insights',
+      'savings percent missing in insights',
+      'less than 1% of this month’s income',
+      'insights savings explained',
+    ],
+    answer:
+      '**Savings** (“Money set aside”) shows **Moved this month**, what went into savings this month, with “About 12% of this month’s income” (for example) under it. That line is hidden when nothing moved, and reads “Less than 1%” when it’s tiny. Then comes **Total in savings**.\n\n' +
+      'With nothing saved yet, it says **Nothing in savings yet** with **See savings**.',
+    keywords: ['savings', 'Moved this month', 'Total in savings', 'money set aside'],
+    pro: true,
+    related: ['home.insights.goals', 'home.insights.what'],
     route: '/insights',
   },
   {
@@ -1661,19 +1837,20 @@ export const homeIntents: Intent[] = [
       'can i see last month in insights',
       'insights for a previous month',
       'how do i go back in insights',
-      'no arrows in insights',
       'see last years insights',
       'compare months in insights',
-      'insights only shows this month',
+      'choose month in insights',
       'view old month spending',
       'insights history',
-      'previous week insights',
+      'insights only shows months with money',
+      'pick a year in insights',
     ],
     answer:
-      '**Insights** always shows the current period: this week, this month, this year, or all time. It has no arrows to step back.\n\nTo look at an earlier month, use **Activity**: tap **Month** and step back with the left arrow. You’ll see that month’s **Income**, **Expenses** and every transaction.\n\nWhat was left over from each finished month is also kept in **Savings**.',
-    keywords: ['last month', 'previous', 'history', 'compare'],
+      'Yes, for **What goes out** and the sections under it. Tap the side of the **Month | Year** switch that’s already chosen to open **Choose month** or **Choose year**. Only months and years with money on record are listed. Picking a year forgets a month picked from another year.\n\n' +
+      'The plum card at the top, **Left this month**, always stays on the current month. For a month’s pay and every transaction, **Activity → Month** steps back with the left arrow.',
+    keywords: ['last month', 'previous', 'Choose month', 'Choose year', 'history'],
     pro: true,
-    related: ['activity.periods.how', 'home.insights.goes-out'],
+    related: ['home.insights.goes-out', 'activity.periods.how'],
     route: '/insights',
   },
 
@@ -1735,6 +1912,7 @@ export const homeIntents: Intent[] = [
     topic: 'activity',
     title: 'Can I pick my own date range?',
     questions: [
+      'view my spending between any two days I choose',
       'can i pick a custom date range',
       'show transactions between two dates',
       'from the 15th to the 14th view',
@@ -1848,6 +2026,7 @@ export const homeIntents: Intent[] = [
     topic: 'activity',
     title: 'How do I filter Activity?',
     questions: [
+      'see only the spending on one of my cards',
       'how do i filter activity',
       'show only receipts in activity',
       'filter by card',
@@ -2122,7 +2301,7 @@ export const homeIntents: Intent[] = [
       'category report',
     ],
     answer:
-      '**Activity** filters by type (**Income**, **Monthly Bills**, **Receipts**, **Subscriptions**) and by card or account, not by category.\n\nThe closest views:\n- **Insights** (Pro) has **Where it goes**, which groups bills by their category, with receipts and subscriptions counted under Other, and **Where you spend most**, which totals each store.\n- In **Activity**, search a store name and read the heading totals.\n\nIf you’d like category totals for receipts, send it as an idea from **Settings → Support and feedback → Share an idea**.',
+      '**Activity** filters by type (**Income**, **Monthly Bills**, **Receipts**, **Subscriptions**) and by card or account, not by category.\n\nThe closest views:\n- **Insights** (Pro) has **Where it goes**, which totals receipts, bills and subscriptions by their categories, and **Where you spend most**, which totals each place.\n- In **Activity**, search a store name and read the heading totals.\n\nIf you’d like category totals for receipts, send it as an idea from **Settings → Support and feedback → Share an idea**.',
     keywords: ['category', 'categories', 'groceries', 'pie chart', 'report'],
     related: ['home.insights.where-it-goes', 'activity.filter.how', 'activity.summary.search'],
     route: '/transactions',

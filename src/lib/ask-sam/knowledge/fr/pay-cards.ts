@@ -216,7 +216,7 @@ export const payCardsFr: IntentText[] = [
       'payé le 31 mais février a juste 28 jours',
     ],
     answer:
-      'Une paie mensuelle garde le jour de ton **Dernier jour de paie**. Quand un mois est trop court pour ce jour, Skip utilise plutôt le dernier jour de ce mois. Ainsi, une paie le 31 s’affiche le 30 avril, et le 28 février (le 29 février lors d’une année bissextile).\n\n**Deux fois par mois** utilise déjà le dernier jour de chaque mois, plus le 15. Si tu n’es payé que le dernier jour, utilise **Chaque mois** avec un **Dernier jour de paie** le 31 d’un mois qui en compte un.',
+      'Une paie mensuelle garde le jour de ton **Dernier jour de paie** chaque mois. Quand un mois est trop court pour ce jour, Skip utilise le dernier jour de ce mois, puis revient à ton jour le mois suivant. Ainsi, une paie le 31 tombe le 31 mars, le 30 avril et le 31 mai, et le 28 février (le 29 février lors d’une année bissextile).\n\n**Prochain jour de paie**, ton **Solde actuel** et **Activité** utilisent ces mêmes dates, et une paie mensuelle compte une fois par mois.\n\n**Deux fois par mois** utilise déjà le dernier jour de chaque mois, plus le 15. Si tu n’es payé que le dernier jour, utilise **Chaque mois** avec un **Dernier jour de paie** le 31 d’un mois qui en compte un.',
     keywords: ['le 31', 'le 30', 'février', 'fin de mois'],
   },
   {
@@ -1724,9 +1724,11 @@ export const payCardsFr: IntentText[] = [
       'page de compte expliquée',
       "comment voir l'historique de ma carte",
       "transactions d'une seule carte",
+      'pourquoi la page de ma carte est classée par mois',
+      'c’est quoi le montant à côté de chaque mois',
     ],
     answer:
-      'Touche une carte ou un compte dans **Cartes** pour ouvrir sa page :\n\n- Son recto, avec le solde en direct.\n- Une case avec le calcul derrière : le solde que tu as écrit, ce qui est sorti, ce qui est entré, et **Montant dû actuel** ou **Solde actuel**.\n- **Transactions** : chaque reçu, facture, abonnement, paie et paiement, du plus récent au plus ancien, avec recherche et filtre.\n- Le crayon en haut pour le modifier, et **Faire un paiement** (cartes) ou **Ajouter de l’argent** (comptes) en bas.\n\nTouche une ligne pour ouvrir le reçu, la facture, l’abonnement ou la page Salaire derrière.',
+      'Touche une carte ou un compte dans **Cartes** pour ouvrir sa page :\n\n- Son recto, avec le solde en direct.\n- Une case avec le calcul derrière : le solde que tu as écrit, ce qui est sorti, ce qui est entré, et **Montant dû actuel** ou **Solde actuel**.\n- **Transactions** : chaque reçu, facture, abonnement, paie et paiement, sous des titres de mois, du plus récent au plus ancien. Chaque mois affiche son total net à côté, en vert quand il est entré plus d’argent qu’il n’en est sorti, et en rouge quand il en est sorti plus. Il y a aussi une recherche et un filtre.\n- Le crayon en haut pour le modifier, et **Faire un paiement** (cartes) ou **Ajouter de l’argent** (comptes) en bas.\n\nTouche une ligne pour ouvrir le reçu, la facture, l’abonnement ou la page Salaire derrière.',
     keywords: ['page de la carte', 'page du compte', 'Transactions', 'détails'],
   },
   {
@@ -1744,9 +1746,10 @@ export const payCardsFr: IntentText[] = [
       "où sont les achats d'avant que j'ajoute la carte",
       'lignes manquantes sur le compte bancaire',
       "mon achat de la semaine passée est pas dans l'historique de ma carte",
+      'le total du mois ne correspond pas aux lignes que je vois',
     ],
     answer:
-      'Une ligne s’affiche sur la page d’une carte ou d’un compte quand :\n\n- Elle a été payée avec cette carte ou ce compte, dans **Payé avec** (**Prélevé sur** pour un abonnement).\n- Sa date est arrivée. Les factures et abonnements apparaissent à leurs jours d’échéance, pas avant.\n- Elle est du jour du solde que tu as écrit ou d’après. Ce qui est plus ancien est considéré comme déjà compris dans ce solde.\n- Avec le forfait gratuit, elle date des 90 derniers jours. Les lignes plus anciennes sont conservées et comptent toujours, derrière **Ton historique plus ancien est conservé**.\n\nUne page vide dit **Rien ici pour l’instant**. Si un reçu est sur la mauvaise carte, ouvre-le et change **Payé avec**.',
+      'Une ligne s’affiche sur la page d’une carte ou d’un compte quand :\n\n- Elle a été payée avec cette carte ou ce compte, dans **Payé avec** (**Prélevé sur** pour un abonnement).\n- Sa date est arrivée. Les factures et abonnements apparaissent à leurs jours d’échéance, pas avant.\n- Elle est du jour du solde que tu as écrit ou d’après. Ce qui est plus ancien est considéré comme déjà compris dans ce solde.\n- Avec le forfait gratuit, elle date des 90 derniers jours. Les lignes plus anciennes sont conservées et comptent toujours, derrière **Ton historique plus ancien est conservé**. Un mois coupé par cette limite affiche quand même le total du mois entier.\n\nUne page vide dit **Rien ici pour l’instant**. Si un reçu est sur la mauvaise carte, ouvre-le et change **Payé avec**.',
     keywords: ['manquant', 'n’apparaît pas', 'Rien ici pour l’instant', 'page vide'],
   },
   {
@@ -1784,9 +1787,10 @@ export const payCardsFr: IntentText[] = [
       'Aucune transaction ici ne correspond à cette recherche',
       "filtrer l'argent envoyé",
       "comment trier les transactions d'un compte",
+      'un mois a disparu quand je filtre',
     ],
     answer:
-      'Sur la page d’une carte ou d’un compte :\n\n- Écris dans **Rechercher des transactions** pour trouver des lignes par nom.\n- Touche le bouton à curseurs pour ouvrir **Filtrer**. Choisis une **Date** et un **Type de transaction** : **Reçus**, **Factures mensuelles**, **Abonnements** et **Paiements** sur une carte, ou **Argent reçu**, **Argent envoyé** et **Paie** sur un compte. Touche **Appliquer**.\n\nLe bouton montre combien de filtres sont actifs. Si rien ne correspond, touche **Effacer la recherche** pour tout revoir ; **Tout effacer** dans le filtre efface aussi.',
+      'Sur la page d’une carte ou d’un compte :\n\n- Écris dans **Rechercher des transactions** pour trouver des lignes par nom.\n- Touche le bouton à curseurs pour ouvrir **Filtrer**. Choisis une **Date** et un **Type de transaction** : **Reçus**, **Factures mensuelles**, **Abonnements** et **Paiements** sur une carte, ou **Argent reçu**, **Argent envoyé** et **Paie** sur un compte. Touche **Appliquer**.\n\nLe bouton montre combien de filtres sont actifs, et un mois sans résultat n’a pas de titre. Si rien ne correspond, touche **Effacer la recherche** pour tout revoir ; **Tout effacer** dans le filtre efface aussi.',
     keywords: ['recherche', 'filtre', 'Rechercher des transactions', 'Type de transaction'],
   },
   {
@@ -1849,9 +1853,11 @@ export const payCardsFr: IntentText[] = [
       'comment récupérer les détails de ma carte après avoir annulé Pro',
       'je suis revenu au gratuit, où sont passées mes cartes',
       "comment débloquer mes cartes après l'annulation",
+      'je peux supprimer ma deuxième carte sans pro',
+      'si je supprime ma première carte, laquelle reste gratuite',
     ],
     answer:
-      'Tes cartes et tes comptes sont tous toujours là. Avec le forfait gratuit, ta première carte de crédit et ton premier compte bancaire (ceux que tu as ajoutés en premier) restent entièrement utilisables. Les cartes ou comptes supplémentaires ajoutés pendant ta période Pro sont conservés, mais affichés estompés dans **Cartes** :\n\n- En toucher un ouvre une page sur Skip Pro au lieu de sa propre page.\n- Ils n’apparaissent pas sous **Payé avec** pour les nouvelles dépenses.\n- Leurs soldes, leur historique et tout ce qui a déjà été payé avec eux comptent toujours partout, y compris dans ton **Solde actuel**.\n\nRien n’est supprimé. Pour les rouvrir, reprends Skip Pro dans **Réglages → Skip Pro**. Si tu as payé avec cet identifiant Apple et que ta période payée n’est pas terminée, touche **Restaurer l’achat** là-bas. Ils s’ouvrent alors et fonctionnent comme avant.',
+      'Tes cartes et tes comptes sont tous toujours là. Avec le forfait gratuit, ta première carte de crédit et ton premier compte bancaire (ceux que tu as ajoutés en premier) fonctionnent comme avant. Les cartes ou comptes supplémentaires ajoutés pendant ta période Pro sont conservés, mais affichés estompés dans **Cartes** :\n\n- Touches-en un pour ouvrir sa propre page, avec son solde et ses transactions. Tu peux le modifier, le supprimer, faire un paiement sur une carte ou ajouter de l’argent sur un compte, le tout gratuitement.\n- Il n’est pas proposé sous **Payé avec**, **Prélevé sur** ou **Payé depuis** pour les nouvelles dépenses. Les factures, abonnements et prêts qui y sont déjà liés continuent de l’utiliser.\n- Son solde, son historique et tout ce qui a déjà été payé avec lui comptent toujours partout, y compris dans ton **Solde actuel**.\n\nSi tu supprimes ta première carte, la plus ancienne des cartes restantes devient la carte gratuite et fonctionne comme avant. Rien n’est supprimé quand Pro se termine, et le jour où tu retrouves Skip Pro, chaque carte et chaque compte peut de nouveau être choisi pour tes dépenses.',
     keywords: ['grisée', 'verrouillée', 'Pro terminé', 'deuxième carte'],
   },
   {
@@ -2112,9 +2118,10 @@ export const payCardsFr: IntentText[] = [
       'je peux pas ouvrir la page de mon compte',
       "l'onglet cartes est vide",
       'soldes manquants',
+      'l’actualisation a échoué mais mes soldes sont encore là',
     ],
     answer:
-      'Quand un chiffre derrière tes soldes ne peut pas être lu, Skip affiche **Une erreur est survenue. Réessaie.** au lieu de la page. C’est voulu, pour que tu ne voies jamais un solde ancien ou à moitié calculé comme s’il était réel.\n\nTouche **Réessayer**, ou tire vers le bas pour actualiser, et vérifie que tu es en ligne. Tes cartes et tes comptes ne sont pas perdus ; ils reviennent dès que Skip peut les lire.',
+      'Si une actualisation échoue pendant que tes cartes sont affichées, Skip garde les chiffres que tu avais déjà à l’écran. **Une erreur est survenue. Réessaie.** ne s’affiche à la place de la page que si rien n’a encore pu être lu, pour que tu ne voies jamais un solde à moitié calculé comme s’il était réel.\n\nTouche **Réessayer**, ou tire vers le bas pour actualiser, et vérifie que tu es en ligne. Tes cartes et tes comptes ne sont pas perdus ; ils reviennent dès que Skip peut les lire.',
     keywords: ['erreur', 'Une erreur est survenue', 'Réessayer', 'ne charge pas'],
   },
   {

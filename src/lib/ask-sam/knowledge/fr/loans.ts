@@ -851,9 +851,10 @@ export const loansFr: IntentText[] = [
       'supprimer un prêt en double',
       'il y a 2 prêts auto mais je n’en ai qu’un',
       'prêt doublon',
+      'j’ai touché deux fois enregistrer le prêt',
     ],
     answer:
-      'Supprime la copie dont tu n’as pas besoin.\n\n1. Ouvre-la depuis **Prêts** avec **Voir les détails**.\n2. Touche **Modifier le prêt**.\n3. Fais défiler vers le bas et touche **Supprimer le prêt**.\n4. Choisis **Tout supprimer** (ou **Supprimer**, s’il n’a pas encore de paiements).\n\n**Tout supprimer** retire aussi ses paiements des mois passés, pour qu’ils ne soient plus comptés deux fois dans tes dépenses. Laisse l’autre copie telle quelle.\n\nAstuce : si les deux sont différents, garde celui dont les chiffres correspondent à ton relevé.',
+      'Toucher deux fois **Enregistrer le prêt** ne crée pas de copie, donc en voir deux veut généralement dire que le prêt a été ajouté deux fois. Supprime la copie dont tu n’as pas besoin.\n\n1. Ouvre-la depuis **Prêts** avec **Voir les détails**.\n2. Touche **Modifier le prêt**.\n3. Fais défiler vers le bas et touche **Supprimer le prêt**.\n4. Choisis **Tout supprimer** (ou **Supprimer**, s’il n’a pas encore de paiements).\n\n**Tout supprimer** retire aussi ses paiements des mois passés, pour qu’ils ne soient plus comptés deux fois dans tes dépenses. Laisse l’autre copie telle quelle.\n\nAstuce : si les deux sont différents, garde celui dont les chiffres correspondent à ton relevé.',
     keywords: ['doublon', 'deux fois', 'copie'],
   },
 

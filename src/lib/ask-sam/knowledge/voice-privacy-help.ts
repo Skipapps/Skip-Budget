@@ -1472,14 +1472,16 @@ export const voicePrivacyHelpIntents: Intent[] = [
       'wipe my account',
       'I dont want to use skip anymore, how do I remove my info',
       'what does Delete everything for good mean',
-      'This removes 2 cards, 5 bills and 40 receipts, everything Skip holds for you. It cannot be undone.',
+      'This removes your account and everything you added. That includes 2 cards, 5 bills and 40 receipts',
+      'what stays after I delete my account',
     ],
     answer:
       'Go to **Settings**, scroll to **Account**, and tap **Delete account**.\n\n' +
-      '1. **Delete your account?** lists what will go, with a count of your cards, accounts, bills, subscriptions, receipts and more. Tap **Continue**, or **Keep my account** to stop.\n' +
-      '2. **Delete everything, for good?** says “There is no way back from here, and no copy kept.” Tap **Delete everything**.\n\n' +
-      'Your account and everything in it are removed at once, and you’re taken back to the welcome screen. Skip also clears your voice name fixes and the shops you added from the phone.\n\n' +
-      'You need to be online. Deleting your account doesn’t cancel Skip Pro, so cancel that with Apple too.',
+      '1. With Skip Pro, **Cancel Skip Pro first?** comes first: deleting your account doesn’t cancel Pro, and Apple keeps billing you until you cancel. **Manage in the App Store** opens your subscriptions and deletes nothing. If you’ve already cancelled, tap **Continue to delete**.\n' +
+      '2. **Delete your account?** counts what will go, like your cards, bank accounts, bills, subscriptions, receipts and pay, and everything else, such as loans, savings, goals and spending habits. Tap **Continue**, or **Keep my account** to stop.\n' +
+      '3. **Delete everything, for good?** is the last step. Tap **Delete everything**.\n\n' +
+      'Your account and everything in it are removed at once, and you’re taken back to the welcome screen. Skip also clears your voice name fixes, remembered stores and recent searches from the phone. A few records outside Skip, such as crash reports, can stay.\n\n' +
+      'You need to be online.',
     keywords: ['Delete account', 'remove account', 'erase', 'close account', 'Delete everything'],
     related: ['privacy.delete-undo', 'privacy.reset', 'privacy.export'],
     route: '/settings',
@@ -1502,7 +1504,7 @@ export const voicePrivacyHelpIntents: Intent[] = [
       'is account deletion permanent',
     ],
     answer:
-      'No. Deleting is immediate and permanent. There’s no grace period and Skip keeps no copy to restore from, so it can’t be brought back. That’s why Skip asks twice.\n\n' +
+      'No. Deleting is immediate and permanent. There’s no grace period and no way to restore it, so it can’t be brought back. That’s why Skip asks before it deletes anything.\n\n' +
       'You can sign up again with the same email, or the same Apple or Google account, but you’ll start with an empty Skip.',
     keywords: ['undo', 'recover', 'restore', 'grace period', 'backup', 'permanent'],
     related: ['privacy.delete-account', 'privacy.reset'],
@@ -1708,7 +1710,7 @@ export const voicePrivacyHelpIntents: Intent[] = [
       '1. Check you’re online, on Wi-Fi or mobile data.\n' +
       '2. Tap **Try again** on the page, or tap the same button again, like **Save**.\n' +
       '3. Still stuck? Close Skip fully and open it again.\n\n' +
-      'Nothing you already saved is lost. When a save fails, what you entered stays on the page so you can try again.\n\n' +
+      'Nothing you already saved is lost. When a save fails, what you entered stays on the page so you can try again, and saving again never makes a second copy of a receipt, subscription, card, account, salary, habit or card payment. If **Home** or **Cards** can’t refresh, they keep the figures they already showed.\n\n' +
       'Messages that tell you what to fix, like “Enter the bank name.” or “Pick a store first.”, aren’t failures. They point to something that still needs an answer.',
     keywords: ['Something went wrong', 'Please try again', 'Try again', 'error', 'failed'],
     related: [

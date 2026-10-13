@@ -461,9 +461,11 @@ export const receiptsEs: IntentText[] = [
       '¿Por qué no se escanea mi recibo?',
       'el escáner no encontró nada en mi recibo',
       'el escaneo deja los campos en blanco',
+      'dice no pudimos leer este recibo',
+      '¿Qué significa No pudimos leer este recibo?',
     ],
     answer: text(
-      'Cuando escaneas o subes desde **Agregar un recibo** y Skip no encuentra nada de lo que se fíe, dice **Algo salió mal. Inténtalo de nuevo.** con **Revisa la tienda, la fecha y el importe abajo.** y se queda en el teclado del importe. Desde el botón de escanear en la página **Recibos**, simplemente abre un recibo vacío para que lo escribas.',
+      'Cuando escaneas o subes desde **Agregar un recibo** y Skip no encuentra nada de lo que se fíe, dice **No pudimos leer este recibo. Complétalo abajo.** y se queda en el teclado del importe. Desde el botón de escanear en la página **Recibos**, simplemente abre un recibo vacío para que lo escribas.',
       'Prueba esto:',
       [
         '- Escanea otra vez con mejor luz y todo el recibo plano en el encuadre.',
@@ -1307,9 +1309,11 @@ export const receiptsEs: IntentText[] = [
       'quitar recibo duplicado',
       'mis gastos salen duplicados',
       'la misma compra registrada dos veces',
+      '¿Si toco guardar dos veces se duplica el recibo?',
+      'se cortó la conexión al guardar, ¿se guardó doble?',
     ],
     answer: text(
-      'Skip no revisa si hay repetidos, así que la misma compra guardada dos veces cuenta dos veces. Quita la que sobra:',
+      'Tocar **Guardar recibo** dos veces, o volver a guardar después de perder la conexión, nunca crea un segundo recibo. Pero Skip no revisa si hay repetidos que agregas a propósito, así que la misma compra agregada dos veces cuenta dos veces. Quita la que sobra:',
       [
         '1. Toca uno de los dos recibos.',
         '2. Toca el lápiz arriba a la derecha.',

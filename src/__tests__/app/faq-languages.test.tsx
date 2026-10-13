@@ -65,7 +65,7 @@ describe('Common questions in Spanish', () => {
       .getAllByText(new RegExp(`^(${sections.join('|')})$`))
       .map((node) => node.props.children);
     expect(headings).toEqual(sections);
-    expect(screen.getByText('¿Sigues con dudas? Escríbenos')).toBeTruthy();
+    expect(screen.getByText('¿Sigues con dudas? Pregúntale a Sam')).toBeTruthy();
     expect(screen.getByLabelText('¿Por qué Skip no se conecta con mi banco?')).toBeTruthy();
   });
 
@@ -134,7 +134,7 @@ describe('Common questions in French', () => {
       .getAllByText(new RegExp(`^(${sections.join('|')})$`))
       .map((node) => node.props.children);
     expect(headings).toEqual(sections);
-    expect(screen.getByText('Toujours pas de réponse ? Écris-nous')).toBeTruthy();
+    expect(screen.getByText('Toujours pas de réponse ? Demande à Sam')).toBeTruthy();
     expect(
       screen.getByLabelText('Pourquoi Skip ne se connecte-t-il pas à ma banque ?'),
     ).toBeTruthy();

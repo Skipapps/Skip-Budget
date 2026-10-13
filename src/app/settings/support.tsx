@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { CircleHelp, Lightbulb, ListChecks, Mail } from 'lucide-react-native';
 
 import { useUpdateProfile } from '@/api/mutations';
+import { SamMark } from '@/components/ask-sam/sam-mark';
 import { SettingsPage } from '@/components/settings/settings-page';
 import { SettingsRow } from '@/components/settings/settings-row';
 import { t } from '@/i18n';
@@ -29,9 +30,10 @@ export default function SupportScreen() {
       />
       <SettingsRow
         icon={CircleHelp}
-        title={t('support.faq')}
-        subtitle={t('support.faqDetail')}
-        onPress={() => router.push('/faq')}
+        artwork={<SamMark size={32} />}
+        title={t('askSam.settings.title')}
+        subtitle={t('askSam.settings.subtitle')}
+        onPress={() => router.push('/ask-sam')}
       />
       <SettingsRow
         icon={Mail}

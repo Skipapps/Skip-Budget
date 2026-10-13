@@ -82,6 +82,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'What are the ways to add a receipt?',
     questions: [
+      'the different ways to add spending',
       'How can I add a receipt?',
       'what are the ways to put in a receipt',
       'add receipt options',
@@ -160,6 +161,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'How do I scan a paper receipt?',
     questions: [
+      'steps to scan a receipt',
       'How do I scan a receipt?',
       'scan receipt',
       'how does the receipt scanner work',
@@ -267,6 +269,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'How do I upload a receipt photo or PDF?',
     questions: [
+      'use a receipt photo saved on my phone',
       'How do I upload a receipt?',
       'upload a photo of a receipt',
       'can I add a receipt from my camera roll',
@@ -532,7 +535,7 @@ export const receiptsIntents: Intent[] = [
       'the scanner is not reading my receipt at all',
     ],
     answer: text(
-      "When you scan or upload from **Add a receipt** and Skip can't find anything it trusts, it says **Something went wrong. Please try again.** with **Check the store, date and amount below.** and stays on the amount keypad. From the scan button on the **Receipts** page, it simply opens an empty receipt for you to type.",
+      "When you scan or upload from **Add a receipt** and Skip can't find anything it trusts, it says **Couldn’t read this receipt. Fill it in below.** and stays on the amount keypad. From the scan button on the **Receipts** page, it simply opens an empty receipt for you to type.",
       'Try these:',
       [
         '- Scan again in better light, with the whole receipt flat in the frame.',
@@ -589,6 +592,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: "Skip can't see my photos to upload",
     questions: [
+      'upload shows none of my photos',
       "Skip can't see my photos",
       'allow photo access to read a receipt',
       'photo library permission',
@@ -739,6 +743,8 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'When do my free scans reset?',
     questions: [
+      'when does my scan count start over',
+      'when do I get my scans back after using them up',
       'When do my free scans reset?',
       'when do I get more scans',
       'scan count reset date',
@@ -825,6 +831,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'What happens when I run out of free scans?',
     questions: [
+      'out of scans this month, what now',
       'What happens when I run out of free scans?',
       'I used all my scans',
       'why is there a PRO tag on scan',
@@ -938,6 +945,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: "What's on the Add a receipt page?",
     questions: [
+      'what is each box on the add a receipt page',
       "What's on the final receipt page?",
       'explain the add a receipt screen',
       'what are all the rows when adding a receipt',
@@ -1098,6 +1106,8 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'Can I add a receipt with a future date?',
     questions: [
+      "receipt for something I haven't bought yet",
+      'add a receipt dated ahead of today',
       'Can I add a receipt with a future date?',
       'receipt dated tomorrow',
       'future receipt not counting',
@@ -1288,6 +1298,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: "My receipt won't save",
     questions: [
+      "receipt won't go through when I save",
       "My receipt won't save",
       'save receipt not working',
       "receipt won't save something went wrong",
@@ -1418,6 +1429,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'How do I delete a receipt?',
     questions: [
+      'delete a lot of receipts together',
       'How do I delete a receipt?',
       'remove a receipt',
       'delete receipt',
@@ -1484,7 +1496,7 @@ export const receiptsIntents: Intent[] = [
       'same purchase entered twice',
     ],
     answer: text(
-      "Skip doesn't check for doubles, so the same purchase saved twice counts twice. Remove the extra one:",
+      "Tapping **Save receipt** twice, or saving again after a lost connection, never makes a second receipt. But Skip doesn't check for doubles you add on purpose, so the same purchase added twice counts twice. Remove the extra one:",
       [
         '1. Tap one of the two receipts.',
         '2. Tap the pencil at the top right.',
@@ -1540,6 +1552,8 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'How do I search my receipts?',
     questions: [
+      'search receipts by store name',
+      'search my receipts for a shop name',
       'How do I search my receipts?',
       'find a receipt by store',
       'search receipts',
@@ -1570,6 +1584,8 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'How do I filter my receipts?',
     questions: [
+      'show receipts paid with one card',
+      'only see receipts from a single card',
       'How do I filter receipts?',
       'filter receipts by card',
       'show only receipts from one day',
@@ -1628,6 +1644,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: "What's the total at the top of Receipts?",
     questions: [
+      'the big number above my receipts list',
       'What is the total at the top of the receipts page?',
       'what does 12 receipts mean',
       'receipts total',
@@ -1810,6 +1827,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: "Why didn't my balance change after a receipt?",
     questions: [
+      'purchase added but card balance stayed the same',
       "Why didn't my balance change after adding a receipt?",
       "card balance didn't go up after receipt",
       'receipt not counted in my balance',
@@ -1876,6 +1894,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'How do I make a receipt book?',
     questions: [
+      'set up a separate book for work receipts',
       'How do I make a receipt book?',
       'create a book',
       'add book',
@@ -2050,6 +2069,8 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'How do I delete a receipt book?',
     questions: [
+      'will the receipts inside a book be deleted with it',
+      'do receipts in a book disappear when I remove the book',
       'How do I delete a receipt book?',
       'remove a book',
       'delete book',
@@ -2239,6 +2260,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: "How do I change a receipt's logo?",
     questions: [
+      'a shop shows the wrong picture',
       "How do I change a receipt's logo?",
       'wrong logo on my receipt',
       'change logo on a receipt',
@@ -2394,6 +2416,7 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'Why does a receipt show a habit icon?',
     questions: [
+      'why do habit receipts have an icon not a logo',
       'Why does a receipt show a habit icon?',
       'From your habit',
       'receipt from a habit',
@@ -2443,7 +2466,6 @@ export const receiptsIntents: Intent[] = [
       'remind me to log receipts every day',
       'evening reminder to add receipts',
       "Add today's receipts while they are still in your pocket",
-      "why didn't the receipt reminder come today",
       'daily nudge',
       'turn off receipts reminder',
       'receipt reminder every night',
@@ -2472,6 +2494,8 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: "My daily receipts reminder didn't come",
     questions: [
+      "never got today's receipts reminder",
+      "why didn't the receipt reminder come today",
       "My daily receipts reminder didn't come",
       'receipt reminder not working',
       "didn't get the receipt notification",
@@ -2558,6 +2582,8 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'Can Skip track the items on a receipt?',
     questions: [
+      'can I list the items inside my receipt',
+      'see the individual products on a receipt, like groceries',
       'Can Skip track the items on a receipt?',
       'itemized receipts',
       'list each item I bought',
@@ -2607,6 +2633,10 @@ export const receiptsIntents: Intent[] = [
     topic: 'receipts',
     title: 'Can Skip add my purchases automatically?',
     questions: [
+      'do purchases get added by itself or do I type them',
+      'link my bank account so receipts appear automatically',
+      'will purchases from my bank card appear in skip without me adding them',
+      'connect my bank so spending is added automatically',
       'Can Skip add my purchases automatically?',
       'automatic receipts from my bank',
       'import card transactions',

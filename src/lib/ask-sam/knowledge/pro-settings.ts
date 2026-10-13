@@ -42,6 +42,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: "What's the difference between Free and Pro?",
     questions: [
+      'what am I missing on the free plan',
       "What's the difference between Free and Pro?",
       'free vs pro',
       'Which features are Pro only?',
@@ -75,7 +76,6 @@ export const proSettingsIntents: Intent[] = [
       '- **Insights**',
       '- Starting new **Spending habits**',
       '- Exporting your payments as a spreadsheet or PDF',
-      '- New features first and priority support',
       '',
       'Your balances always count everything, on any plan.',
     ),
@@ -214,6 +214,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: 'Is there a free trial of Pro?',
     questions: [
+      'try pro free before buying',
       'Is there a free trial?',
       'can i try pro before paying',
       'How long is the trial?',
@@ -281,6 +282,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: 'Can I cancel during the free trial?',
     questions: [
+      'cancel before the trial turns into a paid plan',
       'Can I cancel during the trial?',
       'how do i cancel my free trial',
       'If I cancel the trial do I lose Pro right away?',
@@ -316,6 +318,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: "Why don't I see a free trial?",
     questions: [
+      "where's the free trial option gone",
       'Why is there no free trial for me?',
       'the trial button disappeared',
       'it says Get Pro for instead of try free',
@@ -369,7 +372,7 @@ export const proSettingsIntents: Intent[] = [
       '3. Tap the button at the bottom. It says **Try Pro free for 14 days** if a trial is open to you, or **Get Pro for** and the price.',
       "4. Confirm on Apple's sheet with Face ID or your password.",
       '',
-      'The page closes and Pro is on straight away. Any feature page marked **Included with Skip Pro** also has a **Get Skip Pro** button that brings you here.',
+      'Pro is on straight away. If you came from a feature’s page marked **Included with Skip Pro**, like **Voice entry** or **Insights**, you land in that feature, and anything you were filling in is still there. Those pages have a **Get Skip Pro** button that brings you here.',
       '',
       'Apple bills the payment method on your Apple ID.',
     ),
@@ -382,6 +385,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: "I can't buy Pro. What's wrong?",
     questions: [
+      'the subscribe button does nothing',
       "I can't buy Pro",
       'purchase not working',
       'the pro button says check again',
@@ -441,7 +445,7 @@ export const proSettingsIntents: Intent[] = [
     answer: text(
       'Pro is tied to the Skip account you were signed in with when you bought it. Try these in order:',
       '',
-      '1. Make sure you are online and wait a few seconds. Skip checks again each time you come back to the app.',
+      '1. Make sure you are online and wait a few seconds. Skip checks again each time you come back to the app. If a save button says **One moment…**, Skip is checking your Pro again, for up to about 10 seconds, and then saves.',
       '2. Look at the top of **Settings**. It says **Skip Pro — active** when Pro is on.',
       '3. If not, open **Settings → Skip Pro** and tap **Restore purchase**. **Welcome back — Pro is active.** means Apple found it.',
       '4. Check that you are signed in to the same Skip account, and that this iPhone uses the Apple ID you paid with.',
@@ -489,6 +493,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: 'Does Pro carry over to a new phone?',
     questions: [
+      'do I keep pro after reinstalling skip',
       'Does Pro work on my new iPhone?',
       'do i have to pay again on a new phone',
       'Will I keep Pro if I reinstall Skip?',
@@ -544,6 +549,8 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: 'How do I know if I have Pro?',
     questions: [
+      'where can I see if my plan is free or paid',
+      "how do I tell whether I'm on free or paid",
       'How do I know if I have Pro?',
       'am I on pro',
       'check my subscription status',
@@ -578,6 +585,8 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: 'When does my Pro renew?',
     questions: [
+      'what day does pro renew',
+      'date of my next pro charge',
       'When does my subscription renew?',
       'when will i be charged next',
       'next billing date',
@@ -609,6 +618,8 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: 'How do I cancel Skip Pro?',
     questions: [
+      "I'm not using pro anymore and want to stop paying",
+      "I don't want to keep paying for pro",
       'How do I cancel Pro?',
       'cancel my subscription',
       'unsubscribe from skip pro',
@@ -753,7 +764,7 @@ export const proSettingsIntents: Intent[] = [
       "does anything break if i don't renew",
     ],
     answer:
-      "Nothing is deleted. Everything you added stays in your account and keeps counting in your balances. Skip simply goes back to the free plan:\n\n- Lists show the last 90 days again. Older entries are hidden, not gone.\n- Your first credit card and first bank account stay fully usable. Any others stay, with their history, but they're faded on **Cards**: tapping one opens a page about Skip Pro instead of its own page, and they can't be picked for new spending.\n- Habits you already have keep working. Starting a new one needs Pro.\n- **Voice entry**, **Insights** and exporting open a Pro page instead.\n- Scans and uploads go back to 15 each a month.\n\nThe day you have Pro again, everything comes back as it was.",
+      'Nothing is deleted. Everything you added stays in your account and keeps counting in your balances. Skip simply goes back to the free plan:\n\n- Lists show the last 90 days again. Older entries are hidden, not gone.\n- Your first credit card and first bank account work as before. Any others stay, faded on **Cards**: you can still open, edit or delete them, but not pick them for new spending. Bills, subscriptions and loans already paid with them keep them.\n- Habits you already have keep working. Starting a new one needs Pro.\n- **Voice entry**, **Insights** and exporting open a Pro page instead.\n- Scans and uploads go back to 15 each a month.\n\nThe day you have Pro again, everything comes back as it was.',
     keywords: ['lapse', 'expired', 'downgrade', 'ended', 'deleted', 'cancel pro'],
     related: ['cards.free.locked', 'pro.history.hidden', 'pro.lapse.come-back', 'pro.cancel.after'],
   },
@@ -796,6 +807,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: 'What happens if I get Pro again later?',
     questions: [
+      'is a trial available a second time',
       'If I subscribe again, do I get my old data back?',
       'resubscribe skip pro',
       'coming back to pro after cancelling',
@@ -811,7 +823,7 @@ export const proSettingsIntents: Intent[] = [
       'Yes, all of it. Nothing was deleted while you were on free, so the day Pro is active again:',
       '',
       '- History older than 90 days shows again, up to 7 years.',
-      '- Extra cards and accounts open and appear under **Paid with** again.',
+      '- Extra cards and accounts can be picked under **Paid with** again, and stop looking faded.',
       '- **Voice entry**, **Insights**, exporting and new habits unlock.',
       '- Scans and uploads have no monthly limit.',
       '',
@@ -855,6 +867,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: 'Can I get the one-time offer back?',
     questions: [
+      'closed the offer by accident',
       'Can I get the half price offer back?',
       'I closed the offer by accident',
       'offer disappeared',
@@ -997,6 +1010,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: 'Is Skip Pro worth it?',
     questions: [
+      'is the paid version worth it for me',
       'Is Pro worth it?',
       'should I get pro',
       'is premium worth the money',
@@ -1036,6 +1050,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'pro',
     title: 'Can I pay for Pro outside the App Store?',
     questions: [
+      'does skip keep my card on file for pro',
       'Can I pay with PayPal?',
       'pay for pro on the website',
       'can I use a credit card directly instead of apple',
@@ -1104,6 +1119,7 @@ export const proSettingsIntents: Intent[] = [
       'do I need to cancel pro before I delete my account',
       'deleted account, is the subscription still active',
       'does erasing my account stop the subscription charge',
+      'it says cancel skip pro first when I delete my account',
     ],
     answer: text(
       "No. Deleting the app, signing out or deleting your Skip account doesn't touch your subscription. Apple keeps billing until you cancel with Apple.",
@@ -1113,7 +1129,7 @@ export const proSettingsIntents: Intent[] = [
       '2. Tap Subscriptions, then Skip Budget.',
       '3. Tap Cancel Subscription.',
       '',
-      'If you plan to delete your account, cancel first, while **Settings → Skip Pro → Manage in the App Store** is still there for you. If you were charged after deleting, you can ask Apple for a refund at reportaproblem.apple.com.',
+      'If you plan to delete your account, cancel first. With Skip Pro, **Delete account** asks **Cancel Skip Pro first?**, and its **Manage in the App Store** button opens your subscriptions without deleting anything. If you were charged after deleting, you can ask Apple for a refund at reportaproblem.apple.com.',
     ),
     keywords: ['delete account', 'uninstall', 'still charged', 'sign out'],
     related: ['pro.manage.cancel', 'pro.manage.refund', 'pro.cancel.after'],
@@ -1121,7 +1137,7 @@ export const proSettingsIntents: Intent[] = [
   {
     id: 'pro.support.priority',
     topic: 'pro',
-    title: 'What do priority support and new features first mean?',
+    title: 'Does Skip Pro include priority support or early access?',
     questions: [
       'What is priority support?',
       'new features first, what does that mean',
@@ -1135,22 +1151,20 @@ export const proSettingsIntents: Intent[] = [
       'is there a special support email for pro',
     ],
     answer: text(
-      'Both are part of Skip Pro, listed on the Pro page.',
+      'No. Skip Pro doesn’t include priority support or early access to new features, and the Pro page doesn’t list them.',
       '',
-      "- Priority support: Pro members are first in line for help. There's no separate address: write from **Settings → Support and feedback → Email support**, like everyone.",
-      '- New features first: Pro members get early access to new features.',
-      '',
-      'App updates themselves come through the App Store for everyone.',
+      'Everyone gets the same help: ask me, or write from **Settings → Support and feedback → Email support**. New features reach everyone through App Store updates.',
     ),
     keywords: ['priority support', 'early access', 'new features first', 'beta'],
     related: ['settings.contact.how', 'pro.compare.list'],
-    pro: true,
   },
   {
     id: 'pro.free.settings',
     topic: 'pro',
     title: 'Are themes, reminders and app lock free?',
     questions: [
+      'do I need to pay for app lock',
+      'does face id lock need pro',
       'Is dark mode a Pro feature?',
       'are reminders free',
       'is app lock pro only',
@@ -1228,6 +1242,7 @@ export const proSettingsIntents: Intent[] = [
       '- **Support and feedback**: common questions, email support and ideas',
       '- **Buy a coffee for team**: an optional tip',
       '- **Account**: **Sign out** and **Delete account**',
+      '- **Ask Sam**: questions about Skip, answered right away',
     ),
     keywords: ['settings', 'options', 'menu', 'preferences', 'account'],
     related: [
@@ -1312,6 +1327,8 @@ export const proSettingsIntents: Intent[] = [
     topic: 'settings',
     title: "Can I change Skip's colours?",
     questions: [
+      'can I unlock new themes',
+      'are extra colours a pro feature',
       'Can I change the app colour?',
       'change accent color',
       'different color themes?',
@@ -1382,6 +1399,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'settings',
     title: 'What changes when I switch language?',
     questions: [
+      'does switching the language translate everything',
       'What changes when I change the language?',
       'will my bills be translated',
       'why are some things still in English',
@@ -1443,6 +1461,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'settings',
     title: 'How do I change the currency?',
     questions: [
+      'change the currency sign on my amounts',
       'How do I change the currency?',
       'currency setting',
       'change dollars to pounds',
@@ -1532,6 +1551,8 @@ export const proSettingsIntents: Intent[] = [
     topic: 'settings',
     title: 'How do I lock Skip with Face ID?',
     questions: [
+      'make sure nobody else can open skip on my phone',
+      'keep others from getting into the app on my phone',
       'How do I turn on Face ID for Skip?',
       'app lock',
       'can I password protect the app',
@@ -1596,6 +1617,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'settings',
     title: "Face ID won't unlock Skip",
     questions: [
+      "face id won't work when I open the app",
       "Face ID won't unlock Skip",
       'stuck on skip is locked',
       'locked out of the app',
@@ -1826,7 +1848,7 @@ export const proSettingsIntents: Intent[] = [
       'Go to **Settings → Support and feedback**. You will find:',
       '',
       '- **Getting started**: puts the setup steps back on **Home**',
-      '- **Common questions**: short answers, no waiting',
+      '- **Ask Sam**: questions about Skip, answered right away',
       '- **Email support**: tell us something is wrong or unclear',
       '- **Share an idea**: tell us what Skip should do next',
       '',
@@ -1911,6 +1933,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'settings',
     title: "My support message won't send",
     questions: [
+      "support form won't send",
       "My message won't send",
       'send button not working on support',
       'it said something went wrong when sending feedback',
@@ -1973,7 +1996,7 @@ export const proSettingsIntents: Intent[] = [
   {
     id: 'settings.faq.page',
     topic: 'settings',
-    title: 'Where are the common questions?',
+    title: 'Is there a list of common questions?',
     questions: [
       'Where is the FAQ?',
       'common questions page',
@@ -1983,13 +2006,13 @@ export const proSettingsIntents: Intent[] = [
       'is there a help page',
       'where can i read answers',
       'faq skip budget',
-      'Still stuck? Message us',
+      'Still stuck? Ask Sam',
       'help section',
     ],
     answer: text(
-      'Go to **Settings → Support and feedback → Common questions**. Tap a question to open its answer, and tap again to close it. The answers are built into the app, so they work offline.',
+      'The quickest way is to ask me. I’m in **Settings → Support and feedback → Ask Sam**, and at the very bottom of **Settings**.',
       '',
-      "If your question isn't there, tap **Still stuck? Message us** at the bottom to write to a person.",
+      'There’s also **Common questions**, a page of short answers that works offline. Tap a question to open its answer, and tap again to close it. At its bottom, **Still stuck? Ask Sam** brings you back here.',
     ),
     keywords: ['FAQ', 'Common questions', 'help page'],
     related: ['settings.support.overview', 'settings.contact.how'],
@@ -2051,6 +2074,8 @@ export const proSettingsIntents: Intent[] = [
     topic: 'settings',
     title: 'Which settings stay on this phone only?',
     questions: [
+      'settings that carry over when I switch phones',
+      'what has to be set up again on a new phone',
       "Why didn't my settings move to my new phone?",
       'settings not syncing between devices',
       'dark mode reset after reinstall',
@@ -2086,6 +2111,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'reminders',
     title: 'Where do I set up reminders?',
     questions: [
+      "find every reminder I've set",
       'Where do I set up reminders?',
       'reminders page',
       'skip notification settings page',
@@ -2238,6 +2264,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'reminders',
     title: 'How do I change what time a reminder comes?',
     questions: [
+      'move my reminder from morning to evening',
       'How do I change the reminder time?',
       'reminder comes at 9am, can i change it',
       'set reminder time to evening',
@@ -2475,6 +2502,7 @@ export const proSettingsIntents: Intent[] = [
     topic: 'reminders',
     title: 'Why is my reminder in English or in dollars?',
     questions: [
+      'currency sign in my notifications is wrong',
       'Why are my reminders in English?',
       'reminder shows $ but I use pounds',
       'notification in english even though app is spanish',

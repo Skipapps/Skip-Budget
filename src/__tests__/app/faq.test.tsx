@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/react-native';
+import { router } from 'expo-router';
 
 import FaqScreen from '@/app/faq';
 
@@ -56,5 +57,13 @@ describe('Common questions', () => {
     expect(screen.getByText(/Voice entry, Insights and seven years of history/)).toBeTruthy();
     expect(screen.getByText(/the bills, receipts and cards on your account/)).toBeTruthy();
     expect(screen.getByText(/there is no grace copy kept\.$/)).toBeTruthy();
+  });
+
+  it('sends someone still stuck to Ask Sam', async () => {
+    const screen = await render(<FaqScreen />);
+
+    await fireEvent.press(screen.getByText('Still stuck? Ask Sam'));
+
+    expect(router.push).toHaveBeenCalledWith('/ask-sam');
   });
 });

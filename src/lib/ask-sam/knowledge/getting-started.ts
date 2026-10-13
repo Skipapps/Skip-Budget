@@ -8,6 +8,8 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'What is Skip?',
     questions: [
+      'is skip only a spending tracker',
+      'what else does skip do besides tracking spending',
       'What is Skip?',
       'what does this app do',
       'What is Skip Budget for?',
@@ -77,6 +79,7 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'Is Skip free?',
     questions: [
+      'do I ever have to pay if I stay on the free plan',
       'how much does skip cost',
       'Do I have to pay to use Skip?',
       'is this app free or paid',
@@ -479,6 +482,8 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'Do I need an account to use Skip?',
     questions: [
+      'do I have to register first or can I look around',
+      'why does skip make me sign up before I can use it',
       'Do I need an account to use Skip?',
       'can i use skip without signing up',
       'Why do I have to make an account?',
@@ -540,6 +545,8 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'Skip is stuck on the opening logo',
     questions: [
+      'the app is stuck on the logo forever',
+      'app stays on the logo screen and never opens',
       'Skip is stuck on the logo',
       'app wont open past the splash screen',
       'Skip freezes on the start screen',
@@ -558,7 +565,7 @@ export const gettingStartedIntents: Intent[] = [
       '2. Swipe Skip up and off the screen to close it.\n' +
       '3. Open Skip again.\n\n' +
       'If it happens every time, restart your iPhone and check the App Store for a Skip update. If it still will not open, write to admin@skipapps.net so we can look into it.',
-    keywords: ['stuck', 'frozen', 'splash', 'wont open', 'launch', 'blank screen'],
+    keywords: ['logo screen', 'stuck', 'frozen', 'splash', 'wont open', 'launch', 'blank screen'],
     related: ['getting-started.launch.splash', 'getting-started.internet.need'],
   },
   {
@@ -596,6 +603,7 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'What is the Why Skip page?',
     questions: [
+      "what's on the second welcome screen",
       'What is the Why Skip page?',
       'what does awareness privacy control mean',
       'understand your money dont just automate it meaning',
@@ -626,6 +634,7 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'What does What Skip can do show?',
     questions: [
+      'the intro page right before sign up',
       'What does What Skip can do show?',
       'what are the five things skip can do',
       'the page with lets go button',
@@ -746,6 +755,7 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'Apple, Google or email: which should I use?',
     questions: [
+      'is apple sign in or email sign in better',
       'Should I sign up with Apple, Google or email?',
       'which sign in option is best',
       'what is the difference between apple and email sign up',
@@ -776,6 +786,7 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'How do I sign up with my email?',
     questions: [
+      'sign up using only an email address, no apple or google',
       'How do I sign up with my email?',
       'continue with email steps',
       'create account with email and password',
@@ -1257,6 +1268,7 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: "I used Apple or Google, what's my password?",
     questions: [
+      'I use google sign in, is there a skip password',
       'I signed up with Apple, what is my password?',
       'what is my password if i used google',
       'i dont know which way i signed up',
@@ -1283,6 +1295,7 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'How do I change my password?',
     questions: [
+      'change my password when I still know the current one',
       'How do I change my password?',
       'change password in settings',
       'where is the password setting',
@@ -1554,6 +1567,10 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'Which email am I signed in with?',
     questions: [
+      'which email address did I use to sign up',
+      'forgot my login email',
+      'check what email my account was made with',
+      "I can't remember which email I used for skip",
       'Which email am I signed in with?',
       'where can i see my account email',
       'what email is my skip account',
@@ -1718,6 +1735,7 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'Can I skip setup and do it later?',
     questions: [
+      'skip the setup steps for now and go to home',
       'Can I skip setup and do it later?',
       'set up later button',
       'I just want to look around first',
@@ -1778,6 +1796,7 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'What is the card and bank account step?',
     questions: [
+      'only add a card in setup, no bank account',
       'What is the card and bank account step?',
       'add your credit card and bank account step',
       'step 2 setup',
@@ -1800,7 +1819,7 @@ export const gettingStartedIntents: Intent[] = [
       '2. Save the card. You will see **Add your bank account**.\n' +
       '3. Tap **Add bank account** to add one now, or **Skip** to leave it.\n\n' +
       'The step is ticked either way, since one card or one account is enough. Skip never asks for a full card number. The free plan has room for 1 credit card and 1 bank account.',
-    keywords: ['credit card', 'bank account', 'step 2', 'wallet', 'card form'],
+    keywords: ['card and bank', 'credit card', 'bank account', 'step 2', 'wallet', 'card form'],
     related: [
       'getting-started.setup.account-offer',
       'getting-started.setup.no-card',
@@ -2064,6 +2083,8 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'What is the Getting started card?',
     questions: [
+      "what's the getting started box for",
+      "what's that getting started section on home for",
       'What is the Getting started card?',
       'what is the checklist on home',
       'what does 2 of 5 done mean',
@@ -2123,6 +2144,7 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'How do I get the Getting started card back?',
     questions: [
+      'I dismissed getting started, how do I get it back',
       'How do I get the Getting started card back?',
       'bring back getting started',
       'i hid the checklist by mistake',
@@ -2168,6 +2190,7 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'Why did Getting started come back?',
     questions: [
+      'the setup card shows up again on its own',
       'Why did Getting started come back?',
       'the setup card showed up again on home',
       'getting started reappeared',
@@ -2231,6 +2254,8 @@ export const gettingStartedIntents: Intent[] = [
     topic: 'getting-started',
     title: 'What are the tabs at the bottom?',
     questions: [
+      'difference between the tabs at the bottom',
+      'what is each bottom tab for',
       'What are the tabs at the bottom?',
       'what do the icons at the bottom mean',
       'how do i move around the app',
@@ -2358,8 +2383,8 @@ export const gettingStartedIntents: Intent[] = [
       'There is no separate tour. Skip shows you around as you go:\n\n' +
       '- The welcome pages explain what Skip is before you sign up.\n' +
       '- **Let’s set up Skip** and the **Getting started** card on **Home** walk you through the five setup steps.\n' +
-      '- **Settings → Support and feedback → Common questions** has short answers.\n\n' +
-      'And you can ask me anything, any time.',
+      '- **Common questions** is a page of short answers. Open it with the link below.\n\n' +
+      'And you can ask me anything, any time: I’m in **Settings → Support and feedback** and at the bottom of **Settings**.',
     keywords: ['tour', 'tutorial', 'guide', 'faq', 'help', 'common questions', 'walkthrough'],
     related: [
       'getting-started.card.back',

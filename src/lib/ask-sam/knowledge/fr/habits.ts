@@ -1482,9 +1482,10 @@ export const habitsFr: IntentText[] = [
       "les changements d'habitude ne restent pas",
       'enregistrer les modifications est grisé sur mon habitude',
       "message d'erreur en modifiant une habitude",
+      'enregistrer deux fois crée une deuxième habitude ?',
     ],
     answer:
-      'Skip affiche **Une erreur est survenue. Réessaie.** quand un enregistrement ou une suppression ne peut pas joindre ton compte, ou avant d’avoir lu combien de jours l’habitude a notés (il a besoin de ce nombre pour poser la question sur les jours passés).\n\n1. Vérifie ta connexion Internet.\n2. Attends un instant, puis touche de nouveau **Enregistrer les modifications** ou **Supprimer l’habitude**.\n\n**Enregistrer les modifications** n’est grisé que tant qu’un enregistrement ou une suppression est encore en cours.\n\nSi tu vois **Pour enregistrer l’habitude, remplis : ...**, remplis d’abord ce qui est listé.',
+      'Si tu touches **Enregistrer les modifications** ou **Supprimer l’habitude** avant que Skip ait fini de lire l’habitude, Skip attend que ce soit fait, puis continue, donc tu n’as pas besoin de toucher de nouveau. **Une erreur est survenue. Réessaie.** veut dire que l’enregistrement ou la suppression n’a pas pu joindre ton compte.\n\n1. Vérifie ta connexion Internet.\n2. Touche de nouveau **Enregistrer les modifications** ou **Supprimer l’habitude**. Enregistrer deux fois ne crée jamais de deuxième habitude.\n\n**Enregistrer les modifications** n’est grisé que tant qu’un enregistrement ou une suppression est encore en cours.\n\nSi tu vois **Pour enregistrer l’habitude, remplis : ...**, remplis d’abord ce qui est listé.',
     keywords: ["ne s'enregistre pas", 'erreur', 'grisé', 'impossible de supprimer'],
   },
 ];

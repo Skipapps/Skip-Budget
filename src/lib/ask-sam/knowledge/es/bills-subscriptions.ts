@@ -1157,7 +1157,7 @@ export const billsSubscriptionsEs: IntentText[] = [
       'factura anual el 29 de febrero',
     ],
     answer:
-      'En un mes sin ese día, Skip usa el último día del mes. Una factura que vence el 31 se cuenta el 30 de abril, y el 28 de febrero (29 de febrero en un año bisiesto). Una factura anual del 29 de febrero se cuenta el 28 de febrero en los demás años.\n\nDespués de un mes más corto, revisa **Próximo vencimiento** en la página de la factura. Si se quedó en el día anterior, toca el lápiz y vuelve a poner **Fecha de pago** en la fecha que quieras.\n\nConsejo: una fecha del 1 al 28 nunca se mueve.',
+      'En un mes sin ese día, Skip usa el último día del mes y vuelve a tu día al mes siguiente. Una factura que vence el 31 se cuenta el 31 de marzo, el 30 de abril y el 31 de mayo, y el 28 de febrero (29 de febrero en un año bisiesto). Una factura anual del 29 de febrero se cuenta el 28 de febrero en los demás años y otra vez el 29 en un año bisiesto. Las suscripciones, los pagos de préstamos y las facturas **Cada 3 meses** funcionan igual.\n\nPor eso **Próximo vencimiento** puede mostrar el 30 o el 28 en un mes corto; al mes siguiente vuelve a tu día. Si cambias **Fecha de pago** a otra fecha, ese es el día que Skip conserva desde entonces.\n\nConsejo: una fecha del 1 al 28 nunca se mueve.',
     keywords: ['día 31', 'fin de mes', 'febrero', 'año bisiesto'],
   },
   {
@@ -1999,9 +1999,10 @@ export const billsSubscriptionsEs: IntentText[] = [
       'tengo netflix dos veces en mi lista',
       'agregué la misma suscripción dos veces por error',
       'puse una factura dos veces, cómo quito una',
+      'toqué guardar factura dos veces, ¿se duplica?',
     ],
     answer:
-      'Elimina la que sobra con **Eliminar todo**, para que sus pagos dejen de contar:\n\n1. Abre la repetida desde **Facturas mensuales** (o **Suscripciones**).\n2. Toca el lápiz y luego **Eliminar factura** (o **Eliminar suscripción**).\n3. Toca **Eliminar todo**.\n\nLos totales y saldos se actualizan al instante. Una sola factura nunca se cobra dos veces el mismo mes (ni la misma semana, trimestre o año), así que un doble casi siempre significa que se agregaron dos copias.',
+      'Elimina la que sobra con **Eliminar todo**, para que sus pagos dejen de contar:\n\n1. Abre la repetida desde **Facturas mensuales** (o **Suscripciones**).\n2. Toca el lápiz y luego **Eliminar factura** (o **Eliminar suscripción**).\n3. Toca **Eliminar todo**.\n\nLos totales y saldos se actualizan al instante. Una sola factura nunca se cobra dos veces el mismo mes (ni la misma semana, trimestre o año), así que un doble casi siempre significa que se agregaron dos copias. Tocar **Guardar factura** dos veces no crea un doble: el botón se queda en **Guardando…** hasta que se cierra la página.',
     keywords: ['duplicada', 'doble', 'repetida', 'dos veces'],
   },
 

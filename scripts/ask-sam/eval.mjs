@@ -1,5 +1,6 @@
 // Runs the held-out questions in src/lib/ask-sam/eval through the real engine and prints what Sam
-// got wrong. Usage: node scripts/ask-sam/eval.mjs [--misses] [--topic loans] [--json out.json]
+// got wrong. Usage: node scripts/ask-sam/eval.mjs [--fresh] [--misses] [--topic loans] [--json out.json]
+// --fresh runs the blind set written after tuning instead; it measures, and is never tuned against.
 
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,7 +16,7 @@ const value = (name) => (args.indexOf(name) >= 0 ? args[args.indexOf(name) + 1] 
 const entry = join(ROOT, 'src/lib/ask-sam/eval-entry.tmp.ts');
 writeFileSync(
   entry,
-  "export { createAskSam } from './conversation';\nexport { createMatcher } from './matcher';\nexport { ALL_INTENTS } from './knowledge';\nexport { TOPICS } from './topics';\nexport { HELD_OUT, ALIASES, NOT_ABOUT_SKIP } from './eval/held-out';\n",
+  "export { createAskSam } from './conversation';\nexport { createMatcher } from './matcher';\nexport { ALL_INTENTS } from './knowledge';\nexport { TOPICS } from './topics';\nexport { HELD_OUT, ALIASES, NOT_ABOUT_SKIP } from './eval/held-out';\nexport { HELD_OUT_FRESH } from './eval/held-out-fresh';\n",
 );
 let lib;
 try {
@@ -33,10 +34,12 @@ const {
   createMatcher,
   ALL_INTENTS,
   TOPICS,
-  HELD_OUT: RAW,
+  HELD_OUT: TUNED,
+  HELD_OUT_FRESH,
   ALIASES,
   NOT_ABOUT_SKIP,
 } = lib;
+const RAW = flag('--fresh') ? HELD_OUT_FRESH : TUNED;
 const HELD_OUT = RAW.map((c) => ({ ...c, id: ALIASES[c.id] ?? c.id }));
 const ids = new Set(ALL_INTENTS.map((intent) => intent.id));
 const topicFilter = value('--topic');
