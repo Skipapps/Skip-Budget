@@ -63,11 +63,6 @@ export const subscriptionsMessages = defineMessages({
     es: '¿Cuánto cuesta?',
     fr: 'Combien ça coûte ?',
   },
-  'subscriptions.add.askService': {
-    en: 'Which service is it?',
-    es: '¿Qué servicio es?',
-    fr: 'Quel est le service ?',
-  },
   'subscriptions.add.pickDay': {
     en: 'Select a date',
     es: 'Elige una fecha',
@@ -226,59 +221,11 @@ export const subscriptionsMessages = defineMessages({
   },
   'subscriptions.spendCategory.other': { en: 'Other', es: 'Otros', fr: 'Autre' },
 
-  'subscriptions.plans.title': {
-    en: 'Your subscriptions',
-    es: 'Tus suscripciones',
-    fr: 'Tes abonnements',
-  },
-  'subscriptions.plans.search': {
-    en: 'Search subscriptions',
-    es: 'Buscar suscripciones',
-    fr: 'Rechercher des abonnements',
-  },
-  'subscriptions.plans.filtersActive': {
-    en: { one: 'Filters, {count} active', other: 'Filters, {count} active' },
-    es: { one: 'Filtros, {count} activo', other: 'Filtros, {count} activos' },
-    fr: { one: 'Filtres, {count} actif', other: 'Filtres, {count} actifs' },
-  },
-  'subscriptions.plans.loading': { en: 'Loading', es: 'Cargando', fr: 'Chargement' },
-  // Counted on the whole list, as the English always was.
-  'subscriptions.plans.countOf': {
-    en: {
-      one: '{shown} of {count} subscriptions',
-      other: '{shown} of {count} subscriptions',
-    },
-    es: { one: '{shown} de {count} suscripción', other: '{shown} de {count} suscripciones' },
-    fr: { one: '{shown} sur {count} abonnement', other: '{shown} sur {count} abonnements' },
-  },
-  'subscriptions.plans.count': {
-    en: { one: '{count} subscription', other: '{count} subscriptions' },
-    es: { one: '{count} suscripción', other: '{count} suscripciones' },
-    fr: { one: '{count} abonnement', other: '{count} abonnements' },
-  },
-  'subscriptions.plans.perMonth': { en: '/ mo', es: '/ mes', fr: '/ mois' },
   'subscriptions.plans.emptyMessage': {
     en: 'Add the ones you pay for and Skip will show what they cost you each month.',
     es: 'Agrega las que pagas y Skip te mostrará cuánto te cuestan cada mes.',
     fr: 'Ajoute ceux que tu paies et Skip te montrera ce qu’ils te coûtent chaque mois.',
   },
-  'subscriptions.plans.noMatchTitle': {
-    en: 'Nothing matches',
-    es: 'Nada coincide',
-    fr: 'Aucun résultat',
-  },
-  'subscriptions.plans.noMatchMessage': {
-    en: 'No subscription fits that search and those filters. Try a different name or clear what you have set.',
-    es: 'Ninguna suscripción coincide con esa búsqueda y esos filtros. Prueba otro nombre o borra lo que elegiste.',
-    fr: 'Aucun abonnement ne correspond à cette recherche et à ces filtres. Essaie un autre nom ou efface ce que tu as choisi.',
-  },
-  'subscriptions.plans.clearFilters': {
-    en: 'Clear filters',
-    es: 'Borrar filtros',
-    fr: 'Effacer les filtres',
-  },
-  /** The cancelled ones, under the rest: kept for their history, never totalled. */
-  'subscriptions.plans.cancelled': { en: 'Cancelled', es: 'Canceladas', fr: 'Annulés' },
   'subscriptions.cancelledLastCharged': {
     en: 'Cancelled · last charged {date}',
     es: 'Cancelada · último cargo el {date}',
@@ -291,33 +238,6 @@ export const subscriptionsMessages = defineMessages({
     fr: 'Annulé, dernier prélèvement le {date}',
   },
 
-  'subscriptions.renewals.title': { en: 'Subscriptions', es: 'Suscripciones', fr: 'Abonnements' },
-  'subscriptions.renewals.label': {
-    en: 'Renewals charged',
-    es: 'Renovaciones cobradas',
-    fr: 'Renouvellements prélevés',
-  },
-  'subscriptions.renewals.nothing': {
-    en: 'Nothing in this window',
-    es: 'Nada en este periodo',
-    fr: 'Rien dans cette période',
-  },
-  'subscriptions.renewals.count': {
-    en: { one: '{count} charge', other: '{count} charges' },
-    es: { one: '{count} cargo', other: '{count} cargos' },
-    fr: { one: '{count} prélèvement', other: '{count} prélèvements' },
-  },
-  'subscriptions.renewals.emptyMessage': {
-    en: 'Add the ones you pay for and every renewal shows up here as it happens.',
-    es: 'Agrega las que pagas y cada renovación aparecerá aquí en cuanto ocurra.',
-    fr: 'Ajoute ceux que tu paies et chaque renouvellement s’affichera ici dès qu’il a lieu.',
-  },
-  'subscriptions.renewals.windowMessage': {
-    en: 'Nothing renewed in this stretch of time. Try a wider window.',
-    es: 'Nada se renovó en este periodo. Prueba con uno más amplio.',
-    fr: 'Rien ne s’est renouvelé dans cette période. Essaie une période plus longue.',
-  },
-
   'subscriptions.detail.nextRenewal': {
     en: 'Next renewal',
     es: 'Próxima renovación',
@@ -325,29 +245,6 @@ export const subscriptionsMessages = defineMessages({
   },
   'subscriptions.detail.paidFrom': { en: 'Paid from', es: 'Se paga con', fr: 'Payé avec' },
   'subscriptions.detail.started': { en: 'Started', es: 'Inicio', fr: 'Début' },
-
-  'subscriptions.filter.close': {
-    en: 'Close filters',
-    es: 'Cerrar filtros',
-    fr: 'Fermer les filtres',
-  },
-  'subscriptions.filter.title': {
-    en: 'Filter subscriptions',
-    es: 'Filtrar suscripciones',
-    fr: 'Filtrer les abonnements',
-  },
-  'subscriptions.filter.everyCycle': {
-    en: 'Showing every cycle.',
-    es: 'Se muestran todos los ciclos.',
-    fr: 'Tous les cycles sont affichés.',
-  },
-  'subscriptions.filter.everySource': {
-    en: 'Showing every credit card and account.',
-    es: 'Se muestran todas las tarjetas de crédito y cuentas.',
-    fr: 'Toutes les cartes de crédit et tous les comptes sont affichés.',
-  },
-  'subscriptions.filter.reset': { en: 'Reset', es: 'Borrar', fr: 'Effacer' },
-  'subscriptions.filter.apply': { en: 'Apply', es: 'Aplicar', fr: 'Appliquer' },
 
   'subscriptions.row.a11y': {
     en: '{name}, {amount} {cycle}',

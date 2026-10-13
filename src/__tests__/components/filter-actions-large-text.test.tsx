@@ -2,15 +2,10 @@ import { act, fireEvent, render } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 
-import { BillFilterSheet, EMPTY_BILL_FILTERS } from '@/components/bills/bill-filter-sheet';
 import {
   EMPTY_RECEIPT_FILTERS,
   ReceiptFilterSheet,
 } from '@/components/receipts/receipt-filter-sheet';
-import {
-  EMPTY_SUBSCRIPTION_FILTERS,
-  SubscriptionFilterSheet,
-} from '@/components/subscriptions/subscription-filter-sheet';
 import { EMPTY_FILTERS, FilterSheet } from '@/components/transactions/filter-sheet';
 import { FilterActions } from '@/components/ui/filter-actions';
 import { t, type MessageKey } from '@/i18n';
@@ -19,7 +14,7 @@ import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 import { TEXT_CAP } from '@/theme/text-scale';
 
 /**
- * Reset and Apply at the foot of the four filter pages, at every text size and in every language:
+ * Reset and Apply at the foot of the Receipts and Activity filter pages, at every text size and in every language:
  * a third and two thirds side by side while both labels fit on one line, otherwise stacked with
  * Apply first. Spanish and French run longer, so the same page can stack in one language and not in
  * another. Neither label is ever cut, and Apply is always there.
@@ -68,15 +63,10 @@ const ROOM = {
 };
 
 const PAGES: { page: string; reset: MessageKey; apply: MessageKey }[] = [
-  { page: 'Bills', reset: 'bills.filter.reset', apply: 'bills.filter.apply' },
-  {
-    page: 'Subscriptions',
-    reset: 'subscriptions.filter.reset',
-    apply: 'subscriptions.filter.apply',
-  },
   { page: 'Receipts', reset: 'receipts.filter.reset', apply: 'receipts.filter.apply' },
   { page: 'Activity', reset: 'transactions.filter.reset', apply: 'transactions.filter.apply' },
 ];
+const ACTIVITY = PAGES.find((each) => each.page === 'Activity')!;
 
 function phone(fontScale: number) {
   const window = { width: 375, height: 812, scale: 3, fontScale };
@@ -170,7 +160,7 @@ describe('which layout each page gets, in each language', () => {
 });
 
 describe.each(LANGUAGES)('Activity’s filter actions in %s at the largest text size', (language) => {
-  const page = PAGES[3];
+  const page = ACTIVITY;
 
   it('draws both labels whole, on the row ceiling, with no line limit', async () => {
     phone(1.4);
@@ -210,7 +200,7 @@ describe.each(LANGUAGES)('Activity’s filter actions in %s at the largest text 
 describe('a stacked pair', () => {
   it('stays stacked once its buttons have the whole width, rather than going back and forth', async () => {
     phone(1.4);
-    const labels = labelsIn('fr', PAGES[3]);
+    const labels = labelsIn('fr', ACTIVITY);
     const screen = await render(actions(labels));
     await layOut(screen, labels, 1.4);
     expect(stacked(screen)).toBe(true);
@@ -222,7 +212,7 @@ describe('a stacked pair', () => {
 
   it('goes back beside each other when the text size comes down', async () => {
     phone(1.4);
-    const labels = labelsIn('es', PAGES[3]);
+    const labels = labelsIn('es', ACTIVITY);
     const screen = await render(actions(labels));
     await layOut(screen, labels, 1.4);
     expect(stacked(screen)).toBe(true);
@@ -233,30 +223,8 @@ describe('a stacked pair', () => {
   });
 });
 
-describe.each(LANGUAGES)('the four filter pages in %s', (language) => {
+describe.each(LANGUAGES)('the Receipts and Activity filter pages in %s', (language) => {
   const sheets: { page: string; sheet: (onApply: jest.Mock) => ReactElement }[] = [
-    {
-      page: 'Bills',
-      sheet: (onApply) => (
-        <BillFilterSheet
-          filters={EMPTY_BILL_FILTERS}
-          sourceOptions={[]}
-          onCancel={() => {}}
-          onApply={onApply}
-        />
-      ),
-    },
-    {
-      page: 'Subscriptions',
-      sheet: (onApply) => (
-        <SubscriptionFilterSheet
-          filters={EMPTY_SUBSCRIPTION_FILTERS}
-          sourceOptions={[]}
-          onCancel={() => {}}
-          onApply={onApply}
-        />
-      ),
-    },
     {
       page: 'Receipts',
       sheet: (onApply) => (

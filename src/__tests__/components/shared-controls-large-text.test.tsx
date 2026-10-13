@@ -4,7 +4,6 @@ import { Dimensions, Text, View } from 'react-native';
 
 import PrivacyScreen from '@/app/privacy';
 import { AppLockGate } from '@/components/app-lock-gate';
-import { BillFilterSheet, EMPTY_BILL_FILTERS } from '@/components/bills/bill-filter-sheet';
 import { CategoryPicker } from '@/components/bills/category-picker';
 import { ScheduleCard } from '@/components/calculators/schedule-card';
 import { SliderRow } from '@/components/calculators/slider-row';
@@ -16,10 +15,6 @@ import {
 } from '@/components/receipts/receipt-filter-sheet';
 import { SettingsRow } from '@/components/settings/settings-row';
 import { SetupCollection } from '@/components/setup/setup-collection';
-import {
-  EMPTY_SUBSCRIPTION_FILTERS,
-  SubscriptionFilterSheet,
-} from '@/components/subscriptions/subscription-filter-sheet';
 import { EMPTY_FILTERS, FilterSheet } from '@/components/transactions/filter-sheet';
 import { ActionPill } from '@/components/ui/action-pill';
 import { AmountPad } from '@/components/ui/amount-pad';
@@ -360,7 +355,7 @@ const CASES: Case[] = [
       <SearchField
         value="Netflix"
         onChangeText={noop}
-        placeholder={t('subscriptions.plans.search')}
+        placeholder={t('payments.search.placeholder')}
       />
     ),
     same: both(/^Netflix$/),
@@ -376,14 +371,14 @@ const CASES: Case[] = [
       <PageState
         art={(() => null) as never}
         title={t('bills.noBillsYet')}
-        message={t('bills.charged.emptyMessage')}
+        message={t('bills.plans.emptyMessage')}
         actionLabel={t('bills.addABill')}
         onAction={noop}
       />
     ),
     roles: () => [
       [t('bills.noBillsYet'), 'heading'],
-      [t('bills.charged.emptyMessage'), 'reading'],
+      [t('bills.plans.emptyMessage'), 'reading'],
       [t('bills.addABill'), 'row'],
     ],
   },
@@ -576,31 +571,6 @@ const CASES: Case[] = [
       [t('transactions.filter.reset'), 'row'],
       [t('transactions.filter.apply'), 'row'],
     ],
-  },
-  {
-    name: 'BillFilterSheet',
-    draw: () => (
-      <BillFilterSheet
-        filters={EMPTY_BILL_FILTERS}
-        sourceOptions={[]}
-        onCancel={noop}
-        onApply={noop}
-      />
-    ),
-    same: both(/^Internet$/),
-    roles: () => [[t('bills.filter.title'), 'heading']],
-  },
-  {
-    name: 'SubscriptionFilterSheet',
-    draw: () => (
-      <SubscriptionFilterSheet
-        filters={EMPTY_SUBSCRIPTION_FILTERS}
-        sourceOptions={[]}
-        onCancel={noop}
-        onApply={noop}
-      />
-    ),
-    roles: () => [[t('subscriptions.filter.title'), 'heading']],
   },
   {
     name: 'ReceiptFilterSheet',

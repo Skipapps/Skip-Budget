@@ -235,47 +235,11 @@ export const billsMessages = defineMessages({
     fr: 'Cherche ou écris un nom',
   },
 
-  'bills.plans.title': { en: 'Your bills', es: 'Tus facturas', fr: 'Tes factures' },
-  'bills.plans.search': {
-    en: 'Search bills',
-    es: 'Buscar facturas',
-    fr: 'Rechercher des factures',
-  },
-  'bills.plans.filtersActive': {
-    en: { one: 'Filters, {count} active', other: 'Filters, {count} active' },
-    es: { one: 'Filtros, {count} activo', other: 'Filtros, {count} activos' },
-    fr: { one: 'Filtres, {count} actif', other: 'Filtres, {count} actifs' },
-  },
-  'bills.plans.loading': { en: 'Loading', es: 'Cargando', fr: 'Chargement' },
-  // Counted on the whole list, as the English always was.
-  'bills.plans.countOf': {
-    en: { one: '{shown} of {count} bills', other: '{shown} of {count} bills' },
-    es: { one: '{shown} de {count} factura', other: '{shown} de {count} facturas' },
-    fr: { one: '{shown} sur {count} facture', other: '{shown} sur {count} factures' },
-  },
-  'bills.plans.count': {
-    en: { one: '{count} bill', other: '{count} bills' },
-    es: { one: '{count} factura', other: '{count} facturas' },
-    fr: { one: '{count} facture', other: '{count} factures' },
-  },
   'bills.plans.emptyMessage': {
     en: 'Add the ones that repeat — rent, power, phone — and Skip will keep track of what is due.',
     es: 'Agrega las que se repiten (renta, luz, teléfono) y Skip llevará la cuenta de lo que vence.',
     fr: 'Ajoute celles qui reviennent — loyer, électricité, téléphone — et Skip suivra ce qui est à payer.',
   },
-  'bills.plans.noMatchTitle': { en: 'Nothing matches', es: 'Nada coincide', fr: 'Aucun résultat' },
-  'bills.plans.noMatchMessage': {
-    en: 'No bill fits that search and those filters. Try a different name or clear what you have set.',
-    es: 'Ninguna factura coincide con esa búsqueda y esos filtros. Prueba otro nombre o borra lo que elegiste.',
-    fr: 'Aucune facture ne correspond à cette recherche et à ces filtres. Essaie un autre nom ou efface ce que tu as choisi.',
-  },
-  'bills.plans.clearFilters': {
-    en: 'Clear filters',
-    es: 'Borrar filtros',
-    fr: 'Effacer les filtres',
-  },
-  /** The bills that no longer run, under the rest: kept for their history, never totalled. */
-  'bills.plans.stopped': { en: 'Stopped', es: 'Detenidas', fr: 'Arrêtées' },
   'bills.stoppedOn': {
     en: 'Stopped on {date}',
     es: 'Detenida el {date}',
@@ -290,37 +254,6 @@ export const billsMessages = defineMessages({
   },
   'bills.loanStopped': { en: 'Stopped', es: 'Detenido', fr: 'Arrêté' },
 
-  'bills.charged.title': {
-    en: 'Monthly bills',
-    es: 'Facturas mensuales',
-    fr: 'Factures mensuelles',
-  },
-  'bills.charged.label': {
-    en: 'Bills charged',
-    es: 'Facturas cobradas',
-    fr: 'Factures prélevées',
-  },
-  'bills.charged.nothing': {
-    en: 'Nothing in this window',
-    es: 'Nada en este periodo',
-    fr: 'Rien dans cette période',
-  },
-  'bills.charged.count': {
-    en: { one: '{count} charge', other: '{count} charges' },
-    es: { one: '{count} cargo', other: '{count} cargos' },
-    fr: { one: '{count} prélèvement', other: '{count} prélèvements' },
-  },
-  'bills.charged.emptyMessage': {
-    en: 'Add the ones that repeat — rent, power, phone — and each time one lands it shows up here.',
-    es: 'Agrega las que se repiten (renta, luz, teléfono) y cada vez que llegue una aparecerá aquí.',
-    fr: 'Ajoute celles qui reviennent — loyer, électricité, téléphone — et chaque fois qu’une arrive, elle s’affiche ici.',
-  },
-  'bills.charged.windowMessage': {
-    en: 'Your bills have not landed in this stretch of time. Try a wider window.',
-    es: 'No llegó ninguna de tus facturas en este periodo. Prueba con uno más amplio.',
-    fr: 'Aucune de tes factures n’est arrivée dans cette période. Essaie une période plus longue.',
-  },
-
   'bills.detail.nextDue': {
     en: 'Next due',
     es: 'Próximo vencimiento',
@@ -331,27 +264,6 @@ export const billsMessages = defineMessages({
   'bills.detail.otherCategory': { en: 'Other', es: 'Otra', fr: 'Autre' },
   'bills.detail.started': { en: 'Started', es: 'Inicio', fr: 'Début' },
   'bills.detail.ends': { en: 'Ends', es: 'Termina', fr: 'Fin' },
-
-  'bills.filter.close': { en: 'Close filters', es: 'Cerrar filtros', fr: 'Fermer les filtres' },
-  'bills.filter.title': { en: 'Filter bills', es: 'Filtrar facturas', fr: 'Filtrer les factures' },
-  'bills.filter.everyCategory': {
-    en: 'Showing every category.',
-    es: 'Se muestran todas las categorías.',
-    fr: 'Toutes les catégories sont affichées.',
-  },
-  'bills.filter.everySource': {
-    en: 'Showing every credit card and account.',
-    es: 'Se muestran todas las tarjetas de crédito y cuentas.',
-    fr: 'Toutes les cartes de crédit et tous les comptes sont affichés.',
-  },
-  'bills.filter.howOften': { en: 'How often', es: 'Frecuencia', fr: 'Fréquence' },
-  'bills.filter.everySchedule': {
-    en: 'Showing every schedule.',
-    es: 'Se muestran todas las frecuencias.',
-    fr: 'Toutes les fréquences sont affichées.',
-  },
-  'bills.filter.reset': { en: 'Reset', es: 'Borrar', fr: 'Effacer' },
-  'bills.filter.apply': { en: 'Apply', es: 'Aplicar', fr: 'Appliquer' },
 
   'bills.row.a11y': {
     en: '{name}, {amount}, {recurrence}, paid with {source}',

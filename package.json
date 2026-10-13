@@ -92,6 +92,16 @@
     "unrs-resolver@1.12.2": true
   },
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/.claude/"
+    ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/.claude/"
+    ],
+    "watchPathIgnorePatterns": [
+      "<rootDir>/.claude/"
+    ]
   }
 }
