@@ -375,7 +375,7 @@ export const voicePrivacyHelpIntents: Intent[] = [
       '- “Twelve fifty” can be $12.50 or $1,250.\n' +
       '- “Fifteen ninety nine” can be $15.99 or $1,599.\n' +
       '- Two separate figures, like “$40 plus $5 tip”, are offered as $5 and $40. Skip never adds figures together.\n\n' +
-      'Tap the right one under **Which amount did you mean?**. If neither is right, tap **Neither, I’ll type it** and use the keypad. **Save** stays off until you choose, with the hint “Pick the amount you meant.”\n\n' +
+      'Tap the right one under **Which amount did you mean?**. If neither is right, tap **Neither, I’ll type it** and use the keypad. Tap **Save** before choosing, and it says the amount is still missing.\n\n' +
       'To avoid the question, say “$12.50”, “twelve dollars fifty”, or the total on its own.',
     keywords: ['Which amount did you mean', 'two amounts', 'Neither', 'ambiguous', 'pick amount'],
     related: ['voice.say.amounts', 'voice.amount.wrong', 'voice.review.required'],
@@ -647,7 +647,7 @@ export const voicePrivacyHelpIntents: Intent[] = [
       '- **You said** shows your words in quotes.\n' +
       '- **Add as** switches between **Receipt**, **Bill** and **Subscription**.\n' +
       '- The big figure is the amount. Tap it to change it.\n' +
-      '- Rows below hold the rest: the store, service or bill name, the date, how often, **Paid with** (**Charged to** for a subscription) and a **Note**. A bill or subscription also asks for a **Reminder**. A row saying **Tap to add** is still needed. Tap any row to change it.\n' +
+      '- Rows below hold the rest: the store, service or bill name, the date, how often, **Paid with** (**Charged to** for a subscription) with your cards and a **Skip** pill, and a **Note**. A bill or subscription also asks for a **Reminder**. A row saying **Tap to add** is still needed. Tap any row to change it.\n' +
       '- At the bottom: **Save**, **Say it again** and **More options**.\n\n' +
       '“You can edit this later.” means you can always open the saved entry and change it.',
     keywords: ['Is this right?', 'Did Skip hear you right?', 'You said', 'check page', 'review'],
@@ -677,9 +677,9 @@ export const voicePrivacyHelpIntents: Intent[] = [
       'Enter how much you spent shows under the button',
     ],
     answer:
-      'Something Skip needs is still empty.\n\n' +
-      '- **Bill or subscription**: tap **Save** and the line above it lists what’s left, like “To save this bill, fill in: Paid with, Reminder.” It can name the amount, the name, **Category**, **Paid with** (**Charged to**), **Reminder** and **Due on** (or **Next renewal** for a subscription).\n' +
-      '- **Receipt**: the line above **Save** says what: “Pick the amount you meant.”, “Pick a store first.” or “Enter how much you spent.”\n\n' +
+      'Something Skip needs is still empty. Tap **Save** and the line above it lists what’s left, like “To save this receipt, fill in: Store, Paid with.”\n\n' +
+      '- **Receipt**: the amount, the store and **Paid with**.\n' +
+      '- **Bill or subscription**: the amount, the name, **Category**, **Paid with** (**Charged to**), **Reminder** and **Due on** (or **Next renewal** for a subscription).\n\n' +
       'Rows still needed say **Tap to add**. If the line says “Something went wrong. Please try again.” instead, the save itself failed. Check your connection and tap **Save** again.',
     keywords: ['save greyed out', 'disabled', 'missing', 'Category', 'Due on', 'required'],
     related: ['voice.amount.which', 'voice.store.wrong', 'voice.error'],
@@ -807,9 +807,8 @@ export const voicePrivacyHelpIntents: Intent[] = [
       'paid from my bank account by voice',
     ],
     answer:
-      'Saying the card doesn’t choose it. Skip hears “on my Amex” or “with Apple Pay” and knows it isn’t the store, but you pick the card yourself on the check page:\n\n' +
-      '- **Bill or subscription**: tap one of the cards or accounts under **Paid with** (**Charged to** for a subscription), or **Skip** for none. One is needed before **Save**.\n' +
-      '- **Receipt**: tap **Paid with**, choose the card or bank account and tap **Done**. If you leave it empty, the receipt saves with no card or account, so it doesn’t move any card or account balance.',
+      'Saying the card doesn’t choose it. Skip hears “on my Amex” or “with Apple Pay” and knows it isn’t the store, but you pick the card yourself on the check page.\n\n' +
+      'Tap one of the cards or accounts under **Paid with** (**Charged to** for a subscription), or **Skip** for none. One is needed before **Save**, for a receipt, a bill or a subscription. **Skip** saves it with no card or account, so it doesn’t move any card or account balance.',
     keywords: ['Paid with', 'Charged to', 'card', 'Amex', 'Visa', 'Apple Pay', 'account'],
     related: ['voice.review.page', 'voice.review.more-options'],
     pro: true,

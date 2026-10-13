@@ -318,7 +318,7 @@ export const voicePrivacyHelpFr: IntentText[] = [
       '- « Twelve fifty » peut être $12.50 ou $1,250.\n' +
       '- « Fifteen ninety nine » peut être $15.99 ou $1,599.\n' +
       '- Deux chiffres distincts, comme « $40 plus $5 tip », sont proposés comme $5 et $40. Skip n’additionne jamais des chiffres.\n\n' +
-      'Touche le bon sous **Quel montant voulais-tu dire ?**. Si aucun ne convient, touche **Aucun, je vais le taper** et utilise le clavier numérique. **Enregistrer** reste désactivé tant que tu n’as pas choisi, avec l’indice « Choisis le montant que tu voulais dire. »\n\n' +
+      'Touche le bon sous **Quel montant voulais-tu dire ?**. Si aucun ne convient, touche **Aucun, je vais le taper** et utilise le clavier numérique. Si tu touches **Enregistrer** avant de choisir, il te dit que le montant manque encore.\n\n' +
       'Pour éviter la question, dis « $12.50 », « twelve dollars fifty », ou le total seul.',
     keywords: ['Quel montant voulais-tu dire ?', 'deux montants', 'Aucun', 'ambigu'],
   },
@@ -558,7 +558,7 @@ export const voicePrivacyHelpFr: IntentText[] = [
       '- **Tu as dit** affiche tes mots entre guillemets.\n' +
       '- **Ajouter comme** permet de passer de **Reçu** à **Facture** ou à **Abonnement**.\n' +
       '- Le gros chiffre est le montant. Touche-le pour le changer.\n' +
-      '- Les lignes en dessous contiennent le reste : le magasin, le service ou le nom de la facture, la date, la fréquence, **Payé avec** (**Prélevé sur** pour un abonnement) et une **Note**. Une facture ou un abonnement demande aussi un **Rappel**. Une ligne qui dit **Touche pour ajouter** est encore nécessaire. Touche n’importe quelle ligne pour la changer.\n' +
+      '- Les lignes en dessous contiennent le reste : le magasin, le service ou le nom de la facture, la date, la fréquence, **Payé avec** (**Payée avec** pour une facture, **Prélevé sur** pour un abonnement), qui propose tes cartes et une pastille **Skip**, et une **Note**. Une facture ou un abonnement demande aussi un **Rappel**. Une ligne qui dit **Touche pour ajouter** est encore nécessaire. Touche n’importe quelle ligne pour la changer.\n' +
       '- En bas : **Enregistrer**, **Redis-le** et **Plus d’options**.\n\n' +
       '« Tu pourras le modifier plus tard. » veut dire que tu peux toujours ouvrir l’entrée enregistrée et la modifier.',
     keywords: ['C’est bien ça ?', 'Skip t’a bien entendu ?', 'Tu as dit', 'page de vérification'],
@@ -580,9 +580,9 @@ export const voicePrivacyHelpFr: IntentText[] = [
       'Indique combien tu as dépensé s’affiche sous le bouton',
     ],
     answer:
-      'Il manque encore quelque chose dont Skip a besoin.\n\n' +
-      '- **Facture ou abonnement** : touche **Enregistrer** et la ligne au-dessus liste ce qui manque, par exemple « Pour enregistrer la facture, remplis : Payée avec, Rappel. » Elle peut citer le montant, le nom, **Catégorie**, **Payée avec** (**Prélevé sur**), **Rappel** et **Date d’échéance** (ou **Prochain renouvellement** pour un abonnement).\n' +
-      '- **Reçu** : la ligne au-dessus de **Enregistrer** te dit quoi : « Choisis le montant que tu voulais dire. », « Choisis d’abord un magasin. » ou « Indique combien tu as dépensé. »\n\n' +
+      'Il manque encore quelque chose dont Skip a besoin. Touche **Enregistrer** et la ligne au-dessus liste ce qui manque, par exemple « Pour enregistrer le reçu, remplis : Magasin, Payé avec. »\n\n' +
+      '- **Reçu** : le montant, le magasin et **Payé avec**.\n' +
+      '- **Facture ou abonnement** : le montant, le nom, **Catégorie**, **Payée avec** (**Prélevé sur**), **Rappel** et **Date d’échéance** (ou **Prochain renouvellement** pour un abonnement).\n\n' +
       'Les lignes encore nécessaires disent **Touche pour ajouter**. Si la ligne dit plutôt « Une erreur est survenue. Réessaie. », c’est l’enregistrement lui-même qui a échoué. Vérifie ta connexion et touche **Enregistrer** de nouveau.',
     keywords: ['enregistrer grisé', 'désactivé', 'manquant', 'obligatoire'],
   },
@@ -695,9 +695,8 @@ export const voicePrivacyHelpFr: IntentText[] = [
       'payé depuis mon compte bancaire par la voix',
     ],
     answer:
-      'Dire la carte ne la choisit pas. Skip entend « on my Amex » ou « with Apple Pay » et sait que ce n’est pas le magasin, mais c’est toi qui choisis la carte sur la page de vérification :\n\n' +
-      '- **Facture ou abonnement** : touche une des cartes ou un des comptes sous **Payée avec** (**Prélevé sur** pour un abonnement), ou **Skip** pour n’en choisir aucun. Il faut en choisir un avant **Enregistrer**.\n' +
-      '- **Reçu** : touche **Payé avec**, choisis la carte ou le compte bancaire et touche **Terminé**. Si tu la laisses vide, le reçu s’enregistre sans carte ni compte, donc il ne touche aucun solde de carte ou de compte.',
+      'Dire la carte ne la choisit pas. Skip entend « on my Amex » ou « with Apple Pay » et sait que ce n’est pas le magasin, mais c’est toi qui choisis la carte sur la page de vérification.\n\n' +
+      'Touche une des cartes ou un des comptes sous **Payé avec** (**Payée avec** pour une facture, **Prélevé sur** pour un abonnement), ou **Skip** pour n’en choisir aucun. Il faut en choisir un avant **Enregistrer**, pour un reçu, une facture ou un abonnement. Avec **Skip**, l’entrée s’enregistre sans carte ni compte, donc elle ne touche aucun solde de carte ou de compte.',
     keywords: ['Payé avec', 'Prélevé sur', 'carte', 'Apple Pay'],
   },
 

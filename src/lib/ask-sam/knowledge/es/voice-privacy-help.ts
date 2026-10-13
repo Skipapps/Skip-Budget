@@ -325,7 +325,7 @@ export const voicePrivacyHelpEs: IntentText[] = [
       '- “Twelve fifty” puede ser $12.50 o $1,250.\n' +
       '- “Fifteen ninety nine” puede ser $15.99 o $1,599.\n' +
       '- Dos cifras separadas, como “$40 plus $5 tip”, se ofrecen como $5 y $40. Skip nunca suma cifras.\n\n' +
-      'Toca el importe correcto en **¿Qué importe quisiste decir?**. Si ninguno es el correcto, toca **Ninguno, lo escribo yo** y usa el teclado numérico. **Guardar** sigue desactivado hasta que elijas, con la pista “Elige el importe que quisiste decir.”\n\n' +
+      'Toca el importe correcto en **¿Qué importe quisiste decir?**. Si ninguno es el correcto, toca **Ninguno, lo escribo yo** y usa el teclado numérico. Si tocas **Guardar** antes de elegir, te dice que todavía falta el importe.\n\n' +
       'Para evitar la pregunta, di “$12.50”, “twelve dollars fifty”, o el total solo.',
     keywords: ['¿Qué importe quisiste decir?', 'dos importes', 'Ninguno', 'ambiguo'],
   },
@@ -571,7 +571,7 @@ export const voicePrivacyHelpEs: IntentText[] = [
       '- **Dijiste** muestra tus palabras entre comillas.\n' +
       '- **Agregar como** cambia entre **Recibo**, **Factura** y **Suscripción**.\n' +
       '- La cifra grande es el importe. Tócala para cambiarlo.\n' +
-      '- Las filas de abajo tienen el resto: la tienda, el servicio o el nombre de la factura, la fecha, cada cuánto se repite, **Pagado con** (**Se paga con** en una factura y **Se cobra a** en una suscripción) y una **Nota**. Una factura o suscripción también pide un **Recordatorio**. Una fila que dice **Toca para agregar** todavía hace falta. Toca cualquier fila para cambiarla.\n' +
+      '- Las filas de abajo tienen el resto: la tienda, el servicio o el nombre de la factura, la fecha, cada cuánto se repite, **Pagado con** (**Se paga con** en una factura y **Se cobra a** en una suscripción), que muestra tus tarjetas y una pastilla **Skip**, y una **Nota**. Una factura o suscripción también pide un **Recordatorio**. Una fila que dice **Toca para agregar** todavía hace falta. Toca cualquier fila para cambiarla.\n' +
       '- Al final: **Guardar**, **Dilo otra vez** y **Más opciones**.\n\n' +
       '“Puedes editarlo más tarde.” significa que siempre puedes abrir la entrada guardada y cambiarla.',
     keywords: ['¿Es correcto?', '¿Skip te escuchó bien?', 'Dijiste', 'página de revisión'],
@@ -594,9 +594,9 @@ export const voicePrivacyHelpEs: IntentText[] = [
       'no me deja guardar xq falta algo',
     ],
     answer:
-      'Todavía falta algo que Skip necesita.\n\n' +
-      '- **Factura o suscripción**: toca **Guardar** y la línea que está encima enumera lo que falta, por ejemplo “Para guardar la factura, completa: Se paga con, Recordatorio.” Puede mencionar el importe, el nombre, **Categoría**, **Se paga con** (**Se cobra a**), **Recordatorio** y **Fecha de vencimiento** (o **Próxima renovación** en una suscripción).\n' +
-      '- **Recibo**: la línea que está encima de **Guardar** dice qué: “Elige el importe que quisiste decir.”, “Primero elige una tienda.” o “Ingresa cuánto gastaste.”\n\n' +
+      'Todavía falta algo que Skip necesita. Toca **Guardar** y la línea que está encima enumera lo que falta, por ejemplo “Para guardar el recibo, completa: Tienda, Pagado con.”\n\n' +
+      '- **Recibo**: el importe, la tienda y **Pagado con**.\n' +
+      '- **Factura o suscripción**: el importe, el nombre, **Categoría**, **Se paga con** (**Se cobra a**), **Recordatorio** y **Fecha de vencimiento** (o **Próxima renovación** en una suscripción).\n\n' +
       'Las filas que todavía hacen falta dicen **Toca para agregar**. Si la línea dice “Algo salió mal. Inténtalo de nuevo.”, falló el guardado en sí. Revisa tu conexión y toca **Guardar** otra vez.',
     keywords: ['guardar gris', 'desactivado', 'falta algo', 'Fecha de vencimiento'],
   },
@@ -711,9 +711,8 @@ export const voicePrivacyHelpEs: IntentText[] = [
       'xq no agarra la tarjeta q dije',
     ],
     answer:
-      'Decir la tarjeta no la elige. Skip oye “on my Amex” o “with Apple Pay” y sabe que no es la tienda, pero la tarjeta la eliges tú en la página de revisión:\n\n' +
-      '- **Factura o suscripción**: toca una de las tarjetas o cuentas debajo de **Se paga con** (**Se cobra a** en una suscripción), o **Skip** para no elegir ninguna. Hace falta una antes de **Guardar**.\n' +
-      '- **Recibo**: toca **Pagado con**, elige la tarjeta o la cuenta bancaria y toca **Listo**. Si lo dejas vacío, el recibo se guarda sin tarjeta ni cuenta, así que no mueve el saldo de ninguna tarjeta ni cuenta.',
+      'Decir la tarjeta no la elige. Skip oye “on my Amex” o “with Apple Pay” y sabe que no es la tienda, pero la tarjeta la eliges tú en la página de revisión.\n\n' +
+      'Toca una de las tarjetas o cuentas debajo de **Pagado con** (**Se paga con** en una factura y **Se cobra a** en una suscripción), o **Skip** para no elegir ninguna. Hace falta una antes de **Guardar**, sea un recibo, una factura o una suscripción. Con **Skip** se guarda sin tarjeta ni cuenta, así que no mueve el saldo de ninguna tarjeta ni cuenta.',
     keywords: ['Pagado con', 'Se cobra a', 'tarjeta', 'Amex'],
   },
 
