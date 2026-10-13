@@ -2,6 +2,7 @@ import { router, type Href } from 'expo-router';
 import { openBrowserAsync } from 'expo-web-browser';
 import {
   Check,
+  ChevronRight,
   Coffee,
   Crown,
   FlaskConical,
@@ -26,6 +27,7 @@ import { proMonthlyLabel, proYearlyLabel } from '@/lib/wall';
 import { setProOverride, useProOverride } from '@/lib/pro-bypass';
 import { useUpdateProfile } from '@/api/mutations';
 import { ProfileAvatar } from '@/components/ui/profile-avatar';
+import { SamMark } from '@/components/ask-sam/sam-mark';
 import { CoffeeMark } from '@/components/settings/coffee-mark';
 import { SettingsRow } from '@/components/settings/settings-row';
 import { SettingsSection } from '@/components/settings/settings-section';
@@ -35,6 +37,8 @@ import { useConfirm, useDialog } from '@/providers/dialog-provider';
 import { useToast } from '@/providers/toast-context';
 import { useColors } from '@/providers/theme-provider';
 import { findAvatar } from '@/theme/avatars';
+import { TEXT_CAP } from '@/theme/text-scale';
+import { withTap } from '@/lib/press';
 import { TextField } from '@/components/ui/text-field';
 
 import { useCharges } from '@/api/charges';
@@ -319,7 +323,41 @@ export default function SettingsScreen() {
         />
       </SettingsSection>
 
+      <AskSamButton />
+
       <View className="h-24 w-full" />
     </Screen>
+  );
+}
+
+/** The way into Ask Sam, the help chat, set apart from the rows above as a button of its own. */
+function AskSamButton() {
+  const colors = useColors();
+  const title = t('askSam.settings.title');
+  const subtitle = t('askSam.settings.subtitle');
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${subtitle}`}
+      onPress={withTap(() => router.push('/ask-sam'))}
+      className="mt-8 w-full flex-row items-center gap-3 rounded-[18px] border border-line bg-card px-4 py-3.5 active:opacity-70"
+    >
+      <SamMark size={40} />
+      <View className="min-w-0 flex-1">
+        <Text
+          className="font-app-semibold text-[16px] leading-[21px] text-ink"
+          maxFontSizeMultiplier={TEXT_CAP.row}
+        >
+          {title}
+        </Text>
+        <Text
+          className="mt-0.5 font-app text-[13px] leading-[18px] text-muted"
+          maxFontSizeMultiplier={TEXT_CAP.row}
+        >
+          {subtitle}
+        </Text>
+      </View>
+      <ChevronRight size={18} color={colors.muted} strokeWidth={2} />
+    </Pressable>
   );
 }

@@ -8588,3 +8588,18 @@ The "worker failed to exit" warning is in both runs, and was already in this aft
 4. **Dead code for the later archive (Founder approval):** `bill-filter-sheet`, `subscription-filter-sheet`, and the unused `bills.charged/plans.*` and `subscriptions.renewals/plans.*` keys.
 5. **expo-print:** the PDF share is proven only on the Release build. `ios/` is git-ignored, so the pod change is not in the commit.
 6. **Midnight:** a pull now runs the sweep. Without a pull or a resume, the month page still counts today's due before history and Home do, until the next resume.
+
+## 2026-10-13 — CEO: Ask Sam help chat, at the bottom of Settings
+- **Library:** 876 answers asked 10,736 ways in English, in `src/lib/ask-sam/knowledge`, plus Spanish and French versions of every answer in `knowledge/es` and `knowledge/fr`. Each language has 10+ phrasings per answer, written natively, not translated line by line.
+  - Written by Pia and Paulo, reviewed against the code by Dmitri (×5), coverage audit by Tara, held-out test questions by Theo (×4), extra phrasings by Mia (×2).
+- **Engine:** no AI (`src/lib/ask-sam`). It follows follow-up questions ("and for subscriptions?", "why?"). Per-language rules live in `language.ts`. Search terms are prepared at build time (`prepared/`, from `scripts/ask-sam/build-prepared.mjs`), and the library test fails if they're stale.
+- **In the app:** route `/ask-sam` (`src/app/ask-sam.tsx`), opened from an Ask Sam button at the bottom of Settings. The screen is built to the Founder's design (`src/components/ask-sam/ask-sam-chat.tsx`):
+  - Welcome page: five common questions and See all topics.
+  - Answer card: bold opening line and an "Open {screen} ›" link.
+  - "Was this helpful?" thumbs, Related and "Did you mean" lists, and a pill composer.
+  - The contact form sends through the existing send-message inbox.
+- **Skip tile:** the Founder approved naming it "Skip" in every language. `bills/subscriptions/receipts.add.skipSource` and the two receipt-book lines now say Skip in es/fr; onboarding's Skip buttons keep Omitir/Passer.
+- **Loan answers:** reworded to the new **First payment** field on Add loan, in all three languages.
+- **Accuracy:** English held-out questions are 74.9% right first and 88.8% with the right answer on screen. Follow-ups in 270 test chats are 58.6% right and 72.7% on screen.
+- **Test page:** https://claude.ai/artifact/2fVgFTLH7NRVpXBTKWBkKq
+- **Docs:** handoff in `.claude/team/dev/ask-sam-handoff.md`; app bugs and copy issues found in `.claude/team/dev/ask-sam-findings.md`.

@@ -240,7 +240,7 @@ const WORDS = {
     storePlaceholder: 'Escribe el nombre de la tienda',
     oldStorePlaceholder: 'Busca una tienda',
     paidWith: 'Pagado con',
-    skip: 'Omitir',
+    skip: 'Skip',
     save: 'Guardar recibo',
     missing: (fields: string) => `Para guardar el recibo, completa: ${fields}.`,
     // How the Paid with row used to read, before it became pills.
@@ -252,7 +252,7 @@ const WORDS = {
     storePlaceholder: 'Écris le nom du magasin',
     oldStorePlaceholder: 'Cherche un magasin',
     paidWith: 'Payé avec',
-    skip: 'Passer',
+    skip: 'Skip',
     save: 'Enregistrer le reçu',
     missing: (fields: string) => `Pour enregistrer le reçu, remplis${NBSP}: ${fields}.`,
     optional: 'Facultatif',
@@ -438,7 +438,7 @@ describe('Add receipt in Spanish', () => {
     expect(screen.getByText('Archivado en Supermercado')).toBeTruthy();
     // An edit opens on the card it was saved with.
     expect(radio(screen, CARD, true)).toBeTruthy();
-    expect(radio(screen, 'Omitir', false)).toBeTruthy();
+    expect(radio(screen, 'Skip', false)).toBeTruthy();
     expect(screen.getByLabelText('Fecha, jue 10 sep')).toBeTruthy();
     expect(screen.getByText('Eliminar recibo')).toBeTruthy();
     expectNoRawText(screen.toJSON());

@@ -136,7 +136,7 @@ beforeEach(() => {
 });
 
 describe('Settings, the main page', () => {
-  it('keeps Skip Pro and Profile above four rows and the coffee link, and the account actions below', async () => {
+  it('keeps Skip Pro and Profile above four rows and the coffee link, the account actions below, and Ask Sam last', async () => {
     const screen = await render(<SettingsScreen />);
 
     expect(buttonLabels(screen)).toEqual([
@@ -148,6 +148,7 @@ describe('Settings, the main page', () => {
       COFFEE,
       'Sign out',
       'Delete account. Permanent, and it cannot be undone',
+      'Ask Sam. Questions about Skip, answered right away',
     ]);
     expect(screen.getByDisplayValue('Sam')).toBeTruthy();
     // The development switches stay where they were, in development builds.
@@ -239,6 +240,14 @@ describe('Settings, the main page', () => {
     await fireEvent.press(screen.getByRole('button', { name: /^Profile picture/ }));
 
     expect(jest.mocked(router.push).mock.calls.map(([href]) => href)).toEqual(['/pro', '/avatar']);
+  });
+
+  it('opens Ask Sam from its button at the bottom', async () => {
+    const screen = await render(<SettingsScreen />);
+
+    await fireEvent.press(screen.getByRole('button', { name: /^Ask Sam/ }));
+
+    expect(router.push).toHaveBeenCalledWith('/ask-sam');
   });
 
   it('signs out to the welcome page', async () => {

@@ -190,7 +190,7 @@ export const billsMessages = defineMessages({
   },
   'bills.add.pickDay': { en: 'Select a date', es: 'Elige una fecha', fr: 'Choisis une date' },
   // Paid with: none of the cards or accounts, chosen on purpose.
-  'bills.add.skipSource': { en: 'Skip', es: 'Omitir', fr: 'Passer' },
+  'bills.add.skipSource': { en: 'Skip', es: 'Skip', fr: 'Skip' },
   'bills.add.noReminder': { en: 'No reminder', es: 'Sin recordatorio', fr: 'Aucun rappel' },
   // {fields} is the boxes still empty, by the names they carry on the page.
   'bills.add.missing': {

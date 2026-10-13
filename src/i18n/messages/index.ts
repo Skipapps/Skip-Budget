@@ -1,5 +1,6 @@
 import { accountsMessages } from '@/i18n/messages/accounts';
 import { apiMessages } from '@/i18n/messages/api';
+import { askSamMessages } from '@/i18n/messages/ask-sam';
 import { authMessages } from '@/i18n/messages/auth';
 import { billsMessages } from '@/i18n/messages/bills';
 import { cardsMessages } from '@/i18n/messages/cards';
@@ -38,6 +39,7 @@ import { voiceMessages } from '@/i18n/messages/voice';
 export const MESSAGE_AREAS = {
   accounts: accountsMessages,
   api: apiMessages,
+  askSam: askSamMessages,
   auth: authMessages,
   bills: billsMessages,
   cards: cardsMessages,
@@ -80,6 +82,7 @@ export const MESSAGE_AREAS = {
 export const MESSAGES = {
   ...MESSAGE_AREAS.accounts,
   ...MESSAGE_AREAS.api,
+  ...MESSAGE_AREAS.askSam,
   ...MESSAGE_AREAS.auth,
   ...MESSAGE_AREAS.bills,
   ...MESSAGE_AREAS.cards,

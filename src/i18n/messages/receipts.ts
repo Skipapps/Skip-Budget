@@ -40,7 +40,7 @@ export const receiptsMessages = defineMessages({
     fr: 'Écris le nom du magasin',
   },
   // Paid with: none of the cards or accounts, chosen on purpose.
-  'receipts.add.skipSource': { en: 'Skip', es: 'Omitir', fr: 'Passer' },
+  'receipts.add.skipSource': { en: 'Skip', es: 'Skip', fr: 'Skip' },
   // {fields} is the boxes still empty, by the names they carry on the page.
   'receipts.add.missing': {
     en: 'To save this receipt, fill in: {fields}.',
@@ -502,8 +502,8 @@ export const receiptsMessages = defineMessages({
   'receipts.books.pay.label': { en: 'Paid from', es: 'Se paga con', fr: 'Payé avec' },
   'receipts.books.pay.skipHint': {
     en: 'With Skip, each receipt picks its own card or account.',
-    es: 'Con Omitir, cada recibo elige su propia tarjeta o cuenta.',
-    fr: 'Avec Passer, chaque reçu choisit sa propre carte ou son compte.',
+    es: 'Con Skip, cada recibo elige su propia tarjeta o cuenta.',
+    fr: 'Avec Skip, chaque reçu choisit sa propre carte ou son compte.',
   },
   'receipts.books.default.title': {
     en: 'Make this my default book',
@@ -534,8 +534,8 @@ export const receiptsMessages = defineMessages({
   },
   'receipts.books.payMissing': {
     en: 'Pick where this book is paid from, or Skip.',
-    es: 'Elige con qué se paga este libro, u Omitir.',
-    fr: 'Choisis ce qui paie ce carnet, ou Passer.',
+    es: 'Elige con qué se paga este libro, o Skip.',
+    fr: 'Choisis ce qui paie ce carnet, ou Skip.',
   },
   'receipts.books.delete': { en: 'Delete book', es: 'Eliminar libro', fr: 'Supprimer le carnet' },
   'receipts.books.deleting': { en: 'Deleting…', es: 'Eliminando…', fr: 'Suppression…' },

@@ -1,0 +1,50 @@
+import type { MessageKey } from '@/i18n';
+
+/**
+ * The screen each answer can open, named the way the app names it, for "Open {screen}". Pickers and
+ * pages that need a row to work on (a year, a month, one receipt's logo) are left out: opened bare
+ * they have nothing to show.
+ */
+export const SCREENS: Record<string, MessageKey> = {
+  '/home': 'askSam.screen.home',
+  '/cards': 'askSam.screen.cards',
+  '/transactions': 'askSam.screen.transactions',
+  '/settings': 'askSam.screen.settings',
+  '/salary': 'askSam.screen.salary',
+  '/habits': 'askSam.screen.habits',
+  '/habit-new': 'askSam.screen.habitNew',
+  '/add-loan': 'askSam.screen.addLoan',
+  '/loans': 'askSam.screen.loans',
+  '/loan-calculator': 'askSam.screen.loanCalculator',
+  '/pro': 'askSam.screen.pro',
+  '/reminders': 'askSam.screen.reminders',
+  '/receipts': 'askSam.screen.receipts',
+  '/add-receipt': 'askSam.screen.addReceipt',
+  '/settings/preferences': 'askSam.screen.preferences',
+  '/savings': 'askSam.screen.savings',
+  '/voice': 'askSam.screen.voice',
+  '/insights': 'askSam.screen.insights',
+  '/bills': 'askSam.screen.bills',
+  '/add-bill': 'askSam.screen.addBill',
+  '/subscriptions': 'askSam.screen.subscriptions',
+  '/add-subscription': 'askSam.screen.addSubscription',
+  '/privacy': 'askSam.screen.privacy',
+  '/terms': 'askSam.screen.terms',
+  '/settings/support': 'askSam.screen.support',
+  '/settings/about': 'askSam.screen.about',
+  '/settings/your-money': 'askSam.screen.yourMoney',
+  '/send-to-goals': 'askSam.screen.sendToGoals',
+  '/goals': 'askSam.screen.goals',
+  '/goal-calculator': 'askSam.screen.goalCalculator',
+  '/savings-entry': 'askSam.screen.savingsEntry',
+  '/payment-search': 'askSam.screen.paymentSearch',
+  '/payment-history': 'askSam.screen.paymentHistory',
+  '/payment-export': 'askSam.screen.paymentExport',
+  '/notifications': 'askSam.screen.notifications',
+  '/contact': 'askSam.screen.contact',
+  '/add-account': 'askSam.screen.addAccount',
+  '/add-card': 'askSam.screen.addCard',
+  '/faq': 'askSam.screen.faq',
+  '/avatar': 'askSam.screen.avatar',
+  '/receipt-book': 'askSam.screen.receiptBook',
+};

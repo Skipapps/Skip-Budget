@@ -69,7 +69,7 @@ export const subscriptionsMessages = defineMessages({
     fr: 'Choisis une date',
   },
   // Charged to: none of the cards or accounts, chosen on purpose.
-  'subscriptions.add.skipSource': { en: 'Skip', es: 'Omitir', fr: 'Passer' },
+  'subscriptions.add.skipSource': { en: 'Skip', es: 'Skip', fr: 'Skip' },
   'subscriptions.add.noReminder': {
     en: 'No reminder',
     es: 'Sin recordatorio',

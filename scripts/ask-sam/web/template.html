@@ -1,0 +1,1780 @@
+<title>Ask Sam</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap"
+/>
+<style>
+  /* Layout: one phone-width chat column, the way Ask Sam will sit in the app; All answers and
+   Your notes are sibling tabs for reviewing the library and what testing turned up.
+   Tokens are Skip's own palette (src/theme/palette.ts). */
+  :root {
+    --surface: #fbf9f7;
+    --card: #ffffff;
+    --ink: #111111;
+    --body: #2f2f2f;
+    --muted: #6f6f6f;
+    --line: #e5e1dc;
+    --accent: #905479;
+    --accent-ink: #905479;
+    --on-accent: #ffffff;
+    --tint: #f4ebf1;
+    --tint-ink: #6b3858;
+    --good: #2f7a55;
+    --bad: #b0453a;
+    --note-bg: #fff5e6;
+    --note-ink: #774a06;
+    --shadow: 0 1px 2px rgba(17, 17, 17, 0.05), 0 4px 14px rgba(17, 17, 17, 0.05);
+    --font: 'Montserrat', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --surface: #1b181f;
+      --card: #2a2634;
+      --ink: #f8f6fb;
+      --body: #e4e0ea;
+      --muted: #a7a1b2;
+      --line: #3e3949;
+      --accent: #905479;
+      --accent-ink: #d19cbd;
+      --on-accent: #ffffff;
+      --tint: #3a2c3a;
+      --tint-ink: #e8bcd6;
+      --good: #7fd6a0;
+      --bad: #f08a86;
+      --note-bg: #3a2f1e;
+      --note-ink: #f2cf92;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme='dark'] {
+    --surface: #1b181f;
+    --card: #2a2634;
+    --ink: #f8f6fb;
+    --body: #e4e0ea;
+    --muted: #a7a1b2;
+    --line: #3e3949;
+    --accent: #905479;
+    --accent-ink: #d19cbd;
+    --on-accent: #ffffff;
+    --tint: #3a2c3a;
+    --tint-ink: #e8bcd6;
+    --good: #7fd6a0;
+    --bad: #f08a86;
+    --note-bg: #3a2f1e;
+    --note-ink: #f2cf92;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    color-scheme: dark;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--surface);
+    color: var(--body);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+  button {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent-ink);
+    outline-offset: 2px;
+  }
+
+  .app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .top {
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding-inline: 16px;
+  }
+  .top-inner {
+    max-width: 720px;
+    margin: 0 auto;
+    padding-block: 12px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .mark {
+    width: 40px;
+    height: 40px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+  }
+  .brand-text {
+    min-width: 0;
+    flex: 1;
+  }
+  .brand h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  .brand p {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--note-bg);
+    color: var(--note-ink);
+    white-space: nowrap;
+  }
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--body);
+  }
+  .icon-btn:hover {
+    border-color: var(--accent-ink);
+  }
+  .icon-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tab {
+    border: 0;
+    background: none;
+    padding: 10px 12px 11px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+  }
+  .tab[aria-selected='true'] {
+    color: var(--accent-ink);
+    border-bottom-color: var(--accent);
+  }
+  .tab .count {
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 4px;
+  }
+
+  .view {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-inline: 16px;
+  }
+  .view[hidden] {
+    display: none !important;
+  }
+  .column {
+    max-width: 640px;
+    margin: 0 auto;
+    padding-block: 20px 28px;
+  }
+
+  /* Chat */
+  .thread {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  .row.user {
+    justify-content: flex-end;
+  }
+  .row .mark {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+  }
+  .bubble {
+    min-width: 0;
+    max-width: 86%;
+    padding: 12px 15px;
+    border-radius: 18px;
+  }
+  .row.sam .bubble {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-bottom-left-radius: 6px;
+    box-shadow: var(--shadow);
+    color: var(--body);
+  }
+  .row.user .bubble {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-bottom-right-radius: 6px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .bubble p {
+    margin: 0;
+  }
+  .bubble p + p,
+  .bubble p + ul,
+  .bubble p + ol,
+  .bubble ul + p,
+  .bubble ol + p,
+  .bubble ul + ol,
+  .bubble ol + ul {
+    margin-top: 10px;
+  }
+  .bubble ul,
+  .bubble ol {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .bubble b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .row.user .bubble b {
+    color: inherit;
+  }
+  .w {
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+  }
+  .w.on {
+    opacity: 1;
+  }
+
+  .badges {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--tint);
+    color: var(--tint-ink);
+  }
+  .route {
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .route svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .after {
+    margin-left: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .feedback {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .fb {
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 4px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12.5px;
+  }
+  .fb svg {
+    width: 14px;
+    height: 14px;
+  }
+  .fb:hover {
+    color: var(--accent-ink);
+    border-color: var(--accent-ink);
+  }
+  .fb[aria-pressed='true'] {
+    background: var(--tint);
+    color: var(--tint-ink);
+    border-color: transparent;
+  }
+  .debug {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    padding: 6px 9px;
+    overflow-wrap: anywhere;
+  }
+  .debug b {
+    color: var(--body);
+    font-weight: 600;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chip {
+    border: 1px solid var(--accent-ink);
+    color: var(--accent-ink);
+    background: transparent;
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-size: 13.5px;
+    font-weight: 500;
+    text-align: left;
+    line-height: 1.3;
+  }
+  .chip:hover {
+    background: var(--tint);
+  }
+  .chip.contact {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+  }
+  .chip.contact:hover {
+    filter: brightness(1.08);
+  }
+  .alt {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .alt-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+
+  .flagbox,
+  .contact {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 12px;
+  }
+  .flagbox label,
+  .contact label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  @media (max-width: 460px) {
+    .field-row {
+      grid-template-columns: 1fr;
+    }
+  }
+  textarea,
+  input[type='text'],
+  input[type='email'],
+  select {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    padding: 9px 11px;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  textarea {
+    resize: vertical;
+    min-height: 64px;
+  }
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500 !important;
+    color: var(--body) !important;
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .primary {
+    border: 0;
+    background: var(--accent);
+    color: var(--on-accent);
+    border-radius: 999px;
+    padding: 9px 18px;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .primary:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .quiet {
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 6px 4px;
+  }
+  .hint {
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .hint.bad {
+    color: var(--bad);
+  }
+  .sent {
+    font-size: 13px;
+    color: var(--body);
+    background: var(--note-bg);
+    color: var(--note-ink);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+
+  .typing {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px 2px;
+  }
+  .typing i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    opacity: 0.4;
+    animation: blink 1.1s infinite ease-in-out;
+  }
+  .typing i:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .typing i:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+  @keyframes blink {
+    0%,
+    80%,
+    100% {
+      opacity: 0.25;
+      transform: translateY(0);
+    }
+    40% {
+      opacity: 0.9;
+      transform: translateY(-3px);
+    }
+  }
+
+  .composer {
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+    padding-inline: 16px;
+  }
+  .composer[hidden] {
+    display: none !important;
+  }
+  .composer form {
+    max-width: 640px;
+    margin: 0 auto;
+    padding-block: 10px 12px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .composer textarea {
+    min-height: 44px;
+    max-height: 140px;
+    border-radius: 22px;
+    padding: 11px 16px;
+    background: var(--card);
+    resize: none;
+    line-height: 1.4;
+  }
+  .send {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 0;
+    background: var(--accent);
+    color: var(--on-accent);
+    display: grid;
+    place-items: center;
+  }
+  .send:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .send svg {
+    width: 20px;
+    height: 20px;
+  }
+  .composer-note {
+    max-width: 640px;
+    margin: 0 auto;
+    padding-bottom: 10px;
+    font-size: 11.5px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .switch input {
+    accent-color: var(--accent);
+  }
+
+  /* Library */
+  .lib-head {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .lib-head h2,
+  .notes-head h2 {
+    margin: 0;
+    font-size: 20px;
+    color: var(--ink);
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .lib-head p,
+  .notes-head p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13.5px;
+  }
+  .stats {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .stats b {
+    color: var(--ink);
+    font-size: 17px;
+    font-weight: 700;
+    margin-right: 4px;
+  }
+  .search {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--surface);
+    padding-block: 8px;
+  }
+  .topic {
+    margin-top: 22px;
+  }
+  .topic h3 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+  .intent {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 8px;
+  }
+  .intent summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 11px 14px;
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .intent summary::-webkit-details-marker {
+    display: none;
+  }
+  .intent summary .t {
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 14.5px;
+    min-width: 0;
+  }
+  .intent summary .n {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .intent[open] summary {
+    border-bottom: 1px solid var(--line);
+  }
+  .intent-body {
+    padding: 12px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .intent-body .answer {
+    color: var(--body);
+  }
+  .intent-body .answer p {
+    margin: 0;
+  }
+  .intent-body .answer p + p,
+  .intent-body .answer p + ul,
+  .intent-body .answer ul + p,
+  .intent-body .answer p + ol,
+  .intent-body .answer ol + p {
+    margin-top: 8px;
+  }
+  .intent-body .answer ul,
+  .intent-body .answer ol {
+    margin: 0;
+    padding-left: 20px;
+  }
+  .intent-body .answer b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .asks {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 13.5px;
+    color: var(--body);
+    columns: 2 240px;
+    column-gap: 24px;
+  }
+  .asks li {
+    break-inside: avoid;
+    margin-bottom: 2px;
+  }
+  .idline {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 0;
+  }
+
+  /* Notes */
+  .notes-head {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .note {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .note-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .kind {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+  .kind.flag,
+  .kind.unhelpful {
+    background: var(--note-bg);
+    color: var(--note-ink);
+  }
+  .kind.miss {
+    background: var(--tint);
+    color: var(--tint-ink);
+  }
+  .kind.contact {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .when {
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .note q {
+    color: var(--ink);
+    font-weight: 600;
+    quotes: '“' '”';
+  }
+  .note .txt {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .w {
+      transition: none;
+    }
+    .typing i {
+      animation: none;
+      opacity: 0.6;
+    }
+  }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">S</div>
+        <div class="brand-text">
+          <h1>Ask Sam</h1>
+          <p>Skip’s built-in helper · answers from a written library, no AI</p>
+        </div>
+        <span class="pill" title="Not connected to the app yet">Test version</span>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="Views">
+        <button class="tab" role="tab" id="tab-chat" aria-selected="true" aria-controls="view-chat">
+          Chat
+        </button>
+        <button
+          class="tab"
+          role="tab"
+          id="tab-library"
+          aria-selected="false"
+          aria-controls="view-library"
+        >
+          All answers<span class="count" id="count-library"></span>
+        </button>
+        <button
+          class="tab"
+          role="tab"
+          id="tab-notes"
+          aria-selected="false"
+          aria-controls="view-notes"
+        >
+          Your notes<span class="count" id="count-notes"></span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="view" id="view-chat" role="tabpanel" aria-labelledby="tab-chat">
+    <div class="column"><div class="thread" id="thread" aria-live="polite"></div></div>
+  </main>
+
+  <main class="view" id="view-library" role="tabpanel" aria-labelledby="tab-library" hidden>
+    <div class="column">
+      <div class="lib-head">
+        <h2>Everything Sam knows</h2>
+        <p>
+          Every answer, grouped by topic, with the different ways people might ask for it. Search,
+          open one to read it, or try it in the chat.
+        </p>
+        <div class="stats" id="stats"></div>
+      </div>
+      <div class="search">
+        <input
+          type="text"
+          id="lib-search"
+          placeholder="Search questions and answers"
+          aria-label="Search questions and answers"
+          autocomplete="off"
+        />
+      </div>
+      <div id="library"></div>
+    </div>
+  </main>
+
+  <main class="view" id="view-notes" role="tabpanel" aria-labelledby="tab-notes" hidden>
+    <div class="column">
+      <div class="notes-head">
+        <h2>Your test notes</h2>
+        <p>
+          Answers you flagged or marked not helpful, questions Sam couldn’t answer, and contact
+          forms you tried. They’re saved with this page so Claude can read them and fix the answers.
+        </p>
+      </div>
+      <div id="notes"><p class="empty">Loading notes…</p></div>
+    </div>
+  </main>
+
+  <footer class="composer" id="composer">
+    <form id="ask-form" autocomplete="off">
+      <textarea
+        id="ask-input"
+        rows="1"
+        placeholder="Ask anything about Skip"
+        aria-label="Your question"
+      ></textarea>
+      <button class="send" id="ask-send" type="submit" aria-label="Send" disabled>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="m5 12 7-7 7 7" />
+          <path d="M12 19V5" />
+        </svg>
+      </button>
+    </form>
+    <div class="composer-note">
+      <label class="switch"
+        ><input type="checkbox" id="show-details" /> Show why Sam picked each answer</label
+      >
+      <button class="quiet" type="button" id="restart">Start over</button>
+    </div>
+  </footer>
+</div>
+
+<script>
+  /*ASK_SAM_ENGINE*/
+</script>
+<script>
+  (function () {
+    'use strict';
+    var L = window.AskSamLib;
+    var VARS = { proMonthly: '$1.99', proYearly: '$19.99' };
+    var BUILT = '{{BUILT}}';
+
+    var ICONS = {
+      up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+      down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>',
+      flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg>',
+      open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>',
+    };
+
+    var reduceMotion =
+      window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var thread = document.getElementById('thread');
+    var view = document.getElementById('view-chat');
+    var input = document.getElementById('ask-input');
+    var sendButton = document.getElementById('ask-send');
+    var detailsBox = document.getElementById('show-details');
+    var sam;
+    var busy = false;
+    var uid = 0;
+    var lastQuery = '';
+    var db = null;
+    var notes = [];
+
+    function el(tag, attrs, children) {
+      var node = document.createElement(tag);
+      if (attrs)
+        for (var key in attrs) {
+          if (key === 'class') node.className = attrs[key];
+          else if (key === 'text') node.textContent = attrs[key];
+          else if (key === 'html') node.innerHTML = attrs[key];
+          else node.setAttribute(key, attrs[key]);
+        }
+      (children || []).forEach(function (child) {
+        if (child) node.appendChild(child);
+      });
+      return node;
+    }
+
+    function spansInto(parent, spans) {
+      spans.forEach(function (span) {
+        if (span.bold) parent.appendChild(el('b', { text: span.text }));
+        else parent.appendChild(document.createTextNode(span.text));
+      });
+    }
+
+    function renderBlocks(text) {
+      var frag = document.createDocumentFragment();
+      L.parseAnswer(text).forEach(function (block) {
+        if (block.type === 'paragraph') {
+          var p = el('p');
+          spansInto(p, block.spans);
+          frag.appendChild(p);
+        } else {
+          var list = el(block.type === 'steps' ? 'ol' : 'ul');
+          block.items.forEach(function (item) {
+            var li = el('li');
+            spansInto(li, item);
+            list.appendChild(li);
+          });
+          frag.appendChild(list);
+        }
+      });
+      return frag;
+    }
+
+    function wrapWords(root) {
+      var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      var nodes = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode);
+      var words = [];
+      nodes.forEach(function (node) {
+        var parts = node.textContent.split(/(\s+)/);
+        var frag = document.createDocumentFragment();
+        parts.forEach(function (part) {
+          if (!part) return;
+          if (/^\s+$/.test(part)) {
+            frag.appendChild(document.createTextNode(part));
+            return;
+          }
+          var span = el('span', { class: 'w', text: part });
+          words.push(span);
+          frag.appendChild(span);
+        });
+        node.parentNode.replaceChild(frag, node);
+      });
+      return words;
+    }
+
+    function nearBottom() {
+      return view.scrollHeight - view.scrollTop - view.clientHeight < 160;
+    }
+    function toBottom(force) {
+      if (force || nearBottom()) view.scrollTop = view.scrollHeight;
+    }
+
+    // Set when the person sends another question mid-reply: the reply in progress finishes at once.
+    var hurry = false;
+    var wake = null;
+    function wait(ms) {
+      return new Promise(function (resolve) {
+        if (hurry) return resolve();
+        var timer = setTimeout(done, ms);
+        function done() {
+          clearTimeout(timer);
+          wake = null;
+          resolve();
+        }
+        wake = done;
+      });
+    }
+
+    function reveal(words) {
+      if (reduceMotion || !words.length) {
+        words.forEach(function (w) {
+          w.classList.add('on');
+        });
+        return Promise.resolve();
+      }
+      // Paced by the clock, not by frames: a page in the background gets few frames, and should
+      // catch up the moment it is looked at again.
+      return new Promise(function (resolve) {
+        var index = 0;
+        var started = performance.now();
+        var duration = Math.min(900, words.length * 18);
+        function step() {
+          var target = hurry
+            ? words.length
+            : Math.ceil((words.length * (performance.now() - started)) / duration);
+          while (index < Math.min(target, words.length)) words[index++].classList.add('on');
+          toBottom();
+          if (index < words.length) setTimeout(step, 16);
+          else resolve();
+        }
+        step();
+      });
+    }
+
+    function addUser(text) {
+      var row = el('div', { class: 'row user' }, [el('div', { class: 'bubble', text: text })]);
+      thread.appendChild(row);
+      toBottom(true);
+    }
+
+    function samRow(content) {
+      var bubble = el('div', { class: 'bubble' }, [content]);
+      var row = el('div', { class: 'row sam' }, [
+        el('div', { class: 'mark', 'aria-hidden': 'true', text: 'S' }),
+        bubble,
+      ]);
+      thread.appendChild(row);
+      return { row: row, bubble: bubble };
+    }
+
+    function typing() {
+      var dots = el('span', { class: 'typing', 'aria-label': 'Sam is typing' }, [
+        el('i'),
+        el('i'),
+        el('i'),
+      ]);
+      var holder = samRow(dots);
+      toBottom(true);
+      return holder.row;
+    }
+
+    function routeLabel(route) {
+      var name = route
+        .replace(/^\/+/, '')
+        .replace(/\(tabs\)\//, '')
+        .split('/')[0]
+        .replace(/-/g, ' ');
+      if (name === 'transactions') name = 'activity';
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+
+    async function showReply(reply, query) {
+      var dots = typing();
+      var words = reply.text.split(/\s+/).length;
+      await wait(reduceMotion ? 150 : 380 + Math.min(900, words * 9));
+      dots.remove();
+
+      var body = el('div');
+      if (reply.pro)
+        body.appendChild(
+          el('div', { class: 'badges' }, [el('span', { class: 'badge', text: 'Pro' })]),
+        );
+      body.appendChild(renderBlocks(reply.text));
+      var holder = samRow(body);
+      var revealed = wrapWords(body);
+      if (reply.route) {
+        holder.bubble.appendChild(
+          el('div', { class: 'route', html: ICONS.open + '<span></span>' }),
+        );
+        holder.bubble.lastChild.lastChild.textContent =
+          'In the app, this offers a button to open ' + routeLabel(reply.route);
+      }
+      await reveal(revealed);
+
+      // Under an answer, most useful first: the near misses when Sam wasn't sure, then where people
+      // go next, then the quiet "Helpful?" row.
+      var after = el('div', { class: 'after' });
+      if (reply.kind === 'contact') after.appendChild(contactForm(reply));
+      if (reply.alternatives && reply.alternatives.length) {
+        var alt = el('div', { class: 'alt' }, [
+          el('span', { class: 'alt-label', text: 'Not quite? Did you mean:' }),
+        ]);
+        alt.appendChild(chipRow(reply.alternatives));
+        after.appendChild(alt);
+      }
+      if (reply.chips.length) {
+        var next = el('div', { class: 'alt' });
+        if (reply.kind === 'answer')
+          next.appendChild(el('span', { class: 'alt-label', text: 'You might also ask' }));
+        next.appendChild(chipRow(reply.chips));
+        after.appendChild(next);
+      }
+      if (reply.askFeedback) after.appendChild(feedbackRow(reply, query));
+      if (reply.debug) {
+        var debug = el('div', { class: 'debug' });
+        debug.hidden = !detailsBox.checked;
+        var top = reply.debug.candidates.map(function (c, i) {
+          return (i === 0 ? '<b>' : '') + c.id + ' ' + c.score.toFixed(2) + (i === 0 ? '</b>' : '');
+        });
+        debug.innerHTML =
+          'Decision: <b>' +
+          reply.kind +
+          '</b> · ' +
+          (top.length ? top.join(' · ') : 'no candidates');
+        after.appendChild(debug);
+      }
+      if (after.childNodes.length) thread.appendChild(after);
+      toBottom();
+
+      if (reply.kind === 'fallback' && query)
+        saveNote({
+          kind: 'miss',
+          query: query,
+          intentId: '',
+          title: '',
+          note: '',
+          top: reply.debug ? reply.debug.candidates.slice(0, 3) : [],
+        });
+    }
+
+    function chipRow(chips) {
+      var row = el('div', { class: 'chips' });
+      chips.forEach(function (chip) {
+        var button = el('button', {
+          class: 'chip' + (chip.action === 'contact' ? ' contact' : ''),
+          type: 'button',
+          text: chip.label,
+        });
+        button.addEventListener('click', function () {
+          if (!busy)
+            run(
+              function () {
+                return sam.choose(chip);
+              },
+              chip.label,
+              '',
+            );
+        });
+        row.appendChild(button);
+      });
+      return row;
+    }
+
+    function feedbackRow(reply, query) {
+      var row = el('div', { class: 'feedback' }, [el('span', { text: 'Helpful?' })]);
+      var up = el('button', {
+        class: 'fb',
+        type: 'button',
+        'aria-pressed': 'false',
+        'aria-label': 'Helpful',
+        html: ICONS.up,
+      });
+      var down = el('button', {
+        class: 'fb',
+        type: 'button',
+        'aria-pressed': 'false',
+        'aria-label': 'Not helpful',
+        html: ICONS.down,
+      });
+      var flag = el('button', {
+        class: 'fb',
+        type: 'button',
+        html: ICONS.flag + '<span>Flag answer</span>',
+      });
+      row.appendChild(up);
+      row.appendChild(down);
+      row.appendChild(flag);
+      var done = false;
+      up.addEventListener('click', function () {
+        if (done || busy) return;
+        done = true;
+        up.setAttribute('aria-pressed', 'true');
+        run(
+          function () {
+            return [sam.feedback(reply.intentId, true)];
+          },
+          null,
+          '',
+        );
+      });
+      down.addEventListener('click', function () {
+        if (done || busy) return;
+        done = true;
+        down.setAttribute('aria-pressed', 'true');
+        saveNote({
+          kind: 'unhelpful',
+          query: query,
+          intentId: reply.intentId,
+          title: titleOf(reply.intentId),
+          note: '',
+        });
+        run(
+          function () {
+            return [sam.feedback(reply.intentId, false)];
+          },
+          null,
+          '',
+        );
+      });
+      flag.addEventListener('click', function () {
+        if (row.nextSibling && row.nextSibling.className === 'flagbox') return;
+        row.parentNode.insertBefore(flagBox(reply, query), row.nextSibling);
+      });
+      return row;
+    }
+
+    function titleOf(id) {
+      var intent = sam && sam.matcher.byId(id);
+      return intent ? intent.title : '';
+    }
+
+    function flagBox(reply, query) {
+      var id = 'flag-' + ++uid;
+      var box = el('form', { class: 'flagbox' });
+      box.appendChild(
+        el('label', {
+          for: id,
+          text: 'What’s wrong or missing? Write what the answer should say.',
+        }),
+      );
+      var area = el('textarea', { id: id, rows: '3' });
+      box.appendChild(area);
+      var hint = el('span', { class: 'hint' });
+      var save = el('button', { class: 'primary', type: 'submit', text: 'Save note' });
+      var cancel = el('button', { class: 'quiet', type: 'button', text: 'Cancel' });
+      box.appendChild(el('div', { class: 'actions' }, [save, cancel, hint]));
+      cancel.addEventListener('click', function () {
+        box.remove();
+      });
+      box.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        var note = area.value.trim();
+        if (!note) {
+          hint.className = 'hint bad';
+          hint.textContent = 'Write a few words first.';
+          return;
+        }
+        save.disabled = true;
+        var ok = await saveNote({
+          kind: 'flag',
+          query: query,
+          intentId: reply.intentId,
+          title: titleOf(reply.intentId),
+          note: note,
+        });
+        if (ok) {
+          box.replaceWith(
+            el('div', {
+              class: 'sent',
+              text: 'Saved to Your notes. Claude will read it and fix the answer.',
+            }),
+          );
+        } else {
+          save.disabled = false;
+          hint.className = 'hint bad';
+          hint.textContent =
+            'Couldn’t save here. Notes save when this page is open in Claude while you’re signed in.';
+        }
+      });
+      setTimeout(function () {
+        area.focus();
+      }, 0);
+      return box;
+    }
+
+    function contactForm(reply) {
+      var n = ++uid;
+      var form = el('form', { class: 'contact', novalidate: '' });
+      var topic = el('select', { id: 'ct-topic-' + n });
+      topic.appendChild(el('option', { value: 'support', text: 'I need help' }));
+      topic.appendChild(el('option', { value: 'idea', text: 'I have an idea' }));
+      topic.value = reply.contact && reply.contact.topic === 'idea' ? 'idea' : 'support';
+      var name = el('input', { type: 'text', id: 'ct-name-' + n, autocomplete: 'name' });
+      var email = el('input', {
+        type: 'email',
+        id: 'ct-email-' + n,
+        autocomplete: 'email',
+        placeholder: 'you@example.com',
+      });
+      var message = el('textarea', { id: 'ct-message-' + n, rows: '4' });
+      message.value = (reply.contact && reply.contact.draft) || '';
+      var include = el('input', { type: 'checkbox', id: 'ct-include-' + n });
+      include.checked = true;
+      var hint = el('span', { class: 'hint' });
+      var send = el('button', { class: 'primary', type: 'submit', text: 'Send' });
+
+      form.appendChild(
+        el('div', { class: 'field' }, [
+          el('label', { for: topic.id, text: 'What is it about?' }),
+          topic,
+        ]),
+      );
+      form.appendChild(
+        el('div', { class: 'field-row' }, [
+          el('div', { class: 'field' }, [el('label', { for: name.id, text: 'Your name' }), name]),
+          el('div', { class: 'field' }, [
+            el('label', { for: email.id, text: 'Email for the reply' }),
+            email,
+          ]),
+        ]),
+      );
+      form.appendChild(
+        el('div', { class: 'field' }, [
+          el('label', { for: message.id, text: 'Your message' }),
+          message,
+        ]),
+      );
+      form.appendChild(
+        el('label', { class: 'check', for: include.id }, [
+          include,
+          document.createTextNode('Include this chat, so you don’t have to repeat yourself'),
+        ]),
+      );
+      form.appendChild(el('div', { class: 'actions' }, [send, hint]));
+
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (!message.value.trim()) {
+          hint.className = 'hint bad';
+          hint.textContent = 'Write your message first.';
+          message.focus();
+          return;
+        }
+        if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) {
+          hint.className = 'hint bad';
+          hint.textContent = 'Add an email so the team can reply.';
+          email.focus();
+          return;
+        }
+        saveNote({
+          kind: 'contact',
+          query: lastQuery,
+          intentId: reply.intentId || '',
+          title: topic.value === 'idea' ? 'Idea' : 'Support',
+          note: message.value.trim(),
+        });
+        form.replaceWith(
+          el('div', {
+            class: 'sent',
+            text:
+              'Test version: nothing was sent. In the app, this goes to the Skip team’s inbox' +
+              (include.checked ? ' with this chat attached' : '') +
+              ', and the reply comes to the email you gave.',
+          }),
+        );
+      });
+      return form;
+    }
+
+    // A question typed while Sam is still answering waits its turn instead of being dropped.
+    var waiting = [];
+    async function run(produce, userText, query) {
+      if (busy) {
+        if (userText && query) {
+          waiting.push({ produce: produce, userText: userText, query: query });
+          hurry = true;
+          if (wake) wake();
+        }
+        return;
+      }
+      busy = true;
+      var turn = { produce: produce, userText: userText, query: query };
+      while (turn) {
+        if (turn.userText) addUser(turn.userText);
+        var replies = turn.produce();
+        for (var i = 0; i < replies.length; i += 1) await showReply(replies[i], turn.query);
+        turn = waiting.shift();
+        hurry = waiting.length > 0;
+      }
+      busy = false;
+    }
+
+    function ask(text) {
+      lastQuery = text;
+      return run(
+        function () {
+          return sam.ask(text);
+        },
+        text,
+        text,
+      );
+    }
+
+    function start() {
+      sam = L.createAskSam({ intents: L.ALL_INTENTS, topics: L.TOPICS, vars: VARS });
+      thread.innerHTML = '';
+      run(
+        function () {
+          return [sam.greet()];
+        },
+        null,
+        '',
+      );
+    }
+
+    document.getElementById('ask-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      var text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      autosize();
+      ask(text);
+    });
+    input.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+        event.preventDefault();
+        document.getElementById('ask-form').requestSubmit();
+      }
+    });
+    function autosize() {
+      input.style.height = 'auto';
+      input.style.height = Math.min(140, input.scrollHeight) + 'px';
+      sendButton.disabled = !input.value.trim();
+    }
+    input.addEventListener('input', autosize);
+    document.getElementById('restart').addEventListener('click', function () {
+      if (!busy) start();
+    });
+
+    try {
+      detailsBox.checked = localStorage.getItem('ask-sam-details') === '1';
+    } catch (e) {}
+    detailsBox.addEventListener('change', function () {
+      try {
+        localStorage.setItem('ask-sam-details', detailsBox.checked ? '1' : '0');
+      } catch (e) {}
+      Array.prototype.forEach.call(document.querySelectorAll('.debug'), function (node) {
+        node.hidden = !detailsBox.checked;
+      });
+    });
+
+    /* Tabs */
+    var tabs = ['chat', 'library', 'notes'];
+    function show(name) {
+      tabs.forEach(function (tab) {
+        document.getElementById('tab-' + tab).setAttribute('aria-selected', String(tab === name));
+        document.getElementById('view-' + tab).hidden = tab !== name;
+      });
+      document.getElementById('composer').hidden = name !== 'chat';
+      if (name === 'library') buildLibrary();
+      if (name === 'chat')
+        setTimeout(function () {
+          input.focus();
+        }, 0);
+    }
+    tabs.forEach(function (tab) {
+      document.getElementById('tab-' + tab).addEventListener('click', function () {
+        show(tab);
+      });
+    });
+    if (['library', 'notes'].indexOf(location.hash.slice(1)) >= 0) show(location.hash.slice(1));
+
+    /* Library */
+    var libraryBuilt = false;
+    var searchIndex = [];
+    function buildLibrary() {
+      if (libraryBuilt) return;
+      libraryBuilt = true;
+      var root = document.getElementById('library');
+      var order = L.TOPICS.map(function (t) {
+        return t.id;
+      }).concat(['chat']);
+      var labels = {};
+      L.TOPICS.forEach(function (t) {
+        labels[t.id] = t.label;
+      });
+      labels.chat = 'Small talk and getting help';
+      order.forEach(function (topicId) {
+        var intents = L.ALL_INTENTS.filter(function (i) {
+          return i.topic === topicId;
+        });
+        if (!intents.length) return;
+        var section = el('section', { class: 'topic' });
+        section.appendChild(
+          el('h3', {}, [
+            el('span', { text: labels[topicId] || topicId }),
+            el('span', { text: String(intents.length) }),
+          ]),
+        );
+        intents.forEach(function (intent) {
+          var details = el('details', { class: 'intent' });
+          var summary = el('summary', {}, [
+            el('span', { class: 't', text: intent.title }),
+            el('span', {
+              class: 'n',
+              text: (intent.pro ? 'Pro · ' : '') + intent.questions.length + ' ways',
+            }),
+          ]);
+          details.appendChild(summary);
+          var filled = false;
+          details.addEventListener('toggle', function () {
+            if (!details.open || filled) return;
+            filled = true;
+            var body = el('div', { class: 'intent-body' });
+            var answer = el('div', { class: 'answer' });
+            answer.appendChild(
+              renderBlocks(
+                intent.answer.replace(/\{(\w+)\}/g, function (w, k) {
+                  return VARS[k] || w;
+                }),
+              ),
+            );
+            body.appendChild(answer);
+            var asks = el('ul', { class: 'asks' });
+            intent.questions.forEach(function (q) {
+              asks.appendChild(el('li', { text: q }));
+            });
+            body.appendChild(
+              el('div', {}, [el('div', { class: 'label', text: 'Ways people ask' }), asks]),
+            );
+            var meta =
+              intent.id +
+              (intent.route ? ' · opens ' + intent.route : '') +
+              (intent.related && intent.related.length
+                ? ' · next: ' + intent.related.join(', ')
+                : '');
+            body.appendChild(el('div', { class: 'idline', text: meta }));
+            var tryIt = el('button', {
+              class: 'icon-btn',
+              type: 'button',
+              text: 'Ask this in the chat',
+            });
+            tryIt.addEventListener('click', function () {
+              show('chat');
+              if (!busy) ask(intent.questions[0]);
+            });
+            body.appendChild(el('div', {}, [tryIt]));
+            details.appendChild(body);
+          });
+          section.appendChild(details);
+          searchIndex.push({
+            node: details,
+            text: [intent.title, intent.id, intent.answer]
+              .concat(intent.questions, intent.keywords || [])
+              .join(' ')
+              .toLowerCase(),
+          });
+        });
+        root.appendChild(section);
+      });
+      root.appendChild(
+        el('p', {
+          class: 'empty',
+          id: 'lib-empty',
+          hidden: '',
+          text: 'Nothing matches that. Try fewer words.',
+        }),
+      );
+    }
+    document.getElementById('lib-search').addEventListener('input', function (event) {
+      var words = event.target.value.toLowerCase().split(/\s+/).filter(Boolean);
+      var shown = 0;
+      searchIndex.forEach(function (item) {
+        var hit = words.every(function (w) {
+          return item.text.indexOf(w) >= 0;
+        });
+        item.node.hidden = !hit;
+        if (hit) shown += 1;
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('.topic'), function (section) {
+        section.hidden = !section.querySelector('.intent:not([hidden])');
+      });
+      document.getElementById('lib-empty').hidden = shown > 0;
+    });
+
+    var answerCount = L.ALL_INTENTS.filter(function (i) {
+      return i.topic !== 'chat';
+    }).length;
+    var askCount = L.ALL_INTENTS.reduce(function (sum, i) {
+      return sum + i.questions.length;
+    }, 0);
+    var proCount = L.ALL_INTENTS.filter(function (i) {
+      return i.pro;
+    }).length;
+    document.getElementById('count-library').textContent = answerCount;
+    document.getElementById('stats').innerHTML =
+      '<span><b>' +
+      answerCount +
+      '</b>answers about the app</span><span><b>' +
+      askCount.toLocaleString('en-US') +
+      '</b>ways of asking</span><span><b>' +
+      proCount +
+      '</b>about Pro features</span><span><b>' +
+      L.TOPICS.length +
+      '</b>topics</span><span>Built ' +
+      BUILT +
+      ' UTC</span>';
+
+    /* Notes */
+    var KIND_LABEL = {
+      flag: 'Flagged',
+      unhelpful: 'Not helpful',
+      miss: 'Couldn’t answer',
+      contact: 'Contact form',
+    };
+    async function saveNote(note) {
+      if (!db) return false;
+      try {
+        note.at = new Date().toISOString();
+        await db.collection('notes').add(note);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+    function renderNotes() {
+      var root = document.getElementById('notes');
+      root.innerHTML = '';
+      document.getElementById('count-notes').textContent = notes.length ? notes.length : '';
+      if (!db) {
+        root.appendChild(
+          el('p', {
+            class: 'empty',
+            text: 'Notes save only when this page is open in Claude while you’re signed in. The chat works either way.',
+          }),
+        );
+        return;
+      }
+      if (!notes.length) {
+        root.appendChild(
+          el('p', {
+            class: 'empty',
+            text: 'Nothing yet. Tap “Flag answer” under any answer, and every question Sam can’t answer is kept here automatically.',
+          }),
+        );
+        return;
+      }
+      notes.forEach(function (snap) {
+        var n = snap.data() || {};
+        var card = el('article', { class: 'note' });
+        var when = n.at
+          ? new Date(n.at).toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            })
+          : '';
+        card.appendChild(
+          el('div', { class: 'note-top' }, [
+            el('span', {
+              class: 'kind ' + (n.kind || ''),
+              text: KIND_LABEL[n.kind] || n.kind || 'Note',
+            }),
+            el('span', { class: 'when', text: when }),
+          ]),
+        );
+        if (n.query) {
+          var q = el('div');
+          q.appendChild(el('q', { text: n.query }));
+          card.appendChild(q);
+        }
+        if (n.title || n.intentId)
+          card.appendChild(
+            el('div', {
+              class: 'idline',
+              text:
+                'Answered with: ' + (n.title || '') + (n.intentId ? ' (' + n.intentId + ')' : ''),
+            }),
+          );
+        if (n.note) card.appendChild(el('div', { class: 'txt', text: n.note }));
+        var remove = el('button', { class: 'quiet', type: 'button', text: 'Remove' });
+        remove.addEventListener('click', function () {
+          snap &&
+            db
+              .collection('notes')
+              .doc(snap.id)
+              .delete()
+              .catch(function () {});
+        });
+        card.appendChild(el('div', {}, [remove]));
+        root.appendChild(card);
+      });
+    }
+    (async function connect() {
+      try {
+        db = window.claude && window.claude.use ? await window.claude.use('db') : null;
+      } catch (e) {
+        db = null;
+      }
+      if (!db) {
+        renderNotes();
+        return;
+      }
+      db.collection('notes')
+        .orderBy('at', 'desc')
+        .limit(300)
+        .onSnapshot(
+          function (snap) {
+            notes = snap.docs;
+            renderNotes();
+          },
+          function () {
+            db = null;
+            renderNotes();
+          },
+        );
+    })();
+
+    start();
+  })();
+</script>

@@ -330,7 +330,7 @@ const WORDS: { en: Walk; es: Words; fr: Words } = {
     renewalBox: 'Próxima renovación, Elige una fecha',
     day: 'lunes 12 de octubre de 2026',
     yearly: 'Anual',
-    skip: 'Omitir',
+    skip: 'Skip',
     noReminder: 'Sin recordatorio',
     save: 'Guardar suscripción',
     amount: 'Importe',
@@ -354,7 +354,7 @@ const WORDS: { en: Walk; es: Words; fr: Words } = {
     renewalBox: 'Prochain renouvellement, Choisis une date',
     day: 'lundi 12 octobre 2026',
     yearly: 'Chaque année',
-    skip: 'Passer',
+    skip: 'Skip',
     noReminder: 'Aucun rappel',
     save: 'Enregistrer l’abonnement',
     amount: 'Montant',
@@ -472,7 +472,7 @@ describe('Add a subscription in Spanish', () => {
     expect(screen.getByLabelText('Próxima renovación, Elige una fecha')).toBeTruthy();
     // Nothing is answered yet, so no pill is lit.
     expect(screen.getByText('Se cobra a')).toBeTruthy();
-    for (const pill of [CARD, ACCOUNT, 'Omitir']) expect(radio(screen, pill, false)).toBeTruthy();
+    for (const pill of [CARD, ACCOUNT, 'Skip']) expect(radio(screen, pill, false)).toBeTruthy();
     expect(screen.getByText('Recordatorio')).toBeTruthy();
     expect(screen.getByText('Antes de que se renueve')).toBeTruthy();
     expect(radio(screen, 'Sin recordatorio', false)).toBeTruthy();
@@ -721,7 +721,7 @@ describe('Add a subscription in French', () => {
     expect(screen.getByText('Choisis une date')).toBeTruthy();
     expect(screen.getByLabelText('Prochain renouvellement, Choisis une date')).toBeTruthy();
     expect(screen.getByText('Prélevé sur')).toBeTruthy();
-    expect(screen.getByLabelText('Passer')).toBeTruthy();
+    expect(screen.getByLabelText('Skip')).toBeTruthy();
     expect(screen.getByText('Rappel')).toBeTruthy();
     expect(screen.getByText('Avant le renouvellement')).toBeTruthy();
     expect(screen.getByLabelText('Aucun rappel')).toBeTruthy();

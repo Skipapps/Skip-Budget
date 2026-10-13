@@ -284,7 +284,7 @@ const WORDS: { en: Walk; es: Words; fr: Words } = {
     paymentBox: 'Fecha de pago, Elige una fecha',
     day: 'jueves 15 de octubre de 2026',
     quarterly: 'Cada 3 meses',
-    skip: 'Omitir',
+    skip: 'Skip',
     noReminder: 'Sin recordatorio',
     save: 'Guardar factura',
     nameLabel: 'Nombre',
@@ -311,7 +311,7 @@ const WORDS: { en: Walk; es: Words; fr: Words } = {
     paymentBox: 'Date de paiement, Choisis une date',
     day: 'jeudi 15 octobre 2026',
     quarterly: 'Tous les 3 mois',
-    skip: 'Passer',
+    skip: 'Skip',
     noReminder: 'Aucun rappel',
     save: 'Enregistrer la facture',
     nameLabel: 'Nom',
@@ -434,7 +434,7 @@ describe('Add a bill in Spanish', () => {
       expect(screen.getByLabelText(chip)).toBeTruthy();
     }
     expect(screen.getByText('Se paga con')).toBeTruthy();
-    expect(screen.getByLabelText('Omitir')).toBeTruthy();
+    expect(screen.getByLabelText('Skip')).toBeTruthy();
     expect(screen.getByText('Recordatorio')).toBeTruthy();
     expect(screen.getByText('Antes de que venza la factura')).toBeTruthy();
     expect(screen.getByLabelText('Sin recordatorio')).toBeTruthy();
@@ -600,7 +600,7 @@ describe('Add a bill in French', () => {
       expect(screen.getByLabelText(chip)).toBeTruthy();
     }
     expect(screen.getByText('Payée avec')).toBeTruthy();
-    expect(screen.getByLabelText('Passer')).toBeTruthy();
+    expect(screen.getByLabelText('Skip')).toBeTruthy();
     expect(screen.getByText('Rappel')).toBeTruthy();
     expect(screen.getByText('Avant l’échéance de la facture')).toBeTruthy();
     expect(screen.getByLabelText('Aucun rappel')).toBeTruthy();
