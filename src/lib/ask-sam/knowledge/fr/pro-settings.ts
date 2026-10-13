@@ -685,7 +685,7 @@ export const proSettingsFr: IntentText[] = [
       'Rien n’est supprimé. Tout ce que tu as ajouté reste dans ton compte et continue de compter dans tes soldes. Skip revient simplement au forfait gratuit :',
       '',
       '- Les listes montrent de nouveau les 90 derniers jours. Les entrées plus anciennes sont masquées, pas perdues.',
-      '- Ta première carte de crédit et ton premier compte bancaire fonctionnent comme avant. Les autres restent, estompés dans **Cartes** : tu peux toujours les ouvrir, les modifier ou les supprimer, mais pas les choisir pour de nouvelles dépenses. Les factures, abonnements et prêts déjà payés avec eux les gardent.',
+      '- Ta première carte de crédit et ton premier compte bancaire fonctionnent comme avant. Les autres restent, estompés dans **Cartes** : tu peux toujours les ouvrir, les modifier ou les supprimer, payer depuis un compte supplémentaire et les garder sur ce qui les utilise déjà, mais pas les choisir pour de nouvelles dépenses.',
       '- Les habitudes que tu as déjà continuent de fonctionner. En commencer une nouvelle demande Pro.',
       '- La **Saisie vocale**, **Aperçu** et l’export ouvrent une page Pro à la place.',
       '- Les numérisations et les imports reviennent à 15 chacun par mois.',

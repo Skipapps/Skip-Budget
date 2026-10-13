@@ -692,7 +692,7 @@ export const proSettingsEs: IntentText[] = [
       'No se borra nada. Todo lo que agregaste sigue en tu cuenta y sigue contando en tus saldos. Skip simplemente vuelve al plan gratis:',
       '',
       '- Las listas vuelven a mostrar los últimos 90 días. Lo anterior queda oculto, no borrado.',
-      '- Tu primera tarjeta de crédito y tu primera cuenta bancaria funcionan como antes. Las demás se quedan, atenuadas en **Tarjetas**: todavía puedes abrirlas, editarlas o eliminarlas, pero no elegirlas para gastos nuevos. Las facturas, suscripciones y préstamos que ya se pagan con ellas las conservan.',
+      '- Tu primera tarjeta de crédito y tu primera cuenta bancaria funcionan como antes. Las demás se quedan, atenuadas en **Tarjetas**: todavía puedes abrirlas, editarlas o eliminarlas, pagar desde una cuenta extra y mantenerlas en lo que ya las usa, pero no elegirlas para gastos nuevos.',
       '- Los hábitos que ya tienes siguen funcionando. Empezar uno nuevo necesita Pro.',
       '- **Entrada por voz**, **Análisis** y exportar abren una página de Pro en su lugar.',
       '- Los escaneos y las subidas vuelven a 15 al mes cada uno.',

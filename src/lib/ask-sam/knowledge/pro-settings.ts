@@ -764,7 +764,7 @@ export const proSettingsIntents: Intent[] = [
       "does anything break if i don't renew",
     ],
     answer:
-      'Nothing is deleted. Everything you added stays in your account and keeps counting in your balances. Skip simply goes back to the free plan:\n\n- Lists show the last 90 days again. Older entries are hidden, not gone.\n- Your first credit card and first bank account work as before. Any others stay, faded on **Cards**: you can still open, edit or delete them, but not pick them for new spending. Bills, subscriptions and loans already paid with them keep them.\n- Habits you already have keep working. Starting a new one needs Pro.\n- **Voice entry**, **Insights** and exporting open a Pro page instead.\n- Scans and uploads go back to 15 each a month.\n\nThe day you have Pro again, everything comes back as it was.',
+      'Nothing is deleted. Everything you added stays in your account and keeps counting in your balances. Skip simply goes back to the free plan:\n\n- Lists show the last 90 days again. Older entries are hidden, not gone.\n- Your first credit card and first bank account work as before. Any others stay, faded on **Cards**: you can still open, edit or delete them, pay from an extra account, and keep them on what already uses them, but not pick them for new spending.\n- Habits you already have keep working. Starting a new one needs Pro.\n- **Voice entry**, **Insights** and exporting open a Pro page instead.\n- Scans and uploads go back to 15 each a month.\n\nThe day you have Pro again, everything comes back as it was.',
     keywords: ['lapse', 'expired', 'downgrade', 'ended', 'deleted', 'cancel pro'],
     related: ['cards.free.locked', 'pro.history.hidden', 'pro.lapse.come-back', 'pro.cancel.after'],
   },
