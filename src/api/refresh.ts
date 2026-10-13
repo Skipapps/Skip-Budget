@@ -177,31 +177,66 @@ export function useRefreshAll() {
 /** Long enough that flicking between apps does not re-run the sweep. */
 const SWEEP_INTERVAL_MS = 60_000;
 
+/** The day-flip sweep fires this long after midnight, so the clock it reads is surely the new day. */
+const MIDNIGHT_GRACE_MS = 1_000;
+
+/** Milliseconds from `now` to the next local midnight; a clock-change day is 23 or 25 hours long. */
+export function msUntilNextMidnight(now: Date): number {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
+}
+
 /**
- * Keeps schedules current on launch and on every return to the app, so a rent bill dated two weeks
- * ago never greets someone after a long absence. Only invalidates when something actually moved.
+ * Keeps schedules current on launch, on every return to the app, and when the day turns while the
+ * app stays open (a phone left on Home overnight never resumes), so a rent bill dated two weeks ago
+ * never greets someone after a long absence. Only invalidates when something actually moved.
  */
 export function useKeepSchedulesCurrent() {
   const client = useQueryClient();
   const userId = useUserId();
-  // Epoch millis of the last sweep. Zero means it has never run.
+  // Epoch millis and local day of the last sweep. Zero and null mean it has never run.
   const lastSweep = useRef(0);
+  const lastSweepDay = useRef<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
 
-    const maybeSweep = () => {
-      const now = Date.now();
-      if (now - lastSweep.current < SWEEP_INTERVAL_MS) return;
-      lastSweep.current = now;
+    const run = (now: Date) => {
+      lastSweep.current = now.getTime();
+      lastSweepDay.current = toIsoDate(now);
       void sweep(client, userId);
     };
 
+    // A return within a minute of the last sweep skips it, unless the day has turned since.
+    const maybeSweep = () => {
+      const now = new Date();
+      const recent = now.getTime() - lastSweep.current < SWEEP_INTERVAL_MS;
+      if (recent && toIsoDate(now) === lastSweepDay.current) return;
+      run(now);
+    };
+
+    // A timer, not AppState: an app left open is never resumed. Once per day: a resume that already
+    // swept the new day has done it.
+    let midnight: ReturnType<typeof setTimeout> | undefined;
+    const armMidnight = () => {
+      midnight = setTimeout(
+        () => {
+          const now = new Date();
+          if (toIsoDate(now) !== lastSweepDay.current) run(now);
+          armMidnight();
+        },
+        msUntilNextMidnight(new Date()) + MIDNIGHT_GRACE_MS,
+      );
+    };
+
     maybeSweep();
+    armMidnight();
 
     const subscription = AppState.addEventListener('change', (status: AppStateStatus) => {
       if (status === 'active') maybeSweep();
     });
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      clearTimeout(midnight);
+    };
   }, [client, userId]);
 }
