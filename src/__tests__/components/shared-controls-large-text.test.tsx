@@ -280,7 +280,8 @@ const CASES: Case[] = [
         skip={{ label: t('bills.add.skipSource'), selected: false, onPress: noop }}
       />
     ),
-    same: both(/^(VISA|Everyday)?( ?••\d{4})?$/),
+    // "Skip" is the app's name on the tile, kept in every language.
+    same: both(/^((VISA|Everyday)?( ?••\d{4})?|Skip)$/),
     roles: () => [
       ['VISA', 'control'],
       ['••4242', 'control'],
