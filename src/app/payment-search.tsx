@@ -14,6 +14,7 @@ import { SearchInput } from '@/components/payments/search-input';
 import { SearchResults } from '@/components/payments/search-results';
 import { goBack } from '@/components/ui/back-button';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
@@ -29,7 +30,14 @@ import { TEXT_CAP } from '@/theme/text-scale';
 /** What the page reads of `usePayments`. */
 export type SearchData = Pick<
   PaymentsData,
-  'payments' | 'listFloor' | 'free' | 'labelOf' | 'isLoading' | 'isError' | 'refetch'
+  | 'payments'
+  | 'listFloor'
+  | 'free'
+  | 'labelOf'
+  | 'isLoading'
+  | 'isError'
+  | 'refreshFailed'
+  | 'refetch'
 >;
 
 /** Search payments (`?kind=all|bill|subscription`): the page reads every payment once, here. */
@@ -104,6 +112,8 @@ export function PaymentSearchPage({ today, data }: { today: string; data: Search
         </View>
       }
     >
+      {/* No figure card here: the note sits under the field, over whatever the page shows. */}
+      <RefreshNote show={data.refreshFailed && !(searching && data.isError)} />
       {!searching ? (
         <View testID="search-start" className="w-full">
           <RecentSearches recent={recent.recent} onPick={setQuery} onForget={recent.forget} />

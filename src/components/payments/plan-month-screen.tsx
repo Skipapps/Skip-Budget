@@ -13,6 +13,7 @@ import { PlanMonthRow } from '@/components/payments/plan-month-row';
 import { SectionCard } from '@/components/payments/section-card';
 import { StoppedRow, type LoanEndingInfo } from '@/components/payments/stopped-row';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
@@ -20,6 +21,7 @@ import { monthOf, type MonthPlanRow, type PlanKind } from '@/lib/bill-month';
 import { failureText } from '@/lib/failure';
 import { isLoanBill } from '@/lib/ledger-link';
 import { onPaymentPicked } from '@/lib/payment-pick';
+import { failedEmpty } from '@/lib/query-state';
 import { withTap } from '@/lib/press';
 import { useToday } from '@/lib/use-today';
 import { useColors } from '@/providers/theme-provider';
@@ -43,7 +45,7 @@ type PlanMarkFields = 'kind' | 'categoryId' | 'iconId' | 'domain' | 'logoHidden'
 
 /** How every finished loan ended, by its bill, read the way the Loans page reads it. */
 function useLoanEndings(today: string) {
-  const { loans, isPending, isError, refetch } = useLoans(today);
+  const { loans, isPending, isError, refreshFailed, refetch } = useLoans(today);
   const endings = useMemo(() => {
     const found = new Map<string, LoanEndingInfo>();
     for (const row of loans) {
@@ -52,7 +54,7 @@ function useLoanEndings(today: string) {
     }
     return found;
   }, [loans, today]);
-  return { endings, isPending, isError, refetch };
+  return { endings, isPending, isError, refreshFailed, refetch };
 }
 
 /** What both pages share: the day, the month shown and its read, the pull and the links. */
@@ -110,7 +112,10 @@ function BillsMonth({ month }: { month?: string }) {
       data={{
         ...data,
         isLoading: data.isLoading || (needsLoans && loans.isPending),
-        isError: data.isError || (needsLoans && loans.isError),
+        // Loans that failed to read with nothing to show leave a stopped loan unnamed; a reload
+        // that failed behind loans already read only adds to the note.
+        isError: data.isError || (needsLoans && failedEmpty(loans)),
+        refreshFailed: data.refreshFailed || (needsLoans && loans.refreshFailed),
         refetch: () => {
           data.refetch();
           if (needsLoans) loans.refetch();
@@ -198,6 +203,7 @@ export function PlanMonthPage({ kind, today, data, loanEndings, links, pull }: P
           today={today}
           view={data.view}
           labelOf={data.labelOf}
+          refreshFailed={data.refreshFailed}
           loanEndings={loanEndings}
           links={links}
         />
@@ -211,9 +217,11 @@ function MonthBody({
   today,
   view,
   labelOf,
+  refreshFailed,
   loanEndings,
   links,
-}: Omit<PlanMonthPageProps, 'data' | 'pull'> & Pick<PlanMonthData, 'view' | 'labelOf'>) {
+}: Omit<PlanMonthPageProps, 'data' | 'pull'> &
+  Pick<PlanMonthData, 'view' | 'labelOf' | 'refreshFailed'>) {
   const colors = useColors();
   // A running plan wins over a stopped one of the same id.
   const planById = new Map<string, Pick<MonthPlanRow, PlanMarkFields | 'href'>>(
@@ -226,6 +234,7 @@ function MonthBody({
       <View className="mt-3 w-full">
         <MonthCard kind={kind} view={view} onChooseMonth={links.onChooseMonth} />
       </View>
+      <RefreshNote show={refreshFailed} />
 
       {view.comingUp.length > 0 ? (
         <SectionCard

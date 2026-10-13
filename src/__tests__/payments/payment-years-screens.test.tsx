@@ -116,6 +116,13 @@ jest.mock('@/lib/use-today', () => ({
 let mockPro = { pro: true, ready: true };
 jest.mock('@/api/pro', () => ({ usePro: () => mockPro }));
 
+// The pull is the app's own refresh, which runs the sweep; it needs a QueryClient of its own.
+const mockRefreshAll = jest.fn(() => Promise.resolve());
+let mockRefreshing = false;
+jest.mock('@/api/refresh', () => ({
+  useRefreshAll: () => ({ refresh: mockRefreshAll, refreshing: mockRefreshing }),
+}));
+
 // The five reads under `usePayments`, as fake queries on one shared world: a test loads, fails and
 // refetches them as the network would, and the page re-reads when it changes.
 type ReadName = 'bills' | 'subscriptions' | 'charges' | 'payoffs' | 'labels';
@@ -548,6 +555,7 @@ function scrollOf(node: Host | null): Host | null {
 const inside = (node: unknown) => scrollOf(node as Host) !== null;
 
 beforeEach(async () => {
+  mockRefreshing = false;
   resetLocaleForTests();
   resetProStatusForTests();
   mounted = null;
@@ -811,13 +819,19 @@ describe('All years, while it is read', () => {
     expect(sinceCard()[1]).toBe('$131,251.84');
   });
 
-  it('re-reads every part on a pull to refresh', async () => {
-    const asked: ReadName[] = [];
+  it('pulls to refresh with the app’s own refresh, which runs the sweep, and shows it working', async () => {
     await openYears();
-    mockWorld = { ...mockWorld, refetched: (name) => asked.push(name) };
     const scroller = scrollOf(screen.getByTestId('years-card') as unknown as Host);
+    expect(scroller?.props.refreshControl.props.refreshing).toBe(false);
     await act(async () => scroller?.props.refreshControl.props.onRefresh());
-    expect([...asked].sort()).toEqual(['bills', 'charges', 'labels', 'payoffs', 'subscriptions']);
+    expect(mockRefreshAll).toHaveBeenCalledTimes(1);
+
+    mockRefreshing = true;
+    await openYears();
+    expect(
+      scrollOf(screen.getByTestId('years-card') as unknown as Host)?.props.refreshControl.props
+        .refreshing,
+    ).toBe(true);
   });
 
   it.each<ReadName>(['bills', 'subscriptions', 'charges', 'payoffs', 'labels'])(

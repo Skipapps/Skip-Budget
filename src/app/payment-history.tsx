@@ -12,6 +12,7 @@ import { KindTabs, type KindTab } from '@/components/payments/kind-tabs';
 import { SearchButton } from '@/components/payments/search-button';
 import { useExport } from '@/components/payments/use-export';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
@@ -122,6 +123,7 @@ export default function PaymentHistoryScreen() {
               <View className="mt-4 w-full">
                 <HistoryCard summary={summary} />
               </View>
+              <RefreshNote show={data.refreshFailed} />
               <HistoryList
                 year={year}
                 today={today}

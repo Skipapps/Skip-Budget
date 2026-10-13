@@ -137,6 +137,7 @@ function dataOf(over: Partial<SearchData> = {}): SearchData {
     labelOf,
     isLoading: false,
     isError: false,
+    refreshFailed: false,
     refetch: jest.fn(),
     ...over,
   };
@@ -434,6 +435,56 @@ describe('the results', () => {
     expect(screen.queryByTestId('search-results')).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
     expect(failed.refetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+const NOTE: Record<Language, string> = {
+  en: 'Couldn’t refresh · showing your last figures',
+  es: 'No se pudo actualizar · mostrando tus últimas cifras',
+  fr: 'Impossible d’actualiser · voici tes derniers chiffres',
+};
+
+type Host = ReturnType<typeof screen.getByText>;
+
+/** The refresh note as drawn, and what comes straight after it. */
+function noteAbove(language: Language = 'en'): Host {
+  const note = screen.getByText(NOTE[language]);
+  expect(note.props.accessibilityRole).toBe('text');
+  expect(note.props.maxFontSizeMultiplier).toBe(TEXT_CAP.reading);
+  expect(note.props.numberOfLines).toBeUndefined();
+  expect(String(note.props.className)).toContain('text-center');
+  const kids = (note.parent?.children ?? []) as (Host | string)[];
+  return kids[kids.indexOf(note) + 1] as Host;
+}
+
+describe('a refresh that failed', () => {
+  it('says so under the field, above Recent and the filters', async () => {
+    mockRecent.recent = ['AEP'];
+    await draw(dataOf({ refreshFailed: true }));
+    expect(noteAbove().props.testID).toBe('search-start');
+    expect(screen.getByTestId('recent-searches')).toBeTruthy();
+  });
+
+  it('says so above the results, which still show', async () => {
+    await draw(dataOf({ refreshFailed: true }));
+    await type('netflix');
+    expect(noteAbove().props.testID).toBe('search-results');
+    expect(screen.getByText('62 results · 2021 – 2026')).toBeTruthy();
+  });
+
+  it('has no note after a good refresh, and never one beside the error page', async () => {
+    await draw(dataOf());
+    expect(screen.queryByText(NOTE.en)).toBeNull();
+    await draw(dataOf({ isError: true, refreshFailed: true }));
+    await type('netflix');
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+    expect(screen.queryByText(NOTE.en)).toBeNull();
+  });
+
+  it.each<Language>(['es', 'fr'])('says it in %s', async (language) => {
+    setLanguage(language);
+    await draw(dataOf({ refreshFailed: true }));
+    expect(noteAbove(language).props.testID).toBe('search-start');
   });
 });
 

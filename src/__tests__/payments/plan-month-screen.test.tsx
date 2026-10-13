@@ -433,6 +433,7 @@ function monthData(kind: PlanKind, month: string, data: Data): PlanMonthData {
     labelOf: (id) => mockLabels.get(id) ?? null,
     isLoading: false,
     isError: false,
+    refreshFailed: false,
     refetch: jest.fn(),
   };
 }

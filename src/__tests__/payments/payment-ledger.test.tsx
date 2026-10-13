@@ -890,6 +890,7 @@ describe('usePlanMonth', () => {
       'isLoading',
       'labelOf',
       'refetch',
+      'refreshFailed',
       'view',
     ]);
   });
@@ -1219,6 +1220,10 @@ describe('loading, failure and Try again', () => {
       expect(view.result.current.payments.isError).toBe(true);
       expect(view.result.current.month.isError).toBe(true);
     });
+
+    // Nothing was ever read, so there is nothing to keep showing.
+    expect(view.result.current.payments.refreshFailed).toBe(false);
+    expect(view.result.current.month.refreshFailed).toBe(false);
   });
 
   it('works nothing out from part of the data', async () => {
@@ -1270,5 +1275,121 @@ describe('loading, failure and Try again', () => {
 
     for (const table of tables) expect(mockReads[table]).toBe(1);
     expect(mockReads.receipts ?? 0).toBe(0);
+  });
+});
+
+describe('a refresh that fails', () => {
+  const KEYS: Record<string, string[]> = {
+    bills: ['bills', 'user-1'],
+    subscriptions: ['subscriptions', 'user-1'],
+    charges: ['charges', 'user-1'],
+    loan_payoffs: ['loans', 'user-1', 'payoffs'],
+    cards: ['cards', 'user-1'],
+    bank_accounts: ['bank_accounts', 'user-1'],
+  };
+
+  async function openBoth() {
+    const view = await renderHook(
+      () => ({ payments: usePayments(TODAY), month: usePlanMonth('bill', '2026-10', TODAY) }),
+      { wrapper },
+    );
+    await waitFor(() => {
+      loaded(view.result.current.payments);
+      loaded(view.result.current.month);
+      expect(view.result.current.payments.payments.length).toBeGreaterThan(0);
+    });
+    return view;
+  }
+
+  const state = (data: { isError: boolean; refreshFailed: boolean }) => ({
+    isError: data.isError,
+    refreshFailed: data.refreshFailed,
+  });
+
+  it.each(Object.keys(KEYS))(
+    'keeps the last figures when %s fails to refresh, until a refresh works',
+    async (table) => {
+      const view = await openBoth();
+      const { payments } = view.result.current.payments;
+      const { view: month } = view.result.current.month;
+      expect(state(view.result.current.payments)).toEqual({ isError: false, refreshFailed: false });
+      walks.mockClear();
+
+      mockFailing.add(table);
+      await act(async () => {
+        view.result.current.payments.refetch();
+      });
+      await waitFor(() => expect(view.result.current.payments.refreshFailed).toBe(true));
+
+      // The read did fail, and kept what it last read.
+      expect(client.getQueryState(KEYS[table])).toMatchObject({ status: 'error' });
+      expect(client.getQueryData(KEYS[table])).toBeDefined();
+      expect(state(view.result.current.payments)).toEqual({ isError: false, refreshFailed: true });
+      expect(state(view.result.current.month)).toEqual({ isError: false, refreshFailed: true });
+      // The same figures, not worked out again.
+      expect(view.result.current.payments.payments).toBe(payments);
+      expect(view.result.current.month.view).toBe(month);
+      expect(view.result.current.payments.labelOf(VISA)).toBe('Visa ••4421');
+      expect(walks).not.toHaveBeenCalled();
+
+      mockFailing.delete(table);
+      await act(async () => {
+        view.result.current.payments.refetch();
+      });
+      await waitFor(() => expect(view.result.current.payments.refreshFailed).toBe(false));
+
+      expect(state(view.result.current.payments)).toEqual({ isError: false, refreshFailed: false });
+      expect(state(view.result.current.month)).toEqual({ isError: false, refreshFailed: false });
+      expect(view.result.current.payments.payments).toBe(payments);
+      expect(walks).not.toHaveBeenCalled();
+    },
+  );
+
+  it('shows what did come in while another read failed to refresh', async () => {
+    const view = await openBoth();
+    walks.mockClear();
+
+    mockFailing.add('bills');
+    mockAccounts['user-1'].charges = [
+      ...CHARGES,
+      ...charged({ bill: 'phone' }, [TODAY], { label: named('Phone'), amount: flat(70) }),
+    ];
+    await act(async () => {
+      view.result.current.payments.refetch();
+    });
+    await waitFor(() =>
+      expect(ids(view.result.current.payments.payments)).toContain('charge-phone-2026-10-12'),
+    );
+
+    expect(state(view.result.current.payments)).toEqual({ isError: false, refreshFailed: true });
+    expect(paymentWalks()).toBe(1);
+  });
+
+  it('holds while another read is on its first load, and an empty failure wins', async () => {
+    const view = await openBoth();
+    mockHold = 'cards';
+    mockFailing.add('bills');
+    // The names are read afresh, as on a new account's first load, while the bills refresh fails.
+    await act(async () => {
+      client.removeQueries({ queryKey: ['cards'] });
+      view.result.current.payments.refetch();
+    });
+    await waitFor(() => {
+      expect(mockHeld.length).toBeGreaterThan(0);
+      expect(client.getQueryState(KEYS.bills)).toMatchObject({ status: 'error' });
+    });
+
+    // The app-wide rule: a refresh that failed is said at once; the page still holds on loading.
+    expect(view.result.current.payments.isLoading).toBe(true);
+    expect(state(view.result.current.payments)).toEqual({ isError: false, refreshFailed: true });
+
+    // The names then fail with nothing to show: that is the error page, not a stale note.
+    mockFailing.add('cards');
+    await act(async () => {
+      for (const answer of mockHeld.splice(0)) answer();
+    });
+    await waitFor(() => expect(view.result.current.payments.isLoading).toBe(false));
+    expect(state(view.result.current.payments)).toEqual({ isError: true, refreshFailed: false });
+    expect(state(view.result.current.month)).toEqual({ isError: true, refreshFailed: false });
   });
 });

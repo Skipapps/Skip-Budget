@@ -7,6 +7,7 @@ import { ChoiceList, type ChoiceItem } from '@/components/payments/choice-list';
 import { ProFooter } from '@/components/payments/pro-footer';
 import { goBack } from '@/components/ui/back-button';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
@@ -103,6 +104,7 @@ export default function PaymentYearScreen() {
             value={selected}
             onChoose={choose}
           />
+          <RefreshNote show={data.refreshFailed} />
           {data.free ? (
             <ProFooter
               className="mt-6"

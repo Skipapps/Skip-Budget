@@ -7,6 +7,7 @@ import {
   useCards,
   type PaymentSourceRow,
 } from '@/api/queries';
+import { anyRefreshFailed, failedEmpty } from '@/lib/query-state';
 
 /**
  * Names for where each payment came from, from every card and account. Not `usePaymentSources`: on
@@ -21,8 +22,13 @@ export function usePaymentLabels(): {
   /** Null for no source, or one deleted since: the page says "Card not set". */
   labelOf: (id: string) => string | null;
   isLoading: boolean;
-  /** A failed read must not show its payments as "Card not set": the page says it failed instead. */
+  /**
+   * A read failed with nothing to show. Its payments must not read as "Card not set": the page says
+   * it failed instead.
+   */
   isError: boolean;
+  /** The latest refresh failed, but both reads still hold what they last read: names as before. */
+  refreshFailed: boolean;
   refetch: () => void;
 } {
   const cards = useCards();
@@ -45,11 +51,13 @@ export function usePaymentLabels(): {
     refetchAccounts();
   }, [refetchCards, refetchAccounts]);
 
+  const isError = failedEmpty(cards) || failedEmpty(accounts);
   return {
     sources,
     labelOf,
     isLoading: cards.isLoading || accounts.isLoading,
-    isError: cards.isError || accounts.isError,
+    isError,
+    refreshFailed: !isError && anyRefreshFailed([cards, accounts]),
     refetch,
   };
 }

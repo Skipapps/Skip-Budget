@@ -106,8 +106,21 @@ jest.mock('@/api/payment-ledger', () => ({
   usePlanMonth: (...args: unknown[]) => mockPlanMonth(...args),
 }));
 
-type LoansRead = { loans: unknown[]; isPending: boolean; isError: boolean; refetch: jest.Mock };
-let mockLoans: LoansRead = { loans: [], isPending: false, isError: false, refetch: jest.fn() };
+type LoansRead = {
+  loans: unknown[];
+  isPending: boolean;
+  isError: boolean;
+  /** A reload of the loans failed behind a list still showing. */
+  refreshFailed?: boolean;
+  refetch: jest.Mock;
+};
+let mockLoans: LoansRead = {
+  loans: [],
+  isPending: false,
+  isError: false,
+  refreshFailed: false,
+  refetch: jest.fn(),
+};
 // Counted, so a page that has no use for the loans is seen never to read them.
 const mockUseLoans = jest.fn();
 jest.mock('@/api/loans', () => ({
@@ -298,6 +311,7 @@ function dataOf(view: PlanMonth, over: Partial<PlanMonthData> = {}): PlanMonthDa
     labelOf,
     isLoading: false,
     isError: false,
+    refreshFailed: false,
     refetch: jest.fn(),
     ...over,
   };
@@ -343,7 +357,13 @@ function pullOf(tree: Tree): (() => void) | undefined {
 beforeEach(() => {
   resetLocaleForTests();
   mockToday = '2026-10-12';
-  mockLoans = { loans: [], isPending: false, isError: false, refetch: jest.fn() };
+  mockLoans = {
+    loans: [],
+    isPending: false,
+    isError: false,
+    refreshFailed: false,
+    refetch: jest.fn(),
+  };
   mockOwners.length = 0;
   jest.clearAllMocks();
   mockUseLoans.mockImplementation(() => mockLoans);
@@ -981,6 +1001,86 @@ describe('the page’s month', () => {
     mockPlanMonth.mockImplementation(() => dataOf({ ...BILLS, stopped: [loanStopped] }));
     await render(<PlanMonthScreen kind="bill" />);
     expect(within(rowNamed('stopped-row-van')).getByText('Paid off on 10 Sep 2026')).toBeTruthy();
+  });
+});
+
+const NOTE: Record<Language, string> = {
+  en: 'Couldn’t refresh · showing your last figures',
+  es: 'No se pudo actualizar · mostrando tus últimas cifras',
+  fr: 'Impossible d’actualiser · voici tes derniers chiffres',
+};
+
+type Host = ReturnType<typeof screen.getByText>;
+
+/**
+ * The refresh note as drawn: muted and centred, wrapping at the reading ceiling, read by VoiceOver,
+ * and straight under the card whose testID is given.
+ */
+function noteUnder(cardTestID: string, language: Language = 'en'): Host {
+  const note = screen.getByText(NOTE[language]);
+  expect(note.props.accessibilityRole).toBe('text');
+  expect(note.props.maxFontSizeMultiplier).toBe(TEXT_CAP.reading);
+  expect(note.props.numberOfLines).toBeUndefined();
+  expect(classOf(note)).toContain('text-center');
+  expect(classOf(note)).toContain('text-muted');
+  const kids = (note.parent?.children ?? []) as (Host | string)[];
+  const before = kids[kids.indexOf(note) - 1];
+  expect(typeof before).toBe('object');
+  const card = before as Host;
+  expect(
+    card.props.testID === cardTestID || within(card).queryByTestId(cardTestID, hidden) !== null,
+  ).toBe(true);
+  return note;
+}
+
+describe('a refresh that failed', () => {
+  it('keeps the month on screen with the note straight under the card', async () => {
+    await drawPage('bill', dataOf(BILLS, { refreshFailed: true }));
+    expect(screen.getByTestId('month-card')).toBeTruthy();
+    expect(screen.getByTestId('all-plans')).toBeTruthy();
+    noteUnder('month-card');
+  });
+
+  it('has no note after a good refresh, and never one beside the error page', async () => {
+    await drawPage('bill', dataOf(BILLS));
+    expect(screen.queryByText(NOTE.en)).toBeNull();
+    await drawPage('bill', dataOf(BILLS, { isError: true, refreshFailed: true }));
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+    expect(screen.queryByText(NOTE.en)).toBeNull();
+  });
+
+  it.each<Language>(['es', 'fr'])('says it in %s', async (language) => {
+    setLanguage(language);
+    await drawPage('subscription', dataOf(SUBSCRIPTIONS, { refreshFailed: true }));
+    noteUnder('month-card', language);
+  });
+
+  it('adds a failed reload of the loans behind a stopped loan, and only then', async () => {
+    const van = stoppedRow({ planId: 'van', name: 'Van loan', amount: 320, categoryId: 'loans' });
+    mockLoans = {
+      loans: [],
+      isPending: false,
+      isError: false,
+      refreshFailed: true,
+      refetch: jest.fn(),
+    };
+    mockPlanMonth.mockImplementation(() => dataOf({ ...BILLS, stopped: [van] }));
+    await render(<PlanMonthScreen kind="bill" />);
+    noteUnder('month-card');
+
+    // With no stopped loan on the page the loans read says nothing.
+    mockPlanMonth.mockImplementation(() => dataOf(BILLS));
+    await render(<PlanMonthScreen kind="bill" />);
+    expect(screen.queryByText(NOTE.en)).toBeNull();
+  });
+
+  it('shows the error page only when the loans have nothing to show', async () => {
+    const van = stoppedRow({ planId: 'van', name: 'Van loan', amount: 320, categoryId: 'loans' });
+    mockPlanMonth.mockImplementation(() => dataOf({ ...BILLS, stopped: [van] }));
+    mockLoans = { loans: [], isPending: false, isError: true, refetch: jest.fn() };
+    await render(<PlanMonthScreen kind="bill" />);
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+    expect(screen.queryByText(NOTE.en)).toBeNull();
   });
 });
 

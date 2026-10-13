@@ -26,6 +26,7 @@ import {
 import { paymentEntries, type PaymentEntry } from '@/lib/payment-entries';
 import { paymentFloor } from '@/lib/payment-years';
 import { useKnownFree } from '@/lib/pro-status';
+import { anyRefreshFailed, failedEmpty } from '@/lib/query-state';
 import { useUserId } from '@/providers/session-provider';
 
 /**
@@ -116,9 +117,10 @@ function lastChargedOf(charges: readonly ChargeRow[]): ReadonlyMap<string, strin
 const NO_READS: PlanReads = { bills: NONE, subscriptions: NONE, charges: NONE, payoffs: NONE };
 
 /**
- * The plans, their charges and payoffs, and the names of where they were paid from. A failed or
- * loading read of any of them holds the page: a missing charges read would swap a recorded amount
- * for a projected one, and a missing label would read as "Card not set".
+ * The plans, their charges and payoffs, and the names of where they were paid from. Any of them
+ * loading, or failed with nothing to show, holds the page: a missing charges read would swap a
+ * recorded amount for a projected one, and a missing label would read as "Card not set". A failed
+ * refresh keeps every read's last data, so nothing is worked out again.
  */
 function usePlanReads() {
   const userId = useUserId();
@@ -153,6 +155,10 @@ function usePlanReads() {
     refetchLabels();
   }, [refetchBills, refetchSubscriptions, refetchCharges, refetchPayoffs, refetchLabels]);
 
+  const plans = [bills, subscriptions, charges, payoffs];
+  // The names are a combined read: no `data` of their own, and their own `refreshFailed`.
+  const isError = [...plans, labels].some(failedEmpty);
+
   return {
     reads,
     memoKeys: [reads.bills, reads.subscriptions, reads.charges, reads.payoffs],
@@ -166,12 +172,8 @@ function usePlanReads() {
       charges.isLoading ||
       payoffs.isLoading ||
       labels.isLoading,
-    isError:
-      bills.isError ||
-      subscriptions.isError ||
-      charges.isError ||
-      payoffs.isError ||
-      labels.isError,
+    isError,
+    refreshFailed: !isError && (anyRefreshFailed(plans) || labels.refreshFailed),
     refetch,
   };
 }
@@ -192,7 +194,10 @@ export type PaymentsData = {
   /** Every card, then every account; locked ones too. */
   sources: PaymentSourceRow[];
   isLoading: boolean;
+  /** A read failed with nothing to show: the error page. */
   isError: boolean;
+  /** The latest refresh failed; every read still holds its last data, and `payments` is that. */
+  refreshFailed: boolean;
   refetch: () => void;
 };
 
@@ -223,6 +228,7 @@ export function usePayments(today: string): PaymentsData {
     sources: read.sources,
     isLoading: read.isLoading,
     isError: read.isError,
+    refreshFailed: read.refreshFailed,
     refetch: read.refetch,
   };
 }
@@ -234,7 +240,10 @@ export type PlanMonthData = {
   /** Null for no source, or one deleted since. */
   labelOf: (id: string) => string | null;
   isLoading: boolean;
+  /** A read failed with nothing to show: the error page. */
   isError: boolean;
+  /** The latest refresh failed; every read still holds its last data, and `view` is that. */
+  refreshFailed: boolean;
   refetch: () => void;
 };
 
@@ -285,6 +294,7 @@ export function usePlanMonth(kind: PlanKind, asked: string, today: string): Plan
     labelOf: read.labelOf,
     isLoading: read.isLoading,
     isError: read.isError,
+    refreshFailed: read.refreshFailed,
     refetch: read.refetch,
   };
 }

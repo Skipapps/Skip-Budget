@@ -97,6 +97,11 @@ let mockPro = { pro: true, ready: true };
 jest.mock('@/api/pro', () => ({ usePro: () => mockPro }));
 let mockData: PaymentsData;
 jest.mock('@/api/payment-ledger', () => ({ usePayments: () => mockData }));
+// The app's own refresh, which runs the sweep: a pull must reach it.
+const mockRefreshAll = jest.fn(() => Promise.resolve());
+jest.mock('@/api/refresh', () => ({
+  useRefreshAll: () => ({ refresh: mockRefreshAll, refreshing: false }),
+}));
 
 // ---------------------------------------------------------------------------------------------
 // The design's seven years.
@@ -191,6 +196,7 @@ function dataOf(over: Partial<PaymentsData> = {}): PaymentsData {
     sources: [],
     isLoading: false,
     isError: false,
+    refreshFailed: false,
     refetch: jest.fn(),
     ...over,
   };
@@ -689,6 +695,93 @@ describe.each([
       }
     },
   );
+});
+
+const NOTE: Record<Language, string> = {
+  en: 'Couldn’t refresh · showing your last figures',
+  es: 'No se pudo actualizar · mostrando tus últimas cifras',
+  fr: 'Impossible d’actualiser · voici tes derniers chiffres',
+};
+
+type Host = ReturnType<typeof screen.getByText>;
+
+/**
+ * The refresh note as drawn: muted and centred, wrapping at the reading ceiling, read by VoiceOver,
+ * and straight under the card whose testID is given.
+ */
+function noteUnder(cardTestID: string, language: Language = 'en'): Host {
+  const note = screen.getByText(NOTE[language]);
+  expect(note.props.accessibilityRole).toBe('text');
+  expect(note.props.maxFontSizeMultiplier).toBe(TEXT_CAP.reading);
+  expect(note.props.numberOfLines).toBeUndefined();
+  expect(classOf(note)).toContain('text-center');
+  const kids = (note.parent?.children ?? []) as (Host | string)[];
+  const card = kids[kids.indexOf(note) - 1] as Host;
+  expect(typeof card).toBe('object');
+  expect(
+    card.props.testID === cardTestID || within(card).queryByTestId(cardTestID, hidden) !== null,
+  ).toBe(true);
+  return note;
+}
+
+describe('pull to refresh on All years', () => {
+  it('runs the app’s refresh, sweep and all: not a bare re-read', async () => {
+    const refetch = jest.fn();
+    await openYears({}, dataOf({ refetch }));
+    let pull: (() => void) | undefined;
+    const walk = (node: unknown) => {
+      if (!node || typeof node !== 'object') return;
+      const host = node as {
+        type: string;
+        props: { refreshControl?: { props: { onRefresh: () => void } } };
+        children?: unknown[];
+      };
+      if (host.type === 'RCTScrollView' && host.props.refreshControl) {
+        pull = host.props.refreshControl.props.onRefresh;
+      }
+      host.children?.forEach(walk);
+    };
+    const tree = screen.toJSON();
+    (Array.isArray(tree) ? tree : [tree]).forEach(walk);
+    expect(pull).toBeDefined();
+    await act(async () => pull?.());
+    expect(mockRefreshAll).toHaveBeenCalledTimes(1);
+    expect(refetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('a refresh that failed', () => {
+  it('keeps Choose year listed, with the note straight under the years', async () => {
+    await openYear({}, dataOf({ refreshFailed: true }));
+    expect(screen.getAllByRole('radio').length).toBeGreaterThan(1);
+    noteUnder('years');
+  });
+
+  it('keeps All years shown, with the note straight under the Paid since card', async () => {
+    await openYears({}, dataOf({ refreshFailed: true }));
+    expect(screen.getByTestId('years-card')).toBeTruthy();
+    noteUnder('years-card');
+  });
+
+  it('has no note after a good refresh, and never one beside the error page', async () => {
+    await openYear({}, dataOf());
+    expect(screen.queryByText(NOTE.en)).toBeNull();
+    await openYears({}, dataOf());
+    expect(screen.queryByText(NOTE.en)).toBeNull();
+    for (const open of [openYear, openYears]) {
+      await open({}, dataOf({ isError: true, refreshFailed: true, payments: [] }));
+      expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+      expect(screen.queryByText(NOTE.en)).toBeNull();
+    }
+  });
+
+  it.each<Language>(['es', 'fr'])('says it in %s on both pages', async (language) => {
+    setLanguage(language);
+    await openYear({}, dataOf({ refreshFailed: true }));
+    noteUnder('years', language);
+    await openYears({}, dataOf({ refreshFailed: true }));
+    noteUnder('years-card', language);
+  });
 });
 
 describe('in Spanish and French', () => {

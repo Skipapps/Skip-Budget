@@ -4,12 +4,14 @@ import { useMemo } from 'react';
 import { View } from 'react-native';
 
 import { usePayments } from '@/api/payment-ledger';
+import { useRefreshAll } from '@/api/refresh';
 import { PlumCard } from '@/components/payments/plum-card';
 import { ProFooter } from '@/components/payments/pro-footer';
 import { useExport } from '@/components/payments/use-export';
 import { YearCard, paymentsCountText } from '@/components/payments/year-card';
 import { goBack } from '@/components/ui/back-button';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
@@ -35,6 +37,8 @@ export default function PaymentYearsScreen() {
   const params = useLocalSearchParams<{ kind?: string; owner?: string }>();
   const { today } = useToday();
   const data = usePayments(today);
+  // The app's own refresh rather than a re-read: it runs the sweep, as every payments page does.
+  const { refresh, refreshing } = useRefreshAll();
   const artwork = useArtwork();
   const exporter = useExport();
   const once = useNavigateOnce();
@@ -65,7 +69,8 @@ export default function PaymentYearsScreen() {
     <Screen
       title={t('payments.years.title')}
       showBack
-      onRefresh={data.refetch}
+      onRefresh={() => void refresh()}
+      refreshing={refreshing}
       headerActions={[
         {
           icon: Share,
@@ -99,6 +104,7 @@ export default function PaymentYearsScreen() {
               accessibilityLabel={`${label}, ${figure}. ${count}, ${years}.`}
             />
           </View>
+          <RefreshNote show={data.refreshFailed} />
           {list.years.map((row) => (
             <YearCard key={row.year} className="mt-3" summary={row} onOpen={() => open(row.year)} />
           ))}

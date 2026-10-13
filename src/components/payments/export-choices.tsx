@@ -6,6 +6,7 @@ import { ChoiceList } from '@/components/payments/choice-list';
 import { SectionCard } from '@/components/payments/section-card';
 import { Button } from '@/components/ui/button';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { t, useLocale } from '@/i18n';
@@ -37,7 +38,10 @@ export type ExportPayments = {
   /** Null for no card or account, or one deleted since. */
   labelOf: (id: string) => string | null;
   isLoading: boolean;
+  /** A read failed with nothing to show: the error page. */
   isError: boolean;
+  /** A reload failed while the last payments still show: the note under the summary. */
+  refreshFailed: boolean;
   refetch: () => void;
 };
 
@@ -245,6 +249,7 @@ export function ExportScreen({
               </Text>
             </View>
           </SectionCard>
+          <RefreshNote show={data.refreshFailed} />
 
           {rows.length > 0 ? (
             <ExportChoices value={format} onChoose={setFormat} />

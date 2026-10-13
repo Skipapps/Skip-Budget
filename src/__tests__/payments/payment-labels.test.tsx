@@ -197,6 +197,7 @@ describe('usePaymentLabels', () => {
     const { result } = await renderLabels();
 
     expect(result.current.labels.isError).toBe(true);
+    expect(result.current.labels.refreshFailed).toBe(false);
     expect(result.current.labels.labelOf('acct-1')).toBe('Komal ••7010');
     expect(result.current.labels.labelOf('card-2')).toBeNull();
     expect(mockReads).toEqual({ cards: 1, bank_accounts: 1 });
@@ -216,8 +217,75 @@ describe('usePaymentLabels', () => {
     const { result } = await renderLabels();
 
     expect(result.current.labels.isError).toBe(true);
+    expect(result.current.labels.refreshFailed).toBe(false);
     expect(result.current.labels.labelOf('card-2')).toBe('Discover ••6334');
     expect(result.current.labels.labelOf('acct-1')).toBeNull();
+  });
+
+  it.each([['cards'], ['bank_accounts']] as const)(
+    'keeps every name when %s fails to refresh, until a refresh works',
+    async (table) => {
+      const { result } = await renderLabels();
+      const first = result.current.labels;
+      expect(first).toMatchObject({ isError: false, refreshFailed: false });
+
+      mockFailing.add(table);
+      await act(async () => {
+        result.current.labels.refetch();
+      });
+      await waitFor(() => expect(result.current.labels.refreshFailed).toBe(true));
+
+      expect(client.getQueryState([table, 'user-1'])).toMatchObject({ status: 'error' });
+      expect(result.current.labels.isError).toBe(false);
+      expect(result.current.labels.isLoading).toBe(false);
+      // The same names, from the same data: nothing reads as "Card not set".
+      expect(result.current.labels.sources).toBe(first.sources);
+      expect(result.current.labels.labelOf).toBe(first.labelOf);
+      expect(result.current.labels.labelOf('card-2')).toBe('Discover ••6334');
+      expect(result.current.labels.labelOf('acct-2')).toBe('Ally');
+
+      mockFailing.clear();
+      await act(async () => {
+        result.current.labels.refetch();
+      });
+      await waitFor(() => expect(result.current.labels.refreshFailed).toBe(false));
+
+      expect(result.current.labels.isError).toBe(false);
+      expect(result.current.labels.sources).toBe(first.sources);
+    },
+  );
+
+  it('holds while the other read is on its first load, and an empty failure wins', async () => {
+    const { result } = await renderLabels();
+    mockFailing.add('cards');
+    mockHold = true;
+    // The accounts are read afresh, as on a first load, while the cards refresh fails.
+    await act(async () => {
+      client.removeQueries({ queryKey: ['bank_accounts'] });
+      result.current.labels.refetch();
+    });
+    await waitFor(() => expect(mockHeld).toHaveLength(2));
+    await act(async () => {
+      mockHeld.shift()?.();
+    });
+    await waitFor(() =>
+      expect(client.getQueryState(['cards', 'user-1'])).toMatchObject({ status: 'error' }),
+    );
+
+    // The app-wide rule: a refresh that failed is said at once; the page still holds on loading.
+    expect(result.current.labels).toMatchObject({
+      isLoading: true,
+      isError: false,
+      refreshFailed: true,
+    });
+
+    // The accounts then fail with nothing to show: that is the error page, not a stale note.
+    mockFailing.add('bank_accounts');
+    await act(async () => {
+      mockHeld.shift()?.();
+    });
+    await waitFor(() => expect(result.current.labels.isLoading).toBe(false));
+    expect(result.current.labels).toMatchObject({ isError: true, refreshFailed: false });
   });
 
   it('is loading until both reads answer', async () => {
@@ -245,7 +313,12 @@ describe('usePaymentLabels', () => {
     mockUserId = null;
     const { result } = await renderHook(() => usePaymentLabels(), { wrapper });
 
-    expect(result.current).toMatchObject({ sources: [], isLoading: false, isError: false });
+    expect(result.current).toMatchObject({
+      sources: [],
+      isLoading: false,
+      isError: false,
+      refreshFailed: false,
+    });
     expect(mockReads).toEqual({ cards: 0, bank_accounts: 0 });
   });
 

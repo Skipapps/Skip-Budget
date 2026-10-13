@@ -4,9 +4,11 @@ import { AccessibilityInfo, Dimensions } from 'react-native';
 import type { ShareRequest, ShareResult } from '@/api/payment-export';
 import PaymentExportRoute from '@/app/payment-export';
 import { ExportScreen, type ExportPayments } from '@/components/payments/export-choices';
+import type { Language } from '@/i18n/config';
 import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
 import type { PaymentEntry } from '@/lib/payment-entries';
 import { publishProStatus, resetProStatusForTests } from '@/lib/pro-status';
+import { TEXT_CAP } from '@/theme/text-scale';
 
 /**
  * Export: the page says what goes out (kind, year, how many payments), offers CSV or PDF, and one
@@ -130,6 +132,7 @@ function data(extra: Partial<ExportPayments> = {}): ExportPayments {
     labelOf: (id) => LABELS[id] ?? null,
     isLoading: false,
     isError: false,
+    refreshFailed: false,
     refetch: jest.fn(),
     ...extra,
   };
@@ -276,6 +279,51 @@ describe('what goes out', () => {
     expect(screen.queryByRole('button', { name: 'Export' })).toBeNull();
     await fireEvent.press(screen.getByText('Try again'));
     expect(mockData.refetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+const NOTE: Record<Language, string> = {
+  en: 'Couldn’t refresh · showing your last figures',
+  es: 'No se pudo actualizar · mostrando tus últimas cifras',
+  fr: 'Impossible d’actualiser · voici tes derniers chiffres',
+};
+
+type Host = ReturnType<typeof screen.getByText>;
+
+/** The refresh note as drawn, straight under the summary card. */
+function noteUnderSummary(language: Language = 'en') {
+  const note = screen.getByText(NOTE[language]);
+  expect(note.props.accessibilityRole).toBe('text');
+  expect(note.props.maxFontSizeMultiplier).toBe(TEXT_CAP.reading);
+  expect(note.props.numberOfLines).toBeUndefined();
+  expect(String(note.props.className)).toContain('text-center');
+  const kids = (note.parent?.children ?? []) as (Host | string)[];
+  expect((kids[kids.indexOf(note) - 1] as Host).props.testID).toBe('export-summary');
+}
+
+describe('a refresh that failed', () => {
+  it('keeps the export offered, with the note straight under the summary', async () => {
+    mockData = data({ refreshFailed: true });
+    await show('bill', '2026');
+    noteUnderSummary();
+    expect(screen.getByRole('button', { name: 'Export' })).toBeTruthy();
+  });
+
+  it('has no note after a good refresh, and never one beside the error page', async () => {
+    mockData = data();
+    await show('bill', '2026');
+    expect(screen.queryByText(NOTE.en)).toBeNull();
+    mockData = data({ isError: true, refreshFailed: true });
+    await show('bill', '2026');
+    expect(screen.getByText(FAILURE)).toBeTruthy();
+    expect(screen.queryByText(NOTE.en)).toBeNull();
+  });
+
+  it.each<Language>(['es', 'fr'])('says it in %s', async (language) => {
+    setLanguage(language);
+    mockData = data({ refreshFailed: true });
+    await show('bill', '2026');
+    noteUnderSummary(language);
   });
 });
 
