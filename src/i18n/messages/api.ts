@@ -16,6 +16,11 @@ export const apiMessages = defineMessages({
     es: 'La contraseña debe tener al menos 6 caracteres.',
     fr: 'Le mot de passe doit contenir au moins 6 caractères.',
   },
+  'api.auth.samePassword': {
+    en: 'That’s your current password. Choose a new one.',
+    es: 'Esa es tu contraseña actual. Elige una nueva.',
+    fr: 'C’est ton mot de passe actuel. Choisis-en un nouveau.',
+  },
   'api.auth.badEmail': {
     en: 'That email address does not look right.',
     es: 'Esa dirección de correo no parece correcta.',

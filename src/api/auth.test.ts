@@ -7,7 +7,7 @@
 // babel-plugin-jest-hoist lifts the jest.mock() calls below above this import.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { deleteAccount, signInWithEmail, signOut, verifyOtp } from './auth';
+import { deleteAccount, signInWithEmail, signOut, updatePassword, verifyOtp } from './auth';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 import type { VoiceDraft } from '@/lib/voice';
@@ -36,16 +36,20 @@ const order: string[] = [];
 let mockSession: { user: { id: string } } | null = { user: { id: 'user-A' } };
 let mockSessionError: Error | null = null;
 let mockSignOutError: { message: string } | null = null;
-let mockAuthError: { message: string } | null = null;
+let mockAuthError: { message: string; code?: string } | null = null;
 
 const mockForgetDevice = jest.fn(async (_userId: string) => {
   order.push('forget');
 });
 
-const mockAuthSignOut = jest.fn(async () => {
+const mockAuthSignOut = jest.fn(async (_options?: { scope?: 'global' | 'local' | 'others' }) => {
   order.push('signOut');
   return { error: mockSignOutError };
 });
+
+const mockUpdateUser = jest.fn(async (_attributes: { password?: string }) => ({
+  error: mockAuthError,
+}));
 
 const mockGetSession = jest.fn(async () => {
   if (mockSessionError) throw mockSessionError;
@@ -106,7 +110,8 @@ jest.mock('@/lib/supabase', () => ({
   supabase: {
     auth: {
       getSession: () => mockGetSession(),
-      signOut: () => mockAuthSignOut(),
+      signOut: (options?: { scope?: 'global' | 'local' | 'others' }) => mockAuthSignOut(options),
+      updateUser: (attributes: { password?: string }) => mockUpdateUser(attributes),
       signInWithPassword: async () => ({ error: mockAuthError }),
       verifyOtp: async () => ({ error: mockAuthError }),
       getUser: async () => ({ data: { user: mockLiveUser } }),
@@ -114,6 +119,77 @@ jest.mock('@/lib/supabase', () => ({
     rpc: async () => ({ error: mockRpcError }),
   },
 }));
+
+const REAL_STORAGE_KEY = 'skip-test-auth';
+
+const base64Url = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
+
+/**
+ * The real supabase-js client, holding user-A's unexpired session, with `answer` as its server. It
+ * proves what the SDK does with the options and errors the mocks above only pass along.
+ */
+function realClient(answer: (url: string) => Promise<Response>) {
+  const { createClient } =
+    jest.requireActual<typeof import('@supabase/supabase-js')>('@supabase/supabase-js');
+  const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+  const accessToken = [
+    base64Url({ alg: 'HS256', typ: 'JWT' }),
+    base64Url({ sub: 'user-A', aud: 'authenticated', role: 'authenticated', exp: expiresAt }),
+    'signature',
+  ].join('.');
+  const stored = new Map<string, string>([
+    [
+      REAL_STORAGE_KEY,
+      JSON.stringify({
+        access_token: accessToken,
+        refresh_token: 'refresh-A',
+        token_type: 'bearer',
+        expires_in: 3600,
+        expires_at: expiresAt,
+        user: {
+          id: 'user-A',
+          aud: 'authenticated',
+          app_metadata: {},
+          user_metadata: {},
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      }),
+    ],
+  ]);
+  const requests: string[] = [];
+  const client = createClient('https://skip-test.supabase.co', 'publishable-key', {
+    global: {
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        requests.push(`${init?.method ?? 'GET'} ${url}`);
+        return answer(url);
+      },
+    },
+    auth: {
+      storage: {
+        getItem: async (key: string) => stored.get(key) ?? null,
+        setItem: async (key: string, value: string) => void stored.set(key, value),
+        removeItem: async (key: string) => void stored.delete(key),
+      },
+      storageKey: REAL_STORAGE_KEY,
+      persistSession: true,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+  const events: string[] = [];
+  client.auth.onAuthStateChange((event, session) => {
+    events.push(`${event}:${session ? 'session' : 'none'}`);
+  });
+  return { client, requests, stored, events };
+}
+
+/** An answer from the auth server in the shape it sends since API version 2024-01-01. */
+const serverRefusal = (status: number, code: string, message: string) =>
+  new Response(JSON.stringify({ code, message }), {
+    status,
+    headers: { 'Content-Type': 'application/json', 'X-Supabase-Api-Version': '2024-01-01' },
+  });
 
 describe('signOut', () => {
   beforeEach(async () => {
@@ -142,6 +218,68 @@ describe('signOut', () => {
     expect(mockForgetDevice).toHaveBeenCalledWith('user-A');
     expect(order).toEqual(['forget', 'signOut']);
     expect(result.error).toBeNull();
+  });
+
+  it("signs out this phone only, once its push row, the person's voice, stores and searches and the wrap-up notice are gone", async () => {
+    mockForgetVoice.mockImplementation(async () => {
+      order.push('voice');
+    });
+    mockForgetStores.mockImplementation(async () => {
+      order.push('stores');
+    });
+    mockForgetSearches.mockImplementation(async (userId) => {
+      order.push('searches');
+      await forgetRealSearches(userId);
+    });
+    mockCancelWrapUp.mockClear();
+    mockCancelWrapUp.mockImplementationOnce(async () => {
+      order.push('wrapUp');
+    });
+
+    const result = await signOut();
+
+    expect(mockAuthSignOut).toHaveBeenCalledTimes(1);
+    expect(mockAuthSignOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(mockForgetDevice).toHaveBeenCalledWith('user-A');
+    expect(mockForgetVoice).toHaveBeenCalledWith('user-A');
+    expect(mockForgetStores).toHaveBeenCalledWith('user-A');
+    expect(mockForgetSearches).toHaveBeenCalledWith('user-A');
+    expect(order).toEqual(['forget', 'voice', 'stores', 'searches', 'wrapUp', 'signOut']);
+    expect(result.error).toBeNull();
+  });
+
+  it("asks the server to end only this phone's session, and the app still hears SIGNED_OUT", async () => {
+    const real = realClient(async () => new Response(null, { status: 204 }));
+    mockAuthSignOut.mockImplementationOnce((options) => real.client.auth.signOut(options));
+
+    const result = await signOut();
+
+    expect(result.error).toBeNull();
+    expect(real.requests).toEqual([
+      'POST https://skip-test.supabase.co/auth/v1/logout?scope=local',
+    ]);
+    // The session provider sets what this event carries, so every user-keyed query and the
+    // realtime channel drop with it.
+    expect(real.events.at(-1)).toBe('SIGNED_OUT:none');
+    expect(real.stored.has(REAL_STORAGE_KEY)).toBe(false);
+  });
+
+  it('still signs this phone out when the server cannot be reached, and says it failed', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const real = realClient(async () => {
+      throw new TypeError('Network request failed');
+    });
+    mockAuthSignOut.mockImplementationOnce((options) => real.client.auth.signOut(options));
+
+    const result = await signOut();
+
+    expect(result.error).toBe(FAILURE_MESSAGE);
+    expect(real.requests).toEqual([
+      'POST https://skip-test.supabase.co/auth/v1/logout?scope=local',
+    ]);
+    expect(real.events.at(-1)).toBe('SIGNED_OUT:none');
+    expect(real.stored.has(REAL_STORAGE_KEY)).toBe(false);
+    log.mockRestore();
   });
 
   it('signs out anyway when the row cannot be deleted', async () => {
@@ -406,6 +544,30 @@ describe('deleteAccount', () => {
     expect(order).toEqual(['voice', 'searches', 'signOut']);
   });
 
+  it('signs only this phone out of the deleted account', async () => {
+    const result = await deleteAccount();
+
+    expect(result.error).toBeNull();
+    expect(mockAuthSignOut).toHaveBeenCalledTimes(1);
+    expect(mockAuthSignOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+
+  it("clears this phone's copy of the deleted account's session, though the server no longer knows it", async () => {
+    const real = realClient(async () =>
+      serverRefusal(403, 'user_not_found', 'User from sub claim in JWT does not exist'),
+    );
+    mockAuthSignOut.mockImplementationOnce((options) => real.client.auth.signOut(options));
+
+    const result = await deleteAccount();
+
+    expect(result.error).toBeNull();
+    expect(real.requests).toEqual([
+      'POST https://skip-test.supabase.co/auth/v1/logout?scope=local',
+    ]);
+    expect(real.events.at(-1)).toBe('SIGNED_OUT:none');
+    expect(real.stored.has(REAL_STORAGE_KEY)).toBe(false);
+  });
+
   it('takes the pending wrap-up notice off the phone once the account is gone', async () => {
     mockCancelWrapUp.mockClear();
 
@@ -548,5 +710,93 @@ describe('sign-in wording in Spanish and French', () => {
     mockLiveUser = { id: 'user-A' };
     expect((await deleteAccount()).error).toBe('Une erreur est survenue. Réessaie.');
     mockLiveUser = null;
+  });
+});
+
+describe('new password wording', () => {
+  const SAME = 'That’s your current password. Choose a new one.';
+  const SHORT = 'Password must be at least 6 characters.';
+  // The auth server's words when the new password is the current one.
+  const SAME_WORDS = 'New password should be different from the old password.';
+
+  beforeEach(() => {
+    resetLocaleForTests();
+    mockAuthError = null;
+    mockUpdateUser.mockClear();
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  afterAll(() => resetLocaleForTests());
+
+  it('names a new password that is the current one, not a short one', async () => {
+    mockAuthError = { code: 'same_password', message: SAME_WORDS };
+    expect((await updatePassword('hunter22')).error).toBe(SAME);
+    expect(mockUpdateUser).toHaveBeenCalledWith({ password: 'hunter22' });
+  });
+
+  it('knows it by its code alone, even when the words read like a short password', async () => {
+    mockAuthError = { code: 'same_password', message: 'Password should be new.' };
+    expect((await updatePassword('hunter22')).error).toBe(SAME);
+  });
+
+  it('knows it by the words alone when no code comes with them', async () => {
+    mockAuthError = { message: SAME_WORDS };
+    expect((await updatePassword('hunter22')).error).toBe(SAME);
+  });
+
+  it('still says a short password is too short', async () => {
+    mockAuthError = { code: 'weak_password', message: 'Password should be at least 6 characters.' };
+    expect((await updatePassword('abc12')).error).toBe(SHORT);
+    mockAuthError = { message: 'Password should be at least 6 characters' };
+    expect((await updatePassword('abc12')).error).toBe(SHORT);
+  });
+
+  it('says the one failure line for anything it does not recognise', async () => {
+    mockAuthError = { message: 'Network request failed' };
+    expect((await updatePassword('hunter22')).error).toBe(FAILURE_MESSAGE);
+    mockAuthError = { code: 'unexpected_failure', message: 'Unexpected failure' };
+    expect((await updatePassword('hunter22')).error).toBe(FAILURE_MESSAGE);
+  });
+
+  it('says it in Spanish and French', async () => {
+    mockAuthError = { code: 'same_password', message: SAME_WORDS };
+    setLanguage('es');
+    expect((await updatePassword('hunter22')).error).toBe(
+      'Esa es tu contraseña actual. Elige una nueva.',
+    );
+    setLanguage('fr');
+    expect((await updatePassword('hunter22')).error).toBe(
+      'C’est ton mot de passe actuel. Choisis-en un nouveau.',
+    );
+  });
+
+  it('reads the error the real auth client builds from either shape of the server answer', async () => {
+    const answers = [
+      () => serverRefusal(422, 'same_password', SAME_WORDS),
+      // Before API version 2024-01-01 the code came as error_code, beside a numeric code.
+      () =>
+        new Response(JSON.stringify({ code: 422, error_code: 'same_password', msg: SAME_WORDS }), {
+          status: 422,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    ];
+    for (const answer of answers) {
+      const real = realClient(async () => answer());
+      mockUpdateUser.mockImplementationOnce((attributes) =>
+        real.client.auth.updateUser(attributes),
+      );
+      expect((await updatePassword('hunter22')).error).toBe(SAME);
+      expect(real.requests).toEqual(['PUT https://skip-test.supabase.co/auth/v1/user']);
+    }
+
+    const real = realClient(async () =>
+      serverRefusal(422, 'weak_password', 'Password should be at least 6 characters.'),
+    );
+    mockUpdateUser.mockImplementationOnce((attributes) => real.client.auth.updateUser(attributes));
+    expect((await updatePassword('abc12')).error).toBe(SHORT);
   });
 });

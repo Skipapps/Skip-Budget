@@ -19,10 +19,13 @@ export type SignUpResult = AuthResult & {
  * What a refused sign-in says. A wrong password, a taken email or an expired code will not mend on
  * a retry, so these say what to do instead; anything unrecognised gets the one failure line.
  */
-function readable(error: { message?: string } | null | undefined): string {
+function readable(error: { message?: string; code?: string } | null | undefined): string {
   const lower = (error?.message ?? '').toLowerCase();
   if (lower.includes('invalid login credentials')) return t('api.auth.wrongPassword');
   if (lower.includes('already registered')) return t('api.auth.emailTaken');
+  // Before the short-password check: the server's words for this one also say "password should be".
+  if (error?.code === 'same_password' || lower.includes('different from the old password'))
+    return t('api.auth.samePassword');
   if (lower.includes('password should be')) return t('api.auth.shortPassword');
   if (lower.includes('unable to validate email')) return t('api.auth.badEmail');
   if (lower.includes('token has expired') || lower.includes('expired'))
@@ -110,11 +113,11 @@ export async function sendPasswordReset(email: string): Promise<AuthResult> {
 }
 
 /**
- * Signs out, first deleting this device's push row. `device_tokens` is protected by
- * `auth.uid() = user_id`, so once the session is gone the row is unreachable and the scheduler
- * would keep pushing this account's reminders to the phone. A failed tidy-up (simulator token read,
- * offline) is logged and never blocks signing out; the sender drops a stale row once APNs answers
- * Unregistered.
+ * Signs this phone out; the account's other phones stay signed in. It first deletes this device's
+ * push row. `device_tokens` is protected by `auth.uid() = user_id`, so once the session is gone the
+ * row is unreachable and the scheduler would keep pushing this account's reminders to the phone.
+ * A failed tidy-up (simulator token read, offline) is logged and never blocks signing out; the
+ * sender drops a stale row once APNs answers Unregistered.
  */
 export async function signOut(): Promise<AuthResult> {
   await forgetThisDevice();
@@ -123,7 +126,8 @@ export async function signOut(): Promise<AuthResult> {
   // month to whoever signs in next.
   await cancelWrapUpNotification();
 
-  const { error } = await supabase.auth.signOut();
+  // The default scope, 'global', would sign out every phone on this account.
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
   return { error: error ? failureMessage(error) : null };
 }
 
@@ -187,6 +191,7 @@ export async function deleteAccount(): Promise<AuthResult> {
   // still names the person.
   await forgetThisPersonsVoice();
   await cancelWrapUpNotification();
-  await supabase.auth.signOut();
+  // Local is enough: the account's sessions were deleted with it; only this phone's copy is left.
+  await supabase.auth.signOut({ scope: 'local' });
   return { error: null };
 }
