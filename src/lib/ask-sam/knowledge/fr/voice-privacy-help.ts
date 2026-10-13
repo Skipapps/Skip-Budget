@@ -369,7 +369,7 @@ export const voicePrivacyHelpFr: IntentText[] = [
       'Le sens du jour dépend du type :\n' +
       '- **Reçu** : le plus récent, puisque tu as déjà acheté. Un 5 dit le 13 donne le 5 de ce mois-ci.\n' +
       '- **Facture ou abonnement** : le prochain. Un 5 dit le 13 donne le 5 du mois prochain. Des mots au passé comme « paid », « was due » ou « renewed » pointent plutôt vers l’arrière.\n\n' +
-      'Si tu dis le 31 et que le mois est plus court, une facture prend le dernier jour du mois. Sans jour dit, un reçu est daté d’aujourd’hui, une facture demande **Date d’échéance**, et un abonnement peut s’enregistrer sans date de renouvellement.\n\n' +
+      'Si tu dis le 31 et que le mois est plus court, une facture prend le dernier jour du mois. Sans jour dit, un reçu est daté d’aujourd’hui, une facture demande **Date d’échéance**, et un abonnement demande **Prochain renouvellement**.\n\n' +
       'Pour changer, touche la ligne de la date et choisis un jour. Sur un reçu, les boutons **Aujourd’hui** et **Hier** sous la date la règlent d’un seul toucher.',
     keywords: ['date', 'jour', 'hier', 'échéance'],
   },
@@ -558,7 +558,7 @@ export const voicePrivacyHelpFr: IntentText[] = [
       '- **Tu as dit** affiche tes mots entre guillemets.\n' +
       '- **Ajouter comme** permet de passer de **Reçu** à **Facture** ou à **Abonnement**.\n' +
       '- Le gros chiffre est le montant. Touche-le pour le changer.\n' +
-      '- Les lignes en dessous contiennent le reste : le magasin, le service ou le nom de la facture, la date, la fréquence, **Payé avec** et une **Note**. Une ligne qui dit **Touche pour ajouter** est encore nécessaire. Touche n’importe quelle ligne pour la changer.\n' +
+      '- Les lignes en dessous contiennent le reste : le magasin, le service ou le nom de la facture, la date, la fréquence, **Payé avec** (**Prélevé sur** pour un abonnement) et une **Note**. Une facture ou un abonnement demande aussi un **Rappel**. Une ligne qui dit **Touche pour ajouter** est encore nécessaire. Touche n’importe quelle ligne pour la changer.\n' +
       '- En bas : **Enregistrer**, **Redis-le** et **Plus d’options**.\n\n' +
       '« Tu pourras le modifier plus tard. » veut dire que tu peux toujours ouvrir l’entrée enregistrée et la modifier.',
     keywords: ['C’est bien ça ?', 'Skip t’a bien entendu ?', 'Tu as dit', 'page de vérification'],
@@ -580,13 +580,9 @@ export const voicePrivacyHelpFr: IntentText[] = [
       'Indique combien tu as dépensé s’affiche sous le bouton',
     ],
     answer:
-      'Il manque encore quelque chose dont Skip a besoin. La ligne au-dessus de **Enregistrer** te dit quoi :\n\n' +
-      '- « Choisis le montant que tu voulais dire. » Choisis-en un sous **Quel montant voulais-tu dire ?**\n' +
-      '- « Choisis à quoi correspond la facture. » Touche **Catégorie** et choisis-en une.\n' +
-      '- « Choisis d’abord un magasin. » ou « Choisis d’abord un service. » Touche la ligne **Magasin** ou **Service**.\n' +
-      '- « Indique combien tu as dépensé. », « Indique combien ça coûte. » ou « Indique ce que ça coûte. » Touche le montant.\n' +
-      '- « Donne un nom à la facture. » Touche **Nom**.\n' +
-      '- « Choisis la première date d’échéance. » Touche **Date d’échéance**.\n\n' +
+      'Il manque encore quelque chose dont Skip a besoin.\n\n' +
+      '- **Facture ou abonnement** : touche **Enregistrer** et la ligne au-dessus liste ce qui manque, par exemple « Pour enregistrer la facture, remplis : Payée avec, Rappel. » Elle peut citer le montant, le nom, **Catégorie**, **Payée avec** (**Prélevé sur**), **Rappel** et **Date d’échéance** (ou **Prochain renouvellement** pour un abonnement).\n' +
+      '- **Reçu** : la ligne au-dessus de **Enregistrer** te dit quoi : « Choisis le montant que tu voulais dire. », « Choisis d’abord un magasin. » ou « Indique combien tu as dépensé. »\n\n' +
       'Les lignes encore nécessaires disent **Touche pour ajouter**. Si la ligne dit plutôt « Une erreur est survenue. Réessaie. », c’est l’enregistrement lui-même qui a échoué. Vérifie ta connexion et touche **Enregistrer** de nouveau.',
     keywords: ['enregistrer grisé', 'désactivé', 'manquant', 'obligatoire'],
   },
@@ -606,7 +602,7 @@ export const voicePrivacyHelpFr: IntentText[] = [
       'plus de champs quand j’ajoute par la voix',
     ],
     answer:
-      '**Plus d’options** ouvre le formulaire d’ajout complet pour ce type, avec tout ce que Skip a entendu déjà rempli. Utilise-le quand tu veux un champ que la page de vérification n’affiche pas, comme le **Rappel** d’une facture.\n\n' +
+      '**Plus d’options** ouvre le formulaire d’ajout complet pour ce type, avec tout ce que Skip a entendu déjà rempli. Utilise-le quand tu veux un champ que la page de vérification n’affiche pas.\n\n' +
       'Le formulaire demande alors ce qu’il demande toujours. Pour une facture ou un abonnement, cela comprend **Payée avec** et **Rappel**, où **Aucun rappel** est une réponse tout à fait correcte. Enregistrer à partir de là te ramène aussi à **Accueil**.\n\n' +
       'Tes mots et tes modifications t’accompagnent, alors tu n’as rien à redire.',
     keywords: ['Plus d’options', 'formulaire complet', 'rappel', 'tous les champs'],
@@ -664,7 +660,7 @@ export const voicePrivacyHelpFr: IntentText[] = [
     title: 'Une facture ajoutée par la voix a-t-elle un rappel ?',
     questions: [
       'est-ce que j’aurai un rappel pour une facture ajoutée par la voix ?',
-      'mon abonnement vocal n’a pas de rappel',
+      'mon abonnement vocal a aussi un rappel ?',
       'comment ajouter un rappel à une facture vocale',
       'j’ai ajouté mon loyer par la voix et je n’ai pas eu de rappel',
       'la voix règle des rappels ?',
@@ -673,14 +669,14 @@ export const voicePrivacyHelpFr: IntentText[] = [
       'régler un rappel après l’ajout par la voix',
       'pourquoi ma facture vocale ne m’a pas rappelé',
       'reglage rappel saisie vocale',
+      'pourquoi la page voix me demande un rappel',
     ],
     answer:
-      'Non. Une facture ou un abonnement enregistré depuis la page de vérification vocale n’a pas de rappel. Tu peux en ajouter un en quelques touches :\n\n' +
+      'Oui. Pour une facture ou un abonnement, la page de vérification vocale demande un **Rappel**, comme les formulaires d’ajout à la main. Choisis quand tu le veux, ou **Aucun rappel** : l’un des deux est nécessaire avant **Enregistrer**.\n\n' +
+      'Pour le changer plus tard :\n' +
       '1. Ouvre la facture ou l’abonnement.\n' +
       '2. Touche le crayon en haut.\n' +
-      '3. Règle **Rappel** et enregistre.\n\n' +
-      'Tu peux aussi activer les rappels pour n’importe quelle facture ou n’importe quel abonnement dans **Réglages → Préférences → Rappels**.\n\n' +
-      'Pour régler le rappel pendant l’ajout, touche **Plus d’options** sur la page de vérification plutôt que **Enregistrer**. Le formulaire complet demande **Rappel** avant d’enregistrer.',
+      '3. Règle **Rappel** et enregistre.',
     keywords: ['rappel', 'notification', 'rappeler', 'facture vocale'],
   },
   {
@@ -699,10 +695,9 @@ export const voicePrivacyHelpFr: IntentText[] = [
       'payé depuis mon compte bancaire par la voix',
     ],
     answer:
-      'Dire la carte ne la choisit pas. Skip entend « on my Amex » ou « with Apple Pay » et sait que ce n’est pas le magasin, mais c’est toi qui choisis la carte :\n\n' +
-      '1. Sur la page de vérification, touche **Payé avec** (**Prélevé sur** pour un abonnement).\n' +
-      '2. Choisis la carte ou le compte bancaire et touche **Terminé**.\n\n' +
-      'Si tu la laisses vide, l’entrée s’enregistre sans carte ni compte, donc elle ne touche aucun solde de carte ou de compte. La ligne n’apparaît que lorsque tu as au moins une carte ou un compte sous **Cartes**.',
+      'Dire la carte ne la choisit pas. Skip entend « on my Amex » ou « with Apple Pay » et sait que ce n’est pas le magasin, mais c’est toi qui choisis la carte sur la page de vérification :\n\n' +
+      '- **Facture ou abonnement** : touche une des cartes ou un des comptes sous **Payée avec** (**Prélevé sur** pour un abonnement), ou **Skip** pour n’en choisir aucun. Il faut en choisir un avant **Enregistrer**.\n' +
+      '- **Reçu** : touche **Payé avec**, choisis la carte ou le compte bancaire et touche **Terminé**. Si tu la laisses vide, le reçu s’enregistre sans carte ni compte, donc il ne touche aucun solde de carte ou de compte.',
     keywords: ['Payé avec', 'Prélevé sur', 'carte', 'Apple Pay'],
   },
 
@@ -1496,9 +1491,31 @@ export const voicePrivacyHelpFr: IntentText[] = [
       '1. Vérifie que tu es en ligne, en Wi-Fi ou avec les données cellulaires.\n' +
       '2. Touche **Réessayer** sur la page, ou touche de nouveau le même bouton, comme **Enregistrer**.\n' +
       '3. Ça bloque encore ? Ferme Skip complètement et rouvre-la.\n\n' +
-      'Rien de ce que tu as déjà enregistré n’est perdu. Quand un enregistrement échoue, ce que tu avais saisi reste sur la page pour que tu puisses réessayer, et enregistrer de nouveau ne crée jamais de deuxième copie d’un reçu, d’une facture, d’un abonnement, d’une carte, d’un compte, d’un salaire, d’une habitude ou d’un paiement de carte. Si **Accueil** ou **Cartes** n’arrive pas à s’actualiser, ils gardent les chiffres qu’ils affichaient déjà.\n\n' +
+      'Rien de ce que tu as déjà enregistré n’est perdu. Quand un enregistrement échoue, ce que tu avais saisi reste sur la page pour que tu puisses réessayer, et enregistrer de nouveau ne crée jamais de deuxième copie d’un reçu, d’une facture, d’un abonnement, d’une carte, d’un compte, d’un salaire, d’une habitude ou d’un paiement de carte. Si une page n’arrive pas à s’actualiser, elle garde les chiffres qu’elle affichait déjà, avec « Impossible d’actualiser · voici tes derniers chiffres » en dessous.\n\n' +
       'Les messages qui te disent quoi corriger, comme « Indique le nom de la banque. » ou « Choisis d’abord un magasin. », ne sont pas des échecs. Ils indiquent quelque chose qui attend encore une réponse.',
     keywords: ['Une erreur est survenue', 'Réessaie', 'Réessayer', 'erreur'],
+  },
+  {
+    id: 'troubleshooting.refresh-failed',
+    title: 'Que veut dire « Impossible d’actualiser » ?',
+    questions: [
+      'ça veut dire quoi impossible d’actualiser voici tes derniers chiffres',
+      'ça dit impossible d’actualiser sous mon solde',
+      'voici tes derniers chiffres',
+      'mes chiffres sont pas a jour ?',
+      'mes chiffres se sont pas mis à jour et ça dit impossible d’actualiser',
+      'impossible d’actualiser sur factures mensuelles',
+      'le solde affiché est ancien ?',
+      'pourquoi ça dit voici tes derniers chiffres sur accueil',
+      'actualisation echouee mais les chiffres sont encore la',
+      'comment avoir les chiffres les plus récents',
+      'impossible dactualiser',
+    ],
+    answer:
+      'Skip n’a pas pu recharger les chiffres de cette page à l’instant, le plus souvent à cause de la connexion, alors elle continue d’afficher les derniers qu’elle avait. Ce sont les chiffres de ta dernière actualisation réussie, pas une estimation.\n\n' +
+      'Tire vers le bas sur la page pour réessayer, ou reviens une fois que tu es en ligne. La ligne disparaît dès qu’une actualisation fonctionne. Une page entière **Une erreur est survenue. Réessaie.** n’apparaît que s’il n’y a encore rien à afficher.\n\n' +
+      'Tu la verras sur des pages comme **Accueil**, **Cartes** et la page de chaque carte, **Factures mensuelles**, **Abonnements**, **Historique des paiements**, **Prêts**, **Habitudes de dépense**, **Objectifs** et **Aperçu**.',
+    keywords: ['Impossible d’actualiser', 'derniers chiffres', 'pas à jour', 'actualisation'],
   },
   {
     id: 'troubleshooting.failure.repeats',
@@ -1777,7 +1794,7 @@ export const voicePrivacyHelpFr: IntentText[] = [
     answer:
       'Le « aujourd’hui » de Skip est la date de ton iPhone, et ton compte garde le fuseau horaire de ton téléphone pour que les prélèvements et les rappels suivent ta journée.\n\n' +
       '- Vérifie la date et l’heure de l’iPhone : **Réglages → Général → Date et heure**, avec **Réglage automatique** activé.\n' +
-      '- Après un voyage, ferme Skip complètement (balaie-la dans le sélecteur d’apps) et rouvre-la. Elle enregistre le nouveau fuseau horaire à chaque démarrage.\n' +
+      '- Après un voyage, reviens simplement dans Skip. Elle enregistre le nouveau fuseau horaire chaque fois qu’elle s’ouvre ou revient au premier plan.\n' +
       '- Si Skip est restée ouverte toute la nuit, elle passe au nouveau jour en moins d’une minute, ou dès que tu y reviens.\n\n' +
       'Si une entrée a le mauvais jour, ouvre-la, touche le crayon et change la date.',
     keywords: ['date', 'fuseau horaire', 'mauvais jour', 'voyage'],

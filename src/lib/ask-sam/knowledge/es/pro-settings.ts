@@ -2089,7 +2089,7 @@ export const proSettingsEs: IntentText[] = [
     answer: text(
       'Los dos detienen el recordatorio. La diferencia es lo que Skip recuerda.',
       '',
-      '- Apagar el interruptor: ves **Recordatorio desactivado**. Se conserva con cuánta anticipación era, así que al volver a activarlo regresa eso. La hora vuelve a las 9:00 a. m., así que toca el reloj para ponerla otra vez si la habías cambiado.',
+      '- Apagar el interruptor: ves **Recordatorio desactivado**. Se conservan tanto los días de anticipación como la hora, así que al volver a activarlo regresan los dos.',
       '- Tocar la papelera junto al reloj (se ve mientras el recordatorio está activado): ves **Recordatorio eliminado**. Se quita por completo, y si lo activas después empieza otra vez a 1 día antes, a las 9:00 a. m.',
       '',
       'Para silenciar todas las notificaciones de Skip a la vez, desactiva las notificaciones de Skip en la app Ajustes del iPhone, en Notificaciones. Tus recordatorios siguen configurados, pero no te llega nada.',
@@ -2122,7 +2122,7 @@ export const proSettingsEs: IntentText[] = [
       '',
       'Si tocaste No permitir cuando Skip te lo pidió por primera vez, este es el único camino de vuelta: el iPhone pregunta una sola vez.',
       '',
-      'No hace falta configurar de nuevo tus recordatorios. Se guardaron aunque las notificaciones estuvieran desactivadas. Un último paso: abre Skip, ve a **Ajustes → Preferencias → Recordatorios** y desactiva y vuelve a activar el **Resumen mensual**. Así Skip sabe que este teléfono ya puede recibir tus recordatorios.',
+      'No hace falta configurar de nuevo tus recordatorios. Se guardaron aunque las notificaciones estuvieran desactivadas. Luego vuelve a Skip: lo detecta y registra este teléfono para tus recordatorios por sí solo.',
     ),
     keywords: ['permiso', 'permitir notificaciones', 'no permitir', 'notificaciones apagadas'],
   },
@@ -2147,7 +2147,7 @@ export const proSettingsEs: IntentText[] = [
     answer: text(
       'Revisa esto en orden:',
       '',
-      '1. Notificaciones: en la app Ajustes del iPhone, toca Notificaciones y luego Skip Budget, y comprueba que Permitir notificaciones esté activado. Si lo acabas de activar ahí, desactiva y vuelve a activar el **Resumen mensual** en **Ajustes → Preferencias → Recordatorios**. Un Modo de concentración o No molestar también puede retenerlas.',
+      '1. Notificaciones: en la app Ajustes del iPhone, toca Notificaciones y luego Skip Budget, y comprueba que Permitir notificaciones esté activado. Si lo acabas de activar ahí, vuelve a Skip para que registre este teléfono. Un Modo de concentración o No molestar también puede retenerlas.',
       '2. El interruptor: en **Ajustes → Preferencias → Recordatorios**, comprueba que ese recordatorio esté activado, con los días y la hora que esperas.',
       '3. El día: llega en la fecha de vencimiento menos los días que elegiste. Si ese día ya había pasado cuando lo configuraste (digamos **1 semana** antes de una factura que vence en 3 días), esta vez no llega; el siguiente llega antes de la fecha siguiente.',
       '4. La fecha: sigue la próxima fecha de vencimiento de la factura, la próxima renovación, el día de pago de la tarjeta o el próximo día de pago. No se avisa de facturas detenidas ni de suscripciones canceladas.',

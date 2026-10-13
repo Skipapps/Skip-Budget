@@ -2543,7 +2543,7 @@ const cardIntents: Intent[] = [
       'balances missing',
     ],
     answer:
-      'If a refresh fails while your cards are showing, Skip keeps the figures you already had on screen. **Something went wrong. Please try again.** shows instead of the page only when nothing could be read yet, so you never see a half-worked-out balance as if it were real.\n\nTap **Try again**, or pull down to refresh, and check that you’re online. Your cards and accounts aren’t lost; they come back as soon as Skip can read them.',
+      'If a refresh fails while your cards are showing, Skip keeps the figures you already had on screen, with “Couldn’t refresh · showing your last figures” under them. **Something went wrong. Please try again.** shows instead of the page only when nothing could be read yet, so you never see a half-worked-out balance as if it were real.\n\nTap **Try again**, or pull down to refresh, and check that you’re online. Your cards and accounts aren’t lost; they come back as soon as Skip can read them.',
     keywords: ['error', 'Something went wrong', 'Try again', 'not loading'],
     related: ['cards.tab.overview', 'cards.balance.no-sync'],
     route: '/cards',

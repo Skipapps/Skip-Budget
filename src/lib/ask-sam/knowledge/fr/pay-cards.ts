@@ -2121,7 +2121,7 @@ export const payCardsFr: IntentText[] = [
       'l’actualisation a échoué mais mes soldes sont encore là',
     ],
     answer:
-      'Si une actualisation échoue pendant que tes cartes sont affichées, Skip garde les chiffres que tu avais déjà à l’écran. **Une erreur est survenue. Réessaie.** ne s’affiche à la place de la page que si rien n’a encore pu être lu, pour que tu ne voies jamais un solde à moitié calculé comme s’il était réel.\n\nTouche **Réessayer**, ou tire vers le bas pour actualiser, et vérifie que tu es en ligne. Tes cartes et tes comptes ne sont pas perdus ; ils reviennent dès que Skip peut les lire.',
+      'Si une actualisation échoue pendant que tes cartes sont affichées, Skip garde les chiffres que tu avais déjà à l’écran, avec « Impossible d’actualiser · voici tes derniers chiffres » en dessous. **Une erreur est survenue. Réessaie.** ne s’affiche à la place de la page que si rien n’a encore pu être lu, pour que tu ne voies jamais un solde à moitié calculé comme s’il était réel.\n\nTouche **Réessayer**, ou tire vers le bas pour actualiser, et vérifie que tu es en ligne. Tes cartes et tes comptes ne sont pas perdus ; ils reviennent dès que Skip peut les lire.',
     keywords: ['erreur', 'Une erreur est survenue', 'Réessayer', 'ne charge pas'],
   },
   {

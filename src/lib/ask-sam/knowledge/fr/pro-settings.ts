@@ -2024,7 +2024,7 @@ export const proSettingsFr: IntentText[] = [
     answer: text(
       'Les deux arrêtent le rappel. La différence, c’est ce dont Skip se souvient.',
       '',
-      '- Désactive l’interrupteur : tu vois **Rappel désactivé**. Le nombre de jours avant est conservé, donc le réactiver le ramène. L’heure revient à 9 h 00, touche donc l’horloge pour la régler de nouveau si tu l’avais changée.',
+      '- Désactive l’interrupteur : tu vois **Rappel désactivé**. Le nombre de jours avant et l’heure sont tous deux conservés, donc le réactiver les ramène.',
       '- Touche la corbeille à côté de l’horloge (affichée quand le rappel est activé) : tu vois **Rappel supprimé**. Il est entièrement retiré, et l’activer plus tard recommence à 1 jour avant, 9 h 00.',
       '',
       'Pour faire taire toutes les notifications de Skip d’un coup, désactive les notifications de Skip dans l’app Réglages de l’iPhone, sous Notifications. Tes rappels restent réglés, mais rien ne te parvient.',
@@ -2055,7 +2055,7 @@ export const proSettingsFr: IntentText[] = [
       '',
       'Si tu as touché Ne pas autoriser quand Skip l’a demandé la première fois, c’est le seul chemin de retour : l’iPhone ne demande qu’une fois.',
       '',
-      'Tes rappels n’ont pas besoin d’être réglés de nouveau. Ils ont été enregistrés même quand les notifications étaient désactivées. Une dernière étape : ouvre Skip, va dans **Réglages → Préférences → Rappels** et désactive puis réactive **Bilan mensuel**. Ça indique à Skip que ce téléphone peut maintenant recevoir tes rappels.',
+      'Tes rappels n’ont pas besoin d’être réglés de nouveau. Ils ont été enregistrés même quand les notifications étaient désactivées. Ensuite, reviens dans Skip : elle s’en aperçoit et inscrit d’elle-même ce téléphone pour tes rappels.',
     ),
     keywords: [
       'permission',
@@ -2083,7 +2083,7 @@ export const proSettingsFr: IntentText[] = [
     answer: text(
       'Vérifie ceci dans l’ordre :',
       '',
-      '1. Notifications : dans l’app Réglages de l’iPhone, touche Notifications, puis Skip Budget, et assure-toi qu’Autoriser les notifications est activé. Si tu viens juste de l’activer là, désactive puis réactive **Bilan mensuel** dans **Réglages → Préférences → Rappels**. Une Concentration ou Ne pas déranger peut aussi les retenir.',
+      '1. Notifications : dans l’app Réglages de l’iPhone, touche Notifications, puis Skip Budget, et assure-toi qu’Autoriser les notifications est activé. Si tu viens juste de l’activer là, reviens dans Skip pour qu’elle inscrive ce téléphone. Une Concentration ou Ne pas déranger peut aussi les retenir.',
       '2. L’interrupteur : dans **Réglages → Préférences → Rappels**, vérifie que ce rappel est activé, avec les jours et l’heure que tu attends.',
       '3. Le jour : il arrive à l’échéance moins les jours que tu as choisis. Si ce jour était déjà passé quand tu l’as réglé (disons **1 semaine** avant une facture due dans 3 jours), il n’y en a pas cette fois ; le prochain arrive avant la date suivante.',
       '4. La date : il suit la prochaine échéance de la facture, le prochain renouvellement, la date de paiement de la carte ou la prochaine paie. Les factures arrêtées et les abonnements annulés ne sont pas rappelés.',

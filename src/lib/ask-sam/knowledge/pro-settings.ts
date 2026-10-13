@@ -2315,7 +2315,7 @@ export const proSettingsIntents: Intent[] = [
       'mute skip notifications',
     ],
     answer:
-      'Both stop the reminder. The difference is what Skip remembers.\n\n- Turn the switch off: you see **Reminder off**. How many days before is kept, so switching it back on brings that back. The time goes back to 9:00 AM, so tap the clock to set it again if you had changed it.\n- Tap the bin next to the clock (shown while the reminder is on): you see **Reminder deleted**. It’s removed completely, and turning it on later starts again at 1 day before, 9:00 AM.\n\nTo silence every Skip notification at once, turn off notifications for Skip in the iPhone Settings app under Notifications. Your reminders stay set, but nothing reaches you.',
+      'Both stop the reminder. The difference is what Skip remembers.\n\n- Turn the switch off: you see **Reminder off**. How many days before and the time are both kept, so switching it back on brings them back.\n- Tap the bin next to the clock (shown while the reminder is on): you see **Reminder deleted**. It’s removed completely, and turning it on later starts again at 1 day before, 9:00 AM.\n\nTo silence every Skip notification at once, turn off notifications for Skip in the iPhone Settings app under Notifications. Your reminders stay set, but nothing reaches you.',
     keywords: ['turn off', 'Reminder off', 'Reminder deleted', 'bin', 'trash', 'mute'],
     related: ['reminders.item.turn-on', 'reminders.permission.allow'],
     route: '/reminders',
@@ -2338,7 +2338,7 @@ export const proSettingsIntents: Intent[] = [
       'no notification popup',
     ],
     answer:
-      "Skip's reminders arrive as iPhone notifications, so your iPhone has to allow them.\n\n1. Open the iPhone Settings app.\n2. Tap Notifications, then Skip Budget.\n3. Turn on Allow Notifications. Lock Screen and Banners help you see them.\n\nIf you tapped Don't Allow when Skip first asked, this is the only way back: the iPhone asks just once.\n\nYour reminders don't need setting again. They were saved even while notifications were off. One last step: open Skip, go to **Settings → Preferences → Reminders** and switch **Monthly wrap-up** off and on again. That tells Skip this phone can now get your reminders.",
+      "Skip's reminders arrive as iPhone notifications, so your iPhone has to allow them.\n\n1. Open the iPhone Settings app.\n2. Tap Notifications, then Skip Budget.\n3. Turn on Allow Notifications. Lock Screen and Banners help you see them.\n\nIf you tapped Don't Allow when Skip first asked, this is the only way back: the iPhone asks just once.\n\nYour reminders don't need setting again. They were saved even while notifications were off. Then come back to Skip: it notices, and signs this phone up for your reminders by itself.",
     keywords: ['permission', 'allow notifications', "don't allow", 'notifications off'],
     related: [
       'reminders.problem.not-arriving',
@@ -2364,7 +2364,7 @@ export const proSettingsIntents: Intent[] = [
       "didn't get notified",
     ],
     answer:
-      "Check these in order:\n\n1. Notifications: in the iPhone Settings app, tap Notifications, then Skip Budget, and make sure Allow Notifications is on. If you only just turned it on there, switch **Monthly wrap-up** off and on again in **Settings → Preferences → Reminders**. A Focus or Do Not Disturb can hold them back too.\n2. The switch: on **Settings → Preferences → Reminders**, check that reminder is on, with the days and time you expect.\n3. The day: it comes on the due date minus the days you picked. If that day had already passed when you set it (say **1 week** before a bill due in 3 days), there’s none this time; the next one comes before the following date.\n4. The date: it follows the bill’s next due date, the next renewal, the card’s payment day or the next payday. Stopped bills and cancelled subscriptions aren’t reminded.\n5. Timing: it can come up to about 15 minutes after the time you chose, and your phone needs internet.\n\nThe **Daily receipts reminder** skips days you've already added a receipt.",
+      "Check these in order:\n\n1. Notifications: in the iPhone Settings app, tap Notifications, then Skip Budget, and make sure Allow Notifications is on. If you only just turned it on there, come back to Skip so it can sign this phone up. A Focus or Do Not Disturb can hold them back too.\n2. The switch: on **Settings → Preferences → Reminders**, check that reminder is on, with the days and time you expect.\n3. The day: it comes on the due date minus the days you picked. If that day had already passed when you set it (say **1 week** before a bill due in 3 days), there’s none this time; the next one comes before the following date.\n4. The date: it follows the bill’s next due date, the next renewal, the card’s payment day or the next payday. Stopped bills and cancelled subscriptions aren’t reminded.\n5. Timing: it can come up to about 15 minutes after the time you chose, and your phone needs internet.\n\nThe **Daily receipts reminder** skips days you've already added a receipt.",
     keywords: ['not arriving', 'missing reminder', 'no notification', 'reminder failed'],
     related: [
       'reminders.permission.allow',

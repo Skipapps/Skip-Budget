@@ -2100,7 +2100,7 @@ export const payCardsEs: IntentText[] = [
       'no se actualizó pero sigo viendo mis saldos',
     ],
     answer:
-      'Si una actualización falla mientras tus tarjetas están en pantalla, Skip conserva las cifras que ya tenías a la vista. **Algo salió mal. Inténtalo de nuevo.** aparece en lugar de la página solo cuando todavía no se pudo leer nada, así nunca ves un saldo a medio calcular como si fuera real.\n\nToca **Intentar de nuevo**, o desliza hacia abajo para actualizar, y revisa que estés en línea. Tus tarjetas y cuentas no se pierden; vuelven en cuanto Skip pueda leerlas.',
+      'Si una actualización falla mientras tus tarjetas están en pantalla, Skip conserva las cifras que ya tenías a la vista, con “No se pudo actualizar · mostrando tus últimas cifras” debajo. **Algo salió mal. Inténtalo de nuevo.** aparece en lugar de la página solo cuando todavía no se pudo leer nada, así nunca ves un saldo a medio calcular como si fuera real.\n\nToca **Intentar de nuevo**, o desliza hacia abajo para actualizar, y revisa que estés en línea. Tus tarjetas y cuentas no se pierden; vuelven en cuanto Skip pueda leerlas.',
     keywords: ['error', 'Algo salió mal', 'Intentar de nuevo', 'no carga'],
   },
   {

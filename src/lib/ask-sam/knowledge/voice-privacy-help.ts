@@ -427,7 +427,7 @@ export const voicePrivacyHelpIntents: Intent[] = [
       'Which way a day points depends on the type:\n' +
       '- **Receipt**: the most recent one, because you already bought it. “On the 5th” said on the 13th is the 5th of this month.\n' +
       '- **Bill or subscription**: the next one. “Due on the 5th” said on the 13th is the 5th of next month. Past words like “paid”, “was due” or “renewed” point back instead.\n\n' +
-      'If you say the 31st and that month is shorter, a bill uses the month’s last day. With no day said, a receipt is today, a bill asks for **Due on**, and a subscription can save without a renewal date.\n\n' +
+      'If you say the 31st and that month is shorter, a bill uses the month’s last day. With no day said, a receipt is today, a bill asks for **Due on**, and a subscription asks for **Next renewal**.\n\n' +
       'To change it, tap the date row and pick a day. On a receipt, the **Today** and **Yesterday** chips under the date set it in one tap.',
     keywords: ['date', 'day', 'yesterday', 'last friday', 'due on', 'renews on', 'when'],
     related: ['voice.kind.change', 'voice.cycle', 'voice.say.bills'],
@@ -647,7 +647,7 @@ export const voicePrivacyHelpIntents: Intent[] = [
       '- **You said** shows your words in quotes.\n' +
       '- **Add as** switches between **Receipt**, **Bill** and **Subscription**.\n' +
       '- The big figure is the amount. Tap it to change it.\n' +
-      '- Rows below hold the rest: the store, service or bill name, the date, how often, **Paid with** and a **Note**. A row saying **Tap to add** is still needed. Tap any row to change it.\n' +
+      '- Rows below hold the rest: the store, service or bill name, the date, how often, **Paid with** (**Charged to** for a subscription) and a **Note**. A bill or subscription also asks for a **Reminder**. A row saying **Tap to add** is still needed. Tap any row to change it.\n' +
       '- At the bottom: **Save**, **Say it again** and **More options**.\n\n' +
       '“You can edit this later.” means you can always open the saved entry and change it.',
     keywords: ['Is this right?', 'Did Skip hear you right?', 'You said', 'check page', 'review'],
@@ -677,13 +677,9 @@ export const voicePrivacyHelpIntents: Intent[] = [
       'Enter how much you spent shows under the button',
     ],
     answer:
-      'Something Skip needs is still empty. The line above **Save** says what:\n\n' +
-      '- “Pick the amount you meant.” Choose one under **Which amount did you mean?**\n' +
-      '- “Pick what the bill is for.” Tap **Category** and choose one.\n' +
-      '- “Pick a store first.” or “Pick a service first.” Tap the **Store** or **Service** row.\n' +
-      '- “Enter how much you spent.”, “Enter how much it costs.” or “Enter what it costs.” Tap the amount.\n' +
-      '- “Give the bill a name.” Tap **Name**.\n' +
-      '- “Pick the first due date.” Tap **Due on**.\n\n' +
+      'Something Skip needs is still empty.\n\n' +
+      '- **Bill or subscription**: tap **Save** and the line above it lists what’s left, like “To save this bill, fill in: Paid with, Reminder.” It can name the amount, the name, **Category**, **Paid with** (**Charged to**), **Reminder** and **Due on** (or **Next renewal** for a subscription).\n' +
+      '- **Receipt**: the line above **Save** says what: “Pick the amount you meant.”, “Pick a store first.” or “Enter how much you spent.”\n\n' +
       'Rows still needed say **Tap to add**. If the line says “Something went wrong. Please try again.” instead, the save itself failed. Check your connection and tap **Save** again.',
     keywords: ['save greyed out', 'disabled', 'missing', 'Category', 'Due on', 'required'],
     related: ['voice.amount.which', 'voice.store.wrong', 'voice.error'],
@@ -696,7 +692,6 @@ export const voicePrivacyHelpIntents: Intent[] = [
     questions: [
       'What is More options on the voice page?',
       'how do I get the full form from voice',
-      'can i add a reminder from the voice check page',
       'more options button voice',
       'I want to set more details than voice shows',
       'how do i open the normal add form with what I said',
@@ -704,9 +699,10 @@ export const voicePrivacyHelpIntents: Intent[] = [
       'what happens if I tap more options',
       'more options vs save',
       'more fields when adding by voice',
+      'open the full form from the voice page',
     ],
     answer:
-      '**More options** opens the full add form for that type, with everything Skip heard already filled in. Use it when you want a field the check page doesn’t show, like a bill’s **Reminder**.\n\n' +
+      '**More options** opens the full add form for that type, with everything Skip heard already filled in. Use it when you want a field the check page doesn’t show.\n\n' +
       'The form then asks what it always does. For a bill or subscription, that includes **Paid with** and **Reminder**, where **No reminder** is a fine answer. Saving from there also takes you to **Home**.\n\n' +
       'Your words and any changes go with you, so you don’t have to say anything again.',
     keywords: ['More options', 'full form', 'reminder', 'all fields'],
@@ -782,14 +778,14 @@ export const voicePrivacyHelpIntents: Intent[] = [
       'set reminder after adding by voice',
       'why didnt my voice bill remind me',
       'voice entry reminder setting',
+      'can i add a reminder from the voice check page',
     ],
     answer:
-      'No. A bill or subscription saved from the voice check page has no reminder. You can add one in a few taps:\n\n' +
+      'Yes. For a bill or subscription, the voice check page asks for a **Reminder**, just like the typed forms. Pick when you want it, or **No reminder**: one of them is needed before **Save**.\n\n' +
+      'To change it later:\n' +
       '1. Open the bill or subscription.\n' +
       '2. Tap the pencil at the top.\n' +
-      '3. Set **Reminder** and save.\n\n' +
-      'You can also switch on reminders for any bill or subscription in **Settings → Preferences → Reminders**.\n\n' +
-      'To set the reminder while adding, tap **More options** on the check page instead of **Save**. The full form asks for **Reminder** before it saves.',
+      '3. Set **Reminder** and save.',
     keywords: ['reminder', 'notification', 'remind', 'voice bill'],
     related: ['voice.review.more-options', 'voice.after-save', 'voice.say.bills'],
     pro: true,
@@ -811,10 +807,9 @@ export const voicePrivacyHelpIntents: Intent[] = [
       'paid from my bank account by voice',
     ],
     answer:
-      'Saying the card doesn’t choose it. Skip hears “on my Amex” or “with Apple Pay” and knows it isn’t the store, but you pick the card yourself:\n\n' +
-      '1. On the check page, tap **Paid with** (**Charged to** for a subscription).\n' +
-      '2. Choose the card or bank account and tap **Done**.\n\n' +
-      'If you leave it empty, the entry saves with no card or account, so it doesn’t move any card or account balance. The row only appears once you have at least one card or account under **Cards**.',
+      'Saying the card doesn’t choose it. Skip hears “on my Amex” or “with Apple Pay” and knows it isn’t the store, but you pick the card yourself on the check page:\n\n' +
+      '- **Bill or subscription**: tap one of the cards or accounts under **Paid with** (**Charged to** for a subscription), or **Skip** for none. One is needed before **Save**.\n' +
+      '- **Receipt**: tap **Paid with**, choose the card or bank account and tap **Done**. If you leave it empty, the receipt saves with no card or account, so it doesn’t move any card or account balance.',
     keywords: ['Paid with', 'Charged to', 'card', 'Amex', 'Visa', 'Apple Pay', 'account'],
     related: ['voice.review.page', 'voice.review.more-options'],
     pro: true,
@@ -1710,7 +1705,7 @@ export const voicePrivacyHelpIntents: Intent[] = [
       '1. Check you’re online, on Wi-Fi or mobile data.\n' +
       '2. Tap **Try again** on the page, or tap the same button again, like **Save**.\n' +
       '3. Still stuck? Close Skip fully and open it again.\n\n' +
-      'Nothing you already saved is lost. When a save fails, what you entered stays on the page so you can try again, and saving again never makes a second copy of a receipt, bill, subscription, card, account, salary, habit or card payment. If **Home** or **Cards** can’t refresh, they keep the figures they already showed.\n\n' +
+      'Nothing you already saved is lost. When a save fails, what you entered stays on the page so you can try again, and saving again never makes a second copy of a receipt, bill, subscription, card, account, salary, habit or card payment. If a page can’t refresh, it keeps the figures it already showed, with “Couldn’t refresh · showing your last figures” under them.\n\n' +
       'Messages that tell you what to fix, like “Enter the bank name.” or “Pick a store first.”, aren’t failures. They point to something that still needs an answer.',
     keywords: ['Something went wrong', 'Please try again', 'Try again', 'error', 'failed'],
     related: [
@@ -1718,6 +1713,29 @@ export const voicePrivacyHelpIntents: Intent[] = [
       'troubleshooting.wont-save',
       'troubleshooting.slow',
     ],
+  },
+  {
+    id: 'troubleshooting.refresh-failed',
+    topic: 'troubleshooting',
+    title: 'What does “Couldn’t refresh” mean?',
+    questions: [
+      'what does couldnt refresh showing your last figures mean',
+      'it says couldnt refresh under my balance',
+      'showing your last figures',
+      'are these numbers out of date',
+      'my figures did not update and it says couldnt refresh',
+      'couldnt refresh on monthly bills',
+      'is the balance shown old',
+      'why does it say showing your last figures on home',
+      'refresh failed but numbers still there',
+      'how do i get the latest figures',
+    ],
+    answer:
+      'Skip couldn’t reload that page’s figures just now, usually because of the connection, so it keeps showing the last ones it had. They’re the figures from your last successful refresh, not a guess.\n\n' +
+      'Pull down on the page to try again, or come back once you’re online. The line goes as soon as a refresh works. A full **Something went wrong. Please try again.** page appears only when there’s nothing to show yet.\n\n' +
+      'You’ll see it on pages such as **Home**, **Cards** and each card’s page, **Monthly bills**, **Subscriptions**, **Payment history**, **Loans**, **Spending habits**, **Goals** and **Insights**.',
+    keywords: ['Couldn’t refresh', 'last figures', 'out of date', 'refresh failed'],
+    related: ['troubleshooting.failure.what', 'cards.error'],
   },
   {
     id: 'troubleshooting.failure.repeats',
@@ -2021,7 +2039,7 @@ export const voicePrivacyHelpIntents: Intent[] = [
       'wrong day everywhere in skip',
     ],
     answer:
-      'Skip’s “today” is your iPhone’s own date, and your account keeps your phone’s time zone so charges and reminders follow your day.\n\n- Check the iPhone’s date and time: **Settings → General → Date & Time**, with **Set Automatically** on.\n- After travelling, close Skip fully (swipe it away in the app switcher) and open it again. It saves the new time zone each time it starts.\n- If Skip was left open overnight, it moves to the new day within a minute, or as soon as you come back to it.\n\nIf one entry has the wrong day, open it, tap the pencil and change the date.',
+      'Skip’s “today” is your iPhone’s own date, and your account keeps your phone’s time zone so charges and reminders follow your day.\n\n- Check the iPhone’s date and time: **Settings → General → Date & Time**, with **Set Automatically** on.\n- After travelling, just come back to Skip. It saves the new time zone whenever it opens or comes back to the front.\n- If Skip was left open overnight, it moves to the new day within a minute, or as soon as you come back to it.\n\nIf one entry has the wrong day, open it, tap the pencil and change the date.',
     keywords: ['date', 'time zone', 'wrong day', 'travel', 'today', 'midnight'],
     related: ['troubleshooting.numbers-wrong', 'troubleshooting.sync'],
   },

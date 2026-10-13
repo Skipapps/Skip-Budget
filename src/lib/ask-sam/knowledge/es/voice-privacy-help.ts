@@ -373,11 +373,11 @@ export const voicePrivacyHelpEs: IntentText[] = [
       'mi renta del día 1 se fue al próximo mes',
     ],
     answer:
-      'Skip entiende casi todas las formas cotidianas de decir un día: “today”, “yesterday”, “tomorrow”, “the day before yesterday”, “3 days ago”, “a week ago”, “last Friday”, “next Friday”, “on Monday”, “October 3rd” y “10/3”.\n\n' +
+      'Skip entiende casi todas las formas cotidianas de decir un día: “today”, “yesterday”, “tomorrow”, “the day before yesterday”, “3 days ago”, “a week ago”, “last Friday”, “next Friday”, “on Monday”, “on the 5th”, “October 3rd” y “10/3”.\n\n' +
       'Hacia dónde apunta un día depende del tipo:\n' +
       '- **Recibo**: el más reciente, porque ya lo compraste. “On the 5th” dicho el día 13 es el 5 de este mes.\n' +
       '- **Factura o suscripción**: el próximo. “Due on the 5th” dicho el día 13 es el 5 del mes que viene. Palabras en pasado como “paid”, “was due” o “renewed” apuntan hacia atrás.\n\n' +
-      'Si dices el 31 y ese mes es más corto, una factura usa el último día del mes. Si no dices ningún día, un recibo es de hoy, una factura pide **Fecha de vencimiento** y una suscripción puede guardarse sin fecha de renovación.\n\n' +
+      'Si dices el 31 y ese mes es más corto, una factura usa el último día del mes. Si no dices ningún día, un recibo es de hoy, una factura pide **Fecha de vencimiento** y una suscripción pide **Próxima renovación**.\n\n' +
       'Para cambiarlo, toca la fila de la fecha y elige un día. En un recibo, los botones **Hoy** y **Ayer** debajo de la fecha lo fijan con un toque.',
     keywords: ['fecha', 'día', 'ayer', 'viernes pasado'],
   },
@@ -571,7 +571,7 @@ export const voicePrivacyHelpEs: IntentText[] = [
       '- **Dijiste** muestra tus palabras entre comillas.\n' +
       '- **Agregar como** cambia entre **Recibo**, **Factura** y **Suscripción**.\n' +
       '- La cifra grande es el importe. Tócala para cambiarlo.\n' +
-      '- Las filas de abajo tienen el resto: la tienda, el servicio o el nombre de la factura, la fecha, cada cuánto se repite, **Pagado con** y una **Nota**. Una fila que dice **Toca para agregar** todavía hace falta. Toca cualquier fila para cambiarla.\n' +
+      '- Las filas de abajo tienen el resto: la tienda, el servicio o el nombre de la factura, la fecha, cada cuánto se repite, **Pagado con** (**Se paga con** en una factura y **Se cobra a** en una suscripción) y una **Nota**. Una factura o suscripción también pide un **Recordatorio**. Una fila que dice **Toca para agregar** todavía hace falta. Toca cualquier fila para cambiarla.\n' +
       '- Al final: **Guardar**, **Dilo otra vez** y **Más opciones**.\n\n' +
       '“Puedes editarlo más tarde.” significa que siempre puedes abrir la entrada guardada y cambiarla.',
     keywords: ['¿Es correcto?', '¿Skip te escuchó bien?', 'Dijiste', 'página de revisión'],
@@ -594,13 +594,9 @@ export const voicePrivacyHelpEs: IntentText[] = [
       'no me deja guardar xq falta algo',
     ],
     answer:
-      'Todavía falta algo que Skip necesita. La línea que está encima de **Guardar** dice qué:\n\n' +
-      '- “Elige el importe que quisiste decir.” Elige uno en **¿Qué importe quisiste decir?**\n' +
-      '- “Elige de qué es la factura.” Toca **Categoría** y elige una.\n' +
-      '- “Primero elige una tienda.” o “Primero elige un servicio.” Toca la fila **Tienda** o **Servicio**.\n' +
-      '- “Ingresa cuánto gastaste.” o “Ingresa cuánto cuesta.” Toca el importe.\n' +
-      '- “Ponle un nombre a la factura.” Toca **Nombre**.\n' +
-      '- “Elige la primera fecha de vencimiento.” Toca **Fecha de vencimiento**.\n\n' +
+      'Todavía falta algo que Skip necesita.\n\n' +
+      '- **Factura o suscripción**: toca **Guardar** y la línea que está encima enumera lo que falta, por ejemplo “Para guardar la factura, completa: Se paga con, Recordatorio.” Puede mencionar el importe, el nombre, **Categoría**, **Se paga con** (**Se cobra a**), **Recordatorio** y **Fecha de vencimiento** (o **Próxima renovación** en una suscripción).\n' +
+      '- **Recibo**: la línea que está encima de **Guardar** dice qué: “Elige el importe que quisiste decir.”, “Primero elige una tienda.” o “Ingresa cuánto gastaste.”\n\n' +
       'Las filas que todavía hacen falta dicen **Toca para agregar**. Si la línea dice “Algo salió mal. Inténtalo de nuevo.”, falló el guardado en sí. Revisa tu conexión y toca **Guardar** otra vez.',
     keywords: ['guardar gris', 'desactivado', 'falta algo', 'Fecha de vencimiento'],
   },
@@ -620,7 +616,7 @@ export const voicePrivacyHelpEs: IntentText[] = [
       'más campos al agregar por voz',
     ],
     answer:
-      '**Más opciones** abre el formulario completo de ese tipo, con todo lo que Skip escuchó ya llenado. Úsalo cuando quieras un campo que la página de revisión no muestra, como el **Recordatorio** de una factura.\n\n' +
+      '**Más opciones** abre el formulario completo de ese tipo, con todo lo que Skip escuchó ya llenado. Úsalo cuando quieras un campo que la página de revisión no muestra.\n\n' +
       'Luego el formulario pide lo que siempre pide. En una factura o suscripción, eso incluye **Se paga con** (**Se cobra a** en una suscripción) y **Recordatorio**, donde **Sin recordatorio** es una respuesta válida. Si guardas desde ahí, también vuelves a **Inicio**.\n\n' +
       'Tus palabras y los cambios que hiciste te acompañan, así que no tienes que decir nada otra vez.',
     keywords: ['Más opciones', 'formulario completo', 'recordatorio', 'todos los campos'],
@@ -679,7 +675,7 @@ export const voicePrivacyHelpEs: IntentText[] = [
     title: '¿Una factura por voz tiene recordatorio?',
     questions: [
       '¿Me avisarán de una factura que agregué por voz?',
-      'la suscripción por voz no tiene recordatorio',
+      'la suscripción por voz también lleva recordatorio',
       'cómo agrego un recordatorio a una factura por voz',
       'agregué la renta por voz y no me llegó recordatorio',
       'la voz pone recordatorios',
@@ -688,14 +684,14 @@ export const voicePrivacyHelpEs: IntentText[] = [
       'poner recordatorio después de agregar por voz',
       'por qué mi factura por voz no me avisó',
       'ajuste de recordatorio en la entrada de voz',
+      'por qué la página de voz me pide un recordatorio',
     ],
     answer:
-      'No. Una factura o suscripción guardada desde la página de revisión de voz no tiene recordatorio. Puedes agregarlo en unos toques:\n\n' +
+      'Sí. En una factura o suscripción, la página de revisión de voz pide un **Recordatorio**, igual que los formularios para agregar a mano. Elige cuándo lo quieres, o **Sin recordatorio**: hace falta una de las dos antes de **Guardar**.\n\n' +
+      'Para cambiarlo después:\n' +
       '1. Abre la factura o suscripción.\n' +
       '2. Toca el lápiz de arriba.\n' +
-      '3. Configura **Recordatorio** y guarda.\n\n' +
-      'También puedes activar los recordatorios de cualquier factura o suscripción en **Ajustes → Preferencias → Recordatorios**.\n\n' +
-      'Para configurar el recordatorio al agregar, toca **Más opciones** en la página de revisión en vez de **Guardar**. El formulario completo pide el **Recordatorio** antes de guardar.',
+      '3. Configura **Recordatorio** y guarda.',
     keywords: ['recordatorio', 'aviso', 'avisar', 'factura por voz'],
   },
   {
@@ -715,10 +711,9 @@ export const voicePrivacyHelpEs: IntentText[] = [
       'xq no agarra la tarjeta q dije',
     ],
     answer:
-      'Decir la tarjeta no la elige. Skip oye “on my Amex” o “with Apple Pay” y sabe que no es la tienda, pero la tarjeta la eliges tú:\n\n' +
-      '1. En la página de revisión, toca **Pagado con** (**Se paga con** en una factura y **Se cobra a** en una suscripción).\n' +
-      '2. Elige la tarjeta o la cuenta bancaria y toca **Listo**.\n\n' +
-      'Si lo dejas vacío, la entrada se guarda sin tarjeta ni cuenta, así que no mueve el saldo de ninguna tarjeta ni cuenta. La fila solo aparece cuando ya tienes al menos una tarjeta o cuenta en **Tarjetas**.',
+      'Decir la tarjeta no la elige. Skip oye “on my Amex” o “with Apple Pay” y sabe que no es la tienda, pero la tarjeta la eliges tú en la página de revisión:\n\n' +
+      '- **Factura o suscripción**: toca una de las tarjetas o cuentas debajo de **Se paga con** (**Se cobra a** en una suscripción), o **Skip** para no elegir ninguna. Hace falta una antes de **Guardar**.\n' +
+      '- **Recibo**: toca **Pagado con**, elige la tarjeta o la cuenta bancaria y toca **Listo**. Si lo dejas vacío, el recibo se guarda sin tarjeta ni cuenta, así que no mueve el saldo de ninguna tarjeta ni cuenta.',
     keywords: ['Pagado con', 'Se cobra a', 'tarjeta', 'Amex'],
   },
 
@@ -1559,9 +1554,31 @@ export const voicePrivacyHelpEs: IntentText[] = [
       '1. Revisa que estés en línea, con Wi-Fi o datos móviles.\n' +
       '2. Toca **Intentar de nuevo** en la página, o toca otra vez el mismo botón, como **Guardar**.\n' +
       '3. ¿Sigue igual? Cierra Skip por completo y ábrelo de nuevo.\n\n' +
-      'No se pierde nada de lo que ya guardaste. Cuando falla un guardado, lo que ingresaste se queda en la página para que lo intentes de nuevo, y guardar otra vez nunca crea una segunda copia de un recibo, factura, suscripción, tarjeta, cuenta, salario, hábito o pago de tarjeta. Si **Inicio** o **Tarjetas** no pueden actualizarse, conservan las cifras que ya mostraban.\n\n' +
+      'No se pierde nada de lo que ya guardaste. Cuando falla un guardado, lo que ingresaste se queda en la página para que lo intentes de nuevo, y guardar otra vez nunca crea una segunda copia de un recibo, factura, suscripción, tarjeta, cuenta, salario, hábito o pago de tarjeta. Si una página no puede actualizarse, conserva las cifras que ya mostraba, con “No se pudo actualizar · mostrando tus últimas cifras” debajo.\n\n' +
       'Los mensajes que te dicen qué corregir, como “Ingresa el nombre del banco.” o “Primero elige una tienda.”, no son fallos. Señalan algo que todavía necesita una respuesta.',
     keywords: ['Algo salió mal', 'Inténtalo de nuevo', 'Intentar de nuevo', 'error'],
+  },
+  {
+    id: 'troubleshooting.refresh-failed',
+    title: '¿Qué significa “No se pudo actualizar”?',
+    questions: [
+      'qué significa no se pudo actualizar mostrando tus últimas cifras',
+      'dice no se pudo actualizar debajo de mi saldo',
+      'mostrando tus ultimas cifras',
+      '¿estas cifras están desactualizadas?',
+      'mis cifras no se actualizaron y dice no se pudo actualizar',
+      'no se pudo actualizar en facturas mensuales',
+      'el saldo que veo es viejo?',
+      'por que dice mostrando tus ultimas cifras en inicio',
+      'fallo la actualizacion pero siguen los numeros',
+      'cómo veo las cifras más recientes',
+      'no se actualiza la pagina pero veo mis datos',
+    ],
+    answer:
+      'Skip no pudo volver a cargar las cifras de esa página en este momento, normalmente por la conexión, así que sigue mostrando las últimas que tenía. Son las cifras de tu última actualización correcta, no una estimación.\n\n' +
+      'Desliza hacia abajo en la página para intentarlo de nuevo, o vuelve cuando estés en línea. La línea desaparece en cuanto una actualización funciona. Una página entera con **Algo salió mal. Inténtalo de nuevo.** solo aparece cuando todavía no hay nada que mostrar.\n\n' +
+      'La verás en páginas como **Inicio**, **Tarjetas** y la página de cada tarjeta, **Facturas mensuales**, **Suscripciones**, **Historial de pagos**, **Préstamos**, **Hábitos de gasto**, **Metas** y **Análisis**.',
+    keywords: ['No se pudo actualizar', 'últimas cifras', 'desactualizadas', 'no se actualiza'],
   },
   {
     id: 'troubleshooting.failure.repeats',
@@ -1846,7 +1863,7 @@ export const voicePrivacyHelpEs: IntentText[] = [
     answer:
       'El “hoy” de Skip es la fecha de tu propio iPhone, y tu cuenta guarda la zona horaria de tu teléfono para que los cargos y recordatorios sigan tu día.\n\n' +
       '- Revisa la fecha y la hora del iPhone: **Ajustes → General → Fecha y hora**, con **Ajuste automático** activado.\n' +
-      '- Después de viajar, cierra Skip por completo (deslízalo en el selector de apps) y ábrelo de nuevo. Guarda la nueva zona horaria cada vez que arranca.\n' +
+      '- Después de viajar, solo vuelve a Skip. Guarda la nueva zona horaria cada vez que se abre o vuelve al primer plano.\n' +
       '- Si dejaste Skip abierto toda la noche, pasa al nuevo día en un minuto, o en cuanto vuelvas a él.\n\n' +
       'Si una entrada tiene el día equivocado, ábrela, toca el lápiz y cambia la fecha.',
     keywords: ['fecha', 'zona horaria', 'día equivocado', 'viaje'],
