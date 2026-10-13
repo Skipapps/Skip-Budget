@@ -8,13 +8,45 @@
 // Secret:  npx supabase secrets set RC_WEBHOOK_SECRET=...   (same value pasted
 //          into RevenueCat → Integrations → Webhooks → Authorization header)
 
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+
+import { ENTITLEMENT_COLUMNS, isUserId, runTransfer, type EntitlementStore } from './transfer.ts';
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+function serviceClient(): SupabaseClient {
+  return createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  );
+}
+
+/**
+ * A TRANSFER has no app_user_id, so the usual path would skip it and the receiving account would
+ * stay free on the server while its phone says Pro. See transfer.ts for the rules.
+ */
+async function handleTransfer(event: Record<string, unknown>): Promise<Response> {
+  const service = serviceClient();
+  const store: EntitlementStore = {
+    read: (userIds) =>
+      service.from('entitlements').select(ENTITLEMENT_COLUMNS).in('user_id', userIds),
+    write: (row) => service.from('entitlements').upsert(row),
+    switchOff: (userIds, writtenBy, nowIso) => {
+      const rows = service
+        .from('entitlements')
+        .update({ pro: false, will_renew: false, updated_at: nowIso })
+        .in('user_id', userIds);
+      // A purchase that lands between the read and this update keeps its row.
+      return writtenBy ? rows.lte('updated_at', writtenBy) : rows;
+    },
+  };
+  const { status, body } = await runTransfer(event, store, console, Date.now());
+  return json(body, status);
 }
 
 Deno.serve(async (request) => {
@@ -36,11 +68,14 @@ Deno.serve(async (request) => {
 
   const event = payload.event ?? {};
   const type = String(event.type ?? '');
+
+  if (type === 'TRANSFER') return handleTransfer(event);
+
   const userId = String(event.app_user_id ?? '');
 
   // The app signs into RevenueCat with the Supabase user id, so this is a uuid. Anonymous ids
   // ($RCAnonymousID:…) are logged and skipped, not erred.
-  if (!/^[0-9a-f-]{36}$/i.test(userId)) {
+  if (!isUserId(userId)) {
     console.log('skipping non-uuid app_user_id', type);
     return json({ skipped: true });
   }
@@ -54,20 +89,17 @@ Deno.serve(async (request) => {
     // A cancellation keeps access until the period runs out; only EXPIRATION means "off, now".
     (expiresMs === null || expiresMs > Date.now());
 
-  const service = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-  );
-
-  const { error } = await service.from('entitlements').upsert({
-    user_id: userId,
-    pro: active,
-    product_id: String(event.product_id ?? '') || null,
-    expires_at: expiresMs ? new Date(expiresMs).toISOString() : null,
-    environment: String(event.environment ?? '') || null,
-    will_renew: type !== 'CANCELLATION' && type !== 'EXPIRATION',
-    updated_at: new Date().toISOString(),
-  });
+  const { error } = await serviceClient()
+    .from('entitlements')
+    .upsert({
+      user_id: userId,
+      pro: active,
+      product_id: String(event.product_id ?? '') || null,
+      expires_at: expiresMs ? new Date(expiresMs).toISOString() : null,
+      environment: String(event.environment ?? '') || null,
+      will_renew: type !== 'CANCELLATION' && type !== 'EXPIRATION',
+      updated_at: new Date().toISOString(),
+    });
 
   if (error) {
     console.error('entitlement upsert failed', error.message);
