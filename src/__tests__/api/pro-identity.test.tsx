@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 
-import { resetProStatusForTests } from '@/lib/pro-status';
+import { proStatus, resetProStatusForTests, type ProStatus } from '@/lib/pro-status';
 
 /**
  * RevenueCat speaks for one account at a time. When a second account signs in on the same phone,
@@ -17,6 +17,10 @@ let mockSdkUser: string | null = null;
 let mockActive: Record<string, string[]> = {};
 let mockLogInGate: Promise<void> | null = null;
 let mockServerPro: Record<string, boolean> = {};
+// When set, the server's answer waits until the test lets it through.
+let mockServerGate: Promise<void> | null = null;
+/** Every sign-in and read the SDK did, in order, with the account it was signed in as. */
+const mockSdkCalls: string[] = [];
 const mockListeners = new Set<(info: unknown) => void>();
 /** The account the SDK was signed in as each time restore ran. */
 const mockRestoredAs: (string | null)[] = [];
@@ -34,12 +38,17 @@ const mockConfigure = jest.fn((options: { appUserID: string }) => {
 const mockLogIn = jest.fn(async (userId: string) => {
   if (mockLogInGate) await mockLogInGate;
   mockSdkUser = userId;
+  mockSdkCalls.push(`logIn:${userId}`);
   return { customerInfo: mockInfoFor(userId), created: false };
 });
-const mockRpc = jest.fn(async (_name: string, args: { p_user: string }) => ({
-  data: mockServerPro[args.p_user] ?? false,
-  error: null,
-}));
+const mockLogOut = jest.fn(async () => {
+  mockSdkUser = '$RCAnonymousID:test';
+  return mockInfoFor(mockSdkUser);
+});
+const mockRpc = jest.fn(async (_name: string, args: { p_user: string }) => {
+  if (mockServerGate) await mockServerGate;
+  return { data: mockServerPro[args.p_user] ?? false, error: null };
+});
 
 jest.mock('react-native-purchases', () => ({
   __esModule: true,
@@ -48,7 +57,12 @@ jest.mock('react-native-purchases', () => ({
     configure: (options: { appUserID: string }) => mockConfigure(options),
     setLogLevel: jest.fn(async () => {}),
     logIn: (userId: string) => mockLogIn(userId),
-    getCustomerInfo: async () => mockInfoFor(mockSdkUser),
+    logOut: () => mockLogOut(),
+    isAnonymous: async () => Boolean(mockSdkUser?.startsWith('$RCAnonymousID:')),
+    getCustomerInfo: async () => {
+      mockSdkCalls.push(`read:${mockSdkUser}`);
+      return mockInfoFor(mockSdkUser);
+    },
     restorePurchases: async () => {
       mockRestoredAs.push(mockSdkUser);
       return mockInfoFor(mockSdkUser);
@@ -80,6 +94,9 @@ beforeEach(() => {
   mockActive = {};
   mockServerPro = {};
   mockLogInGate = null;
+  mockServerGate = null;
+  mockSdkCalls.length = 0;
+  mockLogOut.mockClear();
   mockListeners.clear();
   mockRestoredAs.length = 0;
   mockLogIn.mockClear();
@@ -214,5 +231,146 @@ describe("the server's copy", () => {
     const { result } = await renderHook(() => mod.useProSource(), { wrapper });
     await waitFor(() => expect(result.current).toEqual({ pro: true, ready: true }));
     expect(mockRpc).toHaveBeenCalledWith('is_pro', { p_user: 'user-9' });
+  });
+});
+
+describe('signing out', () => {
+  const clients: QueryClient[] = [];
+
+  /**
+   * One cache for the whole test, as the app has one, so what a sign-out leaves behind shows. Kept
+   * for good (the app's lasts five minutes), so no collection timer outlives the test.
+   */
+  function appWrapper() {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
+    clients.push(client);
+    const Wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    return { client, wrapper: Wrapper };
+  }
+
+  afterEach(() => {
+    for (const client of clients) client.clear();
+    clients.length = 0;
+  });
+
+  it('leaves nothing saying Pro once the account has gone', async () => {
+    mockUserId = 'user-20';
+    mockActive = { 'user-20': ['pro'] };
+    mockServerPro = { 'user-20': true };
+    const { client, wrapper } = appWrapper();
+    const reader = await renderHook(() => mod.usePro(), { wrapper });
+    const bridge = await renderHook(() => mod.useConfigurePurchases(), { wrapper });
+    await waitFor(() => expect(proStatus()).toEqual({ pro: true, ready: true }));
+
+    mockUserId = null;
+    await bridge.rerender({});
+
+    await waitFor(() => expect(proStatus()).toEqual({ pro: false, ready: false }));
+    expect(reader.result.current).toEqual({ pro: false, ready: false });
+    expect(client.getQueryData(['entitlement', 'user-20'])).toBeUndefined();
+    expect(mockListeners.size).toBe(0);
+  });
+
+  it('makes the same account, signing back in, wait for its answer afresh instead of the old one', async () => {
+    mockUserId = 'user-21';
+    mockActive = { 'user-21': ['pro'] };
+    mockServerPro = { 'user-21': true };
+    const { wrapper } = appWrapper();
+    const seen: ProStatus[] = [];
+    const { result, rerender } = await renderHook(
+      () => {
+        const status = mod.useProSource();
+        seen.push(status);
+        return status;
+      },
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current).toEqual({ pro: true, ready: true }));
+
+    mockUserId = null;
+    await rerender({});
+    // Their Pro ends while they are signed out, and the server is slow to say so.
+    mockActive = {};
+    mockServerPro = {};
+    let open: () => void = () => {};
+    mockServerGate = new Promise<void>((resolve) => (open = resolve));
+    seen.length = 0;
+
+    mockUserId = 'user-21';
+    await rerender({});
+    await waitFor(() => expect(mockSdkCalls.at(-1)).toBe('read:user-21'));
+    expect(result.current).toEqual({ pro: false, ready: false });
+
+    await act(async () => open());
+    await waitFor(() => expect(result.current).toEqual({ pro: false, ready: true }));
+    expect(seen.filter((status) => status.pro)).toEqual([]);
+  });
+
+  it("signs the next account in to RevenueCat before anything is read for it, and never shows it the last one's Pro", async () => {
+    mockUserId = 'user-22';
+    mockActive = { 'user-22': ['skip_budget_pro'] };
+    const { wrapper } = appWrapper();
+    const seen: { userId: string | null; pro: boolean }[] = [];
+    const { result, rerender } = await renderHook(
+      () => {
+        const status = mod.useProSource();
+        seen.push({ userId: mockUserId, pro: status.pro });
+        return status;
+      },
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current).toEqual({ pro: true, ready: true }));
+
+    mockUserId = null;
+    await rerender({});
+    mockSdkCalls.length = 0;
+
+    mockUserId = 'user-23';
+    await rerender({});
+    await waitFor(() => expect(result.current).toEqual({ pro: false, ready: true }));
+
+    expect(mockSdkCalls).toEqual(['logIn:user-23', 'read:user-23']);
+    expect(mockSdkUser).toBe('user-23');
+    expect(seen.filter((entry) => entry.userId === 'user-23' && entry.pro)).toEqual([]);
+  });
+
+  it("keeps a signed-in account's server answer where a purchase's refresh finds it", async () => {
+    mockUserId = 'user-25';
+    mockServerPro = {};
+    const { client, wrapper } = appWrapper();
+    const { result } = await renderHook(() => mod.useProSource(), { wrapper });
+    await waitFor(() => expect(result.current).toEqual({ pro: false, ready: true }));
+    expect(client.getQueryData(['entitlement', 'user-25'])).toBe(false);
+
+    // The webhook has written the row; a purchase asks every entitlement read again.
+    mockServerPro = { 'user-25': true };
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: ['entitlement'] });
+    });
+    await waitFor(() => expect(result.current).toEqual({ pro: true, ready: true }));
+  });
+
+  it('leaves RevenueCat on the account until the next sign-in, never on an anonymous id', async () => {
+    // RevenueCat's rule for apps that use only their own ids: never call logOut. The anonymous id
+    // it makes would become the original id of the next new account to sign in here, which isFor
+    // then refuses, and a renewal seen meanwhile could move the subscription onto it.
+    mockUserId = 'user-24';
+    const { wrapper } = appWrapper();
+    const bridge = await renderHook(() => mod.useConfigurePurchases(), { wrapper });
+    await waitFor(() => expect(mockSdkUser).toBe('user-24'));
+
+    mockUserId = null;
+    await bridge.rerender({});
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockLogOut).not.toHaveBeenCalled();
+    expect(mockSdkUser).toBe('user-24');
+    expect(mockListeners.size).toBe(0);
   });
 });

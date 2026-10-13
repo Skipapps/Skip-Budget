@@ -150,6 +150,9 @@ export function useProSource(): ProStatus {
   // Remembered with the account it belongs to, so after a sign-out the next account never inherits
   // the previous one's answer while its own is on the way.
   const [sdk, setSdk] = useState<{ userId: string; pro: boolean } | null>(null);
+  // Dropped at sign-out too, so an account signing back in waits for its answer afresh: Pro may
+  // have ended meanwhile.
+  if (!userId && sdk) setSdk(null);
   const sdkPro = sdk && sdk.userId === userId ? sdk.pro : null;
   // Development-only, opt-in. It changes the answer below and nothing else: the SDK listener,
   // server query, offerings, purchase and restore still run. 'free' exists because a sandbox
@@ -178,6 +181,18 @@ export function useProSource(): ProStatus {
       return data === true;
     },
   });
+
+  // The server's answers go at sign-out for the same reason. RevenueCat is left signed in as the
+  // account until the next sign-in's logIn: logOut would make an anonymous id, which the next new
+  // account to sign in here is merged into (its original id, so isFor refuses it), and a renewal
+  // seen meanwhile could move the subscription onto it.
+  useEffect(() => {
+    if (userId) return;
+    client.removeQueries({
+      queryKey: ['entitlement'],
+      predicate: (query) => query.queryKey[1] != null,
+    });
+  }, [userId, client]);
 
   useEffect(() => {
     if (!RC_KEY || !userId) return;
