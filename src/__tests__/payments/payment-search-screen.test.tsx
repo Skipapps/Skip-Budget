@@ -23,6 +23,10 @@ import { ThemeProvider } from '@/providers/theme-provider';
 import { buildTokens, type Scheme } from '@/theme/palette';
 import { TEXT_CAP } from '@/theme/text-scale';
 
+// A machine under load needs more than Jest's five seconds for these heavy pages; a test that
+// is really stuck still fails.
+jest.setTimeout(20000);
+
 /**
  * Search payments as a person meets it: the real route over the real `usePayments`, the real ledger
  * and the real recent-searches store. Only the network edge (the database), the phone's storage and

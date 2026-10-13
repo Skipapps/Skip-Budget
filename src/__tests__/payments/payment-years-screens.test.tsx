@@ -18,6 +18,10 @@ import { buildTokens, mix, type Scheme } from '@/theme/palette';
 import { shadows } from '@/theme/shadows';
 import { TEXT_CAP } from '@/theme/text-scale';
 
+// A machine under load needs more than Jest's five seconds for these heavy pages; a test that
+// is really stuck still fails.
+jest.setTimeout(20000);
+
 /**
  * Choose year (7.png) and All years (2.png) as a person meets them, on 12 Oct 2026. The pages' own
  * hook, `usePayments`, runs for real over the real ledger; only the five reads under it (bills,

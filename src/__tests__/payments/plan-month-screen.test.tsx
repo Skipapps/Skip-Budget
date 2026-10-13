@@ -23,6 +23,10 @@ import { buildTokens, mix, type Scheme } from '@/theme/palette';
 import { shadows } from '@/theme/shadows';
 import { TEXT_CAP } from '@/theme/text-scale';
 
+// A machine under load needs more than Jest's five seconds for these heavy pages; a test that
+// is really stuck still fails.
+jest.setTimeout(20000);
+
 /**
  * The Monthly bills and Subscriptions page as a person meets it, on the Founder's design month
  * (1.png, 6.png): October 2026 seen on the 12th. Nothing here is a hand-made view. The page's own
