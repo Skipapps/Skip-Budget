@@ -148,6 +148,8 @@ const mockState = (read: ReadName) => {
     isLoading: mockLoading.has(read),
     isPending: mockLoading.has(read),
     isError: mockFailing.has(read) || mockReloadFailed.has(read),
+    // What a combined read says of itself; a plain one is judged by its data instead.
+    refreshFailed: mockReloadFailed.has(read) && !mockFailing.has(read),
     refetch: mockRefetch[read],
   };
 };
@@ -208,7 +210,12 @@ jest.mock('@/api/queries', () => ({
 
 jest.mock('@/api/loans', () => ({
   ...jest.requireActual('@/api/loans'),
-  useLoans: () => ({ loans: mockLoans, ...mockState('loans') }),
+  // As the hook says it: `isError` only with nothing cached, a failed reload is `refreshFailed`.
+  useLoans: () => ({
+    loans: mockLoans,
+    ...mockState('loans'),
+    isError: mockFailing.has('loans'),
+  }),
 }));
 
 jest.mock('@/api/payment-ledger', () => ({
@@ -241,6 +248,23 @@ const mockPicker = jest.fn((params: PeriodPickerParams) => ({
   params,
 }));
 const draw = () => render(<InsightsScreen periodHref={mockPicker as never} />);
+
+const NOTE = 'Couldn’t refresh · showing your last figures';
+
+/** What is drawn straight after the plum card, top to bottom. */
+function afterHero(): string | undefined {
+  const drawn: string[] = [];
+  const walk = (node: unknown): void => {
+    if (node == null) return;
+    if (typeof node === 'string') return void drawn.push(node);
+    if (Array.isArray(node)) return node.forEach(walk);
+    const element = node as { props?: { testID?: string }; children?: unknown[] | null };
+    (element.children ?? []).forEach(walk);
+    if (element.props?.testID === 'insights-hero') drawn.push('<end of hero>');
+  };
+  walk(screen.toJSON());
+  return drawn[drawn.indexOf('<end of hero>') + 1];
+}
 
 function loan(
   id: string,
@@ -765,6 +789,8 @@ describe('Insights — a read that fails', () => {
       expect(card.getByText(FAILURE_MESSAGE)).toBeTruthy();
       expect(screen.getAllByText(FAILURE_MESSAGE)).toHaveLength(1);
       expect(screen.queryByText(figure)).toBeNull();
+      // Nothing older is showing there, so nothing is said about refreshing.
+      expect(screen.queryByText(NOTE)).toBeNull();
       // Everything else is still drawn.
       expect(within(screen.getByTestId('insights-hero')).getByText('$8,400.01')).toBeTruthy();
       const others = OWN.filter(([other]) => other !== id).map(([, , otherFigure]) => otherFigure);
@@ -891,6 +917,60 @@ describe('Insights — a read that fails', () => {
         drawn: true,
       });
     }
+    // Said once, straight under the plum card.
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    expect(afterHero()).toBe(NOTE);
+  });
+
+  it('keeps Goals and Savings when their reload fails behind them, with the note', async () => {
+    fillThePage();
+    mockReloadFailed = new Set<ReadName>(['goals', 'savings']);
+    await draw();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect(screen.getByTestId('insights-goals')).toBeTruthy();
+    expect(screen.getByTestId('insights-savings')).toBeTruthy();
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    expect(afterHero()).toBe(NOTE);
+  });
+
+  it('keeps the Loans card when its reload fails behind it, with the note', async () => {
+    fillThePage();
+    mockReloadFailed = new Set<ReadName>(['loans']);
+    await draw();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect(section('loans').getByText('Monthly payments')).toBeTruthy();
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    expect(afterHero()).toBe(NOTE);
+  });
+
+  it('keeps a failed section’s line in its own card, the note only under the plum card', async () => {
+    fillThePage();
+    // Loans has nothing cached; Goals is showing figures from before a failed reload.
+    mockFailing = new Set<ReadName>(['loans']);
+    mockReloadFailed = new Set<ReadName>(['goals']);
+    await draw();
+    const card = within(screen.getByTestId('insights-section-loans-failed'));
+    expect(card.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    expect(card.queryByText(NOTE)).toBeNull();
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    expect(afterHero()).toBe(NOTE);
+    expect(screen.getByTestId('insights-goals')).toBeTruthy();
+  });
+
+  it('says nothing about refreshing while every read is fresh', async () => {
+    fillThePage();
+    await draw();
+    expect(screen.getByTestId('insights-hero')).toBeTruthy();
+    expect(screen.queryByText(NOTE)).toBeNull();
+  });
+
+  it('puts no note beside the plum card’s failure', async () => {
+    fillThePage();
+    mockFailing = new Set<ReadName>(['ledger']);
+    mockReloadFailed = new Set<ReadName>(['habits', 'goals']);
+    await draw();
+    expect(screen.getByTestId('insights-hero-failed')).toBeTruthy();
+    expect(screen.queryByText(NOTE)).toBeNull();
   });
 
   it('holds each section’s room while its read is out, the figures nowhere', async () => {

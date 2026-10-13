@@ -12,11 +12,13 @@ import { HabitsHero } from '@/components/habits/habits-hero';
 import { useHabitDays } from '@/components/habits/use-habit-days';
 import { WeekSelector } from '@/components/habits/week-selector';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
 import { failureText } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
+import { anyRefreshFailed, failedEmpty } from '@/lib/query-state';
 import { earliestWeek, savedAllTime, shiftWeek, spentInWeek, weekStartOf } from '@/lib/habit-week';
 import { withTap } from '@/lib/press';
 import { useToday } from '@/lib/use-today';
@@ -99,11 +101,8 @@ export default function HabitsScreen() {
   const loading = habits.isPending || stopped.isPending || taps.isPending;
   // Only a read with nothing to show is a failed page; a refresh that fails keeps the last read.
   // Without the stopped habits Saved so far would be short, so their read counts like the others.
-  const failed =
-    (habits.isError && !habits.data) ||
-    (stopped.isError && !stopped.data) ||
-    (taps.isError && !taps.data);
-  const refreshFailed = habits.isError || stopped.isError || taps.isError;
+  const failed = failedEmpty(habits) || failedEmpty(stopped) || failedEmpty(taps);
+  const refreshNote = anyRefreshFailed([habits, stopped, taps]);
 
   return (
     <Screen
@@ -137,6 +136,7 @@ export default function HabitsScreen() {
               saved={formatCurrency(saved)}
             />
           ) : null}
+          <RefreshNote show={refreshNote} />
           <PageState
             art={artwork.emptyWallet}
             title={t('habits.empty.title')}
@@ -152,6 +152,7 @@ export default function HabitsScreen() {
             spent={formatCurrency(spent)}
             saved={formatCurrency(saved)}
           />
+          <RefreshNote show={refreshNote} />
 
           <WeekSelector
             weekStart={weekStart}
@@ -164,9 +165,8 @@ export default function HabitsScreen() {
             onThisWeek={back > 0 ? () => moveTo(0) : undefined}
           />
 
-          {refreshFailed || days.failed ? (
-            <FailureLine onRetry={refreshFailed ? refetch : undefined} />
-          ) : null}
+          {/* A day tap that did not go through; there is nothing to read again. */}
+          {days.failed ? <FailureLine /> : null}
 
           <View className="mt-[16px] w-full gap-[16px] pb-10">
             {active.map((habit) => (

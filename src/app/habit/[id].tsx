@@ -8,7 +8,6 @@ import { useHistoryFloor } from '@/api/history';
 import { habitMaths, useHabit, useHabitTaps, type HabitRow } from '@/api/habits';
 import { usePaymentSources } from '@/api/queries';
 import { localDate } from '@/components/habits/day-row';
-import { FailureLine } from '@/components/habits/failure-line';
 import { habitColorName } from '@/components/habits/habit-color-swatches';
 import { HabitIcon } from '@/components/habits/habit-icon';
 import { HabitAboutCard, HabitWeekCard } from '@/components/habits/habit-week-card';
@@ -17,6 +16,7 @@ import type { PlanDetailRow } from '@/components/plans/detail-parts';
 import { HistoryNotice } from '@/components/pro/history-notice';
 import { goBack } from '@/components/ui/back-button';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { SectionHeading } from '@/components/ui/typography';
@@ -25,6 +25,7 @@ import { monthShort } from '@/i18n/calendar';
 import { formatFullDate } from '@/lib/date';
 import { failureText } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
+import { anyRefreshFailed, failedEmpty } from '@/lib/query-state';
 import {
   countsFrom,
   habitHistory,
@@ -126,8 +127,7 @@ export default function HabitDetailScreen() {
   };
 
   // Only a read with nothing to show is a failed page; a refresh that fails keeps the last read.
-  const refreshFailed = habit.isError || taps.isError;
-  if ((habit.isError && row === undefined) || (taps.isError && !taps.data)) {
+  if (failedEmpty(habit) || failedEmpty(taps)) {
     return (
       <Screen showBack>
         <PageState
@@ -212,7 +212,7 @@ export default function HabitDetailScreen() {
           skipped: t('habits.detail.daysSkipped', { count: figures.skipped }),
         })}
       </Text>
-      {refreshFailed ? <FailureLine onRetry={refetch} /> : null}
+      <RefreshNote show={anyRefreshFailed([habit, taps])} />
 
       <SectionHeading
         className="mt-[26px]"

@@ -18,6 +18,7 @@ import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { t } from '@/i18n';
 import { failureText } from '@/lib/failure';
+import { failedEmpty } from '@/lib/query-state';
 import { useToast } from '@/providers/toast-context';
 
 /**
@@ -55,7 +56,8 @@ export default function HelloScreen() {
   }
 
   // A failed read is not an empty profile: answering would overwrite the name already on record.
-  if (profile.isError) {
+  // A reload that fails behind a profile already read keeps that answer.
+  if (failedEmpty(profile)) {
     return (
       <Screen>
         <PageState

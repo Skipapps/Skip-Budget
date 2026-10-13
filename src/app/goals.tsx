@@ -12,6 +12,7 @@ import {
 } from '@/components/savings/goal-cards';
 import { paceOf } from '@/components/savings/goal-words';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { SectionHeading } from '@/components/ui/typography';
@@ -23,10 +24,10 @@ import { useArtwork } from '@/theme/artwork';
 /** Every goal: what has been saved toward them, the ones still going, and the ones reached. */
 export default function GoalsScreen() {
   const artwork = useArtwork();
-  const { goals, summary, isPending, isError, refetch } = useGoals();
+  const { summary, isPending, isError, refreshFailed, refetch } = useGoals();
   const { active, done } = summary;
-  // Only when nothing could be read: a failed reload behind the list keeps the list.
-  const unread = isError && goals.length === 0;
+  // Only when a read has nothing to show: a goal counted without its moves would say a wrong figure.
+  const unread = isError && !refreshFailed;
   const newGoal = () => router.push('/goal-calculator');
   const open = (id: string) => router.push({ pathname: '/goal/[id]', params: { id } });
 
@@ -60,6 +61,7 @@ export default function GoalsScreen() {
               done={done.length}
             />
           )}
+          <RefreshNote show={refreshFailed} />
 
           {active.length > 0 ? (
             <>

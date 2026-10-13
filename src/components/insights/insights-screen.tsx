@@ -45,6 +45,7 @@ import {
 } from '@/components/insights/use-insights-period';
 import { cardOf, loansPageSummary, priceLoans } from '@/components/loans/priced-loans';
 import { useProGate } from '@/components/pro/pro-gate';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
@@ -67,6 +68,7 @@ import {
 import { habitsSummary, movedThisMonth, nextDue, subscriptionCost } from '@/lib/insights-sections';
 import { fromCents, toCents } from '@/lib/money';
 import { oneOffsInMonth, scheduledPerMonth } from '@/lib/pay';
+import { anyRefreshFailed } from '@/lib/query-state';
 import { useToday } from '@/lib/use-today';
 
 /** How many dues the Bills & subscriptions card lists. */
@@ -297,6 +299,28 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
 
   const current = isCurrentPeriod(period, today);
   const month = shownMonth(period, today);
+  // These two pass on a raw isError: only a read with nothing cached fails their section.
+  const goalsFailed = goals.isError && !goals.refreshFailed;
+  const savingsFailed = savings.isError && !savings.refreshFailed;
+  const refreshNote =
+    heroLedger.refreshFailed ||
+    periodLedger.refreshFailed ||
+    balances.refreshFailed ||
+    loans.refreshFailed ||
+    goals.refreshFailed ||
+    savings.refreshFailed ||
+    anyRefreshFailed([
+      receipts,
+      subscriptions,
+      bills,
+      spendCategories,
+      salary,
+      cards,
+      habits,
+      stoppedHabits,
+      taps,
+    ]);
+
   const year = shownYear(period, today);
   const cardLabel =
     period.mode === 'month'
@@ -318,6 +342,8 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
           <InsightsHero figures={hero} />
         )}
       </View>
+      {/* One note for every figure on the page, never beside the plum card's failure. */}
+      <RefreshNote show={refreshNote && spendState.kind !== 'failed'} />
 
       <IncomeSection state={together([salary])} figures={income} />
 
@@ -376,7 +402,7 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
       <HabitsSection state={together([habits, stoppedHabits, taps])} summary={habitSummary} />
       <GoalsSection
         state={together([
-          { isLoading: goals.isPending, isError: goals.isError, refetch: goals.refetch },
+          { isLoading: goals.isPending, isError: goalsFailed, refetch: goals.refetch },
         ])}
         goals={{
           saved: goals.summary.saved,
@@ -387,7 +413,7 @@ function InsightsBody({ periodHref }: { periodHref: PeriodPickerHref }) {
       />
       <SavingsSection
         state={together([
-          { isLoading: savings.isPending, isError: savings.isError, refetch: savings.refetch },
+          { isLoading: savings.isPending, isError: savingsFailed, refetch: savings.refetch },
         ])}
         savings={{
           moved: moved.moved,

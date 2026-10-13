@@ -107,7 +107,26 @@ let mockMoves: MoveRow[];
 let mockReady: number;
 let mockUpdate: Update;
 let mockDue: string | null;
+const NOTE = 'Couldn’t refresh · showing your last figures';
+
+/** What is drawn straight after the Send page's "from savings" card. */
+function afterSendFrom(): string | undefined {
+  const drawn: string[] = [];
+  const walk = (node: unknown): void => {
+    if (node == null) return;
+    if (typeof node === 'string') return void drawn.push(node);
+    if (Array.isArray(node)) return node.forEach(walk);
+    const element = node as { props?: { testID?: string }; children?: unknown[] | null };
+    (element.children ?? []).forEach(walk);
+    if (element.props?.testID === 'send-from') drawn.push('<end of send-from>');
+  };
+  walk(screen.toJSON());
+  return drawn[drawn.indexOf('<end of send-from>') + 1];
+}
+
+// A reload failed behind what is showing; a read failed with nothing cached.
 let mockReloadFailed = false;
+let mockNothingRead = false;
 const mockSavePot = jest.fn();
 const mockRemovePot = jest.fn();
 const mockSend = jest.fn();
@@ -125,7 +144,8 @@ jest.mock('@/api/savings', () => {
       withMoneyLeft: mockPots.filter((pot) => pot.left > 0),
     },
     isPending: false,
-    isError: mockReloadFailed,
+    isError: mockReloadFailed || mockNothingRead,
+    refreshFailed: mockReloadFailed && !mockNothingRead,
     refetch: mockRefetch,
   });
   return {
@@ -168,6 +188,7 @@ beforeEach(() => {
   mockPathname = '/home';
   mockFocused = true;
   mockReloadFailed = false;
+  mockNothingRead = false;
   mockPots = [SEPTEMBER, AUGUST, JULY];
   // August's $520 and July's $200 are in goals.
   mockMoves = [
@@ -550,6 +571,26 @@ describe('sending to goals', () => {
     await rerender(<SendToGoalsScreen />);
     expect(screen.getByText('$50 to goals')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    // Said once, straight under what is ready to send.
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    expect(afterSendFrom()).toBe(NOTE);
+  });
+
+  it('says nothing about refreshing while its reads are fresh', async () => {
+    await render(<SendToGoalsScreen />);
+    expect(screen.getByTestId('send-from')).toBeTruthy();
+    expect(screen.queryByText(NOTE)).toBeNull();
+  });
+
+  it('is the failure page, not a figure without the moves, when a read has nothing cached', async () => {
+    // The pots are there but the moves never loaded: ready to send would count money in goals.
+    mockNothingRead = true;
+    await render(<SendToGoalsScreen />);
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+    expect(screen.queryByTestId('send-from')).toBeNull();
+    expect(screen.queryByText(NOTE)).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
+    expect(mockRefetch).toHaveBeenCalled();
   });
 
   it('invites a first goal when there is none, or keeps the money in savings', async () => {

@@ -422,6 +422,24 @@ describe('when there is no row to change', () => {
     expect(mockRead.refetch).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the page, not the failure line, when a reload fails behind the row it read', async () => {
+    mockRead = { data: SUBSCRIPTION, isError: true, isFetched: true, refetch: jest.fn() };
+    const screen = await render(<ChangeLogoScreen />);
+
+    expect(screen.getByTestId('mark:calmair.com')).toBeTruthy();
+    expect(saveButton(screen)).toBeTruthy();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+  });
+
+  it('still says the row is gone when a reload fails behind a row read as gone', async () => {
+    mockRead = { data: null, isError: true, isFetched: true, refetch: jest.fn() };
+    const screen = await render(<ChangeLogoScreen />);
+
+    expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    await fireEvent.press(screen.getByText('Go back'));
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ['the row is gone', () => opening('subscription', null)],
     ['the link names no kind', () => (mockParams = { id: 's1' })],

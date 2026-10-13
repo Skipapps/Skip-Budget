@@ -27,6 +27,7 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { TextLink } from '@/components/ui/text-link';
 import { t } from '@/i18n';
 import { failureMessage, failureText } from '@/lib/failure';
+import { failedEmpty } from '@/lib/query-state';
 import { success, warn } from '@/lib/haptics';
 import { useToast } from '@/providers/toast-context';
 import { logoDomainOf } from '@/lib/logo-domain';
@@ -82,7 +83,8 @@ export default function ChangeLogoScreen() {
     );
   }
 
-  if (query.isError) {
+  // A reload that fails behind a row already read keeps the page; only nothing read is a failure.
+  if (failedEmpty(query)) {
     return (
       <Screen title={LOGO_COPY.changeLogo} showBack>
         <PageState

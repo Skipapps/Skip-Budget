@@ -141,6 +141,8 @@ type Screen = Awaited<ReturnType<typeof render>>;
 const NBSP = ' ';
 
 /** Every word drawn, top to bottom, read off the nodes: a text matcher would fold no-break spaces. */
+const NOTE = 'Couldn’t refresh · showing your last figures';
+
 const shown = (screen: Pick<Screen, 'getAllByText'>) =>
   screen.getAllByText(/./).map((text) => String(text.props.children));
 
@@ -736,20 +738,34 @@ describe('a habit’s page: states', () => {
     expect(mockTaps.refetch).toHaveBeenCalled();
   });
 
-  it('keeps the page when a refresh fails, with the failure line and Try again', async () => {
-    mockTaps = { ...mockTaps, isError: true };
-    mockHabit = { ...mockHabit, isError: true };
-    const screen = await render(<HabitDetailScreen />);
+  it.each([
+    ['both reads', true, true],
+    ['the habit', true, false],
+    ['the receipts', false, true],
+  ])(
+    'keeps the page when a refresh of %s fails, with the note under the tally',
+    async (_reads, habitFails, tapsFails) => {
+      mockHabit = { ...mockHabit, isError: habitFails };
+      mockTaps = { ...mockTaps, isError: tapsFails };
+      const screen = await render(<HabitDetailScreen />);
 
-    expect(shown(screen)).toEqual(
-      expect.arrayContaining(['$5.00 each time · since Oct 5', '$11.50', 'Week by week']),
-    );
-    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Try again'));
-    expect(mockHabit.refetch).toHaveBeenCalled();
-    expect(mockTaps.refetch).toHaveBeenCalled();
-    // A habit still there is not taken for a deleted one because its refresh failed.
-    expect(router.back).not.toHaveBeenCalled();
+      const words = shown(screen);
+      expect(words).toEqual(
+        expect.arrayContaining(['$5.00 each time · since Oct 5', '$11.50', 'Week by week']),
+      );
+      expect(screen.getAllByText(NOTE)).toHaveLength(1);
+      expect(words[words.indexOf('2 days bought · 2 days skipped') + 1]).toBe(NOTE);
+      // The figures are there, only possibly behind: not the failure line.
+      expect(screen.queryByText('Something went wrong. Please try again.')).toBeNull();
+      // A habit still there is not taken for a deleted one because its refresh failed.
+      expect(router.back).not.toHaveBeenCalled();
+    },
+  );
+
+  it('says nothing about refreshing while both reads are fresh', async () => {
+    const screen = await render(<HabitDetailScreen />);
+    expect(screen.getByText('2 days bought · 2 days skipped')).toBeTruthy();
+    expect(screen.queryByText(NOTE)).toBeNull();
   });
 
   it('waits on a skeleton while loading', async () => {

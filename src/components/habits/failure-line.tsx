@@ -6,9 +6,9 @@ import { failureText } from '@/lib/failure';
 import { TEXT_CAP } from '@/theme/text-scale';
 
 /**
- * The one failure line, under what is already on screen: a tap that did not go through, or a
- * refresh that failed while the last read still shows. Try again only when there is something to
- * read again.
+ * The one failure line, under what is already on screen: a tap that did not go through. A reload
+ * that fails while the last read still shows is RefreshNote's, never this. Try again only when
+ * there is something to read again.
  */
 export function FailureLine({ onRetry }: { onRetry?: () => void }) {
   return (

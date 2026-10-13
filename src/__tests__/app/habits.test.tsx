@@ -152,6 +152,22 @@ function deferred<T>() {
 type Screen = Awaited<ReturnType<typeof render>>;
 const NBSP = ' ';
 const FAILURE = 'Something went wrong. Please try again.';
+const NOTE = 'Couldn’t refresh · showing your last figures';
+
+/** What is drawn straight after the hero, top to bottom. */
+function afterHero(screen: Screen): string | undefined {
+  type Node = { props: Record<string, unknown>; children: (Node | string)[] | null };
+  const drawn: string[] = [];
+  const walk = (node: Node | string | (Node | string)[] | null) => {
+    if (node === null) return;
+    if (typeof node === 'string') return void drawn.push(node);
+    if (Array.isArray(node)) return node.forEach(walk);
+    node.children?.forEach(walk);
+    if (node.props.testID === 'habits-hero') drawn.push('<end of hero>');
+  };
+  walk(screen.toJSON() as never);
+  return drawn[drawn.indexOf('<end of hero>') + 1];
+}
 
 /** Every word drawn or read out, so a raw key or an unfilled {param} cannot hide anywhere. */
 function wordsOn(screen: Screen): string[] {
@@ -223,16 +239,35 @@ describe('the habits dashboard: states', () => {
     expect(mockTaps.refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps what it last read when a refresh fails, with the failure line and Try again', async () => {
+  it('keeps what it last read when a refresh fails, with the note straight under the hero', async () => {
     mockHabits = { ...query([COFFEE, DELIVERY]), isError: true };
     const screen = await render(<HabitsScreen />);
 
     expect(hero(screen)).toBe('Spent this week, $35.00. Saved so far, $235.00.');
     expect(screen.getByLabelText('Coffee, Tuesday, October 6, not bought')).toBeEnabled();
-    expect(screen.getByText(FAILURE)).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Try again'));
-    expect(mockHabits.refetch).toHaveBeenCalledTimes(1);
-    expect(mockTaps.refetch).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    expect(afterHero(screen)).toBe(NOTE);
+    // The figures are there, only possibly behind: not the failure line.
+    expect(screen.queryByText(FAILURE)).toBeNull();
+  });
+
+  it.each([['stopped habits'], ['receipts']])(
+    'says the same when only the %s fail to reload',
+    async (read) => {
+      if (read === 'receipts') mockTaps = { ...query(TAPS), isError: true };
+      else mockStopped = { ...query<HabitRow[]>([]), isError: true };
+      const screen = await render(<HabitsScreen />);
+
+      expect(hero(screen)).toBe('Spent this week, $35.00. Saved so far, $235.00.');
+      expect(afterHero(screen)).toBe(NOTE);
+      expect(screen.queryByText(FAILURE)).toBeNull();
+    },
+  );
+
+  it('says nothing about refreshing while every read is fresh', async () => {
+    const screen = await render(<HabitsScreen />);
+    expect(hero(screen)).toBe('Spent this week, $35.00. Saved so far, $235.00.');
+    expect(screen.queryByText(NOTE)).toBeNull();
   });
 
   it('invites a first habit when there are none, with no hero or week selector', async () => {
@@ -458,6 +493,26 @@ describe('the habits dashboard: hero and weeks', () => {
     ).toEqual(['Saved so far', '$45.00']);
     expect(screen.queryByText('Spent this week')).toBeNull();
     expect(screen.getByText('Track a spending habit')).toBeTruthy();
+  });
+
+  it('keeps the stopped habits’ hero and the empty page when a refresh fails, with the note', async () => {
+    mockHabits = { ...query<HabitRow[]>([]), isError: true };
+    mockStopped = query([
+      habit({
+        id: 'gone',
+        name: 'Snacks',
+        price: 9,
+        started_on: '2026-09-28',
+        saved_from: '2026-09-28',
+        archived_at: new Date(2026, 9, 8, 20, 0).toISOString(),
+      }),
+    ]);
+    const screen = await render(<HabitsScreen />);
+
+    expect(hero(screen)).toBe('Spent this week, $9.00. Saved so far, $81.00.');
+    expect(afterHero(screen)).toBe(NOTE);
+    expect(screen.getByText('Track a spending habit')).toBeTruthy();
+    expect(screen.queryByText(FAILURE)).toBeNull();
   });
 
   it('keeps the plain empty page when the stopped habits saved and spent nothing', async () => {

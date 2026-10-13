@@ -5,11 +5,13 @@ import { Text, View } from 'react-native';
 import { useMarkNewsSeen } from '@/api/news';
 import { useAnnouncements, type AnnouncementRow } from '@/api/queries';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { failureText } from '@/lib/failure';
+import { failedEmpty, refreshFailed } from '@/lib/query-state';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 
@@ -55,11 +57,13 @@ export default function NotificationsScreen() {
       onRefresh={() => void news.refetch()}
       refreshing={news.isRefetching}
     >
+      {/* The list has no summary, so the note heads it. */}
+      <RefreshNote show={refreshFailed(news)} />
       {news.isPending ? (
         <View className="mt-6 w-full">
           <SkeletonList rows={3} />
         </View>
-      ) : news.isError ? (
+      ) : failedEmpty(news) ? (
         <PageState
           art={artwork.error}
           title={failureText()}

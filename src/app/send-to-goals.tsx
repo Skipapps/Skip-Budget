@@ -15,6 +15,7 @@ import { AmountPad } from '@/components/ui/amount-pad';
 import { goBack } from '@/components/ui/back-button';
 import { Button } from '@/components/ui/button';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { SectionHeading } from '@/components/ui/typography';
@@ -54,9 +55,10 @@ export default function SendToGoalsScreen() {
       </Screen>
     );
   }
-  // Only when nothing could be read: a failed reload behind the page keeps it, and what was typed.
+  // Only when a read has nothing to show: a failed reload behind the page keeps it, and what was
+  // typed. Ready to send worked out without the moves would offer money already in goals.
   const unread =
-    (savings.isError && savings.pots.length === 0) || (goals.isError && goals.goals.length === 0);
+    (savings.isError && !savings.refreshFailed) || (goals.isError && !goals.refreshFailed);
   if (unread) {
     return (
       <Screen title={t('savings.sendPage.title')} showBack>
@@ -83,6 +85,7 @@ export default function SendToGoalsScreen() {
       fillFirst={Boolean(first) && ordered[0]?.id === first}
       preferPotId={pot ?? null}
       onGone={refresh}
+      refreshFailed={savings.refreshFailed || goals.refreshFailed}
     />
   );
 }
@@ -94,6 +97,7 @@ function SendForm({
   fillFirst,
   preferPotId,
   onGone,
+  refreshFailed,
 }: {
   available: number;
   pots: readonly PotView[];
@@ -102,6 +106,7 @@ function SendForm({
   preferPotId: string | null;
   /** A goal or pot went on another phone: read again, and the page drops it. */
   onGone: () => void;
+  refreshFailed: boolean;
 }) {
   const toast = useToast();
   const send = useSendToGoals();
@@ -192,6 +197,7 @@ function SendForm({
           available={available}
           pots={pots.map((pot) => ({ name: potName(pot), amount: pot.left }))}
         />
+        <RefreshNote show={refreshFailed} />
         <GoalInviteCard on="send" />
       </Screen>
     );
@@ -231,6 +237,7 @@ function SendForm({
         available={available}
         pots={pots.map((pot) => ({ name: potName(pot), amount: pot.left }))}
       />
+      <RefreshNote show={refreshFailed} />
 
       <View className="mb-3 mt-6 w-full flex-row flex-wrap items-baseline justify-between gap-x-3 px-1">
         <View className="min-w-0 shrink">
