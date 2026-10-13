@@ -47,6 +47,17 @@ jest.mock('@/api/mutations', () => ({
   useSaveLoan: () => ({ mutateAsync: mockSave, isPending: false }),
   useUpdateLoan: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useDeleteBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useStopBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
+}));
+jest.mock('@/api/past-charges', () => ({
+  usePastCharges: () => ({
+    ready: true,
+    count: 0,
+    lastChargedOn: null,
+    choose: async () => 'upcoming',
+    chooseDelete: async () => 'everything',
+    retry: jest.fn(),
+  }),
 }));
 // The edit pages' loading state; a new loan never shows it.
 jest.mock('@/components/ui/skeleton', () => ({ SkeletonList: () => null, Skeleton: () => null }));

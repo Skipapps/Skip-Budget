@@ -19,6 +19,7 @@ export const toastMessages = defineMessages({
     fr: 'Facture mise à jour',
   },
   'toast.bill.deleted': { en: 'Bill deleted', es: 'Factura eliminada', fr: 'Facture supprimée' },
+  'toast.bill.stopped': { en: 'Bill stopped', es: 'Factura detenida', fr: 'Facture arrêtée' },
   'toast.subscription.added': {
     en: 'Subscription added',
     es: 'Suscripción agregada',
@@ -33,6 +34,11 @@ export const toastMessages = defineMessages({
     en: 'Subscription deleted',
     es: 'Suscripción eliminada',
     fr: 'Abonnement supprimé',
+  },
+  'toast.subscription.stopped': {
+    en: 'Subscription cancelled',
+    es: 'Suscripción cancelada',
+    fr: 'Abonnement annulé',
   },
   'toast.receipt.added': { en: 'Receipt added', es: 'Recibo agregado', fr: 'Reçu ajouté' },
   'toast.receipt.updated': {
@@ -55,6 +61,7 @@ export const toastMessages = defineMessages({
     fr: 'Habitude mise à jour',
   },
   'toast.habit.deleted': { en: 'Habit deleted', es: 'Hábito eliminado', fr: 'Habitude supprimée' },
+  'toast.habit.stopped': { en: 'Habit stopped', es: 'Hábito detenido', fr: 'Habitude arrêtée' },
   'toast.pay.saved': { en: 'Pay saved', es: 'Sueldo guardado', fr: 'Paie enregistrée' },
   'toast.loan.saved': { en: 'Loan saved', es: 'Préstamo guardado', fr: 'Prêt enregistré' },
   'toast.loan.updated': {
@@ -63,6 +70,7 @@ export const toastMessages = defineMessages({
     fr: 'Prêt mis à jour',
   },
   'toast.loan.deleted': { en: 'Loan deleted', es: 'Préstamo eliminado', fr: 'Prêt supprimé' },
+  'toast.loan.stopped': { en: 'Loan stopped', es: 'Préstamo detenido', fr: 'Prêt arrêté' },
   'toast.loan.paidOff': { en: 'Loan paid off', es: 'Préstamo liquidado', fr: 'Prêt soldé' },
   'toast.loan.paymentRecorded': {
     en: 'Payment recorded',

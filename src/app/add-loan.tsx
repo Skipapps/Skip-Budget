@@ -1,8 +1,9 @@
-import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useLoanDetail, type LoanDetail } from '@/api/loans';
-import { useDeleteBill, useSaveLoan, useUpdateLoan } from '@/api/mutations';
+import { useDeleteBill, useSaveLoan, useStopBill, useUpdateLoan } from '@/api/mutations';
+import { usePastCharges, type PastChargesScope } from '@/api/past-charges';
 import { usePaymentSources, type PaymentSourceRow } from '@/api/queries';
 import { useApplyReminder, useReminderChoice } from '@/api/reminders';
 import { LoanDetailsView } from '@/components/loans/add/loan-details-view';
@@ -22,6 +23,7 @@ import { LoanKeypadView } from '@/components/loans/add/loan-keypad-view';
 import { loanReminderOn } from '@/components/loans/add/loan-reminder';
 import { LoanReviewView } from '@/components/loans/add/loan-review-view';
 import { localDate } from '@/components/loans/loan-words';
+import { loanViewOf } from '@/components/loans/view/loan-view-data';
 import { goBack } from '@/components/ui/back-button';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
@@ -39,7 +41,6 @@ import { finishFlowOn } from '@/lib/nav';
 import { formatFullDate } from '@/lib/date';
 import { billReminderCaption, type LeadDays } from '@/lib/reminder-words';
 import { useToday } from '@/lib/use-today';
-import { useConfirm } from '@/providers/dialog-provider';
 import { useToast } from '@/providers/toast-context';
 import { useArtwork } from '@/theme/artwork';
 
@@ -61,8 +62,14 @@ const rateRange = () =>
  */
 type Editing = {
   billId: string;
+  /** The bill as last read: what its recorded payments copied, and the dates a stop reads. */
+  bill: LoanDetail['bill'];
   /** Kept through the edit: without them Save would end the bill where the loan as lent ends. */
   payoffs: readonly LoanPayoff[] | undefined;
+  /** Payoffs recorded on it, which a delete counts with its payments. */
+  payoffCount: number;
+  /** Paid off or stopped already: its past is kept, so a delete can only remove it. */
+  ended: boolean;
   source: PaymentSourceRow | null;
   reminder: ReturnType<typeof useReminderChoice>;
 };
@@ -89,11 +96,13 @@ function NewLoanScreen({ params }: { params: LoanRouteParams & { view?: string }
 
 /**
  * Changing a saved loan only runs on the loan as read: loading, unreadable and gone are separate
- * answers, never a blank form whose Save would write over it.
+ * answers, never a blank form whose Save would write over it. A finished loan is final, so a link
+ * to change one opens its page instead.
  */
 function EditLoanScreen({ billId }: { billId: string }) {
   const artwork = useArtwork();
   const focused = useIsFocused();
+  const { today } = useToday();
   const detail = useLoanDetail(billId);
   const reminder = useReminderChoice('bill', billId);
   const read = detail.data;
@@ -104,17 +113,24 @@ function EditLoanScreen({ billId }: { billId: string }) {
   const fresh = read?.kind === 'loan' ? read.loan : null;
   if (fresh && fresh !== kept) setKept(fresh);
   const loan = fresh ?? kept;
+  const ended = useMemo(() => Boolean(loan && loanViewOf(loan, today)?.ending), [loan, today]);
   // The page's starting figures, from the first read: a reload while editing never resets them.
   const [opening, setOpening] = useState<{
     form: LoanForm;
     inSpending: boolean;
     payoffs: readonly LoanPayoff[] | undefined;
+    /**
+     * Finished when the page opened. Never re-read: Delete's "Keep past payments" finishes the loan
+     * from this page, and leaving is that flow's own step.
+     */
+    finished: boolean;
   } | null>(null);
   if (loan && !opening) {
     setOpening({
       form: loanFormFromSaved(loan),
       inSpending: loan.bill.in_spending,
       payoffs: readStoredPayoffs(loan.payoffs),
+      finished: ended,
     });
   }
 
@@ -124,6 +140,10 @@ function EditLoanScreen({ billId }: { billId: string }) {
     if (missing && focused) goBack();
   }, [missing, focused]);
 
+  if (opening?.finished) {
+    return <Redirect href={{ pathname: '/loan/[id]', params: { id: billId } }} />;
+  }
+
   if (loan && opening) {
     return (
       <AddLoanFlow
@@ -132,7 +152,10 @@ function EditLoanScreen({ billId }: { billId: string }) {
         initialInSpending={opening.inSpending}
         editing={{
           billId,
+          bill: loan.bill,
           payoffs: opening.payoffs,
+          payoffCount: loan.payoffs.length,
+          ended,
           source: loan.source,
           reminder,
         }}
@@ -199,8 +222,9 @@ function AddLoanFlow({
   const saveLoan = useSaveLoan();
   const updateLoan = useUpdateLoan();
   const deleteBill = useDeleteBill();
+  const stopBill = useStopBill();
+  const pastCharges = usePastCharges('loan', editing?.billId);
   const applyReminder = useApplyReminder();
-  const confirm = useConfirm();
   const toast = useToast();
 
   // Priced only on the page that shows it; the details page asks on Continue.
@@ -289,9 +313,26 @@ function AddLoanFlow({
       : { cardId: null, bankAccountId: chosen.id };
   };
 
+  /**
+   * Whether Save changes what a recorded payment copied from the bill: its name, the monthly
+   * payment (to the cent) or where it is paid from.
+   */
+  const changesPayments = (priced: NonNullable<typeof figures>): boolean => {
+    if (!editing) return false;
+    const stored = editing.bill;
+    const { cardId, bankAccountId } = sourceIds();
+    return (
+      loanName(form).trim() !== stored.name.trim() ||
+      Math.round(priced.save.monthlyPayment * 100) !== Math.round(Number(stored.amount) * 100) ||
+      cardId !== (stored.card_id ?? null) ||
+      bankAccountId !== (stored.bank_account_id ?? null)
+    );
+  };
+
   const writeLoan = async (
     type: NonNullable<LoanForm['type']>,
     priced: NonNullable<typeof figures>,
+    past: PastChargesScope,
   ): Promise<string> => {
     const values = {
       name: loanName(form).trim(),
@@ -311,7 +352,7 @@ function AddLoanFlow({
       inSpending,
     };
     if (editing) {
-      await updateLoan.mutateAsync({ billId: editing.billId, ...values, today });
+      await updateLoan.mutateAsync({ billId: editing.billId, ...values, today, past });
       return editing.billId;
     }
     // Payments made before today happened before the loan was added: not this app's spending.
@@ -334,10 +375,30 @@ function AddLoanFlow({
   const handleSave = async () => {
     if (!figures || !form.type || form.sourceId === null || inFlight.current) return;
     inFlight.current = true;
-    setSaving(true);
     setError(null);
+
+    // Asked before anything is written, so backing out leaves the loan as it was. Once written,
+    // a Save again only retries the reminder, so there is nothing to ask.
+    let past: PastChargesScope = 'upcoming';
+    if (editing && !writtenId) {
+      if (!pastCharges.ready) {
+        inFlight.current = false;
+        pastCharges.retry();
+        warn();
+        setError(failureText());
+        return;
+      }
+      const scope = await pastCharges.choose(loanName(form).trim(), changesPayments(figures));
+      if (scope === null) {
+        inFlight.current = false;
+        return;
+      }
+      past = scope;
+    }
+
+    setSaving(true);
     try {
-      const billId = writtenId ?? (await writeLoan(form.type, figures));
+      const billId = writtenId ?? (await writeLoan(form.type, figures, past));
       setWrittenId(billId);
       await writeReminder(billId);
       leave();
@@ -363,16 +424,29 @@ function AddLoanFlow({
 
   const handleDelete = async () => {
     if (!editing || deleting) return;
-    const ok = await confirm({
-      title: t('loanFlow.edit.deleteTitle'),
-      message: t('loanFlow.edit.deleteMessage'),
-      confirmLabel: t('common.delete'),
-      destructive: true,
-    });
-    if (!ok) return;
-    setDeleting(true);
     setError(null);
+    // The question counts the payments, so it waits for them as Save does.
+    if (!pastCharges.ready) {
+      pastCharges.retry();
+      warn();
+      setError(failureText());
+      return;
+    }
+    const choice = await pastCharges.chooseDelete(editing.bill.name, {
+      stopped: editing.ended,
+      extra: editing.payoffCount,
+    });
+    if (choice === null) return;
+    setDeleting(true);
     try {
+      if (choice === 'keep') {
+        await stopBill.mutateAsync({ bill: editing.bill, today });
+        success();
+        toast('toast.loan.stopped');
+        // Back to the loan's page, which this flow sits on; it now reads Stopped.
+        router.back();
+        return;
+      }
       await deleteBill.mutateAsync(editing.billId);
       toast('toast.loan.deleted', 'deleted');
       // The loan's page and this flow go with it, so Back cannot reach either.

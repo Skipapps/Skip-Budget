@@ -11,6 +11,7 @@ import {
 } from '@/components/bills/bill-filter-sheet';
 import { useArtwork } from '@/theme/artwork';
 import { BillRow, billCategoryLabel } from '@/components/bills/bill-row';
+import { useLoanEndings, type LoanEndingByBill } from '@/components/loans/use-loan-endings';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { PageState } from '@/components/ui/page-state';
@@ -21,14 +22,31 @@ import { getBillCategory } from '@/data/bill-categories';
 import { countsInSpending } from '@/lib/bill-spending';
 import { billPageHref } from '@/lib/ledger-link';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
+import { SectionHeading } from '@/components/ui/typography';
 import { t } from '@/i18n';
-import { toIsoDate } from '@/lib/date';
+import { formatFullDate, toIsoDate } from '@/lib/date';
+import { billStopped } from '@/lib/plan-stop';
 import { groupByDate } from '@/lib/group';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
 import { failureText } from '@/lib/failure';
+
+const dateOf = (iso: string) => formatFullDate(new Date(`${iso}T00:00:00`));
+
+/** What a stopped bill says in place of its due date; a loan's says how the loan ended. */
+function stoppedWords(id: string, endsOn: string | null, loans: LoanEndingByBill): string {
+  const loan = loans.get(id);
+  if (loan?.ending === 'paid' && loan.endedOn) {
+    return t('loan.list.paidOffOn', { date: dateOf(loan.endedOn) });
+  }
+  if (loan) {
+    const on = loan.endedOn ?? endsOn;
+    return on ? t('bills.loanStoppedOn', { date: dateOf(on) }) : t('bills.loanStopped');
+  }
+  return endsOn ? t('bills.stoppedOn', { date: dateOf(endsOn) }) : t('bills.stopped');
+}
 
 export default function BillPlansScreen() {
   const artwork = useArtwork();
@@ -41,6 +59,7 @@ export default function BillPlansScreen() {
   const today = toIsoDate(new Date());
   const query = useBills();
   const { sources } = usePaymentSources();
+  const loanEndings = useLoanEndings(today);
 
   const sourceOptions = useMemo(
     () => sources.map((source) => ({ value: source.id, label: source.label })),
@@ -65,9 +84,14 @@ export default function BillPlansScreen() {
         categoryId: row.category_id,
         iconId: row.icon_id ?? undefined,
         sourceId: row.card_id ?? row.bank_account_id ?? '',
+        // Stopped is final: listed under the rest for its history, never in the total.
+        // A finished loan is final too, paid off as well as stopped.
+        stopped: billStopped(row, today) || Boolean(loanEndings.get(row.id)?.ending),
+        endsOn: row.ends_on ?? null,
       })),
-    [query.data],
+    [query.data, today, loanEndings],
   );
+  const running = useMemo(() => bills.filter((bill) => !bill.stopped), [bills]);
 
   const visible = useMemo(() => {
     return bills.filter((bill) => {
@@ -88,16 +112,18 @@ export default function BillPlansScreen() {
     });
   }, [bills, queryText, filters]);
 
-  const total = visible.reduce((sum, bill) => sum + bill.amount, 0);
+  const visibleRunning = useMemo(() => visible.filter((bill) => !bill.stopped), [visible]);
+  const visibleStopped = useMemo(() => visible.filter((bill) => bill.stopped), [visible]);
+  const total = visibleRunning.reduce((sum, bill) => sum + bill.amount, 0);
 
   // Soonest first: a bill list is about what is coming, not what has gone.
   const groups = useMemo(
     () =>
-      groupByDate(visible, (bill) => bill.dueDate, {
+      groupByDate(visibleRunning, (bill) => bill.dueDate, {
         amountOf: (bill) => bill.amount,
         direction: 'asc',
       }),
-    [visible],
+    [visibleRunning],
   );
 
   const narrowed = queryText.trim().length > 0 || activeCount > 0;
@@ -152,8 +178,11 @@ export default function BillPlansScreen() {
               {query.isPending
                 ? t('bills.plans.loading')
                 : narrowed
-                  ? t('bills.plans.countOf', { shown: visible.length, count: bills.length })
-                  : t('bills.plans.count', { count: bills.length })}
+                  ? t('bills.plans.countOf', {
+                      shown: visibleRunning.length,
+                      count: running.length,
+                    })
+                  : t('bills.plans.count', { count: running.length })}
             </Text>
             <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
               {formatCurrency(total)}
@@ -213,6 +242,21 @@ export default function BillPlansScreen() {
               ))}
             </View>
           ))}
+
+          {visibleStopped.length > 0 ? (
+            <View className="w-full" testID="bills-stopped">
+              <SectionHeading className="mb-1 mt-7">{t('bills.plans.stopped')}</SectionHeading>
+              {visibleStopped.map((bill) => (
+                <BillRow
+                  key={bill.id}
+                  bill={bill}
+                  sourceLabel={sourceLabels.get(bill.sourceId) ?? ''}
+                  status={stoppedWords(bill.id, bill.endsOn, loanEndings)}
+                  onPress={() => router.push(billPageHref(bill.id, bill.categoryId))}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
       ) : null}
 

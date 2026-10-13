@@ -215,17 +215,6 @@ export const loanFlowMessages = defineMessages({
   },
   'loanFlow.edit.delete': { en: 'Delete loan', es: 'Eliminar préstamo', fr: 'Supprimer le prêt' },
   'loanFlow.edit.deleting': { en: 'Deleting…', es: 'Eliminando…', fr: 'Suppression…' },
-  'loanFlow.edit.deleteTitle': {
-    en: 'Delete this loan?',
-    es: '¿Eliminar este préstamo?',
-    fr: 'Supprimer ce prêt ?',
-  },
-  // Deleting a loan removes its bill, and every payment recorded against it goes too.
-  'loanFlow.edit.deleteMessage': {
-    en: 'Its payment history and reminder are deleted too. This can’t be undone.',
-    es: 'También se eliminan su historial de pagos y su recordatorio. Esto no se puede deshacer.',
-    fr: 'Son historique de paiements et son rappel sont aussi supprimés. Cette action est irréversible.',
-  },
 
   // The loan's own page.
   'loanFlow.view.editA11y': { en: 'Edit {name}', es: 'Editar {name}', fr: 'Modifier {name}' },

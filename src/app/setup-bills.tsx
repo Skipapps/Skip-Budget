@@ -8,11 +8,14 @@ import { t } from '@/i18n';
 import { countsInSpending } from '@/lib/bill-spending';
 import { billPageHref, isLoanBill } from '@/lib/ledger-link';
 import { logoDomainOf } from '@/lib/logo-domain';
+import { billStopped } from '@/lib/plan-stop';
+import { useToday } from '@/lib/use-today';
 
 /** The bills step of the setup walk-in: add as many as there are, then Done. */
 export default function SetupBillsScreen() {
   const query = useBills();
   const { sources } = usePaymentSources();
+  const { today } = useToday();
 
   const sourceLabels = useMemo(
     () => new Map(sources.map((source) => [source.id, source.label])),
@@ -32,8 +35,9 @@ export default function SetupBillsScreen() {
         categoryId: row.category_id,
         iconId: row.icon_id ?? undefined,
         sourceId: row.card_id ?? row.bank_account_id ?? '',
+        stopped: billStopped(row, today),
       })),
-    [query.data],
+    [query.data, today],
   );
 
   return (
@@ -54,10 +58,11 @@ export default function SetupBillsScreen() {
           key={bill.id}
           bill={bill}
           sourceLabel={sourceLabels.get(bill.sourceId) ?? ''}
-          // A loan is changed from its own page, which its pencil leads on from.
+          // A loan is changed from its own page, which its pencil leads on from; a stopped bill is
+          // final, so it opens on its page, never its edit form.
           onPress={() =>
             router.push(
-              isLoanBill(bill.categoryId)
+              isLoanBill(bill.categoryId) || bill.stopped
                 ? billPageHref(bill.id, bill.categoryId)
                 : `/add-bill?id=${bill.id}`,
             )

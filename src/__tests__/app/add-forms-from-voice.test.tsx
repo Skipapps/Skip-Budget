@@ -132,6 +132,7 @@ jest.mock('@/api/past-charges', () => ({
     ready: true,
     saving: false,
     choose: async () => 'upcoming',
+    chooseDelete: async () => 'everything',
     apply: jest.fn(),
     retry: jest.fn(),
   }),
@@ -175,9 +176,11 @@ jest.mock('@/api/mutations', () => ({
   useCreateBill: () => mutation(),
   useUpdateBill: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useStopBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useCreateSubscription: () => mutation(),
   useUpdateSubscription: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useStopSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
 
 let mockRow: unknown = null;

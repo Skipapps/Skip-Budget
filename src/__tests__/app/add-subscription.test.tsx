@@ -75,10 +75,15 @@ jest.mock('@/providers/dialog-provider', () => ({
   useDialog: () => async () => undefined,
 }));
 
+const mockChooseDelete = jest.fn(
+  async (_name: string, _options?: object): Promise<string | null> => 'everything',
+);
 jest.mock('@/api/past-charges', () => ({
   usePastCharges: () => ({
     choose: async () => 'upcoming',
+    chooseDelete: mockChooseDelete,
     apply: jest.fn(),
+    count: 0,
     lastChargedOn: null,
     ready: true,
     retry: jest.fn(),
@@ -86,9 +91,17 @@ jest.mock('@/api/past-charges', () => ({
   }),
 }));
 
+const mockToast = jest.fn();
+jest.mock('@/providers/toast-context', () => ({ useToast: () => mockToast }));
+
 let mockParams: Record<string, string | undefined> = {};
 const mockScreenOptions = jest.fn();
+const mockRedirect = jest.fn();
 jest.mock('expo-router', () => ({
+  Redirect: ({ href }: { href: unknown }) => {
+    mockRedirect(href);
+    return null;
+  },
   router: {
     back: jest.fn(),
     push: jest.fn(),
@@ -118,11 +131,13 @@ let mockCreating = false;
 const mockUseUpdate = jest.fn(() => ({ mutateAsync: mockUpdate, isPending: false }));
 const mockUseCreate = jest.fn(() => ({ mutateAsync: mockCreate, isPending: mockCreating }));
 const mockUseDelete = jest.fn(() => ({ mutateAsync: mockDelete, isPending: false }));
+const mockStop = jest.fn();
 
 jest.mock('@/api/mutations', () => ({
   useUpdateSubscription: () => mockUseUpdate(),
   useCreateSubscription: () => mockUseCreate(),
   useDeleteSubscription: () => mockUseDelete(),
+  useStopSubscription: () => ({ mutateAsync: mockStop, isPending: false }),
 }));
 
 // The real chips and wording; only the two hooks that read and write the reminder are replaced.
@@ -342,6 +357,8 @@ beforeEach(() => {
   mockCreate.mockResolvedValue({ id: 'sub-new' });
   mockUpdate.mockResolvedValue(undefined);
   mockDelete.mockResolvedValue(undefined);
+  mockStop.mockResolvedValue({ id: 'sub-1' });
+  mockChooseDelete.mockResolvedValue('everything');
   mockUseDelete.mockImplementation(() => ({ mutateAsync: mockDelete, isPending: false }));
   backHandlers.clear();
   jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, handler) => {
@@ -1194,12 +1211,16 @@ describe('Add subscription — the status line', () => {
     expect(isChecked(screen, 'Active')).toBe(true);
   });
 
-  it('opens a cancelled subscription on Cancelled', async () => {
+  it('opens a cancelled subscription on its page, never on its chips', async () => {
     editing({ ...SPOTIFY, active: false });
     const screen = await render(<AddSubscriptionScreen />);
 
-    expect(isChecked(screen, 'Cancelled')).toBe(true);
-    expect(isChecked(screen, 'Active')).toBe(false);
+    expect(mockRedirect).toHaveBeenCalledWith({
+      pathname: '/subscription/[id]',
+      params: { id: 'sub-1' },
+    });
+    expect(screen.queryByLabelText('Active')).toBeNull();
+    expect(screen.queryByLabelText('Cancelled')).toBeNull();
   });
 });
 
@@ -1750,16 +1771,12 @@ describe('Add subscription — deleting a saved subscription', () => {
     expect(screen.getByText('Delete subscription')).toBeTruthy();
     expect(screen.getByLabelText('Delete this subscription')).toBeTruthy();
 
-    mockConfirm.mockResolvedValueOnce(false);
+    mockChooseDelete.mockResolvedValueOnce(null);
     await press(screen, 'Delete this subscription');
 
-    expect(mockConfirm).toHaveBeenCalledWith({
-      title: 'Delete this subscription?',
-      message: 'This cannot be undone.',
-      confirmLabel: 'Delete',
-      destructive: true,
-    });
+    expect(mockChooseDelete).toHaveBeenCalledWith('Spotify', { stopped: false });
     expect(mockDelete).not.toHaveBeenCalled();
+    expect(mockStop).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
   });
 
@@ -1771,6 +1788,56 @@ describe('Add subscription — deleting a saved subscription', () => {
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockDelete).toHaveBeenCalledWith('sub-1');
     expect(mockDelete).toHaveBeenCalledTimes(1);
+    expect(mockStop).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledWith('toast.subscription.deleted', 'deleted');
+  });
+
+  it('keeps the past: cancels the subscription and leaves', async () => {
+    mockChooseDelete.mockResolvedValueOnce('keep');
+    const screen = await render(<AddSubscriptionScreen />);
+
+    await press(screen, 'Delete this subscription');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockStop).toHaveBeenCalledWith('sub-1');
+    expect(mockDelete).not.toHaveBeenCalled();
+    // The success look, in the word the page then shows.
+    expect(mockToast).toHaveBeenCalledWith('toast.subscription.stopped');
+  });
+
+  it('says Subscription cancelled when it is cancelled from the Status chips', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+
+    await press(screen, 'Cancelled');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({ active: false });
+    expect(mockToast).toHaveBeenCalledWith('toast.subscription.stopped');
+  });
+
+  it('asks by its saved state, not the unsaved chips', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await press(screen, 'Cancelled');
+
+    await press(screen, 'Delete this subscription');
+
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('sub-1'));
+    expect(mockChooseDelete).toHaveBeenCalledWith('Spotify', { stopped: false });
+  });
+
+  it('stays on the form once Keep cancels it from here, leaving by its own step', async () => {
+    mockChooseDelete.mockResolvedValueOnce('keep');
+    const screen = await render(<AddSubscriptionScreen />);
+
+    await press(screen, 'Delete this subscription');
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    // The reload finds it cancelled before the page has left.
+    editing({ ...SPOTIFY, active: false });
+    await screen.rerender(<AddSubscriptionScreen />);
+
+    expect(mockRedirect).not.toHaveBeenCalled();
+    expect(router.back).toHaveBeenCalledTimes(1);
   });
 
   it('says Deleting… while the delete is in flight', async () => {

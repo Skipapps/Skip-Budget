@@ -32,6 +32,13 @@ type SubscriptionRowProps = {
   logoHidden?: boolean | null;
   /** Cancelled plans stay in the list, dimmed rather than hidden. */
   active?: boolean;
+  /**
+   * Said in place of the cycle and renewal date, for a plan that no longer renews ("Cancelled ·
+   * last charged 3 Oct 2026").
+   */
+  status?: string;
+  /** `status` as VoiceOver reads it, when the shown words do not read aloud well. */
+  spokenStatus?: string;
   onPress?: () => void;
 };
 
@@ -48,6 +55,8 @@ export function SubscriptionRow({
   domain,
   logoHidden,
   active = true,
+  status,
+  spokenStatus = status,
   onPress,
 }: SubscriptionRowProps) {
   const moneyColor = useMoneyColor();
@@ -60,9 +69,14 @@ export function SubscriptionRow({
     cycle: shownCycle,
     source: sourceLabel,
   };
-  const accessibilityLabel = sourceLabel
-    ? t(active ? 'subscriptions.row.a11ySource' : 'subscriptions.row.a11ySourceCancelled', spoken)
-    : t(active ? 'subscriptions.row.a11y' : 'subscriptions.row.a11yCancelled', spoken);
+  const accessibilityLabel = status
+    ? t(sourceLabel ? 'subscriptions.row.a11ySourceStatus' : 'subscriptions.row.a11yStatus', {
+        ...spoken,
+        status: spokenStatus ?? '',
+      })
+    : sourceLabel
+      ? t(active ? 'subscriptions.row.a11ySource' : 'subscriptions.row.a11ySourceCancelled', spoken)
+      : t(active ? 'subscriptions.row.a11y' : 'subscriptions.row.a11yCancelled', spoken);
 
   const figure = (
     <FitText
@@ -77,7 +91,7 @@ export function SubscriptionRow({
       {formatCurrency(amount)}
     </FitText>
   );
-  const renews = (
+  const renews = status ? null : (
     <FitText
       id="date"
       hug
@@ -123,7 +137,8 @@ export function SubscriptionRow({
             className="font-app text-muted"
             slotClassName="mt-0.5 w-full"
           >
-            {`${active ? shownCycle : t('subscriptions.cancelled')}${sourceLabel ? ` · ${sourceLabel}` : ''}`}
+            {status ??
+              `${active ? shownCycle : t('subscriptions.cancelled')}${sourceLabel ? ` · ${sourceLabel}` : ''}`}
           </FitText>
           {stacked ? renews : null}
         </View>

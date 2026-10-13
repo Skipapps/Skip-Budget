@@ -67,6 +67,22 @@ const mockBills = {
   refetch: jest.fn(),
 };
 
+// The stopped-plan Delete reads the charges and deletes; neither is reached on a running plan.
+jest.mock('@/api/past-charges', () => ({
+  usePastCharges: () => ({
+    ready: true,
+    count: 0,
+    lastChargedOn: null,
+    chooseDelete: jest.fn(),
+    retry: jest.fn(),
+  }),
+}));
+jest.mock('@/api/mutations', () => ({
+  useDeleteBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useDeleteSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
+}));
+jest.mock('@/providers/dialog-provider', () => ({ useDialog: () => jest.fn() }));
+
 // No loan behind the bill unless a test says so: the page stays a bill page.
 const NO_LOAN = { data: { kind: 'bill' } as unknown, isPending: false, isError: false };
 let mockLoanRead = NO_LOAN;

@@ -128,10 +128,15 @@ jest.mock('expo-router', () => ({
   },
 }));
 
+const mockChooseDelete = jest.fn(
+  async (_name: string, _options?: object): Promise<string | null> => 'everything',
+);
 jest.mock('@/api/past-charges', () => ({
   usePastCharges: () => ({
     choose: async () => 'upcoming',
+    chooseDelete: mockChooseDelete,
     apply: jest.fn(),
+    count: 0,
     lastChargedOn: null,
     ready: true,
     retry: jest.fn(),
@@ -167,6 +172,7 @@ jest.mock('@/api/mutations', () => ({
   useUpdateBill: () => mockUseUpdateBill(),
   useCreateBill: () => mockUseCreateBill(),
   useDeleteBill: () => mockUseDeleteBill(),
+  useStopBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
 
 const BRANDS = [
@@ -397,6 +403,7 @@ beforeEach(() => {
   mockConfirm.mockResolvedValue(true);
   mockCreate.mockResolvedValue({ id: 'bill-new' });
   mockDelete.mockResolvedValue(undefined);
+  mockChooseDelete.mockResolvedValue('everything');
   backHandlers.clear();
   jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, handler) => {
     backHandlers.add(handler);
@@ -2058,25 +2065,20 @@ describe('Add bill — deleting a saved bill', () => {
 
     await press(screen, 'Delete this bill');
 
-    expect(mockConfirm).toHaveBeenCalledWith({
-      title: 'Delete this bill?',
-      message: 'This cannot be undone.',
-      confirmLabel: 'Delete',
-      destructive: true,
-    });
+    expect(mockChooseDelete).toHaveBeenCalledWith('Power', { stopped: false });
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockDelete).toHaveBeenCalledWith('bill-1');
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it('keeps the bill when the question is declined', async () => {
-    mockConfirm.mockResolvedValue(false);
+    mockChooseDelete.mockResolvedValue(null);
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
     await press(screen, 'Delete this bill');
 
-    await waitFor(() => expect(mockConfirm).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockChooseDelete).toHaveBeenCalledTimes(1));
     expect(mockDelete).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
   });

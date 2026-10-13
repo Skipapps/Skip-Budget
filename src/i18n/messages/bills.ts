@@ -156,16 +156,6 @@ export const billsMessages = defineMessages({
   },
   'bills.add.saveBill': { en: 'Save bill', es: 'Guardar factura', fr: 'Enregistrer la facture' },
   'bills.add.calculator': { en: 'Calculator', es: 'Calculadora', fr: 'Calculatrice' },
-  'bills.add.deleteTitle': {
-    en: 'Delete this bill?',
-    es: '¿Eliminar esta factura?',
-    fr: 'Supprimer cette facture ?',
-  },
-  'bills.add.deleteMessage': {
-    en: 'This cannot be undone.',
-    es: 'Esto no se puede deshacer.',
-    fr: 'Cette action est irréversible.',
-  },
   'bills.add.deleteA11y': {
     en: 'Delete this bill',
     es: 'Eliminar esta factura',
@@ -284,6 +274,21 @@ export const billsMessages = defineMessages({
     es: 'Borrar filtros',
     fr: 'Effacer les filtres',
   },
+  /** The bills that no longer run, under the rest: kept for their history, never totalled. */
+  'bills.plans.stopped': { en: 'Stopped', es: 'Detenidas', fr: 'Arrêtées' },
+  'bills.stoppedOn': {
+    en: 'Stopped on {date}',
+    es: 'Detenida el {date}',
+    fr: 'Arrêtée le {date}',
+  },
+  'bills.stopped': { en: 'Stopped', es: 'Detenida', fr: 'Arrêtée' },
+  /** A loan's bill: the loan's own gender in Spanish and French. */
+  'bills.loanStoppedOn': {
+    en: 'Stopped on {date}',
+    es: 'Detenido el {date}',
+    fr: 'Arrêté le {date}',
+  },
+  'bills.loanStopped': { en: 'Stopped', es: 'Detenido', fr: 'Arrêté' },
 
   'bills.charged.title': {
     en: 'Monthly bills',
@@ -352,6 +357,11 @@ export const billsMessages = defineMessages({
     en: '{name}, {amount}, {recurrence}, paid with {source}',
     es: '{name}, {amount}, {recurrence}, se paga con {source}',
     fr: '{name}, {amount}, {recurrence}, payée avec {source}',
+  },
+  'bills.row.a11yStatus': {
+    en: '{name}, {amount}, {recurrence}, paid with {source}. {status}',
+    es: '{name}, {amount}, {recurrence}, se paga con {source}. {status}',
+    fr: '{name}, {amount}, {recurrence}, payée avec {source}. {status}',
   },
 
   // The page for one bill or one subscription.

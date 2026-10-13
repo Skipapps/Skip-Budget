@@ -97,16 +97,6 @@ export const subscriptionsMessages = defineMessages({
     es: 'Guardar suscripción',
     fr: 'Enregistrer l’abonnement',
   },
-  'subscriptions.add.deleteTitle': {
-    en: 'Delete this subscription?',
-    es: '¿Eliminar esta suscripción?',
-    fr: 'Supprimer cet abonnement ?',
-  },
-  'subscriptions.add.deleteMessage': {
-    en: 'This cannot be undone.',
-    es: 'Esto no se puede deshacer.',
-    fr: 'Cette action est irréversible.',
-  },
   'subscriptions.add.deleteA11y': {
     en: 'Delete this subscription',
     es: 'Eliminar esta suscripción',
@@ -287,6 +277,19 @@ export const subscriptionsMessages = defineMessages({
     es: 'Borrar filtros',
     fr: 'Effacer les filtres',
   },
+  /** The cancelled ones, under the rest: kept for their history, never totalled. */
+  'subscriptions.plans.cancelled': { en: 'Cancelled', es: 'Canceladas', fr: 'Annulés' },
+  'subscriptions.cancelledLastCharged': {
+    en: 'Cancelled · last charged {date}',
+    es: 'Cancelada · último cargo el {date}',
+    fr: 'Annulé · dernier prélèvement le {date}',
+  },
+  /** The same, read aloud: a comma, not the dot. */
+  'subscriptions.cancelledLastChargedA11y': {
+    en: 'Cancelled, last charged {date}',
+    es: 'Cancelada, último cargo el {date}',
+    fr: 'Annulé, dernier prélèvement le {date}',
+  },
 
   'subscriptions.renewals.title': { en: 'Subscriptions', es: 'Suscripciones', fr: 'Abonnements' },
   'subscriptions.renewals.label': {
@@ -365,6 +368,16 @@ export const subscriptionsMessages = defineMessages({
     en: '{name}, {amount} {cycle}, charged to {source}, cancelled',
     es: '{name}, {amount} {cycle}, se cobra a {source}, cancelada',
     fr: '{name}, {amount} {cycle}, prélevé sur {source}, annulé',
+  },
+  'subscriptions.row.a11yStatus': {
+    en: '{name}, {amount} {cycle}. {status}',
+    es: '{name}, {amount} {cycle}. {status}',
+    fr: '{name}, {amount} {cycle}. {status}',
+  },
+  'subscriptions.row.a11ySourceStatus': {
+    en: '{name}, {amount} {cycle}, charged to {source}. {status}',
+    es: '{name}, {amount} {cycle}, se cobra a {source}. {status}',
+    fr: '{name}, {amount} {cycle}, prélevé sur {source}. {status}',
   },
   'subscriptions.row.hint': {
     en: 'Opens this subscription',

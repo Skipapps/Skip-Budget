@@ -100,8 +100,32 @@ let mockDetail: {
 jest.mock('@/api/loans', () => ({ useLoanDetail: () => mockDetail }));
 
 const mockDeletePayoff = jest.fn(async (_input: unknown) => undefined);
+const mockDeleteBill = jest.fn(async (id: string) => ({ id }));
 jest.mock('@/api/mutations', () => ({
   useDeletePayoff: () => ({ mutateAsync: mockDeletePayoff, isPending: false }),
+  useDeleteBill: () => ({ mutateAsync: mockDeleteBill, isPending: false }),
+}));
+// The real delete question over the loan's recorded payments (two, unless a test says so).
+let mockPayments = 2;
+let mockPaymentsRead = true;
+const mockRetryPayments = jest.fn();
+jest.mock('@/api/past-charges', () => ({
+  usePastCharges: () => {
+    const { askDelete } = jest.requireActual('@/components/ui/past-choice').usePastChoice();
+    return {
+      ready: mockPaymentsRead,
+      count: mockPayments,
+      lastChargedOn: null,
+      retry: mockRetryPayments,
+      chooseDelete: (name: string, options: { stopped?: boolean; extra?: number } = {}) =>
+        askDelete({
+          name,
+          noun: 'payments',
+          count: mockPayments + (options.extra ?? 0),
+          stopped: options.stopped,
+        }),
+    };
+  },
 }));
 const mockConfirm = jest.fn(async (_options: Record<string, unknown>) => true);
 const mockAsk = jest.fn(async (_request: Record<string, unknown>) => null);
@@ -175,6 +199,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockToday = TODAY;
   mockFocused = true;
+  mockPayments = 2;
+  mockPaymentsRead = true;
   showing(carLoan());
 });
 
@@ -466,7 +492,7 @@ describe('payoffs', () => {
     expect(screen.getByTestId('loan-history-payoff-po-1')).toBeTruthy();
   });
 
-  it('shows a loan paid off by one as finished, with no Pay off, and taking it out restores the end', async () => {
+  it('shows a loan paid off by one as finished, with no Pay off, and taking it back reopens it', async () => {
     const all = payoff('po-2', '2026-10-12', 10_701.09, 'full', null);
     // Its bill ends the day it was paid off.
     showing(carLoan({ ends_on: '2026-10-12' }, { payoffs: [all] }));
@@ -483,24 +509,52 @@ describe('payoffs', () => {
     expect(row.getByText('12 Oct · No payment method')).toBeTruthy();
     expect(row.getByText('$10,701.09')).toBeTruthy();
 
+    // The one thing a finished loan still offers: undoing the full payoff that finished it.
     await fireEvent.press(screen.getByTestId('loan-history-payoff-po-2'));
+    expect(mockConfirm).toHaveBeenCalledWith({
+      title: 'Remove this payment?',
+      message:
+        '$10,701.09 paid on 12 Oct 2026 comes off this loan, and its figures go back to how they were without it.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    // Back to the term's own last payment: the loan runs again.
     expect(mockDeletePayoff).toHaveBeenCalledWith({
       billId: 'bill-car',
       payoffId: 'po-2',
       lastPaymentOn: '2028-12-27',
     });
+    expect(mockToast).toHaveBeenCalledWith('toast.loan.paymentRemoved', 'deleted');
   });
 
-  it('leaves a bill stopped early stopped when one of its payoffs is taken out', async () => {
+  it('offers only the finishing payoff back: an earlier one on that loan stays history', async () => {
+    const all = payoff('po-2', '2026-10-12', 8_701.09, 'full', null);
+    showing(carLoan({ ends_on: '2026-10-12' }, { payoffs: [extra, all] }));
+    await render(<LoanScreen />);
+    await fireEvent.press(screen.getByTestId('loan-history-payoff-po-1'));
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockAsk).not.toHaveBeenCalled();
+    expect(mockDeletePayoff).not.toHaveBeenCalled();
+  });
+
+  it('offers nothing back on a loan paid off on schedule', async () => {
+    mockToday = '2029-03-01';
+    showing(carLoan({}, { payoffs: [extra] }));
+    await render(<LoanScreen />);
+    expect(screen.getByText(/^Paid off on /)).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'See all, History' }));
+    await fireEvent.press(screen.getByTestId('loan-history-payoff-po-1'));
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockDeletePayoff).not.toHaveBeenCalled();
+  });
+
+  it('keeps the payoffs of a stopped loan as history too', async () => {
     showing(carLoan({ next_due_on: null, ends_on: '2026-10-05' }, { payoffs: [extra] }));
     await render(<LoanScreen />);
     expect(screen.getByText(/^Stopped on 5 Oct 2026/)).toBeTruthy();
     await fireEvent.press(screen.getByTestId('loan-history-payoff-po-1'));
-    expect(mockDeletePayoff).toHaveBeenCalledWith({
-      billId: 'bill-car',
-      payoffId: 'po-1',
-      lastPaymentOn: null,
-    });
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(mockDeletePayoff).not.toHaveBeenCalled();
   });
 
   it('takes out only the latest; an earlier one says to take out the later first', async () => {
@@ -623,7 +677,7 @@ describe('getting about', () => {
     mockToday = '2029-03-01';
     const { unmount } = await render(<LoanScreen />);
     expect(screen.queryByRole('button', { name: 'Pay off' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Edit loan' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Edit loan' })).toBeNull();
     await unmount();
 
     mockToday = TODAY;
@@ -669,6 +723,105 @@ describe('getting about', () => {
     mockDetail = detailOf({ kind: 'gone' });
     await render(<LoanScreen />);
     expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('a finished loan is final', () => {
+  // Stopped by Delete's "Keep past payments" today: final, so there is nothing to edit.
+  const stopped = () => carLoan({ ends_on: TODAY });
+
+  it('offers no pencil and no Edit loan, and Delete loan in their place', async () => {
+    showing(stopped());
+    await render(<LoanScreen />);
+    expect(screen.getByText(/^Stopped on 12 Oct 2026/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Edit Car loan' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit loan' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Pay off' })).toBeNull();
+    const footer = within(screen.getByTestId('loan-view-footer'));
+    expect(footer.getAllByRole('button').map((node) => node.props.accessibilityLabel)).toEqual([
+      'Delete loan',
+    ]);
+  });
+
+  it('asks only to remove it, the way out keeping its past, and deletes it on Remove everything', async () => {
+    const payoff = { id: 'po-1', paid_on: '2026-10-03', amount: 2000, kind: 'partial' };
+    showing(carLoan({ ends_on: TODAY }, { payoffs: [payoff] as never }));
+    mockAsk.mockResolvedValueOnce('everything' as never);
+    await render(<LoanScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete loan' }));
+
+    expect(mockAsk).toHaveBeenCalledWith({
+      title: 'Delete Car loan?',
+      // Two recorded payments and the payoff.
+      message:
+        'Car loan has 3 past payments. Keep them in your history, or remove them from past months too? Either way, nothing after today is recorded.',
+      actions: [{ id: 'everything', label: 'Remove everything', destructive: true }],
+      cancelLabel: 'Keep past payments',
+    });
+    expect(mockDeleteBill).toHaveBeenCalledWith('bill-car');
+    expect(mockToast).toHaveBeenCalledWith('toast.loan.deleted', 'deleted');
+    expect(screen.getByRole('button', { name: 'Deleting…' })).toBeTruthy();
+  });
+
+  it('keeps it as it is when the person keeps its past', async () => {
+    showing(stopped());
+    await render(<LoanScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete loan' }));
+    expect(mockAsk).toHaveBeenCalledTimes(1);
+    expect(mockDeleteBill).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Delete loan' })).toBeTruthy();
+  });
+
+  it('with nothing recorded, asks the plain Delete', async () => {
+    mockPayments = 0;
+    showing(stopped());
+    await render(<LoanScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete loan' }));
+    expect(mockAsk).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Delete Car loan?', message: 'This can’t be undone.' }),
+    );
+  });
+
+  it('waits for the payments, saying the one failure line, and asks nothing', async () => {
+    mockPaymentsRead = false;
+    showing(stopped());
+    await render(<LoanScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete loan' }));
+    expect(mockRetryPayments).toHaveBeenCalled();
+    expect(mockAsk).toHaveBeenCalledWith({ title: 'Something went wrong. Please try again.' });
+    expect(mockDeleteBill).not.toHaveBeenCalled();
+  });
+
+  it('says the one failure line when it cannot delete, and offers Delete again', async () => {
+    jest.spyOn(console, 'log').mockImplementationOnce(() => {});
+    mockDeleteBill.mockRejectedValueOnce(new Error('offline'));
+    mockAsk.mockResolvedValueOnce('everything' as never);
+    showing(stopped());
+    await render(<LoanScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete loan' }));
+    expect(mockAsk).toHaveBeenLastCalledWith({ title: 'Something went wrong. Please try again.' });
+    expect(screen.getByRole('button', { name: 'Delete loan' })).toBeTruthy();
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  it('is just as final once paid off on schedule: its history, and Delete only', async () => {
+    mockToday = '2029-03-01';
+    await render(<LoanScreen />);
+    expect(screen.getByText(/^Paid off on 27 Dec 2028/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Edit Car loan' })).toBeNull();
+    const footer = within(screen.getByTestId('loan-view-footer'));
+    expect(footer.getAllByRole('button').map((node) => node.props.accessibilityLabel)).toEqual([
+      'Delete loan',
+    ]);
+    mockAsk.mockResolvedValueOnce('everything' as never);
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete loan' }));
+    expect(mockAsk).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actions: [{ id: 'everything', label: 'Remove everything', destructive: true }],
+        cancelLabel: 'Keep past payments',
+      }),
+    );
+    expect(mockDeleteBill).toHaveBeenCalledWith('bill-car');
   });
 });
 

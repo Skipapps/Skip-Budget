@@ -81,9 +81,10 @@ jest.mock('@/theme/artwork', () => ({
 }));
 
 const mockConfirm = jest.fn(async (_: object) => true);
+const mockAsk = jest.fn(async (_: object): Promise<string | null> => null);
 jest.mock('@/providers/dialog-provider', () => ({
   useConfirm: () => mockConfirm,
-  useDialog: () => async () => undefined,
+  useDialog: () => mockAsk,
 }));
 
 let mockParams: Record<string, string | undefined> = {};
@@ -100,15 +101,22 @@ jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
 }));
 
+// The real delete question, in the language on screen, over two past charges.
 jest.mock('@/api/past-charges', () => ({
-  usePastCharges: () => ({
-    lastChargedOn: null,
-    ready: true,
-    saving: false,
-    choose: async () => 'upcoming',
-    apply: jest.fn(),
-    retry: jest.fn(),
-  }),
+  usePastCharges: () => {
+    const { askDelete } = jest.requireActual('@/components/ui/past-choice').usePastChoice();
+    return {
+      lastChargedOn: null,
+      ready: true,
+      saving: false,
+      count: 2,
+      choose: async () => 'upcoming',
+      chooseDelete: (name: string, options: { stopped?: boolean } = {}) =>
+        askDelete({ name, noun: 'charges', count: 2, stopped: options.stopped }),
+      apply: jest.fn(),
+      retry: jest.fn(),
+    };
+  },
 }));
 
 // The real chips and wording; only the two hooks that read and write the reminder are replaced.
@@ -163,6 +171,7 @@ jest.mock('@/api/mutations', () => ({
   useCreateSubscription: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateSubscription: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useStopSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
 
 let mockRow: { data: unknown; isError: boolean; isFetched: boolean };
@@ -634,11 +643,14 @@ describe('Edit a subscription in French', () => {
     expectNoRawText(screen.toJSON());
 
     await press(screen, 'Supprimer cet abonnement');
-    expect(mockConfirm).toHaveBeenCalledWith({
-      title: `Supprimer cet abonnement${NBSP}?`,
-      message: 'Cette action est irréversible.',
-      confirmLabel: 'Supprimer',
-      destructive: true,
+    expect(mockAsk).toHaveBeenCalledWith({
+      title: `Supprimer Netflix${NBSP}?`,
+      message: `Netflix a 2 prélèvements passés. Les garder dans ton historique, ou les retirer aussi des mois passés${NBSP}? Dans les deux cas, rien n’est enregistré après aujourd’hui.`,
+      actions: [
+        { id: 'keep', label: 'Garder les prélèvements passés' },
+        { id: 'everything', label: 'Tout supprimer', destructive: true },
+      ],
+      cancelLabel: 'Annuler',
     });
   });
 

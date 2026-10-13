@@ -1,5 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 
+import { useDeleteSubscription } from '@/api/mutations';
+import { usePastCharges } from '@/api/past-charges';
 import { usePaymentSources, useSubscriptions } from '@/api/queries';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { ChangeLogoButton } from '@/components/brands/change-logo-button';
@@ -7,34 +10,70 @@ import { PlanDetail, type PlanDetailRow } from '@/components/plans/plan-detail';
 import { cycleLabel } from '@/components/subscriptions/subscription-row';
 import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
+import { failureMessage, failureText } from '@/lib/failure';
+import { warn } from '@/lib/haptics';
 import { logoDomainOf } from '@/lib/logo-domain';
+import { useDialog } from '@/providers/dialog-provider';
+import { useToast } from '@/providers/toast-context';
 
 const asDate = (iso: string) => formatFullDate(new Date(`${iso}T00:00:00`));
 
+/**
+ * One subscription: its details, its paid and upcoming renewals, and the pencil to edit it. A
+ * cancelled one is final: no pencil, and Delete on the page.
+ */
 export default function SubscriptionDetailScreen() {
   const { id = '' } = useLocalSearchParams<{ id: string }>();
   const subscriptions = useSubscriptions();
   const { sources } = usePaymentSources();
+  const pastCharges = usePastCharges('subscription', id || undefined);
+  const deleteSubscription = useDeleteSubscription();
+  const ask = useDialog();
+  const toast = useToast();
+  // Held from the press until the subscription is gone: the page leaves once the list lacks it.
+  const [deleting, setDeleting] = useState(false);
 
   const subscription = subscriptions.data
     ? (subscriptions.data.find((row) => row.id === id) ?? null)
     : undefined;
+  const cancelled = subscription ? !subscription.active : false;
+
+  const remove = async () => {
+    if (!subscription || deleting) return;
+    // The question counts the charges, so it waits for them.
+    if (!pastCharges.ready) {
+      pastCharges.retry();
+      warn();
+      await ask({ title: failureText() });
+      return;
+    }
+    const choice = await pastCharges.chooseDelete(subscription.name, { stopped: true });
+    if (choice !== 'everything') return;
+    setDeleting(true);
+    try {
+      await deleteSubscription.mutateAsync(id);
+      toast('toast.subscription.deleted', 'deleted');
+    } catch (thrown) {
+      setDeleting(false);
+      warn();
+      await ask({ title: failureMessage(thrown) });
+    }
+  };
 
   const details: PlanDetailRow[] = [];
   if (subscription) {
     const source = sources.find(
       (option) => option.id === (subscription.card_id ?? subscription.bank_account_id),
     );
-    details.push({
-      label: subscription.active
-        ? t('subscriptions.detail.nextRenewal')
-        : t('subscriptions.field.status'),
-      value: !subscription.active
-        ? t('subscriptions.cancelled')
-        : subscription.next_renewal_on
+    // A cancelled one says so under its amount, with the last day it charged.
+    if (!cancelled) {
+      details.push({
+        label: t('subscriptions.detail.nextRenewal'),
+        value: subscription.next_renewal_on
           ? asDate(subscription.next_renewal_on)
           : t('dates.noDate'),
-    });
+      });
+    }
     details.push({
       label: t('subscriptions.detail.paidFrom'),
       value: source?.label ?? t('subscriptions.noPaymentMethod'),
@@ -71,14 +110,29 @@ export default function SubscriptionDetailScreen() {
         ) : null
       }
       frequency={
-        subscription
-          ? subscription.active
+        !subscription
+          ? ''
+          : !cancelled
             ? cycleLabel(subscription.cycle)
-            : t('subscriptions.cancelled')
-          : ''
+            : pastCharges.lastChargedOn
+              ? t('subscriptions.cancelledLastCharged', {
+                  date: asDate(pastCharges.lastChargedOn),
+                })
+              : t('subscriptions.cancelled')
       }
       details={details}
       editHref={`/add-subscription?id=${id}`}
+      stopped={
+        cancelled
+          ? {
+              label: deleting
+                ? t('subscriptions.add.deleting')
+                : t('subscriptions.add.deleteSubscription'),
+              busy: deleting,
+              onDelete: () => void remove(),
+            }
+          : undefined
+      }
     />
   );
 }

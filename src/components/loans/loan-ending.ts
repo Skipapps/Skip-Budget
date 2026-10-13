@@ -1,5 +1,7 @@
-import { loanFinished, type LoanBill } from '@/lib/active-loans';
-import type { LoanStatus } from '@/lib/loan-status';
+import { loanFinished, loanPricingDay, type LoanBill } from '@/lib/active-loans';
+import type { LoanTerms } from '@/lib/loan';
+import { paidOffOn } from '@/lib/loan-payoff';
+import { loanStatus, type LoanStatus } from '@/lib/loan-status';
 
 /**
  * Null while the loan is being paid. 'paid' once the schedule's last payment has come; 'stopped'
@@ -21,4 +23,17 @@ export function loanEnding(
   return status.paidOff
     ? { ending: 'paid', endedOn: status.lastPaymentOn }
     : { ending: 'stopped', endedOn: bill.ends_on ?? null };
+}
+
+/**
+ * `loanEnding` from a loan's stored terms, read on the day the Loans page reads it: the day it was
+ * paid off or its bill stopped, if that came first.
+ */
+export function endingOfTerms(
+  terms: LoanTerms,
+  bill: Pick<LoanBill, 'next_due_on' | 'ends_on'>,
+  today: string,
+): { ending: LoanEnding; endedOn: string | null } {
+  const status = loanStatus(terms, loanPricingDay(bill, today, paidOffOn(terms)));
+  return loanEnding(bill, status, today);
 }

@@ -82,7 +82,11 @@ jest.mock('@/providers/dialog-provider', () => ({
   useDialog: () => async () => undefined,
 }));
 
+const mockToast = jest.fn();
+jest.mock('@/providers/toast-context', () => ({ useToast: () => mockToast }));
+
 let mockParams: Record<string, string | undefined> = {};
+const mockRedirect = jest.fn();
 jest.mock('expo-router', () => ({
   router: {
     back: jest.fn(),
@@ -94,14 +98,20 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useFocusEffect: () => {},
   Stack: { Screen: () => null },
+  Redirect: ({ href }: { href: unknown }) => {
+    mockRedirect(href);
+    return null;
+  },
 }));
 
 const mockPast = {
   lastChargedOn: null as string | null,
   ready: true,
   saving: false,
+  count: 0,
   choose: jest.fn(async () => 'upcoming' as 'upcoming' | 'all' | null),
-  apply: jest.fn(async () => {}),
+  chooseDelete: jest.fn(async (_name: string, _options?: object) => 'everything' as string | null),
+  apply: jest.fn(async (_values: object) => {}),
   retry: jest.fn(),
 };
 jest.mock('@/api/past-charges', () => ({ usePastCharges: () => mockPast }));
@@ -120,11 +130,13 @@ jest.mock('@/api/reminders', () => ({
 const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
 const mockDelete = jest.fn();
+const mockStop = jest.fn();
 let mockPending = false;
 jest.mock('@/api/mutations', () => ({
   useCreateBill: () => ({ mutateAsync: mockCreate, isPending: mockPending }),
   useUpdateBill: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteBill: () => ({ mutateAsync: mockDelete, isPending: false }),
+  useStopBill: () => ({ mutateAsync: mockStop, isPending: false }),
 }));
 
 const BRANDS = [
@@ -358,6 +370,8 @@ beforeEach(() => {
   mockPast.lastChargedOn = null;
   mockPast.ready = true;
   mockPast.choose.mockResolvedValue('upcoming');
+  mockPast.chooseDelete.mockResolvedValue('everything');
+  mockPast.apply.mockResolvedValue(undefined);
   mockKnown = [];
   mockLogoAnswer.mockImplementation((name: string) =>
     name === 'Town Power' ? TOWN_POWER_LOGO : name === 'Metro Hydro' ? METRO_HYDRO_LOGO : null,
@@ -366,6 +380,7 @@ beforeEach(() => {
   mockCreate.mockResolvedValue({ id: 'bill-new' });
   mockUpdate.mockResolvedValue(undefined);
   mockDelete.mockResolvedValue(undefined);
+  mockStop.mockResolvedValue({ id: 'bill-1' });
 });
 
 describe('Add bill — what a new bill saves', () => {
@@ -1372,9 +1387,10 @@ describe('Add bill — the checks inside Save', () => {
   it('refuses a period that ends before it starts', async () => {
     editing({
       ...PERIOD,
-      starts_on: '2026-10-10',
-      next_due_on: '2026-10-10',
-      ends_on: '2026-10-01',
+      // Still running: its end is after today, only before its start.
+      starts_on: '2026-10-20',
+      next_due_on: '2026-10-20',
+      ends_on: '2026-10-10',
     });
     const screen = await render(<AddBillScreen />);
 
@@ -1391,21 +1407,22 @@ describe('Add bill — the checks inside Save', () => {
   it('drops the message once a new end date has been picked, and saves with it', async () => {
     editing({
       ...PERIOD,
-      starts_on: '2026-10-10',
-      next_due_on: '2026-10-10',
-      ends_on: '2026-10-01',
+      // Still running: its end is after today, only before its start.
+      starts_on: '2026-10-20',
+      next_due_on: '2026-10-20',
+      ends_on: '2026-10-10',
     });
     const screen = await render(<AddBillScreen />);
 
     await press(screen, 'Save changes');
     expect(screen.getByText('The end date cannot be before the start date.')).toBeTruthy();
-    await pickDay(screen, 'To, Thu Oct 1', 'Saturday 31 October 2026');
+    await pickDay(screen, 'To, Sat Oct 10', 'Saturday 31 October 2026');
 
     expect(screen.queryByText('The end date cannot be before the start date.')).toBeNull();
     await press(screen, 'Save changes');
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
-      starts_on: '2026-10-10',
+      starts_on: '2026-10-20',
       ends_on: '2026-10-31',
     });
   });
@@ -1414,9 +1431,10 @@ describe('Add bill — the checks inside Save', () => {
   it('drops the message once the end date it names has been cleared', async () => {
     editing({
       ...PERIOD,
-      starts_on: '2026-10-10',
-      next_due_on: '2026-10-10',
-      ends_on: '2026-10-01',
+      // Still running: its end is after today, only before its start.
+      starts_on: '2026-10-20',
+      next_due_on: '2026-10-20',
+      ends_on: '2026-10-10',
     });
     const screen = await render(<AddBillScreen />);
 
@@ -1444,6 +1462,37 @@ describe('Add bill — the checks inside Save', () => {
       starts_on: '2026-10-10',
       ends_on: '2026-10-10',
     });
+  });
+
+  it('retries a failed rewrite of past charges on the next Save, without asking again', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockPast.choose.mockResolvedValue('all');
+    mockPast.apply.mockRejectedValueOnce(new Error('network down'));
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+    await press(screen, 'Checking ••0099');
+
+    await press(screen, 'Save changes');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockApplyReminder).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+
+    // Saved, the bill now matches the form: nothing it copies differs, so nothing would be asked.
+    mockPast.choose.mockResolvedValue('upcoming');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockPast.choose).toHaveBeenCalledTimes(1);
+    expect(mockPast.apply).toHaveBeenCalledTimes(2);
+    expect(mockPast.apply).toHaveBeenLastCalledWith({
+      label: 'Power',
+      amount: 84.2,
+      card_id: null,
+      bank_account_id: 'acct-1',
+    });
+    expect(mockApplyReminder).toHaveBeenCalledTimes(1);
+    log.mockRestore();
   });
 
   it('says the one failure line and writes nothing while past charges cannot be read', async () => {
@@ -1566,30 +1615,103 @@ describe('Add bill — leaving after a save from a voice hand-off', () => {
 });
 
 describe('Add bill — deleting', () => {
-  it('asks first, then deletes the bill and leaves', async () => {
+  it('asks about its past by its saved name, then removes everything and leaves', async () => {
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
     await press(screen, 'Delete this bill');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-    expect(mockConfirm).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'Delete this bill?', destructive: true }),
-    );
+    expect(mockPast.chooseDelete).toHaveBeenCalledWith('Power', { stopped: false });
     expect(mockDelete).toHaveBeenCalledWith('bill-1');
+    expect(mockStop).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledWith('toast.bill.deleted', 'deleted');
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it('keeps the bill when the question is declined', async () => {
-    mockConfirm.mockResolvedValueOnce(false);
+  it('keeps the past: stops the bill today, as stored, and goes back to its page', async () => {
+    mockPast.chooseDelete.mockResolvedValueOnce('keep');
     editing(POWER);
     const screen = await render(<AddBillScreen />);
 
     await press(screen, 'Delete this bill');
 
-    await waitFor(() => expect(mockConfirm).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockStop).toHaveBeenCalledWith({ bill: POWER, today: '2026-10-07' });
     expect(mockDelete).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledWith('toast.bill.stopped');
+  });
+
+  it('opens a stopped bill on its page, which is final, never on its form', async () => {
+    editing({ ...POWER, ends_on: '2026-10-01' });
+    const screen = await render(<AddBillScreen />);
+
+    expect(mockRedirect).toHaveBeenCalledWith({ pathname: '/bill/[id]', params: { id: 'bill-1' } });
+    expect(screen.queryByLabelText('Save changes')).toBeNull();
+    expect(screen.queryByLabelText('Delete this bill')).toBeNull();
+  });
+
+  it('opens a finished loan’s bill on the loan’s page', async () => {
+    editing({ ...POWER, category_id: 'loans', icon_id: 'loan-car', next_due_on: null });
+    await render(<AddBillScreen />);
+
+    expect(mockRedirect).toHaveBeenCalledWith({ pathname: '/loan/[id]', params: { id: 'bill-1' } });
+  });
+
+  it('stays on the form once Keep stops the bill from it, leaving by its own step', async () => {
+    mockPast.chooseDelete.mockResolvedValueOnce('keep');
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Delete this bill');
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    // The reload finds it stopped before the page has left.
+    editing({ ...POWER, ends_on: '2026-10-07' });
+    await screen.rerender(<AddBillScreen />);
+
+    expect(mockRedirect).not.toHaveBeenCalled();
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes nothing when the question is backed out of', async () => {
+    mockPast.chooseDelete.mockResolvedValueOnce(null);
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Delete this bill');
+
+    await waitFor(() => expect(mockPast.chooseDelete).toHaveBeenCalledTimes(1));
+    expect(mockDelete).not.toHaveBeenCalled();
+    expect(mockStop).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('waits for the charges: says the one failure line and asks nothing until they are read', async () => {
+    mockPast.ready = false;
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Delete this bill');
+
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(mockPast.retry).toHaveBeenCalled();
+    expect(mockPast.chooseDelete).not.toHaveBeenCalled();
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it('says the one failure line when keeping the past fails, and stays', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockPast.chooseDelete.mockResolvedValueOnce('keep');
+    mockStop.mockRejectedValueOnce(new Error('network down'));
+    editing(POWER);
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Delete this bill');
+
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(router.back).not.toHaveBeenCalled();
+    log.mockRestore();
   });
 
   it('says the one failure line when the delete fails, and stays', async () => {

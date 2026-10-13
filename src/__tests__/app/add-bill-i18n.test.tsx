@@ -57,9 +57,10 @@ jest.mock('@/theme/artwork', () => ({
 }));
 
 const mockConfirm = jest.fn(async (_: object) => true);
+const mockAsk = jest.fn(async (_: object): Promise<string | null> => null);
 jest.mock('@/providers/dialog-provider', () => ({
   useConfirm: () => mockConfirm,
-  useDialog: () => async () => undefined,
+  useDialog: () => mockAsk,
 }));
 
 let mockParams: Record<string, string | undefined> = {};
@@ -76,15 +77,22 @@ jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
 }));
 
+// The real delete question, in the language on screen, over two past charges.
 jest.mock('@/api/past-charges', () => ({
-  usePastCharges: () => ({
-    lastChargedOn: null,
-    ready: true,
-    saving: false,
-    choose: async () => 'upcoming',
-    apply: jest.fn(),
-    retry: jest.fn(),
-  }),
+  usePastCharges: () => {
+    const { askDelete } = jest.requireActual('@/components/ui/past-choice').usePastChoice();
+    return {
+      lastChargedOn: null,
+      ready: true,
+      saving: false,
+      count: 2,
+      choose: async () => 'upcoming',
+      chooseDelete: (name: string, options: { stopped?: boolean } = {}) =>
+        askDelete({ name, noun: 'charges', count: 2, stopped: options.stopped }),
+      apply: jest.fn(),
+      retry: jest.fn(),
+    };
+  },
 }));
 
 const mockApplyReminder = jest.fn(async (..._: unknown[]) => {});
@@ -121,6 +129,7 @@ jest.mock('@/api/mutations', () => ({
   useCreateBill: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateBill: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useStopBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
 
 let mockBill: { data: unknown; isError: boolean; isFetched: boolean };
@@ -525,9 +534,9 @@ describe('Add a bill in Spanish', () => {
       data: {
         ...POWER,
         recurrence: 'period',
-        starts_on: '2026-10-10',
-        next_due_on: '2026-10-10',
-        ends_on: '2026-10-01',
+        starts_on: '2026-10-20',
+        next_due_on: '2026-10-20',
+        ends_on: '2026-10-10',
       },
       isError: false,
       isFetched: true,
@@ -646,11 +655,14 @@ describe('Add a bill in French', () => {
     expect(screen.getByText('Modifier la facture')).toBeTruthy();
 
     await press(screen, 'Supprimer cette facture');
-    expect(mockConfirm).toHaveBeenCalledWith({
-      title: `Supprimer cette facture${NBSP}?`,
-      message: 'Cette action est irréversible.',
-      confirmLabel: 'Supprimer',
-      destructive: true,
+    expect(mockAsk).toHaveBeenCalledWith({
+      title: `Supprimer CFE${NBSP}?`,
+      message: `CFE a 2 prélèvements passés. Les garder dans ton historique, ou les retirer aussi des mois passés${NBSP}? Dans les deux cas, rien n’est enregistré après aujourd’hui.`,
+      actions: [
+        { id: 'keep', label: 'Garder les prélèvements passés' },
+        { id: 'everything', label: 'Tout supprimer', destructive: true },
+      ],
+      cancelLabel: 'Annuler',
     });
   });
 

@@ -50,6 +50,8 @@ import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { TEXT_CAP } from '@/theme/text-scale';
 import { failureText } from '@/lib/failure';
+import { billStopped } from '@/lib/plan-stop';
+import { useToday } from '@/lib/use-today';
 import { t } from '@/i18n';
 
 type Item = {
@@ -82,6 +84,7 @@ export default function RemindersScreen() {
   const receipts = useReceiptReminder();
   const salaryAccounts = useSalaryAccountIds();
   const wrapUp = useWrapUpSwitch();
+  const { today } = useToday();
 
   // Which row's clock is open, by target key. One at a time.
   const [timeFor, setTimeFor] = useState<string | null>(null);
@@ -148,17 +151,20 @@ export default function RemindersScreen() {
       {
         title: t('reminders.group.bills'),
         icon: ReceiptText,
-        items: (bills.data ?? []).map((row) => ({
-          kind: 'bill' as const,
-          id: row.id,
-          label: row.name,
-          caption: row.next_due_on
-            ? t('reminders.bill.due', {
-                amount: formatCurrency(row.amount),
-                date: when(row.next_due_on),
-              })
-            : formatCurrency(row.amount),
-        })),
+        // A stopped bill is never reminded (the server sends nothing), so it offers no switch.
+        items: (bills.data ?? [])
+          .filter((row) => !billStopped(row, today))
+          .map((row) => ({
+            kind: 'bill' as const,
+            id: row.id,
+            label: row.name,
+            caption: row.next_due_on
+              ? t('reminders.bill.due', {
+                  amount: formatCurrency(row.amount),
+                  date: when(row.next_due_on),
+                })
+              : formatCurrency(row.amount),
+          })),
       },
       {
         title: t('reminders.group.subscriptions'),
@@ -207,7 +213,7 @@ export default function RemindersScreen() {
         })),
       },
     ],
-    [bills.data, subscriptions.data, cards.data, accounts.data, salaryAccounts.ids],
+    [bills.data, subscriptions.data, cards.data, accounts.data, salaryAccounts.ids, today],
   );
 
   const targets = groups.reduce((sum, group) => sum + group.items.length, 0);

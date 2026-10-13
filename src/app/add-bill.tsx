@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams, type Href } from 'expo-router';
 import { AlignLeft, Calculator, Repeat, Trash2, Tag } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -10,7 +10,7 @@ import {
   type ReminderChoice,
 } from '@/api/reminders';
 import { buildBillValues } from '@/api/entry-values';
-import { useCreateBill, useDeleteBill, useUpdateBill } from '@/api/mutations';
+import { useCreateBill, useDeleteBill, useStopBill, useUpdateBill } from '@/api/mutations';
 import { usePastCharges } from '@/api/past-charges';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
@@ -35,7 +35,6 @@ import { ReminderField } from '@/components/ui/reminder-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { FieldLabel, Title } from '@/components/ui/typography';
-import { useConfirm } from '@/providers/dialog-provider';
 import { useToast } from '@/providers/toast-context';
 import {
   RECURRENCES,
@@ -51,6 +50,8 @@ import { success, warn } from '@/lib/haptics';
 import { failureMessage, failureText } from '@/lib/failure';
 import { logoColumns } from '@/lib/logo-columns';
 import { logoDomainOf } from '@/lib/logo-domain';
+import { billPageHref } from '@/lib/ledger-link';
+import { billStopped } from '@/lib/plan-stop';
 import {
   cameFromVoice,
   clearVoiceDraft,
@@ -107,14 +108,25 @@ const asDate = (value?: string | null) => (value ? new Date(`${value}T00:00:00`)
 /**
  * An edit with no record in hand never becomes a blank form: `id` makes Save an update, so a form
  * mounted without the row would write empty fields over a real bill. Loading, unreadable and gone
- * are separate answers.
+ * are separate answers. A stopped bill (or finished loan) is final, so a link to change one opens
+ * its page instead.
  */
 export default function AddBillScreen() {
   const params = useLocalSearchParams<{ id?: string; from?: string }>();
   const { id } = params;
   const artwork = useArtwork();
+  const { today } = useToday();
   const bill = useBill(id);
   const existing = bill.data ?? null;
+  // Decided on the first read only: Delete's "Keep past charges" stops the bill from this page,
+  // and leaving is that flow's own step.
+  const [stoppedPage, setStoppedPage] = useState<Href | false | null>(null);
+  if (existing && stoppedPage === null) {
+    setStoppedPage(
+      billStopped(existing, today) ? billPageHref(existing.id, existing.category_id) : false,
+    );
+  }
+  if (stoppedPage) return <Redirect href={stoppedPage} />;
 
   if (id && !existing) {
     // Retry, never a fall back to creating: the row is still there, this screen cannot see it.
@@ -241,7 +253,7 @@ function BillForm({
   const [view, setView] = useState<Page>(initialView);
   // Outlives the review page while a row's own page is open, so coming back lands where it was.
   const [reviewY, setReviewY] = useState(0);
-  const { todayDate } = useToday();
+  const { today, todayDate } = useToday();
 
   const [categoryId, setCategoryId] = useState<string>(
     existing?.category_id ?? prefill?.categoryId ?? '',
@@ -303,25 +315,41 @@ function BillForm({
   const createBill = useCreateBill();
   const updateBill = useUpdateBill();
   const pastCharges = usePastCharges('bill', id);
+  // Set once the bill took an edit whose past charges failed to follow: the bill then matches the
+  // form, so the question would not come up again and the next Save must redo the rewrite itself.
+  const [rewritePending, setRewritePending] = useState(false);
   const deleteBill = useDeleteBill();
-  const confirm = useConfirm();
+  const stopBill = useStopBill();
   const toast = useToast();
 
   const handleDelete = async () => {
-    if (!id) return;
-    const ok = await confirm({
-      title: t('bills.add.deleteTitle'),
-      message: t('bills.add.deleteMessage'),
-      confirmLabel: t('common.delete'),
-      destructive: true,
-    });
-    if (!ok) return;
+    if (!id || !existing) return;
+    setError(null);
+    // The question counts the charges, so it waits for them as Save does.
+    if (!pastCharges.ready) {
+      pastCharges.retry();
+      warn();
+      setError(failureText());
+      return;
+    }
+    const choice = await pastCharges.chooseDelete(
+      existing.name || categoryName(existing.category_id),
+      { stopped: billStopped(existing, today) },
+    );
+    if (choice === null) return;
 
     try {
-      await deleteBill.mutateAsync(id);
-      toast('toast.bill.deleted', 'deleted');
+      if (choice === 'keep') {
+        await stopBill.mutateAsync({ bill: existing, today });
+        success();
+        toast('toast.bill.stopped');
+      } else {
+        await deleteBill.mutateAsync(id);
+        toast('toast.bill.deleted', 'deleted');
+      }
       router.back();
     } catch (thrown) {
+      warn();
       setError(failureMessage(thrown));
     }
   };
@@ -423,7 +451,7 @@ function BillForm({
         return;
       }
 
-      const scope = await pastCharges.choose(carried.label, changed);
+      const scope = rewritePending ? 'all' : await pastCharges.choose(carried.label, changed);
       if (scope === null) return;
 
       const billId =
@@ -431,7 +459,11 @@ function BillForm({
           ? (await updateBill.mutateAsync({ id, values }), id)
           : (await createBill.mutateAsync(values)).id;
 
-      if (scope === 'all') await pastCharges.apply(carried);
+      if (scope === 'all') {
+        setRewritePending(true);
+        await pastCharges.apply(carried);
+        setRewritePending(false);
+      }
 
       // After the bill exists, because a reminder points at a row. Untouched while the saved one is
       // unknown: the form's 'off' is then a guess, and writing it deletes the reminder.
@@ -449,6 +481,7 @@ function BillForm({
   };
 
   const busy = createBill.isPending || updateBill.isPending || pastCharges.saving;
+  const deleting = deleteBill.isPending || stopBill.isPending;
   // The page this form opened on. Anywhere else the edge swipe is off, and Back steps back.
   const isRoot = view === initialView;
 
@@ -782,7 +815,9 @@ function BillForm({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('bills.add.deleteA11y')}
-            onPress={handleDelete}
+            accessibilityState={{ disabled: deleting }}
+            disabled={deleting}
+            onPress={() => void handleDelete()}
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
@@ -790,7 +825,7 @@ function BillForm({
               className="font-app-medium text-[15px] text-danger"
               maxFontSizeMultiplier={TEXT_CAP.row}
             >
-              {deleteBill.isPending ? t('bills.add.deleting') : t('bills.add.deleteBill')}
+              {deleting ? t('bills.add.deleting') : t('bills.add.deleteBill')}
             </Text>
           </Pressable>
         ) : null

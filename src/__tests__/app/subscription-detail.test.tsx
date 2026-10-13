@@ -36,6 +36,22 @@ jest.mock('@/components/brands/brand-mark', () => ({
   },
 }));
 
+// The stopped-plan Delete reads the charges and deletes; neither is reached on a running plan.
+jest.mock('@/api/past-charges', () => ({
+  usePastCharges: () => ({
+    ready: true,
+    count: 0,
+    lastChargedOn: null,
+    chooseDelete: jest.fn(),
+    retry: jest.fn(),
+  }),
+}));
+jest.mock('@/api/mutations', () => ({
+  useDeleteBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useDeleteSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
+}));
+jest.mock('@/providers/dialog-provider', () => ({ useDialog: () => jest.fn() }));
+
 let mockRow: Record<string, unknown>;
 jest.mock('@/api/queries', () => ({
   useSubscriptions: () => ({

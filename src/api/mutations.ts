@@ -1,7 +1,9 @@
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 
 import { guardLoanBillDates } from '@/api/entry-values';
+import type { PastChargesScope } from '@/api/past-charges';
 import type { AccrualBasis } from '@/lib/loan';
+import { stopBillValues, type StoppableBill } from '@/lib/plan-stop';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 import type { PayFrequency } from '@/lib/date';
@@ -285,6 +287,48 @@ export const useCreateBill = () => useCreate<BillValues>('bills');
 export const useUpdateBill = () => useUpdate<Partial<BillValues>>('bills', guardBillDates);
 export const useDeleteBill = () => useRemove('bills');
 
+export type StopBillInput = {
+  /** The bill (or the loan's bill) as last read: its dates decide what the stop writes. */
+  bill: { id: string } & StoppableBill;
+  /** The person's today (yyyy-mm-dd, `useToday`): the stop day, whose due is still recorded. */
+  today: string;
+};
+
+/**
+ * "Keep past" on a bill or a loan: stops it at the end of today (`stopBillValues`) and leaves every
+ * charge, payoff and the reminder as they are. Nothing after today is recorded, projected or
+ * reminded; a loan reads as stopped on today. Not through `useUpdateBill`: its loan guard puts a
+ * later start back, which `bills_period_order` then refuses.
+ *
+ * One update, made only while the start and end are still the ones the stop was worked out from:
+ * if another phone changed them meanwhile, nothing is written and it fails (NOTHING_UPDATED).
+ */
+export function useStopBill() {
+  const client = useQueryClient();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async ({ bill, today }: StopBillInput) => {
+      let query = supabase
+        .from('bills')
+        .update(stopBillValues(bill, today) as never)
+        .eq('id', bill.id);
+      query = bill.starts_on ? query.eq('starts_on', bill.starts_on) : query.is('starts_on', null);
+      query = bill.ends_on ? query.eq('ends_on', bill.ends_on) : query.is('ends_on', null);
+      const { data, error } = await query.select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error(NOTHING_UPDATED);
+      return { id: bill.id };
+    },
+    onSuccess: ({ id }) => {
+      invalidate('bills');
+      invalidate('loans');
+      client.invalidateQueries({ queryKey: ['bill', id] });
+      client.invalidateQueries({ queryKey: ['loan', id] });
+    },
+  });
+}
+
 export type SalaryValues = {
   name: string;
   /** What lands each payday. Worked out from the hourly fields when hourly. */
@@ -355,6 +399,33 @@ export type SubscriptionValues = {
 export const useCreateSubscription = () => useCreate<SubscriptionValues>('subscriptions');
 export const useUpdateSubscription = () => useUpdate<Partial<SubscriptionValues>>('subscriptions');
 export const useDeleteSubscription = () => useRemove('subscriptions');
+
+/**
+ * "Keep past" on a subscription: Cancelled (`active: false`), its charges and reminder left as they
+ * are. The recorders, the schedule roll, projections and reminders all skip an inactive one.
+ * Takes the subscription's id.
+ */
+export function useStopSubscription() {
+  const client = useQueryClient();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .update({ active: false } as never)
+        .eq('id', id)
+        .select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error(NOTHING_UPDATED);
+      return { id };
+    },
+    onSuccess: ({ id }) => {
+      invalidate('subscriptions');
+      client.invalidateQueries({ queryKey: ['subscription', id] });
+    },
+  });
+}
 
 const LOGO_TABLES = {
   receipt: 'receipts',
@@ -585,6 +656,12 @@ export type UpdateLoanValues = Omit<SaveLoanValues, 'inSpending' | 'countsFrom'>
   inSpending: boolean;
   /** The person's today (yyyy-mm-dd, `useToday`): where a switch back on counts from. */
   today: string;
+  /**
+   * The answer to "Change past payments too?". 'all' also gives every payment already recorded the
+   * new name, monthly payment and paid from, in the same transaction as the edit; 'upcoming', or
+   * left out, keeps them as they landed.
+   */
+  past?: PastChargesScope;
 };
 
 /**
@@ -592,6 +669,10 @@ export type UpdateLoanValues = Omit<SaveLoanValues, 'inSpending' | 'countsFrom'>
  * kept. What it counts as spending never reaches before the day the loan was added or into a month
  * already charged (the rules are update_loan's). Refused as save_loan is, with the same words for
  * `refusedLoanSave`; a loan deleted meanwhile is refused with P0002.
+ *
+ * With `past: 'all'` it is `update_loan_and_charges`: the same edit, then the recorded payments,
+ * all or nothing. A database without that function refuses it (PGRST202) and nothing is written;
+ * there is no fallback to the plain edit, which would save the loan without its past.
  */
 export function useUpdateLoan() {
   const client = useQueryClient();
@@ -604,39 +685,43 @@ export function useUpdateLoan() {
           ? values.paymentOverrides
           : null;
       const firstDay = Number(values.firstPaymentOn.slice(8, 10));
-      const { error } = await supabase.rpc('update_loan', {
-        p_bill_id: values.billId,
-        p_name: values.name,
-        p_icon_id: values.iconId,
-        p_principal: values.principal,
-        p_annual_rate: values.annualRate,
-        p_term_months: values.termMonths,
-        p_monthly_payment: values.monthlyPayment,
-        p_total_interest: values.totalInterest,
-        p_first_payment_on: values.firstPaymentOn,
-        p_funded_on: values.fundedOn,
-        p_day_count_basis: values.dayCountBasis,
-        p_card_id: values.cardId,
-        p_bank_account_id: values.bankAccountId,
-        p_in_spending: values.inSpending,
-        // Every optional part is sent, null for none: the edit replaces the contract, so a change,
-        // a last payment or a payment day left out is one taken away. The day is kept only when it
-        // is not the first payment's own, as save_loan keeps it, so an unchanged loan saves as it was.
-        p_payment_day:
-          values.paymentDay != null && values.paymentDay !== firstDay ? values.paymentDay : null,
-        p_payment_overrides: overrides,
-        p_last_payment_on: values.lastPaymentOn ?? null,
-        p_today: values.today,
-      });
+      const { error } = await supabase.rpc(
+        values.past === 'all' ? 'update_loan_and_charges' : 'update_loan',
+        {
+          p_bill_id: values.billId,
+          p_name: values.name,
+          p_icon_id: values.iconId,
+          p_principal: values.principal,
+          p_annual_rate: values.annualRate,
+          p_term_months: values.termMonths,
+          p_monthly_payment: values.monthlyPayment,
+          p_total_interest: values.totalInterest,
+          p_first_payment_on: values.firstPaymentOn,
+          p_funded_on: values.fundedOn,
+          p_day_count_basis: values.dayCountBasis,
+          p_card_id: values.cardId,
+          p_bank_account_id: values.bankAccountId,
+          p_in_spending: values.inSpending,
+          // Every optional part is sent, null for none: the edit replaces the contract, so a change,
+          // a last payment or a payment day left out is one taken away. The day is kept only when it
+          // is not the first payment's own, as save_loan keeps it, so an unchanged loan saves as it was.
+          p_payment_day:
+            values.paymentDay != null && values.paymentDay !== firstDay ? values.paymentDay : null,
+          p_payment_overrides: overrides,
+          p_last_payment_on: values.lastPaymentOn ?? null,
+          p_today: values.today,
+        },
+      );
       if (error) throw error;
       return { id: values.billId };
     },
-    onSuccess: ({ id }) => {
+    onSuccess: ({ id }, { past }) => {
       invalidate('bills');
       invalidate('loans');
       // The bill page and its edit form read these single-row keys, which the lists' keys miss.
       client.invalidateQueries({ queryKey: ['bill', id] });
       client.invalidateQueries({ queryKey: ['loan', id] });
+      if (past === 'all') client.invalidateQueries({ queryKey: ['charges'] });
     },
   });
 }

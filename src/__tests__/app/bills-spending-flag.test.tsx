@@ -74,6 +74,8 @@ const CAR_LOAN = {
 
 let mockBills: { data: unknown[]; isPending: boolean; isError: boolean };
 
+// How each loan ended, for a loan's bill under Stopped; none here has ended.
+jest.mock('@/components/loans/use-loan-endings', () => ({ useLoanEndings: () => new Map() }));
 jest.mock('@/api/queries', () => ({
   useBills: () => ({ ...mockBills, refetch: jest.fn() }),
   usePaymentSources: () => ({

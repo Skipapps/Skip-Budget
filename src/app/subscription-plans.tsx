@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useArtwork } from '@/theme/artwork';
+import { useCharges } from '@/api/charges';
 import { usePaymentSources, useSubscriptions } from '@/api/queries';
 import {
   EMPTY_SUBSCRIPTION_FILTERS,
@@ -17,14 +18,17 @@ import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
+import { SectionHeading } from '@/components/ui/typography';
 import { t } from '@/i18n';
-import { toIsoDate } from '@/lib/date';
+import { formatFullDate, toIsoDate } from '@/lib/date';
 import { groupByDate } from '@/lib/group';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
 import { failureText } from '@/lib/failure';
+
+const dateOf = (iso: string) => formatFullDate(new Date(`${iso}T00:00:00`));
 
 /** Normalised to a month so a yearly plan does not look cheap beside a monthly one. */
 const PER_MONTH: Record<string, number> = {
@@ -45,6 +49,20 @@ export default function SubscriptionPlansScreen() {
 
   const { data: subscriptions = [], isLoading, isError, refetch } = useSubscriptions();
   const { sources } = usePaymentSources();
+  const charges = useCharges();
+  // A cancelled plan has no stop date of its own; the last day it charged says when it ended.
+  const lastCharged = useMemo(() => {
+    const latest = new Map<string, string>();
+    for (const charge of charges.data ?? []) {
+      const id = charge.subscription_id;
+      if (id && (latest.get(id) ?? '') < charge.charged_on) latest.set(id, charge.charged_on);
+    }
+    return latest;
+  }, [charges.data]);
+  const running = useMemo(
+    () => subscriptions.filter((subscription) => subscription.active),
+    [subscriptions],
+  );
 
   const activeCount = countActiveSubscriptionFilters(filters);
   const sourceOptions = useMemo(
@@ -68,21 +86,28 @@ export default function SubscriptionPlansScreen() {
     });
   }, [subscriptions, query, filters]);
 
-  // Cancelled plans are shown but cost nothing, so they stay out of the total.
-  const monthlyTotal = visible.reduce(
-    (sum, subscription) =>
-      subscription.active ? sum + subscription.amount * (PER_MONTH[subscription.cycle] ?? 1) : sum,
+  // Cancelled is final: those are listed under the rest for their history, never in a total.
+  const visibleRunning = useMemo(
+    () => visible.filter((subscription) => subscription.active),
+    [visible],
+  );
+  const visibleCancelled = useMemo(
+    () => visible.filter((subscription) => !subscription.active),
+    [visible],
+  );
+  const monthlyTotal = visibleRunning.reduce(
+    (sum, subscription) => sum + subscription.amount * (PER_MONTH[subscription.cycle] ?? 1),
     0,
   );
 
-  // Soonest renewal first. Cancelled plans still show but add nothing to a group total.
+  // Soonest renewal first.
   const groups = useMemo(
     () =>
-      groupByDate(visible, (subscription) => subscription.next_renewal_on, {
-        amountOf: (subscription) => (subscription.active ? -Math.abs(subscription.amount) : 0),
+      groupByDate(visibleRunning, (subscription) => subscription.next_renewal_on, {
+        amountOf: (subscription) => -Math.abs(subscription.amount),
         direction: 'asc',
       }),
-    [visible],
+    [visibleRunning],
   );
 
   const narrowed = query.trim().length > 0 || activeCount > 0;
@@ -141,10 +166,10 @@ export default function SubscriptionPlansScreen() {
                 ? t('subscriptions.plans.loading')
                 : narrowed
                   ? t('subscriptions.plans.countOf', {
-                      shown: visible.length,
-                      count: subscriptions.length,
+                      shown: visibleRunning.length,
+                      count: running.length,
                     })
-                  : t('subscriptions.plans.count', { count: subscriptions.length })}
+                  : t('subscriptions.plans.count', { count: running.length })}
             </Text>
             {isLoading ? null : (
               <Text className="font-app-semibold text-[15px] text-ink" maxFontSizeMultiplier={1.3}>
@@ -218,6 +243,45 @@ export default function SubscriptionPlansScreen() {
               ))}
             </View>
           ))}
+
+          {visibleCancelled.length > 0 ? (
+            <View className="w-full" testID="subscriptions-cancelled">
+              <SectionHeading className="mb-1 mt-7">
+                {t('subscriptions.plans.cancelled')}
+              </SectionHeading>
+              {visibleCancelled.map((subscription) => {
+                const last = lastCharged.get(subscription.id);
+                return (
+                  <SubscriptionRow
+                    key={subscription.id}
+                    name={subscription.name}
+                    amount={subscription.amount}
+                    cycle={subscription.cycle}
+                    renewsOn={null}
+                    domain={logoDomainOf(subscription)}
+                    logoHidden={subscription.logo_hidden}
+                    active={false}
+                    status={
+                      last
+                        ? t('subscriptions.cancelledLastCharged', { date: dateOf(last) })
+                        : t('subscriptions.cancelled')
+                    }
+                    spokenStatus={
+                      last
+                        ? t('subscriptions.cancelledLastChargedA11y', { date: dateOf(last) })
+                        : t('subscriptions.cancelled')
+                    }
+                    sourceLabel={
+                      sourceLabels.get(
+                        subscription.card_id ?? subscription.bank_account_id ?? '',
+                      ) ?? ''
+                    }
+                    onPress={() => router.push(`/subscription/${subscription.id}`)}
+                  />
+                );
+              })}
+            </View>
+          ) : null}
         </View>
       ) : null}
 

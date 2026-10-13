@@ -550,15 +550,15 @@ const CASES: Case[] = [
     name: 'ConfirmDialog',
     draw: () => (
       <ConfirmDialog
-        title={t('bills.add.deleteTitle')}
-        message={t('bills.add.deleteMessage')}
+        title={t('ui.past.delete.title', { name: 'Rent' })}
+        message={t('ui.past.delete.none')}
         actions={[{ id: 'confirm', label: t('common.delete'), destructive: true }]}
         onResolve={noop}
       />
     ),
     roles: () => [
-      [t('bills.add.deleteTitle'), 'heading'],
-      [t('bills.add.deleteMessage'), 'reading'],
+      [t('ui.past.delete.title', { name: 'Rent' }), 'heading'],
+      [t('ui.past.delete.none'), 'reading'],
       [t('common.delete'), 'row'],
     ],
   },

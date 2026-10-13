@@ -95,9 +95,27 @@ let mockBills: { data: unknown[] | undefined; isPending: boolean; isError: boole
 let mockEntries: ReturnType<typeof charge>[];
 
 // No loan behind these bills: the page stays a bill page.
+// The stopped-plan Delete reads the charges and deletes; neither is reached on a running plan.
+jest.mock('@/api/past-charges', () => ({
+  usePastCharges: () => ({
+    ready: true,
+    count: 0,
+    lastChargedOn: null,
+    chooseDelete: jest.fn(),
+    retry: jest.fn(),
+  }),
+}));
+jest.mock('@/api/mutations', () => ({
+  useDeleteBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useDeleteSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
+}));
+jest.mock('@/providers/dialog-provider', () => ({ useDialog: () => jest.fn() }));
+
 jest.mock('@/api/loans', () => ({
   useLoanDetail: () => ({ data: { kind: 'bill' }, isPending: false, isError: false }),
 }));
+// How each loan ended, for a loan's bill under Stopped; none here has ended.
+jest.mock('@/components/loans/use-loan-endings', () => ({ useLoanEndings: () => new Map() }));
 jest.mock('@/api/queries', () => ({
   useBills: () => ({ ...mockBills, refetch: jest.fn() }),
   usePaymentSources: () => ({

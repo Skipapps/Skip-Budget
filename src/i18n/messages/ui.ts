@@ -136,6 +136,162 @@ export const uiMessages = defineMessages({
   'ui.color.black': { en: 'Black', es: 'Negro', fr: 'Noir' },
   'ui.color.current': { en: 'Current colour', es: 'Color actual', fr: 'Couleur actuelle' },
 
+  /** The one question every plan asks about its past, on an edit or a delete. */
+  'ui.past.change.title.charges': {
+    en: 'Change past charges too?',
+    es: '¿Cambiar también los cargos anteriores?',
+    fr: 'Modifier aussi les prélèvements passés ?',
+  },
+  'ui.past.change.title.payments': {
+    en: 'Change past payments too?',
+    es: '¿Cambiar también los pagos anteriores?',
+    fr: 'Modifier aussi les paiements passés ?',
+  },
+  'ui.past.change.title.days': {
+    en: 'Change past days too?',
+    es: '¿Cambiar también los días anteriores?',
+    fr: 'Modifier aussi les jours passés ?',
+  },
+  'ui.past.change.body.charges': {
+    en: {
+      one: '{name} has already been charged once. Change that charge as well, or only the ones still to come?',
+      other:
+        '{name} has already been charged {count} times. Change those as well, or only the ones still to come?',
+    },
+    es: {
+      one: 'Ya hubo un cargo de {name}. ¿Cambiar también ese cargo o solo los próximos?',
+      other: 'Ya hubo {count} cargos de {name}. ¿Cambiarlos también o solo los próximos?',
+    },
+    fr: {
+      one: 'Un prélèvement a déjà eu lieu pour {name}. Modifier aussi ce prélèvement, ou seulement ceux à venir ?',
+      other:
+        '{count} prélèvements ont déjà eu lieu pour {name}. Les modifier aussi, ou seulement ceux à venir ?',
+    },
+  },
+  'ui.past.change.body.payments': {
+    en: {
+      one: '{name} already has 1 payment recorded. Change that payment as well, or only the ones still to come?',
+      other:
+        '{name} already has {count} payments recorded. Change those as well, or only the ones still to come?',
+    },
+    es: {
+      one: 'Ya hay un pago registrado de {name}. ¿Cambiar también ese pago o solo los próximos?',
+      other: 'Ya hay {count} pagos registrados de {name}. ¿Cambiarlos también o solo los próximos?',
+    },
+    fr: {
+      one: 'Un paiement a déjà été enregistré pour {name}. Modifier aussi ce paiement, ou seulement ceux à venir ?',
+      other:
+        '{count} paiements ont déjà été enregistrés pour {name}. Les modifier aussi, ou seulement ceux à venir ?',
+    },
+  },
+  'ui.past.change.body.days': {
+    en: {
+      one: '{name} already has 1 day logged. Change that day as well, or only the days still to come?',
+      other:
+        '{name} already has {count} days logged. Change those as well, or only the days still to come?',
+    },
+    es: {
+      one: 'Ya hay un día registrado en {name}. ¿Cambiar también ese día o solo los próximos?',
+      other: 'Ya hay {count} días registrados en {name}. ¿Cambiarlos también o solo los próximos?',
+    },
+    fr: {
+      one: 'Un jour a déjà été noté pour {name}. Modifier aussi ce jour, ou seulement ceux à venir ?',
+      other:
+        '{count} jours ont déjà été notés pour {name}. Les modifier aussi, ou seulement ceux à venir ?',
+    },
+  },
+  'ui.past.change.all': {
+    en: 'Past and upcoming',
+    es: 'Anteriores y próximos',
+    fr: 'Passés et à venir',
+  },
+  'ui.past.change.upcoming': {
+    en: 'Upcoming only',
+    es: 'Solo los próximos',
+    fr: 'Seulement ceux à venir',
+  },
+  'ui.past.delete.title': {
+    en: 'Delete {name}?',
+    es: '¿Eliminar {name}?',
+    fr: 'Supprimer {name} ?',
+  },
+  'ui.past.delete.none': {
+    en: 'This can’t be undone.',
+    es: 'Esto no se puede deshacer.',
+    fr: 'Cette action est irréversible.',
+  },
+  'ui.past.delete.body.charges': {
+    en: {
+      one: '{name} has 1 past charge. Keep it in your history, or remove it from past months too? Either way, nothing after today is recorded.',
+      other:
+        '{name} has {count} past charges. Keep them in your history, or remove them from past months too? Either way, nothing after today is recorded.',
+    },
+    es: {
+      one: '{name} tiene un cargo anterior. ¿Conservarlo en tu historial o quitarlo también de los meses pasados? En ambos casos, no se registra nada después de hoy.',
+      other:
+        '{name} tiene {count} cargos anteriores. ¿Conservarlos en tu historial o quitarlos también de los meses pasados? En ambos casos, no se registra nada después de hoy.',
+    },
+    fr: {
+      one: '{name} a un prélèvement passé. Le garder dans ton historique, ou le retirer aussi des mois passés ? Dans les deux cas, rien n’est enregistré après aujourd’hui.',
+      other:
+        '{name} a {count} prélèvements passés. Les garder dans ton historique, ou les retirer aussi des mois passés ? Dans les deux cas, rien n’est enregistré après aujourd’hui.',
+    },
+  },
+  'ui.past.delete.body.payments': {
+    en: {
+      one: '{name} has 1 past payment. Keep it in your history, or remove it from past months too? Either way, nothing after today is recorded.',
+      other:
+        '{name} has {count} past payments. Keep them in your history, or remove them from past months too? Either way, nothing after today is recorded.',
+    },
+    es: {
+      one: '{name} tiene un pago anterior. ¿Conservarlo en tu historial o quitarlo también de los meses pasados? En ambos casos, no se registra nada después de hoy.',
+      other:
+        '{name} tiene {count} pagos anteriores. ¿Conservarlos en tu historial o quitarlos también de los meses pasados? En ambos casos, no se registra nada después de hoy.',
+    },
+    fr: {
+      one: '{name} a un paiement passé. Le garder dans ton historique, ou le retirer aussi des mois passés ? Dans les deux cas, rien n’est enregistré après aujourd’hui.',
+      other:
+        '{name} a {count} paiements passés. Les garder dans ton historique, ou les retirer aussi des mois passés ? Dans les deux cas, rien n’est enregistré après aujourd’hui.',
+    },
+  },
+  'ui.past.delete.body.days': {
+    en: {
+      one: '{name} has 1 past day. Keep it in your history, or remove it from past months too? Either way, nothing after today is recorded.',
+      other:
+        '{name} has {count} past days. Keep them in your history, or remove them from past months too? Either way, nothing after today is recorded.',
+    },
+    es: {
+      one: '{name} tiene un día anterior. ¿Conservarlo en tu historial o quitarlo también de los meses pasados? En ambos casos, no se registra nada después de hoy.',
+      other:
+        '{name} tiene {count} días anteriores. ¿Conservarlos en tu historial o quitarlos también de los meses pasados? En ambos casos, no se registra nada después de hoy.',
+    },
+    fr: {
+      one: '{name} a un jour passé. Le garder dans ton historique, ou le retirer aussi des mois passés ? Dans les deux cas, rien n’est enregistré après aujourd’hui.',
+      other:
+        '{name} a {count} jours passés. Les garder dans ton historique, ou les retirer aussi des mois passés ? Dans les deux cas, rien n’est enregistré après aujourd’hui.',
+    },
+  },
+  'ui.past.delete.keep.charges': {
+    en: 'Keep past charges',
+    es: 'Conservar los cargos anteriores',
+    fr: 'Garder les prélèvements passés',
+  },
+  'ui.past.delete.keep.payments': {
+    en: 'Keep past payments',
+    es: 'Conservar los pagos anteriores',
+    fr: 'Garder les paiements passés',
+  },
+  'ui.past.delete.keep.days': {
+    en: 'Keep past days',
+    es: 'Conservar los días anteriores',
+    fr: 'Garder les jours passés',
+  },
+  'ui.past.delete.everything': {
+    en: 'Remove everything',
+    es: 'Eliminar todo',
+    fr: 'Tout supprimer',
+  },
+
   /** A Paid with tile as VoiceOver reads it; "terminada" agrees with tarjeta and cuenta alike. */
   'ui.source.endingIn': {
     en: '{name}, ending in {last4}',

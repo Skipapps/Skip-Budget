@@ -7,6 +7,7 @@ import { useLedger, type LedgerEntry } from '@/api/queries';
 import { hidOlder } from '@/lib/allowance';
 import { ChargeSection, DetailCard, type PlanDetailRow } from '@/components/plans/detail-parts';
 import { HistoryNotice } from '@/components/pro/history-notice';
+import { QuietAction } from '@/components/savings/quiet-action';
 import { goBack } from '@/components/ui/back-button';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { PageState } from '@/components/ui/page-state';
@@ -59,12 +60,18 @@ type PlanDetailProps = {
   frequency: string;
   details: PlanDetailRow[];
   editHref: string;
+  /**
+   * A plan that has stopped is final: no pencil, and Delete is the one thing left to do on its page.
+   * Left out, the page is the running plan's, edited from the pencil. `label` says "Deleting…"
+   * while `busy`.
+   */
+  stopped?: { label: string; busy: boolean; onDelete: () => void };
 };
 
 /**
  * One bill or subscription, whole: what it is, what it has cost and what is still to come. The
  * charges on Monthly bills and Subscriptions open here, and so do the lists in Settings. The header
- * pencil opens the edit flow, Delete included.
+ * pencil opens the edit flow, Delete included; a stopped plan has Delete here instead.
  */
 export function PlanDetail({
   kind,
@@ -77,6 +84,7 @@ export function PlanDetail({
   frequency,
   details,
   editHref,
+  stopped,
 }: PlanDetailProps) {
   const artwork = useArtwork();
   const moneyColor = useMoneyColor();
@@ -149,13 +157,28 @@ export function PlanDetail({
         onRetry();
         ledger.refetch();
       }}
-      headerActions={[
-        {
-          icon: Pencil,
-          label: t('bills.planDetail.edit', { name: plan.name }),
-          onPress: () => router.push(editHref as never),
-        },
-      ]}
+      headerActions={
+        stopped
+          ? []
+          : [
+              {
+                icon: Pencil,
+                label: t('bills.planDetail.edit', { name: plan.name }),
+                onPress: () => router.push(editHref as never),
+              },
+            ]
+      }
+      footer={
+        stopped ? (
+          <QuietAction
+            tone="danger"
+            label={stopped.label}
+            onPress={stopped.onDelete}
+            disabled={stopped.busy}
+            testID="plan-delete"
+          />
+        ) : undefined
+      }
     >
       <DetailCard
         mark={mark}

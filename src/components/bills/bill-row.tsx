@@ -14,6 +14,8 @@ import { useColors, useMoneyColor } from '@/providers/theme-provider';
 type BillRowProps = {
   bill: Bill;
   sourceLabel: string;
+  /** Said in place of the due date, for a bill that no longer has one ("Stopped on 12 Oct 2026"). */
+  status?: string;
   onPress?: () => void;
 };
 
@@ -66,7 +68,7 @@ export function billCategoryHint(id: string, fallback = ''): string {
  * One bill in a list. The name wraps between words; a word too wide to sit beside the amount and
  * date puts them under the name instead.
  */
-export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
+export function BillRow({ bill, sourceLabel, status, onPress }: BillRowProps) {
   const colors = useColors();
   const moneyColor = useMoneyColor();
   const words = useFitGroup({ mode: 'switch' });
@@ -103,7 +105,7 @@ export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
       className="font-app text-muted"
       slotClassName="mt-0.5"
     >
-      {formatFullDate(new Date(`${bill.dueDate}T00:00:00`))}
+      {status ?? formatFullDate(new Date(`${bill.dueDate}T00:00:00`))}
     </FitText>
   );
 
@@ -111,11 +113,12 @@ export function BillRow({ bill, sourceLabel, onPress }: BillRowProps) {
     <FitGroup group={words} className="w-full">
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={t('bills.row.a11y', {
+        accessibilityLabel={t(status ? 'bills.row.a11yStatus' : 'bills.row.a11y', {
           name: bill.name,
           amount: formatCurrency(bill.amount),
           recurrence,
           source: sourceLabel,
+          ...(status ? { status } : {}),
         })}
         onPress={onPress}
         className="w-full flex-row items-center gap-3 py-3.5 active:opacity-60"

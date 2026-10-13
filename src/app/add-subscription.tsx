@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { AlignLeft, CircleCheck, RefreshCw, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -14,6 +14,7 @@ import { buildSubscriptionValues } from '@/api/entry-values';
 import {
   useCreateSubscription,
   useDeleteSubscription,
+  useStopSubscription,
   useUpdateSubscription,
 } from '@/api/mutations';
 import { usePastCharges } from '@/api/past-charges';
@@ -36,7 +37,6 @@ import { ReminderField } from '@/components/ui/reminder-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { FieldLabel } from '@/components/ui/typography';
-import { useConfirm } from '@/providers/dialog-provider';
 import { useToast } from '@/providers/toast-context';
 import { t, type MessageKey } from '@/i18n';
 import { logoColumns } from '@/lib/logo-columns';
@@ -145,6 +145,14 @@ export default function AddSubscriptionScreen() {
   const artwork = useArtwork();
   const subscription = useSubscription(id);
   const existing = subscription.data ?? null;
+  // A cancelled subscription is final, so a link to change one opens its page: its Active chip would
+  // restart it and fill in the renewals since. Decided on the first read only: Keep or Cancelled
+  // from this form cancels it here, and leaving is that flow's own step.
+  const [cancelledAtOpen, setCancelledAtOpen] = useState<boolean | null>(null);
+  if (existing && cancelledAtOpen === null) setCancelledAtOpen(!existing.active);
+  if (cancelledAtOpen && id) {
+    return <Redirect href={{ pathname: '/subscription/[id]', params: { id } }} />;
+  }
 
   if (id && !existing) {
     if (subscription.isError) {
@@ -276,8 +284,11 @@ function SubscriptionForm({
   const createSubscription = useCreateSubscription();
   const updateSubscription = useUpdateSubscription();
   const pastCharges = usePastCharges('subscription', id);
+  // Set once the subscription took an edit whose past charges failed to follow: it then matches the
+  // form, so the question would not come up again and the next Save must redo the rewrite itself.
+  const [rewritePending, setRewritePending] = useState(false);
   const deleteSubscription = useDeleteSubscription();
-  const confirm = useConfirm();
+  const stopSubscription = useStopSubscription();
   const toast = useToast();
 
   const savedReminder = useReminderChoice('subscription', id);
@@ -371,7 +382,7 @@ function SubscriptionForm({
         return;
       }
 
-      const scope = await pastCharges.choose(carried.label, changed);
+      const scope = rewritePending ? 'all' : await pastCharges.choose(carried.label, changed);
       if (scope === null) return;
 
       const subscriptionId =
@@ -379,7 +390,11 @@ function SubscriptionForm({
           ? (await updateSubscription.mutateAsync({ id, values }), id)
           : (await createSubscription.mutateAsync(values)).id;
 
-      if (scope === 'all') await pastCharges.apply(carried);
+      if (scope === 'all') {
+        setRewritePending(true);
+        await pastCharges.apply(carried);
+        setRewritePending(false);
+      }
 
       // After the row exists, because a reminder points at one. Untouched while the saved one is
       // unknown: the form's 'off' is then a guess, and writing it deletes the reminder.
@@ -387,7 +402,14 @@ function SubscriptionForm({
         await applyReminder('subscription', subscriptionId, choiceToLead(reminder), remindAt);
       }
       success();
-      toast(editing ? 'toast.subscription.updated' : 'toast.subscription.added');
+      // Cancelled from the Status chips is the same stop as Delete's "Keep past charges".
+      toast(
+        !editing
+          ? 'toast.subscription.added'
+          : initial.active && !active
+            ? 'toast.subscription.stopped'
+            : 'toast.subscription.updated',
+      );
       leave();
     } catch (thrown) {
       warn();
@@ -397,24 +419,38 @@ function SubscriptionForm({
 
   const handleDelete = async () => {
     if (!id) return;
-    const ok = await confirm({
-      title: t('subscriptions.add.deleteTitle'),
-      message: t('subscriptions.add.deleteMessage'),
-      confirmLabel: t('common.delete'),
-      destructive: true,
+    setError(null);
+    // The question counts the charges, so it waits for them as Save does.
+    if (!pastCharges.ready) {
+      pastCharges.retry();
+      warn();
+      setError(failureText());
+      return;
+    }
+    // Stopped as saved, not as the Status chips stand unsaved.
+    const choice = await pastCharges.chooseDelete(initial.service?.name ?? '', {
+      stopped: !initial.active,
     });
-    if (!ok) return;
+    if (choice === null) return;
 
     try {
-      await deleteSubscription.mutateAsync(id);
-      toast('toast.subscription.deleted', 'deleted');
+      if (choice === 'keep') {
+        await stopSubscription.mutateAsync(id);
+        success();
+        toast('toast.subscription.stopped');
+      } else {
+        await deleteSubscription.mutateAsync(id);
+        toast('toast.subscription.deleted', 'deleted');
+      }
       router.back();
     } catch (thrown) {
+      warn();
       setError(failureMessage(thrown));
     }
   };
 
   const busy = createSubscription.isPending || updateSubscription.isPending || pastCharges.saving;
+  const deleting = deleteSubscription.isPending || stopSubscription.isPending;
   // The page this form opened on. Anywhere else the edge swipe is off, and Back steps back.
   const isRoot = view === initialView;
 
@@ -680,7 +716,9 @@ function SubscriptionForm({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('subscriptions.add.deleteA11y')}
-            onPress={handleDelete}
+            accessibilityState={{ disabled: deleting }}
+            disabled={deleting}
+            onPress={() => void handleDelete()}
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
@@ -688,7 +726,7 @@ function SubscriptionForm({
               className="font-app-medium text-[15px] text-danger"
               maxFontSizeMultiplier={TEXT_CAP.row}
             >
-              {deleteSubscription.isPending
+              {deleting
                 ? t('subscriptions.add.deleting')
                 : t('subscriptions.add.deleteSubscription')}
             </Text>

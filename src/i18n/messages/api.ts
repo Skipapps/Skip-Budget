@@ -134,47 +134,6 @@ export const apiMessages = defineMessages({
     es: 'Solo los próximos',
     fr: 'Seulement celles à venir',
   },
-  'api.pastCharges.title': {
-    en: 'Change past charges too?',
-    es: '¿Cambiar también los cargos anteriores?',
-    fr: 'Modifier aussi les prélèvements passés ?',
-  },
-  'api.pastCharges.charged': {
-    en: {
-      one: '{name} has already been charged once. Change that charge as well, or only the ones still to come?',
-      other:
-        '{name} has already been charged {count} times. Change those as well, or only the ones still to come?',
-    },
-    es: {
-      one: 'Ya hubo un cargo de {name}. ¿Cambiar también ese cargo o solo los próximos?',
-      other: 'Ya hubo {count} cargos de {name}. ¿Cambiarlos también o solo los próximos?',
-    },
-    fr: {
-      one: 'Un prélèvement a déjà eu lieu pour {name}. Modifier aussi ce prélèvement, ou seulement ceux à venir ?',
-      other:
-        '{count} prélèvements ont déjà eu lieu pour {name}. Les modifier aussi, ou seulement ceux à venir ?',
-    },
-  },
-  'api.pastCharges.maybeOne': {
-    en: '{name} may already have been charged. Change that charge as well, or only the ones still to come?',
-    es: 'Puede que ya haya un cargo de {name}. ¿Cambiar también ese cargo o solo los próximos?',
-    fr: 'Un prélèvement a peut-être déjà eu lieu pour {name}. Modifier aussi ce prélèvement, ou seulement ceux à venir ?',
-  },
-  'api.pastCharges.maybeMany': {
-    en: '{name} may already have been charged. Change those as well, or only the ones still to come?',
-    es: 'Puede que ya haya cargos de {name}. ¿Cambiarlos también o solo los próximos?',
-    fr: 'Des prélèvements ont peut-être déjà eu lieu pour {name}. Les modifier aussi, ou seulement ceux à venir ?',
-  },
-  'api.pastCharges.all': {
-    en: 'Past and upcoming',
-    es: 'Anteriores y próximos',
-    fr: 'Passés et à venir',
-  },
-  'api.pastCharges.upcoming': {
-    en: 'Upcoming only',
-    es: 'Solo los próximos',
-    fr: 'Seulement ceux à venir',
-  },
 
   'api.setup.salary.title': {
     en: 'Set your pay',

@@ -67,11 +67,27 @@ jest.mock('@/providers/toast-context', () => ({ useToast: () => mockToast }));
 const mockSave = jest.fn(async (_input: Record<string, unknown>) => ({ id: 'bill-9' }));
 const mockUpdate = jest.fn(async (input: { billId: string }) => ({ id: input.billId }));
 const mockDelete = jest.fn(async (id: string) => ({ id }));
+const mockStop = jest.fn(async (input: { bill: { id: string } }) => ({ id: input.bill.id }));
 jest.mock('@/api/mutations', () => ({
   useSaveLoan: () => ({ mutateAsync: mockSave, isPending: false }),
   useUpdateLoan: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteBill: () => ({ mutateAsync: mockDelete, isPending: false }),
+  useStopBill: () => ({ mutateAsync: mockStop, isPending: false }),
 }));
+// The questions about the loan's past; their words are past-choice's and are tested there.
+const mockPast = {
+  ready: true,
+  count: 0,
+  lastChargedOn: null,
+  choose: jest.fn(
+    async (_name: string, _changed: boolean): Promise<'all' | 'upcoming' | null> => 'upcoming',
+  ),
+  chooseDelete: jest.fn(
+    async (_name: string, _options?: object): Promise<'keep' | 'everything' | null> => 'everything',
+  ),
+  retry: jest.fn(),
+};
+jest.mock('@/api/past-charges', () => ({ usePastCharges: () => mockPast }));
 jest.mock('@/components/ui/skeleton', () => {
   const { View } = jest.requireActual('react-native');
   return { SkeletonList: () => <View testID="skeleton" />, Skeleton: () => null };
@@ -117,7 +133,12 @@ jest.mock('@/api/reminders', () => ({
 const mockNav = jest.fn();
 let mockParams: Record<string, string> = {};
 const mockSwipe: boolean[] = [];
+const mockRedirect = jest.fn();
 jest.mock('expo-router', () => ({
+  Redirect: ({ href }: { href: unknown }) => {
+    mockRedirect(href);
+    return null;
+  },
   useLocalSearchParams: () => mockParams,
   useFocusEffect: () => {},
   useIsFocused: () => true,
@@ -148,6 +169,9 @@ beforeEach(() => {
   mockPickedDay = new Date(2024, 11, 27);
   mockDetail = { data: undefined, isPending: true, isError: false, refetch: jest.fn() };
   mockReminderChoice = { choice: 'off', remindAt: '09:00', unknown: false };
+  mockPast.ready = true;
+  mockPast.choose.mockResolvedValue('upcoming');
+  mockPast.chooseDelete.mockResolvedValue('everything');
 });
 
 const press = (node: Node) => fireEvent.press(node);
@@ -767,6 +791,7 @@ describe('changing a saved loan', () => {
       payment_day: null,
       created_at: '2026-10-12T09:00:00Z',
       source: null,
+      payoffs: [],
       ...loan,
       bill: {
         id: 'bill-car',
@@ -820,6 +845,7 @@ describe('changing a saved loan', () => {
     paymentDay: null,
     inSpending: true,
     today: '2026-10-12',
+    past: 'upcoming',
   };
 
   it('opens straight on the details, filled in from the saved loan', async () => {
@@ -857,6 +883,7 @@ describe('changing a saved loan', () => {
     expect(checked(radio('1 day'))).toBe(true);
     await press(button('Save changes'));
 
+    expect(mockPast.choose).toHaveBeenCalledWith('Car loan', false);
     expect(mockUpdate).toHaveBeenCalledWith(UNCHANGED);
     expect(mockSave).not.toHaveBeenCalled();
     expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'bill-car', 1, '08:30');
@@ -864,48 +891,43 @@ describe('changing a saved loan', () => {
     expect(mockNav.mock.calls).toEqual([['back']]);
   });
 
-  it('keeps a loan a payoff cleared paid off: Save ends it that day, and its schedule shows the payoff', async () => {
-    const all = {
-      id: 'po-2',
-      bill_id: 'bill-car',
-      paid_on: '2026-10-12',
-      amount: 10_701.09,
-      kind: 'full',
-      card_id: null,
-      bank_account_id: null,
-      counted: true,
-      created_at: '2026-10-12T12:00:00Z',
-      source: null,
-    };
-    showing(savedLoan({ ends_on: '2026-10-12' }, { payoffs: [all] }));
-    await render(<AddLoanScreen />);
-    await press(button('Continue'));
+  describe('a finished loan, which is final', () => {
+    const toItsPage = { pathname: '/loan/[id]', params: { id: 'bill-car' } };
 
-    await press(button('Payment schedule'));
-    const [, route] = mockNav.mock.calls.find(([kind]) => kind === 'push') as [
-      string,
-      { params: Record<string, string> },
-    ];
-    expect(route.params.payoffs).toBe('[["2026-10-12",10701.09]]');
+    it('opens a loan a payoff cleared on its page, never on its form', async () => {
+      const all = { id: 'po-2', paid_on: '2026-10-12', amount: 10_701.09, kind: 'full' };
+      showing(savedLoan({ ends_on: '2026-10-12' }, { payoffs: [all] }));
+      await render(<AddLoanScreen />);
+      expect(mockRedirect).toHaveBeenCalledWith(toItsPage);
+      expect(screen.queryByText('Loan name')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Delete loan' })).toBeNull();
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
 
-    await press(button('Save changes'));
-    // Without its payoff the loan would end on its term's own last day and the bill charge again.
-    expect(mockUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ billId: 'bill-car', lastPaymentOn: '2026-10-12' }),
-    );
+    it('opens a loan paid off on schedule, or stopped, on its page', async () => {
+      // The last payment, 27 Dec 2028, is behind on this day.
+      jest.setSystemTime(new Date(2029, 2, 1, 9, 0));
+      await render(<AddLoanScreen />);
+      expect(mockRedirect).toHaveBeenLastCalledWith(toItsPage);
+      await screen.unmount();
+      jest.setSystemTime(new Date(2026, 9, 12, 9, 0));
 
-    await screen.unmount();
-    mockParams = route.params;
-    await render(<LoanScheduleScreen />);
-    await press(screen.getByText(/^Show all/));
-    expect(
-      screen.getByLabelText(
-        'Paid off, 12 Oct 2026. $10,701.09: $27.42 interest, $10,673.67 off the balance. $0.00 left.',
-      ),
-    ).toBeTruthy();
-    // It came after payment 21, and nothing comes after it.
-    expect(screen.getByLabelText(/^Payment 21, 27 Sep 2026,/)).toBeTruthy();
-    expect(screen.queryByLabelText(/^Payment 22,/)).toBeNull();
+      showing(savedLoan({ ends_on: '2026-10-11' }));
+      await render(<AddLoanScreen />);
+      expect(mockRedirect).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText('Loan name')).toBeNull();
+    });
+
+    it('stays on the form once Keep stops the loan from it, leaving by its own step', async () => {
+      mockPast.chooseDelete.mockResolvedValueOnce('keep');
+      await render(<AddLoanScreen />);
+      await press(button('Delete loan'));
+      // The reload finds it stopped before the page has left.
+      showing(savedLoan({ ends_on: '2026-10-12' }));
+      await screen.rerender(<AddLoanScreen />);
+      expect(mockRedirect).not.toHaveBeenCalled();
+      expect(mockNav.mock.calls).toEqual([['back']]);
+    });
   });
 
   it('refuses a start after money already paid off it, naming that payment, and saves nothing', async () => {
@@ -1023,6 +1045,106 @@ describe('changing a saved loan', () => {
     expect(mockNav).not.toHaveBeenCalled();
   });
 
+  describe('Change past payments too?', () => {
+    /** Review of the saved loan with the monthly payment changed to $430. */
+    async function withPayment(keys = ['4', '3', '0']) {
+      await render(<AddLoanScreen />);
+      await press(button('Monthly payment, $424.80. Edit'));
+      for (let key = 0; key < 6; key += 1) await press(screen.getByLabelText('Delete last digit'));
+      await typeKeys(keys);
+      await press(button('Done'));
+      await press(button('Continue'));
+    }
+
+    it('asks once the monthly payment changes, and rewrites the payments with the edit', async () => {
+      mockPast.choose.mockResolvedValueOnce('all');
+      await withPayment();
+      await press(button('Save changes'));
+      expect(mockPast.choose).toHaveBeenCalledWith('Car loan', true);
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ monthlyPayment: 430, past: 'all' }),
+      );
+      expect(mockToast).toHaveBeenCalledWith('toast.loan.updated');
+    });
+
+    it('keeps the payments as they landed when told upcoming only', async () => {
+      await withPayment();
+      await press(button('Save changes'));
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ monthlyPayment: 430, past: 'upcoming' }),
+      );
+    });
+
+    it('asks when only the name or only where it is paid from changes', async () => {
+      await render(<AddLoanScreen />);
+      await fireEvent.changeText(box('Loan name'), 'Civic');
+      await press(button('Continue'));
+      await press(button('Save changes'));
+      expect(mockPast.choose).toHaveBeenLastCalledWith('Civic', true);
+      await screen.unmount();
+
+      await render(<AddLoanScreen />);
+      await press(radio(/^Amex/));
+      await press(button('Continue'));
+      await press(button('Save changes'));
+      expect(mockPast.choose).toHaveBeenLastCalledWith('Car loan', true);
+    });
+
+    it('writes nothing when backed out of, and asks again on the next Save', async () => {
+      mockPast.choose.mockResolvedValueOnce(null);
+      await withPayment();
+      await press(button('Save changes'));
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(mockApplyReminder).not.toHaveBeenCalled();
+      expect(mockNav).not.toHaveBeenCalled();
+      expect(button('Save changes').props.accessibilityState).toEqual(
+        expect.objectContaining({ disabled: false }),
+      );
+
+      await press(button('Save changes'));
+      expect(mockPast.choose).toHaveBeenCalledTimes(2);
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it('waits for the payments: says the one failure line and writes nothing until they are read', async () => {
+      mockPast.ready = false;
+      await withPayment();
+      await press(button('Save changes'));
+      expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+      expect(mockPast.retry).toHaveBeenCalled();
+      expect(mockPast.choose).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it('asks again after an edit that was not saved, as nothing of it was written', async () => {
+      mockPast.choose.mockResolvedValue('all');
+      // Before the atomic edit is live the server refuses it outright.
+      mockUpdate.mockRejectedValueOnce({ code: 'PGRST202', message: 'not found' } as never);
+      await withPayment();
+      await press(button('Save changes'));
+      expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+      expect(mockApplyReminder).not.toHaveBeenCalled();
+
+      await press(button('Save changes'));
+      expect(mockPast.choose).toHaveBeenCalledTimes(2);
+      expect(mockUpdate).toHaveBeenCalledTimes(2);
+      expect(mockUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ past: 'all' }));
+    });
+
+    it('asks nothing when only the reminder is left to write after a save', async () => {
+      mockPast.choose.mockResolvedValue('all');
+      mockApplyReminder.mockRejectedValueOnce(new Error('offline'));
+      await withPayment();
+      await press(button('Save changes'));
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+
+      await press(button('Save changes'));
+      expect(mockPast.choose).toHaveBeenCalledTimes(1);
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockApplyReminder).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it('asks before Close throws the changes away', async () => {
     await render(<AddLoanScreen />);
     await press(button('Close'));
@@ -1036,22 +1158,57 @@ describe('changing a saved loan', () => {
     it('asks, deletes the loan’s bill, and lands on Loans with neither of its pages beneath', async () => {
       await render(<AddLoanScreen />);
       await press(button('Delete loan'));
-      expect(mockConfirm).toHaveBeenCalledWith({
-        title: 'Delete this loan?',
-        message: 'Its payment history and reminder are deleted too. This can’t be undone.',
-        confirmLabel: 'Delete',
-        destructive: true,
-      });
+      expect(mockPast.chooseDelete).toHaveBeenCalledWith('Car loan', { stopped: false, extra: 0 });
       expect(mockDelete).toHaveBeenCalledWith('bill-car');
+      expect(mockStop).not.toHaveBeenCalled();
       expect(mockToast).toHaveBeenCalledWith('toast.loan.deleted', 'deleted');
       expect(mockNav.mock.calls).toEqual([['dismissAll'], ['push', '/loans']]);
     });
 
+    it('keeps the past: stops the loan today, as stored, and goes back to its page', async () => {
+      mockPast.chooseDelete.mockResolvedValueOnce('keep');
+      await render(<AddLoanScreen />);
+      await press(button('Delete loan'));
+      expect(mockStop).toHaveBeenCalledWith({ bill: savedLoan().bill, today: '2026-10-12' });
+      expect(mockDelete).not.toHaveBeenCalled();
+      expect(mockToast).toHaveBeenCalledWith('toast.loan.stopped');
+      expect(mockNav.mock.calls).toEqual([['back']]);
+    });
+
+    it('counts its payoffs with its payments', async () => {
+      const payoff = { id: 'po-1', paid_on: '2026-10-03', amount: 2000, kind: 'partial' };
+      showing(savedLoan({}, { payoffs: [payoff] }));
+      await render(<AddLoanScreen />);
+      await press(button('Delete loan'));
+      expect(mockPast.chooseDelete).toHaveBeenCalledWith('Car loan', { stopped: false, extra: 1 });
+    });
+
     it('does nothing when the person keeps it', async () => {
-      mockConfirm.mockResolvedValueOnce(false);
+      mockPast.chooseDelete.mockResolvedValueOnce(null);
       await render(<AddLoanScreen />);
       await press(button('Delete loan'));
       expect(mockDelete).not.toHaveBeenCalled();
+      expect(mockStop).not.toHaveBeenCalled();
+      expect(mockNav).not.toHaveBeenCalled();
+    });
+
+    it('waits for the payments: says the one failure line and asks nothing until they are read', async () => {
+      mockPast.ready = false;
+      await render(<AddLoanScreen />);
+      await press(button('Delete loan'));
+      expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+      expect(mockPast.retry).toHaveBeenCalled();
+      expect(mockPast.chooseDelete).not.toHaveBeenCalled();
+      expect(mockDelete).not.toHaveBeenCalled();
+    });
+
+    it('says the one failure line when it cannot stop, and stays', async () => {
+      mockPast.chooseDelete.mockResolvedValueOnce('keep');
+      mockStop.mockRejectedValueOnce(new Error('offline'));
+      await render(<AddLoanScreen />);
+      await press(button('Delete loan'));
+      expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+      expect(mockToast).not.toHaveBeenCalled();
       expect(mockNav).not.toHaveBeenCalled();
     });
 

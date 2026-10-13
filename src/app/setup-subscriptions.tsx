@@ -45,7 +45,14 @@ export default function SetupSubscriptionsScreen() {
           sourceLabel={
             sourceLabels.get(subscription.card_id ?? subscription.bank_account_id ?? '') ?? ''
           }
-          onPress={() => router.push(`/add-subscription?id=${subscription.id}`)}
+          // A cancelled one is final, so it opens on its page, never its edit form.
+          onPress={() =>
+            router.push(
+              subscription.active
+                ? `/add-subscription?id=${subscription.id}`
+                : `/subscription/${subscription.id}`,
+            )
+          }
         />
       ))}
     </SetupCollection>

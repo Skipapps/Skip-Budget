@@ -279,12 +279,15 @@ export function HistoryCard({
   paidFrom,
   today,
   onRemovePayoff,
+  canRemovePayoff = () => true,
 }: {
   history: LoanViewHistory;
   /** Where the scheduled payments come from; a payoff names its own. */
   paidFrom: PaymentSourceRow | null;
   today: string;
   onRemovePayoff: (payoff: PayoffRow) => void;
+  /** Which payoffs can be taken out; on a finished loan, which is read-only, at most one. */
+  canRemovePayoff?: (payoff: PayoffRow) => boolean;
 }) {
   const [all, setAll] = useState(false);
   const shown = all ? history.rows : history.rows.slice(0, HISTORY_SHOWN);
@@ -312,7 +315,7 @@ export function HistoryCard({
               payoff={row}
               first={index === 0}
               today={today}
-              onRemove={() => onRemovePayoff(row)}
+              onRemove={canRemovePayoff(row) ? () => onRemovePayoff(row) : undefined}
             />
           ) : (
             <ScheduledLine
@@ -383,7 +386,7 @@ function PayoffLine({
   payoff: PayoffRow;
   first: boolean;
   today: string;
-  onRemove: () => void;
+  onRemove?: () => void;
 }) {
   const kind = payoff.full ? t('loanFlow.view.paidOff') : t('loanFlow.view.extraPayment');
   const amount = formatCurrency(payoff.amount);
@@ -405,7 +408,7 @@ function PayoffLine({
           : t('loanFlow.view.payoffNoSourceA11y', said)
       }
       action={
-        payoff.id
+        payoff.id && onRemove
           ? {
               onPress: onRemove,
               hint: payoff.latest

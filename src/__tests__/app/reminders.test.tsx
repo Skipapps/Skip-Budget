@@ -46,6 +46,7 @@ jest.mock('@/components/ui/skeleton', () => ({ SkeletonList: () => null }));
 // every switch on it a guess.
 let mockFailed: string | null = null;
 const mockRefetched: string[] = [];
+let mockBills: unknown[] = [];
 
 const mockQuery = (name: string, data: unknown[]) => ({
   data: mockFailed === name ? undefined : data,
@@ -56,7 +57,7 @@ const mockQuery = (name: string, data: unknown[]) => ({
 });
 
 jest.mock('@/api/queries', () => ({
-  useBills: () => mockQuery('bills', []),
+  useBills: () => mockQuery('bills', mockBills),
   useSubscriptions: () => mockQuery('subscriptions', []),
   useCards: () => mockQuery('cards', []),
   useBankAccounts: () => mockQuery('accounts', []),
@@ -131,6 +132,40 @@ beforeEach(() => {
   mockReceiptReminder = { enabled: false, remindAt: '20:00' };
   mockFailed = null;
   mockRefetched.length = 0;
+  mockBills = [];
+});
+
+describe('Reminders — bills', () => {
+  const bill = (id: string, name: string, dates: Record<string, string | null>) => ({
+    id,
+    name,
+    amount: 50,
+    category_id: 'other',
+    icon_id: null,
+    recurrence: 'monthly',
+    card_id: null,
+    bank_account_id: null,
+    ...dates,
+  });
+
+  it('offers no switch for a stopped bill, which is never reminded', async () => {
+    mockBills = [
+      bill('b1', 'Rent', { next_due_on: '2099-01-01', starts_on: '2020-01-01', ends_on: null }),
+      // Stopped, its past kept: it ended on a day already gone.
+      bill('b2', 'Gym', {
+        next_due_on: '2020-02-01',
+        starts_on: '2020-01-01',
+        ends_on: '2020-01-31',
+      }),
+      // Stopped before it started: no next date at all.
+      bill('b3', 'Course', { next_due_on: null, starts_on: '2020-01-01', ends_on: '2020-01-01' }),
+    ];
+    const screen = await render(<RemindersScreen />);
+
+    expect(screen.getByText('Rent')).toBeTruthy();
+    expect(screen.queryByText('Gym')).toBeNull();
+    expect(screen.queryByText('Course')).toBeNull();
+  });
 });
 
 describe('Reminders — daily receipts reminder', () => {

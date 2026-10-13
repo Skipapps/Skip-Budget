@@ -799,6 +799,23 @@ export type LedgerInput = {
 };
 
 /**
+ * Whether the ledger walks a plan's schedule. One that does not (cancelled, stopped with no next
+ * date, finished) has only what it recorded. `ledgerEntries` and `bookFlows` both ask this, so a
+ * charge is listed by one of them and counted once.
+ */
+function subscriptionRuns<T extends Pick<SubscriptionRow, 'active' | 'next_renewal_on'>>(
+  row: T,
+): row is T & { next_renewal_on: string } {
+  return Boolean(row.active && row.next_renewal_on);
+}
+
+function billRuns<T extends Pick<BillRow, 'next_due_on'>>(
+  row: T,
+): row is T & { next_due_on: string } {
+  return Boolean(row.next_due_on);
+}
+
+/**
  * The ledger itself, newest first (see LedgerEntry): `useLedger` on what the screens read, and the
  * savings close on what it reads fresh, so a closed month is the month Home showed.
  */
@@ -872,8 +889,35 @@ export function ledgerEntries({
     }
   };
 
+  // A plan no longer running is due nothing more, but what it was charged went out: listed as it
+  // was recorded, in the window, never projected.
+  const listRecorded = (
+    key: string,
+    draw: Omit<LedgerEntry, 'id' | 'label' | 'date' | 'amount' | 'sourceId'>,
+  ) => {
+    for (const charge of byPlan.get(key) ?? []) {
+      if (!inRange(charge.date)) continue;
+      entries.push({
+        ...draw,
+        id: charge.id,
+        label: charge.label,
+        date: charge.date,
+        amount: -Math.abs(charge.amount),
+        sourceId: charge.cardId ?? charge.accountId ?? '',
+      });
+    }
+  };
+
   for (const row of subscriptions) {
-    if (!row.active || !row.next_renewal_on) continue;
+    if (!subscriptionRuns(row)) {
+      listRecorded(planKey('subscription', row.id), {
+        kind: 'subscription',
+        domain: logoDomainOf(row),
+        logoHidden: Boolean(row.logo_hidden),
+        planId: row.id,
+      });
+      continue;
+    }
     expand(
       {
         id: planKey('subscription', row.id),
@@ -899,7 +943,17 @@ export function ledgerEntries({
   }
 
   for (const row of bills) {
-    if (!row.next_due_on) continue;
+    if (!billRuns(row)) {
+      listRecorded(planKey('bill', row.id), {
+        kind: 'bill',
+        domain: logoDomainOf(row),
+        logoHidden: Boolean(row.logo_hidden),
+        categoryId: row.category_id,
+        iconId: row.icon_id,
+        planId: row.id,
+      });
+      continue;
+    }
     expand(
       {
         id: planKey('bill', row.id),
@@ -1161,8 +1215,10 @@ export function bookFlows({
     });
   }
 
-  // The ledger walks only plans that are still running. What a cancelled subscription or a
-  // finished bill was charged still went out, so it stays spent.
+  // The ledger lists what a cancelled subscription or a finished bill was charged inside its
+  // window. The rest (outside the window, or a plan no longer read) still went out, so it stays
+  // spent; each charge once.
+  const listed = new Set(entries.map((entry) => entry.id));
   const running = new Set<string>();
   const plans = new Map<
     string,
@@ -1170,16 +1226,16 @@ export function bookFlows({
   >();
   for (const row of subscriptions) {
     const key = planKey('subscription', row.id);
-    if (row.active && row.next_renewal_on) running.add(key);
+    if (subscriptionRuns(row)) running.add(key);
     plans.set(key, { domain: logoDomainOf(row), logoHidden: Boolean(row.logo_hidden) });
   }
   for (const row of bills) {
     const key = planKey('bill', row.id);
-    if (row.next_due_on) running.add(key);
+    if (billRuns(row)) running.add(key);
     plans.set(key, { ...row, domain: logoDomainOf(row), logoHidden: Boolean(row.logo_hidden) });
   }
   for (const charge of readCharges(charges).rows) {
-    if (running.has(charge.planId)) continue;
+    if (running.has(charge.planId) || listed.has(charge.id)) continue;
     const plan = plans.get(charge.planId);
     spending.push({
       id: charge.id,

@@ -8,6 +8,7 @@ import { useBills, useLedger, usePaymentSources } from '@/api/queries';
 import { hidOlder } from '@/lib/allowance';
 import { countsInSpending } from '@/lib/bill-spending';
 import { billPageHref } from '@/lib/ledger-link';
+import { billStopped } from '@/lib/plan-stop';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { FitFigure } from '@/components/ui/fit-group';
@@ -63,7 +64,10 @@ export default function BillsScreen() {
     [charges],
   );
 
-  const planCount = (plans.data ?? []).filter(countsInSpending).length;
+  // A stopped bill keeps its charges in the list but is no longer a bill to add to or count.
+  const planCount = (plans.data ?? []).filter(
+    (bill) => countsInSpending(bill) && !billStopped(bill, today),
+  ).length;
   const openBill = (id: string, categoryId: string | null | undefined) => () =>
     router.push(billPageHref(id, categoryId));
 

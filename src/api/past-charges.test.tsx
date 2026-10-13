@@ -7,7 +7,7 @@ import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
 /**
  * Editing a plan that has already been charged asks whether the charges behind it change too, and
- * only then.
+ * only then; deleting one asks whether to keep that past. A loan's charges are its payments.
  */
 
 const mockAsk = jest.fn();
@@ -33,6 +33,9 @@ const RENT_CHARGES = [
   { id: 'c-1', bill_id: 'rent', subscription_id: null, charged_on: '2026-08-01' },
   { id: 'c-2', bill_id: 'rent', subscription_id: null, charged_on: '2026-09-01' },
   { id: 'c-3', bill_id: 'power', subscription_id: null, charged_on: '2026-09-03' },
+  { id: 'c-4', bill_id: 'car', subscription_id: null, charged_on: '2026-08-27' },
+  { id: 'c-5', bill_id: 'car', subscription_id: null, charged_on: '2026-09-27' },
+  { id: 'c-6', bill_id: 'car', subscription_id: null, charged_on: '2026-10-27' },
 ];
 
 const NEW_RENT = { label: 'Rent', amount: 1100, card_id: 'card-1', bank_account_id: null };
@@ -67,6 +70,7 @@ describe('when the bill has been charged', () => {
     mockAsk.mockResolvedValue('all');
     const { result } = await renderHook(() => usePastCharges('bill', 'rent'), { wrapper });
 
+    expect(result.current.count).toBe(2);
     await expect(result.current.choose('Rent', true)).resolves.toBe('all');
 
     const request = mockAsk.mock.calls[0][0];
@@ -87,13 +91,104 @@ describe('when the bill has been charged', () => {
     await expect(result.current.choose('Rent', true)).resolves.toBeNull();
   });
 
-  it('asks anyway when the charges have not been read', async () => {
+  it('never guesses while the charges have not been read: no question, nothing to save', async () => {
     mockCharges = { data: undefined, isSuccess: false };
-    mockAsk.mockResolvedValue('upcoming');
     const { result } = await renderHook(() => usePastCharges('bill', 'rent'), { wrapper });
 
-    await result.current.choose('Rent', true);
-    expect(mockAsk.mock.calls[0][0].message).toContain('Rent may already have been charged.');
+    await expect(result.current.choose('Rent', true)).resolves.toBeNull();
+    await expect(result.current.chooseDelete('Rent')).resolves.toBeNull();
+    expect(mockAsk).not.toHaveBeenCalled();
+  });
+});
+
+describe('a loan', () => {
+  it('counts its bill’s charges as its payments, and asks in those words', async () => {
+    mockAsk.mockResolvedValue('all');
+    const { result } = await renderHook(() => usePastCharges('loan', 'car'), { wrapper });
+
+    expect(result.current.count).toBe(3);
+    expect(result.current.lastChargedOn).toBe('2026-10-27');
+    await expect(result.current.choose('Car loan', true)).resolves.toBe('all');
+    expect(mockAsk.mock.calls[0][0]).toMatchObject({
+      title: 'Change past payments too?',
+      message:
+        'Car loan already has 3 payments recorded. Change those as well, or only the ones still to come?',
+    });
+  });
+
+  it('never rewrites its payments from here: the edit itself does, in one transaction', async () => {
+    const { result } = await renderHook(() => usePastCharges('loan', 'car'), { wrapper });
+
+    await expect(act(() => result.current.apply(NEW_RENT))).rejects.toThrow();
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('counts its payoffs with its payments when it is deleted', async () => {
+    mockAsk.mockResolvedValue('keep');
+    const { result } = await renderHook(() => usePastCharges('loan', 'car'), { wrapper });
+
+    await expect(result.current.chooseDelete('Car loan', { extra: 1 })).resolves.toBe('keep');
+    expect(mockAsk.mock.calls[0][0].message).toBe(
+      'Car loan has 4 past payments. Keep them in your history, or remove them from past months too? Either way, nothing after today is recorded.',
+    );
+  });
+
+  it('offers to keep the past of a loan with a payoff and no payment yet', async () => {
+    mockAsk.mockResolvedValue('everything');
+    const { result } = await renderHook(() => usePastCharges('loan', 'new-loan'), { wrapper });
+
+    await expect(result.current.chooseDelete('New loan', { extra: 1 })).resolves.toBe('everything');
+    const request = mockAsk.mock.calls[0][0];
+    expect(request.message).toContain('New loan has 1 past payment.');
+    expect(request.actions.map((action: { id: string }) => action.id)).toEqual([
+      'keep',
+      'everything',
+    ]);
+  });
+});
+
+describe('Delete', () => {
+  it('is the plain confirm for a plan with no past', async () => {
+    mockAsk.mockResolvedValue('everything');
+    const { result } = await renderHook(() => usePastCharges('bill', 'water'), { wrapper });
+
+    await expect(result.current.chooseDelete('Water')).resolves.toBe('everything');
+    const request = mockAsk.mock.calls[0][0];
+    expect(request.title).toBe('Delete Water?');
+    expect(request.message).toBe('This can’t be undone.');
+    expect(request.actions.map((action: { id: string }) => action.id)).toEqual(['everything']);
+  });
+
+  it('offers to keep the past of a running plan, first, or remove everything', async () => {
+    mockAsk.mockResolvedValue('keep');
+    const { result } = await renderHook(() => usePastCharges('bill', 'rent'), { wrapper });
+
+    await expect(result.current.chooseDelete('Rent')).resolves.toBe('keep');
+    const request = mockAsk.mock.calls[0][0];
+    expect(request.message).toBe(
+      'Rent has 2 past charges. Keep them in your history, or remove them from past months too? Either way, nothing after today is recorded.',
+    );
+    expect(request.actions.map((action: { label: string }) => action.label)).toEqual([
+      'Keep past charges',
+      'Remove everything',
+    ]);
+  });
+
+  it('only removes a plan already stopped, whose past is kept already', async () => {
+    mockAsk.mockResolvedValue(null);
+    mockCharges = {
+      data: [{ id: 'c-9', bill_id: null, subscription_id: 'netflix', charged_on: '2026-09-05' }],
+      isSuccess: true,
+    };
+    const { result } = await renderHook(() => usePastCharges('subscription', 'netflix'), {
+      wrapper,
+    });
+
+    await expect(result.current.chooseDelete('Netflix', { stopped: true })).resolves.toBeNull();
+    const request = mockAsk.mock.calls[0][0];
+    expect(request.message).toContain('Netflix has 1 past charge.');
+    expect(request.actions.map((action: { id: string }) => action.id)).toEqual(['everything']);
+    expect(request.cancelLabel).toBe('Keep past charges');
   });
 });
 
@@ -160,16 +255,6 @@ describe('the question, word for word', () => {
     expect((await asked('power', 'Power')).message).toBe(
       'Power has already been charged once. Change that charge as well, or only the ones still to come?',
     );
-
-    mockCharges = { data: undefined, isSuccess: false };
-    expect((await asked('rent', 'Rent')).message).toBe(
-      'Rent may already have been charged. Change those as well, or only the ones still to come?',
-    );
-
-    mockCharges = { data: [RENT_CHARGES[2]], isSuccess: false };
-    expect((await asked('power', 'Power')).message).toBe(
-      'Power may already have been charged. Change that charge as well, or only the ones still to come?',
-    );
   });
 
   it('asks in Spanish', async () => {
@@ -189,16 +274,10 @@ describe('the question, word for word', () => {
   it('asks in French, with "that charge" only for one charge', async () => {
     setLanguage('fr');
     const one = await asked('power', 'Hydro');
-    expect(one.title).toBe('Modifier aussi les prélèvements passés\u00a0?');
+    expect(one.title).toBe('Modifier aussi les prélèvements passés ?');
     expect(one.message).toBe(
-      'Un prélèvement a déjà eu lieu pour Hydro. Modifier aussi ce prélèvement, ou seulement ceux à venir\u00a0?',
+      'Un prélèvement a déjà eu lieu pour Hydro. Modifier aussi ce prélèvement, ou seulement ceux à venir ?',
     );
     expect(one.cancelLabel).toBe('Annuler');
-
-    mockCharges = { data: undefined, isSuccess: false };
-    const unknown = await asked('rent', 'Loyer');
-    expect(unknown.message).toBe(
-      'Des prélèvements ont peut-être déjà eu lieu pour Loyer. Les modifier aussi, ou seulement ceux à venir\u00a0?',
-    );
   });
 });

@@ -5,8 +5,8 @@ import { join } from 'node:path';
  * What the migrations leave for loans, read from the files in the order the CLI applies them:
  * save_loan's live signature (and that its grants name that signature, or a dropped function's
  * grants are lost), the changed-payments column and its check, the rate's precision, the payment
- * day, the "counts toward spending" flag in the recorder and the reminders, update_loan, and loan
- * payoffs.
+ * day, the "counts toward spending" flag in the recorder and the reminders, update_loan, loan
+ * payoffs, and the loan edit that rewrites the payments already recorded.
  */
 
 const DIR = join(__dirname, '../../../supabase/migrations');
@@ -368,5 +368,58 @@ describe('loan payoffs after every migration', () => {
     expect(after).toMatch(block);
     expect(after.replace(' v_paid_off_on date;', '').replace(block, '')).toBe(before);
     expect(after).toContain('v_ends_on := least(v_ends_on, v_paid_off_on);');
+  });
+});
+
+describe('update_loan_and_charges after every migration', () => {
+  const FILE = '20261012100004_update_loan_and_charges.sql';
+  const live = liveSignature('update_loan_and_charges');
+  const body = () => functionIn(FILE, 'update_loan_and_charges');
+
+  it('takes update_loan’s parameters, names, order and defaults', () => {
+    expect(live.file).toBe(FILE);
+    const own = (parameters: string) => parameters.split(',').map((line) => line.trim());
+    expect(own(live.parameters)).toEqual(own(liveSignature('update_loan').parameters));
+  });
+
+  it('runs as the caller, for signed-in callers only, by its own signature', () => {
+    const text = sql(FILE).replace(/\s+/g, ' ');
+    const signature = live.types.join(', ');
+    expect(body()).toContain('security invoker set search_path = public');
+    expect(body()).not.toContain('security definer');
+    expect(text).toContain(
+      `revoke all on function public.update_loan_and_charges( ${signature} ) from public, anon;`,
+    );
+    expect(text).toContain(
+      `grant execute on function public.update_loan_and_charges( ${signature} ) to authenticated;`,
+    );
+  });
+
+  it('saves the loan through update_loan, then copies the bill onto its charges as the recorders do', () => {
+    const saved = body().indexOf('perform public.update_loan(');
+    const read = body().indexOf(
+      'select * into strict v_bill from public.bills where id = p_bill_id;',
+    );
+    const rewrite = body().indexOf(
+      "update public.charges set label = coalesce(nullif(v_bill.name, ''), 'Bill'), amount = v_bill.amount, card_id = v_bill.card_id, bank_account_id = v_bill.bank_account_id where bill_id = p_bill_id;",
+    );
+    expect(saved).toBeGreaterThan(-1);
+    expect(read).toBeGreaterThan(saved);
+    expect(rewrite).toBeGreaterThan(read);
+    // The recorders' own label, so a rewritten charge reads as one recorded today would.
+    expect(functionIn('20261012100001_loan_add_flow.sql', 'record_due_charges')).toContain(
+      "coalesce(nullif(b.name, ''), 'Bill') as label",
+    );
+  });
+
+  it('never moves a charge’s date, touches a payoff or swallows a refusal', () => {
+    expect(body()).not.toMatch(/charged_on\s*=/);
+    expect(body()).not.toContain('loan_payoffs');
+    expect(body()).not.toMatch(/exception/i);
+  });
+
+  it('leaves update_loan as the payoffs migration made it', () => {
+    expect(liveSignature('update_loan').file).toBe('20261012100003_loan_payoffs.sql');
+    expect(sql(FILE)).not.toMatch(/function public\.update_loan\(/i);
   });
 });

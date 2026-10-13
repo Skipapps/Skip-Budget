@@ -66,7 +66,8 @@ export default function SubscriptionsScreen() {
     [charges],
   );
 
-  const planCount = plans.data?.length ?? 0;
+  // A cancelled one keeps its renewals in the list but is no longer one to add to or count.
+  const planCount = (plans.data ?? []).filter((plan) => plan.active).length;
 
   return (
     <Screen

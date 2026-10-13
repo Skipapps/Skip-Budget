@@ -99,6 +99,32 @@ const renewal = (date: string, planId = 's1') => ({
 let mockSubscriptions: { data: unknown[]; isLoading: boolean; isError: boolean };
 let mockEntries: ReturnType<typeof renewal>[];
 
+// The stopped-plan Delete reads the charges and deletes; neither is reached on a running plan.
+jest.mock('@/api/past-charges', () => ({
+  usePastCharges: () => ({
+    ready: true,
+    count: 0,
+    lastChargedOn: null,
+    chooseDelete: jest.fn(),
+    retry: jest.fn(),
+  }),
+}));
+jest.mock('@/api/mutations', () => ({
+  useDeleteBill: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useDeleteSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
+}));
+jest.mock('@/providers/dialog-provider', () => ({ useDialog: () => jest.fn() }));
+// Calm, cancelled, last charged on 1 August.
+jest.mock('@/api/charges', () => ({
+  useCharges: () => ({
+    data: [
+      { id: 'c-1', subscription_id: 's3', bill_id: null, charged_on: '2026-08-01' },
+      { id: 'c-2', subscription_id: 's3', bill_id: null, charged_on: '2026-05-01' },
+    ],
+    isSuccess: true,
+  }),
+}));
+
 jest.mock('@/api/queries', () => ({
   useSubscriptions: () => ({
     ...mockSubscriptions,
@@ -161,17 +187,21 @@ describe('Your subscriptions', () => {
     expect(screen.getByLabelText('Agregar suscripción')).toBeTruthy();
     expect(screen.getByPlaceholderText('Buscar suscripciones')).toBeTruthy();
     expect(screen.getByLabelText('Filtrar suscripciones')).toBeTruthy();
-    expect(screen.getByText('3 suscripciones')).toBeTruthy();
+    // The cancelled one is not counted: it is listed under Canceladas.
+    expect(screen.getByText('2 suscripciones')).toBeTruthy();
     // 15.99 a month plus 1200 a year; the cancelled plan adds nothing.
     expect(screen.getByText('$115.99 / mes')).toBeTruthy();
     expect(screen.getByText('Mensual · VISA ••4421')).toBeTruthy();
     expect(screen.getByText('Anual')).toBeTruthy();
-    expect(screen.getByText('Cancelada · VISA ••4421')).toBeTruthy();
+    expect(screen.getByText('Canceladas')).toBeTruthy();
+    expect(screen.getByText('Cancelada · último cargo el 1 ago 2026')).toBeTruthy();
     expect(screen.getByText('Sin fecha de renovación')).toBeTruthy();
     expect(screen.getByLabelText('Netflix, $15.99 Mensual, se cobra a VISA ••4421')).toBeTruthy();
     expect(screen.getByLabelText('Costco, $1,200.00 Anual')).toBeTruthy();
     expect(
-      screen.getByLabelText('Calm, $14.99 Trimestral, se cobra a VISA ••4421, cancelada'),
+      screen.getByLabelText(
+        'Calm, $14.99 Trimestral, se cobra a VISA ••4421. Cancelada, último cargo el 1 ago 2026',
+      ),
     ).toBeTruthy();
     expect(screen.getAllByHintText('Abre esta suscripción')).toHaveLength(3);
     expectNoRawText(screen.toJSON());
@@ -182,7 +212,7 @@ describe('Your subscriptions', () => {
     const screen = await render(<SubscriptionPlansScreen />);
 
     await fireEvent.changeText(screen.getByPlaceholderText('Buscar suscripciones'), 'zzz');
-    expect(screen.getByText('0 de 3 suscripciones')).toBeTruthy();
+    expect(screen.getByText('0 de 2 suscripciones')).toBeTruthy();
     expect(screen.getByText('Nada coincide')).toBeTruthy();
     expect(screen.getByText('Borrar filtros')).toBeTruthy();
     expectNoRawText(screen.toJSON());
@@ -193,7 +223,9 @@ describe('Your subscriptions', () => {
     const screen = await render(<SubscriptionPlansScreen />);
 
     expect(screen.getByText('Tes abonnements')).toBeTruthy();
-    expect(screen.getByText('3 abonnements')).toBeTruthy();
+    expect(screen.getByText('2 abonnements')).toBeTruthy();
+    expect(screen.getByText('Annulés')).toBeTruthy();
+    expect(screen.getByText('Annulé · dernier prélèvement le 1 août 2026')).toBeTruthy();
     // Matched without folding spaces, so the no-break space before the mark is proven.
     expect(
       screen.getByText(`115,99${NBSP}$ / mois`, {
@@ -217,7 +249,7 @@ describe('Your subscriptions', () => {
     await fireEvent.press(screen.getByText('Appliquer'));
 
     expect(screen.getByLabelText('Filtres, 1 actif')).toBeTruthy();
-    expect(screen.getByText('1 sur 3 abonnements')).toBeTruthy();
+    expect(screen.getByText('1 sur 2 abonnements')).toBeTruthy();
     expectNoRawText(screen.toJSON());
   });
 
@@ -316,9 +348,12 @@ describe("A subscription's own page", () => {
     const screen = await render(<SubscriptionDetailScreen />);
 
     expect(screen.getByText(`15,99${NBSP}$`)).toBeTruthy();
-    expect(screen.getByText('Statut')).toBeTruthy();
-    // The heading under the amount and the status row.
-    expect(screen.getAllByText('Annulé')).toHaveLength(2);
+    // Under the amount; there is no renewal to come.
+    expect(screen.getByText('Annulé')).toBeTruthy();
+    expect(screen.queryByText('Prochain renouvellement')).toBeNull();
+    // Final: no pencil, and Delete on the page.
+    expect(screen.queryByLabelText('Modifier Netflix')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Supprimer l’abonnement' })).toBeTruthy();
     expect(screen.getByText('Payé avec')).toBeTruthy();
     expect(screen.getByText('Aucun mode de paiement')).toBeTruthy();
     expect(

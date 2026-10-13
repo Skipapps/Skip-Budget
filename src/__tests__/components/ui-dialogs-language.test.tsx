@@ -179,8 +179,8 @@ describe('ConfirmDialog buttons at every text size, in every language', () => {
     const onResolve = jest.fn();
     const screen = await render(
       <ConfirmDialog
-        title={t('bills.add.deleteTitle')}
-        message={t('bills.add.deleteMessage')}
+        title={t('ui.past.delete.title', { name: 'Rent' })}
+        message={t('ui.past.delete.none')}
         actions={[{ id: 'confirm', label: t('common.delete'), destructive: true }]}
         cancelLabel={t('common.cancel')}
         onResolve={onResolve}
@@ -236,10 +236,10 @@ describe('ConfirmDialog buttons at every text size, in every language', () => {
         expect(text.props.adjustsFontSizeToFit).toBeUndefined();
         expect(text.props.maxFontSizeMultiplier).toBe(TEXT_CAP.row);
       }
-      expect(screen.getByText(t('bills.add.deleteTitle')).props.maxFontSizeMultiplier).toBe(
-        TEXT_CAP.heading,
-      );
-      expect(screen.getByText(t('bills.add.deleteMessage')).props.maxFontSizeMultiplier).toBe(
+      expect(
+        screen.getByText(t('ui.past.delete.title', { name: 'Rent' })).props.maxFontSizeMultiplier,
+      ).toBe(TEXT_CAP.heading);
+      expect(screen.getByText(t('ui.past.delete.none')).props.maxFontSizeMultiplier).toBe(
         TEXT_CAP.reading,
       );
       expectNoRawText(screen.toJSON() as Json);

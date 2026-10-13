@@ -42,7 +42,11 @@ beforeEach(() => {
   mockRpc.mockReset().mockResolvedValue({ data: { id: 'bill-1' }, error: null });
   mockFrom.mockReset();
   client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+    // gcTime 0 on mutations too, or the mutation cache's timer holds Jest open after the run.
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false, gcTime: 0 },
+    },
   });
   invalidated = [];
   jest.spyOn(client, 'invalidateQueries').mockImplementation((filters) => {
@@ -230,5 +234,69 @@ describe('useUpdateLoan', () => {
     expect(error).toMatchObject(missing);
     expect(mockRpc).toHaveBeenCalledTimes(1);
     expect(mockFrom).not.toHaveBeenCalled();
+  });
+});
+
+describe('useUpdateLoan, past and upcoming', () => {
+  const argsOf = (call: number) => mockRpc.mock.calls[call] as [string, Record<string, unknown>];
+
+  it('sends the same edit to update_loan_and_charges, so the payments change with the loan', async () => {
+    await update(EDIT);
+    const { error, value } = await update({ ...EDIT, past: 'all' });
+
+    expect(error).toBeUndefined();
+    expect(value).toEqual({ id: 'bill-1' });
+    expect(argsOf(0)[0]).toBe('update_loan');
+    expect(argsOf(1)[0]).toBe('update_loan_and_charges');
+    expect(argsOf(1)[1]).toEqual(argsOf(0)[1]);
+  });
+
+  it('keeps upcoming only, or no answer, on plain update_loan', async () => {
+    await update({ ...EDIT, past: 'upcoming' });
+    await update(EDIT);
+
+    expect(mockRpc.mock.calls.map(([name]) => name)).toEqual(['update_loan', 'update_loan']);
+  });
+
+  it('refreshes the recorded payments as well', async () => {
+    await update({ ...EDIT, past: 'all' });
+
+    expect(invalidated).toContainEqual(['charges']);
+    expect(invalidated).toContainEqual(['dashboard']);
+    expect(invalidated).toContainEqual(['bills']);
+    expect(invalidated).toContainEqual(['loan', 'bill-1']);
+  });
+
+  it('leaves the payments’ cache alone for upcoming only', async () => {
+    await update({ ...EDIT, past: 'upcoming' });
+
+    expect(invalidated).not.toContainEqual(['charges']);
+  });
+
+  it('is refused in update_loan’s own words', async () => {
+    const failure = { code: 'P0001', message: 'the last payment must fall within the term' };
+    mockRpc.mockResolvedValue({ data: null, error: failure });
+    const { error } = await update({ ...EDIT, past: 'all' });
+
+    expect(refusedLoanSave(error)).toBe('lastPayment');
+    expect(invalidated).toEqual([]);
+  });
+
+  it('fails, and writes nothing at all, on a database without update_loan_and_charges', async () => {
+    const missing: Failure = {
+      code: 'PGRST202',
+      message:
+        'Could not find the function public.update_loan_and_charges(...) in the schema cache',
+    };
+    mockRpc.mockResolvedValue({ data: null, error: missing });
+    const { error } = await update({ ...EDIT, past: 'all' });
+
+    expect(error).toMatchObject(missing);
+    expect(refusedLoanSave(error)).toBeNull();
+    // Not the plain edit instead, which would save the loan and leave its past as it was.
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(mockRpc).toHaveBeenCalledWith('update_loan_and_charges', expect.anything());
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(invalidated).toEqual([]);
   });
 });

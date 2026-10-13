@@ -75,6 +75,7 @@ jest.mock('@/providers/dialog-provider', () => ({
 }));
 
 let mockParams: Record<string, string | undefined> = {};
+const mockRedirect = jest.fn();
 jest.mock('expo-router', () => ({
   router: {
     back: jest.fn(),
@@ -86,6 +87,10 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useFocusEffect: () => {},
   Stack: { Screen: () => null },
+  Redirect: ({ href }: { href: unknown }) => {
+    mockRedirect(href);
+    return null;
+  },
 }));
 
 /** What happened, in order: the question, the write, the rewrite of past renewals, the reminder. */
@@ -98,7 +103,7 @@ const mockPast = {
   choose: jest.fn(
     async (_label: string, _changed: boolean) => 'upcoming' as 'upcoming' | 'all' | null,
   ),
-  apply: jest.fn(async () => {}),
+  apply: jest.fn(async (_values: object) => {}),
   retry: jest.fn(),
 };
 jest.mock('@/api/past-charges', () => ({ usePastCharges: () => mockPast }));
@@ -120,6 +125,7 @@ jest.mock('@/api/mutations', () => ({
   useCreateSubscription: () => ({ mutateAsync: mockCreate, isPending: mockPending }),
   useUpdateSubscription: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useDeleteSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useStopSubscription: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
 
 const BRANDS = [
@@ -809,15 +815,31 @@ describe('Add subscription — what an edit saves', () => {
     });
   });
 
-  it('puts a cancelled subscription back to Active', async () => {
+  it('never puts a cancelled subscription back to Active: cancelled is final, so it opens its page', async () => {
     mockSubscription = { data: { ...SPOTIFY, active: false }, isError: false, isFetched: true };
     const screen = await render(<AddSubscriptionScreen />);
 
-    await press(screen, 'Active');
-    await press(screen, 'Save changes');
+    expect(mockRedirect).toHaveBeenCalledWith({
+      pathname: '/subscription/[id]',
+      params: { id: 'sub-1' },
+    });
+    expect(screen.queryByLabelText('Active')).toBeNull();
+    expect(screen.queryByLabelText('Save changes')).toBeNull();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
 
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
-    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({ active: true });
+  it('stays on the form once Cancelled is saved from it, leaving by its own step', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+
+    await press(screen, 'Cancelled');
+    await press(screen, 'Save changes');
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    // The reload finds it cancelled before the page has left.
+    mockSubscription = { data: { ...SPOTIFY, active: false }, isError: false, isFetched: true };
+    await screen.rerender(<AddSubscriptionScreen />);
+
+    expect(mockRedirect).not.toHaveBeenCalled();
+    expect(router.back).toHaveBeenCalledTimes(1);
   });
 
   it('takes the account off with Skip', async () => {
@@ -975,6 +997,40 @@ describe('Add subscription — the question, the write and the reminder', () => 
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockOrder).toEqual(['update', 'apply', 'reminder']);
+  });
+
+  it('retries a failed rewrite of past renewals on the next Save, without asking again', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockPast.choose.mockResolvedValue('all');
+    mockPast.apply.mockImplementationOnce(async () => {
+      throw new Error('network down');
+    });
+    mockParams = { id: 'sub-1' };
+    mockSubscription = { data: SPOTIFY, isError: false, isFetched: true };
+    const screen = await render(<AddSubscriptionScreen />);
+    await press(screen, 'VISA ••4421');
+
+    await press(screen, 'Save changes');
+    await waitFor(() => expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy());
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockApplyReminder).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+
+    // Saved, the row now matches the form: nothing it copies differs, so nothing would be asked.
+    mockPast.choose.mockResolvedValue('upcoming');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(mockPast.choose).toHaveBeenCalledTimes(1);
+    expect(mockPast.apply).toHaveBeenCalledTimes(2);
+    expect(mockPast.apply).toHaveBeenLastCalledWith({
+      label: 'Spotify',
+      amount: 11.99,
+      card_id: 'card-1',
+      bank_account_id: null,
+    });
+    expect(mockOrder).toEqual(['update', 'update', 'apply', 'reminder']);
+    log.mockRestore();
   });
 
   it('sets the reminder against the row just made, with the lead and time chosen', async () => {
