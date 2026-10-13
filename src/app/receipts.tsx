@@ -24,6 +24,7 @@ import { GENERAL_BOOK } from '@/data/receipt-books';
 import { bookTipSeen, markBookTipSeen, useBookOnReturn } from '@/lib/book-choice';
 import { bookOfReceipt, defaultBookOf } from '@/lib/receipt-books';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -39,6 +40,7 @@ import { formatCurrency } from '@/lib/format';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
 import { failureMessage, failureText } from '@/lib/failure';
+import { anyRefreshFailed, failedEmpty } from '@/lib/query-state';
 
 export default function ReceiptsScreen() {
   const artwork = useArtwork();
@@ -58,7 +60,10 @@ export default function ReceiptsScreen() {
   const storedDefault = useReceiptBookDefault();
   // Books are read before the list is drawn: a receipt in a book must never show under General.
   const isLoading = receiptsQuery.isLoading || booksQuery.isLoading || storedDefault.isLoading;
-  const isError = receiptsQuery.isError || booksQuery.isError;
+  const isError = failedEmpty(receiptsQuery) || failedEmpty(booksQuery);
+  // The default book picks which book's figures show, so its reload counts too.
+  const refreshNote =
+    !isLoading && !isError && anyRefreshFailed([receiptsQuery, booksQuery, storedDefault]);
   const refetch = () => {
     void receiptsQuery.refetch();
     void booksQuery.refetch();
@@ -294,6 +299,8 @@ export default function ReceiptsScreen() {
           </View>
         </>
       )}
+      {/* Under the count and total; with an empty book, under the book pills. */}
+      <RefreshNote show={refreshNote} />
 
       {isLoading ? <SkeletonList rows={6} /> : null}
 

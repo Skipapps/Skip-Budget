@@ -81,10 +81,18 @@ type Source = { id: string; label: string; color: string; kind: 'card' | 'accoun
 let mockCards: Row[] = [];
 let mockAccounts: Row[] = [];
 let mockSources: Source[] = [];
+let mockEvery: Source[] = [];
 jest.mock('@/api/queries', () => ({
   useCards: () => ({ data: mockCards }),
   useBankAccounts: () => ({ data: mockAccounts }),
   usePaymentSources: () => ({ sources: mockSources, isLoading: false }),
+}));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: mockEvery,
+    labelOf: (id: string) => mockEvery.find((source) => source.id === id)?.label ?? null,
+    isLoading: false,
+  }),
 }));
 
 const CARD = 'card-1';
@@ -99,13 +107,16 @@ const SOURCES: Record<string, Source> = {
   [CAPITAL]: { id: CAPITAL, label: 'Capital One 360 ••2048', color: '#D03027', kind: 'account' },
 };
 
+/** `usable` is what new spending may use: all of it on Pro, the oldest card and account on free. */
 function openWallet({
   cards = [CARD],
   accounts = [CHECKING, SAVINGS, CAPITAL],
-}: { cards?: string[]; accounts?: string[] } = {}) {
+  usable = accounts,
+}: { cards?: string[]; accounts?: string[]; usable?: string[] } = {}) {
   mockCards = cards.map((id) => ({ id }));
   mockAccounts = accounts.map((id) => ({ id }));
-  mockSources = [...cards, ...accounts].map((id) => SOURCES[id]);
+  mockSources = [...cards, ...usable].map((id) => SOURCES[id]);
+  mockEvery = [...cards, ...accounts].map((id) => SOURCES[id]);
 }
 
 const NBSP = ' ';
@@ -286,6 +297,29 @@ describe.each([ES, FR])('The payment page in $language', (w) => {
     expect(screen.getByLabelText(w.back, RAW)).toBeTruthy();
     expect(screen.getByLabelText(w.close, RAW)).toBeTruthy();
     expectNoLeftovers(screen);
+  });
+
+  it('offers the free plan’s locked accounts as where a card payment came from', async () => {
+    openWallet({ usable: [CHECKING] });
+    const screen = await render(<SourcePaymentScreen />, { wrapper: Toasts });
+
+    await typeAmount(screen, '12.50', w.decimalKey);
+    await pressButton(screen, w.next);
+
+    expect(pills(screen)).toEqual([
+      'Chase Checking ••7730',
+      'Ally Savings ••9911',
+      'Capital One 360 ••2048',
+      w.somewhereElse,
+    ]);
+    await press(screen, 'Capital One 360 ••2048');
+    await pressButton(screen, w.saveCard);
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      card_id: CARD,
+      from_bank_account_id: CAPITAL,
+    });
   });
 
   it('reads money added to an account, both steps, in the language', async () => {

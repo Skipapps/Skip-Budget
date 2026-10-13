@@ -105,7 +105,13 @@ jest.mock('@/api/queries', () => ({
     isError: false,
     refetch: jest.fn(),
   }),
-  usePaymentSources: () => ({ sources: [{ id: 'card1', label: 'VISA ••4821' }] }),
+}));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: [{ id: 'card1', label: 'VISA ••4821' }],
+    labelOf: (id: string) => (id === 'card1' ? 'VISA ••4821' : null),
+    isLoading: false,
+  }),
 }));
 jest.mock('@/api/brands', () => ({ useSpendCategories: () => ({ data: [] }) }));
 jest.mock('@/api/history', () => ({

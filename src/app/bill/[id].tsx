@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useLoanDetail } from '@/api/loans';
 import { useDeleteBill } from '@/api/mutations';
 import { usePastCharges, type PastRead } from '@/api/past-charges';
-import { useBills, usePaymentSources } from '@/api/queries';
+import { usePaymentLabels } from '@/api/payment-labels';
+import { useBills } from '@/api/queries';
 import { BillMark } from '@/components/bills/bill-mark';
 import { ChangeLogoButton } from '@/components/brands/change-logo-button';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
@@ -33,7 +34,8 @@ export default function BillDetailScreen() {
   const { today } = useToday();
   const bills = useBills();
   const loan = useLoanDetail(id || undefined);
-  const { sources } = usePaymentSources();
+  // Every card and account, a locked one too: what an entry is paid with is named on any plan.
+  const labels = usePaymentLabels();
   const pastCharges = usePastCharges('bill', id || undefined);
   const deleteBill = useDeleteBill();
   const ask = useDialog();
@@ -79,7 +81,7 @@ export default function BillDetailScreen() {
 
   const details: PlanDetailRow[] = [];
   if (bill) {
-    const source = sources.find((option) => option.id === (bill.card_id ?? bill.bank_account_id));
+    const source = labels.labelOf(bill.card_id ?? bill.bank_account_id ?? '');
     if (!stopped) {
       details.push({
         label: t('bills.detail.nextDue'),
@@ -88,7 +90,7 @@ export default function BillDetailScreen() {
     }
     details.push({
       label: t('bills.detail.paidFrom'),
-      value: source?.label ?? t('bills.noPaymentMethod'),
+      value: source ?? t('bills.noPaymentMethod'),
     });
     details.push({ label: t('bills.field.category'), value: categoryOf(bill.category_id) });
     if (bill.starts_on) {
@@ -113,7 +115,8 @@ export default function BillDetailScreen() {
       kind="bill"
       id={id}
       plan={bill}
-      isLoading={bills.isPending || loanUnread}
+      // Until the names are read, a bill paid with a card would read "No payment method".
+      isLoading={bills.isPending || loanUnread || labels.isLoading}
       isError={bills.isError}
       onRetry={() => void bills.refetch()}
       mark={

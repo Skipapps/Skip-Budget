@@ -4,9 +4,10 @@
  * the writing, with the checks in the same order and the same words.
  *
  * Pure on purpose: no hooks, no Supabase, and nothing from `@/data/bill-categories` (it pulls lucide
- * icons into Jest). The caller hands in what it already read: the payment sources, and for an edit
- * the last charge on record and where the plan counts from. A new item passes
- * `lastChargedOn: null, countsFrom: null`, which makes both floors no-ops.
+ * icons into Jest). The caller hands in what it already read: the payment sources new spending may
+ * use, and for an edit the row as saved, the last charge on record and where the plan counts from. A
+ * new item passes no saved row and `lastChargedOn: null, countsFrom: null`, which makes both floors
+ * no-ops.
  *
  * The amount check is exactly the forms' `Number.isFinite(v) && v > 0`, with no rounding: the
  * keypad already settles at two decimals, and anything stricter would change what the forms
@@ -21,6 +22,34 @@ import { toIsoDate } from '@/lib/date';
 
 /** A card or bank account, as `usePaymentSources()` lists it. */
 export type SourceRef = { id: string; kind: 'card' | 'account' };
+
+/** Where an entry already on record is paid from: its two columns as stored. */
+export type SavedSource = { card_id: string | null; bank_account_id: string | null };
+
+/** The card or account id a stored entry is paid from; '' for none. */
+export function savedSourceId(saved: SavedSource): string {
+  return saved.card_id ?? saved.bank_account_id ?? '';
+}
+
+/**
+ * The Paid with tiles: what new spending may use (`offered`, from `usePaymentSources`), plus, on an
+ * edit, the entry's own card or account when the plan no longer offers it, so the person sees what
+ * it is paid with. It goes among the others of its kind, found in `every` (`usePaymentLabels`). Until
+ * that list is read the tiles are the offered ones alone; Save keeps the source either way.
+ */
+export function withSavedSource<T extends SourceRef>(
+  offered: readonly T[],
+  every: readonly T[],
+  saved: SavedSource | null | undefined,
+): readonly T[] {
+  const id = saved ? savedSourceId(saved) : '';
+  if (!id || offered.some((source) => source.id === id)) return offered;
+  const own = every.find((source) => source.id === id);
+  if (!own) return offered;
+  const cards = offered.filter((source) => source.kind === 'card');
+  const accounts = offered.filter((source) => source.kind === 'account');
+  return own.kind === 'card' ? [...cards, own, ...accounts] : [...cards, ...accounts, own];
+}
 
 /** The values to write, or the first thing wrong: which field, and the form's hint for it. */
 export type Built<T, F extends string> =
@@ -38,8 +67,20 @@ function positive(amount: string): number | null {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-/** A source id is filed under the column of its own kind; an unknown id under neither. */
-function sourceColumns(sourceId: string, sources: readonly SourceRef[]) {
+/**
+ * A source id is filed under the column of its own kind; an id `sources` does not offer under
+ * neither. `sources` is what new spending may use, so nothing new is filed under a card or account
+ * the plan has locked. An edit that leaves the choice as it was keeps the stored columns: a card
+ * locked since Pro ended is still that entry's card.
+ */
+function sourceColumns(
+  sourceId: string,
+  sources: readonly SourceRef[],
+  saved: SavedSource | null | undefined,
+) {
+  if (saved && sourceId === savedSourceId(saved)) {
+    return { card_id: saved.card_id, bank_account_id: saved.bank_account_id };
+  }
   const chosen = sources.find((source) => source.id === sourceId);
   return {
     card_id: chosen?.kind === 'card' ? chosen.id : null,
@@ -60,10 +101,14 @@ export type ReceiptInput = {
   captureSource: CaptureSource;
 };
 
-/** add-receipt's Save. The store is checked before the amount. */
+/**
+ * add-receipt's Save. The store is checked before the amount. `saved` is the receipt being edited
+ * (its card or account is kept while unchanged); a new receipt passes none.
+ */
 export function buildReceiptValues(
   input: ReceiptInput,
   sources: readonly SourceRef[],
+  saved?: SavedSource | null,
 ): Built<ReceiptValues, 'store' | 'amount'> {
   const { store } = input;
   if (!store) return refuse('store', t('api.entry.pickStore'));
@@ -78,7 +123,7 @@ export function buildReceiptValues(
       amount,
       purchased_on: toIsoDate(input.date),
       category_id: store.categoryId || 'other',
-      ...sourceColumns(input.sourceId, sources),
+      ...sourceColumns(input.sourceId, sources, saved),
       note: noteOf(input.note),
       source: input.captureSource,
       image_path: null,
@@ -112,6 +157,8 @@ export function buildBillValues(
   input: BillInput,
   ctx: {
     sources: readonly SourceRef[];
+    /** The bill being edited, whose card or account is kept while unchanged; none for a new one. */
+    saved?: SavedSource | null;
     lastChargedOn: string | null;
     /** The bill has a loan behind it (useLoanForBill), whatever category it is filed under now. */
     hasLoan?: boolean;
@@ -154,7 +201,7 @@ export function buildBillValues(
       // cycle a second time. A set period keeps its own first day.
       starts_on: isPeriod ? start : floorAfterCharges(start, ctx.lastChargedOn, input.recurrence),
       ends_on: input.endDate ? toIsoDate(input.endDate) : null,
-      ...sourceColumns(input.sourceId, ctx.sources),
+      ...sourceColumns(input.sourceId, ctx.sources, ctx.saved),
       note: noteOf(input.note),
     },
   };
@@ -211,6 +258,8 @@ export function buildSubscriptionValues(
   input: SubscriptionInput,
   ctx: {
     sources: readonly SourceRef[];
+    /** The subscription being edited, whose card or account is kept while unchanged. */
+    saved?: SavedSource | null;
     lastChargedOn: string | null;
     /** yyyy-mm-dd the row already counts renewals from; null for a new one. */
     countsFrom: string | null;
@@ -238,7 +287,7 @@ export function buildSubscriptionValues(
         input.cycle,
       ),
       category_id: service.categoryId || 'other',
-      ...sourceColumns(input.sourceId, ctx.sources),
+      ...sourceColumns(input.sourceId, ctx.sources, ctx.saved),
       note: noteOf(input.note),
       active: input.active,
     },

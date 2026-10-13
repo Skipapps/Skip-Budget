@@ -71,6 +71,21 @@ jest.mock('@/api/queries', () => ({
     ],
   }),
 }));
+// Every card and account: card-2 is a free account's locked extra, which usePaymentSources leaves out.
+jest.mock('@/api/payment-labels', () => {
+  const sources = [
+    { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
+    { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
+    { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
+  ];
+  return {
+    usePaymentLabels: () => ({
+      sources,
+      labelOf: (id: string) => sources.find((source) => source.id === id)?.label ?? null,
+      isLoading: false,
+    }),
+  };
+});
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
@@ -336,6 +351,28 @@ describe.each(['es', 'fr'] as const)('New habit in %s', (language) => {
       screen.getByRole('radio', { name: language === 'es' ? 'Caramelo' : 'Caramel' }),
     ).toBeTruthy();
     expectNoKeys(screen);
+  });
+
+  it('shows a card the free plan has locked chosen on an edit, and Save keeps it', async () => {
+    setLanguage(language);
+    mockParams = { id: 'habit-1' };
+    mockHabit = { data: { ...SAVED_HABIT, card_id: 'card-2' }, isError: false, isFetched: true };
+    const screen = await render(<HabitNewScreen />);
+
+    expect(
+      screen.getByRole('radio', { name: 'Amex ••3005' }).props.accessibilityState,
+    ).toMatchObject({ checked: true });
+    await fireEvent.press(
+      screen.getByRole('button', {
+        name: language === 'es' ? 'Guardar cambios' : 'Enregistrer les modifications',
+      }),
+    );
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      card_id: 'card-2',
+      bank_account_id: null,
+    });
   });
 });
 

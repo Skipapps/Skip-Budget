@@ -43,8 +43,19 @@ let mockBills: { data?: unknown[]; isPending: boolean; isError: boolean };
 
 jest.mock('@/api/queries', () => ({
   useBills: () => ({ ...mockBills, refetch: mockRefetch }),
-  usePaymentSources: () => ({ sources: [{ id: 'card-1', label: 'Visa' }] }),
 }));
+jest.mock('@/api/payment-labels', () => {
+  // Every card and account by name. card-2 is a free account's locked extra: no picker offers it
+  // for new spending, but what it pays is named.
+  const names: Record<string, string> = { 'card-1': 'Visa', 'card-2': 'Amex ••3005' };
+  return {
+    usePaymentLabels: () => ({
+      sources: [],
+      labelOf: (id: string) => names[id] ?? null,
+      isLoading: false,
+    }),
+  };
+});
 
 const RENT = {
   id: 'bill-1',
@@ -126,4 +137,16 @@ it('says the one failure line when the bills will not load, and retries', async 
   expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
   await fireEvent.press(screen.getByText('Try again'));
   expect(mockRefetch).toHaveBeenCalled();
+});
+
+it('names the card a bill is paid with, a card the free plan has locked too', async () => {
+  mockBills = {
+    data: [RENT, { ...RENT, id: 'bill-2', name: 'Gym', card_id: 'card-2' }],
+    isPending: false,
+    isError: false,
+  };
+  const screen = await render(<SetupBillsScreen />);
+
+  expect(screen.getByText('Monthly · Visa')).toBeTruthy();
+  expect(screen.getByText('Monthly · Amex ••3005')).toBeTruthy();
 });

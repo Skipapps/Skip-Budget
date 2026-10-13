@@ -65,6 +65,13 @@ jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'owner' }));
 jest.mock('@/api/queries', () => ({
   usePaymentSources: () => ({ sources: [{ id: 'card-1', label: 'Visa ••4242' }] }),
 }));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: [{ id: 'card-1', label: 'Visa ••4242' }],
+    labelOf: (id: string) => (id === 'card-1' ? 'Visa ••4242' : null),
+    isLoading: false,
+  }),
+}));
 jest.mock('@/api/brands', () => ({
   useSpendCategories: () => ({ data: [{ id: 'dining', label: 'Dining' }] }),
 }));

@@ -37,8 +37,19 @@ let mockSubscriptions: { data?: unknown[]; isPending: boolean; isError: boolean 
 
 jest.mock('@/api/queries', () => ({
   useSubscriptions: () => ({ ...mockSubscriptions, refetch: jest.fn() }),
-  usePaymentSources: () => ({ sources: [{ id: 'card-1', label: 'Visa' }] }),
 }));
+jest.mock('@/api/payment-labels', () => {
+  // Every card and account by name. card-2 is a free account's locked extra: no picker offers it
+  // for new spending, but what it pays is named.
+  const names: Record<string, string> = { 'card-1': 'Visa', 'card-2': 'Amex ••3005' };
+  return {
+    usePaymentLabels: () => ({
+      sources: [],
+      labelOf: (id: string) => names[id] ?? null,
+      isLoading: false,
+    }),
+  };
+});
 
 const NETFLIX = {
   id: 'sub-1',
@@ -85,4 +96,16 @@ it('lists the ones added, and goes round again or finishes', async () => {
 
   await fireEvent.press(screen.getByText('Done'));
   expect(router.back).toHaveBeenCalled();
+});
+
+it('names the card a subscription is paid with, a card the free plan has locked too', async () => {
+  mockSubscriptions = {
+    data: [NETFLIX, { ...NETFLIX, id: 'sub-2', name: 'Spotify', card_id: 'card-2' }],
+    isPending: false,
+    isError: false,
+  };
+  const screen = await render(<SetupSubscriptionsScreen />);
+
+  expect(screen.getByText('Monthly · Visa')).toBeTruthy();
+  expect(screen.getByText('Monthly · Amex ••3005')).toBeTruthy();
 });

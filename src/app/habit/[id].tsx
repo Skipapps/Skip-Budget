@@ -6,7 +6,7 @@ import { Text, View } from 'react-native';
 import { useSpendCategories } from '@/api/brands';
 import { useHistoryFloor } from '@/api/history';
 import { habitMaths, useHabit, useHabitTaps, type HabitRow } from '@/api/habits';
-import { usePaymentSources } from '@/api/queries';
+import { usePaymentLabels } from '@/api/payment-labels';
 import { localDate } from '@/components/habits/day-row';
 import { habitColorName } from '@/components/habits/habit-color-swatches';
 import { HabitIcon } from '@/components/habits/habit-icon';
@@ -86,7 +86,8 @@ export default function HabitDetailScreen() {
   const { today } = useToday();
   const habit = useHabit(id);
   const taps = useHabitTaps();
-  const { sources } = usePaymentSources();
+  // Every card and account, a locked one too: what a habit is paid with is named on any plan.
+  const labels = usePaymentLabels();
   const { data: categories = [] } = useSpendCategories();
   // Free lists 90 days back; the totals still count every receipt.
   const { floor, free } = useHistoryFloor();
@@ -140,7 +141,8 @@ export default function HabitDetailScreen() {
     );
   }
 
-  if (habit.isPending || taps.isPending || gone || !row || !figures) {
+  // Until the names are read, a habit paid with a card would read "No card or account".
+  if (habit.isPending || taps.isPending || labels.isLoading || gone || !row || !figures) {
     return (
       <Screen showBack>
         <SkeletonList rows={4} />
@@ -153,13 +155,13 @@ export default function HabitDetailScreen() {
     price,
     date: sinceDate(figures.since, today),
   });
-  const source = sources.find((option) => option.id === (row.card_id ?? row.bank_account_id));
+  const source = labels.labelOf(row.card_id ?? row.bank_account_id ?? '');
 
   const about: PlanDetailRow[] = [
     { label: t('habits.detail.price'), value: t('habits.detail.priceEach', { price }) },
     {
       label: t('receipts.field.paidWith'),
-      value: source?.label ?? t('receipts.detail.noPaymentMethod'),
+      value: source ?? t('receipts.detail.noPaymentMethod'),
     },
     {
       label: t('receipts.field.category'),

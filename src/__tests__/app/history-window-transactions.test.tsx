@@ -52,7 +52,13 @@ jest.mock('@/api/queries', () => ({
     isError: false,
     refetch: jest.fn(),
   }),
-  usePaymentSources: () => ({ sources: [{ id: 's1', label: 'Everyday' }] }),
+}));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: [{ id: 's1', label: 'Everyday', color: '#111111', kind: 'account' }],
+    labelOf: (id: string) => (id === 's1' ? 'Everyday' : null),
+    isLoading: false,
+  }),
 }));
 
 jest.useFakeTimers().setSystemTime(new Date(`${TODAY}T09:00:00`));

@@ -1,7 +1,7 @@
 import { randomUUID } from 'expo-crypto';
 import { router, useLocalSearchParams } from 'expo-router';
 import { CalendarDays, ChevronRight, Tag, Trash2 } from 'lucide-react-native';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import {
@@ -21,6 +21,8 @@ import {
   type HabitValues,
 } from '@/api/habits';
 import { useProWrite } from '@/api/confirm-pro';
+import { withSavedSource } from '@/api/entry-values';
+import { usePaymentLabels } from '@/api/payment-labels';
 import { usePaymentSources, type PaymentSourceRow } from '@/api/queries';
 import {
   EntryReview,
@@ -246,7 +248,11 @@ function HabitForm({
   const [reviewY, setReviewY] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const { sources } = usePaymentSources();
+  // New spending takes only what the plan offers; an edit also shows the card or account the habit
+  // is already paid with, though the plan has locked it since, and Save keeps it.
+  const { sources: offered } = usePaymentSources();
+  const { sources: every } = usePaymentLabels();
+  const sources = useMemo(() => withSavedSource(offered, every, saved), [offered, every, saved]);
   const habits = useHabits();
   // An edit previews the card with its real days; a new habit has none yet.
   const taps = useHabitTaps();
@@ -363,7 +369,7 @@ function HabitForm({
       return;
     }
 
-    const paidWith = paidWithColumns(sourceId, sources, saved);
+    const paidWith = paidWithColumns(sourceId, offered, saved);
     const categoryId = habitIcon(iconId)?.spendCategory ?? 'other';
     const patch: HabitEditValues | null = saved
       ? {

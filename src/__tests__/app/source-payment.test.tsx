@@ -9,8 +9,8 @@ import { ToastContext } from '@/providers/toast-context';
 
 /**
  * A payment to a card, or money added to an account: how much, then where it came from. Pinned: the
- * second step exists only when there is another account to choose; its pills are the usable
- * accounts other than the page's own, then a last pill for money from outside; an unanswered Save
+ * second step exists only when there is another account to choose; its pills are every account
+ * other than the page's own, a free plan's locked ones too, then a last pill for money from outside; an unanswered Save
  * writes nothing and says why; what is written carries the account chosen as `from_bank_account_id`,
  * null for money from outside, under one row id for the visit; and the amount survives Back.
  *
@@ -87,10 +87,18 @@ type Source = { id: string; label: string; color: string; kind: 'card' | 'accoun
 let mockCards: Row[] = [];
 let mockAccounts: Row[] = [];
 let mockSources: Source[] = [];
+let mockEvery: Source[] = [];
 jest.mock('@/api/queries', () => ({
   useCards: () => ({ data: mockCards }),
   useBankAccounts: () => ({ data: mockAccounts }),
   usePaymentSources: () => ({ sources: mockSources, isLoading: false }),
+}));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: mockEvery,
+    labelOf: (id: string) => mockEvery.find((source) => source.id === id)?.label ?? null,
+    isLoading: false,
+  }),
 }));
 
 const CARD = 'card-1';
@@ -106,8 +114,8 @@ const SOURCES: Record<string, Source> = {
 };
 
 /**
- * What the person has. `usable` is the accounts the "Paid with" pickers offer: all of them on Pro,
- * only the oldest on the free plan.
+ * What the person has. `usable` is the accounts the "Paid with" pickers offer for new spending: all
+ * of them on Pro, only the oldest on the free plan. The rest are locked, and named all the same.
  */
 function openWallet({
   cards = [CARD],
@@ -117,6 +125,7 @@ function openWallet({
   mockCards = cards.map((id) => ({ id }));
   mockAccounts = accounts.map((id) => ({ id }));
   mockSources = [...cards, ...usable].map((id) => SOURCES[id]);
+  mockEvery = [...cards, ...accounts].map((id) => SOURCES[id]);
 }
 
 type Screen = Awaited<ReturnType<typeof render>>;
@@ -236,13 +245,35 @@ describe('A card payment with accounts to pay from', () => {
     expect(pills(screen).filter((label) => label.includes('Visa'))).toEqual([]);
   });
 
-  it('offers only the accounts the plan lets it, on the free plan', async () => {
+  it('offers every account on the free plan too, the locked ones as well: paying off is free', async () => {
     openWallet({ usable: [CHECKING] });
     const screen = await render(<SourcePaymentScreen />, { wrapper: Toasts });
 
     await toSecondStep(screen);
 
-    expect(pills(screen)).toEqual(['Chase Checking ••7730', 'Somewhere else']);
+    expect(pills(screen)).toEqual([
+      'Chase Checking ••7730',
+      'Ally Savings ••9911',
+      'Capital One 360 ••2048',
+      'Somewhere else',
+    ]);
+  });
+
+  it('pays the card from a locked account on the free plan', async () => {
+    openWallet({ usable: [CHECKING] });
+    const screen = await render(<SourcePaymentScreen />, { wrapper: Toasts });
+    await toSecondStep(screen);
+
+    await press(screen, 'Ally Savings ••9911');
+    await pressButton(screen, 'Save payment');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(written()).toMatchObject({
+      card_id: CARD,
+      bank_account_id: null,
+      amount: 12.5,
+      from_bank_account_id: SAVINGS,
+    });
   });
 
   it('saves a payment from the account chosen, then goes back', async () => {
@@ -739,7 +770,7 @@ describe('Money added to an account that has other accounts', () => {
     );
   });
 
-  it('offers only the usable accounts other than itself, on the free plan', async () => {
+  it('offers every other account on the free plan, locked or not, never itself', async () => {
     // The oldest account is the one the free plan lets be paid from; this is the second.
     openWallet({ usable: [CHECKING] });
     mockParams = { id: SAVINGS };
@@ -747,15 +778,34 @@ describe('Money added to an account that has other accounts', () => {
 
     await toSecondStep(screen, '250');
 
-    expect(pills(screen)).toEqual(['Chase Checking ••7730', 'New money']);
+    expect(pills(screen)).toEqual(['Chase Checking ••7730', 'Capital One 360 ••2048', 'New money']);
+  });
+
+  it('moves money out of a locked account into the usable one, on the free plan', async () => {
+    openWallet({ usable: [CHECKING] });
+    mockParams = { id: CHECKING };
+    const screen = await render(<SourcePaymentScreen />, { wrapper: Toasts });
+    await toSecondStep(screen, '250');
+
+    expect(pills(screen)).toEqual(['Ally Savings ••9911', 'Capital One 360 ••2048', 'New money']);
+    await press(screen, 'Capital One 360 ••2048');
+    await pressButton(screen, 'Add money');
+
+    await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+    expect(written()).toMatchObject({
+      card_id: null,
+      bank_account_id: CHECKING,
+      amount: 250,
+      from_bank_account_id: CAPITAL,
+    });
   });
 });
 
 describe('Money added to the only account there is', () => {
   beforeEach(() => {
     mockParams = { id: CHECKING };
-    // A free plan's single usable account is the page's own: nothing else to come from.
-    openWallet({ cards: [CARD], accounts: [CHECKING, SAVINGS], usable: [CHECKING] });
+    // The page's own account is the only one: nothing else to come from.
+    openWallet({ cards: [CARD], accounts: [CHECKING] });
   });
 
   it('is one step, with no question about where it came from', async () => {

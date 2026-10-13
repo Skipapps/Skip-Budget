@@ -2,6 +2,7 @@ import { act, fireEvent, render } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import SubscriptionDetailScreen from '@/app/subscription/[id]';
+import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
 /**
  * A subscription's own page draws the logo by the row's rule (its own choice, else the catalog's,
@@ -57,6 +58,18 @@ jest.mock('@/api/mutations', () => ({
 const mockAsk = jest.fn();
 jest.mock('@/providers/dialog-provider', () => ({ useDialog: () => mockAsk }));
 
+// Every card and account by name, as usePaymentLabels gives them; null while they are still read.
+// acct-2 is a free account's locked extra: no picker offers it, but what it paid is named.
+const mockNames: Record<string, string> = { 'acct-2': 'Ally Savings ••0042' };
+let mockNamesLoading = false;
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: [],
+    labelOf: (id: string) => (mockNamesLoading ? null : (mockNames[id] ?? null)),
+    isLoading: mockNamesLoading,
+  }),
+}));
+
 let mockRow: Record<string, unknown>;
 jest.mock('@/api/queries', () => ({
   useSubscriptions: () => ({
@@ -65,7 +78,6 @@ jest.mock('@/api/queries', () => ({
     isError: false,
     refetch: jest.fn(),
   }),
-  usePaymentSources: () => ({ sources: [] }),
   useLedger: () => ({
     entries: [],
     allEntries: [],
@@ -91,7 +103,9 @@ const CALM = {
 beforeEach(() => {
   jest.clearAllMocks();
   mockRow = CALM;
+  mockNamesLoading = false;
 });
+afterAll(() => resetLocaleForTests());
 
 it('opens Change logo for this subscription from its logo', async () => {
   const screen = await render(<SubscriptionDetailScreen />);
@@ -161,5 +175,43 @@ describe('Delete, on a cancelled subscription', () => {
     log.mockRestore();
     expect(mockChooseDelete).not.toHaveBeenCalled();
     expect(mockDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe('paid from an account the free plan has locked', () => {
+  afterEach(() => resetLocaleForTests());
+
+  it.each([
+    ['en', 'No payment method'],
+    ['es', 'Sin forma de pago'],
+    ['fr', 'Aucun mode de paiement'],
+  ] as const)('names the account in %s', async (language, none) => {
+    setLanguage(language);
+    mockRow = { ...CALM, bank_account_id: 'acct-2' };
+
+    const screen = await render(<SubscriptionDetailScreen />);
+
+    expect(screen.getByText('Ally Savings ••0042')).toBeTruthy();
+    expect(screen.queryByText(none)).toBeNull();
+  });
+
+  it('says nothing about how it is paid until the names are read', async () => {
+    mockRow = { ...CALM, bank_account_id: 'acct-2' };
+    mockNamesLoading = true;
+
+    const screen = await render(<SubscriptionDetailScreen />);
+
+    expect(screen.queryByText('No payment method')).toBeNull();
+    expect(screen.queryByText('$14.99')).toBeNull();
+
+    mockNamesLoading = false;
+    await screen.rerender(<SubscriptionDetailScreen />);
+    expect(screen.getByText('Ally Savings ••0042')).toBeTruthy();
+  });
+
+  it('still says one with no card or account has none, once the names are read', async () => {
+    const screen = await render(<SubscriptionDetailScreen />);
+
+    expect(screen.getByText('No payment method')).toBeTruthy();
   });
 });

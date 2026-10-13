@@ -51,7 +51,7 @@ const RECEIPTS = [
   { id: 'r1', merchant: 'Soriana', amount: 234.56, purchased_on: '2026-09-10', card_id: null },
 ].map((row) => ({ bank_account_id: null, brands: null, ...row }));
 
-let mockState: { data: unknown[]; isLoading: boolean; isError: boolean } = {
+let mockState: { data?: unknown[]; isLoading: boolean; isError: boolean } = {
   data: RECEIPTS,
   isLoading: false,
   isError: false,
@@ -124,7 +124,8 @@ describe('Receipts in Spanish', () => {
 
   it('says the one failure line when the list cannot be read', async () => {
     setLanguage('es');
-    mockState = { data: [], isLoading: false, isError: true };
+    // A read that failed with nothing cached; one with rows still showing keeps them (RefreshNote).
+    mockState = { data: undefined, isLoading: false, isError: true };
     const screen = await render(<ReceiptsScreen />);
 
     expect(screen.getByText('Algo salió mal. Inténtalo de nuevo.')).toBeTruthy();

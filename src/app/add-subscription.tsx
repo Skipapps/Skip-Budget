@@ -1,7 +1,7 @@
 import { randomUUID } from 'expo-crypto';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { AlignLeft, CircleCheck, RefreshCw, Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import {
@@ -11,7 +11,7 @@ import {
   type ReminderChoice,
 } from '@/api/reminders';
 import { guessCategory, useSpendCategories } from '@/api/brands';
-import { buildSubscriptionValues } from '@/api/entry-values';
+import { buildSubscriptionValues, withSavedSource, type SavedSource } from '@/api/entry-values';
 import {
   useCreateSubscription,
   useDeleteSubscription,
@@ -19,6 +19,7 @@ import {
   useUpdateSubscription,
 } from '@/api/mutations';
 import { usePastCharges, type PastRead } from '@/api/past-charges';
+import { usePaymentLabels } from '@/api/payment-labels';
 import { usePaymentSources, useSubscription } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { DateBox } from '@/components/entry/date-box';
@@ -252,8 +253,8 @@ function SubscriptionForm({
 }: {
   id?: string;
   initial: Initial;
-  /** The row being edited, for the logo it already has. */
-  saved?: LogoFields | null;
+  /** The row being edited, for the logo and the card or account it already has. */
+  saved?: (LogoFields & SavedSource) | null;
   initialView: 'amount' | 'review';
   /** Saved from a voice hand-off: back to Home, never onto the review page again. */
   fromVoice?: boolean;
@@ -279,7 +280,11 @@ function SubscriptionForm({
   const [error, setError] = useState<string | null>(null);
   const { todayDate } = useToday();
 
-  const { sources } = usePaymentSources();
+  // New spending takes only what the plan offers; an edit also shows, and keeps, the card or
+  // account the subscription is already paid with, though the plan has locked it since.
+  const { sources: offered } = usePaymentSources();
+  const { sources: every } = usePaymentLabels();
+  const sources = useMemo(() => withSavedSource(offered, every, saved), [offered, every, saved]);
   const { data: categories = [] } = useSpendCategories();
 
   const createSubscription = useCreateSubscription();
@@ -379,7 +384,12 @@ function SubscriptionForm({
     // renewal already recorded.
     const built = buildSubscriptionValues(
       { service: chosen, amount, cycle, renewsOn, sourceId, note, active },
-      { sources, lastChargedOn: past.lastChargedOn, countsFrom: initial.countsFrom },
+      {
+        sources: offered,
+        saved,
+        lastChargedOn: past.lastChargedOn,
+        countsFrom: initial.countsFrom,
+      },
     );
     if (!built.ok) {
       fail(built.message);

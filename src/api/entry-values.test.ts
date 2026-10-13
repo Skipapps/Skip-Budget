@@ -2,8 +2,12 @@ import {
   buildBillValues,
   buildReceiptValues,
   buildSubscriptionValues,
+  savedSourceId,
+  withSavedSource,
   type BillInput,
+  type Built,
   type ReceiptInput,
+  type SavedSource,
   type SubscriptionInput,
 } from '@/api/entry-values';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
@@ -476,5 +480,176 @@ describe('the form hints in Spanish and French', () => {
         subscriptionCtx,
       ),
     ).toMatchObject({ field: 'amount', message: 'Indique ce que ça coûte.' });
+  });
+});
+
+/**
+ * Free keeps the oldest card and account for new spending; the rest are locked (after Pro ends).
+ * `SOURCES` is what the pickers offer such an account; card-2 and acct-2 are its locked extras.
+ */
+describe('a card or account locked since Pro ended', () => {
+  const columns = (built: Built<SavedSource, string>) =>
+    built.ok ? [built.values.card_id, built.values.bank_account_id] : built;
+  const onCard2 = { card_id: 'card-2', bank_account_id: null };
+  const onAcct2 = { card_id: null, bank_account_id: 'acct-2' };
+
+  const receipt = (sourceId: string): ReceiptInput => ({
+    store: WHOLE_FOODS,
+    amount: '12.5',
+    date: day(2026, 10, 13),
+    sourceId,
+    note: '',
+    captureSource: 'manual',
+  });
+  const bill = (sourceId: string): BillInput => ({
+    name: 'Housing',
+    amount: '1100',
+    issuer: null,
+    categoryId: 'housing',
+    iconId: 'other',
+    recurrence: 'monthly',
+    startDate: day(2026, 11, 1),
+    endDate: null,
+    sourceId,
+    note: '',
+  });
+  const subscription = (sourceId: string): SubscriptionInput => ({
+    service: { brandId: 'b-nf', name: 'Netflix', domain: 'netflix.com', categoryId: 'other' },
+    amount: '15.99',
+    cycle: 'monthly',
+    renewsOn: null,
+    sourceId,
+    note: '',
+    active: true,
+  });
+
+  it('never files a new receipt, bill or subscription under one', () => {
+    for (const id of ['card-2', 'acct-2']) {
+      expect(columns(buildReceiptValues(receipt(id), SOURCES))).toEqual([null, null]);
+      expect(columns(buildReceiptValues(receipt(id), SOURCES, null))).toEqual([null, null]);
+      expect(columns(buildBillValues(bill(id), { sources: SOURCES, lastChargedOn: null }))).toEqual(
+        [null, null],
+      );
+      expect(
+        columns(
+          buildSubscriptionValues(subscription(id), {
+            sources: SOURCES,
+            lastChargedOn: null,
+            countsFrom: null,
+          }),
+        ),
+      ).toEqual([null, null]);
+    }
+  });
+
+  it('keeps an edited entry on its own locked card or account', () => {
+    expect(columns(buildReceiptValues(receipt('card-2'), SOURCES, onCard2))).toEqual([
+      'card-2',
+      null,
+    ]);
+    expect(columns(buildReceiptValues(receipt('acct-2'), SOURCES, onAcct2))).toEqual([
+      null,
+      'acct-2',
+    ]);
+    expect(
+      columns(
+        buildBillValues(bill('acct-2'), {
+          sources: SOURCES,
+          saved: onAcct2,
+          lastChargedOn: '2026-10-01',
+        }),
+      ),
+    ).toEqual([null, 'acct-2']);
+    expect(
+      columns(
+        buildSubscriptionValues(subscription('card-2'), {
+          sources: SOURCES,
+          saved: onCard2,
+          lastChargedOn: null,
+          countsFrom: '2026-09-01',
+        }),
+      ),
+    ).toEqual(['card-2', null]);
+  });
+
+  it('moves an edited entry off it to an offered one, or to none', () => {
+    expect(columns(buildReceiptValues(receipt('card-1'), SOURCES, onCard2))).toEqual([
+      'card-1',
+      null,
+    ]);
+    expect(columns(buildReceiptValues(receipt('acct-1'), SOURCES, onCard2))).toEqual([
+      null,
+      'acct-1',
+    ]);
+    expect(columns(buildReceiptValues(receipt(''), SOURCES, onCard2))).toEqual([null, null]);
+  });
+
+  it('never moves an edited entry onto a locked card or account it is not already on', () => {
+    // Paid with another locked extra, or with nothing, the edit may not newly pick card-2.
+    expect(columns(buildReceiptValues(receipt('card-2'), SOURCES, onAcct2))).toEqual([null, null]);
+    const unpaid = { card_id: null, bank_account_id: null };
+    expect(columns(buildReceiptValues(receipt('card-2'), SOURCES, unpaid))).toEqual([null, null]);
+    expect(
+      columns(
+        buildBillValues(bill('card-2'), {
+          sources: SOURCES,
+          saved: unpaid,
+          lastChargedOn: null,
+        }),
+      ),
+    ).toEqual([null, null]);
+  });
+
+  it('leaves an offered source and a saved one alike exactly as before', () => {
+    const onCard1 = { card_id: 'card-1', bank_account_id: null };
+    expect(columns(buildReceiptValues(receipt('card-1'), SOURCES, onCard1))).toEqual([
+      'card-1',
+      null,
+    ]);
+    expect(columns(buildReceiptValues(receipt('acct-1'), SOURCES, onCard1))).toEqual([
+      null,
+      'acct-1',
+    ]);
+  });
+
+  it('names the id a stored entry is paid from', () => {
+    expect(savedSourceId(onCard2)).toBe('card-2');
+    expect(savedSourceId(onAcct2)).toBe('acct-2');
+    expect(savedSourceId({ card_id: null, bank_account_id: null })).toBe('');
+  });
+
+  describe('withSavedSource, the tiles an edit shows', () => {
+    const offered = [
+      { id: 'card-1', kind: 'card' as const },
+      { id: 'acct-1', kind: 'account' as const },
+    ];
+    const every = [
+      { id: 'card-1', kind: 'card' as const },
+      { id: 'card-2', kind: 'card' as const },
+      { id: 'acct-1', kind: 'account' as const },
+      { id: 'acct-2', kind: 'account' as const },
+    ];
+    const ids = (list: readonly { id: string }[]) => list.map((source) => source.id);
+
+    it('offers a new entry only what new spending may use', () => {
+      expect(withSavedSource(offered, every, null)).toBe(offered);
+      expect(withSavedSource(offered, every, undefined)).toBe(offered);
+      expect(withSavedSource(offered, every, { card_id: null, bank_account_id: null })).toBe(
+        offered,
+      );
+    });
+
+    it('adds the entry’s own locked card among the cards, and a locked account last', () => {
+      expect(ids(withSavedSource(offered, every, onCard2))).toEqual(['card-1', 'card-2', 'acct-1']);
+      expect(ids(withSavedSource(offered, every, onAcct2))).toEqual(['card-1', 'acct-1', 'acct-2']);
+      // Never the other extras.
+      expect(ids(withSavedSource(offered, every, onCard2))).not.toContain('acct-2');
+    });
+
+    it('changes nothing when its source is offered already, or not read yet', () => {
+      const onCard1 = { card_id: 'card-1', bank_account_id: null };
+      expect(withSavedSource(offered, every, onCard1)).toBe(offered);
+      expect(withSavedSource(offered, [], onCard2)).toBe(offered);
+    });
   });
 });

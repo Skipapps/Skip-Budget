@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
 
-import { usePaymentSources, useSubscriptions } from '@/api/queries';
+import { usePaymentLabels } from '@/api/payment-labels';
+import { useSubscriptions } from '@/api/queries';
 import { SetupCollection } from '@/components/setup/setup-collection';
 import { t } from '@/i18n';
 import { SubscriptionRow } from '@/components/subscriptions/subscription-row';
@@ -10,12 +10,8 @@ import { logoDomainOf } from '@/lib/logo-domain';
 /** The subscriptions step of the setup walk-in: add as many as there are, then Done. */
 export default function SetupSubscriptionsScreen() {
   const query = useSubscriptions();
-  const { sources } = usePaymentSources();
-
-  const sourceLabels = useMemo(
-    () => new Map(sources.map((source) => [source.id, source.label])),
-    [sources],
-  );
+  // Every card and account, a locked one too: each subscription names what pays it on any plan.
+  const { labelOf } = usePaymentLabels();
 
   const subscriptions = query.data ?? [];
 
@@ -42,9 +38,7 @@ export default function SetupSubscriptionsScreen() {
           domain={logoDomainOf(subscription)}
           logoHidden={subscription.logo_hidden}
           active={subscription.active}
-          sourceLabel={
-            sourceLabels.get(subscription.card_id ?? subscription.bank_account_id ?? '') ?? ''
-          }
+          sourceLabel={labelOf(subscription.card_id ?? subscription.bank_account_id ?? '') ?? ''}
           // A cancelled one is final, so it opens on its page, never its edit form.
           onPress={() =>
             router.push(

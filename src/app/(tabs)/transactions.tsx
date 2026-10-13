@@ -15,13 +15,15 @@ import { LedgerRow } from '@/components/transactions/ledger-row';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
-import { usePaymentSources, useLedger, type LedgerEntry } from '@/api/queries';
+import { usePaymentLabels } from '@/api/payment-labels';
+import { useLedger, type LedgerEntry } from '@/api/queries';
 import { hidOlder } from '@/lib/allowance';
 import { useCharges } from '@/api/charges';
 import { useHistoryFloor } from '@/api/history';
 import { HistoryNotice } from '@/components/pro/history-notice';
 import { useRefreshAll } from '@/api/refresh';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { LedgerSummary } from '@/components/transactions/ledger-summary';
@@ -79,11 +81,13 @@ export default function TransactionsScreen() {
     hidden,
     isLoading,
     isError,
+    refreshFailed,
     refetch,
   } = useLedger(range, today);
   const hiddenOlder = hidOlder(hidden);
   const { refresh, refreshing } = useRefreshAll();
-  const { sources } = usePaymentSources();
+  // Every card and account, a locked one too: its entries are named and can be filtered on any plan.
+  const labels = usePaymentLabels();
 
   // Which plan each recorded charge came from, so a past row opens its bill or subscription. A
   // recorded occurrence carries only the charge id; the ledger reads the same query (no extra
@@ -100,12 +104,8 @@ export default function TransactionsScreen() {
   const activeCount = countActiveFilters(filters);
 
   const sourceOptions = useMemo(
-    () => sources.map((source) => ({ value: source.id, label: source.label })),
-    [sources],
-  );
-  const sourceLabels = useMemo(
-    () => new Map(sources.map((source) => [source.id, source.label])),
-    [sources],
+    () => labels.sources.map((source) => ({ value: source.id, label: source.label })),
+    [labels.sources],
   );
 
   const buckets = useMemo(() => periodBuckets(periodKey, anchor), [periodKey, anchor]);
@@ -211,6 +211,8 @@ export default function TransactionsScreen() {
       {!isLoading && !isError ? (
         <View className="mt-4 w-full">
           <LedgerSummary totals={totals} />
+          {/* The rows below come from the same reads, so this covers them too. */}
+          <RefreshNote show={refreshFailed} />
         </View>
       ) : null}
 
@@ -310,7 +312,7 @@ export default function TransactionsScreen() {
                 <LedgerRow
                   key={entry.id}
                   entry={entry}
-                  sourceLabel={sourceLabels.get(entry.sourceId) ?? ''}
+                  sourceLabel={labels.labelOf(entry.sourceId) ?? ''}
                   kindLabel={ledgerKindLabel(entry.kind)}
                   onPress={openEntry(entry)}
                 />

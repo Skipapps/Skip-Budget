@@ -204,10 +204,25 @@ let mockSources = [
   { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
 ];
 
+// A free account's locked extras: usePaymentSources (what new spending may use) leaves them out,
+// usePaymentLabels (every card and account) has them.
+const LOCKED = [
+  { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
+  { id: 'acct-2', label: 'Ally ••0042', color: '#444444', kind: 'account' },
+];
+let mockEvery = [...mockSources, ...LOCKED];
+
 let mockSubscription: { data: unknown; isError: boolean; isFetched: boolean };
 jest.mock('@/api/queries', () => ({
   useSubscription: () => ({ ...mockSubscription, refetch: jest.fn() }),
   usePaymentSources: () => ({ sources: mockSources }),
+}));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: mockEvery,
+    labelOf: (id: string) => mockEvery.find((source) => source.id === id)?.label ?? null,
+    isLoading: false,
+  }),
 }));
 
 // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
@@ -383,6 +398,7 @@ beforeEach(() => {
     { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
     { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
   ];
+  mockEvery = [...mockSources, ...LOCKED];
   mockPast.lastChargedOn = null;
   mockPast.ready = true;
   mockPast.saving = false;
@@ -1923,5 +1939,115 @@ describe('Add subscription — saving again after a later step failed', () => {
     expect(mockApplyReminder).toHaveBeenCalledTimes(2);
     expect(mockApplyReminder).toHaveBeenLastCalledWith('subscription', 'sub-new', null, '09:00');
     log.mockRestore();
+  });
+});
+
+describe('Add subscription — a card or account the free plan has locked', () => {
+  /** The Charged to tiles on the page, in the order drawn (the page's other chips left out). */
+  const SOURCE_TILES = ['VISA ••4421', 'Checking ••0099', 'Amex ••3005', 'Ally ••0042', 'Skip'];
+  const tiles = (screen: Screen) =>
+    screen
+      .queryAllByRole('radio')
+      .map((node) => node.props.accessibilityLabel as string)
+      .filter((label) => SOURCE_TILES.includes(label));
+
+  it('is never offered for a new subscription', async () => {
+    const screen = await render(<AddSubscriptionScreen />);
+    await netflixAt(screen, '15.99');
+
+    expect(tiles(screen)).toEqual(['VISA ••4421', 'Checking ••0099', 'Skip']);
+  });
+
+  describe('on an edit of one paid with it', () => {
+    beforeEach(() => {
+      mockParams = { id: 'sub-1' };
+      mockSubscription = {
+        data: { ...SPOTIFY, card_id: 'card-2', bank_account_id: null },
+        isError: false,
+        isFetched: true,
+      };
+    });
+
+    it('shows it chosen, among the cards, and keeps it on Save with no change to ask about', async () => {
+      const screen = await render(<AddSubscriptionScreen />);
+
+      expect(tiles(screen)).toEqual(['VISA ••4421', 'Amex ••3005', 'Checking ••0099', 'Skip']);
+      expect(screen.getByLabelText('Amex ••3005')).toBeSelected();
+      await press(screen, 'Save changes');
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+        card_id: 'card-2',
+        bank_account_id: null,
+      });
+      // Nothing a recorded renewal copies has changed, so its past renewals are left alone.
+      expect(mockPast.choose).toHaveBeenCalledWith('Spotify', false, READ);
+      expect(mockPast.apply).not.toHaveBeenCalled();
+    });
+
+    it('keeps a locked account the same way', async () => {
+      mockSubscription = {
+        data: { ...SPOTIFY, card_id: null, bank_account_id: 'acct-2' },
+        isError: false,
+        isFetched: true,
+      };
+      const screen = await render(<AddSubscriptionScreen />);
+
+      expect(tiles(screen)).toEqual(['VISA ••4421', 'Checking ••0099', 'Ally ••0042', 'Skip']);
+      expect(screen.getByLabelText('Ally ••0042')).toBeSelected();
+      await press(screen, 'Save changes');
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+        card_id: null,
+        bank_account_id: 'acct-2',
+      });
+    });
+
+    it('moves off it to an offered card, and can go back to it before saving', async () => {
+      const screen = await render(<AddSubscriptionScreen />);
+
+      await press(screen, 'VISA ••4421');
+      expect(screen.getByLabelText('Amex ••3005')).not.toBeSelected();
+      await press(screen, 'Amex ••3005');
+      await press(screen, 'Save changes');
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({ card_id: 'card-2' });
+    });
+
+    it('saves the move when the person picks an offered card instead', async () => {
+      const screen = await render(<AddSubscriptionScreen />);
+
+      await press(screen, 'Checking ••0099');
+      await press(screen, 'Save changes');
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+        card_id: null,
+        bank_account_id: 'acct-1',
+      });
+    });
+
+    it('keeps it on Save even before the names are read', async () => {
+      mockEvery = [];
+      const screen = await render(<AddSubscriptionScreen />);
+
+      await press(screen, 'Save changes');
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+        card_id: 'card-2',
+        bank_account_id: null,
+      });
+    });
+  });
+
+  it('offers an edit no locked extra but its own', async () => {
+    mockParams = { id: 'sub-1' };
+    mockSubscription = { data: SPOTIFY, isError: false, isFetched: true };
+    const screen = await render(<AddSubscriptionScreen />);
+
+    expect(tiles(screen)).toEqual(['VISA ••4421', 'Checking ••0099', 'Skip']);
   });
 });

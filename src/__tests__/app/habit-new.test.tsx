@@ -119,6 +119,15 @@ let mockSources = [
   { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
 ];
 jest.mock('@/api/queries', () => ({ usePaymentSources: () => ({ sources: mockSources }) }));
+// Every card and account: on a free plan also the locked extras usePaymentSources leaves out.
+let mockEvery = [...mockSources];
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: mockEvery,
+    labelOf: (id: string) => mockEvery.find((source) => source.id === id)?.label ?? null,
+    isLoading: false,
+  }),
+}));
 
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 // What asking the store and the database again answers, after a Pro refusal the app disagrees with.
@@ -268,6 +277,7 @@ beforeEach(() => {
     { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
     { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
   ];
+  mockEvery = [...mockSources];
   mockCreate.mockResolvedValue(habitRow({ id: 'habit-new' }));
   mockUpdate.mockResolvedValue({ id: 'habit-1' });
   mockArchive.mockResolvedValue({ id: 'habit-1' });
@@ -556,6 +566,19 @@ describe('New habit — the final page (step 3 of 3)', () => {
     expect(screen.getByText('You can edit this later.')).toBeTruthy();
     expect(screen.queryByText('You can change this anytime.')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Delete habit' })).toBeNull();
+  });
+
+  it('never offers a card the free plan has locked to a new habit', async () => {
+    mockEvery = [
+      mockSources[0],
+      { id: 'card-locked', label: 'Amex ••3005', color: '#333333', kind: 'card' },
+      mockSources[1],
+    ];
+    const screen = await render(<HabitNewScreen />);
+    await presetToFinal(screen);
+
+    expect(screen.getByRole('radio', { name: 'VISA ••4421' })).toBeTruthy();
+    expect(screen.queryByRole('radio', { name: 'Amex ••3005' })).toBeNull();
   });
 
   it('never greys Start tracking out: it names what is missing, and writes nothing', async () => {
@@ -963,7 +986,16 @@ describe('Edit habit (/habit-new?id=)', () => {
 
   it('keeps a card the plan no longer lists when Paid with is left alone', async () => {
     editing({ card_id: 'card-locked' });
+    mockEvery = [
+      mockSources[0],
+      { id: 'card-locked', label: 'Amex ••3005', color: '#333333', kind: 'card' },
+      mockSources[1],
+    ];
     const screen = await render(<HabitNewScreen />);
+    // Shown, and shown chosen, so the person sees what the habit is paid with.
+    expect(
+      screen.getByRole('radio', { name: 'Amex ••3005' }).props.accessibilityState,
+    ).toMatchObject({ checked: true });
     await pressButton(screen, 'Save changes');
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));

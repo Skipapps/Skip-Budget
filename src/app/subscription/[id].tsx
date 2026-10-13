@@ -3,7 +3,8 @@ import { useState } from 'react';
 
 import { useDeleteSubscription } from '@/api/mutations';
 import { usePastCharges, type PastRead } from '@/api/past-charges';
-import { usePaymentSources, useSubscriptions } from '@/api/queries';
+import { usePaymentLabels } from '@/api/payment-labels';
+import { useSubscriptions } from '@/api/queries';
 import { BrandMark } from '@/components/brands/brand-mark';
 import { ChangeLogoButton } from '@/components/brands/change-logo-button';
 import { PlanDetail, type PlanDetailRow } from '@/components/plans/plan-detail';
@@ -25,7 +26,8 @@ const asDate = (iso: string) => formatFullDate(new Date(`${iso}T00:00:00`));
 export default function SubscriptionDetailScreen() {
   const { id = '' } = useLocalSearchParams<{ id: string }>();
   const subscriptions = useSubscriptions();
-  const { sources } = usePaymentSources();
+  // Every card and account, a locked one too: what an entry is paid with is named on any plan.
+  const labels = usePaymentLabels();
   const pastCharges = usePastCharges('subscription', id || undefined);
   const deleteSubscription = useDeleteSubscription();
   const ask = useDialog();
@@ -69,9 +71,7 @@ export default function SubscriptionDetailScreen() {
 
   const details: PlanDetailRow[] = [];
   if (subscription) {
-    const source = sources.find(
-      (option) => option.id === (subscription.card_id ?? subscription.bank_account_id),
-    );
+    const source = labels.labelOf(subscription.card_id ?? subscription.bank_account_id ?? '');
     // A cancelled one says so under its amount, with the last day it charged.
     if (!cancelled) {
       details.push({
@@ -83,7 +83,7 @@ export default function SubscriptionDetailScreen() {
     }
     details.push({
       label: t('subscriptions.detail.paidFrom'),
-      value: source?.label ?? t('subscriptions.noPaymentMethod'),
+      value: source ?? t('subscriptions.noPaymentMethod'),
     });
     if (subscription.started_on) {
       details.push({
@@ -101,7 +101,8 @@ export default function SubscriptionDetailScreen() {
       kind="subscription"
       id={id}
       plan={subscription}
-      isLoading={subscriptions.isPending}
+      // Until the names are read, one paid with a card would read "No payment method".
+      isLoading={subscriptions.isPending || labels.isLoading}
       isError={subscriptions.isError}
       onRetry={() => void subscriptions.refetch()}
       mark={

@@ -141,6 +141,20 @@ jest.mock('@/api/queries', () => ({
     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
   }),
 }));
+// Every card and account: card-2 is a free account's locked extra, which usePaymentSources leaves out.
+jest.mock('@/api/payment-labels', () => {
+  const sources = [
+    { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
+    { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
+  ];
+  return {
+    usePaymentLabels: () => ({
+      sources,
+      labelOf: (id: string) => sources.find((source) => source.id === id)?.label ?? null,
+      isLoading: false,
+    }),
+  };
+});
 
 // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
 jest.useFakeTimers({
@@ -723,6 +737,34 @@ describe('Paid with and the reminder in Spanish and French', () => {
       expect(screen.getByRole('radio', { name: CARD, checked: false })).toBeTruthy();
     },
   );
+
+  it.each([
+    ['es', 'Guardar cambios'],
+    ['fr', 'Enregistrer les modifications'],
+  ] as const)(
+    'shows a card the free plan has locked chosen on an edit, and keeps it, in %s',
+    async (language, save) => {
+      editing('card-2');
+      setLanguage(language);
+      const screen = await render(<AddBillScreen />);
+
+      expect(screen.getByRole('radio', { name: 'Amex ••3005', checked: true })).toBeTruthy();
+      expect(screen.getByRole('radio', { name: CARD, checked: false })).toBeTruthy();
+      await fireEvent.press(screen.getByRole('button', { name: save }));
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+        card_id: 'card-2',
+        bank_account_id: null,
+      });
+    },
+  );
+
+  it.each(LOCALIZED)('never offers the locked card to a new bill in %s', async (language) => {
+    const screen = await reachFinalPage(language);
+
+    expect(screen.queryByRole('radio', { name: 'Amex ••3005' })).toBeNull();
+  });
 
   it.each(LOCALIZED)('shows a saved bill’s card as chosen in %s', async (language) => {
     const words = WORDS[language];

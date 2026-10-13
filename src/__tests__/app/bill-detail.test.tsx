@@ -2,6 +2,7 @@ import { act, fireEvent, render } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import BillDetailScreen from '@/app/bill/[id]';
+import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
 /**
  * One bill's own page: the details, its charges as one timeline (Paid on top, then Upcoming, oldest
@@ -93,12 +94,26 @@ const NO_LOAN = { data: { kind: 'bill' } as unknown, isPending: false, isError: 
 let mockLoanRead = NO_LOAN;
 jest.mock('@/api/loans', () => ({ useLoanDetail: () => mockLoanRead }));
 
+// Every card and account by name, as usePaymentLabels gives them; null while they are still read.
+// card-2 is a free account's locked extra: no picker offers it, but what it paid is named.
+const mockNames: Record<string, string> = {
+  acc1: 'Chase Checking ••7730',
+  'card-2': 'Amex ••3005',
+};
+let mockNamesLoading = false;
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: [],
+    labelOf: (id: string) => (mockNamesLoading ? null : (mockNames[id] ?? null)),
+    isLoading: mockNamesLoading,
+  }),
+}));
+
 const mockLedger = jest.fn();
 // Charges the window holds but a free list leaves out (older than 90 days).
 let mockOlder: string[] = [];
 jest.mock('@/api/queries', () => ({
   useBills: () => mockBills,
-  usePaymentSources: () => ({ sources: [{ id: 'acc1', label: 'Chase Checking ••7730' }] }),
   useLedger: (range: { from: string; to: string }) => {
     mockLedger(range);
     const entry = (date: string, planId = 'b1') => ({
@@ -128,11 +143,16 @@ jest.mock('@/api/queries', () => ({
   },
 }));
 
+const HOUSING = mockBills.data![0] as Record<string, unknown>;
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockId = 'b1';
   mockLoanRead = NO_LOAN;
+  mockNamesLoading = false;
+  mockBills.data = [HOUSING];
 });
+afterAll(() => resetLocaleForTests());
 
 it('shows the bill, then its paid and upcoming charges as one timeline', async () => {
   const screen = await render(<BillDetailScreen />);
@@ -387,5 +407,45 @@ describe('Delete, on a stopped bill', () => {
     log.mockRestore();
     expect(mockChooseDelete).not.toHaveBeenCalled();
     expect(mockDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe('paid from a card the free plan has locked', () => {
+  afterEach(() => resetLocaleForTests());
+
+  it.each([
+    ['en', 'No payment method'],
+    ['es', 'Sin forma de pago'],
+    ['fr', 'Aucun mode de paiement'],
+  ] as const)('names the card in %s', async (language, none) => {
+    setLanguage(language);
+    mockBills.data = [{ ...HOUSING, card_id: 'card-2', bank_account_id: null }];
+
+    const screen = await render(<BillDetailScreen />);
+
+    expect(screen.getByText('Amex ••3005')).toBeTruthy();
+    expect(screen.queryByText(none)).toBeNull();
+  });
+
+  it('says nothing about how it is paid until the names are read', async () => {
+    mockBills.data = [{ ...HOUSING, card_id: 'card-2', bank_account_id: null }];
+    mockNamesLoading = true;
+
+    const screen = await render(<BillDetailScreen />);
+
+    expect(screen.queryByText('No payment method')).toBeNull();
+    expect(screen.queryByText('$1,030.00')).toBeNull();
+
+    mockNamesLoading = false;
+    await screen.rerender(<BillDetailScreen />);
+    expect(screen.getByText('Amex ••3005')).toBeTruthy();
+  });
+
+  it('still says a bill with no card or account has none, once the names are read', async () => {
+    mockBills.data = [{ ...HOUSING, card_id: null, bank_account_id: null }];
+
+    const screen = await render(<BillDetailScreen />);
+
+    expect(screen.getByText('No payment method')).toBeTruthy();
   });
 });

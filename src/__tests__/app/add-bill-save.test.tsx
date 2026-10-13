@@ -228,6 +228,20 @@ jest.mock('@/api/queries', () => ({
   useLoanForBill: () => ({ data: mockLoan }),
   usePaymentSources: () => ({ sources: SOURCES }),
 }));
+// A free account's locked extras: usePaymentSources (what new spending may use) leaves them out,
+// usePaymentLabels (every card and account) has them.
+const LOCKED = [
+  { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
+  { id: 'acct-2', label: 'Ally ••0042', color: '#444444', kind: 'account' },
+];
+let mockEvery = [...SOURCES, ...LOCKED];
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: mockEvery,
+    labelOf: (id: string) => mockEvery.find((source) => source.id === id)?.label ?? null,
+    isLoading: false,
+  }),
+}));
 
 // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
 jest.useFakeTimers({
@@ -390,6 +404,7 @@ beforeEach(() => {
   mockPending = false;
   mockBill = { data: null, isError: false, isFetched: false };
   mockLoan = null;
+  mockEvery = [...SOURCES, ...LOCKED];
   mockSavedReminder = { choice: 'off', remindAt: '09:00' };
   mockPast.lastChargedOn = null;
   mockPast.ready = true;
@@ -2439,5 +2454,80 @@ describe('Add bill — Save again once the bill is written', () => {
     expect(router.back).not.toHaveBeenCalled();
     expect(mockToast).toHaveBeenCalledWith('toast.bill.added');
     expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Add bill — a card or account the free plan has locked', () => {
+  /** The Paid with tiles on the page, in the order drawn (the page's other chips left out). */
+  const SOURCE_TILES = ['VISA ••4421', 'Checking ••0099', 'Amex ••3005', 'Ally ••0042', 'Skip'];
+  const tiles = (screen: Screen) =>
+    screen
+      .queryAllByRole('radio')
+      .map((node) => node.props.accessibilityLabel as string)
+      .filter((label) => SOURCE_TILES.includes(label));
+
+  it('is never offered for a new bill', async () => {
+    const screen = await render(<AddBillScreen />);
+    await newBill(screen, TILE.housing, '1100');
+
+    expect(tiles(screen)).toEqual(['VISA ••4421', 'Checking ••0099', 'Skip']);
+  });
+
+  it('shows it chosen on an edit, keeps it on Save, and leaves the past charges alone', async () => {
+    editing({ ...POWER, card_id: 'card-2' });
+    const screen = await render(<AddBillScreen />);
+
+    expect(tiles(screen)).toEqual(['VISA ••4421', 'Amex ••3005', 'Checking ••0099', 'Skip']);
+    expect(screen.getByLabelText('Amex ••3005')).toBeSelected();
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      card_id: 'card-2',
+      bank_account_id: null,
+    });
+    // Nothing a recorded charge copies has changed, so there is nothing to ask about.
+    expect(mockPast.choose).toHaveBeenCalledWith('Power', false, READ);
+    expect(mockPast.apply).not.toHaveBeenCalled();
+  });
+
+  it('keeps a locked account the same way', async () => {
+    editing({ ...POWER, card_id: null, bank_account_id: 'acct-2' });
+    const screen = await render(<AddBillScreen />);
+
+    expect(screen.getByLabelText('Ally ••0042')).toBeSelected();
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      card_id: null,
+      bank_account_id: 'acct-2',
+    });
+  });
+
+  it('saves a move to an offered account, as a change to ask about', async () => {
+    editing({ ...POWER, card_id: 'card-2' });
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Checking ••0099');
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+      card_id: null,
+      bank_account_id: 'acct-1',
+    });
+    expect(mockPast.choose).toHaveBeenCalledWith('Power', true, READ);
+  });
+
+  it('keeps it on Save even before the names are read', async () => {
+    mockEvery = [];
+    editing({ ...POWER, card_id: 'card-2' });
+    const screen = await render(<AddBillScreen />);
+
+    await press(screen, 'Save changes');
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({ card_id: 'card-2' });
   });
 });

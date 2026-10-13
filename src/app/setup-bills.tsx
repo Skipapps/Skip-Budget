@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
 
-import { useBills, usePaymentSources } from '@/api/queries';
+import { usePaymentLabels } from '@/api/payment-labels';
+import { useBills } from '@/api/queries';
 import { BillRow } from '@/components/bills/bill-row';
 import { SetupCollection } from '@/components/setup/setup-collection';
 import { t } from '@/i18n';
@@ -14,13 +15,9 @@ import { useToday } from '@/lib/use-today';
 /** The bills step of the setup walk-in: add as many as there are, then Done. */
 export default function SetupBillsScreen() {
   const query = useBills();
-  const { sources } = usePaymentSources();
+  // Every card and account, a locked one too: each bill names what it is paid with on any plan.
+  const { labelOf } = usePaymentLabels();
   const { today } = useToday();
-
-  const sourceLabels = useMemo(
-    () => new Map(sources.map((source) => [source.id, source.label])),
-    [sources],
-  );
 
   // The DB stores positive magnitudes; the UI shows outgoings as negative.
   const bills = useMemo(
@@ -57,7 +54,7 @@ export default function SetupBillsScreen() {
         <BillRow
           key={bill.id}
           bill={bill}
-          sourceLabel={sourceLabels.get(bill.sourceId) ?? ''}
+          sourceLabel={labelOf(bill.sourceId) ?? ''}
           // A loan is changed from its own page, which its pencil leads on from; a stopped bill is
           // final, so it opens on its page, never its edit form.
           onPress={() =>

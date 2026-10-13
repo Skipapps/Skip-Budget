@@ -208,6 +208,13 @@ jest.mock('@/api/queries', () => ({
   useLoanForBill: () => ({ data: null }),
   usePaymentSources: () => ({ sources: mockSources }),
 }));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: mockSources,
+    labelOf: (id: string) => mockSources.find((source) => source.id === id)?.label ?? null,
+    isLoading: false,
+  }),
+}));
 
 // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
 jest.useFakeTimers({

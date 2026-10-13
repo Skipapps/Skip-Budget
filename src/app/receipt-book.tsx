@@ -1,8 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Info, Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { withSavedSource } from '@/api/entry-values';
+import { usePaymentLabels } from '@/api/payment-labels';
 import { usePaymentSources, type PaymentSourceRow } from '@/api/queries';
 import {
   bookNameRefused,
@@ -117,6 +119,13 @@ function BookForm({
   const toast = useToast();
   const confirm = useConfirm();
   const { sources } = usePaymentSources();
+  // A book being edited also shows the card or account it is paid from when the plan has locked it
+  // since, so the person sees it; Save keeps it until it is changed.
+  const { sources: every } = usePaymentLabels();
+  const tiles = useMemo(
+    () => withSavedSource(sources, every, book ?? null),
+    [sources, every, book],
+  );
   const save = useSaveReceiptBook();
   const remove = useDeleteReceiptBook();
 
@@ -278,7 +287,7 @@ function BookForm({
     <>
       <Heading title={t('receipts.books.pay.heading')} sub={t('receipts.books.pay.sub')} />
       <PaidFrom
-        sources={sources}
+        sources={tiles}
         value={sourceId}
         onChange={(next) => {
           setError(null);

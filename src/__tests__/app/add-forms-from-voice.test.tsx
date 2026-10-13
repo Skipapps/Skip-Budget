@@ -202,6 +202,21 @@ jest.mock('@/api/queries', () => {
     }),
   };
 });
+// Every card and account: card-2 is a free account's locked extra, which a voice entry never takes.
+jest.mock('@/api/payment-labels', () => {
+  const sources = [
+    { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
+    { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
+    { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
+  ];
+  return {
+    usePaymentLabels: () => ({
+      sources,
+      labelOf: (id: string) => sources.find((source) => source.id === id)?.label ?? null,
+      isLoading: false,
+    }),
+  };
+});
 
 // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
 jest.useFakeTimers({

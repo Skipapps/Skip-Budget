@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { useCreatePayment } from '@/api/mutations';
-import { useBankAccounts, useCards, usePaymentSources } from '@/api/queries';
+import { usePaymentLabels } from '@/api/payment-labels';
+import { useBankAccounts, useCards } from '@/api/queries';
 import { AmountStep } from '@/components/flow/amount-step';
 import { StepFlow } from '@/components/flow/step-flow';
 import { PageState } from '@/components/ui/page-state';
@@ -31,8 +32,9 @@ export default function SourcePaymentScreen() {
   const artwork = useArtwork();
   const cards = useCards();
   const accounts = useBankAccounts();
-  // The same accounts the "Paid with" pickers offer, so a plan's limit applies here too.
-  const { sources } = usePaymentSources();
+  // Every account, a locked one too: paying a card off and moving money out are free on any plan.
+  // Only new spending keeps to the accounts the "Paid with" pickers offer.
+  const { sources } = usePaymentLabels();
   const createPayment = useCreatePayment();
   const toast = useToast();
   const { today } = useToday();

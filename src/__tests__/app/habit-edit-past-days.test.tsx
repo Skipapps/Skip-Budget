@@ -84,6 +84,9 @@ jest.mock('@/api/queries', () => ({
     ],
   }),
 }));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({ sources: [], labelOf: () => null, isLoading: false }),
+}));
 
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 const mockUpdate = jest.fn();

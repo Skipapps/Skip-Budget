@@ -9,7 +9,7 @@ import {
   Trash2,
   Tag,
 } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import {
@@ -18,9 +18,10 @@ import {
   useReminderChoice,
   type ReminderChoice,
 } from '@/api/reminders';
-import { buildBillValues } from '@/api/entry-values';
+import { buildBillValues, withSavedSource } from '@/api/entry-values';
 import { useCreateBill, useDeleteBill, useStopBill, useUpdateBill } from '@/api/mutations';
 import { usePastCharges, type CarriedValues, type PastRead } from '@/api/past-charges';
+import { usePaymentLabels } from '@/api/payment-labels';
 import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
 import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
 import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
@@ -325,7 +326,14 @@ function BillForm({
 
   const [error, setError] = useState<string | null>(null);
 
-  const { sources } = usePaymentSources();
+  // New spending takes only what the plan offers; an edit also shows, and keeps, the card or
+  // account the bill is paid from, though the plan has locked it since.
+  const { sources: offered } = usePaymentSources();
+  const { sources: every } = usePaymentLabels();
+  const sources = useMemo(
+    () => withSavedSource(offered, every, existing),
+    [offered, every, existing],
+  );
   // A loan behind the bill keeps its type icon through an edit (`buildBillValues`).
   const { data: loan } = useLoanForBill(id);
   const createBill = useCreateBill();
@@ -496,7 +504,12 @@ function BillForm({
         sourceId,
         note,
       },
-      { sources, lastChargedOn: past.lastChargedOn, hasLoan: Boolean(loan) },
+      {
+        sources: offered,
+        saved: existing,
+        lastChargedOn: past.lastChargedOn,
+        hasLoan: Boolean(loan),
+      },
     );
     if (!built.ok) {
       inFlight.current = false;

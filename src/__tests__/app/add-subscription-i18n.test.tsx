@@ -185,6 +185,21 @@ jest.mock('@/api/queries', () => ({
     ],
   }),
 }));
+// Every card and account: card-2 is a free account's locked extra, which usePaymentSources leaves out.
+jest.mock('@/api/payment-labels', () => {
+  const sources = [
+    { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
+    { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
+    { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
+  ];
+  return {
+    usePaymentLabels: () => ({
+      sources,
+      labelOf: (id: string) => sources.find((source) => source.id === id)?.label ?? null,
+      isLoading: false,
+    }),
+  };
+});
 
 // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
 jest.useFakeTimers({
@@ -778,6 +793,37 @@ describe('Charged to and the reminder in Spanish and French', () => {
       expect(radio(screen, words.skip, true)).toBeTruthy();
       expect(radio(screen, CARD, false)).toBeTruthy();
       expect(radio(screen, words.noReminder, true)).toBeTruthy();
+    },
+  );
+
+  it.each([
+    ['es', 'Guardar cambios'],
+    ['fr', 'Enregistrer les modifications'],
+  ] as const)(
+    'shows a card the free plan has locked chosen on an edit, and keeps it, in %s',
+    async (language, save) => {
+      editing('card-2');
+      setLanguage(language);
+      const screen = await render(<AddSubscriptionScreen />);
+
+      expect(radio(screen, 'Amex ••3005', true)).toBeTruthy();
+      expect(radio(screen, CARD, false)).toBeTruthy();
+      await fireEvent.press(screen.getByRole('button', { name: save }));
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+        card_id: 'card-2',
+        bank_account_id: null,
+      });
+    },
+  );
+
+  it.each(LOCALIZED)(
+    'never offers a card the free plan has locked to a new one in %s',
+    async (language) => {
+      const screen = await reachFinalPage(language);
+
+      expect(screen.queryByRole('radio', { name: 'Amex ••3005' })).toBeNull();
     },
   );
 

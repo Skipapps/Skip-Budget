@@ -99,13 +99,20 @@ const mockReceipts = {
   refetch: jest.fn(),
 };
 
-jest.mock('@/api/queries', () => ({
-  useReceipts: () => mockReceipts,
-  usePaymentSources: () => ({
-    sources: [
-      { id: 'card1', label: 'VISA ••4821' },
-      { id: 'acc1', label: 'Chase Checking ••7730' },
-    ],
+jest.mock('@/api/queries', () => ({ useReceipts: () => mockReceipts }));
+// Every card and account by name, as usePaymentLabels gives them; null while they are still read.
+// card-2 is a free account's locked extra: no picker offers it, but what it paid is named.
+const mockNames: Record<string, string> = {
+  card1: 'VISA ••4821',
+  acc1: 'Chase Checking ••7730',
+  'card-2': 'Amex ••3005',
+};
+let mockNamesLoading = false;
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: [],
+    labelOf: (id: string) => (mockNamesLoading ? null : (mockNames[id] ?? null)),
+    isLoading: mockNamesLoading,
   }),
 }));
 // None of these receipts is a habit's.
@@ -121,6 +128,7 @@ beforeEach(() => {
   mockReceipts.data = RECEIPTS;
   mockReceipts.isPending = false;
   mockReceipts.isError = false;
+  mockNamesLoading = false;
 });
 afterAll(() => resetLocaleForTests());
 
@@ -301,5 +309,118 @@ describe('on the free plan', () => {
         'Older history is saved. Free shows the last 90 days. Skip Pro shows up to 7 years.',
       ),
     ).toBeTruthy();
+  });
+});
+
+describe('paid with a card the free plan has locked', () => {
+  // r5 was paid with the locked card; r1, from the same store, with an offered one.
+  const LOCKED = row('r5', 'Starbucks', '2026-09-28', { amount: 4.5, card_id: 'card-2' });
+
+  beforeEach(() => {
+    mockId = 'r5';
+    mockReceipts.data = [RECEIPTS[0], LOCKED];
+  });
+  afterEach(() => resetLocaleForTests());
+
+  it.each([
+    ['en', 'No card or account'],
+    ['es', 'Sin tarjeta ni cuenta'],
+    ['fr', 'Aucune carte ni aucun compte'],
+  ] as const)(
+    'names the card on the page and in the store’s list in %s',
+    async (language, none) => {
+      setLanguage(language);
+      const screen = await render(<ReceiptDetailScreen />);
+
+      // In the details, and on the receipt's own line in the store's list.
+      expect(screen.getByText('Amex ••3005')).toBeTruthy();
+      expect(screen.getByText(/^Amex ••3005 · /)).toBeTruthy();
+      expect(screen.queryByText(none)).toBeNull();
+    },
+  );
+
+  it('names it on another receipt’s page too, in that page’s list', async () => {
+    mockId = 'r1';
+    const screen = await render(<ReceiptDetailScreen />);
+
+    expect(screen.getByLabelText(/^28 Sep 2026, -\$4\.50, Amex ••3005/)).toBeTruthy();
+  });
+
+  it('says nothing about how it was paid until the names are read', async () => {
+    mockNamesLoading = true;
+    const screen = await render(<ReceiptDetailScreen />);
+
+    expect(screen.queryByText(/No card or account/)).toBeNull();
+    expect(screen.queryByText('$4.50')).toBeNull();
+
+    mockNamesLoading = false;
+    await screen.rerender(<ReceiptDetailScreen />);
+    expect(screen.getByText('Amex ••3005')).toBeTruthy();
+  });
+});
+
+describe('a receipt’s page after a failed reload', () => {
+  const NOTE = 'Couldn’t refresh · showing your last figures';
+
+  /** Every line the page draws, top to bottom, with the end of the receipt card marked. */
+  const drawnInOrder = (screen: Awaited<ReturnType<typeof render>>) => {
+    const out: string[] = [];
+    const walk = (node: unknown): void => {
+      if (node == null) return;
+      if (typeof node === 'string') {
+        out.push(node);
+        return;
+      }
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      const element = node as { props?: { testID?: string }; children?: unknown[] | null };
+      (element.children ?? []).forEach(walk);
+      if (element.props?.testID === 'plan-details') out.push('<end of card>');
+    };
+    walk(screen.toJSON());
+    return out;
+  };
+
+  it('says nothing about refreshing while the read is fresh', async () => {
+    const screen = await render(<ReceiptDetailScreen />);
+
+    expect(screen.getByText('$12.50')).toBeTruthy();
+    expect(screen.queryByText(NOTE)).toBeNull();
+  });
+
+  it('keeps the receipt and its store’s list, with the note straight under the card', async () => {
+    // TanStack keeps the last good answer and reports the failed reload as isError.
+    mockReceipts.isError = true;
+    const screen = await render(<ReceiptDetailScreen />);
+
+    expect(screen.getByText('$12.50')).toBeTruthy();
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    const drawn = drawnInOrder(screen);
+    expect(drawn[drawn.indexOf('<end of card>') + 1]).toBe(NOTE);
+    expect(screen.getByTestId('receipts-from-store')).toBeTruthy();
+    expect(screen.queryByText('Something went wrong. Please try again.')).toBeNull();
+    expect(router.back).not.toHaveBeenCalled();
+  });
+
+  it('is the failure page, with no note, when there is nothing to show', async () => {
+    mockReceipts.data = undefined;
+    mockReceipts.isError = true;
+    const screen = await render(<ReceiptDetailScreen />);
+
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+    expect(screen.queryByText(NOTE)).toBeNull();
+  });
+
+  it.each([
+    ['es', 'No se pudo actualizar · mostrando tus últimas cifras'],
+    ['fr', 'Impossible d’actualiser · voici tes derniers chiffres'],
+  ] as const)('says the note in %s', async (language, note) => {
+    setLanguage(language);
+    mockReceipts.isError = true;
+    const screen = await render(<ReceiptDetailScreen />);
+
+    expect(screen.getAllByText(note)).toHaveLength(1);
   });
 });

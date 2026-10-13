@@ -133,6 +133,17 @@ jest.mock('@/api/habits', () => ({
 jest.mock('@/api/queries', () => ({
   usePaymentSources: () => ({ sources: [{ id: 'card-1', label: 'Visa ••4242' }] }),
 }));
+// Every card and account by name, as usePaymentLabels gives them; null while they are still read.
+// card-2 is a free account's locked extra: no picker offers it, but what it pays with is named.
+const mockNames: Record<string, string> = { 'card-1': 'Visa ••4242', 'card-2': 'Amex ••3005' };
+let mockNamesLoading = false;
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: [],
+    labelOf: (id: string) => (mockNamesLoading ? null : (mockNames[id] ?? null)),
+    isLoading: mockNamesLoading,
+  }),
+}));
 jest.mock('@/api/brands', () => ({
   useSpendCategories: () => ({ data: [{ id: 'dining', label: 'Dining' }] }),
 }));
@@ -193,6 +204,7 @@ beforeEach(() => {
   mockId = 'coffee';
   mockToday = '2026-10-09';
   mockFloor = { floor: '2019-10-09', free: false };
+  mockNamesLoading = false;
   mockHabit = query<HabitRow | null | undefined>(COFFEE);
   // The Wednesday receipt was edited to $6.50; the taps carry each receipt's own amount. The tea
   // tap is another habit's.
@@ -908,5 +920,34 @@ describe('a habit’s page: money and languages', () => {
     ]);
     expect(screen.getByLabelText('Modifier Tim Hortons')).toBeTruthy();
     expect(leftovers(screen)).toEqual([]);
+  });
+});
+
+describe('a habit’s page: paid with a card the free plan has locked', () => {
+  it.each([
+    ['en', 'Paid with', 'No card or account'],
+    ['es', 'Pagado con', 'Sin tarjeta ni cuenta'],
+    ['fr', 'Payé avec', 'Aucune carte ni aucun compte'],
+  ] as const)('names the card in %s', async (language, paidWith, none) => {
+    setLanguage(language);
+    mockHabit = query<HabitRow | null | undefined>(habitRow({ card_id: 'card-2' }));
+    const screen = await render(<HabitDetailScreen />);
+
+    const rows = shown(within(screen.getByTestId('habit-about')));
+    expect(rows.slice(2, 4)).toEqual([paidWith, 'Amex ••3005']);
+    expect(rows).not.toContain(none);
+  });
+
+  it('says nothing about how it is paid until the names are read', async () => {
+    mockHabit = query<HabitRow | null | undefined>(habitRow({ card_id: 'card-2' }));
+    mockNamesLoading = true;
+    const screen = await render(<HabitDetailScreen />);
+
+    expect(screen.queryByText('No card or account')).toBeNull();
+    expect(screen.queryByTestId('habit-about')).toBeNull();
+
+    mockNamesLoading = false;
+    await screen.rerender(<HabitDetailScreen />);
+    expect(shown(within(screen.getByTestId('habit-about')))).toContain('Amex ••3005');
   });
 });

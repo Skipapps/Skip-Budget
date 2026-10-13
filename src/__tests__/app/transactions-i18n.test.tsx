@@ -61,8 +61,22 @@ jest.mock('@/api/queries', () => ({
     isError: mockFailed,
     refetch: jest.fn(),
   }),
-  usePaymentSources: () => ({ sources: [{ id: 's1', label: 'Everyday ••1111' }] }),
 }));
+// Every card and account, as usePaymentLabels names them. s2 is a free account's locked extra: no
+// picker offers it for new spending, but its entries are named and can be filtered.
+jest.mock('@/api/payment-labels', () => {
+  const sources = [
+    { id: 's1', label: 'Everyday ••1111', color: '#111111', kind: 'account' },
+    { id: 's2', label: 'Amex ••3005', color: '#222222', kind: 'card' },
+  ];
+  return {
+    usePaymentLabels: () => ({
+      sources,
+      labelOf: (id: string) => sources.find((source) => source.id === id)?.label ?? null,
+      isLoading: false,
+    }),
+  };
+});
 
 // Only the clock is fixed; real timers keep the renders independent of one another.
 jest.useFakeTimers({
@@ -227,4 +241,30 @@ describe('Transactions in French', () => {
     expect(screen.getByText('Une erreur est survenue. Réessaie.')).toBeTruthy();
     expect(screen.getByText('Réessayer')).toBeTruthy();
   });
+});
+
+describe('Transactions with a card the free plan has locked', () => {
+  const LOCKED = { id: 'receipt-l1', label: 'Florist', amount: -9, date: TODAY, kind: 'receipt' };
+
+  it.each([
+    ['en', 'Receipts · Amex ••3005', 'Filter transactions', 'Apply'],
+    ['es', 'Recibos · Amex ••3005', 'Filtrar movimientos', 'Aplicar'],
+    ['fr', 'Reçus · Amex ••3005', 'Filtrer les transactions', 'Appliquer'],
+  ] as const)(
+    'names it on its rows and filters on it in %s',
+    async (language, row, open, apply) => {
+      setLanguage(language);
+      mockEntries = [...ENTRIES, { ...LOCKED, sourceId: 's2' }];
+      const screen = await render(<TransactionsScreen />);
+
+      expect(screen.getByText(row)).toBeTruthy();
+
+      await fireEvent.press(screen.getByLabelText(open));
+      await fireEvent.press(screen.getByLabelText('Amex ••3005'));
+      await fireEvent.press(screen.getByText(apply));
+
+      expect(screen.getByText('Florist')).toBeTruthy();
+      expect(screen.queryByText('Bakery')).toBeNull();
+    },
+  );
 });

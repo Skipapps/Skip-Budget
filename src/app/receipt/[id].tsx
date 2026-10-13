@@ -5,7 +5,8 @@ import { Pressable, Text, View } from 'react-native';
 
 import { useHabit } from '@/api/habits';
 import { useHistoryFloor } from '@/api/history';
-import { useReceipts, usePaymentSources, type ReceiptRow } from '@/api/queries';
+import { usePaymentLabels } from '@/api/payment-labels';
+import { useReceipts, type ReceiptRow } from '@/api/queries';
 import { useReceiptBooks } from '@/api/receipt-books';
 import { useSpendCategories } from '@/api/brands';
 import { BrandMark } from '@/components/brands/brand-mark';
@@ -16,11 +17,13 @@ import { HistoryNotice } from '@/components/pro/history-notice';
 import { goBack } from '@/components/ui/back-button';
 import { ChoiceChips } from '@/components/ui/choice-chips';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
 import { formatFullDate, toIsoDate } from '@/lib/date';
 import { failureText } from '@/lib/failure';
+import { failedEmpty, refreshFailed } from '@/lib/query-state';
 import { formatCurrency } from '@/lib/format';
 import { logoDomainOf } from '@/lib/logo-domain';
 import { rangeFor } from '@/lib/range';
@@ -71,7 +74,8 @@ export default function ReceiptDetailScreen() {
   const artwork = useArtwork();
   const moneyColor = useMoneyColor();
   const receipts = useReceipts();
-  const { sources } = usePaymentSources();
+  // Every card and account, a locked one too: what a receipt was paid with is named on any plan.
+  const labels = usePaymentLabels();
   const { data: categories = [] } = useSpendCategories();
   const { data: books = [] } = useReceiptBooks();
   const [windowKey, setWindowKey] = useState<Window>('all');
@@ -112,7 +116,8 @@ export default function ReceiptDetailScreen() {
     if (gone) goBack();
   }, [gone]);
 
-  if (receipts.isPending || gone) {
+  // Until the names are read, a receipt paid with a card would read "No card or account".
+  if (receipts.isPending || gone || labels.isLoading) {
     return (
       <Screen showBack>
         <SkeletonList rows={4} />
@@ -120,7 +125,8 @@ export default function ReceiptDetailScreen() {
     );
   }
 
-  if (receipts.isError || !receipt) {
+  // Only a read with nothing to show is the failure page; a failed reload keeps the receipt shown.
+  if (failedEmpty(receipts) || !receipt) {
     return (
       <Screen showBack>
         <PageState
@@ -134,7 +140,7 @@ export default function ReceiptDetailScreen() {
   }
 
   const sourceLabel = (row: ReceiptRow) =>
-    sources.find((option) => option.id === (row.card_id ?? row.bank_account_id))?.label;
+    labels.labelOf(row.card_id ?? row.bank_account_id ?? '') ?? undefined;
 
   const details: PlanDetailRow[] = [
     {
@@ -204,6 +210,8 @@ export default function ReceiptDetailScreen() {
         subtitle={t('receipts.detail.boughtOn', { date: asDate(receipt.purchased_on) })}
         rows={details}
       />
+      {/* The store's list below comes from the same read, so this covers it too. */}
+      <RefreshNote show={refreshFailed(receipts)} />
 
       {habitId && habit.data ? (
         <HabitLink

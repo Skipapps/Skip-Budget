@@ -88,7 +88,9 @@ jest.mock('@/api/queries', () => ({
   useProfile: () => ({ ...mockProfile, refetch: jest.fn() }),
   useBills: () => ({ ...mockList, refetch: jest.fn() }),
   useSubscriptions: () => ({ ...mockList, refetch: jest.fn() }),
-  usePaymentSources: () => ({ sources: [] }),
+}));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({ sources: [], labelOf: () => null, isLoading: false }),
 }));
 jest.mock('@/api/mutations', () => ({ useUpdateProfile: () => ({ mutate: jest.fn() }) }));
 
