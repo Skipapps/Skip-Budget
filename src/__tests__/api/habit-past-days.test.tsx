@@ -7,21 +7,20 @@ import {
   habitCarriedValues,
   habitTapValues,
   refusedHabitGone,
-  refusedBeforeHabitStart,
   useDeleteHabitAndDays,
   useHabitPastDays,
   useHabitTaps,
-  useRewriteHabitDays,
-  type HabitCarriedValues,
+  useUpdateHabitAndDays,
+  type HabitEditValues,
   type HabitRow,
 } from '@/api/habits';
 import { refusedForPro } from '@/lib/pro-refusal';
 
 /**
- * Editing or deleting a habit that has filed days asks about them. Past and upcoming rewrites the
- * copied columns of every one of its receipts, to the cent; Upcoming only writes none; Remove
- * everything takes the habit and its days in one call, and a habit that is gone is refused, never
- * reported as removed.
+ * Editing or deleting a habit that has filed days asks about them. Past and upcoming saves the habit
+ * and its days in one call, to the cent; Upcoming only writes none of the days; Remove everything
+ * takes the habit and its days in one call. A habit that is gone is refused, never reported as
+ * saved or removed.
  */
 
 type Answer = { data?: unknown; error?: unknown; count?: number | null };
@@ -134,9 +133,6 @@ async function settle<T>(work: () => Promise<T>): Promise<T> {
   return outcome.value;
 }
 
-const calls = (request: Request | undefined, op: string) =>
-  (request?.calls ?? []).filter(([name]) => name === op).map(([, ...args]) => args);
-
 const EVERY_HABIT_KEY = [['habits'], ['receipts'], ['receipt'], ['dashboard']];
 
 /** What PostgREST answers for delete_habit's refusal. */
@@ -225,133 +221,205 @@ describe('habitCarriedChanged', () => {
   });
 });
 
-const LATTES: HabitCarriedValues = {
-  merchant: 'Lattes',
-  amount: 6.1,
-  category_id: 'dining',
+/** What the edit page saves for Coffee renamed Lattes at $6.10, paid from the account. */
+const LATTES: HabitEditValues = {
+  name: 'Lattes',
+  icon_id: 'food-dining/coffee',
+  color: 'violet',
+  price: 6.1,
   card_id: null,
   bank_account_id: 'acct-1',
 };
 
-describe('useRewriteHabitDays', () => {
-  it("updates the copied columns of every receipt of that habit, and nothing else's", async () => {
-    const { result } = await renderHook(() => useRewriteHabitDays(), { wrapper });
+/** update_habit_and_days's answer: the habit as saved, as PostgREST sends it. */
+const SAVED_LATTES = {
+  ...COFFEE,
+  name: 'Lattes',
+  color: 'violet',
+  price: '6.10',
+  card_id: null,
+  bank_account_id: 'acct-1',
+};
+
+/** What the page sends for LATTES, argument by argument. */
+const LATTES_CALL = {
+  p_habit: 'habit-coffee',
+  p_name: 'Lattes',
+  p_icon_id: 'food-dining/coffee',
+  p_color: 'violet',
+  p_price: 6.1,
+  p_card_id: null,
+  p_bank_account_id: 'acct-1',
+  p_category_id: null,
+};
+
+describe('useUpdateHabitAndDays', () => {
+  it('saves the habit and its days in one call to update_habit_and_days, and resolves to the habit as saved', async () => {
+    mockAnswers.push({ data: SAVED_LATTES });
+    const { result } = await renderHook(() => useUpdateHabitAndDays(), { wrapper });
 
     await expect(
-      settle(() => result.current.mutateAsync({ habitId: 'habit-coffee', values: LATTES })),
-    ).resolves.toEqual({ habitId: 'habit-coffee' });
+      settle(() => result.current.mutateAsync({ id: 'habit-coffee', values: LATTES })),
+    ).resolves.toEqual({
+      ...COFFEE,
+      name: 'Lattes',
+      color: 'violet',
+      price: 6.1,
+      card_id: null,
+      bank_account_id: 'acct-1',
+    });
 
-    expect(mockRequests).toHaveLength(1);
-    const write = mockRequests[0];
-    expect(write.table).toBe('receipts');
-    expect(calls(write, 'update')).toEqual([[LATTES]]);
-    expect(calls(write, 'eq')).toEqual([['habit_id', 'habit-coffee']]);
-    // An update in place: no day is deleted and filed again.
-    expect(calls(write, 'delete')).toEqual([]);
-    expect(calls(write, 'insert')).toEqual([]);
-    expect(mockRpcs).toEqual([]);
+    expect(mockRpcs).toEqual([['update_habit_and_days', LATTES_CALL]]);
+    // Nothing is written table by table, which could leave the habit and its days apart.
+    expect(mockRequests).toHaveLength(0);
   });
 
-  it('refreshes what a receipt edit refreshes, for every receipt', async () => {
-    const { result } = await renderHook(() => useRewriteHabitDays(), { wrapper });
+  it('refreshes what a habit edit and a receipt edit refresh: the habits, every receipt, the totals', async () => {
+    mockAnswers.push({ data: SAVED_LATTES });
+    const { result } = await renderHook(() => useUpdateHabitAndDays(), { wrapper });
 
-    await settle(() => result.current.mutateAsync({ habitId: 'habit-coffee', values: LATTES }));
+    await settle(() => result.current.mutateAsync({ id: 'habit-coffee', values: LATTES }));
 
-    expect(invalidated).toEqual([['receipts'], ['receipt'], ['dashboard']]);
+    expect(invalidated).toEqual(EVERY_HABIT_KEY);
   });
 
-  it('writes only the five copied columns, whatever else it is handed', async () => {
-    const { result } = await renderHook(() => useRewriteHabitDays(), { wrapper });
+  it('sends only the arguments the function takes, whatever else it is handed', async () => {
+    mockAnswers.push({ data: SAVED_LATTES });
+    const { result } = await renderHook(() => useUpdateHabitAndDays(), { wrapper });
     const handed = {
       ...LATTES,
       purchased_on: '2026-10-01',
       habit_id: 'habit-other',
-      note: null,
-    } as HabitCarriedValues;
+      user_id: 'user-2',
+      saved_from: '2026-01-01',
+    } as HabitEditValues;
 
-    await settle(() => result.current.mutateAsync({ habitId: 'habit-coffee', values: handed }));
+    await settle(() => result.current.mutateAsync({ id: 'habit-coffee', values: handed }));
 
-    const [[written]] = calls(mockRequests[0], 'update') as [[Record<string, unknown>]];
-    expect(Object.keys(written).sort()).toEqual([
-      'amount',
-      'bank_account_id',
-      'card_id',
-      'category_id',
-      'merchant',
-    ]);
+    expect(mockRpcs).toEqual([['update_habit_and_days', LATTES_CALL]]);
   });
 
-  it('writes the price to the cent, float noise gone', async () => {
-    const { result } = await renderHook(() => useRewriteHabitDays(), { wrapper });
+  it('sends the price to the cent, float noise gone', async () => {
+    mockAnswers.push({ data: SAVED_LATTES }, { data: SAVED_LATTES });
+    const { result } = await renderHook(() => useUpdateHabitAndDays(), { wrapper });
 
     await settle(() =>
-      result.current.mutateAsync({
-        habitId: 'habit-coffee',
-        values: { ...LATTES, amount: 0.1 + 0.2 },
-      }),
+      result.current.mutateAsync({ id: 'habit-coffee', values: { ...LATTES, price: 0.1 + 0.2 } }),
     );
     await settle(() =>
       result.current.mutateAsync({
-        habitId: 'habit-coffee',
-        values: { ...LATTES, amount: Number('4.50') },
+        id: 'habit-coffee',
+        values: { ...LATTES, price: Number('4.50') },
       }),
     );
 
-    expect(calls(mockRequests[0], 'update')[0][0]).toMatchObject({ amount: 0.3 });
-    expect(calls(mockRequests[1], 'update')[0][0]).toMatchObject({ amount: 4.5 });
+    expect(mockRpcs.map(([, args]) => (args as { p_price: number }).p_price)).toEqual([0.3, 4.5]);
   });
 
-  it('trims the name, files no category under other, and lets a card win over an account', async () => {
-    const { result } = await renderHook(() => useRewriteHabitDays(), { wrapper });
+  it('trims the name, and lets a card win over an account', async () => {
+    mockAnswers.push({ data: SAVED_LATTES });
+    const { result } = await renderHook(() => useUpdateHabitAndDays(), { wrapper });
 
     await settle(() =>
       result.current.mutateAsync({
-        habitId: 'habit-coffee',
-        values: { ...LATTES, merchant: ' Lattes ', category_id: '', card_id: 'card-1' },
+        id: 'habit-coffee',
+        values: { ...LATTES, name: ' Lattes ', card_id: 'card-1' },
       }),
     );
 
-    expect(calls(mockRequests[0], 'update')).toEqual([
+    expect(mockRpcs).toEqual([
       [
-        {
-          merchant: 'Lattes',
-          amount: 6.1,
-          category_id: 'other',
-          card_id: 'card-1',
-          bank_account_id: null,
-        },
+        'update_habit_and_days',
+        { ...LATTES_CALL, p_name: 'Lattes', p_card_id: 'card-1', p_bank_account_id: null },
       ],
     ]);
   });
 
+  it('keeps the category the habit is filed under unless a new icon brings one', async () => {
+    mockAnswers.push({ data: SAVED_LATTES }, { data: SAVED_LATTES });
+    const { result } = await renderHook(() => useUpdateHabitAndDays(), { wrapper });
+
+    await settle(() => result.current.mutateAsync({ id: 'habit-coffee', values: LATTES }));
+    await settle(() =>
+      result.current.mutateAsync({
+        id: 'habit-coffee',
+        values: { ...LATTES, icon_id: 'food-dining/groceries', category_id: 'groceries' },
+      }),
+    );
+
+    expect(mockRpcs.map(([, args]) => args)).toEqual([
+      LATTES_CALL,
+      { ...LATTES_CALL, p_icon_id: 'food-dining/groceries', p_category_id: 'groceries' },
+    ]);
+  });
+
   it.each([
-    ['a zero price', { amount: 0 }],
-    ['a price below zero', { amount: -4.5 }],
-    ['a price that is not a number', { amount: Number.NaN }],
-    ['a fraction of a cent, which the database would round', { amount: 4.355 }],
-    ['an empty name', { merchant: '   ' }],
-  ])('writes nothing for %s', async (_what, change) => {
-    const { result } = await renderHook(() => useRewriteHabitDays(), { wrapper });
+    ['a zero price', { price: 0 }],
+    ['a price below zero', { price: -4.5 }],
+    ['a price that is not a number', { price: Number.NaN }],
+    ['a fraction of a cent, which the database would round', { price: 4.355 }],
+    ['an empty name', { name: '   ' }],
+  ])('sends nothing for %s', async (_what, change) => {
+    const { result } = await renderHook(() => useUpdateHabitAndDays(), { wrapper });
 
     await expect(
       settle(() =>
-        result.current.mutateAsync({ habitId: 'habit-coffee', values: { ...LATTES, ...change } }),
+        result.current.mutateAsync({ id: 'habit-coffee', values: { ...LATTES, ...change } }),
       ),
     ).rejects.toThrow();
+    expect(mockRpcs).toEqual([]);
     expect(mockRequests).toHaveLength(0);
     expect(invalidated).toEqual([]);
   });
 
-  it('fails when the update fails, and refreshes nothing', async () => {
-    mockAnswers.push({ error: { code: '08006', message: 'connection failure' } });
-    const { result } = await renderHook(() => useRewriteHabitDays(), { wrapper });
+  it('fails once, with no retry, when the habit is gone, and refreshes the stale habit so the page reads it gone', async () => {
+    // Even under an app-wide mutation retry, the refusal reaches the person on the first answer.
+    client = new QueryClient({
+      defaultOptions: { mutations: { retry: 3, retryDelay: 0, gcTime: 0 } },
+    });
+    jest.spyOn(client, 'invalidateQueries').mockImplementation((filters) => {
+      invalidated.push((filters?.queryKey ?? []) as unknown[]);
+      return Promise.resolve();
+    });
+    mockAnswers.push({ error: GONE }, { error: GONE }, { error: GONE });
+    const { result } = await renderHook(() => useUpdateHabitAndDays(), { wrapper });
 
     const thrown = await settle(() =>
-      result.current.mutateAsync({ habitId: 'habit-coffee', values: LATTES }),
+      result.current.mutateAsync({ id: 'habit-coffee', values: LATTES }),
     ).catch((error: unknown) => error);
 
-    expect(thrown).toMatchObject({ code: '08006' });
-    expect(refusedBeforeHabitStart(thrown)).toBe(false);
+    expect(refusedHabitGone(thrown)).toBe(true);
+    expect(mockRpcs).toHaveLength(1);
+    expect(invalidated).toEqual(EVERY_HABIT_KEY);
+  });
+
+  it('fails with no fallback when the database has no such function: nothing is written table by table', async () => {
+    mockAnswers.push({
+      error: {
+        code: 'PGRST202',
+        message: 'Could not find the function public.update_habit_and_days',
+      },
+    });
+    const { result } = await renderHook(() => useUpdateHabitAndDays(), { wrapper });
+
+    const thrown = await settle(() =>
+      result.current.mutateAsync({ id: 'habit-coffee', values: LATTES }),
+    ).catch((error: unknown) => error);
+
+    expect(thrown).toMatchObject({ code: 'PGRST202' });
+    expect(refusedHabitGone(thrown)).toBe(false);
+    expect(mockRpcs).toHaveLength(1);
+    expect(mockRequests).toHaveLength(0);
+    expect(invalidated).toEqual([]);
+  });
+
+  it('fails on an answer with no habit in it, rather than report a save it cannot show', async () => {
+    mockAnswers.push({ data: null });
+    const { result } = await renderHook(() => useUpdateHabitAndDays(), { wrapper });
+
+    await expect(
+      settle(() => result.current.mutateAsync({ id: 'habit-coffee', values: LATTES })),
+    ).rejects.toThrow();
     expect(invalidated).toEqual([]);
   });
 });

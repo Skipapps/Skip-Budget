@@ -6,7 +6,6 @@ import { Pressable, Text, View } from 'react-native';
 
 import {
   habitCarriedChanged,
-  habitCarriedValues,
   refusedHabitGone,
   useArchiveHabit,
   useCreateHabit,
@@ -15,8 +14,9 @@ import {
   useHabitPastDays,
   useHabitTaps,
   useHabits,
-  useRewriteHabitDays,
   useUpdateHabit,
+  useUpdateHabitAndDays,
+  type HabitEditValues,
   type HabitRow,
   type HabitValues,
 } from '@/api/habits';
@@ -255,14 +255,11 @@ function HabitForm({
   const updateHabit = useUpdateHabit();
   const archiveHabit = useArchiveHabit();
   const deleteHabit = useDeleteHabitAndDays();
-  const rewriteDays = useRewriteHabitDays();
+  const updateHabitAndDays = useUpdateHabitAndDays();
   const pastDays = useHabitPastDays(saved?.id);
   const { askChange, askDelete } = usePastChoice();
   // While the days are read before a question that counts them: the button waits, as for a save.
   const [readingDays, setReadingDays] = useState(false);
-  // Set once the days took a Past and upcoming whose habit update then failed: the days already
-  // carry the form's values, so the next Save writes both again without asking.
-  const [rewritePending, setRewritePending] = useState(false);
   // A new habit's row id for this visit, so a Save repeated after a lost answer finds the habit the
   // first may have started instead of starting a second (`insertOnce`).
   const [newId] = useState(() => randomUUID());
@@ -368,7 +365,7 @@ function HabitForm({
 
     const paidWith = paidWithColumns(sourceId, sources, saved);
     const categoryId = habitIcon(iconId)?.spendCategory ?? 'other';
-    const patch: Partial<HabitValues> | null = saved
+    const patch: HabitEditValues | null = saved
       ? {
           name: trimmed,
           icon_id: iconId,
@@ -381,8 +378,8 @@ function HabitForm({
       : null;
 
     // Asked before anything is written, so backing out leaves the habit and its days as they were.
-    let scope: PastChange = rewritePending ? 'all' : 'upcoming';
-    if (saved && patch && !rewritePending && habitCarriedChanged(saved, { ...saved, ...patch })) {
+    let scope: PastChange = 'upcoming';
+    if (saved && patch && habitCarriedChanged(saved, { ...saved, ...patch })) {
       // The question counts the days, so it waits for that read rather than guess a count.
       const count = await readDays();
       if (count === null) return;
@@ -393,15 +390,10 @@ function HabitForm({
 
     try {
       if (saved && patch) {
-        if (scope === 'all') {
-          await rewriteDays.mutateAsync({
-            habitId: saved.id,
-            values: habitCarriedValues({ ...saved, ...patch }),
-          });
-          setRewritePending(true);
-        }
-        await updateHabit.mutateAsync({ id: saved.id, values: patch });
-        setRewritePending(false);
+        const edit = { id: saved.id, values: patch };
+        await (scope === 'all'
+          ? updateHabitAndDays.mutateAsync(edit)
+          : updateHabit.mutateAsync(edit));
         success();
         toast('toast.habit.updated');
       } else {
@@ -644,7 +636,7 @@ function HabitForm({
     );
   }
 
-  const saving = createHabit.isPending || updateHabit.isPending || rewriteDays.isPending;
+  const saving = createHabit.isPending || updateHabit.isPending || updateHabitAndDays.isPending;
   // Reading the days only holds the buttons: nothing is being saved or deleted yet.
   const busy = saving || proWrite.checking || readingDays;
   const deleting = archiveHabit.isPending || deleteHabit.isPending;

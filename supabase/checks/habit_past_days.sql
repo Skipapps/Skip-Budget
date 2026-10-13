@@ -4,8 +4,8 @@
 --   docker exec -i supabase_db_SkipBudget psql -U postgres -d postgres -q -t < supabase/checks/habit_past_days.sql
 --
 -- Ends with ALL CHECKS PASSED; any failed check stops with FAILED, "wrong refusal" or "expected".
--- The receipts writes are the app's own: "Past and upcoming" is useRewriteHabitDays's update,
--- "Remove everything" is useDeleteHabitAndDays's call.
+-- The receipts writes mirror the app's: "Past and upcoming" is now update_habit_and_days (checked
+-- in update_habit_and_days.sql), "Remove everything" is useDeleteHabitAndDays's call.
 
 \set ON_ERROR_STOP on
 begin;

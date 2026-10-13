@@ -132,7 +132,7 @@ const mockCreate = jest.fn();
 jest.mock('expo-crypto', () => ({ randomUUID: jest.fn() }));
 const mockUpdate = jest.fn();
 const mockArchive = jest.fn();
-const mockRewrite = jest.fn();
+const mockUpdateAndDays = jest.fn();
 const mockDeleteAll = jest.fn();
 const mockRetry = jest.fn();
 // The days read as the page awaits it.
@@ -149,8 +149,8 @@ jest.mock('@/api/habits', () => ({
   useHabitPastDays: () => ({ ...mockPastDays, retry: mockRetry, load: mockLoadDays }),
   useCreateHabit: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateHabit: () => ({ mutateAsync: mockUpdate, isPending: false }),
+  useUpdateHabitAndDays: () => ({ mutateAsync: mockUpdateAndDays, isPending: false }),
   useArchiveHabit: () => ({ mutateAsync: mockArchive, isPending: false }),
-  useRewriteHabitDays: () => ({ mutateAsync: mockRewrite, isPending: false }),
   useDeleteHabitAndDays: () => ({ mutateAsync: mockDeleteAll, isPending: false }),
 }));
 
@@ -271,7 +271,7 @@ beforeEach(() => {
   mockCreate.mockResolvedValue(habitRow({ id: 'habit-new' }));
   mockUpdate.mockResolvedValue({ id: 'habit-1' });
   mockArchive.mockResolvedValue({ id: 'habit-1' });
-  mockRewrite.mockResolvedValue({ habitId: 'habit-1' });
+  mockUpdateAndDays.mockResolvedValue(habitRow());
   mockDeleteAll.mockResolvedValue({ habitId: 'habit-1' });
   mockConfirm.mockResolvedValue(true);
   mockAsk.mockReset();
@@ -940,7 +940,7 @@ describe('Edit habit (/habit-new?id=)', () => {
     });
     expect(mockCreate).not.toHaveBeenCalled();
     expect(mockAsk).not.toHaveBeenCalled();
-    expect(mockRewrite).not.toHaveBeenCalled();
+    expect(mockUpdateAndDays).not.toHaveBeenCalled();
     expect(mockToast).toHaveBeenCalledWith('toast.habit.updated');
     expect(router.back).toHaveBeenCalledTimes(1);
   });

@@ -75,7 +75,7 @@ jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
 const mockArchive = jest.fn();
-const mockRewrite = jest.fn();
+const mockUpdateAndDays = jest.fn();
 const mockDeleteAll = jest.fn();
 const mockRetry = jest.fn();
 // The days read as the page awaits it: the count, or the read's failure while they are unread.
@@ -94,8 +94,8 @@ jest.mock('@/api/habits', () => ({
   useHabitPastDays: () => ({ ...mockPastDays, retry: mockRetry, load: mockLoadDays }),
   useCreateHabit: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateHabit: () => ({ mutateAsync: mockUpdate, isPending: false }),
+  useUpdateHabitAndDays: () => ({ mutateAsync: mockUpdateAndDays, isPending: false }),
   useArchiveHabit: () => ({ mutateAsync: mockArchive, isPending: false }),
-  useRewriteHabitDays: () => ({ mutateAsync: mockRewrite, isPending: false }),
   useDeleteHabitAndDays: () => ({ mutateAsync: mockDeleteAll, isPending: false }),
 }));
 
@@ -234,7 +234,7 @@ beforeEach(() => {
   mockCreate.mockResolvedValue({ id: 'habit-new' });
   mockUpdate.mockResolvedValue({ id: 'habit-1' });
   mockArchive.mockResolvedValue({ id: 'habit-1' });
-  mockRewrite.mockResolvedValue({ habitId: 'habit-1' });
+  mockUpdateAndDays.mockResolvedValue(SAVED_HABIT);
   mockDeleteAll.mockResolvedValue({ habitId: 'habit-1' });
   mockAsk.mockReset();
   mockAsk.mockResolvedValue(null);
@@ -370,7 +370,7 @@ describe.each(['es', 'fr'] as const)(
       mockPastDays = count === null ? { count: null, ready: false } : { count, ready: true };
     };
 
-    it('asks which days an edit reaches in the language, then writes the days before the habit', async () => {
+    it('asks which days an edit reaches in the language, then saves the habit and its days in one call', async () => {
       const english = inEnglish(language, () => ({
         title: t('ui.past.change.title.days'),
         message: t('ui.past.change.body.days', { name: 'Café', count: 3 }),
@@ -402,20 +402,18 @@ describe.each(['es', 'fr'] as const)(
       expect(request.cancelLabel).not.toBe(english.cancel);
       expectWholeSentences(request);
 
-      expect(mockRewrite).toHaveBeenCalledWith({
-        habitId: 'habit-1',
+      expect(mockUpdateAndDays).toHaveBeenCalledWith({
+        id: 'habit-1',
         values: {
-          merchant: 'Café',
-          amount: 5,
-          category_id: 'dining',
+          name: 'Café',
+          icon_id: 'food-dining/coffee',
+          color: 'caramel',
+          price: 5,
           card_id: null,
           bank_account_id: 'acct-1',
         },
       });
-      expect(mockUpdate).toHaveBeenCalledTimes(1);
-      expect(mockRewrite.mock.invocationCallOrder[0]).toBeLessThan(
-        mockUpdate.mock.invocationCallOrder[0],
-      );
+      expect(mockUpdate).not.toHaveBeenCalled();
       expect(mockToast).toHaveBeenCalledWith('toast.habit.updated');
     });
 
@@ -430,7 +428,7 @@ describe.each(['es', 'fr'] as const)(
       const { message } = mockAsk.mock.calls[0][0];
       expect(message).toBe(t('ui.past.change.body.days', { name: 'Café', count: 1 }));
       expect(message).not.toBe(t('ui.past.change.body.days', { name: 'Café', count: 3 }));
-      expect(mockRewrite).not.toHaveBeenCalled();
+      expect(mockUpdateAndDays).not.toHaveBeenCalled();
     });
 
     it('says the one failure line in the language when the days cannot be read, and writes nothing', async () => {
@@ -444,7 +442,7 @@ describe.each(['es', 'fr'] as const)(
       expect(t('common.failure')).not.toBe(FAILURE_MESSAGE);
       log.mockRestore();
       expect(mockAsk).not.toHaveBeenCalled();
-      expect(mockRewrite).not.toHaveBeenCalled();
+      expect(mockUpdateAndDays).not.toHaveBeenCalled();
       expect(mockUpdate).not.toHaveBeenCalled();
       expectNoKeys(screen);
     });

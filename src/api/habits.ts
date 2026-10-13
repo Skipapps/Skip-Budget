@@ -25,7 +25,7 @@ export type HabitRow = {
   color: HabitColor;
   /**
    * What one tapped day costs. A change reaches the days already tapped only when the person
-   * chooses Past and upcoming (`useRewriteHabitDays`).
+   * chooses Past and upcoming (`useUpdateHabitAndDays`).
    */
   price: number;
   /** Where a tap's receipt is filed in spending. */
@@ -238,6 +238,12 @@ export type HabitValues = {
   sort_order?: number;
 };
 
+/** What the edit page saves: every field it shows, and the category only with a new icon. */
+export type HabitEditValues = Pick<
+  HabitValues,
+  'name' | 'icon_id' | 'color' | 'price' | 'card_id' | 'bank_account_id'
+> & { category_id?: string };
+
 /** The database keeps names trimmed, so a stray space typed at the end is not a refusal. */
 function trimmed<T extends Partial<HabitValues>>(values: T): T {
   return typeof values.name === 'string' ? { ...values, name: values.name.trim() } : values;
@@ -263,12 +269,9 @@ export function useCreateHabit() {
 }
 
 /**
- * Any plan may edit a habit it has. Writes the habit alone: the days already tapped keep the name,
- * price, Paid with and category they were filed with unless the person chooses Past and upcoming.
- * Then `useRewriteHabitDays` goes first and this second: if this one fails, the habit still differs
- * from what was typed, so saving again asks again and repeats both. The other way round, a failed
- * rewrite leaves the habit already saved, and saving again sees no change and never asks. The icon
- * and colour are read through the habit, so every day follows them either way.
+ * Any plan may edit a habit it has. Upcoming only: writes the habit alone, so the days already
+ * tapped keep the name, price, Paid with and category they were filed with. The icon and colour are
+ * read through the habit, so every day follows them either way.
  */
 export function useUpdateHabit() {
   const invalidate = useInvalidateHabits();
@@ -515,54 +518,65 @@ function daysOf(taps: readonly HabitTap[], habitId: string): number {
 }
 
 /**
- * Past and upcoming: rewrites every day `habitId` has filed to `values`, a day whose amount was
- * edited on its own included, as a bill's past charges are. One update of the copied columns, never
- * a delete and re-file: each day keeps its id, date, note, book and photo, and nothing arrives as
- * newly spent. The date and habit are never written, so a day filed before the habit was made is
- * not refused. Throws before writing on a price that is not a whole number of cents above zero, or
- * an empty name.
+ * Past and upcoming: saves the habit and gives every day it has filed the habit's new name, price,
+ * Paid with and category (`habitCarriedValues`), a day whose amount was edited on its own included,
+ * in one transaction on the server (`update_habit_and_days`). A dropped connection therefore never
+ * leaves the habit saved and its days not, or the other way round. Each day keeps its id, date,
+ * note, book and photo, and nothing arrives as newly spent. Throws before calling on a price that
+ * is not a whole number of cents above zero, or an empty name. A habit that is gone, or is not the
+ * caller's, is refused with P0002 (`refusedHabitGone`), and the caches are refreshed then too, since
+ * they still show it: the page then reads it gone. A database without the function refuses with
+ * PGRST202. Nothing is written either way. Resolves to the habit as saved.
  */
-export function useRewriteHabitDays() {
-  const client = useQueryClient();
+export function useUpdateHabitAndDays() {
+  const invalidate = useInvalidateHabits();
 
   return useMutation({
-    mutationFn: async ({ habitId, values }: { habitId: string; values: HabitCarriedValues }) => {
-      const cents = wholeCents(values.amount);
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id: string;
+      values: HabitEditValues;
+    }): Promise<HabitRow> => {
+      const cents = wholeCents(values.price);
       if (cents === null || cents <= 0) throw new Error('A habit needs a price.');
-      const merchant = values.merchant.trim();
-      if (!merchant) throw new Error('A habit needs a name.');
-      // Named column by column, so a caller passing a whole row cannot write anything else.
-      const written: HabitCarriedValues = {
-        merchant,
-        amount: fromCents(cents),
-        category_id: values.category_id || 'other',
-        card_id: values.card_id,
-        bank_account_id: values.card_id ? null : values.bank_account_id,
-      };
-      const { error } = await supabase
-        .from('receipts')
-        .update(written as never)
-        .eq('habit_id', habitId);
+      const name = values.name.trim();
+      if (!name) throw new Error('A habit needs a name.');
+      const { data, error } = await supabase.rpc('update_habit_and_days', {
+        p_habit: id,
+        p_name: name,
+        p_icon_id: values.icon_id,
+        p_color: values.color,
+        p_price: fromCents(cents),
+        p_card_id: values.card_id,
+        // The database allows one; a card wins, as it does for the days.
+        p_bank_account_id: values.card_id ? null : values.bank_account_id,
+        p_category_id: values.category_id ?? null,
+      });
       if (error) throw error;
-      return { habitId };
+      if (!data) throw new Error(NOTHING_UPDATED);
+      return readHabit(data as unknown as RawHabit);
     },
-    // What a receipt edit refreshes, for every receipt: the lists and taps, any open receipt, the
-    // totals. The ledger is built from the receipts list.
-    onSuccess: () => {
-      for (const key of ['receipts', 'receipt', 'dashboard']) {
-        client.invalidateQueries({ queryKey: [key] });
-      }
+    // A refusal answers the same every time; a retry would only delay the message.
+    retry: false,
+    onSuccess: invalidate,
+    onError: (thrown) => {
+      if (refusedHabitGone(thrown)) invalidate();
     },
   });
 }
 
-/** delete_habit's refusal of a habit that is gone, or is not the caller's. */
+/**
+ * The refusal of a habit that is gone, or is not the caller's, in delete_habit and
+ * update_habit_and_days alike.
+ */
 const HABIT_GONE = { code: 'P0002', words: 'there is no such habit' } as const;
 
 /**
- * Whether Remove everything was refused because the habit is not there (removed on another phone,
- * or never the caller's). The screen says the one failure message; this tells it the habit page
- * has nothing left to show.
+ * Whether Remove everything, or Past and upcoming, was refused because the habit is not there
+ * (removed on another phone, or never the caller's). The screen says the one failure message; this
+ * tells it the habit page has nothing left to show.
  */
 export function refusedHabitGone(thrown: unknown): boolean {
   if (!thrown || typeof thrown !== 'object') return false;

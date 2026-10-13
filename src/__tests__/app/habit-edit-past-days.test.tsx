@@ -2,7 +2,7 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import HabitNewScreen from '@/app/habit-new';
-import type { HabitCarriedValues, HabitRow } from '@/api/habits';
+import type { HabitRow } from '@/api/habits';
 import type { DialogRequest } from '@/components/ui/confirm-dialog';
 import { habitIcon } from '@/data/habit-icons';
 import { t } from '@/i18n';
@@ -88,7 +88,7 @@ jest.mock('@/api/queries', () => ({
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 const mockUpdate = jest.fn();
 const mockArchive = jest.fn();
-const mockRewrite = jest.fn();
+const mockUpdateAndDays = jest.fn();
 const mockDeleteAll = jest.fn();
 const mockRetry = jest.fn();
 // The days read as the page awaits it: the count, or the read's failure while they are unread.
@@ -122,8 +122,8 @@ jest.mock('@/api/habits', () => {
     useHabitPastDays: () => ({ ...mockPastDays, retry: mockRetry, load: mockLoadDays }),
     useCreateHabit: () => ({ mutateAsync: jest.fn(), isPending: false }),
     useUpdateHabit: () => useFakeMutation(() => mockUpdate),
+    useUpdateHabitAndDays: () => useFakeMutation(() => mockUpdateAndDays),
     useArchiveHabit: () => useFakeMutation(() => mockArchive),
-    useRewriteHabitDays: () => useFakeMutation(() => mockRewrite),
     useDeleteHabitAndDays: () => useFakeMutation(() => mockDeleteAll),
   };
 });
@@ -172,14 +172,6 @@ const SAVED = {
   icon_id: 'food-dining/coffee',
   color: 'caramel',
   price: 5,
-  card_id: 'card-1',
-  bank_account_id: null,
-};
-/** What the days carry from that same habit. */
-const SAVED_DAYS: HabitCarriedValues = {
-  merchant: 'Coffee',
-  amount: 5,
-  category_id: 'dining',
   card_id: 'card-1',
   bank_account_id: null,
 };
@@ -238,13 +230,15 @@ async function changeIcon(screen: Screen, icon: string, from = 'Coffee', habit =
   await pressButton(screen, 'Done');
 }
 
-/** One change to a field the days copy, what Save writes for it, and what the days are given. */
+/**
+ * One change to a field the days copy, and what Save writes for it. With Past and upcoming the
+ * server gives the days what it saves on the habit, so the page sends the same values either way.
+ */
 type Change = {
   apply: (screen: Screen) => Promise<void>;
   /** The name the question reads: the one typed, trimmed. */
   asks: string;
   values: Record<string, unknown>;
-  days: HabitCarriedValues;
 };
 
 const CHANGES: Record<string, Change> = {
@@ -252,31 +246,26 @@ const CHANGES: Record<string, Change> = {
     apply: (screen) => changeName(screen, '  Latte '),
     asks: 'Latte',
     values: { ...SAVED, name: 'Latte' },
-    days: { ...SAVED_DAYS, merchant: 'Latte' },
   },
   price: {
     apply: (screen) => changePrice(screen, '$7'),
     asks: 'Coffee',
     values: { ...SAVED, price: 7 },
-    days: { ...SAVED_DAYS, amount: 7 },
   },
   'paid with another account': {
     apply: async (screen) => void (await press(screen, 'Checking ••0099')),
     asks: 'Coffee',
     values: { ...SAVED, card_id: null, bank_account_id: 'acct-1' },
-    days: { ...SAVED_DAYS, card_id: null, bank_account_id: 'acct-1' },
   },
   'paid with Skip': {
     apply: async (screen) => void (await press(screen, 'Skip')),
     asks: 'Coffee',
     values: { ...SAVED, card_id: null, bank_account_id: null },
-    days: { ...SAVED_DAYS, card_id: null, bank_account_id: null },
   },
   'category, through the icon': {
     apply: (screen) => changeIcon(screen, 'Groceries'),
     asks: 'Coffee',
     values: { ...SAVED, icon_id: 'food-dining/groceries', category_id: 'groceries' },
-    days: { ...SAVED_DAYS, category_id: 'groceries' },
   },
 };
 const CHANGE_CASES = Object.entries(CHANGES);
@@ -326,12 +315,12 @@ beforeEach(() => {
     if (mockPastDays.count === null) throw READ_FAILED;
     return mockPastDays.count;
   });
-  for (const mock of [mockUpdate, mockArchive, mockRewrite, mockDeleteAll, mockAsk]) {
+  for (const mock of [mockUpdate, mockArchive, mockUpdateAndDays, mockDeleteAll, mockAsk]) {
     mock.mockReset();
   }
   mockUpdate.mockImplementation(async () => void order.push('update'));
   mockArchive.mockImplementation(async () => void order.push('archive'));
-  mockRewrite.mockImplementation(async () => void order.push('rewrite'));
+  mockUpdateAndDays.mockImplementation(async () => void order.push('update and days'));
   mockDeleteAll.mockImplementation(async () => void order.push('delete'));
   mockToast.mockImplementation(() => void order.push('toast'));
   (router.back as jest.Mock).mockImplementation(() => void order.push('back'));
@@ -353,7 +342,7 @@ describe('Edit habit: no question when nothing the days copy has changed', () =>
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     expect(mockUpdate).toHaveBeenCalledWith({ id: 'habit-1', values: { ...SAVED, color: 'blue' } });
     expect(mockAsk).not.toHaveBeenCalled();
-    expect(mockRewrite).not.toHaveBeenCalled();
+    expect(mockUpdateAndDays).not.toHaveBeenCalled();
     expect(mockRetry).not.toHaveBeenCalled();
     expect(success).toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
@@ -376,7 +365,7 @@ describe('Edit habit: no question when nothing the days copy has changed', () =>
       values: { ...SAVED, icon_id: 'food-dining/breakfast', category_id: 'dining' },
     });
     expect(mockAsk).not.toHaveBeenCalled();
-    expect(mockRewrite).not.toHaveBeenCalled();
+    expect(mockUpdateAndDays).not.toHaveBeenCalled();
   });
 
   it('asks nothing when the page is saved as it was opened', async () => {
@@ -386,7 +375,7 @@ describe('Edit habit: no question when nothing the days copy has changed', () =>
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockUpdate).toHaveBeenCalledWith({ id: 'habit-1', values: SAVED });
     expect(mockAsk).not.toHaveBeenCalled();
-    expect(mockRewrite).not.toHaveBeenCalled();
+    expect(mockUpdateAndDays).not.toHaveBeenCalled();
   });
 
   it('counts a stray space on the name and the same price retyped as no change', async () => {
@@ -401,7 +390,7 @@ describe('Edit habit: no question when nothing the days copy has changed', () =>
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockUpdate).toHaveBeenCalledWith({ id: 'habit-1', values: SAVED });
     expect(mockAsk).not.toHaveBeenCalled();
-    expect(mockRewrite).not.toHaveBeenCalled();
+    expect(mockUpdateAndDays).not.toHaveBeenCalled();
   });
 });
 
@@ -415,7 +404,7 @@ describe.each(CHANGE_CASES)('Edit habit: %s changed', (_label, change) => {
 
       await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
       expect(mockAsk).not.toHaveBeenCalled();
-      expect(mockRewrite).not.toHaveBeenCalled();
+      expect(mockUpdateAndDays).not.toHaveBeenCalled();
       expect(mockUpdate).toHaveBeenCalledTimes(1);
       expect(mockUpdate).toHaveBeenCalledWith({ id: 'habit-1', values: change.values });
       expect(mockToast).toHaveBeenCalledWith('toast.habit.updated');
@@ -438,7 +427,7 @@ describe.each(CHANGE_CASES)('Edit habit: %s changed', (_label, change) => {
       expect(warn).toHaveBeenCalled();
       await settle();
       expect(mockAsk).not.toHaveBeenCalled();
-      expect(mockRewrite).not.toHaveBeenCalled();
+      expect(mockUpdateAndDays).not.toHaveBeenCalled();
       expect(mockUpdate).not.toHaveBeenCalled();
       expect(mockToast).not.toHaveBeenCalled();
       expect(router.back).not.toHaveBeenCalled();
@@ -489,18 +478,17 @@ describe.each(CHANGE_CASES)('Edit habit: %s changed', (_label, change) => {
       expect(request.cancelLabel).toBe(t('common.cancel'));
     });
 
-    it('Past and upcoming: the days are rewritten first, with the form’s values, then the habit', async () => {
+    it('Past and upcoming: the habit and its days are saved in one call, with the form’s values', async () => {
       mockAsk.mockResolvedValue('all');
       const screen = await render(<HabitNewScreen />);
       await change.apply(screen);
       await pressButton(screen, 'Save changes');
 
       await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-      expect(mockRewrite).toHaveBeenCalledTimes(1);
-      expect(mockRewrite).toHaveBeenCalledWith({ habitId: 'habit-1', values: change.days });
-      expect(mockUpdate).toHaveBeenCalledTimes(1);
-      expect(mockUpdate).toHaveBeenCalledWith({ id: 'habit-1', values: change.values });
-      expect(order).toEqual(['rewrite', 'update', 'toast', 'back']);
+      expect(mockUpdateAndDays).toHaveBeenCalledTimes(1);
+      expect(mockUpdateAndDays).toHaveBeenCalledWith({ id: 'habit-1', values: change.values });
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expect(order).toEqual(['update and days', 'toast', 'back']);
       expect(mockToast).toHaveBeenCalledTimes(1);
       expect(mockToast).toHaveBeenCalledWith('toast.habit.updated');
       expect(success).toHaveBeenCalled();
@@ -513,7 +501,7 @@ describe.each(CHANGE_CASES)('Edit habit: %s changed', (_label, change) => {
       await pressButton(screen, 'Save changes');
 
       await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-      expect(mockRewrite).not.toHaveBeenCalled();
+      expect(mockUpdateAndDays).not.toHaveBeenCalled();
       expect(mockUpdate).toHaveBeenCalledTimes(1);
       expect(mockUpdate).toHaveBeenCalledWith({ id: 'habit-1', values: change.values });
       expect(order).toEqual(['update', 'toast', 'back']);
@@ -523,40 +511,30 @@ describe.each(CHANGE_CASES)('Edit habit: %s changed', (_label, change) => {
 });
 
 describe('Edit habit: Past and upcoming, step by step', () => {
-  it('does not write the habit until the days are written, nor say Habit updated until both are', async () => {
+  it('says Habit updated, and leaves, only once the one call has answered', async () => {
     mockAsk.mockResolvedValue('all');
-    const rewriting = deferred<{ habitId: string }>();
-    const updating = deferred<{ id: string }>();
-    mockRewrite.mockImplementation(() => {
-      order.push('rewrite');
-      return rewriting.promise;
-    });
-    mockUpdate.mockImplementation(() => {
-      order.push('update');
-      return updating.promise;
+    const saving = deferred<HabitRow>();
+    mockUpdateAndDays.mockImplementation(() => {
+      order.push('update and days');
+      return saving.promise;
     });
     const screen = await render(<HabitNewScreen />);
     await CHANGES.price.apply(screen);
     await pressButton(screen, 'Save changes');
 
-    await waitFor(() => expect(mockRewrite).toHaveBeenCalledTimes(1));
-    await settle();
-    expect(mockUpdate).not.toHaveBeenCalled();
-    expect(mockToast).not.toHaveBeenCalled();
-
-    await act(async () => rewriting.resolve({ habitId: 'habit-1' }));
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockUpdateAndDays).toHaveBeenCalledTimes(1));
     await settle();
     expect(mockToast).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
     expect(success).not.toHaveBeenCalled();
 
-    await act(async () => updating.resolve({ id: 'habit-1' }));
+    await act(async () => saving.resolve(habitRow({ price: 7 })));
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-    expect(order).toEqual(['rewrite', 'update', 'toast', 'back']);
+    expect(order).toEqual(['update and days', 'toast', 'back']);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it('gives the days every changed value at once, to the cent, and never the colour or icon', async () => {
+  it('sends every changed value in the one call, to the cent', async () => {
     mockAsk.mockResolvedValue('all');
     const screen = await render(<HabitNewScreen />);
     await pressButton(screen, 'Habit, Coffee');
@@ -573,17 +551,8 @@ describe('Edit habit: Past and upcoming, step by step', () => {
     await pressButton(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-    expect(mockRewrite.mock.calls[0][0]).toStrictEqual({
-      habitId: 'habit-1',
-      values: {
-        merchant: 'Bubble tea',
-        amount: 4.25,
-        category_id: 'groceries',
-        card_id: null,
-        bank_account_id: 'acct-1',
-      },
-    });
-    expect(mockUpdate.mock.calls[0][0]).toStrictEqual({
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockUpdateAndDays.mock.calls[0][0]).toStrictEqual({
       id: 'habit-1',
       values: {
         name: 'Bubble tea',
@@ -624,7 +593,7 @@ describe('Edit habit: backing out of the question', () => {
 
     await waitFor(() => expect(mockAsk).toHaveBeenCalledTimes(1));
     await settle();
-    expect(mockRewrite).not.toHaveBeenCalled();
+    expect(mockUpdateAndDays).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(mockToast).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
@@ -645,29 +614,31 @@ describe('Edit habit: backing out of the question', () => {
     await pressButton(screen, 'Save changes');
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockAsk).toHaveBeenCalledTimes(2);
-    expect(order).toEqual(['rewrite', 'update', 'toast', 'back']);
+    expect(order).toEqual(['update and days', 'toast', 'back']);
   });
 });
 
 describe('Edit habit: a write that fails', () => {
-  it('stops after a failed rewrite: the habit is not saved, one failure line, no toast, and stays', async () => {
+  it('stays after a failed Past and upcoming: one failure line, no toast, nothing else written', async () => {
     mockAsk.mockResolvedValue('all');
-    mockRewrite.mockRejectedValueOnce(new Error('network down'));
+    mockUpdateAndDays.mockRejectedValueOnce(new Error('network down'));
     const screen = await render(<HabitNewScreen />);
     await CHANGES.price.apply(screen);
     await pressButton(screen, 'Save changes');
 
     expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(screen.queryByText(/network down/)).toBeNull();
+    expect(mockUpdateAndDays).toHaveBeenCalledTimes(1);
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(mockToast).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalled();
+    expect(success).not.toHaveBeenCalled();
   });
 
-  it('asks again on the next Save after a failed rewrite, and that answer decides', async () => {
+  it('asks again on the next Save after a failure, and that answer decides', async () => {
     mockAsk.mockResolvedValueOnce('all').mockResolvedValueOnce('upcoming');
-    mockRewrite.mockRejectedValueOnce(new Error('network down'));
+    mockUpdateAndDays.mockRejectedValueOnce(new Error('network down'));
     const screen = await render(<HabitNewScreen />);
     await CHANGES.price.apply(screen);
     await pressButton(screen, 'Save changes');
@@ -677,97 +648,75 @@ describe('Edit habit: a write that fails', () => {
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockAsk).toHaveBeenCalledTimes(2);
     // The second answer was Upcoming only, so the days are not tried again.
-    expect(mockRewrite).toHaveBeenCalledTimes(1);
+    expect(mockUpdateAndDays).toHaveBeenCalledTimes(1);
     expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate).toHaveBeenCalledWith({ id: 'habit-1', values: CHANGES.price.values });
     expect(mockToast).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the Past and upcoming answer when the days were written and the habit was not', async () => {
+  it('holds no answer after a failure, since nothing was written: the next Save asks and sends the form as it is now', async () => {
     mockAsk.mockResolvedValue('all');
-    failsOnce(mockUpdate, 'update');
+    failsOnce(mockUpdateAndDays, 'update and days');
     const screen = await render(<HabitNewScreen />);
     await CHANGES.price.apply(screen);
     await pressButton(screen, 'Save changes');
-
     expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
-    expect(mockRewrite).toHaveBeenCalledTimes(1);
-    expect(mockUpdate).toHaveBeenCalledTimes(1);
-    expect(mockToast).not.toHaveBeenCalled();
-    expect(router.back).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalled();
-    expect(success).not.toHaveBeenCalled();
 
-    // The price is changed in between: the days follow the form as it is now.
     await changePrice(screen, '$3', '$7.00');
     await pressButton(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-    expect(mockAsk).toHaveBeenCalledTimes(1);
-    expect(mockRewrite).toHaveBeenCalledTimes(2);
-    expect(mockRewrite).toHaveBeenLastCalledWith({
-      habitId: 'habit-1',
-      values: { ...SAVED_DAYS, amount: 3 },
-    });
-    expect(mockUpdate).toHaveBeenCalledTimes(2);
-    expect(mockUpdate).toHaveBeenLastCalledWith({
+    expect(mockAsk).toHaveBeenCalledTimes(2);
+    expect(mockUpdateAndDays).toHaveBeenCalledTimes(2);
+    expect(mockUpdateAndDays).toHaveBeenLastCalledWith({
       id: 'habit-1',
       values: { ...SAVED, price: 3 },
     });
-    expect(order).toEqual(['rewrite', 'update', 'rewrite', 'update', 'toast', 'back']);
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(order).toEqual(['update and days', 'update and days', 'toast', 'back']);
     expect(mockToast).toHaveBeenCalledTimes(1);
     expect(mockToast).toHaveBeenCalledWith('toast.habit.updated');
   });
 
-  it('puts the days back to the saved values when the form is changed back after a failed update', async () => {
+  it('saves plainly when the form is changed back after a failed Past and upcoming: there are no days to put back', async () => {
     mockAsk.mockResolvedValue('all');
-    mockUpdate.mockRejectedValueOnce(new Error('network down'));
+    failsOnce(mockUpdateAndDays, 'update and days');
     const screen = await render(<HabitNewScreen />);
     await CHANGES.name.apply(screen);
     await pressButton(screen, 'Save changes');
     expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
-    expect(mockRewrite).toHaveBeenLastCalledWith({
-      habitId: 'habit-1',
-      values: CHANGES.name.days,
-    });
 
-    // The days already say Latte; leaving them there would split them from the habit.
     await changeName(screen, 'Coffee', 'Latte');
     await pressButton(screen, 'Save changes');
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockAsk).toHaveBeenCalledTimes(1);
-    expect(mockRewrite).toHaveBeenCalledTimes(2);
-    expect(mockRewrite).toHaveBeenLastCalledWith({ habitId: 'habit-1', values: SAVED_DAYS });
-    expect(mockUpdate).toHaveBeenLastCalledWith({ id: 'habit-1', values: SAVED });
+    expect(mockUpdateAndDays).toHaveBeenCalledTimes(1);
+    expect(mockUpdate).toHaveBeenCalledWith({ id: 'habit-1', values: SAVED });
+    expect(order).toEqual(['update and days', 'update', 'toast', 'back']);
   });
 
-  it('holds the answer through any number of failed Saves: one dialog, the rest rewritten and updated each time', async () => {
+  it('asks on every Save after a failure, through any number of them, and says Habit updated once', async () => {
     mockAsk.mockResolvedValue('all');
-    mockUpdate.mockRejectedValueOnce(new Error('one')).mockRejectedValueOnce(new Error('two'));
-    mockRewrite
-      .mockResolvedValueOnce({ habitId: 'habit-1' })
-      .mockResolvedValueOnce({ habitId: 'habit-1' })
+    mockUpdateAndDays
+      .mockRejectedValueOnce(new Error('one'))
+      .mockRejectedValueOnce(new Error('two'))
       .mockRejectedValueOnce(new Error('three'))
-      .mockResolvedValueOnce({ habitId: 'habit-1' });
+      .mockResolvedValueOnce(habitRow({ name: 'Latte' }));
     const screen = await render(<HabitNewScreen />);
     await CHANGES.name.apply(screen);
 
-    await pressButton(screen, 'Save changes');
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
-    await pressButton(screen, 'Save changes');
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(2));
-    // The third Save's rewrite fails: still no question, and the habit is not written.
-    await pressButton(screen, 'Save changes');
-    await waitFor(() => expect(mockRewrite).toHaveBeenCalledTimes(3));
-    await settle();
-    expect(mockUpdate).toHaveBeenCalledTimes(2);
-    expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      await pressButton(screen, 'Save changes');
+      await waitFor(() => expect(mockUpdateAndDays).toHaveBeenCalledTimes(attempt));
+      expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
+    }
 
     await pressButton(screen, 'Save changes');
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
-    expect(mockAsk).toHaveBeenCalledTimes(1);
-    expect(mockRewrite).toHaveBeenCalledTimes(4);
-    expect(mockUpdate).toHaveBeenCalledTimes(3);
+    expect(mockAsk).toHaveBeenCalledTimes(4);
+    expect(mockUpdateAndDays).toHaveBeenCalledTimes(4);
+    expect(mockUpdate).not.toHaveBeenCalled();
     expect(mockToast).toHaveBeenCalledTimes(1);
   });
 
@@ -780,7 +729,7 @@ describe('Edit habit: a write that fails', () => {
 
     expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
     expect(mockAsk).not.toHaveBeenCalled();
-    expect(mockRewrite).not.toHaveBeenCalled();
+    expect(mockUpdateAndDays).not.toHaveBeenCalled();
     expect(mockToast).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
   });
@@ -853,7 +802,7 @@ describe('Delete habit', () => {
     expect(mockToast).toHaveBeenCalledWith('toast.habit.stopped');
     expect(order).toEqual(['archive', 'toast', 'back']);
     expect(mockUpdate).not.toHaveBeenCalled();
-    expect(mockRewrite).not.toHaveBeenCalled();
+    expect(mockUpdateAndDays).not.toHaveBeenCalled();
   });
 
   it('Remove everything: deletes the habit and its days in one call, red Habit deleted, back', async () => {
@@ -1115,7 +1064,7 @@ describe('Edit habit: which edits ask', () => {
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockAsk).not.toHaveBeenCalled();
-    expect(mockRewrite).not.toHaveBeenCalled();
+    expect(mockUpdateAndDays).not.toHaveBeenCalled();
     expect(mockUpdate).toHaveBeenCalledWith({
       id: 'habit-1',
       values: {
@@ -1127,7 +1076,7 @@ describe('Edit habit: which edits ask', () => {
     });
   });
 
-  it('asks once for a colour and a card together, and the colour is not written to the days', async () => {
+  it('asks once for a colour and a card together, and saves both in the one call', async () => {
     mockAsk.mockResolvedValue('all');
     const screen = await render(<HabitNewScreen />);
     await press(screen, 'Violet');
@@ -1136,10 +1085,11 @@ describe('Edit habit: which edits ask', () => {
 
     await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
     expect(mockAsk).toHaveBeenCalledTimes(1);
-    expect(mockRewrite).toHaveBeenCalledWith({
-      habitId: 'habit-1',
-      values: { ...SAVED_DAYS, card_id: null, bank_account_id: null },
+    expect(mockUpdateAndDays).toHaveBeenCalledWith({
+      id: 'habit-1',
+      values: { ...SAVED, color: 'violet', card_id: null, bank_account_id: null },
     });
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -1202,7 +1152,7 @@ describe('Delete habit: a second tap while a removal runs', () => {
     await settle();
     // Only the delete's own question was ever asked.
     expect(mockAsk).toHaveBeenCalledTimes(1);
-    expect(mockRewrite).not.toHaveBeenCalled();
+    expect(mockUpdateAndDays).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
 
     await act(async () => removing.resolve({ habitId: 'habit-1' }));
@@ -1212,11 +1162,11 @@ describe('Delete habit: a second tap while a removal runs', () => {
   });
 
   it.each([
-    ['the days are being rewritten', 'all', mockRewrite],
-    ['the habit is being updated', 'upcoming', mockUpdate],
+    ['the habit and its days are being saved', 'all', mockUpdateAndDays, mockUpdate],
+    ['the habit alone is being saved', 'upcoming', mockUpdate, mockUpdateAndDays],
   ])(
     'greys Delete and Save out while %s, and taps on them do nothing',
-    async (_name, answer, write) => {
+    async (_name, answer, write, other) => {
       mockAsk.mockResolvedValue(answer);
       const writing = deferred<unknown>();
       write.mockImplementation(() => writing.promise);
@@ -1235,12 +1185,13 @@ describe('Delete habit: a second tap while a removal runs', () => {
       expect(mockArchive).not.toHaveBeenCalled();
       expect(mockDeleteAll).not.toHaveBeenCalled();
 
-      await act(async () => writing.resolve({ id: 'habit-1', habitId: 'habit-1' }));
+      await act(async () => writing.resolve({ id: 'habit-1' }));
       await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
       await settle();
       expect(mockToast).toHaveBeenCalledTimes(1);
       expect(mockToast).toHaveBeenCalledWith('toast.habit.updated');
-      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(write).toHaveBeenCalledTimes(1);
+      expect(other).not.toHaveBeenCalled();
       expect(mockAsk).toHaveBeenCalledTimes(1);
     },
   );
