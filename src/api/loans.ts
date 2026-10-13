@@ -22,7 +22,7 @@ import { countsInSpending, withSpendingFlag } from '@/lib/bill-spending';
 import type { LoanTerms } from '@/lib/loan';
 import { loanTermsForBill } from '@/lib/loan-start';
 import { withTimeout } from '@/lib/deadline';
-import { anyRefreshFailed, failedEmpty } from '@/lib/query-state';
+import { anyRefreshFailed, failedEmpty, refreshFailed } from '@/lib/query-state';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
@@ -148,11 +148,14 @@ export function useLoans(today: string) {
     [query.data, today],
   );
 
+  // A failed read must not pass for "no loans", which would show the empty page's invitation.
+  const isError = failedEmpty(query);
   return {
     loans,
     isPending: query.isPending,
-    // A failed read must not pass for "no loans", which would show the empty page's invitation.
-    isError: query.isError,
+    isError,
+    /** The list shows, from a reload that failed behind it (RefreshNote). */
+    refreshFailed: refreshFailed(query),
     refetch: () => {
       void query.refetch();
     },
@@ -252,7 +255,7 @@ export function readLoanDetail(raw: RawLoanDetail | null): LoanDetailRead {
  */
 export function useLoanDetail(billId: string | undefined) {
   const userId = useUserId();
-  return useQuery({
+  const query = useQuery({
     queryKey: ['loans', userId, 'detail', billId],
     enabled: Boolean(userId && billId),
     queryFn: () =>
@@ -278,6 +281,21 @@ export function useLoanDetail(billId: string | undefined) {
         'Could not load your loan. Check your connection and try again.',
       ),
   });
+  // Only the fields the screens read: TanStack re-renders a screen for the fields read here, so
+  // spreading the whole read would re-render all four on every change to it. `isError` stays
+  // TanStack's own: the Pay off page will not price a loan whose opening read failed, even with an
+  // older answer cached.
+  const { data, isPending, isError, isFetching, isFetchedAfterMount, refetch } = query;
+  return {
+    data,
+    isPending,
+    isError,
+    isFetching,
+    isFetchedAfterMount,
+    /** The loan shows, from a reload that failed behind it (RefreshNote). */
+    refreshFailed: refreshFailed({ isError, data }),
+    refetch,
+  };
 }
 
 /**
