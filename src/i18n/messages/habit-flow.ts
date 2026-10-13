@@ -122,27 +122,12 @@ export const habitFlowMessages = defineMessages({
     es: 'Para guardar el hábito, completa: {fields}.',
     fr: 'Pour enregistrer l’habitude, remplis : {fields}.',
   },
-  'habitFlow.edit.futureOnly': {
-    en: 'New taps use the new price and card. Past receipts keep theirs.',
-    es: 'Los días que toques desde ahora usan el precio y la tarjeta nuevos. Los recibos anteriores conservan los suyos.',
-    fr: 'Les prochains jours touchés utilisent le nouveau prix et la nouvelle carte. Les reçus passés gardent les leurs.',
-  },
   'habitFlow.edit.delete': {
     en: 'Delete habit',
     es: 'Eliminar hábito',
     fr: 'Supprimer l’habitude',
   },
   'habitFlow.edit.deleting': { en: 'Deleting…', es: 'Eliminando…', fr: 'Suppression…' },
-  'habitFlow.delete.title': {
-    en: 'Delete {name}?',
-    es: '¿Eliminar {name}?',
-    fr: 'Supprimer {name} ?',
-  },
-  'habitFlow.delete.message': {
-    en: 'Its receipts stay in your spending.',
-    es: 'Sus recibos se quedan en tus gastos.',
-    fr: 'Ses reçus restent dans tes dépenses.',
-  },
 
   // The ten ready-made habits. The name is copied into the habit; the subtitle is only shown here.
   'habitFlow.preset.coffee.name': { en: 'Coffee', es: 'Café', fr: 'Café' },

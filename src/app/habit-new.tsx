@@ -4,11 +4,17 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import {
+  habitCarriedChanged,
+  habitCarriedValues,
+  refusedHabitGone,
   useArchiveHabit,
   useCreateHabit,
+  useDeleteHabitAndDays,
   useHabit,
+  useHabitPastDays,
   useHabitTaps,
   useHabits,
+  useRewriteHabitDays,
   useUpdateHabit,
   type HabitRow,
   type HabitValues,
@@ -33,6 +39,7 @@ import { HabitPresetGrid } from '@/components/habits/habit-preset-grid';
 import { useProGate } from '@/components/pro/pro-gate';
 import { Button } from '@/components/ui/button';
 import { PageState } from '@/components/ui/page-state';
+import { usePastChoice, type PastChange } from '@/components/ui/past-choice';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SourceTiles } from '@/components/ui/source-tiles';
@@ -59,7 +66,6 @@ import { success, warn } from '@/lib/haptics';
 import { withTap } from '@/lib/press';
 import { refusedForPro } from '@/lib/pro-refusal';
 import { useToday } from '@/lib/use-today';
-import { useConfirm } from '@/providers/dialog-provider';
 import { useColors } from '@/providers/theme-provider';
 import { useToast } from '@/providers/toast-context';
 import { useArtwork } from '@/theme/artwork';
@@ -124,9 +130,9 @@ export default function HabitNewScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const artwork = useArtwork();
   const habit = useHabit(id);
-  const existing = habit.data ?? null;
-  // Archived from this page: it is on its way back, and must not flash "gone" while it goes.
-  const [archivedHere, setArchivedHere] = useState(false);
+  // Deleted from this page: it keeps the row it had while it goes back, rather than flash "gone".
+  const [leftWith, setLeftWith] = useState<HabitRow | null>(null);
+  const existing = leftWith ?? habit.data ?? null;
   const gate = useProGate('habits');
 
   // Starting a habit is Pro; editing one the account already has is not.
@@ -170,7 +176,7 @@ export default function HabitNewScreen() {
   }
 
   // Gone, or deleted from another phone: an update on it would report success and write nothing.
-  if (id && (!existing || (existing.archived_at && !archivedHere))) {
+  if (id && (!existing || existing.archived_at)) {
     return (
       <Screen showBack>
         <PageState
@@ -201,7 +207,7 @@ export default function HabitNewScreen() {
       key={existing?.id ?? 'new'}
       saved={existing}
       initial={initial}
-      onArchived={() => setArchivedHere(true)}
+      onRemoved={setLeftWith}
     />
   );
 }
@@ -209,12 +215,12 @@ export default function HabitNewScreen() {
 function HabitForm({
   saved,
   initial,
-  onArchived,
+  onRemoved,
 }: {
   /** The habit being edited; null for a new one. */
   saved: HabitRow | null;
   initial: Initial;
-  onArchived: () => void;
+  onRemoved: (habit: HabitRow) => void;
 }) {
   const colors = useColors();
   const editing = saved !== null;
@@ -248,7 +254,13 @@ function HabitForm({
   const createHabit = useCreateHabit();
   const updateHabit = useUpdateHabit();
   const archiveHabit = useArchiveHabit();
-  const confirm = useConfirm();
+  const deleteHabit = useDeleteHabitAndDays();
+  const rewriteDays = useRewriteHabitDays();
+  const pastDays = useHabitPastDays(saved?.id);
+  const { askChange, askDelete } = usePastChoice();
+  // Set once the days took a Past and upcoming whose habit update then failed: the days already
+  // carry the form's values, so the next Save writes both again without asking.
+  const [rewritePending, setRewritePending] = useState(false);
   const toast = useToast();
 
   const pickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -337,21 +349,44 @@ function HabitForm({
 
     const paidWith = paidWithColumns(sourceId, sources, saved);
     const categoryId = habitIcon(iconId)?.spendCategory ?? 'other';
+    const patch: Partial<HabitValues> | null = saved
+      ? {
+          name: trimmed,
+          icon_id: iconId,
+          color,
+          price: amount,
+          ...paidWith,
+          // An icon this build does not know keeps the category it was filed under.
+          ...(iconId !== saved.icon_id ? { category_id: categoryId } : null),
+        }
+      : null;
+
+    // Asked before anything is written, so backing out leaves the habit and its days as they were.
+    let scope: PastChange = rewritePending ? 'all' : 'upcoming';
+    if (saved && patch && !rewritePending && habitCarriedChanged(saved, { ...saved, ...patch })) {
+      // The question counts the days, so it waits for that read rather than guess a count.
+      if (!pastDays.ready || pastDays.count === null) {
+        pastDays.retry();
+        warn();
+        setError(failureText());
+        return;
+      }
+      const choice = await askChange({ name: trimmed, noun: 'days', count: pastDays.count });
+      if (choice === null) return;
+      scope = choice;
+    }
 
     try {
-      if (saved) {
-        await updateHabit.mutateAsync({
-          id: saved.id,
-          values: {
-            name: trimmed,
-            icon_id: iconId,
-            color,
-            price: amount,
-            ...paidWith,
-            // An icon this build does not know keeps the category it was filed under.
-            ...(iconId !== saved.icon_id ? { category_id: categoryId } : null),
-          },
-        });
+      if (saved && patch) {
+        if (scope === 'all') {
+          await rewriteDays.mutateAsync({
+            habitId: saved.id,
+            values: habitCarriedValues({ ...saved, ...patch }),
+          });
+          setRewritePending(true);
+        }
+        await updateHabit.mutateAsync({ id: saved.id, values: patch });
+        setRewritePending(false);
         success();
         toast('toast.habit.updated');
       } else {
@@ -388,20 +423,37 @@ function HabitForm({
 
   const handleDelete = async () => {
     if (!saved) return;
-    const ok = await confirm({
-      title: t('habitFlow.delete.title', { name: saved.name }),
-      message: t('habitFlow.delete.message'),
-      confirmLabel: t('common.delete'),
-      destructive: true,
-    });
-    if (!ok) return;
+    setError(null);
+    // The question counts the days, so it waits for that read as Save does.
+    if (!pastDays.ready || pastDays.count === null) {
+      pastDays.retry();
+      warn();
+      setError(failureText());
+      return;
+    }
+    const choice = await askDelete({ name: saved.name, noun: 'days', count: pastDays.count });
+    if (choice === null) return;
 
     try {
-      await archiveHabit.mutateAsync(saved.id);
-      onArchived();
-      toast('toast.habit.deleted', 'deleted');
+      if (choice === 'keep') {
+        await archiveHabit.mutateAsync(saved.id);
+        onRemoved(saved);
+        success();
+        toast('toast.habit.stopped');
+      } else {
+        await deleteHabit.mutateAsync(saved.id);
+        onRemoved(saved);
+        toast('toast.habit.deleted', 'deleted');
+      }
       router.back();
     } catch (thrown) {
+      // Removed on another phone already: what was asked for is done, and nothing is left here.
+      if (choice === 'everything' && refusedHabitGone(thrown)) {
+        onRemoved(saved);
+        toast('toast.habit.deleted', 'deleted');
+        router.back();
+        return;
+      }
       warn();
       setError(failureMessage(thrown));
     }
@@ -578,10 +630,9 @@ function HabitForm({
     );
   }
 
-  const busy = createHabit.isPending || updateHabit.isPending;
+  const busy = createHabit.isPending || updateHabit.isPending || rewriteDays.isPending;
+  const deleting = archiveHabit.isPending || deleteHabit.isPending;
   const isRoot = view === initialView;
-  const priceChanged = saved !== null && priceReady && amount !== saved.price;
-  const sourceChanged = saved !== null && sourceId !== savedSource(saved);
 
   const rows: EntryRowSpec[] = [
     {
@@ -687,16 +738,6 @@ function HabitForm({
         </View>
       }
       rows={rows}
-      bottomSlot={
-        priceChanged || sourceChanged ? (
-          <Text
-            className="w-full text-center font-app text-[13px] text-muted"
-            maxFontSizeMultiplier={TEXT_CAP.reading}
-          >
-            {t('habitFlow.edit.futureOnly')}
-          </Text>
-        ) : null
-      }
       primaryLabel={
         busy
           ? t('receipts.add.saving')
@@ -705,7 +746,7 @@ function HabitForm({
             : t('habitFlow.confirm.start')
       }
       // Never greyed out for a gap: Save says what is still missing.
-      primaryDisabled={busy}
+      primaryDisabled={busy || deleting}
       onPrimary={() => void handleSave()}
       error={error}
       footerSlot={
@@ -713,7 +754,9 @@ function HabitForm({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('habitFlow.edit.delete')}
-            onPress={handleDelete}
+            accessibilityState={{ disabled: busy || deleting }}
+            disabled={busy || deleting}
+            onPress={() => void handleDelete()}
             className="min-h-12 w-full flex-row items-center justify-center gap-2 rounded-full active:bg-ink/5"
           >
             <Trash2 size={17} color={colors.danger} strokeWidth={1.8} />
@@ -721,7 +764,7 @@ function HabitForm({
               className="font-app-medium text-[15px] text-danger"
               maxFontSizeMultiplier={TEXT_CAP.row}
             >
-              {archiveHabit.isPending ? t('habitFlow.edit.deleting') : t('habitFlow.edit.delete')}
+              {deleting ? t('habitFlow.edit.deleting') : t('habitFlow.edit.delete')}
             </Text>
           </Pressable>
         ) : null

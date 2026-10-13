@@ -1,10 +1,14 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { router } from 'expo-router';
 
 import HabitNewScreen from '@/app/habit-new';
 import type { HabitRow } from '@/api/habits';
+import type { DialogRequest } from '@/components/ui/confirm-dialog';
+import { t } from '@/i18n';
 import type { Language } from '@/i18n/config';
 import { MESSAGES } from '@/i18n/messages';
 import { resetLocaleForTests, setCurrency, setLanguage } from '@/i18n/store';
+import { FAILURE_MESSAGE } from '@/lib/failure';
 
 /**
  * Starting and editing a habit in Spanish and French: every line on every page is translated, no
@@ -42,11 +46,14 @@ jest.mock('@/providers/theme-provider', () => ({
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
+// The shared past-choice dialog resolves the id of the action the test chooses, or null to back out.
+const mockAsk = jest.fn<Promise<string | null>, [DialogRequest]>();
 jest.mock('@/providers/dialog-provider', () => ({
   useConfirm: () => async () => true,
-  useDialog: () => async () => undefined,
+  useDialog: () => mockAsk,
 }));
-jest.mock('@/providers/toast-context', () => ({ useToast: () => jest.fn() }));
+const mockToast = jest.fn();
+jest.mock('@/providers/toast-context', () => ({ useToast: () => mockToast }));
 
 let mockParams: Record<string, string | undefined> = {};
 jest.mock('expo-router', () => ({
@@ -58,12 +65,21 @@ jest.mock('expo-router', () => ({
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
 jest.mock('@/api/queries', () => ({
   usePaymentSources: () => ({
-    sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
+    sources: [
+      { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
+      { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
+    ],
   }),
 }));
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 const mockCreate = jest.fn();
-let mockHabit: { data: HabitRow | undefined; isError: boolean; isFetched: boolean } = {
+const mockUpdate = jest.fn();
+const mockArchive = jest.fn();
+const mockRewrite = jest.fn();
+const mockDeleteAll = jest.fn();
+const mockRetry = jest.fn();
+let mockPastDays: { count: number | null; ready: boolean } = { count: 0, ready: true };
+let mockHabit: { data: HabitRow | null | undefined; isError: boolean; isFetched: boolean } = {
   data: undefined,
   isError: false,
   isFetched: false,
@@ -73,9 +89,12 @@ jest.mock('@/api/habits', () => ({
   useHabits: () => ({ data: [] }),
   useHabit: () => ({ ...mockHabit, refetch: jest.fn() }),
   useHabitTaps: () => ({ data: [] }),
+  useHabitPastDays: () => ({ ...mockPastDays, retry: mockRetry }),
   useCreateHabit: () => ({ mutateAsync: mockCreate, isPending: false }),
-  useUpdateHabit: () => ({ mutateAsync: jest.fn(), isPending: false }),
-  useArchiveHabit: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useUpdateHabit: () => ({ mutateAsync: mockUpdate, isPending: false }),
+  useArchiveHabit: () => ({ mutateAsync: mockArchive, isPending: false }),
+  useRewriteHabitDays: () => ({ mutateAsync: mockRewrite, isPending: false }),
+  useDeleteHabitAndDays: () => ({ mutateAsync: mockDeleteAll, isPending: false }),
 }));
 
 jest.useFakeTimers({
@@ -183,12 +202,36 @@ const WALK: Record<Exclude<Language, 'en'>, Walk> = {
   },
 };
 
+const SAVED_HABIT: HabitRow = {
+  id: 'habit-1',
+  name: 'Café',
+  icon_id: 'food-dining/coffee',
+  color: 'caramel',
+  price: 5,
+  category_id: 'dining',
+  card_id: 'card-1',
+  bank_account_id: null,
+  preset_id: 'coffee',
+  started_on: '2026-09-28',
+  saved_from: '2026-09-30',
+  sort_order: 0,
+  archived_at: null,
+  created_at: '2026-09-30T10:00:00Z',
+};
+
 beforeEach(() => {
   jest.clearAllMocks();
   resetLocaleForTests();
   mockParams = {};
   mockHabit = { data: undefined, isError: false, isFetched: false };
+  mockPastDays = { count: 0, ready: true };
   mockCreate.mockResolvedValue({ id: 'habit-new' });
+  mockUpdate.mockResolvedValue({ id: 'habit-1' });
+  mockArchive.mockResolvedValue({ id: 'habit-1' });
+  mockRewrite.mockResolvedValue({ habitId: 'habit-1' });
+  mockDeleteAll.mockResolvedValue({ habitId: 'habit-1' });
+  mockAsk.mockReset();
+  mockAsk.mockResolvedValue(null);
 });
 afterAll(() => resetLocaleForTests());
 
@@ -264,26 +307,7 @@ describe.each(['es', 'fr'] as const)('New habit in %s', (language) => {
   it('edits in the language: its title, the day it began, Save changes and Delete', async () => {
     setLanguage(language);
     mockParams = { id: 'habit-1' };
-    mockHabit = {
-      data: {
-        id: 'habit-1',
-        name: 'Café',
-        icon_id: 'food-dining/coffee',
-        color: 'caramel',
-        price: 5,
-        category_id: 'dining',
-        card_id: 'card-1',
-        bank_account_id: null,
-        preset_id: 'coffee',
-        started_on: '2026-09-28',
-        saved_from: '2026-09-30',
-        sort_order: 0,
-        archived_at: null,
-        created_at: '2026-09-30T10:00:00Z',
-      },
-      isError: false,
-      isFetched: true,
-    };
+    mockHabit = { data: SAVED_HABIT, isError: false, isFetched: true };
     const screen = await render(<HabitNewScreen />);
 
     expect(
@@ -308,6 +332,183 @@ describe.each(['es', 'fr'] as const)('New habit in %s', (language) => {
     expectNoKeys(screen);
   });
 });
+
+const EDIT_WORDS = {
+  es: { save: 'Guardar cambios', delete: 'Eliminar hábito' },
+  fr: { save: 'Enregistrer les modifications', delete: 'Supprimer l’habitude' },
+} as const;
+
+/** What `read` says in English, whatever language the page is on. */
+function inEnglish<T>(language: Language, read: () => T): T {
+  setLanguage('en');
+  const english = read();
+  setLanguage(language);
+  return english;
+}
+
+/** No raw key and no unfilled {param} in anything the dialog was asked to say. */
+function expectWholeSentences(request: DialogRequest) {
+  const spoken = JSON.stringify(request);
+  expect(spoken).not.toMatch(/\{\w+\}/);
+  expect(spoken).not.toMatch(/ui\.past\./);
+}
+
+describe.each(['es', 'fr'] as const)(
+  'Editing and deleting a habit that has days, in %s',
+  (language) => {
+    const words = EDIT_WORDS[language];
+    const editing = (count: number | null = 3) => {
+      setLanguage(language);
+      mockParams = { id: 'habit-1' };
+      mockHabit = { data: SAVED_HABIT, isError: false, isFetched: true };
+      mockPastDays = count === null ? { count: null, ready: false } : { count, ready: true };
+    };
+
+    it('asks which days an edit reaches in the language, then writes the days before the habit', async () => {
+      const english = inEnglish(language, () => ({
+        title: t('ui.past.change.title.days'),
+        message: t('ui.past.change.body.days', { name: 'Café', count: 3 }),
+        all: t('ui.past.change.all'),
+        upcoming: t('ui.past.change.upcoming'),
+        cancel: t('common.cancel'),
+      }));
+      editing(3);
+      mockAsk.mockResolvedValue('all');
+      const screen = await render(<HabitNewScreen />);
+      await fireEvent.press(screen.getByRole('radio', { name: 'Checking ••0099' }));
+      await fireEvent.press(screen.getByRole('button', { name: words.save }));
+
+      await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+      expect(mockAsk).toHaveBeenCalledTimes(1);
+      const request = mockAsk.mock.calls[0][0];
+      expect(request.title).toBe(t('ui.past.change.title.days'));
+      expect(request.title).not.toBe(english.title);
+      expect(request.message).toBe(t('ui.past.change.body.days', { name: 'Café', count: 3 }));
+      expect(request.message).not.toBe(english.message);
+      expect(request.actions?.map((action) => action.id)).toEqual(['all', 'upcoming']);
+      expect(request.actions?.map((action) => action.label)).toEqual([
+        t('ui.past.change.all'),
+        t('ui.past.change.upcoming'),
+      ]);
+      expect(request.actions?.[0].label).not.toBe(english.all);
+      expect(request.actions?.[1].label).not.toBe(english.upcoming);
+      expect(request.cancelLabel).toBe(t('common.cancel'));
+      expect(request.cancelLabel).not.toBe(english.cancel);
+      expectWholeSentences(request);
+
+      expect(mockRewrite).toHaveBeenCalledWith({
+        habitId: 'habit-1',
+        values: {
+          merchant: 'Café',
+          amount: 5,
+          category_id: 'dining',
+          card_id: null,
+          bank_account_id: 'acct-1',
+        },
+      });
+      expect(mockUpdate).toHaveBeenCalledTimes(1);
+      expect(mockRewrite.mock.invocationCallOrder[0]).toBeLessThan(
+        mockUpdate.mock.invocationCallOrder[0],
+      );
+      expect(mockToast).toHaveBeenCalledWith('toast.habit.updated');
+    });
+
+    it('reads one day in the singular', async () => {
+      editing(1);
+      mockAsk.mockResolvedValue('upcoming');
+      const screen = await render(<HabitNewScreen />);
+      await fireEvent.press(screen.getByRole('radio', { name: 'Checking ••0099' }));
+      await fireEvent.press(screen.getByRole('button', { name: words.save }));
+
+      await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+      const { message } = mockAsk.mock.calls[0][0];
+      expect(message).toBe(t('ui.past.change.body.days', { name: 'Café', count: 1 }));
+      expect(message).not.toBe(t('ui.past.change.body.days', { name: 'Café', count: 3 }));
+      expect(mockRewrite).not.toHaveBeenCalled();
+    });
+
+    it('says the one failure line in the language when the days are not read yet, and writes nothing', async () => {
+      editing(null);
+      const screen = await render(<HabitNewScreen />);
+      await fireEvent.press(screen.getByRole('radio', { name: 'Checking ••0099' }));
+      await fireEvent.press(screen.getByRole('button', { name: words.save }));
+
+      expect(await screen.findByText(t('common.failure'))).toBeTruthy();
+      expect(t('common.failure')).not.toBe(FAILURE_MESSAGE);
+      expect(mockRetry).toHaveBeenCalledTimes(1);
+      expect(mockAsk).not.toHaveBeenCalled();
+      expect(mockRewrite).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+      expectNoKeys(screen);
+    });
+
+    it('asks whether to keep the days on a delete in the language, and stops the habit on Keep', async () => {
+      const english = inEnglish(language, () => ({
+        title: t('ui.past.delete.title', { name: 'Café' }),
+        message: t('ui.past.delete.body.days', { name: 'Café', count: 3 }),
+        keep: t('ui.past.delete.keep.days'),
+        everything: t('ui.past.delete.everything'),
+      }));
+      editing(3);
+      mockAsk.mockResolvedValue('keep');
+      const screen = await render(<HabitNewScreen />);
+      await fireEvent.press(screen.getByRole('button', { name: words.delete }));
+
+      await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+      const request = mockAsk.mock.calls[0][0];
+      expect(request.title).toBe(t('ui.past.delete.title', { name: 'Café' }));
+      expect(request.title).not.toBe(english.title);
+      expect(request.message).toBe(t('ui.past.delete.body.days', { name: 'Café', count: 3 }));
+      expect(request.message).not.toBe(english.message);
+      expect(request.actions).toEqual([
+        { id: 'keep', label: t('ui.past.delete.keep.days') },
+        { id: 'everything', label: t('ui.past.delete.everything'), destructive: true },
+      ]);
+      expect(request.actions?.[0].label).not.toBe(english.keep);
+      expect(request.actions?.[1].label).not.toBe(english.everything);
+      expect(request.cancelLabel).toBe(t('common.cancel'));
+      expectWholeSentences(request);
+
+      expect(mockArchive).toHaveBeenCalledWith('habit-1');
+      expect(mockDeleteAll).not.toHaveBeenCalled();
+      expect(mockToast).toHaveBeenCalledWith('toast.habit.stopped');
+    });
+
+    it('asks a plain Delete with no day logged, in the language, and removes it for good', async () => {
+      const english = inEnglish(language, () => t('ui.past.delete.none'));
+      editing(0);
+      mockAsk.mockResolvedValue('everything');
+      const screen = await render(<HabitNewScreen />);
+      await fireEvent.press(screen.getByRole('button', { name: words.delete }));
+
+      await waitFor(() => expect(router.back).toHaveBeenCalledTimes(1));
+      const request = mockAsk.mock.calls[0][0];
+      expect(request.title).toBe(t('ui.past.delete.title', { name: 'Café' }));
+      expect(request.message).toBe(t('ui.past.delete.none'));
+      expect(request.message).not.toBe(english);
+      expect(request.actions).toEqual([
+        { id: 'everything', label: t('common.delete'), destructive: true },
+      ]);
+      expectWholeSentences(request);
+      expect(mockDeleteAll).toHaveBeenCalledWith('habit-1');
+      expect(mockToast).toHaveBeenCalledWith('toast.habit.deleted', 'deleted');
+    });
+
+    it('says the one failure line in the language when the delete fails', async () => {
+      editing(3);
+      mockAsk.mockResolvedValue('everything');
+      mockDeleteAll.mockRejectedValue(new Error('network down'));
+      const screen = await render(<HabitNewScreen />);
+      await fireEvent.press(screen.getByRole('button', { name: words.delete }));
+
+      expect(await screen.findByText(t('common.failure'))).toBeTruthy();
+      expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+      expect(mockToast).not.toHaveBeenCalled();
+      expect(router.back).not.toHaveBeenCalled();
+      expectNoKeys(screen);
+    });
+  },
+);
 
 describe('the French and Spanish lines', () => {
   it('keep French no-break spaces before ? and :, and never a plain one', () => {

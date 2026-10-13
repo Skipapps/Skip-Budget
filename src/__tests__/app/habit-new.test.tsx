@@ -4,7 +4,9 @@ import { BackHandler } from 'react-native';
 
 import HabitNewScreen from '@/app/habit-new';
 import type { HabitRow } from '@/api/habits';
+import type { DialogRequest } from '@/components/ui/confirm-dialog';
 import { habitIcon } from '@/data/habit-icons';
+import { t } from '@/i18n';
 import { setCurrency } from '@/i18n/store';
 import { FAILURE_MESSAGE } from '@/lib/failure';
 import { success, warn } from '@/lib/haptics';
@@ -60,9 +62,11 @@ jest.mock('@/theme/artwork', () => ({
 }));
 
 const mockConfirm = jest.fn();
+// The shared past-choice dialog resolves the id of the action the test chooses, or null to back out.
+const mockAsk = jest.fn<Promise<string | null>, [DialogRequest]>();
 jest.mock('@/providers/dialog-provider', () => ({
   useConfirm: () => mockConfirm,
-  useDialog: () => async () => undefined,
+  useDialog: () => mockAsk,
 }));
 const mockToast = jest.fn();
 jest.mock('@/providers/toast-context', () => ({ useToast: () => mockToast }));
@@ -118,6 +122,10 @@ jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 const mockCreate = jest.fn();
 const mockUpdate = jest.fn();
 const mockArchive = jest.fn();
+const mockRewrite = jest.fn();
+const mockDeleteAll = jest.fn();
+const mockRetry = jest.fn();
+let mockPastDays: { count: number | null; ready: boolean };
 let mockHabits: HabitRow[] = [];
 let mockHabit: { data: HabitRow | null | undefined; isError: boolean; isFetched: boolean };
 const mockRefetch = jest.fn();
@@ -126,9 +134,12 @@ jest.mock('@/api/habits', () => ({
   useHabits: () => ({ data: mockHabits }),
   useHabit: () => ({ ...mockHabit, refetch: mockRefetch }),
   useHabitTaps: () => ({ data: [] }),
+  useHabitPastDays: () => ({ ...mockPastDays, retry: mockRetry }),
   useCreateHabit: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateHabit: () => ({ mutateAsync: mockUpdate, isPending: false }),
   useArchiveHabit: () => ({ mutateAsync: mockArchive, isPending: false }),
+  useRewriteHabitDays: () => ({ mutateAsync: mockRewrite, isPending: false }),
+  useDeleteHabitAndDays: () => ({ mutateAsync: mockDeleteAll, isPending: false }),
 }));
 
 // Only the clock is fixed: Thursday, October 8 2026, so this week began on Monday the 5th.
@@ -238,6 +249,7 @@ beforeEach(() => {
   mockGateOpen = false;
   mockHabits = [];
   mockHabit = { data: undefined, isError: false, isFetched: false };
+  mockPastDays = { count: 0, ready: true };
   mockSources = [
     { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
     { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
@@ -245,7 +257,11 @@ beforeEach(() => {
   mockCreate.mockResolvedValue(habitRow({ id: 'habit-new' }));
   mockUpdate.mockResolvedValue({ id: 'habit-1' });
   mockArchive.mockResolvedValue({ id: 'habit-1' });
+  mockRewrite.mockResolvedValue({ habitId: 'habit-1' });
+  mockDeleteAll.mockResolvedValue({ habitId: 'habit-1' });
   mockConfirm.mockResolvedValue(true);
+  mockAsk.mockReset();
+  mockAsk.mockResolvedValue(null);
 });
 
 afterAll(() => setCurrency(null));
@@ -810,25 +826,20 @@ describe('Edit habit (/habit-new?id=)', () => {
     expect(screen.queryByText(/^Week of/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Delete habit' })).toBeTruthy();
-    expect(screen.queryByText(/^New taps use the new price/)).toBeNull();
     // The first page of this route: the swipe and Back leave.
     expect(mockScreenOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
     await pressButton(screen, 'Back');
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
-  it('saves the changes, says future taps only once the price or card moves, then Habit updated', async () => {
+  it('saves colour, price and card together, then says Habit updated, with no day logged to ask about', async () => {
     editing();
     const screen = await render(<HabitNewScreen />);
 
     await press(screen, 'Blue');
-    expect(screen.queryByText(/^New taps use the new price/)).toBeNull();
     await pressButton(screen, 'Price, $5.00 each time');
     await press(screen, '$7');
     await pressButton(screen, 'Done');
-    expect(
-      screen.getByText('New taps use the new price and card. Past receipts keep theirs.'),
-    ).toBeTruthy();
     await press(screen, 'Checking ••0099');
     await pressButton(screen, 'Save changes');
 
@@ -845,6 +856,8 @@ describe('Edit habit (/habit-new?id=)', () => {
       },
     });
     expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockAsk).not.toHaveBeenCalled();
+    expect(mockRewrite).not.toHaveBeenCalled();
     expect(mockToast).toHaveBeenCalledWith('toast.habit.updated');
     expect(router.back).toHaveBeenCalledTimes(1);
   });
@@ -887,26 +900,31 @@ describe('Edit habit (/habit-new?id=)', () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it('deletes after asking: archives, says Habit deleted in red, and goes back', async () => {
+  it('deletes a habit with no day logged after the plain question: removes it, says Habit deleted in red, and goes back', async () => {
     editing();
+    mockAsk.mockResolvedValue('everything');
     const screen = await render(<HabitNewScreen />);
     await pressButton(screen, 'Delete habit');
 
-    expect(mockConfirm).toHaveBeenCalledWith({
-      title: 'Delete Coffee?',
-      message: 'Its receipts stay in your spending.',
-      confirmLabel: 'Delete',
-      destructive: true,
+    await waitFor(() => expect(mockDeleteAll).toHaveBeenCalledWith('habit-1'));
+    expect(mockAsk).toHaveBeenCalledTimes(1);
+    expect(mockAsk.mock.calls[0][0]).toMatchObject({
+      title: t('ui.past.delete.title', { name: 'Coffee' }),
+      message: t('ui.past.delete.none'),
+      actions: [{ id: 'everything', label: t('common.delete'), destructive: true }],
     });
-    await waitFor(() => expect(mockArchive).toHaveBeenCalledWith('habit-1'));
     expect(mockToast).toHaveBeenCalledWith('toast.habit.deleted', 'deleted');
     expect(router.back).toHaveBeenCalledTimes(1);
+    expect(mockArchive).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
+    // The old confirm is gone.
+    expect(mockConfirm).not.toHaveBeenCalled();
   });
 
   it('says the one failure line, with the warning haptic, when the delete fails, and stays', async () => {
     editing();
-    mockArchive.mockRejectedValue(new Error('network down'));
+    mockAsk.mockResolvedValue('everything');
+    mockDeleteAll.mockRejectedValue(new Error('network down'));
     const screen = await render(<HabitNewScreen />);
     await pressButton(screen, 'Delete habit');
 
@@ -918,20 +936,23 @@ describe('Edit habit (/habit-new?id=)', () => {
 
   it('keeps the habit when the dialog is cancelled', async () => {
     editing();
-    mockConfirm.mockResolvedValue(false);
+    mockAsk.mockResolvedValue(null);
     const screen = await render(<HabitNewScreen />);
     await pressButton(screen, 'Delete habit');
 
-    await waitFor(() => expect(mockConfirm).toHaveBeenCalled());
+    await waitFor(() => expect(mockAsk).toHaveBeenCalled());
+    expect(mockDeleteAll).not.toHaveBeenCalled();
     expect(mockArchive).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
   });
 
   it('stays on the page, not "gone", while the archived habit is on its way out', async () => {
     editing();
+    mockPastDays = { count: 2, ready: true };
+    mockAsk.mockResolvedValue('keep');
     const screen = await render(<HabitNewScreen />);
     await pressButton(screen, 'Delete habit');
-    await waitFor(() => expect(mockArchive).toHaveBeenCalled());
+    await waitFor(() => expect(mockArchive).toHaveBeenCalledWith('habit-1'));
 
     mockHabit = {
       data: habitRow({ archived_at: '2026-10-08T09:00:00Z' }),
