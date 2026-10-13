@@ -11,6 +11,8 @@ import {
   REMINDER_CAPTION,
   REMINDER_CHOICES,
   useReceiptReminder,
+  usePaymentNotices,
+  useSetPaymentNotices,
   useSetReceiptReminder,
   useSetReminder,
 } from '@/api/reminders';
@@ -265,5 +267,48 @@ describe('useSetReminder', () => {
       lead_days: 1,
       remind_at: '21:30',
     });
+  });
+});
+
+describe('payment notices', () => {
+  it('are on when the profile holds nothing about them', async () => {
+    mockProfile = null;
+    const { result } = await renderHook(() => usePaymentNotices(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.enabled).toBe(true);
+    expect(result.current.isError).toBe(false);
+  });
+
+  it('are off once the profile says so', async () => {
+    mockProfile = { payment_notices: false };
+    const { result } = await renderHook(() => usePaymentNotices(), { wrapper });
+    await waitFor(() => expect(result.current.enabled).toBe(false));
+  });
+
+  it('writes the switch to this profile, asking for notifications when it goes on', async () => {
+    const { result } = await renderHook(() => useSetPaymentNotices(), { wrapper });
+
+    await result.current.mutateAsync(true);
+
+    expect(mockUpdates).toEqual([
+      { table: 'profiles', values: { payment_notices: true }, id: 'user-1', selected: 'id' },
+    ]);
+    expect(mockEnableReminders).toHaveBeenCalledWith('user-1');
+  });
+
+  it('asks nothing when it goes off', async () => {
+    const { result } = await renderHook(() => useSetPaymentNotices(), { wrapper });
+
+    await result.current.mutateAsync(false);
+
+    expect(mockUpdates[0].values).toEqual({ payment_notices: false });
+    expect(mockEnableReminders).not.toHaveBeenCalled();
+  });
+
+  it('reports a profile it could not write to, rather than a switch that only looks saved', async () => {
+    mockUpdatedRows = [];
+    const { result } = await renderHook(() => useSetPaymentNotices(), { wrapper });
+
+    await expect(result.current.mutateAsync(false)).rejects.toThrow(NOTHING_SAVED);
   });
 });

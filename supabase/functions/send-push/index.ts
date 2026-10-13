@@ -35,6 +35,7 @@ import {
   type SourceRow,
   type TapPayload,
 } from './card.ts';
+import { noticeRecipients } from './notices.ts';
 
 const BUNDLE_ID = 'com.skipapps.skip.budget';
 
@@ -635,7 +636,13 @@ Deno.serve(async (request) => {
     byUser.set(charge.user_id, [...(byUser.get(charge.user_id) ?? []), charge]);
   }
 
+  const recipients = await noticeRecipients([...byUser.keys()], (ids) =>
+    supabase.from('profiles').select('id').in('id', ids).eq('payment_notices', false),
+  );
+  if (recipients.error) console.error('payment_notices read failed', recipients.error);
+
   for (const [chargeUser, theirs] of byUser) {
+    if (!recipients.allowed.has(chargeUser)) continue;
     const tokens = await tokensFor(supabase, chargeUser);
     if (tokens.length === 0) continue;
 

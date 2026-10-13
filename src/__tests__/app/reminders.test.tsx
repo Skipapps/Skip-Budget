@@ -45,6 +45,8 @@ jest.mock('@/components/ui/skeleton', () => ({ SkeletonList: () => null }));
 // `mockFailed` is a query name rather than a flag: any one of the page's seven reads failing makes
 // every switch on it a guess.
 let mockFailed: string | null = null;
+// A read whose reload failed while its last answer is still in hand.
+let mockStale: string | null = null;
 const mockRefetched: string[] = [];
 let mockBills: unknown[] = [];
 
@@ -52,7 +54,7 @@ const mockQuery = (name: string, data: unknown[]) => ({
   data: mockFailed === name ? undefined : data,
   isLoading: false,
   isPending: false,
-  isError: mockFailed === name,
+  isError: mockFailed === name || mockStale === name,
   refetch: () => mockRefetched.push(name),
 });
 
@@ -65,12 +67,15 @@ jest.mock('@/api/queries', () => ({
     ids: new Set<string>(),
     isLoading: false,
     isError: mockFailed === 'salary',
+    refreshFailed: mockStale === 'salary',
     refetch: () => mockRefetched.push('salary'),
   }),
 }));
 
 const mockSetReceiptReminder = jest.fn();
 let mockReceiptReminder = { enabled: false, remindAt: '20:00' };
+const mockSetPaymentNotices = jest.fn();
+let mockPaymentNoticesOn = true;
 
 // Mocked whole: the real module pulls in supabase, AsyncStorage's native module and
 // expo-notifications. The constants are copied from it.
@@ -94,7 +99,7 @@ jest.mock('@/api/reminders', () => ({
   useReminders: () => ({
     data: mockFailed === 'reminders' ? undefined : [],
     isPending: false,
-    isError: mockFailed === 'reminders',
+    isError: mockFailed === 'reminders' || mockStale === 'reminders',
     refetch: () => mockRefetched.push('reminders'),
   }),
   useSetReminder: () => ({ mutate: jest.fn() }),
@@ -106,6 +111,14 @@ jest.mock('@/api/reminders', () => ({
     refetch: () => mockRefetched.push('receipts'),
   }),
   useSetReceiptReminder: () => ({ mutate: mockSetReceiptReminder }),
+  usePaymentNotices: () => ({
+    enabled: mockPaymentNoticesOn,
+    isLoading: false,
+    isError: mockFailed === 'payment-notices',
+    refreshFailed: false,
+    refetch: () => mockRefetched.push('payment-notices'),
+  }),
+  useSetPaymentNotices: () => ({ mutate: mockSetPaymentNotices }),
 }));
 
 const mockSetWrapUp = jest.fn(async (_on: boolean) => true);
@@ -131,8 +144,11 @@ beforeEach(() => {
   mockSetReceiptReminder.mockClear();
   mockReceiptReminder = { enabled: false, remindAt: '20:00' };
   mockFailed = null;
+  mockStale = null;
   mockRefetched.length = 0;
   mockBills = [];
+  mockSetPaymentNotices.mockClear();
+  mockPaymentNoticesOn = true;
 });
 
 describe('Reminders — bills', () => {
@@ -254,6 +270,7 @@ describe('Reminders — a read that did not land', () => {
       'accounts',
       'bills',
       'cards',
+      'payment-notices',
       'receipts',
       'reminders',
       'salary',
@@ -375,5 +392,75 @@ describe('Reminders — the monthly wrap-up', () => {
     mockWrapUp = { enabled: true, refused: false, ready: false };
     const { queryByRole } = await render(<RemindersScreen />);
     expect(queryByRole('switch')).toBeNull();
+  });
+});
+
+describe('Reminders — payment notices', () => {
+  const SWITCH = { name: 'Payment notices' };
+
+  it('are on unless turned off, with the line that says what they are', async () => {
+    const screen = await render(<RemindersScreen />);
+
+    expect(screen.getByText('Tell me when a bill or subscription is paid')).toBeTruthy();
+    expect(screen.getByRole('switch', SWITCH).props.accessibilityState).toMatchObject({
+      checked: true,
+    });
+  });
+
+  it('turns them off from the switch, saying so', async () => {
+    const screen = await render(<RemindersScreen />);
+
+    await fireEvent.press(screen.getByRole('switch', SWITCH));
+
+    expect(mockSetPaymentNotices).toHaveBeenCalledTimes(1);
+    expect(mockSetPaymentNotices.mock.calls[0][0]).toBe(false);
+    mockSetPaymentNotices.mock.calls[0][1].onSuccess();
+    expect(mockToast).toHaveBeenCalledWith('toast.reminder.off', 'deleted');
+  });
+
+  it('turns them back on', async () => {
+    mockPaymentNoticesOn = false;
+    const screen = await render(<RemindersScreen />);
+
+    await fireEvent.press(screen.getByRole('switch', SWITCH));
+
+    expect(mockSetPaymentNotices.mock.calls[0][0]).toBe(true);
+    mockSetPaymentNotices.mock.calls[0][1].onSuccess();
+    expect(mockToast).toHaveBeenCalledWith('toast.reminder.saved');
+  });
+
+  it('says the one failure line in place of the switch when unread, and keeps the rest', async () => {
+    mockFailed = 'payment-notices';
+    const screen = await render(<RemindersScreen />);
+
+    expect(screen.queryByRole('switch', SWITCH)).toBeNull();
+    expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    // The rest of the page stands: only this setting could not be read.
+    expect(screen.getByRole('switch', RECEIPTS_SWITCH)).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('Try again'));
+    expect(mockRefetched).toEqual(['payment-notices']);
+  });
+});
+
+describe('Reminders — a reload that did not land', () => {
+  it.each(['bills', 'reminders', 'salary'])(
+    'keeps what it showed when %s fails to reload, and says the figures may be old',
+    async (name) => {
+      mockStale = name;
+      const screen = await render(<RemindersScreen />);
+
+      expect(screen.getByText('Couldn’t refresh · showing your last figures')).toBeTruthy();
+      expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+      expect(screen.getByRole('switch', RECEIPTS_SWITCH)).toBeTruthy();
+    },
+  );
+
+  it('shows the failure, and no note, when there was nothing to keep', async () => {
+    mockFailed = 'bills';
+    const screen = await render(<RemindersScreen />);
+
+    expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+    expect(screen.queryByText('Couldn’t refresh · showing your last figures')).toBeNull();
   });
 });

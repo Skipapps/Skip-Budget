@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 
 import { NOTHING_SAVED } from '@/api/mutations';
 import { withTimeout } from '@/lib/deadline';
+import { failedEmpty, refreshFailed } from '@/lib/query-state';
 import { enableReminders } from '@/api/push';
 import { t } from '@/i18n';
 import { supabase } from '@/lib/supabase';
@@ -416,5 +417,72 @@ export function useSetReceiptReminder() {
     },
     // Its own key: the profile query behind the dashboard is left alone.
     onSuccess: () => client.invalidateQueries({ queryKey: ['receipt-reminder'] }),
+  });
+}
+
+/**
+ * Whether the scheduler may tell this account a bill or subscription payment went out
+ * (profiles.payment_notices). On unless stored off: that is the column's default, and what every
+ * account had before the switch existed.
+ */
+export function usePaymentNotices() {
+  const userId = useUserId();
+
+  const query = useQuery({
+    queryKey: ['payment-notices', userId],
+    enabled: Boolean(userId),
+    queryFn: () =>
+      withTimeout(
+        (async () => {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('payment_notices')
+            // The select policy also returns friends' and groupmates' rows, so name this one.
+            .eq('id', userId!)
+            .maybeSingle();
+          if (error) throw error;
+          return (data ?? null) as { payment_notices: boolean | null } | null;
+        })(),
+        12_000,
+        'Could not load your payment notices setting. Check your connection and try again.',
+      ),
+  });
+
+  return {
+    enabled: query.data?.payment_notices !== false,
+    isLoading: query.isLoading,
+    isError: failedEmpty(query),
+    refreshFailed: refreshFailed(query),
+    refetch: query.refetch,
+  };
+}
+
+/**
+ * Turns payment notices on or off. On is a yes to notifications, so it enables reminders for the
+ * account as the other switches do; failure there is ignored and the next launch retries.
+ */
+export function useSetPaymentNotices() {
+  const userId = useUserId();
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (enabled) {
+        const { data: auth } = await supabase.auth.getUser();
+        if (auth.user) void enableReminders(auth.user.id);
+      }
+      if (!userId) throw new Error('Sign in first.');
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ payment_notices: enabled } as never)
+        .eq('id', userId)
+        // A missing profile is a 204 with no error; without the select the switch would report
+        // success and the next read would put it back.
+        .select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error(NOTHING_SAVED);
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: ['payment-notices'] }),
   });
 }

@@ -25,7 +25,7 @@ import type { PayFrequency } from '@/lib/date';
 import { landingAccount, projectedPaydays } from '@/lib/pay';
 import type { AccrualBasis } from '@/lib/loan';
 import { logoDomainOf } from '@/lib/logo-domain';
-import { anyRefreshFailed, failedEmpty, type ReadState } from '@/lib/query-state';
+import { anyRefreshFailed, failedEmpty, refreshFailed, type ReadState } from '@/lib/query-state';
 import { currentBillCategory } from '@/lib/retired-bill-categories';
 import type { DateRange } from '@/lib/range';
 import { lastUpdated } from '@/lib/source-updated';
@@ -434,10 +434,12 @@ export function useSalaryAccountIds() {
 
   // `isError` is additive: without it a failed read is indistinguishable from "no salary lands
   // here", and the payday reminder would vanish instead of the screen saying it could not load.
+  // Only with nothing to show, though: a failed reload keeps the last answer (`refreshFailed`).
   return {
     ids,
     isLoading: query.isLoading,
-    isError: query.isError,
+    isError: failedEmpty(query),
+    refreshFailed: refreshFailed(query),
     refetch: query.refetch,
   };
 }

@@ -67,6 +67,17 @@ export const remindersMessages = defineMessages({
     fr: 'Envoyé à {time}. Change l’heure du rappel quotidien des reçus.',
   },
 
+  'reminders.paymentNotices.switch': {
+    en: 'Payment notices',
+    es: 'Avisos de pago',
+    fr: 'Avis de paiement',
+  },
+  'reminders.paymentNotices.nudge': {
+    en: 'Tell me when a bill or subscription is paid',
+    es: 'Avísame cuando se pague una factura o una suscripción',
+    fr: 'Préviens-moi quand une facture ou un abonnement est payé',
+  },
+
   'reminders.wrapUp.title': { en: 'Savings', es: 'Ahorros', fr: 'Épargne' },
   /** Spanish puts the time last, as in reminders.receipts.time. */
   'reminders.wrapUp.caption': {

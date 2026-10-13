@@ -11,6 +11,7 @@ import {
   useLedger,
   useLoanPayoffRows,
   useReceipts,
+  useSalaryAccountIds,
   useSalaryDetails,
   useSourceBalances,
   useSourceLedger,
@@ -404,4 +405,31 @@ describe('the money book hooks after a failed background refetch', () => {
       expect(book(result.current).states).toEqual([FAILED, FAILED, FAILED]);
     },
   );
+});
+
+describe('useSalaryAccountIds after a failed reload', () => {
+  it('keeps the accounts pay lands in, and says they may be old', async () => {
+    mockRows.salary_source_accounts = [{ bank_account_id: 'acct-1' }];
+    const { client, wrapper } = setUp();
+    const { result } = await renderHook(() => useSalaryAccountIds(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect([...result.current.ids]).toEqual(['acct-1']);
+
+    mockFailures.add('salary_source_accounts');
+    await act(() => client.refetchQueries());
+    await waitFor(() => expect(result.current.refreshFailed).toBe(true));
+
+    expect(result.current.isError).toBe(false);
+    expect([...result.current.ids]).toEqual(['acct-1']);
+  });
+
+  it('fails, with no note, when there was nothing to keep', async () => {
+    mockFailures.add('salary_source_accounts');
+    const { wrapper } = setUp();
+    const { result } = await renderHook(() => useSalaryAccountIds(), { wrapper });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.refreshFailed).toBe(false);
+    expect(result.current.ids.size).toBe(0);
+  });
 });

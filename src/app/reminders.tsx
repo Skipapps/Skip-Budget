@@ -19,9 +19,11 @@ import {
   REMINDER_CAPTION,
   reminderKey,
   targetKey,
+  usePaymentNotices,
   useReceiptReminder,
   useReminders,
   useRemoveReminder,
+  useSetPaymentNotices,
   useSetReceiptReminder,
   useSetReminder,
   type ReminderKind,
@@ -35,6 +37,7 @@ import {
 } from '@/api/queries';
 import { useWrapUpSwitch, WRAP_UP_HOUR } from '@/api/wrap-up-notification';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { SwitchControl } from '@/components/ui/switch-control';
@@ -51,6 +54,7 @@ import { useArtwork } from '@/theme/artwork';
 import { TEXT_CAP } from '@/theme/text-scale';
 import { failureText } from '@/lib/failure';
 import { billStopped } from '@/lib/plan-stop';
+import { anyRefreshFailed, failedEmpty } from '@/lib/query-state';
 import { useToday } from '@/lib/use-today';
 import { t } from '@/i18n';
 
@@ -82,6 +86,7 @@ export default function RemindersScreen() {
   const accounts = useBankAccounts();
   const reminders = useReminders();
   const receipts = useReceiptReminder();
+  const paymentNotices = usePaymentNotices();
   const salaryAccounts = useSalaryAccountIds();
   const wrapUp = useWrapUpSwitch();
   const { today } = useToday();
@@ -92,6 +97,7 @@ export default function RemindersScreen() {
   const setReminder = useSetReminder();
   const removeReminder = useRemoveReminder();
   const setReceiptReminder = useSetReceiptReminder();
+  const setPaymentNotices = useSetPaymentNotices();
   const toast = useToast();
   // Every change here saves at once, so each one says so.
   const saved = { onSuccess: () => toast('toast.reminder.saved') };
@@ -106,6 +112,7 @@ export default function RemindersScreen() {
     reminders.isPending ||
     // Held back with the rest so a switch does not snap on after the page draws.
     receipts.isLoading ||
+    paymentNotices.isLoading ||
     // Until this lands no account looks like one pay arrives in, so rows would flash "No pay lands
     // here yet".
     salaryAccounts.isLoading ||
@@ -113,16 +120,20 @@ export default function RemindersScreen() {
 
   /**
    * Any read that decides what a switch says. A switch drawn off for a read that never landed would
-   * misreport the setting, so a failure takes the page. The daily receipts reminder is the
-   * exception: its failure stays its own and must not take down the other reminders.
+   * misreport the setting, so a failure with nothing to show takes the page; a failed reload keeps
+   * the last answer and says so. The daily receipts reminder and payment notices are the
+   * exceptions: their failure stays their own and must not take down the other reminders.
    */
   const failed =
-    bills.isError ||
-    subscriptions.isError ||
-    cards.isError ||
-    accounts.isError ||
-    reminders.isError ||
+    failedEmpty(bills) ||
+    failedEmpty(subscriptions) ||
+    failedEmpty(cards) ||
+    failedEmpty(accounts) ||
+    failedEmpty(reminders) ||
     salaryAccounts.isError;
+  const stale =
+    anyRefreshFailed([bills, subscriptions, cards, accounts, reminders]) ||
+    salaryAccounts.refreshFailed;
 
   const receiptsFailed = receipts.isError;
 
@@ -133,6 +144,7 @@ export default function RemindersScreen() {
     void accounts.refetch();
     void reminders.refetch();
     void receipts.refetch();
+    void paymentNotices.refetch();
     void salaryAccounts.refetch();
   };
 
@@ -241,6 +253,7 @@ export default function RemindersScreen() {
               })}
         </Subtitle>
       )}
+      <RefreshNote show={!failed && stale} />
 
       {loading && !failed ? <SkeletonList rows={6} /> : null}
 
@@ -394,6 +407,41 @@ export default function RemindersScreen() {
                 accessibilityLabel={t('reminders.wrapUp.switch')}
               />
             </View>
+          </View>
+        </View>
+      ) : null}
+
+      {!loading && !failed ? (
+        <View className="mt-8 w-full rounded-[16px] border border-line bg-card px-4 py-3.5">
+          <View className="w-full flex-row items-center gap-3">
+            <View className="flex-1">
+              <Text
+                className="font-app-semibold text-[15px] text-ink"
+                maxFontSizeMultiplier={TEXT_CAP.row}
+              >
+                {t('reminders.paymentNotices.switch')}
+              </Text>
+              <Text
+                className="font-app text-[13px] text-muted"
+                maxFontSizeMultiplier={TEXT_CAP.row}
+              >
+                {paymentNotices.isError ? failureText() : t('reminders.paymentNotices.nudge')}
+              </Text>
+            </View>
+
+            {paymentNotices.isError ? (
+              <TextLink
+                label={t('common.tryAgain')}
+                variant="subtle"
+                onPress={() => void paymentNotices.refetch()}
+              />
+            ) : (
+              <SwitchControl
+                value={paymentNotices.enabled}
+                onValueChange={(next) => setPaymentNotices.mutate(next, next ? saved : off)}
+                accessibilityLabel={t('reminders.paymentNotices.switch')}
+              />
+            )}
           </View>
         </View>
       ) : null}

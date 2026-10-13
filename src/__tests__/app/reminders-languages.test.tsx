@@ -67,6 +67,7 @@ jest.mock('@/api/queries', () => ({
     ids: new Set<string>(),
     isLoading: false,
     isError: false,
+    refreshFailed: false,
     refetch: jest.fn(),
   }),
 }));
@@ -129,6 +130,14 @@ jest.mock('@/api/reminders', () => {
       refetch: jest.fn(),
     }),
     useSetReceiptReminder: () => ({ mutate: jest.fn() }),
+    usePaymentNotices: () => ({
+      enabled: true,
+      isLoading: false,
+      isError: false,
+      refreshFailed: false,
+      refetch: jest.fn(),
+    }),
+    useSetPaymentNotices: () => ({ mutate: jest.fn() }),
   };
 });
 
