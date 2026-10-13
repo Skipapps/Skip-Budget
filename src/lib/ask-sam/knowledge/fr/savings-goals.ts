@@ -1591,9 +1591,10 @@ export const savingsGoalsFr: IntentText[] = [
       'où est supprimer l’objectif',
       'supprimer mon objectif',
       'effacer un objectif d’épargne',
+      'supprimer l’objectif et ajouter l’achat en reçu',
     ],
     answer:
-      'Ouvre l’objectif, touche le crayon, puis **Supprimer l’objectif** en bas de **Modifier l’objectif**.\n\n- Si une partie de son argent vient de l’épargne, Skip te demande ce qu’il en faut faire : **Remettre $700.00 dans l’épargne** (avec ton montant), **Je l’ai dépensé**, ou **Annuler**.\n- Si rien ne vient de l’épargne, il dit « Il disparaît de tes objectifs. Ton épargne ne change pas. » Touche **Supprimer l’objectif** pour confirmer.\n\nTu verras **Objectif supprimé** et tu arriveras sur **Objectifs**. Il n’y a pas d’annulation.',
+      'Ouvre l’objectif, touche le crayon, puis **Supprimer l’objectif** en bas de **Modifier l’objectif**.\n\n- Si une partie de son argent vient de l’épargne, Skip te demande ce qu’il en faut faire : **Remettre $700.00 dans l’épargne** (avec ton montant), **Je l’ai dépensé** (qui te permet d’ajouter l’achat comme reçu), ou **Annuler**.\n- Si tout son argent a été mis de côté avant Skip, il dit « Il disparaît de tes objectifs. Ton épargne ne change pas. », avec **Supprimer l’objectif** et **Je l’ai dépensé**.\n- S’il ne contient rien, touche **Supprimer l’objectif** pour confirmer.\n\nTu verras **Objectif supprimé** et tu arriveras sur **Objectifs**. Il n’y a pas d’annulation.',
     keywords: ['Supprimer l’objectif', 'Objectif supprimé'],
   },
   {
@@ -1610,10 +1611,12 @@ export const savingsGoalsFr: IntentText[] = [
       'je l’ai dépensé vs remettre',
       'où va l’argent si je supprime mon objectif',
       '« vient de ton épargne » quand je supprime l’objectif',
+      'ajouter le reçu depuis l’objectif en le supprimant',
+      'ajouter le reçu ou juste le supprimer, je choisis quoi',
     ],
     answer:
-      'Quand tu supprimes un objectif qui contient de l’argent de l’épargne, Skip demande où est cet argent maintenant.\n\n- **Remettre $700.00 dans l’épargne** : l’objectif est supprimé et son argent retourne aux mois d’où il vient. **Prêt à utiliser** monte de $700.\n- **Je l’ai dépensé** : l’objectif se ferme et sort de toutes les listes. Son argent reste hors de l’épargne, parce qu’il est parti. **Prêt à utiliser** ne change pas.\n\nDans les deux cas, son montant **Déjà mis de côté** ne va pas dans l’épargne, puisqu’il n’en est jamais venu. Aucun des deux choix ne peut être annulé.',
-    keywords: ['Je l’ai dépensé', 'Remettre dans l’épargne'],
+      'Quand tu supprimes un objectif qui contient de l’argent, Skip demande où est cet argent maintenant.\n\n- **Remettre $700.00 dans l’épargne** : l’objectif est supprimé et son argent retourne aux mois d’où il vient. **Prêt à utiliser** monte de $700.\n- **Je l’ai dépensé** : une page s’ouvre pour ajouter ce que tu as acheté comme reçu. **Ajouter le reçu** l’enregistre et ferme l’objectif en une seule étape, pour que l’achat compte une seule fois. **Juste le supprimer** ferme l’objectif sans reçu. Si tu as déjà ajouté l’achat depuis **Reçus**, touche **Je l’ai déjà ajouté** et choisis ce reçu : Skip le lie et ferme l’objectif, pour qu’il compte une seule fois. Dans tous les cas, son argent reste hors de l’épargne, et **Prêt à utiliser** ne change pas.\n\nSon montant **Déjà mis de côté** ne va pas dans l’épargne, puisqu’il n’en est jamais venu. Aucun des deux choix ne peut être annulé.',
+    keywords: ['Je l’ai dépensé', 'Remettre dans l’épargne', 'Juste le supprimer'],
   },
   {
     id: 'goals.spent',
@@ -1631,10 +1634,56 @@ export const savingsGoalsFr: IntentText[] = [
       'marquer un objectif comme dépensé',
       'j’ai acheté la chose pour laquelle j’épargnais',
       'fini d’épargner et j’ai acheté',
+      'ajouter le reçu depuis l’objectif',
+      'comment mettre l’achat de mon objectif en reçu',
+      'j’ai déjà ajouté le reçu, comment fermer l’objectif',
     ],
     answer:
-      'Bravo. Tu as deux choix :\n\n- Garde l’objectif tel quel. Un objectif atteint reste sous **Atteints** comme trace.\n- Supprime-le : ouvre l’objectif, touche le crayon, **Supprimer l’objectif**, puis **Je l’ai dépensé**. L’objectif quitte tes listes et son argent reste hors de l’épargne.\n\nLes objectifs ne déplacent pas de vrai argent, donc Skip n’enregistre pas l’achat tout seul. Un reçu que tu ajoutes pour cet achat compte comme dépense dans le mois de sa date, comme n’importe quel reçu, et baisse ton **Solde actuel**.',
-    keywords: ['acheté', 'objectif dépensé'],
+      'Bravo. Tu as deux choix :\n\n- Garde l’objectif tel quel. Un objectif atteint reste sous **Atteints** comme trace.\n- Enregistre l’achat : ouvre l’objectif, touche le crayon, **Supprimer l’objectif**, puis **Je l’ai dépensé**. Sur la page **Je l’ai dépensé**, vérifie le magasin, la date et **Payé avec**, puis touche **Ajouter le reçu**. Tu verras **Ajouté comme reçu**.\n\nLe reçu porte sur **Tout ce qu’il y a dans cet objectif**, et il compte une seule fois : sur ta carte ou ton compte, dans ton **Solde actuel** et dans **Aperçu**. Ne l’ajoute pas encore depuis **Reçus**, sinon il compterait deux fois. Si tu l’as déjà ajouté là, touche plutôt **Je l’ai déjà ajouté** et choisis ce reçu. Pour fermer l’objectif sans reçu, touche **Juste le supprimer**.',
+    keywords: ['acheté', 'objectif dépensé', 'Ajouté comme reçu'],
+  },
+  {
+    id: 'goals.spent.savings-vs-insights',
+    title: 'Pourquoi Épargne affiche moins de dépenses qu’Aperçu ?',
+    questions: [
+      'Pourquoi Épargne affiche moins de dépenses qu’Aperçu ?',
+      'pourquoi les depenses dans epargne sont plus basses que dans apercu',
+      'l’achat de mon objectif apparaît pas dans les dépenses de l’épargne',
+      'aperçu dit que j’ai dépensé plus que l’épargne',
+      'j’ai ajouté l’achat de l’objectif en reçu mais les dépenses de l’épargne ont pas monté',
+      'pourquoi le mois dans épargne compte pas ma télé de l’objectif',
+      'epargne et apercu collent pas depuis que j’ai supprimé un objectif',
+      'le reçu de mon objectif compte dans aperçu mais pas dans épargne',
+      'est-ce que le reçu de mon objectif a compté deux fois ?',
+      'ce qui sort est plus haut que les dépenses de l’épargne',
+      'j’ai payé ma tv avec l’argent de l’objectif et ça change rien dans l’épargne',
+      'reçu de l’objectif et reste du mois',
+    ],
+    answer:
+      'Parce que cet argent était déjà mis de côté. Quand tu ajoutes l’achat d’un objectif sur la page **Je l’ai dépensé**, le reçu compte en entier sur ta carte ou ton compte, dans ton **Solde actuel** et dans **Aperçu**.\n\n' +
+      'Dans **Épargne**, le mois ne compte que la partie qui dépasse ce que l’objectif contenait, pour que l’argent ne quitte pas ton épargne une deuxième fois. Exemple : une télé à $662.47 achetée avec un objectif qui contenait $662.47 ajoute $662.47 à **Ce qui sort** dans **Aperçu**, tandis que le montant **Dépenses** du mois dans **Épargne** ne change pas. Une télé à $700 du même objectif y ajoute $37.53.',
+    keywords: ['épargne vs aperçu', 'achat de l’objectif', 'Je l’ai dépensé', 'compte une fois'],
+  },
+  {
+    id: 'goals.spent.receipt-lower',
+    title: 'J’ai baissé le reçu de mon objectif. Où est passé le reste ?',
+    questions: [
+      'j’ai changé le reçu de mon objectif pour un montant plus petit',
+      'reçu de l’objectif modifié plus bas que l’objectif',
+      'j’ai dépensé moins que ce que mon objectif contenait, où est la différence',
+      'la télé a coûté moins que mon objectif mais l’épargne a baissé de tout',
+      'j’ai baissé le montant du reçu de je l’ai dépensé',
+      'mon objectif avait 700 mais j’ai dépensé que 600',
+      'la difference entre l’objectif et le reçu manque dans l’epargne',
+      'baisse du montant sur le recu cree par mon objectif',
+      'pourquoi le reste de mon objectif est pas revenu dans l’épargne ?',
+      'il reste de l’argent de l’objectif après un achat moins cher',
+      'modifie le recu de l’objectif et l’epargne bouge pas',
+    ],
+    answer:
+      'Quand un objectif se ferme avec **Je l’ai dépensé**, tout ce qu’il contenait quitte ton épargne d’un coup. Si tu baisses ensuite le montant de ce reçu, la différence ne retourne pas dans l’épargne : par exemple, $600.00 d’un objectif qui contenait $662.47 laisse $62.47 hors de l’épargne.\n\n' +
+      'Ta carte ou ton compte, ton **Solde actuel** et **Aperçu** utilisent le vrai montant du reçu, donc ils sont justes. Il n’y a que dans **Épargne** que tout l’objectif reste dehors.',
+    keywords: ['reçu plus bas', 'différence de l’objectif', 'dépensé moins', 'reste de l’objectif'],
   },
   {
     id: 'goals.missing',
@@ -1734,7 +1783,7 @@ export const savingsGoalsFr: IntentText[] = [
       'j’ai utilisé mon épargne pour payer des vacances',
     ],
     answer:
-      'L’épargne de Skip est un registre de ce que chaque mois a laissé, donc dépenser dessus n’est pas enregistré tout seul. Fais deux choses :\n\n1. Ajoute ce que tu as acheté comme d’habitude, en reçu ou en facture. Ça compte comme dépense à sa date et baisse ton **Solde actuel**.\n2. Baisse ton épargne pour qu’elle corresponde. Ouvre un mois ou un montant dans **Épargne → Par mois** et touche le crayon. Baisse le **Montant** et touche **Enregistrer les modifications**, ou touche **Retirer de l’épargne** pour tout retirer. **Prêt à utiliser** baisse aussitôt.\n\nSi cet argent est dans un objectif, retire-le d’abord de l’objectif. Si tu as dépensé l’argent d’un objectif pour ce que tu visais, supprime l’objectif et choisis **Je l’ai dépensé**.',
+      'L’épargne de Skip est un registre de ce que chaque mois a laissé, donc dépenser dessus n’est pas enregistré tout seul. Fais deux choses :\n\n1. Ajoute ce que tu as acheté comme d’habitude, en reçu ou en facture. Ça compte comme dépense à sa date et baisse ton **Solde actuel**.\n2. Baisse ton épargne pour qu’elle corresponde. Ouvre un mois ou un montant dans **Épargne → Par mois** et touche le crayon. Baisse le **Montant** et touche **Enregistrer les modifications**, ou touche **Retirer de l’épargne** pour tout retirer. **Prêt à utiliser** baisse aussitôt.\n\nSi cet argent est dans un objectif, retire-le d’abord de l’objectif. Si tu as dépensé l’argent d’un objectif pour ce que tu visais, supprime l’objectif, choisis **Je l’ai dépensé** et ajoute l’achat là, pour qu’il compte une seule fois.',
     keywords: ['dépenser l’épargne', 'utiliser l’épargne', 'piger dans l’épargne', 'vacances'],
   },
   {

@@ -1663,9 +1663,10 @@ export const savingsGoalsEs: IntentText[] = [
       'cómo borro una meta',
       'quitar meta',
       'eliminar mi meta de ahorro',
+      'eliminar la meta y agregar la compra como recibo',
     ],
     answer:
-      'Abre la meta, toca el lápiz y luego **Eliminar meta** al final de **Editar meta**.\n\n- Si parte de su dinero vino de ahorros, Skip te pregunta qué hacer con él: **Devolver $700.00 a ahorros** (con tu cantidad), **Ya lo gasté** o **Cancelar**.\n- Si nada vino de ahorros, dice “Se quita de tus metas. Tus ahorros no cambian.” Toca **Eliminar meta** para confirmar.\n\nVerás **Meta eliminada** y llegarás a **Metas**. No hay deshacer.',
+      'Abre la meta, toca el lápiz y luego **Eliminar meta** al final de **Editar meta**.\n\n- Si parte de su dinero vino de ahorros, Skip te pregunta qué hacer con él: **Devolver $700.00 a ahorros** (con tu cantidad), **Ya lo gasté** (que te deja agregar la compra como recibo) o **Cancelar**.\n- Si todo su dinero lo ahorraste antes de Skip, dice “Se quita de tus metas. Tus ahorros no cambian.”, con **Eliminar meta** y **Ya lo gasté**.\n- Si no tiene nada, toca **Eliminar meta** para confirmar.\n\nVerás **Meta eliminada** y llegarás a **Metas**. No hay deshacer.',
     keywords: ['eliminar meta', 'meta eliminada'],
   },
   {
@@ -1682,10 +1683,12 @@ export const savingsGoalsEs: IntentText[] = [
       'ya lo gasté vs devolver',
       'a dónde va el dinero si elimino mi meta',
       'salió de tus ahorros al eliminar la meta',
+      'agregar el recibo desde la meta al eliminarla',
+      'agregar recibo o solo eliminarla, cuál elijo',
     ],
     answer:
-      'Cuando eliminas una meta que tiene dinero de ahorros, Skip te pregunta dónde está ese dinero ahora.\n\n- **Devolver $700.00 a ahorros**: la meta se elimina y su dinero regresa a los meses de donde vino. **Listo para usar** sube $700.\n- **Ya lo gasté**: la meta se cierra y sale de todas las listas. Su dinero queda fuera de ahorros, porque ya no está. **Listo para usar** no cambia.\n\nEn cualquier caso, su cantidad de **Ya ahorrado** no pasa a ahorros, porque nunca salió de ahí. Ninguna de las dos opciones se puede deshacer.',
-    keywords: ['ya lo gasté', 'devolver a ahorros', 'salió de tus ahorros'],
+      'Cuando eliminas una meta que tiene dinero, Skip te pregunta dónde está ese dinero ahora.\n\n- **Devolver $700.00 a ahorros**: la meta se elimina y su dinero regresa a los meses de donde vino. **Listo para usar** sube $700.\n- **Ya lo gasté**: se abre una página para agregar lo que compraste como recibo. **Agregar recibo** lo guarda y cierra la meta en un solo paso, para que la compra cuente una sola vez. **Solo eliminarla** cierra la meta sin recibo. Si ya agregaste la compra desde **Recibos**, toca **Ya lo agregué** y elige ese recibo: Skip lo vincula y cierra la meta, para que cuente una sola vez. En cualquier caso, su dinero queda fuera de ahorros y **Listo para usar** no cambia.\n\nSu cantidad de **Ya ahorrado** no pasa a ahorros, porque nunca salió de ahí. Ninguna de las dos opciones se puede deshacer.',
+    keywords: ['ya lo gasté', 'devolver a ahorros', 'salió de tus ahorros', 'solo eliminarla'],
   },
   {
     id: 'goals.spent',
@@ -1704,10 +1707,56 @@ export const savingsGoalsEs: IntentText[] = [
       'compré eso para lo que ahorraba',
       'ya compré lo que estaba ahorrando',
       'terminé de ahorrar y lo compré',
+      'agregar el recibo desde la meta',
+      'cómo paso la compra de mi meta a un recibo',
+      'ya agregué el recibo, cómo cierro la meta',
     ],
     answer:
-      'Qué bien. Tienes dos opciones:\n\n- Dejar la meta como está. Una meta cumplida se queda en **Cumplidas** como registro.\n- Eliminarla: abre la meta, toca el lápiz, **Eliminar meta** y luego **Ya lo gasté**. La meta sale de tus listas y su dinero queda fuera de ahorros.\n\nLas metas no mueven dinero real, así que Skip no registra la compra por sí solo. Un recibo que agregues por ella cuenta como gasto en el mes de su fecha, como cualquier recibo, y baja tu **Saldo actual**.',
-    keywords: ['lo compré', 'usé mi meta'],
+      'Qué bien. Tienes dos opciones:\n\n- Dejar la meta como está. Una meta cumplida se queda en **Cumplidas** como registro.\n- Registrar la compra: abre la meta, toca el lápiz, **Eliminar meta** y luego **Ya lo gasté**. En la página **Ya lo gasté**, revisa la tienda, la fecha y **Pagado con**, y luego toca **Agregar recibo**. Verás **Agregado como recibo**.\n\nEl recibo es por **Todo lo de esta meta**, y cuenta una sola vez: en tu tarjeta o cuenta, en tu **Saldo actual** y en **Análisis**. No lo agregues otra vez desde **Recibos**, o contaría dos veces. Si ya lo agregaste ahí, toca **Ya lo agregué** en su lugar y elige ese recibo. Para cerrar la meta sin recibo, toca **Solo eliminarla**.',
+    keywords: ['lo compré', 'usé mi meta', 'agregado como recibo'],
+  },
+  {
+    id: 'goals.spent.savings-vs-insights',
+    title: '¿Por qué Ahorros muestra menos gasto que Análisis?',
+    questions: [
+      '¿Por qué Ahorros muestra menos gasto que Análisis?',
+      'por que en ahorros el gasto es menor que en analisis',
+      'la compra de mi meta no sale en los gastos de ahorros',
+      'agregué la compra de la meta como recibo y los gastos de ahorros no subieron',
+      'por qué el mes en ahorros no cuenta la tele que compré con la meta',
+      'ahorros y analisis no coinciden despues de eliminar una meta',
+      'el recibo de mi meta cuenta en análisis pero no en ahorros',
+      '¿el recibo de mi meta se contó dos veces?',
+      'lo que sale es mayor que los gastos de ahorros',
+      'compré el televisor con la plata de la meta y no aparece en ahorros',
+      'no me cuadra el gasto de ahorros con el de análisis',
+      'recibo de la meta y lo que sobró este mes',
+    ],
+    answer:
+      'Porque ese dinero ya estaba apartado. Cuando agregas la compra de una meta en la página **Ya lo gasté**, el recibo cuenta completo en tu tarjeta o cuenta, en tu **Saldo actual** y en **Análisis**.\n\n' +
+      'En **Ahorros**, el mes solo cuenta la parte que pasa de lo que tenía la meta, para que el dinero no salga de tus ahorros por segunda vez. Ejemplo: una TV de $662.47 comprada con una meta que tenía $662.47 suma $662.47 a **Lo que sale** en **Análisis**, mientras que **Gastos** del mes en **Ahorros** no cambia. Una TV de $700 de la misma meta suma $37.53 ahí.',
+    keywords: ['ahorros vs análisis', 'compra de la meta', 'ya lo gasté', 'cuenta una vez'],
+  },
+  {
+    id: 'goals.spent.receipt-lower',
+    title: 'Bajé el recibo de mi meta. ¿Dónde quedó el resto?',
+    questions: [
+      'cambié el recibo de mi meta a un monto más bajo',
+      'recibo de la meta editado por menos de lo que tenía',
+      'gasté menos de lo que tenía mi meta, dónde está la diferencia',
+      'la tele costo menos que mi meta y igual me bajaron todos los ahorros',
+      'baje el monto del recibo de ya lo gaste',
+      'mi meta tenía 700 pero solo gasté 600',
+      'falta en ahorros la diferencia entre la meta y el recibo',
+      'bajé el monto del recibo que creó mi meta',
+      'por que no volvio a ahorros lo que sobro de la meta',
+      '¿qué pasa con lo que sobra de la meta si compré algo más barato?',
+      'edite el recibo de la meta y ahorros no cambio',
+    ],
+    answer:
+      'Cuando una meta se cierra con **Ya lo gasté**, todo lo que tenía sale de tus ahorros de una vez. Si después bajas el monto de ese recibo, la diferencia no vuelve a ahorros: por ejemplo, $600.00 de una meta que tenía $662.47 deja $62.47 fuera de ahorros.\n\n' +
+      'Tu tarjeta o cuenta, tu **Saldo actual** y **Análisis** usan el monto real del recibo, así que están correctos. Solo **Ahorros** deja fuera todo lo de la meta.',
+    keywords: ['recibo más bajo', 'diferencia de la meta', 'gasté menos', 'sobró de la meta'],
   },
   {
     id: 'goals.missing',
@@ -1810,7 +1859,7 @@ export const savingsGoalsEs: IntentText[] = [
       'gastar los ahorros',
     ],
     answer:
-      'Los ahorros de Skip son un registro de lo que sobró de cada mes, así que gastar de ellos no se registra por sí solo. Haz dos cosas:\n\n1. Agrega lo que compraste como siempre, como recibo o factura. Cuenta como gasto en su fecha y baja tu **Saldo actual**.\n2. Baja tus ahorros para que coincidan. Abre un mes o una cantidad en **Ahorros → Por mes** y toca el lápiz. Baja el **Monto** y toca **Guardar cambios**, o toca **Quitar de ahorros** para sacarlo todo. **Listo para usar** baja al instante.\n\nSi ese dinero está en una meta, sácalo primero de la meta. Si gastaste el dinero de una meta en aquello para lo que ahorrabas, elimina la meta y elige **Ya lo gasté**.',
+      'Los ahorros de Skip son un registro de lo que sobró de cada mes, así que gastar de ellos no se registra por sí solo. Haz dos cosas:\n\n1. Agrega lo que compraste como siempre, como recibo o factura. Cuenta como gasto en su fecha y baja tu **Saldo actual**.\n2. Baja tus ahorros para que coincidan. Abre un mes o una cantidad en **Ahorros → Por mes** y toca el lápiz. Baja el **Monto** y toca **Guardar cambios**, o toca **Quitar de ahorros** para sacarlo todo. **Listo para usar** baja al instante.\n\nSi ese dinero está en una meta, sácalo primero de la meta. Si gastaste el dinero de una meta en aquello para lo que ahorrabas, elimina la meta, elige **Ya lo gasté** y agrega la compra ahí, para que cuente una sola vez.',
     keywords: ['gastar ahorros', 'usar ahorros', 'retirar ahorros', 'tomar de los ahorros'],
   },
   {

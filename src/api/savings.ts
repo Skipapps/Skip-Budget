@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 
 import { withAnchorDay } from '@/api/anchor-day';
 import type { ChargeRow } from '@/api/charges';
+import { readPaidByGoals, usePaidByGoals } from '@/api/goal-purchases';
 import type { PayRow } from '@/api/pay';
 import {
   bookFlows,
@@ -262,24 +263,37 @@ export function useSavings() {
   const core = useSavingsCore();
   const accountDay = useAccountDay();
   const flows = useBookFlows(today);
+  // The moves as read, not core's [] fallback: a failed first read is not "no moves".
+  const paid = usePaidByGoals(useGoalMoves().data);
 
   const month = today.slice(0, 7);
   const soFar = useMemo<SavingsSoFar | null>(() => {
-    if (!accountDay.data || flows.isLoading || flows.isError) return null;
-    const { pay, spending } = savingsFlows(bookEntries(flows.spending, flows.income));
+    if (!accountDay.data || flows.isLoading || flows.isError || !paid.byReceipt) return null;
+    const entries = bookEntries(flows.spending, flows.income);
+    const { pay, spending } = savingsFlows(entries, paid.byReceipt);
     const totals = monthTotals({ month, today, accountCreatedOn: accountDay.data, pay, spending });
     return { month, ...totals, movesOn: movesToSavingsOn(month) };
-  }, [accountDay.data, flows.spending, flows.income, flows.isLoading, flows.isError, month, today]);
+  }, [
+    accountDay.data,
+    flows.spending,
+    flows.income,
+    flows.isLoading,
+    flows.isError,
+    paid.byReceipt,
+    month,
+    today,
+  ]);
 
   return {
     ...core,
     soFar,
-    isPending: core.isPending || accountDay.isPending || flows.isLoading,
-    isError: core.isError || accountDay.isError || flows.isError,
+    isPending: core.isPending || accountDay.isPending || flows.isLoading || paid.isPending,
+    isError: core.isError || accountDay.isError || flows.isError || paid.isError,
     refetch: () => {
       core.refetch();
       void accountDay.refetch();
       flows.refetch();
+      paid.refetch();
     },
   };
 }
@@ -868,7 +882,10 @@ export function unwrittenDatesIn(args: {
  * and a month frozen without it would be wrong for good, so the close waits for the next sweep.
  */
 async function closingFlows(from: string, to: string, today: string) {
-  const reads = await Promise.all([
+  const [paid, ...reads] = await Promise.all([
+    // What a spent goal paid is not the month's spending. A failed read throws: no month is frozen
+    // with a goal's receipt counted in it.
+    readPaidByGoals(readGoalMoves),
     readAll<Raw>('receipts', 'id, merchant, amount, purchased_on, card_id, bank_account_id', {
       column: 'purchased_on',
       from,
@@ -947,7 +964,7 @@ async function closingFlows(from: string, to: string, today: string) {
     bills: billRows,
     charges: chargeRows,
   });
-  return savingsFlows(bookEntries(spending, income));
+  return savingsFlows(bookEntries(spending, income), paid);
 }
 
 /** Function or table not on this database yet: there is nothing to close into. */

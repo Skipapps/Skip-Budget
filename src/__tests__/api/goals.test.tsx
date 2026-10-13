@@ -2,7 +2,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 
-import { useDeleteGoal, useGoal, useGoals, useSaveGoal } from '@/api/goals';
+import {
+  useDeleteGoal,
+  useGoal,
+  useGoals,
+  useLinkGoalReceipt,
+  useSaveGoal,
+  useSpendGoal,
+} from '@/api/goals';
+import { savingsRefusal } from '@/api/savings';
 
 /**
  * The Goals reads and writes as the screens use them, on the design's figures: Trip $300 of $1,200
@@ -20,7 +28,8 @@ const mockDb: {
   pageCap: number;
   reads: string[];
   rpcs: { name: string; args: Row }[];
-} = { tables: {}, readErrors: {}, pageCap: 1000, reads: [], rpcs: [] };
+  rpcError: Failure;
+} = { tables: {}, readErrors: {}, pageCap: 1000, reads: [], rpcs: [], rpcError: null };
 
 jest.mock('@/lib/supabase', () => {
   const build = (table: string) => {
@@ -71,6 +80,8 @@ jest.mock('@/lib/supabase', () => {
       from: build,
       rpc: async (name: string, args: Row) => {
         mockDb.rpcs.push({ name, args });
+        if (mockDb.rpcError) return { data: null, error: mockDb.rpcError };
+        if (name === 'spend_goal') return { data: args.p_receipt, error: null };
         return { data: name === 'save_goal' ? (args.p_id ?? 'goal-new') : null, error: null };
       },
     },
@@ -140,6 +151,7 @@ beforeEach(() => {
   mockDb.pageCap = 1000;
   mockDb.reads = [];
   mockDb.rpcs = [];
+  mockDb.rpcError = null;
   // gcTime 0 on both, or the caches' timers hold Jest open after the run.
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { gcTime: 0 } },
@@ -308,6 +320,88 @@ describe('goal writes', () => {
       { name: 'delete_goal', args: { p_id: 'trip', p_return: returnMoney } },
     ]);
     expect(invalidated).toEqual(expect.arrayContaining([['savings'], ['goals']]));
+    await settle();
+  });
+});
+
+describe('useSpendGoal', () => {
+  const receipt = {
+    receiptId: '7d3c2f61-0a43-4a51-9d1c-3f0b7f1f8a10',
+    merchant: '  Best Buy ',
+    purchasedOn: '2026-10-11',
+    cardId: 'visa',
+    bankAccountId: null,
+    bookId: null,
+  };
+
+  it('ends the goal and files its receipt in one call, and refreshes receipts, Home, savings and goals', async () => {
+    const { result } = await renderHook(() => useSpendGoal(), { wrapper });
+    let spent: unknown;
+    await act(async () => {
+      spent = await result.current.mutateAsync({ id: 'trip', receipt });
+    });
+    expect(spent).toEqual({ id: 'trip', receiptId: receipt.receiptId });
+    expect(mockDb.rpcs).toEqual([
+      {
+        name: 'spend_goal',
+        args: {
+          p_id: 'trip',
+          p_receipt: receipt.receiptId,
+          p_merchant: 'Best Buy',
+          p_purchased_on: '2026-10-11',
+          p_card_id: 'visa',
+          p_bank_account_id: null,
+          p_book_id: null,
+        },
+      },
+    ]);
+    // No amount is sent: the server files what the goal holds.
+    expect(Object.keys(mockDb.rpcs[0].args)).not.toContain('p_amount');
+    expect(invalidated).toEqual(
+      expect.arrayContaining([['receipts'], ['dashboard'], ['savings'], ['goals']]),
+    );
+    await settle();
+  });
+
+  it('passes on a goal gone meanwhile as "gone", and refreshes nothing', async () => {
+    mockDb.rpcError = { code: 'P0002', message: 'That goal is no longer there.' };
+    const { result } = await renderHook(() => useSpendGoal(), { wrapper });
+    let thrown: unknown;
+    await act(async () => {
+      thrown = await result.current.mutateAsync({ id: 'trip', receipt }).catch((error) => error);
+    });
+    expect(savingsRefusal(thrown)?.kind).toBe('gone');
+    expect(invalidated).toEqual([]);
+    await settle();
+  });
+});
+
+describe('useLinkGoalReceipt', () => {
+  it('ends the goal naming the receipt in one call, and refreshes savings and goals only', async () => {
+    const { result } = await renderHook(() => useLinkGoalReceipt(), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ id: 'trip', receiptId: 'receipt-1' });
+    });
+    expect(mockDb.rpcs).toEqual([
+      { name: 'link_goal_receipt', args: { p_id: 'trip', p_receipt: 'receipt-1' } },
+    ]);
+    // The receipt itself does not change: no balance or spending figure moves.
+    expect(invalidated).toEqual(expect.arrayContaining([['savings'], ['goals']]));
+    expect(invalidated).not.toContainEqual(['receipts']);
+    await settle();
+  });
+
+  it('passes on a goal gone meanwhile as "gone", and refreshes nothing', async () => {
+    mockDb.rpcError = { code: 'P0002', message: 'That goal is no longer there.' };
+    const { result } = await renderHook(() => useLinkGoalReceipt(), { wrapper });
+    let thrown: unknown;
+    await act(async () => {
+      thrown = await result.current
+        .mutateAsync({ id: 'trip', receiptId: 'receipt-1' })
+        .catch((error) => error);
+    });
+    expect(savingsRefusal(thrown)?.kind).toBe('gone');
+    expect(invalidated).toEqual([]);
     await settle();
   });
 });

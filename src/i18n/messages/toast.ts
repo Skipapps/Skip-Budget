@@ -11,6 +11,16 @@ export const toastMessages = defineMessages({
     es: 'Cuenta actualizada',
     fr: 'Compte mis à jour',
   },
+  'toast.goal.spent': {
+    en: 'Added as a receipt',
+    es: 'Agregado como recibo',
+    fr: 'Ajouté comme reçu',
+  },
+  'toast.goal.linked': {
+    en: 'Linked to your receipt',
+    es: 'Vinculado a tu recibo',
+    fr: 'Lié à ton reçu',
+  },
   'toast.account.deleted': { en: 'Account deleted', es: 'Cuenta eliminada', fr: 'Compte supprimé' },
   'toast.bill.added': { en: 'Bill added', es: 'Factura agregada', fr: 'Facture ajoutée' },
   'toast.bill.updated': {

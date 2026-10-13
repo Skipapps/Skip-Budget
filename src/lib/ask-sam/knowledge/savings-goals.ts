@@ -2041,7 +2041,7 @@ export const savingsGoalsIntents: Intent[] = [
       'how do I remove my goal',
     ],
     answer:
-      'Open the goal, tap the pencil, then **Delete goal** at the bottom of **Edit goal**.\n\n- If some of its money came from savings, Skip asks what to do with it: **Put $700.00 back in savings** (with your amount), **I spent it**, or **Cancel**.\n- If nothing came from savings, it says “It comes off your goals. Your savings don’t change.” Tap **Delete goal** to confirm.\n\nYou’ll see **Goal deleted** and land on **Goals**. There is no undo.',
+      'Open the goal, tap the pencil, then **Delete goal** at the bottom of **Edit goal**.\n\n- If some of its money came from savings, Skip asks what to do with it: **Put $700.00 back in savings** (with your amount), **I spent it** (which lets you add the purchase as a receipt), or **Cancel**.\n- If its money was all saved before Skip, it says “It comes off your goals. Your savings don’t change.”, with **Delete goal** and **I spent it**.\n- If it holds nothing, tap **Delete goal** to confirm.\n\nYou’ll see **Goal deleted** and land on **Goals**. There is no undo.',
     keywords: ['Delete goal', 'Goal deleted'],
     related: ['goals.delete.choices', 'goals.spent', 'goals.missing'],
   },
@@ -2062,7 +2062,7 @@ export const savingsGoalsIntents: Intent[] = [
       'came from your savings delete goal',
     ],
     answer:
-      'When you delete a goal that holds money from savings, Skip asks where that money is now.\n\n- **Put $700.00 back in savings**: the goal is deleted and its money goes back to the months it came from. **Ready to use** goes up by $700.\n- **I spent it**: the goal closes and leaves every list. Its money stays out of savings, because it is gone. **Ready to use** doesn’t change.\n\nEither way, its **Already saved** amount doesn’t go to savings, since it never came from there. Neither choice can be undone.',
+      'When you delete a goal that holds money, Skip asks where that money is now.\n\n- **Put $700.00 back in savings**: the goal is deleted and its money goes back to the months it came from. **Ready to use** goes up by $700.\n- **I spent it**: a page opens to add what you bought as a receipt. **Add receipt** saves it and closes the goal in one step, so the purchase counts once. **Just remove it** closes the goal without a receipt. If you already added the purchase from **Receipts**, tap **I already added it** and pick that receipt: Skip links it and closes the goal, so it counts once. Either way its money stays out of savings, and **Ready to use** doesn’t change.\n\nIts **Already saved** amount doesn’t go to savings, since it never came from there. Neither choice can be undone.',
     keywords: ['I spent it', 'Put back in savings', 'came from your savings'],
     related: ['goals.delete.how', 'goals.spent', 'savings.ready.change'],
   },
@@ -2086,9 +2086,55 @@ export const savingsGoalsIntents: Intent[] = [
       'finished saving and bought it',
     ],
     answer:
-      'Well done. You have two choices:\n\n- Keep the goal as it is. A reached goal stays under **Completed** as a record.\n- Delete it: open the goal, tap the pencil, **Delete goal**, then **I spent it**. The goal leaves your lists and its money stays out of savings.\n\nGoals don’t move real money, so Skip doesn’t record the purchase by itself. A receipt you add for it counts as spending in the month of its date, like any receipt, and lowers your **Current balance**.',
+      'Well done. You have two choices:\n\n- Keep the goal as it is. A reached goal stays under **Completed** as a record.\n- Record the purchase: open the goal, tap the pencil, **Delete goal**, then **I spent it**. On the **I spent it** page, check the store, date and **Paid with**, then tap **Add receipt**. You’ll see **Added as a receipt**.\n\nThe receipt is for **Everything in this goal**, and it counts once: in your card or account, your **Current balance** and **Insights**. Don’t add it again from **Receipts**, or it would count twice. If you already added it there, tap **I already added it** instead and pick that receipt. To close the goal without a receipt, tap **Just remove it**.',
     keywords: ['bought it', 'used my goal'],
     related: ['goals.delete.choices', 'goals.reached', 'home.balance.vs-savings'],
+  },
+  {
+    id: 'goals.spent.savings-vs-insights',
+    topic: 'goals',
+    title: 'Why does Savings show less spent than Insights?',
+    questions: [
+      'why is savings spent lower than insights after i spent a goal',
+      'goal purchase not in my savings spending',
+      'insights says i spent more than savings does',
+      'i added my goal purchase as a receipt but savings spent did not go up',
+      'why does the month on savings leave out my tv from the goal',
+      'savings and insights spending disagree after deleting a goal',
+      'the receipt from my goal counts in insights but not savings',
+      'did my goal receipt count twice',
+      'what goes out is higher than savings spent',
+      'goal receipt and left over this month',
+    ],
+    answer:
+      'Because that money was already set aside. When you add a goal’s purchase on the **I spent it** page, the receipt counts in full in your card or account, your **Current balance** and **Insights**.\n\n' +
+      'In **Savings**, the month only counts the part that goes beyond what the goal held, so the money doesn’t leave your savings a second time. Example: a $662.47 TV bought with a goal that held $662.47 adds $662.47 to **What goes out** in **Insights**, while **Spent** on the month in **Savings** doesn’t change. A $700 TV from the same goal adds $37.53 there.',
+    keywords: ['savings vs insights', 'goal purchase', 'I spent it', 'counted once'],
+    related: ['goals.spent', 'goals.delete.choices', 'home.insights.goes-out'],
+    route: '/goals',
+  },
+  {
+    id: 'goals.spent.receipt-lower',
+    topic: 'goals',
+    title: 'I lowered my goal’s receipt. Where did the rest go?',
+    questions: [
+      'i changed the receipt from my goal to a smaller amount',
+      'goal receipt edited lower than the goal',
+      'spent less than my goal held where is the difference',
+      'the tv cost less than my goal, savings still went down by all of it',
+      'edited the i spent it receipt amount down',
+      'my goal had 700 but i only spent 600',
+      'difference between goal and receipt missing from savings',
+      'lowered the amount on the receipt my goal made',
+      'savings did not get the leftover from my goal back',
+      'goal money left over after buying something cheaper',
+    ],
+    answer:
+      'When a goal closes with **I spent it**, everything it held leaves your savings at once. If you then lower that receipt’s amount, the difference doesn’t go back to savings: for example, $600.00 from a goal that held $662.47 leaves $62.47 out of savings.\n\n' +
+      'Your card or account, **Current balance** and **Insights** use the receipt’s real amount, so they’re right. Only **Savings** keeps the whole goal out.',
+    keywords: ['receipt lower', 'goal difference', 'spent less', 'leftover'],
+    related: ['goals.spent', 'goals.spent.savings-vs-insights'],
+    route: '/goals',
   },
   {
     id: 'goals.missing',
@@ -2203,7 +2249,7 @@ export const savingsGoalsIntents: Intent[] = [
       'used my savings to pay for a holiday',
     ],
     answer:
-      'Skip’s savings are a record of what each month left over, so spending from them isn’t recorded by itself. Do two things:\n\n1. Add what you bought as usual, as a receipt or a bill. It counts as spending on its date and lowers your **Current balance**.\n2. Lower your savings to match. Open a month or an amount in **Savings → By month** and tap the pencil. Lower the **Amount** and tap **Save changes**, or tap **Remove from savings** to take all of it out. **Ready to use** goes down at once.\n\nIf that money is in a goal, take it out of the goal first. If you spent a goal’s money on what you saved for, delete the goal and choose **I spent it**.',
+      'Skip’s savings are a record of what each month left over, so spending from them isn’t recorded by itself. Do two things:\n\n1. Add what you bought as usual, as a receipt or a bill. It counts as spending on its date and lowers your **Current balance**.\n2. Lower your savings to match. Open a month or an amount in **Savings → By month** and tap the pencil. Lower the **Amount** and tap **Save changes**, or tap **Remove from savings** to take all of it out. **Ready to use** goes down at once.\n\nIf that money is in a goal, take it out of the goal first. If you spent a goal’s money on what you saved for, delete the goal, choose **I spent it** and add the purchase there, so it counts once.',
     keywords: [
       'spend savings',
       'use savings',

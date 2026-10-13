@@ -91,6 +91,8 @@ jest.mock('@/providers/dialog-provider', () => ({
 let mockActive: GoalView[];
 let mockDone: GoalView[];
 let mockMoves: MoveRow[];
+/** Every goal's moves as read: in, still on their way, or a first read that failed. */
+let mockMovesRead: 'read' | 'pending' | 'failed' = 'read';
 const mockSaveGoal = jest.fn();
 const mockDeleteGoal = jest.fn();
 const mockTake = jest.fn();
@@ -106,8 +108,8 @@ jest.mock('@/api/goals', () => ({
   useGoal: (id: string | undefined) => ({
     goal: [...mockActive, ...mockDone].find((goal) => goal.id === id) ?? null,
     moves: mockMoves.filter((row) => row.goal_id === id),
-    isPending: false,
-    isError: false,
+    isPending: mockMovesRead === 'pending',
+    isError: mockMovesRead === 'failed',
     refetch: jest.fn(),
   }),
   useSaveGoal: () => ({ mutateAsync: mockSaveGoal, isPending: false }),
@@ -117,6 +119,7 @@ jest.mock('@/api/savings', () => ({
   useSavingsCore: () => ({ summary: { readyToUse: mockReady } }),
   useTakeFromGoal: () => ({ mutateAsync: mockTake, isPending: false }),
   savingsRefusal: (thrown: { refusal?: unknown }) => thrown?.refusal ?? null,
+  useGoalMoves: () => ({ data: mockMovesRead === 'read' ? mockMoves : undefined }),
 }));
 
 beforeEach(() => {
@@ -125,6 +128,7 @@ beforeEach(() => {
   mockUuid = 0;
   mockParams = {};
   mockFocused = true;
+  mockMovesRead = 'read';
   mockReady = 850;
   mockActive = [TRIP, EMERGENCY];
   mockDone = [NEW_PHONE];
@@ -314,9 +318,22 @@ describe('changing and deleting a goal', () => {
       'Put $300.00 back in savings',
       'I spent it',
     ]);
-    expect(mockDeleteGoal).toHaveBeenCalledWith({ id: 'trip', returnMoney: false });
+    // Spent: its own page files the purchase with the goal, so nothing ends here.
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/goal-spent', params: { id: 'trip' } });
+    expect(mockDeleteGoal).not.toHaveBeenCalled();
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('puts the money back in savings when asked', async () => {
+    mockParams = { id: 'trip' };
+    mockAsk.mockResolvedValueOnce('back');
+    await render(<SaveGoalScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete goal' }));
+    expect(mockDeleteGoal).toHaveBeenCalledWith({ id: 'trip', returnMoney: true });
     expect(mockToast).toHaveBeenCalledWith('toast.goal.deleted', 'deleted');
     expect(router.dismissTo).toHaveBeenCalledWith('/goals');
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it('makes one move after Delete, and never flashes the failure page as the goal vanishes', async () => {
@@ -335,6 +352,69 @@ describe('changing and deleting a goal', () => {
     expect(router.dismissTo).toHaveBeenCalledWith('/goals');
     expect(router.back).not.toHaveBeenCalled();
     expect(screen.queryByText('Something went wrong. Please try again.')).toBeNull();
+  });
+
+  it('offers "I spent it" for a goal holding only money from before Skip', async () => {
+    mockActive = [
+      goalView({
+        id: 'car',
+        name: 'Car',
+        start_amount: 250,
+        fromSavings: 0,
+        saved: 250,
+        percent: 20,
+      }),
+    ];
+    mockParams = { id: 'car' };
+    mockAsk.mockResolvedValueOnce('spent');
+    await render(<SaveGoalScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete goal' }));
+
+    const asked = mockAsk.mock.calls[0][0] as {
+      message: string;
+      actions: { id: string; label: string; destructive?: boolean }[];
+    };
+    expect(asked.message).toBe('It comes off your goals. Your savings don’t change.');
+    expect(asked.actions).toEqual([
+      { id: 'back', label: 'Delete goal', destructive: true },
+      { id: 'spent', label: 'I spent it' },
+    ]);
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/goal-spent', params: { id: 'car' } });
+    expect(mockDeleteGoal).not.toHaveBeenCalled();
+  });
+
+  it('deletes a goal holding only money from before Skip when asked', async () => {
+    mockActive = [
+      goalView({
+        id: 'car',
+        name: 'Car',
+        start_amount: 250,
+        fromSavings: 0,
+        saved: 250,
+        percent: 20,
+      }),
+    ];
+    mockParams = { id: 'car' };
+    mockAsk.mockResolvedValueOnce('back');
+    await render(<SaveGoalScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete goal' }));
+    expect(mockDeleteGoal).toHaveBeenCalledWith({ id: 'car', returnMoney: true });
+    expect(mockToast).toHaveBeenCalledWith('toast.goal.deleted', 'deleted');
+  });
+
+  it('waits for the goal’s moves before offering Delete, which would ask from the start alone', async () => {
+    mockParams = { id: 'trip' };
+    mockMovesRead = 'pending';
+    await render(<SaveGoalScreen />);
+    expect(screen.queryByRole('button', { name: 'Delete goal' })).toBeNull();
+    expect(router.back).not.toHaveBeenCalled();
+
+    mockMovesRead = 'failed';
+    await render(<SaveGoalScreen />);
+    expect(screen.queryByRole('button', { name: 'Delete goal' })).toBeNull();
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+    expect(router.back).not.toHaveBeenCalled();
   });
 
   it('asks plainly when nothing in it came from savings', async () => {

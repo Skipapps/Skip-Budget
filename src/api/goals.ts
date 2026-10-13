@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { lacksSavings, moneyArg, useGoalMoves, useInvalidateSavings } from '@/api/savings';
@@ -177,6 +177,71 @@ export function useDeleteGoal() {
       const { error } = await supabase.rpc('delete_goal', { p_id: id, p_return: returnMoney });
       if (error) throw error;
       return { id, returnMoney };
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export type GoalReceiptValues = {
+  /** The receipt's id, made once per visit: a retry after a lost answer files nothing twice. */
+  receiptId: string;
+  merchant: string;
+  /** yyyy-mm-dd */
+  purchasedOn: string;
+  cardId: string | null;
+  bankAccountId: string | null;
+  /** The receipt book; null is General. */
+  bookId: string | null;
+};
+
+/**
+ * "I spent it", with what was bought filed as a receipt in the same step (`spend_goal`,
+ * 20261013700001_spend_goal.sql): the goal closes as `useDeleteGoal` closes it, and the receipt is
+ * for everything the goal held, worked out by the server. The goal names the receipt, so the month
+ * it is dated in does not count it again (`paidFromGoals`). Refused as 'gone' like a delete.
+ */
+export function useSpendGoal() {
+  const client = useQueryClient();
+  const invalidate = useInvalidateSavings();
+  return useMutation({
+    mutationFn: async ({ id, receipt }: { id: string; receipt: GoalReceiptValues }) => {
+      const { data, error } = await supabase.rpc('spend_goal', {
+        p_id: id,
+        p_receipt: receipt.receiptId,
+        p_merchant: receipt.merchant.trim(),
+        p_purchased_on: receipt.purchasedOn,
+        p_card_id: receipt.cardId,
+        p_bank_account_id: receipt.bankAccountId,
+        p_book_id: receipt.bookId,
+      });
+      if (error) throw error;
+      return { id, receiptId: data as string };
+    },
+    onSuccess: () => {
+      // A new receipt moves every balance and spending figure, as one added from Receipts does.
+      void client.invalidateQueries({ queryKey: ['receipts'] });
+      void client.invalidateQueries({ queryKey: ['dashboard'] });
+      return invalidate();
+    },
+  });
+}
+
+/**
+ * "I spent it" for a purchase already added from Receipts: the goal closes as `useDeleteGoal`
+ * closes it and names that receipt (`link_goal_receipt`, 20261013700002_link_goal_receipt.sql),
+ * which stays as it is. Its month leaves out what the goal paid (`paidFromGoals`). Refused as
+ * 'gone' like a delete.
+ */
+export function useLinkGoalReceipt() {
+  const invalidate = useInvalidateSavings();
+  return useMutation({
+    mutationFn: async ({ id, receiptId }: { id: string; receiptId: string }) => {
+      const { error } = await supabase.rpc('link_goal_receipt', {
+        p_id: id,
+        p_receipt: receiptId,
+      });
+      if (error) throw error;
+      return { id, receiptId };
     },
     onSuccess: invalidate,
   });

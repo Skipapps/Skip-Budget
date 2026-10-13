@@ -254,4 +254,61 @@ export const goalsMessages = defineMessages({
     es: 'Hasta {amount} pueden volver a tus ahorros.',
     fr: 'Jusqu’à {amount} peut retourner dans ton épargne.',
   },
+
+  // "I spent it": what was bought, filed as a receipt with the goal.
+  'goals.spent.lead': {
+    en: 'Add what you bought as a receipt here, so it counts once. Adding it again from Receipts would count it twice.',
+    es: 'Agrega aquí lo que compraste como recibo, para que cuente una sola vez. Si lo agregas otra vez desde Recibos, contaría dos veces.',
+    fr: 'Ajoute ici ce que tu as acheté comme reçu, pour qu’il compte une seule fois. L’ajouter encore depuis Reçus le compterait deux fois.',
+  },
+  'goals.spent.held': {
+    en: 'Everything in this goal',
+    es: 'Todo lo de esta meta',
+    fr: 'Tout ce qu’il y a dans cet objectif',
+  },
+  'goals.spent.add': { en: 'Add receipt', es: 'Agregar recibo', fr: 'Ajouter le reçu' },
+  'goals.spent.justRemove': {
+    en: 'Just remove it',
+    es: 'Solo eliminarla',
+    fr: 'Juste le supprimer',
+  },
+  'goals.spent.alreadyAdded': {
+    en: 'I already added it',
+    es: 'Ya lo agregué',
+    fr: 'Je l’ai déjà ajouté',
+  },
+
+  // "I already added it": the receipt on the record, picked and named by the goal.
+  'goals.link.title': { en: 'Pick the receipt', es: 'Elige el recibo', fr: 'Choisis le reçu' },
+  'goals.link.lead': {
+    en: 'Pick the receipt you added for what you bought. The goal ends, and the money counts once.',
+    es: 'Elige el recibo que agregaste por lo que compraste. La meta termina y el dinero cuenta una sola vez.',
+    fr: 'Choisis le reçu que tu as ajouté pour cet achat. L’objectif se termine et l’argent ne compte qu’une fois.',
+  },
+  'goals.link.near': { en: 'Close to {amount}', es: 'Cerca de {amount}', fr: 'Proche de {amount}' },
+  'goals.link.recent': { en: 'Recent', es: 'Recientes', fr: 'Récents' },
+  'goals.link.none': {
+    en: 'There are no receipts to pick yet.',
+    es: 'Aún no hay recibos para elegir.',
+    fr: 'Il n’y a encore aucun reçu à choisir.',
+  },
+  'goals.link.link': { en: 'Link receipt', es: 'Vincular recibo', fr: 'Lier le reçu' },
+  'goals.link.missing': {
+    en: 'Pick a receipt first.',
+    es: 'Primero elige un recibo.',
+    fr: 'Choisis d’abord un reçu.',
+  },
+  // Asked before linking a receipt smaller than what the goal holds.
+  'goals.link.lessTitle': {
+    en: 'This receipt is {difference} less than the goal.',
+    es: 'Este recibo es {difference} menos que la meta.',
+    fr: 'Ce reçu est inférieur de {difference} à l’objectif.',
+  },
+  'goals.link.lessMessage': {
+    en: 'The rest stays out of savings.',
+    es: 'La diferencia no vuelve a tus ahorros.',
+    fr: 'La différence ne revient pas dans ton épargne.',
+  },
+  'goals.link.anyway': { en: 'Link anyway', es: 'Vincular igual', fr: 'Lier quand même' },
+  'goals.link.pickAnother': { en: 'Pick another', es: 'Elegir otro', fr: 'Choisir un autre' },
 });

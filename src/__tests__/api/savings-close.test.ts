@@ -538,3 +538,68 @@ describe('closeFinishedMonths', () => {
     expect(mockDb.rpcs).toEqual([]);
   });
 });
+
+describe('a goal spent with its receipt ("I spent it")', () => {
+  /**
+   * New TV held 450.00 (150.00 it started with and 300.00 from savings) and was spent on 18 Sep
+   * with its receipt. September's other spending is 3,135.94, as above.
+   */
+  function withSpentGoal(userId: string, receiptAmount: number) {
+    seed(userId);
+    mockDb.tables.receipts.push({
+      id: 'r-tv',
+      merchant: 'Best Buy',
+      amount: receiptAmount,
+      purchased_on: '2026-09-18',
+    });
+    mockDb.tables.goals = [
+      { id: 'tv', start_amount: '150.00', receipt_id: 'r-tv' },
+      { id: 'trip', start_amount: '0.00', receipt_id: null },
+    ];
+    mockDb.tables.goal_moves = [
+      {
+        id: 'm1',
+        goal_id: 'tv',
+        pot_id: 'jul',
+        amount: '300.00',
+        batch_id: 'b1',
+        created_at: '2026-08-02T12:00:00Z',
+      },
+      {
+        id: 'm2',
+        goal_id: 'trip',
+        pot_id: 'jul',
+        amount: '50.00',
+        batch_id: 'b1',
+        created_at: '2026-08-02T12:00:00Z',
+      },
+    ];
+  }
+
+  it('leaves what the goal paid out of the month it is dated in', async () => {
+    withSpentGoal('user-spent', 450);
+    expect(await closeFinishedMonths('user-spent', TODAY)).toBe(3);
+    expect(mockDb.rpcs.map((call) => call.args.p_spent)).toEqual([290, 3221.04, 3135.94]);
+  });
+
+  it('counts only what the receipt cost beyond the goal', async () => {
+    withSpentGoal('user-spent-more', 512.47);
+    await closeFinishedMonths('user-spent-more', TODAY);
+    // 3,135.94 + (512.47 − 450.00).
+    expect(mockDb.rpcs.map((call) => call.args.p_spent)).toEqual([290, 3221.04, 3198.41]);
+  });
+
+  it('counts the receipt in full on a database without goals.receipt_id yet', async () => {
+    withSpentGoal('user-spent-old-db', 450);
+    mockDb.missing = ['receipt_id'];
+    await closeFinishedMonths('user-spent-old-db', TODAY);
+    expect(mockDb.rpcs.map((call) => call.args.p_spent)).toEqual([290, 3221.04, 3585.94]);
+  });
+
+  it('closes nothing when the goals cannot be read', async () => {
+    withSpentGoal('user-spent-flaky', 450);
+    mockDb.readErrors.goals = { code: '08006', message: 'connection failure' };
+    expect(await closeFinishedMonths('user-spent-flaky', TODAY)).toBe(0);
+    expect(mockDb.rpcs).toEqual([]);
+  });
+});

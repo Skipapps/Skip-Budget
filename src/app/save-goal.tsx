@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { useDeleteGoal, useGoal, useSaveGoal } from '@/api/goals';
-import { savingsRefusal } from '@/api/savings';
+import { savingsRefusal, useGoalMoves } from '@/api/savings';
 import { GoalPlanCard } from '@/components/savings/goal-detail-parts';
 import { GoalFigures } from '@/components/savings/goal-figures';
 import { GoalTypeGrid } from '@/components/savings/goal-type-grid';
@@ -56,16 +56,21 @@ export default function SaveGoalScreen() {
   }>();
   const artwork = useArtwork();
   const existing = useGoal(params.id);
+  // Until every move is read, a goal's figure is only what it started with: Delete would ask the
+  // wrong question. The form waits for them.
+  const movesRead = useGoalMoves().data !== undefined;
+  const read = movesRead ? existing.goal : null;
   const focused = useIsFocused();
 
   // The goal as last read: Delete reloads goals before this page leaves, and the form stays drawn
   // until it does, rather than flash the failure page.
   const [kept, setKept] = useState<GoalView | null>(null);
-  if (existing.goal && existing.goal !== kept) setKept(existing.goal);
-  const goal = existing.goal ?? kept;
+  if (read && read !== kept) setKept(read);
+  const goal = read ?? kept;
 
   // An id that matches no open goal (gone on another phone before this opened): leave quietly.
-  const missing = Boolean(params.id) && !existing.isPending && !existing.isError && !goal;
+  const missing =
+    Boolean(params.id) && movesRead && !existing.isPending && !existing.isError && !goal;
   useEffect(() => {
     if (missing && focused) goBack();
   }, [missing, focused]);
@@ -208,19 +213,22 @@ function GoalForm({
     if (!goal || remove.isPending) return;
     setError(null);
     const title = t('goals.detail.deleteTitle', { name: goal.name });
-    let returnMoney = true;
+    const spent = { id: 'spent', label: t('goals.detail.spentIt') };
+    let choice: string | null | undefined;
     if (toCents(goal.fromSavings) > 0) {
       const amount = formatCurrency(goal.fromSavings);
-      const choice = await ask({
+      choice = await ask({
         title,
         message: t('goals.detail.deleteMoney', { amount }),
-        actions: [
-          { id: 'back', label: t('goals.detail.putBack', { amount }) },
-          { id: 'spent', label: t('goals.detail.spentIt') },
-        ],
+        actions: [{ id: 'back', label: t('goals.detail.putBack', { amount }) }, spent],
       });
-      if (!choice) return;
-      returnMoney = choice === 'back';
+    } else if (toCents(goal.saved) > 0) {
+      // Only money from before Skip: none goes back to savings, but it may have been spent.
+      choice = await ask({
+        title,
+        message: t('goals.detail.deleteEmpty'),
+        actions: [{ id: 'back', label: t('goals.detail.delete'), destructive: true }, spent],
+      });
     } else {
       const ok = await confirm({
         title,
@@ -228,10 +236,16 @@ function GoalForm({
         confirmLabel: t('goals.detail.delete'),
         destructive: true,
       });
-      if (!ok) return;
+      choice = ok ? 'back' : null;
+    }
+    if (!choice) return;
+    if (choice === 'spent') {
+      // Its own page files what was bought with the goal, so the money is counted once.
+      router.push({ pathname: '/goal-spent', params: { id: goal.id } });
+      return;
     }
     try {
-      await remove.mutateAsync({ id: goal.id, returnMoney });
+      await remove.mutateAsync({ id: goal.id, returnMoney: true });
       toast('toast.goal.deleted', 'deleted');
       // Its own page is gone with it.
       router.dismissTo('/goals');

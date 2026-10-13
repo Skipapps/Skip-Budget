@@ -46,7 +46,7 @@ const mockDb: {
 };
 
 const mockFlows = {
-  spending: [] as { kind: string; date: string; amount: number }[],
+  spending: [] as { kind: string; date: string; amount: number; id?: string }[],
   income: [] as { id: string; label: string; date: string; amount: number; accountId: null }[],
   isLoading: false,
   isError: false,
@@ -78,6 +78,10 @@ jest.mock('@/lib/supabase', () => {
       },
       lt: (column: string, value: string) => {
         filters.push((row) => String(row[column]) < value);
+        return builder;
+      },
+      not: (column: string) => {
+        filters.push((row) => row[column] !== null && row[column] !== undefined);
         return builder;
       },
       order: () => builder,
@@ -324,6 +328,67 @@ describe('useSavings', () => {
     const { result } = await renderHook(() => useSavings(), { wrapper });
     await waitFor(() => expect(result.current.soFar).not.toBeNull());
     expect(result.current.soFar).toMatchObject({ earned: 0, spent: 40, leftOver: -40 });
+  });
+
+  describe('a goal spent with its receipt', () => {
+    // New TV: 150.00 it started with and 212.47 from September, spent on 8 Oct.
+    function withSpentGoal(receiptAmount: number) {
+      mockDb.tables.goals = [
+        { id: 'tv', start_amount: '150.00', receipt_id: 'r-tv' },
+        { id: 'trip', start_amount: '0.00', receipt_id: null },
+      ];
+      mockDb.tables.goal_moves.push(move('m4', 'tv', 'sep', '212.47', '2026-10-02T10:00:00Z'));
+      mockFlows.spending.push({
+        id: 'receipt-r-tv',
+        kind: 'receipt',
+        date: '2026-10-08',
+        amount: -receiptAmount,
+      });
+    }
+
+    it('leaves what the goal paid out of the month so far', async () => {
+      withSpentGoal(362.47);
+      const { result } = await renderHook(() => useSavings(), { wrapper });
+      await waitFor(() => expect(result.current.soFar).not.toBeNull());
+      expect(result.current.soFar).toMatchObject({ spent: 2961.29, leftOver: 738.71 });
+    });
+
+    it('counts only what the receipt cost beyond the goal', async () => {
+      withSpentGoal(400);
+      const { result } = await renderHook(() => useSavings(), { wrapper });
+      await waitFor(() => expect(result.current.soFar).not.toBeNull());
+      // 2,961.29 + (400.00 − 362.47).
+      expect(result.current.soFar).toMatchObject({ spent: 2998.82, leftOver: 701.18 });
+    });
+
+    it('counts it in full on a database without goals.receipt_id yet', async () => {
+      withSpentGoal(362.47);
+      mockDb.readErrors.goals = {
+        code: '42703',
+        message: 'column goals.receipt_id does not exist',
+      };
+      const { result } = await renderHook(() => useSavings(), { wrapper });
+      await waitFor(() => expect(result.current.soFar).not.toBeNull());
+      expect(result.current.isError).toBe(false);
+      expect(result.current.soFar).toMatchObject({ spent: 3323.76, leftOver: 376.24 });
+    });
+
+    it('has no "so far" when the moves never arrived: a failed read is not "no moves"', async () => {
+      withSpentGoal(362.47);
+      mockDb.readErrors.goal_moves = { code: '08006', message: 'connection failure' };
+      const { result } = await renderHook(() => useSavings(), { wrapper });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      // Counted without New TV's 212.47 from September, it would read 2,961.29 + 150.00 spent.
+      expect(result.current.soFar).toBeNull();
+    });
+
+    it('has no "so far", and says so, when the goals cannot be read', async () => {
+      withSpentGoal(362.47);
+      mockDb.readErrors.goals = { code: '08006', message: 'connection failure' };
+      const { result } = await renderHook(() => useSavings(), { wrapper });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(result.current.soFar).toBeNull();
+    });
   });
 });
 
@@ -739,6 +804,36 @@ describe('useMonthUpdate', () => {
     september();
     expect((await offer('sep')).update).toBeNull();
     expect((await offer('jun')).update).toBeNull();
+  });
+
+  /** New TV, 150.00 it started with and 300.00 from September, spent on 20 Sep after it closed. */
+  function spentInSeptember(receiptAmount: number) {
+    september([
+      { id: 'r-tv', merchant: 'Best Buy', amount: receiptAmount, purchased_on: '2026-09-20' },
+    ]);
+    mockDb.tables.goals = [
+      { id: 'tv', start_amount: '150.00', receipt_id: 'r-tv' },
+      { id: 'trip', start_amount: '0.00', receipt_id: null },
+    ];
+    mockDb.tables.goal_moves.push(move('m4', 'tv', 'sep', '300.00', '2026-10-02T10:00:00Z'));
+  }
+
+  it('offers nothing for a goal’s receipt filed into a closed month', async () => {
+    spentInSeptember(450);
+    expect((await offer('sep')).update).toBeNull();
+  });
+
+  it('offers only what a goal’s receipt cost beyond the goal', async () => {
+    spentInSeptember(500);
+    expect((await offer('sep')).update).toEqual({
+      earned: 3700,
+      spent: 3110,
+      earnedChange: 0,
+      spentChange: 50,
+      amount: 590,
+      inGoals: 300,
+      capped: false,
+    });
   });
 
   it('reads every page of the month: 1,200 receipts that still add up offer nothing', async () => {

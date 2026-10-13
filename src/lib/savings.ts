@@ -102,8 +102,51 @@ export function localDayOf(timestamp: string): string {
   return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`;
 }
 
-/** A row as the money book lists it. Only `kind`, `date` and `amount` are read. */
-export type FlowEntry = { readonly kind: string; readonly date: string; readonly amount: number };
+/**
+ * A row as the money book lists it. `kind`, `date` and `amount` are read; `id` (`receipt-<id>`)
+ * only to find a goal's purchase.
+ */
+export type FlowEntry = {
+  readonly kind: string;
+  readonly date: string;
+  readonly amount: number;
+  readonly id?: string;
+};
+
+/** A spent goal and the receipt filed for it in the same step (goals.receipt_id). */
+export type GoalPurchase = {
+  goal_id: string;
+  receipt_id: string;
+  start_amount: number;
+};
+
+/**
+ * What each spent goal paid toward its receipt, by the receipt's ledger id (`receipt-<id>`):
+ *
+ *   paid = max(0, start_amount + Σ the goal's moves)
+ *
+ * the goal's own figure (`goal_saved` in 20261011100001_savings_goals.sql, `goalProgress` here),
+ * which stops moving once it is closed: sends and take-backs refuse a closed goal. Moves are summed
+ * in cents, every goal's pots included, removed or not, as `goalProgress` sums them.
+ */
+export function paidFromGoals(
+  purchases: readonly GoalPurchase[],
+  moves: readonly MoveRow[],
+): Map<string, number> {
+  const held = new Map<string, number>();
+  for (const purchase of purchases) held.set(purchase.goal_id, cents(purchase.start_amount));
+  for (const move of moves) {
+    const before = held.get(move.goal_id);
+    if (before !== undefined) held.set(move.goal_id, before + cents(move.amount));
+  }
+  const paid = new Map<string, number>();
+  for (const purchase of purchases) {
+    const key = `receipt-${purchase.receipt_id}`;
+    const goalCents = Math.max(0, held.get(purchase.goal_id) ?? 0);
+    paid.set(key, fromCents(toCents(paid.get(key) ?? 0) + goalCents));
+  }
+  return paid;
+}
 
 const SPENDING_KINDS = new Set(['receipt', 'bill', 'subscription']);
 
@@ -111,8 +154,19 @@ const SPENDING_KINDS = new Set(['receipt', 'bill', 'subscription']);
  * Splits money-book rows into what a month counts. Earned is pay; spent is receipts and bill and
  * subscription charges. Any other kind (a card payment, a move between the person's accounts, money
  * added to an account) moves money the person already had, so it is left out even if passed in.
+ *
+ * A spent goal's receipt counts only for what it cost beyond what the goal paid (`paidFromGoals`):
+ *
+ *   counted = max(0, |receipt| − paid)
+ *
+ * That money was set aside already and left savings when the goal closed; counted again here, the
+ * month it is dated in would leave that much less over, and savings would lose it a second time.
+ * The receipt still counts in full everywhere else (balances, Current balance, Insights).
  */
-export function savingsFlows(entries: readonly FlowEntry[]): {
+export function savingsFlows(
+  entries: readonly FlowEntry[],
+  paidByGoals: ReadonlyMap<string, number> = new Map(),
+): {
   pay: MoneyFlow[];
   spending: MoneyFlow[];
 } {
@@ -122,7 +176,13 @@ export function savingsFlows(entries: readonly FlowEntry[]): {
     if (entry.kind === 'income' && entry.amount > 0) {
       pay.push({ date: entry.date, amount: entry.amount });
     } else if (SPENDING_KINDS.has(entry.kind)) {
-      spending.push({ date: entry.date, amount: entry.amount });
+      const paid = entry.kind === 'receipt' && entry.id ? paidByGoals.get(entry.id) : undefined;
+      if (paid === undefined) {
+        spending.push({ date: entry.date, amount: entry.amount });
+        continue;
+      }
+      const rest = Math.abs(cents(entry.amount)) - Math.max(0, cents(paid));
+      if (rest > 0) spending.push({ date: entry.date, amount: fromCents(rest) });
     }
   }
   return { pay, spending };
