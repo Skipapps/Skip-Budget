@@ -220,7 +220,9 @@ export function useSetReminder() {
           bank_account_id: kind === 'account' ? targetId : null,
           enabled,
           lead_days: leadDays,
-          remind_at: remindAt ?? DEFAULT_REMIND_AT,
+          // Left out, an upsert keeps the stored time, so a switch turned off and on again cannot
+          // reset a time the person chose; a new row takes the column's own 09:00.
+          ...(remindAt ? { remind_at: remindAt } : {}),
         } as never,
         { onConflict: CONFLICT_TARGET },
       );

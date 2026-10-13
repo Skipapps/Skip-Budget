@@ -27,6 +27,21 @@ Notifications.setNotificationHandler({
 });
 
 /**
+ * The account that said yes to reminders during this session. Launch read the profile before that
+ * yes, so returning to the front checks here too.
+ */
+let saidYes: string | null = null;
+
+/** The account's yes, written down: launch and each return to the front read it from now on. */
+async function recordYes(userId: string): Promise<void> {
+  saidYes = userId;
+  await supabase
+    .from('profiles')
+    .update({ reminders_enabled_at: new Date().toISOString() } as never)
+    .eq('id', userId);
+}
+
+/**
  * Ask for notifications, then register this device. The ask lives only behind a tap that explains
  * itself: iOS grants one system prompt per install, and spending it at launch is how most refusals
  * happen. Returns whether reminders can now send.
@@ -42,35 +57,40 @@ export async function enableReminders(userId: string): Promise<boolean> {
   if (
     !decision.granted &&
     decision.ios?.status !== Notifications.IosAuthorizationStatus.PROVISIONAL
-  )
+  ) {
+    // The phone said no and the account said yes. Kept, so that allowing notifications later in
+    // Settings signs the phone up the next time Skip comes to the front.
+    try {
+      await recordYes(userId);
+    } catch {
+      // Turning a reminder on again writes it again.
+    }
     return false;
+  }
 
   try {
     await registerDevice(userId);
     await storeTimezone(userId);
-    // The account's yes, written down — launch reads this from now on.
-    await supabase
-      .from('profiles')
-      .update({ reminders_enabled_at: new Date().toISOString() } as never)
-      .eq('id', userId);
+    await recordYes(userId);
   } catch {
     // A token failure loses nothing that the next attempt will not retry.
   }
   return true;
 }
 
-async function registerDevice(userId: string): Promise<void> {
+/** Whether this phone is now signed up; false when it cannot be yet (no permission, a simulator). */
+async function registerDevice(userId: string): Promise<boolean> {
   // A simulator has no push certificate and cannot be given a token; asking
   // throws rather than returning null.
-  if (!Device.isDevice || Platform.OS !== 'ios') return;
+  if (!Device.isDevice || Platform.OS !== 'ios') return false;
 
   // Register only what was already granted; asking happens in enableReminders.
-  if (!(await notificationsAllowed())) return;
+  if (!(await notificationsAllowed())) return false;
 
   const token = await Notifications.getDevicePushTokenAsync();
-  if (typeof token.data !== 'string' || !token.data) return;
+  if (typeof token.data !== 'string' || !token.data) return false;
 
-  await supabase.from('device_tokens').upsert(
+  const { error } = await supabase.from('device_tokens').upsert(
     {
       user_id: userId,
       token: token.data,
@@ -81,6 +101,7 @@ async function registerDevice(userId: string): Promise<void> {
     } as never,
     { onConflict: 'token' },
   );
+  return !error;
 }
 
 /**
@@ -113,15 +134,20 @@ export async function forgetDevice(userId: string): Promise<void> {
 /**
  * Writes the phone's zone, unless `stored` says the account already has it. Every profile write
  * echoes through realtime and re-reads the profile, so a launch that changes nothing writes nothing.
- * `undefined` means the stored zone is not known, and then it is written.
+ * `undefined` means the stored zone is not known, and then it is written. Answers what the account
+ * now holds, as far as this phone knows.
  */
-async function storeTimezone(userId: string, stored?: string | null): Promise<void> {
+async function storeTimezone(
+  userId: string,
+  stored?: string | null,
+): Promise<string | null | undefined> {
   const zone = Localization.getCalendars()[0]?.timeZone;
-  if (!zone || zone === stored) return;
-  await supabase
+  if (!zone || zone === stored) return stored;
+  const { error } = await supabase
     .from('profiles')
     .update({ timezone: zone } as never)
     .eq('id', userId);
+  return error ? stored : zone;
 }
 
 /**
@@ -152,6 +178,26 @@ export function useRegisterPush(): void {
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
+    // What launch read, kept up to date, so a return to the front compares instead of re-reading.
+    let read = false;
+    let storedZone: string | null | undefined;
+    let chose = false;
+    let registered = false;
+
+    const check = async () => {
+      // Every account gets its clock stored, reminders or not: the server computes each user's own
+      // "today" (charge dates, reminder times) from profiles.timezone, and nobody should be billed
+      // on UTC's calendar. Checked at launch and on every return to the front, so travel updates
+      // it; when the read failed, the zone is written regardless.
+      storedZone = await storeTimezone(userId, storedZone);
+      if (cancelled || registered) return;
+
+      // Only for an account that chose reminders: the phone's permission is shared by every
+      // account on it, so registering on permission alone would opt a fresh sign-in into
+      // another's choice. Permission given later in Settings is picked up on the next return.
+      if (!chose && saidYes !== userId) return;
+      registered = await registerDevice(userId);
+    };
 
     (async () => {
       try {
@@ -161,27 +207,23 @@ export function useRegisterPush(): void {
           .eq('id', userId)
           .maybeSingle();
         if (cancelled) return;
-
-        // Every account gets its clock stored, reminders or not: the server computes each user's
-        // own "today" (charge dates, reminder times) from profiles.timezone, and nobody should be
-        // billed on UTC's calendar. Checked each launch, so travel updates it; when the read
-        // failed, the zone is written regardless.
-        await storeTimezone(userId, error ? undefined : (data?.timezone ?? null));
-        if (cancelled) return;
-
-        // Only for an account that chose reminders: the phone's permission is shared by every
-        // account on it, so registering on permission alone would opt a fresh sign-in into
-        // another's choice.
-        if (!data?.reminders_enabled_at) return;
-
-        await registerDevice(userId);
+        storedZone = error ? undefined : (data?.timezone ?? null);
+        chose = Boolean(data?.reminders_enabled_at);
+        read = true;
+        await check();
       } catch {
         // Nothing the person holding the phone can act on.
       }
     })();
 
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !read) return;
+      void check().catch(() => {});
+    });
+
     return () => {
       cancelled = true;
+      sub.remove();
     };
   }, [userId]);
 

@@ -12,6 +12,7 @@ import {
   REMINDER_CHOICES,
   useReceiptReminder,
   useSetReceiptReminder,
+  useSetReminder,
 } from '@/api/reminders';
 import { resetLocaleForTests, setLanguage } from '@/i18n/store';
 
@@ -28,6 +29,7 @@ const mockUpdates: {
   selected: string;
 }[] = [];
 let mockUpdatedRows: { id: string }[] = [];
+const mockUpserts: { table: string; values: Record<string, unknown> }[] = [];
 
 jest.mock('@/lib/supabase', () => {
   const build = (table: string) => {
@@ -35,6 +37,10 @@ jest.mock('@/lib/supabase', () => {
       select: () => builder,
       eq: () => builder,
       maybeSingle: () => Promise.resolve({ data: mockProfile, error: null }),
+      upsert: (values: Record<string, unknown>) => {
+        mockUpserts.push({ table, values });
+        return Promise.resolve({ error: null });
+      },
       update: (values: Record<string, unknown>) => ({
         eq: (_column: string, id: unknown) => ({
           // The update only resolves through `select`, the only shape the hook uses: an update with
@@ -208,5 +214,56 @@ describe('the reminder choices in each language', () => {
     expect(labels(LEAD_OPTIONS)).toEqual(['Le jour même', '1 jour', '3 jours', '1 semaine']);
     expect(REMINDER_CAPTION.subscription).toBe('Avant le renouvellement');
     expect(REMINDER_CAPTION.card).toBe('Avant la date de paiement de cette carte');
+  });
+});
+
+describe('useSetReminder', () => {
+  beforeEach(() => {
+    mockUpserts.length = 0;
+  });
+
+  it('leaves the stored time alone when a switch turns a reminder off or on without one', async () => {
+    const { result } = await renderHook(() => useSetReminder(), { wrapper });
+
+    await result.current.mutateAsync({
+      kind: 'bill',
+      targetId: 'bill-1',
+      enabled: false,
+      leadDays: 3,
+    });
+    await result.current.mutateAsync({
+      kind: 'bill',
+      targetId: 'bill-1',
+      enabled: true,
+      leadDays: 3,
+    });
+
+    expect(mockUpserts).toHaveLength(2);
+    for (const { table, values } of mockUpserts) {
+      expect(table).toBe('reminders');
+      expect(values).not.toHaveProperty('remind_at');
+      expect(values).toMatchObject({ bill_id: 'bill-1', lead_days: 3 });
+    }
+    expect(mockUpserts.map(({ values }) => values.enabled)).toEqual([false, true]);
+  });
+
+  it('writes the time it is given', async () => {
+    const { result } = await renderHook(() => useSetReminder(), { wrapper });
+
+    await result.current.mutateAsync({
+      kind: 'subscription',
+      targetId: 'sub-1',
+      enabled: true,
+      leadDays: 1,
+      remindAt: '21:30',
+    });
+
+    expect(mockUpserts[0].values).toMatchObject({
+      subscription_id: 'sub-1',
+      bill_id: null,
+      enabled: true,
+      lead_days: 1,
+      remind_at: '21:30',
+    });
   });
 });

@@ -376,8 +376,11 @@ describe('enableReminders', () => {
     ).toBe(true);
   });
 
-  it('reports a refusal', async () => {
+  it('reports a refusal, and still writes down the account’s yes for when Settings allows it', async () => {
     await expect(enableReminders('user-A')).resolves.toBe(false);
-    expect(updates).toHaveLength(0);
+    expect(Notifications.getDevicePushTokenAsync).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(1);
+    expect(updates[0][0]).toBe('profiles');
+    expect(Object.keys(updates[0][1] as object)).toEqual(['reminders_enabled_at']);
   });
 });
