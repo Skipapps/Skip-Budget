@@ -20,7 +20,6 @@ export type MoneyTileGroups = {
   labels: FitGroupHandle;
   figures: FitGroupHandle;
   pills: FitGroupHandle;
-  notes: FitGroupHandle;
 };
 
 type MoneyTileProps = {
@@ -29,7 +28,6 @@ type MoneyTileProps = {
   icon: FC<SvgProps>;
   label: string;
   value: MoneyTileValue;
-  note?: string;
   /** Omitted for a tile that goes nowhere yet: it draws no chevron and takes no press. */
   onPress?: () => void;
   accessibilityLabel: string;
@@ -37,15 +35,14 @@ type MoneyTileProps = {
 };
 
 /**
- * One of the Money tiles: gradient icon and chevron on top, then the name, a figure or a pill, and
- * a note. Grows into the height its row stretches it to, so two tiles side by side match.
+ * One of the Money tiles: gradient icon and chevron on top, then the name and a figure or a pill.
+ * Grows into the height its row stretches it to, so two tiles side by side match.
  */
 export function MoneyTile({
   id,
   icon: Icon,
   label,
   value,
-  note,
   onPress,
   accessibilityLabel,
   groups,
@@ -81,7 +78,7 @@ export function MoneyTile({
         {label}
       </FitText>
 
-      {/* One height for a figure and a pill, so the notes of side-by-side tiles line up. */}
+      {/* One height for a figure and a pill, so side-by-side tiles line up. */}
       <View className="mt-[6px] min-h-[26px] w-full justify-center">
         {value.kind === 'figure' ? (
           <FitText
@@ -116,19 +113,6 @@ export function MoneyTile({
         ) : null}
         {value.kind === 'loading' ? <Skeleton className="h-[18px] w-24 rounded-full" /> : null}
       </View>
-
-      {note ? (
-        <FitText
-          group={groups.notes}
-          id={`${id}-note`}
-          role="control"
-          size={12}
-          className="font-app text-muted"
-          slotClassName="mt-[6px] w-full"
-        >
-          {note}
-        </FitText>
-      ) : null}
     </View>
   );
 

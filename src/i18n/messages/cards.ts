@@ -84,40 +84,18 @@ export const cardsMessages = defineMessages({
   'cards.money.goals': { en: 'Goals', es: 'Metas', fr: 'Objectifs' },
   // The tiles' pills sit two to a row, so each is kept short enough to fit on a 375pt phone.
   'cards.money.addSalary': { en: 'Add salary', es: 'Agregar salario', fr: 'Ajouter ta paie' },
-  'cards.money.addPay': { en: 'Add your pay', es: 'Agrega tu salario', fr: 'Ajoute ta paie' },
   'cards.money.open': { en: 'Open', es: 'Abrir', fr: 'Ouvrir' },
   'cards.money.addLoan': { en: 'Add a loan', es: 'Agregar uno', fr: 'Ajouter un prêt' },
-  'cards.money.trackLoans': {
-    en: 'Track what you owe',
-    es: 'Sigue lo que debes',
-    fr: 'Suis ce que tu dois',
-  },
   'cards.money.loansActive': {
     en: { one: '1 active', other: '{count} active' },
     es: { one: '1 activo', other: '{count} activos' },
     fr: { one: '1 actif', other: '{count} actifs' },
   },
-  'cards.money.readyToUse': { en: 'Ready to use', es: 'Listo para usar', fr: 'Prêt à utiliser' },
   'cards.money.addGoal': { en: 'Add a goal', es: 'Agregar una', fr: 'Nouvel objectif' },
-  'cards.money.saveForSomething': {
-    en: 'Save for something',
-    es: 'Ahorra para algo',
-    fr: 'Épargne pour un projet',
-  },
-  'cards.money.goalsReached': {
-    en: { one: '1 reached', other: '{count} reached' },
-    es: { one: '1 cumplida', other: '{count} cumplidas' },
-    fr: { one: '1 atteint', other: '{count} atteints' },
-  },
   'cards.money.goalsActive': {
     en: { one: '1 active', other: '{count} active' },
     es: { one: '1 activa', other: '{count} activas' },
     fr: { one: '1 en cours', other: '{count} en cours' },
-  },
-  'cards.money.tileLabel': {
-    en: '{name}, {value}, {note}',
-    es: '{name}, {value}, {note}',
-    fr: '{name}, {value}, {note}',
   },
   'cards.money.tileLabelShort': {
     en: '{name}, {value}',

@@ -180,11 +180,6 @@ export const remindersMessages = defineMessages({
     es: 'Notificaciones',
     fr: 'Notifications',
   },
-  'reminders.news.intro': {
-    en: 'News from Skip — updates to install and features that have just arrived.',
-    es: 'Novedades de Skip: actualizaciones para instalar y funciones recién llegadas.',
-    fr: 'Les nouvelles de Skip — des mises à jour à installer et des fonctions qui viennent d’arriver.',
-  },
   'reminders.news.empty': {
     en: 'No news yet',
     es: 'Aún no hay novedades',

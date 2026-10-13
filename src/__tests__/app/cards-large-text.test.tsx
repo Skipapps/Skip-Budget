@@ -5,7 +5,7 @@ import CardsScreen from '@/app/(tabs)/cards';
 
 /**
  * The Cards tab at large text sizes. The four Money tiles share one size per kind of line (names,
- * figures, notes) and sit two to a row only while every line fits there whole, pills on one line;
+ * figures) and sit two to a row only while every line fits there whole, pills on one line;
  * otherwise they stack one per row. The card faces take their content's height, so nothing on
  * them is cut.
  */
@@ -122,7 +122,7 @@ const sizeOf = (screen: Screen, text: string) =>
 
 /**
  * Each line's widest word (a pill: its whole label plus its 24pt of padding) at 1.3x, in Montserrat:
- * names 14pt, figures 18pt SemiBold (capped at 1.2x), pills 13pt Medium, notes 12pt.
+ * names 14pt, figures 18pt SemiBold (capped at 1.2x), pills 13pt Medium.
  */
 const NATURAL: Record<string, number> = {
   'salary-label': 54.7,
@@ -133,24 +133,15 @@ const NATURAL: Record<string, number> = {
   'loans-figure': 77,
   'savings-figure': 89.2,
   'goals-pill': 115.8,
-  'salary-note': 64.7,
-  'savings-note': 48.9,
-  'loans-note': 30,
-  'goals-note': 85.7,
 };
 
-/** One layout pass with `room` points for each tile's text, then the four group boxes. */
+/** One layout pass with `room` points for each tile's text, then the three group boxes. */
 async function layOutTiles(screen: Screen, room: number, natural: Record<string, number> = {}) {
   for (const [id, width] of Object.entries({ ...NATURAL, ...natural })) {
     await layout(screen, `fit-slot-${id}`, room);
     await layout(screen, `fit-copy-${id}`, width);
   }
-  for (const box of [
-    'money-tile-labels',
-    'money-tile-figures',
-    'money-tile-pills',
-    'money-tiles',
-  ]) {
+  for (const box of ['money-tile-labels', 'money-tile-figures', 'money-tiles']) {
     await layout(screen, box, 327);
   }
 }
@@ -190,16 +181,27 @@ describe('Cards — Money tiles at large text sizes', () => {
       ['1 active', 1.2],
       ['$850.00', 1.2],
       ['Add a goal', 1.3],
-      ['Ready to use', 1.3],
-      ['Save for something', 1.3],
-      ['Monthly', 1.3],
-      ['Car loan', 1.3],
     ];
     for (const [text, cap] of lines) {
       const node = screen.getByText(text);
       expect([text, node.props.maxFontSizeMultiplier]).toEqual([text, cap]);
       expect(node.props.numberOfLines).toBeUndefined();
       expect(node.props.adjustsFontSizeToFit).toBeUndefined();
+    }
+  });
+
+  it('draws no note under a tile: no line of text, no slot or measuring copy for one', async () => {
+    const screen = await render(<CardsScreen />);
+
+    for (const note of ['Monthly', 'Ready to use', 'Save for something', 'Car loan']) {
+      expect(screen.queryByText(note)).toBeNull();
+    }
+    for (const id of ['salary', 'savings', 'loans', 'goals']) {
+      for (const part of ['slot', 'copy']) {
+        expect(
+          screen.queryByTestId(`fit-${part}-${id}-note`, { includeHiddenElements: true }),
+        ).toBeNull();
+      }
     }
   });
 

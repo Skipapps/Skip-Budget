@@ -67,16 +67,14 @@ jest.mock('@/api/queries', () => ({
 jest.useFakeTimers().setSystemTime(new Date(`${TODAY}T09:00:00`));
 
 describe('Receipts — day order', () => {
-  it('heads the list with the oldest day and ends on today', async () => {
+  it('heads the list with today and ends on the oldest day', async () => {
     const { getAllByText } = await render(<ReceiptsScreen />);
 
     // `1 Sep 2026` appears twice (day heading, then its single row's own date), so the sequence is
     // asserted whole rather than by position.
     const order = getAllByText(/^(1 Sep 2026|Yesterday|Today)$/).map((node) => node.props.children);
 
-    expect(order).toEqual(['1 Sep 2026', '1 Sep 2026', 'Yesterday', 'Today']);
-    expect(order[0]).toBe('1 Sep 2026');
-    expect(order[order.length - 1]).toBe('Today');
+    expect(order).toEqual(['Today', 'Yesterday', '1 Sep 2026', '1 Sep 2026']);
   });
 
   it('leaves the rows inside a day in the order they arrived', async () => {
@@ -86,13 +84,13 @@ describe('Receipts — day order', () => {
       .map((node) => String(node.props.accessibilityLabel ?? ''))
       .filter((label) => label.includes('$'));
 
-    // Oldest day first, then the 11th's three rows untouched, then today.
+    // Today first, then the 11th's three rows untouched, then the oldest day.
     expect(labels).toEqual([
-      'Greengrocer, -$2.00',
+      'Bakery, -$6.00',
       'Chemist, -$5.00',
       'Bookshop, -$4.00',
       'Hardware, -$3.00',
-      'Bakery, -$6.00',
+      'Greengrocer, -$2.00',
     ]);
   });
 });

@@ -75,17 +75,14 @@ type Tile = {
   icon: GradientIconName;
   label: string;
   value: MoneyTileValue;
-  note?: string;
   onPress?: () => void;
 };
 
-/** "Salary, $3,700.00, Monthly": the tile's lines in the order they are drawn. */
+/** "Salary, $3,700.00": the tile's lines in the order they are drawn. */
 function tileLabel(tile: Tile): string {
   const value = tile.value.kind === 'loading' ? '' : tile.value.text;
   if (!value) return tile.label;
-  return tile.note
-    ? t('cards.money.tileLabel', { name: tile.label, value, note: tile.note })
-    : t('cards.money.tileLabelShort', { name: tile.label, value });
+  return t('cards.money.tileLabelShort', { name: tile.label, value });
 }
 
 export default function CardsScreen() {
@@ -116,10 +113,8 @@ export default function CardsScreen() {
     labels: useFitGroup({ mode: 'shrink' }),
     figures: useFitGroup({ mode: 'shrink' }),
     pills: useFitGroup({ mode: 'switch' }),
-    notes: useFitGroup({ mode: 'shrink' }),
   };
-  const tilesStacked =
-    !groups.labels.fits || !groups.figures.fits || !groups.pills.fits || !groups.notes.fits;
+  const tilesStacked = !groups.labels.fits || !groups.figures.fits || !groups.pills.fits;
 
   // A stale balance is worse than none: if any of the reads behind `balances` fails, the faces
   // would fall back to the balance typed when the card was added. A failed salary or loan read
@@ -153,7 +148,6 @@ export default function CardsScreen() {
   const hasSalary = (salary.data?.length ?? 0) > 0;
   const loanList = loans.loans;
   const activeGoals = goals.summary.active;
-  const reachedGoals = goals.summary.done.length;
   const savingsUnread = savings.isError && savings.pots.length === 0;
   const goalsUnread = goals.isError && goals.goals.length === 0;
 
@@ -167,7 +161,6 @@ export default function CardsScreen() {
         : hasSalary
           ? { kind: 'figure', text: formatCurrency(monthlySalary) }
           : { kind: 'pill', text: t('cards.money.addSalary') },
-      note: salary.isPending ? undefined : hasSalary ? t('dates.monthly') : t('cards.money.addPay'),
       onPress: () => router.push('/salary'),
     },
     {
@@ -180,7 +173,6 @@ export default function CardsScreen() {
         : savingsUnread
           ? { kind: 'pill', text: t('cards.money.open') }
           : { kind: 'figure', text: formatCurrency(savings.summary.readyToUse) },
-      note: savings.isPending || savingsUnread ? undefined : t('cards.money.readyToUse'),
       onPress: () => router.push('/savings'),
     },
     {
@@ -192,11 +184,6 @@ export default function CardsScreen() {
         : loanList.length > 0
           ? { kind: 'figure', text: t('cards.money.loansActive', { count: loanList.length }) }
           : { kind: 'pill', text: t('cards.money.addLoan') },
-      note: loans.isPending
-        ? undefined
-        : loanList.length > 0
-          ? loanList.map((loan) => loan.name).join(' · ')
-          : t('cards.money.trackLoans'),
       // The Loans page lists them, or invites a first one, so any count opens it.
       onPress: () => router.push('/loans'),
     },
@@ -209,15 +196,6 @@ export default function CardsScreen() {
         : activeGoals.length > 0
           ? { kind: 'figure', text: t('cards.money.goalsActive', { count: activeGoals.length }) }
           : { kind: 'pill', text: goalsUnread ? t('cards.money.open') : t('cards.money.addGoal') },
-      note: goals.isPending
-        ? undefined
-        : activeGoals.length > 0
-          ? activeGoals.map((goal) => goal.name).join(' · ')
-          : goalsUnread
-            ? undefined
-            : reachedGoals > 0
-              ? t('cards.money.goalsReached', { count: reachedGoals })
-              : t('cards.money.saveForSomething'),
       // The Goals page lists them, or invites a first one, so any count opens it.
       onPress: () => router.push('/goals'),
     },
@@ -346,31 +324,28 @@ export default function CardsScreen() {
 
       <FitGroup group={groups.labels} className="mt-[12px] w-full pb-8" testID="money-tile-labels">
         <FitGroup group={groups.figures} className="w-full" testID="money-tile-figures">
-          <FitGroup group={groups.pills} className="w-full" testID="money-tile-pills">
-            <FitGroup group={groups.notes} className="w-full gap-[12px]" testID="money-tiles">
-              {rows.map((row) => (
-                <View
-                  key={row.map((tile) => tile.id).join('-')}
-                  testID="money-tile-row"
-                  className={tilesStacked ? 'w-full gap-[12px]' : 'w-full flex-row gap-[12px]'}
-                >
-                  {row.map((tile) => (
-                    <View key={tile.id} className={tilesStacked ? 'w-full' : 'min-w-0 flex-1'}>
-                      <MoneyTile
-                        id={tile.id}
-                        icon={icons[tile.icon]}
-                        label={tile.label}
-                        value={tile.value}
-                        note={tile.note}
-                        onPress={tile.onPress}
-                        accessibilityLabel={tileLabel(tile)}
-                        groups={groups}
-                      />
-                    </View>
-                  ))}
-                </View>
-              ))}
-            </FitGroup>
+          <FitGroup group={groups.pills} className="w-full gap-[12px]" testID="money-tiles">
+            {rows.map((row) => (
+              <View
+                key={row.map((tile) => tile.id).join('-')}
+                testID="money-tile-row"
+                className={tilesStacked ? 'w-full gap-[12px]' : 'w-full flex-row gap-[12px]'}
+              >
+                {row.map((tile) => (
+                  <View key={tile.id} className={tilesStacked ? 'w-full' : 'min-w-0 flex-1'}>
+                    <MoneyTile
+                      id={tile.id}
+                      icon={icons[tile.icon]}
+                      label={tile.label}
+                      value={tile.value}
+                      onPress={tile.onPress}
+                      accessibilityLabel={tileLabel(tile)}
+                      groups={groups}
+                    />
+                  </View>
+                ))}
+              </View>
+            ))}
           </FitGroup>
         </FitGroup>
       </FitGroup>

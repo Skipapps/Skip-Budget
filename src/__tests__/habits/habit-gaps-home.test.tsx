@@ -202,12 +202,12 @@ describe('Home when the habits read fails', () => {
     expect(failed.getByText('Go further')).toBeTruthy();
   });
 
-  it('keeps the Loan Calculator card working beside it', async () => {
+  it('keeps the Loans card working beside it', async () => {
     mockHabits = read('error');
     const screen = await render(<HomeScreen />);
 
-    await fireEvent.press(screen.getByLabelText('Loan calculator. Opens the tool.'));
-    expect(router.push).toHaveBeenCalledWith('/loan-calculator');
+    await fireEvent.press(screen.getByLabelText('Loans. Opens the page.'));
+    expect(router.push).toHaveBeenCalledWith('/loans');
     expect(router.push).toHaveBeenCalledTimes(1);
   });
 

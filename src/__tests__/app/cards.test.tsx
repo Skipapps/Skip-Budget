@@ -233,6 +233,14 @@ describe('Cards — the two lists', () => {
   });
 });
 
+type Screen = Awaited<ReturnType<typeof render>>;
+
+/** What a tile draws, top to bottom; its hidden measuring copies are not on screen. */
+const linesIn = (screen: Screen, id: string) =>
+  within(screen.getByTestId(`money-tile-${id}`))
+    .getAllByText(/./)
+    .map((line) => line.props.children);
+
 describe('Cards — the Money tiles', () => {
   it('draws Salary, Savings, Loans and Goals in that order, each with a chevron', async () => {
     const screen = await render(<CardsScreen />);
@@ -250,12 +258,35 @@ describe('Cards — the Money tiles', () => {
     }
   });
 
-  it('Salary shows this month’s pay with cents and “Monthly”, and opens Salary', async () => {
+  it('draws no note under any tile, only the name and one figure', async () => {
+    mockLoans.loans = [
+      { billId: 'bill-9', name: 'Car loan' },
+      { billId: 'bill-3', name: 'Mortgage' },
+    ];
+    mockGoals.active = [{ id: 'g1', name: 'Trip' }];
+    const screen = await render(<CardsScreen />);
+
+    expect(linesIn(screen, 'salary')).toEqual(['Salary', '$1,880.00']);
+    expect(linesIn(screen, 'savings')).toEqual(['Savings', '$850.00']);
+    expect(linesIn(screen, 'loans')).toEqual(['Loans', '2 active']);
+    expect(linesIn(screen, 'goals')).toEqual(['Goals', '1 active']);
+  });
+
+  it('draws no note under the tiles that offer something either, only the name and the pill', async () => {
+    mockSalary.data = [];
+    const screen = await render(<CardsScreen />);
+
+    expect(linesIn(screen, 'salary')).toEqual(['Salary', 'Add salary']);
+    expect(linesIn(screen, 'loans')).toEqual(['Loans', 'Add a loan']);
+    expect(linesIn(screen, 'goals')).toEqual(['Goals', 'Add a goal']);
+  });
+
+  it('Salary shows this month’s pay with cents and no note, and opens Salary', async () => {
     const screen = await render(<CardsScreen />);
 
     expect(screen.getByText('$1,880.00')).toBeTruthy();
-    expect(screen.getByText('Monthly')).toBeTruthy();
-    const tile = screen.getByLabelText('Salary, $1,880.00, Monthly');
+    expect(screen.queryByText('Monthly')).toBeNull();
+    const tile = screen.getByLabelText('Salary, $1,880.00');
     await fireEvent.press(tile);
     expect(router.push).toHaveBeenLastCalledWith('/salary');
   });
@@ -281,9 +312,9 @@ describe('Cards — the Money tiles', () => {
     const screen = await render(<CardsScreen />);
 
     expect(screen.getByText('Add salary')).toBeTruthy();
-    expect(screen.getByText('Add your pay')).toBeTruthy();
+    expect(screen.queryByText('Add your pay')).toBeNull();
     expect(within(screen.getByTestId('money-tile-salary')).queryByText(/^\$/)).toBeNull();
-    await fireEvent.press(screen.getByLabelText('Salary, Add salary, Add your pay'));
+    await fireEvent.press(screen.getByLabelText('Salary, Add salary'));
     expect(router.push).toHaveBeenLastCalledWith('/salary');
   });
 
@@ -301,8 +332,8 @@ describe('Cards — the Money tiles', () => {
     const screen = await render(<CardsScreen />);
 
     expect(screen.getByText('$850.00')).toBeTruthy();
-    expect(screen.getByText('Ready to use')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Savings, $850.00, Ready to use'));
+    expect(screen.queryByText('Ready to use')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Savings, $850.00'));
     expect(router.push).toHaveBeenLastCalledWith('/savings');
   });
 
@@ -310,7 +341,8 @@ describe('Cards — the Money tiles', () => {
     mockSavings.readyToUse = 0;
     const screen = await render(<CardsScreen />);
 
-    expect(screen.getByLabelText('Savings, $0.00, Ready to use')).toBeTruthy();
+    expect(screen.getByLabelText('Savings, $0.00')).toBeTruthy();
+    expect(screen.queryByText('Ready to use')).toBeNull();
   });
 
   it('Savings draws no figure while savings are read', async () => {
@@ -334,8 +366,8 @@ describe('Cards — the Money tiles', () => {
     const screen = await render(<CardsScreen />);
 
     expect(screen.getByText('Add a loan')).toBeTruthy();
-    expect(screen.getByText('Track what you owe')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Loans, Add a loan, Track what you owe'));
+    expect(screen.queryByText('Track what you owe')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Loans, Add a loan'));
     expect(router.push).toHaveBeenLastCalledWith('/loans');
   });
 
@@ -344,12 +376,12 @@ describe('Cards — the Money tiles', () => {
     const screen = await render(<CardsScreen />);
 
     expect(screen.getByText('1 active')).toBeTruthy();
-    expect(screen.getByText('Car loan')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Loans, 1 active, Car loan'));
+    expect(screen.queryByText('Car loan')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Loans, 1 active'));
     expect(router.push).toHaveBeenLastCalledWith('/loans');
   });
 
-  it('Loans with several names them all and opens the Loans page', async () => {
+  it('Loans with several counts them without naming them, and opens the Loans page', async () => {
     mockLoans.loans = [
       { billId: 'bill-9', name: 'Car loan' },
       { billId: 'bill-3', name: 'Mortgage' },
@@ -357,8 +389,8 @@ describe('Cards — the Money tiles', () => {
     const screen = await render(<CardsScreen />);
 
     expect(screen.getByText('2 active')).toBeTruthy();
-    expect(screen.getByText('Car loan · Mortgage')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Loans, 2 active, Car loan · Mortgage'));
+    expect(screen.queryByText(/Car loan|Mortgage/)).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Loans, 2 active'));
     expect(router.push).toHaveBeenLastCalledWith('/loans');
   });
 
@@ -376,12 +408,12 @@ describe('Cards — the Money tiles', () => {
     const screen = await render(<CardsScreen />);
 
     expect(screen.getByText('Add a goal')).toBeTruthy();
-    expect(screen.getByText('Save for something')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Goals, Add a goal, Save for something'));
+    expect(screen.queryByText('Save for something')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Goals, Add a goal'));
     expect(router.push).toHaveBeenLastCalledWith('/goals');
   });
 
-  it('Goals counts the active ones, names them and opens Goals', async () => {
+  it('Goals counts the active ones without naming them, and opens Goals', async () => {
     mockGoals.active = [
       { id: 'g1', name: 'Trip' },
       { id: 'g2', name: 'Emergency fund' },
@@ -389,19 +421,21 @@ describe('Cards — the Money tiles', () => {
     const screen = await render(<CardsScreen />);
 
     expect(screen.getByText('2 active')).toBeTruthy();
-    expect(screen.getByText('Trip · Emergency fund')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Goals, 2 active, Trip · Emergency fund'));
+    expect(screen.queryByText(/Trip|Emergency fund/)).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Goals, 2 active'));
     expect(router.push).toHaveBeenLastCalledWith('/goals');
   });
 
-  it('Goals with only reached ones counts them and still invites a new one', async () => {
+  it('Goals with only reached ones still invites a new one, and says nothing of them', async () => {
     mockGoals.done = [
       { id: 'g1', name: 'New phone' },
       { id: 'g2', name: 'Bike' },
     ];
     const screen = await render(<CardsScreen />);
 
-    await fireEvent.press(screen.getByLabelText('Goals, Add a goal, 2 reached'));
+    expect(screen.getByText('Add a goal')).toBeTruthy();
+    expect(screen.queryByText(/reached|New phone|Bike/)).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Goals, Add a goal'));
     expect(router.push).toHaveBeenLastCalledWith('/goals');
   });
 

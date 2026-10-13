@@ -9,17 +9,19 @@ export type HomeTileGroups = {
   /** Every name in the grid, at one size. */
   names: FitGroupHandle;
   /** Every note in the grid, at one size. */
-  notes: FitGroupHandle;
+  notes?: FitGroupHandle;
 };
 
 type HomeTileProps = {
   /** Names the fit slots; the same in every language, unlike the name. */
   id: string;
   icon: FC<SvgProps>;
-  /** Drawn top right, level with the icon. The whole tile is the button, so it is only a mark. */
+  /** The whole tile is the button, so this is only a mark. */
   mark: ReactNode;
+  /** Top right, level with the icon, or bottom right, level with the name. */
+  markAt?: 'top' | 'bottom';
   name: string;
-  note: string;
+  note?: string;
   groups: HomeTileGroups;
   accessibilityLabel: string;
   onPress: PressableProps['onPress'];
@@ -28,13 +30,14 @@ type HomeTileProps = {
 };
 
 /**
- * A Quick add or Go further tile: gradient icon and a mark on top, then the name and a note, which
- * wrap between words. No height of its own, so a row stretches the two tiles in it to the taller.
+ * A Quick add or Go further tile: gradient icon on top, then the name and a note, which wrap between
+ * words. No height of its own, so a row stretches the two tiles in it to the taller.
  */
 export function HomeTile({
   id,
   icon: Icon,
   mark,
+  markAt = 'top',
   name,
   note,
   groups,
@@ -42,6 +45,19 @@ export function HomeTile({
   onPress,
   className,
 }: HomeTileProps) {
+  const nameText = (
+    <FitText
+      group={groups.names}
+      id={`${id}-name`}
+      role="control"
+      size={15}
+      className="font-app-semibold text-ink"
+      slotClassName={markAt === 'bottom' ? 'min-w-0 flex-1' : 'mt-[12px] w-full'}
+    >
+      {name}
+    </FitText>
+  );
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -61,29 +77,36 @@ export function HomeTile({
         <View className="h-[42px] w-[42px]">
           <Icon width="100%" height="100%" />
         </View>
-        {mark}
+        {markAt === 'top' ? mark : null}
       </View>
 
-      <FitText
-        group={groups.names}
-        id={`${id}-name`}
-        role="control"
-        size={15}
-        className="font-app-semibold text-ink"
-        slotClassName="mt-[12px] w-full"
-      >
-        {name}
-      </FitText>
-      <FitText
-        group={groups.notes}
-        id={`${id}-note`}
-        role="control"
-        size={12}
-        className="font-app text-muted"
-        slotClassName="mt-[4px] w-full"
-      >
-        {note}
-      </FitText>
+      {markAt === 'bottom' ? (
+        // Pushed down, so the mark sits in the corner of a tile stretched by its neighbour.
+        <View
+          testID={`home-tile-${id}-foot`}
+          className="mt-auto w-full flex-row items-center gap-[8px] pt-[12px]"
+        >
+          {nameText}
+          <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {mark}
+          </View>
+        </View>
+      ) : (
+        nameText
+      )}
+
+      {note ? (
+        <FitText
+          group={groups.notes}
+          id={`${id}-note`}
+          role="control"
+          size={12}
+          className="font-app text-muted"
+          slotClassName="mt-[4px] w-full"
+        >
+          {note}
+        </FitText>
+      ) : null}
     </Pressable>
   );
 }

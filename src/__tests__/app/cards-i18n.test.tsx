@@ -171,18 +171,21 @@ describe('Cards tab in Spanish', () => {
     expect(screen.getByText('Cuentas bancarias')).toBeTruthy();
     expect(screen.getByLabelText('Agregar cuenta')).toBeTruthy();
     expect(screen.getByText('Dinero')).toBeTruthy();
-    expect(screen.getByLabelText('Salario, $4,333.33, Mensual')).toBeTruthy();
+    expect(screen.getByLabelText('Salario, $4,333.33')).toBeTruthy();
     expect(screen.getByText('$4,333.33')).toBeTruthy();
-    expect(screen.getByLabelText('Préstamos, Agregar uno, Sigue lo que debes')).toBeTruthy();
-    expect(screen.getByLabelText('Metas, Agregar una, Ahorra para algo')).toBeTruthy();
+    expect(screen.getByLabelText('Préstamos, Agregar uno')).toBeTruthy();
+    expect(screen.getByLabelText('Metas, Agregar una')).toBeTruthy();
+    for (const note of ['Mensual', 'Sigue lo que debes', 'Ahorra para algo']) {
+      expect(screen.queryByText(note)).toBeNull();
+    }
     expectNoLeftovers(screen);
   });
 
   it('draws the Savings tile with what is ready to use, and opens Ahorros', async () => {
     const screen = await render(<CardsScreen />);
 
-    const tile = screen.getByLabelText('Ahorros, $850.00, Listo para usar');
-    expect(screen.getByText('Listo para usar')).toBeTruthy();
+    const tile = screen.getByLabelText('Ahorros, $850.00');
+    expect(screen.queryByText('Listo para usar')).toBeNull();
 
     await fireEvent.press(tile);
     expect(router.push).toHaveBeenLastCalledWith('/savings');
@@ -195,7 +198,8 @@ describe('Cards tab in Spanish', () => {
     ];
     const screen = await render(<CardsScreen />);
 
-    expect(screen.getByLabelText('Préstamos, 2 activos, Auto · Casa')).toBeTruthy();
+    expect(screen.getByLabelText('Préstamos, 2 activos')).toBeTruthy();
+    expect(screen.queryByText('Auto · Casa')).toBeNull();
   });
 
   it('says which rows open and which are locked on the free plan', async () => {
@@ -256,20 +260,22 @@ describe('Cards tab in French', () => {
     expect(screen.getByText('Comptes bancaires')).toBeTruthy();
     expect(screen.getByLabelText('Ajouter un compte')).toBeTruthy();
     expect(screen.getByText('Argent')).toBeTruthy();
-    expect(screen.getByLabelText(`Salaire, 4${NBSP}333,33${NBSP}$, Chaque mois`)).toBeTruthy();
+    expect(screen.getByLabelText(`Salaire, 4${NBSP}333,33${NBSP}$`)).toBeTruthy();
     expect(screen.getByText(`4${NBSP}333,33${NBSP}$`)).toBeTruthy();
-    expect(screen.getByLabelText('Prêts, Ajouter un prêt, Suis ce que tu dois')).toBeTruthy();
-    expect(
-      screen.getByLabelText('Objectifs, Nouvel objectif, Épargne pour un projet'),
-    ).toBeTruthy();
+    expect(screen.getByLabelText('Prêts, Ajouter un prêt')).toBeTruthy();
+    expect(screen.getByLabelText('Objectifs, Nouvel objectif')).toBeTruthy();
+    for (const note of ['Chaque mois', 'Suis ce que tu dois', 'Épargne pour un projet']) {
+      expect(screen.queryByText(note)).toBeNull();
+    }
     expectNoLeftovers(screen);
   });
 
   it('draws the Savings tile with what is ready to use, and opens Épargne', async () => {
     const screen = await render(<CardsScreen />);
 
-    const tile = screen.getByLabelText(`Épargne, 850,00${NBSP}$, Prêt à utiliser`);
+    const tile = screen.getByLabelText(`Épargne, 850,00${NBSP}$`);
     expect(screen.getByText(`850,00${NBSP}$`)).toBeTruthy();
+    expect(screen.queryByText('Prêt à utiliser')).toBeNull();
 
     await fireEvent.press(tile);
     expect(router.push).toHaveBeenLastCalledWith('/savings');
@@ -279,14 +285,16 @@ describe('Cards tab in French', () => {
     mockLoans = [{ billId: 'b1', name: 'Auto' }];
     const screen = await render(<CardsScreen />);
 
-    expect(screen.getByLabelText('Prêts, 1 actif, Auto')).toBeTruthy();
+    expect(screen.getByLabelText('Prêts, 1 actif')).toBeTruthy();
+    expect(screen.queryByText('Auto')).toBeNull();
   });
 
   it('offers to add pay in French when there is none', async () => {
     mockSalary = [];
     const screen = await render(<CardsScreen />);
 
-    expect(screen.getByLabelText('Salaire, Ajouter ta paie, Ajoute ta paie')).toBeTruthy();
+    expect(screen.getByLabelText('Salaire, Ajouter ta paie')).toBeTruthy();
+    expect(screen.queryByText('Ajoute ta paie')).toBeNull();
   });
 
   it('agrees a locked card and a locked account in French', async () => {

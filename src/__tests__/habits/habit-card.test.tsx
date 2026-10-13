@@ -1040,8 +1040,8 @@ describe('the Spending Habits tool card', () => {
     // The pill is a sticker: its word is in the card's label, not read again.
     expect(locked.queryAllByText('PRO')).toHaveLength(0);
     expect(locked.getAllByText('PRO', { includeHiddenElements: true })).toHaveLength(1);
-    // The loan calculator never locks.
-    expect(locked.getByLabelText('Loan calculator. Opens the tool.')).toBeTruthy();
+    // Loans never locks.
+    expect(locked.getByLabelText('Loans. Opens the page.')).toBeTruthy();
   });
 
   it('says it in Spanish and French', async () => {

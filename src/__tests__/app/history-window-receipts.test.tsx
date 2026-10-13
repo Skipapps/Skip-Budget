@@ -5,7 +5,7 @@ import ReceiptsScreen from '@/app/receipts';
 import { publishProStatus, resetProStatusForTests } from '@/lib/pro-status';
 
 /**
- * The receipts list on free shows the last 90 days of the window chosen: a year opens with a line
+ * The receipts list on free shows the last 90 days of the window chosen: a year ends with a line
  * saying the older receipts are kept, and Pro shows them all.
  */
 

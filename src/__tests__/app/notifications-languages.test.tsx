@@ -68,11 +68,7 @@ it('labels the news in Spanish, and leaves the news itself as written', async ()
   const screen = await render(<NotificationsScreen />);
 
   expect(screen.getByText('Notificaciones')).toBeTruthy();
-  expect(
-    screen.getByText(
-      'Novedades de Skip: actualizaciones para instalar y funciones recién llegadas.',
-    ),
-  ).toBeTruthy();
+  expect(screen.queryByText(/^Novedades de Skip/)).toBeNull();
   expect(screen.getByText(`Actualización · ${published(RELEASE.published_at)}`)).toBeTruthy();
   expect(screen.getByText(`Nueva función · ${published(FEATURE.published_at)}`)).toBeTruthy();
   expect(screen.getByText('Version 1.2 is out')).toBeTruthy();

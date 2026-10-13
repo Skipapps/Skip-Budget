@@ -180,12 +180,11 @@ export default function ReceiptsScreen() {
 
   const total = matching.reduce((sum, receipt) => sum - Math.abs(receipt.amount), 0);
 
-  // Oldest day first, today last: the page opens at the bottom, on the latest shop.
+  // Newest day first, so today's shops are at the top.
   const groups = useMemo(
     () =>
       groupByDate(visible, (receipt) => receipt.purchased_on, {
         amountOf: (receipt) => -Math.abs(receipt.amount),
-        direction: 'asc',
       }),
     [visible],
   );
@@ -339,8 +338,6 @@ export default function ReceiptsScreen() {
 
       {!isLoading && !isError && visible.length > 0 ? (
         <View className="w-full pb-10">
-          {/* Oldest first, so the list starts where the plan's window does. */}
-          {hiddenOlder ? <HistoryNotice className="mt-5" /> : null}
           {groups.map((group) => (
             <View key={group.date || 'undated'} className="w-full">
               <DateGroupHeader date={group.date} today={today} total={group.total} />
@@ -361,6 +358,8 @@ export default function ReceiptsScreen() {
               ))}
             </View>
           ))}
+          {/* Below the oldest day shown, where the plan's window ends. */}
+          {hiddenOlder ? <HistoryNotice className="mt-5" /> : null}
         </View>
       ) : null}
 

@@ -7,7 +7,7 @@ import { MIN_TEXT_SIZE } from '@/theme/text-scale';
 jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
 
 jest.mock('@/providers/theme-provider', () => ({
-  useColors: () => ({ accentInk: '#0000FF', muted: '#777777' }),
+  useColors: () => ({ onControl: '#FFFFFF', muted: '#777777' }),
 }));
 
 // Each gradient icon stands in as a view named after it; the drawings have suites of their own.
@@ -22,30 +22,23 @@ jest.mock('@/theme/home-icons', () => {
 });
 
 // Mirrors home.tsx's own wiring: `<QuickActions onPress={(href) => router.push(href)} />`.
-const EXPECTED: { id: string; label: string; note: string; hint: string; href: string }[] = [
-  {
-    id: 'receipt',
-    label: 'Receipt',
-    note: 'Snap or type it',
-    hint: 'Add a receipt',
-    href: '/add-receipt',
-  },
-  { id: 'bill', label: 'Bill', note: 'Rent, phone, power', hint: 'Add a bill', href: '/add-bill' },
+const EXPECTED: { id: string; label: string; hint: string; href: string }[] = [
+  { id: 'receipt', label: 'Receipt', hint: 'Add a receipt', href: '/add-receipt' },
+  { id: 'bill', label: 'Bill', hint: 'Add a bill', href: '/add-bill' },
   {
     id: 'subscription',
     label: 'Subscription',
-    note: 'Netflix, Spotify',
     hint: 'Add a subscription',
     href: '/add-subscription',
   },
-  {
-    id: 'salary',
-    label: 'Salary',
-    note: 'Add a payday',
-    hint: 'Your salary and where it lands',
-    href: '/salary',
-  },
+  { id: 'salary', label: 'Salary', hint: 'Your salary and where it lands', href: '/salary' },
 ];
+
+/** What the plus takes from the name's row: 28pt and the 8pt gap. */
+const PLUS = 36;
+
+/** The notes that used to sit under the names, in every language. */
+const OLD_NOTES = /Snap or type it|Rent, phone, power|Netflix, Spotify|Add a payday/;
 
 type Screen = Awaited<ReturnType<typeof render>>;
 
@@ -55,14 +48,6 @@ const NAME_AT_1: Record<string, number> = {
   bill: 24.4,
   subscription: 98.0,
   salary: 47.0,
-};
-
-/** Montserrat Regular at 12pt, each note's widest word. */
-const NOTE_AT_1: Record<string, number> = {
-  receipt: 30.7,
-  bill: 41.7,
-  subscription: 41.7,
-  salary: 43.5,
 };
 
 function phone(width: number, fontScale: number) {
@@ -77,17 +62,14 @@ async function layout(screen: Screen, testID: string, width: number) {
 }
 
 /**
- * One layout pass at a text scale: each name's and note's room (the tile less its padding) and its
- * measured widest word, then the boxes around the tiles.
+ * One layout pass at a text scale: each name's room (the tile less its padding and the plus) and its
+ * measured widest word, then the box around the tiles.
  */
 async function layOut(screen: Screen, box: number, room: number, fontScale: number) {
   for (const { id } of EXPECTED) {
-    await layout(screen, `fit-slot-${id}-name`, room);
+    await layout(screen, `fit-slot-${id}-name`, room - PLUS);
     await layout(screen, `fit-copy-${id}-name`, NAME_AT_1[id] * Math.min(fontScale, 1.3));
-    await layout(screen, `fit-slot-${id}-note`, room);
-    await layout(screen, `fit-copy-${id}-note`, NOTE_AT_1[id] * Math.min(fontScale, 1.3));
   }
-  await layout(screen, 'quick-add-notes', box);
   await layout(screen, 'quick-add', box);
 }
 
@@ -130,23 +112,29 @@ describe('QuickActions', () => {
   });
 
   it.each(EXPECTED)(
-    'draws "$label" as designed: its gradient icon, the plus, the name and the note',
-    async ({ id, label, note, hint }) => {
+    'draws "$label" as designed: its gradient icon, then the name with a plum plus beside it',
+    async ({ id, label, hint }) => {
       const screen = await render(<QuickActions onPress={() => {}} />);
       const node = tileOf(screen, hint);
       const tile = within(node);
       const hidden = { includeHiddenElements: true };
 
       expect(tile.getByTestId(`icon-${id}`, hidden)).toBeTruthy();
-      expect(tile.getByText(label)).toBeTruthy();
-      expect(tile.getByText(note)).toBeTruthy();
+      expect(tile.queryByText(OLD_NOTES, hidden)).toBeNull();
+
+      // The name and the plus share the bottom row, the plus after the name.
+      const foot = within(tile.getByTestId(`home-tile-${id}-foot`, hidden));
+      expect(foot.getByText(label)).toBeTruthy();
+      expect(String(tile.getByTestId(`home-tile-${id}-foot`, hidden).props.className)).toContain(
+        'mt-auto',
+      );
 
       // The plus is a mark, not a second button: the whole tile is the button, and VoiceOver
       // hears the tile's label once.
-      const plus = tile.getByTestId('quick-add-plus', hidden);
+      const plus = foot.getByTestId('quick-add-plus', hidden);
       expect(tile.queryByTestId('quick-add-plus')).toBeNull();
-      expect(plus.props.className).toContain('rounded-full');
-      expect(plus.props.className).toContain('bg-accent/10');
+      const classes = String(plus.props.className).split(/\s+/);
+      expect(classes).toEqual(expect.arrayContaining(['rounded-full', 'bg-accent']));
       expect(tile.queryAllByRole('button', hidden).filter((button) => button !== node)).toEqual([]);
     },
   );
@@ -170,69 +158,58 @@ describe('QuickActions', () => {
     }
   });
 
-  it('draws the names at one size and the notes at another, whole, with the control ceiling', async () => {
+  it('draws the names at one size, whole, with the control ceiling', async () => {
     const screen = await render(<QuickActions onPress={() => {}} />);
-    for (const { label, note } of EXPECTED) {
-      for (const [text, size] of [
-        [label, 15],
-        [note, 12],
-      ] as const) {
-        const node = screen.getByText(text);
-        expect(sizeOf(screen, text)).toBe(size);
-        expect(node.props.numberOfLines).toBeUndefined();
-        expect(node.props.adjustsFontSizeToFit).toBeUndefined();
-        expect(node.props.maxFontSizeMultiplier).toBe(1.3);
-      }
+    for (const { label } of EXPECTED) {
+      const node = screen.getByText(label);
+      expect(sizeOf(screen, label)).toBe(15);
+      expect(node.props.numberOfLines).toBeUndefined();
+      expect(node.props.adjustsFontSizeToFit).toBeUndefined();
+      expect(node.props.maxFontSizeMultiplier).toBe(1.3);
     }
   });
 
   it('keeps the full size where the tiles have room', async () => {
-    // 402pt at 1.3x: 140pt in each tile, and "Subscription" needs 127.4pt.
-    phone(402, 1.3);
+    // 402pt at the default text size: 104pt beside the plus, and "Subscription" needs 98pt.
+    phone(402, 1);
     const screen = await render(<QuickActions onPress={() => {}} />);
-    await layOut(screen, 360, 140, 1.3);
+    await layOut(screen, 360, 140, 1);
 
-    for (const { label, note } of EXPECTED) {
-      expect(sizeOf(screen, label)).toBe(15);
-      expect(sizeOf(screen, note)).toBe(12);
-    }
+    for (const { label } of EXPECTED) expect(sizeOf(screen, label)).toBe(15);
     expect(rowsOf(screen)).toEqual(TWO_BY_TWO);
   });
 
   it('shrinks all four names together when "Subscription" outgrows its tile', async () => {
-    // 375pt at 1.3x: 126.5pt in each tile, and "Subscription" needs 127.4pt.
+    // 375pt at 1.3x: 90.5pt beside the plus, and "Subscription" needs 127.4pt.
     phone(375, 1.3);
     const screen = await render(<QuickActions onPress={() => {}} />);
     await layOut(screen, 333, 126.5, 1.3);
 
     const sizes = EXPECTED.map(({ label }) => sizeOf(screen, label));
     expect(new Set(sizes).size).toBe(1);
-    // 0.98 of 15pt, drawn at 1.3x: 19.1pt.
-    expect(sizes[0]).toBeCloseTo(15 * 0.98, 5);
-    // The notes are a group of their own, and theirs fit.
-    for (const { note } of EXPECTED) expect(sizeOf(screen, note)).toBe(12);
+    // 0.70 of 15pt, drawn at 1.3x: 13.7pt.
+    expect(sizes[0]).toBeCloseTo(15 * 0.7, 5);
     expect(rowsOf(screen)).toEqual(TWO_BY_TWO);
   });
 
-  it('stays two by two where one column used to take over, a little under the design size', async () => {
-    // 320pt (Display Zoom on a small phone) at 1.3x: 99pt in each tile. Before the Founder's rule
-    // this went to one column; now the names share 0.76 of 15pt, drawn at 14.8pt.
-    phone(320, 1.3);
+  it('stays two by two on a small phone at the default size, a little under the design size', async () => {
+    // 375pt at 1x: 90.5pt beside the plus, so the names share 0.91 of 15pt.
+    phone(375, 1);
     const screen = await render(<QuickActions onPress={() => {}} />);
-    await layOut(screen, 278, 99, 1.3);
+    await layOut(screen, 333, 126.5, 1);
 
     const sizes = EXPECTED.map(({ label }) => sizeOf(screen, label));
     expect(new Set(sizes).size).toBe(1);
-    expect(sizes[0]).toBeCloseTo(15 * 0.76, 5);
-    expect(sizes[0] * 1.3).toBeGreaterThanOrEqual(MIN_TEXT_SIZE);
+    expect(sizes[0]).toBeCloseTo(15 * 0.91, 5);
     expect(rowsOf(screen)).toEqual(TWO_BY_TWO);
   });
 
   it('never takes a name under the 11pt floor, and still never leaves two by two', async () => {
-    // A tile far narrower than any iPhone gives: the floor holds and the grid stays.
-    phone(375, 1.3);
+    // 320pt (Display Zoom on a small phone) at 1.3x: 63pt beside the plus. The floor holds and the
+    // grid stays.
+    phone(320, 1.3);
     const screen = await render(<QuickActions onPress={() => {}} />);
-    await layOut(screen, 140, 50, 1.3);
+    await layOut(screen, 278, 99, 1.3);
 
     const size = sizeOf(screen, 'Subscription');
     expect(size * 1.3).toBeCloseTo(MIN_TEXT_SIZE, 1);

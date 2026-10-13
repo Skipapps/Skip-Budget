@@ -76,28 +76,6 @@ export const homeMessages = defineMessages({
     es: 'Tu salario y a dónde llega',
     fr: 'Ton salaire et où il arrive',
   },
-  /** The line under each Quick add name; short enough for one line on most phones. */
-  'home.quickAdd.receiptNote': {
-    en: 'Snap or type it',
-    es: 'Foto o a mano',
-    fr: 'Photo ou saisie',
-  },
-  'home.quickAdd.billNote': {
-    en: 'Rent, phone, power',
-    es: 'Renta, teléfono, luz',
-    fr: 'Loyer, mobile, énergie',
-  },
-  'home.quickAdd.subscriptionNote': {
-    en: 'Netflix, Spotify',
-    es: 'Netflix, Spotify',
-    fr: 'Netflix, Spotify',
-  },
-  'home.quickAdd.salaryNote': {
-    en: 'Add a payday',
-    es: 'Tu día de pago',
-    fr: 'Ton jour de paie',
-  },
-
   /** What a row came from, under its name; also the Quick add tile labels. */
   'home.kind.receipt': { en: 'Receipt', es: 'Recibo', fr: 'Reçu' },
   'home.kind.bill': { en: 'Bill', es: 'Factura', fr: 'Facture' },
@@ -143,20 +121,11 @@ export const homeMessages = defineMessages({
     es: 'Calculadora de préstamos',
     fr: 'Calculateur de prêt',
   },
-  'home.tool.loanCalculatorNote': {
-    en: 'See a monthly cost',
-    es: 'Mira el pago mensual',
-    fr: 'Vois la mensualité',
-  },
+  'home.tool.loans': { en: 'Loans', es: 'Préstamos', fr: 'Prêts' },
   'home.tool.spendingHabits': {
     en: 'Spending habits',
     es: 'Hábitos de gasto',
     fr: 'Habitudes de dépense',
-  },
-  'home.tool.spendingHabitsNote': {
-    en: 'Spot your patterns',
-    es: 'Mira tus patrones',
-    fr: 'Vois tes tendances',
   },
   'home.tool.habitsLocked': {
     en: 'Spending habits. Pro feature. See what skipping saves.',
@@ -167,6 +136,11 @@ export const homeMessages = defineMessages({
     en: '{label}. Opens the tool.',
     es: '{label}. Abre la herramienta.',
     fr: '{label}. Ouvre l’outil.',
+  },
+  'home.tool.opensPage': {
+    en: '{label}. Opens the page.',
+    es: '{label}. Abre la página.',
+    fr: '{label}. Ouvre la page.',
   },
 
   'home.insights.title': { en: 'Insights', es: 'Análisis', fr: 'Aperçu' },

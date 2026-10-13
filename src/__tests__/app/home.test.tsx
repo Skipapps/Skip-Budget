@@ -395,15 +395,15 @@ describe('Home — Where your money went', () => {
 });
 
 describe('Home — Go further', () => {
-  it('keeps its heading and offers two tools side by side: the loan calculator, then spending habits', async () => {
+  it('keeps its heading and offers two tools side by side: Loans, then spending habits', async () => {
     const { getAllByRole, getByText } = await render(<HomeScreen />);
 
     const tools = getAllByRole('button').filter((node) =>
-      String(node.props.accessibilityLabel ?? '').endsWith('Opens the tool.'),
+      /Opens the (tool|page)\.$/.test(String(node.props.accessibilityLabel ?? '')),
     );
     expect(getByText('Go further')).toBeTruthy();
     expect(tools.map((node) => node.props.accessibilityLabel)).toEqual([
-      'Loan calculator. Opens the tool.',
+      'Loans. Opens the page.',
       'Spending habits. Opens the tool.',
     ]);
 
@@ -416,7 +416,8 @@ describe('Home — Go further', () => {
 
     await fireEvent.press(loan);
     await fireEvent.press(habits);
-    expect(router.push).toHaveBeenNthCalledWith(1, '/loan-calculator');
+    // The loan calculator is on the Loans page.
+    expect(router.push).toHaveBeenNthCalledWith(1, '/loans');
     expect(router.push).toHaveBeenNthCalledWith(2, '/habits');
     expect(router.push).toHaveBeenCalledTimes(2);
   });

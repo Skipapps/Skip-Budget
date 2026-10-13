@@ -140,16 +140,16 @@ describe('the dashboard cards in Spanish', () => {
     expectNoRawText(screen);
   });
 
-  it('names Insights without the Pro note once paid, and the loan calculator always', async () => {
+  it('names Insights without the Pro note once paid, and Loans always', async () => {
     const banner = await render(<InsightBanner pro onPress={() => {}} />);
     expect(
       banner.getByLabelText('Análisis. Descubre la historia detrás de tus gastos.'),
     ).toBeTruthy();
 
     const tools = await render(<ToolCards onPress={() => {}} />);
-    expect(tools.getByLabelText('Calculadora de préstamos. Abre la herramienta.')).toBeTruthy();
-    expect(tools.getByText('Mira el pago mensual')).toBeTruthy();
-    expect(tools.getByText('Mira tus patrones')).toBeTruthy();
+    expect(tools.getByLabelText('Préstamos. Abre la página.')).toBeTruthy();
+    expect(tools.getByLabelText('Hábitos de gasto. Abre la herramienta.')).toBeTruthy();
+    expect(tools.queryByText(/Mira el pago mensual|Mira tus patrones/)).toBeNull();
     expectNoRawText(tools);
   });
 
@@ -164,10 +164,9 @@ describe('the dashboard cards in Spanish', () => {
     expect(screen.getAllByText('Factura', { includeHiddenElements: true }).length).toBeGreaterThan(
       0,
     );
-    for (const note of ['Foto o a mano', 'Renta, teléfono, luz', 'Netflix, Spotify']) {
-      expect(screen.getByText(note)).toBeTruthy();
-    }
-    expect(screen.getByText('Tu día de pago')).toBeTruthy();
+    expect(
+      screen.queryByText(/Foto o a mano|Renta, teléfono, luz|Netflix, Spotify|Tu día de pago/),
+    ).toBeNull();
     expectNoRawText(screen);
   });
 });
@@ -230,7 +229,7 @@ describe('the dashboard cards in French', () => {
     expectNoRawText(screen);
   });
 
-  it('marks Insights as Pro for someone without it, and leaves the loan calculator open', async () => {
+  it('marks Insights as Pro for someone without it, and leaves Loans open', async () => {
     const banner = await render(<InsightBanner pro={false} onPress={() => {}} />);
     expect(
       banner.getByLabelText('Aperçu. Fonction Pro. Découvre l’histoire derrière tes dépenses.'),
@@ -238,9 +237,8 @@ describe('the dashboard cards in French', () => {
     expect(banner.getByText('Découvre l’histoire derrière tes dépenses')).toBeTruthy();
 
     const tools = await render(<ToolCards onPress={() => {}} />);
-    expect(tools.getByLabelText('Calculateur de prêt. Ouvre l’outil.')).toBeTruthy();
-    expect(tools.getByText('Vois la mensualité')).toBeTruthy();
-    expect(tools.getByText('Vois tes tendances')).toBeTruthy();
+    expect(tools.getByLabelText('Prêts. Ouvre la page.')).toBeTruthy();
+    expect(tools.queryByText(/Vois la mensualité|Vois tes tendances/)).toBeNull();
     expect(tools.queryAllByText('PRO', { includeHiddenElements: true })).toHaveLength(0);
     expectNoRawText(tools);
   });
@@ -251,9 +249,9 @@ describe('the dashboard cards in French', () => {
     expect(
       screen.getAllByText('Abonnement', { includeHiddenElements: true }).length,
     ).toBeGreaterThan(0);
-    for (const note of ['Photo ou saisie', 'Loyer, mobile, énergie', 'Ton jour de paie']) {
-      expect(screen.getByText(note)).toBeTruthy();
-    }
+    expect(
+      screen.queryByText(/Photo ou saisie|Loyer, mobile, énergie|Ton jour de paie/),
+    ).toBeNull();
     expectNoRawText(screen);
   });
 });

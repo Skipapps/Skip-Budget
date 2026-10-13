@@ -7,7 +7,6 @@ import { useAnnouncements, type AnnouncementRow } from '@/api/queries';
 import { PageState } from '@/components/ui/page-state';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { Subtitle } from '@/components/ui/typography';
 import { t } from '@/i18n';
 import { formatFullDate } from '@/lib/date';
 import { failureText } from '@/lib/failure';
@@ -56,10 +55,6 @@ export default function NotificationsScreen() {
       onRefresh={() => void news.refetch()}
       refreshing={news.isRefetching}
     >
-      <Subtitle align="left" className="mt-2 w-full">
-        {t('reminders.news.intro')}
-      </Subtitle>
-
       {news.isPending ? (
         <View className="mt-6 w-full">
           <SkeletonList rows={3} />

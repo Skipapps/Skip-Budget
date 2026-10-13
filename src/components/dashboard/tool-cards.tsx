@@ -9,9 +9,10 @@ import { useColors } from '@/providers/theme-provider';
 import { useHomeIcons } from '@/theme/home-icons';
 
 type Tool = {
-  id: 'loanCalculator' | 'spendingHabits';
+  id: 'loans' | 'spendingHabits';
   label: MessageKey;
-  note: MessageKey;
+  /** Read out after the name: what a tap opens. */
+  hint: MessageKey;
   href: Href;
   /** Where it goes, and what it says, while it carries the PRO pill. */
   locked?: { href: Href; label: MessageKey };
@@ -20,15 +21,16 @@ type Tool = {
 /** Tools rather than spending, so tiles rather than list rows. */
 const TOOLS: Tool[] = [
   {
-    id: 'loanCalculator',
-    label: 'home.tool.loanCalculator',
-    note: 'home.tool.loanCalculatorNote',
-    href: '/loan-calculator',
+    // The loan calculator lives on the Loans page, so Loans is the way in.
+    id: 'loans',
+    label: 'home.tool.loans',
+    hint: 'home.tool.opensPage',
+    href: '/loans',
   },
   {
     id: 'spendingHabits',
     label: 'home.tool.spendingHabits',
-    note: 'home.tool.spendingHabitsNote',
+    hint: 'home.tool.opens',
     href: '/habits',
     locked: {
       href: { pathname: '/pro-feature', params: { id: 'habits' } },
@@ -47,22 +49,18 @@ type ToolCardsProps = {
 };
 
 /**
- * The two tools side by side, names at one size and notes at another. If either would have to go
- * under its design size to fit, the two stack, each the full width.
+ * The two tools side by side, names at one size. If either would have to go under its design size
+ * to fit, the two stack, each the full width.
  */
 export function ToolCards({ onPress, habitsLocked = false }: ToolCardsProps) {
   const colors = useColors();
   const icons = useHomeIcons();
-  const groups: HomeTileGroups = {
-    names: useFitGroup({ mode: 'shrink' }),
-    notes: useFitGroup({ mode: 'shrink' }),
-  };
-  const sideBySide = groups.names.fits && groups.notes.fits;
+  const groups: HomeTileGroups = { names: useFitGroup({ mode: 'shrink' }) };
+  const sideBySide = groups.names.fits;
 
   return (
     <FitGroup group={groups.names} className="w-full" testID="go-further">
-      <FitGroup
-        group={groups.notes}
+      <View
         className={sideBySide ? 'w-full flex-row gap-[12px]' : 'w-full gap-[12px]'}
         testID="go-further-tools"
       >
@@ -93,17 +91,14 @@ export function ToolCards({ onPress, habitsLocked = false }: ToolCardsProps) {
                 </View>
               }
               name={t(tool.label)}
-              note={t(tool.note)}
               groups={groups}
-              accessibilityLabel={
-                locked ? t(locked.label) : t('home.tool.opens', { label: t(tool.label) })
-              }
+              accessibilityLabel={locked ? t(locked.label) : t(tool.hint, { label: t(tool.label) })}
               onPress={() => onPress(locked ? locked.href : tool.href)}
               className={sideBySide ? 'min-w-0 flex-1' : 'w-full'}
             />
           );
         })}
-      </FitGroup>
+      </View>
     </FitGroup>
   );
 }

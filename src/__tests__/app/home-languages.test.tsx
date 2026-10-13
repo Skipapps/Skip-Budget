@@ -189,10 +189,9 @@ describe('Home in Spanish', () => {
     expect(screen.getAllByText('Suscripción', all)[0]).toBeTruthy();
     expect(screen.getAllByText('Salario', all)[0]).toBeTruthy();
     expect(screen.getByLabelText('Tu salario y a dónde llega')).toBeTruthy();
-    for (const note of ['Foto o a mano', 'Renta, teléfono, luz', 'Netflix, Spotify']) {
-      expect(screen.getByText(note)).toBeTruthy();
-    }
-    expect(screen.getByText('Tu día de pago')).toBeTruthy();
+    expect(
+      screen.queryByText(/Foto o a mano|Renta, teléfono, luz|Netflix, Spotify|Tu día de pago/),
+    ).toBeNull();
 
     expect(screen.getByText('Primeros pasos')).toBeTruthy();
     expect(screen.getByText('1 de 5 listos')).toBeTruthy();
@@ -211,11 +210,10 @@ describe('Home in Spanish', () => {
     const screen = await render(<HomeScreen />);
 
     expect(screen.getByText('Ve más allá')).toBeTruthy();
-    expect(screen.getByText('Mira el pago mensual')).toBeTruthy();
-    expect(screen.getByText('Mira tus patrones')).toBeTruthy();
-    // The loan calculator is free, so the section no longer says it comes with Pro.
+    expect(screen.queryByText(/Mira el pago mensual|Mira tus patrones/)).toBeNull();
+    // Loans is free, so the section does not say it comes with Pro.
     expect(screen.queryByText('Incluido con Pro')).toBeNull();
-    expect(screen.getByLabelText('Calculadora de préstamos. Abre la herramienta.')).toBeTruthy();
+    expect(screen.getByLabelText('Préstamos. Abre la página.')).toBeTruthy();
     expect(
       screen.getByLabelText('Análisis. Función Pro. Descubre la historia detrás de tus gastos.'),
     ).toBeTruthy();
@@ -315,10 +313,9 @@ describe('Home in French', () => {
       screen.getByLabelText(`Factures mensuelles, -1${NBSP}030,00${NBSP}$, ce mois-ci`),
     ).toBeTruthy();
     expect(screen.getByText('Va plus loin')).toBeTruthy();
-    expect(screen.getByText('Vois la mensualité')).toBeTruthy();
-    expect(screen.getByText('Vois tes tendances')).toBeTruthy();
+    expect(screen.queryByText(/Vois la mensualité|Vois tes tendances/)).toBeNull();
     expect(screen.queryByText('Inclus avec Pro')).toBeNull();
-    expect(screen.getByLabelText('Calculateur de prêt. Ouvre l’outil.')).toBeTruthy();
+    expect(screen.getByLabelText('Prêts. Ouvre la page.')).toBeTruthy();
     expect(screen.getByText('Aperçu')).toBeTruthy();
     expect(screen.getByLabelText('jeu. 10.09. Choisir une date')).toBeTruthy();
     expect(screen.getByText('Récents')).toBeTruthy();

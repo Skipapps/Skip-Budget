@@ -31,6 +31,7 @@ const ICONS = {
   bill: { light: Bill, dark: BillDark },
   subscription: { light: Subscription, dark: SubscriptionDark },
   salary: { light: Salary, dark: SalaryDark },
+  loans: { light: Loans, dark: LoansDark },
   loanCalculator: { light: Loans, dark: LoansDark },
   spendingHabits: { light: SpendingHabits, dark: SpendingHabitsDark },
   insights: { light: Insights, dark: InsightsDark },

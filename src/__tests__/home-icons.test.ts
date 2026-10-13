@@ -148,8 +148,9 @@ describe('the registry', () => {
       receipt: ['home-receipt', 'home-receipt-dark'],
       bill: ['home-bill', 'home-bill-dark'],
       subscription: ['home-subscription', 'home-subscription-dark'],
-      // The designer's loan-calculator and salary drawings are the Cards tab's, file for file.
+      // The designer's loans and salary drawings are the Cards tab's, file for file.
       salary: ['salary', 'salary-dark'],
+      loans: ['loans', 'loans-dark'],
       loanCalculator: ['loans', 'loans-dark'],
       spendingHabits: ['home-spending-habits', 'home-spending-habits-dark'],
       insights: ['home-insights', 'home-insights-dark'],
