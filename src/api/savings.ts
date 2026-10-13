@@ -37,6 +37,7 @@ import {
   type PotView,
 } from '@/lib/savings';
 import type { BookIncome, BookSpend } from '@/lib/money-book';
+import { anyRefreshFailed, failedEmpty } from '@/lib/query-state';
 import { supabase } from '@/lib/supabase';
 import { useToday } from '@/lib/use-today';
 import { useUserId } from '@/providers/session-provider';
@@ -243,6 +244,7 @@ export function useSavingsCore() {
     summary,
     isPending: pots.isPending || moves.isPending,
     isError: pots.isError || moves.isError,
+    refreshFailed: !failedEmpty(pots) && !failedEmpty(moves) && anyRefreshFailed([pots, moves]),
     refetch: () => {
       void pots.refetch();
       void moves.refetch();

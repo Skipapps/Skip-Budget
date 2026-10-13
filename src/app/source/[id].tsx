@@ -20,6 +20,7 @@ import {
 import { FitRows, FitText, useGroupFits } from '@/components/ui/fit-group';
 import { HistoryNotice } from '@/components/pro/history-notice';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { useConfirm } from '@/providers/dialog-provider';
@@ -89,7 +90,8 @@ export default function SourceDetailScreen() {
   // Read here, not inside the hook, so the ledger is a pure function of its inputs.
   const today = toIsoDate(new Date());
 
-  const { source, kind, card, account, ledger, isLoading, isError } = useSourceLedger(id, today);
+  const { source, kind, card, account, ledger, isLoading, isError, refreshFailed } =
+    useSourceLedger(id, today);
   const deletePayment = useDeletePayment();
   const confirm = useConfirm();
   const toast = useToast();
@@ -297,6 +299,7 @@ export default function SourceDetailScreen() {
           strong
         />
       </FitRows>
+      <RefreshNote show={refreshFailed} />
 
       <View className="mt-8 w-full">
         <SectionHeading>{t('transactions.title')}</SectionHeading>

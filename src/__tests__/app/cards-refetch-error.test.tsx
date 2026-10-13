@@ -58,21 +58,26 @@ jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
 jest.mock('@/api/refresh', () => ({
   useRefreshAll: () => ({ refresh: () => {}, refreshing: false }),
 }));
-// Savings and Goals keep their own rule (a failure only with nothing listed), tested elsewhere.
+// Savings and Goals keep their own rule (a failure only with nothing listed) and their own
+// refreshFailed, both tested with their hooks; here only what the page does with the flag.
+type ReadFlags = { isError: boolean; refreshFailed: boolean };
+const FRESH: ReadFlags = { isError: false, refreshFailed: false };
+let mockSavingsRead = FRESH;
+let mockGoalsRead = FRESH;
 jest.mock('@/api/savings', () => ({
   useSavingsCore: () => ({
     pots: [{ id: 'sep' }],
     summary: { readyToUse: 850 },
     isPending: false,
-    isError: false,
+    ...mockSavingsRead,
   }),
 }));
 jest.mock('@/api/goals', () => ({
   useGoals: () => ({
-    goals: [],
-    summary: { active: [], done: [] },
+    goals: [{ id: 'trip' }],
+    summary: { active: [{ id: 'trip', name: 'Trip' }], done: [] },
     isPending: false,
-    isError: false,
+    ...mockGoalsRead,
   }),
 }));
 jest.mock('@/lib/use-today', () => ({ useToday: () => ({ today: TODAY }) }));
@@ -121,6 +126,7 @@ jest.mock('@/lib/supabase', () => {
 });
 
 const TODAY = '2026-09-12';
+const NOTE = 'Couldn’t refresh · showing your last figures';
 
 /** The reads the page decides on, by the key each is cached under. */
 const KEYS = {
@@ -190,6 +196,8 @@ const faces = () => ({
 beforeEach(() => {
   mockOffline = false;
   mockFailing.clear();
+  mockSavingsRead = FRESH;
+  mockGoalsRead = FRESH;
   mockCardFaces.length = 0;
   mockAccountFaces.length = 0;
   for (const table of Object.keys(mockRows)) delete mockRows[table];
@@ -273,6 +281,7 @@ describe('Cards when every read lands', () => {
   it('shows the faces, Salary and Loans, worked by hand', async () => {
     await show();
     await landed();
+    expect(screen.queryByText(NOTE)).toBeNull();
 
     expect(linesIn('salary')).toEqual(['Salary', '$1,880.00']);
     expect(linesIn('loans')).toEqual(['Loans', '1 active']);
@@ -293,6 +302,10 @@ describe('Cards after a failed background refetch', () => {
 
     expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
     expect({ faces: faces(), salary: linesIn('salary'), loans: linesIn('loans') }).toEqual(before);
+    // Said once, inside the Money tiles' block, after the last tile.
+    const tiles = screen.getByTestId('money-tile-labels');
+    expect(within(tiles).getAllByText(NOTE)).toHaveLength(1);
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
   });
 
   it.each([
@@ -309,6 +322,84 @@ describe('Cards after a failed background refetch', () => {
 
     expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
     expect(linesIn(tile)).toEqual(before);
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+  });
+
+  it('shows the note when only the balances fail to reload behind the faces', async () => {
+    const client = await show(['cards']);
+    await landed();
+    const before = faces();
+
+    mockFailing.add('cards');
+    await reloadFailing(client, ['cards']);
+
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect(faces()).toEqual(before);
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+  });
+});
+
+describe('Cards when Savings or Goals failed to reload behind their tile', () => {
+  it.each([
+    [
+      'Savings',
+      'savings',
+      (): void => {
+        mockSavingsRead = { isError: true, refreshFailed: true };
+      },
+      ['Savings', '$850.00'],
+    ],
+    [
+      'Goals',
+      'goals',
+      (): void => {
+        mockGoalsRead = { isError: true, refreshFailed: true };
+      },
+      ['Goals', '1 active'],
+    ],
+  ] as const)('keeps the %s figure and shows the note', async (_name, tile, older, lines) => {
+    older();
+    await show();
+    await landed();
+
+    expect(linesIn(tile)).toEqual(lines);
+    expect(within(screen.getByTestId('money-tile-labels')).getAllByText(NOTE)).toHaveLength(1);
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+  });
+});
+
+describe('Cards when a Savings or Goals read failed with nothing cached', () => {
+  /**
+   * The moves read failed on its first try while pots and goals loaded: the hooks' own figures are
+   * built without the moves (all of September's $850.00 still "held", Trip still "active"), so the
+   * tile must not show them, and there is no older figure to put a note under.
+   */
+  it.each([
+    [
+      'Savings',
+      'savings',
+      (): void => {
+        mockSavingsRead = { isError: true, refreshFailed: false };
+      },
+      '$850.00',
+    ],
+    [
+      'Goals',
+      'goals',
+      (): void => {
+        mockGoalsRead = { isError: true, refreshFailed: false };
+      },
+      '1 active',
+    ],
+  ] as const)('shows no %s figure, only Open', async (name, tile, failed, figure) => {
+    failed();
+    await show();
+    await landed();
+
+    expect(linesIn(tile)).toEqual([name, 'Open']);
+    // Within the tile: Loans says "1 active" too.
+    expect(within(screen.getByTestId(`money-tile-${tile}`)).queryByText(figure)).toBeNull();
+    expect(screen.queryByText(NOTE)).toBeNull();
   });
 });
 
@@ -320,6 +411,7 @@ describe('Cards when a read fails with nothing cached', () => {
       await show();
 
       expect(await screen.findByText(FAILURE_MESSAGE)).toBeTruthy();
+      expect(screen.queryByText(NOTE)).toBeNull();
       expect(screen.queryByText('Credit cards')).toBeNull();
       expect(screen.queryByText('Add a loan')).toBeNull();
       expect(screen.queryByText('Add salary')).toBeNull();

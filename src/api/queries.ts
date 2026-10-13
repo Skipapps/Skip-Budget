@@ -25,6 +25,7 @@ import type { PayFrequency } from '@/lib/date';
 import { landingAccount, projectedPaydays } from '@/lib/pay';
 import type { AccrualBasis } from '@/lib/loan';
 import { logoDomainOf } from '@/lib/logo-domain';
+import { anyRefreshFailed, failedEmpty, type ReadState } from '@/lib/query-state';
 import { currentBillCategory } from '@/lib/retired-bill-categories';
 import type { DateRange } from '@/lib/range';
 import { lastUpdated } from '@/lib/source-updated';
@@ -114,13 +115,12 @@ const QUERY_TIMEOUT_MS = 12_000;
  * than a hand-written chain per hook, because an omitted query (a failed *charges* read) would
  * silently swap a recorded amount for the plan's projected one. A new input goes in one list.
  *
- * A read with data still cached has not failed: TanStack keeps `isError` true after a failed
- * background refetch (a resume on a weak network) while the last good answer stays in `data`, and
- * that answer is still the figure to show. This is TanStack's own `isLoadingError`. A combined
- * result with no `data` of its own passes its `isError` through, so it can be listed here too.
+ * A read with data still cached has not failed (`failedEmpty`): its last answer is still the figure
+ * to show, and the hook says so with `refreshFailed` instead. A combined result with no `data` of its
+ * own passes its `isError` through, so it can be listed here too.
  */
-function anyError(queries: readonly { isError: boolean; data?: unknown }[]): boolean {
-  return queries.some((query) => query.isError && query.data === undefined);
+function anyError(queries: readonly ReadState[]): boolean {
+  return queries.some(failedEmpty);
 }
 
 const LOGO_COLUMNS = 'logo_domain, logo_hidden';
@@ -1171,6 +1171,12 @@ export function useLedger(
     [allEntries],
   );
 
+  // Salary and charges count: missing income makes a net figure wrong, and a failed charges read
+  // substitutes the projected plan amount for the recorded one with nothing to say it is a guess.
+  // Recorded pay, loan payoffs and the accounts pay lands in count for the same reason.
+  const reads = [receipts, subscriptions, bills, salary, charges, pay, payoffs, accounts];
+  const isError = anyError(reads);
+
   return {
     /** What is listed: from the plan's window on. */
     entries,
@@ -1187,10 +1193,9 @@ export function useLedger(
       pay.isLoading ||
       payoffs.isLoading ||
       accounts.isLoading,
-    // Salary and charges count: missing income makes a net figure wrong, and a failed charges read
-    // substitutes the projected plan amount for the recorded one with nothing to say it is a guess.
-    // Recorded pay, loan payoffs and the accounts pay lands in count for the same reason.
-    isError: anyError([receipts, subscriptions, bills, salary, charges, pay, payoffs, accounts]),
+    isError,
+    /** The figures show, from a reload that failed behind them (RefreshNote). */
+    refreshFailed: !isError && anyRefreshFailed(reads),
     refetch: () => {
       receipts.refetch();
       subscriptions.refetch();
@@ -1313,10 +1318,12 @@ export function useBookFlows(today: string) {
   );
 
   const parts = [ledger, subscriptions, bills, charges];
+  const isError = anyError(parts);
   return {
     ...flows,
     isLoading: parts.some((part) => part.isLoading),
-    isError: anyError(parts),
+    isError,
+    refreshFailed: !isError && (ledger.refreshFailed || anyRefreshFailed(parts)),
     refetch: () => {
       for (const part of parts) void part.refetch();
     },
@@ -1369,13 +1376,15 @@ function useMoneyBook(today: string) {
   );
 
   const parts = [flows, cards, accounts, payments];
+  // Every part is a term in some balance, so a missing one would show a wrong figure as a real one.
+  const isError = anyError(parts);
   return {
     book,
     cards,
     accounts,
     isLoading: parts.some((part) => part.isLoading),
-    // Every part is a term in some balance, so a missing one would show a wrong figure as a real one.
-    isError: anyError(parts),
+    isError,
+    refreshFailed: !isError && (flows.refreshFailed || anyRefreshFailed(parts)),
     refetch: () => {
       for (const part of parts) void part.refetch();
     },
@@ -1384,7 +1393,7 @@ function useMoneyBook(today: string) {
 
 /** One card's or account's running balance and the entries behind it. */
 export function useSourceLedger(sourceId: string | undefined, today: string) {
-  const { book, cards, accounts, isLoading, isError, refetch } = useMoneyBook(today);
+  const { book, cards, accounts, isLoading, isError, refreshFailed, refetch } = useMoneyBook(today);
 
   const card = (cards.data ?? []).find((row) => row.id === sourceId);
   const account = (accounts.data ?? []).find((row) => row.id === sourceId);
@@ -1399,13 +1408,14 @@ export function useSourceLedger(sourceId: string | undefined, today: string) {
     ledger: source ? (book.sources.get(source.id) ?? null) : null,
     isLoading,
     isError,
+    refreshFailed,
     refetch,
   };
 }
 
 /** Live balances for every card and account, keyed by id. */
 export function useSourceBalances(today: string) {
-  const { book, cards, accounts, isError, refetch } = useMoneyBook(today);
+  const { book, cards, accounts, isError, refreshFailed, refetch } = useMoneyBook(today);
   const balances = useMemo(() => {
     const next = new Map<string, number>();
     for (const [id, ledger] of book.sources) next.set(id, ledger.balance);
@@ -1430,14 +1440,15 @@ export function useSourceBalances(today: string) {
      * opening figure as the live balance.
      */
     isError,
+    refreshFailed,
     refetch,
   };
 }
 
 /** Home's "Current balance": the person's accounts less what their cards owe, rolled on to today. */
 export function useCurrentBalance(today: string) {
-  const { book, isLoading, isError, refetch } = useMoneyBook(today);
-  return { ...book.current, isLoading, isError, refetch };
+  const { book, isLoading, isError, refreshFailed, refetch } = useMoneyBook(today);
+  return { ...book.current, isLoading, isError, refreshFailed, refetch };
 }
 
 export type LoanRow = {

@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueries } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 
@@ -7,10 +7,13 @@ import { usePayReceived } from '@/api/pay';
 import {
   useBankAccounts,
   useBills,
+  useCurrentBalance,
   useLedger,
   useLoanPayoffRows,
   useReceipts,
   useSalaryDetails,
+  useSourceBalances,
+  useSourceLedger,
   useSubscriptions,
 } from '@/api/queries';
 
@@ -190,6 +193,7 @@ async function loaded() {
   const view = await renderHook(useLedgerAndReads, { wrapper });
   await waitFor(() => expect(view.result.current.ledger.isLoading).toBe(false));
   expect(view.result.current.ledger.isError).toBe(false);
+  expect(view.result.current.ledger.refreshFailed).toBe(false);
   return { client, view };
 }
 
@@ -226,8 +230,9 @@ describe('useLedger after a failed background refetch', () => {
         isRefetchError: true,
       }),
     );
-    // ... and the ledger built in that same render is still the truth.
+    // ... and the ledger built in that same render is still the truth, and says it is older.
     expect(view.result.current.ledger.isError).toBe(false);
+    expect(view.result.current.ledger.refreshFailed).toBe(true);
     expect(figures(view.result.current.ledger)).toEqual(before);
   });
 
@@ -244,6 +249,7 @@ describe('useLedger after a failed background refetch', () => {
       ).toEqual([...LEDGER_TABLES]),
     );
     expect(view.result.current.ledger.isError).toBe(false);
+    expect(view.result.current.ledger.refreshFailed).toBe(true);
     expect(figures(view.result.current.ledger)).toEqual(before);
   });
 });
@@ -256,6 +262,7 @@ describe('useLedger when a read fails with nothing cached', () => {
 
     await waitFor(() => expect(result.current.ledger.isError).toBe(true));
     expect(result.current.reads[table]).toMatchObject({ isError: true, isLoadingError: true });
+    expect(result.current.ledger.refreshFailed).toBe(false);
   });
 
   it('reports an error once the cached answer is dropped and the read fails again', async () => {
@@ -267,5 +274,134 @@ describe('useLedger when a read fails with nothing cached', () => {
 
     await waitFor(() => expect(view.result.current.reads.charges.isLoadingError).toBe(true));
     expect(view.result.current.ledger.isError).toBe(true);
+    expect(view.result.current.ledger.refreshFailed).toBe(false);
   });
+
+  it('says the failure, not the note, when one read has nothing and another is only older', async () => {
+    const { client, view } = await loaded();
+
+    mockFailures.add('receipts');
+    mockFailures.add('charges');
+    await act(() => client.refetchQueries({ queryKey: ['receipts'] }));
+    await act(() => client.resetQueries({ queryKey: ['charges'] }));
+
+    await waitFor(() => {
+      expect(view.result.current.reads.receipts.isRefetchError).toBe(true);
+      expect(view.result.current.reads.charges.isLoadingError).toBe(true);
+    });
+    expect(view.result.current.ledger.isError).toBe(true);
+    expect(view.result.current.ledger.refreshFailed).toBe(false);
+  });
+});
+
+/** Every table the money book reads, by the key its read is cached under. */
+const BOOK_KEYS = {
+  cards: ['cards', 'user-1'],
+  bank_accounts: ['bank_accounts', 'user-1'],
+  payments: ['payments', 'user-1'],
+  receipts: ['receipts', 'user-1'],
+  subscriptions: ['subscriptions', 'user-1'],
+  bills: ['bills', 'user-1'],
+  salary_sources: ['salary_sources', 'user-1', 'details'],
+  charges: ['charges', 'user-1'],
+  pay_received: ['pay_received', 'user-1'],
+  loan_payoffs: ['loans', 'user-1', 'payoffs'],
+} as const;
+type BookTable = keyof typeof BOOK_KEYS;
+const BOOK_TABLES = Object.keys(BOOK_KEYS) as BookTable[];
+
+/**
+ * Home's balance, the Cards tab's balances and one card's page, beside a disabled observer on each
+ * read (it brings no queryFn, so every fetch is the hooks' own): the render where a read says it
+ * failed is the render whose figures are checked.
+ */
+function useBookAndReads() {
+  const probes = useQueries({
+    queries: BOOK_TABLES.map((table) => ({ queryKey: [...BOOK_KEYS[table]], enabled: false })),
+  });
+  return {
+    current: useCurrentBalance(TODAY),
+    balances: useSourceBalances(TODAY),
+    source: useSourceLedger('card-1', TODAY),
+    reads: Object.fromEntries(
+      BOOK_TABLES.map((table, i) => [
+        table,
+        { isRefetchError: probes[i].isRefetchError, isLoadingError: probes[i].isLoadingError },
+      ]),
+    ) as Record<BookTable, { isRefetchError: boolean; isLoadingError: boolean }>,
+  };
+}
+
+/** What each hook says about its reads, and the figures it shows. */
+const book = (view: ReturnType<typeof useBookAndReads>) => ({
+  states: [view.current, view.balances, view.source].map(({ isError, refreshFailed }) => ({
+    isError,
+    refreshFailed,
+  })),
+  figures: {
+    current: view.current.balance,
+    card: view.balances.balances.get('card-1'),
+    ledger: view.source.ledger?.balance,
+  },
+});
+const FRESH = { isError: false, refreshFailed: false };
+const OLDER = { isError: false, refreshFailed: true };
+const FAILED = { isError: true, refreshFailed: false };
+
+describe('the money book hooks after a failed background refetch', () => {
+  beforeEach(() => {
+    // The card the receipt and the bill were charged to: $500.00 owed on the 1st.
+    mockRows.cards = [
+      {
+        id: 'card-1',
+        holder: 'Sam',
+        network: 'Visa',
+        last4: '4421',
+        color: '#111111',
+        balance: 500,
+        balance_as_of: '2026-09-01',
+        bill_due_day: null,
+      },
+    ];
+  });
+
+  async function bookLoaded() {
+    const { client, wrapper } = setUp();
+    const view = await renderHook(useBookAndReads, { wrapper });
+    await waitFor(() => expect(view.result.current.current.isLoading).toBe(false));
+    expect(book(view.result.current).states).toEqual([FRESH, FRESH, FRESH]);
+    return { client, view };
+  }
+
+  it('starts from the hand-worked card', async () => {
+    const { view } = await bookLoaded();
+    // $500.00 owed, plus the $6.25 receipt and the $61.40 internet charge on it.
+    expect(book(view.result.current).figures).toMatchObject({ card: 567.65, ledger: 567.65 });
+  });
+
+  it.each(BOOK_TABLES)(
+    'keeps every figure and says it is older when a refetch of %s fails',
+    async (table) => {
+      const { client, view } = await bookLoaded();
+      const before = book(view.result.current).figures;
+
+      mockFailures.add(table);
+      await act(() => client.refetchQueries());
+      await waitFor(() => expect(view.result.current.reads[table].isRefetchError).toBe(true));
+
+      expect(book(view.result.current)).toEqual({ states: [OLDER, OLDER, OLDER], figures: before });
+    },
+  );
+
+  it.each(['cards', 'payments', 'charges'] as const)(
+    'says the failure, not the note, when %s fails with nothing cached',
+    async (table) => {
+      mockFailures.add(table);
+      const { wrapper } = setUp();
+      const { result } = await renderHook(useBookAndReads, { wrapper });
+
+      await waitFor(() => expect(result.current.reads[table].isLoadingError).toBe(true));
+      expect(book(result.current).states).toEqual([FAILED, FAILED, FAILED]);
+    },
+  );
 });

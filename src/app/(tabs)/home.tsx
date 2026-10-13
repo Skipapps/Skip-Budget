@@ -15,6 +15,7 @@ import { DateSelector } from '@/components/dashboard/date-selector';
 import { TransactionRow } from '@/components/dashboard/transaction-row';
 import { DateGroupHeader } from '@/components/ui/date-group-header';
 import { DatePicker } from '@/components/ui/date-picker';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { TextLink } from '@/components/ui/text-link';
@@ -176,6 +177,9 @@ export default function HomeScreen() {
           loading={balance.isLoading}
           error={balance.isError}
         />
+        {/* Recent and Coming up read the same lists as the month, so this covers them too. Never
+            beside the balance card's failure line. */}
+        <RefreshNote show={(balance.refreshFailed || month.refreshFailed) && !balance.isError} />
       </View>
 
       <View className="mt-6 w-full">

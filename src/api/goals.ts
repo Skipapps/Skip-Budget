@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { lacksSavings, moneyArg, useGoalMoves, useInvalidateSavings } from '@/api/savings';
 import { withTimeout } from '@/lib/deadline';
 import { goalProgress, goalsSummary, type GoalRow, type GoalView } from '@/lib/goals';
+import { anyRefreshFailed, failedEmpty } from '@/lib/query-state';
 import { supabase } from '@/lib/supabase';
 import { useToday } from '@/lib/use-today';
 import { useUserId } from '@/providers/session-provider';
@@ -85,6 +86,8 @@ export function useGoals() {
     summary,
     isPending: goals.isPending || moves.isPending,
     isError: goals.isError || moves.isError,
+    /** The figures show, from a reload that failed behind them (RefreshNote). */
+    refreshFailed: !failedEmpty(goals) && !failedEmpty(moves) && anyRefreshFailed([goals, moves]),
     refetch: () => {
       void goals.refetch();
       void moves.refetch();

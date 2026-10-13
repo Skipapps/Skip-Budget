@@ -35,15 +35,20 @@ jest.mock('expo-router', () => ({
 // The real SDK starts a cleanup interval on import that keeps Jest from exiting.
 jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
 
-// The two cards above the lists are read by the props they are given.
+// The two cards above the lists are read by the props they are given. The balance card leaves a
+// marker, so what is drawn straight under it can be found.
 const mockCard = jest.fn();
 const mockDestinations = jest.fn();
-jest.mock('@/components/dashboard/balance-summary', () => ({
-  BalanceSummary: (props: unknown) => {
-    mockCard(props);
-    return null;
-  },
-}));
+jest.mock('@/components/dashboard/balance-summary', () => {
+  const { createElement } = jest.requireActual('react');
+  const { View } = jest.requireActual('react-native');
+  return {
+    BalanceSummary: (props: unknown) => {
+      mockCard(props);
+      return createElement(View, { testID: 'balance-card' });
+    },
+  };
+});
 jest.mock('@/components/dashboard/destination-list', () => ({
   DestinationList: (props: unknown) => {
     mockDestinations(props);
@@ -85,13 +90,14 @@ jest.mock('@/api/refresh', () => ({
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'user-1' }));
 
 const mockRows: Record<string, unknown[]> = {};
-// Every table fails while this is on.
+// Every table fails while this is on; the tables in mockFailing fail on their own.
 let mockOffline = false;
+const mockFailing = new Set<string>();
 
 jest.mock('@/lib/supabase', () => {
   const build = (table: string) => {
     const answer = () =>
-      mockOffline
+      mockOffline || mockFailing.has(table)
         ? { data: null, error: new Error(`${table} is unreachable`) }
         : { data: mockRows[table] ?? [], error: null };
     const builder: Record<string, unknown> = {
@@ -123,6 +129,7 @@ jest.useFakeTimers({
 });
 
 const BAKERY = 'Bakery, -$6.00, Receipt';
+const NOTE = 'Couldn’t refresh · showing your last figures';
 const INTERNET = 'Internet, -$59.99, Bill';
 
 const PROBED_READS = 9;
@@ -174,6 +181,27 @@ const failedWithData = (client: QueryClient) =>
     .map((query) => String(query.queryKey[0]))
     .sort();
 
+/** Every marker and line Home draws, top to bottom. */
+function drawnInOrder(): string[] {
+  const out: string[] = [];
+  const walk = (node: unknown): void => {
+    if (node == null) return;
+    if (typeof node === 'string') {
+      out.push(node);
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    const element = node as { props?: { testID?: string }; children?: unknown[] | null };
+    if (element.props?.testID) out.push(`#${element.props.testID}`);
+    (element.children ?? []).forEach(walk);
+  };
+  walk(screen.toJSON());
+  return out;
+}
+
 /** What "Where your money went" was last handed. */
 const month = () => {
   const props = mockDestinations.mock.lastCall?.[0];
@@ -182,6 +210,7 @@ const month = () => {
 
 beforeEach(() => {
   mockOffline = false;
+  mockFailing.clear();
   mockCard.mockClear();
   mockDestinations.mockClear();
   for (const table of Object.keys(mockRows)) delete mockRows[table];
@@ -269,6 +298,43 @@ describe('Home after a failed background refetch', () => {
     expect(screen.getByLabelText(BAKERY)).toBeTruthy();
     expect(screen.getByLabelText(INTERNET)).toBeTruthy();
     expect(month()).toEqual(before);
+    // Said once, straight under the balance card.
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    const drawn = drawnInOrder();
+    expect(drawn[drawn.indexOf('#balance-card') + 1]).toBe(NOTE);
+  });
+
+  it('says nothing about refreshing while every read is fresh', async () => {
+    await show();
+    expect(await screen.findByLabelText(BAKERY)).toBeTruthy();
+    await waitFor(() => expect(mockCard.mock.lastCall?.[0]).toMatchObject({ loading: false }));
+
+    expect(screen.queryByText(NOTE)).toBeNull();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+  });
+
+  it.each([
+    // A term of the balance only.
+    ['cards', 1],
+    // A term of the balance and of the month.
+    ['receipts', 1],
+    // Pay, behind the month's income and the balance.
+    ['salary_sources', 1],
+  ])('shows the note when only %s fails to reload behind its figures', async (table, reads) => {
+    const client = await show();
+    expect(await screen.findByLabelText(BAKERY)).toBeTruthy();
+    await waitFor(() => expect(mockCard.mock.lastCall?.[0]).toMatchObject({ loading: false }));
+    const before = { card: mockCard.mock.lastCall?.[0], month: month() };
+
+    mockFailing.add(table);
+    await act(() => client.refetchQueries());
+    await waitFor(() =>
+      expect(screen.getByTestId('refetch-errors').props.children).toBe(String(reads)),
+    );
+
+    expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect({ card: mockCard.mock.lastCall?.[0], month: month() }).toEqual(before);
   });
 
   it('keeps the Current balance when every read fails', async () => {
@@ -299,6 +365,29 @@ describe('Home after a failed background refetch', () => {
   });
 });
 
+describe('Home when the balance has nothing to show but the month does', () => {
+  it('says the failure on the balance with no note beside it, and keeps the month figures', async () => {
+    const client = await show();
+    expect(await screen.findByLabelText(BAKERY)).toBeTruthy();
+    await waitFor(() => expect(month().loading).toBe(false));
+    const before = month();
+
+    // The cards read loses its answer and fails again; the receipts read fails behind its own.
+    mockFailing.add('cards');
+    mockFailing.add('receipts');
+    await act(() => client.refetchQueries({ queryKey: ['receipts'] }));
+    await act(() => client.resetQueries({ queryKey: ['cards'] }));
+    await waitFor(() => {
+      expect(mockCard.mock.lastCall?.[0]).toMatchObject({ error: true });
+      expect(screen.getByTestId('refetch-errors').props.children).toBe('1');
+    });
+
+    expect(month()).toEqual(before);
+    // The note never sits beside a failure line, though the month's figures are the older ones.
+    expect(screen.queryByText(NOTE)).toBeNull();
+  });
+});
+
 describe('Home when the reads fail with nothing cached', () => {
   it('says so in Recent, Coming up, the month figures and the balance', async () => {
     mockOffline = true;
@@ -310,5 +399,7 @@ describe('Home when the reads fail with nothing cached', () => {
     expect(screen.queryByLabelText(INTERNET)).toBeNull();
     expect(month().error).toBe(true);
     expect(mockCard.mock.lastCall?.[0]).toMatchObject({ error: true });
+    // Nothing older is showing, so there is nothing to say about refreshing.
+    expect(screen.queryByText(NOTE)).toBeNull();
   });
 });

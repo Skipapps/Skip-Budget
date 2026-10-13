@@ -32,4 +32,9 @@ export const commonMessages = defineMessages({
     es: 'Algo salió mal. Inténtalo de nuevo.',
     fr: 'Une erreur est survenue. Réessaie.',
   },
+  'common.refreshFailed': {
+    en: 'Couldn’t refresh · showing your last figures',
+    es: 'No se pudo actualizar · mostrando tus últimas cifras',
+    fr: 'Impossible d’actualiser · voici tes derniers chiffres',
+  },
 });

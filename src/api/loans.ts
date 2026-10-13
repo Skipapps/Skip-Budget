@@ -22,6 +22,7 @@ import { countsInSpending, withSpendingFlag } from '@/lib/bill-spending';
 import type { LoanTerms } from '@/lib/loan';
 import { loanTermsForBill } from '@/lib/loan-start';
 import { withTimeout } from '@/lib/deadline';
+import { anyRefreshFailed, failedEmpty } from '@/lib/query-state';
 import { supabase } from '@/lib/supabase';
 import { useUserId } from '@/providers/session-provider';
 
@@ -58,14 +59,14 @@ export function useActiveLoans(today: string) {
     [bills.data, loanBillIds.data, today],
   );
 
+  // A failed read must not pass for "no loans", which would offer to add one.
+  const isError = failedEmpty(bills) || failedEmpty(loanBillIds);
   return {
     loans,
     isPending: bills.isPending || loanBillIds.isPending,
-    // A failed read must not pass for "no loans", which would offer to add one. A failed reload
-    // still holding its last answer has not lost it (TanStack keeps `isError` true for that too).
-    isError:
-      (bills.isError && bills.data === undefined) ||
-      (loanBillIds.isError && loanBillIds.data === undefined),
+    isError,
+    /** The list shows, from a reload that failed behind it (RefreshNote). */
+    refreshFailed: !isError && anyRefreshFailed([bills, loanBillIds]),
     refetch: () => {
       void bills.refetch();
       void loanBillIds.refetch();

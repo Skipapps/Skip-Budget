@@ -14,6 +14,7 @@ import { PaymentCard } from '@/components/cards/payment-card';
 import { ActionPill } from '@/components/ui/action-pill';
 import { FitGroup, useFitGroup } from '@/components/ui/fit-group';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Screen } from '@/components/ui/screen';
 import { SectionHeading, Title } from '@/components/ui/typography';
@@ -27,6 +28,7 @@ import { incomeForMonth } from '@/lib/pay';
 import { useToday } from '@/lib/use-today';
 import { t } from '@/i18n';
 import { failureText } from '@/lib/failure';
+import { refreshFailed } from '@/lib/query-state';
 import { formatCurrency } from '@/lib/format';
 import { TEXT_CAP } from '@/theme/text-scale';
 
@@ -102,6 +104,7 @@ export default function CardsScreen() {
     balances,
     updated,
     isError: balancesError,
+    refreshFailed: balancesRefreshFailed,
     refetch: refetchBalances,
   } = useSourceBalances(today);
   const { refresh, refreshing } = useRefreshAll();
@@ -151,8 +154,10 @@ export default function CardsScreen() {
   const hasSalary = (salary.data?.length ?? 0) > 0;
   const loanList = loans.loans;
   const activeGoals = goals.summary.active;
-  const savingsUnread = savings.isError && savings.pots.length === 0;
-  const goalsUnread = goals.isError && goals.goals.length === 0;
+  // A read that failed with nothing cached leaves a figure built without it (savings held with no
+  // moves out, a reached goal still counted active), so the tile says nothing rather than that.
+  const savingsUnread = savings.isError && !savings.refreshFailed;
+  const goalsUnread = goals.isError && !goals.refreshFailed;
 
   const tiles: Tile[] = [
     {
@@ -196,9 +201,11 @@ export default function CardsScreen() {
       label: t('cards.money.goals'),
       value: goals.isPending
         ? { kind: 'loading' }
-        : activeGoals.length > 0
-          ? { kind: 'figure', text: t('cards.money.goalsActive', { count: activeGoals.length }) }
-          : { kind: 'pill', text: goalsUnread ? t('cards.money.open') : t('cards.money.addGoal') },
+        : goalsUnread
+          ? { kind: 'pill', text: t('cards.money.open') }
+          : activeGoals.length > 0
+            ? { kind: 'figure', text: t('cards.money.goalsActive', { count: activeGoals.length }) }
+            : { kind: 'pill', text: t('cards.money.addGoal') },
       // The Goals page lists them, or invites a first one, so any count opens it.
       onPress: () => router.push('/goals'),
     },
@@ -349,6 +356,15 @@ export default function CardsScreen() {
             ))}
           </FitGroup>
         </FitGroup>
+        <RefreshNote
+          show={
+            balancesRefreshFailed ||
+            refreshFailed(salary) ||
+            loans.refreshFailed ||
+            savings.refreshFailed ||
+            goals.refreshFailed
+          }
+        />
       </FitGroup>
     </Screen>
   );
