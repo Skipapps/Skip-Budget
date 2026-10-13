@@ -60,6 +60,10 @@ jest.mock('@/providers/theme-provider', () => ({
     surface: '#FFFFFF',
     onControl: '#FFFFFF',
     accentInk: '#5B3A6B',
+    // The bill and subscription pages' card pills and reminder clock.
+    card: '#FFFFFF',
+    accent: '#905479',
+    control: '#111111',
   }),
 }));
 jest.mock('@/theme/artwork', () => ({
@@ -97,6 +101,17 @@ jest.mock('@/api/mutations', () => ({
   useCreateReceipt: () => ({ mutateAsync: mockCreateReceipt }),
   useCreateBill: () => ({ mutateAsync: mockCreateBill }),
   useCreateSubscription: () => ({ mutateAsync: jest.fn() }),
+  useUpdateBill: () => ({ mutateAsync: jest.fn() }),
+  useUpdateSubscription: () => ({ mutateAsync: jest.fn() }),
+}));
+
+// The real reminder choices and wording; only the reminder's own write is replaced.
+jest.mock('@/lib/supabase', () => ({ supabase: {} }));
+jest.mock('@/api/push', () => ({ enableReminders: jest.fn() }));
+const mockApplyReminder = jest.fn(async (..._args: unknown[]) => {});
+jest.mock('@/api/reminders', () => ({
+  ...jest.requireActual('@/api/reminders'),
+  useApplyReminder: () => mockApplyReminder,
 }));
 jest.mock('@/api/known-stores', () => ({
   matchKnownStores: () => [],
@@ -288,16 +303,24 @@ describe('/voice-review in Spanish', () => {
       'Hace falta para guardar. Abre «importe» para agregarlo.',
     );
     expect(screen.getByText('Toca para agregar el importe')).toBeTruthy();
-    expect(screen.getByLabelText('Próxima renovación, sin definir, opcional')).toBeTruthy();
-    expect(screen.getByText('Próxima renovación · Opcional')).toBeTruthy();
-    expect(screen.getAllByText('Sin definir').length).toBeGreaterThan(0);
+    // Required, as on the form: a gap to fill, not "Not set".
+    expect(screen.getByLabelText('Próxima renovación, obligatorio')).toBeTruthy();
+    expect(screen.getByText('Próxima renovación')).toBeTruthy();
+    expect(screen.getByText('Se cobra a')).toBeTruthy();
+    expect(screen.getByText('Recordatorio')).toBeTruthy();
+    expect(screen.getByLabelText('Sin recordatorio')).toBeTruthy();
     expect(screen.getByText('Ciclo de cobro')).toBeTruthy();
     expect(screen.getByLabelText('Semanal')).toBeTruthy();
     expect(screen.getByLabelText('Mensual').props.accessibilityState.selected).toBe(true);
     expect(screen.getByLabelText('Trimestral')).toBeTruthy();
     expect(screen.getByLabelText('Anual')).toBeTruthy();
-    expect(screen.getByText('Se cobra a · Opcional')).toBeTruthy();
-    expect(screen.getByText('Ingresa cuánto cuesta.')).toBeTruthy();
+    // Save names every gap at once, in the page's order, as the form does.
+    await press(screen, 'Guardar suscripción');
+    expect(
+      screen.getByText(
+        'Para guardar la suscripción, completa: Importe, Próxima renovación, Se cobra a, Recordatorio.',
+      ),
+    ).toBeTruthy();
     expectNoRawKeys(screen);
   });
 
@@ -376,7 +399,9 @@ describe('/voice-review in French', () => {
     expect(screen.getByLabelText('Chaque mois').props.accessibilityState.selected).toBe(true);
     expect(screen.getByLabelText('Tous les 3 mois')).toBeTruthy();
     expect(screen.getByLabelText('Chaque année')).toBeTruthy();
-    expect(screen.getByText('Payée avec · Facultatif')).toBeTruthy();
+    expect(screen.getByText('Payée avec')).toBeTruthy();
+    expect(screen.getByText('Rappel')).toBeTruthy();
+    expect(screen.getByLabelText('Aucun rappel')).toBeTruthy();
     expect(screen.getByLabelText('Note, non défini, facultatif')).toBeTruthy();
     expectNoRawKeys(screen);
   });
@@ -387,6 +412,8 @@ describe('/voice-review in French', () => {
 
     await press(screen, 'Chaque année');
     expect(screen.getByLabelText('Chaque année').props.accessibilityState.selected).toBe(true);
+    await press(screen, 'Skip');
+    await press(screen, 'Aucun rappel');
     await press(screen, 'Enregistrer la facture');
     expect(mockCreateBill).toHaveBeenCalledWith(
       expect.objectContaining({ recurrence: 'yearly', next_due_on: '2026-10-15' }),
@@ -407,9 +434,14 @@ describe('/voice-review in French', () => {
 
 describe('/voice-review bill names', () => {
   const WORDS = {
-    en: { name: 'Name', energy: 'Electricity & Gas', save: 'Save bill' },
-    es: { name: 'Nombre', energy: 'Luz y gas', save: 'Guardar factura' },
-    fr: { name: 'Nom', energy: 'Électricité et gaz', save: 'Enregistrer la facture' },
+    en: { name: 'Name', energy: 'Electricity & Gas', save: 'Save bill', off: 'No reminder' },
+    es: { name: 'Nombre', energy: 'Luz y gas', save: 'Guardar factura', off: 'Sin recordatorio' },
+    fr: {
+      name: 'Nom',
+      energy: 'Électricité et gaz',
+      save: 'Enregistrer la facture',
+      off: 'Aucun rappel',
+    },
   } as const;
   const DUE = { ...BILL, date: '2026-10-15' };
 
@@ -421,6 +453,9 @@ describe('/voice-review bill names', () => {
     const words = WORDS[language];
 
     expect(screen.getByLabelText(`${words.name}, ${billName ?? words.energy}`)).toBeTruthy();
+    // "Skip" is the app's name in every language.
+    await press(screen, 'Skip');
+    await press(screen, words.off);
     await press(screen, words.save);
     expect(mockCreateBill).toHaveBeenCalledTimes(1);
     const saved = mockCreateBill.mock.calls[0][0];

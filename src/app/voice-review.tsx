@@ -18,11 +18,19 @@ import {
   useCreateBill,
   useCreateReceipt,
   useCreateSubscription,
+  useUpdateBill,
+  useUpdateSubscription,
   type BillValues,
   type ReceiptValues,
   type SubscriptionValues,
 } from '@/api/mutations';
 import { usePaymentSources } from '@/api/queries';
+import {
+  DEFAULT_REMIND_AT,
+  choiceToLead,
+  useApplyReminder,
+  type ReminderChoice,
+} from '@/api/reminders';
 import { useRememberStore } from '@/api/known-stores';
 import { useLearnVoiceAlias, useVoiceAliases } from '@/api/voice-aliases';
 import { BillIconWell } from '@/components/bills/bill-icon';
@@ -40,6 +48,8 @@ import {
 import { useProGate } from '@/components/pro/pro-gate';
 import { cycleLabel } from '@/components/subscriptions/subscription-row';
 import { ChoiceChips } from '@/components/ui/choice-chips';
+import { ReminderField } from '@/components/ui/reminder-field';
+import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextLink } from '@/components/ui/text-link';
 import { FieldLabel } from '@/components/ui/typography';
 import { StaleDraft } from '@/components/voice/stale-draft';
@@ -199,6 +209,9 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   const toast = useToast();
   const createBill = useCreateBill();
   const createSubscription = useCreateSubscription();
+  const updateBill = useUpdateBill();
+  const updateSubscription = useUpdateSubscription();
+  const applyReminder = useApplyReminder();
   const proWrite = useProWrite();
 
   const { id, draft, entry, touched, edited } = session;
@@ -212,6 +225,22 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
 
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Bills and subscriptions ask, as their forms do, how they are paid and whether to remind; nothing
+  // heard answers either. Skip is an answer, picked on purpose, and so is "No reminder".
+  const [sourceAnswered, setSourceAnswered] = useState(false);
+  const [reminder, setReminder] = useState<ReminderChoice | null>(null);
+  const [remindAt, setRemindAt] = useState(DEFAULT_REMIND_AT);
+  // What Save found still unanswered, or a builder's check; it no longer applies once the entry
+  // changes.
+  const [problem, setProblem] = useState<string | null>(null);
+  const [problemEntry, setProblemEntry] = useState(entry);
+  if (problemEntry !== entry) {
+    setProblemEntry(entry);
+    setProblem(null);
+  }
+  // The bill or subscription once filed: Save again after its reminder failed updates that row and
+  // retries the reminder. Nothing here may file it a second time, under its kind or another.
+  const [filed, setFiled] = useState<string | null>(null);
   // The row id for what this page saves, so a Save repeated after a lost answer finds the row the
   // first may have filed instead of filing a second (`insertOnce`).
   const [newId] = useState(() => randomUUID());
@@ -264,18 +293,42 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
     clearVoiceDraft();
   };
 
+  /** Saved: the toast, what a correction teaches, and Home. Back's way out once a row is filed. */
+  const leaveSaved = () => {
+    success();
+    toast(
+      kind === 'receipt'
+        ? 'toast.receipt.added'
+        : kind === 'bill'
+          ? 'toast.bill.added'
+          : 'toast.subscription.added',
+    );
+    // Taught only now, and only when the person put a different name on what was heard: "spot a
+    // fly" saved as Spotify.
+    const lesson = lessonFrom(draft, entry, touched);
+    // Best-effort and never rejects: a lost lesson is learned next time.
+    if (lesson) void learnAlias(lesson.heard, lesson.canonical);
+    discard();
+    router.dismissTo('/home');
+  };
+
   const handleBack = async () => {
-    if (edited && !(await askToDiscard())) return;
+    if (filed) {
+      // A save still writing the reminder leaves by itself.
+      if (!busy.current) go(leaveSaved);
+      return;
+    }
+    if (changed && !(await askToDiscard())) return;
     go(() => {
-      if (edited) discard();
+      if (changed) discard();
       router.back();
     });
   };
 
   const handleSayAgain = async () => {
-    if (edited && !(await askToDiscard())) return;
+    if (changed && !(await askToDiscard())) return;
     go(() => {
-      if (edited) discard();
+      if (changed) discard();
       router.dismissTo('/voice');
     });
   };
@@ -294,27 +347,75 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
     );
   };
 
+  const asks = kind !== 'receipt';
+  const sourceGiven = sourceAnswered || entry.sourceId !== null;
+  // Answers kept on this page count as changes too: leaving would throw them away.
+  const changed = edited || sourceAnswered || reminder !== null;
+
+  /** A bill's or subscription's unanswered lines, in the page's order and its own words. */
+  const unanswered = (): string[] =>
+    [
+      entry.amount === null && t('voice.review.amount'),
+      !(kind === 'bill' ? voiceBillName(entry, categoryLabel) : entry.merchant) && copy.merchant,
+      kind === 'bill' && !entry.billCategoryId && t('voice.review.category'),
+      !entry.date && copy.date,
+      !sourceGiven && copy.paidWith,
+      reminder === null && t('ui.reminder.label'),
+    ].filter((field): field is string => Boolean(field));
+
   const save = async () => {
-    if (busy.current || !built?.ok) return;
+    if (busy.current) return;
+    setFailed(false);
+    setProblem(null);
+    if (asks) {
+      const missing = unanswered();
+      if (missing.length > 0) {
+        warn();
+        setProblem(
+          t(kind === 'bill' ? 'bills.add.missing' : 'subscriptions.add.missing', {
+            fields: missing.join(', '),
+          }),
+        );
+        return;
+      }
+    }
+    if (!built?.ok) {
+      if (built) {
+        warn();
+        setProblem(built.message);
+      }
+      return;
+    }
     busy.current = true;
     setSaving(true);
-    setFailed(false);
     try {
       // The logo the person chose for a store the catalogue does not know; nothing when they did
       // not answer, so such a store saves as letters, as in the forms.
       const logo = logoColumns(entry.merchant);
-      const saved = await proWrite.run(() =>
-        built.kind === 'receipt'
-          ? createReceipt.mutateAsync({
+      const saved = await proWrite.run(async () => {
+        if (built.kind === 'receipt') {
+          return (
+            await createReceipt.mutateAsync({
               id: newId,
               ...built.values,
               ...logo,
               ...(voiceBook && books.length > 0 ? { book_id: bookColumn(voiceBook) } : {}),
             })
-          : built.kind === 'bill'
+          ).id;
+        }
+        const values = { ...built.values, ...logo };
+        if (filed) {
+          await (built.kind === 'bill'
+            ? updateBill.mutateAsync({ id: filed, values })
+            : updateSubscription.mutateAsync({ id: filed, values }));
+          return filed;
+        }
+        return (
+          await (built.kind === 'bill'
             ? createBill.mutateAsync({ id: newId, ...built.values, ...logo })
-            : createSubscription.mutateAsync({ id: newId, ...built.values, ...logo }),
-      );
+            : createSubscription.mutateAsync({ id: newId, ...built.values, ...logo }))
+        ).id;
+      });
       if (saved.status !== 'saved') {
         setSaving(false);
         busy.current = false;
@@ -326,21 +427,12 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
         return;
       }
 
-      success();
-      toast(
-        built.kind === 'receipt'
-          ? 'toast.receipt.added'
-          : built.kind === 'bill'
-            ? 'toast.bill.added'
-            : 'toast.subscription.added',
-      );
-      // Taught only now, and only when the person put a different name on what was heard: "spot a
-      // fly" saved as Spotify.
-      const lesson = lessonFrom(draft, entry, touched);
-      // Best-effort and never rejects: a lost lesson is learned next time.
-      if (lesson) void learnAlias(lesson.heard, lesson.canonical);
-      discard();
-      router.dismissTo('/home');
+      // After the row exists, because a reminder points at one.
+      if (built.kind !== 'receipt' && reminder !== null) {
+        setFiled(saved.value);
+        await applyReminder(built.kind, saved.value, choiceToLead(reminder), remindAt);
+      }
+      leaveSaved();
       // `busy` stays set: the page is leaving, and nothing on it may save again.
     } catch (thrown) {
       setSaving(false);
@@ -481,16 +573,64 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
               key: 'renewal',
               label: copy.date,
               value: dayValue,
+              required: true,
               leading: <GlyphWell icon={CalendarDays} />,
               onPress: () => edit('date'),
             },
           ];
 
-  const rows: EntryRowSpec[] = [
-    merchantRow,
-    ...kindRows,
-    // Without a card or account there is nothing to choose between, as in the forms.
-    ...(sources.length > 0
+  const pickSource = (next: string | null) => {
+    setSourceAnswered(true);
+    if (next !== entry.sourceId) updateVoiceEntry(id, { sourceId: next });
+  };
+
+  // A bill or subscription answers both inline, as its form does; a receipt keeps its own page.
+  const answerRows: EntryRowSpec[] = asks
+    ? [
+        {
+          key: 'paidWith',
+          field: (
+            <View className="w-full">
+              <FieldLabel className="mb-2">{copy.paidWith}</FieldLabel>
+              <SourceTiles
+                sources={sources}
+                value={entry.sourceId ?? ''}
+                onChange={pickSource}
+                skip={{
+                  label: t(
+                    kind === 'bill' ? 'bills.add.skipSource' : 'subscriptions.add.skipSource',
+                  ),
+                  selected: sourceAnswered && entry.sourceId === null,
+                  onPress: () => pickSource(null),
+                }}
+              />
+            </View>
+          ),
+        },
+        {
+          key: 'reminder',
+          field: (
+            <ReminderField
+              kind={kind}
+              value={reminder}
+              onChange={(choice) => {
+                setProblem(null);
+                setReminder(choice);
+              }}
+              time={remindAt}
+              onTimeChange={(at) => {
+                setProblem(null);
+                setRemindAt(at);
+              }}
+              offLabel={t(
+                kind === 'bill' ? 'bills.add.noReminder' : 'subscriptions.add.noReminder',
+              )}
+            />
+          ),
+        },
+      ]
+    : // Without a card or account there is nothing to choose between, as in the form.
+      sources.length > 0
       ? [
           {
             key: 'paidWith',
@@ -500,7 +640,12 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
             onPress: () => edit('source'),
           },
         ]
-      : []),
+      : [];
+
+  const rows: EntryRowSpec[] = [
+    merchantRow,
+    ...kindRows,
+    ...answerRows,
     {
       key: 'note',
       label: copy.note,
@@ -516,7 +661,9 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
   return (
     <EntryReview
       title={copy.title}
-      closePrompt={copy.closePrompt}
+      // Once a row is filed there is nothing here to throw away: no close, and Back leaves the way a
+      // save does.
+      closePrompt={filed ? '' : copy.closePrompt}
       onClose={() =>
         go(() => {
           discard();
@@ -526,7 +673,7 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
       onBack={() => void handleBack()}
       // Once anything has been changed, the edge swipe would throw it away without a word, so it is
       // off and back asks first.
-      root={!edited}
+      root={!changed && !filed}
       amountLabel={t('voice.review.amount')}
       amount={amountText(entry.amount)}
       onEditAmount={() => edit('amount')}
@@ -595,11 +742,16 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
             </Text>
           </View>
 
-          <FieldLabel className="mt-6 w-full">{t('voice.review.addAs')}</FieldLabel>
-          <View className="mt-2 w-full">
-            <ChoiceChips options={KIND_OPTIONS} value={kind} onChange={changeKind} />
-          </View>
-          {!draft.kindSure && !touched.includes('kind') ? (
+          {/* Filed, another kind would be a second row in another list. */}
+          {filed ? null : (
+            <>
+              <FieldLabel className="mt-6 w-full">{t('voice.review.addAs')}</FieldLabel>
+              <View className="mt-2 w-full">
+                <ChoiceChips options={KIND_OPTIONS} value={kind} onChange={changeKind} />
+              </View>
+            </>
+          )}
+          {!filed && !draft.kindSure && !touched.includes('kind') ? (
             <Text
               className="mt-2 w-full font-app text-[13px] text-muted"
               maxFontSizeMultiplier={TEXT_CAP.reading}
@@ -638,25 +790,29 @@ function Review({ session, onLeave }: { session: VoiceSession; onLeave: () => vo
       primaryLabel={
         proWrite.checking ? t('pro.confirm.wait') : saving ? t('voice.review.saving') : copy.save
       }
-      primaryDisabled={saving || !built?.ok}
+      // A bill or subscription is never greyed out for a gap: Save says what is still missing.
+      primaryDisabled={saving || (!asks && !built?.ok)}
       onPrimary={() => void save()}
-      // What still blocks Save, in the forms' own words, until a save has failed.
-      error={failed ? failureText() : null}
-      hint={failed ? null : hint}
+      error={failed ? failureText() : problem}
+      // A receipt's Save says ahead what still blocks it, in the form's own words.
+      hint={failed || asks ? null : hint}
       footerSlot={
-        <View className="w-full flex-row flex-wrap justify-center gap-x-8">
-          <TextLink
-            label={t('voice.review.sayAgain')}
-            variant="subtle"
-            onPress={() => void handleSayAgain()}
-          />
-          <TextLink
-            label={t('voice.review.moreOptions')}
-            variant="subtle"
-            accessibilityHint={t('voice.review.moreOptionsHint')}
-            onPress={() => go(() => router.push(entryToForm(entry)))}
-          />
-        </View>
+        // Filed, saying it again or opening the form would file a second one.
+        filed ? undefined : (
+          <View className="w-full flex-row flex-wrap justify-center gap-x-8">
+            <TextLink
+              label={t('voice.review.sayAgain')}
+              variant="subtle"
+              onPress={() => void handleSayAgain()}
+            />
+            <TextLink
+              label={t('voice.review.moreOptions')}
+              variant="subtle"
+              accessibilityHint={t('voice.review.moreOptionsHint')}
+              onPress={() => go(() => router.push(entryToForm(entry)))}
+            />
+          </View>
+        )
       }
     />
   );
@@ -671,8 +827,7 @@ type BuiltEntry =
 
 /**
  * The entry through its form's own builder. A new item has no charge on record and nothing counted
- * yet, so both floors are no-ops, as for a new item saved from the form. No reminder: the default
- * is Off.
+ * yet, so both floors are no-ops, as for a new item saved from the form.
  */
 function buildFor(
   entry: VoiceEntry,

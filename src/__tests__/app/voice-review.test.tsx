@@ -94,6 +94,10 @@ jest.mock('@/providers/theme-provider', () => ({
     surface: '#FFFFFF',
     onControl: '#FFFFFF',
     accentInk: '#5B3A6B',
+    // The bill and subscription pages' card pills and reminder clock.
+    card: '#FFFFFF',
+    accent: '#905479',
+    control: '#111111',
   }),
 }));
 jest.mock('@/theme/artwork', () => ({
@@ -111,6 +115,9 @@ jest.mock('@/api/confirm-pro', () => {
   const actual = jest.requireActual('@/api/confirm-pro');
   return { ...actual, useProWrite: () => actual.useProWrite(() => mockConfirmPro()) };
 });
+
+const mockToast = jest.fn();
+jest.mock('@/providers/toast-context', () => ({ useToast: () => mockToast }));
 
 jest.mock('@/lib/haptics', () => ({
   tap: jest.fn(),
@@ -155,10 +162,23 @@ jest.mock('expo-crypto', () => ({ randomUUID: jest.fn() }));
 const mockCreateReceipt = jest.fn();
 const mockCreateBill = jest.fn();
 const mockCreateSubscription = jest.fn();
+const mockUpdateBill = jest.fn();
+const mockUpdateSubscription = jest.fn();
 jest.mock('@/api/mutations', () => ({
   useCreateReceipt: () => ({ mutateAsync: mockCreateReceipt }),
   useCreateBill: () => ({ mutateAsync: mockCreateBill }),
   useCreateSubscription: () => ({ mutateAsync: mockCreateSubscription }),
+  useUpdateBill: () => ({ mutateAsync: mockUpdateBill }),
+  useUpdateSubscription: () => ({ mutateAsync: mockUpdateSubscription }),
+}));
+
+// The real reminder choices and wording; only the reminder's own write is replaced.
+jest.mock('@/lib/supabase', () => ({ supabase: {} }));
+jest.mock('@/api/push', () => ({ enableReminders: jest.fn() }));
+const mockApplyReminder = jest.fn(async (..._args: unknown[]) => {});
+jest.mock('@/api/reminders', () => ({
+  ...jest.requireActual('@/api/reminders'),
+  useApplyReminder: () => mockApplyReminder,
 }));
 
 const mockLearn = jest.fn(async () => {});
@@ -254,6 +274,12 @@ const isDisabled = (screen: Screen, label: string) =>
 const isLit = (screen: Screen, label: string) =>
   Boolean(screen.getByLabelText(label).props.accessibilityState?.selected);
 
+/** What a bill or subscription asks on top of what was heard: how it is paid, and a reminder. */
+async function answer(screen: Screen, source = 'Skip', reminder = 'No reminder') {
+  await press(screen, source);
+  await press(screen, reminder);
+}
+
 /** Every line of text on the page, top to bottom. */
 function lines(screen: Screen): string[] {
   const found: string[] = [];
@@ -308,6 +334,9 @@ beforeEach(() => {
   mockCreateReceipt.mockResolvedValue({ id: 'r1' });
   mockCreateBill.mockResolvedValue({ id: 'b1' });
   mockCreateSubscription.mockResolvedValue({ id: 's1' });
+  mockUpdateBill.mockResolvedValue(undefined);
+  mockUpdateSubscription.mockResolvedValue(undefined);
+  mockApplyReminder.mockResolvedValue(undefined);
 });
 
 describe('/voice-review — saving', () => {
@@ -372,6 +401,7 @@ describe('/voice-review — saving', () => {
     expect(screen.getByLabelText('Category, Housing')).toBeTruthy();
     expect(screen.getByLabelText('Due on, Sun Nov 1')).toBeTruthy();
 
+    await answer(screen);
     await press(screen, 'Save bill');
 
     expect(mockCreateBill).toHaveBeenCalledTimes(1);
@@ -389,36 +419,53 @@ describe('/voice-review — saving', () => {
       bank_account_id: null,
       note: null,
     });
+    // No reminder is an answer: it stores none.
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'b1', null, '09:00');
     expect(router.dismissTo).toHaveBeenCalledWith('/home');
   });
 
-  it('saves a subscription with no renewal date, as the form allows', async () => {
-    seed(STREAMING);
+  it('asks for the next renewal, as the form does, then saves the day given', async () => {
+    const id = seed(STREAMING);
     const screen = await render(<VoiceReviewScreen />);
 
-    expect(screen.getByLabelText('Next renewal, not set, optional')).toBeTruthy();
+    expect(screen.getByLabelText('Next renewal, needed')).toBeTruthy();
+    await answer(screen, 'VISA ••4821', '3 days');
     await press(screen, 'Save subscription');
 
-    expect(mockCreateSubscription).toHaveBeenCalledWith({
-      brand_id: 'b-nflx',
-      name: 'Netflix',
-      amount: 15.99,
-      cycle: 'monthly',
-      next_renewal_on: null,
-      started_on: null,
-      category_id: 'streaming',
-      card_id: null,
-      bank_account_id: null,
-      note: null,
-      active: true,
+    expect(screen.getByText('To save this subscription, fill in: Next renewal.')).toBeTruthy();
+    expect(mockCreateSubscription).not.toHaveBeenCalled();
+
+    // What the date page's Done writes.
+    await act(async () => {
+      updateVoiceEntry(id, { date: '2026-10-20' });
     });
+    expect(screen.queryByText(/^To save this subscription/)).toBeNull();
+    await press(screen, 'Save subscription');
+
+    expect(mockCreateSubscription).toHaveBeenCalledTimes(1);
+    expect(mockCreateSubscription).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Netflix',
+        amount: 15.99,
+        next_renewal_on: '2026-10-20',
+        card_id: 'card-1',
+        bank_account_id: null,
+      }),
+    );
+    expect(mockApplyReminder).toHaveBeenCalledWith('subscription', 's1', 3, '09:00');
+    expect(router.dismissTo).toHaveBeenCalledWith('/home');
   });
 
   it.each([
     ['receipt', {}, 'Save receipt', mockCreateReceipt],
     ['bill', RENT, 'Save bill', mockCreateBill],
-    ['subscription', STREAMING, 'Save subscription', mockCreateSubscription],
-  ] as const)('saves the note typed for a %s', async (_kind, patch, save, create) => {
+    [
+      'subscription',
+      { ...STREAMING, date: '2026-10-20' },
+      'Save subscription',
+      mockCreateSubscription,
+    ],
+  ] as const)('saves the note typed for a %s', async (kind, patch, save, create) => {
     const id = seed(patch);
     const screen = await render(<VoiceReviewScreen />);
     expect(screen.getByLabelText('Note, not set, optional')).toBeTruthy();
@@ -429,6 +476,7 @@ describe('/voice-review — saving', () => {
       updateVoiceEntry(id, { note: 'Split with Sam' });
     });
     expect(screen.getByLabelText('Note, Split with Sam')).toBeTruthy();
+    if (kind !== 'receipt') await answer(screen);
     await press(screen, save);
 
     expect(create).toHaveBeenCalledTimes(1);
@@ -531,6 +579,139 @@ describe('/voice-review — saving', () => {
   });
 });
 
+describe('/voice-review — a bill or subscription asks how it is paid and whether to remind', () => {
+  it('says what is still missing on Save, in the form’s words, and files nothing', async () => {
+    seed(RENT);
+    const screen = await render(<VoiceReviewScreen />);
+
+    expect(isDisabled(screen, 'Save bill')).toBe(false);
+    await press(screen, 'Save bill');
+
+    expect(screen.getByText('To save this bill, fill in: Paid with, Reminder.')).toBeTruthy();
+    expect(mockCreateBill).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
+
+    // Answering one leaves the other still asked for; the line goes with the change.
+    await press(screen, 'Skip');
+    await press(screen, 'Save bill');
+    expect(screen.getByText('To save this bill, fill in: Reminder.')).toBeTruthy();
+    expect(mockCreateBill).not.toHaveBeenCalled();
+  });
+
+  it('names a subscription’s gaps as its form does', async () => {
+    seed({ ...STREAMING, date: '2026-10-20' });
+    const screen = await render(<VoiceReviewScreen />);
+
+    await press(screen, 'Save subscription');
+
+    expect(
+      screen.getByText('To save this subscription, fill in: Charged to, Reminder.'),
+    ).toBeTruthy();
+    expect(mockCreateSubscription).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a card', 'VISA ••4821', { card_id: 'card-1', bank_account_id: null }],
+    ['a bank account', 'Checking', { card_id: null, bank_account_id: 'acct-1' }],
+    ['Skip', 'Skip', { card_id: null, bank_account_id: null }],
+  ])('files a bill paid with %s', async (_, pill, columns) => {
+    seed(RENT);
+    const screen = await render(<VoiceReviewScreen />);
+
+    await answer(screen, pill);
+    expect(isLit(screen, pill)).toBe(true);
+    await press(screen, 'Save bill');
+
+    expect(mockCreateBill).toHaveBeenCalledWith(expect.objectContaining(columns));
+  });
+
+  it('sets the reminder picked once the bill exists, at its time', async () => {
+    seed(RENT);
+    const screen = await render(<VoiceReviewScreen />);
+
+    await answer(screen, 'Skip', '1 week');
+    await press(screen, 'Save bill');
+
+    expect(mockApplyReminder).toHaveBeenCalledWith('bill', 'b1', 7, '09:00');
+    expect(mockCreateBill.mock.invocationCallOrder[0]).toBeLessThan(
+      mockApplyReminder.mock.invocationCallOrder[0],
+    );
+    expect(mockToast).toHaveBeenCalledWith('toast.bill.added');
+  });
+
+  it('counts an answer given here as a change: back asks before throwing it away', async () => {
+    seed(RENT);
+    const screen = await render(<VoiceReviewScreen />);
+    expect(mockScreenOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
+
+    await press(screen, '3 days');
+
+    expect(mockScreenOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+    await press(screen, 'Back');
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  describe('when the reminder fails after the bill is filed', () => {
+    let log: jest.SpyInstance;
+    beforeEach(() => {
+      log = jest.spyOn(console, 'log').mockImplementation(() => {});
+      mockApplyReminder.mockRejectedValueOnce(new Error('offline'));
+    });
+    afterEach(() => log.mockRestore());
+
+    async function filed() {
+      seed(RENT);
+      const screen = await render(<VoiceReviewScreen />);
+      await answer(screen, 'Skip', '3 days');
+      await press(screen, 'Save bill');
+      expect(screen.getByText(FAILURE_MESSAGE)).toBeTruthy();
+      expect(mockCreateBill).toHaveBeenCalledTimes(1);
+      expect(router.dismissTo).not.toHaveBeenCalled();
+      return screen;
+    }
+
+    it('updates the filed bill on Save again and retries the reminder, never filing a second', async () => {
+      const screen = await filed();
+
+      await press(screen, 'Save bill');
+
+      expect(mockCreateBill).toHaveBeenCalledTimes(1);
+      expect(mockUpdateBill).toHaveBeenCalledWith({
+        id: 'b1',
+        values: expect.objectContaining({ name: 'Housing', amount: 1800 }),
+      });
+      expect(mockApplyReminder).toHaveBeenCalledTimes(2);
+      expect(mockApplyReminder).toHaveBeenLastCalledWith('bill', 'b1', 3, '09:00');
+      expect(router.dismissTo).toHaveBeenCalledTimes(1);
+      expect(router.dismissTo).toHaveBeenCalledWith('/home');
+      expect(mockToast).toHaveBeenCalledTimes(1);
+    });
+
+    it('offers nothing that would file it again: no kinds, no close, no say again or full form', async () => {
+      const screen = await filed();
+
+      expect(screen.queryByLabelText('Subscription')).toBeNull();
+      expect(screen.queryByLabelText('Close')).toBeNull();
+      expect(screen.queryByLabelText('Say it again')).toBeNull();
+      expect(screen.queryByLabelText('More options')).toBeNull();
+      expect(mockScreenOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+    });
+
+    it('leaves for Home on Back, saying it was added, without asking to discard', async () => {
+      const screen = await filed();
+
+      await press(screen, 'Back');
+
+      expect(mockConfirm).not.toHaveBeenCalled();
+      expect(router.dismissTo).toHaveBeenCalledWith('/home');
+      expect(router.back).not.toHaveBeenCalled();
+      expect(mockToast).toHaveBeenCalledWith('toast.bill.added');
+      expect(success).toHaveBeenCalledTimes(1);
+      expect(mockCreateBill).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
 describe('/voice-review — the final page, as each form draws it', () => {
   it('draws a receipt: amount, then store, date with its chips, paid with and note', async () => {
     seed();
@@ -572,7 +753,10 @@ describe('/voice-review — the final page, as each form draws it', () => {
       'Monthly',
       'Every 3 months',
       'Yearly',
-      'Paid with · Optional',
+      'Paid with',
+      'Skip',
+      'Reminder',
+      'No reminder',
       'Note',
       'Save bill',
     ]);
@@ -593,8 +777,11 @@ describe('/voice-review — the final page, as each form draws it', () => {
       'Monthly',
       'Quarterly',
       'Yearly',
-      'Next renewal · Optional',
-      'Charged to · Optional',
+      'Next renewal',
+      'Charged to',
+      'Skip',
+      'Reminder',
+      'No reminder',
       'Note',
       'Save subscription',
     ]);
@@ -722,16 +909,18 @@ describe('/voice-review — how often', () => {
     expect(isLit(screen, 'Monthly')).toBe(false);
     expect(router.push).not.toHaveBeenCalled();
 
+    await answer(screen);
     await press(screen, 'Save bill');
     expect(mockCreateBill).toHaveBeenCalledWith(expect.objectContaining({ recurrence: 'weekly' }));
   });
 
   it('bills a subscription as picked on its chips', async () => {
-    seed(STREAMING);
+    seed({ ...STREAMING, date: '2026-10-20' });
     const screen = await render(<VoiceReviewScreen />);
 
     await press(screen, 'Yearly');
     expect(isLit(screen, 'Yearly')).toBe(true);
+    await answer(screen);
     await press(screen, 'Save subscription');
     expect(mockCreateSubscription).toHaveBeenCalledWith(
       expect.objectContaining({ cycle: 'yearly' }),
@@ -885,6 +1074,7 @@ describe('/voice-review — logos for a store the catalogue does not know', () =
     expect(screen.queryByLabelText(LOGO_COPY.letters)).toBeNull();
 
     await press(screen, LOGO_COPY.yes);
+    await answer(screen);
     await press(screen, 'Save bill');
 
     expect(mockCreateBill).toHaveBeenCalledWith(
@@ -1217,9 +1407,16 @@ describe('/voice-review — what still blocks Save', () => {
     });
     const screen = await render(<VoiceReviewScreen />);
 
-    expect(screen.getByText('Pick what the bill is for.')).toBeTruthy();
     expect(screen.getByLabelText('Category, needed')).toBeTruthy();
-    expect(isDisabled(screen, 'Save bill')).toBe(true);
+    // Never greyed out for a gap, as on the form: Save says what is still missing.
+    expect(isDisabled(screen, 'Save bill')).toBe(false);
+    await press(screen, 'Save bill');
+
+    expect(
+      screen.getByText('To save this bill, fill in: Name, Category, Paid with, Reminder.'),
+    ).toBeTruthy();
+    expect(mockCreateBill).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
   });
 });
 
@@ -1317,7 +1514,7 @@ describe('/voice-review — around the page', () => {
       note: 'Team lunch',
     });
     expect(screen.getByRole('button', { name: 'Amount, $20.00' })).toBeTruthy();
-    expect(screen.getByLabelText('Charged to, VISA ••4821')).toBeTruthy();
+    expect(isLit(screen, 'VISA ••4821')).toBe(true);
     expect(screen.getByLabelText('Note, Team lunch')).toBeTruthy();
     expect(mockScreenOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
   });

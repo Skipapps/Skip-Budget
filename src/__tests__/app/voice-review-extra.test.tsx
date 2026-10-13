@@ -74,6 +74,10 @@ jest.mock('@/providers/theme-provider', () => ({
     surface: '#FFFFFF',
     onControl: '#FFFFFF',
     accentInk: '#5B3A6B',
+    // The bill and subscription pages' card pills and reminder clock.
+    card: '#FFFFFF',
+    accent: '#905479',
+    control: '#111111',
   }),
 }));
 jest.mock('@/theme/artwork', () => ({
@@ -118,6 +122,17 @@ jest.mock('@/api/mutations', () => ({
   useCreateReceipt: () => ({ mutateAsync: mockCreateReceipt }),
   useCreateBill: () => ({ mutateAsync: mockCreateBill }),
   useCreateSubscription: () => ({ mutateAsync: mockCreateSubscription }),
+  useUpdateBill: () => ({ mutateAsync: jest.fn() }),
+  useUpdateSubscription: () => ({ mutateAsync: jest.fn() }),
+}));
+
+// The real reminder choices and wording; only the reminder's own write is replaced.
+jest.mock('@/lib/supabase', () => ({ supabase: {} }));
+jest.mock('@/api/push', () => ({ enableReminders: jest.fn() }));
+const mockApplyReminder = jest.fn(async (..._args: unknown[]) => {});
+jest.mock('@/api/reminders', () => ({
+  ...jest.requireActual('@/api/reminders'),
+  useApplyReminder: () => mockApplyReminder,
 }));
 
 jest.mock('@/api/known-stores', () => ({
@@ -209,10 +224,14 @@ describe('money check — an ambiguous amount can never be saved without a pick'
         categoryId: 'streaming',
       },
       merchantHeard: 'netflix',
+      date: '2026-10-20',
       cycle: 'monthly',
       transcript: 'Netflix twelve fifty a month',
     });
     const screen = await render(<VoiceReviewScreen />);
+    // Everything else answered, so only the amount stands between it and Save.
+    await press(screen, 'Skip');
+    await press(screen, 'No reminder');
 
     await press(screen, 'Save subscription');
     expect(mockCreateSubscription).not.toHaveBeenCalled();
