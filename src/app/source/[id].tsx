@@ -10,6 +10,7 @@ import { useHistoryFloor } from '@/api/history';
 import { useReceipts, useSourceLedger } from '@/api/queries';
 import { AccountCard } from '@/components/cards/account-card';
 import { PaymentCard } from '@/components/cards/payment-card';
+import { SourceMonthHeader } from '@/components/cards/source-month-header';
 import {
   EMPTY_FILTERS,
   FilterSheet,
@@ -30,6 +31,7 @@ import { formatFullDate, toIsoDate } from '@/lib/date';
 import { formatCurrency } from '@/lib/format';
 import { chargeOwners, ledgerHref } from '@/lib/ledger-link';
 import { newestFirst } from '@/lib/ledger-order';
+import { monthGroups } from '@/lib/payment-years';
 import { lastUpdated } from '@/lib/source-updated';
 import { matchesSearch } from '@/lib/search';
 import { useColors } from '@/providers/theme-provider';
@@ -146,11 +148,17 @@ export default function SourceDetailScreen() {
   );
   const hiddenOlder = free && ledger.entries.some((entry) => entry.date < floor);
 
-  const visible = entries.filter(
-    (entry) =>
-      matchesSearch(entryLabel(entry), query) &&
-      (!filters.date || entry.date === filters.date) &&
-      (filters.kinds.length === 0 || filters.kinds.includes(filterKind(entry))),
+  const matches = (entry: (typeof ledger.entries)[number]) =>
+    matchesSearch(entryLabel(entry), query) &&
+    (!filters.date || entry.date === filters.date) &&
+    (filters.kinds.length === 0 || filters.kinds.includes(filterKind(entry)));
+  const visible = entries.filter(matches);
+  // Grouped after the search and filters. As in Payment history, only the rows stop at the floor: a
+  // month it cuts through keeps the matching rows it hides in its figure. The listed rows come from
+  // `visible`, which already holds the page's order within a day.
+  const months = monthGroups(
+    [...visible, ...ledger.entries.filter((entry) => entry.date < floor && matches(entry))],
+    floor,
   );
   const activeCount = countActiveFilters(filters);
   const narrowed = query.trim().length > 0 || activeCount > 0;
@@ -348,35 +356,51 @@ export default function SourceDetailScreen() {
         />
       ) : (
         <View className="mt-1 w-full pb-28">
-          {visible.map((entry, index) => {
-            // A payment has no page of its own; pressing it offers to remove it, as before.
-            const href =
-              entry.kind === 'payment' ? null : ledgerHref({ ...entry, kind: entry.kind }, owners);
-            return (
-              <Fragment key={entry.id}>
-                {index > 0 ? <View className="ml-[52px] h-px bg-line/60" /> : null}
-                <TransactionRow
-                  label={entryLabel(entry)}
-                  amount={entry.amount}
-                  kindLabel={`${kindLabel(entry.kind)} · ${formatFullDate(new Date(`${entry.date}T00:00:00`))}`}
-                  domain={entry.domain}
-                  logoHidden={entry.logoHidden}
-                  kind={entry.kind}
-                  categoryId={entry.categoryId}
-                  iconId={entry.iconId}
-                  habit={entry.habit}
-                  hint={href && OPEN_HINTS[entry.kind] ? t(OPEN_HINTS[entry.kind]) : undefined}
-                  onPress={
-                    entry.kind === 'payment'
-                      ? () => handleRemovePayment(entry.id, entry.label, entry.amount)
-                      : href
-                        ? () => router.push(href)
-                        : undefined
-                  }
-                />
-              </Fragment>
-            );
-          })}
+          {months.map((group, groupIndex) => (
+            <View
+              key={group.month}
+              testID={`source-month-${group.month}`}
+              className={groupIndex === 0 ? 'mt-4 w-full' : 'mt-6 w-full'}
+            >
+              <SourceMonthHeader
+                month={group.month}
+                net={group.total}
+                className="mb-1"
+                testID={`source-month-${group.month}-header`}
+              />
+              {group.rows.map((entry, index) => {
+                // A payment has no page of its own; pressing it offers to remove it, as before.
+                const href =
+                  entry.kind === 'payment'
+                    ? null
+                    : ledgerHref({ ...entry, kind: entry.kind }, owners);
+                return (
+                  <Fragment key={entry.id}>
+                    {index > 0 ? <View className="ml-[52px] h-px bg-line/60" /> : null}
+                    <TransactionRow
+                      label={entryLabel(entry)}
+                      amount={entry.amount}
+                      kindLabel={`${kindLabel(entry.kind)} · ${formatFullDate(new Date(`${entry.date}T00:00:00`))}`}
+                      domain={entry.domain}
+                      logoHidden={entry.logoHidden}
+                      kind={entry.kind}
+                      categoryId={entry.categoryId}
+                      iconId={entry.iconId}
+                      habit={entry.habit}
+                      hint={href && OPEN_HINTS[entry.kind] ? t(OPEN_HINTS[entry.kind]) : undefined}
+                      onPress={
+                        entry.kind === 'payment'
+                          ? () => handleRemovePayment(entry.id, entry.label, entry.amount)
+                          : href
+                            ? () => router.push(href)
+                            : undefined
+                      }
+                    />
+                  </Fragment>
+                );
+              })}
+            </View>
+          ))}
           {/* Newest first, so the older rows a free plan keeps out of view would come last. */}
           {hiddenOlder ? <HistoryNotice className="mt-3" /> : null}
         </View>

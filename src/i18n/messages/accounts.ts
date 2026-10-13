@@ -365,6 +365,12 @@ export const accountsMessages = defineMessages({
     fr: 'Ouvre cette facture',
   },
   'accounts.source.payHint': { en: 'Opens your pay', es: 'Abre tu salario', fr: 'Ouvre ta paie' },
+  // A month's heading over its rows, read with its net figure: "October 2026, -$600.00 net".
+  'accounts.source.monthA11y': {
+    en: '{month}, {amount} net',
+    es: '{month}, neto: {amount}',
+    fr: '{month}, net : {amount}',
+  },
   'accounts.source.emptyTitle': {
     en: 'Nothing on this one yet',
     es: 'Aún no hay nada aquí',
