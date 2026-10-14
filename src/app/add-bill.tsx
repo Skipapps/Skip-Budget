@@ -469,6 +469,8 @@ function BillForm({
       !name && t('bills.field.name'),
       !categoryId && t('bills.field.category'),
       !startDate && dateLabel,
+      // A set period runs monthly up to its last day, so it cannot be saved without one.
+      hasPeriod && !endDate && t('bills.field.to'),
       sourceId === null && t('bills.field.paidWith'),
       reminder === null && t('ui.reminder.label'),
     ].filter((field): field is string => Boolean(field));
@@ -815,19 +817,12 @@ function BillForm({
                 label={t('bills.field.to')}
                 value={endDate}
                 today={todayDate}
-                placeholder={t('bills.add.noEndDate')}
+                placeholder={t('bills.add.pickDay')}
                 // Days before the start are not offered.
                 minDate={startDate}
                 onChange={(day) => {
                   setError(null);
                   setEndDate(day);
-                }}
-                clear={{
-                  label: t('bills.add.clearEnd'),
-                  onPress: () => {
-                    setError(null);
-                    setEndDate(null);
-                  },
                 }}
               />
             ),

@@ -320,7 +320,7 @@ const HINT = {
 // The day boxes, as a screen reader reads them while they are empty.
 const PAYMENT_ON = 'Payment on, Select a date';
 const STARTS_ON = 'Starts on, Select a date';
-const ENDS_ON = 'To, Ongoing — no end date';
+const ENDS_ON = 'To, Select a date';
 
 const MISSING = /^To save this bill, fill in:/;
 
@@ -655,7 +655,7 @@ describe('Add bill — what a new bill saves', () => {
     });
   });
 
-  it('leaves a period with no end date open-ended', async () => {
+  it('files no period with no end date: Save lists To as missing', async () => {
     const screen = await render(<AddBillScreen />);
 
     await newBill(screen, TILE.insurance, '42');
@@ -664,12 +664,8 @@ describe('Add bill — what a new bill saves', () => {
     expect(screen.getByLabelText(ENDS_ON)).toBeTruthy();
     await press(screen, 'Save bill');
 
-    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    expect(mockCreate.mock.calls[0][0]).toMatchObject({
-      recurrence: 'period',
-      starts_on: '2026-10-05',
-      ends_on: null,
-    });
+    expect(screen.getByText(/^To save this bill, fill in: (.+, )?To(,|\.)/)).toBeTruthy();
+    expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it('drops an end date picked for a period once the bill goes back to repeating', async () => {
@@ -1138,7 +1134,7 @@ describe('Add bill — what an edit saves', () => {
     });
   });
 
-  it('moves the end of a period and clears it again', async () => {
+  it('moves the end of a period, which can never be cleared', async () => {
     editing(PERIOD);
     const screen = await render(<AddBillScreen />);
 
@@ -1153,17 +1149,17 @@ describe('Add bill — what an edit saves', () => {
     mockUpdate.mockClear();
     editing({ ...PERIOD, ends_on: '2026-12-24' });
     const again = await render(<AddBillScreen />);
-    await press(again, 'Clear — make it ongoing');
-    expect(again.getByLabelText(ENDS_ON)).toBeTruthy();
+    expect(again.getByLabelText('To, Thu Dec 24')).toBeTruthy();
+    expect(again.queryByLabelText('Clear — make it ongoing')).toBeNull();
     await press(again, 'Save changes');
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
       recurrence: 'period',
-      ends_on: null,
+      ends_on: '2026-12-24',
     });
   });
 
-  it('drops an end date the start has been moved past', async () => {
+  it('drops an end date the start has been moved past, and asks for a new one', async () => {
     editing(PERIOD);
     const screen = await render(<AddBillScreen />);
 
@@ -1172,12 +1168,8 @@ describe('Add bill — what an edit saves', () => {
     expect(screen.getByLabelText(ENDS_ON)).toBeTruthy();
     await press(screen, 'Save changes');
 
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
-    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
-      recurrence: 'period',
-      starts_on: '2027-01-15',
-      ends_on: null,
-    });
+    expect(screen.getByText('To save this bill, fill in: To.')).toBeTruthy();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it('asks about past charges with what changed, and rewrites them with the new figures', async () => {
@@ -1330,7 +1322,7 @@ describe('Add bill — the line Save shows for what is missing', () => {
     await press(screen, 'Save bill');
 
     expect(
-      screen.getByText('To save this bill, fill in: Name, Starts on, Paid with, Reminder.'),
+      screen.getByText('To save this bill, fill in: Name, Starts on, To, Paid with, Reminder.'),
     ).toBeTruthy();
     expect(mockCreate).not.toHaveBeenCalled();
   });
@@ -1476,8 +1468,8 @@ describe('Add bill — the checks inside Save', () => {
     });
   });
 
-  // The Clear link only empties the end date; the picks around it also drop the message.
-  it('drops the message once the end date it names has been cleared', async () => {
+  // A new end picked drops the message, as every pick on the page does; there is no clear.
+  it('drops the message once a new end date is picked', async () => {
     editing({
       ...PERIOD,
       // Still running: its end is after today, only before its start.
@@ -1489,9 +1481,10 @@ describe('Add bill — the checks inside Save', () => {
 
     await press(screen, 'Save changes');
     expect(screen.getByText('The end date cannot be before the start date.')).toBeTruthy();
-    await press(screen, 'Clear — make it ongoing');
+    expect(screen.queryByLabelText('Clear — make it ongoing')).toBeNull();
+    await pickDay(screen, 'To, Sat Oct 10', 'Saturday 31 October 2026');
 
-    expect(screen.getByLabelText(ENDS_ON)).toBeTruthy();
+    expect(screen.getByLabelText('To, Sat Oct 31')).toBeTruthy();
     expect(screen.queryByText('The end date cannot be before the start date.')).toBeNull();
   });
 

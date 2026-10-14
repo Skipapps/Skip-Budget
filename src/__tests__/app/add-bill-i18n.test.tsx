@@ -466,7 +466,7 @@ describe('Add a bill in Spanish', () => {
 
     await press(screen, 'Periodo específico');
     expect(screen.getByLabelText('Empieza el, Elige una fecha')).toBeTruthy();
-    expect(screen.getByLabelText('Hasta, Continúa — sin fecha de fin')).toBeTruthy();
+    expect(screen.getByLabelText('Hasta, Elige una fecha')).toBeTruthy();
     expect(screen.queryByText('Fecha de pago')).toBeNull();
     expectNoRawText(screen.toJSON());
   });
@@ -499,7 +499,8 @@ describe('Add a bill in Spanish', () => {
 
     expect(screen.getByLabelText('Empieza el, jue 15 oct')).toBeTruthy();
     expect(screen.getByLabelText('Hasta, jue 31 dic')).toBeTruthy();
-    expect(screen.getByLabelText('Borrar — sin fecha de fin')).toBeTruthy();
+    // A set period always has an end: it can be changed, never emptied.
+    expect(screen.queryByLabelText('Borrar — sin fecha de fin')).toBeNull();
 
     // The calendar opens under the box, on the month of the day it holds.
     await press(screen, 'Empieza el, jue 15 oct');
@@ -509,9 +510,7 @@ describe('Add a bill in Spanish', () => {
     expect(screen.getByLabelText('Empieza el, mar 20 oct')).toBeTruthy();
     expect(screen.queryByLabelText('Mes siguiente')).toBeNull();
 
-    await press(screen, 'Borrar — sin fecha de fin');
-    expect(screen.getByLabelText('Hasta, Continúa — sin fecha de fin')).toBeTruthy();
-    expect(screen.queryByLabelText('Borrar — sin fecha de fin')).toBeNull();
+    expect(screen.getByLabelText('Hasta, jue 31 dic')).toBeTruthy();
     expectNoRawText(screen.toJSON());
   });
 
@@ -630,7 +629,7 @@ describe('Add a bill in French', () => {
 
     await press(screen, 'Période précise');
     expect(screen.getByLabelText('Commence le, Choisis une date')).toBeTruthy();
-    expect(screen.getByLabelText('Jusqu’au, En cours — sans date de fin')).toBeTruthy();
+    expect(screen.getByLabelText('Jusqu’au, Choisis une date')).toBeTruthy();
     expect(screen.queryByText('Date de paiement')).toBeNull();
     expectNoRawText(screen.toJSON());
   });
@@ -846,9 +845,9 @@ describe('Save with gaps in Spanish and French', () => {
   });
 
   it.each([
-    ['es', 'Nombre, Empieza el, Se paga con, Recordatorio'],
-    ['fr', 'Nom, Commence le, Payée avec, Rappel'],
-  ] as const)('asks for the start of a specific period in %s', async (language, fields) => {
+    ['es', 'Nombre, Empieza el, Hasta, Se paga con, Recordatorio'],
+    ['fr', 'Nom, Commence le, Jusqu’au, Payée avec, Rappel'],
+  ] as const)('asks for the start and end of a specific period in %s', async (language, fields) => {
     const words = WORDS[language];
     const screen = await reachFinalPage(language);
     await press(screen, words.period);
