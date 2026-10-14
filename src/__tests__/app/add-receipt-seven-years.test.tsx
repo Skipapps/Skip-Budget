@@ -101,6 +101,10 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
+// Card and account names for Paid with: none locked here.
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({ sources: [], labelOf: () => null, isLoading: false }),
+}));
 // The free allowance's count: nothing read by camera or upload this month.
 jest.mock('@/api/capture-usage', () => ({
   useCaptureUsage: () => ({ data: [], isSuccess: true, isError: false, refetch: jest.fn() }),
