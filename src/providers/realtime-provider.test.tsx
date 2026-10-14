@@ -115,4 +115,31 @@ describe('RealtimeProvider', () => {
       await unmount();
     },
   );
+
+  it('counts the free scans again when a receipt is saved or deleted on another device', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    // The usage rows that count the scans are not published; their receipt is.
+    for (const key of ['receipts', 'capture_usage']) client.setQueryData([key, 'user-A'], []);
+    const invalidated: unknown[][] = [];
+    jest.spyOn(client, 'invalidateQueries').mockImplementation((filters) => {
+      invalidated.push((filters?.queryKey ?? []) as unknown[]);
+      return Promise.resolve();
+    });
+    const { unmount } = await render(
+      <QueryClientProvider client={client}>
+        <RealtimeProvider>
+          <Text>Home</Text>
+        </RealtimeProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(mockListeners.map((listener) => listener.table)).not.toContain('capture_usage');
+    mockListeners.find((listener) => listener.table === 'receipts')?.onChange();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, ECHO_WAIT_MS + 50));
+    });
+
+    expect(invalidated).toEqual([['receipts'], ['capture_usage']]);
+    await unmount();
+  });
 });

@@ -185,6 +185,10 @@ jest.mock('@/api/mutations', () => ({
 }));
 
 let mockRow: unknown = null;
+// The free allowance's count: nothing read by camera or upload this month.
+jest.mock('@/api/capture-usage', () => ({
+  useCaptureUsage: () => ({ data: [], isSuccess: true, isError: false, refetch: jest.fn() }),
+}));
 jest.mock('@/api/queries', () => {
   const read = () => ({ data: mockRow, isError: false, isFetched: true, refetch: jest.fn() });
   return {

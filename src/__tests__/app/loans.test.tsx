@@ -67,7 +67,12 @@ jest.mock('expo-router', () => ({
 }));
 
 const mockRefetch = jest.fn();
-let mockLoans: { loans: LoanListRow[]; isPending: boolean; isError: boolean } = {
+let mockLoans: {
+  loans: LoanListRow[];
+  isPending: boolean;
+  isError: boolean;
+  refreshFailed?: boolean;
+} = {
   loans: [],
   isPending: false,
   isError: false,
@@ -75,7 +80,7 @@ let mockLoans: { loans: LoanListRow[]; isPending: boolean; isError: boolean } = 
 jest.mock('@/api/loans', () => {
   const { termsFromStored } = jest.requireActual('@/lib/loan');
   return {
-    useLoans: () => ({ ...mockLoans, refetch: mockRefetch }),
+    useLoans: () => ({ refreshFailed: false, ...mockLoans, refetch: mockRefetch }),
     // As the data layer builds them: a loan without its own first date uses its bill's first.
     loanTermsOf: (row: LoanListRow) => termsFromStored(row, row.bill.starts_on ?? undefined),
   };
@@ -539,7 +544,66 @@ describe('the page', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
     expect(mockRefetch).toHaveBeenCalled();
   });
+
+  it('says nothing of a failed reload while the reads are fine', async () => {
+    await render(<LoansScreen />);
+    expect(screen.queryByText(REFRESH_NOTE)).toBeNull();
+  });
+
+  it('shows only the failure line when the first read failed, with no note', async () => {
+    mockLoans = { loans: [], isPending: false, isError: true, refreshFailed: false };
+    await render(<LoansScreen />);
+
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    expect(screen.queryByTestId('loans-summary')).toBeNull();
+    expect(screen.queryByText(REFRESH_NOTE)).toBeNull();
+  });
+
+  it('keeps the last figures after a failed reload, with the note right under the summary', async () => {
+    mockLoans = { loans: [CAR, PERSONAL], isPending: false, isError: false, refreshFailed: true };
+    await render(<LoansScreen />);
+
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expectLines(within(screen.getByTestId('loans-summary')), ['$35,328.93']);
+    const note = screen.getByText(REFRESH_NOTE);
+    const summary = screen.getByTestId('loans-summary');
+    let card: typeof summary = summary;
+    while (card.parent && !card.parent.children.includes(note)) card = card.parent;
+    const siblings = card.parent!.children;
+    expect(siblings.indexOf(note)).toBe(siblings.indexOf(card) + 1);
+    expect(screen.getByText('Car loan')).toBeTruthy();
+  });
+
+  it('never shows the note with the failure line', async () => {
+    mockLoans = { loans: [CAR], isPending: false, isError: true, refreshFailed: true };
+    await render(<LoansScreen />);
+
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    expect(screen.queryByText(REFRESH_NOTE)).toBeNull();
+  });
+
+  it('keeps the invitation, with the note, when the last answer was no loans', async () => {
+    mockLoans = { loans: [], isPending: false, isError: false, refreshFailed: true };
+    await render(<LoansScreen />);
+
+    expect(screen.getByTestId('loans-empty')).toBeTruthy();
+    expect(screen.getByText(REFRESH_NOTE)).toBeTruthy();
+  });
+
+  it('says the note in Spanish and French', async () => {
+    mockLoans = { loans: [CAR], isPending: false, isError: false, refreshFailed: true };
+    setLanguage('es');
+    await render(<LoansScreen />);
+    expect(screen.getByText('No se pudo actualizar · mostrando tus últimas cifras')).toBeTruthy();
+    await screen.unmount();
+
+    setLanguage('fr');
+    await render(<LoansScreen />);
+    expect(screen.getByText('Impossible d’actualiser · voici tes derniers chiffres')).toBeTruthy();
+  });
 });
+
+const REFRESH_NOTE = 'Couldn’t refresh · showing your last figures';
 
 const NB = ' ';
 

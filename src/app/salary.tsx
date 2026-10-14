@@ -29,15 +29,16 @@ import { TogglePill } from '@/components/ui/toggle-pill';
 import { FieldLabel } from '@/components/ui/typography';
 import {
   useCreateSalarySource,
-  useDeleteSalarySource,
   useDeleteUnseenPay,
   useSetSalaryAccounts,
   useUpdateSalarySource,
   type SalaryValues,
 } from '@/api/mutations';
-import { recordDuePay, usePastPay, type CarriedPay } from '@/api/pay';
+import { recordDuePay, useDeletePay, usePastPay, type CarriedPay } from '@/api/pay';
 import { useBankAccounts, useSalaryDetails } from '@/api/queries';
 import { PageState } from '@/components/ui/page-state';
+import { usePastChoice, type PastDelete } from '@/components/ui/past-choice';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { type SalarySource } from '@/data/salary';
 import { t } from '@/i18n';
 import {
@@ -51,7 +52,6 @@ import { formatCurrency } from '@/lib/format';
 import { landingAccount, oneOffsInMonth, scheduledPerMonth, type PayLine } from '@/lib/pay';
 import { toCents } from '@/lib/money';
 import { useToday } from '@/lib/use-today';
-import { useConfirm } from '@/providers/dialog-provider';
 import { useToast } from '@/providers/toast-context';
 import { useUserId } from '@/providers/session-provider';
 import { useColors } from '@/providers/theme-provider';
@@ -60,6 +60,7 @@ import { OVERTIME_RATES, estimateHourlyPay, hourlyProblem, type HourlyPay } from
 import { accountLabel } from '@/lib/account-label';
 import { onPaidIntoPicked } from '@/lib/paid-into-pick';
 import { useNavigateOnce } from '@/lib/use-navigate-once';
+import { failedEmpty, refreshFailed } from '@/lib/query-state';
 import { useArtwork } from '@/theme/artwork';
 import { TEXT_CAP } from '@/theme/text-scale';
 
@@ -120,14 +121,40 @@ function paycheckOf(source: SalarySource): number {
 }
 
 /**
- * What Save writes: a source with a name and its pay. An hourly source counts once named, its pay
- * checked on Save with a reason; a one-off pay needs no name, as it shows as income on its day.
+ * A source the total card counts: a name and its pay. An hourly source counts once named; a one-off
+ * pay needs no name, as it shows as income on its day.
  */
 function keptOnSave(source: SalarySource): boolean {
   return (
     Boolean(source.name.trim() || source.frequency === 'once') &&
     (source.payType === 'hourly' || source.amount > 0)
   );
+}
+
+/** What a source still needs before Save writes anything, by the labels on its card, in card order. */
+function missingOf(source: SalarySource): string[] {
+  const once = source.frequency === 'once';
+  const missing: string[] = [];
+  if (!once && !source.name.trim()) missing.push(t('salary.name'));
+  if (source.payType === 'hourly') {
+    const pay = hourlyOf(source);
+    if (!(pay.rate > 0)) missing.push(t('salary.hourlyRate'));
+    if (!(pay.hoursPerWeek > 0)) {
+      missing.push(once ? t('salary.hoursWorked') : t('salary.hoursAWeek'));
+    }
+  } else if (!(source.amount > 0)) {
+    missing.push(t('salary.amount'));
+  }
+  if (!source.lastPayday) missing.push(once ? t('salary.paidOn') : t('salary.lastPayday'));
+  return missing;
+}
+
+/** The small title over a card: "One-off pay", or "Source N" counting the regular pays only. */
+function headerOf(sources: SalarySource[], index: number): string {
+  if (sources[index].frequency === 'once') return t('salary.oneOffNumber');
+  return t('salary.sourceNumber', {
+    number: sources.slice(0, index + 1).filter((other) => other.frequency !== 'once').length,
+  });
 }
 
 /** The source as the shared income maths reads it. */
@@ -202,7 +229,7 @@ export default function SalaryScreen() {
   }
 
   // Never an empty editor on failure: Save from there would delete every source.
-  if (details.isError) {
+  if (failedEmpty(details)) {
     return (
       <Screen title={t('salary.title')} showBack>
         <PageState
@@ -237,6 +264,7 @@ export default function SalaryScreen() {
       initial={saved.map(toSource)}
       earlier={earlier.map(toSource)}
       hourlyAvailable={details.data?.hourlyAvailable ?? false}
+      refreshFailed={refreshFailed(details)}
     />
   );
 }
@@ -245,12 +273,15 @@ function SalaryEditor({
   initial,
   earlier,
   hourlyAvailable,
+  refreshFailed: reloadFailed,
 }: {
   initial: SalarySource[];
   /** One-off pays from earlier months, newest first: saved, and shown only when asked for. */
   earlier: SalarySource[];
   /** False until the database has the hourly columns; fixed pay only until then. */
   hourlyAvailable: boolean;
+  /** A reload failed behind the pays shown (RefreshNote). */
+  refreshFailed: boolean;
 }) {
   const colors = useColors();
   // Names this editor to the Paid into page, so the account picked there comes back here.
@@ -281,6 +312,9 @@ function SalaryEditor({
   const clientIds = useRef(new Map<string, string>());
   // New pays a Save has filed: saving again after a later step failed updates them.
   const filedIds = useRef(new Map<string, string>());
+  // What the person answered for each saved pay they removed; Save does it.
+  const removals = useRef(new Map<string, PastDelete>());
+  const asking = useRef(false);
   const [earlierShown, setEarlierShown] = useState(false);
 
   const showEarlier = () => {
@@ -324,9 +358,9 @@ function SalaryEditor({
 
   const createSource = useCreateSalarySource();
   const updateSource = useUpdateSalarySource();
-  const deleteSource = useDeleteSalarySource();
   const deleteUnseen = useDeleteUnseenPay();
-  const confirm = useConfirm();
+  const deletePay = useDeletePay();
+  const { askDelete } = usePastChoice();
   const setAccounts = useSetSalaryAccounts();
   const pastPay = usePastPay();
   const toast = useToast();
@@ -398,40 +432,62 @@ function SalaryEditor({
   };
 
   // Removing a source drops its income from every projection, so it asks first. The row is deleted
-  // on Save, not on the tap.
-  const removeSource = async (id: string) => {
-    const source = sources.find((row) => row.id === id);
-    const name = source?.name.trim();
-
-    const ok = await confirm({
-      title: name ? t('salary.remove.title', { name }) : t('salary.remove.titleUnnamed'),
-      message: t('salary.remove.message'),
-      confirmLabel: t('common.remove'),
-      cancelLabel: t('salary.remove.keep'),
-      destructive: true,
-    });
-    if (!ok) return;
-
-    setSources((current) => current.filter((row) => row.id !== id));
+  // on Save, not on the tap: deleting now would reload the page over the person's other changes.
+  const removeSource = async (index: number) => {
+    const source = sources[index];
+    if (!source || asking.current) return;
+    asking.current = true;
+    try {
+      setError(null);
+      const saved = savedIds.current.has(source.id);
+      let count = 0;
+      if (saved) {
+        try {
+          count = await deletePay.countPast(source.id, today);
+        } catch (thrown) {
+          // Not "no paydays": asked as if there were none, they would be deleted without a word.
+          setError(failureMessage(thrown));
+          return;
+        }
+      }
+      const choice = await askDelete({
+        name: source.name.trim() || headerOf(sources, index),
+        noun: 'pays',
+        count,
+      });
+      if (choice === null) return;
+      if (saved) removals.current.set(source.id, choice);
+      setSources((current) => current.filter((row) => row.id !== source.id));
+    } finally {
+      asking.current = false;
+    }
   };
 
   const activeSource = sources.find((source) => source.id === padTarget?.sourceId);
 
   const handleSave = async () => {
     setError(null);
-    const named = sources.filter(keptOnSave);
-    if (sources.length > 0 && named.length === 0) {
-      setError(t('salary.needNameAndPay'));
+    // Nothing is written while a pay on the page is missing something: it is named with what it
+    // needs, never left out and the rest saved without it.
+    const gaps = sources
+      .map((source, index) => ({ index, missing: missingOf(source) }))
+      .filter((gap) => gap.missing.length > 0);
+    if (gaps.length > 0) {
+      setError(
+        sources.length === 1
+          ? t('salary.missing', { fields: gaps[0].missing.join(', ') })
+          : gaps
+              .map(({ index, missing }) =>
+                t('salary.missingIn', {
+                  source: sources[index].name.trim() || headerOf(sources, index),
+                  fields: missing.join(', '),
+                }),
+              )
+              .join('\n'),
+      );
       return;
     }
-    // A saved pay left without a name would be dropped, and so deleted, on Save: ask for it instead.
-    // So would one an earlier Save may have filed, under a toast that says the pay was saved.
-    const kept = (id: string) => savedIds.current.has(id) || clientIds.current.has(id);
-    if (sources.some((source) => kept(source.id) && !named.includes(source))) {
-      setError(t('salary.needNameAndPay'));
-      return;
-    }
-    for (const source of named) {
+    for (const source of sources) {
       if (source.payType !== 'hourly') continue;
       const problem = hourlyProblem(hourlyOf(source));
       if (problem) {
@@ -443,12 +499,6 @@ function SalaryEditor({
         );
         return;
       }
-    }
-    // Paydays are counted forward from the last one; without it the income never lands anywhere.
-    const undated = named.find((source) => !source.lastPayday);
-    if (undated) {
-      setError(undated.frequency === 'once' ? t('salary.needPaidOn') : t('salary.needLastPayday'));
-      return;
     }
 
     try {
@@ -466,7 +516,7 @@ function SalaryEditor({
         bank_account_id: landingAccount(source.accountIds, accountOrder),
       });
       const carryBack = new Map<string, CarriedPay>();
-      for (const source of named) {
+      for (const source of sources) {
         const before = savedPays.current.get(source.id);
         if (!before || !savedIds.current.has(source.id)) continue;
         const was = carried(before);
@@ -484,9 +534,13 @@ function SalaryEditor({
       }
 
       // Deletes first, so a delete plus a re-add of the same name cannot collide.
-      const stillPresent = new Set(named.map((source) => source.id));
+      const stillPresent = new Set(sources.map((source) => source.id));
+      const removed: PastDelete[] = [];
       for (const id of savedIds.current) {
-        if (!stillPresent.has(id)) await deleteSource.mutateAsync(id);
+        if (stillPresent.has(id)) continue;
+        const choice = removals.current.get(id) ?? 'keep';
+        await deletePay.remove({ id, choice, today });
+        removed.push(choice);
       }
       // A new pay an earlier Save may have filed, and that was removed since, with any pay recorded
       // for it: that would still count as income.
@@ -497,7 +551,7 @@ function SalaryEditor({
         filedIds.current.delete(key);
       }
 
-      for (const source of named) {
+      for (const source of sources) {
         const values: SalaryValues = {
           name: source.name.trim(),
           amount: paycheckOf(source),
@@ -526,7 +580,9 @@ function SalaryEditor({
 
       for (const [id, values] of carryBack) await pastPay.apply(id, values);
 
-      toast('toast.pay.saved');
+      if (removed.includes('everything')) toast('toast.pay.deleted', 'deleted');
+      else if (removed.length > 0) toast('toast.pay.stopped');
+      else toast('toast.pay.saved');
       router.back();
     } catch (thrown) {
       setError(failureMessage(thrown));
@@ -561,6 +617,7 @@ function SalaryEditor({
         nextPayday={nextPayday}
         sources={schedules.length}
       />
+      <RefreshNote show={reloadFailed} />
 
       <View className="mt-4 w-full gap-4">
         {sources.map((source, index) => {
@@ -585,13 +642,7 @@ function SalaryEditor({
                     className="font-app text-[13px] text-muted"
                     maxFontSizeMultiplier={TEXT_CAP.row}
                   >
-                    {once
-                      ? t('salary.oneOffNumber')
-                      : t('salary.sourceNumber', {
-                          number: sources
-                            .slice(0, index + 1)
-                            .filter((other) => other.frequency !== 'once').length,
-                        })}
+                    {headerOf(sources, index)}
                   </Text>
                   {folded ? (
                     <Text
@@ -640,7 +691,7 @@ function SalaryEditor({
                   <CircleButton
                     icon={Trash2}
                     label={t('salary.removeSource', { number: index + 1 })}
-                    onPress={() => void removeSource(source.id)}
+                    onPress={() => void removeSource(index)}
                   />
                 </View>
               </View>

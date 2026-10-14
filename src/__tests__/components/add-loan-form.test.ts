@@ -392,7 +392,7 @@ describe('what Continue says is missing', () => {
       'Loan name',
       'Monthly payment',
       'Amount borrowed',
-      'APR',
+      'Interest rate',
       'Term',
       'Start date',
       'First payment',

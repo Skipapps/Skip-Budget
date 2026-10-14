@@ -56,6 +56,10 @@ let mockReceipts = [
 ].map((row) => ({ ...row, card_id: null, bank_account_id: null, brands: null }));
 const ALL = mockReceipts;
 
+// The free allowance's count: nothing read by camera or upload this month.
+jest.mock('@/api/capture-usage', () => ({
+  useCaptureUsage: () => ({ data: [], isSuccess: true, isError: false, refetch: jest.fn() }),
+}));
 jest.mock('@/api/queries', () => ({
   useReceipts: () => ({
     data: mockReceipts,

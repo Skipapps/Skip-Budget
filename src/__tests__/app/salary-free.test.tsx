@@ -33,7 +33,10 @@ jest.mock('@/theme/gradient-icons', () => ({
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', body: '#222222', accentInk: '#905479' }),
 }));
-jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => jest.fn(async () => true) }));
+// Removing a pay asks the shared past question; with nothing on record it is the plain Delete.
+jest.mock('@/providers/dialog-provider', () => ({
+  useDialog: () => jest.fn(async () => 'everything'),
+}));
 jest.mock('@/lib/use-today', () => ({
   useToday: () => ({ today: '2026-10-08', todayDate: new Date('2026-10-08T00:00:00') }),
 }));
@@ -46,6 +49,11 @@ jest.mock('@/api/pay', () => ({
     choose: jest.fn(async () => 'upcoming'),
     apply: jest.fn(async () => {}),
     saving: false,
+  }),
+  useDeletePay: () => ({
+    countPast: async () => 0,
+    remove: ({ id }: { id: string }) => mockDelete(id),
+    removing: false,
   }),
 }));
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'user-1' }));
@@ -68,7 +76,6 @@ const mockSetAccounts = jest.fn(async (_input: { salaryId: string; accountIds: s
 jest.mock('@/api/mutations', () => ({
   useCreateSalarySource: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateSalarySource: () => ({ mutateAsync: mockUpdate, isPending: false }),
-  useDeleteSalarySource: () => ({ mutateAsync: mockDelete, isPending: false }),
   useDeleteUnseenPay: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useSetSalaryAccounts: () => ({ mutateAsync: mockSetAccounts, isPending: false }),
 }));
@@ -141,7 +148,7 @@ it('adds a second and a third source on the free plan, and saves them', async ()
   await fireEvent.press(screen.getByText('Save'));
 
   expect(router.push).not.toHaveBeenCalled();
-  expect(screen.queryByText('Give each source a name and its pay.')).toBeNull();
+  expect(screen.queryByText(/fill in/)).toBeNull();
   expect(mockUpdate).toHaveBeenCalledTimes(1);
   expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ id: 's1' }));
   expect(mockCreate).toHaveBeenCalledTimes(2);

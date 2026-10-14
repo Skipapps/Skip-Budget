@@ -109,7 +109,7 @@ export function LoanReviewView({
   const when = whenLine(figures);
   const rows = [
     { id: 'monthly', label: t('loan.list.monthly'), value: formatCurrency(figures.monthlyPayment) },
-    { id: 'apr', label: t('loanFlow.field.apr'), value: loanRateText(figures.save.annualRate) },
+    { id: 'rate', label: t('loan.interestRate'), value: loanRateText(figures.save.annualRate) },
     {
       id: 'term',
       label: t('loan.termLabel'),

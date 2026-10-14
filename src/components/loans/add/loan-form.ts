@@ -367,7 +367,7 @@ const FIELD_LABELS: Record<Field, MessageKey> = {
   name: 'loanFlow.field.name',
   monthlyPayment: 'loan.monthlyPayment',
   principal: 'loanFlow.field.borrowed',
-  rate: 'loanFlow.field.apr',
+  rate: 'loan.interestRate',
   term: 'loan.termLabel',
   startDate: 'loanFlow.field.start',
   firstPayment: 'loanFlow.field.firstPayment',

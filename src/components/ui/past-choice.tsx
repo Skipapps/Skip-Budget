@@ -3,8 +3,11 @@ import { useCallback, useMemo } from 'react';
 import { t, type MessageKey } from '@/i18n';
 import { useDialog } from '@/providers/dialog-provider';
 
-/** What a plan's recorded past is called: a bill's charges, a loan's payments, a habit's days. */
-export type PastNoun = 'charges' | 'payments' | 'days';
+/**
+ * What a plan's recorded past is called: a bill's charges, a loan's payments, a habit's days, a
+ * salary's pays.
+ */
+export type PastNoun = 'charges' | 'payments' | 'days' | 'pays';
 
 /** 'all' rewrites what is already recorded as well; 'upcoming' leaves it as it landed. */
 export type PastChange = 'all' | 'upcoming';
@@ -24,29 +27,34 @@ const CHANGE_TITLE: Record<PastNoun, MessageKey> = {
   charges: 'ui.past.change.title.charges',
   payments: 'ui.past.change.title.payments',
   days: 'ui.past.change.title.days',
+  pays: 'ui.past.change.title.pays',
 };
 
 const CHANGE_BODY: Record<PastNoun, MessageKey> = {
   charges: 'ui.past.change.body.charges',
   payments: 'ui.past.change.body.payments',
   days: 'ui.past.change.body.days',
+  pays: 'ui.past.change.body.pays',
 };
 
 const DELETE_BODY: Record<PastNoun, MessageKey> = {
   charges: 'ui.past.delete.body.charges',
   payments: 'ui.past.delete.body.payments',
   days: 'ui.past.delete.body.days',
+  pays: 'ui.past.delete.body.pays',
 };
 
 const KEEP: Record<PastNoun, MessageKey> = {
   charges: 'ui.past.delete.keep.charges',
   payments: 'ui.past.delete.keep.payments',
   days: 'ui.past.delete.keep.days',
+  pays: 'ui.past.delete.keep.pays',
 };
 
 /**
- * The one way bills, subscriptions, loans and habits ask about their past on an edit or a delete.
- * Words only, no data: the caller counts what is recorded (and waits for that read) before asking.
+ * The one way bills, subscriptions, loans, habits and salaries ask about their past on an edit or a
+ * delete. Words only, no data: the caller counts what is recorded (and waits for that read) before
+ * asking.
  * Every question resolves null when the person backs out, and nothing may be written then.
  */
 export function usePastChoice() {

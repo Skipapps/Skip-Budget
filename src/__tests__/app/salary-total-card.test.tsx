@@ -37,13 +37,17 @@ jest.mock('@/lib/haptics', () => ({ tap: jest.fn(), selection: jest.fn() }));
 jest.mock('@/theme/artwork', () => ({
   useArtwork: () => new Proxy({}, { get: () => () => null }),
 }));
-jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => jest.fn(async () => true) }));
+// Removing a pay asks the shared past question; with nothing on record it is the plain Delete.
+jest.mock('@/providers/dialog-provider', () => ({
+  useDialog: () => jest.fn(async () => 'everything'),
+}));
 jest.mock('@/lib/use-today', () => ({
   useToday: () => ({ today: '2026-10-08', todayDate: new Date('2026-10-08T00:00:00') }),
 }));
 jest.mock('@/api/pay', () => ({
   recordDuePay: jest.fn(async () => 0),
   usePastPay: () => ({ choose: jest.fn(), apply: jest.fn(), saving: false }),
+  useDeletePay: () => ({ countPast: async () => 0, remove: jest.fn(), removing: false }),
 }));
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'user-1' }));
 jest.mock('@tanstack/react-query', () => ({

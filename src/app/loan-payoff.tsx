@@ -76,7 +76,9 @@ export default function LoanPayoffScreen() {
   // Its payoffs come with it, so what clears it counts every one already made.
   const terms = useMemo(() => (loan ? loanTermsForBill(loan, loan.bill) : null), [loan]);
 
-  if (loan && terms) return <PayoffOpening loan={loan} terms={terms} />;
+  if (loan && terms) {
+    return <PayoffOpening loan={loan} terms={terms} refreshFailed={detail.refreshFailed} />;
+  }
 
   return (
     <Screen title={t('loanFlow.payoff.action')} showBack>
@@ -99,7 +101,16 @@ export default function LoanPayoffScreen() {
  * Only a loan still being paid can be paid off: one finished (paid off, or its bill stopped) or not
  * started yet says so instead. Asked once, on the loan as opened.
  */
-function PayoffOpening({ loan, terms }: { loan: LoanDetail; terms: LoanTerms }) {
+function PayoffOpening({
+  loan,
+  terms,
+  refreshFailed,
+}: {
+  loan: LoanDetail;
+  terms: LoanTerms;
+  /** A reload of the loan failed while it is priced as opened (RefreshNote). */
+  refreshFailed: boolean;
+}) {
   const { today } = useToday();
   const artwork = useArtwork();
   const [opening] = useState(() => {
@@ -110,7 +121,15 @@ function PayoffOpening({ loan, terms }: { loan: LoanDetail; terms: LoanTerms }) 
   const title = t('loanFlow.payoff.title', { name: loan.bill.name });
 
   if (!opening.finished && opening.days) {
-    return <PayoffFlow loan={loan} terms={terms} days={opening.days} title={title} />;
+    return (
+      <PayoffFlow
+        loan={loan}
+        terms={terms}
+        days={opening.days}
+        title={title}
+        refreshFailed={refreshFailed}
+      />
+    );
   }
   return (
     <Screen title={title} showBack>
@@ -140,11 +159,13 @@ function PayoffFlow({
   terms,
   days,
   title,
+  refreshFailed,
 }: {
   loan: LoanDetail;
   terms: LoanTerms;
   days: PayoffDays;
   title: string;
+  refreshFailed: boolean;
 }) {
   const { today, todayDate } = useToday();
   const toast = useToast();
@@ -290,6 +311,7 @@ function PayoffFlow({
         }}
         busy={saving}
         error={error}
+        refreshFailed={refreshFailed}
         onBack={() => setView('amount')}
         onPay={() => void handlePay()}
         onChangeAmount={() => setView('amount')}
@@ -309,6 +331,7 @@ function PayoffFlow({
         onPress: payItAll,
       }}
       ready={amount !== null}
+      refreshFailed={refreshFailed}
       onBack={() => router.back()}
       onContinue={handleContinue}
     />

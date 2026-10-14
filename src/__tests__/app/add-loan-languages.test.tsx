@@ -183,7 +183,7 @@ describe('in Spanish', () => {
       'Nombre del préstamo',
       'Pago mensual',
       'Importe prestado',
-      'APR',
+      'Tasa de interés',
       'Plazo',
       'Años',
       'Meses',
@@ -210,6 +210,8 @@ describe('in Spanish', () => {
       '$18,000',
       'Mensual',
       '$424.80',
+      'Tasa de interés',
+      '6.25%',
       '4 años · 48 pagos',
       'Intereses totales',
       '$2,390.10',
@@ -239,6 +241,7 @@ describe('in French', () => {
       'Nom du prêt',
       'Paiement mensuel',
       'Montant emprunté',
+      'Taux d’intérêt',
       'Durée',
       'Ans',
       'Mois',
@@ -254,9 +257,9 @@ describe('in French', () => {
     expect(
       screen.getByRole('button', { name: `Paiement mensuel, 424,80${NBSP}$. Modifier` }),
     ).toBeTruthy();
-    expect(box('APR').props.value).toBe('6,25');
-    await fireEvent.changeText(box('APR'), '6,5');
-    expect(box('APR').props.value).toBe('6,5');
+    expect(box('Taux d’intérêt').props.value).toBe('6,25');
+    await fireEvent.changeText(box('Taux d’intérêt'), '6,5');
+    expect(box('Taux d’intérêt').props.value).toBe('6,5');
     expectAllWritten();
   });
 
@@ -282,6 +285,7 @@ describe('in French', () => {
       `Prochain paiement${NBSP}: 27 oct. 2026`,
       `18${NBSP}000${NBSP}$`,
       `424,80${NBSP}$`,
+      'Taux d’intérêt',
       `6,25${NBSP}%`,
       '4 ans · 48 paiements',
       `2${NBSP}390,10${NBSP}$`,
@@ -346,5 +350,33 @@ describe('in every language and currency', () => {
       inSpending: true,
       countsFrom: '2026-10-12',
     });
+  });
+
+  it('names the rate as the calculator does, never "APR", on the details, the review and the missing list', async () => {
+    const RATE: Record<Language, string> = {
+      en: 'Interest rate',
+      es: 'Tasa de interés',
+      fr: 'Taux d’intérêt',
+    };
+    for (const [language, currency] of [
+      ['en', 'USD'],
+      ['es', 'MXN'],
+      ['fr', 'CAD'],
+    ] as [Language, CurrencyCode][]) {
+      await showIn(language, currency);
+      await fireEvent.changeText(box(RATE[language]), '');
+      await fireEvent.press(screen.getByRole('radio', { name: CAR }));
+      await fireEvent.press(screen.getByRole('radio', { name: SKIP }));
+      await fireEvent.press(screen.getByRole('button', { name: CONTINUE }));
+      expect(screen.getByText(new RegExp(`: ${RATE[language]}\\.$`), RAW)).toBeTruthy();
+      expect(everythingRead().filter((text) => /\bAPR\b/.test(text))).toEqual([]);
+
+      await fireEvent.changeText(box(RATE[language]), '6.25');
+      await fireEvent.press(screen.getByRole('button', { name: CONTINUE }));
+      const card = within(screen.getByTestId('loan-review-card'));
+      expect(card.getAllByText(RATE[language], RAW).length).toBeGreaterThan(0);
+      expect(everythingRead().filter((text) => /\bAPR\b/.test(text))).toEqual([]);
+      await screen.unmount();
+    }
   });
 });

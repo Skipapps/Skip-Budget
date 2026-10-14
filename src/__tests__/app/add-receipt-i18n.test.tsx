@@ -126,6 +126,17 @@ let mockReceiptsList: { data: { source: string; created_at: string }[]; isFetche
   isFetched: true,
 };
 let mockSources: { id: string; label: string; color: string; kind: string }[] = [];
+// One usage row per receipt read by camera or upload; none is deleted here.
+jest.mock('@/api/capture-usage', () => ({
+  useCaptureUsage: () => ({
+    data: mockReceiptsList.isFetched
+      ? mockReceiptsList.data.filter((row) => row.source === 'scan' || row.source === 'upload')
+      : undefined,
+    isSuccess: mockReceiptsList.isFetched,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+}));
 jest.mock('@/api/queries', () => ({
   useReceipts: () => mockReceiptsList,
   useReceipt: () => ({ ...mockReceipt, refetch: jest.fn() }),

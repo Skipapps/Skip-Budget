@@ -57,6 +57,10 @@ let mockState: { data?: unknown[]; isLoading: boolean; isError: boolean } = {
   isError: false,
 };
 
+// The free allowance's count: nothing read by camera or upload this month.
+jest.mock('@/api/capture-usage', () => ({
+  useCaptureUsage: () => ({ data: [], isSuccess: true, isError: false, refetch: jest.fn() }),
+}));
 jest.mock('@/api/queries', () => ({
   useReceipts: () => ({ ...mockState, refetch: jest.fn() }),
   usePaymentSources: () => ({

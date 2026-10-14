@@ -488,7 +488,8 @@ function ReceiptForm({
       }
     }
 
-    setCaptureSource(from);
+    // A reading of nothing is typed by hand, so it is filed as typed and is not a free scan spent.
+    if (found.length > 0) setCaptureSource(from);
     setError(null);
     setScanResult(
       found.length === 0

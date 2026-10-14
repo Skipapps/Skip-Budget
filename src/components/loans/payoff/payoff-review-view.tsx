@@ -6,6 +6,7 @@ import { DateBox } from '@/components/entry/date-box';
 import { LoanFlowFooter, LoanFlowPage } from '@/components/loans/add/loan-flow-page';
 import { PayoffLine, type PayoffLineWords } from '@/components/loans/payoff/payoff-line';
 import { FitFigure } from '@/components/ui/fit-group';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { SourceTiles } from '@/components/ui/source-tiles';
 import { TextLink } from '@/components/ui/text-link';
 import { SectionHeading } from '@/components/ui/typography';
@@ -35,6 +36,7 @@ export function PayoffReviewView({
   onSource,
   busy,
   error,
+  refreshFailed = false,
   onBack,
   onPay,
   onChangeAmount,
@@ -59,6 +61,8 @@ export function PayoffReviewView({
   onSource: (id: string) => void;
   busy: boolean;
   error: string | null;
+  /** A reload of the loan failed; the figures are the ones it was opened with. */
+  refreshFailed?: boolean;
   onBack: () => void;
   onPay: () => void;
   onChangeAmount: () => void;
@@ -150,6 +154,7 @@ export function PayoffReviewView({
           />
         ) : null}
       </View>
+      <RefreshNote show={refreshFailed} />
 
       <View className="mt-5 w-full">
         <DateBox

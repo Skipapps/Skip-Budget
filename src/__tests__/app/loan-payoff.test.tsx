@@ -132,6 +132,7 @@ let mockDetail: {
   /** Read since the page opened, rather than from the cache. */
   isFetchedAfterMount: boolean;
   isFetching: boolean;
+  refreshFailed: boolean;
   refetch: () => void;
 };
 /** A read that has landed since the page opened. */
@@ -141,6 +142,7 @@ const freshRead = (data: LoanDetailRead | undefined, isError = false): typeof mo
   isError,
   isFetchedAfterMount: true,
   isFetching: false,
+  refreshFailed: isError && data !== undefined,
   refetch: mockRefetch,
 });
 jest.mock('@/api/loans', () => ({ useLoanDetail: () => mockDetail }));
@@ -633,6 +635,63 @@ describe('a loan that cannot be paid off', () => {
     await render(<LoanPayoffScreen />);
     expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Pay it all' })).toBeNull();
+    expect(screen.queryByText(REFRESH_NOTE)).toBeNull();
+  });
+});
+
+const REFRESH_NOTE = 'Couldn’t refresh · showing your last figures';
+
+describe('a reload that fails while it prices', () => {
+  /** Opened on a fresh read, then a reload behind the page fails. */
+  async function pricedThenFailed() {
+    const view = await render(<LoanPayoffScreen />);
+    expect(screen.queryByText(REFRESH_NOTE)).toBeNull();
+    mockDetail = freshRead(mockDetail.data, true);
+    await view.rerender(<LoanPayoffScreen />);
+    return view;
+  }
+
+  it('shows only the failure line when nothing was read, with no note', async () => {
+    mockDetail = freshRead(undefined, true);
+    await render(<LoanPayoffScreen />);
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    expect(screen.queryByText(REFRESH_NOTE)).toBeNull();
+  });
+
+  it('keeps pricing the loan as opened, with the note right under what the amount does', async () => {
+    await pricedThenFailed();
+
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(line().props.children).toBe('$10,701.09 clears this loan today');
+    const note = screen.getByText(REFRESH_NOTE);
+    const siblings = line().parent!.children;
+    expect(siblings.indexOf(note)).toBe(siblings.indexOf(line()) + 1);
+  });
+
+  it('says it on the review too, right under the payoff card, and still pays', async () => {
+    await pricedThenFailed();
+    await fireEvent.press(screen.getByRole('button', { name: 'Pay it all' }));
+    await fireEvent.press(continueButton());
+
+    const card = screen.getByTestId('payoff-card');
+    const note = screen.getByText(REFRESH_NOTE);
+    const siblings = card.parent!.children;
+    expect(siblings.indexOf(note)).toBe(siblings.indexOf(card) + 1);
+
+    await fireEvent.press(payOffButton());
+    expect(mockRecord).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the note in Spanish and French', async () => {
+    setLanguage('es');
+    const view = await pricedThenFailed();
+    expect(screen.getByText('No se pudo actualizar · mostrando tus últimas cifras')).toBeTruthy();
+    await view.unmount();
+
+    showing(carLoan());
+    setLanguage('fr');
+    await pricedThenFailed();
+    expect(screen.getByText('Impossible d’actualiser · voici tes derniers chiffres')).toBeTruthy();
   });
 });
 

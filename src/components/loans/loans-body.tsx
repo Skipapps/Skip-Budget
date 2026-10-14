@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import { FinishedCard, LoanListCard, type LoanCardData } from '@/components/loans/loan-list-card';
 import { LoanTiles } from '@/components/loans/loan-tiles';
 import { LoansSummaryCard, type LoansSummaryData } from '@/components/loans/loans-summary-card';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { SectionHeading } from '@/components/ui/typography';
 import { t } from '@/i18n';
 import { useLoanIcons } from '@/theme/loan-icons';
@@ -12,12 +13,21 @@ type LoansBodyProps = {
   /** In the order to show; finished ones are taken out and listed below the open ones. */
   loans: readonly LoanCardData[];
   summary: LoansSummaryData;
+  /** A reload failed behind the figures shown. */
+  refreshFailed?: boolean;
   onOpen: (billId: string) => void;
   onCalculator: () => void;
   onAdd: () => void;
 };
 
-export function LoansBody({ loans, summary, onOpen, onCalculator, onAdd }: LoansBodyProps) {
+export function LoansBody({
+  loans,
+  summary,
+  refreshFailed = false,
+  onOpen,
+  onCalculator,
+  onAdd,
+}: LoansBodyProps) {
   const open = loans.filter((loan) => loan.ending === null);
   const finished = loans.filter((loan) => loan.ending !== null);
 
@@ -27,6 +37,7 @@ export function LoansBody({ loans, summary, onOpen, onCalculator, onAdd }: Loans
 
       {/* With only finished loans the card still stands, owing nothing: they are not "no loans". */}
       {loans.length > 0 ? <LoansSummaryCard summary={summary} /> : <EmptyCard />}
+      <RefreshNote show={refreshFailed} />
 
       {open.length > 0 ? (
         <>

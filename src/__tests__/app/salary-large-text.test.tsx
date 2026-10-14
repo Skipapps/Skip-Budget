@@ -34,7 +34,10 @@ jest.mock('@/theme/artwork', () => ({
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => new Proxy({}, { get: () => '#000000' }),
 }));
-jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => jest.fn(async () => true) }));
+// Removing a pay asks the shared past question; with nothing on record it is the plain Delete.
+jest.mock('@/providers/dialog-provider', () => ({
+  useDialog: () => jest.fn(async () => 'everything'),
+}));
 
 // Pay that has already landed is written down before a save changes anything; none of that is under
 // test in this file, so the sweep finds nothing and an edit to a salary that has paid is not asked.
@@ -45,6 +48,7 @@ jest.mock('@/api/pay', () => ({
     apply: jest.fn(async () => {}),
     saving: false,
   }),
+  useDeletePay: () => ({ countPast: async () => 0, remove: jest.fn(), removing: false }),
 }));
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'user-1' }));
 jest.mock('@tanstack/react-query', () => ({
@@ -162,7 +166,7 @@ describe.each(LOCALES)('in %s (%s) at the largest text size', (language, currenc
 
     await fireEvent.press(screen.getByRole('button', { name: t('common.save') }));
 
-    const reason = screen.getByText(t('salary.needLastPayday'));
+    const reason = screen.getByText(t('salary.missing', { fields: t('salary.lastPayday') }));
     expect(insideScroll(reason)).toBe(false);
     expect(reason.props.numberOfLines).toBeUndefined();
     expect(reason.props.maxFontSizeMultiplier).toBe(TEXT_CAP.reading);

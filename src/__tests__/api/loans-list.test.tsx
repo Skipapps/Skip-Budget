@@ -279,6 +279,31 @@ describe('useLoans', () => {
     expect(mockSelects).toHaveLength(1);
   });
 
+  it('says a first read that failed is the failure, never a reload that failed', async () => {
+    mockLoansFailure = { code: '08006', message: 'connection failure' };
+    const { result } = await renderHook(() => useLoans(TODAY), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(result.current.refreshFailed).toBe(false);
+  });
+
+  it('keeps the loans it read when a reload fails, and says so instead of failing', async () => {
+    const { result } = await renderHook(() => useLoans(TODAY), { wrapper });
+    await waitFor(() => expect(result.current.loans).toHaveLength(3));
+    expect(result.current.refreshFailed).toBe(false);
+
+    mockLoansFailure = { code: '08006', message: 'connection failure' };
+    await settle(() => client.refetchQueries({ queryKey: ['loans'] }));
+
+    await waitFor(() => expect(result.current.refreshFailed).toBe(true));
+    expect(result.current.isError).toBe(false);
+    expect(result.current.loans).toHaveLength(3);
+
+    mockLoansFailure = null;
+    await settle(() => client.refetchQueries({ queryKey: ['loans'] }));
+    await waitFor(() => expect(result.current.refreshFailed).toBe(false));
+  });
+
   it('is empty for someone with no loans', async () => {
     mockTables.loans = [];
     const { result } = await renderHook(() => useLoans(TODAY), { wrapper });

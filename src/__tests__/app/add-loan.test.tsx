@@ -238,7 +238,7 @@ async function fillWireframe() {
   await press(button('Amount borrowed, empty. Add'));
   await typeKeys(['1', '8', '0', '0', '0']);
   await press(button('Done'));
-  await fireEvent.changeText(box('APR'), '6.25');
+  await fireEvent.changeText(box('Interest rate'), '6.25');
   await fireEvent.changeText(box('Term'), '4');
   await press(button(/^Start date, /));
   await press(screen.getByTestId('calendar'));
@@ -437,8 +437,8 @@ describe('the details page', () => {
 
   it('keeps the rate and the term as typed, in years or months', async () => {
     await toDetails();
-    await fireEvent.changeText(box('APR'), '6,25');
-    expect(box('APR').props.value).toBe('6.25');
+    await fireEvent.changeText(box('Interest rate'), '6,25');
+    expect(box('Interest rate').props.value).toBe('6.25');
     await fireEvent.changeText(box('Term'), '48');
     await press(radio('Months'));
     expect(checked(radio('Months'))).toBe(true);
@@ -450,7 +450,7 @@ describe('the details page', () => {
     await press(button('Continue'));
     expect(
       screen.getByText(
-        'To continue, fill in: Loan type, Loan name, Amount borrowed, APR, Term, Start date, First payment, Paid from.',
+        'To continue, fill in: Loan type, Loan name, Amount borrowed, Interest rate, Term, Start date, First payment, Paid from.',
       ),
     ).toBeTruthy();
     expect(screen.queryByText('Review your loan')).toBeNull();
@@ -460,7 +460,7 @@ describe('the details page', () => {
     await press(button('Continue'));
     expect(
       screen.getByText(
-        'To continue, fill in: Amount borrowed, APR, Term, Start date, First payment, Paid from.',
+        'To continue, fill in: Amount borrowed, Interest rate, Term, Start date, First payment, Paid from.',
       ),
     ).toBeTruthy();
 
@@ -475,7 +475,7 @@ describe('the details page', () => {
   ])('refuses a rate of %s with the reason', async (rate, words) => {
     await toDetails();
     await fillWireframe();
-    await fireEvent.changeText(box('APR'), rate);
+    await fireEvent.changeText(box('Interest rate'), rate);
     await press(button('Continue'));
     expect(screen.getByText(words)).toBeTruthy();
     expect(screen.queryByText('Review your loan')).toBeNull();
@@ -538,7 +538,7 @@ describe('the review', () => {
       'Amount borrowed',
       'Monthly',
       '$424.80',
-      'APR',
+      'Interest rate',
       '6.25%',
       'Term',
       '4 years · 48 payments',
@@ -557,7 +557,7 @@ describe('the review', () => {
     await toReview();
     expect(
       screen.getByLabelText(
-        'Car loan. Next payment 27 Oct 2026. Amount borrowed, $18,000. Monthly, $424.80. APR, 6.25%. Term, 4 years, 48 payments. Total interest, $2,390.10. Total you’ll pay, $20,390.10',
+        'Car loan. Next payment 27 Oct 2026. Amount borrowed, $18,000. Monthly, $424.80. Interest rate, 6.25%. Term, 4 years, 48 payments. Total interest, $2,390.10. Total you’ll pay, $20,390.10',
       ),
     ).toBeTruthy();
   });
@@ -666,7 +666,7 @@ describe('the review', () => {
     await press(button('Amount borrowed, empty. Add'));
     await typeKeys(['3', '1', '3', '9', '4', '.', '3', '3']);
     await press(button('Done'));
-    await fireEvent.changeText(box('APR'), '8.14');
+    await fireEvent.changeText(box('Interest rate'), '8.14');
     await fireEvent.changeText(box('Term'), '6');
     await pickDate('Start date', new Date(2025, 10, 30));
     await pickDate('First payment', new Date(2026, 0, 14));
@@ -695,7 +695,7 @@ describe('the review', () => {
     await press(button('Back to edit'));
     expect(screen.getByText('Your loan')).toBeTruthy();
     expect(box('Loan name').props.value).toBe('Car loan');
-    expect(box('APR').props.value).toBe('6.25');
+    expect(box('Interest rate').props.value).toBe('6.25');
     expect(checked(radio(/^Chase/))).toBe(true);
     await press(button('Continue'));
     await press(button('Back'));
@@ -878,7 +878,7 @@ describe('from the calculator', () => {
     expect(screen.getByText('Your loan')).toBeTruthy();
     expect(button('Monthly payment, $500.97. Edit')).toBeTruthy();
     expect(button('Amount borrowed, $25,000. Edit')).toBeTruthy();
-    expect(box('APR').props.value).toBe('7.5');
+    expect(box('Interest rate').props.value).toBe('7.5');
     expect(box('Term').props.value).toBe('5');
     expect(checked(radio('Years'))).toBe(true);
     expect(button('Start date, 12 Sep 2026')).toBeTruthy();
@@ -1034,7 +1034,7 @@ describe('changing a saved loan', () => {
     expect(box('Loan name').props.value).toBe('Car loan');
     expect(button('Monthly payment, $424.80. Edit')).toBeTruthy();
     expect(button('Amount borrowed, $18,000. Edit')).toBeTruthy();
-    expect(box('APR').props.value).toBe('6.25');
+    expect(box('Interest rate').props.value).toBe('6.25');
     expect(box('Term').props.value).toBe('4');
     expect(checked(radio('Years'))).toBe(true);
     expect(button('Start date, 27 Dec 2024')).toBeTruthy();
@@ -1212,7 +1212,7 @@ describe('changing a saved loan', () => {
   it('writes what was changed, the switch and the reminder too', async () => {
     showing(savedLoan({ in_spending: false }));
     await render(<AddLoanScreen />);
-    await fireEvent.changeText(box('APR'), '5.9');
+    await fireEvent.changeText(box('Interest rate'), '5.9');
     await press(button('Continue'));
     const counts = screen.getByRole('switch', { name: 'Add to monthly bills' });
     expect(counts.props.accessibilityState).toEqual(expect.objectContaining({ checked: false }));

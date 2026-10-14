@@ -58,6 +58,15 @@ const scansThisMonth = (count: number) =>
     purchased_on: '2000-01-01',
   }));
 
+// One usage row per receipt read by camera or upload; none is deleted here.
+jest.mock('@/api/capture-usage', () => ({
+  useCaptureUsage: () => ({
+    data: mockReceipts.filter((row) => row.source === 'scan' || row.source === 'upload'),
+    isSuccess: true,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+}));
 jest.mock('@/api/queries', () => ({
   useReceipts: () => ({
     data: mockReceipts,

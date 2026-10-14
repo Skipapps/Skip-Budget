@@ -12,12 +12,14 @@ import { LoanViewFooter } from '@/components/loans/view/loan-view-footer';
 import { HistoryCard, UpcomingCard } from '@/components/loans/view/loan-view-lists';
 import { goBack } from '@/components/ui/back-button';
 import { PageState } from '@/components/ui/page-state';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { Screen } from '@/components/ui/screen';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
 import { failureMessage, failureText } from '@/lib/failure';
 import { formatCurrency } from '@/lib/format';
 import { success, warn } from '@/lib/haptics';
+import { failedEmpty } from '@/lib/query-state';
 import { useToday } from '@/lib/use-today';
 import { useConfirm, useDialog } from '@/providers/dialog-provider';
 import { useToast } from '@/providers/toast-context';
@@ -144,7 +146,7 @@ export default function LoanScreen() {
       <Screen showBack>
         {/* A failed reload behind a page already drawn keeps the page; here there is none. A loan
             with no schedule to read cannot be drawn either. */}
-        {detail.isError || read?.kind === 'loan' ? (
+        {failedEmpty(detail) || read?.kind === 'loan' ? (
           <PageState
             art={artwork.error}
             title={failureText()}
@@ -198,6 +200,7 @@ export default function LoanScreen() {
       }
     >
       <LoanViewCard view={view} today={today} />
+      <RefreshNote show={detail.refreshFailed} />
       <UpcomingCard
         payments={view.upcoming}
         onSeeAll={

@@ -177,7 +177,7 @@ export function LoanDetailsView({
         />
 
         <TextField
-          label={t('loanFlow.field.apr')}
+          label={t('loan.interestRate')}
           value={rateShown(form.rate)}
           onChangeText={(text) => onChange({ rate: rateFromTyped(text) })}
           keyboardType="decimal-pad"

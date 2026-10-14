@@ -73,6 +73,8 @@ export const toastMessages = defineMessages({
   'toast.habit.deleted': { en: 'Habit deleted', es: 'Hábito eliminado', fr: 'Habitude supprimée' },
   'toast.habit.stopped': { en: 'Habit stopped', es: 'Hábito detenido', fr: 'Habitude arrêtée' },
   'toast.pay.saved': { en: 'Pay saved', es: 'Sueldo guardado', fr: 'Paie enregistrée' },
+  'toast.pay.stopped': { en: 'Pay stopped', es: 'Sueldo detenido', fr: 'Paie arrêtée' },
+  'toast.pay.deleted': { en: 'Pay deleted', es: 'Sueldo eliminado', fr: 'Paie supprimée' },
   'toast.loan.saved': { en: 'Loan saved', es: 'Préstamo guardado', fr: 'Prêt enregistré' },
   'toast.loan.updated': {
     en: 'Loan updated',

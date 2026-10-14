@@ -32,7 +32,10 @@ jest.mock('@/theme/artwork', () => ({
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', body: '#222222', accentInk: '#905479' }),
 }));
-jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => jest.fn(async () => true) }));
+// Removing a pay asks the shared past question; with nothing on record it is the plain Delete.
+jest.mock('@/providers/dialog-provider', () => ({
+  useDialog: () => jest.fn(async () => 'everything'),
+}));
 
 // Pay that has already landed is written down before a save changes anything; none of that is under
 // test in this file, so the sweep finds nothing and an edit to a salary that has paid is not asked.
@@ -43,6 +46,7 @@ jest.mock('@/api/pay', () => ({
     apply: jest.fn(async () => {}),
     saving: false,
   }),
+  useDeletePay: () => ({ countPast: async () => 0, remove: jest.fn(), removing: false }),
 }));
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'user-1' }));
 jest.mock('@tanstack/react-query', () => ({
@@ -245,15 +249,26 @@ it('works out hourly pay in French and saves the English figure', async () => {
 });
 
 it('names the source in a French hourly problem, with the no-break space before the colon', async () => {
-  mockDetails = { rows: [{ ...hourlyRow, hours_per_week: null }], hourlyAvailable: true };
+  mockDetails = { rows: [{ ...hourlyRow, hours_per_week: 165 }], hourlyAvailable: true };
   await showIn('fr', 'CAD');
 
   await fireEvent.press(screen.getByText('Enregistrer', RAW));
   expect(
     screen.getByText(
-      `Acme${NBSP}: Indique combien d’heures tu travailles dans une semaine normale.`,
+      `Acme${NBSP}: Une semaine ne compte que 168 heures. Vérifie les heures que tu as indiquées.`,
       RAW,
     ),
+  ).toBeTruthy();
+  expect(mockUpdate).not.toHaveBeenCalled();
+});
+
+it('lists missing hours in French by the label on the card', async () => {
+  mockDetails = { rows: [{ ...hourlyRow, hours_per_week: null }], hourlyAvailable: true };
+  await showIn('fr', 'CAD');
+
+  await fireEvent.press(screen.getByText('Enregistrer', RAW));
+  expect(
+    screen.getByText(`Pour enregistrer ta paie, remplis${NBSP}: Heures par semaine.`, RAW),
   ).toBeTruthy();
   expect(mockUpdate).not.toHaveBeenCalled();
 });

@@ -178,6 +178,10 @@ let mockSources: typeof SOURCES = SOURCES;
 let mockReceipt: { data: unknown; isError: boolean; isFetched: boolean };
 const mockRefetch = jest.fn();
 
+// The free allowance's count: nothing read by camera or upload this month.
+jest.mock('@/api/capture-usage', () => ({
+  useCaptureUsage: () => ({ data: [], isSuccess: true, isError: false, refetch: jest.fn() }),
+}));
 jest.mock('@/api/queries', () => ({
   // This month's receipts, which the free scan and upload allowances count.
   useReceipts: () => ({ data: [], isFetched: true, isError: false }),

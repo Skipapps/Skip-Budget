@@ -43,7 +43,10 @@ jest.mock('@/theme/artwork', () => ({
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', body: '#222222', accentInk: '#905479' }),
 }));
-jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => jest.fn(async () => true) }));
+// Removing a pay asks the shared past question; with nothing on record it is the plain Delete.
+jest.mock('@/providers/dialog-provider', () => ({
+  useDialog: () => jest.fn(async () => 'everything'),
+}));
 
 // Pay that has already landed is written down before a save changes anything; none of that is under
 // test in this file, so the sweep finds nothing and an edit to a salary that has paid is not asked.
@@ -54,6 +57,7 @@ jest.mock('@/api/pay', () => ({
     apply: jest.fn(async () => {}),
     saving: false,
   }),
+  useDeletePay: () => ({ countPast: async () => 0, remove: jest.fn(), removing: false }),
 }));
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'user-1' }));
 jest.mock('@tanstack/react-query', () => ({
@@ -119,6 +123,8 @@ let mockRows: unknown[] = [row];
 let mockAccounts: unknown[] = [CHECKING, SAVINGS, CAPITAL];
 let mockAccountsPending = false;
 let mockAccountsFailed = false;
+/** The failed read was a reload: the last answer is still held, as TanStack keeps it. */
+let mockAccountsHeld = false;
 const mockRefetchAccounts = jest.fn();
 jest.mock('@/api/queries', () => ({
   useSalaryDetails: () => ({
@@ -128,7 +134,7 @@ jest.mock('@/api/queries', () => ({
     refetch: jest.fn(),
   }),
   useBankAccounts: () => ({
-    data: mockAccounts,
+    data: mockAccountsFailed && !mockAccountsHeld ? undefined : mockAccounts,
     isPending: mockAccountsPending,
     isError: mockAccountsFailed,
     refetch: mockRefetchAccounts,
@@ -184,6 +190,7 @@ beforeEach(() => {
   mockAccounts = [CHECKING, SAVINGS, CAPITAL];
   mockAccountsPending = false;
   mockAccountsFailed = false;
+  mockAccountsHeld = false;
   mockParams = {};
 });
 afterAll(() => resetLocaleForTests());
@@ -581,6 +588,17 @@ describe('The Paid into page', () => {
     expect(failed.queryByRole('radio')).toBeNull();
     await fireEvent.press(failed.getByText('Try again'));
     expect(mockRefetchAccounts).toHaveBeenCalled();
+  });
+
+  it('keeps the accounts it read when a reload fails, with no failure line', async () => {
+    mockAccountsFailed = true;
+    mockAccountsHeld = true;
+    const page = await open({ selected: 'acc2' });
+
+    expect(page.queryByText('Try again')).toBeNull();
+    expect(choices(page).labels).toEqual([...ACCOUNT_LABELS, 'No account']);
+    await fireEvent.press(page.getByLabelText('Ally Savings ••9911'));
+    expect(router.back).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -197,9 +197,13 @@ let mockSources = [
 let mockReceipt: { data: unknown; isError: boolean; isFetched: boolean };
 // A refused scan counts the month again; this is that read starting over.
 const mockRecount = jest.fn();
+// This month's usage rows, which the free scan and upload allowances count.
+jest.mock('@/api/capture-usage', () => ({
+  useCaptureUsage: () => ({ data: [], isSuccess: true, isError: false, refetch: mockRecount }),
+}));
 jest.mock('@/api/queries', () => ({
   // This month's receipts, which the free scan and upload allowances count.
-  useReceipts: () => ({ data: [], isFetched: true, isError: false, refetch: mockRecount }),
+  useReceipts: () => ({ data: [], isFetched: true, isError: false, refetch: jest.fn() }),
   useReceipt: () => ({ ...mockReceipt, refetch: jest.fn() }),
   usePaymentSources: () => ({ sources: mockSources }),
 }));

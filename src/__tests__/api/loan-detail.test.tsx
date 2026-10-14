@@ -333,6 +333,59 @@ describe('useLoanDetail', () => {
     expect(mockRequests).toHaveLength(1);
   });
 
+  it('says a first read that failed is not a reload that failed', async () => {
+    mockFailure = { code: 'PGRST301', message: 'JWT expired' };
+    const result = await read('bill-1');
+
+    expect(result.current.refreshFailed).toBe(false);
+  });
+
+  it('keeps the loan it read when a reload fails, keeping TanStack’s own isError', async () => {
+    const result = await read('bill-1');
+    expect(result.current.refreshFailed).toBe(false);
+
+    mockFailure = { code: 'PGRST301', message: 'JWT expired' };
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ['loans'] });
+    });
+
+    await waitFor(() => expect(result.current.refreshFailed).toBe(true));
+    // The Pay off page reads this to refuse pricing on a failed opening read.
+    expect(result.current.isError).toBe(true);
+    expect(result.current.data).toMatchObject({ kind: 'loan' });
+  });
+
+  it('re-renders its screens for the fields they read, not for every change to the read', async () => {
+    // Stale after 30 ms: going stale changes the read, and no screen reads whether it is stale.
+    client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 30 } },
+    });
+    let renders = 0;
+    const { result } = await renderHook(
+      () => {
+        renders += 1;
+        return useLoanDetail('bill-1');
+      },
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.data).toMatchObject({ kind: 'loan' }));
+    const drawn = renders;
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    });
+    expect(renders).toBe(drawn);
+    expect(Object.keys(result.current).sort()).toEqual([
+      'data',
+      'isError',
+      'isFetchedAfterMount',
+      'isFetching',
+      'isPending',
+      'refetch',
+      'refreshFailed',
+    ]);
+  });
+
   it('asks nothing without a bill id', async () => {
     await read(undefined);
     expect(mockRequests).toHaveLength(0);

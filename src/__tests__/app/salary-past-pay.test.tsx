@@ -45,8 +45,11 @@ jest.mock('@/lib/use-today', () => ({
   useToday: () => ({ today: '2026-10-08', todayDate: new Date('2026-10-08T00:00:00') }),
 }));
 
-const mockRemove = jest.fn(async (_options: Record<string, unknown>) => true);
-jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => mockRemove }));
+// Removing a pay asks the shared past question; with nothing on record it is the plain Delete.
+const mockAsk = jest.fn(
+  async (_request: Record<string, unknown>): Promise<string | null> => 'everything',
+);
+jest.mock('@/providers/dialog-provider', () => ({ useDialog: () => mockAsk }));
 
 jest.mock('@/theme/gradient-icons', () => ({
   useGradientIcons: () => new Proxy({}, { get: () => () => null }),
@@ -66,6 +69,11 @@ const mockApply = jest.fn(async (_id: string, _values: Carried) => {});
 jest.mock('@/api/pay', () => ({
   recordDuePay: (userId: string, today: string) => mockRecord(userId, today),
   usePastPay: () => ({ choose: mockChoose, apply: mockApply, saving: false }),
+  useDeletePay: () => ({
+    countPast: async () => 0,
+    remove: ({ id }: { id: string }) => mockDelete(id),
+    removing: false,
+  }),
 }));
 
 // A screen raises a toast through the context; outside a provider it does nothing, so this one records.
@@ -90,7 +98,6 @@ const mockSetAccounts = jest.fn(async (_input: { salaryId: string; accountIds: s
 jest.mock('@/api/mutations', () => ({
   useCreateSalarySource: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateSalarySource: () => ({ mutateAsync: mockUpdate, isPending: false }),
-  useDeleteSalarySource: () => ({ mutateAsync: mockDelete, isPending: false }),
   useDeleteUnseenPay: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useSetSalaryAccounts: () => ({ mutateAsync: mockSetAccounts, isPending: false }),
 }));
@@ -189,7 +196,7 @@ beforeEach(() => {
   mockUserId = 'user-1';
   mockRows = [acme];
   mockAccounts = [CHECKING, SAVINGS];
-  mockRemove.mockResolvedValue(true);
+  mockAsk.mockResolvedValue('everything');
   mockToast.mockReset();
   mockToast.mockImplementation(() => {
     mockOrder.push('toast');
@@ -293,7 +300,7 @@ describe('Saving writes down the pay that has come due first', () => {
 
     await save(screen);
 
-    expect(screen.getByText('Give each source a name and its pay.')).toBeTruthy();
+    expect(screen.getByText('To save your pay, fill in: Name.')).toBeTruthy();
     expect(mockRecord).not.toHaveBeenCalled();
     expect(mockChoose).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();

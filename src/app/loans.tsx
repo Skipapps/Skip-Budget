@@ -16,7 +16,7 @@ import { useArtwork } from '@/theme/artwork';
 export default function LoansScreen() {
   const { today } = useToday();
   const artwork = useArtwork();
-  const { loans, isPending, isError, refetch } = useLoans(today);
+  const { loans, isPending, isError, refreshFailed, refetch } = useLoans(today);
 
   const priced = useMemo(() => priceLoans(loans, today), [loans, today]);
   const cards = useMemo(() => priced.map(cardOf), [priced]);
@@ -46,6 +46,7 @@ export default function LoansScreen() {
         <LoansBody
           loans={cards}
           summary={summary}
+          refreshFailed={refreshFailed}
           onOpen={(billId) => router.push({ pathname: '/loan/[id]', params: { id: billId } })}
           onCalculator={openCalculator}
           onAdd={() => router.push('/add-loan')}

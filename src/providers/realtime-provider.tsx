@@ -16,7 +16,8 @@ const AFFECTS: Record<string, string[]> = {
   // Loans are read with their bills, and deleting a bill deletes its loan.
   bills: ['bills', 'loans'],
   subscriptions: ['subscriptions'],
-  receipts: ['receipts'],
+  // A receipt read by camera or upload is counted by its usage row, which is not published.
+  receipts: ['receipts', 'capture_usage'],
   habits: ['habits'],
   receipt_books: ['receipt_books', 'receipts'],
   payments: ['payments'],

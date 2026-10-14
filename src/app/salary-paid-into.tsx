@@ -12,6 +12,7 @@ import { failureText } from '@/lib/failure';
 import { selection } from '@/lib/haptics';
 import { pickPaidInto } from '@/lib/paid-into-pick';
 import { useNavigateOnce } from '@/lib/use-navigate-once';
+import { failedEmpty } from '@/lib/query-state';
 import { useColors } from '@/providers/theme-provider';
 import { useArtwork } from '@/theme/artwork';
 import { TEXT_CAP } from '@/theme/text-scale';
@@ -54,7 +55,7 @@ export default function SalaryPaidIntoScreen() {
     );
   }
 
-  if (accounts.isError) {
+  if (failedEmpty(accounts)) {
     return (
       <Screen title={t('salary.paidInto')} showBack>
         <PageState

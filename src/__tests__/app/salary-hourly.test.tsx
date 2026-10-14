@@ -32,7 +32,10 @@ jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', body: '#222222', accentInk: '#905479' }),
 }));
 
-jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => jest.fn(async () => true) }));
+// Removing a pay asks the shared past question; with nothing on record it is the plain Delete.
+jest.mock('@/providers/dialog-provider', () => ({
+  useDialog: () => jest.fn(async () => 'everything'),
+}));
 
 // Pay that has already landed is written down before a save changes anything; none of that is under
 // test in this file, so the sweep finds nothing and an edit to a salary that has paid is not asked.
@@ -42,6 +45,11 @@ jest.mock('@/api/pay', () => ({
     choose: jest.fn(async () => 'upcoming'),
     apply: jest.fn(async () => {}),
     saving: false,
+  }),
+  useDeletePay: () => ({
+    countPast: async () => 0,
+    remove: ({ id }: { id: string }) => mockDelete(id),
+    removing: false,
   }),
 }));
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'user-1' }));
@@ -55,12 +63,11 @@ jest.mock('@/theme/gradient-icons', () => ({
 
 const mockCreate = jest.fn(async () => ({ id: 'new' }));
 const mockUpdate = jest.fn(async () => ({}));
-const mockDelete = jest.fn(async () => ({}));
+const mockDelete = jest.fn(async (_id: string) => ({}));
 const mockSetAccounts = jest.fn(async () => ({}));
 jest.mock('@/api/mutations', () => ({
   useCreateSalarySource: () => ({ mutateAsync: mockCreate, isPending: false }),
   useUpdateSalarySource: () => ({ mutateAsync: mockUpdate, isPending: false }),
-  useDeleteSalarySource: () => ({ mutateAsync: mockDelete, isPending: false }),
   useDeleteUnseenPay: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useSetSalaryAccounts: () => ({ mutateAsync: mockSetAccounts, isPending: false }),
 }));

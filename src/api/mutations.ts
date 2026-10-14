@@ -55,6 +55,8 @@ const DEPENDENTS: Record<string, string[]> = {
   ],
   // A loan is read with its bill, and goes with it ("on delete cascade").
   bills: ['loans'],
+  // Usage rows point at their receipt; one read by camera or upload writes its row as it is saved.
+  receipts: ['capture_usage'],
 };
 
 function useInvalidate() {

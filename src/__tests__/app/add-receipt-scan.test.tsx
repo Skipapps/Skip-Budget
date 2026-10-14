@@ -173,8 +173,28 @@ const savedThisMonth = (source: string, count: number) =>
   Array.from({ length: count }, () => ({ source, created_at: '2026-10-02T15:00:00.000Z' }));
 
 const mockRecount = jest.fn();
+// The database's usage rows: one per receipt read by camera or upload, kept when the receipt is
+// deleted. Unless a test sets them, they are the receipts above read that way. Null is a database
+// without them yet.
+let mockUsage: { source: string; created_at: string }[] | null | undefined;
+jest.mock('@/api/capture-usage', () => ({
+  useCaptureUsage: () => {
+    const read = mockReceipts.isFetched && !mockReceipts.isError;
+    return {
+      data:
+        mockUsage !== undefined
+          ? mockUsage
+          : read
+            ? mockReceipts.data.filter((row) => row.source === 'scan' || row.source === 'upload')
+            : undefined,
+      isSuccess: read,
+      isError: mockReceipts.isError,
+      refetch: mockRecount,
+    };
+  },
+}));
 jest.mock('@/api/queries', () => ({
-  useReceipts: () => ({ ...mockReceipts, refetch: mockRecount }),
+  useReceipts: () => ({ ...mockReceipts, refetch: jest.fn() }),
   useReceipt: () => ({ data: null, isError: false, isFetched: false, refetch: jest.fn() }),
   usePaymentSources: () => ({
     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
@@ -291,6 +311,7 @@ beforeEach(() => {
   mockScanner.available = true;
   mockPro = { pro: true, ready: true };
   mockReceipts = { data: [], isFetched: true, isError: false };
+  mockUsage = undefined;
   mockCreate.mockResolvedValue({ id: 'receipt-new' });
 });
 
@@ -999,6 +1020,68 @@ describe('the free allowance', () => {
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
     expect(mockCreate.mock.calls[0][0].source).toBe('manual');
     expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps a scan used after its receipt is deleted: 14 receipts kept, 15 read', async () => {
+    mockPro = { pro: false, ready: true };
+    mockReceipts = { data: savedThisMonth('scan', 14), isFetched: true, isError: false };
+    mockUsage = savedThisMonth('scan', 15);
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(screen.getByText('Free this month: 0 scans and 15 uploads left')).toBeTruthy();
+    await press(screen, 'Scan');
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/pro-feature', params: { id: 'scan' } });
+    expect(mockCapture).not.toHaveBeenCalled();
+  });
+
+  it('counts the receipts kept on a database without usage rows yet', async () => {
+    mockPro = { pro: false, ready: true };
+    mockReceipts = { data: savedThisMonth('scan', 15), isFetched: true, isError: false };
+    mockUsage = null;
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(screen.getByText('Free this month: 0 scans and 15 uploads left')).toBeTruthy();
+  });
+
+  it.each(['Scan', 'Upload'])(
+    'files a receipt typed after a reading of nothing (%s) as typed, so no free read is spent',
+    async (button) => {
+      mockPro = { pro: false, ready: true };
+      mockParsed = {};
+      mockCapture.mockResolvedValueOnce({ text: '', lines: [] });
+      mockAsk.mockResolvedValueOnce('photos');
+      mockLibrary.mockResolvedValueOnce({ canceled: false, assets: [{ uri: 'file://blank.jpg' }] });
+      mockRecognize.mockResolvedValueOnce([]);
+      const screen = await render(<AddReceiptScreen />);
+
+      await press(screen, button);
+      await waitFor(() =>
+        expect(screen.getByText('Couldn’t read this receipt. Fill it in below.')).toBeTruthy(),
+      );
+      await typeAmount(screen, '12');
+      await press(screen, 'Continue');
+      await searchStore(screen, 'Deli');
+      await press(screen, 'Add Deli as a new store');
+      await press(screen, 'Skip');
+      await press(screen, 'Save receipt');
+
+      await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+      expect(mockCreate.mock.calls[0][0].source).toBe('manual');
+    },
+  );
+
+  it('files it as a scan when a second reading finds what the first did not', async () => {
+    mockPro = { pro: false, ready: true };
+    const screen = await render(<AddReceiptScreen />);
+
+    await scanOnForm(screen, {});
+    onAmountPage(screen);
+    await scanOnForm(screen, READ);
+    onFinalPage(screen);
+    await press(screen, 'Save receipt');
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0].source).toBe('scan');
   });
 
   it.each([

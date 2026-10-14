@@ -152,6 +152,12 @@ export const uiMessages = defineMessages({
     es: '¿Cambiar también los días anteriores?',
     fr: 'Modifier aussi les jours passés ?',
   },
+  // French says "versements" here: the two answers under it agree with a masculine noun.
+  'ui.past.change.title.pays': {
+    en: 'Change past pay too?',
+    es: '¿Cambiar también los pagos anteriores?',
+    fr: 'Modifier aussi les versements passés ?',
+  },
   'ui.past.change.body.charges': {
     en: {
       one: '{name} has already been charged once. Change that charge as well, or only the ones still to come?',
@@ -198,6 +204,22 @@ export const uiMessages = defineMessages({
       one: 'Un jour a déjà été noté pour {name}. Modifier aussi ce jour, ou seulement ceux à venir ?',
       other:
         '{count} jours ont déjà été notés pour {name}. Les modifier aussi, ou seulement ceux à venir ?',
+    },
+  },
+  'ui.past.change.body.pays': {
+    en: {
+      one: '{name} has already paid you once. Change that pay as well, or only the pay still to come?',
+      other:
+        '{name} has already paid you {count} times. Change those as well, or only the pay still to come?',
+    },
+    es: {
+      one: '{name} ya te pagó una vez. ¿Cambiar también ese pago o solo los próximos?',
+      other: '{name} ya te pagó {count} veces. ¿Cambiarlos también o solo los próximos?',
+    },
+    fr: {
+      one: 'Un versement a déjà été reçu de {name}. Modifier aussi ce versement, ou seulement ceux à venir ?',
+      other:
+        '{count} versements ont déjà été reçus de {name}. Les modifier aussi, ou seulement ceux à venir ?',
     },
   },
   'ui.past.change.all': {
@@ -271,6 +293,23 @@ export const uiMessages = defineMessages({
         '{name} a {count} jours passés. Les garder dans ton historique, ou les retirer aussi des mois passés ? Dans les deux cas, rien n’est enregistré après aujourd’hui.',
     },
   },
+  'ui.past.delete.body.pays': {
+    en: {
+      one: '{name} has paid you once. Keep that pay in your history, or remove it from past months too? Either way, nothing after today is recorded.',
+      other:
+        '{name} has paid you {count} times. Keep that pay in your history, or remove it from past months too? Either way, nothing after today is recorded.',
+    },
+    es: {
+      one: '{name} te pagó una vez. ¿Conservar ese pago en tu historial o quitarlo también de los meses pasados? En ambos casos, no se registra nada después de hoy.',
+      other:
+        '{name} te pagó {count} veces. ¿Conservar esos pagos en tu historial o quitarlos también de los meses pasados? En ambos casos, no se registra nada después de hoy.',
+    },
+    fr: {
+      one: '{name} t’a payé une fois. Garder cette paie dans ton historique, ou la retirer aussi des mois passés ? Dans les deux cas, rien n’est enregistré après aujourd’hui.',
+      other:
+        '{name} t’a payé {count} fois. Garder ces paies dans ton historique, ou les retirer aussi des mois passés ? Dans les deux cas, rien n’est enregistré après aujourd’hui.',
+    },
+  },
   'ui.past.delete.keep.charges': {
     en: 'Keep past charges',
     es: 'Conservar los cargos anteriores',
@@ -285,6 +324,11 @@ export const uiMessages = defineMessages({
     en: 'Keep past days',
     es: 'Conservar los días anteriores',
     fr: 'Garder les jours passés',
+  },
+  'ui.past.delete.keep.pays': {
+    en: 'Keep past pay',
+    es: 'Conservar los pagos anteriores',
+    fr: 'Garder les paies passées',
   },
   'ui.past.delete.everything': {
     en: 'Remove everything',

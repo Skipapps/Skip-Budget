@@ -59,6 +59,10 @@ const mockReceipts = [
   { id: 'r2', merchant: 'Greengrocer', amount: 2, purchased_on: '2026-09-01' },
 ].map((row) => ({ ...row, card_id: null, bank_account_id: null, brands: null }));
 
+// The free allowance's count: nothing read by camera or upload this month.
+jest.mock('@/api/capture-usage', () => ({
+  useCaptureUsage: () => ({ data: [], isSuccess: true, isError: false, refetch: jest.fn() }),
+}));
 jest.mock('@/api/queries', () => ({
   useReceipts: () => ({ data: mockReceipts, isLoading: false, isError: false, refetch: jest.fn() }),
   usePaymentSources: () => ({ sources: [] }),

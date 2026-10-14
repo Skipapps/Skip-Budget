@@ -6,6 +6,7 @@ import { AmountFigure } from '@/components/flow/amount-figure';
 import { AmountKeypad, applyAmountKey } from '@/components/flow/amount-keypad';
 import { LoanFlowFooter, LoanFlowPage, LoanQuestion } from '@/components/loans/add/loan-flow-page';
 import { PayoffLine, type PayoffLineWords } from '@/components/loans/payoff/payoff-line';
+import { RefreshNote } from '@/components/ui/refresh-note';
 import { t } from '@/i18n';
 import { cn } from '@/lib/cn';
 import { withTap } from '@/lib/press';
@@ -66,6 +67,7 @@ export function PayoffAmountView({
   line,
   payAll,
   ready,
+  refreshFailed = false,
   onBack,
   onContinue,
 }: {
@@ -76,6 +78,8 @@ export function PayoffAmountView({
   payAll: { selected: boolean; hint: string; onPress: () => void };
   /** An amount above nothing is typed. */
   ready: boolean;
+  /** A reload of the loan failed; the figures are the ones it was opened with. */
+  refreshFailed?: boolean;
   onBack: () => void;
   onContinue: () => void;
 }) {
@@ -100,6 +104,7 @@ export function PayoffAmountView({
       <View className="mt-6 w-full flex-1">
         <AmountFigure value={draft} />
         <PayoffLine words={line} className="mt-3 text-center" testID="payoff-line" />
+        <RefreshNote show={refreshFailed} />
         <View className="mt-4 w-full">
           <PayAllChip {...payAll} />
         </View>

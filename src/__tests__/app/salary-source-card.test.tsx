@@ -36,7 +36,10 @@ jest.mock('@/theme/gradient-icons', () => ({
 jest.mock('@/providers/theme-provider', () => ({
   useColors: () => ({ ink: '#000000', muted: '#777777', body: '#222222', accentInk: '#905479' }),
 }));
-jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => jest.fn(async () => true) }));
+// Removing a pay asks the shared past question; with nothing on record it is the plain Delete.
+jest.mock('@/providers/dialog-provider', () => ({
+  useDialog: () => jest.fn(async () => 'everything'),
+}));
 jest.mock('@/api/pay', () => ({
   recordDuePay: jest.fn(async () => 0),
   usePastPay: () => ({
@@ -44,6 +47,7 @@ jest.mock('@/api/pay', () => ({
     apply: jest.fn(async () => {}),
     saving: false,
   }),
+  useDeletePay: () => ({ countPast: async () => 0, remove: jest.fn(), removing: false }),
 }));
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'user-1' }));
 jest.mock('@tanstack/react-query', () => ({

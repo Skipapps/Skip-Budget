@@ -1,11 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
+import type { PastDelete } from '@/components/ui/past-choice';
 import { t } from '@/i18n';
-import { historyFloor } from '@/lib/allowance';
 import { withTimeout } from '@/lib/deadline';
-import type { PayFrequency } from '@/lib/date';
-import { landingAccount, unrecordedPaydays } from '@/lib/pay';
+import { duePay, paydaysInHistory, type RecordedDay, type SalaryToRecord } from '@/lib/pay-record';
 import { supabase } from '@/lib/supabase';
 import { useDialog } from '@/providers/dialog-provider';
 import { useUserId } from '@/providers/session-provider';
@@ -54,65 +53,53 @@ export function usePayReceived() {
 
 type NewPay = Omit<PayRow, 'id'> & { user_id: string };
 
+type SalaryRead = Omit<SalaryToRecord, 'account_ids'> & {
+  salary_source_accounts?: { bank_account_id: string }[] | null;
+};
+
+const SALARY_TO_RECORD =
+  'id, name, amount, frequency, last_payday, salary_source_accounts(bank_account_id)';
+
+const toRecord = ({ salary_source_accounts, ...salary }: SalaryRead): SalaryToRecord => ({
+  ...salary,
+  account_ids: (salary_source_accounts ?? []).map((link) => link.bank_account_id),
+});
+
+/** The paydays due and not written down yet, for every salary or for one. Throws on a failed read. */
+async function readDuePay(userId: string, today: string, salaryId?: string): Promise<NewPay[]> {
+  let salaries = supabase.from('salary_sources').select(SALARY_TO_RECORD);
+  let existing = supabase.from('pay_received').select('salary_source_id, paid_on');
+  if (salaryId) {
+    salaries = salaries.eq('id', salaryId);
+    existing = existing.eq('salary_source_id', salaryId);
+  }
+  const [salaryRows, accounts, recorded] = await Promise.all([
+    salaries,
+    supabase.from('bank_accounts').select('id').order('created_at', { ascending: true }),
+    existing,
+  ]);
+  const failed = salaryRows.error ?? accounts.error ?? recorded.error;
+  if (failed) throw failed;
+
+  return duePay({
+    today,
+    salaries: ((salaryRows.data ?? []) as unknown as SalaryRead[]).map(toRecord),
+    recorded: (recorded.data ?? []) as RecordedDay[],
+    accountOrder: (accounts.data ?? []).map((row) => row.id as string),
+  }).map((row) => ({ ...row, user_id: userId }));
+}
+
 /**
  * Records every payday that has come due and is not written down yet; returns how many rows it
  * added. Safe to repeat: the unique index refuses a payday recorded twice by two launches racing.
  */
 export async function recordDuePay(userId: string, today: string): Promise<number> {
-  const [salaries, accounts, existing] = await Promise.all([
-    supabase
-      .from('salary_sources')
-      .select('id, name, amount, frequency, last_payday, salary_source_accounts(bank_account_id)'),
-    supabase.from('bank_accounts').select('id').order('created_at', { ascending: true }),
-    supabase.from('pay_received').select('salary_source_id, paid_on'),
-  ]);
-  if (salaries.error || accounts.error || existing.error) return 0;
-
-  const lastRecorded = new Map<string, string>();
-  for (const row of existing.data ?? []) {
-    const id = row.salary_source_id as string | null;
-    const day = row.paid_on as string;
-    if (id && (!lastRecorded.has(id) || day > lastRecorded.get(id)!)) lastRecorded.set(id, day);
+  let rows: NewPay[];
+  try {
+    rows = await readDuePay(userId, today);
+  } catch {
+    return 0;
   }
-
-  const accountOrder = (accounts.data ?? []).map((row) => row.id as string);
-  // The same floor the ledger walks from, so what is written down is what the screens show.
-  const floor = historyFloor(true, new Date(`${today}T00:00:00`));
-
-  type SalaryRead = {
-    id: string;
-    name: string | null;
-    amount: number;
-    frequency: PayFrequency;
-    last_payday: string | null;
-    salary_source_accounts?: { bank_account_id: string }[] | null;
-  };
-
-  const rows: NewPay[] = [];
-  for (const salary of (salaries.data ?? []) as unknown as SalaryRead[]) {
-    const amount = Number(salary.amount);
-    if (!(amount > 0)) continue;
-    const into = landingAccount(
-      (salary.salary_source_accounts ?? []).map((link) => link.bank_account_id),
-      accountOrder,
-    );
-    for (const day of unrecordedPaydays(
-      { frequency: salary.frequency, lastPayday: salary.last_payday },
-      lastRecorded.get(salary.id) ?? null,
-      floor,
-      today,
-    )) {
-      rows.push({
-        user_id: userId,
-        salary_source_id: salary.id,
-        label: salary.name ?? '',
-        amount,
-        paid_on: day,
-        bank_account_id: into,
-      });
-    }
-  }
-
   if (rows.length === 0) return 0;
 
   // Two launches at once see the same gap; the unique index refuses the second, so it is ignored.
@@ -120,6 +107,92 @@ export async function recordDuePay(userId: string, today: string): Promise<numbe
     .from('pay_received')
     .upsert(rows as never, { ignoreDuplicates: true });
   return error ? 0 : rows.length;
+}
+
+/**
+ * recordDuePay for one salary, failing out loud: "keep past" removes the salary next, and the
+ * paydays it could not write would go with it.
+ */
+async function recordDuePayOf(userId: string, today: string, salaryId: string): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    const rows = await readDuePay(userId, today, salaryId);
+    if (rows.length === 0) return;
+    const { error } = await supabase
+      .from('pay_received')
+      .upsert(rows as never, { ignoreDuplicates: true });
+    if (!error) return;
+    // The upsert's conflict target is the key, not the one-a-day index: a launch's sweep that
+    // wrote the same payday a moment earlier refuses the batch, and a fresh read leaves it out.
+    if (error.code !== '23505' || attempt > 0) throw error;
+  }
+}
+
+/** Deleting a pay: 'keep' stops it today with its paydays left in history; 'everything' takes them too. */
+export type PayDeleteInput = {
+  /** The salary_sources row. */
+  id: string;
+  choice: PastDelete;
+  /** The person's today (yyyy-mm-dd, `useToday`). */
+  today: string;
+};
+
+/**
+ * Deleting a pay that may have paid. `countPast` is the count for `usePastChoice().askDelete`;
+ * `remove` does what the answer said.
+ *
+ * - 'keep': every payday due by today is written down first, so the history and every balance stay
+ *   exactly as shown, then the pay goes. Its paydays outlive it (salary_source_id becomes null), so
+ *   nothing after today is recorded or projected.
+ * - 'everything': the pay and every payday on its record, in one database step. The paydays not
+ *   written down yet were only ever worked out from it, so they go with it.
+ */
+export function useDeletePay() {
+  const userId = useUserId();
+  const client = useQueryClient();
+
+  /**
+   * How many paydays it has in history today: on the record, plus any due that the sweep has not
+   * written down yet. Rejects when a read fails; an unread count is not "none".
+   */
+  const countPast = useCallback(async (id: string, today: string): Promise<number> => {
+    const [salary, recorded] = await Promise.all([
+      supabase.from('salary_sources').select(SALARY_TO_RECORD).eq('id', id).maybeSingle(),
+      supabase.from('pay_received').select('salary_source_id, paid_on').eq('salary_source_id', id),
+    ]);
+    const unrecorded = missingTable(recorded.error);
+    const failed = salary.error ?? (unrecorded ? null : recorded.error);
+    if (failed) throw failed;
+    return paydaysInHistory({
+      today,
+      salary: salary.data ? toRecord(salary.data as unknown as SalaryRead) : null,
+      recorded: unrecorded ? [] : ((recorded.data ?? []) as RecordedDay[]),
+    });
+  }, []);
+
+  const removal = useMutation({
+    mutationFn: async ({ id, choice, today }: PayDeleteInput) => {
+      if (choice === 'everything') {
+        const { error } = await supabase.rpc('delete_salary_and_pay', { p_salary: id });
+        // P0002: removed on another phone already, which is what was asked for.
+        if (error && error.code !== 'P0002') throw error;
+        return { id, choice };
+      }
+      if (!userId) throw new Error('Sign in first.');
+      await recordDuePayOf(userId, today, id);
+      const { error } = await supabase.from('salary_sources').delete().eq('id', id);
+      if (error) throw error;
+      return { id, choice };
+    },
+    onSuccess: ({ choice }) => {
+      for (const key of ['salary_sources', 'salary_source_accounts', 'pay_received', 'dashboard']) {
+        client.invalidateQueries({ queryKey: [key] });
+      }
+      // A finished month whose pay went offers its update on the month's page.
+      if (choice === 'everything') client.invalidateQueries({ queryKey: ['savings'] });
+    },
+  });
+
+  return { countPast, remove: removal.mutateAsync, removing: removal.isPending };
 }
 
 export type PastPayScope = 'all' | 'upcoming';

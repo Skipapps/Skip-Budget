@@ -42,8 +42,6 @@ export const loanFlowMessages = defineMessages({
     es: 'Importe prestado',
     fr: 'Montant emprunté',
   },
-  // The same name in every language, as the schedule writes it.
-  'loanFlow.field.apr': { en: 'APR', es: 'APR', fr: 'APR' },
   'loanFlow.field.start': { en: 'Start date', es: 'Fecha de inicio', fr: 'Date de début' },
   'loanFlow.field.startPlaceholder': {
     en: 'When you got the money',

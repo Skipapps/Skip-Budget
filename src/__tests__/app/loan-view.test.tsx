@@ -95,6 +95,7 @@ let mockDetail: {
   data: LoanDetailRead | undefined;
   isPending: boolean;
   isError: boolean;
+  refreshFailed: boolean;
   refetch: () => void;
 };
 jest.mock('@/api/loans', () => ({ useLoanDetail: () => mockDetail }));
@@ -192,6 +193,7 @@ const detailOf = (
   data,
   isPending: data === undefined,
   isError: false,
+  refreshFailed: false,
   refetch: mockRefetch,
   ...more,
 });
@@ -705,9 +707,71 @@ describe('getting about', () => {
   it('offers Try again when it cannot read, never taking that for a loan gone', async () => {
     mockDetail = detailOf(undefined, { isPending: false, isError: true });
     await render(<LoanScreen />);
+    expect(screen.queryByText(REFRESH_NOTE)).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
     expect(mockRefetch).toHaveBeenCalled();
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('says nothing of a reload while the read is fine', async () => {
+    await render(<LoanScreen />);
+    expect(screen.queryByText(REFRESH_NOTE)).toBeNull();
+  });
+
+  it('keeps the loan after a failed reload, with the note right under the loan card', async () => {
+    mockDetail = detailOf(
+      { kind: 'loan', loan: carLoan() },
+      { isError: true, refreshFailed: true },
+    );
+    await render(<LoanScreen />);
+
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    const card = screen.getByTestId('loan-view-card');
+    const note = screen.getByText(REFRESH_NOTE);
+    let top: typeof card = card;
+    while (top.parent && !top.parent.children.includes(note)) top = top.parent;
+    const siblings = top.parent!.children;
+    expect(siblings.indexOf(note)).toBe(siblings.indexOf(top) + 1);
+    expect(screen.getByRole('button', { name: 'Pay off' })).toBeTruthy();
+  });
+
+  it('never shows the note with the failure line', async () => {
+    mockDetail = detailOf(undefined, { isPending: false, isError: true });
+    await render(<LoanScreen />);
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    expect(screen.queryByText(REFRESH_NOTE)).toBeNull();
+    await screen.unmount();
+
+    // Failed with an answer still held: the page and the note, never the failure line.
+    mockDetail = detailOf(
+      { kind: 'loan', loan: carLoan() },
+      { isError: true, refreshFailed: true },
+    );
+    await render(<LoanScreen />);
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(screen.getByText(REFRESH_NOTE)).toBeTruthy();
+  });
+
+  it('steps back from a loan gone, never the failure line, when a reload behind it fails', async () => {
+    mockDetail = detailOf({ kind: 'gone' }, { isError: true, refreshFailed: true });
+    await render(<LoanScreen />);
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the note in Spanish and French', async () => {
+    mockDetail = detailOf(
+      { kind: 'loan', loan: carLoan() },
+      { isError: true, refreshFailed: true },
+    );
+    setLanguage('es');
+    await render(<LoanScreen />);
+    expect(screen.getByText('No se pudo actualizar · mostrando tus últimas cifras')).toBeTruthy();
+    await screen.unmount();
+
+    setLanguage('fr');
+    await render(<LoanScreen />);
+    expect(screen.getByText('Impossible d’actualiser · voici tes derniers chiffres')).toBeTruthy();
   });
 
   it('sends a Loans bill with no loan behind it to its bill page', async () => {
@@ -734,6 +798,8 @@ describe('getting about', () => {
     expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });
+
+const REFRESH_NOTE = 'Couldn’t refresh · showing your last figures';
 
 describe('a finished loan is final', () => {
   // Stopped by Delete's "Keep past payments" today: final, so there is nothing to edit.

@@ -51,6 +51,10 @@ jest.mock('@/api/scan', () => ({
   draftToParams: () => ({}),
 }));
 
+// The free allowance's count: nothing read by camera or upload this month.
+jest.mock('@/api/capture-usage', () => ({
+  useCaptureUsage: () => ({ data: [], isSuccess: true, isError: false, refetch: jest.fn() }),
+}));
 jest.mock('@/api/queries', () => ({
   useReceipts: () => ({ data: [], isLoading: false, isError: false, refetch: jest.fn() }),
   usePaymentSources: () => ({ sources: [] }),
