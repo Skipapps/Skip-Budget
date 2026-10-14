@@ -420,6 +420,8 @@ export function useSetReceiptReminder() {
   });
 }
 
+const NOT_YET = 'not-yet' as const;
+
 const paymentNoticesMissing = (error: { code?: string; message?: string; details?: string }) =>
   error.code === '42703' && /payment_notices/.test(`${error.message ?? ''} ${error.details ?? ''}`);
 
@@ -443,9 +445,9 @@ export function usePaymentNotices() {
             // The select policy also returns friends' and groupmates' rows, so name this one.
             .eq('id', userId!)
             .maybeSingle();
-          // A build ahead of its migration: the server still sends every notice, so they are on,
-          // and there is nothing to fail over.
-          if (error && paymentNoticesMissing(error)) return null;
+          // A build ahead of its migration: there is no switch yet to show, nothing to fail over,
+          // and the server still sends every notice.
+          if (error && paymentNoticesMissing(error)) return NOT_YET;
           if (error) throw error;
           return (data ?? null) as { payment_notices: boolean | null } | null;
         })(),
@@ -454,8 +456,11 @@ export function usePaymentNotices() {
       ),
   });
 
+  const read = query.data === NOT_YET ? null : query.data;
   return {
-    enabled: query.data?.payment_notices !== false,
+    enabled: read?.payment_notices !== false,
+    /** False on a database the switch has not reached: there is nothing to turn off yet. */
+    available: query.data !== NOT_YET,
     isLoading: query.isLoading,
     isError: failedEmpty(query),
     refreshFailed: refreshFailed(query),

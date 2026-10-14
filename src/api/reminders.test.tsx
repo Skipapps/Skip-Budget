@@ -291,6 +291,15 @@ describe('payment notices', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.enabled).toBe(true);
     expect(result.current.isError).toBe(false);
+    // Nothing to turn off yet, so nothing to offer.
+    expect(result.current.available).toBe(false);
+  });
+
+  it('are offered once the database has the switch', async () => {
+    mockProfile = { payment_notices: true };
+    const { result } = await renderHook(() => usePaymentNotices(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.available).toBe(true);
   });
 
   it('still fails on any other missing column', async () => {

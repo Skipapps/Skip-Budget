@@ -76,6 +76,7 @@ const mockSetReceiptReminder = jest.fn();
 let mockReceiptReminder = { enabled: false, remindAt: '20:00' };
 const mockSetPaymentNotices = jest.fn();
 let mockPaymentNoticesOn = true;
+let mockPaymentNoticesAvailable = true;
 
 // Mocked whole: the real module pulls in supabase, AsyncStorage's native module and
 // expo-notifications. The constants are copied from it.
@@ -113,6 +114,7 @@ jest.mock('@/api/reminders', () => ({
   useSetReceiptReminder: () => ({ mutate: mockSetReceiptReminder }),
   usePaymentNotices: () => ({
     enabled: mockPaymentNoticesOn,
+    available: mockPaymentNoticesAvailable,
     isLoading: false,
     isError: mockFailed === 'payment-notices',
     refreshFailed: false,
@@ -149,6 +151,7 @@ beforeEach(() => {
   mockBills = [];
   mockSetPaymentNotices.mockClear();
   mockPaymentNoticesOn = true;
+  mockPaymentNoticesAvailable = true;
 });
 
 describe('Reminders — bills', () => {
@@ -427,6 +430,16 @@ describe('Reminders — payment notices', () => {
     expect(mockSetPaymentNotices.mock.calls[0][0]).toBe(true);
     mockSetPaymentNotices.mock.calls[0][1].onSuccess();
     expect(mockToast).toHaveBeenCalledWith('toast.reminder.saved');
+  });
+
+  it('offers no switch before the database has one, and nothing fails', async () => {
+    mockPaymentNoticesAvailable = false;
+    const screen = await render(<RemindersScreen />);
+
+    expect(screen.queryByRole('switch', SWITCH)).toBeNull();
+    expect(screen.queryByText('Tell me when a bill or subscription is paid')).toBeNull();
+    expect(screen.queryByText(FAILURE_MESSAGE)).toBeNull();
+    expect(screen.getByRole('switch', RECEIPTS_SWITCH)).toBeTruthy();
   });
 
   it('says the one failure line in place of the switch when unread, and keeps the rest', async () => {

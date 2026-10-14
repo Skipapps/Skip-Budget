@@ -411,7 +411,7 @@ export default function RemindersScreen() {
         </View>
       ) : null}
 
-      {!loading && !failed ? (
+      {!loading && !failed && paymentNotices.available ? (
         <View className="mt-8 w-full rounded-[16px] border border-line bg-card px-4 py-3.5">
           <View className="w-full flex-row items-center gap-3">
             <View className="flex-1">

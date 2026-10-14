@@ -132,6 +132,7 @@ jest.mock('@/api/reminders', () => {
     useSetReceiptReminder: () => ({ mutate: jest.fn() }),
     usePaymentNotices: () => ({
       enabled: true,
+      available: true,
       isLoading: false,
       isError: false,
       refreshFailed: false,
