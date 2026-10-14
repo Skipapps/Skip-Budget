@@ -16,8 +16,9 @@ type Table = 'cards' | 'bank_accounts';
 
 const mockReads: Record<Table, number> = { cards: 0, bank_accounts: 0 };
 const mockFailing = new Set<Table>();
-const mockHeld: (() => void)[] = [];
-let mockHold = false;
+/** Reads of these tables wait, unanswered, until the test lets that table answer (`release`). */
+const mockHolding = new Set<Table>();
+const mockHeld: { table: Table; answer: () => void }[] = [];
 let mockPro = false;
 let mockUserId: string | null = 'user-1';
 
@@ -95,7 +96,7 @@ jest.mock('@/lib/supabase', () => {
               : { data: mockRows[table], error: null },
           );
         };
-        if (mockHold) mockHeld.push(answer);
+        if (mockHolding.has(table)) mockHeld.push({ table, answer });
         else answer();
       },
     };
@@ -107,6 +108,15 @@ jest.mock('@/lib/supabase', () => {
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => mockUserId }));
 jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: mockPro, ready: true }) }));
 
+const heldOf = (table: Table) => mockHeld.filter((held) => held.table === table).length;
+
+/** Lets every held read of one table answer, whatever order the reads were asked in. */
+function release(table: Table) {
+  const now = mockHeld.filter((held) => held.table === table);
+  for (const held of now) mockHeld.splice(mockHeld.indexOf(held), 1);
+  for (const held of now) held.answer();
+}
+
 let client: QueryClient;
 function wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
@@ -117,7 +127,7 @@ beforeEach(() => {
   mockReads.bank_accounts = 0;
   mockFailing.clear();
   mockHeld.length = 0;
-  mockHold = false;
+  mockHolding.clear();
   mockPro = false;
   mockUserId = 'user-1';
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -258,52 +268,62 @@ describe('usePaymentLabels', () => {
   it('holds while the other read is on its first load, and an empty failure wins', async () => {
     const { result } = await renderLabels();
     mockFailing.add('cards');
-    mockHold = true;
-    // The accounts are read afresh, as on a first load, while the cards refresh fails.
+    // The accounts are read afresh, as on a first load, and held open; the cards refresh fails.
+    mockHolding.add('bank_accounts');
     await act(async () => {
       client.removeQueries({ queryKey: ['bank_accounts'] });
       result.current.labels.refetch();
     });
-    await waitFor(() => expect(mockHeld).toHaveLength(2));
-    await act(async () => {
-      mockHeld.shift()?.();
-    });
-    await waitFor(() =>
-      expect(client.getQueryState(['cards', 'user-1'])).toMatchObject({ status: 'error' }),
-    );
 
     // The app-wide rule: a refresh that failed is said at once; the page still holds on loading.
-    expect(result.current.labels).toMatchObject({
-      isLoading: true,
-      isError: false,
-      refreshFailed: true,
+    // The accounts cannot answer until released, so this state cannot pass by.
+    await waitFor(() => {
+      expect(heldOf('bank_accounts')).toBeGreaterThan(0);
+      expect(result.current.labels).toMatchObject({
+        isLoading: true,
+        isError: false,
+        refreshFailed: true,
+      });
     });
+    expect(client.getQueryState(['cards', 'user-1'])).toMatchObject({ status: 'error' });
+    expect(heldOf('bank_accounts')).toBeGreaterThan(0);
 
     // The accounts then fail with nothing to show: that is the error page, not a stale note.
     mockFailing.add('bank_accounts');
     await act(async () => {
-      mockHeld.shift()?.();
+      release('bank_accounts');
     });
-    await waitFor(() => expect(result.current.labels.isLoading).toBe(false));
-    expect(result.current.labels).toMatchObject({ isError: true, refreshFailed: false });
+    await waitFor(() =>
+      expect(result.current.labels).toMatchObject({
+        isLoading: false,
+        isError: true,
+        refreshFailed: false,
+      }),
+    );
   });
 
   it('is loading until both reads answer', async () => {
-    mockHold = true;
+    mockHolding.add('cards');
+    mockHolding.add('bank_accounts');
     const { result } = await renderHook(() => usePaymentLabels(), { wrapper });
 
-    await waitFor(() => expect(mockHeld).toHaveLength(2));
+    await waitFor(() => {
+      expect(heldOf('cards')).toBe(1);
+      expect(heldOf('bank_accounts')).toBe(1);
+    });
     expect(result.current.isLoading).toBe(true);
     expect(result.current.sources).toEqual([]);
     expect(result.current.labelOf('card-1')).toBeNull();
 
+    // The cards answer; the accounts are still held, so it is still loading.
     await act(async () => {
-      mockHeld.shift()?.();
+      release('cards');
     });
+    await waitFor(() => expect(result.current.labelOf('card-1')).toBe('Visa ••7010'));
     expect(result.current.isLoading).toBe(true);
 
     await act(async () => {
-      mockHeld.shift()?.();
+      release('bank_accounts');
     });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.sources).toHaveLength(5);

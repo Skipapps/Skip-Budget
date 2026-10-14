@@ -1374,22 +1374,25 @@ describe('a refresh that fails', () => {
       client.removeQueries({ queryKey: ['cards'] });
       view.result.current.payments.refetch();
     });
+    // The app-wide rule: a refresh that failed is said at once; the page still holds on loading.
+    // The cards cannot answer until released, so this state cannot pass by.
     await waitFor(() => {
       expect(mockHeld.length).toBeGreaterThan(0);
-      expect(client.getQueryState(KEYS.bills)).toMatchObject({ status: 'error' });
+      expect(view.result.current.payments.isLoading).toBe(true);
+      expect(state(view.result.current.payments)).toEqual({ isError: false, refreshFailed: true });
     });
-
-    // The app-wide rule: a refresh that failed is said at once; the page still holds on loading.
-    expect(view.result.current.payments.isLoading).toBe(true);
-    expect(state(view.result.current.payments)).toEqual({ isError: false, refreshFailed: true });
+    expect(client.getQueryState(KEYS.bills)).toMatchObject({ status: 'error' });
+    expect(mockHeld.length).toBeGreaterThan(0);
 
     // The names then fail with nothing to show: that is the error page, not a stale note.
     mockFailing.add('cards');
     await act(async () => {
       for (const answer of mockHeld.splice(0)) answer();
     });
-    await waitFor(() => expect(view.result.current.payments.isLoading).toBe(false));
-    expect(state(view.result.current.payments)).toEqual({ isError: true, refreshFailed: false });
-    expect(state(view.result.current.month)).toEqual({ isError: true, refreshFailed: false });
+    await waitFor(() => {
+      expect(view.result.current.payments.isLoading).toBe(false);
+      expect(state(view.result.current.payments)).toEqual({ isError: true, refreshFailed: false });
+      expect(state(view.result.current.month)).toEqual({ isError: true, refreshFailed: false });
+    });
   });
 });
