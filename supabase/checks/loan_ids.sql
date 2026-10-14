@@ -254,6 +254,31 @@ select pg_temp.check(
       and p.proname in ('save_loan', 'update_loan', 'record_loan_payoff', 'person_today')),
   'all four run as the caller');
 
+-- update_loan and record_loan_payoff call person_today as the signed-in caller.
+select pg_temp.check(
+  has_function_privilege('authenticated', 'public.person_today(uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.person_today(uuid)', 'execute')
+  and not has_function_privilege('public', 'public.person_today(uuid)', 'execute'),
+  'person_today: signed-in people may call it, signed-out ones may not');
+set local role anon;
+select pg_temp.expect_error(
+  $s$select public.person_today('00000000-0000-0000-0000-0000000000d1')$s$, '42501', 'permission denied');
+reset role;
+select pg_temp.as_user('d1');
+select pg_temp.save('Own day');
+select public.update_loan(
+  p_bill_id => (pg_temp.bill('Own day')).id, p_name => 'Own day', p_icon_id => 'loan-car',
+  p_principal => 9000, p_annual_rate => 6, p_term_months => 36, p_monthly_payment => 310,
+  p_total_interest => 600, p_first_payment_on => pg_temp.today() + 40, p_funded_on => pg_temp.today() - 30,
+  p_day_count_basis => 'actual/365', p_card_id => null, p_bank_account_id => null, p_in_spending => true);
+select public.record_loan_payoff((pg_temp.bill('Own day')).id, pg_temp.today(), 10, 'partial', null, null, null, null);
+select pg_temp.check(
+  (pg_temp.bill('Own day')).amount = 310
+  and (select count(*) = 1 from public.loan_payoffs
+        where bill_id = (pg_temp.bill('Own day')).id and paid_on = pg_temp.today()),
+  'signed in, update_loan and record_loan_payoff with no day sent read the person''s own through it');
+reset role;
+
 -- ---------------------------------------------------------------- the person's own day
 update public.profiles set timezone = 'Pacific/Kiritimati' where id = '00000000-0000-0000-0000-0000000000d2';
 select pg_temp.check(
