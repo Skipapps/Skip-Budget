@@ -67,6 +67,9 @@ jest.mock('@/api/queries', () => ({
   useReceipts: () => ({ data: mockReceipts, isLoading: false, isError: false, refetch: jest.fn() }),
   usePaymentSources: () => ({ sources: [] }),
 }));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({ sources: [], labelOf: () => null, isLoading: false }),
+}));
 
 jest.useFakeTimers().setSystemTime(new Date(`${TODAY}T09:00:00`));
 

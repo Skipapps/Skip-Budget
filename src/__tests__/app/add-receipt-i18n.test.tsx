@@ -142,6 +142,18 @@ jest.mock('@/api/queries', () => ({
   useReceipt: () => ({ ...mockReceipt, refetch: jest.fn() }),
   usePaymentSources: () => ({ sources: mockSources }),
 }));
+// Every card and account: card-2 is a free account's locked extra, which usePaymentSources leaves out.
+const mockLockedSource = { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' };
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => {
+    const sources = [...mockSources, mockLockedSource];
+    return {
+      sources,
+      labelOf: (id: string) => sources.find((source) => source.id === id)?.label ?? null,
+      isLoading: false,
+    };
+  },
+}));
 
 // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
 jest.useFakeTimers({
@@ -698,6 +710,26 @@ describe('Paid with in Spanish and French', () => {
 
     expect(radio(screen, CARD, true)).toBeTruthy();
     expect(radio(screen, words.skip, false)).toBeTruthy();
+  });
+
+  it.each(LOCALIZED)(
+    'opens a saved receipt on a card the free plan has locked, shown chosen, in %s',
+    async (language) => {
+      setLanguage(language);
+      mockParams = { id: 'receipt-1' };
+      mockReceipt = { data: { ...SAVED, card_id: 'card-2' }, isError: false, isFetched: true };
+      const screen = await render(<AddReceiptScreen />);
+
+      expect(radio(screen, 'Amex ••3005', true)).toBeTruthy();
+      expect(radio(screen, CARD, false)).toBeTruthy();
+    },
+  );
+
+  it.each(LOCALIZED)('never offers the locked card to a new receipt, in %s', async (language) => {
+    setLanguage(language);
+    const screen = await render(<AddReceiptScreen />);
+
+    expect(screen.queryByRole('radio', { name: 'Amex ••3005' })).toBeNull();
   });
 
   it.each(LOCALIZED)('opens a saved receipt with no card on Skip, in %s', async (language) => {

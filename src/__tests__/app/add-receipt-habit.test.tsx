@@ -152,6 +152,13 @@ jest.mock('@/api/queries', () => ({
     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
   }),
 }));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
+    labelOf: (id: string) => (id === 'card-1' ? 'VISA ••4421' : null),
+    isLoading: false,
+  }),
+}));
 
 jest.useFakeTimers({
   doNotFake: [

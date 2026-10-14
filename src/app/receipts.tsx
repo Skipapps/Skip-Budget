@@ -6,7 +6,8 @@ import { Pressable, Text, View } from 'react-native';
 import { useArtwork } from '@/theme/artwork';
 import { useCaptureAllowance } from '@/api/capture-allowance';
 import { useHistoryFloor } from '@/api/history';
-import { usePaymentSources, useReceipts } from '@/api/queries';
+import { usePaymentLabels } from '@/api/payment-labels';
+import { useReceipts } from '@/api/queries';
 import { useReceiptBookDefault, useReceiptBooks } from '@/api/receipt-books';
 import { useRefreshAll } from '@/api/refresh';
 import { draftToParams, useReceiptScan } from '@/api/scan';
@@ -116,7 +117,8 @@ export default function ReceiptsScreen() {
   const { floor, free } = useHistoryFloor();
   // Seven years back is as far as the app keeps anything, on any plan.
   const kept = useMemo(() => historyFloor(true, new Date()), []);
-  const { sources } = usePaymentSources();
+  // Every card and account, a locked one too: its receipts are named and can be filtered on any plan.
+  const labels = usePaymentLabels();
 
   const { scan, scanning, available: canScan } = useReceiptScan();
   const allowance = useCaptureAllowance();
@@ -147,12 +149,8 @@ export default function ReceiptsScreen() {
 
   const activeCount = countActiveReceiptFilters(filters);
   const sourceOptions = useMemo(
-    () => sources.map((source) => ({ value: source.id, label: source.label })),
-    [sources],
-  );
-  const sourceLabels = useMemo(
-    () => new Map(sources.map((source) => [source.id, source.label])),
-    [sources],
+    () => labels.sources.map((source) => ({ value: source.id, label: source.label })),
+    [labels.sources],
   );
 
   // The book on screen, before any window or search: whether it has anything at all.
@@ -237,7 +235,7 @@ export default function ReceiptsScreen() {
           {currentBook ? (
             <BookInfo
               book={currentBook}
-              sources={sources}
+              sources={labels.sources}
               isDefault={defaultBook === currentBook.id}
               onEdit={() =>
                 router.push({ pathname: '/receipt-book', params: { id: currentBook.id } })
@@ -358,7 +356,7 @@ export default function ReceiptsScreen() {
                   logoHidden={receipt.logo_hidden}
                   habit={receipt.habit}
                   sourceLabel={
-                    sourceLabels.get(receipt.card_id ?? receipt.bank_account_id ?? '') ?? ''
+                    labels.labelOf(receipt.card_id ?? receipt.bank_account_id ?? '') ?? ''
                   }
                   onPress={() => router.push(`/receipt/${receipt.id}`)}
                 />

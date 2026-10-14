@@ -207,6 +207,20 @@ jest.mock('@/api/queries', () => ({
   useReceipt: () => ({ ...mockReceipt, refetch: jest.fn() }),
   usePaymentSources: () => ({ sources: mockSources }),
 }));
+// A free account's locked extras: usePaymentSources (what new spending may use) leaves them out,
+// usePaymentLabels (every card and account) has them.
+const LOCKED = [
+  { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
+  { id: 'acct-2', label: 'Ally ••0042', color: '#444444', kind: 'account' },
+];
+let mockEvery = [...mockSources, ...LOCKED];
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({
+    sources: mockEvery,
+    labelOf: (id: string) => mockEvery.find((source) => source.id === id)?.label ?? null,
+    isLoading: false,
+  }),
+}));
 
 // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
 jest.useFakeTimers({
@@ -337,6 +351,7 @@ beforeEach(() => {
     { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
     { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
   ];
+  mockEvery = [...mockSources, ...LOCKED];
   mockKnown = [];
   mockLogoAnswer.mockImplementation((name: string) =>
     name === 'Planet Fitness'
@@ -1902,5 +1917,88 @@ describe('Add receipt — saving again after a failure', () => {
       'receipt-visit',
     ]);
     log.mockRestore();
+  });
+});
+
+describe('Add receipt — a card or account the free plan has locked', () => {
+  /** The Paid with tiles on the page, in the order drawn (the page's other chips left out). */
+  const SOURCE_TILES = ['VISA ••4421', 'Checking ••0099', 'Amex ••3005', 'Ally ••0042', 'Skip'];
+  const tiles = (screen: Screen) =>
+    screen
+      .queryAllByRole('radio')
+      .map((node) => node.props.accessibilityLabel as string)
+      .filter((label) => SOURCE_TILES.includes(label));
+
+  it('is never offered for a new receipt', async () => {
+    const screen = await render(<AddReceiptScreen />);
+    await readyReceipt(screen, '15.99', 'VISA ••4421');
+
+    expect(tiles(screen)).toEqual(['VISA ••4421', 'Checking ••0099', 'Skip']);
+  });
+
+  describe('on an edit of a receipt paid with it', () => {
+    beforeEach(() => {
+      mockParams = { id: 'receipt-1' };
+      mockReceipt = {
+        data: { ...EXISTING, card_id: 'card-2', bank_account_id: null },
+        isError: false,
+        isFetched: true,
+      };
+    });
+
+    it('shows it chosen, among the cards, and keeps it on Save', async () => {
+      const screen = await render(<AddReceiptScreen />);
+
+      expect(tiles(screen)).toEqual(['VISA ••4421', 'Amex ••3005', 'Checking ••0099', 'Skip']);
+      expect(screen.getByLabelText('Amex ••3005')).toBeSelected();
+      await press(screen, 'Save changes');
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+        card_id: 'card-2',
+        bank_account_id: null,
+      });
+    });
+
+    it('keeps a locked account the same way', async () => {
+      mockReceipt = {
+        data: { ...EXISTING, card_id: null, bank_account_id: 'acct-2' },
+        isError: false,
+        isFetched: true,
+      };
+      const screen = await render(<AddReceiptScreen />);
+
+      expect(screen.getByLabelText('Ally ••0042')).toBeSelected();
+      await press(screen, 'Save changes');
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+        card_id: null,
+        bank_account_id: 'acct-2',
+      });
+    });
+
+    it('saves a move to an offered card', async () => {
+      const screen = await render(<AddReceiptScreen />);
+
+      await press(screen, 'VISA ••4421');
+      await press(screen, 'Save changes');
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
+        card_id: 'card-1',
+        bank_account_id: null,
+      });
+    });
+
+    it('keeps it on Save even before the names are read', async () => {
+      mockEvery = [];
+      const screen = await render(<AddReceiptScreen />);
+
+      await press(screen, 'Save changes');
+
+      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
+      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({ card_id: 'card-2' });
+    });
   });
 });

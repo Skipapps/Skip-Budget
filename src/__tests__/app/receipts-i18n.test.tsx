@@ -67,6 +67,21 @@ jest.mock('@/api/queries', () => ({
     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
   }),
 }));
+// Every card and account: card-2 is a free account's locked extra, which no picker offers for new
+// spending. Its receipts are named and can be filtered all the same.
+jest.mock('@/api/payment-labels', () => {
+  const sources = [
+    { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
+    { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
+  ];
+  return {
+    usePaymentLabels: () => ({
+      sources,
+      labelOf: (id: string) => sources.find((source) => source.id === id)?.label ?? null,
+      isLoading: false,
+    }),
+  };
+});
 
 jest.useFakeTimers().setSystemTime(new Date(`${TODAY}T09:00:00`));
 
@@ -172,4 +187,38 @@ describe('Receipts in French', () => {
     expect(screen.getByText('0 reçu')).toBeTruthy();
     expectNoRawText(screen.toJSON());
   });
+});
+
+describe('Receipts paid with a card the free plan has locked', () => {
+  const LOCKED = {
+    id: 'r3',
+    merchant: 'Florist',
+    amount: 45,
+    purchased_on: TODAY,
+    card_id: 'card-2',
+    bank_account_id: null,
+    brands: null,
+  };
+
+  it.each([
+    ['en', /^Florist, .+, paid with Amex ••3005$/, 'Filter receipts', 'Apply'],
+    ['es', /^Florist, .+, pagado con Amex ••3005$/, 'Filtrar recibos', 'Aplicar'],
+    ['fr', /^Florist, .+, payé avec Amex ••3005$/, 'Filtrer les reçus', 'Appliquer'],
+  ] as const)(
+    'names the card on its row and filters on it in %s',
+    async (language, row, open, apply) => {
+      setLanguage(language);
+      mockState = { data: [...RECEIPTS, LOCKED], isLoading: false, isError: false };
+      const screen = await render(<ReceiptsScreen />);
+
+      expect(screen.getByLabelText(row)).toBeTruthy();
+
+      await fireEvent.press(screen.getByLabelText(open));
+      await fireEvent.press(screen.getByLabelText('Amex ••3005'));
+      await fireEvent.press(screen.getByText(apply));
+
+      expect(screen.getByText('Florist')).toBeTruthy();
+      expect(screen.queryByText('Oxxo')).toBeNull();
+    },
+  );
 });

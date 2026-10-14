@@ -59,6 +59,9 @@ jest.mock('@/api/queries', () => ({
   useReceipts: () => ({ data: [], isLoading: false, isError: false, refetch: jest.fn() }),
   usePaymentSources: () => ({ sources: [] }),
 }));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({ sources: [], labelOf: () => null, isLoading: false }),
+}));
 
 it('adds a receipt by hand from the empty page, even where scanning is possible', async () => {
   const screen = await render(<ReceiptsScreen />);

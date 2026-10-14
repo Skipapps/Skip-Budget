@@ -10,14 +10,14 @@ import {
   Trash2,
   type LucideIcon,
 } from 'lucide-react-native';
-import { useState, type ComponentProps } from 'react';
+import { useMemo, useState, type ComponentProps } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { guessCategory, matchBrand, useBrandDirectory, useSpendCategories } from '@/api/brands';
 import { useHabit } from '@/api/habits';
 import { useCaptureAllowance } from '@/api/capture-allowance';
 import { useProWrite } from '@/api/confirm-pro';
-import { buildReceiptValues } from '@/api/entry-values';
+import { buildReceiptValues, withSavedSource, type SavedSource } from '@/api/entry-values';
 import { receiptParseOptions } from '@/api/scan';
 import {
   useCreateReceipt,
@@ -25,6 +25,7 @@ import {
   useUpdateReceipt,
   type CaptureSource,
 } from '@/api/mutations';
+import { usePaymentLabels } from '@/api/payment-labels';
 import { usePaymentSources, useReceipt } from '@/api/queries';
 import {
   useReceiptBookDefault,
@@ -352,8 +353,8 @@ function ReceiptForm({
    * book. Null opens in the default book, or asks when there is none.
    */
   initialBook?: string | null;
-  /** The row being edited, for the logo it already has. */
-  saved?: LogoFields | null;
+  /** The row being edited, for the logo and the card or account it already has. */
+  saved?: (LogoFields & SavedSource) | null;
   /**
    * Filed by tapping a habit's day. Its store cannot change: another name would cut it from its
    * habit's days.
@@ -394,7 +395,11 @@ function ReceiptForm({
   const [scanResult, setScanResult] = useState<ScanResult | null>(initialScan);
   const { todayDate } = useToday();
 
-  const { sources } = usePaymentSources();
+  // New spending takes only what the plan offers; an edit also shows, and keeps, the card or
+  // account the receipt was paid with, though the plan has locked it since.
+  const { sources: offered } = usePaymentSources();
+  const { sources: every } = usePaymentLabels();
+  const sources = useMemo(() => withSavedSource(offered, every, saved), [offered, every, saved]);
   const { data: books = [] } = useReceiptBooks();
   const storedDefault = useReceiptBookDefault();
   const setDefaultBook = useSetReceiptBookDefault();
@@ -416,7 +421,7 @@ function ReceiptForm({
   const bookSource = bookRow?.card_id ?? bookRow?.bank_account_id ?? null;
   const shownSource =
     sourceId ??
-    (bookSource && sources.some((source) => source.id === bookSource) ? bookSource : null);
+    (bookSource && offered.some((source) => source.id === bookSource) ? bookSource : null);
   const { data: categories = [] } = useSpendCategories();
   const { data: directory = [] } = useBrandDirectory();
 
@@ -481,7 +486,7 @@ function ReceiptForm({
     }
     if (parsed.last4) {
       const digits = parsed.last4;
-      const matched = sources.find((source) => source.label.endsWith(digits));
+      const matched = offered.find((source) => source.label.endsWith(digits));
       if (matched) {
         setSourceId(matched.id);
         found.push('card');
@@ -668,7 +673,8 @@ function ReceiptForm({
 
     const built = buildReceiptValues(
       { store: chosen, amount, date, sourceId: shownSource, note, captureSource },
-      sources,
+      offered,
+      saved,
     );
     if (!built.ok) {
       fail(built.message);

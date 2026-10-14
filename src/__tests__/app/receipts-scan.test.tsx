@@ -77,6 +77,9 @@ jest.mock('@/api/queries', () => ({
   }),
   usePaymentSources: () => ({ sources: [] }),
 }));
+jest.mock('@/api/payment-labels', () => ({
+  usePaymentLabels: () => ({ sources: [], labelOf: () => null, isLoading: false }),
+}));
 
 beforeEach(() => {
   jest.clearAllMocks();
