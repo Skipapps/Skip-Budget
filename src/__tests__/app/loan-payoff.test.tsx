@@ -93,8 +93,19 @@ const AMEX: PaymentSourceRow = {
   color: '#4F7DBA',
   kind: 'card',
 };
+// A free plan's locked extra account: offered only to a picker that asks for every account.
+const mockLockedAccount: PaymentSourceRow = {
+  id: 'acct-ally',
+  label: 'Ally ••9001',
+  name: 'Ally',
+  last4: '9001',
+  color: '#5B6573',
+  kind: 'account',
+};
 jest.mock('@/api/queries', () => ({
-  usePaymentSources: () => ({ sources: [AMEX, CHASE] }),
+  usePaymentSources: ({ withLocked = false }: { withLocked?: boolean } = {}) => ({
+    sources: withLocked ? [AMEX, CHASE, mockLockedAccount] : [AMEX, CHASE],
+  }),
 }));
 
 const TODAY = '2026-10-12';
@@ -483,6 +494,17 @@ describe('paying', () => {
     });
     expect(mockToast).toHaveBeenCalledWith('toast.loan.paymentRecorded');
     expect(mockNav.mock.calls).toEqual([['back']]);
+  });
+
+  it('pays from a locked extra account, since paying off winds the loan down', async () => {
+    await render(<LoanPayoffScreen />);
+    await type('500');
+    await fireEvent.press(continueButton());
+    await fireEvent.press(screen.getByRole('radio', { name: 'Ally, ending in 9001' }));
+    await fireEvent.press(payOffButton());
+    expect(mockRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ cardId: null, bankAccountId: 'acct-ally' }),
+    );
   });
 
   it('pays from no card or account with Skip', async () => {

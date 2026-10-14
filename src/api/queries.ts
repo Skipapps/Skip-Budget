@@ -488,16 +488,21 @@ export function accountSource(
   };
 }
 
-export function usePaymentSources() {
+/**
+ * `withLocked` offers every card and account whatever the plan: paying off a loan winds it down
+ * rather than taking new spending, so a locked extra account may pay.
+ */
+export function usePaymentSources({ withLocked = false }: { withLocked?: boolean } = {}) {
   const cards = useCards();
   const accounts = useBankAccounts();
   const { pro } = usePro();
+  const all = pro || withLocked;
 
   // Locked sources take no new spending: beyond the free allowance, only the oldest card and
   // account appear in "Paid with" pickers. Their history keeps counting everywhere. Queries order
   // oldest-first, so slice(0,1) is the allowance.
-  const usableCards = pro ? (cards.data ?? []) : (cards.data ?? []).slice(0, 1);
-  const usableAccounts = pro ? (accounts.data ?? []) : (accounts.data ?? []).slice(0, 1);
+  const usableCards = all ? (cards.data ?? []) : (cards.data ?? []).slice(0, 1);
+  const usableAccounts = all ? (accounts.data ?? []) : (accounts.data ?? []).slice(0, 1);
 
   const sources: PaymentSourceRow[] = [
     ...usableCards.map(cardSource),

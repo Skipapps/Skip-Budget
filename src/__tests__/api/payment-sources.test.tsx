@@ -61,8 +61,9 @@ jest.mock('@/lib/supabase', () => ({
   },
 }));
 jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'user-1' }));
-// Pro, so every card and account is offered.
-jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: true, ready: true }) }));
+// Pro unless a test says otherwise, so every card and account is offered.
+let mockPro = true;
+jest.mock('@/api/pro', () => ({ usePro: () => ({ pro: mockPro, ready: true }) }));
 
 let client: QueryClient;
 function wrapper({ children }: { children: ReactNode }) {
@@ -72,7 +73,10 @@ function wrapper({ children }: { children: ReactNode }) {
 beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 });
-afterEach(() => client.clear());
+afterEach(() => {
+  client.clear();
+  mockPro = true;
+});
 
 describe('usePaymentSources', () => {
   it('names each card by its own name, else its network, and each account by its nickname or bank, trimmed, with the last four apart', async () => {
@@ -94,5 +98,31 @@ describe('usePaymentSources', () => {
       { id: 'a1', label: 'Everyday ••1111', name: 'Everyday', last4: '1111', kind: 'account' },
       { id: 'a2', label: '  Ally  ', name: 'Ally', last4: null, kind: 'account' },
     ]);
+  });
+});
+
+describe('usePaymentSources on the free plan', () => {
+  it('offers only the oldest card and account for new spending', async () => {
+    mockPro = false;
+    const { result } = await renderHook(() => usePaymentSources(), { wrapper });
+    await waitFor(() =>
+      expect(result.current.sources.map((source) => source.id)).toEqual(['c1', 'a1']),
+    );
+  });
+
+  it('offers every card and account, locked ones too, when asked for them', async () => {
+    mockPro = false;
+    const { result } = await renderHook(() => usePaymentSources({ withLocked: true }), {
+      wrapper,
+    });
+    await waitFor(() =>
+      expect(result.current.sources.map((source) => source.id)).toEqual([
+        'c1',
+        'c2',
+        'c3',
+        'a1',
+        'a2',
+      ]),
+    );
   });
 });

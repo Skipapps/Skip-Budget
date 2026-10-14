@@ -183,7 +183,7 @@ function PayoffFlow({
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
 
-  const { sources: offered } = usePaymentSources();
+  const { sources: offered } = usePaymentSources({ withLocked: true });
   const sources = useMemo(() => withSourceKept(offered, loan.source), [offered, loan.source]);
 
   const quote = useMemo(() => quoteOn(terms, day), [terms, day]);
