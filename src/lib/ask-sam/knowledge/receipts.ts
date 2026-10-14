@@ -542,7 +542,7 @@ export const receiptsIntents: Intent[] = [
         '- For an upload, try a sharper photo or a screenshot.',
         '- Or type it: enter the amount, tap **Continue**, and fill in the rest.',
       ],
-      'Good to know: on **Add a receipt**, if you carry on and save from that same page, it still counts as a scan or upload. To keep it uncounted, close the page with the **X** and start a new receipt by typing.',
+      'Good to know: a scan or upload that read nothing doesn’t use one of your free scans. If you fill it in and save, it’s saved as a typed receipt.',
     ),
     keywords: ['scan failed', 'not working', 'nothing read', 'something went wrong', 'empty scan'],
     related: [
@@ -793,7 +793,8 @@ export const receiptsIntents: Intent[] = [
         '- Opening the camera, closing it, or leaving the page without saving uses nothing.',
         '- Once saved, it stays a scan, even if you change every field by hand.',
         '- Editing a saved receipt later uses nothing.',
-        '- Deleting a receipt you scanned or uploaded this month frees that place again.',
+        '- Deleting a receipt you scanned or uploaded doesn’t give the scan back: it stays used.',
+        '- A scan or upload that read nothing doesn’t count. What you then fill in is saved as a typed receipt.',
         '- Typed receipts, voice receipts and habit days never count.',
       ],
       'The count covers everything saved this month, so scans you made while you had Pro still count if Pro ends mid-month. Scans saved on another iPhone with the same account count too.',

@@ -371,7 +371,7 @@ export const loansEs: IntentText[] = [
     ],
     answer: p(
       'Agregar un préstamo toma tres páginas cortas.',
-      '1. Ve a **Préstamos** y toca **Agregar préstamo**.\n2. Escribe lo que pagas cada mes y toca **Continuar**.\n3. En **Tu préstamo**, elige el **Tipo de préstamo**, revisa el nombre y completa **Importe prestado**, **APR**, **Plazo**, **Fecha de inicio** y **Primer pago**. Indica de dónde sale el pago en **Se paga desde** y toca **Continuar**.\n4. En **Revisa tu préstamo**, revisa las cifras, ajusta **Agregar a las facturas mensuales** y **Recordarme**, y toca **Guardar préstamo**.',
+      '1. Ve a **Préstamos** y toca **Agregar préstamo**.\n2. Escribe lo que pagas cada mes y toca **Continuar**.\n3. En **Tu préstamo**, elige el **Tipo de préstamo**, revisa el nombre y completa **Importe prestado**, **Tasa de interés**, **Plazo**, **Fecha de inicio** y **Primer pago**. Indica de dónde sale el pago en **Se paga desde** y toca **Continuar**.\n4. En **Revisa tu préstamo**, revisa las cifras, ajusta **Agregar a las facturas mensuales** y **Recordarme**, y toca **Guardar préstamo**.',
       'Volverás a **Préstamos** con tu nuevo préstamo. Consejo: ten a mano los papeles de tu préstamo o un estado de cuenta, para que las cifras coincidan con las de tu prestamista. Para detenerte a medias, toca la X de arriba y luego **Sí**. No se guarda nada.',
     ),
     keywords: ['Agregar préstamo', 'nuevo préstamo', 'hipoteca', 'préstamo estudiantil'],
@@ -453,7 +453,7 @@ export const loansEs: IntentText[] = [
   },
   {
     id: 'loans.add.apr',
-    title: '¿Qué escribo en APR?',
+    title: '¿Qué escribo en Tasa de interés?',
     questions: [
       '¿Qué escribo en APR?',
       'APR o tasa de interés, ¿cuál pongo?',
@@ -467,9 +467,10 @@ export const loansEs: IntentText[] = [
       'campo de tasa porcentaje',
       '¿Qué tasa hace que Skip coincida con mi estado de cuenta?',
       'interés anual del préstamo, ¿dónde lo pongo?',
+      'dónde pongo la tasa de interés del préstamo',
     ],
     answer: p(
-      'Escribe la tasa de interés anual de tu préstamo como porcentaje, como 6.25 para 6.25%. Skip cobra los intereses exactamente a esta tasa.',
+      'En **Tasa de interés**, escribe la tasa de interés anual de tu préstamo como porcentaje, como 6.25 para 6.25%. Skip cobra los intereses exactamente a esta tasa.',
       'Si tus papeles muestran una sola tasa, úsala. Si muestran una tasa de interés y un APR más alto, usa la tasa de interés (a veces llamada tasa nominal). El APR es más alto porque también cuenta las comisiones, y tu prestamista cobra los intereses a la tasa de interés, así que esa es la que coincide con tu estado de cuenta.',
       'Puedes escribir de 0 a 100, con hasta nueve decimales. Un préstamo al 0% también funciona.',
     ),
@@ -629,9 +630,9 @@ export const loansEs: IntentText[] = [
       'el botón continuar no avanza',
     ],
     answer: p(
-      '**Continuar** revisa la página y dice qué falta en rojo sobre el botón, como “Para continuar, completa: APR, Fecha de inicio.”',
-      'Otros mensajes que puedes ver:\n- “El plazo de un préstamo puede ser de hasta 50 años.” Acorta el **Plazo**.\n- “Skip puede guardar tasas de 0% a 100%, con hasta nueve decimales.” Revisa el **APR**.\n- “Tu pago mensual no alcanza para cubrir los intereses de este préstamo.” También muestra lo mínimo que puede ser el pago.\n- “Elige un primer pago posterior a la fecha de inicio.” o “Elige un primer pago que no pase del …, un año después de la fecha de inicio.” Cambia el **Primer pago**.',
-      'Todos los campos son necesarios: **Tipo de préstamo**, **Nombre del préstamo**, **Pago mensual**, **Importe prestado**, **APR**, **Plazo**, **Fecha de inicio**, **Primer pago** y **Se paga desde**.',
+      '**Continuar** revisa la página y dice qué falta en rojo sobre el botón, como “Para continuar, completa: Tasa de interés, Fecha de inicio.”',
+      'Otros mensajes que puedes ver:\n- “El plazo de un préstamo puede ser de hasta 50 años.” Acorta el **Plazo**.\n- “Skip puede guardar tasas de 0% a 100%, con hasta nueve decimales.” Revisa la **Tasa de interés**.\n- “Tu pago mensual no alcanza para cubrir los intereses de este préstamo.” También muestra lo mínimo que puede ser el pago.\n- “Elige un primer pago posterior a la fecha de inicio.” o “Elige un primer pago que no pase del …, un año después de la fecha de inicio.” Cambia el **Primer pago**.',
+      'Todos los campos son necesarios: **Tipo de préstamo**, **Nombre del préstamo**, **Pago mensual**, **Importe prestado**, **Tasa de interés**, **Plazo**, **Fecha de inicio**, **Primer pago** y **Se paga desde**.',
     ),
     keywords: ['Para continuar, completa', 'campos obligatorios', 'Continuar'],
   },
@@ -654,7 +655,7 @@ export const loansEs: IntentText[] = [
     ],
     answer: p(
       '**Revisa tu préstamo** muestra el préstamo tal como se guardará, calculado a partir de lo que escribiste.',
-      '- Bajo el nombre: “Primer pago”, “Próximo pago” o “Último pago” con su fecha.\n- La cifra grande: **Importe prestado**.\n- **Mensual**: tu pago regular.\n- **APR**: tu tasa.\n- **Plazo**: el plazo y la cantidad real de pagos.\n- **Intereses totales**: todos los intereses del préstamo.\n- **Total que pagarás**: el importe prestado más los intereses totales.',
+      '- Bajo el nombre: “Primer pago”, “Próximo pago” o “Último pago” con su fecha.\n- La cifra grande: **Importe prestado**.\n- **Mensual**: tu pago regular.\n- **Tasa de interés**: tu tasa.\n- **Plazo**: el plazo y la cantidad real de pagos.\n- **Intereses totales**: todos los intereses del préstamo.\n- **Total que pagarás**: el importe prestado más los intereses totales.',
       'Abajo están **Agregar a las facturas mensuales**, **Recordarme** y **Calendario de pagos** para ver cada pago. Toca **Guardar préstamo** para guardar, o **Volver a editar** para cambiar algo.',
       'Ejemplo: $10,000 al 6% por 1 año, inicio el 1 ene, primer pago el 1 feb, con pagos de $860.55, muestra $326.61 de intereses totales y $10,326.61 en total.',
     ),
@@ -731,7 +732,7 @@ export const loansEs: IntentText[] = [
     ],
     answer: p(
       'Agrégalo con sus datos originales y Skip rellena los pagos que ya hiciste.',
-      '1. Toca **Agregar préstamo** y escribe tu pago mensual.\n2. Usa el **Importe prestado**, el **APR**, el **Plazo**, la **Fecha de inicio** y el **Primer pago** originales de tus papeles.\n3. Guárdalo.',
+      '1. Toca **Agregar préstamo** y escribe tu pago mensual.\n2. Usa el **Importe prestado**, la **Tasa de interés**, el **Plazo**, la **Fecha de inicio** y el **Primer pago** originales de tus papeles.\n3. Guárdalo.',
       'Skip cuenta como hecho todo pago con fecha de hoy o anterior. La página del préstamo los muestra en **Historial**, y **Por pagar** y **Pagos restantes** parten de donde estás ahora.',
       'Los pagos anteriores al día en que agregaste el préstamo no cuentan en tus gastos, porque ocurrieron antes de que los registraras en Skip. Solo se agregan los pagos de ese día en adelante.',
     ),
@@ -1028,7 +1029,7 @@ export const loansEs: IntentText[] = [
       'meses sin intereses, ¿cómo lo agrego?',
     ],
     answer: p(
-      'Sí. Escribe 0 en el **APR**, o pon la **Tasa de interés** de la calculadora en 0%. No hay intereses, así que cada pago se descuenta directamente del saldo.',
+      'Sí. Escribe 0 en la **Tasa de interés**, en **Agregar préstamo** o en la calculadora. No hay intereses, así que cada pago se descuenta directamente del saldo.',
       'La calculadora reparte el importe en partes iguales a lo largo del plazo, y el último pago absorbe los centavos sobrantes. Ejemplo: $1,000 a 3 meses son $333.33, $333.33 y luego $333.34.',
       'Sirve para planes de compra ahora y paga después, financiamientos al 0% de tiendas o de servicios médicos, y dinero prestado por familiares. Skip usa una sola tasa para todo el préstamo, así que no puede pasar a otra tasa cuando termina una oferta al 0%.',
     ),
@@ -1574,7 +1575,7 @@ export const loansEs: IntentText[] = [
     ],
     answer: p(
       'Abre el préstamo desde **Préstamos** con **Ver detalles**, y toca el lápiz de arriba o **Editar préstamo** al final.',
-      '1. Cambia lo que quieras en la página de detalles: tipo, nombre, pago mensual, importe prestado, APR, plazo, fecha de inicio, primer pago o **Se paga desde**.\n2. Toca **Continuar** para llegar a **Revisa tu préstamo**, donde también puedes cambiar **Agregar a las facturas mensuales** y **Recordarme**.\n3. Toca **Guardar cambios**.',
+      '1. Cambia lo que quieras en la página de detalles: tipo, nombre, pago mensual, importe prestado, tasa de interés, plazo, fecha de inicio, primer pago o **Se paga desde**.\n2. Toca **Continuar** para llegar a **Revisa tu préstamo**, donde también puedes cambiar **Agregar a las facturas mensuales** y **Recordarme**.\n3. Toca **Guardar cambios**.',
       'Skip vuelve a calcular todo el préstamo con las cifras nuevas. Si cambiaste el nombre, el pago mensual o **Se paga desde** y ya hay pagos registrados, Skip pregunta si también quieres cambiar esos. Los préstamos liquidados y detenidos no se pueden editar.',
     ),
     keywords: ['Editar préstamo', 'Guardar cambios', 'lápiz', 'cambiar préstamo'],
@@ -1726,7 +1727,7 @@ export const loansEs: IntentText[] = [
     ],
     answer: p(
       'Skip usa una sola tasa fija para todo el préstamo, así que no puede pasar a una tasa nueva a mitad del camino.',
-      'Dos formas de manejarlo:\n- Rápida: toca **Editar préstamo** y escribe el nuevo **APR**. Skip vuelve a calcular todo el préstamo con esa tasa, así que el reparto de intereses de los pagos pasados también cambia.\n- Para seguir la nueva tasa de ahora en adelante: elimina el préstamo con **Conservar los pagos anteriores**, y luego agrega lo que queda como un préstamo nuevo. Usa el saldo de tu estado de cuenta más reciente como **Importe prestado**, la fecha de su último pago como **Fecha de inicio**, la nueva tasa, y los pagos que faltan como **Plazo**.',
+      'Dos formas de manejarlo:\n- Rápida: toca **Editar préstamo** y escribe la nueva **Tasa de interés**. Skip vuelve a calcular todo el préstamo con esa tasa, así que el reparto de intereses de los pagos pasados también cambia.\n- Para seguir la nueva tasa de ahora en adelante: elimina el préstamo con **Conservar los pagos anteriores**, y luego agrega lo que queda como un préstamo nuevo. Usa el saldo de tu estado de cuenta más reciente como **Importe prestado**, la fecha de su último pago como **Fecha de inicio**, la nueva tasa, y los pagos que faltan como **Plazo**.',
       'Para pedir tasas variables, usa **Ajustes → Soporte y comentarios → Comparte una idea**.',
     ),
     keywords: ['tasa variable', 'tasa ajustable', 'cambio de tasa'],
@@ -2024,7 +2025,7 @@ export const loansEs: IntentText[] = [
     ],
     answer: p(
       'Algunos, sobre todo para atrapar errores al escribir:',
-      '- **Importe prestado**: cualquier importe mayor que cero, hasta el centavo. El deslizador de la calculadora se detiene en $1,000,000, pero puedes tocar la cifra para escribir más.\n- **APR**: de 0% a 100%, con hasta nueve decimales.\n- **Plazo**: hasta 50 años en **Agregar préstamo**. El deslizador de la calculadora va de 6 meses a 40 años.\n- Los pagos son mensuales, en un día del mes.\n- El pago mensual debe cubrir al menos los intereses de un mes.',
+      '- **Importe prestado**: cualquier importe mayor que cero, hasta el centavo. El deslizador de la calculadora se detiene en $1,000,000, pero puedes tocar la cifra para escribir más.\n- **Tasa de interés**: de 0% a 100%, con hasta nueve decimales.\n- **Plazo**: hasta 50 años en **Agregar préstamo**. El deslizador de la calculadora va de 6 meses a 40 años.\n- Los pagos son mensuales, en un día del mes.\n- El pago mensual debe cubrir al menos los intereses de un mes.',
       'No hay límite de cuántos préstamos puedes agregar.',
     ),
     keywords: ['límite', 'máximo', 'mínimo', 'tope'],
@@ -2050,7 +2051,7 @@ export const loansEs: IntentText[] = [
     ],
     answer: p(
       'Skip está pensada para coincidir con el estado de cuenta de un prestamista hasta el centavo cuando todas las cifras coinciden con los papeles de tu préstamo. Revisa esto, en orden:',
-      '1. **Pago mensual**: exactamente el de tu prestamista, sin escrow ni seguro.\n2. **APR**: la tasa de interés de tus papeles, no un APR más alto que incluye comisiones.\n3. **Fecha de inicio**: el día en que recibiste el dinero. Los intereses corren desde ahí.\n4. **Primer pago**: la fecha de tus papeles. También fija el día en que vence cada pago siguiente.\n5. **Importe prestado** y **Plazo** del préstamo original.\n6. Cómo se cobran los intereses: la mayoría de las hipotecas usan **Cálculo mensual**.\n7. Pagos extra: regístralos con **Pagar**.',
+      '1. **Pago mensual**: exactamente el de tu prestamista, sin escrow ni seguro.\n2. **Tasa de interés**: la tasa de tus papeles, no un APR más alto que incluye comisiones.\n3. **Fecha de inicio**: el día en que recibiste el dinero. Los intereses corren desde ahí.\n4. **Primer pago**: la fecha de tus papeles. También fija el día en que vence cada pago siguiente.\n5. **Importe prestado** y **Plazo** del préstamo original.\n6. Cómo se cobran los intereses: la mayoría de las hipotecas usan **Cálculo mensual**.\n7. Pagos extra: regístralos con **Pagar**.',
       'Los pagos tardíos y los vencimientos en fin de semana también mueven un poco los intereses de tu prestamista, mientras que Skip supone pagos a tiempo. ¿Sigue sin cuadrar? Envía los detalles con **Ajustes → Soporte y comentarios → Escribir a soporte**.',
     ),
     keywords: ['no coincide', 'mal', 'estado de cuenta', 'desfase'],
@@ -2365,7 +2366,7 @@ export const loansEs: IntentText[] = [
       'mi hermano me prestó dinero',
     ],
     answer:
-      'Si se lo devuelves con un plan, agrégalo como préstamo:\n\n1. Ve a **Préstamos** y toca **Agregar préstamo**.\n2. Escribe lo que devuelves cada mes y toca **Continuar**.\n3. Elige **Personal**, y completa el **Importe prestado**, 0 en el **APR**, el **Plazo**, la **Fecha de inicio**, el **Primer pago** y **Se paga desde**.\n4. Toca **Continuar** y luego **Guardar préstamo**.\n\nSkip muestra entonces lo que queda y cuenta cada pago en su día. Con **Agregar a las facturas mensuales** activado, los pagos salen de tu **Saldo actual**.\n\nSi lo devuelves cuando puedes, un préstamo no encaja, porque necesita un pago fijo. Agrega cada devolución como un recibo, con una **Nota** como “a mamá, quedan $200”.\n\nSkip no lleva una lista de deudas entre personas. Para pedirla, usa **Ajustes → Soporte y comentarios → Comparte una idea**.',
+      'Si se lo devuelves con un plan, agrégalo como préstamo:\n\n1. Ve a **Préstamos** y toca **Agregar préstamo**.\n2. Escribe lo que devuelves cada mes y toca **Continuar**.\n3. Elige **Personal**, y completa el **Importe prestado**, 0 en la **Tasa de interés**, el **Plazo**, la **Fecha de inicio**, el **Primer pago** y **Se paga desde**.\n4. Toca **Continuar** y luego **Guardar préstamo**.\n\nSkip muestra entonces lo que queda y cuenta cada pago en su día. Con **Agregar a las facturas mensuales** activado, los pagos salen de tu **Saldo actual**.\n\nSi lo devuelves cuando puedes, un préstamo no encaja, porque necesita un pago fijo. Agrega cada devolución como un recibo, con una **Nota** como “a mamá, quedan $200”.\n\nSkip no lleva una lista de deudas entre personas. Para pedirla, usa **Ajustes → Soporte y comentarios → Comparte una idea**.',
     keywords: [
       'préstamo familiar',
       'pedí prestado a mis papás',
@@ -2391,7 +2392,7 @@ export const loansEs: IntentText[] = [
       'pagos quincenales sin interés de una compra',
     ],
     answer:
-      'Pagar en 4 se cobra cada dos semanas y los préstamos de Skip son mensuales, así que lo más sencillo es con cuatro recibos:\n\n1. Agrega un recibo para el primer pago, con fecha de hoy, pagado con la tarjeta de la que salió.\n2. Agrega tres más por el mismo monto, con fecha de dos, cuatro y seis semanas a partir de hoy.\n\nCada uno cuenta en su propia fecha, así que tu saldo y tu tarjeta siguen los pagos reales. Una **Nota** como “Afterpay 2 de 4” los mantiene juntos.\n\nPara planes de compra ahora y paga después que se pagan cada mes, como 0% a 12 meses, agrega mejor un préstamo con 0 como **APR**.',
+      'Pagar en 4 se cobra cada dos semanas y los préstamos de Skip son mensuales, así que lo más sencillo es con cuatro recibos:\n\n1. Agrega un recibo para el primer pago, con fecha de hoy, pagado con la tarjeta de la que salió.\n2. Agrega tres más por el mismo monto, con fecha de dos, cuatro y seis semanas a partir de hoy.\n\nCada uno cuenta en su propia fecha, así que tu saldo y tu tarjeta siguen los pagos reales. Una **Nota** como “Afterpay 2 de 4” los mantiene juntos.\n\nPara planes de compra ahora y paga después que se pagan cada mes, como 0% a 12 meses, agrega mejor un préstamo con 0 como **Tasa de interés**.',
     keywords: ['Afterpay', 'Klarna', 'Sezzle', 'pagar en 4'],
   },
   {

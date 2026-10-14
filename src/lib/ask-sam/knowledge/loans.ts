@@ -441,7 +441,7 @@ export const loansIntents: Intent[] = [
     ],
     answer: p(
       'Adding a loan takes three short pages.',
-      '1. Go to **Loans** and tap **Add loan**.\n2. Type what you pay each month and tap **Continue**.\n3. On **Your loan**, pick the **Loan type**, check the name, and fill in **Amount borrowed**, **APR**, **Term**, **Start date** and **First payment**. Pick where it’s **Paid from**, then tap **Continue**.\n4. On **Review your loan**, check the figures, set **Add to monthly bills** and **Remind me**, then tap **Save loan**.',
+      '1. Go to **Loans** and tap **Add loan**.\n2. Type what you pay each month and tap **Continue**.\n3. On **Your loan**, pick the **Loan type**, check the name, and fill in **Amount borrowed**, **Interest rate**, **Term**, **Start date** and **First payment**. Pick where it’s **Paid from**, then tap **Continue**.\n4. On **Review your loan**, check the figures, set **Add to monthly bills** and **Remind me**, then tap **Save loan**.',
       'You’ll land back on **Loans** with your new loan. Tip: have your loan papers or a statement handy, so the figures match your lender’s. To stop part way, tap the X at the top and then **Yes**. Nothing is saved.',
     ),
     keywords: ['Add loan', 'new loan', 'mortgage', 'student loan', 'car loan', 'auto loan'],
@@ -564,7 +564,7 @@ export const loansIntents: Intent[] = [
   {
     id: 'loans.add.apr',
     topic: 'loans',
-    title: 'What should I type for APR?',
+    title: 'What do I type for Interest rate?',
     questions: [
       'What should I type for APR?',
       'APR or interest rate which one do I enter',
@@ -579,7 +579,7 @@ export const loansIntents: Intent[] = [
       'Which rate makes Skip match my statement?',
     ],
     answer: p(
-      'Type the yearly interest rate on your loan as a percent, like 6.25 for 6.25%. Skip charges interest at exactly this rate.',
+      'In **Interest rate**, type the yearly interest rate on your loan as a percent, like 6.25 for 6.25%. Skip charges interest at exactly this rate.',
       'If your papers show one rate, use it. If they show an interest rate and a higher APR, use the interest rate (sometimes called the note rate). The APR is higher because it also counts fees, and your lender charges interest at the interest rate, so that’s the one that matches your statement.',
       'You can type 0 to 100, with up to nine decimals. A 0% loan works too.',
     ),
@@ -756,9 +756,9 @@ export const loansIntents: Intent[] = [
       'skip can save rates from 0% to 100% with up to nine decimals',
     ],
     answer: p(
-      '**Continue** checks the page and says what’s missing in red above the button, like "To continue, fill in: APR, Start date."',
-      'Other messages you might see:\n- "A loan’s term can be up to 50 years." Shorten the **Term**.\n- "Skip can save rates from 0% to 100%, with up to nine decimals." Check the **APR**.\n- "Your monthly payment can’t keep up with this loan’s interest." It also shows the least the payment can be.\n- "Pick a first payment after the start date." or "Pick a first payment no later than …, a year after the start date." Change the **First payment**.',
-      'Every field is needed: **Loan type**, **Loan name**, **Monthly payment**, **Amount borrowed**, **APR**, **Term**, **Start date**, **First payment** and **Paid from**.',
+      '**Continue** checks the page and says what’s missing in red above the button, like "To continue, fill in: Interest rate, Start date."',
+      'Other messages you might see:\n- "A loan’s term can be up to 50 years." Shorten the **Term**.\n- "Skip can save rates from 0% to 100%, with up to nine decimals." Check the **Interest rate**.\n- "Your monthly payment can’t keep up with this loan’s interest." It also shows the least the payment can be.\n- "Pick a first payment after the start date." or "Pick a first payment no later than …, a year after the start date." Change the **First payment**.',
+      'Every field is needed: **Loan type**, **Loan name**, **Monthly payment**, **Amount borrowed**, **Interest rate**, **Term**, **Start date**, **First payment** and **Paid from**.',
     ),
     keywords: ['To continue, fill in', 'required fields', 'Continue'],
     related: ['loans.add.payment-too-low', 'loans.add.apr', 'loans.add.term'],
@@ -784,7 +784,7 @@ export const loansIntents: Intent[] = [
     ],
     answer: p(
       '**Review your loan** shows the loan exactly as it will be saved, worked out from what you typed.',
-      '- Under the name: "First payment", "Next payment" or "Last payment" with its date.\n- The big figure: **Amount borrowed**.\n- **Monthly**: your regular payment.\n- **APR**: your rate.\n- **Term**: the term and the real number of payments.\n- **Total interest**: all the interest over the loan.\n- **Total you’ll pay**: amount borrowed plus total interest.',
+      '- Under the name: "First payment", "Next payment" or "Last payment" with its date.\n- The big figure: **Amount borrowed**.\n- **Monthly**: your regular payment.\n- **Interest rate**: your rate.\n- **Term**: the term and the real number of payments.\n- **Total interest**: all the interest over the loan.\n- **Total you’ll pay**: amount borrowed plus total interest.',
       'Below are **Add to monthly bills**, **Remind me**, and **Payment schedule** to see every payment. Tap **Save loan** to save, or **Back to edit** to change something.',
       'Example: $10,000 at 6% for 1 year, start 1 Jan, first payment 1 Feb, paying $860.55, shows $326.61 total interest and $10,326.61 in total.',
     ),
@@ -886,7 +886,7 @@ export const loansIntents: Intent[] = [
     ],
     answer: p(
       'Add it with its original details, and Skip fills in the payments already made.',
-      '1. Tap **Add loan** and type your monthly payment.\n2. Use the original **Amount borrowed**, **APR**, **Term**, **Start date** and **First payment** from your papers.\n3. Save it.',
+      '1. Tap **Add loan** and type your monthly payment.\n2. Use the original **Amount borrowed**, **Interest rate**, **Term**, **Start date** and **First payment** from your papers.\n3. Save it.',
       'Skip counts every payment dated today or earlier as made. The loan’s page shows them in **History**, and **Left to pay** and **Payments left** start from where you are now.',
       'Payments from before the day you added the loan don’t count in your spending, because they happened before you tracked them in Skip. Only payments from that day on are added.',
     ),
@@ -1225,7 +1225,7 @@ export const loansIntents: Intent[] = [
       'afterpay or klarna instalments with 0% interest, how do I add them',
     ],
     answer: p(
-      'Yes. Type 0 for the **APR**, or set the calculator’s **Interest rate** to 0%. There’s no interest, so every payment comes straight off the balance.',
+      'Yes. Type 0 for the **Interest rate**, in **Add loan** or the calculator. There’s no interest, so every payment comes straight off the balance.',
       'The calculator splits the amount evenly over the term, and the last payment takes up the leftover cents. Example: $1,000 over 3 months is $333.33, $333.33, then $333.34.',
       'This suits buy now, pay later plans, 0% store or medical financing, and money borrowed from family. Skip uses one rate for the whole loan, so it can’t switch to a new rate when a 0% offer ends.',
     ),
@@ -1846,7 +1846,7 @@ export const loansIntents: Intent[] = [
     ],
     answer: p(
       'Open the loan from **Loans** with **View details**, then tap the pencil at the top or **Edit loan** at the bottom.',
-      '1. Change anything on the details page: type, name, monthly payment, amount borrowed, APR, term, start date, first payment or **Paid from**.\n2. Tap **Continue** to reach **Review your loan**, where you can also change **Add to monthly bills** and **Remind me**.\n3. Tap **Save changes**.',
+      '1. Change anything on the details page: type, name, monthly payment, amount borrowed, interest rate, term, start date, first payment or **Paid from**.\n2. Tap **Continue** to reach **Review your loan**, where you can also change **Add to monthly bills** and **Remind me**.\n3. Tap **Save changes**.',
       'Skip works the whole loan out again from the new figures. If you changed the name, monthly payment or **Paid from** and payments are already recorded, Skip asks whether to change those too. Paid-off and stopped loans can’t be edited.',
     ),
     keywords: ['Edit loan', 'Save changes', 'pencil', 'change loan'],
@@ -2015,7 +2015,7 @@ export const loansIntents: Intent[] = [
     ],
     answer: p(
       'Skip uses one fixed rate for the whole loan, so it can’t switch to a new rate partway through.',
-      'Two ways to handle it:\n- Quick: tap **Edit loan** and type the new **APR**. Skip works the whole loan out again at that rate, so past payments’ interest split changes too.\n- To follow the new rate from now on: delete the loan with **Keep past payments**, then add what’s left as a new loan. Use your latest statement’s balance as **Amount borrowed**, its last payment date as **Start date**, the new rate, and the payments left as **Term**.',
+      'Two ways to handle it:\n- Quick: tap **Edit loan** and type the new **Interest rate**. Skip works the whole loan out again at that rate, so past payments’ interest split changes too.\n- To follow the new rate from now on: delete the loan with **Keep past payments**, then add what’s left as a new loan. Use your latest statement’s balance as **Amount borrowed**, its last payment date as **Start date**, the new rate, and the payments left as **Term**.',
       'To ask for variable rates, use **Settings → Support and feedback → Share an idea**.',
     ),
     keywords: ['variable rate', 'adjustable rate', 'ARM', 'rate change'],
@@ -2327,7 +2327,7 @@ export const loansIntents: Intent[] = [
     ],
     answer: p(
       'A few, mostly to catch typing slips:',
-      '- **Amount borrowed**: any amount above zero, to the cent. The calculator’s slider stops at $1,000,000, but you can tap the figure to type more.\n- **APR**: 0% to 100%, with up to nine decimals.\n- **Term**: up to 50 years in **Add loan**. The calculator’s slider runs from 6 months to 40 years.\n- Payments are monthly, on one day of the month.\n- The monthly payment has to cover at least a month’s interest.',
+      '- **Amount borrowed**: any amount above zero, to the cent. The calculator’s slider stops at $1,000,000, but you can tap the figure to type more.\n- **Interest rate**: 0% to 100%, with up to nine decimals.\n- **Term**: up to 50 years in **Add loan**. The calculator’s slider runs from 6 months to 40 years.\n- Payments are monthly, on one day of the month.\n- The monthly payment has to cover at least a month’s interest.',
       'There’s no limit on how many loans you add.',
     ),
     keywords: ['limit', 'maximum', 'max', 'minimum'],
@@ -2355,7 +2355,7 @@ export const loansIntents: Intent[] = [
     ],
     answer: p(
       'Skip is built to match a lender’s statement to the cent when every figure matches your loan papers. Check these, in order:',
-      '1. **Monthly payment**: exactly your lender’s, without escrow or insurance.\n2. **APR**: the interest rate on your papers, not a higher APR that includes fees.\n3. **Start date**: the day you got the money. Interest runs from it.\n4. **First payment**: the date on your papers. It also sets the day each later payment is due.\n5. **Amount borrowed** and **Term** from the original loan.\n6. How interest is charged: most mortgages use **Monthly rests**.\n7. Extra payments: record them with **Pay off**.',
+      '1. **Monthly payment**: exactly your lender’s, without escrow or insurance.\n2. **Interest rate**: the rate on your papers, not a higher APR that includes fees.\n3. **Start date**: the day you got the money. Interest runs from it.\n4. **First payment**: the date on your papers. It also sets the day each later payment is due.\n5. **Amount borrowed** and **Term** from the original loan.\n6. How interest is charged: most mortgages use **Monthly rests**.\n7. Extra payments: record them with **Pay off**.',
       'Late payments and weekend due dates also move your lender’s interest a little, while Skip assumes on-time payments. Still off? Send the details with **Settings → Support and feedback → Email support**.',
     ),
     keywords: ['wrong', 'mismatch', 'statement', 'does not match', 'off'],
@@ -2684,7 +2684,7 @@ export const loansIntents: Intent[] = [
       'my brother lent me money',
     ],
     answer:
-      'If you pay it back on a plan, add it as a loan:\n\n1. Go to **Loans** and tap **Add loan**.\n2. Type what you pay back each month and tap **Continue**.\n3. Pick **Personal**, then fill in the **Amount borrowed**, 0 for the **APR**, the **Term**, the **Start date**, the **First payment** and **Paid from**.\n4. Tap **Continue**, then **Save loan**.\n\nSkip then shows what’s left and counts each payment on its day. With **Add to monthly bills** on, the payments come off your **Current balance**.\n\nIf you pay back whenever you can, a loan won’t fit, because it needs a set payment. Add each repayment as a receipt instead, with a **Note** like “to Mom, $200 left”.\n\nSkip doesn’t keep a list of debts between people. To ask for one, use **Settings → Support and feedback → Share an idea**.',
+      'If you pay it back on a plan, add it as a loan:\n\n1. Go to **Loans** and tap **Add loan**.\n2. Type what you pay back each month and tap **Continue**.\n3. Pick **Personal**, then fill in the **Amount borrowed**, 0 for the **Interest rate**, the **Term**, the **Start date**, the **First payment** and **Paid from**.\n4. Tap **Continue**, then **Save loan**.\n\nSkip then shows what’s left and counts each payment on its day. With **Add to monthly bills** on, the payments come off your **Current balance**.\n\nIf you pay back whenever you can, a loan won’t fit, because it needs a set payment. Add each repayment as a receipt instead, with a **Note** like “to Mom, $200 left”.\n\nSkip doesn’t keep a list of debts between people. To ask for one, use **Settings → Support and feedback → Share an idea**.',
     keywords: [
       'family loan',
       'borrowed from parents',
@@ -2714,7 +2714,7 @@ export const loansIntents: Intent[] = [
       'track installments every 2 weeks for something I bought',
     ],
     answer:
-      'Pay in 4 is taken every two weeks, and Skip’s loans are monthly, so the simplest way is four receipts:\n\n1. Add a receipt for the first payment, dated today, paid with the card it came from.\n2. Add three more for the same amount, dated two, four and six weeks from today.\n\nEach one counts on its own date, so your balance and card follow the real payments. A **Note** like “Afterpay 2 of 4” keeps them together.\n\nFor buy now, pay later plans paid monthly, like 0% over 12 months, add a loan with 0 as the **APR** instead.',
+      'Pay in 4 is taken every two weeks, and Skip’s loans are monthly, so the simplest way is four receipts:\n\n1. Add a receipt for the first payment, dated today, paid with the card it came from.\n2. Add three more for the same amount, dated two, four and six weeks from today.\n\nEach one counts on its own date, so your balance and card follow the real payments. A **Note** like “Afterpay 2 of 4” keeps them together.\n\nFor buy now, pay later plans paid monthly, like 0% over 12 months, add a loan with 0 as the **Interest rate** instead.',
     keywords: ['Afterpay', 'Klarna', 'Sezzle', 'pay in 4', 'BNPL', 'buy now pay later'],
     related: ['loans.math.zero-rate', 'loans.problem.biweekly'],
     route: '/add-receipt',

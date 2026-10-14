@@ -362,7 +362,7 @@ export const loansFr: IntentText[] = [
     ],
     answer: p(
       'Ajouter un prêt se fait en trois courtes pages.',
-      '1. Va dans **Prêts** et touche **Ajouter un prêt**.\n2. Saisis ce que tu paies chaque mois et touche **Continuer**.\n3. Sur **Ton prêt**, choisis le **Type de prêt**, vérifie le nom, et remplis **Montant emprunté**, **APR**, **Durée**, **Date de début** et **Premier paiement**. Choisis d’où il est **Payé depuis**, puis touche **Continuer**.\n4. Sur **Vérifie ton prêt**, vérifie les chiffres, règle **Ajouter aux factures mensuelles** et **Me le rappeler**, puis touche **Enregistrer le prêt**.',
+      '1. Va dans **Prêts** et touche **Ajouter un prêt**.\n2. Saisis ce que tu paies chaque mois et touche **Continuer**.\n3. Sur **Ton prêt**, choisis le **Type de prêt**, vérifie le nom, et remplis **Montant emprunté**, **Taux d’intérêt**, **Durée**, **Date de début** et **Premier paiement**. Choisis d’où il est **Payé depuis**, puis touche **Continuer**.\n4. Sur **Vérifie ton prêt**, vérifie les chiffres, règle **Ajouter aux factures mensuelles** et **Me le rappeler**, puis touche **Enregistrer le prêt**.',
       'Tu reviens sur **Prêts** avec ton nouveau prêt. Astuce : garde tes papiers de prêt ou un relevé sous la main, pour que les chiffres collent à ceux de ton prêteur. Pour t’arrêter en cours de route, touche le X en haut puis **Oui**. Rien n’est enregistré.',
     ),
     keywords: ['Ajouter un prêt', 'nouveau prêt', 'hypothèque', 'prêt étudiant'],
@@ -445,7 +445,7 @@ export const loansFr: IntentText[] = [
   },
   {
     id: 'loans.add.apr',
-    title: 'Que saisir pour l’APR ?',
+    title: 'Que saisir pour le Taux d’intérêt ?',
     questions: [
       'Que saisir pour l’APR ?',
       'APR ou taux d’intérêt, lequel je mets ?',
@@ -459,9 +459,10 @@ export const loansFr: IntentText[] = [
       'champ taux en pourcentage',
       'Quel taux fait que Skip colle à mon relevé ?',
       'taeg ou taux d’intérêt, lequel entrer',
+      'où je mets le taux d’intérêt du prêt',
     ],
     answer: p(
-      'Saisis le taux d’intérêt annuel de ton prêt en pourcentage, comme 6.25 pour 6.25 %. Skip calcule les intérêts exactement à ce taux.',
+      'Dans **Taux d’intérêt**, saisis le taux d’intérêt annuel de ton prêt en pourcentage, comme 6.25 pour 6.25 %. Skip calcule les intérêts exactement à ce taux.',
       'Si tes papiers montrent un seul taux, prends-le. S’ils montrent un taux d’intérêt et un APR plus élevé, prends le taux d’intérêt (parfois appelé taux nominal). L’APR est plus élevé parce qu’il compte aussi les frais, et ton prêteur calcule les intérêts au taux d’intérêt : c’est donc celui qui correspond à ton relevé.',
       'Tu peux saisir de 0 à 100, avec jusqu’à neuf décimales. Un prêt à 0 % fonctionne aussi.',
     ),
@@ -621,9 +622,9 @@ export const loansFr: IntentText[] = [
       'le bouton continuer est bloqué',
     ],
     answer: p(
-      '**Continuer** vérifie la page et indique ce qui manque en rouge au-dessus du bouton, comme « Pour continuer, remplis : APR, Date de début. »',
-      'Autres messages que tu peux voir :\n- « La durée d’un prêt peut aller jusqu’à 50 ans. » Raccourcis la **Durée**.\n- « Skip peut enregistrer des taux de 0 % à 100 %, avec neuf décimales au plus. » Vérifie l’**APR**.\n- « Ton paiement mensuel ne suffit pas à couvrir les intérêts de ce prêt. » Il indique aussi le minimum possible.\n- « Choisis un premier paiement après la date de début. » ou « Choisis un premier paiement au plus tard le …, un an après la date de début. » Change le **Premier paiement**.',
-      'Tous les champs sont nécessaires : **Type de prêt**, **Nom du prêt**, **Paiement mensuel**, **Montant emprunté**, **APR**, **Durée**, **Date de début**, **Premier paiement** et **Payé depuis**.',
+      '**Continuer** vérifie la page et indique ce qui manque en rouge au-dessus du bouton, comme « Pour continuer, remplis : Taux d’intérêt, Date de début. »',
+      'Autres messages que tu peux voir :\n- « La durée d’un prêt peut aller jusqu’à 50 ans. » Raccourcis la **Durée**.\n- « Skip peut enregistrer des taux de 0 % à 100 %, avec neuf décimales au plus. » Vérifie le **Taux d’intérêt**.\n- « Ton paiement mensuel ne suffit pas à couvrir les intérêts de ce prêt. » Il indique aussi le minimum possible.\n- « Choisis un premier paiement après la date de début. » ou « Choisis un premier paiement au plus tard le …, un an après la date de début. » Change le **Premier paiement**.',
+      'Tous les champs sont nécessaires : **Type de prêt**, **Nom du prêt**, **Paiement mensuel**, **Montant emprunté**, **Taux d’intérêt**, **Durée**, **Date de début**, **Premier paiement** et **Payé depuis**.',
     ),
     keywords: ['Pour continuer, remplis', 'champs obligatoires', 'Continuer'],
   },
@@ -644,7 +645,7 @@ export const loansFr: IntentText[] = [
     ],
     answer: p(
       '**Vérifie ton prêt** montre le prêt exactement tel qu’il sera enregistré, calculé à partir de ce que tu as saisi.',
-      '- Sous le nom : « Premier paiement », « Prochain paiement » ou « Dernier paiement » avec sa date.\n- Le gros chiffre : **Montant emprunté**.\n- **Mensuel** : ton paiement régulier.\n- **APR** : ton taux.\n- **Durée** : la durée et le vrai nombre de paiements.\n- **Intérêts totaux** : tous les intérêts sur la durée du prêt.\n- **Total que tu paieras** : montant emprunté plus intérêts totaux.',
+      '- Sous le nom : « Premier paiement », « Prochain paiement » ou « Dernier paiement » avec sa date.\n- Le gros chiffre : **Montant emprunté**.\n- **Mensuel** : ton paiement régulier.\n- **Taux d’intérêt** : ton taux.\n- **Durée** : la durée et le vrai nombre de paiements.\n- **Intérêts totaux** : tous les intérêts sur la durée du prêt.\n- **Total que tu paieras** : montant emprunté plus intérêts totaux.',
       'En dessous, tu trouves **Ajouter aux factures mensuelles**, **Me le rappeler**, et **Calendrier de remboursement** pour voir chaque paiement. Touche **Enregistrer le prêt** pour enregistrer, ou **Revenir aux détails** pour changer quelque chose.',
       'Exemple : $10,000 à 6 % pendant 1 an, début le 1er janvier, premier paiement le 1er février, avec un paiement de $860.55, affiche $326.61 d’intérêts totaux et $10,326.61 au total.',
     ),
@@ -722,7 +723,7 @@ export const loansFr: IntentText[] = [
     ],
     answer: p(
       'Ajoute-le avec ses détails d’origine, et Skip remplit les paiements déjà faits.',
-      '1. Touche **Ajouter un prêt** et saisis ton paiement mensuel.\n2. Utilise le **Montant emprunté**, l’**APR**, la **Durée**, la **Date de début** et le **Premier paiement** d’origine de tes papiers.\n3. Enregistre-le.',
+      '1. Touche **Ajouter un prêt** et saisis ton paiement mensuel.\n2. Utilise le **Montant emprunté**, le **Taux d’intérêt**, la **Durée**, la **Date de début** et le **Premier paiement** d’origine de tes papiers.\n3. Enregistre-le.',
       'Skip compte chaque paiement daté d’aujourd’hui ou avant comme fait. La page du prêt les affiche dans **Historique**, et **Reste à payer** et **Paiements restants** partent d’où tu en es maintenant.',
       'Les paiements d’avant le jour où tu as ajouté le prêt ne comptent pas dans tes dépenses, parce qu’ils ont eu lieu avant que tu les suives dans Skip. Seuls les paiements à partir de ce jour sont ajoutés.',
     ),
@@ -1017,7 +1018,7 @@ export const loansFr: IntentText[] = [
       'afterpay ou klarna en plusieurs fois sans intérêts, comment je les ajoute',
     ],
     answer: p(
-      'Oui. Saisis 0 pour l’**APR**, ou règle le **Taux d’intérêt** du calculateur à 0 %. Il n’y a pas d’intérêts, donc chaque paiement est retiré directement du solde.',
+      'Oui. Saisis 0 pour le **Taux d’intérêt**, dans **Ajouter un prêt** ou le calculateur. Il n’y a pas d’intérêts, donc chaque paiement est retiré directement du solde.',
       'Le calculateur répartit le montant également sur la durée, et le dernier paiement absorbe les cents restants. Exemple : $1,000 sur 3 mois font $333.33, $333.33, puis $333.34.',
       'Ça convient aux plans « achetez maintenant, payez plus tard », au financement à 0 % en magasin ou médical, et à l’argent emprunté à la famille. Skip utilise un seul taux pour tout le prêt, donc il ne peut pas passer à un nouveau taux quand une offre à 0 % se termine.',
     ),
@@ -1537,7 +1538,7 @@ export const loansFr: IntentText[] = [
     ],
     answer: p(
       'Ouvre le prêt depuis **Prêts** avec **Voir les détails**, puis touche le crayon en haut ou **Modifier le prêt** en bas.',
-      '1. Change ce que tu veux sur la page des détails : type, nom, paiement mensuel, montant emprunté, APR, durée, date de début, premier paiement ou **Payé depuis**.\n2. Touche **Continuer** pour arriver à **Vérifie ton prêt**, où tu peux aussi changer **Ajouter aux factures mensuelles** et **Me le rappeler**.\n3. Touche **Enregistrer les modifications**.',
+      '1. Change ce que tu veux sur la page des détails : type, nom, paiement mensuel, montant emprunté, taux d’intérêt, durée, date de début, premier paiement ou **Payé depuis**.\n2. Touche **Continuer** pour arriver à **Vérifie ton prêt**, où tu peux aussi changer **Ajouter aux factures mensuelles** et **Me le rappeler**.\n3. Touche **Enregistrer les modifications**.',
       'Skip recalcule tout le prêt à partir des nouveaux chiffres. Si tu as changé le nom, le paiement mensuel ou **Payé depuis** et que des paiements sont déjà enregistrés, Skip demande s’il faut aussi les changer. Les prêts remboursés et arrêtés ne peuvent pas être modifiés.',
     ),
     keywords: ['Modifier le prêt', 'Enregistrer les modifications', 'crayon', 'changer le prêt'],
@@ -1687,7 +1688,7 @@ export const loansFr: IntentText[] = [
     ],
     answer: p(
       'Skip utilise un seul taux fixe pour tout le prêt, donc il ne peut pas passer à un nouveau taux en cours de route.',
-      'Deux façons de gérer ça :\n- Rapide : touche **Modifier le prêt** et saisis le nouvel **APR**. Skip recalcule tout le prêt à ce taux, donc la répartition des intérêts des paiements passés change aussi.\n- Pour suivre le nouveau taux à partir de maintenant : supprime le prêt avec **Garder les paiements passés**, puis ajoute ce qui reste comme un nouveau prêt. Utilise le solde de ton dernier relevé comme **Montant emprunté**, la date de son dernier paiement comme **Date de début**, le nouveau taux, et les paiements restants comme **Durée**.',
+      'Deux façons de gérer ça :\n- Rapide : touche **Modifier le prêt** et saisis le nouveau **Taux d’intérêt**. Skip recalcule tout le prêt à ce taux, donc la répartition des intérêts des paiements passés change aussi.\n- Pour suivre le nouveau taux à partir de maintenant : supprime le prêt avec **Garder les paiements passés**, puis ajoute ce qui reste comme un nouveau prêt. Utilise le solde de ton dernier relevé comme **Montant emprunté**, la date de son dernier paiement comme **Date de début**, le nouveau taux, et les paiements restants comme **Durée**.',
       'Pour demander les taux variables, utilise **Réglages → Assistance et commentaires → Partage une idée**.',
     ),
     keywords: ['taux variable', 'taux révisable', 'changement de taux', 'ARM'],
@@ -1975,7 +1976,7 @@ export const loansFr: IntentText[] = [
     ],
     answer: p(
       'Quelques-unes, surtout pour attraper les fautes de frappe :',
-      '- **Montant emprunté** : n’importe quel montant supérieur à zéro, au cent près. Le curseur du calculateur s’arrête à $1,000,000, mais tu peux toucher le chiffre pour en saisir plus.\n- **APR** : de 0 % à 100 %, avec jusqu’à neuf décimales.\n- **Durée** : jusqu’à 50 ans dans **Ajouter un prêt**. Le curseur du calculateur va de 6 mois à 40 ans.\n- Les paiements sont mensuels, un jour du mois.\n- Le paiement mensuel doit couvrir au moins les intérêts d’un mois.',
+      '- **Montant emprunté** : n’importe quel montant supérieur à zéro, au cent près. Le curseur du calculateur s’arrête à $1,000,000, mais tu peux toucher le chiffre pour en saisir plus.\n- **Taux d’intérêt** : de 0 % à 100 %, avec jusqu’à neuf décimales.\n- **Durée** : jusqu’à 50 ans dans **Ajouter un prêt**. Le curseur du calculateur va de 6 mois à 40 ans.\n- Les paiements sont mensuels, un jour du mois.\n- Le paiement mensuel doit couvrir au moins les intérêts d’un mois.',
       'Il n’y a pas de limite au nombre de prêts que tu ajoutes.',
     ),
     keywords: ['limite', 'maximum', 'max', 'minimum'],
@@ -2000,7 +2001,7 @@ export const loansFr: IntentText[] = [
     ],
     answer: p(
       'Skip est conçu pour correspondre au cent près au relevé d’un prêteur quand chaque chiffre correspond à tes papiers de prêt. Vérifie ceci, dans l’ordre :',
-      '1. **Paiement mensuel** : exactement celui de ton prêteur, sans escrow ni assurance.\n2. **APR** : le taux d’intérêt de tes papiers, pas un APR plus élevé qui inclut les frais.\n3. **Date de début** : le jour où tu as reçu l’argent. Les intérêts courent à partir de là.\n4. **Premier paiement** : la date de tes papiers. Elle fixe aussi le jour où chaque paiement suivant est dû.\n5. **Montant emprunté** et **Durée** du prêt d’origine.\n6. La façon dont les intérêts sont calculés : la plupart des prêts hypothécaires utilisent le **Calcul mensuel**.\n7. Les paiements supplémentaires : enregistre-les avec **Rembourser**.',
+      '1. **Paiement mensuel** : exactement celui de ton prêteur, sans escrow ni assurance.\n2. **Taux d’intérêt** : le taux de tes papiers, pas un APR plus élevé qui inclut les frais.\n3. **Date de début** : le jour où tu as reçu l’argent. Les intérêts courent à partir de là.\n4. **Premier paiement** : la date de tes papiers. Elle fixe aussi le jour où chaque paiement suivant est dû.\n5. **Montant emprunté** et **Durée** du prêt d’origine.\n6. La façon dont les intérêts sont calculés : la plupart des prêts hypothécaires utilisent le **Calcul mensuel**.\n7. Les paiements supplémentaires : enregistre-les avec **Rembourser**.',
       'Les paiements en retard et les échéances un week-end font aussi bouger un peu les intérêts de ton prêteur, alors que Skip suppose des paiements à temps. Toujours un écart ? Envoie les détails avec **Réglages → Assistance et commentaires → Écrire à l’assistance**.',
     ),
     keywords: ['faux', 'ne correspond pas', 'relevé', 'écart'],
@@ -2300,7 +2301,7 @@ export const loansFr: IntentText[] = [
       'mon frère m’a prêté de l’argent',
     ],
     answer:
-      'Si tu rembourses selon un plan, ajoute-le comme prêt :\n\n1. Va dans **Prêts** et touche **Ajouter un prêt**.\n2. Saisis ce que tu rembourses chaque mois et touche **Continuer**.\n3. Choisis **Personnel**, puis remplis le **Montant emprunté**, 0 pour l’**APR**, la **Durée**, la **Date de début**, le **Premier paiement** et **Payé depuis**.\n4. Touche **Continuer**, puis **Enregistrer le prêt**.\n\nSkip affiche alors ce qui reste et compte chaque paiement à son jour. Avec **Ajouter aux factures mensuelles** activé, les paiements sortent de ton **Solde actuel**.\n\nSi tu rembourses quand tu peux, un prêt ne convient pas, parce qu’il demande un paiement fixe. Ajoute plutôt chaque remboursement comme un reçu, avec une **Note** comme « à Maman, $200 restants ».\n\nSkip ne tient pas de liste de dettes entre personnes. Pour en demander une, utilise **Réglages → Assistance et commentaires → Partage une idée**.',
+      'Si tu rembourses selon un plan, ajoute-le comme prêt :\n\n1. Va dans **Prêts** et touche **Ajouter un prêt**.\n2. Saisis ce que tu rembourses chaque mois et touche **Continuer**.\n3. Choisis **Personnel**, puis remplis le **Montant emprunté**, 0 pour le **Taux d’intérêt**, la **Durée**, la **Date de début**, le **Premier paiement** et **Payé depuis**.\n4. Touche **Continuer**, puis **Enregistrer le prêt**.\n\nSkip affiche alors ce qui reste et compte chaque paiement à son jour. Avec **Ajouter aux factures mensuelles** activé, les paiements sortent de ton **Solde actuel**.\n\nSi tu rembourses quand tu peux, un prêt ne convient pas, parce qu’il demande un paiement fixe. Ajoute plutôt chaque remboursement comme un reçu, avec une **Note** comme « à Maman, $200 restants ».\n\nSkip ne tient pas de liste de dettes entre personnes. Pour en demander une, utilise **Réglages → Assistance et commentaires → Partage une idée**.',
     keywords: ['prêt familial', 'emprunté à mes parents', 'je dois à un ami', 'm’a prêté'],
   },
   {
@@ -2320,7 +2321,7 @@ export const loansFr: IntentText[] = [
       'paiement en 4x sans frais',
     ],
     answer:
-      'Un paiement en 4 fois est prélevé toutes les deux semaines, et les prêts de Skip sont mensuels, donc le plus simple est d’utiliser quatre reçus :\n\n1. Ajoute un reçu pour le premier paiement, daté d’aujourd’hui, payé avec la carte d’où il est sorti.\n2. Ajoute-en trois autres du même montant, datés de deux, quatre et six semaines après aujourd’hui.\n\nChacun compte à sa propre date, donc ton solde et ta carte suivent les vrais paiements. Une **Note** comme « Afterpay 2 sur 4 » les garde ensemble.\n\nPour les plans « achetez maintenant, payez plus tard » payés chaque mois, comme 0 % sur 12 mois, ajoute plutôt un prêt avec 0 comme **APR**.',
+      'Un paiement en 4 fois est prélevé toutes les deux semaines, et les prêts de Skip sont mensuels, donc le plus simple est d’utiliser quatre reçus :\n\n1. Ajoute un reçu pour le premier paiement, daté d’aujourd’hui, payé avec la carte d’où il est sorti.\n2. Ajoute-en trois autres du même montant, datés de deux, quatre et six semaines après aujourd’hui.\n\nChacun compte à sa propre date, donc ton solde et ta carte suivent les vrais paiements. Une **Note** comme « Afterpay 2 sur 4 » les garde ensemble.\n\nPour les plans « achetez maintenant, payez plus tard » payés chaque mois, comme 0 % sur 12 mois, ajoute plutôt un prêt avec 0 comme **Taux d’intérêt**.',
     keywords: ['Afterpay', 'Klarna', 'Sezzle', 'paiement en 4 fois'],
   },
   {

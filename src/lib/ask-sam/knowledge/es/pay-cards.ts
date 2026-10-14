@@ -624,10 +624,11 @@ export const payCardsEs: IntentText[] = [
       '¿Quitar esta fuente?',
       'cómo pauso mi salario',
       'detener mi salario por unos meses',
+      'qué pasa si elijo conservar los pagos anteriores al quitar mi salario',
     ],
     answer:
-      '1. Abre **Tarjetas → Salario**.\n2. Toca el icono de la papelera en la tarjeta del salario.\n3. Toca **Quitar** (o **Conservarla** si cambias de opinión).\n4. Toca **Guardar**.\n\nDesde ese momento, sus días de pago dejan de sumarse. El pago que ya llegó sigue en tus saldos, tus cuentas y **Actividad**, porque realmente lo recibiste. Nada de lo que gastaste cambia.\n\nEl salario solo se quita cuando tocas **Guardar**, así que si regresas sin guardar, se conserva.',
-    keywords: ['quitar salario', 'borrar pago', 'dejé el trabajo', 'Conservarla'],
+      '1. Abre **Tarjetas → Salario**.\n2. Toca el icono de la papelera en la tarjeta del salario.\n3. Responde a la pregunta de Skip, si te hace una.\n4. Toca **Guardar**. Verás **Sueldo detenido** o **Sueldo eliminado**.\n\nSi ese salario ya te pagó alguna vez, Skip pregunta qué hacer con lo que ya te pagó:\n- **Conservar los pagos anteriores**: lo que ya recibiste se queda en tu historial, tus saldos y **Actividad**, y no se agrega nada después de hoy.\n- **Eliminar todo**: sus pagos pasados también se quitan de los meses anteriores.\n\nSi todavía no te ha pagado nada, Skip solo te pide que confirmes. El salario solo se quita cuando tocas **Guardar**, así que si regresas sin guardar, se conserva.',
+    keywords: ['quitar salario', 'borrar pago', 'Conservar los pagos anteriores', 'Eliminar todo'],
   },
   {
     id: 'pay.save.errors',
@@ -645,7 +646,7 @@ export const payCardsEs: IntentText[] = [
       'no me deja guardar mi nomina',
     ],
     answer:
-      'Guardar revisa los salarios de la página, y la línea roja sobre **Guardar** dice qué falta:\n\n- **Ponle a cada fuente un nombre y su salario.** Un salario regular necesita un **Nombre** y un **Importe** mayor que $0. Un pago único solo necesita el importe.\n- **Elige el último día de pago de cada fuente para que Skip calcule los siguientes.** Abre **Último día de pago** y elige una fecha.\n- **Elige el día en que se pagó cada pago único.** Llena **Pagado el**.\n- El nombre de un salario seguido de un problema significa que ese pago por hora necesita su tarifa o sus horas.\n\nUn detalle: cuando tus otros salarios están completos, un salario nuevo al que aún le falta el nombre o el importe no detiene **Guardar**. Los demás se guardan y ese se deja fuera, así que revisa después que esté.\n\nSi ves **Algo salió mal. Inténtalo de nuevo.**, revisa tu conexión y toca **Guardar** otra vez.',
+      'Toca **Guardar** y la línea que está encima dice qué falta todavía, como “Para guardar tu salario, completa: Nombre, Importe, Último día de pago.” Con varios salarios, cada uno tiene su propia línea.\n\n- Un salario regular necesita un **Nombre**, un **Importe** mayor que $0 y su **Último día de pago**, para que Skip calcule los siguientes.\n- Un pago único necesita su importe y **Pagado el**.\n- El nombre de un salario seguido de un problema significa que ese pago por hora necesita su tarifa o sus horas.\n\nNo se deja nada fuera: un salario que empezaste se queda en la página hasta que esté completo o lo quites.\n\nSi ves **Algo salió mal. Inténtalo de nuevo.**, revisa tu conexión y toca **Guardar** otra vez.',
     keywords: ['error al guardar', 'nombre y salario', 'no se guarda'],
   },
   {
@@ -1835,7 +1836,7 @@ export const payCardsEs: IntentText[] = [
       'si elimino mi primera tarjeta, ¿cuál queda gratis?',
     ],
     answer:
-      'Todas tus tarjetas y cuentas siguen ahí. En el plan gratis, tu primera tarjeta de crédito y tu primera cuenta bancaria (las que agregaste primero) funcionan como antes. Las tarjetas o cuentas extra de tu tiempo con Pro se conservan, pero se ven atenuadas en **Tarjetas**:\n\n- Toca una para abrir su propia página, con su saldo y sus movimientos. Puedes editarla, eliminarla, hacer un pago a una tarjeta o agregar dinero a una cuenta, todo gratis.\n- No se ofrece en **Pagado con**, **Se cobra a** ni **Se paga desde** para gastos nuevos. Las facturas, suscripciones y préstamos que ya están vinculados a ella la siguen usando, y al editar una factura, suscripción, hábito o libro de recibos que la usa, sigue seleccionada.\n- Una cuenta extra todavía puede ser de donde sale el dinero cuando haces un pago a una tarjeta o mueves dinero.\n- Su saldo, su historial y todo lo ya pagado con ella siguen contando en todas partes, incluido tu **Saldo actual**.\n\nSi eliminas tu primera tarjeta, la más antigua de las que quedan pasa a ser la gratuita y funciona como antes. No se borra nada cuando termina Pro, y el día que vuelvas a tener Skip Pro, todas las tarjetas y cuentas se pueden elegir otra vez para tus gastos.',
+      'Todas tus tarjetas y cuentas siguen ahí. En el plan gratis, tu primera tarjeta de crédito y tu primera cuenta bancaria (las que agregaste primero) funcionan como antes. Las tarjetas o cuentas extra de tu tiempo con Pro se conservan, pero se ven atenuadas en **Tarjetas**:\n\n- Toca una para abrir su propia página, con su saldo y sus movimientos. Puedes editarla, eliminarla, hacer un pago a una tarjeta o agregar dinero a una cuenta, todo gratis.\n- No se ofrece en **Pagado con**, **Se cobra a** ni **Se paga desde** para gastos nuevos. Las facturas, suscripciones y préstamos que ya están vinculados a ella la siguen usando, y al editar un recibo, factura, suscripción, hábito o libro de recibos que la usa, sigue seleccionada. Las listas, los filtros y las páginas de detalle siguen mostrando su nombre.\n- Una cuenta extra todavía puede ser de donde sale el dinero cuando haces un pago a una tarjeta o mueves dinero.\n- Su saldo, su historial y todo lo ya pagado con ella siguen contando en todas partes, incluido tu **Saldo actual**.\n\nSi eliminas tu primera tarjeta, la más antigua de las que quedan pasa a ser la gratuita y funciona como antes. No se borra nada cuando termina Pro, y el día que vuelvas a tener Skip Pro, todas las tarjetas y cuentas se pueden elegir otra vez para tus gastos.',
     keywords: ['atenuada', 'bloqueada', 'Pro terminó', 'tarjeta extra'],
   },
   {

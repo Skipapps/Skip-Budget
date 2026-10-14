@@ -752,8 +752,8 @@ const payIntents: Intent[] = [
       'Its paydays stop being counted as money coming in, on the dashboard and everywhere else. Nothing you have spent changes.',
     ],
     answer:
-      '1. Open **Cards → Salary**.\n2. Tap the bin icon on the pay’s card.\n3. Tap **Remove** (or **Keep it** to change your mind).\n4. Tap **Save**.\n\nFrom then on, its paydays stop being added. Pay that already landed stays in your balances, your accounts and **Activity**, because you really received it. Nothing you spent changes.\n\nThe pay is only removed when you tap **Save**, so going back without saving keeps it.',
-    keywords: ['remove salary', 'delete pay', 'left job', 'Keep it'],
+      '1. Open **Cards → Salary**.\n2. Tap the bin icon on the pay’s card.\n3. Answer Skip’s question, if it asks one.\n4. Tap **Save**. You’ll see **Pay stopped** or **Pay deleted**.\n\nIf the pay has paid you before, Skip asks what to do with that pay:\n- **Keep past pay**: the pay you already received stays in your history, balances and **Activity**, and nothing is added after today.\n- **Remove everything**: its past pay is removed from past months too.\n\nIf it hasn’t paid you yet, Skip just asks you to confirm. The pay is only removed when you tap **Save**, so going back without saving keeps it.',
+    keywords: ['remove salary', 'delete pay', 'Keep past pay', 'Remove everything'],
     related: ['pay.salary.edit', 'pay.once.earlier', 'pay.history'],
     route: '/salary',
   },
@@ -774,7 +774,7 @@ const payIntents: Intent[] = [
       'it won’t let me save my paycheck',
     ],
     answer:
-      'Save checks the pays on the page, and the red line above **Save** says what’s missing:\n\n- **Give each source a name and its pay.** A regular pay needs a **Name** and an **Amount** above $0. A one-off pay needs only the amount.\n- **Pick the last payday for each source, so Skip can work out the next ones.** Open **Last payday** and pick a date.\n- **Pick the day each one-off pay was paid.** Fill **Paid on**.\n- A pay’s name followed by a problem means that hourly pay needs its rate or hours.\n\nOne catch: when your other pays are complete, a new pay still missing its name or amount doesn’t stop **Save**. The others are saved and that one is left out, so check it’s there afterwards.\n\nIf you see **Something went wrong. Please try again.**, check your connection and tap **Save** again.',
+      'Tap **Save** and the line above it says what’s still missing, like “To save your pay, fill in: Name, Amount, Last payday.” With several pays, each gets its own line.\n\n- A regular pay needs a **Name**, an **Amount** above $0 and its **Last payday**, so Skip can work out the next ones.\n- A one-off pay needs its amount and **Paid on**.\n- A pay’s name followed by a problem means that hourly pay needs its rate or hours.\n\nNothing is left out: a pay you started stays on the page until it’s complete or you remove it.\n\nIf you see **Something went wrong. Please try again.**, check your connection and tap **Save** again.',
     keywords: ['save error', 'name and pay', 'won’t save'],
     related: ['pay.hourly.errors', 'pay.payday.last', 'pay.salary.add'],
     route: '/salary',
@@ -2215,7 +2215,7 @@ const cardIntents: Intent[] = [
       'need my card details back after pro',
     ],
     answer:
-      'Your cards and accounts are all still there. On the free plan, your first credit card and your first bank account (the ones you added earliest) work as before. Any extra cards or accounts from your time on Pro are kept, but drawn faded on **Cards**:\n\n- Tap one to open its own page, with its balance and transactions. You can edit it, delete it, make a payment to a card or add money to an account, all for free.\n- It isn’t offered under **Paid with**, **Charged to** or **Paid from** for new spending. Bills, subscriptions and loans already linked to it keep using it, and editing a bill, subscription, habit or receipt book that uses it keeps it selected.\n- An extra account can still be where the money comes from when you make a card payment or move money.\n- Its balance, history and everything already paid with it still count everywhere, including your **Current balance**.\n\nIf you delete your first card, the next oldest becomes the free one and works as before. Nothing is deleted when Pro ends, and the day you have Skip Pro again, every card and account can be picked for spending again.',
+      'Your cards and accounts are all still there. On the free plan, your first credit card and your first bank account (the ones you added earliest) work as before. Any extra cards or accounts from your time on Pro are kept, but drawn faded on **Cards**:\n\n- Tap one to open its own page, with its balance and transactions. You can edit it, delete it, make a payment to a card or add money to an account, all for free.\n- It isn’t offered under **Paid with**, **Charged to** or **Paid from** for new spending. Bills, subscriptions and loans already linked to it keep using it, and editing a receipt, bill, subscription, habit or receipt book that uses it keeps it selected. Lists, filters and detail pages still show its name.\n- An extra account can still be where the money comes from when you make a card payment or move money.\n- Its balance, history and everything already paid with it still count everywhere, including your **Current balance**.\n\nIf you delete your first card, the next oldest becomes the free one and works as before. Nothing is deleted when Pro ends, and the day you have Skip Pro again, every card and account can be picked for spending again.',
     keywords: [
       'faded',
       'greyed out',
