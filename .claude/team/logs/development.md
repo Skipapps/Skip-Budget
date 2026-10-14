@@ -9493,6 +9493,293 @@ For the real-lender loan, rows are identical to the statement fixture, maturity 
     - Mirror: tsc 0, eslint/prettier clean, 56 suites and 1080 tests pass.
   - prettier is clean on `src/__tests__/supabase/habit-and-days-migration.test.ts` in the real tree.
 
+## 2026-10-13 — Dana — Coffee row back, final delete warning trimmed (DONE, no commits)
+**Outcome:** done. Founder change of plan (via Jay): legal and policy work is paused until the LLC is filed, and Buy Me a Coffee stays for now. This reverses the L5 part of my first entry today; the delete flow, Pro pitch, Manage failure line, FAQ answers and dialog scroll fix are kept.
+- The CEO restored the coffee row in settings.tsx and put support.ts back to HEAD; my delete-flow code there is unchanged.
+- Tests: in settings.test.tsx and settings-languages.test.tsx the coffee tests, mock, COFFEE label, es/fr coffee lines and Support-page lines are back exactly as at HEAD. My "no coffee link" checks are removed. There is no coffee-related difference from HEAD left in either file.
+- `settings.delete.finalMessage` (en/es/fr) drops "Our Privacy policy lists them.", since the Privacy update is parked. It now ends at "…such as crash reports, can stay." Its two test pins are updated.
+
+**Gates:**
+- jest: 23 suites, 434/434. That covers settings, settings-languages, faq, faq-languages, confirm-dialog, past-choice, ui-dialogs-language, shared-controls-large-text, stopped-plans, the other Settings suites and src/i18n. The legal failures are gone with the legal files back at HEAD.
+- tsc: 0, whole tree.
+- eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean on my 9 files.
+
+## 2026-10-13 — Dana — Insights v2 wired (W1–W3), no commits
+- **W1:** `src/app/insights.tsx` is now the thin route (`periodHref={(params) => ({ pathname: '/insights-period', params })}`); new `src/app/insights-period.tsx` exports `InsightsPeriodScreen`. Typed routes regenerated with Expo's own generator (`@expo/router-server/build/typed-routes` `regenerateDeclarations`, as `expo start` runs it): only `/insights-period` was added to `.expo/types/router.d.ts`.
+- **W2:** added the French pay prompt, Groceries as "Supermercado" / "Épicerie", and route-level tests rendering both real default exports; then deleted `src/__tests__/app/insights.test.tsx` and `insights-i18n.test.tsx` (unstaged deletions; I briefly staged them with `git rm` and reset the index entries straight back).
+- **W3:** dropped `out.thisWeek`, `out.allTime`, `in.everyMonth`, `in.thisMonth`, `in.sources`, `in.paidOnce`; no other reader (src, scripts, team docs).
+- **Gates:** `npx jest --ci src/__tests__/insights src/__tests__/large-text-guard.test.ts src/__tests__/no-route-test-files.test.ts`: 10/10 suites, 197/197; messages catalogue 6/6; eslint and prettier clean on my files. Whole-tree tsc: 4 errors, all in payments tests from another session's in-progress `refreshFailed` on `PlanMonthData`/`PaymentsData` (payment-ledger.ts).
+
+- **2026-10-13 — CEO (Quick add UI clean-up session) — Habit one-step save LIVE.** Founder's yes in the CEO chat. Applied `supabase/migrations/20261013500001_update_habit_and_days.sql` to production (jwnsdszstqlpkzwehtmq) with `npx supabase db query --linked -f`, then `npx supabase migration repair --status applied 20261013500001 --linked`. Read-only check: `update_habit_and_days` has the 8 expected args, security invoker, `search_path=public`, authenticated execute yes, anon no, present in `supabase_migrations.schema_migrations`. Local checks before: update_habit_and_days 39 ok, habits 54 ok, habit_past_days 27 ok (Diego, isolated stack); Dmitri APPLY. Client side (useUpdateHabitAndDays) ships with the next commit.
+
+## 2026-10-13 — Diego — #32 RefreshNote: shared helper, component and key built; queries.ts and the Home/Cards wiring wait for "month-end landed" (PARTIAL, no commits)
+**Outcome:** the shared pieces are built and tested. queries.ts is untouched: the 7cda0b6 cherry-pick has not landed (HEAD b37a034). Home and Cards wiring needs the combined hooks' `refreshFailed`, so it waits too.
+
+**What changed:**
+- New `src/lib/query-state.ts`: `ReadState = { isError: boolean; data?: unknown }`, plus `failedEmpty(q)`, `refreshFailed(q)` and `anyRefreshFailed(qs)`, exactly as promised.
+- New `src/components/ui/refresh-note.tsx`: `<RefreshNote show={boolean} />`.
+  - One `font-app text-[13px] text-muted` line, centred, with its own `mt-2`.
+  - `TEXT_CAP.reading`, no line limit, `accessibilityRole="text"`, null when hidden.
+- `src/i18n/messages/common.ts`: new key `common.refreshFailed`.
+  - en: "Couldn’t refresh · showing your last figures". The curly ’ is the house style (93 to 0); the wording is unchanged.
+  - es: "No se pudo actualizar · mostrando tus últimas cifras".
+  - fr: "Impossible d’actualiser · voici tes derniers chiffres".
+- `src/api/loans.ts` (`useActiveLoans`): `isError = failedEmpty(bills) || failedEmpty(loanBillIds)`; new `refreshFailed: !isError && anyRefreshFailed([bills, loanBillIds])`.
+- Tests:
+  - New `src/__tests__/lib/query-state.test.ts` (16): the rules table, the combined pass-through, and agreement with a real QueryObserver's `isLoadingError` / `isRefetchError`.
+  - New `src/__tests__/components/refresh-note.test.tsx` (5): hidden, en, es, fr, large text.
+  - Extended `home-refetch-error` and `cards-refetch-error` with the note assertions: hidden when fresh; shown once, under the balance card or inside the Money tiles block, when every read or one read fails behind cached data; absent when nothing is cached.
+  - The 9 note assertions fail until the wiring lands; every one fails only on the missing line.
+
+**Gates:**
+- tsc: none mine. 5 errors, from other sessions' in-flight `refreshFailed` adoption in payments tests and from `cards-pro-next.test.tsx`.
+- eslint and prettier on my files: clean.
+- query-state, refresh-note and large-text-guard: 27/27. i18n: 73/73. active-loans and cards.test: 50/50.
+
+**Waiting:** once "month-end landed": queries.ts `anyError` → `failedEmpty`; `refreshFailed` on `useLedger`, `useBookFlows`, `useMoneyBook` → `useCurrentBalance` / `useSourceBalances`; then the Home and Cards wiring.
+
+## 2026-10-13 — Diego — Auth: sign-out leaves other phones signed in; same-password message (DONE, no commits)
+**Outcome:** both Founder-approved fixes (via Jay) are done and tested.
+
+**1) Sign-out is local (`src/api/auth.ts`):**
+- `signOut()` now calls `supabase.auth.signOut({ scope: 'local' })`, after the same steps in the same order: forgetThisDevice, forgetThisPersonsVoice, cancelWrapUpNotification.
+- `deleteAccount()` signs out locally too. Its comment: the account's sessions were deleted with its auth.users row, so only this phone's copy is left.
+- Checked against auth-js 2.112.3 (installed) and the published docs. `local` POSTs `/logout?scope=local`, so the server ends this session's refresh tokens. Then `_removeSession` fires SIGNED_OUT. It still fires when the request fails or the server answers 401/403/404. Only `others` skips it.
+- What the app does on SIGNED_OUT: there is no explicit cache clear. SessionProvider sets the session to null. Every user query is keyed `[key, userId]` and `enabled: Boolean(userId)`, and the realtime channel drops with `userId`. Settings navigates with `resetTo('/welcome')` after `signOut()` resolves. There is no query persister.
+
+**2) Same password (`readable()`):**
+- GoTrue answers 422 with code `same_password` and the words "New password should be different from the old password." Older API versions send `error_code`; auth-js maps both to `error.code`.
+- The check runs before the short-password check: by code first, then by the words "different from the old password".
+- The new key `api.auth.samePassword` is in **`src/i18n/messages/api.ts`, not `messages/auth.ts`**. `messages.test.ts` requires each key to start with its area's name, and all `api.auth.*` keys live in api.ts. api.ts was clean in git before the edit.
+- en uses the app's curly apostrophe ("That’s"). 91 English lines use it, 3 use a straight one.
+- `src/app/reset-password.tsx` (the only `updatePassword` caller) shows the error under the confirm field.
+
+**Tests (`src/api/auth.test.ts`, 42, 11 new):**
+- signOut passes `{ scope: 'local' }`, in the order forget, voice, stores, searches, wrapUp, signOut.
+- deleteAccount's sign-out is local.
+- Real supabase-js client with a fake server, run through the app's own `signOut`/`deleteAccount`/`updatePassword`:
+  - Sign-out sends one `POST …/logout?scope=local`, then SIGNED_OUT, with the stored session gone. This also holds offline (FAILURE_MESSAGE comes back) and when the server says 403 user_not_found after a delete.
+  - A same_password refusal reaches the new line in both server shapes, and weak_password still gets the short-password line.
+- Wording: by code, by words, code with short-sounding words, genuinely short, unknown → FAILURE_MESSAGE, es/fr.
+- Mutants on scratch copies via a scratch jest config, with the real files checked unchanged by md5: 10/10 killed, and the control passed.
+
+**Gates:**
+- jest: auth + settings, settings-languages, verify-otp, auth-languages, sign-in-handoff, what-skip-can-do, oauth + src/i18n = 17 suites, 185/185.
+- eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean on my 3 files.
+- `npx tsc --noEmit -p .`: 4–5 errors, all `refreshFailed` in payments tests, from another session's in-flight `src/lib/query-state.ts` work (written 14:59). None are in my files.
+- Full `npx jest`: 9625/9651. On rerunning the 18 failing suites alone, 9 pass. What remains is 5 s timeouts on a loaded machine, the 20 ms parser speed test at 21 ms, another session's new home-refetch-error test, and the Ask Sam prepared library (another session is editing the knowledge files).
+
+**Worth knowing:**
+- An offline sign-out clears the phone but leaves that one server session alive. Nothing on the phone can reach it any more. Global had the same gap.
+- Under global, other phones were signed out but kept their device_tokens rows, so they could still get this account's pushes. Local ends that mismatch.
+- No `Purchases.logOut` on sign-out (`src/api/pro.ts`, not mine). This is unchanged by this work.
+- Follow-up (same day): `src/api/goals.ts`, `useGoals` gains `refreshFailed: !failedEmpty(goals) && !failedEmpty(moves) && anyRefreshFailed([goals, moves])`; its `isError` is unchanged, since Cards' "unread" rule relies on it. New `src/__tests__/api/goals-refresh.test.tsx` (5); goals suites 15/15.
+  - NOTE: goals.ts also holds another session's UNCOMMITTED `useSpendGoal` (line 181+) and its `useQueryClient` import. My import line sits within the same diff hunk, so a commit of either takes both unless split.
+
+## 2026-10-13 — Dana — L17: lapsed extra cards/accounts open, edit and delete for free (DONE, no commits)
+**Outcome:** done. On the Cards tab, an extra card or account past the free allowance now opens `/source/{id}` on every plan. It keeps its fade and has a new VoiceOver label. The FAQ answer says what is true now. Step 2: nothing on the edit/delete path is gated. The CEO's follow-up questions turned up 2 places, outside my files, where extras are left out of things that aren't new spending (below).
+
+**Before editing:** `git status` was clean on cards.tsx, cards.ts and every cards suite. faq.ts already held 3 changed keys: faq.stuck from the Ask Sam session, and include.a/cancelled.a from my L5/L9/L15 entry earlier today. The brief quotes that cancelled.a text, so I went ahead. Of faq.ts I changed only faq.pro.cancelled.a.
+
+**Code:**
+- `src/app/(tabs)/cards.tsx:246,297`: both rows `router.push('/source/{id}')`; the `/pro-feature?id=unlimited&next=/source/{id}` push is gone. The fade stays (`opacity: 0.45` when `!pro && index > 0`, :250/:299). No new visible text.
+- `src/i18n/messages/cards.ts`: `cards.list.cardLocked`/`accountLocked` removed (no reader left). Added `cards.list.cardBeyondFree`/`accountBeyondFree`. en: "{name}. On the free plan you can open, edit or delete it, but not use it for new spending." es/fr in the app's tú/tu voice; French says "la" for carte, "le" for compte.
+- `faq.pro.cancelled.a` (en/es/fr): nothing deleted; first card and account work as before; others stay, count in balances, open/edit/delete but cannot be picked for new spending; no adding past the free allowance; 90-day lists, older entries back when Pro returns. French uses U+00A0 before ":" (legal-faq-messages requires it).
+
+**Step 2 (all open):** the add-card/add-account guard fires only with no `id` (add-card.tsx:64, add-account.tsx:110). Edit = `useUpdateCard`/`useUpdateBankAccount` and delete = `useDeleteCard`/`useDeleteBankAccount` (mutations.ts:319-334), plain PostgREST. The pro_wall migration's `enforce_lock_on_extras` BEFORE UPDATE triggers were dropped by 20260928100001:82-85. Only the INSERT allowance and set_updated_at are left; RLS is `*_all_own`.
+
+**Found (not my files, reported, nothing changed):**
+- source-payment.tsx:35,41 takes its "from" accounts from `usePaymentSources`. On free an extra account can never be the side money leaves: no card payment from it, no move out of it, and Add money on the first account asks nothing. Payments into extras work, and the DB has no Pro check on payments.
+- On free, the bill/subscription/receipt/habit detail pages show "No payment method" / "No card or account" for an entry linked to an extra (bill/[id].tsx:82, subscription/[id].tsx:72, receipt/[id].tsx:137, habit/[id].tsx:152). Their Transactions/Receipts rows show no source name, and the source filters leave extras out (transactions.tsx:103-108, receipts.tsx:145-150). The link and the charges are intact. `usePaymentLabels` (payment-labels.ts) already names every source.
+- Ask Sam `cards.free.locked` (pay-cards.ts ~2190, plus es/fr) still says a tap opens Skip Pro; those files are another session's.
+
+**Tests:**
+- cards-pro-next: the extras open their pages with exactly one push, en labels, fade only on extras, Pro unchanged (4 rows, no fade, add goes straight).
+- cards-i18n: es/fr labels, and each row opens `/source/c2` and `/source/a2`.
+- faq-languages: exact cancelled.a pinned in en/es/fr.
+
+**Gates:**
+- jest, the 9 cards/FAQ suites + src/i18n: 16/17 suites, 154/159. The 5 failures are all in cards-refetch-error, all "Couldn’t refresh · showing your last figures". That is another session's RefreshNote, which cards.tsx does not draw yet; the test file was clean when I started.
+- tsc: errors only in other sessions' live files (4 payments tests `refreshFailed`, salary-large-text).
+- eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean on my 6 files.
+
+## 2026-10-13 — Dmitri (Development Lead) — Insights v2 wiring (W1–W3) final check: GO. Read-only, no src edits.
+- **Fixes confirmed:** M1 (owe fails with Try again on cards or balances, never the typed balance), M2 (`goals.noneActive`), M3 (`spentShareUnder` / `savings.shareUnder` whole sentences on Drew's `belowOnePercent`, en/es/fr tested), M4 (`failed = isError && data === undefined` in `together()` and the picker), S1 (no share when Moved is $0.00), S2 (`loans.noneOpen`), S4 (year pick drops another year's month), S6 (`stateOf` gone).
+- **Routes:** both default exports; both screens wrap `useProGate('insights')` before the body's hooks; `/insights-period` is in the typed routes; no test under `src/app`.
+- **Removed keys:** no reader in src, scripts, team docs or `src/lib/ask-sam`; every `t('insights.*')` key used is defined.
+- **Deleted suites:** every behaviour is re-pinned (owe to the cent, letters rule, large text, money in, es/fr every section, pay prompt en/es/fr, failure + Try again, no friends/groups, copy) except "Savings is not on this page", which v2 reverses by design.
+- **Gates:** jest 11/11 suites, 223/223; eslint `--no-cache` and prettier clean on all Insights files; tsc 5 errors, none in Insights (salary-large-text `salary.needLastPayday`, 4 payments `refreshFailed`).
+- **Non-blocking:** (1) nothing pins the gate on the main Insights screen (the screen suite mocks `useProGate` to null; only the period screen has a gate test). (2) Loans, Goals and Savings still blank on a failed background reload: `useLoans`, `useGoals` and `useSavingsCore` pass raw `isError`. That is for Diego's #32, not Insights.
+
+## 2026-10-13 — Dana — Honest Pro page and leaving-offer copy (DONE, no commits)
+**Outcome:** done. Sections 1 and 2 of Mia's `.claude/team/dev/pro-settings-copy-draft.md` are in the app in en/es/fr, word for word; a script found 0 differences in the 21 strings. Per the CEO's mid-task change (L17 ships in the same release), `pro.unlimited.c` uses Mia's ALT and not the "greyed out" line. Section 3 and the Settings pitch were already done and were not touched.
+
+**Keys:**
+- Removed: `pro.compare.early`, `pro.compare.support`.
+- Added: `pro.offer.renews`.
+- New values: `pro.history.b`, `pro.unlimited.c` (ALT), `pro.compare.upload`, `pro.offer.titleSpecial`, `pro.offer.wasPrice`, `pro.offer.badge`.
+- Unchanged:
+  - `pro.history.subtitle` and `pro.voice.c`: the draft lists both under "no text proposed".
+  - `pro.page.billedYearly`: still used on the Pro page.
+
+**Code:**
+- `src/app/pro.tsx`: the two rows and the `Sparkles`/`Headphones` imports are gone, leaving 8 rows. The Upload row keeps its tick; Mia's optional `pro: unlimited` was not applied.
+- `src/app/pro-offer.tsx`:
+  - `pro.offer.renews` replaces "Billed once a year. Cancel anytime." under the button. It is the same 12px `text-muted` Text with `TEXT_CAP.row`.
+  - `{price}` is `product.priceString`. The line is drawn only when `product` exists and the offer has not ended, so it never shows the US$ stand-in.
+  - The 10.5px "Billed by Apple. Renews automatically…" small print is unchanged.
+  - `wasPrice` is still the VoiceOver label on the struck price; the layout is unchanged.
+- `src/data/pro-features.ts`: on "Add them all", `LockOpen` is replaced by `CircleCheck`, which the same file already uses for voice and habits.
+
+**Tests:**
+- `pro.test.tsx`: 8 rows, the new Upload label, 3 dashes. New test: no early-features or priority-support row, label or icon.
+- `pro-offer.test.tsx`:
+  - New pins for the badge, the "Usually … a year" label and the special title.
+  - The renewal line names the store price: $8.49 against the $9.99 stand-in.
+  - It is 12px with cap 1.4, not 10.5px.
+  - It is hidden in three cases: before the store answers, when the store has no offer plan, and when the offer has ended.
+  - es and fr, including the store's own French price string and the special title in both.
+- `pro-languages.test.tsx`: es/fr Upload rows, no removed rows, 8 rows, `history.b` in both.
+- `pro-feature.test.tsx`: the `unlimited.c` pin.
+- `src/data/pro-features.test.ts`:
+  - en/es/fr pins for `unlimited.c` and `history.b`.
+  - New test: no padlock icon on any point.
+  - New `TWO_LINE_POINTS` (`unlimited:1`), so the ALT may run to two lines.
+
+**Gates:**
+- jest: 25 suites, 303/303. That covers the pro, pro-offer, pro-languages, pro-feature and pro-features suites, all of `src/__tests__/pro`, `api/pro-offer`, pro-copy-salary-free, large-text-guard and src/i18n.
+- Mutants, on scratch copies via a scratch jest config, with the real files unchanged by md5: 7/7 caught, and both controls passed. They were:
+  - fallback price shown;
+  - stand-in price;
+  - small print;
+  - billedYearly back;
+  - shown when ended;
+  - a row back;
+  - the padlock back.
+- eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean on my 9 files.
+- tsc, whole tree: 7 errors, none in my files. They are in salary-* and payments tests that other sessions are editing.
+- `cards-pro-next` was red mid-run while another session was editing cards.tsx/cards.ts; it went green on the rerun.
+
+**Did not fit:**
+- The ALT `pro.unlimited.c` is 50/52/51 characters (en/es/fr). The explainer's rule is one line per point, at most 40 characters, so this point wraps to two lines on a 390pt phone.
+- The explainer wraps a point beside its icon, so nothing is cut, and the test now allows two lines for this one point. The main "greyed out" line (42 characters) would not have fit either.
+
+**Not verified:** on-device layout. Founder check: the "Add them all" explainer and the offer footer in Spanish at the largest text size.
+- **2026-10-13 — Diego — client patch APPLIED to the real tree (uncommitted); migration 20261013500001 is live on production (CEO).**
+  - **Rebase:** all six base files were byte-identical at HEAD 4cedfe0, in the working tree and in my patch base, so it was a plain `git apply` with no 3-way. Each file matches the reviewed version.
+  - **Files:**
+    - `src/api/habits.ts`: `useUpdateHabitAndDays` + `HabitEditValues`, P0002 cache refresh, `useRewriteHabitDays` removed.
+    - `src/app/habit-new.tsx`: 'all' calls the RPC, 'upcoming' calls `useUpdateHabit`, held answer removed.
+    - Tests: `src/__tests__/api/habit-past-days.test.tsx`, `src/__tests__/app/habit-edit-past-days.test.tsx`, `src/__tests__/app/habit-new.test.tsx`, `src/__tests__/app/habit-new-languages.test.tsx`.
+    - Not touched: `src/lib/habit-week.ts` (being edited by Drew) and `src/app/habits.tsx`.
+  - **Gates:**
+    - eslint (cache cleared, `--max-warnings 0`) and prettier are clean on my 7 TS files.
+    - Whole-tree tsc: no errors in my files. The live tree's errors are all other sessions' in-progress work: `src/app/salary.tsx`, salary-large-text, and 4 payments tests (`refreshFailed`).
+    - Habit suites + `src/i18n` + `src/__tests__/supabase` on pristine HEAD b37a034 plus my patch and new files (git archive in scratch): 37/38 suites and 818/819 tests pass. The 1 failure is the `habits.test.tsx` 90-day-floor 5 s timeout under machine load (1-min load was 60 to 470 today). In band, it passes 2/2 both with and without my patch.
+    - Live tree: `add-receipt-habit` and `habit-receipts-list` fail because another session has an untracked `src/api/capture-usage.ts` in progress, pulled in through capture-allowance into receipts.tsx/add-receipt.tsx. The test mocks don't cover it yet ("No QueryClient", "AsyncStorage is null"). Not mine.
+  - **Found, not touched:** bills (`add-bill.tsx:424`) and subscriptions (`add-subscription.tsx:416`) still save "Past and upcoming" as two calls with a held flag, the same gap the habit had. Loans and habits are now single-step.
+
+## 2026-10-13 — Diego — Item 33 data side: a failed background refresh keeps the last figures (`refreshFailed`) (DONE, no commits)
+**Outcome:** `usePayments`, `usePlanMonth` and `usePaymentLabels` now follow one rule.
+- `isError` is true only when a required read failed with nothing to show.
+- The new `refreshFailed` is true when any read's latest attempt failed but every required read still holds data.
+- On a failed refresh the figures stay the very same objects, so the memo does not walk again. No screen was touched; Dana wires the shared note when it exists.
+
+**TanStack 5.102.2, checked in the installed source:**
+- `createResult` gives `isLoadingError = isError && data === undefined` and `isRefetchError = isError && data !== undefined`.
+- The error reducer leaves `data` alone.
+- A retry over data keeps `status: 'error'` until it succeeds, so `refreshFailed` stays on until a refresh works.
+- The rule is written with `isError` and `data`, the same definitions. Other suites' fake queries carry only `data`/`isLoading`/`isError`/`refetch`, so they keep working unchanged.
+
+**New return types:**
+- `usePaymentLabels(): { sources; labelOf; isLoading; isError; refreshFailed: boolean; refetch }`
+- `PaymentsData = { payments; listFloor; free; labelOf; sources; isLoading; isError; refreshFailed: boolean; refetch }`
+- `PlanMonthData = { view; hasPlans; labelOf; isLoading; isError; refreshFailed: boolean; refetch }`
+
+**Required reads:** bills, subscriptions, charges, payoffs, cards and accounts. For the ledger hooks, the names (cards + accounts) count as one read, in once neither is loading or failed with nothing to show. The rule's 6 lines are written in both files because several suites replace `@/api/payment-labels` whole, so `payment-ledger.ts` can import only `usePaymentLabels` from it.
+
+**Tests:**
+- `payment-ledger.test.tsx` (74): a first load that fails gives `isError` and no `refreshFailed`.
+- For each of the 6 reads on its own:
+  - a load that works, then a refresh that fails, gives `refreshFailed` with `isError` false;
+  - the same `payments`/`view` objects come back, with 0 walks;
+  - a later refresh that works clears both.
+- A new charge still shows while bills fail to refresh.
+- No `refreshFailed` while another read is still on its first load.
+- `payment-labels.test.tsx` (12): the same for cards and accounts.
+
+**Gates:**
+- tsc: 0 errors in my 4 files.
+- eslint (cache cleared, `--no-cache`, `--max-warnings 0`): 0. prettier: clean.
+- jest:
+  - my 2 suites: 86/86 in local time, Kiritimati and Los_Angeles;
+  - all suites that use these hooks (payments, the bills/subscriptions app suites, insights): 43/43, 1,524 tests;
+  - guards: 145/145.
+- Mutants: 12/12 caught. They ran on scratch copies only, through a scratch jest config that maps the module to the copy (proved with an unchanged copy and a throwing one).
+
+**Needs others (tsc only, jest passes):** `refreshFailed` is now required, so 4 test builders need `refreshFailed: false` added:
+- `payment-history-page.test.tsx:258`
+- `payment-year-pages.test.tsx:186`
+- `plan-month-parts.test.tsx:295`
+- `plan-month-screen.test.tsx:418`
+
+## 2026-10-13 — Drew — Goals "I spent it" counts the money once (DONE in code; migration NOT applied anywhere live; no commits)
+**Outcome:** done. "I spent it" now opens a full page that files what the goal held as a receipt in the same database step as the goal closes, or just removes it. The money leaves savings once, Current balance once and Insights spending once. Needs migration `20261013700001_spend_goal.sql` applied live before "Add receipt" works (until then it shows the failure line; "Just remove it" works as before).
+
+**Cause:** "I spent it" closes the goal and keeps its moves, so its money stays out of savings. A receipt added for the same purchase then counted as that month's spending, so the 1st's wrap-up moved that much less into savings: savings lost it twice. Without the receipt, Current balance and Insights never saw the purchase at all.
+
+**Design:**
+- New `spend_goal(p_id, p_receipt, p_merchant, p_purchased_on, p_card_id, p_bank_account_id, p_book_id) → uuid` (security definer, savings lock, `for update` on the open goal): inserts the receipt for `goal_saved(p_id)` (start amount + moves; the client sends no amount), closes the goal and sets new `goals.receipt_id` (FK to receipts, on delete set null, unique). Replays by receipt id. Refuses 42501 / 22023 / 23514 (someone else's card or account; book via receipts_own_book) / P0002 in delete_goal's words ('gone').
+- Savings maths (`src/lib/savings.ts`): `paidFromGoals(purchases, moves)` = max(0, start_amount + Σ moves) per linked receipt; `savingsFlows(entries, paidByGoals)` counts a goal's receipt only for max(0, |receipt| − paid). Used by "so far" and by the month close/update (`closingFlows`). The receipt counts in full in the money book, Current balance and Insights.
+- New `src/api/goal-purchases.ts` (reads goals.receipt_id, paged; a DB without the column reads as none). `savings.ts` only imports and calls it.
+- Page `src/app/goal-spent.tsx` (`?id=`): lead, goal card with the fixed amount, Store (goal name), Date (Today/Yesterday/Pick date), Paid with (tiles + Skip), footer "Add receipt" + "Just remove it". Toasts `toast.goal.spent` (check) / `toast.goal.deleted` ('deleted'). Default receipt book, else General.
+- `save-goal.tsx`: the 'spent' choice pushes `/goal-spent`; put-back is unchanged.
+
+**Tests:** new goal-spent-money (13, hand-checked fixture across savingsSummary/monthTotals/moneyBook/heroFigures/spendSummary/goalsSummary), goal-spent screen (15), spend-goal-migration static (7); goals API +2, savings hooks +4, savings close +4, goals-screens updated +1. SQL: `supabase/checks/spend_goal.sql` 37 checks PASS on an isolated local DB (project SkipBudgetDrewChecks, ports 555xx, all migrations; stopped, volumes removed); savings_goals.sql 150, receipt_books, free_capture_allowance, habits, habit_past_days, update_habit_and_days all PASS with it; re-applying the migration is clean; delete_my_account still removes everything; 4/4 SQL mutants caught.
+
+**Gates:** tsc: 0 errors in my files (7 elsewhere, other sessions' payments/salary tests). eslint (cache cleared, --no-cache, --max-warnings 0) and prettier clean on all 15 TS files. jest: 42 suites / 857 tests (goal, savings, insights, money-book, i18n, guards) pass.
+
+**Left for others:** Ask Sam `savings-goals.ts` (~2025-2070, "How do I delete a goal?", "Put back in savings or I spent it?") describes the old flow. `.expo/types/router.d.ts` was regenerated to add `/goal-spent` (gitignored).
+
+## 2026-10-13 — Drew — Stopped habits keep their days in "Saved so far" (PARTIAL: maths + View details done; Habits page wiring BLOCKED on src/api/habits.ts; no commits)
+**Outcome:** the rule is in the maths and pinned to the cent. The Habits page hero can't count stopped habits yet, because the page never reads them: `useHabits()` filters `.is('archived_at', null)`, and no other habit read exists. A drafted, mirror-verified patch for the wiring is in scratch, NOT applied.
+
+**Why stopping drops the days:** not `savedAllTime`, and not the taps (`useHabitTaps` reads every habit receipt, stopped ones included, and `useHabitDays` filters nothing). The habit list is the cause: `useHabits()` returns active habits only → `active` → `maths` → `savedAllTime(maths, …)` sums only the habits it is given. Insights has the same hole (`habitsSummary` gets `useHabits().data`).
+
+**Rule (doc comment at the top of src/lib/habit-week.ts):**
+- Saved = skipped days x price, summed in cents.
+- A skipped day is a saving day with no receipt for the habit dated on it; two receipts on one day count as one bought day.
+- Saving days run from countsFrom (the creation day) to the last saving day. For a running habit that is yesterday. For a stopped habit it is the day before `stoppedOn`, or yesterday if that is earlier.
+- The stop day never saves (it was not over while the habit ran), and no later day does. So stopping leaves Saved exactly where it stood and it never grows after.
+- Price: the stored price. The app refuses to edit an archived habit, so it is the price the habit had when it stopped. The server does not refuse such an edit.
+- A habit removed with everything is in no list and has no receipts, so it adds nothing.
+
+**Files (mine only):**
+- `src/lib/habit-week.ts`:
+  - `HabitMaths.stoppedOn?: string | null`.
+  - New `stoppedOnDay(archivedAt)`: the device-local day of `archived_at`. A bare yyyy-mm-dd is taken as is; anything else that is not a timestamp throws RangeError.
+  - Internal `lastSavingDay` used by `skippedDaysInWeek` and `skippedDaysAllTime`, and so by `savedInWeek`, `savedAllTime` and habitHistory's `saved`.
+  - habitHistory lists no skipped day from the stop day on, and no 'today', for a stopped habit.
+  - limit, progress, dayState and the weeks habitHistory lists are unchanged; a stopped habit has no card.
+  - Running habits: identical results.
+- `src/app/habit/[id].tsx`: Saved = `savedAllTime([maths], own, today)`, the same function as the hero. It was `fromCents(skipped * toCents(price))`, which gives the same figure for running habits.
+- `src/lib/habit-week.test.ts`: +18 tests. Stopped counted to the day before the stop and frozen for years; Saved unmoved on the stop day; receipts on or after the stop are spent, never saved; weekly $25 / $10 / $0; mixed with a running habit, $145.80 = 14580 cents; Keep past days $80 vs Remove everything $45 (and stale receipts of a removed habit add nothing); stop on the creation day or before it = 0; a null stop = running; a 5-price x 5-stop freeze property; history rows sum to 3500 cents; no today once stopped; a bad stop throws; `stoppedOnDay` checks built from local times, so they hold in any TZ.
+- `src/__tests__/habits/habits-saved-parity.test.tsx` (new, 10 tests): the real Habits page and the real View details on the same reads, 8 days, 5–12 Oct. Hero = the habits' own pages added up, to the cent. Hand-counted on Fri 9 Oct: $5.00, $225.00, $16.00, $82.25, hero $328.25. A stopped habit: $161.20 from the stop day on, $489.45 together with the running habits (pure check until wired).
+
+**Gates:**
+- jest: habit-week, habits page, habit detail, saved-parity and Insights habits parity 229/229 at the default timeout. Every suite touching habit maths or Insights habits (33 suites): 798/802. The 4 failures are `home-refetch-error.test.tsx`, another session's in-flight file about Home's "Couldn't refresh" note; Home does not import habit-week.
+- Under load average 265, `habits.test.tsx` "90-day floor" timed out at 5 s, at baseline too, before my change. It passes once the load drops.
+- Mutants in a scratch mirror: 8/8 killed (stop ignored, stop day saves, history ignores the stop, today row when stopped, week or all-time ignoring the stop, UTC instead of the local day, '' read as running); the no-op control survived. Stopped tests pass under UTC, Pacific/Auckland, America/Los_Angeles and Asia/Kolkata.
+- tsc on the whole tree: 5 errors, all in other sessions' in-flight payments and salary tests, none in my files.
+- eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean on my 4 files.
+
+**Drafted, NOT applied:** `/private/tmp/claude-501/-Users-sampathchowdi-Desktop-SkipBudget/ef12afeb-86f7-4f2c-8692-51bdb17f7157/scratchpad/stopped-habits-wiring.patch`.
+- `useStoppedHabits()`, with key `['habits', userId, { stopped: true }]`.
+- `habitMaths` gets `stoppedOn: stoppedOnDay(habit.archived_at)`, with an optional `archived_at` so existing callers still compile.
+- habits.tsx wiring.
+- Test mocks in app/habits, habit-gaps-dashboard and insights-habits-parity, plus new tests.
+- Checks: `git apply --check` is clean against the live tree. In the mirror: 593 tests, 3 load timeouts that pass on rerun; patched files type-clean, lint- and prettier-clean; 5/5 wiring mutants killed.
+
 ## 2026-10-13 — CEO: Ask Sam kept in step with today's app, FAQ → Ask Sam, accuracy
 - **FAQ → Ask Sam:** in **Settings → Support and feedback**, **Common questions** is now the **Ask Sam** row. The FAQ's button reads **Still stuck? Ask Sam** and opens Sam. The FAQ page stays reachable from Sam's "Is there a list of common questions?" answer.
 - **Answers updated in en/es/fr** to match what's committed:
@@ -9516,23 +9803,217 @@ For the real-lender loan, rows are identical to the statement fixture, maturity 
   - The bigger lever is the matcher (negation, the spelling fixer, stopwords, synonyms): next.
 - **Held until their code lands:** Goals "I spent it" (needs the live migration), bills on the never-duplicate list, and the bills page refresh line, due-date change and specific-period rules.
 
-## 2026-10-13 — Drew — Goals "I spent it" counts the money once (DONE in code; migration NOT applied anywhere live; no commits)
-**Outcome:** done. "I spent it" now opens a full page that files what the goal held as a receipt in the same database step as the goal closes, or just removes it. The money leaves savings once, Current balance once and Insights spending once. Needs migration `20261013700001_spend_goal.sql` applied live before "Add receipt" works (until then it shows the failure line; "Just remove it" works as before).
+## 2026-10-13 — Diego — #32 RefreshNote wired: Home, Cards, card/account page (DONE in main's working tree, no commits)
+**Outcome:** the "Couldn’t refresh · showing your last figures" line now shows under Home's balance card, the Cards Money tiles and the card/account sums card when a reload failed behind cached figures. It is hidden when everything is fresh, and absent when nothing is cached (the failure line wins). Built in a scratch worktree (037aeab + 7cda0b6), exported as a patch and applied to main on 641fdd4 with a plain `git apply` (working tree only, main's index untouched). It applied cleanly, with offsets around Ask Sam's savings.ts edits and Quick add's committed L17 rows.
 
-**Cause:** "I spent it" closes the goal and keeps its moves, so its money stays out of savings. A receipt added for the same purchase then counted as that month's spending, so the 1st's wrap-up moved that much less into savings: savings lost it twice. Without the receipt, Current balance and Insights never saw the purchase at all.
+**What changed in main (all uncommitted):**
+- `src/api/queries.ts`:
+  - `anyError` takes `ReadState[]` and uses `failedEmpty`.
+  - `useLedger` keeps its `reads` list and gains `refreshFailed: !isError && anyRefreshFailed(reads)`.
+  - `useBookFlows` and `useMoneyBook` gain `refreshFailed: !isError && (<combined part>.refreshFailed || anyRefreshFailed(parts))`.
+  - `useCurrentBalance`, `useSourceBalances` and `useSourceLedger` pass it through.
+- `src/api/savings.ts`: one import, plus one `refreshFailed` line on `useSavingsCore` (pots, moves); `isError` unchanged. Ask Sam's spend-goal hunks are untouched beside it.
+- `src/app/(tabs)/home.tsx`: `<RefreshNote show={balance.refreshFailed || month.refreshFailed} />` inside the balance card's View.
+- `src/app/(tabs)/cards.tsx`: imports, `refreshFailed: balancesRefreshFailed` in the `useSourceBalances` destructure, and the note as the last child of the Money tiles block. It covers balances, salary, loans, savings and goals.
+- `src/app/source/[id].tsx`: the note directly after the `source-sums` card.
+- Earlier today, still uncommitted: `src/lib/query-state.ts`, `src/components/ui/refresh-note.tsx`, `common.refreshFailed`, `loans.ts`, and `goals.ts` (beside Ask Sam's `useSpendGoal`).
+- Tests:
+  - `queries-refetch-error`: 34. Ledger flags; a mixed case where the failure wins; and the 3 money-book hooks across all 10 tables, using a disabled-observer probe.
+  - `home-refetch-error`: 8. Fresh; every read; one read each for cards, receipts and salary; and the balance failing while the month stays cached.
+  - `cards-refetch-error`: 12, now including Savings and Goals.
+  - New `savings-refresh` (5) and `source-refresh-note` (3).
+- Scratch-worktree mutants: removing any note, dropping savings and goals, ignoring the money book's own reads, dropping the `!isError` guard, and covering only the balance on Home are each caught.
 
-**Design:**
-- New `spend_goal(p_id, p_receipt, p_merchant, p_purchased_on, p_card_id, p_bank_account_id, p_book_id) → uuid` (security definer, savings lock, `for update` on the open goal): inserts the receipt for `goal_saved(p_id)` (start amount + moves; the client sends no amount), closes the goal and sets new `goals.receipt_id` (FK to receipts, on delete set null, unique). Replays by receipt id. Refuses 42501 / 22023 / 23514 (someone else's card or account; book via receipts_own_book) / P0002 in delete_goal's words ('gone').
-- Savings maths (`src/lib/savings.ts`): `paidFromGoals(purchases, moves)` = max(0, start_amount + Σ moves) per linked receipt; `savingsFlows(entries, paidByGoals)` counts a goal's receipt only for max(0, |receipt| − paid). Used by "so far" and by the month close/update (`closingFlows`). The receipt counts in full in the money book, Current balance and Insights.
-- New `src/api/goal-purchases.ts` (reads goals.receipt_id, paged; a DB without the column reads as none). `savings.ts` only imports and calls it.
-- Page `src/app/goal-spent.tsx` (`?id=`): lead, goal card with the fixed amount, Store (goal name), Date (Today/Yesterday/Pick date), Paid with (tiles + Skip), footer "Add receipt" + "Just remove it". Toasts `toast.goal.spent` (check) / `toast.goal.deleted` ('deleted'). Default receipt book, else General.
-- `save-goal.tsx`: the 'spent' choice pushes `/goal-spent`; put-back is unchanged.
+**Gates (main):**
+- tsc: 3 errors, none mine (`pay-delete-money.test.ts`, `salary-hourly` / `salary-one-off` tests, `insights-habits-parity` vs in-flight `habit-week.ts`).
+- eslint and prettier on my 18 files: clean.
+- jest `--testTimeout 60000` on home, cards, queries, money-book, source-detail, source-refresh, goals, savings, refresh-note and query-state: 41 suites, 891/891. large-text-guard and i18n messages: 11/11.
 
-**Tests:** new goal-spent-money (13, hand-checked fixture across savingsSummary/monthTotals/moneyBook/heroFigures/spendSummary/goalsSummary), goal-spent screen (15), spend-goal-migration static (7); goals API +2, savings hooks +4, savings close +4, goals-screens updated +1. SQL: `supabase/checks/spend_goal.sql` 37 checks PASS on an isolated local DB (project SkipBudgetDrewChecks, ports 555xx, all migrations; stopped, volumes removed); savings_goals.sql 150, receipt_books, free_capture_allowance, habits, habit_past_days, update_habit_and_days all PASS with it; re-applying the migration is clean; delete_my_account still removes everything; 4/4 SQL mutants caught.
+**Note for later:** `useSavings` spreads `...core`, so its `refreshFailed` covers only pots and moves, not `accountDay`, `flows` or `paid`. Wire it properly before putting the note on the Savings page.
 
-**Gates:** tsc: 0 errors in my files (7 elsewhere, other sessions' payments/salary tests). eslint (cache cleared, --no-cache, --max-warnings 0) and prettier clean on all 15 TS files. jest: 42 suites / 857 tests (goal, savings, insights, money-book, i18n, guards) pass.
+## 2026-10-13 — Diego — Item 33 follow-up: the shared `query-state` rule, plus the 4 builders (DONE, no commits)
+- **Shared rule:** `payment-labels.ts` and `payment-ledger.ts` now use `src/lib/query-state.ts` (`failedEmpty`, `anyRefreshFailed`); the 6 duplicated lines are gone.
+  - Labels: `isError = failedEmpty(cards) || failedEmpty(accounts)`, `refreshFailed = !isError && anyRefreshFailed([cards, accounts])`.
+  - Ledger hooks: `isError = [...plans, labels].some(failedEmpty)`. The names are a combined read with no `data`, so their `isError` passes through. `refreshFailed = !isError && (anyRefreshFailed(plans) || labels.refreshFailed)`.
+  - The suites that mock `@/api/payment-labels` whole still load: query-state is a pure lib.
+- **One behaviour change from my first rule:** while another read is still on its first load, a failed refresh is now reported at once (`refreshFailed` true, `isLoading` true). It used to wait until every read was in. If that other read then fails with nothing to show, `isError` wins and `refreshFailed` is false. The 2 tests that pinned the old case now pin this.
+- **Builders:** `refreshFailed: false` added, one line each, to `payment-history-page.test.tsx`, `payment-year-pages.test.tsx`, `plan-month-parts.test.tsx` and `plan-month-screen.test.tsx`. None had uncommitted hunks.
+- **Gates:**
+  - tsc: every payments error is gone. 3 remain, all from another session's uncommitted salary/pay work: `pay-delete-money.test.ts` (untracked), `salary-hourly.test.tsx`, `salary-one-off.test.tsx` (`useDeletePay` arity, against modified `pay.ts`/`salary.tsx`).
+  - eslint (cache cleared) on all 8 files I touched: 0. prettier: clean.
+  - jest:
+    - `src/__tests__/payments` plus the bills/subscriptions app suites: all green;
+    - my 2 suites: 86/86 in local time, Kiritimati and Los_Angeles;
+    - guards: 145/145;
+    - the 2 insights suites fail inside the Insights/habits session's uncommitted `habits.ts` / `insights-sections.ts` (`useStoppedHabits`, `habitsSummary`), not in these hooks.
+  - Mutants: 13/13 caught, on scratch copies through a scratch jest mapping (an unchanged copy passes).
 
-**Left for others:** Ask Sam `savings-goals.ts` (~2025-2070, "How do I delete a goal?", "Put back in savings or I spent it?") describes the old flow. `.expo/types/router.d.ts` was regenerated to add `/goal-spent` (gitignored).
+## 2026-10-13 — Dmitri (Development Lead) — #32 RefreshNote final review (Diego): GO. Read-only, no src edits.
+**Outcome:** GO. The rule is right in every combined hook. The note never shows on a fresh page. Coverage is complete on Home, Cards and the card/account page. Copy and a11y are fine. `anyError` behaves exactly as before.
+
+**Checked:**
+- **Rule.** The queries.ts hooks use `!isError && any part`, and combined parts (ledger, flows) count through their own flag, since they have no `data`. Goals and savings keep a raw `isError`, so they use the equivalent `!failedEmpty(each) && anyRefreshFailed`.
+- **Fresh page.** Never shows the note: it needs `isError`, which TanStack clears on the next success.
+- **Note and failure line together.** Never on Cards (the failure page returns before the note) or the Source page (`isError` returns first). On Home, yes in one mixed case, and it is tested on purpose: cards, accounts or payments have nothing cached while a ledger read is behind. The failure line then sits in the balance card with the note right under it.
+- **Coverage.** Recent, Coming up and the month use the same reads; `useReceipts()` and the rest are not keyed by range, so `month.refreshFailed` covers all three. Cards covers faces, salary, loans, savings and goals. Source covers the money book, and its `useReceipts` is one of the ledger reads.
+- **Copy.** U+2019 and U+00B7 in all three languages. es uses tú and fr uses tu, the same as `common.error`. The text wraps, is capped at TEXT_CAP.reading, and uses text-muted.
+- **`anyError`.** `failedEmpty` is the old inline test. No combined result gained a `data` key.
+
+**Gates (main):**
+- jest: 11 suites, 189/189.
+- tsc: 0 errors.
+- eslint --no-cache and prettier on the 13 #32 files: clean.
+
+**Non-blocking:**
+1. Not caused by #32: the Cards savings tile can show too high a figure with no note. If goal_moves failed with nothing cached while pots loaded, `readyToUse = held − 0`. The fix is one line: `savingsUnread = savings.isError && !savings.refreshFailed`. The goals count has the same gap.
+2. The Home mixed case (the failure line plus the note) is a wording or placement call for the CEO or Founder.
+3. Whoever adds the note to the Savings or Goals pages must gate the failure line on `failedEmpty`, not on the raw `isError`.
+4. `useLoanDetail` spreads `...query`, which turns off TanStack's tracked renders (extra re-renders only).
+5. Not verified: how VoiceOver reads the "·".
+- **2026-10-13 — Drew — follow-up (CEO calls 1–5; logic chat OK'd Insights): stopped habits wired into the Habits page AND Insights. DONE, no commits.**
+  - **Applied to the real tree, on HEAD a6a0001:** my wiring patch (base files byte-identical). The Insights parity hunk was held, then added once the logic chat said yes.
+  - **CEO calls:**
+    1. The stop day does not count (unchanged).
+    2. Timezone left as is.
+    3. Habits page "Spent this week" uses the same running + stopped list as Saved. A habit stopped mid-week keeps its earlier receipts in that week. Cards and the week selector stay running-only.
+    4. With no running habit, the hero sits above the empty page when Saved or Spent is above 0. Spent is drawn only when above 0; `HabitsHero.spent` is now optional, and new `habits.hero.spokenSaved` (en/es/fr) speaks it. With nothing at all, the empty page is unchanged.
+    5. Server-side edits left as is.
+  - **Insights (037aeab files, clean before editing):**
+    - `habitsSummary(habits, stopped, taps, today, limit = 3)`. The stopped list is a required 2nd argument, so no caller can forget it.
+    - `savedSoFar = savedAllTime([...habits, ...stopped].map(habitMaths), taps, today)`; rows and count stay running-only. `SummaryHabit` gets an optional `archived_at`.
+    - insights-screen reads `useStoppedHabits()` at the top level and passes `together([habits, stoppedHabits, taps])`. Its inline `failed` rule (same as `failedEmpty`; query-state.ts not imported) means a stopped read that failed with nothing cached shows the failure line + Try again, which asks all three. Loading holds the card. A lower Saved is never shown.
+    - HabitsSection, with no running habit and Saved > 0: the Saved so far card, then the existing empty card under it. `EmptyCard` is exported from section.tsx and takes a `className`. Saved = 0: the plain empty line.
+    - Insights shows no habit spending, so call 3 has nothing to mirror there.
+  - **Tests added:**
+    - app/habits: $44.00 this week / $34.00 last week with a stopped habit, Saved $433.00, selector stops at the running habits' first week; stopped-only hero $9.00 / $81.00 over the empty page; Saved-only tile "Saved so far, $45.00."; plain empty when nothing.
+    - Insights parity: STOPPED $161.20 added to every day; frozen $161.20 from 1 Oct to 4 Jan on both pages, stopped-only included; savedSoFar $489.45 on 9 Oct.
+    - insights-sections: one fixture, $17.40 + $383.84 = $401.24.
+    - insights-screen: stopped-only card order and action; stopped read fails → card fails, Try again asks habits/stopped/taps; stopped loading holds the card. 'stopped' is added to READS.
+  - **Gates:**
+    - `npx jest --ci --testTimeout=60000`: all Insights suites, every habit suite, saved-parity, habit-detail, habit-week, src/i18n, the earlier habit-maths list and all 11 large-text suites — 57 suites, 1274/1274.
+    - Mutants in the mirror: 8/8 killed (spent over running only, no hero when only stopped, hero with nothing, spent at 0, summary ignoring stopped, section ignoring the stopped read, stopped-only shown as plain empty, empty line dropped); the control survived.
+    - tsc on the whole tree: 0.
+    - eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean on my 18 files.
+
+## 2026-10-13 — Diego — RevenueCat at sign-out: Pro no longer lingers; logOut NOT added (PARTIAL by decision, no commits)
+**Outcome:** the Pro state no longer lingers after sign-out. I did NOT add `Purchases.logOut()`: RevenueCat's own rules for this app's id model say never to call it, and it would break `pro.ts`'s identity check. Needs a CEO/Jay call if logOut is still wanted.
+
+**Why no logOut (sources: RevenueCat "Identifying customers" docs; react-native-purchases 10.8.1 installed):**
+- logOut makes an anonymous `$RCAnonymousID`. For apps that use only their own ids, the docs say: "Only configure the SDK with a custom App User ID, and never call .logout()".
+- After a logOut, logIn to an account RevenueCat has never seen merges it with the anonymous id, and "original_app_user_id will be the anonymous id".
+  - `isFor()` (and `storeSaysPro` in confirm-pro.ts) trust only `originalAppUserId === userId`. For that account the SDK answer would never count again, on any phone: a purchase is not seen until the webhook lands, and `restore()` says false.
+  - Deleting your account and signing up again on the same phone hits this.
+- The docs also warn that "a provided user's subscription may be transferred to an anonymous ID - which can only be brought back through a restore". A renewal seen on the signed-out screen could move it. The webhook skips anonymous receivers, so the account would quietly lapse at its next renewal.
+- The next account cannot inherit Pro without logOut. Every SDK read waits behind the serialised logIn, and `isFor` drops another id's late answer. Two new tests prove this.
+
+**What changed (`src/api/pro.ts`, `useProSource`):**
+- The remembered SDK answer is dropped at sign-out (render-phase `setSdk(null)` when `userId` is null).
+- An effect removes cached `['entitlement', <user>]` answers when `userId` goes null. The signed-out key is kept.
+- One comment explains why RevenueCat is left signed in until the next sign-in's logIn.
+- Before the fix (same tests on the old pro.ts): the signed-out account's `entitlement` answer stayed cached. The same account signing back in after its Pro ended was shown `{ pro: true, ready: true }` until the reads came back.
+
+**Tests (`src/__tests__/api/pro-identity.test.tsx`, 11, 5 new):**
+- The mock gains logOut, isAnonymous, a server gate and an ordered log of SDK calls. The new tests use one QueryClient per test with `gcTime: Infinity`.
+- Nothing says Pro after sign-out: published `{false,false}`, cache entry gone, no listener left.
+- The same account back waits for its answer afresh and never shows Pro.
+- A → sign-out → B: the SDK calls are exactly `logIn:B`, then `read:B`. It ends as B, and B is never shown Pro.
+- Sign-out never calls logOut and never leaves RevenueCat on an anonymous id.
+- A signed-in account's server answer is refetched by a purchase's invalidation.
+- Mutants via scratch config + moduleNameMapper, with the real files checked unchanged by md5. Killed: no SDK reset, no cache drop, logOut at sign-out. Control passed.
+  - Survivor: dropping the `if (userId) return` guard. It removes the live query once at sign-in, and useQuery rebuilds it on the next render, so the only effect is an extra fetch. Not pinned.
+
+**Gates:**
+- jest `src/api` + `src/__tests__/api`: 64 suites, 1158/1158.
+- `npx tsc --noEmit -p .`: 0, whole tree.
+- eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean on both files.
+- Full `npx jest`: 10076/10097. 5 suites failed. 4 of them pass alone: receipt-detail and habit-receipt-rows are other sessions' in-flight edits, plus the two i18n suites under load. The Ask Sam prepared library is stale from another session's knowledge edits.
+
+**Open:**
+- If a shared Apple ID moving Pro between Skip accounts is the worry, the lever is RevenueCat's dashboard Restore Behavior ("Transfer" vs "Keep with original App User ID"). logOut is not that lever. Founder/CEO decision.
+- #32 follow-up after Dmitri's GO (same day):
+  - `cards.tsx`: `savingsUnread = savings.isError && !savings.refreshFailed`, and the same for `goalsUnread`. The Goals tile now checks unread BEFORE the active count. Before this, a moves read that failed with nothing cached showed savings as held − 0 and could count a reached goal as active.
+  - `home.tsx`: the note shows only with `&& !balance.isError`, so it never sits beside the balance failure line.
+  - Tests: cards-refetch-error gains "shows no Savings/Goals figure, only Open"; home's mixed case now expects no note. All three fail on the old logic (scratch copy).
+  - Gates: home/cards refetch suites and cards.test 50/50; eslint and prettier clean; tsc's 2 errors are in `transactions.test.tsx` (another session's in-flight `transactions.tsx`), not mine.
+
+## 2026-10-13 — Diego — Founder fixes 3a (data) and 4: deleting recorded pay; the free scan count stays spent (DONE, no commits; migrations NOT applied live)
+**For Dana: hooks and types (`src/api/pay.ts`):**
+- `useDeletePay(): { countPast(id: string, today: string): Promise<number>; remove(input: PayDeleteInput): Promise<{ id: string; choice: PastDelete }>; removing: boolean }`
+- `type PayDeleteInput = { id: string /* salary_sources row */; choice: PastDelete /* 'keep' | 'everything' */; today: string /* useToday */ }`
+- `countPast` = paydays on the record + paydays due by today not written down yet (what the ledger already shows). It rejects on a failed read. 0 means nothing is in history, so the plain confirm is safe.
+- `remove` with 'everything' on a pay already gone (P0002) resolves, so a retried Save is safe.
+
+**Live order and files:**
+- Live order: 20261013100001, then 20261013100002, then the month-end session's 600001–600005. Both of mine must be live before the build that offers "Remove everything"; without 100001 that choice fails with the failure line. Without 100002, the app falls back to counting receipts.
+- New: `supabase/migrations/20261013100001_delete_salary_and_pay.sql`, `supabase/migrations/20261013100002_capture_usage.sql`, `supabase/checks/delete_salary_and_pay.sql`, `supabase/checks/capture_usage.sql`, `src/lib/pay-record.ts`, `src/api/capture-usage.ts`, `src/__tests__/api/pay-delete.test.tsx`, `src/__tests__/api/pay-delete-money.test.ts`, `src/__tests__/api/capture-allowance.test.tsx`.
+- Changed: `src/api/pay.ts`, `src/api/capture-allowance.ts`, `src/api/mutations.ts` (one DEPENDENTS line), `src/providers/realtime-provider.tsx` (one AFFECTS line), `src/app/add-receipt.tsx` (one line in applyScan), `src/providers/realtime-provider.test.tsx`.
+- Test mocks: `src/__tests__/app/add-receipt-scan.test.tsx` (+5 tests). A `@/api/capture-usage` mock (my hunks only) in add-receipt-save, add-receipt-i18n, receipts-scan, add-receipt, add-receipt-habit, add-forms-from-voice, history-window-receipts, receipts, receipts-empty, receipts-i18n and habits/habit-receipts-list.
+- Not touched: `src/api/queries.ts`, `src/lib/pay.ts`, `save_loan`/`update_loan`, `anchor_day`.
+
+**3a: what I found.**
+- A pay's paydays are `pay_received` rows, with `salary_source_id` set to null on delete. Removing a salary already kept its pay, but only what the sweep had written. Paydays due and not yet written were only projected from the salary, so they vanished with it.
+- Savings months are frozen pots (`close_my_savings_month`). Open months, "so far" and every balance come from the same ledger, which reads `pay_received` plus the projection.
+
+**3a: what changed.**
+- 'keep': writes this pay's due paydays first (`recordDuePayOf`; fails loudly, and on a 23505 from a racing sweep it reads again once), then deletes the salary. Two requests: if the delete fails, what was written is exactly what the sweep would have written.
+- 'everything': `delete_salary_and_pay(p_salary)`, which runs as the caller. It locks the salary FOR UPDATE, deletes its paydays, then the salary; otherwise P0002 'there is no such pay'. Revoked from public and anon, granted to authenticated.
+- `recordDuePay` now shares `readDuePay` and `duePay` (src/lib/pay-record.ts) with the keep path; its behaviour is unchanged (pay.test 70/70).
+
+**3a: proof.**
+- `pay-delete-money.test.ts`, one account from June to 13 Oct: Acme biweekly 1,834.62 after a raise from 1,790.00, plus Cafe and a one-off.
+  - Keep: Current balance, Checking, Card and all five months are equal to the cent; no closed pot offers an update; nothing of Acme is projected after today, and the next sweep writes none.
+  - Control: deleting without writing 9 Oct first drops the balance by 1,834.62.
+  - Everything: balance, income and Checking drop by exactly 18,256.96. Months drop by 3,580.00 / 5,503.86 / 3,669.24 / 3,669.24 / 1,834.62; closed pots offer earnedChange −3580 / −5503.86 / −3669.24 / −3669.24.
+
+**4: what I found.**
+- The limit is enforced server-side by `enforce_scan_is_pro`, which counted this month's receipts with source scan/upload, so a delete gave the scan back.
+- A reading of nothing still filed as 'scan': `applyScan` always set the capture source.
+
+**4: what changed.**
+- `capture_usage` table: one row per receipt read by camera or upload, written by an AFTER INSERT trigger. It copies the receipt's created_at, which the server stamps for free accounts. `receipt_id` is ON DELETE SET NULL.
+- Row level security: the owner may only read; insert, update and delete are revoked from the API, and anon has nothing.
+- `enforce_scan_is_pro` now counts usage rows; otherwise it is unchanged.
+- Back-fill from existing receipts, re-run safe through a unique index on receipt_id. Pro scans are recorded too, as they were counted before, so a lapse within the month still counts them.
+- App: `useCaptureUsage` reads usage from local midnight on the 1st, keyed by month, and falls back to receipts with no table. Receipt writes and realtime receipt changes refresh it. A reading of nothing files as 'manual'.
+
+**Scratch database (isolated stack SkipBudgetDiegoPayScan, ports 556xx, no link; stopped after):**
+- All 94 tree migrations, in filename order and in live order (theirs, then mine): delete_salary_and_pay 23 ok, capture_usage 32 ok, and free_capture_allowance unchanged, all PASS. Re-applying mine again also passes.
+- With 600001–600004 (600004 md5 c6d74d1f), in both orders: all three PASS.
+- DB mutants: 8 of 8 caught after one fix to the check (the lock-order check had read a missing "for update" as position 0).
+- Race: a payday written during "everything" is refused by the foreign key with the lock. Without the lock, one payday is left behind with no pay.
+
+**Gates:**
+- tsc: 0 errors on the whole tree.
+- `rm -rf .expo/cache/eslint && npx expo lint`: findings only in 5 files that are not mine. eslint --no-cache --max-warnings 0 and prettier: clean on my 23 files.
+- Client mutants on scratch copies: 18 of 18 killed; the control survived; real files unchanged by md5.
+- Full jest: 425 of 438 suites, 10,208 of 10,234 tests. Of the 13 failing suites, 8 pass in isolation (load). The other 5 are other sessions' in-flight files:
+  - receipts-i18n "failure line": the logic session's `failedEmpty` in receipts.tsx;
+  - add-forms-from-voice subscription cases, add-subscription and add-subscription-i18n: add-subscription.tsx;
+  - add-bill-save: all mock `@/api/mutations`.
+
+## 2026-10-13 — Diego — The sweep runs when the day turns while the app stays open (DONE, no commits)
+**Outcome:** while Home is mounted, a timer to the next local midnight (plus 1 s) runs the same sweep the launch and resume path runs, once per turn of the day, then re-arms. It is cleared on unmount and on sign-out (the effect re-runs on `userId`). A resume at the same moment does not run it twice.
+
+**What changed:**
+- `src/api/refresh.ts`, only the `useKeepSchedulesCurrent` region (lines 177-241; line 44 untouched):
+  - New `MIDNIGHT_GRACE_MS` and exported `msUntilNextMidnight(now)`, which handles 23/25-hour clock-change days.
+  - The resume guard is now day-aware. A return within 60 s still skips, unless the day has turned since the last sweep; before, a 23:59:30 sweep would have swallowed a 00:00:00 resume.
+  - The midnight timer runs only if no sweep has covered the new day yet. That makes it exactly once per flip, and a late-firing timer after a resume does nothing.
+- `src/lib/use-today.ts` untouched: it re-checks every 60 s and on resume, not at midnight, so it is not a day-flip signal.
+- Overlapping sweeps across midnight cannot double-file: the recorders upsert with `ignoreDuplicates`.
+- New `src/__tests__/api/refresh-midnight.test.tsx` (14):
+  - no run before midnight;
+  - one run for the new day at 00:00:01, invalidating `['charges']`, then re-arming for the next day;
+  - a resume 0.5 s past midnight, inside the 60 s window, sweeps the new day and the timer then does not;
+  - a resume after the timer does not double-run;
+  - the timer stops at unmount and at sign-out;
+  - `msUntilNextMidnight` lands exactly on local midnight across month/year ends and the North American and European clock-change days.
+- Scratch-copy mutants (time-only guard, unconditional timer sweep, no clearTimeout, no re-arm, no timer) are all caught.
+
+**Gates:**
+- tsc: 0.
+- eslint and prettier on my 2 files: clean.
+- jest `--testTimeout 60000`, refresh/home/month-end-roll: 16 suites, 153/153.
 
 ## 2026-10-13 — Drew — Goals "I spent it" follow-ups: Dmitri's N1/N3/N4/N7/S4, Founder's S3 and S1 ("I already added it") (DONE in code; migration 20261013700002 NOT applied; no commits)
 **Outcome:** done. 20261013700001 is live (Founder). New `20261013700002_link_goal_receipt.sql` (link_goal_receipt + spend_goal with its retry check straight after the lock, matching this goal) is written and checked on an isolated local DB only; it needs the Founder's yes. Copy for S1 is PROPOSED and awaits approval.
@@ -9546,6 +10027,189 @@ For the real-lender loan, rows are identical to the statement fixture, maturity 
 - **SQL (isolated DB SkipBudgetDrewChecks, both migrations):** link_goal_receipt.sql 34 ok, spend_goal.sql 37 ok, savings_goals 150, receipt_books 19, free_capture_allowance 26, habits 54, habit_past_days 27, update_habit_and_days 39: all PASS. 6/6 mutants caught; re-apply clean; delete_my_account clean. Stopped, volumes removed.
 - **Tests:** goal-spent 27 (incl. es/fr), goal-receipt 10 (incl. es/fr), goal-receipts 6, money test 18 (two goal receipts in a month; linked = filed figures), savings +3 (useMonthUpdate into a closed month ×2, moves read failed), goals API +2, goals-screens +2, static migration 13.
 - **Gates:** tsc 0 (whole tree); eslint (cache cleared, --no-cache, --max-warnings 0) and prettier clean on 19 files; jest --testTimeout=60000: 48 suites / 938 tests (goal, savings, insights, money-book, i18n, guards) + 10 suites / 94 tests (cards, refresh, month-end) pass.
+
+## 2026-10-13 — Drew — Next due inside a charged cycle: findings, then the form-hint helper `effectiveNextDue` (DONE, 2 new files, no commits)
+**Findings (read-only, earlier today):** see `.claude/team/dev/next-due-floor-report.md`. Cause: a running plan's stored next date can sit before its own floor (starts_on / started_on). Readers that walk the schedule are right; the bill and subscription pages, the reminders page, the forms and the server's `reminders_due` print the stored column. Agreed fix: the SQL floor trigger plus a one-off update, in the month-end session's migration series.
+
+**Built:** `src/lib/next-due-hint.ts` (new) and `src/__tests__/payments/next-due-hint.test.ts` (new). card-ledger.ts, charges.ts, bill-month.ts and month-step.ts are imported only.
+- `effectiveNextDue({ picked, recurrence, anchorDay?, lastChargedOn, today })` returns `{ next, paidCycle: { start, label: 'week'|'month'|'quarter'|'year', current } | null }`.
+  - How it works: the floor comes from `floorAfterCharges`, as Save writes it. The next date is the first `occurrencesInRange` date on or after the floor, with the anchor day. The cycle comes from `cycleStart`.
+  - `paidCycle` is non-null exactly when the date moves. It names the newest charged cycle, so a pick in an earlier month says why it lands later.
+  - `current` is the only use of `today`.
+  - Period: no special case. It goes through the same floor, walk and cycle (label 'month'). Today it never moves, so it never hints. Its fixtures follow the announced monthly-walk contract and switch on by themselves once `occurrencesInRange` walks a period monthly (`PERIODS_WALK`).
+  - The look-ahead is 12 months against the trigger's 5 years. The first date on or after a cycle start always falls inside that cycle, so the results are the same.
+- **Parity table:** `NEXT_DUE_FLOOR_TABLE` is exported from the test file as plain text, with 33 hand-worked rows: 27 repeating, 6 period. Its line format is `picked anchor recurrence last-charged | floor next paid-start`. The SQL check copies it between `$nextdue$` markers.
+- **Tests:** 20 in total; on today's main 16 pass and 4 are period-gated.
+  - Every row is checked against the helper, the real `buildBillValues` (next_due_on = picked, starts_on = floor), the real `buildSubscriptionValues` (countsFrom null, earlier and same), the trigger rule worked with `nextOccurrenceFrom`, and `nextDueAfter`.
+  - Named cases: the Founder's 15 Nov; a 31st landing on 30 Nov and then 31 Dec only with anchor 31; invalid anchors; a past uncharged date; last month paid; the charge day; labels and `current`; never charged.
+  - A hand-counted brute force covers 62,062 cases, 40,229 of them hinted.
+
+**Gap found (needs a decision):** under the period contract, `buildBillValues` still saves a period's starts_on as the picked date (`entry-values.ts`, `starts_on: isPeriod ? start : floorAfterCharges(...)`). The trigger reads starts_on as the floor, so a period's date would never move and set periods keep the original bug. The mirror simulation proves it: with the contract applied, "floors a set period as the bill form saves it" fails (15 Oct vs 1 Nov). With the period save floored too, all 19 pass. Either the save floors periods as well, or the trigger floors by charges.
+
+**Gates:**
+- jest, my suite plus charges, entry-values, bill-month, month-end/*, month-end-parity and the no-route guard: 13 suites, 275 passed, 4 skipped.
+- My suite also passes in Pacific/Auckland, America/Los_Angeles and Asia/Kolkata.
+- tsc on the whole tree: 0. eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean on both files.
+- Mutants on a scratch mirror (`scratchpad/drew-nextdue/mirror`; the real files' md5 is unchanged):
+  - 10/10 killed on main's contract;
+  - 3/3 period mutants killed under the simulated period contract;
+  - the no-op control survived both times.
+- `rules.md` was not found anywhere; I followed the log's usual gates.
+
+## 2026-10-13 — Dana — #33 refresh note on the remaining pages, batch 1 (ready to commit, no commits)
+- **Commit-ready:** `src/app/goals.tsx`, `src/app/notifications.tsx`, `src/__tests__/app/goals-refresh-note.test.tsx` (6), `src/__tests__/app/notifications-refresh-note.test.tsx` (4).
+  - Goals: failure page only when a read has nothing cached (`isError && !refreshFailed`, i.e. goals or moves `failedEmpty`); was `isError && goals.length === 0`, which showed $0.00 saved when the moves read failed with goals loaded. Note under the summary or invite card.
+  - Notifications: `failedEmpty(news)` gates the failure page; one note above the list (no summary there).
+- **Parked, not in the tree:** Receipts. Patch at `.claude/team/dev/refresh-note-parked/receipts.patch` (receipts.tsx + new receipts-refresh-note test, 8 cases, passed). It turns the held `receipts-i18n.test.tsx` "cannot be read" case red: that fixture is `data: [], isError: true`, which is a cached empty list. Needs `data: undefined` there (type `data?: unknown[]`), then apply the patch.
+- Gates: tsc 0; eslint --no-cache and prettier clean on the 4 files; jest 14 suites around them green (goals-screens, notifications x2, receipts x5, habit-receipts-list, large-text guard, refresh-note, query-state).
+
+## 2026-10-13 — Dana — Item 33: the refresh note on the payment pages (DONE, no commits)
+After a failed background refresh the pages keep their last figures and show the shared `<RefreshNote>` (the logic chat's; used, not edited). The error page shows only when there is nothing to show (Diego's `isError`).
+
+**Where the note sits:**
+- **Month page** (`components/payments/plan-month-screen.tsx`): straight under the plum MonthCard. Its flag is `data.refreshFailed`, plus the loans read's own `refreshFailed` when a stopped loan is shown.
+  - The leftover is fixed: the loans read sends the page to the error page only through `failedEmpty(loans)`.
+  - Note: `useLoans` now returns `isError` + `refreshFailed` and no `data`, so `refreshFailed(loans)` would always be false. The hook's own flag is used, as query-state.ts says to for combined results.
+- **`/payment-history`:** under the year card.
+- **`/payment-years`:** under the "Paid since" card.
+- **`/payment-year`:** it reads usePayments, so the note goes under its year list, above the Pro footer.
+- **`/payment-search`:** no figure card, so the note is first in the body, under the pinned field and tabs, above Recent/Filters or the results. Never beside the error page (`!(searching && isError)`). `SearchData` gains `refreshFailed`.
+- **`/payment-export`** (`components/payments/export-choices.tsx`): under the scope summary card. `ExportPayments` gains a required `refreshFailed`.
+
+**Tests**, the same checks on each page: data stays and the note is straight under its card (or above the content on search); it is muted and centred, wraps at TEXT_CAP.reading, and VoiceOver reads it (role text); never beside the error page; gone after a good refresh; es/fr wording.
+- plan-month-parts: 56 (+5, including the loans folding and the empty-loans error page).
+- payment-history-page: 39 (+4).
+- payment-year-pages: 43 (+5).
+- payment-search-page: 31 (+5).
+- payment-export-page: 34 (+4).
+- Builders: `refreshFailed: false` added to the search and export builders and the loans mock (the others already had it).
+
+**Mutants:** run on scratch copies only, mapped over the repo module by a scratch jest config in my folder; no project file was touched. Sanity check: an unchanged copy passes. 12/12 caught.
+
+**Gates:**
+- tsc: 0, whole repo.
+- eslint (cache cleared, --no-cache, --max-warnings 0) + prettier: clean on the 11 files.
+- jest (payments + guards + i18n + data + components/ui, `--testPathIgnorePatterns .claude/worktrees` last): 50/51 suites, 1,516 passed, 4 skipped.
+  - The 1 failure was a 5 s timeout under load (load average ~100) in an existing history test. That suite passes alone, 39/39.
+- **Batch 2 (ready to commit):** `src/app/habits.tsx`, `src/app/habit/[id].tsx`, `src/components/habits/failure-line.tsx` (comment only), `src/__tests__/app/habits.test.tsx`, `src/__tests__/app/habit-detail.test.tsx`.
+  - Both pages already kept their figures, but a failed reload drew the red failure line with Try again. Now `failedEmpty` gates the failure page and `anyRefreshFailed` shows RefreshNote: on Habits straight under the hero (also over the empty page when a stopped-habits hero shows); on a habit's page under the bought/skipped tally. The red FailureLine stays only for a day tap that did not go through.
+  - The two pinned "failure line and Try again" cases are rewritten for the note; new cases per read (stopped, receipts, habit), the empty-page case and "nothing while fresh".
+  - Gates: tsc 0; eslint --no-cache and prettier clean on the 5 files; jest all 21 habit suites + insights-habits-parity + large-text guard, 440/440.
+
+## 2026-10-13 — Dana — Item 33 follow-up: every payments page pulls the same way (DONE, no commits)
+- **`src/app/payment-years.tsx`:** pull to refresh is now `useRefreshAll().refresh` (it runs the sweep), with the spinner shown. Before, it was a bare `data.refetch`.
+  - Choose year, search and export have no pull to refresh, so they are unchanged (CEO: "if they pull").
+  - Choose month reads nothing.
+  - The month page and history already pull this way.
+- **Test:** `payment-year-pages.test.tsx` 44 (+1). It now has a `@/api/refresh` mock, and checks that a pull reaches the app refresh and never a re-read. A scratch-copy mutant (the re-read put back) is caught.
+- **Gates:**
+  - tsc: 0, whole repo.
+  - eslint (cache cleared) + prettier: clean on the 2 files.
+  - jest (payments + guards + i18n, ignore option last): 43/44 suites.
+- **The red suite, needs Theo:** his committed `src/__tests__/payments/payment-years-screens.test.tsx` fails 46 tests, all "No QueryClient set" (useRefreshAll), the same as his month and history suites after S2.
+  - Patch, proven on a scratch copy (his file untouched): add the `@/api/refresh` mock (`useRefreshAll: () => ({ refresh: mockRefreshAll, refreshing: false })`). That leaves 81/82.
+  - The last one, line 814 "re-reads every part on a pull to refresh", should expect `mockRefreshAll` called once.
+
+## 2026-10-13 — Dana — Founder fixes: "APR" → "Interest rate", salary never drops an unfinished pay, deleting pay asks about its past, Loans pages keep their figures on a failed refresh (DONE, no commits)
+- **#33 add-on (separate hunk):** `salary.tsx` shows the failure page only on `failedEmpty(details)`, with `<RefreshNote show={refreshFailed(details)} />` under the total card; `salary-paid-into.tsx` uses `failedEmpty(accounts)` (no note there, as asked). Tests: new `salary-refresh-note.test.tsx` (5); in `salary-paid-into.test.tsx` failures are now faked with `data: undefined`, plus a held-reload test. Gates: tsc 0, eslint (cache cleared) and prettier clean, salary and past-choice suites 217/217.
+**Outcome:** all four done, with tests. Salary deletes run through Diego's in-flight `useDeletePay()`. Its "Remove everything" path needs his `delete_salary_and_pay` migration, which is not live yet.
+
+**1. Add loan: "Interest rate".**
+- The field, the Review row and the "To continue, fill in:" list now reuse the calculator's own key, `loan.interestRate` (Interest rate / Tasa de interés / Taux d’intérêt).
+- `loanFlow.field.apr` is deleted. Files: `loan-details-view.tsx`, `loan-review-view.tsx` (row id `rate`), `loan-form.ts` (one line: FIELD_LABELS.rate) and `loan-flow.ts`.
+- VoiceOver: the field is read by its visible label, as every TextField in the app is, and the review card's spoken summary now says "Interest rate, 6.25%". The refusal texts already said "rates".
+- Tests:
+  - add-loan, add-loan-form and add-loan-languages are repinned.
+  - New check in en/es/fr: the rate is named on the details page, the missing list and the review, and no "APR" appears in any text or VoiceOver label.
+
+**2. Salary: an unfinished pay is never dropped (`src/app/salary.tsx`).**
+- Save checks every pay on the page with `missingOf`: Name (not for a one-off), Amount, or Hourly rate plus Hours, and Last payday or Paid on. If anything is missing, nothing is swept, written, toasted or left.
+- With one pay on the page it says: "To save your pay, fill in: Name, Amount, Last payday." With more, it gives one line per pay: "Source 2: fill in Name, Amount, Last payday." (`salary.missing`, `salary.missingIn`, en/es/fr).
+- The hourly reasons that are not missing fields stay as `salary.sourceProblem`.
+- Deleted keys: `salary.needNameAndPay`, `needLastPayday`, `needPaidOn`, `remove.title`, `remove.titleUnnamed`, `remove.message`, `remove.keep`.
+- New `headerOf()` is shared by the card title and the messages.
+
+**3. Salary: deleting pay with a past.**
+- The trash button on a saved pay first reads `useDeletePay().countPast(id, today)`. If that read fails, the page shows the failure line, asks nothing, and the card stays.
+- It then asks `usePastChoice().askDelete({ noun: 'pays' })`:
+  - Keep past pay / Remove everything when there are paydays;
+  - the plain Delete when there are none;
+  - a pay never saved is not counted and gets the plain Delete under its card title.
+- The answer is applied on Save, after the sweep, via `remove({ id, choice, today })`. Deleting on the tap would reload the editor (it is keyed on saved ids) over the person's other edits.
+- A re-entrant tap is ignored while the count is being read.
+- Toasts: any "everything" gives `toast.pay.deleted` (red); otherwise any "keep" gives `toast.pay.stopped`; otherwise `toast.pay.saved`.
+- New noun `'pays'` in `past-choice.tsx` (type and the 4 records only; signature and existing keys unchanged), with 4 keys in `ui.ts`. French change keys say "versements" so the shared masculine answers agree.
+- `toast.ts`: 2 keys. This file also holds another session's in-flight `toast.goal.spent`.
+- Test mocks: in 10 salary suites the dialog mock now provides `useDialog` and the pay mock provides `useDeletePay`.
+
+**4. Loans refresh notes.**
+- `src/api/loans.ts`:
+  - `useLoans`: `isError` is now `failedEmpty`, and it adds `refreshFailed`.
+  - `useLoanDetail`: returns only data/isPending/isError/isFetching/isFetchedAfterMount/refetch plus `refreshFailed`, per the logic review. A spread re-rendered all four screens; getters went stale outside render. `isError` stays TanStack's own.
+- `/loans`: `<RefreshNote>` under the summary (or the empty card), via `LoansBody refreshFailed`.
+- `/loan/[id]`: the note goes under LoanViewCard, and the no-view branch is gated on `failedEmpty(detail)`.
+- `/loan-payoff`: the note shows while pricing, under the amount line and under the review card.
+- The opening re-read keeps its existing guard: never price on a failed read, even with a cached answer. The existing test pins this.
+
+**Tests:**
+- New suites:
+  - `salary-missing.test.tsx` (11)
+  - `salary-delete-pay.test.tsx` (17)
+  - `past-choice-pays.test.tsx` (8)
+- Added to existing suites:
+  - loans (+6)
+  - loan-view (+5)
+  - loan-payoff (+5)
+  - loans-list (+2)
+  - loan-detail (+3, including a re-render pin)
+  - salary-languages (+1, with the hourly test repinned)
+- Mutants on scratch copies (real files untouched): salary 10/10 killed, loans 10/10 killed, both controls pass. The scratchpad is shared with Diego, so my files are in `dana-*` folders.
+
+**Gates:**
+- tsc: 0, whole tree.
+- eslint (cache cleared, `--no-cache --max-warnings 0`) and prettier: clean on my 37 files.
+- `expo lint`, whole tree: errors only in receipt-detail, transactions-i18n and entry-values tests (prettier), plus the known setup.test warning. None of these is mine.
+- Full jest: 434/440 suites, 10236/10252 tests.
+  - 5 of the 6 failing suites pass alone; they timed out under load.
+  - `add-forms-from-voice` fails on another session's in-flight `src/api/payment-labels.ts` (`useCards` is not in that suite's queries mock).
+
+**For others:**
+- Ask Sam:
+  - `knowledge/loans.ts` and its es/fr copies say APR.
+  - `knowledge/pay-cards.ts:762-773` quotes the old salary messages and the "a new pay … is left out" catch, which is now gone.
+  - Salary delete now asks Keep past pay / Remove everything.
+- Not changed, same class: `/add-loan?id=` still shows the failure page on raw `isError`. plan-month-screen and insights read `useLoans().isError`, which now means failedEmpty; they show no note.
+- I accidentally ran Diego's `mut/run.py` once (it had replaced mine in the shared scratchpad). I stopped it at his m12; m12 should be re-run.
+- **Batch 3 (ready to commit):** `src/app/send-to-goals.tsx`, `src/__tests__/app/savings-screens.test.tsx`, `src/app/change-logo.tsx`, `src/__tests__/app/change-logo.test.tsx`.
+  - Send to goals: the failure page now shows when savings or goals has a read with nothing cached (`isError && !refreshFailed`). The old test was `pots.length === 0`, so moves that never loaded with pots loaded offered "ready to send" money that was already in goals. A RefreshNote sits straight under the "from savings" card on both layouts. The test mock now carries `refreshFailed` as the real `useSavingsCore` does, plus "fresh: no note" and "nothing cached: failure page" cases.
+  - Change logo: `failedEmpty(query)`, so a failed reload behind a row already read keeps the page. No note: the page shows no figures. Two cases added.
+  - Gates: tsc 0; eslint --no-cache and prettier clean on the 4 files; savings-screens, change-logo x2 and the large-text guard, 70/70.
+- **Held (claimed by others; change listed for the CEO):** `src/app/reminders.tsx` (Add bill chat), `src/app/salary-paid-into.tsx` (its held test fakes failure with accounts present). See the final report.
+- **2026-10-13 — Drew — follow-up: `endsOn`, the trigger's floor (option b), checks reworked (DONE, same 2 files, no commits).**
+  - **`endsOn`:** new optional input. When the first date after the floor is past `endsOn`, the helper returns `{ next: null, paidCycle }`; the end day itself still counts as a payment. A date that stands is never touched by it. `NextDueHint.next` is now `string | null`.
+  - **Floor:** the doc comment now gives the trigger's floor: the later of starts_on as saved and the cycle after the newest charge. That equals `floorAfterCharges(picked, …)` both for repeating plans and for a period, whose starts_on stays the picked date. The code is unchanged.
+  - **Tests:** 24 (19 pass, 5 period-gated).
+    - Save pin for all 33 rows: `next_due_on` = picked; `starts_on` = the floor, or the picked date for a period.
+    - Trigger model on every row: the floor uses calendar `cycleAfter`; the walk uses `nextOccurrenceFrom`.
+    - Subscription rows go through the same trigger model.
+    - Month-page check on the stored row, on an edit day between the newest charge and the pick.
+    - `endsOn`: a loan after its last payment, one payment left on the end day, a clamped 30 Nov end. A period near its end is gated.
+  - **Table:** `NEXT_DUE_FLOOR_TABLE` is byte-identical (md5 3e130bb928bec15d9961d4f381069018, 33 rows).
+  - **Found, under option (b) + the period contract (mirror):** `nextDueAfter` (bill-month.ts) floors by starts_on alone. For a period moved later inside its paid month (rows 15 Oct and 31 Oct, Oct charged), the month page says 15 Oct / 31 Oct while the stored date and the ledger say 15 Nov / 30 Nov. Everything else passes. The gated test "is the date the month page reads as next for a set period" goes red when the contract lands, until `nextDueAfter` skips a charged cycle as `planOccurrences` does.
+  - **Gates:**
+    - 13 neighbouring suites: 278 passed, 5 skipped. Same result under 3 timezones.
+    - tsc 0; eslint (cache cleared) and prettier clean.
+    - Mutants: 14/14 killed on main's contract; 3/3 period mutants killed under the simulated contract; control survived both.
+  - `rules.md` was not at the given scratchpad path either.
+- **Batch 4 (ready to commit):** `src/components/insights/insights-screen.tsx`, `src/__tests__/insights/insights-screen.test.tsx`.
+  - The Goals and Savings sections passed the combined hooks' raw `isError`, so a failed reload swapped their figures for the failure line. They now fail only with nothing cached (`isError && !refreshFailed`).
+  - One RefreshNote sits straight under the plum card. It covers both ledgers, balances, loans (e52a47a's `useLoans().refreshFailed`), goals, savings and the plain reads (receipts, subscriptions, bills, categories, salary, cards, habits, stopped, taps). It is hidden when the plum card itself failed.
+  - Not covered yet: Plans (`usePlanMonth` has no `refreshFailed` at HEAD; it is in the Bills chat's uncommitted payment-ledger.ts). Add `billMonth.refreshFailed || subscriptionMonth.refreshFailed` once that lands.
+  - Tests: the `useLoans` fake now matches the hook (`isError` only with nothing cached), and every combined fake carries `refreshFailed`. New cases: note after a failed reload of plain reads / goals+savings / loans; no note while fresh; no note beside the plum card's failure; each section's nothing-cached failure line has no note; a failed Loans card keeps its line while the note shows only under the plum card.
+  - Gates: tsc 0; eslint --no-cache and prettier clean; all 9 Insights suites + large-text guard, 211/211.
+- **Batch 5 (ready to commit):** `src/app/hello.tsx`, `src/__tests__/app/hello-refresh.test.tsx` (3).
+  - Hello: `failedEmpty(profile)`. A failed reload behind a profile already read keeps asking for the name that answer lacked, or moves on to /setup for one that had it. Nothing read is still the failure, so a name on record is never overwritten. No note: the page shows no figures.
+  - Gates: eslint --no-cache and prettier clean; hello-refresh + onboarding-languages 19/19. tsc: the only errors are in `src/app/goal-receipt.tsx` (another session's untracked file: goals.link.* keys not in yet), none in mine.
 
 ## 2026-10-13 — Drew — Goals round 3: habit receipts refused on link, figures wait for moves, own receipt kept, smaller-receipt question (DONE in code; 700002 not applied by me; no commits)
 - **Migration 700002:** `link_goal_receipt` now reads `habit_id` with the owner check and refuses a spending habit's day (23514, 'A spending habit''s day cannot be what a goal bought.'). Checks: link_goal_receipt.sql 35 ok (new habit line); spend_goal 37, savings_goals 150, receipt_books 19, free_capture_allowance 26, habits 54, habit_past_days 27, update_habit_and_days 39 all PASS on an isolated local DB; habit mutant caught; re-apply clean; delete_my_account clean; stopped, volumes removed. md5 file 4a18877e21b37df3e59d3ef5703cda80; md5(prosrc) link_goal_receipt 469e9101d848d672d59b9084f075ef07, spend_goal (as 700002 leaves it) 76e958543dc62cfe2a7de22c3a97defc; spend_goal as 700001 left it 6fbaff9c7307a737d9b4d1745140b4d4.
@@ -9562,3 +10226,160 @@ For the real-lender loan, rows are identical to the statement fixture, maturity 
   - reminders.tsx (Add bill chat): `failedEmpty` per plain read, plus `useSalaryAccountIds` in queries.ts returning `isError: failedEmpty(query)` and `refreshFailed` (add-account's pay lookup gains from that too); note under the summary.
   - savings.tsx / savings-pot/[id].tsx / goal/[id].tsx: these need hook hunks in the held savings.ts / goals.ts (`refreshFailed` on useSavings, useSavingsPot, useGoal). The screens then fail only on `isError && !refreshFailed`, hide figures and Send/Take while failed, and put the note under the hero.
   - Insights Plans: add `billMonth.refreshFailed || subscriptionMonth.refreshFailed` to the note after the Bills chat's payment-ledger.ts lands.
+
+## 2026-10-13 — Dmitri (Development Lead) — #33 batches 1–5 quick review (Dana): GO. Read-only, no src edits.
+- **Verdict:** GO on goals, notifications, habits + habit/[id], failure-line (comment), send-to-goals, change-logo, insights-screen, hello, and their 8 suites.
+- **Checked:** every gate uses `failedEmpty`, or `isError && !refreshFailed` on the combined hooks. `useGoals`/`useSavingsCore` `refreshFailed` is at HEAD (507052a), not in the held goals.ts/savings.ts hunks, and is false whenever either read is failedEmpty, so the note and the failure page/line cannot both show on one block, and a fresh page shows no note.
+- **send-to-goals:** Ready to send = savingsSummary(pots, moves) from useSavingsCore. It is now either built from both reads (fresh or cached, with the note) or the page fails. Pinned by the screen case plus the committed savings-refresh/goals-refresh hook suites ("nothing cached gives isError, not refreshFailed").
+- **Habits:** Try again is gone on a failed reload. Pull to refresh still works on both pages (Screen's RefreshControl, `onRefresh={refetch}` re-reads habits, stopped and taps, or habit and taps). The red line now shows only for a day tap that did not go through.
+- **Gates (mine):** jest 9 suites 221/221 (with large-text guard). tsc 0 errors, whole tree, goal-receipt.tsx included. eslint --no-cache --max-warnings 0 and prettier clean on all 17 files.
+- **Follow-ups, not blocking:**
+  - (1) Insights: when the plum card has failed (e.g. a newly picked period's ledger), the note is hidden. Goals/Savings/Loans/Habits then show cached figures from a failed reload with no note anywhere; before #33, Goals and Savings showed their failure line in that state. This is pinned on purpose ("no note beside the plum card's failure"). The CEO decides whether the note should move to the first ready section in that state.
+  - (2) Goals: the skeleton and the failure page can both draw if goals is still pending while moves has failedEmpty. Same before #33.
+  - (3) Hello: on a cached profile with no name and a failed reload, the form shows. A name set on another phone since that read could be overwritten by the person's own answer. Negligible.
+
+## 2026-10-13 — Dmitri (Development Lead) — Founder fixes review (Loans session): GO, no MUST. Migrations 20261013100001 and 20261013100002 are READY for the Founder's go, after the read-only live checks below. Read-only.
+
+**Gates:**
+- tsc 0, whole tree.
+- eslint (cache cleared, `--no-cache`, `--max-warnings 0`, src): 20 errors, all prettier, in 3 files from other sessions (`receipt-detail.test.tsx`, `transactions-i18n.test.tsx`, `entry-values.test.ts`), plus the old setup.test.tsx warning. None are in our files.
+- prettier: of 150 changed TS files, only those same 3 differ.
+- Full jest: 429/442 suites, 10,271/10,299 tests. None of the 13 failing suites is ours:
+  - **Other sessions:** `add-bill-i18n`, `add-bill-save`, `add-subscription-i18n` (Add bill); `add-forms-from-voice` (`useCards` missing from its queries mock, called at `src/api/payment-labels.ts:34`); `habit-new`, `habits`, `habit-icon-picker` (habits); `payments/payment-export-screen` and `payment-history-page` (bills/subs).
+  - **Load timeouts, pass alone:** `loan-schedule-languages` (the real-lender statement test passes 15/15 alone), `savings-parts`, `receipt-parser.rules` (speed), `ask-sam/library` (16/16 alone).
+
+**Migrations:**
+- **`20261013100001_delete_salary_and_pay.sql`:**
+  - Runs as the caller with `search_path=public`; revoked from public and anon, granted to authenticated.
+  - Locks the salary FOR UPDATE, so a payday racing in fails on the foreign key.
+  - Deletes the paydays, then the salary. P0002 when the salary is not the caller's.
+  - Both tables have own-row `for all` policies.
+  - It is a new function only.
+- **`20261013100002_capture_usage.sql`:**
+  - The new table is readable by its owner only; insert, update and delete are revoked from the API.
+  - The AFTER INSERT trigger is security definer and revoked, and it copies the receipt's server-stamped `created_at`.
+  - `receipt_id` is set null on delete, so a deleted scan stays counted.
+  - `enforce_scan_is_pro`'s only change is counting `capture_usage` in place of receipts (diffed against 20261007100001). Its advisory lock still serialises saves, and the AFTER trigger's row commits under it.
+  - The back-fill is idempotent (`not exists` plus a unique partial index) and gives this month exactly the old count.
+- Both are re-run safe.
+- **Apply them by `db query` + `migration repair`, not `db push`.** Live already has 20261013300001 and later, so these two numbers are out of order.
+
+**Live checks wanted before the push (read-only):**
+- The live migration list, to confirm which 202610133/5/7 migrations are applied.
+- None of these exists yet: `delete_salary_and_pay`, `capture_usage`, `record_capture_usage`, `receipts_record_capture`.
+- Live `enforce_scan_is_pro` has `md5(prosrc) = 1da850ae8ff7d1ba90422e37f17910e2` (20261007100001's body), so no other session's live change is overwritten.
+- `receipts_scan_is_pro` (BEFORE INSERT) and `receipts_keep_origin` (BEFORE UPDATE) are present.
+- `capture_source` includes scan and upload.
+- The `salary_sources_all_own` and `pay_received_all_own` policies are present, and `pay_received.salary_source_id` is `on delete set null`.
+- The count of scan and upload receipts, which is the size of the back-fill.
+
+**Checked:**
+- **Keep moves no balance; everything moves exactly that pay.**
+  - Keep writes the pay's due paydays first, failing loudly and re-reading once on a 23505, then deletes the salary.
+  - Everything is one server step. P0002 resolves, so a retried Save is idempotent.
+  - `pay-delete-money.test.ts` proves it: keep leaves every balance and month equal to the cent; everything drops exactly 18,256.96, with closed pots offering their update (Founder OK).
+- **Salary:** deletes apply on Save (CEO call). A failed count asks nothing. Save checks every missing field before anything is written.
+- **The scan count is server-true:** usage rows outlive the receipt, and a reading of nothing is filed as manual. That is Diego's one `add-receipt.tsx` line; I checked his hunk only.
+- **Before the migrations are live:**
+  - `capture_usage` missing reads as "count the receipts".
+  - Everything fails with the one failure line and deletes nothing. Keep works.
+- **`e52a47a`:** `useLoans().isError` now means failedEmpty, with `refreshFailed` added. `useLoanDetail` returns 7 fields plus `refreshFailed`, and tsc confirms no consumer lost a field. Pay off re-reads on opening and never prices a failed or stale opening read (CEO call).
+- **Interest rate:** "APR" → "Interest rate" reuses `loan.interestRate`. `loanFlow.field.apr` is gone with no references.
+- **`'pays'` noun:** additive. The frozen `usePastChoice` signatures are unchanged.
+- **Dana's in-flight refresh hunks:** `salary.tsx` (failedEmpty + RefreshNote under the total card) and `salary-paid-into.tsx` (`failedEmpty(accounts)`) pass with `salary-refresh-note.test.tsx` (3) and `salary-paid-into` (52 together); eslint and prettier are clean.
+- **m12:** a second, interrupted run on the shared scratchpad cannot change the tree or the result. Mutants run on scratch copies, Diego's control passed and his md5 check shows the real files untouched, and the real suites pass. For the record, re-run m12 once on a fresh copy.
+
+**Nice-to-haves:**
+1. `capture_usage` rows never expire. Add them to the nightly retention, or prune anything older than the current month.
+2. `/add-loan?id=`, `plan-month-screen` and `insights` show no refresh note (Dana's list).
+3. Ask Sam's knowledge still says "APR" and quotes the old salary messages (Dana's "For others" list).
+
+## 2026-10-13 — Dana — Locked extras: named everywhere, kept on edit, free to wind down; plus #33 RefreshNote on Receipts, Transactions, a receipt's page (DONE in my files; 4 screens + 17 test files ROUTED as one patch; no commits)
+**Outcome:** on free, cards/accounts past the 1 + 1 can't be picked for new spending, but they're named on every detail page, row and filter, editing an entry paid with one keeps it, and source-payment offers every account as "from". The fixes in files I could edit are live. The other half is one verified patch: `.claude/team/dev/locked-sources-routed/locked-sources.patch`.
+
+**Root fix (bug 2), src/api/entry-values.ts:** `sourceColumns(id, sources, saved)`. If the id equals the entry's stored source, it keeps the stored `card_id`/`bank_account_id` as they are. Otherwise it maps only through `sources`, which callers fill from usePaymentSources. So a new entry (no `saved`) with a locked id drops it exactly as before, and an edit can't newly move onto another locked extra. New exports: `SavedSource`, `savedSourceId`, `withSavedSource(offered, every, saved)`. The last builds the edit picker: what's offered, plus the entry's own locked source among its kind. Builders take an optional `saved` (receipt: third arg; bill/sub: `ctx.saved`). This differs from the brief's example (map through the full list) on purpose: Save never depends on the names having loaded, and the new-entry guard sits in the builder, not just the picker.
+
+**Caller table (usePaymentSources):**
+- (a) new spending, unchanged: voice-review, voice-edit, scan.ts, goal-spent (Drew), new-entry side of every add form, add-receipt's book default + scan last-4 match.
+- (b) names, now usePaymentLabels: bill/[id], subscription/[id], receipt/[id], habit/[id] (routed), transactions, receipts (routed), setup-bills, setup-subscriptions. Detail pages show their skeleton while `isLoading`, so "No payment method" never shows early.
+- (c) edit = offered + own locked source, shown selected, kept on Save: add-subscription, habit-new, receipt-book (book default) done; add-receipt, add-bill routed. add-loan and loan-payoff already did this via withSourceKept.
+- (d) wind-down, every account: source-payment "from".
+
+**#33:** applied the parked receipts.patch (plain `git apply`, not `--3way`, which stages). receipts-i18n fixture now uses `data: undefined`. Transactions: `<RefreshNote show={refreshFailed}>` under the summary. receipt/[id]: failure page on `failedEmpty(receipts) || !receipt`, note under the card. New test file transactions-refresh-note (5); receipt-detail +5.
+
+**Gates:** live tree: 58 suites, 1691/1698; the 7 failures are add-forms-from-voice subscription cases that need the routed mock hunk. Mirror (live + patch): 56 suites / 1705 tests, plus 78 for #33 and receipts. tsc: 0 (live and mirror). eslint (cache cleared, --no-cache, --max-warnings 0) and prettier: clean. Mutants: 17/17 killed (9 on my files, 4 on routed screens, 4 for #33). habit-new "answers with one tap" flakes under load (2 of 5 full runs). Nothing staged.
+- **Batch 6 (ready to commit, on HEAD 43b689f):** savings and goal pages, and Dmitri's Insights follow-up 1.
+  - Hooks (read hooks only; savings.ts and goals.ts were clean when edited):
+    - `usePaidByGoals` gains `refreshFailed: refreshFailed(purchases)`.
+    - `useSavings` gains `refreshFailed`: false while any part has nothing cached (core, account day, money book, purchases), else any part's failed reload. `isError` stays raw, as in useSavingsCore and useGoals.
+    - `useSavingsPot` passes core's `refreshFailed` through; `useGoal` gets the useGoals rule.
+  - Screens fail on `isError && !refreshFailed`:
+    - savings.tsx: note under the summary cards.
+    - savings-pot/[id].tsx and goal/[id].tsx: `pot` / `goal` are null while a read has nothing cached, so no figures, no Send, Add or Take money out, and no pencil. A failed reload that leaves no such pot or goal is still the failure page, never a blank page. Note under the hero.
+  - Behaviour change: on the Savings page, a money book that never loaded now fails the whole page. Before, "October so far" just disappeared with nothing said.
+  - Insights: when the main spending card has failed, the note now goes under the first section below that drew, instead of being hidden. That is Income, then Owe, Loans, Plans, Coming up, Habits, Goals, Savings. With none drawn there is no note. The three self-hiding sections export their hide rules (`owesOnAnyCard`, `hasAnyPlan`, `hasRunning`) so the placement uses the same rule.
+  - Tests:
+    - New `src/__tests__/api/savings-goal-read-refresh.test.tsx` (22).
+    - New `src/__tests__/app/savings-goal-refresh-note.test.tsx` (10), including "moves failed with nothing cached → no figures, no Send".
+    - `insights-screen.test.tsx`: the pinned "no note beside the plum card's failure" case replaced with 3 placement cases.
+    - `savings-i18n.test.tsx`: its failed-reload fake now carries `refreshFailed: true`, as the hook does.
+  - Gates: tsc 0 errors, whole tree; eslint --no-cache and prettier clean on all 14 files; jest on every suite importing these modules, plus Insights, cards and the large-text guard: 34 suites, 586/586.
+- **Batch 6 addendum (CEO call 3):** the Insights note now also covers `billMonth.refreshFailed || subscriptionMonth.refreshFailed` (HEAD's `usePlanMonth`).
+  - The Plans gate was already right: HEAD's `usePlanMonth.isError` is `failedEmpty` over its parts, and `together()` reads a combined result without `data` by its `isError`. No change there.
+  - The test's fake `usePlanMonth` now reports `isError` only with nothing cached, as the hook does.
+  - New case (x2): Bills & subscriptions keeps "Next due" after a failed bill or subscription month reload, with the note under the plum card.
+  - Gates: tsc 0 errors, whole tree; eslint --no-cache and prettier clean; Insights suites + large-text guard 215/215.
+
+## 2026-10-13 — Dmitri (Development Lead) — #33 batch 6 quick review (Dana): FIX-FIRST, one missing test (no code change). Read-only, no src edits.
+- **Verdict:** the code is right. Hold it for one Insights test that pins the hidden-section skip; the JSDoc nit can go in the same pass.
+- **Checked, savings and goals:**
+  - `useSavings`: `failedPart` covers exactly the four "nothing cached" cases (core pots/moves, `failedEmpty(accountDay)`, `flows.isError`, which is failedEmpty by `anyError`, and failedEmpty purchases).
+  - With raw `isError`, every combination resolves one way: fresh, or the failure page, or the page with the note. The note and the failure page never draw together.
+  - Pot and goal pages null `pot`/`goal` on `isError && !refreshFailed`. So with nothing cached there is no hero, no Send, Add or Take, and no pencil, and a missing pot or goal after a failed reload is the failure page (`gone` stays false).
+  - Goal page's Add from savings: `readyToUse` from a failed-empty pots read is 0, so it is hidden (the safe side).
+- **Money book never loaded:** the whole Savings page fails with Try again; pull to refresh and the header + still work. Send-to-goals, the Cards tile and Insights use `useSavingsCore`, so they are unaffected. Nothing worse.
+- **Insights placement:**
+  - Correct. "What goes out" shares `spendState`, and Categories and Merchants are HIDDEN when it fails, so Income is the right first candidate.
+  - The list order matches the render order. The three exported rules match each section's own hide test, and Loans, Habits, Goals and Savings draw an empty card when ready, never HIDDEN.
+- **savings-i18n fake:** `isError: true` + `refreshFailed: true` is what the real hook returns on a failed reload with data cached. The failure cases leave it undefined, which matches the hook's false.
+- **Gates (mine):** jest 15 suites 304/304; tsc 0; eslint --no-cache --max-warnings 0 and prettier clean on all 14 files.
+- **FIX-FIRST (test only):**
+  - No case covers skipping a section that is ready but HIDDEN. Replacing `owesOnAnyCard(owe)` with `true` would survive the suite.
+  - That bug puts the note straight under Income's failure card, which is the "beside a failure line" case this rule exists to prevent.
+  - Add: `fillThePage(); mockCards = []; mockFailing = {ledger, salary}; mockReloadFailed = {goals}` → one note, `after('insights-section-in') !== NOTE`, `after('insights-section-loans') === NOTE`.
+- **Nit (same pass):** in owe-section, plans-section and coming-up-section, the new `export const` sits between the component's JSDoc and the component, so the component's doc block is now orphaned. Move the export above that block.
+- **Follow-ups, not blocking:**
+  - (1) The pot page's "update" offer reads its own month flows (`useMonthUpdate`, staleTime 0). A failed reload of that read keeps the offered figures with no note. This predates #33.
+  - (2) The goal page has no note for a `useSavingsCore` reload failure behind Add from savings.
+  - (3) Insights: when the note lands under Income, the next thing below is the failed "What goes out" card, with its heading between them. That is acceptable, but the Founder may see both lines on one screen.
+- **Batch 6 FIX-FIRST (Dmitri) — done:**
+  1. insights-screen.test: new "passes over a section left off for having nothing to show" case (no cards, so Owe is left off; ledger and salary failed; goals reload failed). It expects one note, not after Income, but after Loans. A mutated copy (`owesOnAnyCard(owe)` → `true`, scratch config + moduleNameMapper; real file md5 unchanged) failed this case alone; the unmutated control passed.
+  2. owe-, plans- and coming-up-section: each `export const` hide rule moved above the component's doc block.
+  3a. `useMonthUpdate` gains `refreshFailed` (none of its four reads empty, any failed reload). The pot page's note is `refreshFailed || updateRefreshFailed`. savings.test: "keeps the offer when a reload behind it fails, and says so", plus "nothing cached → refreshFailed false".
+  3b. Goal page note is `refreshFailed || savings.refreshFailed`, since savings decide Add from savings. savings-goal-refresh-note: +2 cases (update offer only; savings only).
+  - Gates: tsc 0 errors, whole tree; eslint --no-cache and prettier clean on all 15 files; 34 suites, 592/592.
+
+## 2026-10-13 — Diego — Flaky labels test fixed (test-only, no commits)
+- **Cause:** `payment-labels.test.tsx` held every read in one queue and released it in order (`mockHeld.shift()`). The cards and accounts reads are not always queued in the same order, so 9 runs in 20 released the accounts first, and `isLoading` was already false at the assertion.
+- **Fix:** reads are now held per table (`mockHolding`) and released by name (`release('bank_accounts')`). The asserted state ("loading, refresh failed, not an error") sits inside `waitFor` while the held read keeps `isLoading` pinned, so it cannot pass by. No assertion was dropped.
+  - "is loading until both reads answer" also releases by name. It now waits for the cards' names to arrive before checking that it is still loading.
+- **payment-ledger.test.tsx, same pattern:** its holds were already per table. Its "empty failure wins" test asserted the hook's state after waiting on the query cache, so those assertions moved inside `waitFor`.
+- **Proof:**
+  - labels: 20/20 consecutive passes (baseline 9/20 failing); ledger: 20/20.
+  - Both pass in Kiritimati and Los_Angeles.
+  - Mutants on scratch copies, all caught (an unchanged copy passes): accounts loading ignored, names loading ignored, a refresh note over an empty failure (labels and ledger), refresh never failed, names left out of isError.
+- **Gates:** eslint (cache cleared) and prettier clean on both files. Whole-tree tsc: 0.
+
+## 2026-10-13 — Dana — A "Specific period" bill must have an end date (DONE in the main tree on 364bf44, no commits)
+- **`src/app/add-bill.tsx`:**
+  - `handleSave`'s missing list gains `hasPeriod && !endDate && t('bills.field.to')`.
+  - The period `end` DateBox has no `clear`, and its placeholder is "Select a date" (was "No end date").
+  - `writtenRows` is unchanged. The retry path runs before the list, so "Save again once the bill is written" stays green.
+- **Tests:**
+  - `add-bill.test.tsx`: required on edit and on a new bill (listed, nothing written); no clear; the end saves.
+  - `add-bill-save.test.tsx`: a period with no end is not filed; no clear on reopen; a start moved past the end asks for a new one; the old-message case is dropped by a new pick.
+  - `add-bill-i18n.test.tsx`: es/fr "Hasta / Jusqu’au" box and the missing list.
+- **Gates:**
+  - tsc: 0.
+  - eslint (cache cleared) + prettier: clean on the 4 files.
+  - jest (add-bill, add-bill-save, add-bill-i18n, add-forms-from-voice): 386/386.

@@ -1,0 +1,2248 @@
+diff --git a/src/__tests__/app/legal.test.tsx b/src/__tests__/app/legal.test.tsx
+index 74eb4b2..2925308 100644
+--- a/src/__tests__/app/legal.test.tsx
++++ b/src/__tests__/app/legal.test.tsx
+@@ -1,12 +1,15 @@
+-import { render } from '@testing-library/react-native';
++import { fireEvent, render } from '@testing-library/react-native';
++import { openBrowserAsync } from 'expo-web-browser';
+ 
+ import PrivacyScreen from '@/app/privacy';
+ import TermsScreen from '@/app/terms';
++import { legalMessages } from '@/i18n/messages/legal';
+ import { resetLocaleForTests, setLanguage } from '@/i18n/store';
+ 
+ /**
+  * The privacy policy and the terms in all three languages: the same sections in the same order,
+- * every address and date intact, and a notice that the translation yields to the English.
++ * every address and placeholder intact, the links opening Apple's own pages, and a notice that the
++ * translation yields to the English.
+  */
+ 
+ jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
+@@ -17,108 +20,207 @@ jest.mock('react-native-keyboard-controller', () =>
+ 
+ jest.mock('expo-router', () => ({ router: { push: jest.fn(), back: jest.fn() } }));
+ 
++jest.mock('expo-web-browser', () => ({
++  openBrowserAsync: jest.fn(async () => ({ type: 'cancel' })),
++}));
++
++jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
++
+ jest.mock('@/providers/theme-provider', () => ({
+   useColors: () => ({ ink: '#000000', muted: '#777777', body: '#333333', line: '#DDDDDD' }),
+ }));
+ 
++type LegalKey = keyof typeof legalMessages;
++type Screen = Awaited<ReturnType<typeof render>>;
++
+ const RAW_KEY = /^[a-z]+\.[a-zA-Z]+\./;
+ const LEFTOVER_PARAM = /\{\w+\}/;
+ const NUMBERED_HEADING = /^\d+\. /;
+ 
+-beforeEach(() => resetLocaleForTests());
++const PRIVACY_SECTIONS = [
++  'who',
++  'stores',
++  'local',
++  'voice',
++  'pro',
++  'others',
++  'where',
++  'kept',
++  'deleting',
++  'choices',
++  'rights',
++  'children',
++  'changes',
++];
++
++const TERMS_SECTIONS = [
++  'agree',
++  'what',
++  'account',
++  'using',
++  'yours',
++  'free',
++  'paying',
++  'trial',
++  'offers',
++  'cancel',
++  'ends',
++  'change',
++  'warranty',
++  'liability',
++  'ending',
++  'changes',
++  'law',
++];
++
++const SENTRY_BULLET =
++  'Sentry — receives crash and error reports so faults can be fixed. A report carries your iPhone model, the iOS and app versions, and what the app was doing. Like any web service, Sentry may also see the internet address a report comes from.';
++
++beforeEach(() => {
++  resetLocaleForTests();
++  jest.mocked(openBrowserAsync).mockClear();
++});
+ afterAll(() => resetLocaleForTests());
+ 
+ /** The numbered headings, in the order they are drawn. */
+-function headingsOf(screen: Awaited<ReturnType<typeof render>>): string[] {
++function headingsOf(screen: Screen): string[] {
+   return screen.getAllByText(NUMBERED_HEADING).map((node) => [node.props.children].flat().join(''));
+ }
+ 
++/** A line as written in a language; the legal texts have no counted forms. */
++function line(key: LegalKey, language: 'es' | 'fr'): string {
++  return legalMessages[key][language] as string;
++}
++
++/** What the headings say in a language, numbered as the page numbers them. */
++function numbered(document: 'privacy' | 'terms', sections: string[], language: 'es' | 'fr') {
++  return sections.map(
++    (section, index) =>
++      `${index + 1}. ${line(`legal.${document}.${section}.heading` as LegalKey, language)}`,
++  );
++}
++
++/** Every line on screen, for checks across the whole document. */
++function linesOf(screen: Screen): string[] {
++  return screen
++    .getAllByText(/./)
++    .map((node) => [node.props.children].flat().join(''))
++    .filter((line) => line.trim() !== '');
++}
++
+ describe('Privacy policy', () => {
+-  it('reads as written in English, with no translation notice', async () => {
++  it('reads as written in English, thirteen sections in order, with no translation notice', async () => {
+     const screen = await render(<PrivacyScreen />);
+ 
+     expect(screen.getByText('Privacy policy')).toBeTruthy();
+-    expect(screen.getByText('Last updated 28 August 2026')).toBeTruthy();
++    expect(screen.getByText('Last updated [DATE]')).toBeTruthy();
+     expect(screen.queryByText(/courtesy translation/)).toBeNull();
++    expect(
++      screen.getByText(
++        'Skip is a budgeting app, so almost everything in it is something you typed. This explains what is stored, what stays on your phone, who else is involved, and how to delete it.',
++      ),
++    ).toBeTruthy();
+     expect(headingsOf(screen)).toEqual([
+       '1. Who we are',
+       '2. What Skip stores about you',
+       '3. What never leaves your phone',
+       '4. Adding things by voice',
+-      '5. Who else sees it',
+-      '6. How long it is kept',
+-      '7. Deleting your account',
+-      '8. Your rights over your data',
+-      '9. Children',
+-      '10. Changes to this policy',
++      '5. Paying for Skip Pro',
++      '6. Who else sees it',
++      '7. Where your data is stored',
++      '8. How long it is kept',
++      '9. Deleting your account',
++      '10. Your choices',
++      '11. Your rights over your data',
++      '12. Children',
++      '13. Changes to this policy',
+     ]);
+   });
+ 
+-  it('is in Mexican Spanish, section for section, with the notice on top', async () => {
+-    setLanguage('es');
++  it('keeps the placeholders that are filled in before release', async () => {
+     const screen = await render(<PrivacyScreen />);
+ 
+-    expect(screen.getByText('Política de privacidad')).toBeTruthy();
+-    expect(screen.getByText('Última actualización: 28 de agosto de 2026')).toBeTruthy();
+     expect(
+       screen.getByText(
+-        'Esta es una traducción de cortesía. Si hay alguna diferencia, prevalece la versión en inglés.',
++        'Skip is a personal budgeting app from Skip Budget. Skip Budget is run by [LEGAL NAME], an individual, at [POSTAL ADDRESS]. Wherever this policy says “we”, it means Skip Budget.',
+       ),
+     ).toBeTruthy();
+-    expect(headingsOf(screen)).toEqual([
+-      '1. Quiénes somos',
+-      '2. Qué guarda Skip sobre ti',
+-      '3. Lo que nunca sale de tu teléfono',
+-      '4. Agregar cosas por voz',
+-      '5. Quién más tiene acceso',
+-      '6. Cuánto tiempo se conserva',
+-      '7. Eliminar tu cuenta',
+-      '8. Tus derechos sobre tus datos',
+-      '9. Menores de edad',
+-      '10. Cambios a esta política',
+-    ]);
+-    expect(screen.getByText(/Puedes escribirnos a admin@skipapps\.net/)).toBeTruthy();
+-    expect(screen.getByText(/se conserva durante siete años/)).toBeTruthy();
+-    expect(screen.queryAllByText(RAW_KEY)).toEqual([]);
+-    expect(screen.queryAllByText(LEFTOVER_PARAM)).toEqual([]);
++    expect(
++      screen.getByText(
++        'Sentry deletes crash and error reports automatically after [SENTRY DAYS] days.',
++      ),
++    ).toBeTruthy();
++  });
++
++  it('claims nothing about Sentry that the app does not yet do', async () => {
++    const screen = await render(<PrivacyScreen />);
++
++    expect(screen.getByText(SENTRY_BULLET)).toBeTruthy();
++    for (const said of linesOf(screen).filter((text) => text.includes('Sentry'))) {
++      expect({ said, accountId: /account id/.test(said) }).toEqual({ said, accountId: false });
++    }
++    expect(screen.queryByText(/include what you typed/)).toBeNull();
+   });
+ 
+-  it('is in Canadian French, section for section, with the notice on top', async () => {
+-    setLanguage('fr');
++  it('says Skip asks a subscriber to cancel before deleting, as Settings does', async () => {
+     const screen = await render(<PrivacyScreen />);
+ 
+-    expect(screen.getByText('Politique de confidentialité')).toBeTruthy();
+-    expect(screen.getByText('Dernière mise à jour : 28 août 2026')).toBeTruthy();
+     expect(
+       screen.getByText(
+-        'Ceci est une traduction de courtoisie. En cas de divergence, la version anglaise prévaut.',
++        'Deleting your account does not cancel Skip Pro. Apple keeps billing you until you cancel. Cancel first in iOS Settings → your name → Subscriptions. If you have Skip Pro, Skip asks you to cancel it before you delete.',
+       ),
+     ).toBeTruthy();
+-    expect(headingsOf(screen)).toEqual([
+-      '1. Qui nous sommes',
+-      '2. Ce que Skip conserve à ton sujet',
+-      '3. Ce qui ne quitte jamais ton téléphone',
+-      '4. Ajouter des éléments par la voix',
+-      '5. Qui d’autre y a accès',
+-      '6. Combien de temps les données sont conservées',
+-      '7. Supprimer ton compte',
+-      '8. Tes droits sur tes données',
+-      '9. Enfants',
+-      '10. Modifications de cette politique',
+-    ]);
+-    expect(screen.getByText(/Tu peux nous joindre à admin@skipapps\.net/)).toBeTruthy();
+-    expect(screen.getByText(/conservé pendant sept ans/)).toBeTruthy();
+-    expect(screen.queryAllByText(RAW_KEY)).toEqual([]);
+-    expect(screen.queryAllByText(LEFTOVER_PARAM)).toEqual([]);
+   });
++
++  it('says what the seven-year clean-up deletes and what it keeps, as the job does', async () => {
++    const screen = await render(<PrivacyScreen />);
++
++    expect(
++      screen.getByText(
++        'Things that happened (recorded charges, receipts, including habit days, card payments and transfers, and pay you received) are deleted automatically seven years after the date on them.',
++      ),
++    ).toBeTruthy();
++    expect(
++      screen.getByText(
++        'Everything else you set up — bills, subscriptions, loans (with any extra payments), cards, accounts, salaries, savings, goals, habits and receipt books — is kept until you delete it. A standing order set up years ago is still a standing order.',
++      ),
++    ).toBeTruthy();
++  });
++
++  it('no longer mentions Buy Me a Coffee or Skip Splits', async () => {
++    const screen = await render(<PrivacyScreen />);
++
++    expect(screen.queryByText(/coffee/i)).toBeNull();
++    expect(screen.queryByText(/Splits/)).toBeNull();
++  });
++
++  it.each([
++    ['es', 'Política de privacidad', 'Última actualización: [DATE]', '1. Quiénes somos'],
++    ['fr', 'Politique de confidentialité', 'Dernière mise à jour : [DATE]', '1. Qui nous sommes'],
++  ] as const)(
++    'in %s has the same thirteen sections, with the notice on top',
++    async (language, title, dateLine, firstHeading) => {
++      setLanguage(language);
++      const screen = await render(<PrivacyScreen />);
++
++      expect(screen.getByText(title)).toBeTruthy();
++      expect(screen.getByText(dateLine)).toBeTruthy();
++      expect(screen.getByText(line('legal.translationNotice', language))).toBeTruthy();
++      expect(headingsOf(screen)).toEqual(numbered('privacy', PRIVACY_SECTIONS, language));
++      expect(headingsOf(screen)[0]).toBe(firstHeading);
++      expect(screen.getByText(line('legal.privacy.who.p2', language))).toBeTruthy();
++      expect(screen.queryAllByText(RAW_KEY)).toEqual([]);
++      expect(screen.queryAllByText(LEFTOVER_PARAM)).toEqual([]);
++    },
++  );
+ });
+ 
+ describe('Terms of service', () => {
+-  it('reads as written in English, with no translation notice', async () => {
++  it('reads as written in English, seventeen sections in order, with no translation notice', async () => {
+     const screen = await render(<TermsScreen />);
+ 
+     expect(screen.getByText('Terms of service')).toBeTruthy();
+-    expect(screen.getByText('Last updated 28 August 2026')).toBeTruthy();
++    expect(screen.getByText('Last updated [DATE]')).toBeTruthy();
+     expect(screen.queryByText(/courtesy translation/)).toBeNull();
+     expect(headingsOf(screen)).toEqual([
+       '1. Agreeing to these terms',
+@@ -126,69 +228,137 @@ describe('Terms of service', () => {
+       '3. Your account',
+       '4. Using Skip properly',
+       '5. What you put in stays yours',
+-      '6. The app will change',
+-      '7. Money',
+-      '8. No warranty',
+-      '9. Limits on liability',
+-      '10. Ending it',
+-      '11. Changes to these terms',
+-      '12. Law and contact',
++      '6. Free and Skip Pro',
++      '7. Paying for Skip Pro',
++      '8. Free trial',
++      '9. Special offers',
++      '10. Cancelling, refunds and restoring',
++      '11. When Skip Pro ends',
++      '12. The app will change',
++      '13. No warranty',
++      '14. Limits on liability',
++      '15. Ending it',
++      '16. Changes to these terms',
++      '17. Law and contact',
+     ]);
+   });
+ 
+-  it('is in Mexican Spanish, section for section, with the notice on top', async () => {
+-    setLanguage('es');
++  it('opens with the summary, "In short:" and its four points, before section 1', async () => {
+     const screen = await render(<TermsScreen />);
++    const lines = linesOf(screen).filter((line) => line !== '•');
++    const start = lines.indexOf('The agreement between you and Skip Budget for using Skip.');
+ 
+-    expect(screen.getByText('Términos del servicio')).toBeTruthy();
+-    expect(screen.getByText('Última actualización: 28 de agosto de 2026')).toBeTruthy();
+-    expect(screen.getByText(/^Esta es una traducción de cortesía\./)).toBeTruthy();
+-    expect(headingsOf(screen)).toEqual([
+-      '1. Aceptación de estos términos',
+-      '2. Qué es Skip y qué no es',
+-      '3. Tu cuenta',
+-      '4. Uso adecuado de Skip',
+-      '5. Lo que ingresas sigue siendo tuyo',
+-      '6. La aplicación cambiará',
+-      '7. Dinero',
+-      '8. Sin garantía',
+-      '9. Límites de responsabilidad',
+-      '10. Terminación',
+-      '11. Cambios a estos términos',
+-      '12. Ley aplicable y contacto',
++    expect(lines.slice(start, start + 7)).toEqual([
++      'The agreement between you and Skip Budget for using Skip.',
++      'In short:',
++      'Skip is free to download, and most of its features are free.',
++      'Skip Pro is an optional subscription, billed by Apple.',
++      'Skip is a tool for tracking your own money. It is not financial advice.',
++      'What you enter stays yours, and you can delete all of it whenever you like.',
++      '1. Agreeing to these terms',
+     ]);
++  });
++
++  it('heads the parts of "Cancelling, refunds and restoring" without numbering them', async () => {
++    const screen = await render(<TermsScreen />);
++    const lines = linesOf(screen);
++    const at = [
++      '10. Cancelling, refunds and restoring',
++      'To cancel',
++      'Refunds',
++      'Restoring',
++      '11. When Skip Pro ends',
++    ].map((line) => lines.indexOf(line));
++
++    for (const name of ['To cancel', 'Refunds', 'Restoring']) {
++      expect(screen.getByRole('header', { name })).toBeTruthy();
++    }
++    expect(Math.min(...at)).toBeGreaterThan(-1);
++    expect(at).toEqual([...at].sort((a, b) => a - b));
++  });
++
++  it('opens Apple’s standard licence from section 1, under the paragraph that names it', async () => {
++    const screen = await render(<TermsScreen />);
++
+     expect(
+-      screen.getByText(/En la medida en que la ley lo permita, no somos responsables/),
++      screen.getByText(
++        'Apple’s standard licence for apps, the “Licensed Application End User License Agreement” (the standard EULA), applies to Skip alongside these terms. You can read it at https://www.apple.com/legal/internet-services/itunes/dev/stdeula/',
++      ),
+     ).toBeTruthy();
+-    expect(screen.queryAllByText(RAW_KEY)).toEqual([]);
+-    expect(screen.queryAllByText(LEFTOVER_PARAM)).toEqual([]);
++    await fireEvent.press(screen.getByRole('link', { name: 'Read Apple’s standard licence' }));
++
++    expect(jest.mocked(openBrowserAsync).mock.calls).toEqual([
++      ['https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'],
++    ]);
+   });
+ 
+-  it('is in Canadian French, section for section, with the notice on top', async () => {
+-    setLanguage('fr');
++  it('opens Apple’s refund page from section 10', async () => {
+     const screen = await render(<TermsScreen />);
+ 
+-    expect(screen.getByText('Conditions d’utilisation')).toBeTruthy();
+-    expect(screen.getByText('Dernière mise à jour : 28 août 2026')).toBeTruthy();
+-    expect(screen.getByText(/^Ceci est une traduction de courtoisie\./)).toBeTruthy();
+-    expect(headingsOf(screen)).toEqual([
+-      '1. Acceptation de ces conditions',
+-      '2. Ce qu’est Skip, et ce qu’elle n’est pas',
+-      '3. Ton compte',
+-      '4. Utilisation correcte de Skip',
+-      '5. Ce que tu saisis reste à toi',
+-      '6. L’application évoluera',
+-      '7. Argent',
+-      '8. Aucune garantie',
+-      '9. Limites de responsabilité',
+-      '10. Résiliation',
+-      '11. Modifications de ces conditions',
+-      '12. Droit applicable et contact',
+-    ]);
+     expect(
+-      screen.getByText(/Dans la mesure permise par la loi, nous ne sommes pas responsables/),
++      screen.getByText(
++        'Apple handles refunds. We can’t issue refunds ourselves. To ask Apple for one, go to https://reportaproblem.apple.com',
++      ),
+     ).toBeTruthy();
+-    expect(screen.queryAllByText(RAW_KEY)).toEqual([]);
+-    expect(screen.queryAllByText(LEFTOVER_PARAM)).toEqual([]);
++    await fireEvent.press(screen.getByRole('link', { name: 'Ask Apple for a refund' }));
++
++    expect(jest.mocked(openBrowserAsync).mock.calls).toEqual([
++      ['https://reportaproblem.apple.com'],
++    ]);
++    expect(screen.getAllByRole('link')).toHaveLength(2);
+   });
++
++  it('ends with who makes Skip, the contact, and the law, the legal name, address and law still placeholders', async () => {
++    const screen = await render(<TermsScreen />);
++    const lines = linesOf(screen);
++    const start = lines.indexOf('17. Law and contact');
++
++    // The questions line kept its key (law.p1) and its translations, so it is drawn second.
++    expect(lines.slice(start)).toEqual([
++      '17. Law and contact',
++      'Skip Budget is run by [LEGAL NAME], an individual, at [POSTAL ADDRESS].',
++      'Questions about these terms go to admin@skipapps.net.',
++      'These terms are governed by the law of the State of Ohio, United States.',
++      'You keep the consumer protections of the place where you live, and you can use your local courts.',
++    ]);
++    expect(screen.queryByText(/to be confirmed before release/)).toBeNull();
++  });
++
++  it('no longer says Skip has no in-app purchases, or mentions the coffee tip', async () => {
++    const screen = await render(<TermsScreen />);
++
++    expect(screen.queryByText(/in-app purchases/)).toBeNull();
++    expect(screen.queryByText(/coffee/i)).toBeNull();
++    expect(screen.queryByText(/^Money$|\d+\. Money$/)).toBeNull();
++  });
++
++  it.each([
++    [
++      'es',
++      'Términos del servicio',
++      'Última actualización: [DATE]',
++      /En la medida en que la ley lo permita, no somos responsables/,
++    ],
++    [
++      'fr',
++      'Conditions d’utilisation',
++      'Dernière mise à jour : [DATE]',
++      /Dans la mesure permise par la loi, nous ne sommes pas responsables/,
++    ],
++  ] as const)(
++    'in %s has the same seventeen sections and both links, with the notice on top',
++    async (language, title, dateLine, liability) => {
++      setLanguage(language);
++      const screen = await render(<TermsScreen />);
++
++      expect(screen.getByText(title)).toBeTruthy();
++      expect(screen.getByText(dateLine)).toBeTruthy();
++      expect(screen.getByText(line('legal.translationNotice', language))).toBeTruthy();
++      expect(headingsOf(screen)).toEqual(numbered('terms', TERMS_SECTIONS, language));
++      expect(screen.getByText(liability)).toBeTruthy();
++      expect(screen.getAllByRole('link')).toHaveLength(2);
++      expect(screen.queryAllByText(RAW_KEY)).toEqual([]);
++      expect(screen.queryAllByText(LEFTOVER_PARAM)).toEqual([]);
++    },
++  );
+ });
+diff --git a/src/__tests__/components/legal-document.test.tsx b/src/__tests__/components/legal-document.test.tsx
+index b98e66a..01bb794 100644
+--- a/src/__tests__/components/legal-document.test.tsx
++++ b/src/__tests__/components/legal-document.test.tsx
+@@ -1,9 +1,16 @@
+-import { render } from '@testing-library/react-native';
++import { act, fireEvent, render } from '@testing-library/react-native';
++import { openBrowserAsync } from 'expo-web-browser';
++import { AccessibilityInfo } from 'react-native';
+ 
+-import { LegalDocument, type Section } from '@/components/ui/legal-document';
++import { LegalDocument, type Block, type Section } from '@/components/ui/legal-document';
+ import { resetLocaleForTests, setLanguage } from '@/i18n/store';
++import { FAILURE_MESSAGE } from '@/lib/failure';
++import { TEXT_CAP } from '@/theme/text-scale';
+ 
+-/** The shell both legal pages share: a date line, a courtesy notice off English, the blocks. */
++/**
++ * The shell both legal pages share: a date line, a courtesy notice off English, the blocks, and links
++ * that open in the in-app browser.
++ */
+ 
+ jest.mock('lucide-react-native', () => new Proxy({}, { get: () => () => null }));
+ 
+@@ -13,6 +20,10 @@ jest.mock('react-native-keyboard-controller', () =>
+ 
+ jest.mock('expo-router', () => ({ router: { push: jest.fn(), back: jest.fn() } }));
+ 
++jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn() }));
++
++jest.mock('@sentry/react-native', () => ({ captureException: jest.fn() }));
++
+ jest.mock('@/providers/theme-provider', () => ({
+   useColors: () => ({ ink: '#000000', muted: '#777777', body: '#333333', line: '#DDDDDD' }),
+ }));
+@@ -29,13 +40,45 @@ const SECTIONS: Section[] = [
+   { heading: 'Second', blocks: [{ kind: 'text', text: 'Another paragraph.' }] },
+ ];
+ 
++const URL = 'https://example.com/licence';
++
++const LINKED: Section[] = [
++  {
++    heading: 'Buying',
++    blocks: [
++      { kind: 'subheading', text: 'To cancel' },
++      { kind: 'text', text: 'Read it at https://example.com/licence' },
++      { kind: 'link', label: 'Read the licence', url: URL },
++      { kind: 'subheading', text: 'Refunds' },
++    ],
++  },
++];
++
++const SUMMARY: Block[] = [
++  { kind: 'text', text: 'The agreement.' },
++  { kind: 'text', text: 'In short:' },
++  { kind: 'bullets', items: ['First point', 'Second point'] },
++];
++
+ function document() {
+   return (
+     <LegalDocument title="A title" updated="3 May 2026" summary="A summary." sections={SECTIONS} />
+   );
+ }
+ 
+-beforeEach(() => resetLocaleForTests());
++function linked() {
++  return <LegalDocument title="A title" updated="3 May 2026" summary={SUMMARY} sections={LINKED} />;
++}
++
++let log: jest.SpyInstance;
++
++beforeEach(() => {
++  resetLocaleForTests();
++  jest.mocked(openBrowserAsync).mockReset();
++  jest.mocked(openBrowserAsync).mockResolvedValue({ type: 'cancel' } as never);
++  log = jest.spyOn(console, 'log').mockImplementation(() => {});
++});
++afterEach(() => log.mockRestore());
+ afterAll(() => resetLocaleForTests());
+ 
+ describe('LegalDocument', () => {
+@@ -88,3 +131,89 @@ describe('LegalDocument', () => {
+     expect(screen.queryByText(/\{\w+\}/)).toBeNull();
+   });
+ });
++
++describe('LegalDocument, summaries, subheadings and links', () => {
++  it('draws a summary with its own list before the numbered sections', async () => {
++    const screen = await render(linked());
++
++    expect(screen.getByText('The agreement.')).toBeTruthy();
++    expect(screen.getByText('In short:')).toBeTruthy();
++    expect(screen.getByText('First point')).toBeTruthy();
++    expect(screen.getByText('Second point')).toBeTruthy();
++    expect(screen.getAllByText(/^\d+\. /).map((node) => node.props.children)).toEqual([
++      [1, '. ', 'Buying'],
++    ]);
++  });
++
++  it('marks subheadings and section headings as headings, numbering only the sections', async () => {
++    const screen = await render(linked());
++
++    expect(screen.getByRole('header', { name: 'To cancel' }).props.children).toBe('To cancel');
++    expect(screen.getByRole('header', { name: 'Refunds' })).toBeTruthy();
++    expect(screen.getByRole('header', { name: '1. Buying' })).toBeTruthy();
++  });
++
++  it('opens a link in the in-app browser, under the paragraph that keeps its words', async () => {
++    const screen = await render(linked());
++
++    expect(screen.getByText('Read it at https://example.com/licence')).toBeTruthy();
++    await fireEvent.press(screen.getByRole('link', { name: 'Read the licence' }));
++
++    expect(jest.mocked(openBrowserAsync).mock.calls).toEqual([[URL]]);
++    expect(screen.queryByRole('alert')).toBeNull();
++  });
++
++  it('opens one browser for taps made while it is still up', async () => {
++    let close: () => void = () => {};
++    jest
++      .mocked(openBrowserAsync)
++      .mockImplementation(
++        () => new Promise((resolve) => (close = () => resolve({ type: 'cancel' } as never))),
++      );
++    const screen = await render(linked());
++    const link = screen.getByRole('link', { name: 'Read the licence' });
++
++    await fireEvent.press(link);
++    await fireEvent.press(link);
++    expect(openBrowserAsync).toHaveBeenCalledTimes(1);
++
++    await act(async () => close());
++    await fireEvent.press(link);
++    expect(openBrowserAsync).toHaveBeenCalledTimes(2);
++    expect(screen.queryByRole('alert')).toBeNull();
++  });
++
++  it('says the one failure line, and says it aloud, when the page cannot open', async () => {
++    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
++    jest.mocked(openBrowserAsync).mockRejectedValueOnce(new Error('no view controller'));
++    const screen = await render(linked());
++
++    await fireEvent.press(screen.getByRole('link', { name: 'Read the licence' }));
++
++    expect((await screen.findByRole('alert')).props.children).toBe(FAILURE_MESSAGE);
++    expect(screen.getAllByText(FAILURE_MESSAGE)).toHaveLength(1);
++    expect(announce.mock.calls).toEqual([[FAILURE_MESSAGE]]);
++    expect(log).toHaveBeenCalledWith(
++      '[failure]',
++      expect.objectContaining({ message: 'no view controller' }),
++    );
++
++    await fireEvent.press(screen.getByRole('link', { name: 'Read the licence' }));
++    expect(screen.queryByRole('alert')).toBeNull();
++    announce.mockRestore();
++  });
++
++  it('lets the link, the subheading and the failure line grow to their role ceilings', async () => {
++    jest.mocked(openBrowserAsync).mockRejectedValueOnce(new Error('no view controller'));
++    const screen = await render(linked());
++    await fireEvent.press(screen.getByRole('link', { name: 'Read the licence' }));
++
++    expect(screen.getByText('Read the licence').props.maxFontSizeMultiplier).toBe(TEXT_CAP.row);
++    expect(screen.getByText('To cancel').props.maxFontSizeMultiplier).toBe(TEXT_CAP.heading);
++    expect((await screen.findByRole('alert')).props.maxFontSizeMultiplier).toBe(TEXT_CAP.reading);
++    expect(screen.getByText('In short:').props.maxFontSizeMultiplier).toBe(TEXT_CAP.reading);
++    for (const text of ['Read the licence', 'To cancel', 'First point']) {
++      expect(screen.getByText(text).props.numberOfLines).toBeUndefined();
++    }
++  });
++});
+diff --git a/src/app/privacy.tsx b/src/app/privacy.tsx
+index f410185..b20d3b9 100644
+--- a/src/app/privacy.tsx
++++ b/src/app/privacy.tsx
+@@ -21,9 +21,15 @@ function sections(): Section[] {
+           kind: 'bullets',
+           items: [
+             t('legal.privacy.stores.b1'),
++            t('legal.privacy.stores.b5'),
++            t('legal.privacy.stores.b6'),
+             t('legal.privacy.stores.b2'),
+             t('legal.privacy.stores.b3'),
+             t('legal.privacy.stores.b4'),
++            t('legal.privacy.stores.b7'),
++            t('legal.privacy.stores.b8'),
++            t('legal.privacy.stores.b9'),
++            t('legal.privacy.stores.b10'),
+           ],
+         },
+         { kind: 'note', text: t('legal.privacy.stores.note') },
+@@ -34,8 +40,17 @@ function sections(): Section[] {
+       blocks: [
+         {
+           kind: 'bullets',
+-          items: [t('legal.privacy.local.b1'), t('legal.privacy.local.b2')],
++          items: [
++            t('legal.privacy.local.b1'),
++            t('legal.privacy.local.b2'),
++            t('legal.privacy.local.b3'),
++            t('legal.privacy.local.b4'),
++            t('legal.privacy.local.b5'),
++            t('legal.privacy.local.b6'),
++          ],
+         },
++        { kind: 'text', text: t('legal.privacy.local.p1') },
++        { kind: 'note', text: t('legal.privacy.local.note') },
+       ],
+     },
+     {
+@@ -47,6 +62,7 @@ function sections(): Section[] {
+           items: [
+             t('legal.privacy.voice.b1'),
+             t('legal.privacy.voice.b2'),
++            t('legal.privacy.voice.b5'),
+             t('legal.privacy.voice.b3'),
+             t('legal.privacy.voice.b4'),
+           ],
+@@ -54,6 +70,15 @@ function sections(): Section[] {
+         { kind: 'note', text: t('legal.privacy.voice.note') },
+       ],
+     },
++    {
++      heading: t('legal.privacy.pro.heading'),
++      blocks: [
++        { kind: 'text', text: t('legal.privacy.pro.p1') },
++        { kind: 'text', text: t('legal.privacy.pro.p2') },
++        { kind: 'text', text: t('legal.privacy.pro.p3') },
++        { kind: 'text', text: t('legal.privacy.pro.p4') },
++      ],
++    },
+     {
+       heading: t('legal.privacy.others.heading'),
+       blocks: [
+@@ -62,21 +87,52 @@ function sections(): Section[] {
+           kind: 'bullets',
+           items: [
+             t('legal.privacy.others.b1'),
+-            t('legal.privacy.others.b2'),
++            t('legal.privacy.others.b6'),
++            t('legal.privacy.others.b7'),
+             t('legal.privacy.others.b3'),
++            t('legal.privacy.others.b8'),
++          ],
++        },
++        { kind: 'text', text: t('legal.privacy.others.p3') },
++        { kind: 'text', text: t('legal.privacy.others.p4') },
++        { kind: 'text', text: t('legal.privacy.others.p5') },
++        { kind: 'text', text: t('legal.privacy.others.p6') },
++        {
++          kind: 'bullets',
++          items: [
++            t('legal.privacy.others.b2'),
++            t('legal.privacy.others.b9'),
+             t('legal.privacy.others.b4'),
+             t('legal.privacy.others.b5'),
++            t('legal.privacy.others.b10'),
+           ],
+         },
+         { kind: 'text', text: t('legal.privacy.others.p2') },
+       ],
+     },
++    {
++      heading: t('legal.privacy.where.heading'),
++      blocks: [
++        { kind: 'text', text: t('legal.privacy.where.p1') },
++        { kind: 'text', text: t('legal.privacy.where.p2') },
++      ],
++    },
+     {
+       heading: t('legal.privacy.kept.heading'),
+       blocks: [
+         {
+           kind: 'bullets',
+-          items: [t('legal.privacy.kept.b1'), t('legal.privacy.kept.b2')],
++          items: [
++            t('legal.privacy.kept.b1'),
++            t('legal.privacy.kept.b2'),
++            t('legal.privacy.kept.b3'),
++            t('legal.privacy.kept.b4'),
++            t('legal.privacy.kept.b5'),
++            t('legal.privacy.kept.b6'),
++            t('legal.privacy.kept.b7'),
++            t('legal.privacy.kept.b8'),
++            t('legal.privacy.kept.b9'),
++          ],
+         },
+       ],
+     },
+@@ -84,12 +140,47 @@ function sections(): Section[] {
+       heading: t('legal.privacy.deleting.heading'),
+       blocks: [
+         { kind: 'text', text: t('legal.privacy.deleting.p1') },
++        { kind: 'text', text: t('legal.privacy.deleting.p2') },
+         { kind: 'note', text: t('legal.privacy.deleting.note') },
++        { kind: 'note', text: t('legal.privacy.deleting.note2') },
++        { kind: 'text', text: t('legal.privacy.deleting.p3') },
++        {
++          kind: 'bullets',
++          items: [
++            t('legal.privacy.deleting.b1'),
++            t('legal.privacy.deleting.b2'),
++            t('legal.privacy.deleting.b3'),
++            t('legal.privacy.deleting.b4'),
++            t('legal.privacy.deleting.b5'),
++            t('legal.privacy.deleting.b7'),
++            t('legal.privacy.deleting.b6'),
++          ],
++        },
++      ],
++    },
++    {
++      heading: t('legal.privacy.choices.heading'),
++      blocks: [
++        { kind: 'text', text: t('legal.privacy.choices.p1') },
++        {
++          kind: 'bullets',
++          items: [
++            t('legal.privacy.choices.b1'),
++            t('legal.privacy.choices.b2'),
++            t('legal.privacy.choices.b3'),
++            t('legal.privacy.choices.b4'),
++          ],
++        },
++        { kind: 'note', text: t('legal.privacy.choices.note') },
+       ],
+     },
+     {
+       heading: t('legal.privacy.rights.heading'),
+-      blocks: [{ kind: 'text', text: t('legal.privacy.rights.p1') }],
++      blocks: [
++        { kind: 'text', text: t('legal.privacy.rights.p1') },
++        { kind: 'text', text: t('legal.privacy.rights.p2') },
++        { kind: 'text', text: t('legal.privacy.rights.p3') },
++      ],
+     },
+     {
+       heading: t('legal.privacy.children.heading'),
+diff --git a/src/app/terms.tsx b/src/app/terms.tsx
+index d2999bd..08146cb 100644
+--- a/src/app/terms.tsx
++++ b/src/app/terms.tsx
+@@ -1,14 +1,38 @@
+-import { LegalDocument, type Section } from '@/components/ui/legal-document';
++import { LegalDocument, type Block, type Section } from '@/components/ui/legal-document';
+ import { t } from '@/i18n';
+ 
+ /** A developer's draft, not legal advice. */
+ 
++const APPLE_EULA_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
++const APPLE_REFUNDS_URL = 'https://reportaproblem.apple.com';
++
+ /** Built on render: a list made at import would stay in the language the app opened in. */
++function summary(): Block[] {
++  return [
++    { kind: 'text', text: t('legal.terms.summary') },
++    { kind: 'text', text: t('legal.terms.summary.lead') },
++    {
++      kind: 'bullets',
++      items: [
++        t('legal.terms.summary.b1'),
++        t('legal.terms.summary.b2'),
++        t('legal.terms.summary.b3'),
++        t('legal.terms.summary.b4'),
++      ],
++    },
++  ];
++}
++
+ function sections(): Section[] {
+   return [
+     {
+       heading: t('legal.terms.agree.heading'),
+-      blocks: [{ kind: 'text', text: t('legal.terms.agree.p1') }],
++      blocks: [
++        { kind: 'text', text: t('legal.terms.agree.p1') },
++        { kind: 'text', text: t('legal.terms.agree.p2') },
++        { kind: 'text', text: t('legal.terms.agree.p3') },
++        { kind: 'link', label: t('legal.terms.agree.link'), url: APPLE_EULA_URL },
++      ],
+     },
+     {
+       heading: t('legal.terms.what.heading'),
+@@ -40,16 +64,87 @@ function sections(): Section[] {
+       blocks: [{ kind: 'text', text: t('legal.terms.yours.p1') }],
+     },
+     {
+-      heading: t('legal.terms.change.heading'),
+-      blocks: [{ kind: 'text', text: t('legal.terms.change.p1') }],
++      heading: t('legal.terms.free.heading'),
++      blocks: [
++        { kind: 'text', text: t('legal.terms.free.p1') },
++        { kind: 'text', text: t('legal.terms.free.p2') },
++      ],
+     },
+     {
+-      heading: t('legal.terms.money.heading'),
+-      blocks: [{ kind: 'text', text: t('legal.terms.money.p1') }],
++      heading: t('legal.terms.paying.heading'),
++      blocks: [
++        { kind: 'text', text: t('legal.terms.paying.p1') },
++        {
++          kind: 'bullets',
++          items: [
++            t('legal.terms.paying.b1'),
++            t('legal.terms.paying.b2'),
++            t('legal.terms.paying.b3'),
++            t('legal.terms.paying.b4'),
++            t('legal.terms.paying.b5'),
++          ],
++        },
++      ],
++    },
++    {
++      heading: t('legal.terms.trial.heading'),
++      blocks: [
++        { kind: 'text', text: t('legal.terms.trial.p1') },
++        { kind: 'text', text: t('legal.terms.trial.p2') },
++        { kind: 'text', text: t('legal.terms.trial.p3') },
++      ],
++    },
++    {
++      heading: t('legal.terms.offers.heading'),
++      blocks: [
++        { kind: 'text', text: t('legal.terms.offers.p1') },
++        { kind: 'text', text: t('legal.terms.offers.p2') },
++      ],
++    },
++    {
++      heading: t('legal.terms.cancel.heading'),
++      blocks: [
++        { kind: 'subheading', text: t('legal.terms.cancel.sub1') },
++        {
++          kind: 'bullets',
++          items: [t('legal.terms.cancel.b1'), t('legal.terms.cancel.b2')],
++        },
++        { kind: 'text', text: t('legal.terms.cancel.p1') },
++        { kind: 'text', text: t('legal.terms.cancel.p2') },
++        { kind: 'subheading', text: t('legal.terms.cancel.sub2') },
++        { kind: 'text', text: t('legal.terms.cancel.p3') },
++        { kind: 'link', label: t('legal.terms.cancel.link'), url: APPLE_REFUNDS_URL },
++        { kind: 'text', text: t('legal.terms.cancel.p4') },
++        { kind: 'subheading', text: t('legal.terms.cancel.sub3') },
++        { kind: 'text', text: t('legal.terms.cancel.p5') },
++      ],
++    },
++    {
++      heading: t('legal.terms.ends.heading'),
++      blocks: [
++        { kind: 'text', text: t('legal.terms.ends.p1') },
++        { kind: 'text', text: t('legal.terms.ends.p2') },
++        {
++          kind: 'bullets',
++          items: [t('legal.terms.ends.b1'), t('legal.terms.ends.b2'), t('legal.terms.ends.b3')],
++        },
++        { kind: 'text', text: t('legal.terms.ends.p3') },
++        { kind: 'text', text: t('legal.terms.ends.p4') },
++      ],
++    },
++    {
++      heading: t('legal.terms.change.heading'),
++      blocks: [
++        { kind: 'text', text: t('legal.terms.change.p1') },
++        { kind: 'text', text: t('legal.terms.change.p2') },
++      ],
+     },
+     {
+       heading: t('legal.terms.warranty.heading'),
+-      blocks: [{ kind: 'text', text: t('legal.terms.warranty.p1') }],
++      blocks: [
++        { kind: 'text', text: t('legal.terms.warranty.p1') },
++        { kind: 'text', text: t('legal.terms.warranty.p2') },
++      ],
+     },
+     {
+       heading: t('legal.terms.liability.heading'),
+@@ -57,7 +152,11 @@ function sections(): Section[] {
+     },
+     {
+       heading: t('legal.terms.ending.heading'),
+-      blocks: [{ kind: 'text', text: t('legal.terms.ending.p1') }],
++      blocks: [
++        { kind: 'text', text: t('legal.terms.ending.p1') },
++        { kind: 'text', text: t('legal.terms.ending.p2') },
++        { kind: 'text', text: t('legal.terms.ending.p3') },
++      ],
+     },
+     {
+       heading: t('legal.terms.changes.heading'),
+@@ -66,8 +165,10 @@ function sections(): Section[] {
+     {
+       heading: t('legal.terms.law.heading'),
+       blocks: [
++        { kind: 'text', text: t('legal.terms.law.p2') },
+         { kind: 'text', text: t('legal.terms.law.p1') },
+-        { kind: 'note', text: t('legal.terms.law.note') },
++        { kind: 'text', text: t('legal.terms.law.p3') },
++        { kind: 'text', text: t('legal.terms.law.p4') },
+       ],
+     },
+   ];
+@@ -78,7 +179,7 @@ export default function TermsScreen() {
+     <LegalDocument
+       title={t('legal.terms.title')}
+       updated={t('legal.terms.updated')}
+-      summary={t('legal.terms.summary')}
++      summary={summary()}
+       sections={sections()}
+     />
+   );
+diff --git a/src/components/ui/legal-document.tsx b/src/components/ui/legal-document.tsx
+index 504962a..ff6ec56 100644
+--- a/src/components/ui/legal-document.tsx
++++ b/src/components/ui/legal-document.tsx
+@@ -1,14 +1,21 @@
+-import { Text, View } from 'react-native';
++import { openBrowserAsync } from 'expo-web-browser';
++import { useRef, useState } from 'react';
++import { AccessibilityInfo, Pressable, Text, View } from 'react-native';
+ 
+ import { Screen } from '@/components/ui/screen';
+ import { Title } from '@/components/ui/typography';
+ import { t, useLocale } from '@/i18n';
++import { cn } from '@/lib/cn';
++import { failureMessage, failureText } from '@/lib/failure';
+ import { TEXT_CAP } from '@/theme/text-scale';
+ 
+-type Block =
++export type Block =
+   | { kind: 'text'; text: string }
+   | { kind: 'bullets'; items: string[] }
+-  | { kind: 'note'; text: string };
++  | { kind: 'note'; text: string }
++  | { kind: 'subheading'; text: string }
++  /** Its own line under the paragraph that names the address, which keeps its words. */
++  | { kind: 'link'; label: string; url: string };
+ 
+ export type Section = {
+   heading: string;
+@@ -19,10 +26,124 @@ type LegalDocumentProps = {
+   title: string;
+   /** The date the wording last changed, already written in the language on screen. */
+   updated: string;
+-  summary: string;
++  /** One paragraph, or blocks for a summary with its own list. */
++  summary: string | Block[];
+   sections: Section[];
+ };
+ 
++function LinkBlock({ label, url, className }: { label: string; url: string; className: string }) {
++  const [failed, setFailed] = useState(false);
++  // iOS refuses a second browser while one is up; that tap is not a failure to report.
++  const open = useRef(false);
++
++  const press = async () => {
++    if (open.current) return;
++    open.current = true;
++    setFailed(false);
++    try {
++      await openBrowserAsync(url);
++    } catch (thrown) {
++      failureMessage(thrown);
++      setFailed(true);
++      // The line appears out of VoiceOver's sight, so it is said as well.
++      AccessibilityInfo.announceForAccessibility(failureText());
++    } finally {
++      open.current = false;
++    }
++  };
++
++  return (
++    <View className={cn('w-full items-start', className)}>
++      <Pressable
++        accessibilityRole="link"
++        accessibilityLabel={label}
++        onPress={() => void press()}
++        hitSlop={8}
++        className="max-w-full py-1.5 active:opacity-60"
++      >
++        <Text
++          className="font-app-semibold text-[15px] leading-[23px] text-accent-ink underline"
++          maxFontSizeMultiplier={TEXT_CAP.row}
++        >
++          {label}
++        </Text>
++      </Pressable>
++      {failed ? (
++        <Text
++          accessibilityRole="alert"
++          className="mt-1 w-full font-app text-[13px] text-danger"
++          maxFontSizeMultiplier={TEXT_CAP.reading}
++        >
++          {failureText()}
++        </Text>
++      ) : null}
++    </View>
++  );
++}
++
++function BlockView({ block, first }: { block: Block; first: boolean }) {
++  if (block.kind === 'bullets') {
++    return (
++      <View className={cn('w-full gap-2', !first && 'mt-3')}>
++        {block.items.map((item) => (
++          <View key={item} className="w-full flex-row gap-2.5">
++            <Text
++              className="font-app text-[15px] leading-[23px] text-muted"
++              maxFontSizeMultiplier={TEXT_CAP.reading}
++            >
++              •
++            </Text>
++            <Text
++              className="flex-1 font-app text-[15px] leading-[23px] text-body"
++              maxFontSizeMultiplier={TEXT_CAP.reading}
++            >
++              {item}
++            </Text>
++          </View>
++        ))}
++      </View>
++    );
++  }
++
++  if (block.kind === 'note') {
++    return (
++      <View className={cn('w-full rounded-[12px] bg-ink/[0.04] px-4 py-3', !first && 'mt-3')}>
++        <Text
++          className="font-app text-[14px] leading-[21px] text-body"
++          maxFontSizeMultiplier={TEXT_CAP.reading}
++        >
++          {block.text}
++        </Text>
++      </View>
++    );
++  }
++
++  if (block.kind === 'subheading') {
++    return (
++      <Text
++        accessibilityRole="header"
++        className={cn('w-full font-app-semibold text-[15px] text-ink', !first && 'mt-5')}
++        maxFontSizeMultiplier={TEXT_CAP.heading}
++      >
++        {block.text}
++      </Text>
++    );
++  }
++
++  if (block.kind === 'link') {
++    return <LinkBlock label={block.label} url={block.url} className={first ? '' : 'mt-1'} />;
++  }
++
++  return (
++    <Text
++      className={cn('w-full font-app text-[15px] leading-[23px] text-body', !first && 'mt-3')}
++      maxFontSizeMultiplier={TEXT_CAP.reading}
++    >
++      {block.text}
++    </Text>
++  );
++}
++
+ export function LegalDocument({ title, updated, summary, sections }: LegalDocumentProps) {
+   const { language } = useLocale();
+ 
+@@ -51,72 +172,36 @@ export function LegalDocument({ title, updated, summary, sections }: LegalDocume
+         </View>
+       ) : null}
+ 
+-      <Text
+-        className="mt-5 w-full font-app text-[15px] leading-[24px] text-body"
+-        maxFontSizeMultiplier={TEXT_CAP.reading}
+-      >
+-        {summary}
+-      </Text>
++      {typeof summary === 'string' ? (
++        <Text
++          className="mt-5 w-full font-app text-[15px] leading-[24px] text-body"
++          maxFontSizeMultiplier={TEXT_CAP.reading}
++        >
++          {summary}
++        </Text>
++      ) : (
++        <View className="mt-5 w-full">
++          {summary.map((block, index) => (
++            <BlockView key={index} block={block} first={index === 0} />
++          ))}
++        </View>
++      )}
+ 
+       {sections.map((section, index) => (
+         <View key={section.heading} className="mt-8 w-full">
+           <Text
++            accessibilityRole="header"
+             className="w-full font-app-bold text-[17px] text-ink"
+             maxFontSizeMultiplier={TEXT_CAP.heading}
+           >
+             {index + 1}. {section.heading}
+           </Text>
+ 
+-          {section.blocks.map((block, blockIndex) => {
+-            if (block.kind === 'bullets') {
+-              return (
+-                <View key={blockIndex} className="mt-3 w-full gap-2">
+-                  {block.items.map((item) => (
+-                    <View key={item} className="w-full flex-row gap-2.5">
+-                      <Text
+-                        className="font-app text-[15px] leading-[23px] text-muted"
+-                        maxFontSizeMultiplier={TEXT_CAP.reading}
+-                      >
+-                        •
+-                      </Text>
+-                      <Text
+-                        className="flex-1 font-app text-[15px] leading-[23px] text-body"
+-                        maxFontSizeMultiplier={TEXT_CAP.reading}
+-                      >
+-                        {item}
+-                      </Text>
+-                    </View>
+-                  ))}
+-                </View>
+-              );
+-            }
+-
+-            if (block.kind === 'note') {
+-              return (
+-                <View
+-                  key={blockIndex}
+-                  className="mt-3 w-full rounded-[12px] bg-ink/[0.04] px-4 py-3"
+-                >
+-                  <Text
+-                    className="font-app text-[14px] leading-[21px] text-body"
+-                    maxFontSizeMultiplier={TEXT_CAP.reading}
+-                  >
+-                    {block.text}
+-                  </Text>
+-                </View>
+-              );
+-            }
+-
+-            return (
+-              <Text
+-                key={blockIndex}
+-                className="mt-3 w-full font-app text-[15px] leading-[23px] text-body"
+-                maxFontSizeMultiplier={TEXT_CAP.reading}
+-              >
+-                {block.text}
+-              </Text>
+-            );
+-          })}
++          <View className="mt-3 w-full">
++            {section.blocks.map((block, blockIndex) => (
++              <BlockView key={blockIndex} block={block} first={blockIndex === 0} />
++            ))}
++          </View>
+         </View>
+       ))}
+ 
+diff --git a/src/i18n/legal-faq-messages.test.ts b/src/i18n/legal-faq-messages.test.ts
+index 72c457c..9446299 100644
+--- a/src/i18n/legal-faq-messages.test.ts
++++ b/src/i18n/legal-faq-messages.test.ts
+@@ -13,6 +13,9 @@ const text = (value: Message['en']): string => (typeof value === 'string' ? valu
+ 
+ const EMAIL = /[\w.-]+@[\w.-]+\.\w+/g;
+ const FIGURE = /\d+(?:[.,]\d+)?/g;
++const URL = /https?:\/\/[^\s)]+/g;
++/** A detail filled in before release, such as [LEGAL NAME]; written the same in every language. */
++const PLACEHOLDER = /\[[A-Z][A-Z ]*(?::[^\]]*)?\]/g;
+ const NAMES = [
+   'Weknd',
+   'Supabase',
+@@ -24,6 +27,13 @@ const NAMES = [
+   'Apple Push Notification service',
+   'Netflix',
+   'Spotify',
++  'RevenueCat',
++  'Resend',
++  'Cloudflare',
++  'Wikidata',
++  'Skip Logos',
++  'App Store',
++  'Skip Pro',
+ ];
+ 
+ describe('the legal and common-question texts', () => {
+@@ -33,6 +43,8 @@ describe('the legal and common-question texts', () => {
+ 
+   it('are translated, not copied from the English', () => {
+     for (const [key, message] of entries) {
++      // Nothing to translate in a message that is only a placeholder, such as the [DATE] to fill in.
++      if (text(message.en).replace(PLACEHOLDER, '').trim() === '') continue;
+       expect({ key, same: text(message.es) === text(message.en) }).toEqual({ key, same: false });
+       expect({ key, same: text(message.fr) === text(message.en) }).toEqual({ key, same: false });
+     }
+@@ -41,7 +53,12 @@ describe('the legal and common-question texts', () => {
+   it('keep every e-mail address, figure and name the English has', () => {
+     for (const [key, message] of entries) {
+       const english = text(message.en);
+-      const kept = [...(english.match(EMAIL) ?? []), ...(english.match(FIGURE) ?? [])];
++      const kept = [
++        ...(english.match(EMAIL) ?? []),
++        ...(english.match(FIGURE) ?? []),
++        ...(english.match(URL) ?? []),
++        ...(english.match(PLACEHOLDER) ?? []),
++      ];
+       const named = NAMES.filter((name) => english.includes(name));
+       for (const language of ['es', 'fr'] as const) {
+         const translated = text(message[language]);
+@@ -59,7 +76,8 @@ describe('the legal and common-question texts', () => {
+ 
+   it('write French punctuation with the no-break space French puts around it', () => {
+     for (const [key, message] of entries) {
+-      const french = text(message.fr);
++      // A web address and a placeholder keep the colon they are written with.
++      const french = text(message.fr).replace(URL, '').replace(PLACEHOLDER, '');
+       expect({ key, bad: french.match(/[^ \s][:;?!»]/g) }).toEqual({ key, bad: null });
+       expect({ key, bad: french.match(/ [:;?!»]/g) }).toEqual({ key, bad: null });
+       expect({ key, bad: french.match(/«[^ ]/g) }).toEqual({ key, bad: null });
+diff --git a/src/i18n/messages/legal.ts b/src/i18n/messages/legal.ts
+index 4680d56..612c656 100644
+--- a/src/i18n/messages/legal.ts
++++ b/src/i18n/messages/legal.ts
+@@ -2,7 +2,8 @@ import { defineMessages } from '@/i18n/translate';
+ 
+ /**
+  * The privacy policy and the terms, one message per heading, paragraph and bullet. A draft, not
+- * legal advice: the Spanish and French follow the English clause for clause.
++ * legal advice: the Spanish and French follow the English clause for clause. Words in square
++ * brackets ([DATE], [LEGAL NAME]) are placeholders, filled in before release.
+  */
+ export const legalMessages = defineMessages({
+   'legal.lastUpdated': {
+@@ -25,14 +26,14 @@ export const legalMessages = defineMessages({
+     fr: 'Politique de confidentialité',
+   },
+   'legal.privacy.updated': {
+-    en: '28 August 2026',
+-    es: '28 de agosto de 2026',
+-    fr: '28 août 2026',
++    en: '[DATE]',
++    es: '[DATE]',
++    fr: '[DATE]',
+   },
+   'legal.privacy.summary': {
+-    en: 'Skip is a budgeting app, so almost everything in it is something you typed. This explains what is stored, what stays on your phone, who else is involved, and how to get rid of all of it.',
+-    es: 'Skip es una aplicación para llevar tu presupuesto, así que casi todo lo que contiene es algo que tú escribiste. Aquí se explica qué se guarda, qué se queda en tu teléfono, quién más interviene y cómo deshacerte de todo.',
+-    fr: 'Skip est une application de gestion de budget : presque tout ce qu’elle contient, c’est toi qui l’as saisi. Cette politique explique ce qui est conservé, ce qui reste sur ton téléphone, qui d’autre intervient et comment tout effacer.',
++    en: 'Skip is a budgeting app, so almost everything in it is something you typed. This explains what is stored, what stays on your phone, who else is involved, and how to delete it.',
++    es: 'Skip es una aplicación para llevar tu presupuesto, así que casi todo lo que contiene es algo que tú escribiste. Aquí se explica qué se guarda, qué se queda en tu teléfono, quién más interviene y cómo eliminarlo.',
++    fr: 'Skip est une application de gestion de budget : presque tout ce qu’elle contient, c’est toi qui l’as saisi. Cette politique explique ce qui est conservé, ce qui reste sur ton téléphone, qui d’autre intervient et comment le supprimer.',
+   },
+ 
+   'legal.privacy.who.heading': {
+@@ -41,9 +42,9 @@ export const legalMessages = defineMessages({
+     fr: 'Qui nous sommes',
+   },
+   'legal.privacy.who.p1': {
+-    en: 'Skip is a personal budgeting app published by the Weknd team. Wherever this policy says “we”, it means the team that operates Skip and the servers it talks to.',
+-    es: 'Skip es una aplicación de presupuesto personal publicada por el equipo de Weknd. Cuando esta política dice “nosotros”, se refiere al equipo que opera Skip y a los servidores con los que se comunica.',
+-    fr: 'Skip est une application de budget personnel publiée par l’équipe Weknd. Chaque fois que cette politique dit « nous », elle désigne l’équipe qui exploite Skip et les serveurs avec lesquels l’application communique.',
++    en: 'Skip is a personal budgeting app from Skip Budget. Skip Budget is run by [LEGAL NAME], an individual, at [POSTAL ADDRESS]. Wherever this policy says “we”, it means Skip Budget.',
++    es: 'Skip es una aplicación de presupuesto personal de Skip Budget. Skip Budget está a cargo de [LEGAL NAME], una persona física, con domicilio en [POSTAL ADDRESS]. Cuando esta política dice “nosotros”, se refiere a Skip Budget.',
++    fr: 'Skip est une application de budget personnel de Skip Budget. Skip Budget est géré par [LEGAL NAME], une personne physique, à l’adresse [POSTAL ADDRESS]. Chaque fois que cette politique dit « nous », elle désigne Skip Budget.',
+   },
+   'legal.privacy.who.p2': {
+     en: 'You can reach us about anything in this policy at admin@skipapps.net.',
+@@ -57,34 +58,64 @@ export const legalMessages = defineMessages({
+     fr: 'Ce que Skip conserve à ton sujet',
+   },
+   'legal.privacy.stores.p1': {
+-    en: 'Skip only holds what you put into it, plus what is needed to keep you signed in. Specifically:',
+-    es: 'Skip solo guarda lo que tú ingresas, más lo necesario para mantener tu sesión iniciada. En concreto:',
+-    fr: 'Skip ne conserve que ce que tu y saisis, ainsi que ce qui est nécessaire pour maintenir ta session ouverte. Plus précisément :',
++    en: 'Skip keeps what you put into it, plus what it needs to sign you in, send your reminders and know whether you have Skip Pro. Here it is, in groups:',
++    es: 'Skip guarda lo que tú ingresas, más lo que necesita para iniciar tu sesión, enviar tus recordatorios y saber si tienes Skip Pro. Aquí está, por grupos:',
++    fr: 'Skip conserve ce que tu y saisis, ainsi que ce dont elle a besoin pour ouvrir ta session, envoyer tes rappels et savoir si tu as Skip Pro. Le voici, par groupes :',
+   },
+   'legal.privacy.stores.b1': {
+-    en: 'Your account: the email address you signed up with, or the identifier Apple or Google gives us when you sign in with them.',
+-    es: 'Tu cuenta: la dirección de correo con la que creaste tu cuenta, o el identificador que Apple o Google nos proporciona cuando inicias sesión con ellos.',
+-    fr: 'Ton compte : l’adresse courriel avec laquelle tu as créé ton compte, ou l’identifiant que nous transmet Apple ou Google quand tu te connectes avec eux.',
++    en: 'Your account: the email address you signed up with, and your password in a scrambled form that can’t be read back.',
++    es: 'Tu cuenta: la dirección de correo con la que creaste tu cuenta y tu contraseña en una forma codificada que no se puede volver a leer.',
++    fr: 'Ton compte : l’adresse courriel avec laquelle tu as créé ton compte, et ton mot de passe sous une forme codée qui ne peut pas être relue.',
++  },
++  'legal.privacy.stores.b5': {
++    en: 'If you sign in with Apple: the account id Apple gives us and the email it shares, which may be a private relay address. Skip doesn’t save the name Apple offers.',
++    es: 'Si inicias sesión con Apple: el identificador de cuenta que Apple nos da y el correo que comparte, que puede ser una dirección de retransmisión privada. Skip no guarda el nombre que Apple ofrece.',
++    fr: 'Si tu te connectes avec Apple : l’identifiant de compte que nous transmet Apple et l’adresse courriel qu’Apple partage, qui peut être une adresse de relais privée. Skip n’enregistre pas le nom qu’Apple propose.',
++  },
++  'legal.privacy.stores.b6': {
++    en: 'If you sign in with Google: the account id and email Google gives us. Google’s sign-in record also includes your full name and a link to your profile photo. Skip doesn’t use or show either.',
++    es: 'Si inicias sesión con Google: el identificador de cuenta y el correo que Google nos da. El registro de inicio de sesión de Google también incluye tu nombre completo y un enlace a tu foto de perfil. Skip no usa ni muestra ninguno de los dos.',
++    fr: 'Si tu te connectes avec Google : l’identifiant de compte et l’adresse courriel que nous transmet Google. L’enregistrement de connexion de Google comprend aussi ton nom complet et un lien vers ta photo de profil. Skip n’utilise ni n’affiche ni l’un ni l’autre.',
+   },
+   'legal.privacy.stores.b2': {
+-    en: 'Your profile: the display name you choose, and nothing else.',
+-    es: 'Tu perfil: el nombre para mostrar que eliges, y nada más.',
+-    fr: 'Ton profil : le nom d’affichage que tu choisis, et rien d’autre.',
++    en: 'Your profile: the display name you choose and the avatar you pick from Skip’s own set.',
++    es: 'Tu perfil: el nombre para mostrar que eliges y el avatar que escoges del conjunto propio de Skip.',
++    fr: 'Ton profil : le nom d’affichage que tu choisis et l’avatar que tu sélectionnes dans le jeu propre à Skip.',
+   },
+   'legal.privacy.stores.b3': {
+-    en: 'Your money: the bills, subscriptions, receipts, loans, salary sources, savings and card payments you enter, and the record of what your bills and subscriptions have charged.',
+-    es: 'Tu dinero: las facturas, suscripciones, recibos, préstamos, fuentes de salario, ahorros y pagos de tarjeta que ingresas, y el registro de lo que tus facturas y suscripciones han cobrado.',
+-    fr: 'Ton argent : les factures, abonnements, reçus, prêts, sources de salaire, épargne et paiements de carte que tu saisis, ainsi que l’historique des prélèvements de tes factures et de tes abonnements.',
++    en: 'Your money: the bills, subscriptions, receipts, receipt books, loans, salaries, pay, savings, goals and spending habits you enter, with their notes and logo choices. That includes the loan rates and terms, and the hours, overtime and deductions, that you type. It also includes what your bills and subscriptions have charged, your card payments and transfers, and how and when each receipt was added.',
++    es: 'Tu dinero: las facturas, suscripciones, recibos, libros de recibos, préstamos, salarios, pagos recibidos, ahorros, metas y hábitos de gasto que ingresas, con sus notas y los logos que eliges. Eso incluye las tasas y los plazos de los préstamos, y las horas, las horas extra y las deducciones que escribes. También incluye lo que tus facturas y suscripciones han cobrado, tus pagos de tarjeta y transferencias, y cómo y cuándo se agregó cada recibo.',
++    fr: 'Ton argent : les factures, abonnements, reçus, carnets de reçus, prêts, salaires, paies, épargne, objectifs et habitudes de dépense que tu saisis, avec leurs notes et leurs choix de logo. Cela comprend les taux et les durées des prêts, ainsi que les heures, les heures supplémentaires et les déductions que tu saisis. Cela comprend aussi ce que tes factures et tes abonnements ont prélevé, tes paiements de carte et tes virements, ainsi que la façon et le moment où chaque reçu a été ajouté.',
+   },
+   'legal.privacy.stores.b4': {
+-    en: 'Your credit cards and accounts: the name you give them, the network or bank, a colour, a balance you type, a due day, and at most the last four digits.',
+-    es: 'Tus tarjetas de crédito y cuentas: el nombre que les das, la red o el banco, un color, un saldo que escribes, un día de vencimiento y, como máximo, los últimos cuatro dígitos.',
+-    fr: 'Tes cartes de crédit et tes comptes : le nom que tu leur donnes, le réseau ou la banque, une couleur, un solde que tu saisis, un jour d’échéance et, au plus, les quatre derniers chiffres.',
++    en: 'Your cards and bank accounts: the name you give them, the network or bank, the account type, a colour, the balance you type and its date, a due day, an optional credit limit, and, if you add them, the last four digits — never more.',
++    es: 'Tus tarjetas y cuentas bancarias: el nombre que les das, la red o el banco, el tipo de cuenta, un color, el saldo que escribes y su fecha, un día de vencimiento, un límite de crédito opcional y, si los agregas, los últimos cuatro dígitos, y nunca más.',
++    fr: 'Tes cartes et tes comptes bancaires : le nom que tu leur donnes, le réseau ou la banque, le type de compte, une couleur, le solde que tu saisis et sa date, un jour d’échéance, une limite de crédit facultative et, si tu les ajoutes, les quatre derniers chiffres — jamais plus.',
++  },
++  'legal.privacy.stores.b7': {
++    en: 'Your Skip Pro status: whether you have Pro, which plan, when it renews or ends, whether it will renew, and whether the purchase was real or a test. It comes from Apple through RevenueCat. Skip also notes when it showed you the one-time offer, so it appears only once.',
++    es: 'El estado de tu Skip Pro: si tienes Pro, qué plan, cuándo se renueva o termina, si se renovará y si la compra fue real o de prueba. Viene de Apple a través de RevenueCat. Skip también anota cuándo te mostró la oferta única, para que aparezca una sola vez.',
++    fr: 'Le statut de ton Skip Pro : si tu as Pro, quel forfait, quand il se renouvelle ou se termine, s’il se renouvellera, et si l’achat était réel ou un test. Il provient d’Apple par l’intermédiaire de RevenueCat. Skip note aussi le moment où l’offre unique t’a été montrée, afin qu’elle n’apparaisse qu’une seule fois.',
++  },
++  'legal.privacy.stores.b8': {
++    en: 'Messages you send us from the contact form: the topic, the name you give (if any) and your message. Skip adds your account email, so we can reply, and your account id. They come to us by email; Skip’s database doesn’t keep them.',
++    es: 'Los mensajes que nos envías desde el formulario de contacto: el tema, el nombre que indiques (si lo indicas) y tu mensaje. Skip agrega el correo de tu cuenta, para que podamos responderte, y el identificador de tu cuenta. Nos llegan por correo; la base de datos de Skip no los guarda.',
++    fr: 'Les messages que tu nous envoies depuis le formulaire de contact : le sujet, le nom que tu indiques (le cas échéant) et ton message. Skip y ajoute l’adresse courriel de ton compte, pour que nous puissions te répondre, ainsi que l’identifiant de ton compte. Ils nous parviennent par courriel ; la base de données de Skip ne les conserve pas.',
++  },
++  'legal.privacy.stores.b9': {
++    en: 'Your settings: your time zone, kept up to date from your phone so reminders arrive at the right hour; your reminder choices and when each was last sent; your default receipt book; and whether you closed the getting-started card.',
++    es: 'Tus ajustes: tu zona horaria, que se mantiene al día desde tu teléfono para que los recordatorios lleguen a la hora correcta; tus opciones de recordatorio y cuándo se envió cada uno por última vez; tu libro de recibos predeterminado; y si cerraste la tarjeta de Primeros pasos.',
++    fr: 'Tes réglages : ton fuseau horaire, tenu à jour à partir de ton téléphone pour que les rappels arrivent à la bonne heure ; tes choix de rappel et le moment du dernier envoi de chacun ; ton carnet de reçus par défaut ; et si tu as fermé la carte Premiers pas.',
++  },
++  'legal.privacy.stores.b10': {
++    en: 'Your phone’s push address, once you turn on a reminder or the monthly wrap-up. Apple gives it to Skip so notices can reach your iPhone. It is deleted when you sign out or delete your account, or when Apple tells us it no longer works.',
++    es: 'La dirección push de tu teléfono, una vez que activas un recordatorio o el resumen mensual. Apple se la da a Skip para que los avisos lleguen a tu iPhone. Se elimina cuando cierras sesión o eliminas tu cuenta, o cuando Apple nos avisa de que ya no funciona.',
++    fr: 'L’adresse push de ton téléphone, dès que tu actives un rappel ou le bilan mensuel. Apple la transmet à Skip pour que les avis puissent atteindre ton iPhone. Elle est supprimée quand tu te déconnectes ou que tu supprimes ton compte, ou quand Apple nous indique qu’elle ne fonctionne plus.',
+   },
+   'legal.privacy.stores.note': {
+-    en: 'Skip never asks for and never stores a full card number, an expiry date, a security code, or any banking login. Skip does not connect to your bank and cannot move money.',
+-    es: 'Skip nunca pide ni guarda el número completo de una tarjeta, una fecha de vencimiento, un código de seguridad ni ninguna credencial de acceso a tu banco. Skip no se conecta con tu banco y no puede mover dinero.',
+-    fr: 'Skip ne demande ni ne conserve jamais un numéro de carte complet, une date d’expiration, un code de sécurité ni aucun identifiant bancaire. Skip ne se connecte pas à ta banque et ne peut pas déplacer d’argent.',
++    en: 'Skip never asks for and never stores a full card number, an expiry date, a security code, or any banking login. When a receipt shows a card’s last four digits, Skip uses them to pick the card and doesn’t save them. Skip does not connect to your bank and cannot move money.',
++    es: 'Skip nunca pide ni guarda el número completo de una tarjeta, una fecha de vencimiento, un código de seguridad ni ninguna credencial de acceso a tu banco. Cuando un recibo muestra los últimos cuatro dígitos de una tarjeta, Skip los usa para elegir la tarjeta y no los guarda. Skip no se conecta con tu banco y no puede mover dinero.',
++    fr: 'Skip ne demande ni ne conserve jamais un numéro de carte complet, une date d’expiration, un code de sécurité ni aucun identifiant bancaire. Quand un reçu affiche les quatre derniers chiffres d’une carte, Skip s’en sert pour choisir la carte et ne les enregistre pas. Skip ne se connecte pas à ta banque et ne peut pas déplacer d’argent.',
+   },
+ 
+   'legal.privacy.local.heading': {
+@@ -93,14 +124,44 @@ export const legalMessages = defineMessages({
+     fr: 'Ce qui ne quitte jamais ton téléphone',
+   },
+   'legal.privacy.local.b1': {
+-    en: 'Scanning a receipt. The text is read on your device by Apple’s own on-device recognition. The photo is not uploaded, and Skip saves only the fields you confirm — the shop, the amount, the date.',
+-    es: 'Escanear un recibo. El texto se lee en tu dispositivo con el reconocimiento integrado de Apple. La foto no se sube, y Skip guarda solo los campos que confirmas: la tienda, el importe y la fecha.',
+-    fr: 'La numérisation d’un reçu. Le texte est lu sur ton appareil par la reconnaissance intégrée d’Apple. La photo n’est pas téléversée, et Skip n’enregistre que les champs que tu confirmes — le magasin, le montant, la date.',
++    en: 'Scanning or uploading a receipt. The camera image, or the photo or PDF you pick, is read on your phone by Apple’s own on-device text recognition, and nothing is uploaded. Skip then saves the details you confirm, just like a receipt you type: the shop, amount, date, card or account, category, any note, the receipt book, and that it came from a scan or an upload.',
++    es: 'Escanear o subir un recibo. La imagen de la cámara, o la foto o el PDF que eliges, se lee en tu teléfono con el reconocimiento de texto integrado de Apple, y no se sube nada. Después Skip guarda los datos que confirmas, igual que un recibo que escribes: la tienda, el importe, la fecha, la tarjeta o cuenta, la categoría, cualquier nota, el libro de recibos y que vino de un escaneo o de una subida.',
++    fr: 'Numériser ou importer un reçu. L’image de la caméra, ou la photo ou le PDF que tu choisis, est lue sur ton téléphone par la reconnaissance de texte intégrée d’Apple, et rien n’est téléversé. Skip enregistre ensuite les renseignements que tu confirmes, comme pour un reçu que tu saisis : le magasin, le montant, la date, la carte ou le compte, la catégorie, une éventuelle note, le carnet de reçus, et le fait qu’il provient d’une numérisation ou d’un import.',
+   },
+   'legal.privacy.local.b2': {
+-    en: 'Your appearance, haptics and app lock settings, which are stored on the device itself.',
+-    es: 'Tus ajustes de apariencia, respuesta háptica y bloqueo de la app, que se guardan en el propio dispositivo.',
+-    fr: 'Tes réglages d’apparence, de retour haptique et de verrouillage de l’app, qui sont conservés sur l’appareil même.',
++    en: 'Your appearance, haptics, app lock, language, currency and wrap-up settings, and which tips and news you’ve already seen.',
++    es: 'Tus ajustes de apariencia, respuesta háptica, bloqueo de la app, idioma, moneda y resumen mensual, y qué consejos y novedades ya viste.',
++    fr: 'Tes réglages d’apparence, de retour haptique, de verrouillage de l’app, de langue, de devise et de bilan mensuel, ainsi que les conseils et les nouveautés que tu as déjà vus.',
++  },
++  'legal.privacy.local.b3': {
++    en: 'Your voice corrections, the stores and logo answers Skip remembers, and your last 10 payment searches. All of them are erased when you sign out. When you pick a logo, Skip Logos also gets a vote (see “Who else sees it”).',
++    es: 'Tus correcciones de voz, las tiendas y respuestas de logo que Skip recuerda, y tus últimas 10 búsquedas de pagos. Todo eso se borra cuando cierras sesión. Cuando eliges un logo, Skip Logos también recibe un voto (consulta “Quién más tiene acceso”).',
++    fr: 'Tes corrections vocales, les magasins et les réponses de logo dont Skip se souvient, et tes 10 dernières recherches de paiements. Tout cela est effacé quand tu te déconnectes. Quand tu choisis un logo, Skip Logos reçoit aussi un vote (voir « Qui d’autre y a accès »).',
++  },
++  'legal.privacy.local.b4': {
++    en: 'Insights. They are worked out on your phone, and the results aren’t sent anywhere.',
++    es: 'Análisis. Se calculan en tu teléfono, y los resultados no se envían a ninguna parte.',
++    fr: 'Aperçu. Il est calculé sur ton téléphone, et les résultats ne sont envoyés nulle part.',
++  },
++  'legal.privacy.local.b5': {
++    en: 'Exports (Skip Pro). The CSV or PDF is made on your phone for the share sheet, and only the newest one is kept there. Where you send it is up to you.',
++    es: 'Exportaciones (Skip Pro). El CSV o el PDF se genera en tu teléfono para la hoja de compartir, y allí solo se conserva el más reciente. A dónde lo envíes depende de ti.',
++    fr: 'Exportations (Skip Pro). Le CSV ou le PDF est créé sur ton téléphone pour la feuille de partage, et seul le plus récent y est conservé. L’endroit où tu l’envoies dépend de toi.',
++  },
++  'legal.privacy.local.b6': {
++    en: 'The monthly wrap-up and “Remind me in 1 hour” notifications, which your phone schedules itself.',
++    es: 'El resumen mensual y las notificaciones “Remind me in 1 hour” (recordarme en 1 hora), que tu propio teléfono programa.',
++    fr: 'Le bilan mensuel et les notifications « Remind me in 1 hour » (me le rappeler dans 1 heure), que ton téléphone programme lui-même.',
++  },
++  'legal.privacy.local.p1': {
++    en: 'Your sign-in session is kept on your phone and only ever sent to Supabase, to prove it’s you.',
++    es: 'Tu sesión iniciada se guarda en tu teléfono y solo se envía a Supabase, para demostrar que eres tú.',
++    fr: 'Ta session ouverte est conservée sur ton téléphone et n’est envoyée qu’à Supabase, pour prouver que c’est bien toi.',
++  },
++  'legal.privacy.local.note': {
++    en: 'One exception: a shop or service name you type, or that Skip reads from a receipt, is looked up to find its logo.',
++    es: 'Una excepción: el nombre de una tienda o servicio que escribes, o que Skip lee de un recibo, se busca para encontrar su logo.',
++    fr: 'Une exception : le nom d’un magasin ou d’un service que tu saisis, ou que Skip lit sur un reçu, est recherché pour trouver son logo.',
+   },
+ 
+   'legal.privacy.voice.heading': {
+@@ -124,15 +185,20 @@ export const legalMessages = defineMessages({
+     es: 'Cuando tu iPhone puede ejecutar el reconocimiento de voz en el propio dispositivo, tu voz nunca sale de él. Cuando no puede, el servicio de reconocimiento de voz de Apple procesa el audio, conforme a los términos de privacidad de Apple y no a los de esta política.',
+     fr: 'Quand ton iPhone peut effectuer la reconnaissance vocale directement sur l’appareil, ta voix ne le quitte jamais. Quand il ne le peut pas, c’est le service de reconnaissance vocale d’Apple qui traite l’audio, selon les conditions de confidentialité d’Apple et non celles de la présente politique.',
+   },
++  'legal.privacy.voice.b5': {
++    en: 'To help Apple hear names correctly, Skip sends up to 100 hint words with each request: your own store, bill and subscription names first, then well-known brand names. When Apple’s servers do the recognising, these hints go to Apple too.',
++    es: 'Para ayudar a Apple a entender bien los nombres, Skip envía hasta 100 palabras de apoyo con cada solicitud: primero los nombres de tus propias tiendas, facturas y suscripciones, y luego nombres de marcas conocidas. Cuando son los servidores de Apple los que hacen el reconocimiento, estas palabras de apoyo también llegan a Apple.',
++    fr: 'Pour aider Apple à bien comprendre les noms, Skip envoie jusqu’à 100 mots d’appui avec chaque demande : d’abord les noms de tes propres magasins, factures et abonnements, puis des noms de marques connues. Quand ce sont les serveurs d’Apple qui font la reconnaissance, ces mots d’appui vont aussi à Apple.',
++  },
+   'legal.privacy.voice.b3': {
+     en: 'Skip never records or keeps the audio itself, on your phone or on our servers. Only the text you review and confirm becomes a receipt, bill or subscription — stored exactly like one you type in by hand.',
+     es: 'Skip nunca graba ni conserva el audio, ni en tu teléfono ni en nuestros servidores. Solo el texto que revisas y confirmas se convierte en un recibo, una factura o una suscripción, que se guarda exactamente igual que uno que escribes a mano.',
+     fr: 'Skip n’enregistre ni ne conserve jamais l’audio lui-même, ni sur ton téléphone ni sur nos serveurs. Seul le texte que tu vérifies et confirmes devient un reçu, une facture ou un abonnement, enregistré exactement comme ceux que tu saisis à la main.',
+   },
+   'legal.privacy.voice.b4': {
+-    en: 'If you correct what Skip heard (for example, turning “spot a fly” into Spotify), Skip remembers that correction on your phone only, so it recognises it next time. These corrections are never uploaded.',
+-    es: 'Si corriges lo que Skip escuchó (por ejemplo, cambiar “spot a fly” por Spotify), Skip recuerda esa corrección solo en tu teléfono, para reconocerla la próxima vez. Estas correcciones nunca se suben.',
+-    fr: 'Si tu corriges ce que Skip a entendu (par exemple, remplacer « spot a fly » par Spotify), Skip mémorise cette correction sur ton téléphone seulement, afin de la reconnaître la prochaine fois. Ces corrections ne sont jamais téléversées.',
++    en: 'If you correct what Skip heard (for example, turning “spot a fly” into Spotify), Skip remembers that correction on your phone only, so it recognises it next time. These corrections are never uploaded, and they are cleared when you sign out or delete your account.',
++    es: 'Si corriges lo que Skip escuchó (por ejemplo, cambiar “spot a fly” por Spotify), Skip recuerda esa corrección solo en tu teléfono, para reconocerla la próxima vez. Estas correcciones nunca se suben, y se borran cuando cierras sesión o eliminas tu cuenta.',
++    fr: 'Si tu corriges ce que Skip a entendu (par exemple, remplacer « spot a fly » par Spotify), Skip mémorise cette correction sur ton téléphone seulement, afin de la reconnaître la prochaine fois. Ces corrections ne sont jamais téléversées, et elles sont effacées quand tu te déconnectes ou que tu supprimes ton compte.',
+   },
+   'legal.privacy.voice.note': {
+     en: 'Skip asks for microphone and speech recognition access the first time you use voice input. You can turn either off at any time in iOS Settings → Skip Budget — typing still works exactly as before.',
+@@ -140,45 +206,132 @@ export const legalMessages = defineMessages({
+     fr: 'Skip demande l’accès au microphone et à la reconnaissance vocale la première fois que tu utilises la saisie vocale. Tu peux désactiver l’un ou l’autre à tout moment dans Réglages d’iOS → Skip Budget — la saisie au clavier fonctionne exactement comme avant.',
+   },
+ 
++  'legal.privacy.pro.heading': {
++    en: 'Paying for Skip Pro',
++    es: 'Pagar Skip Pro',
++    fr: 'Payer Skip Pro',
++  },
++  'legal.privacy.pro.p1': {
++    en: 'Skip Pro is bought through the App Store. Apple takes the payment, under Apple’s own terms and privacy policy. We never see your card details or your Apple Account.',
++    es: 'Skip Pro se compra a través del App Store. Apple cobra el pago, conforme a sus propios términos y a su propia política de privacidad. Nosotros nunca vemos los datos de tu tarjeta ni tu cuenta de Apple.',
++    fr: 'Skip Pro s’achète par l’intermédiaire de l’App Store. Apple perçoit le paiement, selon ses propres conditions et sa propre politique de confidentialité. Nous ne voyons jamais les données de ta carte ni ton compte Apple.',
++  },
++  'legal.privacy.pro.p2': {
++    en: 'RevenueCat, a service that works for us, checks your purchase with Apple and tells Skip whether you have Pro. Skip signs in to it with your Skip account id whenever you’re signed in, even if you never buy. It receives the purchase details Apple shares, such as the plan, its dates, whether it was a free trial, and the price and country.',
++    es: 'RevenueCat, un servicio que trabaja para nosotros, verifica tu compra con Apple y le dice a Skip si tienes Pro. Skip inicia sesión en RevenueCat con el identificador de tu cuenta de Skip siempre que tienes la sesión iniciada, aunque nunca compres nada. Recibe los datos de la compra que Apple comparte, como el plan, sus fechas, si fue una prueba gratuita, y el precio y el país.',
++    fr: 'RevenueCat, un service qui travaille pour nous, vérifie ton achat auprès d’Apple et indique à Skip si tu as Pro. Skip s’y connecte avec l’identifiant de ton compte Skip chaque fois que ta session est ouverte, même si tu n’achètes jamais rien. Il reçoit les détails d’achat qu’Apple transmet, comme le forfait, ses dates, s’il s’agissait d’un essai gratuit, ainsi que le prix et le pays.',
++  },
++  'legal.privacy.pro.p3': {
++    en: 'RevenueCat never receives your name, your email or anything you’ve entered in Skip.',
++    es: 'RevenueCat nunca recibe tu nombre, tu correo ni nada de lo que has ingresado en Skip.',
++    fr: 'RevenueCat ne reçoit jamais ton nom, ton adresse courriel ni rien de ce que tu as saisi dans Skip.',
++  },
++  'legal.privacy.pro.p4': {
++    en: 'We use this to switch Skip Pro on and off for you, and to see how Skip Pro is doing overall, such as how many people subscribe or cancel.',
++    es: 'Usamos esto para activar y desactivar Skip Pro por ti, y para ver cómo le va a Skip Pro en general, por ejemplo cuántas personas se suscriben o cancelan.',
++    fr: 'Nous nous en servons pour activer et désactiver Skip Pro pour toi, et pour voir comment Skip Pro se porte dans l’ensemble, par exemple combien de personnes s’abonnent ou annulent.',
++  },
++
+   'legal.privacy.others.heading': {
+     en: 'Who else sees it',
+     es: 'Quién más tiene acceso',
+     fr: 'Qui d’autre y a accès',
+   },
+   'legal.privacy.others.p1': {
+-    en: 'Skip uses a small number of services to run. They process data on our behalf and are not permitted to use it for their own purposes.',
+-    es: 'Skip usa un pequeño número de servicios para funcionar. Procesan los datos en nuestro nombre y no tienen permitido usarlos para sus propios fines.',
+-    fr: 'Skip fait appel à un petit nombre de services pour fonctionner. Ils traitent les données pour notre compte et n’ont pas le droit de les utiliser à leurs propres fins.',
++    en: 'Skip uses a few services to run. These ones work for us: they handle data only to provide their service to Skip, they may not use it for their own purposes, and they must protect it at least as well as this policy does.',
++    es: 'Skip usa algunos servicios para funcionar. Estos trabajan para nosotros: tratan los datos solo para prestar su servicio a Skip, no pueden usarlos para sus propios fines y deben protegerlos al menos tan bien como lo hace esta política.',
++    fr: 'Skip fait appel à quelques services pour fonctionner. Ceux-ci travaillent pour nous : ils ne traitent les données que pour fournir leur service à Skip, n’ont pas le droit de les utiliser à leurs propres fins et doivent les protéger au moins aussi bien que le fait la présente politique.',
+   },
+   'legal.privacy.others.b1': {
+-    en: 'Supabase — hosts the database your data lives in, and handles sign-in.',
+-    es: 'Supabase: aloja la base de datos donde viven tus datos y gestiona el inicio de sesión.',
+-    fr: 'Supabase — héberge la base de données où se trouvent tes données et gère la connexion.',
++    en: 'Supabase — hosts the database your data lives in and handles sign-in. When you type a store, Skip searches its own brand list there.',
++    es: 'Supabase: aloja la base de datos donde viven tus datos y gestiona el inicio de sesión. Cuando escribes una tienda, Skip busca allí en su propia lista de marcas.',
++    fr: 'Supabase — héberge la base de données où se trouvent tes données et gère la connexion. Quand tu saisis un magasin, Skip y cherche dans sa propre liste de marques.',
+   },
+-  'legal.privacy.others.b2': {
+-    en: 'Apple and Google — only if you choose to sign in with them, and only to confirm it is you.',
+-    es: 'Apple y Google: solo si decides iniciar sesión con ellos, y solo para confirmar que eres tú.',
+-    fr: 'Apple et Google — seulement si tu choisis de te connecter avec eux, et seulement pour confirmer que c’est bien toi.',
++  'legal.privacy.others.b6': {
++    en: 'RevenueCat — checks Skip Pro purchases with Apple (see “Paying for Skip Pro”).',
++    es: 'RevenueCat: verifica las compras de Skip Pro con Apple (consulta “Pagar Skip Pro”).',
++    fr: 'RevenueCat — vérifie les achats de Skip Pro auprès d’Apple (voir « Payer Skip Pro »).',
++  },
++  'legal.privacy.others.b7': {
++    en: 'Resend — sends the emails with your sign-in and reset codes, and delivers your contact-form messages to us.',
++    es: 'Resend: envía los correos con tus códigos de inicio de sesión y de restablecimiento, y nos entrega los mensajes de tu formulario de contacto.',
++    fr: 'Resend — envoie les courriels contenant tes codes de connexion et de réinitialisation, et nous remet les messages de ton formulaire de contact.',
+   },
+   'legal.privacy.others.b3': {
+-    en: 'Sentry — receives crash and error reports so faults can be fixed. These describe what the app was doing, not what your budget contains.',
+-    es: 'Sentry: recibe informes de fallos y errores para poder corregirlos. Describen lo que hacía la aplicación, no lo que contiene tu presupuesto.',
+-    fr: 'Sentry — reçoit des rapports de plantage et d’erreur afin que les problèmes puissent être corrigés. Ils décrivent ce que l’application était en train de faire, pas le contenu de ton budget.',
++    en: 'Sentry — receives crash and error reports so faults can be fixed. A report carries your iPhone model, the iOS and app versions, and what the app was doing. Like any web service, Sentry may also see the internet address a report comes from.',
++    es: 'Sentry: recibe informes de fallos y errores para poder corregirlos. Un informe incluye el modelo de tu iPhone, las versiones de iOS y de la aplicación, y lo que la aplicación estaba haciendo. Como cualquier servicio web, Sentry también puede ver la dirección de internet desde la que llega un informe.',
++    fr: 'Sentry — reçoit des rapports de plantage et d’erreur afin que les problèmes puissent être corrigés. Un rapport indique le modèle de ton iPhone, les versions d’iOS et de l’application, et ce que l’application était en train de faire. Comme tout service Web, Sentry peut aussi voir l’adresse Internet d’où provient un rapport.',
++  },
++  'legal.privacy.others.b8': {
++    en: 'Cloudflare — runs Skip Logos, our own logo service, described below.',
++    es: 'Cloudflare: opera Skip Logos, nuestro propio servicio de logos, descrito más abajo.',
++    fr: 'Cloudflare — exploite Skip Logos, notre propre service de logos, décrit plus bas.',
++  },
++  'legal.privacy.others.p3': {
++    en: 'Skip Logos finds logos for shops and services. To find one, your phone sends a shop or service name or a website, your iPhone’s Region country and a category. It never sends your account id, email or name.',
++    es: 'Skip Logos encuentra logos para tiendas y servicios. Para encontrar uno, tu teléfono envía el nombre de una tienda o servicio o un sitio web, el país de la Región de tu iPhone y una categoría. Nunca envía el identificador de tu cuenta, tu correo ni tu nombre.',
++    fr: 'Skip Logos trouve des logos pour les magasins et les services. Pour en trouver un, ton téléphone envoie le nom d’un magasin ou d’un service ou un site Web, le pays indiqué dans Région sur ton iPhone et une catégorie. Il n’envoie jamais l’identifiant de ton compte, ton adresse courriel ni ton nom.',
++  },
++  'legal.privacy.others.p4': {
++    en: 'When you pick a logo, Skip also sends a tag made from your account id by one-way scrambling, so each person counts as one vote. The tag can’t be turned back into your account id. If you report a wrong logo, the report sends the website and the name.',
++    es: 'Cuando eliges un logo, Skip también envía una etiqueta creada a partir del identificador de tu cuenta mediante una codificación de un solo sentido, para que cada persona cuente como un solo voto. La etiqueta no se puede convertir de nuevo en el identificador de tu cuenta. Si reportas un logo incorrecto, el reporte envía el sitio web y el nombre.',
++    fr: 'Quand tu choisis un logo, Skip envoie aussi une étiquette créée à partir de l’identifiant de ton compte par un codage à sens unique, de sorte que chaque personne compte pour un seul vote. L’étiquette ne peut pas être reconvertie en identifiant de ton compte. Si tu signales un mauvais logo, le signalement envoie le site Web et le nom.',
++  },
++  'legal.privacy.others.p5': {
++    en: 'The service keeps names it didn’t know (with the country), votes (with the tag) and reports. To learn a new name, it may look it up on Wikidata and visit the brand’s own website. Those lookups come from Cloudflare, not your phone, and aren’t tied to you. Skip Logos and logos.skipapps.net run on Cloudflare, which sees your phone’s internet address like any website. Our code doesn’t store it, and Cloudflare keeps its own request logs for a few days.',
++    es: 'El servicio guarda los nombres que no conocía (con el país), los votos (con la etiqueta) y los reportes. Para aprender un nombre nuevo, puede buscarlo en Wikidata y visitar el sitio web de la propia marca. Esas búsquedas las hace Cloudflare, no tu teléfono, y no se vinculan contigo. Skip Logos y logos.skipapps.net funcionan en Cloudflare, que ve la dirección de internet de tu teléfono como cualquier sitio web. Nuestro código no la guarda, y Cloudflare conserva sus propios registros de solicitudes durante unos días.',
++    fr: 'Le service conserve les noms qu’il ne connaissait pas (avec le pays), les votes (avec l’étiquette) et les signalements. Pour apprendre un nouveau nom, il peut le chercher sur Wikidata et visiter le site Web de la marque elle-même. Ces recherches proviennent de Cloudflare, pas de ton téléphone, et ne sont pas liées à toi. Skip Logos et logos.skipapps.net fonctionnent sur Cloudflare, qui voit l’adresse Internet de ton téléphone comme n’importe quel site Web. Notre code ne la conserve pas, et Cloudflare garde ses propres journaux de requêtes pendant quelques jours.',
++  },
++  'legal.privacy.others.p6': {
++    en: 'These companies work with you directly, under their own privacy policies:',
++    es: 'Estas empresas trabajan directamente contigo, conforme a sus propias políticas de privacidad:',
++    fr: 'Ces entreprises travaillent directement avec toi, selon leurs propres politiques de confidentialité :',
++  },
++  'legal.privacy.others.b2': {
++    en: 'Apple — if you choose Sign in with Apple, to confirm it is you.',
++    es: 'Apple: si eliges Iniciar sesión con Apple, para confirmar que eres tú.',
++    fr: 'Apple — si tu choisis Se connecter avec Apple, pour confirmer que c’est bien toi.',
++  },
++  'legal.privacy.others.b9': {
++    en: 'Apple’s App Store — takes payment for Skip Pro.',
++    es: 'App Store de Apple: cobra el pago de Skip Pro.',
++    fr: 'L’App Store d’Apple — perçoit le paiement de Skip Pro.',
+   },
+   'legal.privacy.others.b4': {
+-    en: 'Apple Push Notification service — delivers reminders, if you turn them on.',
+-    es: 'Apple Push Notification service: entrega los recordatorios, si los activas.',
+-    fr: 'Apple Push Notification service — transmet les rappels, si tu les actives.',
++    en: 'Apple Push Notification service — delivers your reminders and “payment went out” notices, once you’ve turned on a reminder. A notice’s text can include a bill, subscription or card name and an amount.',
++    es: 'Apple Push Notification service: entrega tus recordatorios y los avisos de “el pago salió”, una vez que activas un recordatorio. El texto de un aviso puede incluir el nombre de una factura, suscripción o tarjeta y un importe.',
++    fr: 'Apple Push Notification service — transmet tes rappels et les avis « le paiement est sorti », dès que tu as activé un rappel. Le texte d’un avis peut comprendre le nom d’une facture, d’un abonnement ou d’une carte, ainsi qu’un montant.',
+   },
+   'legal.privacy.others.b5': {
+-    en: 'Apple’s speech recognition — if your iPhone can’t run speech recognition on the device, what you say when you use voice input is sent to Apple’s speech service to turn it into text, under Apple’s own privacy terms. Skip never receives the audio itself, only the text it returns.',
+-    es: 'El reconocimiento de voz de Apple: si tu iPhone no puede ejecutar el reconocimiento de voz en el propio dispositivo, lo que dices al usar la entrada por voz se envía al servicio de voz de Apple para convertirlo en texto, conforme a los términos de privacidad de Apple. Skip nunca recibe el audio, solo el texto que Apple le devuelve.',
+-    fr: 'La reconnaissance vocale d’Apple — si ton iPhone ne peut pas effectuer la reconnaissance vocale sur l’appareil, ce que tu dis en utilisant la saisie vocale est envoyé au service vocal d’Apple pour être transformé en texte, selon les conditions de confidentialité d’Apple. Skip ne reçoit jamais l’audio lui-même, seulement le texte qui lui est renvoyé.',
++    en: 'Apple’s speech recognition — if your iPhone can’t run speech recognition on the device, what you say when you use voice input, and the hint words, go to Apple’s speech service to be turned into text. Skip never receives the audio itself, only the text.',
++    es: 'El reconocimiento de voz de Apple: si tu iPhone no puede ejecutar el reconocimiento de voz en el propio dispositivo, lo que dices al usar la entrada por voz, y las palabras de apoyo, van al servicio de voz de Apple para convertirse en texto. Skip nunca recibe el audio, solo el texto.',
++    fr: 'La reconnaissance vocale d’Apple — si ton iPhone ne peut pas effectuer la reconnaissance vocale sur l’appareil, ce que tu dis en utilisant la saisie vocale, ainsi que les mots d’appui, sont envoyés au service vocal d’Apple pour être transformés en texte. Skip ne reçoit jamais l’audio lui-même, seulement le texte.',
++  },
++  'legal.privacy.others.b10': {
++    en: 'Google — if you choose to sign in with Google, to confirm it is you. Google’s sign-in tool, which is built into Skip, may also collect some details for Google, as Google’s privacy policy describes.',
++    es: 'Google: si eliges iniciar sesión con Google, para confirmar que eres tú. La herramienta de inicio de sesión de Google, que está integrada en Skip, también puede recopilar algunos datos para Google, como describe la política de privacidad de Google.',
++    fr: 'Google — si tu choisis de te connecter avec Google, pour confirmer que c’est bien toi. L’outil de connexion de Google, intégré à Skip, peut aussi recueillir certains renseignements pour Google, comme le décrit la politique de confidentialité de Google.',
+   },
+   'legal.privacy.others.p2': {
+-    en: 'Skip does not sell your data, does not share it for advertising, and carries no advertising or third-party analytics beyond the crash reporting described above.',
+-    es: 'Skip no vende tus datos, no los comparte con fines publicitarios y no incluye publicidad ni analítica de terceros más allá de los informes de fallos descritos arriba.',
+-    fr: 'Skip ne vend pas tes données, ne les communique pas à des fins publicitaires et ne contient ni publicité ni outil d’analyse tiers, hormis les rapports de plantage décrits ci-dessus.',
++    en: 'Skip does not sell your data, does not share it for advertising, and does not track you across other apps or websites. It carries no advertising and no tools that follow what you do in the app. Beyond your own data, the only information we get is the crash and error reports, the Skip Pro purchase details, and the logo lookups, votes and reports described above.',
++    es: 'Skip no vende tus datos, no los comparte con fines publicitarios y no te rastrea en otras aplicaciones ni sitios web. No incluye publicidad ni herramientas que sigan lo que haces en la aplicación. Además de tus propios datos, la única información que recibimos son los informes de fallos y errores, los datos de compra de Skip Pro, y las búsquedas, votos y reportes de logos descritos arriba.',
++    fr: 'Skip ne vend pas tes données, ne les communique pas à des fins publicitaires et ne te suit pas dans d’autres applications ni sur d’autres sites Web. Elle ne contient aucune publicité ni aucun outil qui suive ce que tu fais dans l’application. Outre tes propres données, les seuls renseignements que nous recevons sont les rapports de plantage et d’erreur, les détails d’achat de Skip Pro, ainsi que les recherches, les votes et les signalements de logos décrits ci-dessus.',
++  },
++
++  'legal.privacy.where.heading': {
++    en: 'Where your data is stored',
++    es: 'Dónde se almacenan tus datos',
++    fr: 'Où tes données sont stockées',
++  },
++  'legal.privacy.where.p1': {
++    en: 'Your data is stored on servers run by Supabase, in Canada (Montréal).',
++    es: 'Tus datos se almacenan en servidores operados por Supabase, en Canadá (Montreal).',
++    fr: 'Tes données sont stockées sur des serveurs exploités par Supabase, au Canada (Montréal).',
++  },
++  'legal.privacy.where.p2': {
++    en: 'The other services above may handle data in other countries. Sentry, for example, stores crash and error reports in the United States. Wherever they are, they must protect it as this policy describes.',
++    es: 'Los otros servicios mencionados arriba pueden tratar datos en otros países. Sentry, por ejemplo, almacena los informes de fallos y errores en Estados Unidos. Estén donde estén, deben protegerlos como describe esta política.',
++    fr: 'Les autres services mentionnés ci-dessus peuvent traiter des données dans d’autres pays. Sentry, par exemple, stocke les rapports de plantage et d’erreur aux États-Unis. Où qu’ils soient, ils doivent les protéger comme le décrit la présente politique.',
+   },
+ 
+   'legal.privacy.kept.heading': {
+@@ -187,14 +340,49 @@ export const legalMessages = defineMessages({
+     fr: 'Combien de temps les données sont conservées',
+   },
+   'legal.privacy.kept.b1': {
+-    en: 'Things that happened — recorded charges, receipts and card payments — are kept for seven years and then deleted automatically, a day at a time as each one passes the boundary.',
+-    es: 'Lo que ya ocurrió (cargos registrados, recibos y pagos de tarjeta) se conserva durante siete años y después se elimina automáticamente, día por día, a medida que cada elemento rebasa ese límite.',
+-    fr: 'Ce qui s’est produit — prélèvements enregistrés, reçus et paiements de carte — est conservé pendant sept ans, puis supprimé automatiquement, jour après jour, à mesure que chaque élément dépasse cette limite.',
++    en: 'Things that happened (recorded charges, receipts, including habit days, card payments and transfers, and pay you received) are deleted automatically seven years after the date on them.',
++    es: 'Lo que ya ocurrió (cargos registrados, recibos, incluidos los días de hábito, pagos de tarjeta y transferencias, y los pagos que recibiste) se elimina automáticamente siete años después de la fecha que tiene.',
++    fr: 'Ce qui s’est produit (prélèvements enregistrés, reçus, y compris les jours d’habitude, paiements de carte et virements, et paies reçues) est supprimé automatiquement sept ans après la date qui y figure.',
+   },
+   'legal.privacy.kept.b2': {
+-    en: 'Things that are still running — bills, subscriptions, credit cards, accounts and salary sources — are kept until you delete them, because a standing order set up years ago is still a standing order.',
+-    es: 'Lo que sigue en marcha (facturas, suscripciones, tarjetas de crédito, cuentas y fuentes de salario) se conserva hasta que lo elimines, porque un pago domiciliado que contrataste hace años sigue siendo un pago domiciliado.',
+-    fr: 'Ce qui est toujours en cours — factures, abonnements, cartes de crédit, comptes et sources de salaire — est conservé jusqu’à ce que tu le supprimes, car un paiement préautorisé établi il y a des années reste un paiement préautorisé.',
++    en: 'Everything else you set up — bills, subscriptions, loans (with any extra payments), cards, accounts, salaries, savings, goals, habits and receipt books — is kept until you delete it. A standing order set up years ago is still a standing order.',
++    es: 'Todo lo demás que configuras (facturas, suscripciones, préstamos con sus pagos adicionales, tarjetas, cuentas, salarios, ahorros, metas, hábitos y libros de recibos) se conserva hasta que lo elimines. Un pago domiciliado contratado hace años sigue siendo un pago domiciliado.',
++    fr: 'Tout le reste de ce que tu configures — factures, abonnements, prêts (avec leurs paiements supplémentaires), cartes, comptes, salaires, épargne, objectifs, habitudes et carnets de reçus — est conservé jusqu’à ce que tu le supprimes. Un paiement préautorisé établi il y a des années reste un paiement préautorisé.',
++  },
++  'legal.privacy.kept.b3': {
++    en: 'On the Free plan, lists show the last 90 days. Older entries are hidden, not deleted: they still count in your balances, and Skip Pro shows them again.',
++    es: 'Con el plan gratis, las listas muestran los últimos 90 días. Las entradas más antiguas se ocultan, no se eliminan: siguen contando en tus saldos, y Skip Pro las vuelve a mostrar.',
++    fr: 'Avec le forfait gratuit, les listes affichent les 90 derniers jours. Les entrées plus anciennes sont masquées, pas supprimées : elles comptent toujours dans tes soldes, et Skip Pro les affiche de nouveau.',
++  },
++  'legal.privacy.kept.b4': {
++    en: 'Your account, profile and settings are kept until you delete your account.',
++    es: 'Tu cuenta, tu perfil y tus ajustes se conservan hasta que elimines tu cuenta.',
++    fr: 'Ton compte, ton profil et tes réglages sont conservés jusqu’à ce que tu supprimes ton compte.',
++  },
++  'legal.privacy.kept.b5': {
++    en: 'Messages you send us stay in our email inbox until you ask us to delete them. Resend keeps its own record of sending them for a limited time.',
++    es: 'Los mensajes que nos envías permanecen en nuestra bandeja de correo hasta que nos pidas eliminarlos. Resend guarda su propio registro de los envíos durante un tiempo limitado.',
++    fr: 'Les messages que tu nous envoies restent dans notre boîte courriel jusqu’à ce que tu nous demandes de les supprimer. Resend conserve son propre registre de leur envoi pendant une durée limitée.',
++  },
++  'legal.privacy.kept.b6': {
++    en: 'RevenueCat keeps its record of your Skip Pro purchases, even after you delete your Skip account.',
++    es: 'RevenueCat conserva su registro de tus compras de Skip Pro, incluso después de que elimines tu cuenta de Skip.',
++    fr: 'RevenueCat conserve son registre de tes achats de Skip Pro, même après que tu as supprimé ton compte Skip.',
++  },
++  'legal.privacy.kept.b7': {
++    en: 'Sentry deletes crash and error reports automatically after [SENTRY DAYS] days.',
++    es: 'Sentry elimina automáticamente los informes de fallos y errores después de [SENTRY DAYS] días.',
++    fr: 'Sentry supprime automatiquement les rapports de plantage et d’erreur après [SENTRY DAYS] jours.',
++  },
++  'legal.privacy.kept.b8': {
++    en: 'Skip Logos keeps names, votes and reports without your account id.',
++    es: 'Skip Logos guarda nombres, votos y reportes sin el identificador de tu cuenta.',
++    fr: 'Skip Logos conserve des noms, des votes et des signalements sans l’identifiant de ton compte.',
++  },
++  'legal.privacy.kept.b9': {
++    en: 'Our hosting providers keep short technical logs, such as the internet address a request came from, and rolling backups, for a limited time.',
++    es: 'Nuestros proveedores de alojamiento conservan registros técnicos breves, como la dirección de internet desde la que llegó una solicitud, y copias de seguridad rotativas, durante un tiempo limitado.',
++    fr: 'Nos hébergeurs conservent de courts journaux techniques, comme l’adresse Internet d’où provient une requête, ainsi que des sauvegardes tournantes, pendant une durée limitée.',
+   },
+ 
+   'legal.privacy.deleting.heading': {
+@@ -203,15 +391,101 @@ export const legalMessages = defineMessages({
+     fr: 'Supprimer ton compte',
+   },
+   'legal.privacy.deleting.p1': {
+-    en: 'Settings → Delete account removes your account and everything listed above. Skip shows you a count of exactly what will go before it does anything, and asks twice.',
+-    es: 'Ajustes → Eliminar cuenta elimina tu cuenta y todo lo enumerado arriba. Skip te muestra un recuento exacto de lo que se va a eliminar antes de hacer nada, y te lo pregunta dos veces.',
+-    fr: 'Réglages → Supprimer le compte supprime ton compte et tout ce qui est énuméré ci-dessus. Skip te montre le décompte exact de ce qui sera supprimé avant de faire quoi que ce soit, et te demande deux fois de confirmer.',
++    en: 'Settings → Delete account removes your account and everything Skip keeps about you in its database, all at once. Skip asks twice before it does anything, and shows you a count of the main things that will go.',
++    es: 'Ajustes → Eliminar cuenta elimina tu cuenta y todo lo que Skip guarda sobre ti en su base de datos, todo de una vez. Skip te pregunta dos veces antes de hacer nada, y te muestra un recuento de las principales cosas que se eliminarán.',
++    fr: 'Réglages → Supprimer le compte supprime ton compte et tout ce que Skip conserve à ton sujet dans sa base de données, le tout d’un seul coup. Skip te demande deux fois de confirmer avant de faire quoi que ce soit, et te montre le décompte des principaux éléments qui seront supprimés.',
++  },
++  'legal.privacy.deleting.p2': {
++    en: 'On your phone, Skip also clears your voice corrections, remembered stores, recent searches and any unfinished voice entry.',
++    es: 'En tu teléfono, Skip también borra tus correcciones de voz, las tiendas recordadas, las búsquedas recientes y cualquier entrada por voz sin terminar.',
++    fr: 'Sur ton téléphone, Skip efface aussi tes corrections vocales, les magasins mémorisés, tes recherches récentes et toute saisie vocale inachevée.',
+   },
+   'legal.privacy.deleting.note': {
+     en: 'Deletion is immediate and permanent. There is no grace period and no backup copy kept for you to restore from.',
+     es: 'La eliminación es inmediata y permanente. No hay periodo de gracia ni se conserva ninguna copia de respaldo desde la cual puedas restaurar tus datos.',
+     fr: 'La suppression est immédiate et définitive. Il n’y a aucun délai de grâce et aucune copie de sauvegarde n’est conservée pour te permettre de restaurer tes données.',
+   },
++  'legal.privacy.deleting.note2': {
++    en: 'Deleting your account does not cancel Skip Pro. Apple keeps billing you until you cancel. Cancel first in iOS Settings → your name → Subscriptions. If you have Skip Pro, Skip asks you to cancel it before you delete.',
++    es: 'Eliminar tu cuenta no cancela Skip Pro. Apple sigue cobrándote hasta que lo canceles. Cancélalo primero en Ajustes de iOS → tu nombre → Suscripciones. Si tienes Skip Pro, Skip te pide que lo canceles antes de eliminar tu cuenta.',
++    fr: 'Supprimer ton compte n’annule pas Skip Pro. Apple continue de te facturer jusqu’à ce que tu l’annules. Annule-le d’abord dans Réglages d’iOS → ton nom → Abonnements. Si tu as Skip Pro, Skip te demande de l’annuler avant de supprimer ton compte.',
++  },
++  'legal.privacy.deleting.p3': {
++    en: 'A few things sit outside your Skip account and stay after you delete it:',
++    es: 'Algunas cosas están fuera de tu cuenta de Skip y permanecen después de que la elimines:',
++    fr: 'Quelques éléments se trouvent hors de ton compte Skip et subsistent après que tu l’as supprimé :',
++  },
++  'legal.privacy.deleting.b1': {
++    en: 'Apple’s own record of your purchases, and your Skip Pro subscription until you cancel it.',
++    es: 'El propio registro de Apple de tus compras, y tu suscripción a Skip Pro hasta que la canceles.',
++    fr: 'Le registre d’Apple concernant tes achats, et ton abonnement à Skip Pro tant que tu ne l’as pas annulé.',
++  },
++  'legal.privacy.deleting.b2': {
++    en: 'RevenueCat’s record of your Skip Pro purchases.',
++    es: 'El registro de RevenueCat de tus compras de Skip Pro.',
++    fr: 'Le registre de RevenueCat concernant tes achats de Skip Pro.',
++  },
++  'legal.privacy.deleting.b3': {
++    en: 'Crash and error reports already sent to Sentry, until Sentry deletes them on schedule.',
++    es: 'Los informes de fallos y errores ya enviados a Sentry, hasta que Sentry los elimine según su calendario.',
++    fr: 'Les rapports de plantage et d’erreur déjà envoyés à Sentry, jusqu’à ce que Sentry les supprime selon son calendrier.',
++  },
++  'legal.privacy.deleting.b4': {
++    en: 'Logo votes, which carry only the scrambled tag, and wrong-logo reports and unknown shop names, which carry nothing about you.',
++    es: 'Los votos de logos, que solo llevan la etiqueta codificada, y los reportes de logos incorrectos y los nombres de tiendas desconocidos, que no llevan nada sobre ti.',
++    fr: 'Les votes de logos, qui ne portent que l’étiquette codée, ainsi que les signalements de mauvais logos et les noms de magasins inconnus, qui ne portent rien à ton sujet.',
++  },
++  'legal.privacy.deleting.b5': {
++    en: 'Emails already sent, such as your sign-in codes, and messages you sent us. Ask and we’ll delete the messages.',
++    es: 'Los correos ya enviados, como tus códigos de inicio de sesión, y los mensajes que nos enviaste. Pídenoslo y eliminaremos los mensajes.',
++    fr: 'Les courriels déjà envoyés, comme tes codes de connexion, et les messages que tu nous as envoyés. Demande-le-nous et nous supprimerons les messages.',
++  },
++  'legal.privacy.deleting.b7': {
++    en: 'Our hosting providers’ short technical logs and rolling backups, until they expire.',
++    es: 'Los registros técnicos breves y las copias de seguridad rotativas de nuestros proveedores de alojamiento, hasta que caduquen.',
++    fr: 'Les courts journaux techniques et les sauvegardes tournantes de nos hébergeurs, jusqu’à leur expiration.',
++  },
++  'legal.privacy.deleting.b6': {
++    en: 'Apple or Google may still list Skip as an app you signed in with. You can remove it there (see “Your choices”).',
++    es: 'Apple o Google pueden seguir mostrando Skip como una app con la que iniciaste sesión. Puedes quitarla allí (consulta “Tus opciones”).',
++    fr: 'Apple ou Google peuvent continuer d’afficher Skip comme une application avec laquelle tu as ouvert une session. Tu peux l’y retirer (voir « Tes choix »).',
++  },
++
++  'legal.privacy.choices.heading': {
++    en: 'Your choices',
++    es: 'Tus opciones',
++    fr: 'Tes choix',
++  },
++  'legal.privacy.choices.p1': {
++    en: 'You can change these at any time:',
++    es: 'Puedes cambiar esto en cualquier momento:',
++    fr: 'Tu peux modifier ces choix à tout moment :',
++  },
++  'legal.privacy.choices.b1': {
++    en: 'Microphone, speech recognition and notifications: turn any of them off in iOS Settings → Skip Budget. Typing still works. Voice entry and reminders stop until you turn them back on.',
++    es: 'Micrófono, reconocimiento de voz y notificaciones: desactiva cualquiera de ellos en Ajustes de iOS → Skip Budget. Escribir sigue funcionando. La entrada por voz y los recordatorios se detienen hasta que los vuelvas a activar.',
++    fr: 'Microphone, reconnaissance vocale et notifications : désactive n’importe lequel dans Réglages d’iOS → Skip Budget. La saisie au clavier fonctionne toujours. La saisie vocale et les rappels s’arrêtent jusqu’à ce que tu les réactives.',
++  },
++  'legal.privacy.choices.b2': {
++    en: 'Signing out deletes your phone’s push address from our servers. Turning reminders off in Skip doesn’t; to stop all notices, turn notifications off in iOS Settings → Skip Budget.',
++    es: 'Cerrar sesión elimina de nuestros servidores la dirección push de tu teléfono. Desactivar los recordatorios en Skip no lo hace; para detener todos los avisos, desactiva las notificaciones en Ajustes de iOS → Skip Budget.',
++    fr: 'Se déconnecter supprime de nos serveurs l’adresse push de ton téléphone. Désactiver les rappels dans Skip ne le fait pas ; pour arrêter tous les avis, désactive les notifications dans Réglages d’iOS → Skip Budget.',
++  },
++  'legal.privacy.choices.b3': {
++    en: 'Sign in with Apple: you can stop it in iOS Settings → your name → Sign in with Apple.',
++    es: 'Iniciar sesión con Apple: puedes detenerlo en Ajustes de iOS → tu nombre → Iniciar sesión con Apple.',
++    fr: 'Se connecter avec Apple : tu peux l’arrêter dans Réglages d’iOS → ton nom → Se connecter avec Apple.',
++  },
++  'legal.privacy.choices.b4': {
++    en: 'Sign in with Google: you can remove Skip from the third-party connections in your Google Account.',
++    es: 'Iniciar sesión con Google: puedes quitar Skip de las conexiones de terceros de tu cuenta de Google.',
++    fr: 'Se connecter avec Google : tu peux retirer Skip des connexions tierces de ton compte Google.',
++  },
++  'legal.privacy.choices.note': {
++    en: 'Stopping Apple or Google sign-in doesn’t delete your Skip account, and you may not be able to sign in to it that way again. To remove your data, delete your account in Skip first.',
++    es: 'Detener el inicio de sesión con Apple o Google no elimina tu cuenta de Skip, y es posible que ya no puedas iniciar sesión así. Para eliminar tus datos, primero elimina tu cuenta en Skip.',
++    fr: 'Arrêter la connexion avec Apple ou Google ne supprime pas ton compte Skip, et il se peut que tu ne puisses plus t’y connecter de cette façon. Pour supprimer tes données, supprime d’abord ton compte dans Skip.',
++  },
+ 
+   'legal.privacy.rights.heading': {
+     en: 'Your rights over your data',
+@@ -219,9 +493,19 @@ export const legalMessages = defineMessages({
+     fr: 'Tes droits sur tes données',
+   },
+   'legal.privacy.rights.p1': {
+-    en: 'You can see everything Skip holds about you inside the app, correct any of it by editing it, and delete all of it from Settings. Depending on where you live you may also have a right to a copy of your data in a portable form, or to object to some processing. Write to admin@skipapps.net and we will action it.',
+-    es: 'Puedes ver dentro de la aplicación todo lo que Skip guarda sobre ti, corregirlo editándolo y eliminarlo todo desde Ajustes. Según dónde vivas, también puedes tener derecho a recibir una copia de tus datos en un formato portátil, o a oponerte a cierto tratamiento. Escribe a admin@skipapps.net y daremos curso a tu solicitud.',
+-    fr: 'Tu peux voir dans l’application tout ce que Skip détient à ton sujet, corriger n’importe quel élément en le modifiant et tout supprimer depuis Réglages. Selon l’endroit où tu vis, tu peux aussi avoir le droit d’obtenir une copie de tes données dans un format portable, ou de t’opposer à certains traitements. Écris à admin@skipapps.net et nous y donnerons suite.',
++    en: 'You can correct most of what you entered by editing it, and delete it, or your whole account, in the app. For anything you can’t remove yourself, write to us.',
++    es: 'Puedes corregir la mayor parte de lo que ingresaste editándolo, y eliminarlo, o eliminar toda tu cuenta, en la aplicación. Para lo que no puedas eliminar tú mismo, escríbenos.',
++    fr: 'Tu peux corriger la plupart de ce que tu as saisi en le modifiant, et le supprimer, ou supprimer tout ton compte, dans l’application. Pour tout ce que tu ne peux pas retirer toi-même, écris-nous.',
++  },
++  'legal.privacy.rights.p2': {
++    en: 'Write to admin@skipapps.net and we will send you a copy of everything we hold about you.',
++    es: 'Escribe a admin@skipapps.net y te enviaremos una copia de todo lo que tenemos sobre ti.',
++    fr: 'Écris à admin@skipapps.net et nous t’enverrons une copie de tout ce que nous détenons à ton sujet.',
++  },
++  'legal.privacy.rights.p3': {
++    en: 'Depending on where you live, you may also have the right to get your data in a portable form, to object to or limit some processing, and to complain to your data protection authority. Write to us and we will action it.',
++    es: 'Según dónde vivas, también puedes tener derecho a obtener tus datos en un formato portátil, a oponerte a cierto tratamiento o a limitarlo, y a presentar una queja ante tu autoridad de protección de datos. Escríbenos y daremos curso a tu solicitud.',
++    fr: 'Selon l’endroit où tu vis, tu peux aussi avoir le droit d’obtenir tes données dans un format portable, de t’opposer à certains traitements ou de les limiter, et de déposer une plainte auprès de ton autorité de protection des données. Écris-nous et nous y donnerons suite.',
+   },
+ 
+   'legal.privacy.children.heading': {
+@@ -230,9 +514,9 @@ export const legalMessages = defineMessages({
+     fr: 'Enfants',
+   },
+   'legal.privacy.children.p1': {
+-    en: 'Skip is not intended for children, and we do not knowingly collect data from anyone under the age required to consent where they live. If you believe a child has created an account, write to us and we will remove it.',
+-    es: 'Skip no está dirigida a menores de edad, y no recopilamos datos a sabiendas de ninguna persona que no tenga la edad requerida para dar su consentimiento en el lugar donde vive. Si crees que un menor creó una cuenta, escríbenos y la eliminaremos.',
+-    fr: 'Skip n’est pas destinée aux enfants, et nous ne recueillons pas sciemment de données auprès de personnes qui n’ont pas atteint l’âge requis pour consentir là où elles vivent. Si tu crois qu’un enfant a créé un compte, écris-nous et nous le supprimerons.',
++    en: 'Skip is for people aged 18 and over. We do not knowingly collect data from anyone younger. If you believe someone under 18 has created an account, write to us and we will delete it.',
++    es: 'Skip es para personas de 18 años o más. No recopilamos datos a sabiendas de nadie menor. Si crees que una persona menor de 18 años creó una cuenta, escríbenos y la eliminaremos.',
++    fr: 'Skip s’adresse aux personnes de 18 ans et plus. Nous ne recueillons pas sciemment de données auprès de personnes plus jeunes. Si tu crois qu’une personne de moins de 18 ans a créé un compte, écris-nous et nous le supprimerons.',
+   },
+ 
+   'legal.privacy.changes.heading': {
+@@ -241,9 +525,9 @@ export const legalMessages = defineMessages({
+     fr: 'Modifications de cette politique',
+   },
+   'legal.privacy.changes.p1': {
+-    en: 'If this policy changes in a way that affects what is collected or who it is shared with, the date at the top changes and you will be told in the app before the change takes effect.',
+-    es: 'Si esta política cambia de un modo que afecte lo que se recopila o con quién se comparte, cambiará la fecha que aparece arriba y se te avisará dentro de la aplicación antes de que el cambio entre en vigor.',
+-    fr: 'Si cette politique change d’une façon qui touche ce qui est recueilli ou les personnes avec qui c’est communiqué, la date en haut change et nous t’en informerons dans l’application avant l’entrée en vigueur de la modification.',
++    en: 'If this policy changes in a way that affects what is collected or who it is shared with, the date at the top changes and Skip tells you on its Notifications page before the change takes effect.',
++    es: 'Si esta política cambia de un modo que afecte lo que se recopila o con quién se comparte, cambiará la fecha que aparece arriba y Skip te avisará en su página de Notificaciones antes de que el cambio entre en vigor.',
++    fr: 'Si cette politique change d’une façon qui touche ce qui est recueilli ou les personnes avec qui c’est communiqué, la date en haut change et Skip t’en informe sur sa page Notifications avant l’entrée en vigueur de la modification.',
+   },
+ 
+   // Terms of service
+@@ -254,14 +538,39 @@ export const legalMessages = defineMessages({
+     fr: 'Conditions d’utilisation',
+   },
+   'legal.terms.updated': {
+-    en: '28 August 2026',
+-    es: '28 de agosto de 2026',
+-    fr: '28 août 2026',
++    en: '[DATE]',
++    es: '[DATE]',
++    fr: '[DATE]',
+   },
+   'legal.terms.summary': {
+-    en: 'The agreement between you and the Weknd team for using Skip. In short: it is a tool for tracking your own money, it is not financial advice, what you enter stays yours, and you can delete all of it whenever you like.',
+-    es: 'El acuerdo entre tú y el equipo de Weknd para usar Skip. En resumen: es una herramienta para llevar el control de tu propio dinero, no es asesoría financiera, lo que ingresas sigue siendo tuyo y puedes eliminarlo todo cuando quieras.',
+-    fr: 'L’entente entre toi et l’équipe Weknd pour l’utilisation de Skip. En bref : c’est un outil pour suivre ton propre argent, ce n’est pas un conseil financier, ce que tu saisis reste à toi, et tu peux tout supprimer quand tu veux.',
++    en: 'The agreement between you and Skip Budget for using Skip.',
++    es: 'El acuerdo entre tú y Skip Budget para usar Skip.',
++    fr: 'L’entente entre toi et Skip Budget pour l’utilisation de Skip.',
++  },
++  'legal.terms.summary.lead': {
++    en: 'In short:',
++    es: 'En resumen:',
++    fr: 'En bref :',
++  },
++  'legal.terms.summary.b1': {
++    en: 'Skip is free to download, and most of its features are free.',
++    es: 'Skip se descarga gratis, y la mayoría de sus funciones son gratuitas.',
++    fr: 'Skip se télécharge gratuitement, et la plupart de ses fonctionnalités sont gratuites.',
++  },
++  'legal.terms.summary.b2': {
++    en: 'Skip Pro is an optional subscription, billed by Apple.',
++    es: 'Skip Pro es una suscripción opcional, que cobra Apple.',
++    fr: 'Skip Pro est un abonnement facultatif, facturé par Apple.',
++  },
++  'legal.terms.summary.b3': {
++    en: 'Skip is a tool for tracking your own money. It is not financial advice.',
++    es: 'Skip es una herramienta para llevar el control de tu propio dinero. No es asesoría financiera.',
++    fr: 'Skip est un outil pour suivre ton propre argent. Ce n’est pas un conseil financier.',
++  },
++  'legal.terms.summary.b4': {
++    en: 'What you enter stays yours, and you can delete all of it whenever you like.',
++    es: 'Lo que ingresas sigue siendo tuyo, y puedes eliminarlo todo cuando quieras.',
++    fr: 'Ce que tu saisis reste à toi, et tu peux tout supprimer quand tu veux.',
+   },
+ 
+   'legal.terms.agree.heading': {
+@@ -274,6 +583,22 @@ export const legalMessages = defineMessages({
+     es: 'Al crear una cuenta o usar Skip, aceptas estos términos. Si no estás de acuerdo con ellos, no uses la aplicación. Si usas Skip en nombre de otra persona, confirmas que tienes autorización para aceptar en su nombre.',
+     fr: 'En créant un compte ou en utilisant Skip, tu acceptes ces conditions. Si tu n’es pas d’accord avec elles, n’utilise pas l’application. Si tu utilises Skip au nom d’une autre personne, tu confirmes avoir le droit d’accepter en son nom.',
+   },
++  'legal.terms.agree.p2': {
++    en: 'You must be 18 or older to use Skip.',
++    es: 'Debes tener 18 años o más para usar Skip.',
++    fr: 'Tu dois avoir 18 ans ou plus pour utiliser Skip.',
++  },
++  // Apple’s document title keeps Apple’s own spelling, “License”.
++  'legal.terms.agree.p3': {
++    en: 'Apple’s standard licence for apps, the “Licensed Application End User License Agreement” (the standard EULA), applies to Skip alongside these terms. You can read it at https://www.apple.com/legal/internet-services/itunes/dev/stdeula/',
++    es: 'La licencia estándar de Apple para aplicaciones, el contrato “Licensed Application End User License Agreement” (el EULA estándar), se aplica a Skip junto con estos términos. Puedes leerla en https://www.apple.com/legal/internet-services/itunes/dev/stdeula/',
++    fr: 'La licence standard d’Apple pour les applications, le contrat « Licensed Application End User License Agreement » (l’EULA standard), s’applique à Skip en plus de ces conditions. Tu peux la lire à l’adresse https://www.apple.com/legal/internet-services/itunes/dev/stdeula/',
++  },
++  'legal.terms.agree.link': {
++    en: 'Read Apple’s standard licence',
++    es: 'Leer la licencia estándar de Apple',
++    fr: 'Lire la licence standard d’Apple',
++  },
+ 
+   'legal.terms.what.heading': {
+     en: 'What Skip is, and what it is not',
+@@ -286,9 +611,9 @@ export const legalMessages = defineMessages({
+     fr: 'Skip est un outil pour noter et consulter ton propre argent. Il enregistre ce que tu lui dis et fait des calculs à partir de cela.',
+   },
+   'legal.terms.what.note': {
+-    en: 'Skip is not a bank, a payment service, an accountant or a financial adviser. Nothing in the app is financial, tax or legal advice. Every figure comes from something you entered, and Skip cannot know whether it is right.',
+-    es: 'Skip no es un banco, un servicio de pagos, un contador ni un asesor financiero. Nada en la aplicación constituye asesoría financiera, fiscal ni legal. Cada cifra proviene de algo que tú ingresaste, y Skip no puede saber si es correcta.',
+-    fr: 'Skip n’est ni une banque, ni un service de paiement, ni un comptable, ni un conseiller financier. Rien dans l’application ne constitue un conseil financier, fiscal ou juridique. Chaque chiffre provient de quelque chose que tu as saisi, et Skip ne peut pas savoir s’il est exact.',
++    en: 'Skip is not a bank, a payment service, an accountant or a financial adviser. Nothing in the app is financial, tax or legal advice. A figure can come from something you typed, from a scan, from your voice, or from Skip’s own arithmetic. Skip cannot know whether it is right.',
++    es: 'Skip no es un banco, un servicio de pagos, un contador ni un asesor financiero. Nada en la aplicación constituye asesoría financiera, fiscal ni legal. Una cifra puede venir de algo que escribiste, de un escaneo, de tu voz o de los propios cálculos de Skip. Skip no puede saber si es correcta.',
++    fr: 'Skip n’est ni une banque, ni un service de paiement, ni un comptable, ni un conseiller financier. Rien dans l’application ne constitue un conseil financier, fiscal ou juridique. Un chiffre peut provenir de quelque chose que tu as saisi, d’une numérisation, de ta voix ou des propres calculs de Skip. Skip ne peut pas savoir s’il est exact.',
+   },
+   'legal.terms.what.p2': {
+     en: 'Skip has no connection to your bank and cannot move, hold, send or receive money. Projections of future bills and paydays are estimates based on the schedules you set, not statements about what will happen.',
+@@ -334,9 +659,201 @@ export const legalMessages = defineMessages({
+     fr: 'Ce que tu saisis reste à toi',
+   },
+   'legal.terms.yours.p1': {
+-    en: 'Everything you enter belongs to you. You give us only the permission needed to run the app for you — to store it, back it up and show it back to you on your devices. That permission ends when you delete the data or your account.',
+-    es: 'Todo lo que ingresas te pertenece. Solo nos das la autorización necesaria para operar la aplicación por ti: guardarlo, respaldarlo y mostrártelo de nuevo en tus dispositivos. Esa autorización termina cuando eliminas los datos o tu cuenta.',
+-    fr: 'Tout ce que tu saisis t’appartient. Tu nous accordes uniquement l’autorisation nécessaire pour faire fonctionner l’application pour toi — conserver ces données, les sauvegarder et te les présenter de nouveau sur tes appareils. Cette autorisation prend fin lorsque tu supprimes les données ou ton compte.',
++    en: 'Everything you enter belongs to you. You give us only the permission needed to run the app for you — to store it, back it up, show it back to you on your devices, and use the services our Privacy policy lists to do that. That permission ends when you delete the data or your account, apart from the few things our Privacy policy says can stay.',
++    es: 'Todo lo que ingresas te pertenece. Solo nos das la autorización necesaria para operar la aplicación por ti: guardarlo, respaldarlo, mostrártelo de nuevo en tus dispositivos y usar para ello los servicios que enumera nuestra política de privacidad. Esa autorización termina cuando eliminas los datos o tu cuenta, salvo las pocas cosas que nuestra política de privacidad indica que pueden permanecer.',
++    fr: 'Tout ce que tu saisis t’appartient. Tu nous accordes uniquement l’autorisation nécessaire pour faire fonctionner l’application pour toi — conserver ces données, les sauvegarder, te les présenter de nouveau sur tes appareils, et utiliser pour cela les services que notre politique de confidentialité énumère. Cette autorisation prend fin lorsque tu supprimes les données ou ton compte, à l’exception des quelques éléments que notre politique de confidentialité indique pouvoir subsister.',
++  },
++
++  'legal.terms.free.heading': {
++    en: 'Free and Skip Pro',
++    es: 'Gratis y Skip Pro',
++    fr: 'Gratuit et Skip Pro',
++  },
++  'legal.terms.free.p1': {
++    en: 'Most of Skip is free to use. Skip Pro adds more.',
++    es: 'La mayor parte de Skip es gratis. Skip Pro ofrece más.',
++    fr: 'La plus grande partie de Skip est gratuite. Skip Pro en offre davantage.',
++  },
++  'legal.terms.free.p2': {
++    en: 'The Pro page in Skip shows what Pro includes, and its price, before you pay.',
++    es: 'La página de Pro en Skip muestra lo que incluye Pro, y su precio, antes de que pagues.',
++    fr: 'La page Pro dans Skip indique ce que Pro comprend, ainsi que son prix, avant que tu paies.',
++  },
++
++  'legal.terms.paying.heading': {
++    en: 'Paying for Skip Pro',
++    es: 'Pagar Skip Pro',
++    fr: 'Payer Skip Pro',
++  },
++  'legal.terms.paying.p1': {
++    en: 'Skip Pro comes as a monthly plan or a yearly plan. You buy it through Apple.',
++    es: 'Skip Pro se ofrece en un plan mensual o en un plan anual. Lo compras a través de Apple.',
++    fr: 'Skip Pro existe en forfait mensuel ou en forfait annuel. Tu l’achètes par l’intermédiaire d’Apple.',
++  },
++  'legal.terms.paying.b1': {
++    en: 'Apple charges your Apple Account (Apple ID) when you confirm the purchase, or when a free trial ends.',
++    es: 'Apple cobra a tu cuenta de Apple (ID de Apple) cuando confirmas la compra, o cuando termina una prueba gratuita.',
++    fr: 'Apple facture ton compte Apple (identifiant Apple) quand tu confirmes l’achat, ou quand un essai gratuit se termine.',
++  },
++  'legal.terms.paying.b2': {
++    en: 'You pay the App Store’s price for your Apple Account’s country, in that country’s currency. Skip’s own currency setting doesn’t change it.',
++    es: 'Pagas el precio del App Store para el país de tu cuenta de Apple, en la moneda de ese país. La configuración de moneda de Skip no lo cambia.',
++    fr: 'Tu paies le prix de l’App Store pour le pays de ton compte Apple, dans la devise de ce pays. Le réglage de devise de Skip ne le modifie pas.',
++  },
++  'legal.terms.paying.b3': {
++    en: 'Both plans renew automatically until you cancel.',
++    es: 'Ambos planes se renuevan automáticamente hasta que los canceles.',
++    fr: 'Les deux forfaits se renouvellent automatiquement jusqu’à ce que tu les annules.',
++  },
++  'legal.terms.paying.b4': {
++    en: 'Apple charges your Apple Account up to 24 hours before each new period starts.',
++    es: 'Apple cobra a tu cuenta de Apple hasta 24 horas antes de que empiece cada nuevo periodo.',
++    fr: 'Apple facture ton compte Apple jusqu’à 24 heures avant le début de chaque nouvelle période.',
++  },
++  'legal.terms.paying.b5': {
++    en: 'If the price changes, Apple tells you. Where Apple’s rules require your consent to a new price, Apple asks for it.',
++    es: 'Si el precio cambia, Apple te avisa. Cuando las reglas de Apple exigen tu consentimiento para un nuevo precio, Apple te lo pide.',
++    fr: 'Si le prix change, Apple t’en informe. Lorsque les règles d’Apple exigent ton consentement à un nouveau prix, Apple te le demande.',
++  },
++
++  'legal.terms.trial.heading': {
++    en: 'Free trial',
++    es: 'Prueba gratuita',
++    fr: 'Essai gratuit',
++  },
++  'legal.terms.trial.p1': {
++    en: 'Sometimes Skip Pro starts with a free trial. Apple decides who can have a free trial. If you can, the Pro page shows it and how long it lasts.',
++    es: 'A veces Skip Pro empieza con una prueba gratuita. Apple decide quién puede tener una prueba gratuita. Si tú puedes, la página de Pro la muestra y también cuánto dura.',
++    fr: 'Parfois, Skip Pro commence par un essai gratuit. Apple décide qui peut avoir un essai gratuit. Si tu y as droit, la page Pro le montre, ainsi que sa durée.',
++  },
++  'legal.terms.trial.p2': {
++    en: 'A trial turns into the paid plan, at the price shown, unless you cancel at least 24 hours before it ends.',
++    es: 'Una prueba se convierte en el plan de pago, al precio indicado, a menos que canceles al menos 24 horas antes de que termine.',
++    fr: 'Un essai se transforme en forfait payant, au prix indiqué, à moins que tu n’annules au moins 24 heures avant sa fin.',
++  },
++  'legal.terms.trial.p3': {
++    en: 'A trial can’t be restarted.',
++    es: 'Una prueba no se puede reiniciar.',
++    fr: 'Un essai ne peut pas être relancé.',
++  },
++
++  'legal.terms.offers.heading': {
++    en: 'Special offers',
++    es: 'Ofertas especiales',
++    fr: 'Offres spéciales',
++  },
++  'legal.terms.offers.p1': {
++    en: 'Sometimes Skip shows a special offer. For example, you may see one once, the first time you leave the Pro page without buying. It stays open for 10 minutes.',
++    es: 'A veces Skip muestra una oferta especial. Por ejemplo, puedes verla una sola vez: la primera vez que sales de la página de Pro sin comprar. Permanece abierta durante 10 minutos.',
++    fr: 'Parfois, Skip affiche une offre spéciale. Par exemple, tu peux la voir une seule fois, la première fois que tu quittes la page Pro sans rien acheter. Elle reste ouverte pendant 10 minutes.',
++  },
++  'legal.terms.offers.p2': {
++    en: 'Before you buy, the offer shows its yearly price. It’s a yearly plan that renews automatically until you cancel, like any other plan.',
++    es: 'Antes de comprar, la oferta muestra su precio anual. Es un plan anual que se renueva automáticamente hasta que lo canceles, como cualquier otro plan.',
++    fr: 'Avant l’achat, l’offre indique son prix annuel. C’est un forfait annuel qui se renouvelle automatiquement jusqu’à ce que tu l’annules, comme n’importe quel autre forfait.',
++  },
++
++  'legal.terms.cancel.heading': {
++    en: 'Cancelling, refunds and restoring',
++    es: 'Cancelación, reembolsos y restauración',
++    fr: 'Annulation, remboursements et restauration',
++  },
++  // The quoted labels are the Pro page’s own buttons; they change together.
++  'legal.terms.cancel.sub1': {
++    en: 'To cancel',
++    es: 'Para cancelar',
++    fr: 'Pour annuler',
++  },
++  'legal.terms.cancel.b1': {
++    en: 'On your iPhone, open Settings, tap your name, then Subscriptions, then Skip Budget.',
++    es: 'En tu iPhone, abre Ajustes, toca tu nombre, luego Suscripciones y luego Skip Budget.',
++    fr: 'Sur ton iPhone, ouvre Réglages, touche ton nom, puis Abonnements, puis Skip Budget.',
++  },
++  'legal.terms.cancel.b2': {
++    en: 'Or, while you have Skip Pro, open Settings in Skip, tap Skip Pro, then “Manage in the App Store”.',
++    es: 'O, mientras tengas Skip Pro, abre Ajustes en Skip, toca Skip Pro y luego “Administrar en el App Store”.',
++    fr: 'Ou, tant que tu as Skip Pro, ouvre Réglages dans Skip, touche Skip Pro, puis « Gérer dans l’App Store ».',
++  },
++  'legal.terms.cancel.p1': {
++    en: 'Skip Pro stays on until the end of the period you paid for.',
++    es: 'Skip Pro sigue activo hasta el final del periodo que pagaste.',
++    fr: 'Skip Pro reste actif jusqu’à la fin de la période que tu as payée.',
++  },
++  'legal.terms.cancel.p2': {
++    en: 'Deleting the app or your Skip account does not cancel Skip Pro. Only cancelling with Apple does.',
++    es: 'Eliminar la aplicación o tu cuenta de Skip no cancela Skip Pro. Solo cancelarlo con Apple lo cancela.',
++    fr: 'Supprimer l’application ou ton compte Skip n’annule pas Skip Pro. Seule l’annulation auprès d’Apple le fait.',
++  },
++  'legal.terms.cancel.sub2': {
++    en: 'Refunds',
++    es: 'Reembolsos',
++    fr: 'Remboursements',
++  },
++  'legal.terms.cancel.p3': {
++    en: 'Apple handles refunds. We can’t issue refunds ourselves. To ask Apple for one, go to https://reportaproblem.apple.com',
++    es: 'Apple se encarga de los reembolsos. Nosotros no podemos emitir reembolsos. Para pedirle uno a Apple, ve a https://reportaproblem.apple.com',
++    fr: 'Apple s’occupe des remboursements. Nous ne pouvons pas en émettre nous-mêmes. Pour en demander un à Apple, va à l’adresse https://reportaproblem.apple.com',
++  },
++  'legal.terms.cancel.link': {
++    en: 'Ask Apple for a refund',
++    es: 'Pedir un reembolso a Apple',
++    fr: 'Demander un remboursement à Apple',
++  },
++  'legal.terms.cancel.p4': {
++    en: 'This doesn’t affect your legal rights.',
++    es: 'Esto no afecta tus derechos legales.',
++    fr: 'Cela ne touche pas tes droits légaux.',
++  },
++  'legal.terms.cancel.sub3': {
++    en: 'Restoring',
++    es: 'Restauración',
++    fr: 'Restauration',
++  },
++  'legal.terms.cancel.p5': {
++    en: 'Skip Pro stays with the Skip account you bought it on, so signing in to that account on a new iPhone brings it back. If it doesn’t show, tap “Restore purchase” on the Pro page.',
++    es: 'Skip Pro se queda con la cuenta de Skip con la que lo compraste, así que iniciar sesión en esa cuenta en un iPhone nuevo lo recupera. Si no aparece, toca “Restaurar compra” en la página de Pro.',
++    fr: 'Skip Pro reste associé au compte Skip avec lequel tu l’as acheté : en te connectant à ce compte sur un nouvel iPhone, tu le retrouves. S’il n’apparaît pas, touche « Restaurer l’achat » dans la page Pro.',
++  },
++
++  'legal.terms.ends.heading': {
++    en: 'When Skip Pro ends',
++    es: 'Cuando Skip Pro termina',
++    fr: 'Quand Skip Pro se termine',
++  },
++  'legal.terms.ends.p1': {
++    en: 'Nothing you made is deleted.',
++    es: 'No se elimina nada de lo que creaste.',
++    fr: 'Rien de ce que tu as créé n’est supprimé.',
++  },
++  'legal.terms.ends.p2': {
++    en: 'The Free limits come back. Today they are:',
++    es: 'Vuelven los límites del plan gratis. Hoy son:',
++    fr: 'Les limites du forfait gratuit reviennent. Aujourd’hui, elles sont :',
++  },
++  'legal.terms.ends.b1': {
++    en: 'One card and one bank account for new spending. Any others stay in Skip, greyed out, and still count in your balances. Until you have Skip Pro again, you can’t open them or pick them for new spending.',
++    es: 'Una tarjeta y una cuenta bancaria para gastos nuevos. Las demás se quedan en Skip, en gris, y siguen contando en tus saldos. Hasta que tengas Skip Pro de nuevo, no puedes abrirlas ni elegirlas para gastos nuevos.',
++    fr: 'Une carte et un compte bancaire pour les nouvelles dépenses. Les autres restent dans Skip, grisés, et comptent toujours dans tes soldes. Tant que tu n’as pas de nouveau Skip Pro, tu ne peux ni les ouvrir ni les choisir pour de nouvelles dépenses.',
++  },
++  'legal.terms.ends.b2': {
++    en: '15 camera scans and 15 uploads each calendar month.',
++    es: '15 escaneos con la cámara y 15 subidas cada mes calendario.',
++    fr: '15 numérisations avec la caméra et 15 imports par mois civil.',
++  },
++  'legal.terms.ends.b3': {
++    en: 'Lists show the last 90 days. Older entries are hidden, not deleted. They still count in your balances, and they come back when you have Skip Pro again.',
++    es: 'Las listas muestran los últimos 90 días. Las entradas más antiguas se ocultan, no se eliminan. Siguen contando en tus saldos, y vuelven cuando tienes Skip Pro de nuevo.',
++    fr: 'Les listes affichent les 90 derniers jours. Les entrées plus anciennes sont masquées, pas supprimées. Elles comptent toujours dans tes soldes, et elles reviennent quand tu as de nouveau Skip Pro.',
++  },
++  'legal.terms.ends.p3': {
++    en: 'These stop until you have Skip Pro again: adding things by voice, Insights, exporting your payments, and starting a new spending habit.',
++    es: 'Esto se detiene hasta que tengas Skip Pro de nuevo: agregar cosas por voz, Análisis, exportar tus pagos y empezar un nuevo hábito de gasto.',
++    fr: 'Ceci s’arrête jusqu’à ce que tu aies de nouveau Skip Pro : ajouter des éléments par la voix, Aperçu, exporter tes paiements et commencer une nouvelle habitude de dépense.',
++  },
++  'legal.terms.ends.p4': {
++    en: 'These keep working: the spending habits you already have, and everything you already added by voice or by scanning.',
++    es: 'Esto sigue funcionando: los hábitos de gasto que ya tienes, y todo lo que ya agregaste por voz o con un escaneo.',
++    fr: 'Ceci continue de fonctionner : les habitudes de dépense que tu as déjà, et tout ce que tu as déjà ajouté par la voix ou par numérisation.',
+   },
+ 
+   'legal.terms.change.heading': {
+@@ -349,16 +866,10 @@ export const legalMessages = defineMessages({
+     es: 'Skip está en desarrollo activo. Se pueden agregar, modificar o retirar funciones, y la aplicación puede no estar disponible en ciertos momentos por mantenimiento o por razones ajenas a nuestro control. No prometemos ningún nivel de disponibilidad en particular.',
+     fr: 'Skip est en développement actif. Des fonctionnalités peuvent être ajoutées, modifiées ou retirées, et l’application peut être indisponible à certains moments pour cause d’entretien ou pour des raisons indépendantes de notre volonté. Nous ne promettons aucun niveau de disponibilité particulier.',
+   },
+-
+-  'legal.terms.money.heading': {
+-    en: 'Money',
+-    es: 'Dinero',
+-    fr: 'Argent',
+-  },
+-  'legal.terms.money.p1': {
+-    en: 'Skip is currently free to use and has no in-app purchases or subscriptions. The “Buy a coffee for team” link is an entirely voluntary tip handled by Buy Me a Coffee under their own terms; it buys no feature and no obligation. If paid features are ever introduced, the terms and the price will be shown before you are asked to pay for anything.',
+-    es: 'Por ahora, usar Skip es gratis y no hay compras dentro de la aplicación ni suscripciones. El enlace “Invita un café al equipo” es una propina totalmente voluntaria que gestiona Buy Me a Coffee bajo sus propios términos; no compra ninguna función ni genera ninguna obligación. Si algún día se introducen funciones de pago, los términos y el precio se mostrarán antes de que se te pida pagar por cualquier cosa.',
+-    fr: 'Skip est actuellement gratuite et ne comporte ni achats intégrés ni abonnements. Le lien « Offre un café à l’équipe » est un pourboire entièrement volontaire, géré par Buy Me a Coffee selon ses propres conditions ; il ne donne accès à aucune fonctionnalité et n’entraîne aucune obligation. Si des fonctionnalités payantes sont un jour introduites, les conditions et le prix seront affichés avant qu’on te demande de payer quoi que ce soit.',
++  'legal.terms.change.p2': {
++    en: 'If we ever stop offering Skip Pro, we’ll tell you in the app first. Then we’ll take it off sale with Apple, so it stops renewing. You keep Skip Pro until the end of the time you’ve already paid for.',
++    es: 'Si alguna vez dejamos de ofrecer Skip Pro, te avisaremos primero en la aplicación. Después lo retiraremos de la venta con Apple, para que deje de renovarse. Conservas Skip Pro hasta el final del tiempo que ya pagaste.',
++    fr: 'Si nous cessons un jour d’offrir Skip Pro, nous t’en informerons d’abord dans l’application. Ensuite, nous le retirerons de la vente auprès d’Apple, de sorte qu’il cessera de se renouveler. Tu conserves Skip Pro jusqu’à la fin de la période que tu as déjà payée.',
+   },
+ 
+   'legal.terms.warranty.heading': {
+@@ -371,6 +882,11 @@ export const legalMessages = defineMessages({
+     es: 'Skip se ofrece tal como está. En la medida en que la ley lo permita, no garantizamos que funcione sin interrupciones ni sin errores, ni que sus cálculos sean adecuados para un fin en particular. Eres responsable de las decisiones financieras que tomes.',
+     fr: 'Skip est fournie telle quelle. Dans la mesure permise par la loi, nous ne garantissons pas qu’elle fonctionnera sans interruption ni sans erreur, ni que ses calculs conviendront à un usage particulier. Tu es responsable des décisions financières que tu prends.',
+   },
++  'legal.terms.warranty.p2': {
++    en: 'This doesn’t affect your rights as a consumer.',
++    es: 'Esto no afecta tus derechos como consumidor.',
++    fr: 'Cela ne touche pas tes droits en tant que consommateur.',
++  },
+ 
+   'legal.terms.liability.heading': {
+     en: 'Limits on liability',
+@@ -389,9 +905,19 @@ export const legalMessages = defineMessages({
+     fr: 'Résiliation',
+   },
+   'legal.terms.ending.p1': {
+-    en: 'You can stop using Skip and delete your account at any time from Settings, which removes your data permanently. We may suspend or close an account that breaks these terms, and will say why where we can.',
+-    es: 'Puedes dejar de usar Skip y eliminar tu cuenta en cualquier momento desde Ajustes, lo cual elimina tus datos de forma permanente. Podemos suspender o cerrar una cuenta que incumpla estos términos, y explicaremos el motivo cuando nos sea posible.',
+-    fr: 'Tu peux cesser d’utiliser Skip et supprimer ton compte à tout moment depuis Réglages, ce qui supprime tes données de façon définitive. Nous pouvons suspendre ou fermer un compte qui contrevient à ces conditions, et nous en expliquerons la raison lorsque cela nous est possible.',
++    en: 'You can stop using Skip and delete your account at any time from Settings. Deleting your account permanently removes what you saved in Skip. Our Privacy policy lists the few things that can stay, such as crash reports.',
++    es: 'Puedes dejar de usar Skip y eliminar tu cuenta en cualquier momento desde Ajustes. Eliminar tu cuenta quita de forma permanente lo que guardaste en Skip. Nuestra política de privacidad enumera las pocas cosas que pueden permanecer, como los informes de fallos.',
++    fr: 'Tu peux cesser d’utiliser Skip et supprimer ton compte à tout moment depuis Réglages. Supprimer ton compte retire définitivement ce que tu as enregistré dans Skip. Notre politique de confidentialité énumère les quelques éléments qui peuvent subsister, comme les rapports de plantage.',
++  },
++  'legal.terms.ending.p2': {
++    en: 'Deleting your account does not cancel Skip Pro. If you have Skip Pro, cancel it with Apple first. See “Cancelling, refunds and restoring” above.',
++    es: 'Eliminar tu cuenta no cancela Skip Pro. Si tienes Skip Pro, cancélalo primero con Apple. Consulta “Cancelación, reembolsos y restauración” más arriba.',
++    fr: 'Supprimer ton compte n’annule pas Skip Pro. Si tu as Skip Pro, annule-le d’abord auprès d’Apple. Voir « Annulation, remboursements et restauration » ci-dessus.',
++  },
++  'legal.terms.ending.p3': {
++    en: 'We may suspend or close an account that breaks these terms, and will say why where we can.',
++    es: 'Podemos suspender o cerrar una cuenta que incumpla estos términos, y explicaremos el motivo cuando nos sea posible.',
++    fr: 'Nous pouvons suspendre ou fermer un compte qui contrevient à ces conditions, et nous en expliquerons la raison lorsque cela nous est possible.',
+   },
+ 
+   'legal.terms.changes.heading': {
+@@ -400,9 +926,9 @@ export const legalMessages = defineMessages({
+     fr: 'Modifications de ces conditions',
+   },
+   'legal.terms.changes.p1': {
+-    en: 'If these terms change materially, the date at the top changes and you will be told in the app before the change takes effect. Continuing to use Skip after that means you accept the new terms.',
+-    es: 'Si estos términos cambian de forma importante, cambiará la fecha que aparece arriba y se te avisará dentro de la aplicación antes de que el cambio entre en vigor. Si sigues usando Skip después de eso, aceptas los nuevos términos.',
+-    fr: 'Si ces conditions sont modifiées de façon importante, la date en haut change et nous t’en informerons dans l’application avant l’entrée en vigueur de la modification. Si tu continues d’utiliser Skip par la suite, tu acceptes les nouvelles conditions.',
++    en: 'If these terms change materially, the date at the top changes and you will be told in the app, for example in Notifications, before the change takes effect. Continuing to use Skip after that means you accept the new terms.',
++    es: 'Si estos términos cambian de forma importante, cambiará la fecha que aparece arriba y se te avisará dentro de la aplicación, por ejemplo en Notificaciones, antes de que el cambio entre en vigor. Si sigues usando Skip después de eso, aceptas los nuevos términos.',
++    fr: 'Si ces conditions sont modifiées de façon importante, la date en haut change et nous t’en informerons dans l’application, par exemple dans Notifications, avant l’entrée en vigueur de la modification. Si tu continues d’utiliser Skip par la suite, tu acceptes les nouvelles conditions.',
+   },
+ 
+   'legal.terms.law.heading': {
+@@ -410,14 +936,24 @@ export const legalMessages = defineMessages({
+     es: 'Ley aplicable y contacto',
+     fr: 'Droit applicable et contact',
+   },
++  'legal.terms.law.p2': {
++    en: 'Skip Budget is run by [LEGAL NAME], an individual, at [POSTAL ADDRESS].',
++    es: 'Skip Budget está a cargo de [LEGAL NAME], una persona física, con domicilio en [POSTAL ADDRESS].',
++    fr: 'Skip Budget est géré par [LEGAL NAME], une personne physique, à l’adresse [POSTAL ADDRESS].',
++  },
+   'legal.terms.law.p1': {
+     en: 'Questions about these terms go to admin@skipapps.net.',
+     es: 'Las preguntas sobre estos términos se envían a admin@skipapps.net.',
+     fr: 'Les questions sur ces conditions sont à adresser à admin@skipapps.net.',
+   },
+-  'legal.terms.law.note': {
+-    en: 'The governing law and the courts that would hear a dispute are set by where the Weknd team legally operates, and are to be confirmed before release.',
+-    es: 'La ley aplicable y los tribunales que conocerían de una controversia dependen de dónde opere legalmente el equipo de Weknd, y se confirmarán antes del lanzamiento.',
+-    fr: 'Le droit applicable et les tribunaux qui entendraient un litige dépendent de l’endroit où l’équipe Weknd exerce légalement ses activités, et seront confirmés avant le lancement.',
++  'legal.terms.law.p3': {
++    en: 'These terms are governed by the law of the State of Ohio, United States.',
++    es: 'Estos términos se rigen por las leyes del estado de Ohio, Estados Unidos.',
++    fr: 'Ces conditions sont régies par le droit de l’État de l’Ohio, aux États-Unis.',
++  },
++  'legal.terms.law.p4': {
++    en: 'You keep the consumer protections of the place where you live, and you can use your local courts.',
++    es: 'Conservas las protecciones al consumidor del lugar donde vives, y puedes recurrir a los tribunales locales.',
++    fr: 'Tu conserves les protections des consommateurs de l’endroit où tu vis, et tu peux faire appel aux tribunaux locaux.',
+   },
+ });

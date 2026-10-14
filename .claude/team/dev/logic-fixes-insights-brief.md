@@ -245,3 +245,10 @@ Six other Claude sessions share this working tree. Edit ONLY the paths listed un
   - **L17:** when Pro ends, extra cards and accounts still open, edit and delete for free; only picking them for NEW spending needs Pro.
     - Today cards.tsx sends taps on locked card/account rows to `/pro-feature?id=unlimited&next=/source/{id}`. Under L17 those rows must open `/source/{id}` directly.
   - **L24:** "Payment went out" notices follow an in-app switch in Skip, or stop when every reminder is off. Today only iOS Settings stops them.
+- **After the month-end round-2 commit:** in `src/lib/insights-sections.ts:99-100` (`nextDue`), pass `lastCharged: lastChargedBy(charges).get(planKey(...))` to `nextDueAfter`, so Insights' "Next due" never names a date in a cycle that is already charged. The parameter is optional, so nothing breaks before then.
+- **#33 held screens:**
+  - Receipts, transactions and receipt/[id] are going into Quick add batch 3.
+  - salary and salary-paid-into are going into the Loans chat's commit.
+  - reminders.tsx and `useSalaryAccountIds` are going into the Add bill chat's commit.
+  - savings, savings-pot/[id] and goal/[id] are ours, after the Ask Sam goals commit. They need `refreshFailed` on useSavings, useSavingsPot and useGoal; that also fixes a money bug.
+  - Insights Plans adds `billMonth.refreshFailed || subscriptionMonth.refreshFailed` after the Bills chat's payment-ledger commit.

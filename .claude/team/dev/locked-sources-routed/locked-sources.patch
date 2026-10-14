@@ -1,0 +1,898 @@
+diff --git a/src/app/receipts.tsx b/src/app/receipts.tsx
+index 449e168..22b9f77 100644
+--- a/src/app/receipts.tsx
++++ b/src/app/receipts.tsx
+@@ -6,7 +6,8 @@ import { Pressable, Text, View } from 'react-native';
+ import { useArtwork } from '@/theme/artwork';
+ import { useCaptureAllowance } from '@/api/capture-allowance';
+ import { useHistoryFloor } from '@/api/history';
+-import { usePaymentSources, useReceipts } from '@/api/queries';
++import { usePaymentLabels } from '@/api/payment-labels';
++import { useReceipts } from '@/api/queries';
+ import { useReceiptBookDefault, useReceiptBooks } from '@/api/receipt-books';
+ import { useRefreshAll } from '@/api/refresh';
+ import { draftToParams, useReceiptScan } from '@/api/scan';
+@@ -116,7 +117,8 @@ export default function ReceiptsScreen() {
+   const { floor, free } = useHistoryFloor();
+   // Seven years back is as far as the app keeps anything, on any plan.
+   const kept = useMemo(() => historyFloor(true, new Date()), []);
+-  const { sources } = usePaymentSources();
++  // Every card and account, a locked one too: its receipts are named and can be filtered on any plan.
++  const labels = usePaymentLabels();
+ 
+   const { scan, scanning, available: canScan } = useReceiptScan();
+   const allowance = useCaptureAllowance();
+@@ -147,12 +149,8 @@ export default function ReceiptsScreen() {
+ 
+   const activeCount = countActiveReceiptFilters(filters);
+   const sourceOptions = useMemo(
+-    () => sources.map((source) => ({ value: source.id, label: source.label })),
+-    [sources],
+-  );
+-  const sourceLabels = useMemo(
+-    () => new Map(sources.map((source) => [source.id, source.label])),
+-    [sources],
++    () => labels.sources.map((source) => ({ value: source.id, label: source.label })),
++    [labels.sources],
+   );
+ 
+   // The book on screen, before any window or search: whether it has anything at all.
+@@ -237,7 +235,7 @@ export default function ReceiptsScreen() {
+           {currentBook ? (
+             <BookInfo
+               book={currentBook}
+-              sources={sources}
++              sources={labels.sources}
+               isDefault={defaultBook === currentBook.id}
+               onEdit={() =>
+                 router.push({ pathname: '/receipt-book', params: { id: currentBook.id } })
+@@ -358,7 +356,7 @@ export default function ReceiptsScreen() {
+                   logoHidden={receipt.logo_hidden}
+                   habit={receipt.habit}
+                   sourceLabel={
+-                    sourceLabels.get(receipt.card_id ?? receipt.bank_account_id ?? '') ?? ''
++                    labels.labelOf(receipt.card_id ?? receipt.bank_account_id ?? '') ?? ''
+                   }
+                   onPress={() => router.push(`/receipt/${receipt.id}`)}
+                 />
+diff --git a/src/app/add-receipt.tsx b/src/app/add-receipt.tsx
+index b58a050..e3e8332 100644
+--- a/src/app/add-receipt.tsx
++++ b/src/app/add-receipt.tsx
+@@ -10,14 +10,14 @@ import {
+   Trash2,
+   type LucideIcon,
+ } from 'lucide-react-native';
+-import { useState, type ComponentProps } from 'react';
++import { useMemo, useState, type ComponentProps } from 'react';
+ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+ 
+ import { guessCategory, matchBrand, useBrandDirectory, useSpendCategories } from '@/api/brands';
+ import { useHabit } from '@/api/habits';
+ import { useCaptureAllowance } from '@/api/capture-allowance';
+ import { useProWrite } from '@/api/confirm-pro';
+-import { buildReceiptValues } from '@/api/entry-values';
++import { buildReceiptValues, withSavedSource, type SavedSource } from '@/api/entry-values';
+ import { receiptParseOptions } from '@/api/scan';
+ import {
+   useCreateReceipt,
+@@ -25,6 +25,7 @@ import {
+   useUpdateReceipt,
+   type CaptureSource,
+ } from '@/api/mutations';
++import { usePaymentLabels } from '@/api/payment-labels';
+ import { usePaymentSources, useReceipt } from '@/api/queries';
+ import {
+   useReceiptBookDefault,
+@@ -352,8 +353,8 @@ function ReceiptForm({
+    * book. Null opens in the default book, or asks when there is none.
+    */
+   initialBook?: string | null;
+-  /** The row being edited, for the logo it already has. */
+-  saved?: LogoFields | null;
++  /** The row being edited, for the logo and the card or account it already has. */
++  saved?: (LogoFields & SavedSource) | null;
+   /**
+    * Filed by tapping a habit's day. Its store cannot change: another name would cut it from its
+    * habit's days.
+@@ -394,7 +395,11 @@ function ReceiptForm({
+   const [scanResult, setScanResult] = useState<ScanResult | null>(initialScan);
+   const { todayDate } = useToday();
+ 
+-  const { sources } = usePaymentSources();
++  // New spending takes only what the plan offers; an edit also shows, and keeps, the card or
++  // account the receipt was paid with, though the plan has locked it since.
++  const { sources: offered } = usePaymentSources();
++  const { sources: every } = usePaymentLabels();
++  const sources = useMemo(() => withSavedSource(offered, every, saved), [offered, every, saved]);
+   const { data: books = [] } = useReceiptBooks();
+   const storedDefault = useReceiptBookDefault();
+   const setDefaultBook = useSetReceiptBookDefault();
+@@ -416,7 +421,7 @@ function ReceiptForm({
+   const bookSource = bookRow?.card_id ?? bookRow?.bank_account_id ?? null;
+   const shownSource =
+     sourceId ??
+-    (bookSource && sources.some((source) => source.id === bookSource) ? bookSource : null);
++    (bookSource && offered.some((source) => source.id === bookSource) ? bookSource : null);
+   const { data: categories = [] } = useSpendCategories();
+   const { data: directory = [] } = useBrandDirectory();
+ 
+@@ -481,7 +486,7 @@ function ReceiptForm({
+     }
+     if (parsed.last4) {
+       const digits = parsed.last4;
+-      const matched = sources.find((source) => source.label.endsWith(digits));
++      const matched = offered.find((source) => source.label.endsWith(digits));
+       if (matched) {
+         setSourceId(matched.id);
+         found.push('card');
+@@ -668,7 +673,8 @@ function ReceiptForm({
+ 
+     const built = buildReceiptValues(
+       { store: chosen, amount, date, sourceId: shownSource, note, captureSource },
+-      sources,
++      offered,
++      saved,
+     );
+     if (!built.ok) {
+       fail(built.message);
+diff --git a/src/app/add-bill.tsx b/src/app/add-bill.tsx
+index 4b31091..b116081 100644
+--- a/src/app/add-bill.tsx
++++ b/src/app/add-bill.tsx
+@@ -9,7 +9,7 @@ import {
+   Trash2,
+   Tag,
+ } from 'lucide-react-native';
+-import { useRef, useState } from 'react';
++import { useMemo, useRef, useState } from 'react';
+ import { Pressable, Text, View } from 'react-native';
+ 
+ import {
+@@ -18,9 +18,10 @@ import {
+   useReminderChoice,
+   type ReminderChoice,
+ } from '@/api/reminders';
+-import { buildBillValues } from '@/api/entry-values';
++import { buildBillValues, withSavedSource } from '@/api/entry-values';
+ import { useCreateBill, useDeleteBill, useStopBill, useUpdateBill } from '@/api/mutations';
+ import { usePastCharges, type CarriedValues, type PastRead } from '@/api/past-charges';
++import { usePaymentLabels } from '@/api/payment-labels';
+ import { useBill, useLoanForBill, usePaymentSources } from '@/api/queries';
+ import { BrandField, type BrandSelection } from '@/components/brands/brand-field';
+ import { billCategoryLabel, recurrenceLabel } from '@/components/bills/bill-row';
+@@ -325,7 +326,14 @@ function BillForm({
+ 
+   const [error, setError] = useState<string | null>(null);
+ 
+-  const { sources } = usePaymentSources();
++  // New spending takes only what the plan offers; an edit also shows, and keeps, the card or
++  // account the bill is paid from, though the plan has locked it since.
++  const { sources: offered } = usePaymentSources();
++  const { sources: every } = usePaymentLabels();
++  const sources = useMemo(
++    () => withSavedSource(offered, every, existing),
++    [offered, every, existing],
++  );
+   // A loan behind the bill keeps its type icon through an edit (`buildBillValues`).
+   const { data: loan } = useLoanForBill(id);
+   const createBill = useCreateBill();
+@@ -496,7 +504,12 @@ function BillForm({
+         sourceId,
+         note,
+       },
+-      { sources, lastChargedOn: past.lastChargedOn, hasLoan: Boolean(loan) },
++      {
++        sources: offered,
++        saved: existing,
++        lastChargedOn: past.lastChargedOn,
++        hasLoan: Boolean(loan),
++      },
+     );
+     if (!built.ok) {
+       inFlight.current = false;
+diff --git a/src/app/habit/[id].tsx b/src/app/habit/[id].tsx
+index c88078e..b48e2a9 100644
+--- a/src/app/habit/[id].tsx
++++ b/src/app/habit/[id].tsx
+@@ -6,7 +6,7 @@ import { Text, View } from 'react-native';
+ import { useSpendCategories } from '@/api/brands';
+ import { useHistoryFloor } from '@/api/history';
+ import { habitMaths, useHabit, useHabitTaps, type HabitRow } from '@/api/habits';
+-import { usePaymentSources } from '@/api/queries';
++import { usePaymentLabels } from '@/api/payment-labels';
+ import { localDate } from '@/components/habits/day-row';
+ import { habitColorName } from '@/components/habits/habit-color-swatches';
+ import { HabitIcon } from '@/components/habits/habit-icon';
+@@ -86,7 +86,8 @@ export default function HabitDetailScreen() {
+   const { today } = useToday();
+   const habit = useHabit(id);
+   const taps = useHabitTaps();
+-  const { sources } = usePaymentSources();
++  // Every card and account, a locked one too: what a habit is paid with is named on any plan.
++  const labels = usePaymentLabels();
+   const { data: categories = [] } = useSpendCategories();
+   // Free lists 90 days back; the totals still count every receipt.
+   const { floor, free } = useHistoryFloor();
+@@ -140,7 +141,8 @@ export default function HabitDetailScreen() {
+     );
+   }
+ 
+-  if (habit.isPending || taps.isPending || gone || !row || !figures) {
++  // Until the names are read, a habit paid with a card would read "No card or account".
++  if (habit.isPending || taps.isPending || labels.isLoading || gone || !row || !figures) {
+     return (
+       <Screen showBack>
+         <SkeletonList rows={4} />
+@@ -153,13 +155,13 @@ export default function HabitDetailScreen() {
+     price,
+     date: sinceDate(figures.since, today),
+   });
+-  const source = sources.find((option) => option.id === (row.card_id ?? row.bank_account_id));
++  const source = labels.labelOf(row.card_id ?? row.bank_account_id ?? '');
+ 
+   const about: PlanDetailRow[] = [
+     { label: t('habits.detail.price'), value: t('habits.detail.priceEach', { price }) },
+     {
+       label: t('receipts.field.paidWith'),
+-      value: source?.label ?? t('receipts.detail.noPaymentMethod'),
++      value: source ?? t('receipts.detail.noPaymentMethod'),
+     },
+     {
+       label: t('receipts.field.category'),
+diff --git a/src/__tests__/app/receipts.test.tsx b/src/__tests__/app/receipts.test.tsx
+index 1604c2f..4031f50 100644
+--- a/src/__tests__/app/receipts.test.tsx
++++ b/src/__tests__/app/receipts.test.tsx
+@@ -67,6 +67,9 @@ jest.mock('@/api/queries', () => ({
+   useReceipts: () => ({ data: mockReceipts, isLoading: false, isError: false, refetch: jest.fn() }),
+   usePaymentSources: () => ({ sources: [] }),
+ }));
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({ sources: [], labelOf: () => null, isLoading: false }),
++}));
+ 
+ jest.useFakeTimers().setSystemTime(new Date(`${TODAY}T09:00:00`));
+ 
+diff --git a/src/__tests__/app/receipts-i18n.test.tsx b/src/__tests__/app/receipts-i18n.test.tsx
+index 7d1fd9c..cc140c2 100644
+--- a/src/__tests__/app/receipts-i18n.test.tsx
++++ b/src/__tests__/app/receipts-i18n.test.tsx
+@@ -67,6 +67,21 @@ jest.mock('@/api/queries', () => ({
+     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
+   }),
+ }));
++// Every card and account: card-2 is a free account's locked extra, which no picker offers for new
++// spending. Its receipts are named and can be filtered all the same.
++jest.mock('@/api/payment-labels', () => {
++  const sources = [
++    { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
++    { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
++  ];
++  return {
++    usePaymentLabels: () => ({
++      sources,
++      labelOf: (id: string) => sources.find((source) => source.id === id)?.label ?? null,
++      isLoading: false,
++    }),
++  };
++});
+ 
+ jest.useFakeTimers().setSystemTime(new Date(`${TODAY}T09:00:00`));
+ 
+@@ -173,3 +188,37 @@ describe('Receipts in French', () => {
+     expectNoRawText(screen.toJSON());
+   });
+ });
++
++describe('Receipts paid with a card the free plan has locked', () => {
++  const LOCKED = {
++    id: 'r3',
++    merchant: 'Florist',
++    amount: 45,
++    purchased_on: TODAY,
++    card_id: 'card-2',
++    bank_account_id: null,
++    brands: null,
++  };
++
++  it.each([
++    ['en', /^Florist, .+, paid with Amex ••3005$/, 'Filter receipts', 'Apply'],
++    ['es', /^Florist, .+, pagado con Amex ••3005$/, 'Filtrar recibos', 'Aplicar'],
++    ['fr', /^Florist, .+, payé avec Amex ••3005$/, 'Filtrer les reçus', 'Appliquer'],
++  ] as const)(
++    'names the card on its row and filters on it in %s',
++    async (language, row, open, apply) => {
++      setLanguage(language);
++      mockState = { data: [...RECEIPTS, LOCKED], isLoading: false, isError: false };
++      const screen = await render(<ReceiptsScreen />);
++
++      expect(screen.getByLabelText(row)).toBeTruthy();
++
++      await fireEvent.press(screen.getByLabelText(open));
++      await fireEvent.press(screen.getByLabelText('Amex ••3005'));
++      await fireEvent.press(screen.getByText(apply));
++
++      expect(screen.getByText('Florist')).toBeTruthy();
++      expect(screen.queryByText('Oxxo')).toBeNull();
++    },
++  );
++});
+diff --git a/src/__tests__/app/receipts-empty.test.tsx b/src/__tests__/app/receipts-empty.test.tsx
+index 753a00e..5c48425 100644
+--- a/src/__tests__/app/receipts-empty.test.tsx
++++ b/src/__tests__/app/receipts-empty.test.tsx
+@@ -59,6 +59,9 @@ jest.mock('@/api/queries', () => ({
+   useReceipts: () => ({ data: [], isLoading: false, isError: false, refetch: jest.fn() }),
+   usePaymentSources: () => ({ sources: [] }),
+ }));
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({ sources: [], labelOf: () => null, isLoading: false }),
++}));
+ 
+ it('adds a receipt by hand from the empty page, even where scanning is possible', async () => {
+   const screen = await render(<ReceiptsScreen />);
+diff --git a/src/__tests__/app/receipts-scan.test.tsx b/src/__tests__/app/receipts-scan.test.tsx
+index 40681fb..c7ddd89 100644
+--- a/src/__tests__/app/receipts-scan.test.tsx
++++ b/src/__tests__/app/receipts-scan.test.tsx
+@@ -77,6 +77,9 @@ jest.mock('@/api/queries', () => ({
+   }),
+   usePaymentSources: () => ({ sources: [] }),
+ }));
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({ sources: [], labelOf: () => null, isLoading: false }),
++}));
+ 
+ beforeEach(() => {
+   jest.clearAllMocks();
+diff --git a/src/__tests__/app/history-window-receipts.test.tsx b/src/__tests__/app/history-window-receipts.test.tsx
+index e7dbbcb..642e57e 100644
+--- a/src/__tests__/app/history-window-receipts.test.tsx
++++ b/src/__tests__/app/history-window-receipts.test.tsx
+@@ -70,6 +70,9 @@ jest.mock('@/api/queries', () => ({
+   }),
+   usePaymentSources: () => ({ sources: [] }),
+ }));
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({ sources: [], labelOf: () => null, isLoading: false }),
++}));
+ 
+ jest.useFakeTimers().setSystemTime(new Date(`${TODAY}T09:00:00`));
+ 
+diff --git a/src/__tests__/habits/habit-receipts-list.test.tsx b/src/__tests__/habits/habit-receipts-list.test.tsx
+index ad08e80..b243c15 100644
+--- a/src/__tests__/habits/habit-receipts-list.test.tsx
++++ b/src/__tests__/habits/habit-receipts-list.test.tsx
+@@ -81,6 +81,9 @@ jest.mock('@/api/queries', () => ({
+   useReceipts: () => ({ data: mockReceipts, isLoading: false, isError: false, refetch: jest.fn() }),
+   usePaymentSources: () => ({ sources: [] }),
+ }));
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({ sources: [], labelOf: () => null, isLoading: false }),
++}));
+ 
+ jest.useFakeTimers().setSystemTime(new Date(`${TODAY}T09:00:00`));
+ 
+diff --git a/src/__tests__/app/add-receipt.test.tsx b/src/__tests__/app/add-receipt.test.tsx
+index f5bafcc..82a133b 100644
+--- a/src/__tests__/app/add-receipt.test.tsx
++++ b/src/__tests__/app/add-receipt.test.tsx
+@@ -188,6 +188,14 @@ jest.mock('@/api/queries', () => ({
+   useReceipt: () => ({ ...mockReceipt, refetch: mockRefetch }),
+   usePaymentSources: () => ({ sources: mockSources }),
+ }));
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({
++    sources: mockSources,
++    labelOf: (id: string) =>
++      mockSources.find((source: { id: string }) => source.id === id)?.label ?? null,
++    isLoading: false,
++  }),
++}));
+ 
+ // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
+ jest.useFakeTimers({
+diff --git a/src/__tests__/app/add-receipt-i18n.test.tsx b/src/__tests__/app/add-receipt-i18n.test.tsx
+index 51804fe..bc3dd65 100644
+--- a/src/__tests__/app/add-receipt-i18n.test.tsx
++++ b/src/__tests__/app/add-receipt-i18n.test.tsx
+@@ -142,6 +142,18 @@ jest.mock('@/api/queries', () => ({
+   useReceipt: () => ({ ...mockReceipt, refetch: jest.fn() }),
+   usePaymentSources: () => ({ sources: mockSources }),
+ }));
++// Every card and account: card-2 is a free account's locked extra, which usePaymentSources leaves out.
++const mockLockedSource = { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' };
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => {
++    const sources = [...mockSources, mockLockedSource];
++    return {
++      sources,
++      labelOf: (id: string) => sources.find((source) => source.id === id)?.label ?? null,
++      isLoading: false,
++    };
++  },
++}));
+ 
+ // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
+ jest.useFakeTimers({
+@@ -700,6 +712,26 @@ describe('Paid with in Spanish and French', () => {
+     expect(radio(screen, words.skip, false)).toBeTruthy();
+   });
+ 
++  it.each(LOCALIZED)(
++    'opens a saved receipt on a card the free plan has locked, shown chosen, in %s',
++    async (language) => {
++      setLanguage(language);
++      mockParams = { id: 'receipt-1' };
++      mockReceipt = { data: { ...SAVED, card_id: 'card-2' }, isError: false, isFetched: true };
++      const screen = await render(<AddReceiptScreen />);
++
++      expect(radio(screen, 'Amex ••3005', true)).toBeTruthy();
++      expect(radio(screen, CARD, false)).toBeTruthy();
++    },
++  );
++
++  it.each(LOCALIZED)('never offers the locked card to a new receipt, in %s', async (language) => {
++    setLanguage(language);
++    const screen = await render(<AddReceiptScreen />);
++
++    expect(screen.queryByRole('radio', { name: 'Amex ••3005' })).toBeNull();
++  });
++
+   it.each(LOCALIZED)('opens a saved receipt with no card on Skip, in %s', async (language) => {
+     const words = WORDS[language];
+     setLanguage(language);
+diff --git a/src/__tests__/app/add-receipt-save.test.tsx b/src/__tests__/app/add-receipt-save.test.tsx
+index 2491345..2480991 100644
+--- a/src/__tests__/app/add-receipt-save.test.tsx
++++ b/src/__tests__/app/add-receipt-save.test.tsx
+@@ -207,6 +207,20 @@ jest.mock('@/api/queries', () => ({
+   useReceipt: () => ({ ...mockReceipt, refetch: jest.fn() }),
+   usePaymentSources: () => ({ sources: mockSources }),
+ }));
++// A free account's locked extras: usePaymentSources (what new spending may use) leaves them out,
++// usePaymentLabels (every card and account) has them.
++const LOCKED = [
++  { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
++  { id: 'acct-2', label: 'Ally ••0042', color: '#444444', kind: 'account' },
++];
++let mockEvery = [...mockSources, ...LOCKED];
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({
++    sources: mockEvery,
++    labelOf: (id: string) => mockEvery.find((source) => source.id === id)?.label ?? null,
++    isLoading: false,
++  }),
++}));
+ 
+ // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
+ jest.useFakeTimers({
+@@ -337,6 +351,7 @@ beforeEach(() => {
+     { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
+     { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
+   ];
++  mockEvery = [...mockSources, ...LOCKED];
+   mockKnown = [];
+   mockLogoAnswer.mockImplementation((name: string) =>
+     name === 'Planet Fitness'
+@@ -1904,3 +1919,86 @@ describe('Add receipt — saving again after a failure', () => {
+     log.mockRestore();
+   });
+ });
++
++describe('Add receipt — a card or account the free plan has locked', () => {
++  /** The Paid with tiles on the page, in the order drawn (the page's other chips left out). */
++  const SOURCE_TILES = ['VISA ••4421', 'Checking ••0099', 'Amex ••3005', 'Ally ••0042', 'Skip'];
++  const tiles = (screen: Screen) =>
++    screen
++      .queryAllByRole('radio')
++      .map((node) => node.props.accessibilityLabel as string)
++      .filter((label) => SOURCE_TILES.includes(label));
++
++  it('is never offered for a new receipt', async () => {
++    const screen = await render(<AddReceiptScreen />);
++    await readyReceipt(screen, '15.99', 'VISA ••4421');
++
++    expect(tiles(screen)).toEqual(['VISA ••4421', 'Checking ••0099', 'Skip']);
++  });
++
++  describe('on an edit of a receipt paid with it', () => {
++    beforeEach(() => {
++      mockParams = { id: 'receipt-1' };
++      mockReceipt = {
++        data: { ...EXISTING, card_id: 'card-2', bank_account_id: null },
++        isError: false,
++        isFetched: true,
++      };
++    });
++
++    it('shows it chosen, among the cards, and keeps it on Save', async () => {
++      const screen = await render(<AddReceiptScreen />);
++
++      expect(tiles(screen)).toEqual(['VISA ••4421', 'Amex ••3005', 'Checking ••0099', 'Skip']);
++      expect(screen.getByLabelText('Amex ••3005')).toBeSelected();
++      await press(screen, 'Save changes');
++
++      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
++      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
++        card_id: 'card-2',
++        bank_account_id: null,
++      });
++    });
++
++    it('keeps a locked account the same way', async () => {
++      mockReceipt = {
++        data: { ...EXISTING, card_id: null, bank_account_id: 'acct-2' },
++        isError: false,
++        isFetched: true,
++      };
++      const screen = await render(<AddReceiptScreen />);
++
++      expect(screen.getByLabelText('Ally ••0042')).toBeSelected();
++      await press(screen, 'Save changes');
++
++      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
++      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
++        card_id: null,
++        bank_account_id: 'acct-2',
++      });
++    });
++
++    it('saves a move to an offered card', async () => {
++      const screen = await render(<AddReceiptScreen />);
++
++      await press(screen, 'VISA ••4421');
++      await press(screen, 'Save changes');
++
++      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
++      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
++        card_id: 'card-1',
++        bank_account_id: null,
++      });
++    });
++
++    it('keeps it on Save even before the names are read', async () => {
++      mockEvery = [];
++      const screen = await render(<AddReceiptScreen />);
++
++      await press(screen, 'Save changes');
++
++      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
++      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({ card_id: 'card-2' });
++    });
++  });
++});
+diff --git a/src/__tests__/app/add-receipt-scan.test.tsx b/src/__tests__/app/add-receipt-scan.test.tsx
+index a957260..8f5a61e 100644
+--- a/src/__tests__/app/add-receipt-scan.test.tsx
++++ b/src/__tests__/app/add-receipt-scan.test.tsx
+@@ -200,6 +200,13 @@ jest.mock('@/api/queries', () => ({
+     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
+   }),
+ }));
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({
++    sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
++    labelOf: (id: string) => (id === 'card-1' ? 'VISA ••4421' : null),
++    isLoading: false,
++  }),
++}));
+ 
+ // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
+ jest.useFakeTimers({
+diff --git a/src/__tests__/app/add-receipt-habit.test.tsx b/src/__tests__/app/add-receipt-habit.test.tsx
+index 39d4a80..415d38d 100644
+--- a/src/__tests__/app/add-receipt-habit.test.tsx
++++ b/src/__tests__/app/add-receipt-habit.test.tsx
+@@ -152,6 +152,13 @@ jest.mock('@/api/queries', () => ({
+     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
+   }),
+ }));
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({
++    sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
++    labelOf: (id: string) => (id === 'card-1' ? 'VISA ••4421' : null),
++    isLoading: false,
++  }),
++}));
+ 
+ jest.useFakeTimers({
+   doNotFake: [
+diff --git a/src/__tests__/app/add-forms-from-voice.test.tsx b/src/__tests__/app/add-forms-from-voice.test.tsx
+index 94893a5..526103b 100644
+--- a/src/__tests__/app/add-forms-from-voice.test.tsx
++++ b/src/__tests__/app/add-forms-from-voice.test.tsx
+@@ -206,6 +206,21 @@ jest.mock('@/api/queries', () => {
+     }),
+   };
+ });
++// Every card and account: card-2 is a free account's locked extra, which a voice entry never takes.
++jest.mock('@/api/payment-labels', () => {
++  const sources = [
++    { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
++    { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
++    { id: 'acct-1', label: 'Checking ••0099', color: '#222222', kind: 'account' },
++  ];
++  return {
++    usePaymentLabels: () => ({
++      sources,
++      labelOf: (id: string) => sources.find((source) => source.id === id)?.label ?? null,
++      isLoading: false,
++    }),
++  };
++});
+ 
+ // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
+ jest.useFakeTimers({
+diff --git a/src/__tests__/app/add-bill.test.tsx b/src/__tests__/app/add-bill.test.tsx
+index 5179033..dfccff5 100644
+--- a/src/__tests__/app/add-bill.test.tsx
++++ b/src/__tests__/app/add-bill.test.tsx
+@@ -208,6 +208,13 @@ jest.mock('@/api/queries', () => ({
+   useLoanForBill: () => ({ data: null }),
+   usePaymentSources: () => ({ sources: mockSources }),
+ }));
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({
++    sources: mockSources,
++    labelOf: (id: string) => mockSources.find((source) => source.id === id)?.label ?? null,
++    isLoading: false,
++  }),
++}));
+ 
+ // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
+ jest.useFakeTimers({
+diff --git a/src/__tests__/app/add-bill-i18n.test.tsx b/src/__tests__/app/add-bill-i18n.test.tsx
+index 1962e9d..3cb6a03 100644
+--- a/src/__tests__/app/add-bill-i18n.test.tsx
++++ b/src/__tests__/app/add-bill-i18n.test.tsx
+@@ -141,6 +141,20 @@ jest.mock('@/api/queries', () => ({
+     sources: [{ id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' }],
+   }),
+ }));
++// Every card and account: card-2 is a free account's locked extra, which usePaymentSources leaves out.
++jest.mock('@/api/payment-labels', () => {
++  const sources = [
++    { id: 'card-1', label: 'VISA ••4421', color: '#111111', kind: 'card' },
++    { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
++  ];
++  return {
++    usePaymentLabels: () => ({
++      sources,
++      labelOf: (id: string) => sources.find((source) => source.id === id)?.label ?? null,
++      isLoading: false,
++    }),
++  };
++});
+ 
+ // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
+ jest.useFakeTimers({
+@@ -724,6 +738,34 @@ describe('Paid with and the reminder in Spanish and French', () => {
+     },
+   );
+ 
++  it.each([
++    ['es', 'Guardar cambios'],
++    ['fr', 'Enregistrer les modifications'],
++  ] as const)(
++    'shows a card the free plan has locked chosen on an edit, and keeps it, in %s',
++    async (language, save) => {
++      editing('card-2');
++      setLanguage(language);
++      const screen = await render(<AddBillScreen />);
++
++      expect(screen.getByRole('radio', { name: 'Amex ••3005', checked: true })).toBeTruthy();
++      expect(screen.getByRole('radio', { name: CARD, checked: false })).toBeTruthy();
++      await fireEvent.press(screen.getByRole('button', { name: save }));
++
++      await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
++      expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
++        card_id: 'card-2',
++        bank_account_id: null,
++      });
++    },
++  );
++
++  it.each(LOCALIZED)('never offers the locked card to a new bill in %s', async (language) => {
++    const screen = await reachFinalPage(language);
++
++    expect(screen.queryByRole('radio', { name: 'Amex ••3005' })).toBeNull();
++  });
++
+   it.each(LOCALIZED)('shows a saved bill’s card as chosen in %s', async (language) => {
+     const words = WORDS[language];
+     editing('card-1');
+diff --git a/src/__tests__/app/add-bill-save.test.tsx b/src/__tests__/app/add-bill-save.test.tsx
+index 7e21a79..d8780a8 100644
+--- a/src/__tests__/app/add-bill-save.test.tsx
++++ b/src/__tests__/app/add-bill-save.test.tsx
+@@ -228,6 +228,20 @@ jest.mock('@/api/queries', () => ({
+   useLoanForBill: () => ({ data: mockLoan }),
+   usePaymentSources: () => ({ sources: SOURCES }),
+ }));
++// A free account's locked extras: usePaymentSources (what new spending may use) leaves them out,
++// usePaymentLabels (every card and account) has them.
++const LOCKED = [
++  { id: 'card-2', label: 'Amex ••3005', color: '#333333', kind: 'card' },
++  { id: 'acct-2', label: 'Ally ••0042', color: '#444444', kind: 'account' },
++];
++let mockEvery = [...SOURCES, ...LOCKED];
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({
++    sources: mockEvery,
++    labelOf: (id: string) => mockEvery.find((source) => source.id === id)?.label ?? null,
++    isLoading: false,
++  }),
++}));
+ 
+ // Only the clock is fixed: Wednesday, October 7 2026. Real timers keep every render independent.
+ jest.useFakeTimers({
+@@ -390,6 +404,7 @@ beforeEach(() => {
+   mockPending = false;
+   mockBill = { data: null, isError: false, isFetched: false };
+   mockLoan = null;
++  mockEvery = [...SOURCES, ...LOCKED];
+   mockSavedReminder = { choice: 'off', remindAt: '09:00' };
+   mockPast.lastChargedOn = null;
+   mockPast.ready = true;
+@@ -2441,3 +2456,78 @@ describe('Add bill — Save again once the bill is written', () => {
+     expect(mockCreate).toHaveBeenCalledTimes(1);
+   });
+ });
++
++describe('Add bill — a card or account the free plan has locked', () => {
++  /** The Paid with tiles on the page, in the order drawn (the page's other chips left out). */
++  const SOURCE_TILES = ['VISA ••4421', 'Checking ••0099', 'Amex ••3005', 'Ally ••0042', 'Skip'];
++  const tiles = (screen: Screen) =>
++    screen
++      .queryAllByRole('radio')
++      .map((node) => node.props.accessibilityLabel as string)
++      .filter((label) => SOURCE_TILES.includes(label));
++
++  it('is never offered for a new bill', async () => {
++    const screen = await render(<AddBillScreen />);
++    await newBill(screen, TILE.housing, '1100');
++
++    expect(tiles(screen)).toEqual(['VISA ••4421', 'Checking ••0099', 'Skip']);
++  });
++
++  it('shows it chosen on an edit, keeps it on Save, and leaves the past charges alone', async () => {
++    editing({ ...POWER, card_id: 'card-2' });
++    const screen = await render(<AddBillScreen />);
++
++    expect(tiles(screen)).toEqual(['VISA ••4421', 'Amex ••3005', 'Checking ••0099', 'Skip']);
++    expect(screen.getByLabelText('Amex ••3005')).toBeSelected();
++    await press(screen, 'Save changes');
++
++    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
++    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
++      card_id: 'card-2',
++      bank_account_id: null,
++    });
++    // Nothing a recorded charge copies has changed, so there is nothing to ask about.
++    expect(mockPast.choose).toHaveBeenCalledWith('Power', false, READ);
++    expect(mockPast.apply).not.toHaveBeenCalled();
++  });
++
++  it('keeps a locked account the same way', async () => {
++    editing({ ...POWER, card_id: null, bank_account_id: 'acct-2' });
++    const screen = await render(<AddBillScreen />);
++
++    expect(screen.getByLabelText('Ally ••0042')).toBeSelected();
++    await press(screen, 'Save changes');
++
++    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
++    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
++      card_id: null,
++      bank_account_id: 'acct-2',
++    });
++  });
++
++  it('saves a move to an offered account, as a change to ask about', async () => {
++    editing({ ...POWER, card_id: 'card-2' });
++    const screen = await render(<AddBillScreen />);
++
++    await press(screen, 'Checking ••0099');
++    await press(screen, 'Save changes');
++
++    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
++    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({
++      card_id: null,
++      bank_account_id: 'acct-1',
++    });
++    expect(mockPast.choose).toHaveBeenCalledWith('Power', true, READ);
++  });
++
++  it('keeps it on Save even before the names are read', async () => {
++    mockEvery = [];
++    editing({ ...POWER, card_id: 'card-2' });
++    const screen = await render(<AddBillScreen />);
++
++    await press(screen, 'Save changes');
++
++    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
++    expect(mockUpdate.mock.calls[0][0].values).toMatchObject({ card_id: 'card-2' });
++  });
++});
+diff --git a/src/__tests__/app/habit-detail.test.tsx b/src/__tests__/app/habit-detail.test.tsx
+index a025c51..9c379a3 100644
+--- a/src/__tests__/app/habit-detail.test.tsx
++++ b/src/__tests__/app/habit-detail.test.tsx
+@@ -133,6 +133,17 @@ jest.mock('@/api/habits', () => ({
+ jest.mock('@/api/queries', () => ({
+   usePaymentSources: () => ({ sources: [{ id: 'card-1', label: 'Visa ••4242' }] }),
+ }));
++// Every card and account by name, as usePaymentLabels gives them; null while they are still read.
++// card-2 is a free account's locked extra: no picker offers it, but what it pays with is named.
++const mockNames: Record<string, string> = { 'card-1': 'Visa ••4242', 'card-2': 'Amex ••3005' };
++let mockNamesLoading = false;
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({
++    sources: [],
++    labelOf: (id: string) => (mockNamesLoading ? null : (mockNames[id] ?? null)),
++    isLoading: mockNamesLoading,
++  }),
++}));
+ jest.mock('@/api/brands', () => ({
+   useSpendCategories: () => ({ data: [{ id: 'dining', label: 'Dining' }] }),
+ }));
+@@ -193,6 +204,7 @@ beforeEach(() => {
+   mockId = 'coffee';
+   mockToday = '2026-10-09';
+   mockFloor = { floor: '2019-10-09', free: false };
++  mockNamesLoading = false;
+   mockHabit = query<HabitRow | null | undefined>(COFFEE);
+   // The Wednesday receipt was edited to $6.50; the taps carry each receipt's own amount. The tea
+   // tap is another habit's.
+@@ -910,3 +922,32 @@ describe('a habit’s page: money and languages', () => {
+     expect(leftovers(screen)).toEqual([]);
+   });
+ });
++
++describe('a habit’s page: paid with a card the free plan has locked', () => {
++  it.each([
++    ['en', 'Paid with', 'No card or account'],
++    ['es', 'Pagado con', 'Sin tarjeta ni cuenta'],
++    ['fr', 'Payé avec', 'Aucune carte ni aucun compte'],
++  ] as const)('names the card in %s', async (language, paidWith, none) => {
++    setLanguage(language);
++    mockHabit = query<HabitRow | null | undefined>(habitRow({ card_id: 'card-2' }));
++    const screen = await render(<HabitDetailScreen />);
++
++    const rows = shown(within(screen.getByTestId('habit-about')));
++    expect(rows.slice(2, 4)).toEqual([paidWith, 'Amex ••3005']);
++    expect(rows).not.toContain(none);
++  });
++
++  it('says nothing about how it is paid until the names are read', async () => {
++    mockHabit = query<HabitRow | null | undefined>(habitRow({ card_id: 'card-2' }));
++    mockNamesLoading = true;
++    const screen = await render(<HabitDetailScreen />);
++
++    expect(screen.queryByText('No card or account')).toBeNull();
++    expect(screen.queryByTestId('habit-about')).toBeNull();
++
++    mockNamesLoading = false;
++    await screen.rerender(<HabitDetailScreen />);
++    expect(shown(within(screen.getByTestId('habit-about')))).toContain('Amex ••3005');
++  });
++});
+diff --git a/src/__tests__/habits/habits-saved-parity.test.tsx b/src/__tests__/habits/habits-saved-parity.test.tsx
+index 3c7c524..a886729 100644
+--- a/src/__tests__/habits/habits-saved-parity.test.tsx
++++ b/src/__tests__/habits/habits-saved-parity.test.tsx
+@@ -65,6 +65,13 @@ jest.mock('@/providers/session-provider', () => ({ useUserId: () => 'owner' }));
+ jest.mock('@/api/queries', () => ({
+   usePaymentSources: () => ({ sources: [{ id: 'card-1', label: 'Visa ••4242' }] }),
+ }));
++jest.mock('@/api/payment-labels', () => ({
++  usePaymentLabels: () => ({
++    sources: [{ id: 'card-1', label: 'Visa ••4242' }],
++    labelOf: (id: string) => (id === 'card-1' ? 'Visa ••4242' : null),
++    isLoading: false,
++  }),
++}));
+ jest.mock('@/api/brands', () => ({
+   useSpendCategories: () => ({ data: [{ id: 'dining', label: 'Dining' }] }),
+ }));
