@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo } from 'react-native';
@@ -182,6 +183,9 @@ function PayoffFlow({
   // Held from the press until the page is left: a second tap would record the payoff twice.
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
+  // This visit's payoff id, so a Pay repeated after a lost answer finds the payoff the first may
+  // have recorded instead of recording a second.
+  const [payoffId] = useState(() => randomUUID());
 
   const { sources: offered } = usePaymentSources({ withLocked: true });
   const sources = useMemo(() => withSourceKept(offered, loan.source), [offered, loan.source]);
@@ -249,6 +253,7 @@ function PayoffFlow({
         ...sourceIds(),
         lastPaymentOn: check.endsOn,
         today,
+        id: payoffId,
       });
       success();
       toast(check.kind === 'full' ? 'toast.loan.paidOff' : 'toast.loan.paymentRecorded');

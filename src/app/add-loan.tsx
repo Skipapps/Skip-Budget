@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto';
 import { Redirect, router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -209,6 +210,9 @@ function AddLoanFlow({
   // The loan's bill once it is written (filed, or changed): a Save pressed again after a failed
   // reminder writes the reminder alone, never a second loan or a second change.
   const [writtenId, setWrittenId] = useState<string | null>(null);
+  // A new loan's id for this visit, so a Save repeated after a lost answer finds the loan the first
+  // may have filed instead of filing a second.
+  const [newLoanId] = useState(() => randomUUID());
   // Held from the press until the page is left, the reminder write included: a second tap in that
   // time would toast and navigate twice. The ref answers within the same frame.
   const [saving, setSaving] = useState(false);
@@ -371,7 +375,7 @@ function AddLoanFlow({
       return editing.billId;
     }
     // Payments made before today happened before the loan was added: not this app's spending.
-    const saved = await saveLoan.mutateAsync({ ...values, countsFrom: today });
+    const saved = await saveLoan.mutateAsync({ ...values, countsFrom: today, id: newLoanId });
     return saved.id;
   };
 

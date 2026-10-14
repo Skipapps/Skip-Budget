@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { randomUUID } from 'expo-crypto';
 
 import AddLoanScreen from '@/app/add-loan';
 import LoanScheduleScreen from '@/app/loan-schedule';
@@ -74,6 +75,9 @@ const mockConfirm = jest.fn(async (_options: Record<string, unknown>) => true);
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => mockConfirm }));
 const mockToast = jest.fn();
 jest.mock('@/providers/toast-context', () => ({ useToast: () => mockToast }));
+
+// No row id unless a test gives one, as Jest's own stand-in answers, so the goldens stay as written.
+jest.mock('expo-crypto', () => ({ randomUUID: jest.fn() }));
 
 const mockSave = jest.fn(async (_input: Record<string, unknown>) => ({ id: 'bill-9' }));
 const mockUpdate = jest.fn(async (input: { billId: string }) => ({ id: input.billId }));
@@ -825,6 +829,35 @@ describe('saving', () => {
     expect(mockSave).toHaveBeenCalled();
     expect(mockApplyReminder).not.toHaveBeenCalled();
   });
+
+  it('files a new loan under one id for the visit, so Save after a lost answer finds it', async () => {
+    jest.mocked(randomUUID).mockReturnValueOnce('loan-visit');
+    // No Postgres code: the answer was lost, so the first save may have filed the loan.
+    mockSave.mockRejectedValueOnce(new Error('Network request failed'));
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    await toReview();
+    await press(button('Save loan'));
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+
+    await press(button('Save loan'));
+
+    expect(mockSave).toHaveBeenCalledTimes(2);
+    expect(mockSave.mock.calls.map(([input]) => input.id)).toEqual(['loan-visit', 'loan-visit']);
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    expect(mockToast).toHaveBeenCalledWith('toast.loan.saved');
+    log.mockRestore();
+  });
+
+  it('gives a second visit an id of its own', async () => {
+    jest.mocked(randomUUID).mockReturnValueOnce('visit-1').mockReturnValueOnce('visit-2');
+    await toReview();
+    await press(button('Save loan'));
+    await screen.unmount();
+    await toReview();
+    await press(button('Save loan'));
+
+    expect(mockSave.mock.calls.map(([input]) => input.id)).toEqual(['visit-1', 'visit-2']);
+  });
 });
 
 describe('close', () => {
@@ -1026,6 +1059,17 @@ describe('changing a saved loan', () => {
     today: '2026-10-12',
     past: 'upcoming',
   };
+
+  it('sends no id with an edit: the loan is changed where it is', async () => {
+    jest.mocked(randomUUID).mockReturnValueOnce('loan-visit');
+    await render(<AddLoanScreen />);
+    await press(button('Continue'));
+    await press(button('Save changes'));
+
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate.mock.calls[0][0]).not.toHaveProperty('id');
+    expect(mockSave).not.toHaveBeenCalled();
+  });
 
   it('opens straight on the details, filled in from the saved loan', async () => {
     await render(<AddLoanScreen />);

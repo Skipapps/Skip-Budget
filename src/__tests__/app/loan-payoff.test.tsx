@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { randomUUID } from 'expo-crypto';
 import { AccessibilityInfo } from 'react-native';
 
 import LoanPayoffScreen from '@/app/loan-payoff';
@@ -71,6 +72,9 @@ const mockConfirm = jest.fn(async (_options: Record<string, unknown>) => true);
 jest.mock('@/providers/dialog-provider', () => ({ useConfirm: () => mockConfirm }));
 const mockToast = jest.fn();
 jest.mock('@/providers/toast-context', () => ({ useToast: () => mockToast }));
+
+// No row id unless a test gives one, as Jest's own stand-in answers, so the goldens stay as written.
+jest.mock('expo-crypto', () => ({ randomUUID: jest.fn() }));
 
 const mockRecord = jest.fn(async (_input: Record<string, unknown>) => undefined);
 jest.mock('@/api/mutations', () => ({
@@ -562,6 +566,44 @@ describe('paying', () => {
 
     await fireEvent.press(payOffButton());
     expect(mockRecord).toHaveBeenCalledTimes(2);
+  });
+
+  it('records under one id for the visit, so paying again after a lost answer finds it', async () => {
+    jest.mocked(randomUUID).mockReturnValueOnce('payoff-visit');
+    // No Postgres code: the answer was lost, so the first press may have recorded the payoff.
+    mockRecord.mockImplementationOnce(async () => {
+      throw new Error('Network request failed');
+    });
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    await render(<LoanPayoffScreen />);
+    await type('500');
+    await fireEvent.press(continueButton());
+    await fireEvent.press(payOffButton());
+    expect(screen.getByText('Something went wrong. Please try again.')).toBeTruthy();
+
+    await fireEvent.press(payOffButton());
+
+    expect(mockRecord.mock.calls.map(([input]) => input.id)).toEqual([
+      'payoff-visit',
+      'payoff-visit',
+    ]);
+    expect(mockToast).toHaveBeenCalledTimes(1);
+    log.mockRestore();
+  });
+
+  it('gives a second visit a payoff id of its own', async () => {
+    jest.mocked(randomUUID).mockReturnValueOnce('visit-1').mockReturnValueOnce('visit-2');
+    await render(<LoanPayoffScreen />);
+    await type('500');
+    await fireEvent.press(continueButton());
+    await fireEvent.press(payOffButton());
+    await screen.unmount();
+    await render(<LoanPayoffScreen />);
+    await type('500');
+    await fireEvent.press(continueButton());
+    await fireEvent.press(payOffButton());
+
+    expect(mockRecord.mock.calls.map(([input]) => input.id)).toEqual(['visit-1', 'visit-2']);
   });
 });
 
